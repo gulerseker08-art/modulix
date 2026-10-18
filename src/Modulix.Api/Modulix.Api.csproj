@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Modulix.Core.Contracts\Modulix.Core.Contracts.csproj" />
+    <ProjectReference Include="..\Modulix.Core\Modulix.Core.csproj" />
+    <ProjectReference Include="..\Modulix.Infrastructure\Modulix.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modulix.Modules.Crm\Modulix.Modules.Crm.csproj" />
+    <ProjectReference Include="..\Modulix.Modules.Logistics\Modulix.Modules.Logistics.csproj" />
+    <ProjectReference Include="..\Modulix.AI\Modulix.AI.csproj" />
+    <ProjectReference Include="..\Modulix.Shared\Modulix.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

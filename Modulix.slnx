@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Modulix.AI/Modulix.AI.csproj" />
+    <Project Path="src/Modulix.Api/Modulix.Api.csproj" />
+    <Project Path="src/Modulix.Core.Contracts/Modulix.Core.Contracts.csproj" />
+    <Project Path="src/Modulix.Core/Modulix.Core.csproj" />
+    <Project Path="src/Modulix.Infrastructure/Modulix.Infrastructure.csproj" />
+    <Project Path="src/Modulix.Modules.Crm/Modulix.Modules.Crm.csproj" />
+    <Project Path="src/Modulix.Modules.Logistics/Modulix.Modules.Logistics.csproj" />
+    <Project Path="src/Modulix.Shared/Modulix.Shared.csproj" />
+    <Project Path="src/Modulix.Web/Modulix.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Modulix.ArchitectureTests/Modulix.ArchitectureTests.csproj" />
+    <Project Path="tests/Modulix.Core.Tests/Modulix.Core.Tests.csproj" />
+    <Project Path="tests/Modulix.E2ETests/Modulix.E2ETests.csproj" />
+    <Project Path="tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj" />
+    <Project Path="tests/Modulix.Modules.Crm.Tests/Modulix.Modules.Crm.Tests.csproj" />
+    <Project Path="tests/Modulix.Modules.Logistics.Tests/Modulix.Modules.Logistics.Tests.csproj" />
+  </Folder>
+</Solution>

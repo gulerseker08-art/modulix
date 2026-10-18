@@ -1,0 +1,12 @@
+<Project>
+  <!-- Tüm projeler için ortak ayarlar. Testler repo kökünü bu dosyayı arayarak bulur; silmeyin. -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <!-- Null uyarıları derlemeyi durdurur; diğer uyarılar şimdilik yalnızca uyarıdır. -->
+    <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
+    <Company>Modulix</Company>
+    <Product>Modulix</Product>
+  </PropertyGroup>
+</Project>
