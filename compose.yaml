@@ -1,0 +1,46 @@
+# Modulix yerel geliştirme ortamı.
+# Doğrudan kullanmak yerine scripts\db-up.ps1 çalıştırın; şifreleri .env dosyasından okur.
+
+name: modulix
+
+x-sqlserver-image: &sqlserver-image mcr.microsoft.com/mssql/server:2025-latest
+
+services:
+  sqlserver:
+    image: *sqlserver-image
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD .env dosyasinda yok}
+      # healthcheck icindeki sqlcmd sifreyi buradan okur
+      SQLCMDPASSWORD: ${MSSQL_SA_PASSWORD}
+    ports:
+      # 1433 yerine 14333: bilgisayarinizdaki olasi SQL Server kurulumuyla cakismasin
+      - "${MSSQL_PORT:-14333}:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q \"SELECT 1\" -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # Tek seferlik: veritabani, semalar ve kullanicilar. Tekrar calistirmak guvenlidir.
+  db-init:
+    image: *sqlserver-image
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      SQLCMDPASSWORD: ${MSSQL_SA_PASSWORD}
+      # sqlcmd ortam degiskenlerini $(DEGISKEN) olarak init.sql icinde kullanir
+      MODULIX_APP_PASSWORD: ${MODULIX_APP_PASSWORD:?MODULIX_APP_PASSWORD .env dosyasinda yok}
+      MODULIX_MIGRATOR_PASSWORD: ${MODULIX_MIGRATOR_PASSWORD:?MODULIX_MIGRATOR_PASSWORD .env dosyasinda yok}
+    volumes:
+      - ./docker/sqlserver:/scripts:ro
+    entrypoint: ["/opt/mssql-tools18/bin/sqlcmd", "-S", "sqlserver", "-U", "sa", "-C", "-b", "-i", "/scripts/init.sql"]
+    restart: "no"
+
+volumes:
+  sqlserver-data:

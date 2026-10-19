@@ -1,41 +1,37 @@
+using Modulix.Infrastructure.Persistence;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+// "migrate" komutu: bekleyen migration'ları uygular ve çıkar. Uygulama bu kullanıcıyla çalışmaz.
+//   dotnet run --project src/Modulix.Api -- migrate
+if (args.Contains("migrate", StringComparer.OrdinalIgnoreCase))
+{
+    var migrationsConnection = RequiredConnectionString(builder.Configuration, PersistenceSetup.MigrationsConnectionName);
+    await PersistenceSetup.MigrateAsync(migrationsConnection);
+    Console.WriteLine("Migration'lar uygulandı.");
+    return;
+}
+
 builder.Services.AddOpenApi();
+builder.Services.AddModulixPersistence(
+    RequiredConnectionString(builder.Configuration, PersistenceSetup.AppConnectionName));
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ModulixDbContext>("database");
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
 app.UseHttpsRedirection();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+app.MapHealthChecks("/health");
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+static string RequiredConnectionString(IConfiguration configuration, string name) =>
+    configuration.GetConnectionString(name) is { Length: > 0 } value
+        ? value
+        : throw new InvalidOperationException(
+            $"ConnectionStrings:{name} bulunamadı. Önce scripts\\db-up.ps1 çalıştırın.");
