@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # sabit: runner imaji degisince CI sessizce bozulmasin
     timeout-minutes: 25
     env:
       DOTNET_NOLOGO: "1"
@@ -28,10 +28,10 @@ jobs:
 
     steps:
       - name: Kodu al
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: .NET SDK (global.json)
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
