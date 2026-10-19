@@ -1,0 +1,76 @@
+# Modulix CI: her push ve pull request'te derler, gercek SQL Server uzerinde testleri calistirir.
+# Yerel kurulumla ayni dosyalari kullanir (compose.yaml, docker/sqlserver/init.sql).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Ayni dala ust uste push yapilirsa eski calisma iptal edilir (dakika tasarrufu).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v4
+
+      - name: .NET SDK (global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # Her calismada yeni, yalnizca bu calismaya ozel sifreler. Kayitlarda gizlenir.
+      - name: Gecici veritabani sifreleri
+        run: |
+          sa="Mx!$(openssl rand -hex 12)"
+          app="Mx!$(openssl rand -hex 12)"
+          migrator="Mx!$(openssl rand -hex 12)"
+          for secret in "$sa" "$app" "$migrator"; do echo "::add-mask::$secret"; done
+          printf 'MSSQL_PORT=14333\nMSSQL_SA_PASSWORD=%s\nMODULIX_APP_PASSWORD=%s\nMODULIX_MIGRATOR_PASSWORD=%s\n' \
+            "$sa" "$app" "$migrator" > .env
+          {
+            echo "ConnectionStrings__Modulix=Server=localhost,14333;Database=Modulix;User Id=modulix_app;Password=$app;TrustServerCertificate=True"
+            echo "ConnectionStrings__ModulixMigrations=Server=localhost,14333;Database=Modulix;User Id=modulix_migrator;Password=$migrator;TrustServerCertificate=True"
+          } >> "$GITHUB_ENV"
+
+      - name: SQL Server'i baslat
+        run: docker compose up -d --wait sqlserver
+
+      - name: Veritabani, semalar ve kullanicilar
+        run: docker compose run --rm db-init
+
+      - name: Paketleri geri yukle
+        run: dotnet restore
+
+      # Directory.Build.props: CI'da yuksek/kritik guvenlik acigi olan paket derlemeyi durdurur.
+      - name: Derle
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Migration'lari uygula
+        run: dotnet run --project src/Modulix.Api --configuration Release --no-build -- migrate
+
+      - name: Mimari testler
+        run: dotnet test tests/Modulix.ArchitectureTests/Modulix.ArchitectureTests.csproj --configuration Release --no-build
+
+      - name: Entegrasyon testleri
+        run: dotnet test tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj --configuration Release --no-build
+
+      - name: Hata durumunda SQL Server kayitlari
+        if: failure()
+        run: docker compose logs sqlserver --tail 100

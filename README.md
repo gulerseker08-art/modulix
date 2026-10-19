@@ -1,5 +1,7 @@
 # Modulix
 
+[![CI](https://github.com/gulerseker08-art/modulix/actions/workflows/ci.yml/badge.svg)](https://github.com/gulerseker08-art/modulix/actions/workflows/ci.yml)
+
 AI destekli, modüler, multi-tenant kurumsal iş yönetim platformu. Faz 1: Core + CRM + Lojistik, tüm ekranlar mobil uyumlu.
 
 Mimari kararlar `docs/adr` klasöründedir.
@@ -57,6 +59,16 @@ powershell -ExecutionPolicy Bypass -File scripts\db-up.ps1
 ```
 
 Migration'ları `dotnet ef database update` ile değil, `db-up.ps1` (içinde `dotnet run --project src/Modulix.Api -- migrate`) ile uygulayın; böylece yalnızca migration kullanıcısı şema değiştirir.
+
+## Sürekli entegrasyon (Görev 3)
+
+`main` dalına her push'ta ve her pull request'te GitHub Actions (`.github/workflows/ci.yml`):
+
+1. SQL Server'ı yereldekiyle aynı `compose.yaml` ve `init.sql` ile açar; şifreler her çalışmada yeniden üretilir.
+2. Release modunda derler. Yüksek veya kritik güvenlik açığı olan bir paket varsa derleme durur.
+3. Migration'ları uygular, mimari ve entegrasyon testlerini çalıştırır.
+
+Sonuç GitHub'da reponun **Actions** sekmesinde ve README'deki rozette görünür. Bir çalışma yaklaşık 5–8 dakika sürer; özel repolarda bu süre aylık ücretsiz dakika kotasından düşer.
 
 ## Günlük komutlar
 

@@ -9,4 +9,13 @@
     <Company>Modulix</Company>
     <Product>Modulix</Product>
   </PropertyGroup>
+
+  <!--
+    CI (GitHub Actions) içinde yüksek (NU1903) ve kritik (NU1904) güvenlik açığı olan bir paket
+    derlemeyi durdurur. Yerelde yalnızca uyarı olarak kalır; böylece yeni yayımlanan bir açık
+    sizi iş ortasında durdurmaz, ama main dalına sessizce giremez.
+  -->
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
 </Project>
