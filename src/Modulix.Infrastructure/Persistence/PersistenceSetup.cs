@@ -1,7 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Authorization;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
+using Modulix.Infrastructure.Authorization;
+using Modulix.Infrastructure.Modules;
 using Modulix.Infrastructure.Tenancy;
 
 namespace Modulix.Infrastructure.Persistence;
@@ -33,6 +38,11 @@ public static class PersistenceSetup
                 .AddInterceptors(new TenantSessionContextInterceptor(tenantAccessor));
         });
         services.AddScoped<IMembershipDirectory, MembershipDirectory>();
+
+        // Modül hakları ve izinler; ModuleCatalog'u host kaydeder (AddModulixModules).
+        services.AddScoped<IModuleEntitlements, ModuleEntitlements>();
+        services.AddScoped<IRoleService, RoleService>();
+        services.AddScoped<ICurrentAccess, CurrentAccess>();
         return services;
     }
 

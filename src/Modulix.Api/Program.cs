@@ -1,7 +1,11 @@
+using Modulix.Api.Access;
 using Modulix.Api.Auth;
 using Modulix.Api.Development;
 using Modulix.Api.Tenancy;
+using Modulix.Core.Modules;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Modules.Crm;
+using Modulix.Modules.Logistics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +25,9 @@ builder.Services.AddModulixPersistence(
     RequiredConnectionString(builder.Configuration, PersistenceSetup.AppConnectionName));
 builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
+
+// Modüller burada kaydedilir; yeni bir modül eklemek için IModule uygulamasını listeye ekleyin.
+builder.Services.AddModulixModules(new CrmModule(), new LogisticsModule());
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ModulixDbContext>("database");
 
@@ -53,6 +60,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapAuthEndpoints();
 app.MapTenantEndpoints();
+app.MapAccessEndpoints();
 
 app.Run();
 

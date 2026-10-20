@@ -1,0 +1,116 @@
+using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Modules;
+
+namespace Modulix.Core.Tests.Modules;
+
+public class ModuleCatalogTests
+{
+    [Fact]
+    public void Catalog_lists_modules_sorted_by_key()
+    {
+        var catalog = new ModuleCatalog([new CoreModule(), Module("sales", "sales.orders.read"), Module("billing")]);
+
+        Assert.Equal(["billing", "core", "sales"], catalog.Modules.Select(m => m.Key));
+        Assert.True(catalog.ContainsPermission("sales.orders.read"));
+        Assert.True(catalog.ContainsPermission(CoreModule.Permissions.ManageRoles));
+        Assert.False(catalog.ContainsPermission("sales.orders.write"));
+    }
+
+    [Fact]
+    public void Catalog_requires_core_module()
+    {
+        Assert.Throws<InvalidOperationException>(() => new ModuleCatalog([Module("sales")]));
+    }
+
+    [Fact]
+    public void Duplicate_module_key_is_rejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => new ModuleCatalog([new CoreModule(), Module("sales"), Module("sales")]));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("s")]
+    [InlineData("Sales")]
+    [InlineData("1sales")]
+    [InlineData("sa-les")]
+    [InlineData("sa.les")]
+    public void Invalid_module_key_is_rejected(string key)
+    {
+        Assert.Throws<InvalidOperationException>(() => new ModuleCatalog([new CoreModule(), Module(key)]));
+    }
+
+    [Theory]
+    [InlineData("billing.orders.read")]
+    [InlineData("sales.orders")]
+    [InlineData("sales.Orders.read")]
+    [InlineData("salesx.orders.read")]
+    public void Permission_must_be_prefixed_with_its_module_and_well_formed(string permission)
+    {
+        Assert.Throws<InvalidOperationException>(() => new ModuleCatalog([new CoreModule(), Module("sales", permission)]));
+    }
+
+    [Fact]
+    public void Duplicate_permission_is_rejected()
+    {
+        Assert.Throws<InvalidOperationException>(
+            () => new ModuleCatalog([new CoreModule(), Module("sales", "sales.orders.read", "sales.orders.read")]));
+    }
+
+    [Fact]
+    public void Core_is_always_enabled_other_modules_need_an_entitlement()
+    {
+        var catalog = new ModuleCatalog([new CoreModule(), Module("sales")]);
+        var none = new HashSet<string>();
+
+        Assert.True(catalog.IsEnabled("core", none));
+        Assert.False(catalog.IsEnabled("sales", none));
+        Assert.True(catalog.IsEnabled("sales", new HashSet<string> { "sales" }));
+        Assert.False(catalog.IsEnabled("unknown", new HashSet<string> { "unknown" }));
+    }
+
+    [Fact]
+    public void Effective_permissions_drop_disabled_modules_and_unknown_permissions()
+    {
+        var catalog = new ModuleCatalog(
+        [
+            new CoreModule(),
+            Module("sales", "sales.orders.read"),
+            Module("billing", "billing.invoices.read"),
+        ]);
+
+        var effective = catalog.EffectivePermissions(
+            ["sales.orders.read", "billing.invoices.read", "sales.removed.read", CoreModule.Permissions.ManageRoles],
+            new HashSet<string> { "sales" });
+
+        Assert.Equal(
+            [CoreModule.Permissions.ManageRoles, "sales.orders.read"],
+            effective.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Registration_adds_core_and_rejects_invalid_catalog()
+    {
+        var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+
+        services.AddModulixModules(Module("sales", "sales.orders.read"));
+
+        var catalog = Assert.Single(services, d => d.ServiceType == typeof(ModuleCatalog)).ImplementationInstance as ModuleCatalog;
+        Assert.NotNull(catalog);
+        Assert.NotNull(catalog.Find("core"));
+        Assert.NotNull(catalog.Find("sales"));
+        Assert.Throws<InvalidOperationException>(() => services.AddModulixModules(Module("core")));
+    }
+
+    private static IModule Module(string key, params string[] permissions) => new TestModule(key, permissions);
+
+    private sealed class TestModule(string key, string[] permissions) : IModule
+    {
+        public string Key => key;
+
+        public string DisplayName => key;
+
+        public IReadOnlyList<PermissionDefinition> Permissions { get; } =
+            permissions.Select(p => new PermissionDefinition(p, p)).ToList();
+    }
+}

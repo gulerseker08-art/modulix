@@ -2,7 +2,9 @@ using System.Reflection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Identity;
@@ -12,7 +14,7 @@ namespace Modulix.Infrastructure.Persistence;
 /// <summary>
 /// Core ve platform tablolarının DbContext'i. Modüller bu sınıfa erişemez; kayıtlara
 /// yalnızca kayıt boru hattı üzerinden ulaşır (talimat Bölüm 3, kural 1).
-/// Kimlik tabloları rolsüzdür: roller tenant'a özeldir ve üyeliğe bağlanır (Görev E4).
+/// Kimlik tabloları rolsüzdür: roller tenant'a özeldir ve üyeliğe bağlanır (<see cref="Role"/>, <see cref="MembershipRole"/>).
 ///
 /// Tenant izolasyonu, birinci katman (ADR-0002): <see cref="ITenantEntity"/> uygulayan her
 /// entity'ye otomatik sorgu filtresi uygulanır ve kaydederken TenantId aktif tenant'tan atanır.
@@ -29,6 +31,12 @@ public class ModulixDbContext(DbContextOptions<ModulixDbContext> options, ITenan
     public DbSet<Membership> Memberships => Set<Membership>();
 
     public DbSet<TenantSetting> TenantSettings => Set<TenantSetting>();
+
+    public DbSet<ModuleEntitlement> ModuleEntitlements => Set<ModuleEntitlement>();
+
+    public DbSet<Role> Roles => Set<Role>();
+
+    public DbSet<MembershipRole> MembershipRoles => Set<MembershipRole>();
 
     /// <summary>Sorgu filtresinde kullanılır; EF her sorguda yeniden okur. Aktif tenant yoksa hiçbir satır dönmez.</summary>
     private Guid? CurrentTenantId => tenantAccessor?.Current?.TenantId;

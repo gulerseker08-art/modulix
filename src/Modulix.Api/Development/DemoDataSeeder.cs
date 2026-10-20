@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Api.Tenancy;
+using Modulix.Core.Authorization;
+using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
@@ -8,6 +12,8 @@ namespace Modulix.Api.Development;
 
 /// <summary>
 /// Yalnızca geliştirme ortamı için örnek veri: 2 tenant, 3 kullanıcı. Tekrar çalıştırmak güvenlidir.
+/// Acme'de CRM ve Lojistik, Beta'da yalnızca Lojistik açıktır; her tenant'ta tüm izinleri olan
+/// bir "Yönetici" rolü vardır ve örnek kullanıcılar bu role atanır.
 ///   dotnet run --project src/Modulix.Api -- seed
 /// </summary>
 public static class DemoDataSeeder
@@ -34,6 +40,45 @@ public static class DemoDataSeeder
         await EnsureMembershipAsync(db, beta, deniz, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
+
+        var entitlements = scope.ServiceProvider.GetRequiredService<IModuleEntitlements>();
+        await entitlements.SetEnabledAsync(acme.Id, "crm", enabled: true, cancellationToken);
+        await entitlements.SetEnabledAsync(acme.Id, "logistics", enabled: true, cancellationToken);
+        await entitlements.SetEnabledAsync(beta.Id, "logistics", enabled: true, cancellationToken);
+
+        await EnsureAdministratorsAsync(services, acme, cancellationToken);
+        await EnsureAdministratorsAsync(services, beta, cancellationToken);
+    }
+
+    /// <summary>Tenant'ta tüm izinleri olan "Yönetici" rolünü oluşturur ve tenant'ın tüm üyelerine atar.</summary>
+    private static async Task EnsureAdministratorsAsync(IServiceProvider services, Tenant tenant, CancellationToken ct)
+    {
+        using var scope = services.CreateScope();
+
+        // Roller tenant verisidir; yazmak için o tenant'ın bağlamı gerekir.
+        scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current =
+            new TenantContext(tenant.Id, Guid.Empty, Guid.Empty);
+
+        var catalog = scope.ServiceProvider.GetRequiredService<ModuleCatalog>();
+        var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+
+        const string name = "Yönetici";
+        var allPermissions = catalog.Modules.SelectMany(m => m.Permissions).Select(p => p.Key).ToList();
+        var existing = (await roles.ListAsync(ct)).SingleOrDefault(r => r.Name == name);
+        var admin = existing is null
+            ? await roles.CreateAsync(name, allPermissions, ct)
+            : await roles.UpdateAsync(existing.Id, name, allPermissions, ct) ?? existing;
+
+        var membershipIds = await db.Memberships.Where(m => m.TenantId == tenant.Id).Select(m => m.Id).ToListAsync(ct);
+        foreach (var membershipId in membershipIds)
+        {
+            var assigned = await roles.GetMembershipRolesAsync(membershipId, ct) ?? [];
+            if (assigned.All(r => r.Id != admin.Id))
+            {
+                await roles.SetMembershipRolesAsync(membershipId, [.. assigned.Select(r => r.Id), admin.Id], ct);
+            }
+        }
     }
 
     private static async Task<Tenant> EnsureTenantAsync(ModulixDbContext db, string name, string slug, CancellationToken ct)
