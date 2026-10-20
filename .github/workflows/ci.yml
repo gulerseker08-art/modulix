@@ -56,24 +56,35 @@ jobs:
         run: docker compose run --rm db-init
 
       - name: Paketleri geri yukle
-        run: dotnet restore
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet restore 2>&1 | tee "$RUNNER_TEMP/steplogs/restore.log"
 
       # Directory.Build.props: CI'da yuksek/kritik guvenlik acigi olan paket derlemeyi durdurur.
       - name: Derle
-        run: dotnet build --configuration Release --no-restore
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet build --configuration Release --no-restore 2>&1 | tee "$RUNNER_TEMP/steplogs/build.log"
 
       - name: Migration'lari uygula
-        run: dotnet run --project src/Modulix.Api --configuration Release --no-build -- migrate
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet run --project src/Modulix.Api --configuration Release --no-build -- migrate 2>&1 | tee "$RUNNER_TEMP/steplogs/migrate.log"
 
       - name: Mimari testler
-        run: dotnet test tests/Modulix.ArchitectureTests/Modulix.ArchitectureTests.csproj --configuration Release --no-build
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.ArchitectureTests/Modulix.ArchitectureTests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/architecture-tests.log"
 
       - name: Core birim testleri
-        run: dotnet test tests/Modulix.Core.Tests/Modulix.Core.Tests.csproj --configuration Release --no-build
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Core.Tests/Modulix.Core.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/core-tests.log"
 
       - name: Entegrasyon testleri
-        run: dotnet test tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj --configuration Release --no-build
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/integration-tests.log"
 
       - name: Hata durumunda SQL Server kayitlari
         if: failure()
-        run: docker compose logs sqlserver --tail 100
+        run: mkdir -p "$RUNNER_TEMP/steplogs"; docker compose logs sqlserver --tail 100 2>&1 | tee "$RUNNER_TEMP/steplogs/sqlserver.log"
+
+      # Hata ayrintisi GitHub annotation olarak yazilir (kayit dosyasina erisemeyen araclar icin).
+      - name: Hata ozeti
+        if: failure()
+        run: |
+          for f in "$RUNNER_TEMP"/steplogs/*.log; do
+            [ -f "$f" ] || continue
+            body=$( { grep -E "error|Error|ERROR|fail|Fail|Exception|Assert" "$f" | tail -n 40; echo '--- son satirlar ---'; tail -n 40 "$f"; } )
+            body="${body//'%'/'%25'}"; body="${body//$'\r'/'%0D'}"; body="${body//$'\n'/'%0A'}"
+            echo "::error title=$(basename "$f")::${body:0:60000}"
+          done

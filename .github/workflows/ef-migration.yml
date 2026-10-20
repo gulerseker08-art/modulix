@@ -48,11 +48,8 @@ jobs:
         run: dotnet tool restore
 
       - name: Migration olustur
-        run: >
-          dotnet ef migrations add "$MIGRATION_NAME"
-          --project src/Modulix.Infrastructure
-          --startup-project src/Modulix.Api
-          --output-dir Persistence/Migrations
+        run: |
+          set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet ef migrations add "$MIGRATION_NAME" --project src/Modulix.Infrastructure --startup-project src/Modulix.Api --output-dir Persistence/Migrations --verbose 2>&1 | tee "$RUNNER_TEMP/steplogs/migration.log"
 
       - name: Commit ve push
         run: |
@@ -65,3 +62,14 @@ jobs:
           fi
           git commit -m "Migration: $MIGRATION_NAME"
           git push origin "HEAD:$GITHUB_REF_NAME"
+
+      # Hata ayrintisi GitHub annotation olarak yazilir (kayit dosyasina erisemeyen araclar icin).
+      - name: Hata ozeti
+        if: failure()
+        run: |
+          for f in "$RUNNER_TEMP"/steplogs/*.log; do
+            [ -f "$f" ] || continue
+            body=$( { grep -E "error|Error|ERROR|fail|Fail|Exception|Assert" "$f" | tail -n 40; echo '--- son satirlar ---'; tail -n 40 "$f"; } )
+            body="${body//'%'/'%25'}"; body="${body//$'\r'/'%0D'}"; body="${body//$'\n'/'%0A'}"
+            echo "::error title=$(basename "$f")::${body:0:60000}"
+          done
