@@ -4,8 +4,8 @@
 name: CI
 
 on:
+  # Tum dallar: gorev dallari main'e alinmadan once burada dogrulanir.
   push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:

@@ -1,0 +1,67 @@
+# EF Core migration'ini GitHub uzerinde uretir ve calistirildigi dala commit'ler.
+# Kullanim (Actions sekmesi > "EF migration olustur" > Run workflow): dal ve migration adi secilir.
+# Yerelde de ayni sey yapilabilir: README > "Yeni migration eklemek".
+
+name: EF migration olustur
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "Migration adi (PascalCase, ornek: PlatformIdentity)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ef-migration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  add-migration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      MIGRATION_NAME: ${{ inputs.name }}
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v5
+
+      - name: .NET SDK (global.json)
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Adi dogrula
+        run: |
+          if [[ ! "$MIGRATION_NAME" =~ ^[A-Z][A-Za-z0-9]{2,60}$ ]]; then
+            echo "Gecersiz migration adi: '$MIGRATION_NAME' (PascalCase, 3-61 karakter)"
+            exit 1
+          fi
+
+      - name: dotnet-ef
+        run: dotnet tool restore
+
+      - name: Migration olustur
+        run: >
+          dotnet ef migrations add "$MIGRATION_NAME"
+          --project src/Modulix.Infrastructure
+          --startup-project src/Modulix.Api
+          --output-dir Persistence/Migrations
+
+      - name: Commit ve push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Modulix.Infrastructure/Persistence/Migrations
+          if git diff --cached --quiet; then
+            echo "Degisiklik yok; model ile son migration ayni."
+            exit 0
+          fi
+          git commit -m "Migration: $MIGRATION_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
