@@ -36,11 +36,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                 table: "TenantSettings",
                 columns: new[] { "TenantId", "Key" },
                 unique: true);
+
+            // Elle eklendi: veritabanı katmanında tenant izolasyonu (ADR-0002, Row-Level Security).
+            TenantIsolationSql.CreatePolicy(migrationBuilder, "core", "TenantSettings");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            TenantIsolationSql.DropPolicy(migrationBuilder);
+
             migrationBuilder.DropTable(
                 name: "TenantSettings",
                 schema: "core");
