@@ -60,13 +60,39 @@ powershell -ExecutionPolicy Bypass -File scripts\db-up.ps1
 
 Migration'ları `dotnet ef database update` ile değil, `db-up.ps1` (içinde `dotnet run --project src/Modulix.Api -- migrate`) ile uygulayın; böylece yalnızca migration kullanıcısı şema değiştirir.
 
+## Giriş ve aktif tenant (Görev 4)
+
+Kimlik doğrulama ASP.NET Core Identity ve şifreli, `HttpOnly`, `Secure`, `SameSite=Strict` bir oturum çereziyle yapılır. Kullanıcı birden fazla tenant'a üye olabilir.
+
+| Uç nokta | Ne yapar |
+| --- | --- |
+| `POST /api/auth/login` | Giriş. Tek üyelik varsa o tenant otomatik seçilir. 5 hatalı denemede hesap 15 dakika kilitlenir. |
+| `GET /api/auth/me` | Kullanıcı, etkin üyelikleri ve aktif tenant. |
+| `POST /api/auth/active-tenant` | Aktif tenant seçimi. Yalnızca etkin üyeliği olan tenant seçilebilir. |
+| `GET /api/tenant/current` | Aktif tenant; yoksa 403. |
+| `POST /api/auth/logout` | Çıkış. |
+
+Aktif tenant her istekte veritabanından yeniden doğrulanır: üyelik devre dışı bırakılır veya tenant kapatılırsa erişim bir sonraki istekte kalkar. İstemcinin gönderdiği bir başlık veya parametre tenant belirlemez.
+
+**Örnek kullanıcılar** (yalnızca geliştirme, `scripts\db-up.ps1` oluşturur; şifre `Modulix.Demo1`):
+
+| Kullanıcı | Üyelik |
+| --- | --- |
+| `ayse@acme.demo` | Acme Lojistik |
+| `mehmet@beta.demo` | Beta Taşımacılık |
+| `deniz@ortak.demo` | İkisi de (tenant seçmesi gerekir) |
+
+Elle denemek için Visual Studio'da `src/Modulix.Api/Modulix.Api.http` dosyasını açın.
+
 ## Sürekli entegrasyon (Görev 3)
 
 `main` dalına her push'ta ve her pull request'te GitHub Actions (`.github/workflows/ci.yml`):
 
 1. SQL Server'ı yereldekiyle aynı `compose.yaml` ve `init.sql` ile açar; şifreler her çalışmada yeniden üretilir.
 2. Release modunda derler. Yüksek veya kritik güvenlik açığı olan bir paket varsa derleme durur.
-3. Migration'ları uygular, mimari ve entegrasyon testlerini çalıştırır.
+3. Migration'ları uygular; mimari, birim ve entegrasyon testlerini çalıştırır.
+
+CI tüm dallarda çalışır. Yeni migration'ı GitHub üzerinde üretmek için **Actions → EF migration olustur → Run workflow**.
 
 Sonuç GitHub'da reponun **Actions** sekmesinde ve README'deki rozette görünür. Bir çalışma yaklaşık 5–8 dakika sürer; özel repolarda bu süre aylık ücretsiz dakika kotasından düşer.
 
@@ -78,6 +104,7 @@ powershell -ExecutionPolicy Bypass -File scripts\db-up.ps1
 
 dotnet build
 dotnet test tests/Modulix.ArchitectureTests
+dotnet test tests/Modulix.Core.Tests
 dotnet test tests/Modulix.IntegrationTests
 
 # API'yi çalıştır; sağlık kontrolü: /health ("Healthy" dönmeli)

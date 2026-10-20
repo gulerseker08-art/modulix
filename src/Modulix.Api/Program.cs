@@ -1,3 +1,6 @@
+using Modulix.Api.Auth;
+using Modulix.Api.Development;
+using Modulix.Api.Tenancy;
 using Modulix.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,12 +16,29 @@ if (args.Contains("migrate", StringComparer.OrdinalIgnoreCase))
 }
 
 builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
 builder.Services.AddModulixPersistence(
     RequiredConnectionString(builder.Configuration, PersistenceSetup.AppConnectionName));
+builder.Services.AddModulixAuth();
+builder.Services.AddModulixTenancy();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ModulixDbContext>("database");
 
 var app = builder.Build();
+
+// "seed" komutu: yalnızca geliştirme ortamında örnek tenant ve kullanıcıları oluşturur ve çıkar.
+//   dotnet run --project src/Modulix.Api -- seed
+if (args.Contains("seed", StringComparer.OrdinalIgnoreCase))
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException("Örnek veri yalnızca Development ortamında oluşturulabilir.");
+    }
+
+    await DemoDataSeeder.SeedAsync(app.Services);
+    Console.WriteLine($"Örnek veri hazır. Kullanıcılar: ayse@acme.demo, mehmet@beta.demo, deniz@ortak.demo (şifre: {DemoDataSeeder.DemoPassword})");
+    return;
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -26,7 +46,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseMiddleware<TenantContextMiddleware>();
+app.UseAuthorization();
+
 app.MapHealthChecks("/health");
+app.MapAuthEndpoints();
+app.MapTenantEndpoints();
 
 app.Run();
 
@@ -35,3 +61,6 @@ static string RequiredConnectionString(IConfiguration configuration, string name
         ? value
         : throw new InvalidOperationException(
             $"ConnectionStrings:{name} bulunamadı. Önce scripts\\db-up.ps1 çalıştırın.");
+
+/// <summary>Entegrasyon testleri (WebApplicationFactory) için.</summary>
+public partial class Program;

@@ -14,4 +14,7 @@
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.*" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.*" />
+  </ItemGroup>
 </Project>

@@ -8,6 +8,7 @@
 #   3. Veritabanini, semalari ve iki kullaniciyi kurar (docker/sqlserver/init.sql).
 #   4. Baglanti cumlelerini user-secrets'a yazar (kod deposuna sifre girmez).
 #   5. Bekleyen migration'lari migration kullanicisiyla uygular.
+#   6. Ornek tenant ve kullanicilari olusturur (varsa dokunmaz).
 
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path -Parent $PSScriptRoot)
@@ -48,9 +49,9 @@ function Read-EnvFile([string] $path) {
     return $values
 }
 
-# --- 1/5 Docker ve .env --------------------------------------------------------
+# --- 1/6 Docker ve .env --------------------------------------------------------
 
-Write-Step '1/5 Docker ve .env kontrolu'
+Write-Step '1/6 Docker ve .env kontrolu'
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw 'docker komutu bulunamadi. Docker Desktop kurulu mu?'
@@ -100,19 +101,19 @@ if (-not (Select-String -Path '.gitignore' -Pattern '^\.env$' -Quiet)) {
 
 $port = $envValues['MSSQL_PORT']
 
-# --- 2/5 SQL Server ------------------------------------------------------------
+# --- 2/6 SQL Server ------------------------------------------------------------
 
-Write-Step '2/5 SQL Server baslatiliyor (ilk seferde imaj inecek, birkac dakika surebilir)'
+Write-Step '2/6 SQL Server baslatiliyor (ilk seferde imaj inecek, birkac dakika surebilir)'
 Invoke-Checked docker @('compose', 'up', '-d', '--wait', 'sqlserver')
 
-# --- 3/5 Veritabani, semalar, kullanicilar -------------------------------------
+# --- 3/6 Veritabani, semalar, kullanicilar -------------------------------------
 
-Write-Step '3/5 Veritabani, semalar ve kullanicilar'
+Write-Step '3/6 Veritabani, semalar ve kullanicilar'
 Invoke-Checked docker @('compose', 'run', '--rm', 'db-init')
 
-# --- 4/5 Baglanti cumleleri ----------------------------------------------------
+# --- 4/6 Baglanti cumleleri ----------------------------------------------------
 
-Write-Step '4/5 Baglanti cumleleri (user-secrets)'
+Write-Step '4/6 Baglanti cumleleri (user-secrets)'
 
 $apiXml = Get-Content -Raw -Path $ApiProject
 if ($apiXml -notmatch '<UserSecretsId>') {
@@ -131,10 +132,15 @@ $migratorConnection = "Server=$server;Database=Modulix;User Id=modulix_migrator;
 Invoke-Checked dotnet @('user-secrets', 'set', 'ConnectionStrings:Modulix', $appConnection, '--project', $ApiProject)
 Invoke-Checked dotnet @('user-secrets', 'set', 'ConnectionStrings:ModulixMigrations', $migratorConnection, '--project', $ApiProject)
 
-# --- 5/5 Migration -------------------------------------------------------------
+# --- 5/6 Migration -------------------------------------------------------------
 
-Write-Step '5/5 Migration uygulaniyor'
+Write-Step '5/6 Migration uygulaniyor'
 Invoke-Checked dotnet @('run', '--project', 'src/Modulix.Api', '--', 'migrate')
+
+# --- 6/6 Ornek veri ------------------------------------------------------------
+
+Write-Step '6/6 Ornek veri (yalnizca gelistirme)'
+Invoke-Checked dotnet @('run', '--project', 'src/Modulix.Api', '--no-build', '--', 'seed')
 
 Write-Host ''
 Write-Host "Veritabani hazir: localhost,$port / Modulix" -ForegroundColor Green

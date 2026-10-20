@@ -68,6 +68,9 @@ jobs:
       - name: Mimari testler
         run: dotnet test tests/Modulix.ArchitectureTests/Modulix.ArchitectureTests.csproj --configuration Release --no-build
 
+      - name: Core birim testleri
+        run: dotnet test tests/Modulix.Core.Tests/Modulix.Core.Tests.csproj --configuration Release --no-build
+
       - name: Entegrasyon testleri
         run: dotnet test tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj --configuration Release --no-build
 

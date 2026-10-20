@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Platform;
+using Modulix.Infrastructure.Tenancy;
 
 namespace Modulix.Infrastructure.Persistence;
 
@@ -18,6 +20,7 @@ public static class PersistenceSetup
         ArgumentException.ThrowIfNullOrWhiteSpace(appConnectionString);
 
         services.AddDbContext<ModulixDbContext>(options => options.UseModulixSqlServer(appConnectionString));
+        services.AddScoped<IMembershipDirectory, MembershipDirectory>();
         return services;
     }
 
