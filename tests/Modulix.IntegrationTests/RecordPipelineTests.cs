@@ -182,7 +182,7 @@ public class RecordPipelineTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.True(await db.AuditLog.AnyAsync());
 
         await Assert.ThrowsAsync<SqlException>(() =>
-            db.Database.ExecuteSqlRawAsync("UPDATE [core].[AuditLog] SET [Changes] = N'{}'"));
+            db.Database.ExecuteSqlRawAsync("UPDATE [core].[AuditLog] SET [Changes] = {0}", "degisti"));
         await Assert.ThrowsAsync<SqlException>(() =>
             db.Database.ExecuteSqlRawAsync("DELETE FROM [core].[AuditLog]"));
     }
