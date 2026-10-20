@@ -142,6 +142,35 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Tenants", "platform");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Settings.TenantSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("TenantSettings", "core");
+                });
+
             modelBuilder.Entity("Modulix.Infrastructure.Identity.ModulixUser", b =>
                 {
                     b.Property<Guid>("Id")
