@@ -78,6 +78,15 @@ jobs:
         if: failure()
         run: mkdir -p "$RUNNER_TEMP/steplogs"; docker compose logs sqlserver --tail 100 2>&1 | tee "$RUNNER_TEMP/steplogs/sqlserver.log"
 
+      - name: Test ozeti
+        if: always()
+        run: |
+          for f in "$RUNNER_TEMP"/steplogs/*-tests.log; do
+            [ -f "$f" ] || continue
+            line=$(grep -E "(Passed|Failed)!|total:|toplam:" "$f" | tail -n 1)
+            echo "::notice title=$(basename "$f" .log)::${line:-ozet bulunamadi}"
+          done
+
       # Hata ayrintisi GitHub annotation olarak yazilir (kayit dosyasina erisemeyen araclar icin).
       - name: Hata ozeti
         if: failure()
