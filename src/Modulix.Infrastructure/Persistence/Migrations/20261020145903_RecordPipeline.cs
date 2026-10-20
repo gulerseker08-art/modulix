@@ -17,7 +17,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                 table: "TenantSettings",
                 type: "bigint",
                 nullable: false,
-                defaultValue: 0L);
+                defaultValue: 1L);
 
             migrationBuilder.CreateTable(
                 name: "AuditLog",
@@ -72,11 +72,22 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                 schema: "platform",
                 table: "OutboxMessages",
                 columns: new[] { "ProcessedAt", "OccurredAt" });
+
+            // Audit tenant verisidir: Row-Level Security ile korunur ve uygulama tarafından değiştirilemez.
+            TenantIsolationSql.AddTable(migrationBuilder, "core", "AuditLog");
+            migrationBuilder.Sql(
+                "IF DATABASE_PRINCIPAL_ID(N'modulix_app_role') IS NOT NULL " +
+                "DENY UPDATE, DELETE ON [core].[AuditLog] TO [modulix_app_role];");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                "IF DATABASE_PRINCIPAL_ID(N'modulix_app_role') IS NOT NULL " +
+                "REVOKE UPDATE, DELETE ON [core].[AuditLog] TO [modulix_app_role];");
+            TenantIsolationSql.RemoveTable(migrationBuilder, "core", "AuditLog");
+
             migrationBuilder.DropTable(
                 name: "AuditLog",
                 schema: "core");
