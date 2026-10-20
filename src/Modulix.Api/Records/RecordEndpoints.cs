@@ -18,9 +18,9 @@ public static class RecordEndpoints
             .AddEndpointFilter<RequireTenantFilter>()
             .WithTags("Records");
 
-        group.MapGet("", async (string entityKey, int? page, int? pageSize, IRecordPipeline pipeline, CancellationToken ct) =>
+        group.MapGet("", async (string entityKey, int? page, int? pageSize, string? search, IRecordPipeline pipeline, CancellationToken ct) =>
         {
-            var result = await pipeline.QueryAsync(new RecordQuery(entityKey, page ?? 1, pageSize ?? 50), ct);
+            var result = await pipeline.QueryAsync(new RecordQuery(entityKey, page ?? 1, pageSize ?? 50, search), ct);
             return result.IsSuccess
                 ? Results.Ok(new RecordPageResponse(
                     result.Value!.Items.Select(ToResponse).ToList(), result.Value.Page, result.Value.PageSize, result.Value.TotalCount))
@@ -59,7 +59,7 @@ public static class RecordEndpoints
 
     private static RecordResponse ToResponse(RecordData data) => new(data.EntityKey, data.Id, data.Version, data.Values);
 
-    private static IResult ToProblem(RecordError error)
+    internal static IResult ToProblem(RecordError error)
     {
         var extensions = new Dictionary<string, object?> { ["code"] = error.Code.ToString() };
 

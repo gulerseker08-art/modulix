@@ -1,0 +1,229 @@
+@page "/crm/kisiler"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Kişiler · Modulix</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ContactsRead">
+    <div class="page-header">
+        <h1>Kişiler</h1>
+        @if (Session.Can(CrmAccess.ContactsWrite) && form is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="New">Yeni kişi</button>
+        }
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni kişi" : "Kişiyi düzenle")</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="firstName">Ad *</label>
+                    <input id="firstName" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.FirstName" />
+                    <FieldError Field="firstName" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="lastName">Soyad *</label>
+                    <input id="lastName" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.LastName" />
+                    <FieldError Field="lastName" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="companyId">Firma</label>
+                    <select id="companyId" class="form-select" @bind="form.CompanyId">
+                        <option value="">—</option>
+                        @foreach (var company in Lookups.Companies)
+                        {
+                            <option value="@company.Id">@company.Name</option>
+                        }
+                    </select>
+                    <FieldError Field="companyId" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="title">Unvan</label>
+                    <input id="title" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.Title" />
+                    <FieldError Field="title" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="email">E-posta</label>
+                    <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" @bind="form.Email" />
+                    <FieldError Field="email" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="phone">Telefon</label>
+                    <input id="phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
+                    <FieldError Field="phone" Errors="errors" />
+                </div>
+                <div class="span-all">
+                    <label class="form-label" for="notes">Notlar</label>
+                    <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
+                    <FieldError Field="notes" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <input class="form-control" type="search" placeholder="Ad, soyad veya e-posta ara" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (page is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Kayıt yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead>
+                <tr><th>Ad soyad</th><th>Firma</th><th>Unvan</th><th>Telefon</th><th>E-posta</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var contact in page.Items)
+                {
+                    <tr>
+                        <td data-label="Ad soyad" class="primary">@contact.FirstName @contact.LastName</td>
+                        <td data-label="Firma">@Lookups.CompanyName(contact.CompanyId)</td>
+                        <td data-label="Unvan">@contact.Title</td>
+                        <td data-label="Telefon">@contact.Phone</td>
+                        <td data-label="E-posta">@contact.Email</td>
+                        <td class="actions">
+                            @if (Session.Can(CrmAccess.ContactsWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(contact)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/contacts";
+
+    private CrmPage<ContactDto>? page;
+    private ContactForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private string? search;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.ContactsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var result = await Api.GetAsync<CrmPage<ContactDto>>($"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void New() => Open(new ContactForm());
+
+    private void Edit(ContactDto contact) => Open(new ContactForm
+    {
+        Id = contact.Id,
+        Version = contact.Version,
+        FirstName = contact.FirstName,
+        LastName = contact.LastName,
+        CompanyId = contact.CompanyId,
+        Title = contact.Title,
+        Email = contact.Email,
+        Phone = contact.Phone,
+        Notes = contact.Notes,
+    });
+
+    private void Open(ContactForm value)
+    {
+        form = value;
+        errors = null;
+        message = null;
+    }
+
+    private void Cancel() => form = null;
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var request = new SaveContactRequest(form!.FirstName, form.LastName, form.CompanyId, form.Title, form.Email, form.Phone, form.Notes, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<ContactDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<ContactDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync(page?.Page ?? 1);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync(1);
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class ContactForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string FirstName { get; set; } = string.Empty;
+
+        public string LastName { get; set; } = string.Empty;
+
+        public Guid? CompanyId { get; set; }
+
+        public string? Title { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? Phone { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}

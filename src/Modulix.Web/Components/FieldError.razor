@@ -1,0 +1,14 @@
+@* Sunucunun döndürdüğü alan hatası (alan adı camelCase, ör. "name"). *@
+@if (Errors is not null && Errors.TryGetValue(Field, out var messages))
+{
+    @foreach (var message in messages)
+    {
+        <div class="invalid-feedback d-block">@message</div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public string Field { get; set; } = string.Empty;
+
+    [Parameter] public IReadOnlyDictionary<string, string[]>? Errors { get; set; }
+}

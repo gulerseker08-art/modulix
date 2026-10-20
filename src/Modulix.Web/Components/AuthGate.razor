@@ -1,0 +1,67 @@
+@* Oturum, aktif tenant ve (verilirse) izin ister; yoksa giriş veya tenant seçimine yönlendirir ya da uyarı gösterir.
+   Asıl denetim sunucudadır; bu yalnızca kullanıcıyı doğru ekrana götürür. *@
+@implements IDisposable
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+@if (!Session.IsLoaded)
+{
+    <p class="text-muted">Yükleniyor…</p>
+}
+else if (Session.IsSignedIn && Session.HasActiveTenant)
+{
+    @if (Module is not null && !Session.IsModuleEnabled(Module))
+    {
+        <div class="alert alert-warning">Bu modül kuruluşunuz için açık değil.</div>
+    }
+    else if (Permission is not null && !Session.Can(Permission))
+    {
+        <div class="alert alert-warning">Bu ekranı görüntüleme yetkiniz yok. Yöneticinizden rol isteyin.</div>
+    }
+    else
+    {
+        @ChildContent
+    }
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Modül anahtarı (ör. "crm"); tenant için kapalıysa içerik gösterilmez.</summary>
+    [Parameter] public string? Module { get; set; }
+
+    /// <summary>İzin anahtarı (ör. "crm.companies.read").</summary>
+    [Parameter] public string? Permission { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.Changed += OnChanged;
+        await Session.EnsureLoadedAsync();
+        Redirect();
+    }
+
+    private void OnChanged()
+    {
+        Redirect();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Redirect()
+    {
+        if (!Session.IsLoaded)
+        {
+            return;
+        }
+
+        if (!Session.IsSignedIn)
+        {
+            Navigation.NavigateTo($"giris?donus={Uri.EscapeDataString(Navigation.ToBaseRelativePath(Navigation.Uri))}");
+        }
+        else if (!Session.HasActiveTenant)
+        {
+            Navigation.NavigateTo("tenant");
+        }
+    }
+
+    public void Dispose() => Session.Changed -= OnChanged;
+}

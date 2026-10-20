@@ -1,4 +1,8 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject SessionState Session
+@inject NavigationManager Navigation
+
 <div class="page">
     <div class="sidebar">
         <NavMenu />
@@ -6,7 +10,21 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            @if (Session.IsSignedIn)
+            {
+                <span class="session-info text-truncate">
+                    @Session.User!.DisplayName
+                    @if (Session.ActiveTenantName is { } tenant)
+                    {
+                        <span class="text-muted"> · @tenant</span>
+                    }
+                </span>
+                @if (Session.User.Memberships.Count > 1)
+                {
+                    <a href="tenant">Kuruluş değiştir</a>
+                }
+                <button type="button" class="btn btn-link" @onclick="LogoutAsync">Çıkış</button>
+            }
         </div>
 
         <article class="content px-4">
@@ -14,3 +32,21 @@
         </article>
     </main>
 </div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        Session.Changed += OnChanged;
+        await Session.EnsureLoadedAsync();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task LogoutAsync()
+    {
+        await Session.LogoutAsync();
+        Navigation.NavigateTo("giris");
+    }
+
+    public void Dispose() => Session.Changed -= OnChanged;
+}

@@ -13,9 +13,7 @@ public static class ModuleServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(modules);
 
-        var all = new List<IModule> { new CoreModule() };
-        all.AddRange(modules);
-        var catalog = new ModuleCatalog(all);
+        var catalog = ModuleCatalog.Create(modules);
 
         foreach (var module in catalog.Modules)
         {

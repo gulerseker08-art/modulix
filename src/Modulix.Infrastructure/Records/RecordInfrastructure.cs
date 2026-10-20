@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Modules;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
 
@@ -156,19 +158,46 @@ internal sealed class EfUnitOfWork(ModulixDbContext db) : IUnitOfWork
         {
             throw new RecordConflictException("Aynı anahtarla bir kayıt zaten var.", exception);
         }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 547 })
+        {
+            // Yabancı anahtar: silinmek istenen kayda bağlı başka kayıtlar var.
+            throw new RecordConflictException("Bu kayda bağlı başka kayıtlar olduğu için işlem yapılamadı.", exception);
+        }
     }
+}
+
+/// <summary>
+/// Boru hattının lisans adımı: özelliğin modülü (FeatureKey'in ilk bölümü, ör. "crm.company" → "crm")
+/// aktif tenant için açık mı? Core özellikleri her zaman açıktır. Plan bazlı özellik hakları E5'te gelir.
+/// </summary>
+internal sealed class ModuleEntitlementService(ITenantContextAccessor tenantAccessor, ICurrentAccess access) : IEntitlementService
+{
+    public async Task<bool> CanUseAsync(Guid tenantId, string featureKey, CancellationToken cancellationToken) =>
+        tenantAccessor.Current?.TenantId == tenantId
+        && await access.IsModuleEnabledAsync(AccessKeys.ModuleOf(featureKey), cancellationToken);
+}
+
+/// <summary>
+/// Boru hattının yetki adımı: kayıt deposunun işlem için istediği izin (<see cref="IRecordStore.PermissionFor"/>)
+/// kullanıcının rollerinde var ve modülü açık mı? İzin istemeyen depo için aktif tenant yeterlidir.
+/// </summary>
+internal sealed class StorePermissionService(IRecordStoreRegistry stores, ICurrentAccess access) : IPermissionService
+{
+    public async Task<bool> HasPermissionAsync(TenantContext tenant, string entityKey, RecordOperation operation, CancellationToken cancellationToken) =>
+        stores.Find(entityKey)?.PermissionFor(operation) is not { } permission
+        || await access.HasPermissionAsync(permission, cancellationToken);
 }
 
 public static class RecordsSetup
 {
     /// <summary>
-    /// Kayıt boru hattı ve Core'un kayıt türleri. Lisans, yetki ve veri kapsamı için v0 varsayılanları
-    /// TryAdd ile kaydedilir; E4 ve E5'te gerçek uygulamalar bunların yerine geçer.
+    /// Kayıt boru hattı ve Core'un kayıt türleri. Lisans adımı modül haklarını, yetki adımı rollerin izinlerini
+    /// denetler (E4). Veri kapsamı için v0 varsayılanı TryAdd ile kaydedilir; gerçek uygulaması sonra gelir.
     /// </summary>
     public static IServiceCollection AddModulixRecords(this IServiceCollection services)
     {
-        services.TryAddScoped<IEntitlementService, AllowAllEntitlements>();
-        services.TryAddScoped<IPermissionService, AllowAllPermissions>();
+        services.TryAddScoped<IEntitlementService, ModuleEntitlementService>();
+        services.TryAddScoped<IPermissionService, StorePermissionService>();
         services.TryAddScoped<IDataScopeService, TenantWideDataScope>();
 
         services.AddScoped<IAuditWriter, EfAuditWriter>();

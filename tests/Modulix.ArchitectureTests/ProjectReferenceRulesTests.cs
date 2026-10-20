@@ -21,6 +21,8 @@ public class ProjectReferenceRulesTests
         ["Modulix.Modules.Logistics"] = [CoreContracts],
         ["Modulix.AI"] = [CoreContracts],
         ["Modulix.Web"] = ["Modulix.Shared"],
+
+        // Host: modülleri kaydeder, uç noktalarını eşler ve arayüzü (Modulix.Web) aynı adresten sunar.
         ["Modulix.Api"] =
         [
             CoreContracts,

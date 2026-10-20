@@ -1,0 +1,49 @@
+@page "/giris"
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>Giriş · Modulix</PageTitle>
+
+<div class="narrow">
+    <h1>Giriş</h1>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
+
+    <form @onsubmit="LoginAsync" @onsubmit:preventDefault>
+        <div class="mb-3">
+            <label class="form-label" for="email">E-posta</label>
+            <input id="email" class="form-control" type="email" autocomplete="username" required @bind="email" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="password">Şifre</label>
+            <input id="password" class="form-control" type="password" autocomplete="current-password" required @bind="password" />
+        </div>
+        <button type="submit" class="btn btn-primary w-100" disabled="@busy">Giriş yap</button>
+    </form>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "donus")] public string? ReturnUrl { get; set; }
+
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private string? error;
+    private bool busy;
+
+    private async Task LoginAsync()
+    {
+        busy = true;
+        error = await Session.LoginAsync(email, password);
+        busy = false;
+
+        if (error is null)
+        {
+            // Yalnızca uygulama içi adreslere dönülür.
+            var target = ReturnUrl is { Length: > 0 } url && !url.Contains("//") && !url.Contains(':') ? url : string.Empty;
+            Navigation.NavigateTo(Session.HasActiveTenant ? target : "tenant");
+        }
+    }
+}

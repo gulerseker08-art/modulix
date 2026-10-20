@@ -1,7 +1,35 @@
-﻿@page "/"
+@page "/"
+@inject SessionState Session
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Modulix</PageTitle>
 
-<h1>Hello, world!</h1>
+<AuthGate>
+    <h1>Hoş geldiniz</h1>
+    <p class="text-muted">@Session.ActiveTenantName</p>
 
-Welcome to your new app.
+    @if (Session.IsModuleEnabled(CrmAccess.ModuleKey))
+    {
+        <div class="tiles">
+            @if (Session.Can(CrmAccess.CompaniesRead))
+            {
+                <a class="tile" href="crm/firmalar"><strong>Firmalar</strong><span>Müşteri ve tedarikçi kartları</span></a>
+            }
+            @if (Session.Can(CrmAccess.ContactsRead))
+            {
+                <a class="tile" href="crm/kisiler"><strong>Kişiler</strong><span>Firmalardaki kişiler</span></a>
+            }
+            @if (Session.Can(CrmAccess.OpportunitiesRead))
+            {
+                <a class="tile" href="crm/firsatlar"><strong>Fırsatlar</strong><span>Satış süreci ve tutarlar</span></a>
+            }
+            @if (Session.Can(CrmAccess.ActivitiesRead))
+            {
+                <a class="tile" href="crm/aktiviteler"><strong>Aktiviteler</strong><span>Arama, toplantı, görev</span></a>
+            }
+        </div>
+    }
+    else
+    {
+        <p>Kuruluşunuz için açık bir modül yok.</p>
+    }
+</AuthGate>

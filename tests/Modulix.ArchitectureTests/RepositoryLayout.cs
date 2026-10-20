@@ -31,6 +31,13 @@ internal static class RepositoryLayout
             .Select(include => Path.GetFileNameWithoutExtension(include.Replace('\\', '/')))
             .ToList();
 
+    public static IReadOnlyList<string> PackageReferences(FileInfo csproj) =>
+        XDocument.Load(csproj.FullName)
+            .Descendants("PackageReference")
+            .Select(element => (string?)element.Attribute("Include"))
+            .OfType<string>()
+            .ToList();
+
     private static IReadOnlyList<FileInfo> ProjectsUnder(string folder)
     {
         var directory = new DirectoryInfo(Path.Combine(Root.FullName, folder));

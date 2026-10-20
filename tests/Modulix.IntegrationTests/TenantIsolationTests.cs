@@ -1,6 +1,8 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Persistence;
 
@@ -137,6 +139,45 @@ public class TenantIsolationTests(ModulixApiFactory factory) : IClassFixture<Mod
 
         await Assert.ThrowsAsync<SqlException>(() => Db(scope).Database.ExecuteSqlRawAsync(
             $"ALTER SECURITY POLICY {TenantIsolationSql.PolicyName} WITH (STATE = OFF)"));
+    }
+
+    [Fact]
+    public async Task Every_tenant_table_is_protected_by_row_level_security()
+    {
+        // Modül tabloları dahil: ITenantEntity olan her tablo politikada olmalı (migration'da TenantIsolationSql.AddTable).
+        using var scope = factory.OpenScope(tenantId: null);
+        var tenantTables = Db(scope).Model.GetEntityTypes()
+            .Where(t => typeof(ITenantEntity).IsAssignableFrom(t.ClrType))
+            .Select(t => $"{t.GetSchema()}.{t.GetTableName()}")
+            .ToHashSet();
+        Assert.Contains("crm.Companies", tenantTables);
+
+        var connectionString = scope.ServiceProvider.GetRequiredService<IConfiguration>()
+            .GetConnectionString(PersistenceSetup.MigrationsConnectionName);
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(
+            """
+            SELECT s.name + '.' + t.name, COUNT(*)
+            FROM sys.security_predicates p
+            JOIN sys.tables t ON t.object_id = p.target_object_id
+            JOIN sys.schemas s ON s.schema_id = t.schema_id
+            GROUP BY s.name, t.name
+            """,
+            connection);
+
+        var protectedTables = new Dictionary<string, int>();
+        await using (var reader = await command.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                protectedTables[reader.GetString(0)] = reader.GetInt32(1);
+            }
+        }
+
+        // Her tabloda üç koşul: okuma filtresi, ekleme ve güncelleme engeli.
+        var missing = tenantTables.Where(t => protectedTables.GetValueOrDefault(t) != 3).Order().ToList();
+        Assert.True(missing.Count == 0, $"Row-Level Security politikasında olmayan tenant tablosu: {string.Join(", ", missing)}");
     }
 
     private async Task<(Guid A, Guid B, string Key)> TwoTenantsWithSameSettingAsync()

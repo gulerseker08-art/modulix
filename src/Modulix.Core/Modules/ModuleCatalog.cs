@@ -55,6 +55,13 @@ public sealed class ModuleCatalog
         Modules = [.. this.modules.Values.OrderBy(m => m.Key, StringComparer.Ordinal)];
     }
 
+    /// <summary>Core modülü ve verilen modüllerden katalog oluşturur.</summary>
+    public static ModuleCatalog Create(params IModule[] modules)
+    {
+        ArgumentNullException.ThrowIfNull(modules);
+        return new ModuleCatalog([new CoreModule(), .. modules]);
+    }
+
     /// <summary>Anahtara göre sıralı.</summary>
     public IReadOnlyList<IModule> Modules { get; }
 

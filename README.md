@@ -106,6 +106,28 @@ Geçerli izin = kullanıcının rollerindeki izinler ∩ tenant için açık mod
 
 Örnek veride Acme'de CRM ve Lojistik, Beta'da yalnızca Lojistik açıktır; örnek kullanıcıların hepsi kendi tenant'larında tüm izinleri olan "Yönetici" rolündedir. Modül açıp kapatmak için şimdilik bir uç nokta yoktur (platform yöneticisi rolü sonraki görev); kodda `IModuleEntitlements.SetEnabledAsync` kullanılır.
 
+## CRM modülü
+
+İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.
+
+| Uç nokta | Ne yapar | İzin |
+| --- | --- | --- |
+| `GET /api/crm/companies?search=&page=&pageSize=` | Firmalar (sayfalı, aramalı) | `crm.companies.read` |
+| `GET /api/crm/companies/{id}` | Tek firma | `crm.companies.read` |
+| `POST`, `PUT /{id}`, `DELETE /{id}?version=` | Ekle, düzenle, sil | `crm.companies.write` |
+| `/api/crm/contacts`, `/api/crm/opportunities`, `/api/crm/activities` | Aynı kalıp | `crm.<kaynak>.read` / `.write` |
+
+- Tüm işlemler kayıt boru hattından geçer: modül tenant için kapalıysa veya izin yoksa 403, başka tenant'ın kaydı 404, başka tenant'ın kaydına bağlanmak 422 döner. Bağlı kaydı olan firma silinemez (409). Audit ve outbox kaydı otomatik yazılır.
+- Aynı kayıtlara genel uçtan da ulaşılır (`/api/records/crm.company` vb.); aynı izinler geçerlidir.
+- Arayüz API ile aynı adresten sunulur: `https://localhost:7026` → giriş, kuruluş seçimi, Firmalar / Kişiler / Fırsatlar / Aktiviteler. Telefonda listeler kart görünümüne döner.
+
+**Yeni bir sektör modülü eklemek** (CRM'i örnek alın):
+
+1. `Domain`: entity'ler `ITenantEntity` uygular. `Persistence`: `IEntityTypeConfiguration` sınıfları, şema = modül anahtarı (aksi halde uygulama açılmaz).
+2. `Records`: her entity için bir kayıt deposu (`CrmRecordStore` kalıbı); `IModule.ConfigureServices` içinde kaydedilir.
+3. `Program.cs` → `ModulixModules.Create()` listesine modülü ekleyin, uç noktaları `MapCrmEndpoints` gibi eşleyin.
+4. Migration üretin ve her tablo için `TenantIsolationSql.AddTable` ekleyin; eklenmezse `Every_tenant_table_is_protected_by_row_level_security` testi kırılır.
+
 ## Sürekli entegrasyon (Görev 3)
 
 `main` dalına her push'ta ve her pull request'te GitHub Actions (`.github/workflows/ci.yml`):
