@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Api.Tenancy;
+using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
@@ -95,5 +97,35 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         var tenant = await db.Tenants.SingleAsync(t => t.Id == tenantId);
         tenant.Close();
         await db.SaveChangesAsync();
+    }
+
+    public async Task SetModuleAsync(Guid tenantId, string moduleKey, bool enabled)
+    {
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IModuleEntitlements>()
+            .SetEnabledAsync(tenantId, moduleKey, enabled, CancellationToken.None);
+    }
+
+    public async Task<Guid> GetMembershipIdAsync(Guid userId, Guid tenantId)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        return await db.Memberships.Where(m => m.UserId == userId && m.TenantId == tenantId).Select(m => m.Id).SingleAsync();
+    }
+
+    /// <summary>Tenant'ta rol oluşturur ve verilen kullanıcılara (üyelikleri üzerinden) atar.</summary>
+    public async Task<RoleSummary> CreateRoleAsync(Guid tenantId, IReadOnlyCollection<string> permissions, params ModulixUser[] assignTo)
+    {
+        using var scope = OpenScope(tenantId);
+        var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+        var role = await roles.CreateAsync($"Rol {Guid.NewGuid():N}"[..20], permissions, CancellationToken.None);
+
+        foreach (var user in assignTo)
+        {
+            var membershipId = await GetMembershipIdAsync(user.Id, tenantId);
+            Assert.True(await roles.SetMembershipRolesAsync(membershipId, [role.Id], CancellationToken.None));
+        }
+
+        return role;
     }
 }

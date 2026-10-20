@@ -84,6 +84,28 @@ Aktif tenant her istekte veritabanından yeniden doğrulanır: üyelik devre dı
 
 Elle denemek için Visual Studio'da `src/Modulix.Api/Modulix.Api.http` dosyasını açın.
 
+## Modüller, roller ve izinler (Görev E4)
+
+Her modül kendini tek bir `IModule` uygulamasıyla tanıtır (`Modulix.Core.Contracts.Modules`): anahtar (ör. `crm`), ad ve izin listesi. İzin anahtarları modül anahtarıyla başlar (`crm.companies.read`). Modüller `src/Modulix.Api/Program.cs` içinde `AddModulixModules(...)` ile kaydedilir; kaydedilmeyen modül mimari testi kırar.
+
+| Kavram | Nerede | Kural |
+| --- | --- | --- |
+| Modül hakkı (entitlement) | `platform.ModuleEntitlements` | Tenant başına açık/kapalı. Kaydı olmayan modül kapalıdır; `core` her zaman açıktır. Kapatma veri silmez. |
+| Rol | `core.Roles` | Tenant'a özel; ad ve izin listesi. Row-Level Security ile korunur. |
+| Rol ataması | `core.MembershipRoles` | Rol üyeliğe atanır; aynı kişinin her tenant'ta ayrı rolleri olur. Başka tenant'ın rolü veritabanı düzeyinde de atanamaz. |
+
+Geçerli izin = kullanıcının rollerindeki izinler ∩ tenant için açık modüller. Rol veya modül değişikliği bir sonraki istekte geçerli olur. Modül uç noktaları `.RequirePermission(CrmModule.Permissions.CompaniesRead)` veya `.RequireModule("crm")` ile korunur; izin yoksa 403 döner.
+
+| Uç nokta | Ne yapar | İzin |
+| --- | --- | --- |
+| `GET /api/tenant/modules` | Kayıtlı modüller ve aktif tenant için açık olanlar | Aktif tenant |
+| `GET /api/tenant/access` | Oturumdaki kullanıcının açık modülleri ve geçerli izinleri | Aktif tenant |
+| `GET /api/roles`, `POST /api/roles`, `PUT /api/roles/{id}` | Rolleri listeler, ekler, düzenler | `core.roles.manage` |
+| `GET /api/roles/permissions` | Rollere atanabilecek izinler (yalnızca açık modüllerin) | `core.roles.manage` |
+| `GET`/`PUT /api/memberships/{id}/roles` | Bir üyeliğin rolleri | `core.roles.manage` |
+
+Örnek veride Acme'de CRM ve Lojistik, Beta'da yalnızca Lojistik açıktır; örnek kullanıcıların hepsi kendi tenant'larında tüm izinleri olan "Yönetici" rolündedir. Modül açıp kapatmak için şimdilik bir uç nokta yoktur (platform yöneticisi rolü sonraki görev); kodda `IModuleEntitlements.SetEnabledAsync` kullanılır.
+
 ## Sürekli entegrasyon (Görev 3)
 
 `main` dalına her push'ta ve her pull request'te GitHub Actions (`.github/workflows/ci.yml`):

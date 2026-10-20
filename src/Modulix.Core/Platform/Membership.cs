@@ -10,7 +10,7 @@ public enum MembershipStatus
 
 /// <summary>
 /// Bir kullanıcının bir tenant'taki üyeliği. Bir kullanıcının birden fazla üyeliği olabilir;
-/// rol ve veri kapsamı üyelik başına tanımlanır (Görev E4).
+/// roller üyelik başına atanır (<see cref="Authorization.MembershipRole"/>); veri kapsamı da üyelik başına tanımlanacaktır.
 /// </summary>
 public sealed class Membership
 {
