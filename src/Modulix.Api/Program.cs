@@ -1,7 +1,9 @@
 using Modulix.Api.Auth;
 using Modulix.Api.Development;
+using Modulix.Api.Records;
 using Modulix.Api.Tenancy;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Records;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +23,7 @@ builder.Services.AddModulixPersistence(
     RequiredConnectionString(builder.Configuration, PersistenceSetup.AppConnectionName));
 builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
+builder.Services.AddModulixRecords();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ModulixDbContext>("database");
 
@@ -53,6 +56,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapAuthEndpoints();
 app.MapTenantEndpoints();
+app.MapRecordEndpoints();
 
 app.Run();
 

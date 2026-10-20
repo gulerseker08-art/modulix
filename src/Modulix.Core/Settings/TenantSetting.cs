@@ -21,7 +21,9 @@ public sealed partial class TenantSetting : ITenantEntity
     {
         Id = Guid.CreateVersion7();
         Key = NormalizeKey(key);
-        SetValue(value);
+        Value = ValidateValue(value);
+        UpdatedAt = DateTimeOffset.UtcNow;
+        Version = 1;
     }
 
     public Guid Id { get; private set; }
@@ -35,7 +37,23 @@ public sealed partial class TenantSetting : ITenantEntity
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    /// <summary>Her değişiklikte artar; eşzamanlı güncellemeleri yakalamak için kullanılır.</summary>
+    public long Version { get; private set; }
+
     public void SetValue(string value)
+    {
+        var validated = ValidateValue(value);
+        if (validated == Value)
+        {
+            return;
+        }
+
+        Value = validated;
+        UpdatedAt = DateTimeOffset.UtcNow;
+        Version++;
+    }
+
+    public static string ValidateValue(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
         if (value.Length > ValueMaxLength)
@@ -43,8 +61,7 @@ public sealed partial class TenantSetting : ITenantEntity
             throw new ArgumentException($"Ayar değeri en fazla {ValueMaxLength} karakter olabilir.", nameof(value));
         }
 
-        Value = value;
-        UpdatedAt = DateTimeOffset.UtcNow;
+        return value;
     }
 
     public static string NormalizeKey(string key)

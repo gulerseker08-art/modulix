@@ -54,6 +54,7 @@ internal sealed class TenantSettingConfiguration : IEntityTypeConfiguration<Modu
         builder.Property(s => s.Key).HasMaxLength(Modulix.Core.Settings.TenantSetting.KeyMaxLength).IsRequired();
         builder.Property(s => s.Value).HasMaxLength(Modulix.Core.Settings.TenantSetting.ValueMaxLength).IsRequired();
         builder.Property(s => s.UpdatedAt).IsRequired();
+        builder.Property(s => s.Version).IsConcurrencyToken();
         builder.HasIndex(s => new { s.TenantId, s.Key }).IsUnique();
     }
 }

@@ -6,6 +6,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Platform;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Identity;
+using Modulix.Infrastructure.Records;
 
 namespace Modulix.Infrastructure.Persistence;
 
@@ -29,6 +30,10 @@ public class ModulixDbContext(DbContextOptions<ModulixDbContext> options, ITenan
     public DbSet<Membership> Memberships => Set<Membership>();
 
     public DbSet<TenantSetting> TenantSettings => Set<TenantSetting>();
+
+    public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
+
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     /// <summary>Sorgu filtresinde kullanılır; EF her sorguda yeniden okur. Aktif tenant yoksa hiçbir satır dönmez.</summary>
     private Guid? CurrentTenantId => tenantAccessor?.Current?.TenantId;
