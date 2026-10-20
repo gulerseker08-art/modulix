@@ -41,3 +41,19 @@ internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Members
         builder.HasOne<ModulixUser>().WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class TenantSettingConfiguration : IEntityTypeConfiguration<Modulix.Core.Settings.TenantSetting>
+{
+    public void Configure(EntityTypeBuilder<Modulix.Core.Settings.TenantSetting> builder)
+    {
+        // Tenant verisi: core şemasında; Row-Level Security ile korunur (migration: TenantIsolationSql).
+        builder.ToTable("TenantSettings", DatabaseSchemas.Core);
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).ValueGeneratedNever();
+        builder.Property(s => s.TenantId).IsRequired();
+        builder.Property(s => s.Key).HasMaxLength(Modulix.Core.Settings.TenantSetting.KeyMaxLength).IsRequired();
+        builder.Property(s => s.Value).HasMaxLength(Modulix.Core.Settings.TenantSetting.ValueMaxLength).IsRequired();
+        builder.Property(s => s.UpdatedAt).IsRequired();
+        builder.HasIndex(s => new { s.TenantId, s.Key }).IsUnique();
+    }
+}

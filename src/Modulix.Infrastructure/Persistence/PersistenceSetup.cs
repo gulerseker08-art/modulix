@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Tenancy;
 
@@ -19,7 +20,18 @@ public static class PersistenceSetup
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(appConnectionString);
 
-        services.AddDbContext<ModulixDbContext>(options => options.UseModulixSqlServer(appConnectionString));
+        services.AddSingleton<ITenantConnectionResolver>(new SharedDatabaseConnectionResolver(appConnectionString));
+
+        // Seçenekler istek başına oluşturulur; böylece oturum değerini yazan interceptor o isteğin tenant'ını görür.
+        services.AddDbContext<ModulixDbContext>((serviceProvider, options) =>
+        {
+            var tenantAccessor = serviceProvider.GetService<ITenantContextAccessor>();
+            var connectionString = serviceProvider.GetRequiredService<ITenantConnectionResolver>()
+                .GetConnectionString(tenantAccessor?.Current?.TenantId);
+
+            options.UseModulixSqlServer(connectionString)
+                .AddInterceptors(new TenantSessionContextInterceptor(tenantAccessor));
+        });
         services.AddScoped<IMembershipDirectory, MembershipDirectory>();
         return services;
     }

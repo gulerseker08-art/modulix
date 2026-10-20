@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Api.Tenancy;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
@@ -59,6 +61,22 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
 
         await db.SaveChangesAsync();
         return user;
+    }
+
+    /// <summary>
+    /// İstek benzeri bir kapsam açar. <paramref name="tenantId"/> verilirse o tenant aktif sayılır
+    /// (gerçek istekte bunu sunucudaki üyelik doğrulaması yapar); null ise aktif tenant yoktur.
+    /// </summary>
+    public IServiceScope OpenScope(Guid? tenantId)
+    {
+        var scope = Services.CreateScope();
+        if (tenantId is { } id)
+        {
+            scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current =
+                new TenantContext(id, Guid.NewGuid(), Guid.NewGuid());
+        }
+
+        return scope;
     }
 
     public async Task DisableMembershipAsync(Guid userId, Guid tenantId)
