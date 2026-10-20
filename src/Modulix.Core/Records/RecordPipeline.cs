@@ -46,10 +46,12 @@ public sealed class RecordPipeline(
             return gate;
         }
 
+        var search = query.Search?.Trim();
         var normalized = query with
         {
             Page = Math.Max(1, query.Page),
             PageSize = Math.Clamp(query.PageSize, 1, RecordQuery.MaxPageSize),
+            Search = string.IsNullOrEmpty(search) ? null : search[..Math.Min(search.Length, RecordQuery.MaxSearchLength)],
         };
 
         var page = await store!.QueryAsync(normalized, cancellationToken);
@@ -87,6 +89,10 @@ public sealed class RecordPipeline(
             Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<RecordData>.Ok(created);
+        }
+        catch (RecordValidationException invalid)
+        {
+            return Invalid<RecordData>(invalid.Errors);
         }
         catch (RecordConflictException conflict)
         {
@@ -130,6 +136,10 @@ public sealed class RecordPipeline(
             Record(tenant!, command.Source, updated.EntityKey, updated.Id, AuditAction.Updated, DomainEventTypes.RecordUpdated, before.Values, updated.Values);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<RecordData>.Ok(updated);
+        }
+        catch (RecordValidationException invalid)
+        {
+            return Invalid<RecordData>(invalid.Errors);
         }
         catch (RecordConflictException conflict)
         {

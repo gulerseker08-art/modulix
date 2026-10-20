@@ -36,8 +36,11 @@ public sealed record RecordCommand(
     long? ExpectedVersion = null,
     ExecutionSource Source = ExecutionSource.Api);
 
-public sealed record RecordQuery(string EntityKey, int Page = 1, int PageSize = 50)
+/// <summary>Sayfalı liste isteği. <see cref="Search"/> verilirse kayıt deposu kendi arama alanlarında arar.</summary>
+public sealed record RecordQuery(string EntityKey, int Page = 1, int PageSize = 50, string? Search = null)
 {
+    public const int MaxSearchLength = 100;
+
     public const int MaxPageSize = 200;
 }
 
@@ -104,15 +107,25 @@ public interface IRecordStore
     /// <summary>Lisans kontrolünde kullanılan özellik (ör. "crm.company"); plan adı değil.</summary>
     string FeatureKey { get; }
 
+    /// <summary>
+    /// İşlem için gereken izin (ör. "crm.companies.read"); null ise aktif tenant yeterlidir.
+    /// İzin, modülü tenant için açık ve kullanıcının rollerinden birinde varsa geçer.
+    /// </summary>
+    string? PermissionFor(RecordOperation operation) => null;
+
     IReadOnlyList<RecordFieldError> Validate(RecordOperation operation, JsonObject values);
 
     Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken);
 
     Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken);
 
+    /// <summary>Veriye bağlı bir kural geçmezse (ör. bağlı kayıt yok) <see cref="RecordValidationException"/>.</summary>
     Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken);
 
-    /// <summary>Kayıt yoksa null. Sürüm uyuşmazsa <see cref="RecordConflictException"/>.</summary>
+    /// <summary>
+    /// Kayıt yoksa null. Sürüm uyuşmazsa <see cref="RecordConflictException"/>; veriye bağlı bir kural
+    /// geçmezse <see cref="RecordValidationException"/>.
+    /// </summary>
     Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken);
 
     /// <summary>Kayıt yoksa false. Sürüm uyuşmazsa <see cref="RecordConflictException"/>.</summary>
@@ -121,3 +134,10 @@ public interface IRecordStore
 
 /// <summary>Eşzamanlı değişiklik veya benzersizlik ihlali.</summary>
 public sealed class RecordConflictException(string message, Exception? innerException = null) : Exception(message, innerException);
+
+/// <summary>Yalnızca veriye bakarak anlaşılabilen doğrulama hatası (ör. seçilen firma bu tenant'ta yok).</summary>
+public sealed class RecordValidationException(IReadOnlyList<RecordFieldError> errors)
+    : Exception("Doğrulama hatası.")
+{
+    public IReadOnlyList<RecordFieldError> Errors { get; } = errors;
+}

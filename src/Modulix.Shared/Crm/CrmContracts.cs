@@ -1,0 +1,130 @@
+using System.Text.Json.Serialization;
+
+namespace Modulix.Shared.Crm;
+
+// CRM uç noktalarının (/api/crm/...) sözleşmeleri. Alan adları kayıt boru hattındaki teknik adlarla
+// aynıdır (camelCase); sunucu aynı kuralları yeniden doğrular. Kaydetme isteklerinde Version verilirse
+// eşzamanlı değişiklik 409 ile reddedilir. Listeler sayfalıdır: CrmPage<T>.
+
+public sealed record CrmPage<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
+
+public static class CrmLimits
+{
+    public const int NameMaxLength = 200;
+    public const int PersonNameMaxLength = 100;
+    public const int TaxNumberMaxLength = 20;
+    public const int PhoneMaxLength = 30;
+    public const int EmailMaxLength = 254;
+    public const int TextMaxLength = 200;
+    public const int CityMaxLength = 100;
+    public const int NotesMaxLength = 4000;
+}
+
+public sealed record CompanyDto(
+    Guid Id,
+    long Version,
+    string Name,
+    string? TaxNumber,
+    string? Phone,
+    string? Email,
+    string? Website,
+    string? City,
+    string? Notes);
+
+public sealed record SaveCompanyRequest(
+    string Name,
+    string? TaxNumber = null,
+    string? Phone = null,
+    string? Email = null,
+    string? Website = null,
+    string? City = null,
+    string? Notes = null,
+    long? Version = null);
+
+public sealed record ContactDto(
+    Guid Id,
+    long Version,
+    string FirstName,
+    string LastName,
+    Guid? CompanyId,
+    string? Title,
+    string? Email,
+    string? Phone,
+    string? Notes);
+
+public sealed record SaveContactRequest(
+    string FirstName,
+    string LastName,
+    Guid? CompanyId = null,
+    string? Title = null,
+    string? Email = null,
+    string? Phone = null,
+    string? Notes = null,
+    long? Version = null);
+
+[JsonConverter(typeof(JsonStringEnumConverter<OpportunityStage>))]
+public enum OpportunityStage
+{
+    Lead = 1,
+    Qualified = 2,
+    Proposal = 3,
+    Negotiation = 4,
+    Won = 5,
+    Lost = 6,
+}
+
+public sealed record OpportunityDto(
+    Guid Id,
+    long Version,
+    string Title,
+    Guid CompanyId,
+    Guid? ContactId,
+    OpportunityStage Stage,
+    decimal? Amount,
+    string Currency,
+    DateOnly? ExpectedCloseDate,
+    string? Notes);
+
+public sealed record SaveOpportunityRequest(
+    string Title,
+    Guid CompanyId,
+    Guid? ContactId = null,
+    OpportunityStage Stage = OpportunityStage.Lead,
+    decimal? Amount = null,
+    string Currency = "TRY",
+    DateOnly? ExpectedCloseDate = null,
+    string? Notes = null,
+    long? Version = null);
+
+[JsonConverter(typeof(JsonStringEnumConverter<ActivityType>))]
+public enum ActivityType
+{
+    Call = 1,
+    Meeting = 2,
+    Email = 3,
+    Task = 4,
+    Note = 5,
+}
+
+public sealed record ActivityDto(
+    Guid Id,
+    long Version,
+    ActivityType Type,
+    string Subject,
+    DateTimeOffset? DueAt,
+    DateTimeOffset? CompletedAt,
+    Guid? CompanyId,
+    Guid? ContactId,
+    Guid? OpportunityId,
+    string? Notes);
+
+public sealed record SaveActivityRequest(
+    string Subject,
+    ActivityType Type = ActivityType.Task,
+    DateTimeOffset? DueAt = null,
+    DateTimeOffset? CompletedAt = null,
+    Guid? CompanyId = null,
+    Guid? ContactId = null,
+    Guid? OpportunityId = null,
+    string? Notes = null,
+    long? Version = null);

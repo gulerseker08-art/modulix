@@ -4,9 +4,10 @@ using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Core.Records;
 
-// Boru hattının adımları. v0'da lisans, yetki ve veri kapsamı her şeye izin verir; gerçek
-// uygulamaları E5 (entitlement) ve E4 (yetki, data scope) epic'lerinde gelir. Boru hattı ve
-// çağıranlar değişmez; yalnızca kayıtlı uygulama değişir.
+// Boru hattının adımları. Lisans (modül hakkı) ve yetki (rol izinleri) Infrastructure'daki
+// uygulamalarla denetlenir; aşağıdaki "her şeye izin ver" sınıfları birim testleri içindir.
+// Veri kapsamı v0'da tenant geneli; gerçek uygulaması sonra gelir. Boru hattı ve çağıranlar
+// değişmez; yalnızca kayıtlı uygulama değişir.
 
 public interface IEntitlementService
 {

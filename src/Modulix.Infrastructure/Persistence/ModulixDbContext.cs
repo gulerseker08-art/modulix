@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
+using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
@@ -20,8 +21,14 @@ namespace Modulix.Infrastructure.Persistence;
 /// Tenant izolasyonu, birinci katman (ADR-0002): <see cref="ITenantEntity"/> uygulayan her
 /// entity'ye otomatik sorgu filtresi uygulanır ve kaydederken TenantId aktif tenant'tan atanır.
 /// İkinci katman veritabanındadır (<see cref="TenantIsolationSql"/>).
+///
+/// Modül tabloları: kayıtlı her modülün projesindeki <c>IEntityTypeConfiguration</c> sınıfları modele eklenir
+/// (<see cref="ApplyModuleModels"/>). Modüller bu tablolara <see cref="IModuleData"/> üzerinden erişir.
 /// </summary>
-public class ModulixDbContext(DbContextOptions<ModulixDbContext> options, ITenantContextAccessor? tenantAccessor = null)
+public class ModulixDbContext(
+    DbContextOptions<ModulixDbContext> options,
+    ITenantContextAccessor? tenantAccessor = null,
+    ModuleCatalog? modules = null)
     : IdentityUserContext<ModulixUser, Guid>(options)
 {
     private static readonly MethodInfo ApplyTenantFilterMethod =
@@ -46,6 +53,9 @@ public class ModulixDbContext(DbContextOptions<ModulixDbContext> options, ITenan
     /// <summary>Sorgu filtresinde kullanılır; EF her sorguda yeniden okur. Aktif tenant yoksa hiçbir satır dönmez.</summary>
     private Guid? CurrentTenantId => tenantAccessor?.Current?.TenantId;
 
+    /// <summary>Modeli belirleyen modüller; EF model önbelleğinin anahtarıdır (<see cref="ModuleModelCacheKeyFactory"/>).</summary>
+    internal string ModelKey => modules is null ? string.Empty : string.Join(',', modules.Modules.Select(m => m.Key));
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -61,6 +71,7 @@ public class ModulixDbContext(DbContextOptions<ModulixDbContext> options, ITenan
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens", DatabaseSchemas.Platform);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ModulixDbContext).Assembly);
+        ApplyModuleModels(modelBuilder);
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes()
                      .Where(t => typeof(ITenantEntity).IsAssignableFrom(t.ClrType) && t.BaseType is null)
@@ -80,6 +91,39 @@ public class ModulixDbContext(DbContextOptions<ModulixDbContext> options, ITenan
     {
         ApplyTenantRules();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// Modül entity'lerini modele ekler. Bir modülün tablosu tenant verisi değilse veya başka şemadaysa
+    /// uygulama açılmaz: her modül yalnızca kendi şemasına, yalnızca tenant'a ait kayıt yazar.
+    /// </summary>
+    private void ApplyModuleModels(ModelBuilder modelBuilder)
+    {
+        foreach (var module in modules?.Modules ?? [])
+        {
+            var assembly = module.GetType().Assembly;
+            if (assembly == typeof(ModulixDbContext).Assembly || assembly == typeof(ModuleCatalog).Assembly)
+            {
+                continue;
+            }
+
+            modelBuilder.ApplyConfigurationsFromAssembly(assembly);
+
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes().Where(t => t.ClrType.Assembly == assembly))
+            {
+                if (!typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType))
+                {
+                    throw new InvalidOperationException(
+                        $"{module.Key} modülünün entity'si {entityType.ClrType.Name} ITenantEntity uygulamıyor.");
+                }
+
+                if (entityType.GetSchema() != module.Key)
+                {
+                    throw new InvalidOperationException(
+                        $"{module.Key} modülünün tablosu {entityType.GetTableName()} '{entityType.GetSchema()}' şemasında; '{module.Key}' olmalı.");
+                }
+            }
+        }
     }
 
     private void ApplyTenantFilter<TEntity>(ModelBuilder modelBuilder)
