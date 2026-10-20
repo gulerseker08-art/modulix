@@ -44,8 +44,10 @@ jobs:
             exit 1
           fi
 
-      - name: dotnet-ef
-        run: dotnet tool restore
+      - name: dotnet-ef ve paketler
+        run: |
+          dotnet tool restore
+          dotnet restore
 
       - name: Migration olustur
         run: |
