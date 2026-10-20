@@ -1,0 +1,23 @@
+@* Sayfalama: önceki / sonraki ve toplam kayıt sayısı. *@
+@if (TotalCount > 0)
+{
+    <nav class="pager" aria-label="Sayfalar">
+        <button type="button" class="btn btn-outline-secondary" disabled="@(Page <= 1)" @onclick="() => Go(Page - 1)">Önceki</button>
+        <span class="text-muted">Sayfa @Page / @PageCount · @TotalCount kayıt</span>
+        <button type="button" class="btn btn-outline-secondary" disabled="@(Page >= PageCount)" @onclick="() => Go(Page + 1)">Sonraki</button>
+    </nav>
+}
+
+@code {
+    [Parameter] public int Page { get; set; }
+
+    [Parameter] public int PageSize { get; set; }
+
+    [Parameter] public int TotalCount { get; set; }
+
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)Math.Max(1, PageSize)));
+
+    private Task Go(int page) => PageChanged.InvokeAsync(page);
+}

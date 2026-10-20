@@ -1,0 +1,58 @@
+@page "/tenant"
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>Kuruluş seçin · Modulix</PageTitle>
+
+<div class="narrow">
+    <h1>Kuruluş seçin</h1>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
+
+    @if (!Session.IsLoaded)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (Session.User is null)
+    {
+        <p><a href="giris">Giriş yapın</a>.</p>
+    }
+    else if (Session.User.Memberships.Count == 0)
+    {
+        <p>Hiçbir kuruluşa üyeliğiniz yok.</p>
+    }
+    else
+    {
+        <div class="list-group">
+            @foreach (var membership in Session.User.Memberships)
+            {
+                <button type="button" class="list-group-item list-group-item-action @(membership.TenantId == Session.User.ActiveTenantId ? "active" : null)"
+                        disabled="@busy" @onclick="() => SelectAsync(membership.TenantId)">
+                    @membership.TenantName
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string? error;
+    private bool busy;
+
+    protected override Task OnInitializedAsync() => Session.EnsureLoadedAsync();
+
+    private async Task SelectAsync(Guid tenantId)
+    {
+        busy = true;
+        error = await Session.SelectTenantAsync(tenantId);
+        busy = false;
+
+        if (error is null)
+        {
+            Navigation.NavigateTo(string.Empty);
+        }
+    }
+}

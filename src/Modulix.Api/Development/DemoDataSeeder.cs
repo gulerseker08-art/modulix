@@ -1,19 +1,22 @@
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Authorization;
+using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Modules.Crm;
 
 namespace Modulix.Api.Development;
 
 /// <summary>
 /// Yalnızca geliştirme ortamı için örnek veri: 2 tenant, 3 kullanıcı. Tekrar çalıştırmak güvenlidir.
 /// Acme'de CRM ve Lojistik, Beta'da yalnızca Lojistik açıktır; her tenant'ta tüm izinleri olan
-/// bir "Yönetici" rolü vardır ve örnek kullanıcılar bu role atanır.
+/// bir "Yönetici" rolü vardır ve örnek kullanıcılar bu role atanır. Acme'de birkaç örnek CRM kaydı vardır.
 ///   dotnet run --project src/Modulix.Api -- seed
 /// </summary>
 public static class DemoDataSeeder
@@ -48,6 +51,59 @@ public static class DemoDataSeeder
 
         await EnsureAdministratorsAsync(services, acme, cancellationToken);
         await EnsureAdministratorsAsync(services, beta, cancellationToken);
+
+        await EnsureCrmSamplesAsync(services, acme, ayse, cancellationToken);
+    }
+
+    /// <summary>Acme için birkaç CRM kaydı. Kayıt boru hattından geçer (audit: Ayşe). Tenant'ta firma varsa dokunmaz.</summary>
+    private static async Task EnsureCrmSamplesAsync(IServiceProvider services, Tenant tenant, ModulixUser user, CancellationToken ct)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var membershipId = await db.Memberships.Where(m => m.TenantId == tenant.Id && m.UserId == user.Id).Select(m => m.Id).SingleAsync(ct);
+        scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(tenant.Id, user.Id, membershipId);
+
+        var pipeline = scope.ServiceProvider.GetRequiredService<IRecordPipeline>();
+        var existing = await pipeline.QueryAsync(new RecordQuery(CrmModule.Entities.Company, PageSize: 1), ct);
+        if (!existing.IsSuccess || existing.Value!.TotalCount > 0)
+        {
+            return;
+        }
+
+        async Task<Guid> CreateAsync(string entityKey, JsonObject values)
+        {
+            var result = await pipeline.CreateAsync(new RecordCommand(entityKey, null, values, Source: ExecutionSource.Import), ct);
+            return result.IsSuccess
+                ? result.Value!.Id
+                : throw new InvalidOperationException($"Örnek CRM kaydı oluşturulamadı ({entityKey}): {result.Error!.Message}");
+        }
+
+        var anka = await CreateAsync(CrmModule.Entities.Company, new JsonObject
+        {
+            ["name"] = "Anka Gıda A.Ş.", ["city"] = "İstanbul", ["phone"] = "0212 555 01 01", ["email"] = "info@anka.demo",
+        });
+        var delta = await CreateAsync(CrmModule.Entities.Company, new JsonObject
+        {
+            ["name"] = "Delta Yapı Ltd.", ["city"] = "Ankara", ["taxNumber"] = "1234567890",
+        });
+        var selin = await CreateAsync(CrmModule.Entities.Contact, new JsonObject
+        {
+            ["firstName"] = "Selin", ["lastName"] = "Aydın", ["companyId"] = anka.ToString(), ["title"] = "Satın Alma Müdürü",
+        });
+        var depo = await CreateAsync(CrmModule.Entities.Opportunity, new JsonObject
+        {
+            ["title"] = "Depo taşımacılığı sözleşmesi", ["companyId"] = anka.ToString(), ["contactId"] = selin.ToString(),
+            ["stage"] = "Proposal", ["amount"] = 450000m, ["currency"] = "TRY",
+        });
+        await CreateAsync(CrmModule.Entities.Opportunity, new JsonObject
+        {
+            ["title"] = "Şantiye malzeme sevkiyatı", ["companyId"] = delta.ToString(), ["stage"] = "Lead",
+        });
+        await CreateAsync(CrmModule.Entities.Activity, new JsonObject
+        {
+            ["type"] = "Meeting", ["subject"] = "Teklif sunumu", ["companyId"] = anka.ToString(), ["opportunityId"] = depo.ToString(),
+            ["dueAt"] = DateTimeOffset.UtcNow.Date.AddDays(3).AddHours(7).ToString("O"),
+        });
     }
 
     /// <summary>Tenant'ta tüm izinleri olan "Yönetici" rolünü oluşturur ve tenant'ın tüm üyelerine atar.</summary>

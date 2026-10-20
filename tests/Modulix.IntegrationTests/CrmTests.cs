@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Modules.Crm;
@@ -182,6 +183,16 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
         // Genel kayıt uç noktası da aynı izni ister (boru hattının yetki adımı).
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"/api/records/{CrmModule.Entities.Company}",
             new RecordWriteRequest(new JsonObject { ["name"] = "Yasak" }))).StatusCode);
+    }
+
+    [Fact]
+    public void Shared_access_keys_match_the_module()
+    {
+        // Arayüz menüsü bu anahtarlara bakar; modüldeki bir değişiklik arayüzü sessizce bozmasın.
+        Assert.Equal(CrmModule.ModuleKey, CrmAccess.ModuleKey);
+        Assert.Equal(
+            ((IModule)new CrmModule()).Permissions.Select(p => p.Key).Order(),
+            typeof(CrmAccess).GetFields().Where(f => f.Name != nameof(CrmAccess.ModuleKey)).Select(f => (string)f.GetValue(null)!).Order());
     }
 
     [Fact]

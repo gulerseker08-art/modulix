@@ -1,7 +1,10 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+@implements IDisposable
+@inject SessionState Session
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">Modulix.Web</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+        <a class="navbar-brand" href="">Modulix</a>
+        <button title="Menü" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
     </div>
@@ -11,29 +14,50 @@
     <nav class="nav flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Ana sayfa
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
+
+        @* Menü yalnızca tenant için açık modülleri ve kullanıcının görebildiği ekranları gösterir. *@
+        @if (Session.IsModuleEnabled(CrmAccess.ModuleKey))
+        {
+            <div class="nav-section px-3">CRM</div>
+            @foreach (var (href, label, permission) in CrmLinks)
+            {
+                @if (Session.Can(permission))
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="@href">
+                            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @label
+                        </NavLink>
+                    </div>
+                }
+            }
+        }
     </nav>
 </div>
 
 @code {
+    private static readonly (string Href, string Label, string Permission)[] CrmLinks =
+    [
+        ("crm/firmalar", "Firmalar", CrmAccess.CompaniesRead),
+        ("crm/kisiler", "Kişiler", CrmAccess.ContactsRead),
+        ("crm/firsatlar", "Fırsatlar", CrmAccess.OpportunitiesRead),
+        ("crm/aktiviteler", "Aktiviteler", CrmAccess.ActivitiesRead),
+    ];
+
     private bool collapseNavMenu = true;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    protected override void OnInitialized() => Session.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
     }
+
+    public void Dispose() => Session.Changed -= OnChanged;
 }

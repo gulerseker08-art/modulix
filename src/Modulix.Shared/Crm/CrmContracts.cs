@@ -6,6 +6,24 @@ namespace Modulix.Shared.Crm;
 // aynıdır (camelCase); sunucu aynı kuralları yeniden doğrular. Kaydetme isteklerinde Version verilirse
 // eşzamanlı değişiklik 409 ile reddedilir. Listeler sayfalıdır: CrmPage<T>.
 
+/// <summary>
+/// Modül ve izin anahtarları; arayüz menüleri ve ekranları buna göre gösterir. Sunucudaki
+/// <c>CrmModule</c> ile aynı olmalıdır (entegrasyon testi denetler).
+/// </summary>
+public static class CrmAccess
+{
+    public const string ModuleKey = "crm";
+
+    public const string CompaniesRead = "crm.companies.read";
+    public const string CompaniesWrite = "crm.companies.write";
+    public const string ContactsRead = "crm.contacts.read";
+    public const string ContactsWrite = "crm.contacts.write";
+    public const string OpportunitiesRead = "crm.opportunities.read";
+    public const string OpportunitiesWrite = "crm.opportunities.write";
+    public const string ActivitiesRead = "crm.activities.read";
+    public const string ActivitiesWrite = "crm.activities.write";
+}
+
 public sealed record CrmPage<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
 public static class CrmLimits
