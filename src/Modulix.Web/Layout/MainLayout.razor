@@ -12,6 +12,7 @@
         <div class="top-row px-4">
             @if (Session.IsSignedIn)
             {
+                <span class="avatar" aria-hidden="true">@Initials(Session.User!.DisplayName)</span>
                 <span class="session-info text-truncate">
                     @Session.User!.DisplayName
                     @if (Session.ActiveTenantName is { } tenant)
@@ -47,6 +48,9 @@
         await Session.LogoutAsync();
         Navigation.NavigateTo("giris");
     }
+
+    private static string Initials(string name) =>
+        string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpper(p[0])));
 
     public void Dispose() => Session.Changed -= OnChanged;
 }

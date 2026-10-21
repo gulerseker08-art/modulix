@@ -1,5 +1,52 @@
+/* ---- Modulix teması: tüm renkler buradan gelir ---- */
+:root {
+    --mx-navy: #0e1a33;
+    --mx-navy-soft: #16244a;
+    --mx-indigo: #2e33cf;
+    --mx-indigo-hover: #2428b0;
+    --mx-indigo-rgb: 46, 51, 207;
+    --mx-teal: #1fa99b;
+    --mx-lilac: #e6e5fb;
+    --mx-cream: #f6f4ef;
+    --mx-surface: #ffffff;
+    --mx-ink: #0e1a33;
+    --mx-muted: #6b7280;
+    --mx-border: #e7e5ee;
+    --mx-radius: 0.875rem;
+    --mx-shadow: 0 1px 2px rgba(14, 26, 51, 0.04), 0 4px 16px rgba(14, 26, 51, 0.05);
+    --mx-font: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+
+    /* Bootstrap'ı aynı renklere bağla */
+    --bs-primary: var(--mx-indigo);
+    --bs-primary-rgb: var(--mx-indigo-rgb);
+    --bs-body-font-family: var(--mx-font);
+    --bs-body-bg: var(--mx-cream);
+    --bs-body-color: var(--mx-ink);
+    --bs-emphasis-color: var(--mx-ink);
+    --bs-secondary-color: var(--mx-muted);
+    --bs-border-color: var(--mx-border);
+    --bs-tertiary-bg: var(--mx-surface);
+    --bs-link-color: var(--mx-indigo);
+    --bs-link-color-rgb: var(--mx-indigo-rgb);
+    --bs-link-hover-color: var(--mx-indigo-hover);
+    --bs-link-hover-color-rgb: 36, 40, 176;
+    --bs-border-radius: 0.625rem;
+    --bs-focus-ring-color: rgba(var(--mx-indigo-rgb), 0.25);
+}
+
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: var(--mx-font);
+    background: var(--mx-cream);
+    color: var(--mx-ink);
+}
+
+h1, h2, h3 {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+h1 {
+    font-size: 1.75rem;
 }
 
 h1:focus {
@@ -7,33 +54,62 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #0071c1;
+    color: var(--mx-indigo);
 }
 
 .btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    --bs-btn-bg: var(--mx-indigo);
+    --bs-btn-border-color: var(--mx-indigo);
+    --bs-btn-hover-bg: var(--mx-indigo-hover);
+    --bs-btn-hover-border-color: var(--mx-indigo-hover);
+    --bs-btn-active-bg: var(--mx-indigo-hover);
+    --bs-btn-active-border-color: var(--mx-indigo-hover);
+    --bs-btn-disabled-bg: var(--mx-indigo);
+    --bs-btn-disabled-border-color: var(--mx-indigo);
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+.btn-outline-primary {
+    --bs-btn-color: var(--mx-indigo);
+    --bs-btn-border-color: var(--mx-indigo);
+    --bs-btn-hover-bg: var(--mx-indigo);
+    --bs-btn-hover-border-color: var(--mx-indigo);
+    --bs-btn-active-bg: var(--mx-indigo-hover);
+    --bs-btn-active-border-color: var(--mx-indigo-hover);
+}
+
+.btn {
+    font-weight: 600;
+}
+
+.form-control, .form-select {
+    background-color: var(--mx-surface);
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-select:focus, .form-check-input:focus {
+    border-color: rgba(var(--mx-indigo-rgb), 0.5);
+    box-shadow: 0 0 0 0.25rem rgba(var(--mx-indigo-rgb), 0.2);
+}
+
+.form-check-input:checked {
+    background-color: var(--mx-indigo);
+    border-color: var(--mx-indigo);
 }
 
 .content {
-    padding-top: 1.1rem;
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
 }
 
 .valid.modified:not([type=checkbox]) {
-    outline: 1px solid #26b050;
+    outline: 1px solid var(--mx-teal);
 }
 
 .invalid {
-    outline: 1px solid red;
+    outline: 1px solid #d63939;
 }
 
 .validation-message {
-    color: red;
+    color: #d63939;
 }
 
 #blazor-error-ui {
@@ -78,14 +154,14 @@ a, .btn-link {
 
     .loading-progress circle {
         fill: none;
-        stroke: #e0e0e0;
+        stroke: var(--mx-lilac);
         stroke-width: 0.6rem;
         transform-origin: 50% 50%;
         transform: rotate(-90deg);
     }
 
         .loading-progress circle:last-child {
-            stroke: #1b6ec2;
+            stroke: var(--mx-indigo);
             stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
             transition: stroke-dasharray 0.05s ease-in-out;
         }
@@ -102,7 +178,7 @@ a, .btn-link {
     }
 
 code {
-    color: #c02d76;
+    color: var(--mx-indigo);
 }
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
@@ -143,10 +219,11 @@ code {
 
 .record-form {
     border: 1px solid var(--bs-border-color);
-    border-radius: 0.5rem;
-    padding: 1rem;
+    border-radius: var(--mx-radius);
+    padding: 1.25rem;
     margin-bottom: 1.5rem;
-    background: var(--bs-tertiary-bg);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
 }
 
     .record-form h2 {
@@ -189,7 +266,7 @@ code {
 }
 
 .nav-section {
-    color: #9fb3d9;
+    color: #7f8bb0;
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.05em;
@@ -212,31 +289,69 @@ code {
 .tile {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    padding: 1rem;
-    border: 1px solid var(--bs-border-color);
-    border-radius: 0.5rem;
+    gap: 0.35rem;
+    padding: 1.25rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
     text-decoration: none;
     color: inherit;
+    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
-    .tile:hover {
-        border-color: #1b6ec2;
+    .tile strong {
+        font-size: 1.1rem;
     }
 
     .tile span {
         color: var(--bs-secondary-color);
+        font-size: 0.875rem;
     }
 
+    /* Kartın altındaki ok düğmesi */
+    .tile::after {
+        content: "→";
+        display: grid;
+        place-items: center;
+        width: 3rem;
+        height: 2rem;
+        margin-top: auto;
+        border-radius: 999px;
+        background: var(--mx-lilac);
+        color: var(--mx-indigo);
+        font-weight: 700;
+    }
+
+    .tile:nth-child(even)::after {
+        background: #dcf3ef;
+        color: var(--mx-teal);
+    }
+
+    .tile:hover {
+        border-color: rgba(var(--mx-indigo-rgb), 0.4);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(14, 26, 51, 0.08);
+    }
+
+.table {
+    --bs-table-bg: var(--mx-surface);
+}
+
+.list-group-item.active {
+    background-color: var(--mx-indigo);
+    border-color: var(--mx-indigo);
+}
+
 .badge {
-    background: var(--bs-secondary-bg);
+    background: var(--mx-lilac);
     color: var(--bs-body-color);
     font-weight: 500;
 }
 
     .badge.stage-won {
-        background: #d1e7dd;
-        color: #0a3622;
+        background: #dcf3ef;
+        color: #0f6b61;
     }
 
     .badge.stage-lost {
@@ -262,7 +377,8 @@ tr.done td.primary {
 
     .record-table tr {
         border: 1px solid var(--bs-border-color);
-        border-radius: 0.5rem;
+        border-radius: var(--mx-radius);
+        background: var(--mx-surface);
         margin-bottom: 0.75rem;
         padding: 0.5rem 0.75rem;
     }
@@ -303,6 +419,22 @@ tr.done td.primary {
     .tiles {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .record-table {
+        background: var(--mx-surface);
+        border-radius: var(--mx-radius);
+        overflow: hidden;
+        box-shadow: var(--mx-shadow);
+    }
+
+        .record-table thead th {
+            background: #f3f2fa;
+            color: var(--mx-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
 
     .record-table td.actions {
         text-align: right;
