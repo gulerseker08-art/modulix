@@ -81,6 +81,37 @@ a, .btn-link {
     font-weight: 600;
 }
 
+/* İkincil düğmeler (Vazgeç, Ara, sayfalama): beyaz zemin, ince çerçeve */
+.btn-outline-secondary {
+    --bs-btn-color: var(--mx-ink);
+    --bs-btn-bg: var(--mx-surface);
+    --bs-btn-border-color: var(--mx-border);
+    --bs-btn-hover-color: var(--mx-indigo);
+    --bs-btn-hover-bg: var(--mx-lilac);
+    --bs-btn-hover-border-color: var(--mx-lilac);
+    --bs-btn-active-color: var(--mx-indigo);
+    --bs-btn-active-bg: var(--mx-lilac);
+    --bs-btn-active-border-color: var(--mx-lilac);
+    --bs-btn-disabled-color: var(--mx-muted);
+    --bs-btn-disabled-bg: var(--mx-surface);
+    --bs-btn-disabled-border-color: var(--mx-border);
+}
+
+.btn-outline-danger {
+    --bs-btn-bg: var(--mx-surface);
+}
+
+.alert {
+    border: 0;
+    border-radius: var(--mx-radius);
+}
+
+.form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #3b4561;
+}
+
 .form-control, .form-select {
     background-color: var(--mx-surface);
 }
@@ -257,7 +288,15 @@ code {
     margin-bottom: 1rem;
 }
 
+    /* Arama kutusuna büyüteç simgesi */
+    .search .form-control {
+        padding-left: 2.5rem;
+        background: var(--mx-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 0.9rem center;
+        border-radius: 999px;
+    }
+
 .pager {
+    margin-top: 1rem;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -346,8 +385,31 @@ code {
 .badge {
     background: var(--mx-lilac);
     color: var(--bs-body-color);
-    font-weight: 500;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 0.4em 0.75em;
 }
+
+    /* Fırsat aşamaları: soğuk adaylardan kazanılana doğru */
+    .badge.stage-lead {
+        background: #eef0f5;
+        color: #4b5573;
+    }
+
+    .badge.stage-qualified {
+        background: var(--mx-lilac);
+        color: var(--mx-indigo);
+    }
+
+    .badge.stage-proposal {
+        background: #dfe6ff;
+        color: #2433a8;
+    }
+
+    .badge.stage-negotiation {
+        background: #fdf0d5;
+        color: #8a5a00;
+    }
 
     .badge.stage-won {
         background: #dcf3ef;
@@ -426,6 +488,19 @@ tr.done td.primary {
         overflow: hidden;
         box-shadow: var(--mx-shadow);
     }
+
+        .record-table > :not(caption) > * > * {
+            padding: 0.85rem 1rem;
+            vertical-align: middle;
+        }
+
+        .record-table tbody tr:hover > * {
+            background: #faf9fe;
+        }
+
+        .record-table tbody tr:last-child > * {
+            border-bottom: 0;
+        }
 
         .record-table thead th {
             background: #f3f2fa;
