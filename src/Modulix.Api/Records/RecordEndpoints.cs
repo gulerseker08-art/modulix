@@ -18,9 +18,9 @@ public static class RecordEndpoints
             .AddEndpointFilter<RequireTenantFilter>()
             .WithTags("Records");
 
-        group.MapGet("", async (string entityKey, int? page, int? pageSize, string? search, IRecordPipeline pipeline, CancellationToken ct) =>
+        group.MapGet("", async (string entityKey, int? page, int? pageSize, string? search, HttpRequest http, IRecordPipeline pipeline, CancellationToken ct) =>
         {
-            var result = await pipeline.QueryAsync(new RecordQuery(entityKey, page ?? 1, pageSize ?? 50, search), ct);
+            var result = await pipeline.QueryAsync(new RecordQuery(entityKey, page ?? 1, pageSize ?? 50, search, FiltersFrom(http)), ct);
             return result.IsSuccess
                 ? Results.Ok(new RecordPageResponse(
                     result.Value!.Items.Select(ToResponse).ToList(), result.Value.Page, result.Value.PageSize, result.Value.TotalCount))
@@ -55,6 +55,21 @@ public static class RecordEndpoints
         });
 
         return app;
+    }
+
+    /// <summary>Sayfa ve arama dışındaki sorgu parametreleri filtredir (ör. ?companyId=...); boş değerler yok sayılır.</summary>
+    internal static IReadOnlyDictionary<string, string>? FiltersFrom(HttpRequest http)
+    {
+        var filters = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, values) in http.Query)
+        {
+            if (key is not ("page" or "pageSize" or "search") && values.LastOrDefault() is { Length: > 0 } value)
+            {
+                filters[key] = value;
+            }
+        }
+
+        return filters.Count == 0 ? null : filters;
     }
 
     private static RecordResponse ToResponse(RecordData data) => new(data.EntityKey, data.Id, data.Version, data.Values);

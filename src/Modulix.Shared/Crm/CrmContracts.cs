@@ -36,6 +36,29 @@ public static class CrmLimits
     public const int TextMaxLength = 200;
     public const int CityMaxLength = 100;
     public const int NotesMaxLength = 4000;
+    public const int IndustryMaxLength = 100;
+    public const int AddressMaxLength = 500;
+    public const int TagsMaxLength = 200;
+    public const int LostReasonMaxLength = 500;
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<CompanyStatus>))]
+public enum CompanyStatus
+{
+    Prospect = 1,
+    Customer = 2,
+    Inactive = 3,
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<CompanySource>))]
+public enum CompanySource
+{
+    Referral = 1,
+    Website = 2,
+    Event = 3,
+    Advertising = 4,
+    ColdCall = 5,
+    Other = 6,
 }
 
 public sealed record CompanyDto(
@@ -47,8 +70,15 @@ public sealed record CompanyDto(
     string? Email,
     string? Website,
     string? City,
+    string? Address,
+    string? Industry,
+    CompanyStatus Status,
+    CompanySource? Source,
+    string? Tags,
+    Guid? OwnerId,
     string? Notes);
 
+/// <summary>Sorumlu boş bırakılırsa kaydı oluşturan kullanıcı atanır.</summary>
 public sealed record SaveCompanyRequest(
     string Name,
     string? TaxNumber = null,
@@ -57,7 +87,13 @@ public sealed record SaveCompanyRequest(
     string? Website = null,
     string? City = null,
     string? Notes = null,
-    long? Version = null);
+    long? Version = null,
+    string? Address = null,
+    string? Industry = null,
+    CompanyStatus Status = CompanyStatus.Prospect,
+    CompanySource? Source = null,
+    string? Tags = null,
+    Guid? OwnerId = null);
 
 public sealed record ContactDto(
     Guid Id,
@@ -101,6 +137,9 @@ public sealed record OpportunityDto(
     decimal? Amount,
     string Currency,
     DateOnly? ExpectedCloseDate,
+    int? Probability,
+    string? LostReason,
+    Guid? OwnerId,
     string? Notes);
 
 public sealed record SaveOpportunityRequest(
@@ -112,7 +151,10 @@ public sealed record SaveOpportunityRequest(
     string Currency = "TRY",
     DateOnly? ExpectedCloseDate = null,
     string? Notes = null,
-    long? Version = null);
+    long? Version = null,
+    int? Probability = null,
+    string? LostReason = null,
+    Guid? OwnerId = null);
 
 [JsonConverter(typeof(JsonStringEnumConverter<ActivityType>))]
 public enum ActivityType
@@ -134,6 +176,7 @@ public sealed record ActivityDto(
     Guid? CompanyId,
     Guid? ContactId,
     Guid? OpportunityId,
+    Guid? OwnerId,
     string? Notes);
 
 public sealed record SaveActivityRequest(
@@ -145,4 +188,5 @@ public sealed record SaveActivityRequest(
     Guid? ContactId = null,
     Guid? OpportunityId = null,
     string? Notes = null,
-    long? Version = null);
+    long? Version = null,
+    Guid? OwnerId = null);

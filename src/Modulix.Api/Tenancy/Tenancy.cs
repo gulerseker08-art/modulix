@@ -77,6 +77,13 @@ public static class TenancySetup
             .AddEndpointFilter<RequireTenantFilter>()
             .WithTags("Tenant");
 
+        // Sorumlu seçimi için üye adları; her üye görebilir (e-posta ve rol bilgisi verilmez).
+        app.MapGet("/api/tenant/members", async (ITenantMembers members, CancellationToken ct) =>
+                (await members.ListActiveAsync(ct)).Select(m => new TenantMemberResponse(m.UserId, m.DisplayName)).ToList())
+            .RequireAuthorization()
+            .AddEndpointFilter<RequireTenantFilter>()
+            .WithTags("Tenant");
+
         return app;
     }
 }

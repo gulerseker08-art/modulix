@@ -8,9 +8,9 @@
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.OpportunitiesRead">
     <div class="page-header">
         <h1>Fırsatlar</h1>
-        @if (Session.Can(CrmAccess.OpportunitiesWrite) && form is null)
+        @if (Session.Can(CrmAccess.OpportunitiesWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="New">Yeni fırsat</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)">Yeni fırsat</button>
         }
     </div>
 
@@ -19,86 +19,86 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    @if (form is not null)
+    @if (editing)
     {
-        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni fırsat" : "Fırsatı düzenle")</h2>
-            <div class="form-grid">
-                <div class="span-all">
-                    <label class="form-label" for="title">Başlık *</label>
-                    <input id="title" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="form.Title" />
-                    <FieldError Field="title" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="companyId">Firma *</label>
-                    <select id="companyId" class="form-select" @bind="form.CompanyId">
-                        <option value="">Seçin</option>
-                        @foreach (var company in Lookups.Companies)
-                        {
-                            <option value="@company.Id">@company.Name</option>
-                        }
-                    </select>
-                    <FieldError Field="companyId" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="contactId">Kişi</label>
-                    <select id="contactId" class="form-select" @bind="form.ContactId">
-                        <option value="">—</option>
-                        @foreach (var contact in Lookups.Contacts.Where(c => form.CompanyId is null || c.CompanyId == form.CompanyId))
-                        {
-                            <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
-                        }
-                    </select>
-                    <FieldError Field="contactId" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="stage">Aşama</label>
-                    <select id="stage" class="form-select" @bind="form.Stage">
-                        @foreach (var stage in Enum.GetValues<OpportunityStage>())
-                        {
-                            <option value="@stage">@CrmLabels.Of(stage)</option>
-                        }
-                    </select>
-                    <FieldError Field="stage" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="expectedCloseDate">Beklenen kapanış</label>
-                    <input id="expectedCloseDate" class="form-control" type="date" @bind="form.ExpectedCloseDate" />
-                    <FieldError Field="expectedCloseDate" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="amount">Tutar</label>
-                    <input id="amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.Amount" />
-                    <FieldError Field="amount" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="currency">Para birimi</label>
-                    <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
-                    <FieldError Field="currency" Errors="errors" />
-                </div>
-                <div class="span-all">
-                    <label class="form-label" for="notes">Notlar</label>
-                    <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
-                    <FieldError Field="notes" Errors="errors" />
-                </div>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Vazgeç</button>
-                @if (form.Id is not null)
-                {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
-                }
-            </div>
-        </form>
+        <OpportunityEditor Opportunity="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="SavedAsync" />
     }
+
+    <div class="filters">
+        <div class="segmented" role="group" aria-label="Görünüm">
+            <button type="button" class="chip @(board ? "active" : null)" @onclick="() => SwitchAsync(true)">Satış hunisi</button>
+            <button type="button" class="chip @(!board ? "active" : null)" @onclick="() => SwitchAsync(false)">Liste</button>
+        </div>
+        <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@mine" @onclick="ToggleMineAsync">Yalnızca benimkiler</button>
+    </div>
 
     <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
         <input class="form-control" type="search" placeholder="Başlık ara" @bind="search" />
         <button type="submit" class="btn btn-outline-secondary">Ara</button>
     </form>
 
-    @if (page is null)
+    @if (board)
+    {
+        @if (columns is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+        else
+        {
+            <p class="text-muted small board-hint">
+                @(Session.Can(CrmAccess.OpportunitiesWrite) ? "Kartı sürükleyerek veya kartın altındaki listeden aşamasını değiştirin." : null)
+            </p>
+            <div class="board">
+                @foreach (var column in columns)
+                {
+                    <section class="board-column @(dropTarget == column.Stage ? "drop" : null)"
+                             @ondragover="() => dropTarget = column.Stage" @ondragover:preventDefault
+                             @ondragleave="() => dropTarget = null"
+                             @ondrop="() => DropAsync(column.Stage)">
+                        <header>
+                            <span class="badge stage-@column.Stage.ToString().ToLowerInvariant()">@CrmLabels.Of(column.Stage)</span>
+                            <span class="count">@column.Page.TotalCount</span>
+                            <small>@Totals(column.Page.Items)</small>
+                        </header>
+                        @foreach (var opportunity in column.Page.Items)
+                        {
+                            <article class="board-card" draggable="@(Session.Can(CrmAccess.OpportunitiesWrite) ? "true" : "false")"
+                                     @ondragstart="() => dragged = opportunity">
+                                <strong>@opportunity.Title</strong>
+                                <a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a>
+                                <span>
+                                    @FormatAmount(opportunity)
+                                    @if (opportunity.Probability is { } probability) { <text> · %@probability</text> }
+                                </span>
+                                @if (opportunity.OwnerId is not null)
+                                {
+                                    <span class="owner">@Lookups.MemberName(opportunity.OwnerId)</span>
+                                }
+                                @if (Session.Can(CrmAccess.OpportunitiesWrite))
+                                {
+                                    <div class="card-actions">
+                                        <select class="form-select form-select-sm" aria-label="Aşama" value="@opportunity.Stage"
+                                                @onchange="e => MoveAsync(opportunity, Enum.Parse<OpportunityStage>((string)e.Value!))">
+                                            @foreach (var stage in Enum.GetValues<OpportunityStage>())
+                                            {
+                                                <option value="@stage">@CrmLabels.Of(stage)</option>
+                                            }
+                                        </select>
+                                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(opportunity)">Düzenle</button>
+                                    </div>
+                                }
+                            </article>
+                        }
+                        @if (column.Page.TotalCount > column.Page.Items.Count)
+                        {
+                            <p class="text-muted small">İlk @column.Page.Items.Count kayıt gösteriliyor; listeyi kullanın.</p>
+                        }
+                    </section>
+                }
+            </div>
+        }
+    }
+    else if (page is null)
     {
         <p class="text-muted">Yükleniyor…</p>
     }
@@ -110,21 +110,23 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Başlık</th><th>Firma</th><th>Aşama</th><th class="text-end">Tutar</th><th>Kapanış</th><th></th></tr>
+                <tr><th>Başlık</th><th>Firma</th><th>Aşama</th><th class="text-end">Tutar</th><th>Olasılık</th><th>Sorumlu</th><th>Kapanış</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var opportunity in page.Items)
                 {
                     <tr>
                         <td data-label="Başlık" class="primary">@opportunity.Title</td>
-                        <td data-label="Firma">@Lookups.CompanyName(opportunity.CompanyId)</td>
+                        <td data-label="Firma"><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></td>
                         <td data-label="Aşama"><span class="badge stage-@opportunity.Stage.ToString().ToLowerInvariant()">@CrmLabels.Of(opportunity.Stage)</span></td>
                         <td data-label="Tutar" class="text-end">@FormatAmount(opportunity)</td>
+                        <td data-label="Olasılık">@(opportunity.Probability is { } p ? $"%{p}" : null)</td>
+                        <td data-label="Sorumlu">@Lookups.MemberName(opportunity.OwnerId)</td>
                         <td data-label="Kapanış">@(opportunity.ExpectedCloseDate is { } date ? CrmLabels.Date(date) : null)</td>
                         <td class="actions">
                             @if (Session.Can(CrmAccess.OpportunitiesWrite))
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(opportunity)">Düzenle</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(opportunity)">Düzenle</button>
                             }
                         </td>
                     </tr>
@@ -138,12 +140,19 @@
 @code {
     private const string Url = "/api/crm/opportunities";
 
+    // Panoda her aşamadan en fazla bu kadar kart yüklenir; aşama başlığındaki sayı tüm kayıtları sayar.
+    private const int ColumnSize = 50;
+
     private CrmPage<OpportunityDto>? page;
-    private OpportunityForm? form;
-    private IReadOnlyDictionary<string, string[]>? errors;
+    private IReadOnlyList<BoardColumn>? columns;
+    private OpportunityDto? selected;
+    private OpportunityDto? dragged;
+    private OpportunityStage? dropTarget;
+    private bool editing;
+    private bool board = true;
+    private bool mine;
     private string? message;
     private string? search;
-    private bool busy;
 
     protected override async Task OnInitializedAsync()
     {
@@ -158,101 +167,89 @@
     private static string FormatAmount(OpportunityDto opportunity) =>
         opportunity.Amount is { } amount ? CrmLabels.Amount(amount, opportunity.Currency) : string.Empty;
 
+    private static string Totals(IEnumerable<OpportunityDto> items) =>
+        string.Join(" + ", items
+            .Where(o => o.Amount is not null)
+            .GroupBy(o => o.Currency)
+            .Select(g => CrmLabels.Amount(g.Sum(o => o.Amount!.Value), g.Key)));
+
+    private string Filters()
+    {
+        var filters = $"&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        return mine ? filters + "&ownerId=me" : filters;
+    }
+
+    private async Task SwitchAsync(bool toBoard)
+    {
+        board = toBoard;
+        await LoadAsync(1);
+    }
+
+    private async Task ToggleMineAsync()
+    {
+        mine = !mine;
+        await LoadAsync(1);
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
-        var result = await Api.GetAsync<CrmPage<OpportunityDto>>($"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}");
+        if (board)
+        {
+            var results = await Task.WhenAll(Enum.GetValues<OpportunityStage>().Select(async stage =>
+                (Stage: stage, Result: await Api.GetAsync<CrmPage<OpportunityDto>>($"{Url}?stage={stage}&pageSize={ColumnSize}{Filters()}"))));
+            message = results.Select(r => r.Result.Error).FirstOrDefault(e => e is not null);
+            columns = results
+                .Select(r => new BoardColumn(r.Stage, r.Result.Value ?? new CrmPage<OpportunityDto>([], 1, ColumnSize, 0)))
+                .ToList();
+            return;
+        }
+
+        var result = await Api.GetAsync<CrmPage<OpportunityDto>>($"{Url}?page={pageNumber}{Filters()}");
         page = result.Value;
         message = result.Error;
     }
 
-    private void New() => Open(new OpportunityForm());
-
-    private void Edit(OpportunityDto opportunity) => Open(new OpportunityForm
+    private async Task DropAsync(OpportunityStage stage)
     {
-        Id = opportunity.Id,
-        Version = opportunity.Version,
-        Title = opportunity.Title,
-        CompanyId = opportunity.CompanyId,
-        ContactId = opportunity.ContactId,
-        Stage = opportunity.Stage,
-        Amount = opportunity.Amount,
-        Currency = opportunity.Currency,
-        ExpectedCloseDate = opportunity.ExpectedCloseDate,
-        Notes = opportunity.Notes,
-    });
+        dropTarget = null;
+        if (dragged is { } opportunity)
+        {
+            dragged = null;
+            await MoveAsync(opportunity, stage);
+        }
+    }
 
-    private void Open(OpportunityForm value)
+    /// <summary>Aşamayı değiştirir. Kaybedildi'ye taşınan fırsat için nedeni sormak üzere form açılır.</summary>
+    private async Task MoveAsync(OpportunityDto opportunity, OpportunityStage stage)
     {
-        form = value;
-        errors = null;
+        if (opportunity.Stage == stage)
+        {
+            return;
+        }
+
+        if (stage == OpportunityStage.Lost)
+        {
+            Open(opportunity with { Stage = stage });
+            return;
+        }
+
+        var result = await Api.PutAsync<OpportunityDto>($"{Url}/{opportunity.Id}", CrmRequests.From(opportunity) with { Stage = stage });
+        message = result.Error;
+        await LoadAsync(1);
+    }
+
+    private void Open(OpportunityDto? opportunity)
+    {
+        selected = opportunity;
+        editing = true;
         message = null;
     }
 
-    private void Cancel() => form = null;
-
-    private async Task SaveAsync()
+    private async Task SavedAsync()
     {
-        if (form!.CompanyId is not { } companyId)
-        {
-            errors = new Dictionary<string, string[]> { ["companyId"] = ["Bu alan zorunludur."] };
-            return;
-        }
-
-        busy = true;
-        var request = new SaveOpportunityRequest(
-            form.Title, companyId, form.ContactId, form.Stage, form.Amount, form.Currency, form.ExpectedCloseDate, form.Notes, form.Version);
-        var result = form.Id is { } id
-            ? await Api.PutAsync<OpportunityDto>($"{Url}/{id}", request)
-            : await Api.PostAsync<OpportunityDto>(Url, request);
-        busy = false;
-
-        if (result.IsSuccess)
-        {
-            form = null;
-            await LoadAsync(page?.Page ?? 1);
-            return;
-        }
-
-        errors = result.FieldErrors;
-        message = result.Error;
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
     }
 
-    private async Task DeleteAsync()
-    {
-        busy = true;
-        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
-        busy = false;
-
-        if (result.IsSuccess)
-        {
-            form = null;
-            await LoadAsync(1);
-            return;
-        }
-
-        message = result.Error;
-    }
-
-    private sealed class OpportunityForm
-    {
-        public Guid? Id { get; init; }
-
-        public long? Version { get; init; }
-
-        public string Title { get; set; } = string.Empty;
-
-        public Guid? CompanyId { get; set; }
-
-        public Guid? ContactId { get; set; }
-
-        public OpportunityStage Stage { get; set; } = OpportunityStage.Lead;
-
-        public decimal? Amount { get; set; }
-
-        public string Currency { get; set; } = "TRY";
-
-        public DateOnly? ExpectedCloseDate { get; set; }
-
-        public string? Notes { get; set; }
-    }
+    private sealed record BoardColumn(OpportunityStage Stage, CrmPage<OpportunityDto> Page);
 }

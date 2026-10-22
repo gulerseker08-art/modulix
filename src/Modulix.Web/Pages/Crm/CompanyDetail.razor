@@ -1,0 +1,375 @@
+@page "/crm/firmalar/{Id:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>@(company?.Name ?? "Firma") · Modulix</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.CompaniesRead">
+    <a class="back-link" href="crm/firmalar">← Firmalar</a>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (company is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else if (editingCompany)
+    {
+        <CompanyEditor Company="company" Lookups="Lookups" Saved="CompanySaved" Deleted="CompanyDeleted" Cancelled="() => editingCompany = false" />
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <h1>@company.Name</h1>
+                <div class="header-meta">
+                    <span class="badge status-@company.Status.ToString().ToLowerInvariant()">@CrmLabels.Of(company.Status)</span>
+                    @foreach (var tag in CrmLabels.Tags(company.Tags))
+                    {
+                        <span class="badge tag">@tag</span>
+                    }
+                </div>
+            </div>
+            @if (Session.Can(CrmAccess.CompaniesWrite))
+            {
+                <button type="button" class="btn btn-outline-primary" @onclick="() => editingCompany = true">Düzenle</button>
+            }
+        </div>
+
+        <div class="summary">
+            <div class="summary-item">
+                <span>Açık fırsatlar</span>
+                <strong>@OpenOpportunities.Count()</strong>
+                <small>@Totals(OpenOpportunities)</small>
+            </div>
+            <div class="summary-item">
+                <span>Kazanılan</span>
+                <strong>@WonOpportunities.Count()</strong>
+                <small>@Totals(WonOpportunities)</small>
+            </div>
+            <div class="summary-item">
+                <span>Açık aktiviteler</span>
+                <strong>@(activities?.Count(a => a.CompletedAt is null) ?? 0)</strong>
+                <small>@OverdueText</small>
+            </div>
+        </div>
+
+        @* Boş alanlar gösterilmez; telefonda kart kısa kalır. *@
+        <dl class="detail-grid">
+            <div><dt>Sorumlu</dt><dd>@Lookups.MemberName(company.OwnerId)</dd></div>
+            @if (company.Industry is { } industry)
+            {
+                <div><dt>Sektör</dt><dd>@industry</dd></div>
+            }
+            @if (company.Source is { } source)
+            {
+                <div><dt>Kaynak</dt><dd>@CrmLabels.Of(source)</dd></div>
+            }
+            @if (company.Phone is { } phone)
+            {
+                <div><dt>Telefon</dt><dd><a href="tel:@phone">@phone</a></dd></div>
+            }
+            @if (company.Email is { } email)
+            {
+                <div><dt>E-posta</dt><dd><a href="mailto:@email">@email</a></dd></div>
+            }
+            @if (company.Website is { } website)
+            {
+                <div><dt>Web sitesi</dt><dd>@website</dd></div>
+            }
+            @if (company.TaxNumber is { } taxNumber)
+            {
+                <div><dt>Vergi no</dt><dd>@taxNumber</dd></div>
+            }
+            @if (company.City is { } city)
+            {
+                <div><dt>Şehir</dt><dd>@city</dd></div>
+            }
+            @if (company.Address is { } address)
+            {
+                <div class="span-all"><dt>Adres</dt><dd>@address</dd></div>
+            }
+            @if (company.Notes is { } notes)
+            {
+                <div class="span-all"><dt>Notlar</dt><dd class="notes">@notes</dd></div>
+            }
+        </dl>
+
+        @if (Session.Can(CrmAccess.ActivitiesRead))
+        {
+            <section class="detail-section">
+                <div class="section-header">
+                    <h2>Aktiviteler</h2>
+                    @if (Session.Can(CrmAccess.ActivitiesWrite) && !editingActivity)
+                    {
+                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OpenActivity(null)">Aktivite ekle</button>
+                    }
+                </div>
+                @if (editingActivity)
+                {
+                    <ActivityEditor Activity="selectedActivity" FixedCompanyId="Id" Lookups="Lookups"
+                                    Saved="ActivitySaved" Deleted="ActivitySaved" Cancelled="() => editingActivity = false" />
+                }
+                @if (activities is { Count: > 0 })
+                {
+                    <ul class="item-list">
+                        @foreach (var activity in activities)
+                        {
+                            <li class="@ActivityClass(activity)">
+                                @if (Session.Can(CrmAccess.ActivitiesWrite) && activity.CompletedAt is null)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary btn-sm check" title="Tamamla" aria-label="Tamamla"
+                                            disabled="@busy" @onclick="() => CompleteAsync(activity)">✓</button>
+                                }
+                                <div class="item-main">
+                                    <strong>@activity.Subject</strong>
+                                    <span>
+                                        @CrmLabels.Of(activity.Type)
+                                        @if (activity.DueAt is { } due) { <text> · @CrmLabels.Time(due)</text> }
+                                        @if (activity.OwnerId is not null) { <text> · @Lookups.MemberName(activity.OwnerId)</text> }
+                                        @if (activity.CompletedAt is not null) { <text> · Tamamlandı</text> }
+                                    </span>
+                                </div>
+                                @if (Session.Can(CrmAccess.ActivitiesWrite))
+                                {
+                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenActivity(activity)">Düzenle</button>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+                else if (activities is not null)
+                {
+                    <p class="text-muted">Henüz aktivite yok.</p>
+                }
+            </section>
+        }
+
+        @if (Session.Can(CrmAccess.OpportunitiesRead))
+        {
+            <section class="detail-section">
+                <div class="section-header">
+                    <h2>Fırsatlar</h2>
+                    @if (Session.Can(CrmAccess.OpportunitiesWrite) && !editingOpportunity)
+                    {
+                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OpenOpportunity(null)">Fırsat ekle</button>
+                    }
+                </div>
+                @if (editingOpportunity)
+                {
+                    <OpportunityEditor Opportunity="selectedOpportunity" FixedCompanyId="Id" Lookups="Lookups"
+                                       Saved="OpportunitySaved" Deleted="OpportunitySaved" Cancelled="() => editingOpportunity = false" />
+                }
+                @if (opportunities is { Count: > 0 })
+                {
+                    <ul class="item-list">
+                        @foreach (var opportunity in opportunities)
+                        {
+                            <li>
+                                <div class="item-main">
+                                    <strong>@opportunity.Title</strong>
+                                    <span>
+                                        <span class="badge stage-@opportunity.Stage.ToString().ToLowerInvariant()">@CrmLabels.Of(opportunity.Stage)</span>
+                                        @if (opportunity.Amount is { } amount) { <text> @CrmLabels.Amount(amount, opportunity.Currency)</text> }
+                                        @if (opportunity.Probability is { } probability) { <text> · %@probability</text> }
+                                        @if (opportunity.OwnerId is not null) { <text> · @Lookups.MemberName(opportunity.OwnerId)</text> }
+                                    </span>
+                                    @if (opportunity.Stage == OpportunityStage.Lost && opportunity.LostReason is { } reason)
+                                    {
+                                        <span>Neden: @reason</span>
+                                    }
+                                </div>
+                                @if (Session.Can(CrmAccess.OpportunitiesWrite))
+                                {
+                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenOpportunity(opportunity)">Düzenle</button>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+                else if (opportunities is not null)
+                {
+                    <p class="text-muted">Henüz fırsat yok.</p>
+                }
+            </section>
+        }
+
+        @if (Session.Can(CrmAccess.ContactsRead))
+        {
+            <section class="detail-section">
+                <div class="section-header">
+                    <h2>Kişiler</h2>
+                    @if (Session.Can(CrmAccess.ContactsWrite))
+                    {
+                        <a class="btn btn-outline-secondary btn-sm" href="crm/kisiler">Kişilere git</a>
+                    }
+                </div>
+                @if (contacts is { Count: > 0 })
+                {
+                    <ul class="item-list">
+                        @foreach (var contact in contacts)
+                        {
+                            <li>
+                                <div class="item-main">
+                                    <strong>@contact.FirstName @contact.LastName</strong>
+                                    <span>
+                                        @contact.Title
+                                        @if (contact.Phone is { } contactPhone) { <text> · </text><a href="tel:@contactPhone">@contactPhone</a> }
+                                        @if (contact.Email is { } contactEmail) { <text> · </text><a href="mailto:@contactEmail">@contactEmail</a> }
+                                    </span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+                else if (contacts is not null)
+                {
+                    <p class="text-muted">Henüz kişi yok.</p>
+                }
+            </section>
+        }
+    }
+</AuthGate>
+
+@code {
+    // Bir firmanın ilişkili kayıtları tek sayfada; v1'de her türden ilk 200 kayıt gösterilir.
+    private const int Size = 200;
+
+    private CompanyDto? company;
+    private IReadOnlyList<ContactDto>? contacts;
+    private IReadOnlyList<OpportunityDto>? opportunities;
+    private IReadOnlyList<ActivityDto>? activities;
+    private ActivityDto? selectedActivity;
+    private OpportunityDto? selectedOpportunity;
+    private bool editingCompany;
+    private bool editingActivity;
+    private bool editingOpportunity;
+    private bool busy;
+    private string? message;
+
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private IEnumerable<OpportunityDto> OpenOpportunities =>
+        opportunities?.Where(o => o.Stage is not (OpportunityStage.Won or OpportunityStage.Lost)) ?? [];
+
+    private IEnumerable<OpportunityDto> WonOpportunities => opportunities?.Where(o => o.Stage == OpportunityStage.Won) ?? [];
+
+    private string? OverdueText
+    {
+        get
+        {
+            var overdue = activities?.Count(IsOverdue) ?? 0;
+            return overdue > 0 ? $"{overdue} geciken" : null;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.CompaniesRead))
+        {
+            await Lookups.LoadAsync(contacts: true, opportunities: true);
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<CompanyDto>($"/api/crm/companies/{Id}");
+        company = result.Value;
+        message = result.Error;
+        if (company is null)
+        {
+            return;
+        }
+
+        await Task.WhenAll(LoadContactsAsync(), LoadOpportunitiesAsync(), LoadActivitiesAsync());
+    }
+
+    private async Task LoadContactsAsync()
+    {
+        if (Session.Can(CrmAccess.ContactsRead))
+        {
+            contacts = (await Api.GetAsync<CrmPage<ContactDto>>($"/api/crm/contacts?companyId={Id}&pageSize={Size}")).Value?.Items ?? [];
+        }
+    }
+
+    private async Task LoadOpportunitiesAsync()
+    {
+        if (Session.Can(CrmAccess.OpportunitiesRead))
+        {
+            opportunities = (await Api.GetAsync<CrmPage<OpportunityDto>>($"/api/crm/opportunities?companyId={Id}&pageSize={Size}")).Value?.Items ?? [];
+        }
+    }
+
+    private async Task LoadActivitiesAsync()
+    {
+        if (Session.Can(CrmAccess.ActivitiesRead))
+        {
+            activities = (await Api.GetAsync<CrmPage<ActivityDto>>($"/api/crm/activities?companyId={Id}&pageSize={Size}")).Value?.Items ?? [];
+        }
+    }
+
+    private static bool IsOverdue(ActivityDto activity) =>
+        activity.CompletedAt is null && activity.DueAt is { } due && due < DateTimeOffset.Now;
+
+    private static string? ActivityClass(ActivityDto activity) =>
+        activity.CompletedAt is not null ? "done" : IsOverdue(activity) ? "overdue" : null;
+
+    private static string Totals(IEnumerable<OpportunityDto> items) =>
+        string.Join(" + ", items
+            .Where(o => o.Amount is not null)
+            .GroupBy(o => o.Currency)
+            .Select(g => CrmLabels.Amount(g.Sum(o => o.Amount!.Value), g.Key)));
+
+    private void CompanySaved(CompanyDto saved)
+    {
+        company = saved;
+        editingCompany = false;
+    }
+
+    private void CompanyDeleted() => Navigation.NavigateTo("crm/firmalar");
+
+    private void OpenActivity(ActivityDto? activity)
+    {
+        selectedActivity = activity;
+        editingActivity = true;
+    }
+
+    private async Task ActivitySaved()
+    {
+        editingActivity = false;
+        await LoadActivitiesAsync();
+    }
+
+    private void OpenOpportunity(OpportunityDto? opportunity)
+    {
+        selectedOpportunity = opportunity;
+        editingOpportunity = true;
+    }
+
+    private async Task OpportunitySaved()
+    {
+        editingOpportunity = false;
+        await LoadOpportunitiesAsync();
+    }
+
+    private async Task CompleteAsync(ActivityDto activity)
+    {
+        busy = true;
+        var result = await Api.PutAsync<ActivityDto>(
+            $"/api/crm/activities/{activity.Id}", CrmRequests.From(activity) with { CompletedAt = DateTimeOffset.Now });
+        busy = false;
+        message = result.Error;
+        await LoadActivitiesAsync();
+    }
+}

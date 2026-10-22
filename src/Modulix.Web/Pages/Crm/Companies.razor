@@ -1,13 +1,14 @@
 @page "/crm/firmalar"
 @inject ApiClient Api
 @inject SessionState Session
+@inject CrmLookups Lookups
 
 <PageTitle>Firmalar · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.CompaniesRead">
     <div class="page-header">
         <h1>Firmalar</h1>
-        @if (Session.Can(CrmAccess.CompaniesWrite) && form is null)
+        @if (Session.Can(CrmAccess.CompaniesWrite) && !editing)
         {
             <button type="button" class="btn btn-primary" @onclick="New">Yeni firma</button>
         }
@@ -18,60 +19,22 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    @if (form is not null)
+    @if (editing)
     {
-        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni firma" : "Firmayı düzenle")</h2>
-            <div class="form-grid">
-                <div>
-                    <label class="form-label" for="name">Ad *</label>
-                    <input id="name" class="form-control" maxlength="@CrmLimits.NameMaxLength" @bind="form.Name" />
-                    <FieldError Field="name" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="taxNumber">Vergi no</label>
-                    <input id="taxNumber" class="form-control" maxlength="@CrmLimits.TaxNumberMaxLength" @bind="form.TaxNumber" />
-                    <FieldError Field="taxNumber" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="phone">Telefon</label>
-                    <input id="phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
-                    <FieldError Field="phone" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="email">E-posta</label>
-                    <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" @bind="form.Email" />
-                    <FieldError Field="email" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="website">Web sitesi</label>
-                    <input id="website" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="form.Website" />
-                    <FieldError Field="website" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="city">Şehir</label>
-                    <input id="city" class="form-control" maxlength="@CrmLimits.CityMaxLength" @bind="form.City" />
-                    <FieldError Field="city" Errors="errors" />
-                </div>
-                <div class="span-all">
-                    <label class="form-label" for="notes">Notlar</label>
-                    <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
-                    <FieldError Field="notes" Errors="errors" />
-                </div>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Vazgeç</button>
-                @if (form.Id is not null)
-                {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
-                }
-            </div>
-        </form>
+        <CompanyEditor Company="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
     }
 
+    <div class="filters" role="group" aria-label="Durum">
+        <button type="button" class="chip @(status is null && !mine ? "active" : null)" @onclick="() => FilterAsync(null, false)">Tümü</button>
+        <button type="button" class="chip @(mine ? "active" : null)" @onclick="() => FilterAsync(null, true)">Benim firmalarım</button>
+        @foreach (var value in Enum.GetValues<CompanyStatus>())
+        {
+            <button type="button" class="chip @(status == value ? "active" : null)" @onclick="() => FilterAsync(value, false)">@CrmLabels.Of(value)</button>
+        }
+    </div>
+
     <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Ad, vergi no veya şehir ara" @bind="search" />
+        <input class="form-control" type="search" placeholder="Ad, vergi no, şehir veya etiket ara" @bind="search" />
         <button type="submit" class="btn btn-outline-secondary">Ara</button>
     </form>
 
@@ -87,16 +50,17 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ad</th><th>Şehir</th><th>Telefon</th><th>E-posta</th><th></th></tr>
+                <tr><th>Ad</th><th>Durum</th><th>Şehir</th><th>Sorumlu</th><th>Telefon</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var company in page.Items)
                 {
                     <tr>
-                        <td data-label="Ad" class="primary">@company.Name</td>
+                        <td data-label="Ad" class="primary"><a href="crm/firmalar/@company.Id">@company.Name</a></td>
+                        <td data-label="Durum"><span class="badge status-@company.Status.ToString().ToLowerInvariant()">@CrmLabels.Of(company.Status)</span></td>
                         <td data-label="Şehir">@company.City</td>
+                        <td data-label="Sorumlu">@Lookups.MemberName(company.OwnerId)</td>
                         <td data-label="Telefon">@company.Phone</td>
-                        <td data-label="E-posta">@company.Email</td>
                         <td class="actions">
                             @if (Session.Can(CrmAccess.CompaniesWrite))
                             {
@@ -115,106 +79,64 @@
     private const string Url = "/api/crm/companies";
 
     private CrmPage<CompanyDto>? page;
-    private CompanyForm? form;
-    private IReadOnlyDictionary<string, string[]>? errors;
+    private CompanyDto? selected;
+    private bool editing;
     private string? message;
     private string? search;
-    private bool busy;
+    private CompanyStatus? status;
+    private bool mine;
 
     protected override async Task OnInitializedAsync()
     {
         await Session.EnsureLoadedAsync();
         if (Session.Can(CrmAccess.CompaniesRead))
         {
+            await Lookups.LoadAsync();
             await LoadAsync(1);
         }
+    }
+
+    private async Task FilterAsync(CompanyStatus? value, bool onlyMine)
+    {
+        status = value;
+        mine = onlyMine;
+        await LoadAsync(1);
     }
 
     private async Task LoadAsync(int pageNumber)
     {
-        var result = await Api.GetAsync<CrmPage<CompanyDto>>($"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}");
+        var url = $"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (status is { } s)
+        {
+            url += $"&status={s}";
+        }
+
+        if (mine)
+        {
+            url += "&ownerId=me";
+        }
+
+        var result = await Api.GetAsync<CrmPage<CompanyDto>>(url);
         page = result.Value;
         message = result.Error;
     }
 
-    private void New() => Open(new CompanyForm());
+    private void New() => Open(null);
 
-    private void Edit(CompanyDto company) => Open(new CompanyForm
-    {
-        Id = company.Id,
-        Version = company.Version,
-        Name = company.Name,
-        TaxNumber = company.TaxNumber,
-        Phone = company.Phone,
-        Email = company.Email,
-        Website = company.Website,
-        City = company.City,
-        Notes = company.Notes,
-    });
+    private void Edit(CompanyDto company) => Open(company);
 
-    private void Open(CompanyForm value)
+    private void Open(CompanyDto? company)
     {
-        form = value;
-        errors = null;
+        selected = company;
+        editing = true;
         message = null;
     }
 
-    private void Cancel() => form = null;
+    private void Close() => editing = false;
 
-    private async Task SaveAsync()
+    private async Task SavedAsync()
     {
-        busy = true;
-        var request = new SaveCompanyRequest(form!.Name, form.TaxNumber, form.Phone, form.Email, form.Website, form.City, form.Notes, form.Version);
-        var result = form.Id is { } id
-            ? await Api.PutAsync<CompanyDto>($"{Url}/{id}", request)
-            : await Api.PostAsync<CompanyDto>(Url, request);
-        busy = false;
-
-        if (result.IsSuccess)
-        {
-            form = null;
-            await LoadAsync(page?.Page ?? 1);
-            return;
-        }
-
-        errors = result.FieldErrors;
-        message = result.Error;
-    }
-
-    private async Task DeleteAsync()
-    {
-        busy = true;
-        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
-        busy = false;
-
-        if (result.IsSuccess)
-        {
-            form = null;
-            await LoadAsync(1);
-            return;
-        }
-
-        message = result.Error;
-    }
-
-    private sealed class CompanyForm
-    {
-        public Guid? Id { get; init; }
-
-        public long? Version { get; init; }
-
-        public string Name { get; set; } = string.Empty;
-
-        public string? TaxNumber { get; set; }
-
-        public string? Phone { get; set; }
-
-        public string? Email { get; set; }
-
-        public string? Website { get; set; }
-
-        public string? City { get; set; }
-
-        public string? Notes { get; set; }
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
     }
 }

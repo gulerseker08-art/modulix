@@ -56,6 +56,7 @@ public sealed class CrmModule : IModule
 
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<CrmStoreContext>();
         services.AddScoped<IRecordStore, CompanyRecordStore>();
         services.AddScoped<IRecordStore, ContactRecordStore>();
         services.AddScoped<IRecordStore, OpportunityRecordStore>();

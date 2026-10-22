@@ -101,7 +101,12 @@
                 {
                     <tr>
                         <td data-label="Ad soyad" class="primary">@contact.FirstName @contact.LastName</td>
-                        <td data-label="Firma">@Lookups.CompanyName(contact.CompanyId)</td>
+                        <td data-label="Firma">
+                            @if (contact.CompanyId is { } companyId)
+                            {
+                                <a href="crm/firmalar/@companyId">@Lookups.CompanyName(companyId)</a>
+                            }
+                        </td>
                         <td data-label="Unvan">@contact.Title</td>
                         <td data-label="Telefon">@contact.Phone</td>
                         <td data-label="E-posta">@contact.Email</td>

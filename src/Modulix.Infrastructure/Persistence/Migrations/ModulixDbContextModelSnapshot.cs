@@ -443,6 +443,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("OpportunityId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Subject")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -473,6 +476,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "OpportunityId");
 
+                    b.HasIndex("TenantId", "OwnerId", "CompletedAt");
+
                     b.ToTable("Activities", "crm");
                 });
 
@@ -480,6 +485,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("City")
                         .HasMaxLength(100)
@@ -492,6 +501,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("nvarchar(254)");
 
+                    b.Property<string>("Industry")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -501,9 +514,22 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
+
+                    b.Property<int?>("Source")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Tags")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("TaxNumber")
                         .HasMaxLength(20)
@@ -526,6 +552,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "Name");
+
+                    b.HasIndex("TenantId", "OwnerId");
 
                     b.HasIndex("TenantId", "TaxNumber")
                         .IsUnique()
@@ -618,9 +646,19 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("ExpectedCloseDate")
                         .HasColumnType("date");
 
+                    b.Property<string>("LostReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Probability")
+                        .HasColumnType("int");
 
                     b.Property<int>("Stage")
                         .HasColumnType("int");
@@ -645,6 +683,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "CompanyId");
 
                     b.HasIndex("TenantId", "ContactId");
+
+                    b.HasIndex("TenantId", "OwnerId");
 
                     b.HasIndex("TenantId", "Stage");
 

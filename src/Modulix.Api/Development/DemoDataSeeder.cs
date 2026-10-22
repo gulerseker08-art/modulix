@@ -81,10 +81,11 @@ public static class DemoDataSeeder
         var anka = await CreateAsync(CrmModule.Entities.Company, new JsonObject
         {
             ["name"] = "Anka Gıda A.Ş.", ["city"] = "İstanbul", ["phone"] = "0212 555 01 01", ["email"] = "info@anka.demo",
+            ["status"] = "Customer", ["industry"] = "Gıda", ["source"] = "Referral", ["tags"] = "öncelikli, soğuk zincir",
         });
         var delta = await CreateAsync(CrmModule.Entities.Company, new JsonObject
         {
-            ["name"] = "Delta Yapı Ltd.", ["city"] = "Ankara", ["taxNumber"] = "1234567890",
+            ["name"] = "Delta Yapı Ltd.", ["city"] = "Ankara", ["taxNumber"] = "1234567890", ["industry"] = "İnşaat", ["source"] = "Event",
         });
         var selin = await CreateAsync(CrmModule.Entities.Contact, new JsonObject
         {
@@ -93,7 +94,7 @@ public static class DemoDataSeeder
         var depo = await CreateAsync(CrmModule.Entities.Opportunity, new JsonObject
         {
             ["title"] = "Depo taşımacılığı sözleşmesi", ["companyId"] = anka.ToString(), ["contactId"] = selin.ToString(),
-            ["stage"] = "Proposal", ["amount"] = 450000m, ["currency"] = "TRY",
+            ["stage"] = "Proposal", ["amount"] = 450000m, ["currency"] = "TRY", ["probability"] = 60,
         });
         await CreateAsync(CrmModule.Entities.Opportunity, new JsonObject
         {
@@ -103,6 +104,11 @@ public static class DemoDataSeeder
         {
             ["type"] = "Meeting", ["subject"] = "Teklif sunumu", ["companyId"] = anka.ToString(), ["opportunityId"] = depo.ToString(),
             ["dueAt"] = DateTimeOffset.UtcNow.Date.AddDays(3).AddHours(7).ToString("O"),
+        });
+        await CreateAsync(CrmModule.Entities.Activity, new JsonObject
+        {
+            ["type"] = "Call", ["subject"] = "Delta'yı arayıp ihtiyacı netleştir", ["companyId"] = delta.ToString(),
+            ["dueAt"] = DateTimeOffset.UtcNow.AddDays(-1).ToString("O"),
         });
     }
 

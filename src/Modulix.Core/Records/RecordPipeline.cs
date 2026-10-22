@@ -54,7 +54,20 @@ public sealed class RecordPipeline(
             Search = string.IsNullOrEmpty(search) ? null : search[..Math.Min(search.Length, RecordQuery.MaxSearchLength)],
         };
 
-        var page = await store!.QueryAsync(normalized, cancellationToken);
+        if (normalized.Filters is { Count: > RecordQuery.MaxFilters })
+        {
+            return Invalid<RecordPage>([new RecordFieldError("filters", $"En fazla {RecordQuery.MaxFilters} filtre verilebilir.")]);
+        }
+
+        RecordPage page;
+        try
+        {
+            page = await store!.QueryAsync(normalized, cancellationToken);
+        }
+        catch (RecordValidationException invalid)
+        {
+            return Invalid<RecordPage>(invalid.Errors);
+        }
 
         // v0: kapsam sonuç üzerinde uygulanır. E4'te kapsam sorguya taşınır (sayfalama doğru kalsın diye).
         var visible = new List<RecordData>(page.Items.Count);
