@@ -40,6 +40,7 @@ public static class PersistenceSetup
                 .AddInterceptors(new TenantSessionContextInterceptor(tenantAccessor));
         });
         services.AddScoped<IMembershipDirectory, MembershipDirectory>();
+        services.AddScoped<ITenantMembers, TenantMembers>();
         services.AddScoped<IModuleData, ModuleData>();
 
         // Modül hakları ve izinler; ModuleCatalog'u host kaydeder (AddModulixModules).

@@ -38,8 +38,13 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.Property(c => c.Email).HasMaxLength(Company.EmailMaxLength);
         builder.Property(c => c.Website).HasMaxLength(Company.WebsiteMaxLength);
         builder.Property(c => c.City).HasMaxLength(Company.CityMaxLength);
+        builder.Property(c => c.Address).HasMaxLength(Company.AddressMaxLength);
+        builder.Property(c => c.Industry).HasMaxLength(Company.IndustryMaxLength);
+        builder.Property(c => c.Status).IsRequired();
+        builder.Property(c => c.Tags).HasMaxLength(Company.TagsMaxLength);
         builder.Property(c => c.Notes).HasMaxLength(Company.NotesMaxLength);
         builder.HasIndex(c => new { c.TenantId, c.Name });
+        builder.HasIndex(c => new { c.TenantId, c.OwnerId });
 
         // Vergi numarası tenant içinde tekildir; boş bırakılan kayıtlar bu kurala girmez (SQL Server filtreli indeks üretir).
         builder.HasIndex(c => new { c.TenantId, c.TaxNumber }).IsUnique();
@@ -76,8 +81,10 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
         builder.Property(o => o.Stage).IsRequired();
         builder.Property(o => o.Amount).HasPrecision(18, 2);
         builder.Property(o => o.Currency).HasMaxLength(Opportunity.CurrencyLength).IsFixedLength().IsUnicode(false).IsRequired();
+        builder.Property(o => o.LostReason).HasMaxLength(Opportunity.LostReasonMaxLength);
         builder.Property(o => o.Notes).HasMaxLength(Company.NotesMaxLength);
         builder.HasIndex(o => new { o.TenantId, o.Stage });
+        builder.HasIndex(o => new { o.TenantId, o.OwnerId });
 
         builder.HasOne<Company>()
             .WithMany()
@@ -101,6 +108,7 @@ internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
         builder.Property(a => a.Subject).HasMaxLength(Activity.SubjectMaxLength).IsRequired();
         builder.Property(a => a.Notes).HasMaxLength(Company.NotesMaxLength);
         builder.HasIndex(a => new { a.TenantId, a.DueAt });
+        builder.HasIndex(a => new { a.TenantId, a.OwnerId, a.CompletedAt });
 
         builder.HasOne<Company>()
             .WithMany()

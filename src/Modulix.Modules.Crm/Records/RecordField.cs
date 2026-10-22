@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
-using Modulix.Core.Contracts.Persistence;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Records;
@@ -41,8 +40,8 @@ internal sealed class RecordField<TEntity>
     /// <summary>Alan boş (null) bırakılabilir mi?</summary>
     public bool Nullable { get; }
 
-    /// <summary>Bağlı kayıt alanıysa, kaydın aktif tenant'ta var olup olmadığını denetler.</summary>
-    public Func<IModuleData, Guid, CancellationToken, Task<bool>>? Exists { get; init; }
+    /// <summary>Bağlı kayıt (veya kullanıcı) alanıysa, aktif tenant'ta var olup olmadığını denetler.</summary>
+    public Func<CrmStoreContext, Guid, CancellationToken, Task<bool>>? Exists { get; init; }
 
     /// <summary>Bağlı kayıt bulunamazsa gösterilen mesaj.</summary>
     public string? NotFoundMessage { get; init; }
@@ -134,30 +133,53 @@ internal static class Field
     public static RecordField<T> Choice<T, TEnum>(string name, Func<T, TEnum> get, Action<T, TEnum> set)
         where TEnum : struct, Enum =>
         new(name, required: false, nullable: false, node =>
-                node.GetValueKind() == JsonValueKind.String
-                && node.GetValue<string>() is { Length: > 0 } text
-                && char.IsAsciiLetter(text[0])
-                && Enum.TryParse<TEnum>(text, ignoreCase: true, out var value)
-                && Enum.IsDefined(value)
+                node.GetValueKind() == JsonValueKind.String && FilterValue.Choice<TEnum>(node.GetValue<string>()) is { } value
                     ? ParsedValue.Of(value)
                     : ParsedValue.Fail($"Geçerli değerler: {string.Join(", ", Enum.GetNames<TEnum>())}."),
             e => get(e).ToString(),
             (e, v) => set(e, (TEnum)v!));
 
+    /// <summary>Boş bırakılabilen seçenek.</summary>
+    public static RecordField<T> OptionalChoice<T, TEnum>(string name, Func<T, TEnum?> get, Action<T, TEnum?> set)
+        where TEnum : struct, Enum =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() == JsonValueKind.String && FilterValue.Choice<TEnum>(node.GetValue<string>()) is { } value
+                    ? ParsedValue.Of(value)
+                    : ParsedValue.Fail($"Geçerli değerler: {string.Join(", ", Enum.GetNames<TEnum>())}."),
+            e => get(e)?.ToString(),
+            (e, v) => set(e, (TEnum?)v));
+
+    /// <summary>Yüzde: 0-100 arası tam sayı.</summary>
+    public static RecordField<T> Percent<T>(string name, Func<T, int?> get, Action<T, int?> set) =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var percent) && percent is >= 0 and <= 100
+                    ? ParsedValue.Of(percent)
+                    : ParsedValue.Fail("0 ile 100 arasında bir tam sayı girin."),
+            e => get(e) is { } value ? JsonValue.Create(value) : null,
+            (e, v) => set(e, (int?)v));
+
+    /// <summary>Kaydın sorumlusu: aktif tenant'ın etkin üyesi olan bir kullanıcı.</summary>
+    public static RecordField<T> Owner<T>(string name, Func<T, Guid?> get, Action<T, Guid?> set) =>
+        new(name, required: false, nullable: true, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v))
+        {
+            Exists = (context, id, ct) => context.Members.IsActiveMemberAsync(id, ct),
+            NotFoundMessage = "Kullanıcı bu kuruluşun üyesi değil.",
+        };
+
     /// <summary>Aynı tenant'taki başka bir CRM kaydına bağ. Kayıt yoksa (veya başka tenant'ınsa) doğrulama hatası.</summary>
     public static RecordField<T> Reference<T, TTarget>(
         string name, string notFoundMessage, Func<T, Guid?> get, Action<T, Guid?> set, bool required = false)
         where TTarget : CrmEntity =>
-        new(name, required, nullable: !required, node =>
-                node.GetValueKind() == JsonValueKind.String && Guid.TryParse(node.GetValue<string>(), out var id) && id != Guid.Empty
-                    ? ParsedValue.Of(id)
-                    : ParsedValue.Fail("Geçerli bir kayıt kimliği olmalıdır."),
-            e => get(e) is { } value ? value.ToString() : null,
-            (e, v) => set(e, (Guid?)v))
+        new(name, required, nullable: !required, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v))
         {
-            Exists = (data, id, ct) => data.Set<TTarget>().AnyAsync(t => t.Id == id, ct),
+            Exists = (context, id, ct) => context.Data.Set<TTarget>().AnyAsync(t => t.Id == id, ct),
             NotFoundMessage = notFoundMessage,
         };
+
+    private static ParsedValue ParseId(JsonNode node) =>
+        node.GetValueKind() == JsonValueKind.String && FilterValue.Id(node.GetValue<string>()) is { } id
+            ? ParsedValue.Of(id)
+            : ParsedValue.Fail("Geçerli bir kayıt kimliği olmalıdır.");
 
     private static ParsedValue ParseText(JsonNode node, int maxLength)
     {

@@ -36,12 +36,23 @@ public sealed record RecordCommand(
     long? ExpectedVersion = null,
     ExecutionSource Source = ExecutionSource.Api);
 
-/// <summary>Sayfalı liste isteği. <see cref="Search"/> verilirse kayıt deposu kendi arama alanlarında arar.</summary>
-public sealed record RecordQuery(string EntityKey, int Page = 1, int PageSize = 50, string? Search = null)
+/// <summary>
+/// Sayfalı liste isteği. <see cref="Search"/> verilirse kayıt deposu kendi arama alanlarında arar.
+/// <see cref="Filters"/> ad → değer çiftleridir (ör. "companyId"); hangi filtrelerin geçerli olduğunu kayıt
+/// deposu belirler, bilinmeyen filtre veya geçersiz değer doğrulama hatasıdır.
+/// </summary>
+public sealed record RecordQuery(
+    string EntityKey,
+    int Page = 1,
+    int PageSize = 50,
+    string? Search = null,
+    IReadOnlyDictionary<string, string>? Filters = null)
 {
     public const int MaxSearchLength = 100;
 
     public const int MaxPageSize = 200;
+
+    public const int MaxFilters = 10;
 }
 
 public sealed record RecordPage(IReadOnlyList<RecordData> Items, int Page, int PageSize, int TotalCount);
@@ -117,6 +128,7 @@ public interface IRecordStore
 
     Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken);
 
+    /// <summary>Filtre bilinmiyorsa veya değeri geçersizse <see cref="RecordValidationException"/>.</summary>
     Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken);
 
     /// <summary>Veriye bağlı bir kural geçmezse (ör. bağlı kayıt yok) <see cref="RecordValidationException"/>.</summary>

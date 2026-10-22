@@ -1,0 +1,223 @@
+@* Fırsat ekleme/düzenleme formu; Fırsatlar sayfası ve firma detay sayfası kullanır. *@
+@inject ApiClient Api
+
+<form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <h2>@(Opportunity is null ? "Yeni fırsat" : "Fırsatı düzenle")</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="form-grid">
+        <div class="span-all">
+            <label class="form-label" for="title">Başlık *</label>
+            <input id="title" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="form.Title" />
+            <FieldError Field="title" Errors="errors" />
+        </div>
+        @if (FixedCompanyId is null)
+        {
+            <div>
+                <label class="form-label" for="companyId">Firma *</label>
+                <select id="companyId" class="form-select" @bind="form.CompanyId">
+                    <option value="">Seçin</option>
+                    @foreach (var company in Lookups.Companies)
+                    {
+                        <option value="@company.Id">@company.Name</option>
+                    }
+                </select>
+                <FieldError Field="companyId" Errors="errors" />
+            </div>
+        }
+        <div>
+            <label class="form-label" for="contactId">Kişi</label>
+            <select id="contactId" class="form-select" @bind="form.ContactId">
+                <option value="">—</option>
+                @foreach (var contact in Lookups.Contacts.Where(c => form.CompanyId is null || c.CompanyId == form.CompanyId))
+                {
+                    <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
+                }
+            </select>
+            <FieldError Field="contactId" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="stage">Aşama</label>
+            <select id="stage" class="form-select" @bind="form.Stage">
+                @foreach (var stage in Enum.GetValues<OpportunityStage>())
+                {
+                    <option value="@stage">@CrmLabels.Of(stage)</option>
+                }
+            </select>
+            <FieldError Field="stage" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="probability">Olasılık (%)</label>
+            <input id="probability" class="form-control" type="number" min="0" max="100" step="5" inputmode="numeric" @bind="form.Probability" />
+            <FieldError Field="probability" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="amount">Tutar</label>
+            <input id="amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.Amount" />
+            <FieldError Field="amount" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="currency">Para birimi</label>
+            <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
+            <FieldError Field="currency" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="expectedCloseDate">Beklenen kapanış</label>
+            <input id="expectedCloseDate" class="form-control" type="date" @bind="form.ExpectedCloseDate" />
+            <FieldError Field="expectedCloseDate" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="ownerId">Sorumlu</label>
+            <select id="ownerId" class="form-select" @bind="form.OwnerId">
+                <option value="">@(Opportunity is null ? "Ben" : "—")</option>
+                @foreach (var member in Lookups.Members)
+                {
+                    <option value="@member.UserId">@member.DisplayName</option>
+                }
+            </select>
+            <FieldError Field="ownerId" Errors="errors" />
+        </div>
+        @if (form.Stage == OpportunityStage.Lost || !string.IsNullOrEmpty(form.LostReason))
+        {
+            <div class="span-all">
+                <label class="form-label" for="lostReason">Kaybedilme nedeni</label>
+                <input id="lostReason" class="form-control" maxlength="@CrmLimits.LostReasonMaxLength" placeholder="Örn. fiyat yüksek bulundu" @bind="form.LostReason" />
+                <FieldError Field="lostReason" Errors="errors" />
+            </div>
+        }
+        <div class="span-all">
+            <label class="form-label" for="notes">Notlar</label>
+            <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
+            <FieldError Field="notes" Errors="errors" />
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        @if (Opportunity is not null)
+        {
+            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+        }
+    </div>
+</form>
+
+@code {
+    private const string Url = "/api/crm/opportunities";
+
+    private OpportunityForm form = new();
+    private OpportunityDto? source;
+    private bool initialized;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    /// <summary>Düzenlenecek fırsat; null ise yeni fırsat.</summary>
+    [Parameter] public OpportunityDto? Opportunity { get; set; }
+
+    /// <summary>Verilirse firma seçilemez (firma detay sayfası).</summary>
+    [Parameter] public Guid? FixedCompanyId { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<OpportunityDto> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Opportunity))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Opportunity;
+        form = Opportunity is { } o
+            ? new OpportunityForm
+            {
+                Id = o.Id, Version = o.Version, Title = o.Title, CompanyId = o.CompanyId, ContactId = o.ContactId, Stage = o.Stage,
+                Probability = o.Probability, Amount = o.Amount, Currency = o.Currency, ExpectedCloseDate = o.ExpectedCloseDate,
+                LostReason = o.LostReason, OwnerId = o.OwnerId, Notes = o.Notes,
+            }
+            : new OpportunityForm { CompanyId = FixedCompanyId };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (form.CompanyId is not { } companyId)
+        {
+            errors = new Dictionary<string, string[]> { ["companyId"] = ["Bu alan zorunludur."] };
+            return;
+        }
+
+        busy = true;
+        var request = new SaveOpportunityRequest(
+            form.Title, companyId, form.ContactId, form.Stage, form.Amount, form.Currency, form.ExpectedCloseDate, form.Notes, form.Version,
+            form.Probability, form.LostReason, form.OwnerId);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<OpportunityDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<OpportunityDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class OpportunityForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Title { get; set; } = string.Empty;
+
+        public Guid? CompanyId { get; set; }
+
+        public Guid? ContactId { get; set; }
+
+        public OpportunityStage Stage { get; set; } = OpportunityStage.Lead;
+
+        public int? Probability { get; set; }
+
+        public decimal? Amount { get; set; }
+
+        public string Currency { get; set; } = "TRY";
+
+        public DateOnly? ExpectedCloseDate { get; set; }
+
+        public string? LostReason { get; set; }
+
+        public Guid? OwnerId { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}

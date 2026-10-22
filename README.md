@@ -116,10 +116,23 @@ Geçerli izin = kullanıcının rollerindeki izinler ∩ tenant için açık mod
 | `GET /api/crm/companies/{id}` | Tek firma | `crm.companies.read` |
 | `POST`, `PUT /{id}`, `DELETE /{id}?version=` | Ekle, düzenle, sil | `crm.companies.write` |
 | `/api/crm/contacts`, `/api/crm/opportunities`, `/api/crm/activities` | Aynı kalıp | `crm.<kaynak>.read` / `.write` |
+| `GET /api/tenant/members` | Kuruluşun etkin üyeleri (sorumlu seçimi) | Aktif tenant |
+
+Listeler filtre alır; bilinmeyen filtre veya geçersiz değer 422 döner. `ownerId=me` isteği yapan kullanıcıdır.
+
+| Kaynak | Filtreler |
+| --- | --- |
+| Firmalar | `status` (Prospect, Customer, Inactive), `ownerId` |
+| Kişiler | `companyId` |
+| Fırsatlar | `companyId`, `contactId`, `stage`, `open=true` (kazanılmamış ve kaybedilmemiş), `ownerId` |
+| Aktiviteler | `companyId`, `contactId`, `opportunityId`, `open=true`, `dueBefore=<ISO zaman>`, `ownerId` |
+
+- Firma, fırsat ve aktivitenin bir sorumlusu vardır; oluştururken boş bırakılırsa kaydı oluşturan kullanıcı atanır. Sorumlu, kuruluşun etkin üyesi olmalıdır.
 
 - Tüm işlemler kayıt boru hattından geçer: modül tenant için kapalıysa veya izin yoksa 403, başka tenant'ın kaydı 404, başka tenant'ın kaydına bağlanmak 422 döner. Bağlı kaydı olan firma silinemez (409). Audit ve outbox kaydı otomatik yazılır.
 - Aynı kayıtlara genel uçtan da ulaşılır (`/api/records/crm.company` vb.); aynı izinler geçerlidir.
 - Arayüz API ile aynı adresten sunulur: `https://localhost:7026` → giriş, kuruluş seçimi, Firmalar / Kişiler / Fırsatlar / Aktiviteler. Telefonda listeler kart görünümüne döner.
+- Firma adına tıklayınca firma detay sayfası açılır: kişiler, fırsatlar ve aktiviteler tek ekranda; aktivite ve fırsat oradan eklenir. Fırsatlar sayfası varsayılan olarak satış hunisini (aşama sütunları, sürükle bırak) gösterir. Aktiviteler sayfası "Bugün" görünümüyle açılır (bugüne kadar yapılması gereken açık işlerim).
 
 **Yeni bir sektör modülü eklemek** (CRM'i örnek alın):
 

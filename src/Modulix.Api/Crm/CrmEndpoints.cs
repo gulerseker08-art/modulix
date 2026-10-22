@@ -56,9 +56,11 @@ public static class CrmEndpoints
     private sealed class CrmResource<TDto, TSave>(string path, string entityKey)
         where TSave : class
     {
-        public async Task<IResult> ListAsync(int? page, int? pageSize, string? search, IRecordPipeline pipeline, CancellationToken ct)
+        public async Task<IResult> ListAsync(
+            int? page, int? pageSize, string? search, HttpRequest http, IRecordPipeline pipeline, CancellationToken ct)
         {
-            var result = await pipeline.QueryAsync(new RecordQuery(entityKey, page ?? 1, pageSize ?? 50, search), ct);
+            var query = new RecordQuery(entityKey, page ?? 1, pageSize ?? 50, search, RecordEndpoints.FiltersFrom(http));
+            var result = await pipeline.QueryAsync(query, ct);
             return result.IsSuccess
                 ? Results.Ok(new CrmPage<TDto>(
                     result.Value!.Items.Select(ToDto<TDto>).ToList(), result.Value.Page, result.Value.PageSize, result.Value.TotalCount))

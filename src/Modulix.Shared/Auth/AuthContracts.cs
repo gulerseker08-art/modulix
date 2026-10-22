@@ -17,3 +17,6 @@ public sealed record MeResponse(
     IReadOnlyList<MembershipDto> Memberships);
 
 public sealed record CurrentTenantResponse(Guid TenantId, string Name, string Slug);
+
+/// <summary>Aktif tenant'ın etkin üyesi; kayıtlarda sorumlu seçmek için.</summary>
+public sealed record TenantMemberResponse(Guid UserId, string DisplayName);

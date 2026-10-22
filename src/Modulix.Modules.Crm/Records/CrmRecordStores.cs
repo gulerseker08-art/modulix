@@ -1,12 +1,12 @@
-using Modulix.Core.Contracts.Persistence;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Records;
 
 // Kayıt türleri: "crm.company", "crm.contact", "crm.opportunity", "crm.activity".
-// Alan adları API'de ve audit kaydında görünen teknik kimliklerdir; değiştirmeyin.
+// Alan ve filtre adları API'de ve audit kaydında görünen teknik kimliklerdir; değiştirmeyin.
+// Sorumlu filtresi "ownerId=me" isteği yapan kullanıcıyı seçer.
 
-internal sealed class CompanyRecordStore(IModuleData data) : CrmRecordStore<Company>(data)
+internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordStore<Company>(context)
 {
     public override string EntityKey => CrmModule.Entities.Company;
 
@@ -22,16 +22,31 @@ internal sealed class CompanyRecordStore(IModuleData data) : CrmRecordStore<Comp
         Field.Email<Company>("email", Company.EmailMaxLength, c => c.Email, (c, v) => c.Email = v),
         Field.Text<Company>("website", Company.WebsiteMaxLength, c => c.Website, (c, v) => c.Website = v),
         Field.Text<Company>("city", Company.CityMaxLength, c => c.City, (c, v) => c.City = v),
+        Field.Text<Company>("address", Company.AddressMaxLength, c => c.Address, (c, v) => c.Address = v),
+        Field.Text<Company>("industry", Company.IndustryMaxLength, c => c.Industry, (c, v) => c.Industry = v),
+        Field.Choice<Company, CompanyStatus>("status", c => c.Status, (c, v) => c.Status = v),
+        Field.OptionalChoice<Company, CompanySource>("source", c => c.Source, (c, v) => c.Source = v),
+        Field.Text<Company>("tags", Company.TagsMaxLength, c => c.Tags, (c, v) => c.Tags = v),
+        Field.Owner<Company>(OwnerField, c => c.OwnerId, (c, v) => c.OwnerId = v),
         Field.Text<Company>("notes", Company.NotesMaxLength, c => c.Notes, (c, v) => c.Notes = v),
     ];
+
+    protected override IReadOnlyDictionary<string, RecordFilter<Company>> Filters { get; } = new Dictionary<string, RecordFilter<Company>>
+    {
+        ["status"] = (q, v, _) => FilterValue.Choice<CompanyStatus>(v) is { } status ? q.Where(c => c.Status == status) : null,
+        [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
+    };
 
     protected override IOrderedQueryable<Company> Order(IQueryable<Company> source) => source.OrderBy(c => c.Name);
 
     protected override IQueryable<Company> Search(IQueryable<Company> source, string term) =>
-        source.Where(c => c.Name.Contains(term) || (c.TaxNumber != null && c.TaxNumber.Contains(term)) || (c.City != null && c.City.Contains(term)));
+        source.Where(c => c.Name.Contains(term)
+            || (c.TaxNumber != null && c.TaxNumber.Contains(term))
+            || (c.City != null && c.City.Contains(term))
+            || (c.Tags != null && c.Tags.Contains(term)));
 }
 
-internal sealed class ContactRecordStore(IModuleData data) : CrmRecordStore<Contact>(data)
+internal sealed class ContactRecordStore(CrmStoreContext context) : CrmRecordStore<Contact>(context)
 {
     public override string EntityKey => CrmModule.Entities.Contact;
 
@@ -50,6 +65,11 @@ internal sealed class ContactRecordStore(IModuleData data) : CrmRecordStore<Cont
         Field.Text<Contact>("notes", Company.NotesMaxLength, c => c.Notes, (c, v) => c.Notes = v),
     ];
 
+    protected override IReadOnlyDictionary<string, RecordFilter<Contact>> Filters { get; } = new Dictionary<string, RecordFilter<Contact>>
+    {
+        ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.CompanyId == id) : null,
+    };
+
     protected override IOrderedQueryable<Contact> Order(IQueryable<Contact> source) =>
         source.OrderBy(c => c.LastName).ThenBy(c => c.FirstName);
 
@@ -57,7 +77,7 @@ internal sealed class ContactRecordStore(IModuleData data) : CrmRecordStore<Cont
         source.Where(c => c.FirstName.Contains(term) || c.LastName.Contains(term) || (c.Email != null && c.Email.Contains(term)));
 }
 
-internal sealed class OpportunityRecordStore(IModuleData data) : CrmRecordStore<Opportunity>(data)
+internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecordStore<Opportunity>(context)
 {
     public override string EntityKey => CrmModule.Entities.Opportunity;
 
@@ -74,8 +94,23 @@ internal sealed class OpportunityRecordStore(IModuleData data) : CrmRecordStore<
         Field.Money<Opportunity>("amount", o => o.Amount, (o, v) => o.Amount = v),
         Field.Currency<Opportunity>("currency", o => o.Currency, (o, v) => o.Currency = v),
         Field.Date<Opportunity>("expectedCloseDate", o => o.ExpectedCloseDate, (o, v) => o.ExpectedCloseDate = v),
+        Field.Percent<Opportunity>("probability", o => o.Probability, (o, v) => o.Probability = v),
+        Field.Text<Opportunity>("lostReason", Opportunity.LostReasonMaxLength, o => o.LostReason, (o, v) => o.LostReason = v),
+        Field.Owner<Opportunity>(OwnerField, o => o.OwnerId, (o, v) => o.OwnerId = v),
         Field.Text<Opportunity>("notes", Company.NotesMaxLength, o => o.Notes, (o, v) => o.Notes = v),
     ];
+
+    /// <summary>"open=true": kazanılmamış ve kaybedilmemiş fırsatlar.</summary>
+    protected override IReadOnlyDictionary<string, RecordFilter<Opportunity>> Filters { get; } = new Dictionary<string, RecordFilter<Opportunity>>
+    {
+        ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.CompanyId == id) : null,
+        ["contactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.ContactId == id) : null,
+        ["stage"] = (q, v, _) => FilterValue.Choice<OpportunityStage>(v) is { } stage ? q.Where(o => o.Stage == stage) : null,
+        ["open"] = (q, v, _) => FilterValue.Bool(v) is { } open
+            ? q.Where(o => (o.Stage != OpportunityStage.Won && o.Stage != OpportunityStage.Lost) == open)
+            : null,
+        [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(o => o.OwnerId == owner) : null,
+    };
 
     protected override IOrderedQueryable<Opportunity> Order(IQueryable<Opportunity> source) =>
         source.OrderByDescending(o => o.CreatedAt);
@@ -84,7 +119,7 @@ internal sealed class OpportunityRecordStore(IModuleData data) : CrmRecordStore<
         source.Where(o => o.Title.Contains(term));
 }
 
-internal sealed class ActivityRecordStore(IModuleData data) : CrmRecordStore<Activity>(data)
+internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordStore<Activity>(context)
 {
     public override string EntityKey => CrmModule.Entities.Activity;
 
@@ -101,8 +136,23 @@ internal sealed class ActivityRecordStore(IModuleData data) : CrmRecordStore<Act
         Field.Reference<Activity, Company>("companyId", "Firma bulunamadı.", a => a.CompanyId, (a, v) => a.CompanyId = v),
         Field.Reference<Activity, Contact>("contactId", "Kişi bulunamadı.", a => a.ContactId, (a, v) => a.ContactId = v),
         Field.Reference<Activity, Opportunity>("opportunityId", "Fırsat bulunamadı.", a => a.OpportunityId, (a, v) => a.OpportunityId = v),
+        Field.Owner<Activity>(OwnerField, a => a.OwnerId, (a, v) => a.OwnerId = v),
         Field.Text<Activity>("notes", Company.NotesMaxLength, a => a.Notes, (a, v) => a.Notes = v),
     ];
+
+    /// <summary>
+    /// "open=true": tamamlanmamış. "dueBefore": bu zamandan önce yapılması gereken (ör. bugünün sonu veya şimdi);
+    /// gün sınırını kullanıcının saat dilimine göre istemci hesaplar.
+    /// </summary>
+    protected override IReadOnlyDictionary<string, RecordFilter<Activity>> Filters { get; } = new Dictionary<string, RecordFilter<Activity>>
+    {
+        ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(a => a.CompanyId == id) : null,
+        ["contactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(a => a.ContactId == id) : null,
+        ["opportunityId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(a => a.OpportunityId == id) : null,
+        ["open"] = (q, v, _) => FilterValue.Bool(v) is { } open ? q.Where(a => (a.CompletedAt == null) == open) : null,
+        ["dueBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(a => a.DueAt != null && a.DueAt < time) : null,
+        [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(a => a.OwnerId == owner) : null,
+    };
 
     /// <summary>Açık aktiviteler önce, en yakın tarihli üstte; tarihsizler sonda.</summary>
     protected override IOrderedQueryable<Activity> Order(IQueryable<Activity> source) =>

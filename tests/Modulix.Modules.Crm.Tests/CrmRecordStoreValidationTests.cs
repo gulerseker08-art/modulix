@@ -10,7 +10,7 @@ namespace Modulix.Modules.Crm.Tests;
 /// <summary>CRM kayıt depolarının alan doğrulaması (veritabanı gerektirmez).</summary>
 public class CrmRecordStoreValidationTests
 {
-    private static readonly IModuleData NoData = new NoModuleData();
+    private static readonly CrmStoreContext NoData = new(new NoModuleData(), new NoMembers(), new NoTenant());
 
     [Fact]
     public void Create_requires_required_fields()
@@ -76,6 +76,14 @@ public class CrmRecordStoreValidationTests
     [InlineData("expectedCloseDate", "\"31.12.2026\"", false)]
     [InlineData("companyId", "\"not-a-guid\"", false)]
     [InlineData("companyId", "\"00000000-0000-0000-0000-000000000000\"", false)]
+    [InlineData("probability", "0", true)]
+    [InlineData("probability", "100", true)]
+    [InlineData("probability", "101", false)]
+    [InlineData("probability", "50.5", false)]
+    [InlineData("probability", "null", true)]
+    [InlineData("lostReason", "\"Fiyat yüksek\"", true)]
+    [InlineData("ownerId", "\"not-a-guid\"", false)]
+    [InlineData("ownerId", "null", true)]
     public void Opportunity_field_formats(string field, string json, bool valid)
     {
         var values = new JsonObject
@@ -103,6 +111,25 @@ public class CrmRecordStoreValidationTests
         Assert.Equal(valid, errors.Count == 0);
     }
 
+    [Theory]
+    [InlineData("status", "\"Customer\"", true)]
+    [InlineData("status", "null", false)]
+    [InlineData("status", "\"Musteri\"", false)]
+    [InlineData("source", "\"Referral\"", true)]
+    [InlineData("source", "null", true)]
+    [InlineData("source", "\"1\"", false)]
+    [InlineData("tags", "\"öncelikli, ihracat\"", true)]
+    [InlineData("address", "\"Atatürk Cad. No:1\"", true)]
+    public void Company_field_formats(string field, string json, bool valid)
+    {
+        var values = new JsonObject { ["name"] = "Acme" };
+        values[field] = JsonNode.Parse(json);
+
+        var errors = new CompanyRecordStore(NoData).Validate(RecordOperation.Create, values);
+
+        Assert.Equal(valid, errors.Count == 0);
+    }
+
     [Fact]
     public void Stores_require_module_permissions()
     {
@@ -112,6 +139,20 @@ public class CrmRecordStoreValidationTests
         Assert.Equal(CrmModule.Permissions.CompaniesWrite, store.PermissionFor(RecordOperation.Create));
         Assert.Equal(CrmModule.Permissions.CompaniesWrite, store.PermissionFor(RecordOperation.Delete));
         Assert.Equal(CrmModule.ModuleKey, store.FeatureKey.Split('.')[0]);
+    }
+
+    private sealed class NoMembers : ITenantMembers
+    {
+        public Task<IReadOnlyList<TenantMember>> ListActiveAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Doğrulama üyelere erişmemeli.");
+
+        public Task<bool> IsActiveMemberAsync(Guid userId, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Doğrulama üyelere erişmemeli.");
+    }
+
+    private sealed class NoTenant : ITenantContextAccessor
+    {
+        public TenantContext? Current => null;
     }
 
     private sealed class NoModuleData : IModuleData

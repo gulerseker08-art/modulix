@@ -1,0 +1,210 @@
+@* Aktivite ekleme/düzenleme formu; Aktiviteler sayfası ve firma detay sayfası kullanır. *@
+@inject ApiClient Api
+
+<form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <h2>@(Activity is null ? "Yeni aktivite" : "Aktiviteyi düzenle")</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="form-grid">
+        <div class="span-all">
+            <label class="form-label" for="subject">Konu *</label>
+            <input id="subject" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="form.Subject" />
+            <FieldError Field="subject" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="type">Tür</label>
+            <select id="type" class="form-select" @bind="form.Type">
+                @foreach (var type in Enum.GetValues<ActivityType>())
+                {
+                    <option value="@type">@CrmLabels.Of(type)</option>
+                }
+            </select>
+            <FieldError Field="type" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="dueAt">Tarih ve saat</label>
+            <input id="dueAt" class="form-control" type="datetime-local" @bind="form.DueAt" />
+            <FieldError Field="dueAt" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="ownerId">Atanan</label>
+            <select id="ownerId" class="form-select" @bind="form.OwnerId">
+                <option value="">@(Activity is null ? "Ben" : "—")</option>
+                @foreach (var member in Lookups.Members)
+                {
+                    <option value="@member.UserId">@member.DisplayName</option>
+                }
+            </select>
+            <FieldError Field="ownerId" Errors="errors" />
+        </div>
+        @if (FixedCompanyId is null)
+        {
+            <div>
+                <label class="form-label" for="companyId">Firma</label>
+                <select id="companyId" class="form-select" @bind="form.CompanyId">
+                    <option value="">—</option>
+                    @foreach (var company in Lookups.Companies)
+                    {
+                        <option value="@company.Id">@company.Name</option>
+                    }
+                </select>
+                <FieldError Field="companyId" Errors="errors" />
+            </div>
+        }
+        <div>
+            <label class="form-label" for="contactId">Kişi</label>
+            <select id="contactId" class="form-select" @bind="form.ContactId">
+                <option value="">—</option>
+                @foreach (var contact in Lookups.Contacts.Where(c => form.CompanyId is null || c.CompanyId == form.CompanyId))
+                {
+                    <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
+                }
+            </select>
+            <FieldError Field="contactId" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="opportunityId">Fırsat</label>
+            <select id="opportunityId" class="form-select" @bind="form.OpportunityId">
+                <option value="">—</option>
+                @foreach (var opportunity in Lookups.Opportunities.Where(o => form.CompanyId is null || o.CompanyId == form.CompanyId))
+                {
+                    <option value="@opportunity.Id">@opportunity.Title</option>
+                }
+            </select>
+            <FieldError Field="opportunityId" Errors="errors" />
+        </div>
+        <div class="form-check-row">
+            <input id="completed" class="form-check-input" type="checkbox" @bind="form.Completed" />
+            <label class="form-check-label" for="completed">Tamamlandı</label>
+        </div>
+        <div class="span-all">
+            <label class="form-label" for="notes">Notlar</label>
+            <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
+            <FieldError Field="notes" Errors="errors" />
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        @if (Activity is not null)
+        {
+            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+        }
+    </div>
+</form>
+
+@code {
+    private const string Url = "/api/crm/activities";
+
+    private ActivityForm form = new();
+    private ActivityDto? source;
+    private bool initialized;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    /// <summary>Düzenlenecek aktivite; null ise yeni aktivite.</summary>
+    [Parameter] public ActivityDto? Activity { get; set; }
+
+    /// <summary>Verilirse firma seçilemez (firma detay sayfası).</summary>
+    [Parameter] public Guid? FixedCompanyId { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<ActivityDto> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Activity))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Activity;
+        form = Activity is { } a
+            ? new ActivityForm
+            {
+                Id = a.Id, Version = a.Version, Type = a.Type, Subject = a.Subject, DueAt = a.DueAt?.ToLocalTime().DateTime,
+                CompletedAt = a.CompletedAt, Completed = a.CompletedAt is not null, CompanyId = a.CompanyId, ContactId = a.ContactId,
+                OpportunityId = a.OpportunityId, OwnerId = a.OwnerId, Notes = a.Notes,
+            }
+            : new ActivityForm { CompanyId = FixedCompanyId };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+
+        // Tamamlanma zamanı ilk işaretlendiği an olarak kalır; işaret kaldırılınca silinir.
+        var completedAt = form.Completed ? form.CompletedAt ?? DateTimeOffset.Now : (DateTimeOffset?)null;
+        var dueAt = form.DueAt is { } local ? new DateTimeOffset(DateTime.SpecifyKind(local, DateTimeKind.Local)) : (DateTimeOffset?)null;
+        var request = new SaveActivityRequest(
+            form.Subject, form.Type, dueAt, completedAt, form.CompanyId, form.ContactId, form.OpportunityId, form.Notes, form.Version, form.OwnerId);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<ActivityDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<ActivityDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class ActivityForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public ActivityType Type { get; set; } = ActivityType.Task;
+
+        public string Subject { get; set; } = string.Empty;
+
+        public DateTime? DueAt { get; set; }
+
+        public DateTimeOffset? CompletedAt { get; init; }
+
+        public bool Completed { get; set; }
+
+        public Guid? CompanyId { get; set; }
+
+        public Guid? ContactId { get; set; }
+
+        public Guid? OpportunityId { get; set; }
+
+        public Guid? OwnerId { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}

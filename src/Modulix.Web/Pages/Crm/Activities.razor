@@ -8,9 +8,9 @@
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ActivitiesRead">
     <div class="page-header">
         <h1>Aktiviteler</h1>
-        @if (Session.Can(CrmAccess.ActivitiesWrite) && form is null)
+        @if (Session.Can(CrmAccess.ActivitiesWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="New">Yeni aktivite</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)">Yeni aktivite</button>
         }
     </div>
 
@@ -19,84 +19,17 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    @if (form is not null)
+    @if (editing)
     {
-        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni aktivite" : "Aktiviteyi düzenle")</h2>
-            <div class="form-grid">
-                <div class="span-all">
-                    <label class="form-label" for="subject">Konu *</label>
-                    <input id="subject" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="form.Subject" />
-                    <FieldError Field="subject" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="type">Tür</label>
-                    <select id="type" class="form-select" @bind="form.Type">
-                        @foreach (var type in Enum.GetValues<ActivityType>())
-                        {
-                            <option value="@type">@CrmLabels.Of(type)</option>
-                        }
-                    </select>
-                    <FieldError Field="type" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="dueAt">Tarih ve saat</label>
-                    <input id="dueAt" class="form-control" type="datetime-local" @bind="form.DueAt" />
-                    <FieldError Field="dueAt" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="companyId">Firma</label>
-                    <select id="companyId" class="form-select" @bind="form.CompanyId">
-                        <option value="">—</option>
-                        @foreach (var company in Lookups.Companies)
-                        {
-                            <option value="@company.Id">@company.Name</option>
-                        }
-                    </select>
-                    <FieldError Field="companyId" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="contactId">Kişi</label>
-                    <select id="contactId" class="form-select" @bind="form.ContactId">
-                        <option value="">—</option>
-                        @foreach (var contact in Lookups.Contacts.Where(c => form.CompanyId is null || c.CompanyId == form.CompanyId))
-                        {
-                            <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
-                        }
-                    </select>
-                    <FieldError Field="contactId" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="opportunityId">Fırsat</label>
-                    <select id="opportunityId" class="form-select" @bind="form.OpportunityId">
-                        <option value="">—</option>
-                        @foreach (var opportunity in Lookups.Opportunities.Where(o => form.CompanyId is null || o.CompanyId == form.CompanyId))
-                        {
-                            <option value="@opportunity.Id">@opportunity.Title</option>
-                        }
-                    </select>
-                    <FieldError Field="opportunityId" Errors="errors" />
-                </div>
-                <div class="form-check-row">
-                    <input id="completed" class="form-check-input" type="checkbox" @bind="form.Completed" />
-                    <label class="form-check-label" for="completed">Tamamlandı</label>
-                </div>
-                <div class="span-all">
-                    <label class="form-label" for="notes">Notlar</label>
-                    <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
-                    <FieldError Field="notes" Errors="errors" />
-                </div>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Vazgeç</button>
-                @if (form.Id is not null)
-                {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
-                }
-            </div>
-        </form>
+        <ActivityEditor Activity="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="() => editing = false" />
     }
+
+    <div class="filters" role="group" aria-label="Görünüm">
+        @foreach (var (value, label) in Views)
+        {
+            <button type="button" class="chip @(view == value ? "active" : null)" @onclick="() => SwitchAsync(value)">@label</button>
+        }
+    </div>
 
     <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
         <input class="form-control" type="search" placeholder="Konu ara" @bind="search" />
@@ -109,27 +42,39 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Kayıt yok.</p>
+        <p class="text-muted">@(view == View.All ? "Kayıt yok." : "Bu listede yapılacak iş yok.")</p>
     }
     else
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Konu</th><th>Tür</th><th>Tarih</th><th>Firma</th><th>Durum</th><th></th></tr>
+                <tr><th></th><th>Konu</th><th>Tür</th><th>Tarih</th><th>Firma</th><th>Atanan</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var activity in page.Items)
                 {
-                    <tr class="@(activity.CompletedAt is null ? null : "done")">
+                    <tr class="@RowClass(activity)">
+                        <td class="check-cell">
+                            @if (Session.Can(CrmAccess.ActivitiesWrite) && activity.CompletedAt is null)
+                            {
+                                <button type="button" class="btn btn-outline-secondary btn-sm check" title="Tamamla" aria-label="Tamamla"
+                                        disabled="@busy" @onclick="() => CompleteAsync(activity)">✓</button>
+                            }
+                        </td>
                         <td data-label="Konu" class="primary">@activity.Subject</td>
                         <td data-label="Tür">@CrmLabels.Of(activity.Type)</td>
-                        <td data-label="Tarih">@(activity.DueAt is { } due ? CrmLabels.Time(due) : null)</td>
-                        <td data-label="Firma">@Lookups.CompanyName(activity.CompanyId)</td>
-                        <td data-label="Durum">@(activity.CompletedAt is null ? "Açık" : "Tamamlandı")</td>
+                        <td data-label="Tarih">@(activity.DueAt is { } due ? CrmLabels.Time(due) : null)@(IsOverdue(activity) ? " · gecikti" : null)</td>
+                        <td data-label="Firma">
+                            @if (activity.CompanyId is { } companyId)
+                            {
+                                <a href="crm/firmalar/@companyId">@Lookups.CompanyName(companyId)</a>
+                            }
+                        </td>
+                        <td data-label="Atanan">@Lookups.MemberName(activity.OwnerId)</td>
                         <td class="actions">
                             @if (Session.Can(CrmAccess.ActivitiesWrite))
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(activity)">Düzenle</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(activity)">Düzenle</button>
                             }
                         </td>
                     </tr>
@@ -143,12 +88,31 @@
 @code {
     private const string Url = "/api/crm/activities";
 
+    private enum View
+    {
+        Today,
+        Overdue,
+        Mine,
+        Open,
+        All,
+    }
+
+    private static readonly (View Value, string Label)[] Views =
+    [
+        (View.Today, "Bugün"),
+        (View.Overdue, "Geciken"),
+        (View.Mine, "Bana atananlar"),
+        (View.Open, "Tüm açıklar"),
+        (View.All, "Tümü"),
+    ];
+
     private CrmPage<ActivityDto>? page;
-    private ActivityForm? form;
-    private IReadOnlyDictionary<string, string[]>? errors;
+    private ActivityDto? selected;
+    private bool editing;
+    private bool busy;
+    private View view = View.Today;
     private string? message;
     private string? search;
-    private bool busy;
 
     protected override async Task OnInitializedAsync()
     {
@@ -160,102 +124,60 @@
         }
     }
 
+    private static bool IsOverdue(ActivityDto activity) =>
+        activity.CompletedAt is null && activity.DueAt is { } due && due < DateTimeOffset.Now;
+
+    private static string? RowClass(ActivityDto activity) =>
+        activity.CompletedAt is not null ? "done" : IsOverdue(activity) ? "overdue" : null;
+
+    /// <summary>Gün sınırı tarayıcının saat dilimine göre hesaplanır; "Bugün" gecikenleri de içerir.</summary>
+    private string ViewFilters()
+    {
+        var now = DateTimeOffset.Now;
+        var endOfToday = new DateTimeOffset(now.Date.AddDays(1), now.Offset);
+        return view switch
+        {
+            View.Today => $"&open=true&ownerId=me&dueBefore={Uri.EscapeDataString(endOfToday.ToString("O"))}",
+            View.Overdue => $"&open=true&ownerId=me&dueBefore={Uri.EscapeDataString(now.ToString("O"))}",
+            View.Mine => "&open=true&ownerId=me",
+            View.Open => "&open=true",
+            _ => string.Empty,
+        };
+    }
+
+    private async Task SwitchAsync(View value)
+    {
+        view = value;
+        await LoadAsync(1);
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
-        var result = await Api.GetAsync<CrmPage<ActivityDto>>($"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}");
+        var result = await Api.GetAsync<CrmPage<ActivityDto>>(
+            $"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}{ViewFilters()}");
         page = result.Value;
         message = result.Error;
     }
 
-    private void New() => Open(new ActivityForm());
-
-    private void Edit(ActivityDto activity) => Open(new ActivityForm
+    private void Open(ActivityDto? activity)
     {
-        Id = activity.Id,
-        Version = activity.Version,
-        Type = activity.Type,
-        Subject = activity.Subject,
-        DueAt = activity.DueAt?.ToLocalTime().DateTime,
-        CompletedAt = activity.CompletedAt,
-        Completed = activity.CompletedAt is not null,
-        CompanyId = activity.CompanyId,
-        ContactId = activity.ContactId,
-        OpportunityId = activity.OpportunityId,
-        Notes = activity.Notes,
-    });
-
-    private void Open(ActivityForm value)
-    {
-        form = value;
-        errors = null;
+        selected = activity;
+        editing = true;
         message = null;
     }
 
-    private void Cancel() => form = null;
-
-    private async Task SaveAsync()
+    private async Task SavedAsync()
     {
-        busy = true;
-
-        // Tamamlanma zamanı ilk işaretlendiği an olarak kalır; işaret kaldırılınca silinir.
-        var completedAt = form!.Completed ? form.CompletedAt ?? DateTimeOffset.Now : (DateTimeOffset?)null;
-        var dueAt = form.DueAt is { } local ? new DateTimeOffset(DateTime.SpecifyKind(local, DateTimeKind.Local)) : (DateTimeOffset?)null;
-        var request = new SaveActivityRequest(
-            form.Subject, form.Type, dueAt, completedAt, form.CompanyId, form.ContactId, form.OpportunityId, form.Notes, form.Version);
-        var result = form.Id is { } id
-            ? await Api.PutAsync<ActivityDto>($"{Url}/{id}", request)
-            : await Api.PostAsync<ActivityDto>(Url, request);
-        busy = false;
-
-        if (result.IsSuccess)
-        {
-            form = null;
-            await LoadAsync(page?.Page ?? 1);
-            return;
-        }
-
-        errors = result.FieldErrors;
-        message = result.Error;
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
     }
 
-    private async Task DeleteAsync()
+    private async Task CompleteAsync(ActivityDto activity)
     {
         busy = true;
-        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
+        var result = await Api.PutAsync<ActivityDto>($"{Url}/{activity.Id}", CrmRequests.From(activity) with { CompletedAt = DateTimeOffset.Now });
         busy = false;
-
-        if (result.IsSuccess)
-        {
-            form = null;
-            await LoadAsync(1);
-            return;
-        }
-
         message = result.Error;
-    }
-
-    private sealed class ActivityForm
-    {
-        public Guid? Id { get; init; }
-
-        public long? Version { get; init; }
-
-        public ActivityType Type { get; set; } = ActivityType.Task;
-
-        public string Subject { get; set; } = string.Empty;
-
-        public DateTime? DueAt { get; set; }
-
-        public DateTimeOffset? CompletedAt { get; init; }
-
-        public bool Completed { get; set; }
-
-        public Guid? CompanyId { get; set; }
-
-        public Guid? ContactId { get; set; }
-
-        public Guid? OpportunityId { get; set; }
-
-        public string? Notes { get; set; }
+        await LoadAsync(page?.Page ?? 1);
     }
 }

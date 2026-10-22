@@ -186,6 +186,84 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
     }
 
     [Fact]
+    public async Task Owner_defaults_to_the_creator_and_must_be_a_member_of_the_tenant()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, CrmModule.ModuleKey, enabled: true);
+        var ayse = await factory.CreateUserAsync(tenant);
+        var colleague = await factory.CreateUserAsync(tenant);
+        var outsider = await factory.CreateUserAsync(await factory.CreateTenantAsync());
+        await factory.CreateRoleAsync(tenant.Id, AllCrmPermissions, ayse);
+        using var client = await LoginAsync(ayse.Email!);
+
+        var company = await PostAsync<CompanyDto>(client, "/api/crm/companies", new SaveCompanyRequest(
+            "Delta A.Ş.", Address: "Atatürk Cad. 1", Industry: "Gıda", Status: CompanyStatus.Customer,
+            Source: CompanySource.Referral, Tags: "öncelikli, ihracat"));
+        Assert.Equal(ayse.Id, company.OwnerId);
+        Assert.Equal(CompanyStatus.Customer, company.Status);
+        Assert.Equal(CompanySource.Referral, company.Source);
+        Assert.Equal("öncelikli, ihracat", company.Tags);
+
+        var opportunity = await PostAsync<OpportunityDto>(client, "/api/crm/opportunities", new SaveOpportunityRequest(
+            "Depo projesi", company.Id, Probability: 40, OwnerId: colleague.Id));
+        Assert.Equal(colleague.Id, opportunity.OwnerId);
+        Assert.Equal(40, opportunity.Probability);
+
+        var members = (await client.GetFromJsonAsync<List<TenantMemberResponse>>("/api/tenant/members"))!;
+        Assert.Equal(new[] { ayse.Id, colleague.Id }.Order(), members.Select(m => m.UserId).Order());
+
+        var problem = await ValidationProblemAsync(await client.PostAsJsonAsync("/api/crm/activities",
+            new SaveActivityRequest("Ara", OwnerId: outsider.Id)));
+        Assert.Equal(["Kullanıcı bu kuruluşun üyesi değil."], problem.Errors["ownerId"]);
+
+        await factory.DisableMembershipAsync(colleague.Id, tenant.Id);
+        problem = await ValidationProblemAsync(await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
+            new SaveOpportunityRequest("Depo projesi", company.Id, OwnerId: colleague.Id, Version: opportunity.Version)));
+        Assert.Contains("ownerId", problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task Lists_filter_by_company_owner_stage_and_due_time()
+    {
+        var (client, _, userId) = await CrmClientAsync();
+        using var _ = client;
+        var company = await CreateCompanyAsync(client, "Filtre A.Ş.");
+        var other = await CreateCompanyAsync(client, "Başka A.Ş.");
+
+        var contact = await PostAsync<ContactDto>(client, "/api/crm/contacts", new SaveContactRequest("Ali", "Can", company.Id));
+        await PostAsync<ContactDto>(client, "/api/crm/contacts", new SaveContactRequest("Veli", "Can", other.Id));
+        var open = await PostAsync<OpportunityDto>(client, "/api/crm/opportunities",
+            new SaveOpportunityRequest("Açık", company.Id, Stage: OpportunityStage.Proposal));
+        await PostAsync<OpportunityDto>(client, "/api/crm/opportunities",
+            new SaveOpportunityRequest("Kazanılan", company.Id, Stage: OpportunityStage.Won));
+        await PostAsync<OpportunityDto>(client, "/api/crm/opportunities", new SaveOpportunityRequest("Başka", other.Id));
+
+        var now = DateTimeOffset.UtcNow;
+        var overdue = await PostAsync<ActivityDto>(client, "/api/crm/activities",
+            new SaveActivityRequest("Geciken", DueAt: now.AddDays(-1), CompanyId: company.Id));
+        await PostAsync<ActivityDto>(client, "/api/crm/activities",
+            new SaveActivityRequest("Yarın", DueAt: now.AddDays(1), CompanyId: company.Id));
+        await PostAsync<ActivityDto>(client, "/api/crm/activities",
+            new SaveActivityRequest("Bitti", DueAt: now.AddDays(-2), CompletedAt: now, CompanyId: company.Id));
+
+        Assert.Equal([contact.Id], (await ListAsync<ContactDto>(client, $"contacts?companyId={company.Id}")).Select(c => c.Id));
+        Assert.Equal(["Açık", "Kazanılan"], (await ListAsync<OpportunityDto>(client, $"opportunities?companyId={company.Id}")).Select(o => o.Title).Order());
+        Assert.Equal([open.Id], (await ListAsync<OpportunityDto>(client, $"opportunities?companyId={company.Id}&open=true")).Select(o => o.Id));
+        Assert.Equal(["Kazanılan"], (await ListAsync<OpportunityDto>(client, $"opportunities?companyId={company.Id}&stage=won")).Select(o => o.Title));
+
+        var dueBefore = Uri.EscapeDataString(now.ToString("O"));
+        var mine = await ListAsync<ActivityDto>(client, $"activities?ownerId=me&open=true&dueBefore={dueBefore}");
+        Assert.Equal([overdue.Id], mine.Select(a => a.Id));
+        Assert.All(mine, a => Assert.Equal(userId, a.OwnerId));
+        Assert.Equal(3, (await ListAsync<ActivityDto>(client, $"activities?companyId={company.Id}")).Count);
+
+        var unknown = await ValidationProblemAsync(await client.GetAsync("/api/crm/companies?renk=mavi"));
+        Assert.Equal(["Bilinmeyen filtre."], unknown.Errors["renk"]);
+        var invalid = await ValidationProblemAsync(await client.GetAsync("/api/crm/opportunities?stage=kazanildi&companyId=x"));
+        Assert.Equal(new[] { "companyId", "stage" }, invalid.Errors.Keys.Order());
+    }
+
+    [Fact]
     public void Shared_access_keys_match_the_module()
     {
         // Arayüz menüsü bu anahtarlara bakar; modüldeki bir değişiklik arayüzü sessizce bozmasın.
@@ -229,6 +307,9 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
         Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<T>())!;
     }
+
+    private static async Task<IReadOnlyList<T>> ListAsync<T>(HttpClient client, string path) =>
+        (await client.GetFromJsonAsync<CrmPage<T>>($"/api/crm/{path}"))!.Items;
 
     private static async Task<ValidationProblemDetails> ValidationProblemAsync(HttpResponseMessage response)
     {

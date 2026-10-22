@@ -1,0 +1,216 @@
+@* Firma ekleme/düzenleme formu; Firmalar listesi ve firma detay sayfası kullanır. *@
+@inject ApiClient Api
+
+<form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <h2>@(Company is null ? "Yeni firma" : "Firmayı düzenle")</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="name">Ad *</label>
+            <input id="name" class="form-control" maxlength="@CrmLimits.NameMaxLength" @bind="form.Name" />
+            <FieldError Field="name" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="status">Durum</label>
+            <select id="status" class="form-select" @bind="form.Status">
+                @foreach (var status in Enum.GetValues<CompanyStatus>())
+                {
+                    <option value="@status">@CrmLabels.Of(status)</option>
+                }
+            </select>
+            <FieldError Field="status" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="ownerId">Sorumlu</label>
+            <select id="ownerId" class="form-select" @bind="form.OwnerId">
+                <option value="">@(Company is null ? "Ben" : "—")</option>
+                @foreach (var member in Lookups.Members)
+                {
+                    <option value="@member.UserId">@member.DisplayName</option>
+                }
+            </select>
+            <FieldError Field="ownerId" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="industry">Sektör</label>
+            <input id="industry" class="form-control" maxlength="@CrmLimits.IndustryMaxLength" @bind="form.Industry" />
+            <FieldError Field="industry" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="source">Kaynak</label>
+            <select id="source" class="form-select" @bind="form.Source">
+                <option value="">—</option>
+                @foreach (var source in Enum.GetValues<CompanySource>())
+                {
+                    <option value="@source">@CrmLabels.Of(source)</option>
+                }
+            </select>
+            <FieldError Field="source" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="taxNumber">Vergi no</label>
+            <input id="taxNumber" class="form-control" maxlength="@CrmLimits.TaxNumberMaxLength" @bind="form.TaxNumber" />
+            <FieldError Field="taxNumber" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="phone">Telefon</label>
+            <input id="phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
+            <FieldError Field="phone" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="email">E-posta</label>
+            <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" @bind="form.Email" />
+            <FieldError Field="email" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="website">Web sitesi</label>
+            <input id="website" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="form.Website" />
+            <FieldError Field="website" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="city">Şehir</label>
+            <input id="city" class="form-control" maxlength="@CrmLimits.CityMaxLength" @bind="form.City" />
+            <FieldError Field="city" Errors="errors" />
+        </div>
+        <div class="span-all">
+            <label class="form-label" for="address">Adres</label>
+            <input id="address" class="form-control" maxlength="@CrmLimits.AddressMaxLength" @bind="form.Address" />
+            <FieldError Field="address" Errors="errors" />
+        </div>
+        <div class="span-all">
+            <label class="form-label" for="tags">Etiketler</label>
+            <input id="tags" class="form-control" maxlength="@CrmLimits.TagsMaxLength" placeholder="Virgülle ayırın: öncelikli, ihracat" @bind="form.Tags" />
+            <FieldError Field="tags" Errors="errors" />
+        </div>
+        <div class="span-all">
+            <label class="form-label" for="notes">Notlar</label>
+            <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
+            <FieldError Field="notes" Errors="errors" />
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        @if (Company is not null)
+        {
+            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+        }
+    </div>
+</form>
+
+@code {
+    private const string Url = "/api/crm/companies";
+
+    private CompanyForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    /// <summary>Düzenlenecek firma; null ise yeni firma.</summary>
+    [Parameter] public CompanyDto? Company { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<CompanyDto> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private CompanyDto? source;
+    private bool initialized;
+
+    /// <summary>Form yalnızca başka bir firma verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (!initialized || !ReferenceEquals(source, Company))
+        {
+            initialized = true;
+            source = Company;
+            form = Company is { } c
+                ? new CompanyForm
+                {
+                    Id = c.Id, Version = c.Version, Name = c.Name, TaxNumber = c.TaxNumber, Phone = c.Phone, Email = c.Email,
+                    Website = c.Website, City = c.City, Address = c.Address, Industry = c.Industry, Status = c.Status,
+                    Source = c.Source, Tags = c.Tags, OwnerId = c.OwnerId, Notes = c.Notes,
+                }
+                : new CompanyForm();
+            errors = null;
+            message = null;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var request = new SaveCompanyRequest(
+            form.Name, form.TaxNumber, form.Phone, form.Email, form.Website, form.City, form.Notes, form.Version,
+            form.Address, form.Industry, form.Status, form.Source, form.Tags, form.OwnerId);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<CompanyDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<CompanyDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class CompanyForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? TaxNumber { get; set; }
+
+        public string? Phone { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? Website { get; set; }
+
+        public string? City { get; set; }
+
+        public string? Address { get; set; }
+
+        public string? Industry { get; set; }
+
+        public CompanyStatus Status { get; set; } = CompanyStatus.Prospect;
+
+        public CompanySource? Source { get; set; }
+
+        public string? Tags { get; set; }
+
+        public Guid? OwnerId { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}

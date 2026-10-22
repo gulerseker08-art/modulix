@@ -8,12 +8,17 @@ namespace Modulix.Modules.Crm.Records;
 
 /// <summary>
 /// CRM kayıt depolarının ortak kalıbı; yeni bir sektör modülü de aynısını izler. Alt sınıf yalnızca
-/// anahtarı, izinleri, alan listesini, sıralamayı ve aramayı verir. Kaydetmez: boru hattı kaydı,
+/// anahtarı, izinleri, alan listesini, filtreleri, sıralamayı ve aramayı verir. Kaydetmez: boru hattı kaydı,
 /// audit'i ve olayı tek seferde yazar. Tenant filtresi ve RLS <see cref="IModuleData"/> üzerinden uygulanır.
 /// </summary>
-internal abstract class CrmRecordStore<TEntity>(IModuleData data) : IRecordStore
+internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IRecordStore
     where TEntity : CrmEntity, new()
 {
+    /// <summary>Sorumlu alanının adı; oluştururken boş bırakılırsa isteği yapan kullanıcı atanır.</summary>
+    protected const string OwnerField = "ownerId";
+
+    private static readonly IReadOnlyDictionary<string, RecordFilter<TEntity>> NoFilters = new Dictionary<string, RecordFilter<TEntity>>();
+
     private Dictionary<string, RecordField<TEntity>>? fieldsByName;
 
     public abstract string EntityKey { get; }
@@ -27,7 +32,10 @@ internal abstract class CrmRecordStore<TEntity>(IModuleData data) : IRecordStore
 
     protected abstract IReadOnlyList<RecordField<TEntity>> Fields { get; }
 
-    protected IModuleData Data => data;
+    /// <summary>Listede kullanılabilen filtreler (sorgu parametresi adı → filtre).</summary>
+    protected virtual IReadOnlyDictionary<string, RecordFilter<TEntity>> Filters => NoFilters;
+
+    private IModuleData Data => context.Data;
 
     private Dictionary<string, RecordField<TEntity>> FieldsByName =>
         fieldsByName ??= Fields.ToDictionary(f => f.Name, StringComparer.Ordinal);
@@ -63,13 +71,13 @@ internal abstract class CrmRecordStore<TEntity>(IModuleData data) : IRecordStore
 
     public async Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken)
     {
-        var entity = await data.Set<TEntity>().AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await Data.Set<TEntity>().AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         return entity is null ? null : ToData(entity);
     }
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
-        var source = data.Set<TEntity>().AsNoTracking();
+        var source = ApplyFilters(Data.Set<TEntity>().AsNoTracking(), query.Filters);
         if (query.Search is { } term)
         {
             source = Search(source, term);
@@ -89,13 +97,18 @@ internal abstract class CrmRecordStore<TEntity>(IModuleData data) : IRecordStore
     {
         var entity = new TEntity();
         await ApplyAsync(entity, values, cancellationToken);
-        data.Set<TEntity>().Add(entity);
+        if (FieldsByName.TryGetValue(OwnerField, out var owner) && owner.Read(entity) is null)
+        {
+            owner.Write(entity, context.CurrentUserId);
+        }
+
+        Data.Set<TEntity>().Add(entity);
         return ToData(entity);
     }
 
     public async Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken)
     {
-        var entity = await data.Set<TEntity>().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await Data.Set<TEntity>().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         if (entity is null)
         {
             return null;
@@ -115,14 +128,14 @@ internal abstract class CrmRecordStore<TEntity>(IModuleData data) : IRecordStore
 
     public async Task<bool> DeleteAsync(Guid id, long? expectedVersion, CancellationToken cancellationToken)
     {
-        var entity = await data.Set<TEntity>().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await Data.Set<TEntity>().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         if (entity is null)
         {
             return false;
         }
 
         EnsureVersion(entity, expectedVersion);
-        data.Set<TEntity>().Remove(entity);
+        Data.Set<TEntity>().Remove(entity);
         return true;
     }
 
@@ -130,6 +143,33 @@ internal abstract class CrmRecordStore<TEntity>(IModuleData data) : IRecordStore
     protected abstract IOrderedQueryable<TEntity> Order(IQueryable<TEntity> source);
 
     protected abstract IQueryable<TEntity> Search(IQueryable<TEntity> source, string term);
+
+    private IQueryable<TEntity> ApplyFilters(IQueryable<TEntity> source, IReadOnlyDictionary<string, string>? filters)
+    {
+        if (filters is null)
+        {
+            return source;
+        }
+
+        var errors = new List<RecordFieldError>();
+        foreach (var (name, value) in filters)
+        {
+            if (!Filters.TryGetValue(name, out var filter))
+            {
+                errors.Add(new RecordFieldError(name, "Bilinmeyen filtre."));
+            }
+            else if (filter(source, value, context) is { } filtered)
+            {
+                source = filtered;
+            }
+            else
+            {
+                errors.Add(new RecordFieldError(name, "Geçersiz filtre değeri."));
+            }
+        }
+
+        return errors.Count > 0 ? throw new RecordValidationException(errors) : source;
+    }
 
     private RecordData ToData(TEntity entity)
     {
@@ -152,7 +192,7 @@ internal abstract class CrmRecordStore<TEntity>(IModuleData data) : IRecordStore
             var field = FieldsByName[name];
             var value = field.Parse(node).Value;
 
-            if (field.Exists is { } exists && value is Guid id && !await exists(data, id, cancellationToken))
+            if (field.Exists is { } exists && value is Guid id && !await exists(context, id, cancellationToken))
             {
                 // Başka tenant'ın kaydı da "bulunamadı" sayılır; varlığı belli edilmez.
                 errors.Add(new RecordFieldError(name, field.NotFoundMessage ?? "Kayıt bulunamadı."));

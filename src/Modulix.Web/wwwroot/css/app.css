@@ -534,3 +534,322 @@ tr.done td.primary {
         text-align: center;
     }
 }
+
+/* ---- CRM: filtreler, firma detayı, satış hunisi ---- */
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.segmented {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.2rem;
+    border-radius: 999px;
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+}
+
+    .segmented .chip {
+        border: 0;
+    }
+
+.chip {
+    min-height: 36px;
+    padding: 0.35rem 0.9rem;
+    border: 1px solid var(--mx-border);
+    border-radius: 999px;
+    background: var(--mx-surface);
+    color: var(--mx-ink);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+    .chip:hover {
+        background: var(--mx-lilac);
+    }
+
+    .chip.active {
+        background: var(--mx-indigo);
+        border-color: var(--mx-indigo);
+        color: #fff;
+    }
+
+.badge.status-prospect {
+    background: #fdf0d5;
+    color: #8a5a00;
+}
+
+.badge.status-customer {
+    background: #dcf3ef;
+    color: #0f6b61;
+}
+
+.badge.status-inactive {
+    background: #eef0f5;
+    color: #4b5573;
+}
+
+.badge.tag {
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+    font-weight: 500;
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 0.75rem;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+}
+
+.summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+}
+
+    .summary-item span {
+        color: var(--mx-muted);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .summary-item strong {
+        font-size: 1.5rem;
+    }
+
+    .summary-item small {
+        color: var(--mx-muted);
+        min-height: 1.2em;
+    }
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem 1rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+}
+
+    .detail-grid dt {
+        color: var(--mx-muted);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .detail-grid dd {
+        margin: 0;
+        min-height: 1.5em;
+        overflow-wrap: anywhere;
+    }
+
+    .detail-grid .notes {
+        white-space: pre-line;
+    }
+
+.detail-section {
+    margin-bottom: 1.5rem;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+    .section-header h2 {
+        font-size: 1.15rem;
+        margin: 0;
+    }
+
+.item-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+}
+
+    .item-list li {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.65rem 1rem;
+        border-bottom: 1px solid var(--mx-border);
+    }
+
+        .item-list li:last-child {
+            border-bottom: 0;
+        }
+
+.item-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+    .item-main span {
+        color: var(--mx-muted);
+        font-size: 0.875rem;
+    }
+
+.btn.check {
+    width: 36px;
+    padding: 0;
+    border-radius: 999px;
+    flex: none;
+}
+
+li.done .item-main strong {
+    text-decoration: line-through;
+    color: var(--mx-muted);
+}
+
+li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
+    color: #b42318;
+    font-weight: 600;
+}
+
+.board-hint {
+    margin-bottom: 0.5rem;
+}
+
+/* Telefonda sütunlar yan yana kaydırılır; masaüstünde altı aşama tek satıra sığar. */
+.board {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(16rem, 85vw);
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.75rem;
+    scroll-snap-type: x mandatory;
+}
+
+.board-column {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-radius: var(--mx-radius);
+    background: #efedf6;
+    scroll-snap-align: start;
+    min-height: 10rem;
+}
+
+    .board-column.drop {
+        outline: 2px dashed var(--mx-indigo);
+    }
+
+    .board-column header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+        .board-column header .count {
+            font-weight: 700;
+        }
+
+        .board-column header small {
+            width: 100%;
+            color: var(--mx-muted);
+        }
+
+.board-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.75rem;
+    border: 1px solid var(--mx-border);
+    border-radius: 0.625rem;
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+    cursor: grab;
+}
+
+    .board-card span, .board-card a {
+        font-size: 0.875rem;
+    }
+
+    .board-card .owner {
+        color: var(--mx-muted);
+    }
+
+.card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.35rem;
+}
+
+    .card-actions .form-select {
+        flex: 1;
+        min-width: 0;
+        min-height: 36px;
+    }
+
+.check-cell {
+    width: 3rem;
+}
+
+@media (max-width: 767.98px) {
+    .record-table td.check-cell:empty {
+        display: none;
+    }
+}
+
+@media (min-width: 768px) {
+    .detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+        .detail-grid .span-all {
+            grid-column: 1 / -1;
+        }
+
+    .board {
+        grid-auto-columns: minmax(15rem, 1fr);
+    }
+}
+
+@media (min-width: 1200px) {
+    .detail-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .board {
+        grid-auto-columns: minmax(12rem, 1fr);
+    }
+}
