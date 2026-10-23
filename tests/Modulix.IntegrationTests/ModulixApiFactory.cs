@@ -22,7 +22,12 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
 {
     public const string Password = "Test.Password1";
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Development");
+    protected override void ConfigureWebHost(IWebHostBuilder builder) =>
+        builder
+            .UseEnvironment("Development")
+
+            // E-posta işleyicisi testlerde çalışmaz; e-posta testleri işleyiciyi kendisi çağırır (EmailTests).
+            .UseSetting("Email:WorkerEnabled", "false");
 
     /// <summary>Çerezleri saklayan, HTTPS üzerinden konuşan istemci (oturum çerezi Secure).</summary>
     public HttpClient CreateBrowserClient() =>

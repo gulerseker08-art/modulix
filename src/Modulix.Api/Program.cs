@@ -2,10 +2,12 @@ using Modulix.Api.Access;
 using Modulix.Api.Auth;
 using Modulix.Api.Crm;
 using Modulix.Api.Development;
+using Modulix.Api.Email;
 using Modulix.Api.Records;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Modules;
+using Modulix.Infrastructure.Email;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Records;
 using Modulix.Modules.Crm;
@@ -33,6 +35,11 @@ builder.Services.AddModulixTenancy();
 builder.Services.AddModulixModules(ModulixModules.Create());
 
 builder.Services.AddModulixRecords();
+
+// E-posta: kuyruk + arka plan gönderici. Ayarlar "Email" bölümünde; SMTP şifresi user-secrets veya ortam değişkeninde.
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddModulixEmail();
+builder.Services.AddHostedService<EmailDispatchWorker>();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ModulixDbContext>("database");
 
@@ -49,6 +56,16 @@ if (args.Contains("seed", StringComparer.OrdinalIgnoreCase))
 
     await DemoDataSeeder.SeedAsync(app.Services);
     Console.WriteLine($"Örnek veri hazır. Kullanıcılar: ayse@acme.demo, mehmet@beta.demo, deniz@ortak.demo (şifre: {DemoDataSeeder.DemoPassword})");
+    return;
+}
+
+// "test-email" komutu: verilen adrese deneme e-postası gönderir ve sonucu yazar; SMTP ayarlarını sınamak içindir.
+//   dotnet run --project src/Modulix.Api -- test-email adres@ornek.com
+if (args.Contains("test-email", StringComparer.OrdinalIgnoreCase))
+{
+    var to = args.SkipWhile(a => !a.Equals("test-email", StringComparison.OrdinalIgnoreCase)).Skip(1).FirstOrDefault()
+        ?? throw new InvalidOperationException("Alıcı adresi gerekli: -- test-email adres@ornek.com");
+    Console.WriteLine(await TestEmail.SendAsync(app.Services, to));
     return;
 }
 

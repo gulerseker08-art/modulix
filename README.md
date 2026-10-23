@@ -141,6 +141,34 @@ Listeler filtre alır; bilinmeyen filtre veya geçersiz değer 422 döner. `owne
 3. `Program.cs` → `ModulixModules.Create()` listesine modülü ekleyin, uç noktaları `MapCrmEndpoints` gibi eşleyin.
 4. Migration üretin ve her tablo için `TenantIsolationSql.AddTable` ekleyin; eklenmezse `Every_tenant_table_is_protected_by_row_level_security` testi kırılır.
 
+## E-posta
+
+Uygulama e-postayı hemen göndermez: `IEmailQueue.Enqueue(...)` e-postayı `platform.EmailMessages` kuyruğuna yazar, arka plandaki işleyici (her 10 saniyede) SMTP ile gönderir. Kuyruğa yazma, çağıranın kaydıyla aynı işlemdedir; kayıt geri alınırsa e-posta da gitmez. Aktif tenant varsa e-posta o tenant'a bağlanır; yoksa platform e-postasıdır (ör. şifre sıfırlama). `IEmailQueue` `Modulix.Core.Contracts` içindedir, modüller de kullanabilir.
+
+- Gönderilemeyen e-posta 1 dk, 5 dk, 15 dk ve 1 saat arayla tekrar denenir; 5. denemeden sonra veya sunucu alıcıyı kalıcı olarak reddederse (5xx) `Failed` olur ve hata `LastError` alanında kalır.
+- Birden fazla uygulama örneği aynı anda çalışabilir; her e-posta tek bir örnek tarafından alınır. Kayıtlara alıcı adresi değil, yalnızca e-postanın kimliği yazılır.
+- Kullanıcı girdisini HTML gövdeye eklemeden önce kodlayın (`WebUtility.HtmlEncode`).
+
+**Yerelde:** `scripts\db-up.ps1` SQL Server'ın yanında **Mailpit**'i de başlatır. Development ayarları e-postaları ona gönderir; hiçbir e-posta dışarı çıkmaz, hepsi **http://localhost:8025** adresinde görünür.
+
+```powershell
+# SMTP ayarlarını sınamak için deneme e-postası (sonucu yazar)
+dotnet run --project src/Modulix.Api -- test-email ayse@acme.demo
+```
+
+**Gerçek sunucu (canlı ortam):** `appsettings.json` içindeki `Email` bölümü; şifre kod deposuna yazılmaz.
+
+| Ayar | Örnek | Not |
+| --- | --- | --- |
+| `Email:FromAddress` | `noreply@firmaniz.com` | Gönderen adres; SPF/DKIM kayıtları bu alan adı için yapılmalı |
+| `Email:FromName` | `Modülix` | |
+| `Email:Smtp:Host`, `Port` | `smtp.sendgrid.net`, `587` | Herhangi bir SMTP hizmeti (SendGrid, Amazon SES, Mailgun, Office 365) |
+| `Email:Smtp:Security` | `Auto` | `Auto`, `StartTls`, `SslOnConnect`; `None` yalnızca Mailpit için |
+| `Email:Smtp:UserName` | `apikey` | Boşsa kimlik doğrulama yapılmaz |
+| `Email:Smtp:Password` | | `dotnet user-secrets set Email:Smtp:Password ...` veya ortam değişkeni `Email__Smtp__Password` |
+
+`FromAddress` veya `Smtp:Host` boşsa işleyici başlamaz ve uyarı yazar; e-postalar kuyrukta bekler, ayarlar tamamlanıp uygulama yeniden başlatılınca gönderilir.
+
 ## Sürekli entegrasyon (Görev 3)
 
 `main` dalına her push'ta ve her pull request'te GitHub Actions (`.github/workflows/ci.yml`):

@@ -4,7 +4,7 @@
 #
 # Yaptiklari:
 #   1. .env yoksa olusturur ve sifreleri rastgele uretir (.env git'e gitmez).
-#   2. Docker'da SQL Server'i baslatir.
+#   2. Docker'da SQL Server'i ve yerel test posta kutusunu (Mailpit, http://localhost:8025) baslatir.
 #   3. Veritabanini, semalari ve iki kullaniciyi kurar (docker/sqlserver/init.sql).
 #   4. Baglanti cumlelerini user-secrets'a yazar (kod deposuna sifre girmez).
 #   5. Bekleyen migration'lari migration kullanicisiyla uygular.
@@ -104,7 +104,7 @@ $port = $envValues['MSSQL_PORT']
 # --- 2/6 SQL Server ------------------------------------------------------------
 
 Write-Step '2/6 SQL Server baslatiliyor (ilk seferde imaj inecek, birkac dakika surebilir)'
-Invoke-Checked docker @('compose', 'up', '-d', '--wait', 'sqlserver')
+Invoke-Checked docker @('compose', 'up', '-d', '--wait', 'sqlserver', 'mailpit')
 
 # --- 3/6 Veritabani, semalar, kullanicilar -------------------------------------
 
