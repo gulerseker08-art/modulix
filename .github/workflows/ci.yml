@@ -49,8 +49,9 @@ jobs:
             echo "ConnectionStrings__ModulixMigrations=Server=localhost,14333;Database=Modulix;User Id=modulix_migrator;Password=$migrator;TrustServerCertificate=True"
           } >> "$GITHUB_ENV"
 
-      - name: SQL Server'i baslat
-        run: docker compose up -d --wait sqlserver
+      # Mailpit: yerel test posta kutusu; e-posta entegrasyon testi gercek SMTP gonderimini burada dogrular.
+      - name: SQL Server'i ve Mailpit'i baslat
+        run: docker compose up -d --wait sqlserver mailpit
 
       - name: Veritabani, semalar ve kullanicilar
         run: docker compose run --rm db-init

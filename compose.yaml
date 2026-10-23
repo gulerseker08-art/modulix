@@ -42,5 +42,12 @@ services:
     entrypoint: ["/opt/mssql-tools18/bin/sqlcmd", "-S", "sqlserver", "-U", "sa", "-C", "-b", "-i", "/scripts/init.sql"]
     restart: "no"
 
+  # Yerel test posta kutusu: uygulamanin gonderdigi e-postalar disariya cikmaz, http://localhost:8025 adresinde gorunur.
+  mailpit:
+    image: axllent/mailpit:v1.32
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
 volumes:
   sqlserver-data:

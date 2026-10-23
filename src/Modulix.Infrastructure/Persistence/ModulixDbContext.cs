@@ -8,6 +8,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Settings;
+using Modulix.Infrastructure.Email;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Records;
 
@@ -49,6 +50,8 @@ public class ModulixDbContext(
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public DbSet<QueuedEmail> EmailMessages => Set<QueuedEmail>();
 
     /// <summary>Sorgu filtresinde kullanılır; EF her sorguda yeniden okur. Aktif tenant yoksa hiçbir satır dönmez.</summary>
     private Guid? CurrentTenantId => tenantAccessor?.Current?.TenantId;
