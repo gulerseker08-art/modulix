@@ -133,7 +133,7 @@
         form = Activity is { } a
             ? new ActivityForm
             {
-                Id = a.Id, Version = a.Version, Type = a.Type, Subject = a.Subject, DueAt = a.DueAt?.ToLocalTime().DateTime,
+                Id = a.Id, Version = a.Version, Type = a.Type, Subject = a.Subject, DueAt = a.DueAt is { } due ? Regional.ToTenant(due).DateTime : null,
                 CompletedAt = a.CompletedAt, Completed = a.CompletedAt is not null, CompanyId = a.CompanyId, ContactId = a.ContactId,
                 OpportunityId = a.OpportunityId, OwnerId = a.OwnerId, Notes = a.Notes,
             }
@@ -148,7 +148,8 @@
 
         // Tamamlanma zamanı ilk işaretlendiği an olarak kalır; işaret kaldırılınca silinir.
         var completedAt = form.Completed ? form.CompletedAt ?? DateTimeOffset.Now : (DateTimeOffset?)null;
-        var dueAt = form.DueAt is { } local ? new DateTimeOffset(DateTime.SpecifyKind(local, DateTimeKind.Local)) : (DateTimeOffset?)null;
+        // Formdaki saat firmanın saat dilimindedir.
+        var dueAt = form.DueAt is { } local ? Regional.FromTenant(local) : (DateTimeOffset?)null;
         var request = new SaveActivityRequest(
             form.Subject, form.Type, dueAt, completedAt, form.CompanyId, form.ContactId, form.OpportunityId, form.Notes, form.Version, form.OwnerId);
         var result = form.Id is { } id

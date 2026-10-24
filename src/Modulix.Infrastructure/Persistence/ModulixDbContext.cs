@@ -41,6 +41,8 @@ public class ModulixDbContext(
 
     public DbSet<TenantSetting> TenantSettings => Set<TenantSetting>();
 
+    public DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
+
     public DbSet<ModuleEntitlement> ModuleEntitlements => Set<ModuleEntitlement>();
 
     public DbSet<Role> Roles => Set<Role>();

@@ -53,14 +53,13 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
 /// <summary>Seçeneklerin Türkçe adları ve sayı/tarih biçimleri.</summary>
 public static class CrmLabels
 {
-    // Tarayıcıda tüm kültür verisi yüklenmez (indirme boyutu); Türkçe biçim burada sabitlenir.
-    private static readonly NumberFormatInfo Numbers = new() { NumberDecimalSeparator = ",", NumberGroupSeparator = "." };
+    // Biçimler ve saat dilimi firmanın bölgesel ayarlarından gelir (Y6b, Regional).
+    public static string Amount(decimal amount, string currency) => $"{amount.ToString("N2", Regional.Numbers)} {currency}";
 
-    public static string Amount(decimal amount, string currency) => $"{amount.ToString("N2", Numbers)} {currency}";
+    public static string Date(DateOnly date) => date.ToString(Regional.DatePattern, CultureInfo.InvariantCulture);
 
-    public static string Date(DateOnly date) => date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
-
-    public static string Time(DateTimeOffset time) => time.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture);
+    public static string Time(DateTimeOffset time) =>
+        Regional.ToTenant(time).ToString($"{Regional.DatePattern} {Regional.TimePattern}", CultureInfo.InvariantCulture);
 
     public static string Of(OpportunityStage stage) => stage switch
     {

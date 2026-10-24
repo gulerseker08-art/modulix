@@ -237,6 +237,39 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Tenants", "platform");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Settings.TenantLogo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.ToTable("TenantLogos", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Settings.TenantSetting", b =>
                 {
                     b.Property<Guid>("Id")

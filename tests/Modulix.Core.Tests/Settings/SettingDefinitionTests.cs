@@ -76,3 +76,30 @@ public class SettingDefinitionTests
         public IReadOnlyList<SettingDefinition> Settings => settings;
     }
 }
+
+public class RegionalTimeTests
+{
+    [Fact]
+    public void Day_starts_at_midnight_in_the_tenant_time_zone()
+    {
+        var istanbul = RegionalTime.Find("Europe/Istanbul");
+        Assert.Equal(new DateTimeOffset(2026, 10, 24, 0, 0, 0, TimeSpan.FromHours(3)), RegionalTime.StartOfDay(new DateOnly(2026, 10, 24), istanbul));
+
+        var newYork = RegionalTime.Find("America/New_York");
+        Assert.Equal(TimeSpan.FromHours(-4), RegionalTime.StartOfDay(new DateOnly(2026, 7, 1), newYork).Offset);
+        Assert.Equal(TimeSpan.FromHours(-5), RegionalTime.StartOfDay(new DateOnly(2026, 12, 1), newYork).Offset);
+
+        // Bilinmeyen saat dilimi İstanbul sayılır.
+        Assert.Equal(istanbul.Id, RegionalTime.Find("Mars/Olympus").Id);
+    }
+
+    [Fact]
+    public void Logo_type_is_detected_from_the_content()
+    {
+        Assert.Equal(TenantLogo.Png, TenantLogo.DetectContentType([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0]));
+        Assert.Equal(TenantLogo.Jpeg, TenantLogo.DetectContentType([0xFF, 0xD8, 0xFF, 0xE0]));
+        Assert.Null(TenantLogo.DetectContentType("<svg"u8));
+        Assert.Null(TenantLogo.DetectContentType([]));
+        Assert.Null(TenantLogo.DetectContentType(new byte[TenantLogo.MaxBytes + 1]));
+    }
+}

@@ -130,11 +130,11 @@
     private static string? RowClass(ActivityDto activity) =>
         activity.CompletedAt is not null ? "done" : IsOverdue(activity) ? "overdue" : null;
 
-    /// <summary>Gün sınırı tarayıcının saat dilimine göre hesaplanır; "Bugün" gecikenleri de içerir.</summary>
+    /// <summary>Gün sınırı firmanın saat dilimine göre hesaplanır; "Bugün" gecikenleri de içerir.</summary>
     private string ViewFilters()
     {
-        var now = DateTimeOffset.Now;
-        var endOfToday = new DateTimeOffset(now.Date.AddDays(1), now.Offset);
+        var now = Regional.Now;
+        var endOfToday = Regional.FromTenant(now.Date.AddDays(1));
         return view switch
         {
             View.Today => $"&open=true&ownerId=me&dueBefore={Uri.EscapeDataString(endOfToday.ToString("O"))}",

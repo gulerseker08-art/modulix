@@ -31,7 +31,15 @@ public sealed record SettingDto(
     string Value,
     long Version);
 
-public sealed record SettingsResponse(IReadOnlyList<SettingDto> Settings);
+/// <summary><see cref="Logo"/>: firmanın logosu varsa bilgisi; görüntü <c>/api/settings/logo?v={Version}</c> adresindedir.</summary>
+public sealed record SettingsResponse(IReadOnlyList<SettingDto> Settings, TenantLogoDto? Logo = null);
+
+public sealed record TenantLogoDto(string ContentType, int Size, long Version)
+{
+    public const int MaxBytes = 256 * 1024;
+
+    public string Url => $"api/settings/logo?v={Version}";
+}
 
 public sealed record SettingWriteDto(string Value, long Version);
 

@@ -18,6 +18,14 @@ public sealed class ApiClient(HttpClient http)
 
     public Task<ApiResult<T>> PutAsync<T>(string url, object body) => SendAsync<T>(() => http.PutAsJsonAsync(url, body, Json));
 
+    /// <summary>Gövdesi dosyanın kendisi olan istek (ör. logo).</summary>
+    public Task<ApiResult<T>> PutBytesAsync<T>(string url, byte[] body, string contentType) => SendAsync<T>(() =>
+    {
+        var content = new ByteArrayContent(body);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        return http.PutAsync(url, content);
+    });
+
     public Task<ApiResult<bool>> DeleteAsync(string url) => SendAsync<bool>(() => http.DeleteAsync(url));
 
     private static async Task<ApiResult<T>> SendAsync<T>(Func<Task<HttpResponseMessage>> send)
@@ -52,6 +60,7 @@ public sealed class ApiClient(HttpClient http)
                 HttpStatusCode.NotFound => problem?.Title ?? "Kayıt bulunamadı.",
                 HttpStatusCode.Conflict => problem?.Title ?? "Kayıt başka biri tarafından değiştirildi.",
                 HttpStatusCode.UnprocessableEntity => "Lütfen işaretli alanları düzeltin.",
+                HttpStatusCode.BadRequest when problem?.Errors is { Count: > 0 } errors => errors.Values.SelectMany(e => e).First(),
                 _ => problem?.Title ?? "Beklenmeyen bir hata oluştu.",
             };
 

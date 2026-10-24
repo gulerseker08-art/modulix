@@ -29,6 +29,36 @@
     }
     else
     {
+        <section class="record-form settings-group">
+            <h2>Logo</h2>
+            @if (logoMessage is not null)
+            {
+                <div class="alert @(logoFailed ? "alert-danger" : "alert-success")" role="@(logoFailed ? "alert" : "status")">@logoMessage</div>
+            }
+            @if (Session.Logo is { } logo)
+            {
+                <p><img class="logo-preview" src="@logo.Url" alt="Firmanın logosu" /></p>
+            }
+            else
+            {
+                <p class="text-muted">Logo yüklenmemiş.</p>
+            }
+            @if (canEdit)
+            {
+                <div class="form-actions">
+                    <label class="btn btn-outline-primary mb-0">
+                        @(Session.Logo is null ? "Logo yükle" : "Logoyu değiştir")
+                        <InputFile class="visually-hidden" accept="image/png,image/jpeg" OnChange="UploadLogoAsync" disabled="@busy" />
+                    </label>
+                    @if (Session.Logo is not null)
+                    {
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="RemoveLogoAsync">Logoyu kaldır</button>
+                    }
+                </div>
+                <div class="form-text">PNG veya JPEG, en fazla 256 KB. Üst çubukta firmanın adının yanında görünür.</div>
+            }
+        </section>
+
         @foreach (var group in settings.GroupBy(s => s.Group))
         {
             <form class="record-form settings-group" novalidate @onsubmit="() => SaveAsync(group.Key)" @onsubmit:preventDefault>
@@ -99,6 +129,8 @@
     private readonly Dictionary<string, string> groupErrors = [];
     private IReadOnlyDictionary<string, string[]>? errors;
     private bool canEdit;
+    private string? logoMessage;
+    private bool logoFailed;
     private bool busy;
     private string? message;
 
@@ -169,11 +201,41 @@
             }
 
             notices[group] = "Kaydedildi.";
+
+            // Üst çubuktaki görünen ad ve ekranların biçimleri yeni ayarlarla yenilenir.
+            await Session.RefreshAsync();
         }
         else
         {
             groupErrors[group] = result.Error!;
         }
+    }
+
+    private async Task UploadLogoAsync(InputFileChangeEventArgs e)
+    {
+        logoMessage = null;
+        if (e.File.Size > TenantLogoDto.MaxBytes)
+        {
+            (logoMessage, logoFailed) = ("Logo en fazla 256 KB olabilir.", true);
+            return;
+        }
+
+        busy = true;
+        using var stream = new MemoryStream();
+        await e.File.OpenReadStream(TenantLogoDto.MaxBytes).CopyToAsync(stream);
+        var result = await Api.PutBytesAsync<TenantLogoDto>("/api/settings/logo", stream.ToArray(), e.File.ContentType);
+        busy = false;
+        (logoMessage, logoFailed) = result.IsSuccess ? ("Logo kaydedildi.", false) : (result.Error, true);
+        await Session.RefreshAsync();
+    }
+
+    private async Task RemoveLogoAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync("/api/settings/logo");
+        busy = false;
+        (logoMessage, logoFailed) = result.IsSuccess ? ("Logo kaldırıldı.", false) : (result.Error, true);
+        await Session.RefreshAsync();
     }
 
     private static string InputType(SettingKind kind) => kind switch

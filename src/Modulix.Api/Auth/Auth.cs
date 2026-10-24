@@ -9,6 +9,7 @@ using Modulix.Core.Records;
 using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Settings;
 using Modulix.Infrastructure.Users;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Users;
@@ -111,6 +112,7 @@ public static class AuthEndpoints
         SignInManager<ModulixUser> signIn,
         IMembershipDirectory directory,
         AccountAudit audit,
+        TenantDisplayNames names,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrEmpty(request.Password))
@@ -156,7 +158,7 @@ public static class AuthEndpoints
         }
 
         await IssueSessionAsync(http, signIn, user, active?.TenantId);
-        return Results.Ok(ToResponse(user, active?.TenantId, memberships));
+        return Results.Ok(await ToResponseAsync(user, active?.TenantId, memberships, names, ct));
     }
 
     private static async Task<IResult> LogoutAsync(SignInManager<ModulixUser> signIn)
@@ -170,6 +172,7 @@ public static class AuthEndpoints
         UserManager<ModulixUser> users,
         IMembershipDirectory directory,
         ITenantContextAccessor tenant,
+        TenantDisplayNames names,
         CancellationToken ct)
     {
         var user = await users.GetUserAsync(principal);
@@ -179,7 +182,7 @@ public static class AuthEndpoints
         }
 
         var memberships = await directory.GetActiveForUserAsync(user.Id, ct);
-        return Results.Ok(ToResponse(user, tenant.Current?.TenantId, memberships));
+        return Results.Ok(await ToResponseAsync(user, tenant.Current?.TenantId, memberships, names, ct));
     }
 
     private static async Task<IResult> SelectTenantAsync(
@@ -190,6 +193,7 @@ public static class AuthEndpoints
         SignInManager<ModulixUser> signIn,
         IMembershipDirectory directory,
         AccountAudit audit,
+        TenantDisplayNames names,
         CancellationToken ct)
     {
         var user = await users.GetUserAsync(principal);
@@ -210,7 +214,7 @@ public static class AuthEndpoints
         await audit.RecordAsync(user, AuditAction.SignedIn, [membership.TenantId], Client(http), ct);
         await IssueSessionAsync(http, signIn, user, membership.TenantId);
         var memberships = await directory.GetActiveForUserAsync(user.Id, ct);
-        return Results.Ok(ToResponse(user, membership.TenantId, memberships));
+        return Results.Ok(await ToResponseAsync(user, membership.TenantId, memberships, names, ct));
     }
 
     private static async Task<IResult> GetInvitationAsync(Guid uyelik, string? token, AccountLinks links, CancellationToken ct) =>
@@ -226,6 +230,7 @@ public static class AuthEndpoints
         SignInManager<ModulixUser> signIn,
         IMembershipDirectory directory,
         AccountAudit audit,
+        TenantDisplayNames names,
         CancellationToken ct)
     {
         var result = await links.AcceptInvitationAsync(request.MembershipId, request.Token, request.Password, ct);
@@ -246,7 +251,7 @@ public static class AuthEndpoints
         }
 
         await IssueSessionAsync(http, signIn, user, active?.TenantId);
-        return Results.Ok(ToResponse(user, active?.TenantId, memberships));
+        return Results.Ok(await ToResponseAsync(user, active?.TenantId, memberships, names, ct));
     }
 
     private static async Task<IResult> ResetPasswordAsync(
@@ -278,14 +283,18 @@ public static class AuthEndpoints
         await http.SignInAsync(IdentityConstants.ApplicationScheme, principal, new AuthenticationProperties { IsPersistent = false });
     }
 
-    private static MeResponse ToResponse(ModulixUser user, Guid? activeTenantId, IReadOnlyList<MembershipSummary> memberships) =>
-        new(
+    private static async Task<MeResponse> ToResponseAsync(
+        ModulixUser user, Guid? activeTenantId, IReadOnlyList<MembershipSummary> memberships, TenantDisplayNames names, CancellationToken ct)
+    {
+        var shown = await names.GetAsync(memberships.Select(m => m.TenantId), user.Id, ct);
+        return new(
             user.Id,
             user.Email ?? string.Empty,
             user.DisplayName,
             activeTenantId,
-            memberships.Select(m => new MembershipDto(m.TenantId, m.TenantName, m.TenantSlug)).ToList(),
+            memberships.Select(m => new MembershipDto(m.TenantId, m.TenantName, m.TenantSlug, shown.GetValueOrDefault(m.TenantId))).ToList(),
             user.IsPlatformAdministrator);
+    }
 
     private static IResult InvalidLink(string message) =>
         Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: message);

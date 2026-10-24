@@ -6,7 +6,11 @@ public sealed record LoginRequest(string Email, string Password);
 
 public sealed record SelectTenantRequest(Guid TenantId);
 
-public sealed record MembershipDto(Guid TenantId, string TenantName, string TenantSlug);
+/// <summary><see cref="DisplayName"/>: firmanın ayarladığı görünen ad (Y6b); yoksa <see cref="TenantName"/> gösterilir.</summary>
+public sealed record MembershipDto(Guid TenantId, string TenantName, string TenantSlug, string? DisplayName = null)
+{
+    public string ShownName => DisplayName ?? TenantName;
+}
 
 /// <summary>
 /// Oturumdaki kullanıcı. <see cref="ActiveTenantId"/> sunucuda doğrulanmış aktif tenant'tır.

@@ -12,6 +12,11 @@
         <div class="top-row px-4">
             @if (Session.IsSignedIn)
             {
+                @* Firmanın logosu (Y6b), ayarlanmışsa. *@
+                @if (Session.Logo is { } logo)
+                {
+                    <img class="tenant-logo" src="@logo.Url" alt="@Session.ActiveTenantName" />
+                }
                 <span class="avatar" aria-hidden="true">@Initials(Session.User!.DisplayName)</span>
                 <span class="session-info text-truncate">
                     @Session.User!.DisplayName
