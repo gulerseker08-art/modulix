@@ -1179,3 +1179,28 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 .session-link:hover {
     text-decoration: underline;
 }
+
+/* İki adımlı doğrulama (Y7b). */
+.recovery-codes {
+    columns: 2;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--mx-surface-muted, #f4f5f8);
+    border-radius: var(--mx-radius);
+}
+
+.qr-code {
+    width: 200px;
+    height: 200px;
+    image-rendering: pixelated;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+}
+
+.shared-key {
+    word-break: break-all;
+}
+
+.setup-steps {
+    padding-left: 1.25rem;
+}

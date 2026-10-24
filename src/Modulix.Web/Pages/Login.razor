@@ -12,18 +12,34 @@
         <div class="alert alert-danger" role="alert">@error</div>
     }
 
-    <form @onsubmit="LoginAsync" @onsubmit:preventDefault>
-        <div class="mb-3">
-            <label class="form-label" for="email">E-posta</label>
-            <input id="email" class="form-control" type="email" autocomplete="username" required @bind="email" />
-        </div>
-        <div class="mb-3">
-            <label class="form-label" for="password">Şifre</label>
-            <input id="password" class="form-control" type="password" autocomplete="current-password" required @bind="password" />
-        </div>
-        <button type="submit" class="btn btn-primary w-100" disabled="@busy">Giriş yap</button>
-    </form>
-    <p class="mt-3"><a href="sifremi-unuttum">Şifremi unuttum</a></p>
+    @if (Session.TwoFactorPending)
+    {
+        @* İkinci adım (Y7b): doğrulama uygulamasındaki kod veya bir kurtarma kodu. *@
+        <form @onsubmit="VerifyAsync" @onsubmit:preventDefault>
+            <p>Doğrulama uygulamanızdaki 6 haneli kodu girin. Telefonunuz yanınızda değilse kurtarma kodlarınızdan birini kullanabilirsiniz.</p>
+            <div class="mb-3">
+                <label class="form-label" for="code">Doğrulama kodu</label>
+                <input id="code" class="form-control" autocomplete="one-time-code" inputmode="text" maxlength="20" required
+                       @bind="code" @bind:event="oninput" />
+            </div>
+            <button type="submit" class="btn btn-primary w-100" disabled="@(busy || string.IsNullOrWhiteSpace(code))">Doğrula</button>
+        </form>
+    }
+    else
+    {
+        <form @onsubmit="LoginAsync" @onsubmit:preventDefault>
+            <div class="mb-3">
+                <label class="form-label" for="email">E-posta</label>
+                <input id="email" class="form-control" type="email" autocomplete="username" required @bind="email" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="password">Şifre</label>
+                <input id="password" class="form-control" type="password" autocomplete="current-password" required @bind="password" />
+            </div>
+            <button type="submit" class="btn btn-primary w-100" disabled="@busy">Giriş yap</button>
+        </form>
+        <p class="mt-3"><a href="sifremi-unuttum">Şifremi unuttum</a></p>
+    }
 </div>
 
 @code {
@@ -31,6 +47,7 @@
 
     private string email = string.Empty;
     private string password = string.Empty;
+    private string code = string.Empty;
     private string? error;
     private bool busy;
 
@@ -40,11 +57,37 @@
         error = await Session.LoginAsync(email, password);
         busy = false;
 
+        if (error is null && !Session.TwoFactorPending)
+        {
+            Continue(usedRecoveryCode: false);
+        }
+    }
+
+    private async Task VerifyAsync()
+    {
+        busy = true;
+        var entered = code.Trim();
+        error = await Session.CompleteTwoFactorAsync(entered);
+        busy = false;
+        code = string.Empty;
+
         if (error is null)
         {
-            // Yalnızca uygulama içi adreslere dönülür.
-            var target = ReturnUrl is { Length: > 0 } url && !url.Contains("//") && !url.Contains(':') ? url : string.Empty;
-            Navigation.NavigateTo(Session.HasActiveTenant ? target : Session.NoTenantHome);
+            // 6 haneli kod uygulamanındır; diğerleri kurtarma kodudur. Kişi kalan kodlarını Hesabım'da görür.
+            Continue(usedRecoveryCode: !(entered.Replace(" ", string.Empty) is { Length: 6 } digits && digits.All(char.IsAsciiDigit)));
         }
+    }
+
+    private void Continue(bool usedRecoveryCode)
+    {
+        if (usedRecoveryCode)
+        {
+            Navigation.NavigateTo("hesabim?kurtarma=1");
+            return;
+        }
+
+        // Yalnızca uygulama içi adreslere dönülür.
+        var target = ReturnUrl is { Length: > 0 } url && !url.Contains("//") && !url.Contains(':') ? url : string.Empty;
+        Navigation.NavigateTo(Session.HasActiveTenant ? target : Session.NoTenantHome);
     }
 }

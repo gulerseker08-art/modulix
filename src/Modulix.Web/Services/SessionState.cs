@@ -53,9 +53,16 @@ public sealed class SessionState(ApiClient api)
     /// <summary>İlk çağrıda oturumu sunucudan okur; sonrakiler aynı sonucu bekler.</summary>
     public Task EnsureLoadedAsync() => loading ??= ReloadAsync();
 
+    /// <summary>Şifre doğru, iki adımlı doğrulama açık (Y7b): giriş <see cref="CompleteTwoFactorAsync"/> ile tamamlanır.</summary>
+    public bool TwoFactorPending { get; private set; }
+
+    /// <summary>Kişinin firması iki adımlı doğrulama istiyor ve kendisininki kapalı: firma ekranları açılmaz, önce kurulum yapılır.</summary>
+    public bool TwoFactorRequired => User?.TwoFactorRequired == true;
+
     public async Task<string?> LoginAsync(string email, string password)
     {
-        var result = await api.PostAsync<MeResponse>("/api/auth/login", new LoginRequest(email, password));
+        // 200'de gövde oturumdur (TwoFactorRequired yok, false okunur); 202'de ikinci adım istenir.
+        var result = await api.PostAsync<LoginChallengeResponse>("/api/auth/login", new LoginRequest(email, password));
         if (!result.IsSuccess)
         {
             return result.Status == System.Net.HttpStatusCode.Unauthorized
@@ -63,6 +70,30 @@ public sealed class SessionState(ApiClient api)
                 : result.Error;
         }
 
+        TwoFactorPending = result.Value?.TwoFactorRequired == true;
+        if (!TwoFactorPending)
+        {
+            loading = ReloadAsync();
+            await loading;
+        }
+
+        return null;
+    }
+
+    public async Task<string?> CompleteTwoFactorAsync(string code)
+    {
+        var result = await api.PostAsync<MeResponse>("/api/auth/login/two-factor", new TwoFactorLoginRequest(code));
+        if (!result.IsSuccess)
+        {
+            if (result.Status == System.Net.HttpStatusCode.Unauthorized)
+            {
+                TwoFactorPending = false;
+            }
+
+            return result.Error;
+        }
+
+        TwoFactorPending = false;
         loading = ReloadAsync();
         await loading;
         return null;
@@ -105,7 +136,7 @@ public sealed class SessionState(ApiClient api)
         User = me.IsSuccess ? me.Value : null;
         Access = null;
 
-        if (User?.ActiveTenantId is not null)
+        if (User?.ActiveTenantId is not null && !TwoFactorRequired)
         {
             var access = await api.GetAsync<MyAccessResponse>("/api/tenant/access");
             Access = access.IsSuccess ? access.Value : null;

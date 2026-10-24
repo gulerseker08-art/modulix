@@ -22,7 +22,18 @@ public sealed record MeResponse(
     string DisplayName,
     Guid? ActiveTenantId,
     IReadOnlyList<MembershipDto> Memberships,
-    bool IsPlatformAdministrator = false);
+    bool IsPlatformAdministrator = false,
+    bool TwoFactorEnabled = false,
+    bool TwoFactorRequired = false);
+
+/// <summary>
+/// Girişin yanıtı: şifre doğruysa ve iki adımlı doğrulama açıksa 202 ve <see cref="TwoFactorRequired"/> döner; kod
+/// <c>/api/auth/login/two-factor</c>'a gönderilir (5 dakika içinde). Aksi halde gövde <see cref="MeResponse"/>'tur.
+/// </summary>
+public sealed record LoginChallengeResponse(bool TwoFactorRequired);
+
+/// <summary>Uygulamadaki 6 haneli kod veya bir kurtarma kodu.</summary>
+public sealed record TwoFactorLoginRequest(string Code);
 
 public sealed record CurrentTenantResponse(Guid TenantId, string Name, string Slug);
 

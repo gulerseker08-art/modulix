@@ -61,6 +61,13 @@ public enum AuditAction
     PasswordChanged = 10,
     PasswordResetRequested = 11,
     SessionsClosed = 12,
+
+    // İki adımlı doğrulama (Y7b).
+    TwoFactorEnabled = 13,
+    TwoFactorDisabled = 14,
+    RecoveryCodesRegenerated = 15,
+    SignedInWithRecoveryCode = 16,
+    TwoFactorReset = 17,
 }
 
 /// <summary>Audit kaydı: kim, ne, ne zaman. <see cref="Changes"/>: alan → { old, new }.</summary>

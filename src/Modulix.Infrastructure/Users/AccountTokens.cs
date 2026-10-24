@@ -28,6 +28,8 @@ public static class AccountTokens
 
     public static string SignInLink(string publicUrl) => $"{Root(publicUrl)}/giris";
 
+    public static string AccountLink(string publicUrl) => $"{Root(publicUrl)}/hesabim";
+
     private static string Root(string publicUrl)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(publicUrl);

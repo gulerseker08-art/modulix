@@ -27,7 +27,8 @@ public sealed record UserDto(
     DateTimeOffset? InvitedAt,
     DateTimeOffset? LastSignInAt,
     bool IsLockedOut,
-    bool IsCurrentUser)
+    bool IsCurrentUser,
+    bool TwoFactorEnabled = false)
 {
     public bool IsAdministrator => Roles.Any(r => r.IsSystem);
 }

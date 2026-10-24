@@ -8,7 +8,7 @@
 {
     <p class="text-muted">Yükleniyor…</p>
 }
-else if (Session.IsSignedIn && Session.HasActiveTenant)
+else if (Session.IsSignedIn && Session.HasActiveTenant && (!Session.TwoFactorRequired || AllowWithoutTwoFactor))
 {
     @if (Module is not null && !Session.IsModuleEnabled(Module))
     {
@@ -27,6 +27,9 @@ else if (Session.IsSignedIn && Session.HasActiveTenant)
 
 @code {
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Firma iki adımlı doğrulama istese de gösterilir (Hesabım: kurulum orada yapılır).</summary>
+    [Parameter] public bool AllowWithoutTwoFactor { get; set; }
 
     /// <summary>Modül anahtarı (ör. "crm"); tenant için kapalıysa içerik gösterilmez.</summary>
     [Parameter] public string? Module { get; set; }
@@ -69,6 +72,11 @@ else if (Session.IsSignedIn && Session.HasActiveTenant)
         else if (!Session.HasActiveTenant)
         {
             Navigation.NavigateTo(Session.NoTenantHome);
+        }
+        else if (Session.TwoFactorRequired && !Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("hesabim", StringComparison.Ordinal))
+        {
+            // Firma iki adımlı doğrulama istiyor (Y7b): kurulum Hesabım'da yapılır.
+            Navigation.NavigateTo("hesabim?iki-adim=gerekli");
         }
     }
 

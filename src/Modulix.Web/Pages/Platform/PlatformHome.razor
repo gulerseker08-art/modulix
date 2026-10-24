@@ -1,4 +1,5 @@
 @page "/platform"
+@inject ApiClient Api
 
 <PageTitle>Platform · Modulix</PageTitle>
 
@@ -12,4 +13,44 @@
         <a class="tile" href="platform/moduller"><strong>Modül hakları</strong><span>Firma × modül, aç/kapa</span></a>
         <a class="tile" href="platform/katalog"><strong>Modül kataloğu</strong><span>Modüller, izinler, hazır roller</span></a>
     </div>
+
+    @* Y7b: telefonunu ve kurtarma kodlarını kaybeden kişinin iki adımlı doğrulaması yalnızca buradan sıfırlanır. *@
+    <form class="record-form settings-group mt-4" novalidate @onsubmit="ResetTwoFactorAsync" @onsubmit:preventDefault>
+        <h2>İki adımlı doğrulamayı sıfırla</h2>
+        <p class="text-muted">Telefonuna ve kurtarma kodlarına erişemeyen kişi için. Kimliğini doğruladıktan sonra kullanın: doğrulama kapanır, kişinin tüm oturumları kapatılır ve işlem denetim kaydına yazılır.</p>
+        <Notice Text="@notice" Failed="failed" />
+        <div class="mb-3">
+            <label class="form-label" for="resetEmail">Kişinin e-postası</label>
+            <input id="resetEmail" class="form-control" type="email" autocomplete="off" @bind="email" @bind:event="oninput" />
+            <FieldError Field="email" Errors="errors" />
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-outline-danger" disabled="@(busy || string.IsNullOrWhiteSpace(email))">Sıfırla</button>
+        </div>
+    </form>
 </PlatformGate>
+
+@code {
+    private string email = string.Empty;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    private async Task ResetTwoFactorAsync()
+    {
+        busy = true;
+        var target = email.Trim();
+        var result = await Api.PostAsync<bool>("/api/platform/users/reset-two-factor", new ResetTwoFactorRequest(target));
+        busy = false;
+        errors = result.FieldErrors;
+        if (result.IsSuccess)
+        {
+            (notice, failed, email) = ($"{target} için iki adımlı doğrulama kapatıldı ve oturumları sonlandırıldı.", false, string.Empty);
+        }
+        else
+        {
+            (notice, failed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+        }
+    }
+}

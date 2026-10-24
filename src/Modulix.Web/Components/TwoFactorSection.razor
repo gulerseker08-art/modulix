@@ -1,0 +1,162 @@
+@inject ApiClient Api
+@inject SessionState Session
+
+@* İki adımlı doğrulama (Y7b): kurulum (QR kod, doğrulama), kurtarma kodları ve kapatma. Hesabım sayfasındadır. *@
+<section id="iki-adim" class="record-form settings-group">
+    <h2>İki adımlı doğrulama</h2>
+    <Notice Text="@notice" Failed="failed" />
+
+    @if (status is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (codes is not null)
+    {
+        <div class="alert alert-warning" role="status">
+            Bu kurtarma kodlarını şimdi bir yere kaydedin; bir daha gösterilmez. Telefonunuz yanınızda değilken her biriyle bir kez giriş yapabilirsiniz.
+        </div>
+        <pre class="recovery-codes">@string.Join("\n", codes)</pre>
+        <div class="form-actions">
+            <a class="btn btn-outline-primary" download="modulix-kurtarma-kodlari.txt"
+               href="@($"data:text/plain;charset=utf-8,{Uri.EscapeDataString(string.Join("\r\n", codes))}")">Kodları indir</a>
+            <button type="button" class="btn btn-primary" @onclick="() => codes = null">Kaydettim</button>
+        </div>
+    }
+    else if (status.Enabled)
+    {
+        <p><span class="badge user-active">Açık</span> Girişte doğrulama uygulamanızdaki kod istenir. @status.RecoveryCodesLeft kurtarma kodunuz kaldı.</p>
+        @if (status.RequiredBy.Count > 0)
+        {
+            <p class="text-muted">@string.Join(", ", status.RequiredBy) iki adımlı doğrulamayı zorunlu kılıyor; kapatamazsınız.</p>
+        }
+
+        <div class="form-grid">
+            <div class="mb-3">
+                <label class="form-label" for="tfPassword">Mevcut şifre</label>
+                <input id="tfPassword" class="form-control" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput" />
+                <FieldError Field="currentPassword" Errors="errors" />
+            </div>
+            @if (status.RequiredBy.Count == 0)
+            {
+                <div class="mb-3">
+                    <label class="form-label" for="tfDisableCode">Kod (kapatmak için)</label>
+                    <input id="tfDisableCode" class="form-control" autocomplete="one-time-code" @bind="code" @bind:event="oninput" />
+                    <FieldError Field="code" Errors="errors" />
+                </div>
+            }
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-outline-primary" disabled="@(busy || password.Length == 0)" @onclick="RegenerateAsync">Kurtarma kodlarını yenile</button>
+            @if (status.RequiredBy.Count == 0)
+            {
+                <button type="button" class="btn btn-outline-danger" disabled="@(busy || password.Length == 0 || code.Length == 0)" @onclick="DisableAsync">Kapat</button>
+            }
+        </div>
+    }
+    else if (setup is not null)
+    {
+        <ol class="setup-steps">
+            <li>Telefonunuza bir doğrulama uygulaması kurun (Google Authenticator, Microsoft Authenticator vb.).</li>
+            <li>Uygulamada QR kodu okutun. Okutamıyorsanız anahtarı elle girin: <code class="shared-key">@setup.SharedKey</code></li>
+            <li>Uygulamanın gösterdiği 6 haneli kodu girin.</li>
+        </ol>
+        <p><img class="qr-code" src="@setup.QrCode" alt="Doğrulama uygulaması için QR kod" /></p>
+        <div class="mb-3">
+            <label class="form-label" for="tfCode">Kod</label>
+            <input id="tfCode" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="7" @bind="code" @bind:event="oninput" />
+            <FieldError Field="code" Errors="errors" />
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-primary" disabled="@(busy || code.Length == 0)" @onclick="EnableAsync">Doğrula ve aç</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => setup = null">Vazgeç</button>
+        </div>
+    }
+    else
+    {
+        <p><span class="badge user-disabled">Kapalı</span> Açarsanız girişte şifrenin yanında telefonunuzdaki doğrulama uygulamasının kodu da istenir.</p>
+        <div class="mb-3">
+            <label class="form-label" for="tfStartPassword">Mevcut şifre</label>
+            <input id="tfStartPassword" class="form-control" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput" />
+            <FieldError Field="currentPassword" Errors="errors" />
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-primary" disabled="@(busy || password.Length == 0)" @onclick="StartAsync">Kurulumu başlat</button>
+        </div>
+    }
+</section>
+
+@code {
+    private TwoFactorStatusResponse? status;
+    private TwoFactorSetupResponse? setup;
+    private IReadOnlyList<string>? codes;
+    private string password = string.Empty;
+    private string code = string.Empty;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() => status = (await Api.GetAsync<TwoFactorStatusResponse>("/api/account/two-factor")).Value;
+
+    private async Task StartAsync()
+    {
+        var result = await RunAsync(() => Api.PostAsync<TwoFactorSetupResponse>("/api/account/two-factor/setup", new StartTwoFactorRequest(password)));
+        if (result.Value is { } started)
+        {
+            (setup, password, notice) = (started, string.Empty, null);
+        }
+    }
+
+    private async Task EnableAsync()
+    {
+        var result = await RunAsync(() => Api.PostAsync<RecoveryCodesResponse>("/api/account/two-factor/enable", new EnableTwoFactorRequest(code)));
+        if (result.Value is { } enabled)
+        {
+            (codes, setup, code) = (enabled.Codes, null, string.Empty);
+            (notice, failed) = ("İki adımlı doğrulama açıldı.", false);
+            await LoadAsync();
+
+            // Firma zorunlu kılıyorsa ekranlar artık açılır.
+            await Session.RefreshAsync();
+        }
+    }
+
+    private async Task RegenerateAsync()
+    {
+        var result = await RunAsync(() => Api.PostAsync<RecoveryCodesResponse>("/api/account/two-factor/recovery-codes", new RegenerateRecoveryCodesRequest(password)));
+        if (result.Value is { } regenerated)
+        {
+            (codes, password) = (regenerated.Codes, string.Empty);
+            (notice, failed) = ("Yeni kurtarma kodları oluşturuldu; eskiler artık geçersiz.", false);
+            await LoadAsync();
+        }
+    }
+
+    private async Task DisableAsync()
+    {
+        var result = await RunAsync(() => Api.PostAsync<bool>("/api/account/two-factor/disable", new DisableTwoFactorRequest(password, code)));
+        if (result.IsSuccess)
+        {
+            (password, code) = (string.Empty, string.Empty);
+            (notice, failed) = ("İki adımlı doğrulama kapatıldı.", false);
+            await LoadAsync();
+            await Session.RefreshAsync();
+        }
+    }
+
+    private async Task<ApiResult<T>> RunAsync<T>(Func<Task<ApiResult<T>>> call)
+    {
+        busy = true;
+        var result = await call();
+        busy = false;
+        errors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+        }
+
+        return result;
+    }
+}

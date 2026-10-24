@@ -44,10 +44,10 @@ public static class UserEndpoints
     }
 
     private static async Task<IResult> ListAsync(
-        string? search, UserStatus? status, Guid? roleId, int? page, int? pageSize, IUserAdministration admin, CancellationToken ct)
+        string? search, UserStatus? status, Guid? roleId, bool? twoFactor, int? page, int? pageSize, IUserAdministration admin, CancellationToken ct)
     {
         var result = await admin.ListAsync(
-            new UserQuery(search, (MembershipStatus?)status, roleId, page ?? 1, pageSize ?? 25), ct);
+            new UserQuery(search, (MembershipStatus?)status, roleId, page ?? 1, pageSize ?? 25) { TwoFactorEnabled = twoFactor }, ct);
         return Results.Ok(new UserPageResponse(result.Items.Select(ToDto).ToList(), result.Page, result.PageSize, result.TotalCount));
     }
 
@@ -178,7 +178,8 @@ public static class UserEndpoints
         user.InvitedAt,
         user.LastSignInAt,
         user.IsLockedOut,
-        user.IsCurrentUser);
+        user.IsCurrentUser,
+        user.TwoFactorEnabled);
 
     // ArgumentException.Message sonuna " (Parameter 'x')" ekler; kullanıcıya yalnızca asıl mesaj gösterilir.
     private static string FieldMessage(ArgumentException ex) =>

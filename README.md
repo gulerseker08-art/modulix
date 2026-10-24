@@ -194,6 +194,16 @@ Platformu işleten ekip için ayrı bir alan: menüde **Platform** (`/platform`)
 - **Oturumlar** sunucuda da tutulur (`platform.UserSessions`): çerez oturum kimliğini taşır, her istekte oturumun kapatılmadığı denetlenir (son etkinlik en fazla 5 dakikada bir yazılır). `GET /api/account/sessions`, `DELETE /api/account/sessions/{id}`, `POST /api/account/sessions/close-others`. Çıkış oturumu kapatır; 30 günden eski kayıtlar girişte silinir.
 - Yönetici (`core.users.manage`) `POST /api/users/{üyelik}/close-sessions` ile kişinin tüm oturumlarını kapatır (diğer firmalardaki de kapanır; Yönetici rolündekini yalnızca yönetici kapatabilir). Devre dışı bırakmak oturumları kapatmaz: o firmaya erişim zaten hemen kesilir.
 
+### İki adımlı doğrulama (Y7b)
+
+Doğrulama uygulamasıyla (TOTP: Google/Microsoft Authenticator vb.) çalışır; hesaba aittir, kişinin bütün firmalarında geçerlidir. "Bu cihazı hatırla" yoktur.
+
+- **Kurulum** Hesabım → İki adımlı doğrulama: mevcut şifre → QR kod ve anahtar (`POST /api/account/two-factor/setup`) → uygulamadaki kod (`/enable`) → 10 kurtarma kodu bir kez gösterilir (indirilebilir). `GET /api/account/two-factor` durumu ve kalan kod sayısını verir; `/recovery-codes` (şifre) kodları yeniler, `/disable` (şifre ve kod) kapatır.
+- **Giriş**: şifre doğruysa ve doğrulama açıksa `POST /api/auth/login` 202 döner; ikinci adım `POST /api/auth/login/two-factor` (6 haneli kod ya da kurtarma kodu). Hatalı kodlar hatalı şifre gibi sayılır ve hesabı kilitler (423). Kurtarma koduyla girişte kişiye e-posta gider ve Hesabım'a yönlendirilir.
+- **Firma zorunluluğu**: Ayarlar → Güvenlik → "İki adımlı doğrulama zorunlu" (`core.security.require-two-factor`). Açıkken doğrulaması kapalı üye firmanın verisine erişemez (403 `two-factor-required`), ekranlar Hesabım'a yönlendirir; kurunca devam eder. Ayarı açan kişinin kendi doğrulaması açık olmalıdır; zorunlu firmada üye doğrulamasını kapatamaz. Kullanıcı listesinde "İki adımlı" sütunu ve süzgeci vardır.
+- **Kayıp telefon ve kodlar**: yalnızca platform yöneticisi sıfırlar (Platform sayfası, `POST /api/platform/users/reset-two-factor`): doğrulama kapanır, kişinin tüm oturumları kapatılır.
+- Denetim kaydına "Hesap" olarak açma, kapatma, kod yenileme, kurtarma koduyla giriş ve sıfırlama yazılır (sıfırlamada işlemi yapan platform yöneticisidir).
+
 ## CRM modülü
 
 İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.
