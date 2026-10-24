@@ -161,6 +161,17 @@ Platformu işleten ekip için ayrı bir alan: menüde **Platform** (`/platform`)
 - **Modül hakları (Y4b)** (`/platform/moduller`): firma × modül tablosu, her hücrede aç/kapa anahtarı; firma detayında da aynı anahtarlar. `PUT /api/platform/tenants/{id}/modules/{modül}` gövde `{ "enabled": false }`. Kapatmak veri silmez: modülün menüsü ve uç noktaları o firmada kapanır, rollerdeki izinler korunur ve modül yeniden açılınca geçerli olur. Değişiklik firmanın bir sonraki isteğinde geçerlidir ve firmanın denetim kaydına `core.tenant` olarak (`modules` önce/sonra) yazılır. Çekirdek modül kapatılamaz (400).
 - **Modül kataloğu (Y4b)** (`/platform/katalog`, `GET /api/platform/catalog`): kayıtlı modüller, izinleri (kaynak ve işlem), hazır rolleri ve kaç açık firmada açık oldukları. Salt okunur; modül eklemek kodla olur.
 
+### Denetim kaydı (Y5)
+
+**Yönetim → Denetim kaydı** (`/yonetim/denetim`), `core.audit.read` izni ister (Yönetici rolünde vardır). Uç noktalar `/api/audit` altındadır ve yalnızca okur; denetim kaydını değiştiren veya silen bir yol yoktur, veritabanında da uygulama rolüne `UPDATE` ve `DELETE` yasaktır.
+
+- **Liste:** en yeni üstte; tarih, kullanıcı, kayıt türü, kayıt, işlem (Oluşturdu, Değiştirdi, Sildi, Dışa aktardı) ve kaynak (Arayüz, Arka plan işi, İçe aktarma, AI). Satıra tıklayınca değişen alanlar eski ve yeni değerleriyle açılır; değerler okunur biçimdedir (seçenek etiketleri, kullanıcı adları, bağlı kaydın adı).
+- **Filtreler:** kullanıcı, kayıt türü, işlem, kaynak ve tarih aralığı (`GET /api/audit?userId=&entityKey=&action=&source=&from=2026-01-01&to=2026-01-31&page=1`). Tarihler Türkiye saatiyle gün olarak yorumlanır, bitiş günü dahildir.
+- **Gizli değerler:** okur, kayıt türünün görüntüleme iznine sahip değilse (ör. CRM izni olmayan biri firma kaydı) satırı ve değişen alanların adlarını görür, değerler "gizli" yazılır. Yönetici her şeyi görür.
+- **Kullanıcı adı:** firmaya üye olmayan bir platform yöneticisinin işlemleri "Modülix platform yöneticisi" olarak görünür; sistem işlemleri "Sistem".
+- **CSV** (`GET /api/audit/export`, aynı filtreler): noktalı virgülle ayrılmış, UTF-8 BOM'lu (Türkçe Excel doğrudan açar), her değişen alan bir satır. En fazla 50.000 kayıt; fazlası 400 döner ve tarih aralığı daraltılır. `=`, `+`, `-` veya `@` ile başlayan hücreler kesme işaretiyle başlatılır. Dışa aktarmanın kendisi de denetim kaydına (`core.audit`, filtreler ve satır sayısıyla) yazılır.
+- Modüller kayıt türlerini `IModule.AuditedEntities` ile tanımlar (alan etiketleri, seçenekler, kullanıcı ve bağlantı alanları, görüntüleme izni).
+
 ## CRM modülü
 
 İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.

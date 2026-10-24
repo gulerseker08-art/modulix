@@ -1,4 +1,5 @@
 using Modulix.Api.Access;
+using Modulix.Api.Audit;
 using Modulix.Api.Auth;
 using Modulix.Api.Crm;
 using Modulix.Api.Development;
@@ -106,6 +107,7 @@ app.MapUserEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapPlatformEndpoints();
+app.MapAuditEndpoints();
 
 // Bilinmeyen API adresi 404 döner; diğer adresler arayüzün sayfalarıdır.
 app.Map("/api/{**path}", () => Results.NotFound());

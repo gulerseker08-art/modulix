@@ -76,6 +76,76 @@ public sealed class CrmModule : IModule
             ]),
     ];
 
+    /// <summary>Denetim kaydı (Y5): alanların görünen adları; seçenek adları arayüzdekilerle aynıdır.</summary>
+    IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
+    [
+        new(Entities.Company, "Firma (CRM)", Permissions.CompaniesRead, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["taxNumber"] = "Vergi no", ["phone"] = "Telefon", ["email"] = "E-posta", ["website"] = "Web sitesi",
+            ["city"] = "Şehir", ["address"] = "Adres", ["industry"] = "Sektör", ["status"] = "Durum", ["source"] = "Kaynak",
+            ["tags"] = "Etiketler", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+        }, "name")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string> { ["Prospect"] = "Potansiyel", ["Customer"] = "Müşteri", ["Inactive"] = "Pasif" },
+                ["source"] = new Dictionary<string, string>
+                {
+                    ["Referral"] = "Tavsiye", ["Website"] = "Web sitesi", ["Event"] = "Etkinlik / fuar", ["Advertising"] = "Reklam",
+                    ["ColdCall"] = "Soğuk arama", ["Other"] = "Diğer",
+                },
+            },
+            UserFields = ["ownerId"],
+        },
+        new(Entities.Contact, "Kişi (CRM)", Permissions.ContactsRead, new Dictionary<string, string>
+        {
+            ["firstName"] = "Ad", ["lastName"] = "Soyad", ["companyId"] = "Firma", ["title"] = "Unvan", ["email"] = "E-posta",
+            ["phone"] = "Telefon", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+        })
+        {
+            TitleFields = ["firstName", "lastName"],
+            UserFields = ["ownerId"],
+            References = new Dictionary<string, string> { ["companyId"] = Entities.Company },
+        },
+        new(Entities.Opportunity, "Fırsat (CRM)", Permissions.OpportunitiesRead, new Dictionary<string, string>
+        {
+            ["title"] = "Başlık", ["companyId"] = "Firma", ["contactId"] = "Kişi", ["stage"] = "Aşama", ["amount"] = "Tutar",
+            ["currency"] = "Para birimi", ["expectedCloseDate"] = "Tahmini kapanış", ["probability"] = "Olasılık (%)",
+            ["lostReason"] = "Kaybetme nedeni", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+        }, "title")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["stage"] = new Dictionary<string, string>
+                {
+                    ["Lead"] = "Aday", ["Qualified"] = "Nitelikli", ["Proposal"] = "Teklif", ["Negotiation"] = "Pazarlık",
+                    ["Won"] = "Kazanıldı", ["Lost"] = "Kaybedildi",
+                },
+            },
+            UserFields = ["ownerId"],
+            References = new Dictionary<string, string> { ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact },
+        },
+        new(Entities.Activity, "Aktivite (CRM)", Permissions.ActivitiesRead, new Dictionary<string, string>
+        {
+            ["type"] = "Tür", ["subject"] = "Konu", ["dueAt"] = "Tarih", ["completedAt"] = "Tamamlanma", ["companyId"] = "Firma",
+            ["contactId"] = "Kişi", ["opportunityId"] = "Fırsat", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+        }, "subject")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["type"] = new Dictionary<string, string>
+                {
+                    ["Call"] = "Arama", ["Meeting"] = "Toplantı", ["Email"] = "E-posta", ["Task"] = "Görev", ["Note"] = "Not",
+                },
+            },
+            UserFields = ["ownerId"],
+            References = new Dictionary<string, string>
+            {
+                ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact, ["opportunityId"] = Entities.Opportunity,
+            },
+        },
+    ];
+
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<CrmStoreContext>();

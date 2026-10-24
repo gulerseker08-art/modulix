@@ -1047,3 +1047,42 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
     .catalog-module code {
         font-size: 0.8rem;
     }
+
+/* Denetim kaydı (Y5). */
+.audit-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+    margin-bottom: 1rem;
+}
+
+.audit-filter-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.audit-row {
+    cursor: pointer;
+}
+
+.link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    text-decoration: underline dotted;
+}
+
+.audit-detail > td {
+    background: var(--bs-tertiary-bg, #f8f9fa);
+}
+
+.audit-changes {
+    margin: 0;
+    max-width: 48rem;
+}
+
+.audit-table td[data-label="Tarih"] {
+    white-space: nowrap;
+}

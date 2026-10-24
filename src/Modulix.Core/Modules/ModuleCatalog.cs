@@ -10,6 +10,7 @@ public sealed class ModuleCatalog
 {
     private readonly Dictionary<string, IModule> modules;
     private readonly Dictionary<string, PermissionDefinition> permissions;
+    private readonly Dictionary<string, AuditedEntity> auditedEntities = new(StringComparer.Ordinal);
 
     public ModuleCatalog(IEnumerable<IModule> modules)
     {
@@ -47,6 +48,15 @@ public sealed class ModuleCatalog
             }
 
             ValidateTemplates(module);
+
+            foreach (var entity in module.AuditedEntities)
+            {
+                if (!entity.EntityKey.StartsWith(module.Key + ".", StringComparison.Ordinal) || !auditedEntities.TryAdd(entity.EntityKey, entity))
+                {
+                    throw new InvalidOperationException(
+                        $"Geçersiz veya tekrar eden denetim kayıt türü: '{entity.EntityKey}' ({module.Key}). Biçim: '{module.Key}.tür'.");
+                }
+            }
         }
 
         if (!this.modules.ContainsKey(CoreModule.ModuleKey))
@@ -73,6 +83,12 @@ public sealed class ModuleCatalog
     public IModule? Find(string moduleKey) => modules.GetValueOrDefault(moduleKey);
 
     public bool ContainsModule(string moduleKey) => modules.ContainsKey(moduleKey);
+
+    /// <summary>Denetim kaydında gösterilen kayıt türü (Y5); tanımlı değilse <c>null</c>.</summary>
+    public AuditedEntity? FindAuditedEntity(string entityKey) => auditedEntities.GetValueOrDefault(entityKey);
+
+    /// <summary>Tüm denetim kayıt türleri, modül sırasıyla.</summary>
+    public IEnumerable<AuditedEntity> AuditedEntities => Modules.SelectMany(m => m.AuditedEntities);
 
     public bool ContainsPermission(string permissionKey) => permissions.ContainsKey(permissionKey);
 
