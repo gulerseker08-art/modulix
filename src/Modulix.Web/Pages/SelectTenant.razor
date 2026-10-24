@@ -31,7 +31,7 @@
             {
                 <button type="button" class="list-group-item list-group-item-action @(membership.TenantId == Session.User.ActiveTenantId ? "active" : null)"
                         disabled="@busy" @onclick="() => SelectAsync(membership.TenantId)">
-                    @membership.TenantName
+                    @membership.ShownName
                 </button>
             }
         </div>

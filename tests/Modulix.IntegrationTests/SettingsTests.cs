@@ -121,6 +121,104 @@ public class SettingsTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
     }
 
     [Fact]
+    public async Task Audit_dates_and_csv_follow_the_tenant_time_zone()
+    {
+        var (client, _) = await ManagerAsync();
+        await client.PutAsJsonAsync("/api/settings", Save((SettingKeys.TimeZone, "America/New_York", 0)));
+
+        var item = (await client.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=core.tenant-setting"))!.Items.Single();
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+        var local = TimeZoneInfo.ConvertTime(item.OccurredAt, zone);
+
+        var csv = System.Text.Encoding.UTF8.GetString(await client.GetByteArrayAsync("/api/audit/export?entityKey=core.tenant-setting"));
+        Assert.Contains(local.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + ";", csv);
+
+        // Gün sınırları New York saatine göredir.
+        var day = DateOnly.FromDateTime(local.DateTime).ToString("yyyy-MM-dd");
+        var next = DateOnly.FromDateTime(local.DateTime).AddDays(1).ToString("yyyy-MM-dd");
+        var previous = DateOnly.FromDateTime(local.DateTime).AddDays(-1).ToString("yyyy-MM-dd");
+        Assert.Equal(1, (await client.GetFromJsonAsync<AuditPageResponse>($"/api/audit?entityKey=core.tenant-setting&from={day}&to={day}"))!.TotalCount);
+        Assert.Equal(0, (await client.GetFromJsonAsync<AuditPageResponse>($"/api/audit?entityKey=core.tenant-setting&from={next}"))!.TotalCount);
+        Assert.Equal(0, (await client.GetFromJsonAsync<AuditPageResponse>($"/api/audit?entityKey=core.tenant-setting&to={previous}"))!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Display_name_is_shown_in_the_session_for_that_tenant_only()
+    {
+        var first = await factory.CreateTenantAsync();
+        var second = await factory.CreateTenantAsync();
+        var manager = await factory.CreateUserAsync(first, second);
+        await factory.CreateRoleAsync(first.Id, [ManageSettings], manager);
+        using var client = await LoginAsync(manager);
+        await client.PostAsJsonAsync("/api/auth/active-tenant", new SelectTenantRequest(first.Id));
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/settings", Save((SettingKeys.DisplayName, "Anka", 0)))).StatusCode);
+
+        var me = (await client.GetFromJsonAsync<MeResponse>("/api/auth/me"))!;
+        var shown = me.Memberships.Single(m => m.TenantId == first.Id);
+        Assert.Equal(("Anka", "Anka"), (shown.DisplayName, shown.ShownName));
+        var other = me.Memberships.Single(m => m.TenantId == second.Id);
+        Assert.Null(other.DisplayName);
+        Assert.Equal(second.Name, other.ShownName);
+    }
+
+    [Fact]
+    public async Task Logo_accepts_only_small_png_or_jpeg_and_is_audited()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        var manager = await factory.CreateUserAsync(tenant);
+        var member = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [ManageSettings, ReadAudit], manager);
+        using var client = await LoginAsync(manager);
+        using var memberClient = await LoginAsync(member);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await memberClient.GetAsync("/api/settings/logo")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await memberClient.PutAsync("/api/settings/logo", Image(Png))).StatusCode);
+
+        // SVG (betik taşıyabilir), uzantısı PNG olan metin ve büyük dosya reddedilir.
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsync("/api/settings/logo",
+            Image("<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>"u8.ToArray(), "image/svg+xml"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsync("/api/settings/logo", Image("merhaba"u8.ToArray()))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsync("/api/settings/logo", Image([.. Png, .. new byte[256 * 1024]]))).StatusCode);
+
+        var saved = await client.PutAsync("/api/settings/logo", Image(Png));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var info = (await saved.Content.ReadFromJsonAsync<TenantLogoDto>())!;
+        Assert.Equal(("image/png", 1L), (info.ContentType, info.Version));
+
+        var read = await memberClient.GetAsync(info.Url.Replace("api/", "/api/"));
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        Assert.Equal("image/png", read.Content.Headers.ContentType!.MediaType);
+        Assert.Equal("nosniff", read.Headers.GetValues("X-Content-Type-Options").Single());
+        Assert.Equal(Png, await read.Content.ReadAsByteArrayAsync());
+        Assert.Equal(1L, (await client.GetFromJsonAsync<SettingsResponse>("/api/settings"))!.Logo!.Version);
+
+        // Başka firma bu logoyu görmez.
+        var other = await factory.CreateTenantAsync();
+        using var otherClient = await LoginAsync(await factory.CreateUserAsync(other));
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.GetAsync("/api/settings/logo")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/settings/logo")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/settings/logo")).StatusCode);
+
+        var audit = (await client.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=core.tenant"))!.Items;
+        Assert.Equal(2, audit.Count);
+        var removed = Assert.Single(audit[0].Changes);
+        Assert.Equal(("Logo", "PNG, 1 KB", (string?)null), (removed.Label, removed.Old, removed.New));
+        Assert.Equal(("Logo", (string?)null, "PNG, 1 KB"), (audit[1].Changes[0].Label, audit[1].Changes[0].Old, audit[1].Changes[0].New));
+    }
+
+    // 1x1 şeffaf PNG.
+    private static readonly byte[] Png = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
+
+    private static ByteArrayContent Image(byte[] data, string contentType = "image/png")
+    {
+        var content = new ByteArrayContent(data);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        return content;
+    }
+
+    [Fact]
     public void Shared_setting_keys_match_the_core_module()
     {
         // Arayüz ayarları bu anahtarlarla okur; çekirdekteki bir değişiklik arayüzü sessizce bozmasın.

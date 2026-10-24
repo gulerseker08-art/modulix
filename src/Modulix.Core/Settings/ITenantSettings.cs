@@ -20,6 +20,9 @@ public interface ITenantSettings
     /// <summary>Açık modüllerin ayarları, tanım sırasıyla, kaydedilmemişler varsayılanla.</summary>
     Task<IReadOnlyList<TenantSettingValue>> GetAsync(CancellationToken cancellationToken);
 
+    /// <summary>Tek ayarın değeri (kaydedilmemişse varsayılan). Tanımsız anahtar için <see cref="ArgumentException"/>.</summary>
+    Task<string> GetValueAsync(string key, CancellationToken cancellationToken);
+
     /// <summary>
     /// Değerleri tek işlemde kaydeder; biri başarısız olursa hiçbiri yazılmaz. Değişmeyen değer yazılmaz (denetim kaydı
     /// da yoktur). Tanımsız veya modülü kapalı anahtar için <see cref="ArgumentException"/> (ParamName anahtardır).

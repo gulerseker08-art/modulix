@@ -28,6 +28,13 @@ internal sealed class TenantSettings(
                 : new TenantSettingValue(s.ModuleKey, s.Definition, s.Definition.DefaultValue, 0))];
     }
 
+    public async Task<string> GetValueAsync(string key, CancellationToken cancellationToken)
+    {
+        var definition = catalog.FindSetting(key)?.Definition ?? throw new ArgumentException("Tanımlı bir ayar değil.", nameof(key));
+        return await db.TenantSettings.AsNoTracking().Where(s => s.Key == key).Select(s => s.Value).SingleOrDefaultAsync(cancellationToken)
+            ?? definition.DefaultValue;
+    }
+
     public async Task<RecordResult<IReadOnlyList<TenantSettingValue>>> SaveAsync(
         IReadOnlyDictionary<string, SettingWrite> values, CancellationToken cancellationToken)
     {

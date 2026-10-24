@@ -1134,3 +1134,19 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 .settings-group {
     margin-bottom: 1.5rem;
 }
+
+.tenant-logo {
+    max-height: 32px;
+    max-width: 120px;
+    object-fit: contain;
+}
+
+.logo-preview {
+    max-height: 64px;
+    max-width: 200px;
+    object-fit: contain;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    padding: 0.25rem;
+    background: #fff;
+}

@@ -210,7 +210,8 @@
 
         public decimal? Amount { get; set; }
 
-        public string Currency { get; set; } = "TRY";
+        // Yeni fırsatın para birimi firmanın varsayılanıdır (Y6b).
+        public string Currency { get; set; } = Regional.Currency;
 
         public DateOnly? ExpectedCloseDate { get; set; }
 

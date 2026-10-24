@@ -1,5 +1,6 @@
 using Modulix.Shared.Access;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Settings;
 
 namespace Modulix.Web.Services;
 
@@ -32,8 +33,12 @@ public sealed class SessionState(ApiClient api)
     /// </summary>
     public string NoTenantHome => IsPlatformAdministrator && User?.Memberships.Count == 0 ? "platform" : "tenant";
 
+    /// <summary>Firmanın görünen adı (ayarlanmışsa, Y6b), yoksa kayıtlı adı.</summary>
     public string? ActiveTenantName =>
-        User?.Memberships.FirstOrDefault(m => m.TenantId == User.ActiveTenantId)?.TenantName;
+        User?.Memberships.FirstOrDefault(m => m.TenantId == User.ActiveTenantId)?.ShownName;
+
+    /// <summary>Aktif firmanın logosu (Y6b); yoksa <c>null</c>.</summary>
+    public TenantLogoDto? Logo { get; private set; }
 
     public bool IsModuleEnabled(string moduleKey) => Access?.EnabledModules.Contains(moduleKey) == true;
 
@@ -88,6 +93,8 @@ public sealed class SessionState(ApiClient api)
         await api.PostAsync<bool>("/api/auth/logout", new { });
         User = null;
         Access = null;
+        Logo = null;
+        Regional.Apply(null);
         loading = Task.CompletedTask;
         Changed?.Invoke();
     }
@@ -102,6 +109,16 @@ public sealed class SessionState(ApiClient api)
         {
             var access = await api.GetAsync<MyAccessResponse>("/api/tenant/access");
             Access = access.IsSuccess ? access.Value : null;
+
+            // Bölgesel ayarlar ve logo: ekranlar saatleri, biçimleri ve para birimini buradan alır.
+            var settings = await api.GetAsync<SettingsResponse>("/api/settings");
+            Regional.Apply(settings.Value?.Settings);
+            Logo = settings.Value?.Logo;
+        }
+        else
+        {
+            Regional.Apply(null);
+            Logo = null;
         }
 
         IsLoaded = true;

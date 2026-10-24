@@ -61,3 +61,20 @@ internal sealed class TenantSettingConfiguration : IEntityTypeConfiguration<Modu
         builder.HasIndex(s => new { s.TenantId, s.Key }).IsUnique();
     }
 }
+
+internal sealed class TenantLogoConfiguration : IEntityTypeConfiguration<Modulix.Core.Settings.TenantLogo>
+{
+    public void Configure(EntityTypeBuilder<Modulix.Core.Settings.TenantLogo> builder)
+    {
+        // Tenant verisi (Y6b): firma başına bir logo; Row-Level Security ile korunur.
+        builder.ToTable("TenantLogos", DatabaseSchemas.Core);
+        builder.HasKey(l => l.Id);
+        builder.Property(l => l.Id).ValueGeneratedNever();
+        builder.Property(l => l.TenantId).IsRequired();
+        builder.Property(l => l.ContentType).HasMaxLength(50).IsUnicode(false).IsRequired();
+        builder.Property(l => l.Data).IsRequired();
+        builder.Property(l => l.UpdatedAt).IsRequired();
+        builder.Property(l => l.Version).IsConcurrencyToken();
+        builder.HasIndex(l => l.TenantId).IsUnique();
+    }
+}
