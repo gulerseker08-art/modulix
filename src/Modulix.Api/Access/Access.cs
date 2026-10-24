@@ -92,6 +92,7 @@ public static class AccessEndpoints
         roles.MapGet("/permissions", ListAssignablePermissionsAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
         roles.MapPost("/", CreateRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
         roles.MapPut("/{roleId:guid}", UpdateRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
+        roles.MapDelete("/{roleId:guid}", DeleteRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
 
         // Rol atamak kullanıcı yönetimidir: rolleri tanımlamak (core.roles.manage) ayrı bir yetkidir.
         var memberships = app.MapGroup("/api/memberships/{membershipId:guid}/roles")
@@ -143,40 +144,54 @@ public static class AccessEndpoints
         {
             if (await access.IsModuleEnabledAsync(module.Key, ct))
             {
-                permissions.AddRange(module.Permissions.Select(p => new PermissionDto(p.Key, p.DisplayName, module.Key)));
+                permissions.AddRange(module.Permissions.Select(p =>
+                    new PermissionDto(p.Key, p.DisplayName, module.Key, module.DisplayName, p.ResourceName ?? AccessKeys.ResourceOf(p.Key))));
             }
         }
 
         return Results.Ok(permissions);
     }
 
-    private static async Task<IResult> CreateRoleAsync(SaveRoleRequest request, IRoleService roles, CancellationToken ct)
+    // Rol uç noktaları kullanıcı yönetimiyle aynı hata biçimini kullanır: mesaj başlıktadır, alan hatası alanın altında.
+    private static async Task<IResult> CreateRoleAsync(
+        SaveRoleRequest request, IRoleService roles, ITenantContextAccessor tenant, CancellationToken ct)
     {
         try
         {
-            var role = await roles.CreateAsync(request.Name, request.Permissions ?? [], ct);
+            var role = await roles.CreateAsync(request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId);
             return Results.Created($"/api/roles/{role.Id}", ToDto(role));
         }
-        catch (ArgumentException ex)
+        catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
         {
-            return BadRequest(ex);
+            return problem;
         }
     }
 
-    private static async Task<IResult> UpdateRoleAsync(Guid roleId, SaveRoleRequest request, IRoleService roles, CancellationToken ct)
+    private static async Task<IResult> UpdateRoleAsync(
+        Guid roleId, SaveRoleRequest request, IRoleService roles, ITenantContextAccessor tenant, CancellationToken ct)
     {
         try
         {
-            var role = await roles.UpdateAsync(roleId, request.Name, request.Permissions ?? [], ct);
+            var role = await roles.UpdateAsync(roleId, request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId);
             return role is null ? RoleNotFound() : Results.Ok(ToDto(role));
         }
-        catch (ArgumentException ex)
+        catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
         {
-            return BadRequest(ex);
+            return problem;
         }
-        catch (RoleConflictException ex)
+    }
+
+    /// <summary>Üyesi olan rol için <c>moveTo</c> gerekir: üyeler o role taşınır (409 yoksa).</summary>
+    private static async Task<IResult> DeleteRoleAsync(
+        Guid roleId, Guid? moveTo, IRoleService roles, ITenantContextAccessor tenant, CancellationToken ct)
+    {
+        try
         {
-            return Conflict(ex);
+            return await roles.DeleteAsync(roleId, moveTo, ct, tenant.Current!.MembershipId) ? Results.NoContent() : RoleNotFound();
+        }
+        catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
+        {
+            return problem;
         }
     }
 
@@ -194,13 +209,7 @@ public static class AccessEndpoints
         CancellationToken ct) =>
         UserEndpoints.Run(() => users.SetRolesAsync(membershipId, request.RoleIds ?? [], ct));
 
-    private static RoleDto ToDto(RoleSummary role) => new(role.Id, role.Name, role.Permissions, role.IsSystem);
-
-    private static IResult BadRequest(ArgumentException ex) =>
-        Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Geçersiz istek.", detail: ex.Message);
-
-    private static IResult Conflict(RoleConflictException ex) =>
-        Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "İşlem yapılamadı.", detail: ex.Message);
+    private static RoleDto ToDto(RoleSummary role) => new(role.Id, role.Name, role.Permissions, role.IsSystem, role.MemberCount);
 
     private static IResult RoleNotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Rol bulunamadı.");

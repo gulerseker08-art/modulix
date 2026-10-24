@@ -5,7 +5,11 @@ namespace Modulix.Shared.Access;
 /// <summary>Kayıtlı bir modül ve aktif tenant için açık olup olmadığı.</summary>
 public sealed record ModuleDto(string Key, string DisplayName, bool IsEnabled);
 
-public sealed record PermissionDto(string Key, string DisplayName, string ModuleKey);
+/// <summary>
+/// Atanabilir izin. Rol ekranı izinleri modüle (<see cref="ModuleName"/>) ve kaynağa (<see cref="ResourceName"/>, ör.
+/// "Firmalar") göre gruplar; aynı kaynağın okuma ve yazma izinleri matriste aynı satırdadır.
+/// </summary>
+public sealed record PermissionDto(string Key, string DisplayName, string ModuleKey, string ModuleName = "", string ResourceName = "");
 
 /// <summary>
 /// Oturumdaki kullanıcının aktif tenant'taki erişimi; arayüz menüleri buna göre gösterir.
@@ -13,8 +17,11 @@ public sealed record PermissionDto(string Key, string DisplayName, string Module
 /// </summary>
 public sealed record MyAccessResponse(IReadOnlyList<string> EnabledModules, IReadOnlyList<string> Permissions, bool IsAdministrator = false);
 
-/// <summary>Sistem rolünde (<see cref="IsSystem"/>, "Yönetici") izin listesi boştur: rol tüm izinleri verir ve düzenlenemez.</summary>
-public sealed record RoleDto(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false);
+/// <summary>
+/// Sistem rolünde (<see cref="IsSystem"/>, "Yönetici") izin listesi boştur: rol tüm izinleri verir ve düzenlenemez.
+/// <see cref="MemberCount"/> rol listesinde doldurulur.
+/// </summary>
+public sealed record RoleDto(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false, int MemberCount = 0);
 
 public sealed record SaveRoleRequest(string Name, IReadOnlyList<string> Permissions);
 

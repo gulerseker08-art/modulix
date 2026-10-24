@@ -35,8 +35,12 @@ public interface IModule
     }
 }
 
-/// <summary>Bir izin. <see cref="Key"/> biçimi: "modül.kaynak.işlem" (ör. "crm.companies.read").</summary>
-public sealed record PermissionDefinition(string Key, string DisplayName);
+/// <summary>
+/// Bir izin. <see cref="Key"/> biçimi: "modül.kaynak.işlem" (ör. "crm.companies.read").
+/// <see cref="ResourceName"/>: rol ekranındaki izin matrisinin satır adı (ör. "Firmalar"); aynı kaynağın okuma ve yazma
+/// izinleri aynı satırda gösterilir. Verilmezse anahtardaki kaynak adı kullanılır.
+/// </summary>
+public sealed record PermissionDefinition(string Key, string DisplayName, string? ResourceName = null);
 
 /// <summary>
 /// Kişiye atanan kayıt türü (ADR-0004). <see cref="Label"/> sayıyla birlikte gösterilir (ör. "12 firma").

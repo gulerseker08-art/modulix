@@ -48,6 +48,7 @@ public static class PersistenceSetup
         services.AddScoped<IModuleEntitlements, ModuleEntitlements>();
         services.AddScoped<AdministratorGuard>();
         services.AddScoped<IRoleService, RoleService>();
+        services.AddScoped<MembershipPermissions>();
         services.AddScoped<ICurrentAccess, CurrentAccess>();
 
         // Kullanıcı yönetimi (Y2); UserManager'ı host kaydeder (AddModulixAuth).

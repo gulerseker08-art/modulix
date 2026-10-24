@@ -1,8 +1,6 @@
-using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
-using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.Infrastructure.Authorization;
 
@@ -14,7 +12,7 @@ internal sealed class CurrentAccess(
     ITenantContextAccessor tenantAccessor,
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
-    ModulixDbContext db) : ICurrentAccess
+    MembershipPermissions membershipPermissions) : ICurrentAccess
 {
     private static readonly IReadOnlySet<string> None = new HashSet<string>();
 
@@ -45,24 +43,8 @@ internal sealed class CurrentAccess(
             return None;
         }
 
-        if (permissions is null)
-        {
-            // Roller ve atamalar tenant verisidir: sorgu filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür.
-            var roles = await (
-                from assignment in db.MembershipRoles.AsNoTracking()
-                join role in db.Roles.AsNoTracking() on assignment.RoleId equals role.Id
-                where assignment.MembershipId == tenant.MembershipId
-                select new { role.IsSystem, role.Permissions })
-                .ToListAsync(cancellationToken);
-
-            // Sistem rolü ("Yönetici") katalogdaki tüm izinleri verir; yeni açılan modülün izinleri de kendiliğinden gelir.
-            var granted = roles.Any(r => r.IsSystem)
-                ? catalog.PermissionKeys
-                : roles.SelectMany(r => r.Permissions);
-
-            permissions = catalog.EffectivePermissions(granted, await GetEnabledModulesAsync(cancellationToken));
-        }
-
+        permissions ??= (await membershipPermissions.GetAsync(tenant.MembershipId, await GetEnabledModulesAsync(cancellationToken), cancellationToken))
+            .Permissions;
         return permissions;
     }
 

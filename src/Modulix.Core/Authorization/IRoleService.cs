@@ -2,9 +2,9 @@ namespace Modulix.Core.Authorization;
 
 /// <summary>
 /// Rol özeti. Sistem rolünde (<see cref="IsSystem"/>) <see cref="Permissions"/> boştur: rol, tenant için açık
-/// tüm modüllerin tüm izinlerini verir.
+/// tüm modüllerin tüm izinlerini verir. <see cref="MemberCount"/> yalnızca listede doldurulur.
 /// </summary>
-public sealed record RoleSummary(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false);
+public sealed record RoleSummary(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false, int MemberCount = 0);
 
 /// <summary>
 /// İstek kurallara uygun ama tenant'ın durumuyla çelişiyor: sistem rolünü düzenlemek veya son yöneticinin
@@ -18,16 +18,30 @@ public sealed class RoleConflictException(string message) : Exception(message);
 /// tenant'ta bulunmayan rol için <see cref="ArgumentException"/>, sistem rolünü değiştirme veya
 /// son yöneticiyi kaldırma için <see cref="RoleConflictException"/> fırlatır.
 /// Rol ve atama değişiklikleri denetim kaydına yazılır.
+///
+/// <c>actingMembershipId</c> verilirse (kullanıcı isteği) yetki yükseltmeye karşı kural uygulanır: yönetici olmayan kişi
+/// bir role yalnızca kendisinde olan izni ekleyebilir veya rolden çıkarabilir; değilse
+/// <see cref="Platform.UserAdministrationException"/> (<see cref="Platform.UserAdministrationError.PermissionDenied"/>).
 /// </summary>
 public interface IRoleService
 {
-    /// <summary>Ada göre sıralı.</summary>
+    /// <summary>Ada göre sıralı; üye sayılarıyla.</summary>
     Task<IReadOnlyList<RoleSummary>> ListAsync(CancellationToken cancellationToken);
 
-    Task<RoleSummary> CreateAsync(string name, IReadOnlyCollection<string> permissions, CancellationToken cancellationToken);
+    Task<RoleSummary> CreateAsync(
+        string name, IReadOnlyCollection<string> permissions, CancellationToken cancellationToken, Guid? actingMembershipId = null);
 
     /// <summary>Rol bu tenant'ta yoksa <c>null</c>.</summary>
-    Task<RoleSummary?> UpdateAsync(Guid roleId, string name, IReadOnlyCollection<string> permissions, CancellationToken cancellationToken);
+    Task<RoleSummary?> UpdateAsync(
+        Guid roleId, string name, IReadOnlyCollection<string> permissions, CancellationToken cancellationToken, Guid? actingMembershipId = null);
+
+    /// <summary>
+    /// Rolü siler; rol bu tenant'ta yoksa <c>false</c>. Sistem rolü silinemez (<see cref="RoleConflictException"/>).
+    /// Rolün üyesi varsa <paramref name="moveToRoleId"/> gerekir (yoksa <see cref="RoleConflictException"/>): üyeler o
+    /// role taşınır, taşıma ve silme tek işlemdedir. Üye taşımak rol atamasıdır; <c>actingMembershipId</c> verilirse
+    /// işlemi yapanın kullanıcı yönetme izni olmalı, hedef yönetici rolüyse kendisi yönetici olmalıdır.
+    /// </summary>
+    Task<bool> DeleteAsync(Guid roleId, Guid? moveToRoleId, CancellationToken cancellationToken, Guid? actingMembershipId = null);
 
     /// <summary>
     /// Tenant'ın sistem rolünü ("Yönetici") döner; yoksa oluşturur. Aynı adlı eski bir rol varsa sistem rolüne çevrilir.

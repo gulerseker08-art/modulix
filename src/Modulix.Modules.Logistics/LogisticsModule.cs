@@ -23,11 +23,11 @@ public sealed class LogisticsModule : IModule
 
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
     [
-        new(Permissions.ShipmentsRead, "Sevkiyatları görüntüler"),
-        new(Permissions.ShipmentsWrite, "Sevkiyat ekler ve düzenler"),
-        new(Permissions.CarriersRead, "Taşıyıcıları görüntüler"),
-        new(Permissions.CarriersWrite, "Taşıyıcı ekler ve düzenler"),
-        new(Permissions.CostsRead, "Maliyetleri görüntüler"),
-        new(Permissions.CostsWrite, "Maliyet ekler ve düzenler"),
+        new(Permissions.ShipmentsRead, "Sevkiyatları görüntüler", "Sevkiyatlar"),
+        new(Permissions.ShipmentsWrite, "Sevkiyat ekler ve düzenler", "Sevkiyatlar"),
+        new(Permissions.CarriersRead, "Taşıyıcıları görüntüler", "Taşıyıcılar"),
+        new(Permissions.CarriersWrite, "Taşıyıcı ekler ve düzenler", "Taşıyıcılar"),
+        new(Permissions.CostsRead, "Maliyetleri görüntüler", "Maliyetler"),
+        new(Permissions.CostsWrite, "Maliyet ekler ve düzenler", "Maliyetler"),
     ];
 }
