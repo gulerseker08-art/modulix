@@ -1,0 +1,57 @@
+@* Kayıt devri seçimi: kişinin sorumlu olduğu kayıtlar ve devralacak etkin üye. Devir sunucuda kayıt boru hattından
+   geçer; işlemi yapanın kayıtları düzenleme izni yoksa hiçbir şey değişmez. *@
+@if (Owned is null)
+{
+    <p class="text-muted">Kayıtlar okunamadı.</p>
+}
+else if (Owned.Count == 0 || Owned.All(o => o.Count == 0))
+{
+    <p class="text-muted">Kişinin sorumlu olduğu açık kayıt yok.</p>
+}
+else
+{
+    <p>Sorumlu olduğu kayıtlar: <strong>@Describe(Owned)</strong>.</p>
+    @if (Owned.Any(o => o.Count is null))
+    {
+        <p class="text-muted">Bazı kayıtları görme izniniz yok; devretmek için o kayıtları düzenleme izni gerekir.</p>
+    }
+
+    <div class="mb-3 handover-choice">
+        <label class="form-label" for="receiver">Devralacak kişi</label>
+        <select id="receiver" class="form-select" value="@Selected?.ToString()" @onchange="Changed">
+            @if (!Required)
+            {
+                <option value="">Devretme, kayıtlar kişide kalsın</option>
+            }
+            else
+            {
+                <option value="">Seçin</option>
+            }
+            @foreach (var receiver in Receivers)
+            {
+                <option value="@receiver.MembershipId">@receiver.DisplayName</option>
+            }
+        </select>
+        <div class="form-text">Kapanmış fırsatlar ve tamamlanmış aktiviteler geçmiş olarak kişide kalır.</div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<OwnedRecordsDto>? Owned { get; set; }
+
+    [Parameter, EditorRequired] public IReadOnlyList<UserDto> Receivers { get; set; } = [];
+
+    /// <summary>Devir zorunlu mu (yalnızca devir işlemi) yoksa isteğe bağlı mı (devre dışı bırakma)?</summary>
+    [Parameter] public bool Required { get; set; }
+
+    [Parameter] public Guid? Selected { get; set; }
+
+    [Parameter] public EventCallback<Guid?> SelectedChanged { get; set; }
+
+    /// <summary>Ör. "12 firma, 3 açık fırsat"; sayısı sıfır olanlar yazılmaz.</summary>
+    public static string Describe(IEnumerable<OwnedRecordsDto> owned) =>
+        string.Join(", ", owned.Where(o => o.Count > 0).Select(o => $"{o.Count} {o.Label}"));
+
+    private Task Changed(ChangeEventArgs e) =>
+        SelectedChanged.InvokeAsync(Guid.TryParse(e.Value?.ToString(), out var id) ? id : null);
+}

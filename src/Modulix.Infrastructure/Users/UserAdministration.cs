@@ -32,6 +32,7 @@ internal sealed class UserAdministration(
     AdministratorGuard administrators,
     IEmailQueue emails,
     IAuditWriter audit,
+    RecordHandover handover,
     TimeProvider time,
     IOptions<UserAdministrationOptions> options) : IUserAdministration
 {
@@ -245,7 +246,7 @@ internal sealed class UserAdministration(
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task DisableAsync(Guid membershipId, CancellationToken cancellationToken)
+    public async Task DisableAsync(Guid membershipId, Guid? transferToMembershipId, CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
         var (membership, _) = await LoadAsync(tenant, membershipId, cancellationToken);
@@ -261,8 +262,15 @@ internal sealed class UserAdministration(
 
         if (membership.Status == MembershipStatus.Disabled)
         {
+            if (transferToMembershipId is { } target)
+            {
+                await TransferRecordsAsync(membershipId, target, cancellationToken);
+            }
+
             return;
         }
+
+        var receiver = transferToMembershipId is { } to ? await LoadReceiverAsync(tenant, membership, to, cancellationToken) : null;
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
@@ -282,10 +290,36 @@ internal sealed class UserAdministration(
             return;
         }
 
+        // Devir aynı işlemde: kayıtlar devredilmeden kişi devre dışı kalmaz, devre dışı kalmadan kayıtlar el değiştirmez.
+        if (receiver is not null)
+        {
+            await handover.TransferAsync(membership.UserId, receiver.UserId, cancellationToken);
+        }
+
         membership.Disable();
         AuditStatus(tenant, membership, MembershipStatus.Active);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<OwnedRecordSummary>> GetOwnedRecordsAsync(Guid membershipId, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var (membership, _) = await LoadAsync(tenant, membershipId, cancellationToken);
+        return await handover.CountAsync(membership.UserId, cancellationToken);
+    }
+
+    public async Task<int> TransferRecordsAsync(Guid membershipId, Guid toMembershipId, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var (membership, _) = await LoadAsync(tenant, membershipId, cancellationToken);
+        var receiver = await LoadReceiverAsync(tenant, membership, toMembershipId, cancellationToken);
+        await EnsureMayManageAsync(tenant, membershipId, cancellationToken);
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var moved = await handover.TransferAsync(membership.UserId, receiver.UserId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return moved;
     }
 
     public async Task EnableAsync(Guid membershipId, CancellationToken cancellationToken)
@@ -382,6 +416,21 @@ internal sealed class UserAdministration(
             ?? throw NotFound();
         var user = await users.FindByIdAsync(membership.UserId.ToString()) ?? throw NotFound();
         return (membership, user);
+    }
+
+    /// <summary>Kayıtları devralacak üye: bu tenant'ta etkin olmalı ve devreden kişi olmamalı.</summary>
+    private async Task<Membership> LoadReceiverAsync(TenantContext tenant, Membership from, Guid toMembershipId, CancellationToken cancellationToken)
+    {
+        if (toMembershipId == from.Id)
+        {
+            throw new ArgumentException("Kayıtlar aynı kişiye devredilemez.", "transferToMembershipId");
+        }
+
+        var receiver = await db.Memberships.AsNoTracking()
+            .SingleOrDefaultAsync(m => m.Id == toMembershipId && m.TenantId == tenant.TenantId, cancellationToken);
+        return receiver is { Status: MembershipStatus.Active }
+            ? receiver
+            : throw new ArgumentException("Kayıtları devralacak kişi bu kuruluşun etkin bir üyesi olmalı.", "transferToMembershipId");
     }
 
     private async Task<Dictionary<Guid, List<UserRole>>> LoadRolesAsync(IReadOnlyCollection<Guid> membershipIds, CancellationToken cancellationToken)

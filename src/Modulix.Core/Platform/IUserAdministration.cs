@@ -46,7 +46,13 @@ public enum UserAdministrationError
 
     /// <summary>Davet sınırı aşıldı. API 429.</summary>
     TooManyRequests = 4,
+
+    /// <summary>İşlemi yapanın gereken izni yok (ör. devredilecek kayıtları düzenleme izni). API 403.</summary>
+    PermissionDenied = 5,
 }
+
+/// <summary>Kişinin sorumlu olduğu bir kayıt türünün sayısı; işlemi yapan bu kayıtları göremiyorsa <see cref="Count"/> boştur.</summary>
+public sealed record OwnedRecordSummary(string EntityKey, string Label, int? Count);
 
 public sealed class UserAdministrationException(UserAdministrationError error, string message) : Exception(message)
 {
@@ -88,7 +94,22 @@ public interface IUserAdministration
     /// <summary>Bekleyen daveti siler; bağlantı üyeliğe bağlı olduğu için artık çalışmaz.</summary>
     Task CancelInvitationAsync(Guid membershipId, CancellationToken cancellationToken);
 
-    Task DisableAsync(Guid membershipId, CancellationToken cancellationToken);
+    /// <summary>
+    /// Üyeliği devre dışı bırakır. <paramref name="transferToMembershipId"/> verilirse kişinin sorumlu olduğu kayıtlar
+    /// (<see cref="GetOwnedRecordsAsync"/>) önce o üyeye devredilir; devir veya devre dışı bırakma başarısız olursa hiçbiri
+    /// yapılmaz. Üyelik zaten devre dışıysa yalnızca devir yapılır.
+    /// </summary>
+    Task DisableAsync(Guid membershipId, Guid? transferToMembershipId, CancellationToken cancellationToken);
+
+    /// <summary>Kişinin sorumlu olduğu kayıtların türlere göre sayısı (tenant için açık modüllerin <c>OwnedRecords</c>'u).</summary>
+    Task<IReadOnlyList<OwnedRecordSummary>> GetOwnedRecordsAsync(Guid membershipId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Kişinin sorumlu olduğu kayıtları başka bir etkin üyeye devreder ve devredilen kayıt sayısını döner. Her kayıt
+    /// kayıt boru hattından geçer (yetki, doğrulama, denetim kaydı, olay); biri başarısız olursa hiçbiri devredilmez.
+    /// İşlemi yapanın kayıtları düzenleme izni yoksa <see cref="UserAdministrationError.PermissionDenied"/>.
+    /// </summary>
+    Task<int> TransferRecordsAsync(Guid membershipId, Guid toMembershipId, CancellationToken cancellationToken);
 
     Task EnableAsync(Guid membershipId, CancellationToken cancellationToken);
 
