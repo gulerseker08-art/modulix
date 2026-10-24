@@ -11,6 +11,9 @@ public static class ModulixClaimTypes
 {
     /// <summary>Aktif tenant. Yalnızca sunucu yazar (şifreli oturum çerezinde); her istekte yeniden doğrulanır.</summary>
     public const string TenantId = "modulix:tenant_id";
+
+    /// <summary>Sunucudaki oturum (Y7a, <c>platform.UserSessions</c>); her istekte kapatılmadığı denetlenir.</summary>
+    public const string SessionId = "modulix:session_id";
 }
 
 /// <summary>İstek başına aktif tenant bağlamı; <see cref="TenantContextMiddleware"/> doldurur.</summary>

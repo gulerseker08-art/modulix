@@ -55,6 +55,8 @@ public class ModulixDbContext(
 
     public DbSet<QueuedEmail> EmailMessages => Set<QueuedEmail>();
 
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
+
     /// <summary>Sorgu filtresinde kullanılır; EF her sorguda yeniden okur. Aktif tenant yoksa hiçbir satır dönmez.</summary>
     private Guid? CurrentTenantId => tenantAccessor?.Current?.TenantId;
 

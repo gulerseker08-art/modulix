@@ -30,13 +30,17 @@ public sealed class AccountAudit(ModulixDbContext db, ITenantScopeFactory tenant
 {
     /// <param name="tenantIds">Yazılacak firmalar; <c>null</c>: kişinin etkin üye olduğu tüm açık firmalar.</param>
     /// <param name="reason">Başarısız girişin nedeni (<see cref="AccountAuditReasons"/>).</param>
+    /// <param name="before">Değişen hesap alanlarının eski değerleri (ör. ad); yeni değerler <paramref name="details"/>'tadır.</param>
+    /// <param name="details">Olaya eklenecek alanlar (ör. yeni ad, kapatılan oturum sayısı).</param>
     public async Task RecordAsync(
         ModulixUser user,
         AuditAction action,
         IReadOnlyCollection<Guid>? tenantIds,
         AccountClient client,
         CancellationToken cancellationToken,
-        string? reason = null)
+        string? reason = null,
+        JsonObject? before = null,
+        JsonObject? details = null)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(client);
@@ -55,6 +59,11 @@ public sealed class AccountAudit(ModulixDbContext db, ITenantScopeFactory tenant
             values["reason"] = reason;
         }
 
+        foreach (var (field, value) in details ?? [])
+        {
+            values[field] = value?.DeepClone();
+        }
+
         foreach (var tenantId in tenantIds.Distinct())
         {
             await using var scope = tenantScopes.Create(new TenantContext(tenantId, user.Id, Guid.Empty));
@@ -65,7 +74,7 @@ public sealed class AccountAudit(ModulixDbContext db, ITenantScopeFactory tenant
                 CoreModule.AuditedEntityKeys.Account,
                 user.Id,
                 action,
-                RecordDiff.Compute(null, values),
+                RecordDiff.Compute(before?.DeepClone().AsObject(), values),
                 ExecutionSource.Api,
                 Activity.Current?.TraceId.ToString()));
             await services.GetRequiredService<ModulixDbContext>().SaveChangesAsync(cancellationToken);

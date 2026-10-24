@@ -23,6 +23,9 @@ public static class AccountTokens
     public static string PasswordResetLink(string publicUrl, Guid userId, string token) =>
         $"{Root(publicUrl)}/sifre-sifirla?kullanici={userId}&token={Uri.EscapeDataString(token)}";
 
+    public static string EmailChangeLink(string publicUrl, Guid userId, string email, string token) =>
+        $"{Root(publicUrl)}/eposta-onayla?kullanici={userId}&eposta={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}";
+
     public static string SignInLink(string publicUrl) => $"{Root(publicUrl)}/giris";
 
     private static string Root(string publicUrl)

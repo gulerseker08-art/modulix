@@ -1,0 +1,11 @@
+@* Bir bölümün sonuç mesajı: başarılıysa yeşil, değilse kırmızı. Metin yoksa bir şey göstermez. *@
+@if (Text is not null)
+{
+    <div class="alert @(Failed ? "alert-danger" : "alert-success")" role="@(Failed ? "alert" : "status")">@Text</div>
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+
+    [Parameter] public bool Failed { get; set; }
+}

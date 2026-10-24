@@ -19,7 +19,7 @@
                 }
                 <span class="avatar" aria-hidden="true">@Initials(Session.User!.DisplayName)</span>
                 <span class="session-info text-truncate">
-                    @Session.User!.DisplayName
+                    <a class="session-link" href="hesabim" title="Hesabım">@Session.User!.DisplayName</a>
                     @if (Session.ActiveTenantName is { } tenant)
                     {
                         <span class="text-muted"> · @tenant</span>

@@ -184,6 +184,16 @@ Platformu işleten ekip için ayrı bir alan: menüde **Platform** (`/platform`)
 - **Ayarlar ekranlarda kullanılır.** Tarih ve saatler firmanın saat diliminde, seçili tarih/sayı biçiminde gösterilir (Türkçe `24.10.2026 14:30` · `1.234,50`, İngilizce GB `24/10/2026` · `1,234.50`, İngilizce ABD `10/24/2026 2:30 PM`). Denetim kaydının tarih filtresi gün sınırlarını, CSV de saatleri firmanın saat dilimine göre alır. Yeni fırsatın para birimi varsayılan para birimidir (mevcut kayıtlar değişmez). Görünen ad üst çubukta ve firma seçiminde kayıtlı adın yerine gösterilir.
 - **Logo:** `PUT /api/settings/logo` (`core.settings.manage`) gövde olarak dosyanın kendisini alır; yalnızca PNG veya JPEG, en fazla 256 KB. Tür uzantıdan değil içerikten anlaşılır; SVG kabul edilmez (betik taşıyabilir). `GET /api/settings/logo` her üyeye dosyayı döner (`nosniff`, önbellek sürüme bağlı), `DELETE` kaldırır. Logo veritabanında `core.TenantLogos` tablosunda (RLS) durur, değişikliği denetim kaydına "Firma · Logo" olarak yazılır ve üst çubukta görünür.
 
+### Hesap güvenliği (Y7a)
+
+**Hesabım** (`/hesabim`, üst çubukta kişinin adı): ad, e-posta, şifre ve açık oturumlar. Bilgiler kişiye aittir; birden fazla firmada çalışan kişinin değişikliği hepsinde geçerlidir ve her firmanın denetim kaydına "Hesap" olarak yazılır.
+
+- `GET /api/account`, `PUT /api/account/profile` (ad), `POST /api/account/password` (mevcut ve yeni şifre; bu oturum açık kalır, diğerleri kapanır; hatalı mevcut şifre girişteki gibi sayılır ve hesabı kilitler).
+- `POST /api/account/email` (yeni adres ve mevcut şifre): yeni adrese 24 saat geçerli onay bağlantısı (`/eposta-onayla`) gider. `POST /api/auth/confirm-email-change` e-postayı ve giriş adını değiştirir, tüm oturumları kapatır, eski adrese bilgi verir. Adres başka hesapta kullanılıyorsa bu yalnızca bağlantıda söylenir.
+- **Şifremi unuttum** (`/sifremi-unuttum`, `POST /api/auth/forgot-password`): hesap olsun olmasın 202 döner. Aynı hesaba 15 dakikada en fazla bir bağlantı gider; bir IP adresinden saatte 10 istek kabul edilir, fazlası 429 (`Account:ForgotPasswordPerIpPerHour`, `Account:ForgotPasswordInterval`). Daveti bekleyen kişiye gitmez.
+- **Oturumlar** sunucuda da tutulur (`platform.UserSessions`): çerez oturum kimliğini taşır, her istekte oturumun kapatılmadığı denetlenir (son etkinlik en fazla 5 dakikada bir yazılır). `GET /api/account/sessions`, `DELETE /api/account/sessions/{id}`, `POST /api/account/sessions/close-others`. Çıkış oturumu kapatır; 30 günden eski kayıtlar girişte silinir.
+- Yönetici (`core.users.manage`) `POST /api/users/{üyelik}/close-sessions` ile kişinin tüm oturumlarını kapatır (diğer firmalardaki de kapanır; Yönetici rolündekini yalnızca yönetici kapatabilir). Devre dışı bırakmak oturumları kapatmaz: o firmaya erişim zaten hemen kesilir.
+
 ## CRM modülü
 
 İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.

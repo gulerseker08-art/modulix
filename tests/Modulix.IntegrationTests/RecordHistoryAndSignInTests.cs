@@ -111,7 +111,7 @@ public class RecordHistoryAndSignInTests(ModulixApiFactory factory) : IClassFixt
         var page = (await auditorClient.GetFromJsonAsync<AuditPageResponse>($"/api/audit?entityKey=core.account&userId={user.Id}"))!;
         Assert.Equal([AuditOperation.SignedIn, AuditOperation.SignInFailed], page.Items.Select(i => i.Action));
         var item = page.Items[1];
-        Assert.Equal("Oturum", item.EntityName);
+        Assert.Equal("Hesap", item.EntityName);
         Assert.Equal(user.Email, item.RecordTitle);
         Assert.Equal("Test Kullanıcı", item.UserName);
         Assert.Contains(item.Changes, c => c.Label == "Neden" && c.New == "Hatalı şifre");

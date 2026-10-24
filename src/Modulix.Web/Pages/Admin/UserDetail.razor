@@ -169,6 +169,10 @@
                     $"{url}/password-reset", false, $"Şifre sıfırlama bağlantısı {user.Email} adresine gönderildi.", null, false);
                 if (!user.IsCurrentUser)
                 {
+                    yield return new("Oturumlarını kapat",
+                        "Kişinin tüm cihazlardaki oturumları kapanır, diğer kuruluşlardakiler de. Yeniden giriş yapması gerekir.",
+                        $"{url}/close-sessions", false, "Kişinin oturumları kapatıldı.",
+                        $"{user.DisplayName} kişisinin tüm oturumları kapatılsın mı?", true);
                     yield return new("Devre dışı bırak", "Kişi bu kuruluşa erişemez; kayıtları ve diğer kuruluşlardaki üyelikleri kalır.",
                         $"{url}/disable", false, "Kullanıcı devre dışı bırakıldı.",
                         $"{user.DisplayName} devre dışı bırakılsın mı? Bir sonraki işleminde erişimi kesilir.", true, Handover: true);

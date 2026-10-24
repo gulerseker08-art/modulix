@@ -13,6 +13,9 @@ public enum AuditOperation
     LockedOut = 7,
     PasswordReset = 8,
     InvitationAccepted = 9,
+    PasswordChanged = 10,
+    PasswordResetRequested = 11,
+    SessionsClosed = 12,
 }
 
 public enum AuditSource
@@ -69,6 +72,9 @@ public static class AuditText
         AuditOperation.LockedOut => "Hesap kilitlendi",
         AuditOperation.PasswordReset => "Şifresini sıfırladı",
         AuditOperation.InvitationAccepted => "Daveti kabul etti",
+        AuditOperation.PasswordChanged => "Şifresini değiştirdi",
+        AuditOperation.PasswordResetRequested => "Şifre sıfırlama bağlantısı istedi",
+        AuditOperation.SessionsClosed => "Oturum kapattı",
         _ => action.ToString(),
     };
 

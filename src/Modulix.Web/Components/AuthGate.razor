@@ -59,7 +59,12 @@ else if (Session.IsSignedIn && Session.HasActiveTenant)
 
         if (!Session.IsSignedIn)
         {
-            Navigation.NavigateTo($"giris?donus={Uri.EscapeDataString(Navigation.ToBaseRelativePath(Navigation.Uri))}");
+            // Oturum kapanınca birden fazla bileşen aynı anda yönlendirebilir; giriş sayfasındaysak dönüş adresi bozulmasın.
+            var current = Navigation.ToBaseRelativePath(Navigation.Uri);
+            if (!current.StartsWith("giris", StringComparison.Ordinal))
+            {
+                Navigation.NavigateTo($"giris?donus={Uri.EscapeDataString(current)}");
+            }
         }
         else if (!Session.HasActiveTenant)
         {

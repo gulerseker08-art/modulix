@@ -56,6 +56,11 @@ public enum AuditAction
     LockedOut = 7,
     PasswordReset = 8,
     InvitationAccepted = 9,
+
+    // Hesap güvenliği (Y7a): kişinin kendi hesabındaki işlemler. Ad ve e-posta değişikliği Updated olarak yazılır.
+    PasswordChanged = 10,
+    PasswordResetRequested = 11,
+    SessionsClosed = 12,
 }
 
 /// <summary>Audit kaydı: kim, ne, ne zaman. <see cref="Changes"/>: alan → { old, new }.</summary>
