@@ -1,0 +1,37 @@
+@page "/yonetim"
+@inject SessionState Session
+
+<PageTitle>Yönetim - Modulix</PageTitle>
+
+@* Menüdeki "Yönetim" bölümünün giriş sayfası. Her kart yalnızca izni olana görünür; asıl denetim sunucudadır. *@
+<AuthGate AnyPermission="CoreAccess.AdministrationPermissions">
+    <h1>Yönetim</h1>
+    <p class="text-muted">@Session.ActiveTenantName</p>
+
+    <div class="tiles">
+        @foreach (var area in Sections.Where(a => Session.Can(a.Permission)))
+        {
+            @if (area.Href is null)
+            {
+                <div class="tile is-soon" aria-disabled="true">
+                    <strong>@area.Title</strong><span>@area.Description</span>
+                </div>
+            }
+            else
+            {
+                <a class="tile" href="@area.Href"><strong>@area.Title</strong><span>@area.Description</span></a>
+            }
+        }
+    </div>
+</AuthGate>
+
+@code {
+    // Href boş olan bölümün ekranı henüz yok (Y2, Y3, Y5, Y6); kart "Yakında" olarak görünür.
+    private static readonly (string Title, string Description, string Permission, string? Href)[] Sections =
+    [
+        ("Kullanıcılar", "Kullanıcı ekleme, devre dışı bırakma, rol atama", CoreAccess.ManageUsers, null),
+        ("Roller", "Roller ve izinleri", CoreAccess.ManageRoles, null),
+        ("Firma ayarları", "Dil, para birimi, saat dilimi, logo", CoreAccess.ManageSettings, null),
+        ("Denetim kaydı", "Kim, neyi, ne zaman değiştirdi", CoreAccess.ReadAudit, null),
+    ];
+}

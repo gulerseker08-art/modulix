@@ -17,6 +17,7 @@ namespace Modulix.IntegrationTests;
 public class ModulesAndRolesTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
     private const string ManageRoles = CoreModule.Permissions.ManageRoles;
+    private const string ManageUsers = CoreModule.Permissions.ManageUsers;
     private const string CompaniesRead = "crm.companies.read";
 
     [Fact]
@@ -73,7 +74,7 @@ public class ModulesAndRolesTests(ModulixApiFactory factory) : IClassFixture<Mod
         await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
         var admin = await factory.CreateUserAsync(tenant);
         var member = await factory.CreateUserAsync(tenant);
-        await factory.CreateRoleAsync(tenant.Id, [ManageRoles], admin);
+        await factory.CreateRoleAsync(tenant.Id, [ManageRoles, ManageUsers], admin);
         using var adminClient = await LoginAsync(admin.Email!);
 
         var assignable = await adminClient.GetFromJsonAsync<List<PermissionDto>>("/api/roles/permissions");
@@ -118,7 +119,7 @@ public class ModulesAndRolesTests(ModulixApiFactory factory) : IClassFixture<Mod
         var b = await factory.CreateTenantAsync();
         var adminA = await factory.CreateUserAsync(a);
         var memberB = await factory.CreateUserAsync(b);
-        var roleA = await factory.CreateRoleAsync(a.Id, [ManageRoles], adminA);
+        var roleA = await factory.CreateRoleAsync(a.Id, [ManageRoles, ManageUsers], adminA);
         var roleB = await factory.CreateRoleAsync(b.Id, [ManageRoles]);
         using var client = await LoginAsync(adminA.Email!);
 

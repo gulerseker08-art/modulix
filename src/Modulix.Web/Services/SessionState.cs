@@ -30,6 +30,9 @@ public sealed class SessionState(ApiClient api)
 
     public bool Can(string permission) => Access?.Permissions.Contains(permission) == true;
 
+    /// <summary>İzinlerden en az biri var mı?</summary>
+    public bool CanAny(IEnumerable<string> permissions) => permissions.Any(Can);
+
     /// <summary>İlk çağrıda oturumu sunucudan okur; sonrakiler aynı sonucu bekler.</summary>
     public Task EnsureLoadedAsync() => loading ??= ReloadAsync();
 

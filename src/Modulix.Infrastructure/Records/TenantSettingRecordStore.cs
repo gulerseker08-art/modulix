@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Modules;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Persistence;
 
@@ -20,6 +21,10 @@ internal sealed class TenantSettingRecordStore(ModulixDbContext db) : IRecordSto
     public string EntityKey => Key;
 
     public string FeatureKey => "core.settings";
+
+    /// <summary>Ayarları her üye okur (ekranlar dil, para birimi gibi değerlere bakar); yazmak için izin gerekir.</summary>
+    public string? PermissionFor(RecordOperation operation) =>
+        operation == RecordOperation.Read ? null : CoreModule.Permissions.ManageSettings;
 
     public IReadOnlyList<RecordFieldError> Validate(RecordOperation operation, JsonObject values)
     {

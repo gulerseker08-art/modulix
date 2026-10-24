@@ -100,11 +100,26 @@ Geçerli izin = kullanıcının rollerindeki izinler ∩ tenant için açık mod
 | --- | --- | --- |
 | `GET /api/tenant/modules` | Kayıtlı modüller ve aktif tenant için açık olanlar | Aktif tenant |
 | `GET /api/tenant/access` | Oturumdaki kullanıcının açık modülleri ve geçerli izinleri | Aktif tenant |
-| `GET /api/roles`, `POST /api/roles`, `PUT /api/roles/{id}` | Rolleri listeler, ekler, düzenler | `core.roles.manage` |
+| `GET /api/roles` | Rolleri listeler | `core.roles.manage` veya `core.users.manage` |
+| `POST /api/roles`, `PUT /api/roles/{id}` | Rol ekler, düzenler | `core.roles.manage` |
 | `GET /api/roles/permissions` | Rollere atanabilecek izinler (yalnızca açık modüllerin) | `core.roles.manage` |
-| `GET`/`PUT /api/memberships/{id}/roles` | Bir üyeliğin rolleri | `core.roles.manage` |
+| `GET`/`PUT /api/memberships/{id}/roles` | Bir üyeliğin rolleri | `core.users.manage` |
 
-Örnek veride Acme'de CRM ve Lojistik, Beta'da yalnızca Lojistik açıktır; örnek kullanıcıların hepsi kendi tenant'larında tüm izinleri olan "Yönetici" rolündedir. Modül açıp kapatmak için şimdilik bir uç nokta yoktur (platform yöneticisi rolü sonraki görev); kodda `IModuleEntitlements.SetEnabledAsync` kullanılır.
+Örnek veride Acme'de CRM ve Lojistik, Beta'da yalnızca Lojistik açıktır; örnek kullanıcıların hepsi kendi tenant'larında "Yönetici" (sistem) rolündedir.
+
+### Yönetim izinleri ve "Yönetici" rolü (Y1)
+
+| İzin | Ne verir |
+| --- | --- |
+| `core.users.manage` | Kullanıcıların rollerini atar (kullanıcı ekleme ekranı Y2'de) |
+| `core.roles.manage` | Rolleri ve izinlerini tanımlar |
+| `core.settings.manage` | Firma ayarlarını yazar (`core.tenant-setting`); okumak için izin gerekmez |
+| `core.audit.read` | Denetim kaydını okur (ekranı Y5'te) |
+
+- Her tenant'ta bir **sistem rolü** vardır: "Yönetici". İzin listesi tutmaz; tenant için açık tüm modüllerin tüm izinlerini verir, yeni açılan modülün izinleri de kendiliğinden gelir. Adı ve izinleri değiştirilemez (409). `IRoleService.EnsureSystemRoleAsync` oluşturur; `SystemRole` migration'ı eski "Yönetici" rollerini sistem rolüne çevirdi ve `core.roles.manage` olan rollere diğer üç yönetim iznini ekledi.
+- **Son yönetici korunur:** etkin üyeliği olan son yöneticinin Yönetici rolü kaldırılamaz (409). Kural `AdministratorGuard` içindedir; aynı anda birbirinin yetkisini kaldırmaya çalışan iki yöneticiden yalnızca biri geçer.
+- Rol oluşturma, rol düzenleme ve rol atamaları denetim kaydına yazılır (`core.role`, `core.membership`).
+- Arayüzde yönetim izinlerinden biri olan kullanıcı menüde **Yönetim** bölümünü görür (`/yonetim`). Modül açıp kapatmak için şimdilik bir uç nokta yoktur (platform yöneticisi rolü sonraki görev); kodda `IModuleEntitlements.SetEnabledAsync` kullanılır.
 
 ## CRM modülü
 

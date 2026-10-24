@@ -7,10 +7,15 @@ namespace Modulix.Core.Authorization;
 /// Tenant'a özel rol: bir ad ve izin listesi (Görev E4). Kullanıcıya üyeliği üzerinden atanır
 /// (<see cref="MembershipRole"/>); aynı kullanıcının farklı tenant'larda farklı rolleri olur.
 /// Tenant verisidir; Row-Level Security ile korunur.
+///
+/// Her tenant'ta bir sistem rolü ("Yönetici", <see cref="IsSystem"/>) bulunur: izin listesi tutmaz, tenant için
+/// açık tüm modüllerin tüm izinlerini verir; adı ve izinleri değiştirilemez. Son yöneticinin bu rolü kaldırılamaz.
 /// </summary>
 public sealed class Role : ITenantEntity
 {
     public const int NameMaxLength = 100;
+
+    public const string SystemRoleName = "Yönetici";
 
     private Role()
     {
@@ -25,6 +30,14 @@ public sealed class Role : ITenantEntity
         CreatedAt = DateTimeOffset.UtcNow;
     }
 
+    /// <summary>Tenant'ın yönetici rolünü oluşturur.</summary>
+    public static Role CreateSystem()
+    {
+        var role = new Role(SystemRoleName, []);
+        role.IsSystem = true;
+        return role;
+    }
+
     public Guid Id { get; private set; }
 
     /// <summary>Kaydederken aktif tenant'tan atanır; uygulama kodu yazmaz.</summary>
@@ -37,8 +50,22 @@ public sealed class Role : ITenantEntity
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>Tenant'ın yönetici rolü: tüm izinleri verir, düzenlenemez.</summary>
+    public bool IsSystem { get; private set; }
+
+    /// <summary>
+    /// Aynı adlı eski bir rolü sistem rolüne çevirir (sistem rolü öncesi oluşturulmuş "Yönetici" rolleri için).
+    /// İzin listesi boşaltılır; sistem rolü izinlerini katalogdan alır.
+    /// </summary>
+    public void MarkAsSystem()
+    {
+        IsSystem = true;
+        Permissions = [];
+    }
+
     public void Rename(string name)
     {
+        EnsureEditable();
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var trimmed = name.Trim();
         if (trimmed.Length > NameMaxLength)
@@ -55,6 +82,7 @@ public sealed class Role : ITenantEntity
     /// </summary>
     public void SetPermissions(IEnumerable<string> permissions)
     {
+        EnsureEditable();
         ArgumentNullException.ThrowIfNull(permissions);
         var normalized = permissions
             .Select(p => p?.Trim() ?? string.Empty)
@@ -69,5 +97,13 @@ public sealed class Role : ITenantEntity
         }
 
         Permissions = normalized;
+    }
+
+    private void EnsureEditable()
+    {
+        if (IsSystem)
+        {
+            throw new RoleConflictException($"'{Name}' sistem rolüdür; adı ve izinleri değiştirilemez.");
+        }
     }
 }

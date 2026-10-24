@@ -10,8 +10,23 @@ public sealed record PermissionDto(string Key, string DisplayName, string Module
 /// <summary>Oturumdaki kullanıcının aktif tenant'taki erişimi; arayüz menüleri buna göre gösterir.</summary>
 public sealed record MyAccessResponse(IReadOnlyList<string> EnabledModules, IReadOnlyList<string> Permissions);
 
-public sealed record RoleDto(Guid Id, string Name, IReadOnlyList<string> Permissions);
+/// <summary>Sistem rolünde (<see cref="IsSystem"/>, "Yönetici") izin listesi boştur: rol tüm izinleri verir ve düzenlenemez.</summary>
+public sealed record RoleDto(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false);
 
 public sealed record SaveRoleRequest(string Name, IReadOnlyList<string> Permissions);
 
 public sealed record SetMembershipRolesRequest(IReadOnlyList<Guid> RoleIds);
+
+/// <summary>Çekirdek (yönetim) izinleri; arayüz menüsü bunlara bakar. <c>CoreModule.Permissions</c> ile aynıdır (test denetler).</summary>
+public static class CoreAccess
+{
+    public const string ModuleKey = "core";
+
+    public const string ManageUsers = "core.users.manage";
+    public const string ManageRoles = "core.roles.manage";
+    public const string ManageSettings = "core.settings.manage";
+    public const string ReadAudit = "core.audit.read";
+
+    /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
+    public static IReadOnlyList<string> AdministrationPermissions { get; } = [ManageUsers, ManageRoles, ManageSettings, ReadAudit];
+}

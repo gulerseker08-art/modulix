@@ -1,11 +1,23 @@
 namespace Modulix.Core.Authorization;
 
-public sealed record RoleSummary(Guid Id, string Name, IReadOnlyList<string> Permissions);
+/// <summary>
+/// Rol özeti. Sistem rolünde (<see cref="IsSystem"/>) <see cref="Permissions"/> boştur: rol, tenant için açık
+/// tüm modüllerin tüm izinlerini verir.
+/// </summary>
+public sealed record RoleSummary(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false);
+
+/// <summary>
+/// İstek kurallara uygun ama tenant'ın durumuyla çelişiyor: sistem rolünü düzenlemek veya son yöneticinin
+/// yönetici rolünü kaldırmak gibi. API 409 döner.
+/// </summary>
+public sealed class RoleConflictException(string message) : Exception(message);
 
 /// <summary>
 /// Aktif tenant'ın rolleri ve üyelik rol atamaları. Aktif tenant yoksa yazma işlemleri
 /// <see cref="InvalidOperationException"/> fırlatır. Geçersiz ad, katalogda olmayan izin veya
-/// tenant'ta bulunmayan rol için <see cref="ArgumentException"/> fırlatır.
+/// tenant'ta bulunmayan rol için <see cref="ArgumentException"/>, sistem rolünü değiştirme veya
+/// son yöneticiyi kaldırma için <see cref="RoleConflictException"/> fırlatır.
+/// Rol ve atama değişiklikleri denetim kaydına yazılır.
 /// </summary>
 public interface IRoleService
 {
@@ -18,7 +30,13 @@ public interface IRoleService
     Task<RoleSummary?> UpdateAsync(Guid roleId, string name, IReadOnlyCollection<string> permissions, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Tenant'ın sistem rolünü ("Yönetici") döner; yoksa oluşturur. Aynı adlı eski bir rol varsa sistem rolüne çevrilir.
+    /// </summary>
+    Task<RoleSummary> EnsureSystemRoleAsync(CancellationToken cancellationToken);
+
+    /// <summary>
     /// Üyeliğin rollerini verilen listeyle değiştirir. Üyelik aktif tenant'a ait değilse <c>false</c>.
+    /// Değişiklik tenant'ı etkin yöneticisiz bırakacaksa <see cref="RoleConflictException"/>.
     /// </summary>
     Task<bool> SetMembershipRolesAsync(Guid membershipId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken);
 

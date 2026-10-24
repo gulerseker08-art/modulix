@@ -373,6 +373,25 @@ code {
         box-shadow: 0 8px 24px rgba(14, 26, 51, 0.08);
     }
 
+    /* Henüz yapılmamış ekranın kartı: tıklanmaz, "Yakında" etiketi taşır. */
+    .tile.is-soon {
+        cursor: default;
+        opacity: 0.7;
+    }
+
+        .tile.is-soon::after {
+            content: "Yakında";
+            width: auto;
+            padding: 0 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .tile.is-soon:hover {
+            border-color: var(--mx-border);
+            transform: none;
+            box-shadow: none;
+        }
+
 .table {
     --bs-table-bg: var(--mx-surface);
 }
