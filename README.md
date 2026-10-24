@@ -81,6 +81,7 @@ Aktif tenant her istekte veritabanından yeniden doğrulanır: üyelik devre dı
 | `ayse@acme.demo` | Acme Lojistik |
 | `mehmet@beta.demo` | Beta Taşımacılık |
 | `deniz@ortak.demo` | İkisi de (tenant seçmesi gerekir) |
+| `platform@modulix.demo` | Hiçbiri; platform yöneticisi (girişte `/platform`'a gider) |
 
 Elle denemek için Visual Studio'da `src/Modulix.Api/Modulix.Api.http` dosyasını açın.
 
@@ -145,6 +146,18 @@ Ekran: **Yönetim → Roller** (`/yonetim/roller`). Uç noktalar `/api/roles` al
 - `GET /api/roles` her rolün üye sayısını (`memberCount`) da döner. Rol değişikliği, rolün üyelerinin bir sonraki isteğinde geçerli olur.
 - **Hazır roller (Y3b, [ADR-0005](docs/adr/0005-rol-sablonlari.md)):** modüller önerdikleri rolleri `IModule.RoleTemplates` ile bildirir (CRM "Satış temsilcisi", Lojistik "Operasyon"); çekirdek açık modüllerin tüm görüntüleme izinleriyle "Salt okur" şablonunu ekler. `GET /api/roles/templates` yalnızca açık modüllerin şablonlarını döner. Yeni rol formunda "Şablondan başla"; yalnızca Yönetici rolü varken rol listesi şablonları kart olarak önerir.
 - **Kim neye erişebilir:** rol detayında "Bu rolde kimler var" (`GET /api/roles/{id}/members`, `core.roles.manage` veya `core.users.manage`); kullanıcı detayında "Erişim": kişinin geçerli izinleri ve her izni veren roller (`GET /api/users/{id}/access`, `core.users.manage`). Hesap sunucunun her istekte uyguladığıyla aynıdır (`MembershipPermissions`).
+
+### Platform yönetimi (Y4a)
+
+Platformu işleten ekip için ayrı bir alan: menüde **Platform** (`/platform`), yalnızca platform yöneticisine görünür. Uç noktalar `/api/platform` altındadır.
+
+- **Platform yöneticisi** kullanıcı düzeyinde bir bayraktır (`IsPlatformAdministrator`); firmaya bağlı değildir. Arayüzden atanamaz, komut satırıyla atanır:
+  `dotnet run --project src/Modulix.Api -- platform-admin kisi@ornek.com` (kaldırmak için sonuna `--remove`). Hesap yoksa oluşturulur ve şifre belirleme bağlantısı konsola yazılır. Bayrak her istekte veritabanından okunur; kaldırılınca bir sonraki istekte 403.
+- **Firma verisini görmez:** RLS atlanmaz. Platform yöneticisi yalnızca platform tablolarını (firmalar, üyelikler, modül hakları) ve sayıları görür; firmaya yazılan her şey (roller, denetim kaydı) o firmanın bağlamında yazılır.
+- **Firmalar** (`/platform/firmalar`): ad, kısa ad, durum, etkin üye ve yönetici sayısı, açık modüller; arama ve durum filtresi.
+- **Firma açma** tek işlemdir: firma, Yönetici sistem rolü, seçilen modüller, seçilen hazır roller ve ilk yöneticinin daveti (Y2 akışı) birlikte oluşur. Biri başarısız olursa (ör. kısa ad kullanılıyor, 409) hiçbiri oluşmaz ve e-posta gitmez.
+- **Firma detayı:** yöneticiler ve bekleyen davetler, "Yönetici davet et" (yöneticisi kalmayan firmanın kurtarma yolu), ad değiştirme, kapatma ve yeniden açma. Kapatmada veri silinmez; üyeler bir sonraki isteklerinde 403 alır, firma seçim listesinden çıkar, davet bağlantıları çalışmaz.
+- Açma, ad değiştirme, kapatma ve yeniden açma firmanın denetim kaydına `core.tenant` olarak, işlemi yapan platform yöneticisi adına yazılır; yönetici daveti `core.membership` kaydıdır.
 
 ## CRM modülü
 

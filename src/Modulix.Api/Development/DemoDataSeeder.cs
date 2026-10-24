@@ -14,7 +14,7 @@ using Modulix.Modules.Crm;
 namespace Modulix.Api.Development;
 
 /// <summary>
-/// Yalnızca geliştirme ortamı için örnek veri: 2 tenant, 3 kullanıcı. Tekrar çalıştırmak güvenlidir.
+/// Yalnızca geliştirme ortamı için örnek veri: 2 tenant, 3 kullanıcı ve bir platform yöneticisi. Tekrar çalıştırmak güvenlidir.
 /// Acme'de CRM ve Lojistik, Beta'da yalnızca Lojistik açıktır; her tenant'ta tüm izinleri olan
 /// bir "Yönetici" rolü vardır ve örnek kullanıcılar bu role atanır. Acme'de birkaç örnek CRM kaydı vardır.
 ///   dotnet run --project src/Modulix.Api -- seed
@@ -36,6 +36,14 @@ public static class DemoDataSeeder
         var ayse = await EnsureUserAsync(users, "ayse@acme.demo", "Ayşe Yılmaz");
         var mehmet = await EnsureUserAsync(users, "mehmet@beta.demo", "Mehmet Kaya");
         var deniz = await EnsureUserAsync(users, "deniz@ortak.demo", "Deniz Demir");
+
+        // Platform yöneticisi (Y4): hiçbir firmaya üye değildir.
+        var platform = await EnsureUserAsync(users, "platform@modulix.demo", "Platform Yöneticisi");
+        if (!platform.IsPlatformAdministrator)
+        {
+            platform.IsPlatformAdministrator = true;
+            await users.UpdateAsync(platform);
+        }
 
         await EnsureMembershipAsync(db, acme, ayse, cancellationToken);
         await EnsureMembershipAsync(db, beta, mehmet, cancellationToken);

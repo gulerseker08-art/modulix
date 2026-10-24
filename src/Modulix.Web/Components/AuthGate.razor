@@ -63,7 +63,7 @@ else if (Session.IsSignedIn && Session.HasActiveTenant)
         }
         else if (!Session.HasActiveTenant)
         {
-            Navigation.NavigateTo("tenant");
+            Navigation.NavigateTo(Session.NoTenantHome);
         }
     }
 

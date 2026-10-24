@@ -1,0 +1,153 @@
+@* Firma açma formu (Y4); Firmalar sayfası kullanır. Açılış sunucuda tek işlemdir: firma, Yönetici rolü, modüller,
+   hazır roller ve ilk yöneticinin daveti birlikte oluşur. *@
+@inject ApiClient Api
+
+<form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+    <h2>Firma aç</h2>
+    <p class="text-muted">
+        İlk yöneticiye şifresini belirleyeceği bir bağlantı gönderilir (7 gün geçerli). E-posta platformda zaten
+        kayıtlıysa kişi hemen eklenir ve bilgilendirilir.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="tenantName">Firma adı *</label>
+            <input id="tenantName" class="form-control" maxlength="200" @bind="name" @bind:after="SuggestSlug" />
+            <FieldError Field="name" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="tenantSlug">Kısa ad *</label>
+            <input id="tenantSlug" class="form-control" maxlength="50" @bind="slug" @bind:after="() => slugEdited = true" />
+            <small class="text-muted">Adreslerde kullanılır; a-z, 0-9 ve tire. Sonradan değişmez.</small>
+            <FieldError Field="slug" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="adminEmail">İlk yöneticinin e-postası *</label>
+            <input id="adminEmail" class="form-control" type="email" autocomplete="off" @bind="administratorEmail" />
+            <FieldError Field="administratorEmail" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="adminName">İlk yöneticinin adı soyadı *</label>
+            <input id="adminName" class="form-control" maxlength="200" @bind="administratorName" />
+            <FieldError Field="administratorName" Errors="errors" />
+        </div>
+        <fieldset class="span-all">
+            <legend class="form-label">Açılacak modüller</legend>
+            @foreach (var module in Modules.Modules)
+            {
+                <div class="form-check">
+                    <input id="module-@module.Key" class="form-check-input" type="checkbox"
+                           checked="@modules.Contains(module.Key)" @onchange="e => ToggleModule(module.Key, (bool)e.Value!)" />
+                    <label class="form-check-label" for="module-@module.Key">@module.DisplayName</label>
+                </div>
+            }
+            <FieldError Field="modules" Errors="errors" />
+        </fieldset>
+        @if (Templates.Count > 0)
+        {
+            <fieldset class="span-all">
+                <legend class="form-label">Hazır roller (isteğe bağlı)</legend>
+                @foreach (var template in Templates)
+                {
+                    <div class="form-check">
+                        <input id="template-@template.Key" class="form-check-input" type="checkbox"
+                               checked="@templates.Contains(template.Key)" @onchange="e => Toggle(templates, template.Key, (bool)e.Value!)" />
+                        <label class="form-check-label" for="template-@template.Key">
+                            @template.Name <small class="text-muted">@template.Description</small>
+                        </label>
+                    </div>
+                }
+                <FieldError Field="roleTemplates" Errors="errors" />
+            </fieldset>
+        }
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" disabled="@busy">Firmayı aç</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+    </div>
+</form>
+
+@code {
+    [Parameter, EditorRequired] public PlatformModulesResponse Modules { get; set; } = default!;
+
+    [Parameter] public EventCallback<CreateTenantResponse> Created { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private readonly HashSet<string> modules = [];
+    private readonly HashSet<string> templates = [];
+    private string name = string.Empty;
+    private string slug = string.Empty;
+    private bool slugEdited;
+    private string administratorEmail = string.Empty;
+    private string administratorName = string.Empty;
+    private string? message;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private bool busy;
+
+    /// <summary>Seçili modüllerin hazır rolleri; en az bir modül seçiliyse "Salt okur" da.</summary>
+    private List<RoleTemplateDto> Templates
+    {
+        get
+        {
+            var list = Modules.Modules.Where(m => modules.Contains(m.Key)).SelectMany(m => m.Templates).ToList();
+            if (modules.Count > 0)
+            {
+                list.Add(Modules.ReadOnlyTemplate);
+            }
+
+            return list;
+        }
+    }
+
+    private void ToggleModule(string key, bool on)
+    {
+        Toggle(modules, key, on);
+
+        // Kapanan modülün şablonları seçimden çıkar.
+        templates.IntersectWith(Templates.Select(t => t.Key));
+    }
+
+    private static void Toggle(HashSet<string> set, string key, bool on)
+    {
+        if (on)
+        {
+            set.Add(key);
+        }
+        else
+        {
+            set.Remove(key);
+        }
+    }
+
+    private void SuggestSlug()
+    {
+        if (!slugEdited)
+        {
+            slug = Slug.Suggest(name);
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<CreateTenantResponse>("/api/platform/tenants", new CreateTenantRequest(
+            name, slug, [.. modules], [.. templates], administratorEmail, administratorName));
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            errors = result.FieldErrors;
+            return;
+        }
+
+        await Created.InvokeAsync(result.Value!);
+    }
+}

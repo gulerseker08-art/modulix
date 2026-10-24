@@ -261,7 +261,8 @@ public static class AuthEndpoints
             user.Email ?? string.Empty,
             user.DisplayName,
             activeTenantId,
-            memberships.Select(m => new MembershipDto(m.TenantId, m.TenantName, m.TenantSlug)).ToList());
+            memberships.Select(m => new MembershipDto(m.TenantId, m.TenantName, m.TenantSlug)).ToList(),
+            user.IsPlatformAdministrator);
 
     private static IResult InvalidLink(string message) =>
         Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: message);

@@ -3,6 +3,7 @@ using Modulix.Api.Auth;
 using Modulix.Api.Crm;
 using Modulix.Api.Development;
 using Modulix.Api.Email;
+using Modulix.Api.Platform;
 using Modulix.Api.Records;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
@@ -60,7 +61,15 @@ if (args.Contains("seed", StringComparer.OrdinalIgnoreCase))
     }
 
     await DemoDataSeeder.SeedAsync(app.Services);
-    Console.WriteLine($"Örnek veri hazır. Kullanıcılar: ayse@acme.demo, mehmet@beta.demo, deniz@ortak.demo (şifre: {DemoDataSeeder.DemoPassword})");
+    Console.WriteLine($"Örnek veri hazır. Kullanıcılar: ayse@acme.demo, mehmet@beta.demo, deniz@ortak.demo, platform yöneticisi platform@modulix.demo (şifre: {DemoDataSeeder.DemoPassword})");
+    return;
+}
+
+// "platform-admin" komutu: kişiyi platform yöneticisi yapar (--remove: kaldırır) ve çıkar. Arayüzden atanamaz.
+//   dotnet run --project src/Modulix.Api -- platform-admin kisi@ornek.com
+if (args.Contains(PlatformAdministratorCommand.Name, StringComparer.OrdinalIgnoreCase))
+{
+    Console.WriteLine(await PlatformAdministratorCommand.RunAsync(app.Services, args));
     return;
 }
 
@@ -96,6 +105,7 @@ app.MapAccessEndpoints();
 app.MapUserEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
+app.MapPlatformEndpoints();
 
 // Bilinmeyen API adresi 404 döner; diğer adresler arayüzün sayfalarıdır.
 app.Map("/api/{**path}", () => Results.NotFound());

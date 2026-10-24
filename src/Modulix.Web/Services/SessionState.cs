@@ -23,6 +23,15 @@ public sealed class SessionState(ApiClient api)
 
     public bool HasActiveTenant => User?.ActiveTenantId is not null;
 
+    /// <summary>Platform yöneticisi (Y4): "Platform" menüsü görünür. Sunucu her istekte yeniden denetler.</summary>
+    public bool IsPlatformAdministrator => User?.IsPlatformAdministrator == true;
+
+    /// <summary>
+    /// Tenant gerektirmeyen ilk ekran: hiçbir firmaya üye olmayan platform yöneticisi platform alanına, diğerleri
+    /// firma seçimine gider.
+    /// </summary>
+    public string NoTenantHome => IsPlatformAdministrator && User?.Memberships.Count == 0 ? "platform" : "tenant";
+
     public string? ActiveTenantName =>
         User?.Memberships.FirstOrDefault(m => m.TenantId == User.ActiveTenantId)?.TenantName;
 

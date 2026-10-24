@@ -1017,3 +1017,13 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
         width: 5.5rem;
     }
 }
+
+/* Platform (Y4): bölüm içindeki kısa formlar (yönetici daveti, firma adı). */
+.inline-form {
+    margin-top: 1rem;
+}
+
+    .inline-form h3 {
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }

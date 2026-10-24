@@ -1,0 +1,238 @@
+@page "/platform/firmalar/{TenantId:guid}"
+@inject ApiClient Api
+
+<PageTitle>@(detail?.Tenant.Name ?? "Firma") · Platform · Modulix</PageTitle>
+
+<PlatformGate>
+    <a class="back-link" href="platform/firmalar">← Firmalar</a>
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (detail is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        var tenant = detail.Tenant;
+        <div class="page-header">
+            <div>
+                <h1>@tenant.Name</h1>
+                <div class="header-meta"><TenantStateBadge State="tenant.Status" /></div>
+            </div>
+        </div>
+
+        <dl class="detail-grid">
+            <div><dt>Kısa ad</dt><dd>@tenant.Slug</dd></div>
+            <div><dt>Açılış</dt><dd>@CrmLabels.Time(tenant.CreatedAt)</dd></div>
+            <div><dt>Etkin üye</dt><dd>@tenant.ActiveMemberCount</dd></div>
+            <div><dt>Açık modüller</dt><dd>@ModuleNames(tenant.EnabledModules)</dd></div>
+        </dl>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Yöneticiler</h2></div>
+            @if (detail.Administrators.Count == 0)
+            {
+                <div class="alert alert-warning">Bu firmada yönetici yok. Firmayı yönetecek kişiyi davet edin.</div>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <thead><tr><th>Ad</th><th>E-posta</th><th>Durum</th></tr></thead>
+                    <tbody>
+                        @foreach (var administrator in detail.Administrators)
+                        {
+                            <tr>
+                                <td data-label="Ad" class="primary">@administrator.DisplayName</td>
+                                <td data-label="E-posta">@administrator.Email</td>
+                                <td data-label="Durum">
+                                    <span class="badge user-@administrator.Status.ToString().ToLowerInvariant()">@UserLabels.Of(administrator.Status)</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (tenant.Status == TenantState.Active)
+            {
+                <form class="inline-form" novalidate @onsubmit="InviteAsync" @onsubmit:preventDefault>
+                    <h3>Yönetici davet et</h3>
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label" for="inviteEmail">E-posta *</label>
+                            <input id="inviteEmail" class="form-control" type="email" autocomplete="off" @bind="inviteEmail" />
+                            <FieldError Field="email" Errors="inviteErrors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="inviteName">Ad soyad *</label>
+                            <input id="inviteName" class="form-control" maxlength="200" @bind="inviteName" />
+                            <FieldError Field="displayName" Errors="inviteErrors" />
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" disabled="@busy">Davet gönder</button>
+                    </div>
+                </form>
+            }
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Firma adı</h2></div>
+            <form class="inline-form" novalidate @onsubmit="RenameAsync" @onsubmit:preventDefault>
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="tenantName">Ad</label>
+                        <input id="tenantName" class="form-control" maxlength="200" @bind="newName" />
+                        <FieldError Field="name" Errors="renameErrors" />
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-outline-primary" disabled="@(busy || newName == tenant.Name)">Adı kaydet</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Durum</h2></div>
+            @if (confirmingClose)
+            {
+                <div class="alert alert-warning confirm" role="alertdialog">
+                    <p>
+                        Firmanın @tenant.ActiveMemberCount kullanıcısı bir sonraki isteğinde erişimini kaybeder ve bekleyen
+                        davetler çalışmaz. Veri silinmez; firmayı sonra yeniden açabilirsiniz.
+                    </p>
+                    <button type="button" class="btn btn-danger" disabled="@busy" @onclick="CloseAsync">Firmayı kapat</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirmingClose = false">Vazgeç</button>
+                </div>
+            }
+            else if (tenant.Status == TenantState.Active)
+            {
+                <div class="account-actions">
+                    <div>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => confirmingClose = true">Firmayı kapat</button>
+                        <small class="text-muted">Kullanıcılar giriş yapamaz; veri silinmez.</small>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="account-actions">
+                    <div>
+                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="ReopenAsync">Firmayı yeniden aç</button>
+                        <small class="text-muted">Üyeler ve bekleyen davetler yeniden çalışır.</small>
+                    </div>
+                </div>
+            }
+        </section>
+    }
+</PlatformGate>
+
+@code {
+    [Parameter] public Guid TenantId { get; set; }
+
+    private PlatformTenantDetailResponse? detail;
+    private PlatformModulesResponse? modules;
+    private string newName = string.Empty;
+    private string inviteEmail = string.Empty;
+    private string inviteName = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? inviteErrors;
+    private IReadOnlyDictionary<string, string[]>? renameErrors;
+    private bool confirmingClose;
+    private bool busy;
+    private string? message;
+    private string? notice;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        modules = (await Api.GetAsync<PlatformModulesResponse>("/api/platform/modules")).Value;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<PlatformTenantDetailResponse>($"/api/platform/tenants/{TenantId}");
+        detail = result.Value;
+        message = result.Error;
+        newName = detail?.Tenant.Name ?? string.Empty;
+    }
+
+    private async Task InviteAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<InviteTenantAdministratorResponse>(
+            $"/api/platform/tenants/{TenantId}/administrators", new InviteTenantAdministratorRequest(inviteEmail, inviteName));
+        busy = false;
+        inviteErrors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            Show(error: result.Error);
+            return;
+        }
+
+        var invited = result.Value!;
+        inviteEmail = inviteName = string.Empty;
+        await LoadAsync();
+        Show(success: invited.ExistingAccount
+            ? $"{invited.Administrator.DisplayName} zaten Modülix kullanıyordu; yönetici olarak eklendi ve bilgilendirildi."
+            : $"{invited.Administrator.Email} adresine yönetici daveti gönderildi.");
+    }
+
+    private async Task RenameAsync()
+    {
+        busy = true;
+        var result = await Api.PutAsync<bool>($"/api/platform/tenants/{TenantId}", new RenameTenantRequest(newName));
+        busy = false;
+        renameErrors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            Show(error: result.Error);
+            return;
+        }
+
+        await LoadAsync();
+        Show(success: "Firma adı kaydedildi.");
+    }
+
+    private Task CloseAsync() => ChangeStateAsync("close", "Firma kapatıldı. Veri silinmedi.");
+
+    private Task ReopenAsync() => ChangeStateAsync("reopen", "Firma yeniden açıldı.");
+
+    private async Task ChangeStateAsync(string action, string success)
+    {
+        busy = true;
+        var result = await Api.PostAsync<bool>($"/api/platform/tenants/{TenantId}/{action}", new { });
+        busy = false;
+        confirmingClose = false;
+        if (!result.IsSuccess)
+        {
+            Show(error: result.Error);
+            return;
+        }
+
+        await LoadAsync();
+        Show(success: success);
+    }
+
+    private void Show(string? success = null, string? error = null)
+    {
+        notice = success;
+        message = error;
+    }
+
+    private string ModuleNames(IReadOnlyList<string> keys) =>
+        keys.Count == 0
+            ? "—"
+            : string.Join(", ", keys.Select(k => modules?.Modules.FirstOrDefault(m => m.Key == k)?.DisplayName ?? k));
+}
