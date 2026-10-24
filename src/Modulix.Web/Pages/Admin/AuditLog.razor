@@ -126,8 +126,8 @@
                                             {
                                                 <tr>
                                                     <td>@change.Label</td>
-                                                    <td>@Value(entry, change.Old)</td>
-                                                    <td>@Value(entry, change.New)</td>
+                                                    <td>@Value(entry, change, change.Old)</td>
+                                                    <td>@Value(entry, change, change.New)</td>
                                                 </tr>
                                             }
                                         </tbody>
@@ -209,6 +209,6 @@
     private static string RecordTitle(AuditEntryDto entry) =>
         entry.ValuesHidden ? "Gizli" : entry.RecordTitle ?? "—";
 
-    private static string Value(AuditEntryDto entry, string? value) =>
-        entry.ValuesHidden ? "Gizli" : string.IsNullOrEmpty(value) ? "—" : value;
+    private static string Value(AuditEntryDto entry, AuditFieldChangeDto change, string? value) =>
+        entry.ValuesHidden || change.Hidden ? "Gizli" : string.IsNullOrEmpty(value) ? "—" : value;
 }

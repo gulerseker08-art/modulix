@@ -29,6 +29,23 @@ public interface IDataScopeService
     Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Hassas alanlar (Y8b): kişinin bu kayıt türünde göremediği alanlar. Boru hattı bu alanları okumada çıkarır, yazmada
+/// reddeder (boş değer gönderilmişse yok sayar, böylece kaydın değeri korunur) ve bu alanlara göre süzmeye izin vermez.
+/// </summary>
+public interface IFieldAccessService
+{
+    Task<IReadOnlySet<string>> GetHiddenFieldsAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken);
+}
+
+public sealed class AllFieldsVisible : IFieldAccessService
+{
+    private static readonly IReadOnlySet<string> None = new HashSet<string>();
+
+    public Task<IReadOnlySet<string>> GetHiddenFieldsAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken) =>
+        Task.FromResult(None);
+}
+
 public sealed class AllowAllEntitlements : IEntitlementService
 {
     public Task<bool> CanUseAsync(Guid tenantId, string featureKey, CancellationToken cancellationToken) => Task.FromResult(true);

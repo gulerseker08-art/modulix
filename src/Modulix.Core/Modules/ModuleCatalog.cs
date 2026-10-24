@@ -13,6 +13,7 @@ public sealed class ModuleCatalog
     private readonly Dictionary<string, PermissionDefinition> permissions;
     private readonly Dictionary<string, AuditedEntity> auditedEntities = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, SettingDefinition Definition)> settings = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<SensitiveFields>> sensitiveFields = new(StringComparer.Ordinal);
 
     public ModuleCatalog(IEnumerable<IModule> modules)
     {
@@ -58,6 +59,19 @@ public sealed class ModuleCatalog
                     throw new InvalidOperationException(
                         $"Geçersiz veya tekrar eden denetim kayıt türü: '{entity.EntityKey}' ({module.Key}). Biçim: '{module.Key}.tür'.");
                 }
+            }
+
+            foreach (var sensitive in module.SensitiveFields)
+            {
+                if (!sensitive.EntityKey.StartsWith(module.Key + ".", StringComparison.Ordinal)
+                    || !module.Permissions.Any(p => p.Key == sensitive.Permission)
+                    || sensitive.Fields.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Geçersiz hassas alan tanımı: '{sensitive.EntityKey}' ({module.Key}). Kayıt türü ve izin modülün olmalı, en az bir alan verilmeli.");
+                }
+
+                (sensitiveFields.TryGetValue(sensitive.EntityKey, out var list) ? list : sensitiveFields[sensitive.EntityKey] = []).Add(sensitive);
             }
 
             foreach (var setting in module.Settings)
@@ -123,6 +137,17 @@ public sealed class ModuleCatalog
         Modules.SelectMany(m => m.Settings.Select(s => (m.Key, s)));
 
     public bool ContainsPermission(string permissionKey) => permissions.ContainsKey(permissionKey);
+
+    /// <summary>
+    /// Kayıt türünün, verilen geçerli izinlerle görülemeyen hassas alanları (Y8b). Yönetici tüm izinlere sahip olduğu için
+    /// onun için boştur; çağıran yöneticinin izin kümesini (tüm izinler) verir.
+    /// </summary>
+    public IReadOnlySet<string> HiddenFields(string entityKey, IReadOnlySet<string> grantedPermissions) =>
+        sensitiveFields.TryGetValue(entityKey, out var list)
+            ? list.Where(s => !grantedPermissions.Contains(s.Permission)).SelectMany(s => s.Fields).ToHashSet(StringComparer.Ordinal)
+            : NoFields;
+
+    private static readonly IReadOnlySet<string> NoFields = new HashSet<string>();
 
     public PermissionDefinition? FindPermission(string permissionKey) => permissions.GetValueOrDefault(permissionKey);
 

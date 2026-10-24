@@ -47,6 +47,12 @@ public interface IModule
     /// </summary>
     IReadOnlyList<SettingDefinition> Settings => [];
 
+    /// <summary>
+    /// Hassas alanlar (Y8b): kayıt türünü görebilen ama alanın iznine sahip olmayan kişiye alan gönderilmez, o alanı
+    /// yazamaz ve ona göre süzemez; denetim kaydında değeri gizlenir. İzin modülün kendi iznidir.
+    /// </summary>
+    IReadOnlyList<SensitiveFields> SensitiveFields => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {
@@ -70,6 +76,9 @@ public sealed record OwnedRecordType(string EntityKey, string Label, IReadOnlyDi
     /// <summary>Sorumlu alanının ve filtresinin adı; değeri kullanıcı kimliğidir.</summary>
     public const string OwnerField = "ownerId";
 }
+
+/// <summary>Bir kayıt türünün, <see cref="Permission"/> olmadan görülemeyen alanları (ör. fırsat tutarı, maaş).</summary>
+public sealed record SensitiveFields(string EntityKey, string Permission, IReadOnlyList<string> Fields);
 
 /// <summary>
 /// Hazır rol önerisi (ADR-0005). <see cref="Key"/> modül anahtarıyla başlar (ör. "crm.sales-rep") ve değişmez;

@@ -235,6 +235,9 @@ internal sealed class AuditLog(
             var (entry, entity, changes) = row;
             var visible = recordReadable || Visible(entity);
 
+            // Hassas alanlar (Y8b): kaydı görebilen okur da izni yoksa değerini göremez.
+            var hidden = catalog.HiddenFields(entry.EntityKey, viewer.Permissions);
+
             // Alanlar modülün tanım sırasıyla (ör. önce ad); tanımsız alanlar sonda.
             var order = entity?.Fields.Keys.Select((key, index) => (key, index)).ToDictionary(p => p.key, p => p.index) ?? [];
             var fields = changes.OrderBy(change => order.GetValueOrDefault(change.Key, int.MaxValue)).Select(change =>
@@ -243,6 +246,11 @@ internal sealed class AuditLog(
                 if (!visible)
                 {
                     return new AuditFieldChange(change.Key, label, null, null);
+                }
+
+                if (hidden.Contains(change.Key))
+                {
+                    return new AuditFieldChange(change.Key, label, null, null, Hidden: true);
                 }
 
                 var values = change.Value as JsonObject;

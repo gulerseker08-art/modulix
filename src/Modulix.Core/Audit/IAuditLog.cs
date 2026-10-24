@@ -19,9 +19,10 @@ public sealed record AuditQuery(
 
 /// <summary>
 /// Değişen bir alan, gösterime hazır: <see cref="Label"/> alanın görünen adı; değerler seçenek adı, kişi adı veya bağlı
-/// kaydın adıyla çözülmüştür. Değerler gizliyse ikisi de boştur.
+/// kaydın adıyla çözülmüştür. Değerler gizliyse ikisi de boştur. <see cref="Hidden"/>: alan hassas ve okur onu göremez
+/// (Y8b); satırın diğer alanları görünebilir.
 /// </summary>
-public sealed record AuditFieldChange(string Field, string Label, string? Old, string? New);
+public sealed record AuditFieldChange(string Field, string Label, string? Old, string? New, bool Hidden = false);
 
 /// <summary>
 /// Denetim kaydının bir satırı. <see cref="ValuesHidden"/>: okurun bu kayıt türünü görüntüleme izni yok; değişen

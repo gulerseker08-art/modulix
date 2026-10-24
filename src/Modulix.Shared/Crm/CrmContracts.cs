@@ -19,6 +19,7 @@ public static class CrmAccess
     public const string ContactsRead = "crm.contacts.read";
     public const string ContactsWrite = "crm.contacts.write";
     public const string OpportunitiesRead = "crm.opportunities.read";
+    public const string OpportunityAmountsRead = "crm.opportunity-amounts.read";
     public const string OpportunitiesWrite = "crm.opportunities.write";
     public const string ActivitiesRead = "crm.activities.read";
     public const string ActivitiesWrite = "crm.activities.write";

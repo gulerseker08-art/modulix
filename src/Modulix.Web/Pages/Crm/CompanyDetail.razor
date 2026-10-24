@@ -47,12 +47,12 @@
             <div class="summary-item">
                 <span>Açık fırsatlar</span>
                 <strong>@OpenOpportunities.Count()</strong>
-                <small>@Totals(OpenOpportunities)</small>
+                @if (Session.Can(CrmAccess.OpportunityAmountsRead)) { <small>@Totals(OpenOpportunities)</small> }
             </div>
             <div class="summary-item">
                 <span>Kazanılan</span>
                 <strong>@WonOpportunities.Count()</strong>
-                <small>@Totals(WonOpportunities)</small>
+                @if (Session.Can(CrmAccess.OpportunityAmountsRead)) { <small>@Totals(WonOpportunities)</small> }
             </div>
             <div class="summary-item">
                 <span>Açık aktiviteler</span>

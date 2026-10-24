@@ -133,7 +133,7 @@ public static class AuditEndpoints
         (AuditOperation)item.Action,
         (AuditSource)item.Source,
         item.ValuesHidden,
-        item.Changes.Select(c => new AuditFieldChangeDto(c.Field, c.Label, c.Old, c.New)).ToList());
+        item.Changes.Select(c => new AuditFieldChangeDto(c.Field, c.Label, c.Old, c.New, c.Hidden)).ToList());
 
     private static void AppendRow(StringBuilder csv, IEnumerable<string?> cells)
     {
