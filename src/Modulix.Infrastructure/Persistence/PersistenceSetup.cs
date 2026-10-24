@@ -1,12 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Audit;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
+using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Modules;
 using Modulix.Infrastructure.Platform;
@@ -60,6 +62,9 @@ public static class PersistenceSetup
 
         // Platform yönetimi (Y4); ITenantScopeFactory'yi host kaydeder (tenant bağlamını o kurar).
         services.AddScoped<IPlatformAdministration, PlatformAdministration>();
+
+        // Denetim kaydı okuma (Y5).
+        services.AddScoped<IAuditLog, AuditLog>();
         return services;
     }
 

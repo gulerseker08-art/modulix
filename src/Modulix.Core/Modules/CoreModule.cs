@@ -31,4 +31,51 @@ public sealed class CoreModule : IModule
         new(Permissions.ManageSettings, "Firma ayarlarını değiştirir", "Firma ayarları"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
     ];
+
+    /// <summary>Denetim kayıt türleri (Y5). Yönetim kayıtlarının değerleri her denetim okuruna açıktır.</summary>
+    public static class AuditedEntityKeys
+    {
+        public const string Role = "core.role";
+        public const string Membership = "core.membership";
+        public const string Tenant = "core.tenant";
+        public const string TenantSetting = "core.tenant-setting";
+        public const string Audit = "core.audit";
+    }
+
+    IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
+    [
+        new(AuditedEntityKeys.Role, "Rol", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["permissions"] = "İzinler", ["isSystem"] = "Sistem rolü",
+        }, "name"),
+        new(AuditedEntityKeys.Membership, "Kullanıcı", null, new Dictionary<string, string>
+        {
+            ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["status"] = "Durum", ["roles"] = "Roller",
+            ["invitedAt"] = "Davet", ["lockedOut"] = "Kilit", ["passwordResetRequestedAt"] = "Şifre sıfırlama bağlantısı",
+        }, "displayName")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string> { ["Active"] = "Etkin", ["Disabled"] = "Devre dışı", ["Invited"] = "Davet bekliyor" },
+            },
+        },
+        new(AuditedEntityKeys.Tenant, "Firma bilgileri", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["slug"] = "Kısa ad", ["status"] = "Durum", ["modules"] = "Açık modüller", ["roles"] = "Hazır roller",
+        }, "name")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string> { ["Active"] = "Açık", ["Closed"] = "Kapalı" },
+            },
+        },
+        new(AuditedEntityKeys.TenantSetting, "Firma ayarı", null, new Dictionary<string, string>
+        {
+            ["key"] = "Ayar", ["value"] = "Değer",
+        }, "key"),
+        new(AuditedEntityKeys.Audit, "Denetim kaydı", null, new Dictionary<string, string>
+        {
+            ["filters"] = "Filtreler", ["rows"] = "Satır sayısı",
+        }),
+    ];
 }

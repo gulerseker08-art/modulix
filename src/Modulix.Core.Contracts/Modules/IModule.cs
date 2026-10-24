@@ -35,6 +35,12 @@ public interface IModule
     /// </summary>
     IReadOnlyList<RoleTemplate> RoleTemplates => [];
 
+    /// <summary>
+    /// Denetim kaydı ekranında (Y5) gösterilen kayıt türleri: türün ve alanların görünen adları. Listede olmayan tür
+    /// teknik adıyla gösterilir. Anahtar modül anahtarıyla başlar.
+    /// </summary>
+    IReadOnlyList<AuditedEntity> AuditedEntities => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {
@@ -64,3 +70,28 @@ public sealed record OwnedRecordType(string EntityKey, string Label, IReadOnlyDi
 /// <see cref="Permissions"/> modülün kendi izinleridir. Şablondan oluşturulan rol sıradan bir roldür; şablona bağlı kalmaz.
 /// </summary>
 public sealed record RoleTemplate(string Key, string Name, string Description, IReadOnlyList<string> Permissions);
+
+/// <summary>
+/// Denetim kaydında bir kayıt türü (Y5). <see cref="Fields"/>: alanın teknik adı → görünen adı (ör. "status" → "Durum").
+/// <see cref="ReadPermission"/>: bu izni olmayan denetim okuru satırı görür ama alan değerleri gizlidir (yönetici her
+/// şeyi görür); boşsa değerler her denetim okuruna açıktır. <see cref="TitleField"/>: kaydın adını taşıyan alan
+/// (ad birden fazla alandan oluşuyorsa <see cref="TitleFields"/>, ör. ad ve soyad).
+/// <see cref="Options"/>: seçenekli alanlarda değer → görünen ad. <see cref="UserFields"/>: değeri kullanıcı kimliği
+/// olan alanlar (ad gösterilir). <see cref="References"/>: değeri başka bir kaydın kimliği olan alanlar → o kaydın türü.
+/// </summary>
+public sealed record AuditedEntity(
+    string EntityKey,
+    string DisplayName,
+    string? ReadPermission,
+    IReadOnlyDictionary<string, string> Fields,
+    string? TitleField = null)
+{
+    public IReadOnlyList<string> TitleFields { get; init; } = TitleField is null ? [] : [TitleField];
+
+    public IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Options { get; init; } =
+        new Dictionary<string, IReadOnlyDictionary<string, string>>();
+
+    public IReadOnlyCollection<string> UserFields { get; init; } = [];
+
+    public IReadOnlyDictionary<string, string> References { get; init; } = new Dictionary<string, string>();
+}

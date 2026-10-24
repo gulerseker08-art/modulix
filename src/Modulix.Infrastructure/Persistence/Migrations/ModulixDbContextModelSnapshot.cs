@@ -442,6 +442,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TenantId", "OccurredAt");
+
+                    b.HasIndex("TenantId", "UserId", "OccurredAt");
+
                     b.HasIndex("TenantId", "EntityKey", "RecordId", "OccurredAt");
 
                     b.ToTable("AuditLog", "core");

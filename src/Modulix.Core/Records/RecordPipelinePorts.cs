@@ -46,6 +46,9 @@ public enum AuditAction
     Created = 1,
     Updated = 2,
     Deleted = 3,
+
+    /// <summary>Kayıtlar dışa aktarıldı (ör. denetim kaydının CSV'si, Y5).</summary>
+    Exported = 4,
 }
 
 /// <summary>Audit kaydı: kim, ne, ne zaman. <see cref="Changes"/>: alan → { old, new }.</summary>

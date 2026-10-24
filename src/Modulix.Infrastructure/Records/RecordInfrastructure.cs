@@ -114,6 +114,10 @@ internal sealed class AuditLogEntryConfiguration : IEntityTypeConfiguration<Audi
         builder.Property(a => a.Changes).IsRequired();
         builder.Property(a => a.CorrelationId).HasMaxLength(AuditLogEntry.CorrelationIdMaxLength);
         builder.HasIndex(a => new { a.TenantId, a.EntityKey, a.RecordId, a.OccurredAt });
+
+        // Denetim kaydı ekranı (Y5): en yeni üstte, kullanıcıya göre filtre.
+        builder.HasIndex(a => new { a.TenantId, a.OccurredAt });
+        builder.HasIndex(a => new { a.TenantId, a.UserId, a.OccurredAt });
     }
 }
 

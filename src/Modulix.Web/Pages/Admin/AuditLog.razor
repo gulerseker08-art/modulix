@@ -1,0 +1,214 @@
+@page "/yonetim/denetim"
+@inject ApiClient Api
+
+<PageTitle>Denetim kaydı · Modulix</PageTitle>
+
+@* Denetim kaydı (Y5): kim, neyi, ne zaman, nereden değiştirdi. Yalnızca okunur; kayıtlar değiştirilemez. Okurun
+   görüntüleme izni olmayan kayıt türlerinde değişen alanların adları görünür, değerleri gizlidir. *@
+<AuthGate Permission="@CoreAccess.ReadAudit">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Denetim kaydı</h1>
+        <a class="btn btn-outline-primary" href="@ExportUrl" download>CSV indir</a>
+    </div>
+    <p class="text-muted">Kayıtlar değiştirilemez ve silinemez. CSV en fazla 50.000 kayıt içerir; fazlası için tarih aralığını daraltın.</p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <form class="audit-filters" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <div>
+            <label class="form-label" for="auditUser">Kullanıcı</label>
+            <select id="auditUser" class="form-select" @bind="userId">
+                <option value="">Herkes</option>
+                @foreach (var user in filters?.Users ?? [])
+                {
+                    <option value="@user.UserId">@user.Name</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="auditType">Kayıt türü</label>
+            <select id="auditType" class="form-select" @bind="entityKey">
+                <option value="">Tümü</option>
+                @foreach (var type in filters?.EntityTypes ?? [])
+                {
+                    <option value="@type.Key">@type.Name</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="auditAction">İşlem</label>
+            <select id="auditAction" class="form-select" @bind="action">
+                <option value="">Tümü</option>
+                @foreach (var value in Enum.GetValues<AuditOperation>())
+                {
+                    <option value="@value">@AuditText.Of(value)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="auditSource">Kaynak</label>
+            <select id="auditSource" class="form-select" @bind="source">
+                <option value="">Tümü</option>
+                @foreach (var value in Enum.GetValues<AuditSource>())
+                {
+                    <option value="@value">@AuditText.Of(value)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="auditFrom">Başlangıç</label>
+            <input id="auditFrom" class="form-control" type="date" @bind="from" />
+        </div>
+        <div>
+            <label class="form-label" for="auditTo">Bitiş</label>
+            <input id="auditTo" class="form-control" type="date" @bind="to" />
+        </div>
+        <div class="audit-filter-actions">
+            <button type="submit" class="btn btn-primary">Filtrele</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="ClearAsync">Temizle</button>
+        </div>
+    </form>
+
+    @if (page is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Bu filtreye uyan kayıt yok.</p>
+    }
+    else
+    {
+        <table class="table record-table audit-table">
+            <thead>
+                <tr><th>Tarih</th><th>Kullanıcı</th><th>Kayıt türü</th><th>Kayıt</th><th>İşlem</th><th>Kaynak</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in page.Items)
+                {
+                    var open = expanded.Contains(entry.Id);
+                    <tr class="audit-row @(open ? "is-open" : null)" @onclick="() => Toggle(entry.Id)">
+                        <td data-label="Tarih">
+                            <button type="button" class="link-button" aria-expanded="@(open ? "true" : "false")">@CrmLabels.Time(entry.OccurredAt)</button>
+                        </td>
+                        <td data-label="Kullanıcı">@entry.UserName</td>
+                        <td data-label="Kayıt türü">@entry.EntityName</td>
+                        <td data-label="Kayıt" class="primary">@RecordTitle(entry)</td>
+                        <td data-label="İşlem">@AuditText.Of(entry.Action)</td>
+                        <td data-label="Kaynak">@AuditText.Of(entry.Source)</td>
+                    </tr>
+                    @if (open)
+                    {
+                        <tr class="audit-detail">
+                            <td colspan="6">
+                                @if (entry.ValuesHidden)
+                                {
+                                    <p class="text-muted">Bu kayıt türünü görüntüleme izniniz yok; yalnızca değişen alanlar gösteriliyor.</p>
+                                }
+                                @if (entry.Changes.Count == 0)
+                                {
+                                    <p class="text-muted">Alan değişikliği yok.</p>
+                                }
+                                else
+                                {
+                                    <table class="table table-sm audit-changes">
+                                        <thead><tr><th>Alan</th><th>Eski değer</th><th>Yeni değer</th></tr></thead>
+                                        <tbody>
+                                            @foreach (var change in entry.Changes)
+                                            {
+                                                <tr>
+                                                    <td>@change.Label</td>
+                                                    <td>@Value(entry, change.Old)</td>
+                                                    <td>@Value(entry, change.New)</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private AuditPageResponse? page;
+    private AuditFiltersResponse? filters;
+    private readonly HashSet<Guid> expanded = [];
+    private Guid? userId;
+    private string? entityKey;
+    private AuditOperation? action;
+    private AuditSource? source;
+    private DateOnly? from;
+    private DateOnly? to;
+    private string? message;
+
+    private string ExportUrl => $"api/audit/export?{Filters()}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<AuditFiltersResponse>("/api/audit/filters");
+        filters = result.Value;
+        message = result.Error;
+        if (result.IsSuccess)
+        {
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        expanded.Clear();
+        var result = await Api.GetAsync<AuditPageResponse>($"/api/audit?page={pageNumber}&{Filters()}");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private async Task ClearAsync()
+    {
+        userId = null;
+        entityKey = null;
+        action = null;
+        source = null;
+        from = to = null;
+        await LoadAsync(1);
+    }
+
+    private void Toggle(Guid id)
+    {
+        if (!expanded.Remove(id))
+        {
+            expanded.Add(id);
+        }
+    }
+
+    private string Filters()
+    {
+        var parts = new List<string>();
+        if (userId is { } u) parts.Add($"userId={u}");
+        if (!string.IsNullOrEmpty(entityKey)) parts.Add($"entityKey={Uri.EscapeDataString(entityKey)}");
+        if (action is { } a) parts.Add($"action={a}");
+        if (source is { } s) parts.Add($"source={s}");
+        if (from is { } f) parts.Add($"from={f:yyyy-MM-dd}");
+        if (to is { } t) parts.Add($"to={t:yyyy-MM-dd}");
+        return string.Join('&', parts);
+    }
+
+    private static string RecordTitle(AuditEntryDto entry) =>
+        entry.ValuesHidden ? "Gizli" : entry.RecordTitle ?? "—";
+
+    private static string Value(AuditEntryDto entry, string? value) =>
+        entry.ValuesHidden ? "Gizli" : string.IsNullOrEmpty(value) ? "—" : value;
+}
