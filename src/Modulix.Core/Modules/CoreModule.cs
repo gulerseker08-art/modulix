@@ -108,6 +108,7 @@ public sealed class CoreModule : IModule
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["status"] = "Durum", ["roles"] = "Roller",
             ["invitedAt"] = "Davet", ["lockedOut"] = "Kilit", ["passwordResetRequestedAt"] = "Şifre sıfırlama bağlantısı",
+            ["sessionsClosedAt"] = "Oturumları kapatıldı",
         }, "displayName")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
@@ -133,9 +134,10 @@ public sealed class CoreModule : IModule
         {
             ["filters"] = "Filtreler", ["rows"] = "Satır sayısı",
         }),
-        new(AuditedEntityKeys.Account, "Oturum", null, new Dictionary<string, string>
+        new(AuditedEntityKeys.Account, "Hesap", null, new Dictionary<string, string>
         {
-            ["email"] = "E-posta", ["ip"] = "IP adresi", ["userAgent"] = "Tarayıcı", ["reason"] = "Neden",
+            ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["ip"] = "IP adresi", ["userAgent"] = "Tarayıcı",
+            ["reason"] = "Neden", ["sessions"] = "Kapatılan oturum",
         }, "email")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>

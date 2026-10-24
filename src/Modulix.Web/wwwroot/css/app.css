@@ -1150,3 +1150,32 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
     padding: 0.25rem;
     background: #fff;
 }
+
+/* Hesabım (Y7a). */
+.session-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+}
+
+.session-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--mx-border);
+}
+
+.session-item:last-child {
+    border-bottom: 0;
+}
+
+.session-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.session-link:hover {
+    text-decoration: underline;
+}

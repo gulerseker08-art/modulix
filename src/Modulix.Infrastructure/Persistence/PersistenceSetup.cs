@@ -11,6 +11,7 @@ using Modulix.Core.Platform;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Authorization;
+using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Modules;
 using Modulix.Infrastructure.Platform;
 using Modulix.Infrastructure.Settings;
@@ -61,6 +62,9 @@ public static class PersistenceSetup
         services.AddScoped<IUserAdministration>(sp => sp.GetRequiredService<UserAdministration>());
         services.AddScoped<AccountLinks>();
         services.AddScoped<AccountAudit>();
+        services.AddScoped<UserSessions>();
+        services.AddScoped<AccountSecurity>();
+        services.AddMemoryCache();
         services.AddScoped<RecordHandover>();
 
         // Platform yönetimi (Y4); ITenantScopeFactory'yi host kaydeder (tenant bağlamını o kurar).

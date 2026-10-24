@@ -35,6 +35,8 @@ public static class UserEndpoints
             Run(() => admin.EnableAsync(membershipId, ct)));
         users.MapPost("/{membershipId:guid}/password-reset", (Guid membershipId, HttpContext http, IUserAdministration admin, CancellationToken ct) =>
             Run(() => admin.SendPasswordResetAsync(membershipId, PublicUrl.Resolve(http), ct)));
+        users.MapPost("/{membershipId:guid}/close-sessions", (Guid membershipId, IUserAdministration admin, CancellationToken ct) =>
+            Run(() => admin.CloseSessionsAsync(membershipId, ct)));
         users.MapPost("/{membershipId:guid}/unlock", (Guid membershipId, IUserAdministration admin, CancellationToken ct) =>
             Run(() => admin.UnlockAsync(membershipId, ct)));
 

@@ -1,4 +1,5 @@
 using Modulix.Api.Access;
+using Modulix.Api.Account;
 using Modulix.Api.Audit;
 using Modulix.Api.Auth;
 using Modulix.Api.Crm;
@@ -48,6 +49,9 @@ builder.Services.AddHostedService<EmailDispatchWorker>();
 
 // Kullanıcı yönetimi: davet sınırı "Users" bölümünde; e-postadaki bağlantıların kökü App:PublicUrl (üretimde zorunlu).
 builder.Services.Configure<UserAdministrationOptions>(builder.Configuration.GetSection(UserAdministrationOptions.SectionName));
+
+// Hesap güvenliği (Y7a): "Şifremi unuttum" sınırları "Account" bölümünde.
+builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection(AccountOptions.SectionName));
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ModulixDbContext>("database");
 
@@ -102,6 +106,7 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapAuthEndpoints();
+app.MapAccountEndpoints();
 app.MapTenantEndpoints();
 app.MapAccessEndpoints();
 app.MapUserEndpoints();

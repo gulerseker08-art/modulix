@@ -132,6 +132,12 @@ public interface IUserAdministration
     Task UnlockAsync(Guid membershipId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Kişinin tüm açık oturumlarını kapatır (Y7a). Oturum firmaya bağlı olmadığından diğer firmalardaki oturumu da
+    /// kapanır. Yönetici rolündeki kişinin oturumlarını yalnızca yönetici kapatabilir.
+    /// </summary>
+    Task CloseSessionsAsync(Guid membershipId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Üyeliğin rollerini değiştirir (<see cref="Authorization.IRoleService.SetMembershipRolesAsync"/>); yönetici kuralını
     /// uygular.
     /// </summary>

@@ -11,6 +11,8 @@ using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Settings;
 using Modulix.Infrastructure.Users;
+using Modulix.Api.Users;
+using Modulix.Shared.Account;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Users;
 
@@ -46,17 +48,43 @@ public static class AuthSetup
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return Task.CompletedTask;
             };
+
+            // Güvenlik damgasının yanında sunucudaki oturum da denetlenir: kapatılan oturumun çerezi hemen geçersizdir (Y7a).
+            options.Events.OnValidatePrincipal = async context =>
+            {
+                await SecurityStampValidator.ValidatePrincipalAsync(context);
+                if (context.Principal is not { } principal)
+                {
+                    return;
+                }
+
+                var sessions = context.HttpContext.RequestServices.GetRequiredService<UserSessions>();
+                if (AuthEndpoints.SessionId(principal) is not { } sessionId
+                    || !Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+                    || !await sessions.ValidateAsync(sessionId, userId, context.HttpContext.RequestAborted))
+                {
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+                }
+            };
         });
 
-        // Oturum düzenli aralıklarla yenilenirken aktif tenant iddiası korunur (her istekte yine doğrulanır).
+        // Oturum düzenli aralıklarla yenilenirken aktif tenant ve oturum iddiaları korunur (her istekte yine doğrulanır).
         services.Configure<SecurityStampValidatorOptions>(options =>
         {
             options.OnRefreshingPrincipal = context =>
             {
-                var tenantClaim = context.CurrentPrincipal?.FindFirst(ModulixClaimTypes.TenantId);
-                if (tenantClaim is not null && context.NewPrincipal?.Identity is ClaimsIdentity identity)
+                if (context.NewPrincipal?.Identity is not ClaimsIdentity identity)
                 {
-                    identity.AddClaim(new Claim(tenantClaim.Type, tenantClaim.Value));
+                    return Task.CompletedTask;
+                }
+
+                foreach (var type in new[] { ModulixClaimTypes.TenantId, ModulixClaimTypes.SessionId })
+                {
+                    if (context.CurrentPrincipal?.FindFirst(type) is { } claim)
+                    {
+                        identity.AddClaim(new Claim(claim.Type, claim.Value));
+                    }
                 }
 
                 return Task.CompletedTask;
@@ -102,6 +130,10 @@ public static class AuthEndpoints
         group.MapPost("/accept-invitation", AcceptInvitationAsync).AllowAnonymous();
         group.MapPost("/reset-password", ResetPasswordAsync).AllowAnonymous();
 
+        // Hesap güvenliği (Y7a): "Şifremi unuttum" ve e-posta değişikliğinin onay bağlantısı.
+        group.MapPost("/forgot-password", ForgotPasswordAsync).AllowAnonymous();
+        group.MapPost("/confirm-email-change", ConfirmEmailChangeAsync).AllowAnonymous();
+
         return app;
     }
 
@@ -113,6 +145,7 @@ public static class AuthEndpoints
         IMembershipDirectory directory,
         AccountAudit audit,
         TenantDisplayNames names,
+        UserSessions sessions,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrEmpty(request.Password))
@@ -157,12 +190,18 @@ public static class AuthEndpoints
             await audit.RecordAsync(user, AuditAction.SignedIn, [active.TenantId], client, ct);
         }
 
-        await IssueSessionAsync(http, signIn, user, active?.TenantId);
+        await IssueSessionAsync(http, signIn, user, active?.TenantId, await sessions.StartAsync(user.Id, client, ct));
         return Results.Ok(await ToResponseAsync(user, active?.TenantId, memberships, names, ct));
     }
 
-    private static async Task<IResult> LogoutAsync(SignInManager<ModulixUser> signIn)
+    private static async Task<IResult> LogoutAsync(
+        ClaimsPrincipal principal, UserManager<ModulixUser> users, SignInManager<ModulixUser> signIn, UserSessions sessions, CancellationToken ct)
     {
+        if (SessionId(principal) is { } sessionId && Guid.TryParse(users.GetUserId(principal), out var userId))
+        {
+            await sessions.CloseAsync(userId, sessionId, ct);
+        }
+
         await signIn.SignOutAsync();
         return Results.NoContent();
     }
@@ -212,7 +251,7 @@ public static class AuthEndpoints
         // Firma seçmek o firmaya giriştir; denetim kaydına yalnızca seçilen firmada yazılır.
         await directory.RecordSignInAsync(membership.MembershipId, ct);
         await audit.RecordAsync(user, AuditAction.SignedIn, [membership.TenantId], Client(http), ct);
-        await IssueSessionAsync(http, signIn, user, membership.TenantId);
+        await IssueSessionAsync(http, signIn, user, membership.TenantId, SessionId(principal)!.Value);
         var memberships = await directory.GetActiveForUserAsync(user.Id, ct);
         return Results.Ok(await ToResponseAsync(user, membership.TenantId, memberships, names, ct));
     }
@@ -231,6 +270,7 @@ public static class AuthEndpoints
         IMembershipDirectory directory,
         AccountAudit audit,
         TenantDisplayNames names,
+        UserSessions sessions,
         CancellationToken ct)
     {
         var result = await links.AcceptInvitationAsync(request.MembershipId, request.Token, request.Password, ct);
@@ -250,7 +290,7 @@ public static class AuthEndpoints
             await directory.RecordSignInAsync(active.MembershipId, ct);
         }
 
-        await IssueSessionAsync(http, signIn, user, active?.TenantId);
+        await IssueSessionAsync(http, signIn, user, active?.TenantId, await sessions.StartAsync(user.Id, Client(http), ct));
         return Results.Ok(await ToResponseAsync(user, active?.TenantId, memberships, names, ct));
     }
 
@@ -261,7 +301,7 @@ public static class AuthEndpoints
         if (!result.Succeeded)
         {
             return result.InvalidLink
-                ? InvalidLink("Şifre sıfırlama bağlantısı geçersiz, kullanılmış veya süresi dolmuş. Yöneticinizden yeni bağlantı isteyin.")
+                ? InvalidLink("Şifre sıfırlama bağlantısı geçersiz, kullanılmış veya süresi dolmuş. Giriş sayfasındaki \"Şifremi unuttum\" ile yeni bağlantı isteyin.")
                 : WeakPassword(result);
         }
 
@@ -269,13 +309,36 @@ public static class AuthEndpoints
         return Results.NoContent();
     }
 
-    private static AccountClient Client(HttpContext http) =>
+    /// <summary>Hesap olsun olmasın aynı yanıt (202) döner; yalnızca IP sınırı aşılırsa 429.</summary>
+    private static async Task<IResult> ForgotPasswordAsync(
+        ForgotPasswordRequest request, HttpContext http, AccountSecurity account, CancellationToken ct) =>
+        await account.RequestPasswordResetAsync(request.Email, PublicUrl.Resolve(http), Client(http), ct) == ForgotPasswordResult.TooManyRequests
+            ? Results.Problem(statusCode: StatusCodes.Status429TooManyRequests, title: "Çok sayıda istek yapıldı. Bir süre sonra tekrar deneyin.")
+            : Results.Accepted();
+
+    private static async Task<IResult> ConfirmEmailChangeAsync(
+        ConfirmEmailChangeRequest request, HttpContext http, AccountSecurity account, CancellationToken ct) =>
+        await account.ConfirmEmailChangeAsync(request.UserId, request.Email, request.Token, PublicUrl.Resolve(http), Client(http), ct) switch
+        {
+            EmailChangeResult.Changed => Results.NoContent(),
+            EmailChangeResult.AddressUnavailable => InvalidLink("Bu e-posta adresi kullanılamıyor. Hesabınızın e-postası değişmedi."),
+            _ => InvalidLink("Onay bağlantısı geçersiz, kullanılmış veya süresi dolmuş. Hesabım sayfasından yeniden isteyin."),
+        };
+
+    internal static Guid? SessionId(ClaimsPrincipal principal) =>
+        Guid.TryParse(principal.FindFirstValue(ModulixClaimTypes.SessionId), out var id) ? id : null;
+
+    internal static AccountClient Client(HttpContext http) =>
         new(http.Connection.RemoteIpAddress?.ToString(), http.Request.Headers.UserAgent.ToString() is { Length: > 0 } agent ? agent : null);
 
-    private static async Task IssueSessionAsync(HttpContext http, SignInManager<ModulixUser> signIn, ModulixUser user, Guid? tenantId)
+    /// <summary>Oturum çerezini yazar; şifre değişince (güvenlik damgası yenilenir) aynı oturumla yeniden yazılır.</summary>
+    internal static async Task IssueSessionAsync(
+        HttpContext http, SignInManager<ModulixUser> signIn, ModulixUser user, Guid? tenantId, Guid sessionId)
     {
         var principal = await signIn.CreateUserPrincipalAsync(user);
-        if (tenantId is { } id && principal.Identity is ClaimsIdentity identity)
+        var identity = (ClaimsIdentity)principal.Identity!;
+        identity.AddClaim(new Claim(ModulixClaimTypes.SessionId, sessionId.ToString()));
+        if (tenantId is { } id)
         {
             identity.AddClaim(new Claim(ModulixClaimTypes.TenantId, id.ToString()));
         }

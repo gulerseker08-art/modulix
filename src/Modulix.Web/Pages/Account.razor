@@ -1,0 +1,228 @@
+@page "/hesabim"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Hesabım · Modulix</PageTitle>
+
+@* Kişinin kendi hesabı (Y7a). Bilgiler kişiye aittir: değişiklik üye olduğu bütün kuruluşlarda geçerlidir. *@
+<AuthGate>
+    <h1>Hesabım</h1>
+    <p class="text-muted">Bu bilgiler size aittir; birden fazla kuruluşta çalışıyorsanız hepsinde geçerlidir.</p>
+
+    @if (loadError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@loadError</div>
+    }
+    else if (profile is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else
+    {
+        <form class="record-form settings-group" novalidate @onsubmit="SaveNameAsync" @onsubmit:preventDefault>
+            <h2>Profil</h2>
+            <Notice Text="@nameNotice" Failed="nameFailed" />
+            <div class="mb-3">
+                <label class="form-label" for="displayName">Ad soyad</label>
+                <input id="displayName" class="form-control" maxlength="200" autocomplete="name" @bind="displayName" @bind:event="oninput" />
+                <FieldError Field="displayName" Errors="nameErrors" />
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || displayName.Trim() == profile.DisplayName)">Kaydet</button>
+            </div>
+        </form>
+
+        <form class="record-form settings-group" novalidate @onsubmit="ChangeEmailAsync" @onsubmit:preventDefault>
+            <h2>E-posta</h2>
+            <Notice Text="@emailNotice" Failed="emailFailed" />
+            <p>Giriş e-postanız: <strong>@profile.Email</strong></p>
+            <div class="form-grid">
+                <div class="mb-3">
+                    <label class="form-label" for="newEmail">Yeni e-posta</label>
+                    <input id="newEmail" class="form-control" type="email" autocomplete="email" @bind="newEmail" @bind:event="oninput" />
+                    <FieldError Field="email" Errors="emailErrors" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="emailPassword">Mevcut şifre</label>
+                    <input id="emailPassword" class="form-control" type="password" autocomplete="current-password" @bind="emailPassword" />
+                    <FieldError Field="currentPassword" Errors="emailErrors" />
+                </div>
+            </div>
+            <div class="form-text mb-3">Yeni adrese bir onay bağlantısı gönderilir. E-postanız bağlantıyı açtığınızda değişir; eski adresinize de bilgi verilir.</div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(newEmail))">Onay bağlantısı gönder</button>
+            </div>
+        </form>
+
+        <section class="record-form settings-group">
+            <h2>Şifre</h2>
+            <Notice Text="@passwordNotice" Failed="passwordFailed" />
+            <div class="mb-3">
+                <label class="form-label" for="currentPassword">Mevcut şifre</label>
+                <input id="currentPassword" class="form-control" type="password" autocomplete="current-password" @bind="currentPassword" />
+                <FieldError Field="currentPassword" Errors="passwordErrors" />
+            </div>
+            <PasswordForm @key="passwordFormKey" Email="@profile.Email" Errors="passwordErrors" Busy="busy" Submit="ChangePasswordAsync" ButtonText="Şifremi değiştir" />
+            <div class="form-text">Şifre değişince bu oturum açık kalır, diğer cihazlardaki oturumlarınız kapanır.</div>
+        </section>
+
+        <section class="record-form settings-group">
+            <h2>Açık oturumlar</h2>
+            <Notice Text="@sessionNotice" Failed="sessionFailed" />
+            @if (sessions is null)
+            {
+                <p class="text-muted">Yükleniyor…</p>
+            }
+            else
+            {
+                <ul class="session-list">
+                    @foreach (var session in sessions)
+                    {
+                        <li class="session-item">
+                            <div>
+                                <strong>@session.Device</strong>
+                                @if (session.IsCurrent)
+                                {
+                                    <span class="badge user-active ms-1">Bu oturum</span>
+                                }
+                                <div class="text-muted small">
+                                    @(session.IpAddress ?? "IP bilinmiyor") · Son etkinlik @CrmLabels.Time(session.LastSeenAt) · Giriş @CrmLabels.Time(session.CreatedAt)
+                                </div>
+                            </div>
+                            @if (!session.IsCurrent)
+                            {
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => CloseAsync(session)">Kapat</button>
+                            }
+                        </li>
+                    }
+                </ul>
+                @if (sessions.Count > 1)
+                {
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="CloseOthersAsync">Diğer tüm oturumları kapat</button>
+                    </div>
+                }
+            }
+        </section>
+    }
+</AuthGate>
+
+@code {
+    private AccountProfileResponse? profile;
+    private List<SessionDto>? sessions;
+    private string? loadError;
+    private bool busy;
+
+    private string displayName = string.Empty;
+    private string? nameNotice;
+    private bool nameFailed;
+    private IReadOnlyDictionary<string, string[]>? nameErrors;
+
+    private string newEmail = string.Empty;
+    private string emailPassword = string.Empty;
+    private string? emailNotice;
+    private bool emailFailed;
+    private IReadOnlyDictionary<string, string[]>? emailErrors;
+
+    private string currentPassword = string.Empty;
+    private int passwordFormKey;
+    private string? passwordNotice;
+    private bool passwordFailed;
+    private IReadOnlyDictionary<string, string[]>? passwordErrors;
+
+    private string? sessionNotice;
+    private bool sessionFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<AccountProfileResponse>("/api/account");
+        loadError = result.Error;
+        if (result.Value is { } loaded)
+        {
+            profile = loaded;
+            displayName = loaded.DisplayName;
+            await LoadSessionsAsync();
+        }
+    }
+
+    private async Task LoadSessionsAsync() =>
+        sessions = (await Api.GetAsync<List<SessionDto>>("/api/account/sessions")).Value ?? [];
+
+    private async Task SaveNameAsync()
+    {
+        busy = true;
+        var result = await Api.PutAsync<AccountProfileResponse>("/api/account/profile", new UpdateProfileRequest(displayName));
+        busy = false;
+        nameErrors = result.FieldErrors;
+        if (result.Value is { } saved)
+        {
+            profile = saved;
+            displayName = saved.DisplayName;
+            (nameNotice, nameFailed) = ("Kaydedildi.", false);
+
+            // Üst çubuktaki ad yenilenir.
+            await Session.RefreshAsync();
+        }
+        else
+        {
+            (nameNotice, nameFailed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+        }
+    }
+
+    private async Task ChangeEmailAsync()
+    {
+        busy = true;
+        var email = newEmail.Trim();
+        var result = await Api.PostAsync<bool>("/api/account/email", new ChangeEmailRequest(email, emailPassword));
+        busy = false;
+        emailErrors = result.FieldErrors;
+        if (result.IsSuccess)
+        {
+            (emailNotice, emailFailed) = ($"Onay bağlantısı {email} adresine gönderildi. Bağlantıyı açtığınızda e-postanız değişir.", false);
+            (newEmail, emailPassword) = (string.Empty, string.Empty);
+        }
+        else
+        {
+            (emailNotice, emailFailed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+        }
+    }
+
+    private async Task ChangePasswordAsync(string password)
+    {
+        busy = true;
+        var result = await Api.PostAsync<bool>("/api/account/password", new ChangePasswordRequest(currentPassword, password));
+        busy = false;
+        passwordErrors = result.FieldErrors;
+        if (result.IsSuccess)
+        {
+            (passwordNotice, passwordFailed) = ("Şifreniz değişti. Diğer cihazlardaki oturumlarınız kapatıldı.", false);
+            currentPassword = string.Empty;
+            passwordFormKey++;
+            await LoadSessionsAsync();
+        }
+        else
+        {
+            (passwordNotice, passwordFailed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+        }
+    }
+
+    private async Task CloseAsync(SessionDto session)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/account/sessions/{session.Id}");
+        busy = false;
+        (sessionNotice, sessionFailed) = result.IsSuccess ? ($"{session.Device} oturumu kapatıldı.", false) : (result.Error, true);
+        await LoadSessionsAsync();
+    }
+
+    private async Task CloseOthersAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<CloseSessionsResponse>("/api/account/sessions/close-others", new { });
+        busy = false;
+        (sessionNotice, sessionFailed) = result.Value is { } closed
+            ? ($"{closed.Closed} oturum kapatıldı.", false)
+            : (result.Error, true);
+        await LoadSessionsAsync();
+    }
+}

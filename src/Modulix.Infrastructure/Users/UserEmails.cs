@@ -43,6 +43,44 @@ internal static class UserEmails
             ("Yeni şifre belirle", link),
             "Bu isteği beklemiyorsanız şifreniz değişmez; e-postayı yok sayabilirsiniz.");
 
+    /// <summary>Kişinin kendi istediği şifre sıfırlama bağlantısı (Y7a, "Şifremi unuttum").</summary>
+    public static EmailMessage ForgotPassword(string to, string displayName, string link) =>
+        Build(
+            to,
+            displayName,
+            "Modülix şifre sıfırlama bağlantınız",
+            [
+                "Modülix hesabınız için şifre sıfırlama bağlantısı istendi.",
+                "Yeni şifrenizi belirlemek için bağlantıyı açın. Bağlantı 24 saat geçerlidir ve bir kez kullanılabilir. "
+                + "Hesabınızı birden fazla kuruluşta kullanıyorsanız yeni şifre hepsinde geçerli olur.",
+            ],
+            ("Yeni şifre belirle", link),
+            "Bu isteği siz yapmadıysanız şifreniz değişmez; e-postayı yok sayabilirsiniz.");
+
+    public static EmailMessage ConfirmEmailChange(string to, string displayName, string link) =>
+        Build(
+            to,
+            displayName,
+            "Yeni e-posta adresinizi onaylayın",
+            [
+                "Modülix hesabınızın e-posta adresini bu adresle değiştirmek istediniz.",
+                "Onaylamak için bağlantıyı açın. Bağlantı 24 saat geçerlidir. Onayladıktan sonra bu adresle giriş yaparsınız.",
+            ],
+            ("E-postamı onayla", link),
+            "Bu isteği siz yapmadıysanız e-postayı yok sayabilirsiniz; hesabınız değişmez.");
+
+    public static EmailMessage EmailChanged(string to, string displayName, string newEmail, string link) =>
+        Build(
+            to,
+            displayName,
+            "Modülix e-posta adresiniz değişti",
+            [
+                $"Modülix hesabınızın e-posta adresi {newEmail} olarak değiştirildi. Artık bu adrese e-posta gelmeyecek.",
+                "Bu değişikliği siz yapmadıysanız hemen kuruluşunuzun yöneticisine bildirin.",
+            ],
+            ("Giriş sayfası", link),
+            "Bu e-posta bilgi amaçlıdır.");
+
     private static EmailMessage Build(
         string to, string displayName, string subject, string[] paragraphs, (string Text, string Url) action, string footer)
     {

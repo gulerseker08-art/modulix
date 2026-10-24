@@ -36,6 +36,7 @@ internal sealed class UserAdministration(
     RecordHandover handover,
     MembershipPermissions membershipPermissions,
     IModuleEntitlements entitlements,
+    UserSessions sessions,
     TimeProvider time,
     IOptions<UserAdministrationOptions> options) : IUserAdministration
 {
@@ -408,6 +409,25 @@ internal sealed class UserAdministration(
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task CloseSessionsAsync(Guid membershipId, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var (membership, _) = await LoadAsync(tenant, membershipId, cancellationToken);
+        if (membership.Status == MembershipStatus.Invited)
+        {
+            throw Conflict("Davet bekleyen kullanıcının oturumu yok.");
+        }
+
+        await EnsureMayManageAsync(tenant, membershipId, cancellationToken);
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await sessions.CloseAllAsync(membership.UserId, except: null, cancellationToken);
+        Audit(tenant, membershipId, AuditAction.Updated,
+            new JsonObject { ["sessionsClosedAt"] = null }, new JsonObject { ["sessionsClosedAt"] = time.GetUtcNow() });
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task UnlockAsync(Guid membershipId, CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
@@ -553,7 +573,7 @@ internal sealed class UserAdministration(
             ExecutionSource.Api,
             Activity.Current?.TraceId.ToString()));
 
-    private static string ValidateEmail(string? email)
+    internal static string ValidateEmail(string? email)
     {
         var trimmed = email?.Trim() ?? string.Empty;
         if (trimmed.Length == 0)
@@ -572,7 +592,7 @@ internal sealed class UserAdministration(
         return trimmed;
     }
 
-    private static string ValidateDisplayName(string? displayName)
+    internal static string ValidateDisplayName(string? displayName)
     {
         var trimmed = displayName?.Trim() ?? string.Empty;
         if (trimmed.Length == 0)

@@ -1,0 +1,63 @@
+@page "/eposta-onayla"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>E-posta onayı · Modulix</PageTitle>
+
+@* E-posta değişikliğinin onay bağlantısı (Y7a). Onaylanınca bütün oturumlar kapanır; yeni adresle giriş yapılır. *@
+<div class="narrow">
+    <h1>E-posta onayı</h1>
+
+    @if (linkError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@linkError</div>
+        <a href="giris">Giriş sayfasına git</a>
+    }
+    else if (done)
+    {
+        <div class="alert alert-success" role="status">E-postanız @Email olarak değişti. Güvenliğiniz için bütün oturumlarınız kapatıldı; yeni adresinizle giriş yapın.</div>
+        <a class="btn btn-primary w-100" href="giris">Giriş yap</a>
+    }
+    else
+    {
+        <p>Hesabınızın e-postası <strong>@Email</strong> olarak değişecek. Onayladığınızda bütün oturumlarınız kapanır.</p>
+        <button type="button" class="btn btn-primary w-100" disabled="@busy" @onclick="ConfirmAsync">E-postamı değiştir</button>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "kullanici")] public Guid? UserId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "eposta")] public string? Email { get; set; }
+
+    [SupplyParameterFromQuery(Name = "token")] public string? Token { get; set; }
+
+    private string? linkError;
+    private bool busy;
+    private bool done;
+
+    protected override void OnInitialized()
+    {
+        if (UserId is null || string.IsNullOrEmpty(Email) || string.IsNullOrEmpty(Token))
+        {
+            linkError = "Onay bağlantısı eksik. E-postadaki bağlantıyı açın.";
+        }
+    }
+
+    // Bağlantı açılınca hemen değil, kişi onaylayınca değişir: e-posta tarayıcıları bağlantıları önceden açabilir.
+    private async Task ConfirmAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<bool>("/api/auth/confirm-email-change", new ConfirmEmailChangeRequest(UserId!.Value, Email!, Token!));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            done = true;
+            await Session.RefreshAsync();
+        }
+        else
+        {
+            linkError = result.Error;
+        }
+    }
+}
