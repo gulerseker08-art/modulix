@@ -1,0 +1,185 @@
+@page "/yonetim/ayarlar"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Firma ayarları · Modulix</PageTitle>
+
+@* Firma ayarları (Y6): ayarlar modüllerin tanımından gelir, her bölüm ayrı kaydedilir. Ayarları her üye okur;
+   core.settings.manage izni olmayan için ekran salt okunurdur. *@
+<AuthGate AnyPermission="CoreAccess.AdministrationPermissions">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+    <h1>Firma ayarları</h1>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (!canEdit)
+    {
+        <p class="text-muted">Ayarları değiştirmek için "Firma ayarlarını değiştirir" izni gerekir.</p>
+    }
+
+    @if (settings is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        @foreach (var group in settings.GroupBy(s => s.Group))
+        {
+            <form class="record-form settings-group" novalidate @onsubmit="() => SaveAsync(group.Key)" @onsubmit:preventDefault>
+                <h2>@group.Key</h2>
+                @if (notices.TryGetValue(group.Key, out var notice))
+                {
+                    <div class="alert alert-success" role="status">@notice</div>
+                }
+                @if (groupErrors.TryGetValue(group.Key, out var groupError))
+                {
+                    <div class="alert alert-danger" role="alert">@groupError</div>
+                }
+
+                <div class="form-grid">
+                    @foreach (var setting in group)
+                    {
+                        var id = "s-" + setting.Key.Replace('.', '-');
+                        <div class="@(setting.Kind == SettingKind.MultilineText ? "span-all" : null)">
+                            <label class="form-label" for="@id">@setting.Label@(setting.Required ? " *" : null)</label>
+                            @switch (setting.Kind)
+                            {
+                                case SettingKind.Choice:
+                                    <select id="@id" class="form-select" disabled="@(!canEdit)"
+                                            value="@values[setting.Key]" @onchange="e => Set(setting, e.Value)">
+                                        @foreach (var option in setting.Options)
+                                        {
+                                            <option value="@option.Value">@option.Label</option>
+                                        }
+                                    </select>
+                                    break;
+                                case SettingKind.MultilineText:
+                                    <textarea id="@id" class="form-control" rows="3" maxlength="@setting.MaxLength" disabled="@(!canEdit)"
+                                              value="@values[setting.Key]" @onchange="e => Set(setting, e.Value)"></textarea>
+                                    break;
+                                default:
+                                    <input id="@id" class="form-control" type="@InputType(setting.Kind)" maxlength="@setting.MaxLength"
+                                           disabled="@(!canEdit)" value="@values[setting.Key]" @onchange="e => Set(setting, e.Value)" />
+                                    break;
+                            }
+                            @if (setting.Description is { } description)
+                            {
+                                <div class="form-text">@description</div>
+                            }
+                            <FieldError Field="@setting.Key" Errors="errors" />
+                        </div>
+                    }
+                </div>
+
+                @if (canEdit)
+                {
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" disabled="@(busy || !IsChanged(group))">Kaydet</button>
+                        @if (IsChanged(group))
+                        {
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Reset(group)">Vazgeç</button>
+                        }
+                    </div>
+                }
+            </form>
+        }
+    }
+</AuthGate>
+
+@code {
+    private IReadOnlyList<SettingDto>? settings;
+    private readonly Dictionary<string, string> values = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> notices = [];
+    private readonly Dictionary<string, string> groupErrors = [];
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private bool canEdit;
+    private bool busy;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        canEdit = Session.Can(CoreAccess.ManageSettings);
+        var result = await Api.GetAsync<SettingsResponse>("/api/settings");
+        message = result.Error;
+        if (result.Value is { } loaded)
+        {
+            Load(loaded.Settings);
+        }
+    }
+
+    private void Load(IReadOnlyList<SettingDto> loaded)
+    {
+        settings = loaded;
+        values.Clear();
+        foreach (var setting in loaded)
+        {
+            values[setting.Key] = setting.Value;
+        }
+    }
+
+    private void Set(SettingDto setting, object? value)
+    {
+        values[setting.Key] = (value as string ?? string.Empty).Trim();
+        notices.Remove(setting.Group);
+    }
+
+    private bool IsChanged(IEnumerable<SettingDto> group) => group.Any(s => values[s.Key] != s.Value);
+
+    private void Reset(IEnumerable<SettingDto> group)
+    {
+        foreach (var setting in group)
+        {
+            values[setting.Key] = setting.Value;
+        }
+
+        errors = null;
+    }
+
+    private async Task SaveAsync(string group)
+    {
+        var changed = settings!.Where(s => s.Group == group && values[s.Key] != s.Value).ToList();
+        if (changed.Count == 0)
+        {
+            return;
+        }
+
+        busy = true;
+        notices.Remove(group);
+        groupErrors.Remove(group);
+        var result = await Api.PutAsync<SettingsResponse>("/api/settings",
+            new SaveSettingsRequest(changed.ToDictionary(s => s.Key, s => new SettingWriteDto(values[s.Key], s.Version))));
+        busy = false;
+        errors = result.FieldErrors;
+
+        if (result.Value is { } saved)
+        {
+            // Diğer bölümlerde kaydedilmemiş değişiklikler korunur.
+            var pending = settings!.Where(s => s.Group != group && values[s.Key] != s.Value).ToDictionary(s => s.Key, s => values[s.Key]);
+            Load(saved.Settings);
+            foreach (var (key, value) in pending)
+            {
+                values[key] = value;
+            }
+
+            notices[group] = "Kaydedildi.";
+        }
+        else
+        {
+            groupErrors[group] = result.Error!;
+        }
+    }
+
+    private static string InputType(SettingKind kind) => kind switch
+    {
+        SettingKind.Email => "email",
+        SettingKind.Phone => "tel",
+        _ => "text",
+    };
+}

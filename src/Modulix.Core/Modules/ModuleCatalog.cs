@@ -1,4 +1,5 @@
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Settings;
 
 namespace Modulix.Core.Modules;
 
@@ -11,6 +12,7 @@ public sealed class ModuleCatalog
     private readonly Dictionary<string, IModule> modules;
     private readonly Dictionary<string, PermissionDefinition> permissions;
     private readonly Dictionary<string, AuditedEntity> auditedEntities = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string ModuleKey, SettingDefinition Definition)> settings = new(StringComparer.Ordinal);
 
     public ModuleCatalog(IEnumerable<IModule> modules)
     {
@@ -57,6 +59,27 @@ public sealed class ModuleCatalog
                         $"Geçersiz veya tekrar eden denetim kayıt türü: '{entity.EntityKey}' ({module.Key}). Biçim: '{module.Key}.tür'.");
                 }
             }
+
+            foreach (var setting in module.Settings)
+            {
+                ValidateSetting(module.Key, setting);
+                if (!settings.TryAdd(setting.Key, (module.Key, setting)))
+                {
+                    throw new InvalidOperationException($"Ayar iki kez tanımlı: '{setting.Key}'.");
+                }
+            }
+        }
+
+        // Denetim kaydında ayarın adı gösterilir (ör. "core.regional.currency" yerine "Para birimi").
+        if (auditedEntities.TryGetValue(CoreModule.AuditedEntityKeys.TenantSetting, out var settingEntity))
+        {
+            auditedEntities[settingEntity.EntityKey] = settingEntity with
+            {
+                Options = new Dictionary<string, IReadOnlyDictionary<string, string>>(settingEntity.Options)
+                {
+                    ["key"] = settings.Values.ToDictionary(s => s.Definition.Key, s => s.Definition.DisplayName, StringComparer.Ordinal),
+                },
+            };
         }
 
         if (!this.modules.ContainsKey(CoreModule.ModuleKey))
@@ -88,7 +111,16 @@ public sealed class ModuleCatalog
     public AuditedEntity? FindAuditedEntity(string entityKey) => auditedEntities.GetValueOrDefault(entityKey);
 
     /// <summary>Tüm denetim kayıt türleri, modül sırasıyla.</summary>
-    public IEnumerable<AuditedEntity> AuditedEntities => Modules.SelectMany(m => m.AuditedEntities);
+    public IEnumerable<AuditedEntity> AuditedEntities =>
+        Modules.SelectMany(m => m.AuditedEntities).Select(e => auditedEntities[e.EntityKey]);
+
+    /// <summary>Firma ayarının tanımı ve modülü (Y6); tanımlı değilse <c>null</c>.</summary>
+    public (string ModuleKey, SettingDefinition Definition)? FindSetting(string key) =>
+        settings.TryGetValue(key, out var setting) ? setting : null;
+
+    /// <summary>Tüm firma ayarları, modül ve tanım sırasıyla.</summary>
+    public IEnumerable<(string ModuleKey, SettingDefinition Definition)> Settings =>
+        Modules.SelectMany(m => m.Settings.Select(s => (m.Key, s)));
 
     public bool ContainsPermission(string permissionKey) => permissions.ContainsKey(permissionKey);
 
@@ -140,6 +172,35 @@ public sealed class ModuleCatalog
     /// <summary>Modül katalogda var ve tenant için açık mı?</summary>
     public bool IsEnabled(string moduleKey, IReadOnlySet<string> enabledModules) =>
         ContainsModule(moduleKey) && (IsAlwaysEnabled(moduleKey) || enabledModules.Contains(moduleKey));
+
+    // Ayar anahtarı modülle başlar ve kayıtlı anahtar biçimindedir; varsayılan değer tanıma uyar.
+    private static void ValidateSetting(string moduleKey, SettingDefinition setting)
+    {
+        string normalized;
+        try
+        {
+            normalized = TenantSetting.NormalizeKey(setting.Key);
+        }
+        catch (ArgumentException)
+        {
+            normalized = string.Empty;
+        }
+
+        if (normalized != setting.Key || !setting.Key.StartsWith(moduleKey + ".", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"Geçersiz ayar anahtarı: '{setting.Key}' ({moduleKey}). Biçim: '{moduleKey}.grup.ad'.");
+        }
+
+        if (setting.Type == SettingType.Choice && setting.Options.Count == 0)
+        {
+            throw new InvalidOperationException($"'{setting.Key}' seçenekli ama seçeneği yok.");
+        }
+
+        if (SettingRules.Validate(setting, setting.DefaultValue) is { } error)
+        {
+            throw new InvalidOperationException($"'{setting.Key}' varsayılan değeri geçersiz: {error}");
+        }
+    }
 
     // Şablon anahtarı modülle başlar; izinleri modülün kendi izinleridir (modüller birbirinin iznini bilmez).
     private static void ValidateTemplates(IModule module)

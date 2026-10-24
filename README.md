@@ -174,6 +174,14 @@ Platformu işleten ekip için ayrı bir alan: menüde **Platform** (`/platform`)
 - **Oturum olayları (Y5b):** kayıt türü "Oturum" (`core.account`): giriş, hatalı şifre, hesap kilitlenmesi, kilitliyken deneme, şifre sıfırlama ve davet kabulü; IP adresi ve tarayıcı bilgisiyle (kişisel veri, aydınlatma metnine eklenmeli). Başarılı giriş yalnızca seçilen firmaya yazılır (iki firması olan kişi için firma seçildiğinde). Hatalı şifre, kilitlenme ve şifre sıfırlama kişinin etkin üye olduğu tüm firmalara yazılır; davet kabulü daveti kabul edilen firmalara. Kayıtlı olmayan e-postayla deneme hiçbir firmaya yazılmaz, yalnızca uygulama günlüğüne (e-posta olmadan) düşer.
 - Modüller kayıt türlerini `IModule.AuditedEntities` ile tanımlar (alan etiketleri, seçenekler, kullanıcı ve bağlantı alanları, görüntüleme izni).
 
+### Firma ayarları (Y6)
+
+**Yönetim → Firma ayarları** (`/yonetim/ayarlar`): firma profili (görünen ad, ticari unvan, vergi dairesi ve no, adres, telefon, e-posta) ve bölgesel ayarlar (saat dilimi, para birimi, tarih ve sayı biçimi). Her bölüm ayrı kaydedilir.
+
+- Ayarlar kodda tiplidir: modüller `IModule.Settings` ile tanımlar (anahtar `modül.grup.ad`, tip, varsayılan, uzunluk, seçenekler, biçim). Tanımsız anahtar yazılamaz, değer tanıma uymalıdır; modülü kapalı ayar görünmez ve yazılamaz. Kaydedilmemiş ayarın değeri varsayılandır (yeni firma hiçbir şey kaydetmeden çalışır).
+- `GET /api/settings`: her üye okur. `PUT /api/settings` (`core.settings.manage`): gövde `{ "values": { "core.regional.currency": { "value": "EUR", "version": 1 } } }`. Hepsi birlikte kaydedilir ya da hiçbiri: tanımsız anahtar 400, geçersiz değer 422 (alan adı ayar anahtarıdır), okunduktan sonra değişmiş sürüm 409.
+- Her değişen ayar denetim kaydına "Firma ayarı" olarak, ayarın adıyla ve eski → yeni değerle yazılır; değişmeyen değer yazılmaz. Genel kayıt uç noktası (`/api/records/core.tenant-setting`) da aynı kurallara uyar.
+
 ## CRM modülü
 
 İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.

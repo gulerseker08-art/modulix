@@ -72,7 +72,7 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
         var manager = await factory.CreateUserAsync(tenant);
         await factory.CreateRoleAsync(tenant.Id, [ManageSettings], manager);
         const string url = "/api/records/core.tenant-setting";
-        var key = $"test.{Guid.NewGuid():N}";
+        const string key = Modulix.Core.Modules.CoreModule.SettingKeys.LegalName;
 
         using var memberClient = await LoginAsync(member);
         var denied = await memberClient.PostAsJsonAsync(url, Write(new JsonObject { ["key"] = key, ["value"] = "tr-TR" }));

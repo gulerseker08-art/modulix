@@ -41,6 +41,12 @@ public interface IModule
     /// </summary>
     IReadOnlyList<AuditedEntity> AuditedEntities => [];
 
+    /// <summary>
+    /// Modülün firma ayarları (Y6): tipi, varsayılanı ve doğrulaması kodda tanımlıdır; tanımsız ayar yazılamaz.
+    /// Anahtar modül anahtarıyla başlar. Modül kapalıyken ayarları gösterilmez ve yazılamaz, kayıtlı değerler silinmez.
+    /// </summary>
+    IReadOnlyList<SettingDefinition> Settings => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {
@@ -94,4 +100,44 @@ public sealed record AuditedEntity(
     public IReadOnlyCollection<string> UserFields { get; init; } = [];
 
     public IReadOnlyDictionary<string, string> References { get; init; } = new Dictionary<string, string>();
+}
+
+public enum SettingType
+{
+    Text = 1,
+
+    /// <summary>Çok satırlı metin (ör. adres).</summary>
+    MultilineText = 2,
+
+    Email = 3,
+    Phone = 4,
+
+    /// <summary>Değer <see cref="SettingDefinition.Options"/>'tan biri olmalıdır.</summary>
+    Choice = 5,
+}
+
+/// <summary>Seçenekli ayarda bir seçenek: kaydedilen değer ve görünen adı.</summary>
+public sealed record SettingOption(string Value, string Label);
+
+/// <summary>
+/// Bir firma ayarı (Y6). <see cref="Key"/> biçimi: "modül.grup.ad" (ör. "core.regional.currency"); değişmez, kayıtlı
+/// değerler buna bağlıdır. <see cref="Group"/>: ayarlar ekranındaki bölümün adı (ör. "Bölgesel ayarlar").
+/// Kaydedilmemiş ayarın değeri <see cref="DefaultValue"/>'dur; boş değer "ayarlanmamış" demektir.
+/// <see cref="Pattern"/>: değer boş değilse uyması gereken düzenli ifade, hata metni <see cref="PatternMessage"/>.
+/// </summary>
+public sealed record SettingDefinition(string Key, string DisplayName, string Group, SettingType Type, string DefaultValue = "")
+{
+    public const int DefaultMaxLength = 200;
+
+    public string? Description { get; init; }
+
+    public int MaxLength { get; init; } = DefaultMaxLength;
+
+    public bool Required { get; init; }
+
+    public IReadOnlyList<SettingOption> Options { get; init; } = [];
+
+    public string? Pattern { get; init; }
+
+    public string? PatternMessage { get; init; }
 }

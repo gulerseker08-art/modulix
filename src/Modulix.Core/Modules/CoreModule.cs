@@ -1,4 +1,5 @@
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Settings;
 
 namespace Modulix.Core.Modules;
 
@@ -44,6 +45,58 @@ public sealed class CoreModule : IModule
         /// <summary>Oturum olayları (giriş, hatalı şifre, kilitlenme, şifre sıfırlama, davet kabulü); kayıt kişinin hesabıdır.</summary>
         public const string Account = "core.account";
     }
+
+    /// <summary>Çekirdeğin firma ayarları (Y6): firma profili ve bölgesel ayarlar.</summary>
+    public static class SettingKeys
+    {
+        public const string DisplayName = "core.profile.display-name";
+        public const string LegalName = "core.profile.legal-name";
+        public const string TaxOffice = "core.profile.tax-office";
+        public const string TaxNumber = "core.profile.tax-number";
+        public const string Address = "core.profile.address";
+        public const string Phone = "core.profile.phone";
+        public const string Email = "core.profile.email";
+        public const string TimeZone = "core.regional.time-zone";
+        public const string Currency = "core.regional.currency";
+        public const string Format = "core.regional.format";
+    }
+
+    private const string ProfileGroup = "Firma profili";
+    private const string RegionalGroup = "Bölgesel ayarlar";
+
+    IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
+    [
+        new(SettingKeys.DisplayName, "Görünen ad", ProfileGroup, SettingType.Text)
+        {
+            Description = "Üst çubukta firmanın adı yerine gösterilir. Boşsa firmanın kayıtlı adı kullanılır.",
+            MaxLength = 100,
+        },
+        new(SettingKeys.LegalName, "Ticari unvan", ProfileGroup, SettingType.Text) { MaxLength = 250 },
+        new(SettingKeys.TaxOffice, "Vergi dairesi", ProfileGroup, SettingType.Text) { MaxLength = 100 },
+        new(SettingKeys.TaxNumber, "Vergi no", ProfileGroup, SettingType.Text)
+        {
+            MaxLength = 11,
+            Pattern = "^[0-9]{10,11}$",
+            PatternMessage = "Vergi numarası 10, T.C. kimlik numarası 11 rakamdır.",
+        },
+        new(SettingKeys.Address, "Adres", ProfileGroup, SettingType.MultilineText) { MaxLength = 500 },
+        new(SettingKeys.Phone, "Telefon", ProfileGroup, SettingType.Phone) { MaxLength = 30 },
+        new(SettingKeys.Email, "E-posta", ProfileGroup, SettingType.Email),
+        new(SettingKeys.TimeZone, "Saat dilimi", RegionalGroup, SettingType.Choice, RegionalOptions.DefaultTimeZone)
+        {
+            Description = "Ekranlardaki tarih ve saatler, denetim kaydı ve dışa aktarmalar bu saat dilimini kullanır.",
+            Options = RegionalOptions.TimeZones,
+        },
+        new(SettingKeys.Currency, "Para birimi", RegionalGroup, SettingType.Choice, RegionalOptions.DefaultCurrency)
+        {
+            Description = "Yeni kayıtlarda varsayılan para birimi. Mevcut kayıtların para birimi değişmez.",
+            Options = RegionalOptions.Currencies,
+        },
+        new(SettingKeys.Format, "Tarih ve sayı biçimi", RegionalGroup, SettingType.Choice, RegionalOptions.DefaultFormat)
+        {
+            Options = RegionalOptions.Formats,
+        },
+    ];
 
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
     [

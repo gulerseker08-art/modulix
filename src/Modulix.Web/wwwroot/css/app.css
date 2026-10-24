@@ -1129,3 +1129,8 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 .audit-changes td:first-child, .audit-changes th:first-child {
     white-space: nowrap;
 }
+
+/* Firma ayarları (Y6). */
+.settings-group {
+    margin-bottom: 1.5rem;
+}
