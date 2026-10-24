@@ -41,15 +41,15 @@
                                         @switch (entry.Action)
                                         {
                                             case AuditOperation.Created:
-                                                <span>@Value(change.New)</span>
+                                                <span>@Value(change, change.New)</span>
                                                 break;
                                             case AuditOperation.Deleted:
-                                                <span>@Value(change.Old)</span>
+                                                <span>@Value(change, change.Old)</span>
                                                 break;
                                             default:
-                                                <span class="history-old">@Value(change.Old)</span>
+                                                <span class="history-old">@Value(change, change.Old)</span>
                                                 <span aria-label="yerine"> → </span>
-                                                <span>@Value(change.New)</span>
+                                                <span>@Value(change, change.New)</span>
                                                 break;
                                         }
                                     </li>
@@ -110,5 +110,6 @@
         }
     }
 
-    private static string Value(string? value) => string.IsNullOrEmpty(value) ? "boş" : value;
+    private static string Value(AuditFieldChangeDto change, string? value) =>
+        change.Hidden ? "gizli" : string.IsNullOrEmpty(value) ? "boş" : value;
 }

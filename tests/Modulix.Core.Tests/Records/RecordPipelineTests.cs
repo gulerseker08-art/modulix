@@ -18,6 +18,7 @@ public class RecordPipelineTests
     private bool _licensed = true;
     private bool _permitted = true;
     private bool _inScope = true;
+    private readonly HashSet<string> _hidden = [];
 
     private RecordPipeline Pipeline() => new(
         _tenant,
@@ -25,6 +26,7 @@ public class RecordPipelineTests
         new Gate(() => _licensed),
         new Gate(() => _permitted),
         new Gate(() => _inScope),
+        new HiddenFields(_hidden),
         _audit,
         _outbox,
         _unitOfWork);
@@ -139,6 +141,58 @@ public class RecordPipelineTests
     }
 
     [Fact]
+    public async Task Hidden_field_is_left_out_of_reads_but_kept_in_audit()
+    {
+        var created = (await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a", ["secret"] = 42 }), default)).Value!;
+        _hidden.Add("secret");
+
+        var read = await Pipeline().GetAsync(new RecordRef(Entity, created.Id), default);
+        var page = await Pipeline().QueryAsync(new RecordQuery(Entity), default);
+
+        Assert.False(read.Value!.Values.ContainsKey("secret"));
+        Assert.False(Assert.Single(page.Value!.Items).Values.ContainsKey("secret"));
+        Assert.Equal(42, _store.Records[created.Id].Values["secret"]!.GetValue<int>());
+        Assert.Equal(42, _audit.Entries[0].Changes["secret"]!["new"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task Writing_a_hidden_field_is_denied()
+    {
+        _hidden.Add("secret");
+
+        var result = await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a", ["secret"] = 1 }), default);
+
+        Assert.Equal(RecordErrorCode.PermissionDenied, result.Error!.Code);
+        AssertNothingWritten();
+    }
+
+    [Fact]
+    public async Task Empty_hidden_field_is_ignored_and_stored_value_kept()
+    {
+        var created = (await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a", ["secret"] = 42 }), default)).Value!;
+        _hidden.Add("secret");
+
+        var result = await Pipeline().UpdateAsync(new RecordCommand(Entity, created.Id, new JsonObject { ["text"] = "b", ["secret"] = null }), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.Values.ContainsKey("secret"));
+        Assert.Equal(42, _store.Records[created.Id].Values["secret"]!.GetValue<int>());
+        Assert.False(_audit.Entries[^1].Changes.ContainsKey("secret"));
+    }
+
+    [Fact]
+    public async Task Filtering_by_hidden_field_is_rejected()
+    {
+        _hidden.Add("secret");
+
+        var result = await Pipeline().QueryAsync(
+            new RecordQuery(Entity, Filters: new Dictionary<string, string> { ["secret"] = "42" }), default);
+
+        Assert.Equal(RecordErrorCode.ValidationFailed, result.Error!.Code);
+        Assert.Equal("secret", Assert.Single(result.Error.FieldErrors!).Field);
+    }
+
+    [Fact]
     public async Task Unknown_entity_is_rejected()
     {
         var result = await Pipeline().GetAsync(new RecordRef("crm.yok", Guid.NewGuid()), default);
@@ -188,6 +242,12 @@ public class RecordPipelineTests
             Task.FromResult<IReadOnlySet<Guid>?>(allow() ? null : new HashSet<Guid>());
     }
 
+    private sealed class HiddenFields(IReadOnlySet<string> hidden) : IFieldAccessService
+    {
+        public Task<IReadOnlySet<string>> GetHiddenFieldsAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken) =>
+            Task.FromResult(hidden);
+    }
+
     private sealed class FakeStore : IRecordStore
     {
         public Dictionary<Guid, RecordData> Records { get; } = [];
@@ -221,7 +281,14 @@ public class RecordPipelineTests
                 return Task.FromResult<RecordData?>(null);
             }
 
-            var updated = current with { Version = current.Version + 1, Values = (JsonObject)values.DeepClone() };
+            // Kısmi güncelleme (gerçek depolar gibi): verilmeyen alan korunur.
+            var merged = (JsonObject)current.Values.DeepClone();
+            foreach (var (name, node) in values)
+            {
+                merged[name] = node?.DeepClone();
+            }
+
+            var updated = current with { Version = current.Version + 1, Values = merged };
             Records[id] = updated;
             return Task.FromResult<RecordData?>(updated);
         }

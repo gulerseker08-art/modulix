@@ -24,7 +24,7 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
     [
         CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite,
         CrmModule.Permissions.ContactsRead, CrmModule.Permissions.ContactsWrite,
-        CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.OpportunitiesWrite,
+        CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.OpportunitiesWrite, CrmModule.Permissions.OpportunityAmountsRead,
         CrmModule.Permissions.ActivitiesRead, CrmModule.Permissions.ActivitiesWrite,
     ];
 

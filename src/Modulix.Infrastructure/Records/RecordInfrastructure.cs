@@ -197,13 +197,14 @@ public static class RecordsSetup
 {
     /// <summary>
     /// Kayıt boru hattı ve Core'un kayıt türleri. Lisans adımı modül haklarını, yetki adımı rollerin izinlerini
-    /// denetler (E4), veri kapsamı adımı rollerin kayıt kapsamını ve ekipleri uygular (Y8).
+    /// denetler (E4), veri kapsamı adımı rollerin kayıt kapsamını ve ekipleri uygular (Y8), hassas alanlar izinlere göre gizlenir (Y8b).
     /// </summary>
     public static IServiceCollection AddModulixRecords(this IServiceCollection services)
     {
         services.TryAddScoped<IEntitlementService, ModuleEntitlementService>();
         services.TryAddScoped<IPermissionService, StorePermissionService>();
         services.TryAddScoped<IDataScopeService, MembershipDataScope>();
+        services.TryAddScoped<IFieldAccessService, PermissionFieldAccess>();
 
         services.AddScoped<IAuditWriter, EfAuditWriter>();
         services.AddScoped<IDomainEventOutbox, EfDomainEventOutbox>();

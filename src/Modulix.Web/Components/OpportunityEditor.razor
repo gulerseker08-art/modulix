@@ -1,5 +1,6 @@
 @* Fırsat ekleme/düzenleme formu; Fırsatlar sayfası ve firma detay sayfası kullanır. *@
 @inject ApiClient Api
+@inject SessionState Session
 
 <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
     <h2>@(Opportunity is null ? "Yeni fırsat" : "Fırsatı düzenle")</h2>
@@ -50,16 +51,20 @@
             </select>
             <FieldError Field="stage" Errors="errors" />
         </div>
-        <div>
-            <label class="form-label" for="probability">Olasılık (%)</label>
-            <input id="probability" class="form-control" type="number" min="0" max="100" step="5" inputmode="numeric" @bind="form.Probability" />
-            <FieldError Field="probability" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="amount">Tutar</label>
-            <input id="amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.Amount" />
-            <FieldError Field="amount" Errors="errors" />
-        </div>
+        @* Tutar ve olasılık hassas alandır (Y8b): izni olmayan görmez; boş gönderilir, sunucu kayıttaki değeri korur. *@
+        @if (Session.Can(CrmAccess.OpportunityAmountsRead))
+        {
+            <div>
+                <label class="form-label" for="probability">Olasılık (%)</label>
+                <input id="probability" class="form-control" type="number" min="0" max="100" step="5" inputmode="numeric" @bind="form.Probability" />
+                <FieldError Field="probability" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="amount">Tutar</label>
+                <input id="amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.Amount" />
+                <FieldError Field="amount" Errors="errors" />
+            </div>
+        }
         <div>
             <label class="form-label" for="currency">Para birimi</label>
             <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />

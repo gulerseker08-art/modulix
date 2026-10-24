@@ -136,6 +136,31 @@ public class ModuleCatalogTests
         Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(foreignKey));
     }
 
+    [Fact]
+    public void Sensitive_fields_are_hidden_without_their_permission()
+    {
+        var sales = new TestModule("sales", ["sales.orders.read", "sales.order-prices.read"])
+        {
+            SensitiveFields = [new SensitiveFields("sales.order", "sales.order-prices.read", ["price", "discount"])],
+        };
+        var catalog = ModuleCatalog.Create(sales);
+
+        Assert.Equal(["discount", "price"], catalog.HiddenFields("sales.order", new HashSet<string> { "sales.orders.read" }).Order());
+        Assert.Empty(catalog.HiddenFields("sales.order", new HashSet<string> { "sales.order-prices.read" }));
+        Assert.Empty(catalog.HiddenFields("sales.customer", new HashSet<string>()));
+    }
+
+    [Fact]
+    public void Sensitive_field_with_another_modules_permission_is_rejected()
+    {
+        var sales = new TestModule("sales", ["sales.orders.read"])
+        {
+            SensitiveFields = [new SensitiveFields("sales.order", CoreModule.Permissions.ManageUsers, ["price"])],
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(sales));
+    }
+
     private static IModule Module(string key, params string[] permissions) => new TestModule(key, permissions);
 
     private sealed class TestModule(string key, string[] permissions, IReadOnlyList<RoleTemplate>? templates = null) : IModule
@@ -148,5 +173,7 @@ public class ModuleCatalogTests
             permissions.Select(p => new PermissionDefinition(p, p)).ToList();
 
         public IReadOnlyList<RoleTemplate> RoleTemplates { get; } = templates ?? [];
+
+        public IReadOnlyList<SensitiveFields> SensitiveFields { get; init; } = [];
     }
 }

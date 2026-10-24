@@ -213,6 +213,15 @@ Roller "hangi tür kaydı", kayıt kapsamı "hangi kayıtları" belirler. Kapsam
 - `GET /api/tenant/members?assignable=true`: kişinin sorumlu atayabileceği üyeler. `GET /api/tenant/access` ve kullanıcının "Erişim" görünümü kapsamı (ve ekipleri) gösterir.
 - Yönetici olmayan rol yöneticisi kendi kapsamından geniş kapsam veremez (403).
 
+### Hassas alanlar (Y8b)
+
+Bazı alanlar kaydı görebilen herkese açık değildir. Modül hassas alanlarını ve onları açan izni `IModule.SensitiveFields` ile tanımlar; CRM'de fırsatın **tutarı** ve **olasılığı** `crm.opportunity-amounts.read` ("Fırsat tutarları" satırı) ister. Para birimi hassas değildir. Bu izin "Satış temsilcisi" ve "Salt okur" şablonlarında vardır; migration bugün fırsatları gören her role izni ekler, kimse görünürlük kaybetmez.
+
+- İzni olmayan kişiye alan hiç gönderilmez (tek kayıt, liste, `/api/records`). Boru hattı (`IFieldAccessService`) alanı çıkarır; Yönetici her şeyi görür.
+- Yazma: gizli alana değer vermek 403'tür; boş gönderilen gizli alan yok sayılır ve kayıttaki değer korunur (ekran onu boş gönderir). Gizli alana göre süzmek 422'dir.
+- Denetim kaydında ve kayıt geçmişinde alan satırı görünür ama değeri "Gizli" yazar (`AuditFieldChangeDto.Hidden`).
+- Ekranlar: izni olmayan için fırsat listesinde Tutar ve Olasılık sütunları, huni kartlarındaki tutar, toplamlar ve düzenleyicideki iki alan gösterilmez.
+
 ## CRM modülü
 
 İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.

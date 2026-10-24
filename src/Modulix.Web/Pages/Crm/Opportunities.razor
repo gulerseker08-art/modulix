@@ -58,7 +58,10 @@
                         <header>
                             <span class="badge stage-@column.Stage.ToString().ToLowerInvariant()">@CrmLabels.Of(column.Stage)</span>
                             <span class="count">@column.Page.TotalCount</span>
-                            <small>@Totals(column.Page.Items)</small>
+                            @if (ShowAmounts)
+                            {
+                                <small>@Totals(column.Page.Items)</small>
+                            }
                         </header>
                         @foreach (var opportunity in column.Page.Items)
                         {
@@ -66,10 +69,13 @@
                                      @ondragstart="() => dragged = opportunity">
                                 <strong>@opportunity.Title</strong>
                                 <a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a>
-                                <span>
-                                    @FormatAmount(opportunity)
-                                    @if (opportunity.Probability is { } probability) { <text> · %@probability</text> }
-                                </span>
+                                @if (ShowAmounts)
+                                {
+                                    <span>
+                                        @FormatAmount(opportunity)
+                                        @if (opportunity.Probability is { } probability) { <text> · %@probability</text> }
+                                    </span>
+                                }
                                 @if (opportunity.OwnerId is not null)
                                 {
                                     <span class="owner">@Lookups.MemberName(opportunity.OwnerId)</span>
@@ -110,7 +116,14 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Başlık</th><th>Firma</th><th>Aşama</th><th class="text-end">Tutar</th><th>Olasılık</th><th>Sorumlu</th><th>Kapanış</th><th></th></tr>
+                <tr>
+                    <th>Başlık</th><th>Firma</th><th>Aşama</th>
+                    @if (ShowAmounts)
+                    {
+                        <th class="text-end">Tutar</th><th>Olasılık</th>
+                    }
+                    <th>Sorumlu</th><th>Kapanış</th><th></th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var opportunity in page.Items)
@@ -119,8 +132,11 @@
                         <td data-label="Başlık" class="primary">@opportunity.Title</td>
                         <td data-label="Firma"><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></td>
                         <td data-label="Aşama"><span class="badge stage-@opportunity.Stage.ToString().ToLowerInvariant()">@CrmLabels.Of(opportunity.Stage)</span></td>
-                        <td data-label="Tutar" class="text-end">@FormatAmount(opportunity)</td>
-                        <td data-label="Olasılık">@(opportunity.Probability is { } p ? $"%{p}" : null)</td>
+                        @if (ShowAmounts)
+                        {
+                            <td data-label="Tutar" class="text-end">@FormatAmount(opportunity)</td>
+                            <td data-label="Olasılık">@(opportunity.Probability is { } p ? $"%{p}" : null)</td>
+                        }
                         <td data-label="Sorumlu">@Lookups.MemberName(opportunity.OwnerId)</td>
                         <td data-label="Kapanış">@(opportunity.ExpectedCloseDate is { } date ? CrmLabels.Date(date) : null)</td>
                         <td class="actions">
@@ -163,6 +179,9 @@
             await LoadAsync(1);
         }
     }
+
+    // Tutar ve olasılık hassas alandır (Y8b); izni olmayan için sunucu göndermez, sütunlar ve toplamlar gösterilmez.
+    private bool ShowAmounts => Session.Can(CrmAccess.OpportunityAmountsRead);
 
     private static string FormatAmount(OpportunityDto opportunity) =>
         opportunity.Amount is { } amount ? CrmLabels.Amount(amount, opportunity.Currency) : string.Empty;

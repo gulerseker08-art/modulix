@@ -31,8 +31,11 @@ public enum AuditSource
     AiTool = 4,
 }
 
-/// <summary>Değişen alan; değerler gösterime hazırdır. Değerler gizliyse ikisi de boştur.</summary>
-public sealed record AuditFieldChangeDto(string Field, string Label, string? Old, string? New);
+/// <summary>
+/// Değişen alan; değerler gösterime hazırdır. Değerler gizliyse ikisi de boştur; <see cref="Hidden"/> alanın hassas olduğunu
+/// ve okurun onu göremediğini söyler (Y8b).
+/// </summary>
+public sealed record AuditFieldChangeDto(string Field, string Label, string? Old, string? New, bool Hidden = false);
 
 /// <summary>
 /// Denetim kaydının bir satırı. <see cref="ValuesHidden"/>: okurun bu kayıt türünü görüntüleme izni yok; değişen

@@ -26,6 +26,9 @@ public sealed class CrmModule : IModule
         public const string ContactsWrite = "crm.contacts.write";
         public const string OpportunitiesRead = "crm.opportunities.read";
         public const string OpportunitiesWrite = "crm.opportunities.write";
+
+        /// <summary>Fırsat tutarı ve olasılığı (Y8b, hassas alan). Olmayan kişi fırsatı görür, bu alanları görmez ve yazamaz.</summary>
+        public const string OpportunityAmountsRead = "crm.opportunity-amounts.read";
         public const string ActivitiesRead = "crm.activities.read";
         public const string ActivitiesWrite = "crm.activities.write";
     }
@@ -51,6 +54,7 @@ public sealed class CrmModule : IModule
         new(Permissions.ContactsWrite, "Kişi ekler, düzenler ve siler", "Kişiler"),
         new(Permissions.OpportunitiesRead, "Fırsatları görüntüler", "Fırsatlar"),
         new(Permissions.OpportunitiesWrite, "Fırsat ekler, düzenler ve siler", "Fırsatlar"),
+        new(Permissions.OpportunityAmountsRead, "Fırsat tutarını ve olasılığını görür", "Fırsat tutarları"),
         new(Permissions.ActivitiesRead, "Aktiviteleri görüntüler", "Aktiviteler"),
         new(Permissions.ActivitiesWrite, "Aktivite ekler, düzenler ve siler", "Aktiviteler"),
     ];
@@ -72,13 +76,22 @@ public sealed class CrmModule : IModule
             [
                 Permissions.CompaniesRead, Permissions.CompaniesWrite,
                 Permissions.ContactsRead, Permissions.ContactsWrite,
-                Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite,
+                Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite, Permissions.OpportunityAmountsRead,
                 Permissions.ActivitiesRead, Permissions.ActivitiesWrite,
             ])
         {
             // Y8: temsilci yalnızca sorumlusu olduğu kayıtları görür; ekip lideri için kapsam rolde genişletilir.
             Scope = RecordScope.Own,
         },
+    ];
+
+    /// <summary>
+    /// Hassas alanlar (Y8b): tutar ve olasılık. Para birimi tek başına bir şey söylemediği için hassas değildir (ekran onu
+    /// her zaman gönderir).
+    /// </summary>
+    IReadOnlyList<SensitiveFields> IModule.SensitiveFields { get; } =
+    [
+        new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability"]),
     ];
 
     /// <summary>Denetim kaydı (Y5): alanların görünen adları; seçenek adları arayüzdekilerle aynıdır.</summary>
