@@ -54,6 +54,21 @@ public sealed record PlatformModuleDto(string Key, string DisplayName, IReadOnly
 /// </summary>
 public sealed record PlatformModulesResponse(IReadOnlyList<PlatformModuleDto> Modules, RoleTemplateDto ReadOnlyTemplate);
 
+/// <summary>Firmada modül açma veya kapatma (Y4b). Veri silinmez; değişiklik firmanın bir sonraki isteğinde geçerlidir.</summary>
+public sealed record SetTenantModuleRequest(bool Enabled);
+
+/// <summary>
+/// Katalogdaki bir modül (salt okunur). <see cref="EnabledTenantCount"/>: modülün açık olduğu açık firma sayısı;
+/// çekirdek her firmada açık olduğu için boştur.
+/// </summary>
+public sealed record CatalogModuleDto(
+    string Key,
+    string DisplayName,
+    bool IsAlwaysEnabled,
+    int? EnabledTenantCount,
+    IReadOnlyList<PermissionDto> Permissions,
+    IReadOnlyList<RoleTemplateDto> Templates);
+
 public static class TenantStateText
 {
     public static string Of(TenantState state) => state switch

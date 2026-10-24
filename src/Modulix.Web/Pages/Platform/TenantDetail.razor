@@ -40,6 +40,20 @@
             <div><dt>Açık modüller</dt><dd>@ModuleNames(tenant.EnabledModules)</dd></div>
         </dl>
 
+        @if (modules is not null)
+        {
+            <section class="detail-section">
+                <div class="section-header"><h2>Modüller</h2></div>
+                <p class="text-muted">Değişiklik firmanın bir sonraki isteğinde geçerli olur ve firmanın denetim kaydına yazılır.</p>
+                @foreach (var module in modules.Modules)
+                {
+                    <ModuleToggle TenantId="tenant.Id" TenantName="@tenant.Name" ModuleKey="@module.Key" ModuleName="@module.DisplayName"
+                                  Enabled="tenant.EnabledModules.Contains(module.Key)" ShowLabel="true"
+                                  Changed="error => ModuleChangedAsync(module, error)" />
+                }
+            </section>
+        }
+
         <section class="detail-section">
             <div class="section-header"><h2>Yöneticiler</h2></div>
             @if (detail.Administrators.Count == 0)
@@ -223,6 +237,13 @@
 
         await LoadAsync();
         Show(success: success);
+    }
+
+    private async Task ModuleChangedAsync(PlatformModuleDto module, string? error)
+    {
+        var wasEnabled = detail?.Tenant.EnabledModules.Contains(module.Key) == true;
+        await LoadAsync();
+        Show(success: error is null ? $"{module.DisplayName} {(wasEnabled ? "kapatıldı. Veri silinmedi." : "açıldı.")}" : null, error: error);
     }
 
     private void Show(string? success = null, string? error = null)

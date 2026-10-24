@@ -35,6 +35,9 @@ public static class PlatformEndpoints
         platform.MapPost("/tenants/{tenantId:guid}/reopen", (Guid tenantId, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
             Run(() => admin.ReopenTenantAsync(tenantId, UserId(user), ct)));
         platform.MapPost("/tenants/{tenantId:guid}/administrators", InviteAdministratorAsync);
+        platform.MapPut("/tenants/{tenantId:guid}/modules/{moduleKey}", (Guid tenantId, string moduleKey, SetTenantModuleRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
+            Run(() => admin.SetModuleAsync(tenantId, moduleKey, request.Enabled, UserId(user), ct)));
+        platform.MapGet("/catalog", GetCatalogAsync);
 
         return app;
     }
@@ -52,6 +55,21 @@ public static class PlatformEndpoints
         var readOnly = catalog.TemplatesFor(catalog.Modules.Select(m => m.Key).ToHashSet(StringComparer.Ordinal))
             .Single(t => t.Key == ModuleCatalog.ReadOnlyTemplateKey);
         return new PlatformModulesResponse(modules, new RoleTemplateDto(readOnly.Key, readOnly.Name, readOnly.Description, []));
+    }
+
+    /// <summary>Modül kataloğu (Y4b): kayıtlı modüller, izinleri, hazır rolleri ve kaç firmada açık oldukları.</summary>
+    private static async Task<List<CatalogModuleDto>> GetCatalogAsync(ModuleCatalog catalog, IPlatformAdministration admin, CancellationToken ct)
+    {
+        var usage = (await admin.GetModuleUsageAsync(ct)).ToDictionary(u => u.ModuleKey, u => u.EnabledTenantCount);
+        return catalog.Modules
+            .Select(m => new CatalogModuleDto(
+                m.Key,
+                m.DisplayName,
+                ModuleCatalog.IsAlwaysEnabled(m.Key),
+                usage.TryGetValue(m.Key, out var count) ? count : null,
+                m.Permissions.Select(p => new PermissionDto(p.Key, p.DisplayName, m.Key, m.DisplayName, p.ResourceName ?? AccessKeys.ResourceOf(p.Key))).ToList(),
+                m.RoleTemplates.Select(t => new RoleTemplateDto(t.Key, t.Name, t.Description, t.Permissions)).ToList()))
+            .ToList();
     }
 
     private static async Task<IResult> ListTenantsAsync(

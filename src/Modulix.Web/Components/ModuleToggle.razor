@@ -1,0 +1,79 @@
+@* Bir firmada bir modülü açar veya kapatır (Y4b); modül hakları ekranı ve firma detayı kullanır. Kapatmadan önce
+   uyarı gösterir. Değişiklik firmanın bir sonraki isteğinde geçerli olur; sunucu firmanın denetim kaydına yazar. *@
+@inject ApiClient Api
+
+<div class="module-toggle">
+    <div class="form-check form-switch">
+        <input id="@Id" class="form-check-input" type="checkbox" role="switch" checked="@(shown ?? Enabled)" disabled="@(busy || confirming)"
+               aria-label="@($"{TenantName}: {ModuleName}")" @onchange="OnChange" />
+        <label class="form-check-label" for="@Id">@(ShowLabel ? ModuleName : (shown ?? Enabled) ? "Açık" : "Kapalı")</label>
+    </div>
+    @if (confirming)
+    {
+        <div class="alert alert-warning confirm" role="alertdialog">
+            <p>
+                <strong>@TenantName için @ModuleName kapatılsın mı?</strong>
+                Veri silinmez. Modülün menüsü ve uç noktaları bu firmada kapanır; rollerdeki izinler korunur ve modül
+                yeniden açılınca geçerli olur.
+            </p>
+            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => SetAsync(false)">Kapat</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Cancel">Vazgeç</button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid TenantId { get; set; }
+
+    [Parameter, EditorRequired] public string TenantName { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public string ModuleKey { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public string ModuleName { get; set; } = string.Empty;
+
+    [Parameter] public bool Enabled { get; set; }
+
+    /// <summary>Anahtarın yanında modül adı (firma detayı); yoksa "Açık"/"Kapalı" (tablo).</summary>
+    [Parameter] public bool ShowLabel { get; set; }
+
+    /// <summary>Sonuç: başarıda <c>null</c>, değilse hata mesajı.</summary>
+    [Parameter] public EventCallback<string?> Changed { get; set; }
+
+    private bool confirming;
+    private bool busy;
+
+    // İşlem veya onay sürerken anahtarın gösterdiği değer; bitince yeniden Enabled gösterilir (sonuç ne olursa olsun
+    // değer değiştiği için tarayıcıdaki kutu da güncellenir).
+    private bool? shown;
+
+    private string Id => $"module-{TenantId:N}-{ModuleKey}";
+
+    private async Task OnChange(ChangeEventArgs e)
+    {
+        shown = (bool)e.Value!;
+        if (shown == true)
+        {
+            await SetAsync(true);
+        }
+        else
+        {
+            confirming = true;
+        }
+    }
+
+    private void Cancel()
+    {
+        confirming = false;
+        shown = null;
+    }
+
+    private async Task SetAsync(bool enabled)
+    {
+        busy = true;
+        var result = await Api.PutAsync<bool>($"/api/platform/tenants/{TenantId}/modules/{ModuleKey}", new SetTenantModuleRequest(enabled));
+        busy = false;
+        confirming = false;
+        shown = null;
+        await Changed.InvokeAsync(result.Error);
+    }
+}

@@ -1027,3 +1027,23 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
         font-size: 1rem;
         margin-bottom: 0.75rem;
     }
+
+/* Modül hakları (Y4b): tablo hücresindeki anahtar ve kapatma uyarısı. */
+.module-toggle .form-check {
+    margin-bottom: 0;
+}
+
+.module-toggle .confirm {
+    margin-top: 0.5rem;
+    max-width: 22rem;
+    font-size: 0.875rem;
+}
+
+/* Modül kataloğu (Y4b). */
+.catalog-module {
+    margin-bottom: 1.5rem;
+}
+
+    .catalog-module code {
+        font-size: 0.8rem;
+    }

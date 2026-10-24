@@ -147,7 +147,7 @@ Ekran: **Yönetim → Roller** (`/yonetim/roller`). Uç noktalar `/api/roles` al
 - **Hazır roller (Y3b, [ADR-0005](docs/adr/0005-rol-sablonlari.md)):** modüller önerdikleri rolleri `IModule.RoleTemplates` ile bildirir (CRM "Satış temsilcisi", Lojistik "Operasyon"); çekirdek açık modüllerin tüm görüntüleme izinleriyle "Salt okur" şablonunu ekler. `GET /api/roles/templates` yalnızca açık modüllerin şablonlarını döner. Yeni rol formunda "Şablondan başla"; yalnızca Yönetici rolü varken rol listesi şablonları kart olarak önerir.
 - **Kim neye erişebilir:** rol detayında "Bu rolde kimler var" (`GET /api/roles/{id}/members`, `core.roles.manage` veya `core.users.manage`); kullanıcı detayında "Erişim": kişinin geçerli izinleri ve her izni veren roller (`GET /api/users/{id}/access`, `core.users.manage`). Hesap sunucunun her istekte uyguladığıyla aynıdır (`MembershipPermissions`).
 
-### Platform yönetimi (Y4a)
+### Platform yönetimi (Y4)
 
 Platformu işleten ekip için ayrı bir alan: menüde **Platform** (`/platform`), yalnızca platform yöneticisine görünür. Uç noktalar `/api/platform` altındadır.
 
@@ -158,6 +158,8 @@ Platformu işleten ekip için ayrı bir alan: menüde **Platform** (`/platform`)
 - **Firma açma** tek işlemdir: firma, Yönetici sistem rolü, seçilen modüller, seçilen hazır roller ve ilk yöneticinin daveti (Y2 akışı) birlikte oluşur. Biri başarısız olursa (ör. kısa ad kullanılıyor, 409) hiçbiri oluşmaz ve e-posta gitmez.
 - **Firma detayı:** yöneticiler ve bekleyen davetler, "Yönetici davet et" (yöneticisi kalmayan firmanın kurtarma yolu), ad değiştirme, kapatma ve yeniden açma. Kapatmada veri silinmez; üyeler bir sonraki isteklerinde 403 alır, firma seçim listesinden çıkar, davet bağlantıları çalışmaz.
 - Açma, ad değiştirme, kapatma ve yeniden açma firmanın denetim kaydına `core.tenant` olarak, işlemi yapan platform yöneticisi adına yazılır; yönetici daveti `core.membership` kaydıdır.
+- **Modül hakları (Y4b)** (`/platform/moduller`): firma × modül tablosu, her hücrede aç/kapa anahtarı; firma detayında da aynı anahtarlar. `PUT /api/platform/tenants/{id}/modules/{modül}` gövde `{ "enabled": false }`. Kapatmak veri silmez: modülün menüsü ve uç noktaları o firmada kapanır, rollerdeki izinler korunur ve modül yeniden açılınca geçerli olur. Değişiklik firmanın bir sonraki isteğinde geçerlidir ve firmanın denetim kaydına `core.tenant` olarak (`modules` önce/sonra) yazılır. Çekirdek modül kapatılamaz (400).
+- **Modül kataloğu (Y4b)** (`/platform/katalog`, `GET /api/platform/catalog`): kayıtlı modüller, izinleri (kaynak ve işlem), hazır rolleri ve kaç açık firmada açık oldukları. Salt okunur; modül eklemek kodla olur.
 
 ## CRM modülü
 

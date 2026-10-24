@@ -1,0 +1,135 @@
+@page "/platform/moduller"
+@inject ApiClient Api
+
+<PageTitle>Modül hakları · Platform · Modulix</PageTitle>
+
+@* Firma × modül (Y4b). Açma ve kapama firmanın bir sonraki isteğinde geçerli olur ve firmanın denetim kaydına yazılır. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>Modül hakları</h1>
+    <p class="text-muted">
+        Firmalarda hangi modüllerin açık olduğu. Kapatmak veri silmez; modül yeniden açılınca rollerdeki izinler
+        yeniden geçerli olur. Çekirdek (Yönetim) her firmada açıktır.
+    </p>
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="filters" role="group" aria-label="Durum">
+        <button type="button" class="chip @(status is null ? "active" : null)" @onclick="() => FilterAsync(null)">Tümü</button>
+        @foreach (var value in Enum.GetValues<TenantState>())
+        {
+            <button type="button" class="chip @(status == value ? "active" : null)" @onclick="() => FilterAsync(value)">@TenantStateText.Of(value)</button>
+        }
+    </div>
+
+    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <input class="form-control" type="search" placeholder="Firma ara" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (page is null || modules is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Firma yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead>
+                <tr>
+                    <th>Firma</th>
+                    @foreach (var module in modules.Modules)
+                    {
+                        <th>@module.DisplayName</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tenant in page.Items)
+                {
+                    <tr>
+                        <td data-label="Firma" class="primary">
+                            <a href="platform/firmalar/@tenant.Id">@tenant.Name</a>
+                            @if (tenant.Status == TenantState.Closed)
+                            {
+                                <TenantStateBadge State="tenant.Status" />
+                            }
+                        </td>
+                        @foreach (var module in modules.Modules)
+                        {
+                            <td data-label="@module.DisplayName">
+                                <ModuleToggle TenantId="tenant.Id" TenantName="@tenant.Name" ModuleKey="@module.Key" ModuleName="@module.DisplayName"
+                                              Enabled="tenant.EnabledModules.Contains(module.Key)"
+                                              Changed="error => ChangedAsync(tenant, module, error)" />
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</PlatformGate>
+
+@code {
+    private PlatformTenantPageResponse? page;
+    private PlatformModulesResponse? modules;
+    private string? search;
+    private TenantState? status;
+    private string? message;
+    private string? notice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<PlatformModulesResponse>("/api/platform/modules");
+        modules = result.Value;
+        message = result.Error;
+        if (result.IsSuccess)
+        {
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task FilterAsync(TenantState? value)
+    {
+        status = value;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"/api/platform/tenants?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (status is { } s)
+        {
+            url += $"&status={s}";
+        }
+
+        var result = await Api.GetAsync<PlatformTenantPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private async Task ChangedAsync(PlatformTenantDto tenant, PlatformModuleDto module, string? error)
+    {
+        var wasEnabled = tenant.EnabledModules.Contains(module.Key);
+        await LoadAsync(page?.Page ?? 1);
+        message = error;
+        notice = error is null
+            ? $"{tenant.Name}: {module.DisplayName} {(wasEnabled ? "kapatıldı. Veri silinmedi." : "açıldı.")}"
+            : null;
+    }
+}
