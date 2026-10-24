@@ -198,7 +198,9 @@ public class RoleManagementTests(ModulixApiFactory factory) : IClassFixture<Modu
         var access = await client.GetFromJsonAsync<UserAccessDto>($"/api/users/{memberMembership}/access");
         Assert.False(access!.IsAdministrator);
         Assert.Equal([CompaniesRead, CompaniesWrite, ContactsRead], access.Permissions.Select(p => p.Key));
-        Assert.Equal([readers.Name, writers.Name], access.Permissions.Single(p => p.Key == CompaniesRead).GrantedBy.Select(r => r.Name).Order());
+        Assert.Equal(
+            new[] { readers.Name, writers.Name }.Order(StringComparer.Ordinal),
+            access.Permissions.Single(p => p.Key == CompaniesRead).GrantedBy.Select(r => r.Name).Order(StringComparer.Ordinal));
         Assert.Contains(access.Assignable, p => p.Key == ManageUsers);
 
         using var memberClient = await LoginAsync(member);
