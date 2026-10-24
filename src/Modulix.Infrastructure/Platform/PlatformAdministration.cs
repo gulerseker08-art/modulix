@@ -200,6 +200,56 @@ internal sealed class PlatformAdministration(
             new UserInvitation(email, displayName, [administrator.Id], publicUrl), cancellationToken);
     }
 
+    public async Task SetModuleAsync(Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken)
+    {
+        if (!catalog.ContainsModule(moduleKey) || ModuleCatalog.IsAlwaysEnabled(moduleKey))
+        {
+            throw new ArgumentException($"Açılıp kapatılamayan modül: '{moduleKey}'.", nameof(moduleKey));
+        }
+
+        if (!await db.Tenants.AnyAsync(t => t.Id == tenantId, cancellationToken))
+        {
+            throw NotFound();
+        }
+
+        // Modül hakkı platform tablosundadır; denetim kaydı firma verisidir, ikisi aynı kayıtta yazılır.
+        await using var scope = tenantScopes.Create(new TenantContext(tenantId, actingUserId, Guid.Empty));
+        var services = scope.ServiceProvider;
+        var tenantDb = services.GetRequiredService<ModulixDbContext>();
+        var entitlements = services.GetRequiredService<IModuleEntitlements>();
+        var before = await entitlements.GetEnabledAsync(tenantId, cancellationToken);
+        if (before.Contains(moduleKey) == enabled)
+        {
+            return;
+        }
+
+        var tenant = await tenantDb.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId, cancellationToken);
+        var after = enabled ? before.Append(moduleKey) : before.Where(m => m != moduleKey);
+        Audit(services, tenant, actingUserId, AuditAction.Updated,
+            new JsonObject { ["modules"] = ModuleList(before) },
+            new JsonObject { ["modules"] = ModuleList(after) });
+        await entitlements.SetEnabledAsync(tenantId, moduleKey, enabled, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ModuleUsage>> GetModuleUsageAsync(CancellationToken cancellationToken)
+    {
+        var counts = await (
+            from entitlement in db.ModuleEntitlements.AsNoTracking()
+            join tenant in db.Tenants.AsNoTracking() on entitlement.TenantId equals tenant.Id
+            where entitlement.IsEnabled && tenant.Status == TenantStatus.Active
+            group entitlement by entitlement.ModuleKey into g
+            select new { ModuleKey = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.ModuleKey, g => g.Count, cancellationToken);
+
+        return [.. catalog.Modules
+            .Where(m => !ModuleCatalog.IsAlwaysEnabled(m.Key))
+            .Select(m => new ModuleUsage(m.Key, counts.GetValueOrDefault(m.Key)))];
+    }
+
+    // Katalog sırasıyla; denetim kaydında karşılaştırılabilir olsun.
+    private JsonArray ModuleList(IEnumerable<string> modules) =>
+        new([.. catalog.Modules.Select(m => m.Key).Where(modules.Contains).Select(k => JsonValue.Create(k))]);
+
     private async Task ChangeAsync(Guid tenantId, Guid actingUserId, Action<Tenant> change, CancellationToken cancellationToken)
     {
         if (!await db.Tenants.AnyAsync(t => t.Id == tenantId, cancellationToken))

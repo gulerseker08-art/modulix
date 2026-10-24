@@ -1,0 +1,82 @@
+@page "/platform/katalog"
+@inject ApiClient Api
+
+<PageTitle>Modül kataloğu · Platform · Modulix</PageTitle>
+
+@* Kayıtlı modüller, izinleri, hazır rolleri ve kaç firmada açık oldukları (Y4b). Salt okunur: modül eklemek kodla olur. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>Modül kataloğu</h1>
+    <p class="text-muted">Uygulamaya kayıtlı modüller. Yeni modül kodla eklenir; burada yalnızca görüntülenir.</p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (catalog is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        @foreach (var module in catalog)
+        {
+            <section class="detail-section catalog-module">
+                <div class="section-header">
+                    <h2>@module.DisplayName <code>@module.Key</code></h2>
+                    <span class="badge tag">
+                        @(module.IsAlwaysEnabled ? "Her firmada açık" : $"{module.EnabledTenantCount} firmada açık")
+                    </span>
+                </div>
+
+                <table class="table record-table">
+                    <thead><tr><th>Kaynak</th><th>İzin</th><th>Anahtar</th></tr></thead>
+                    <tbody>
+                        @foreach (var permission in module.Permissions)
+                        {
+                            <tr>
+                                <td data-label="Kaynak">@permission.ResourceName</td>
+                                <td data-label="İzin" class="primary">@permission.DisplayName</td>
+                                <td data-label="Anahtar"><code>@permission.Key</code></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (module.Templates.Count > 0)
+                {
+                    <h3 class="h6">Hazır roller</h3>
+                    <ul>
+                        @foreach (var template in module.Templates)
+                        {
+                            <li>
+                                <strong>@template.Name</strong> <span class="text-muted">@template.Description</span>
+                                <small class="text-muted">(@template.Permissions.Count izin)</small>
+                            </li>
+                        }
+                    </ul>
+                }
+                else if (module.IsAlwaysEnabled)
+                {
+                    <p class="text-muted">"Salt okur" hazır rolü her firmada açık modüllerin görüntüleme izinlerinden oluşur.</p>
+                }
+            </section>
+        }
+    }
+</PlatformGate>
+
+@code {
+    private IReadOnlyList<CatalogModuleDto>? catalog;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<List<CatalogModuleDto>>("/api/platform/catalog");
+        catalog = result.Value;
+        message = result.Error;
+    }
+}

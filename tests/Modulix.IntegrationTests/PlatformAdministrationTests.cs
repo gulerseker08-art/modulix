@@ -8,6 +8,7 @@ using Modulix.Core.Authorization;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Modules.Crm;
 using Modulix.Shared.Access;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Platform;
@@ -16,9 +17,9 @@ using Modulix.Shared.Users;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// Y4a: platform yöneticisi ve firmalar. Platform uç noktalarının yalnızca platform yöneticisine açık olması, firma
-/// açılışının tek işlem olması, ilk yöneticinin davetle firmaya girmesi, kapatma ve yeniden açma; platform
-/// yöneticisinin firma verisini görmemesi.
+/// Y4: platform yöneticisi, firmalar ve modül hakları. Platform uç noktalarının yalnızca platform yöneticisine açık olması, firma
+/// açılışının tek işlem olması, ilk yöneticinin davetle firmaya girmesi, kapatma ve yeniden açma, modül
+/// açıp kapatma ve katalog; platform yöneticisinin firma verisini görmemesi.
 /// </summary>
 public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
@@ -210,6 +211,70 @@ public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IC
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/users")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,
             (await client.PostAsJsonAsync("/api/auth/active-tenant", new SelectTenantRequest(tenant.Id))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Turning_a_module_off_and_on_applies_on_the_next_request_keeps_roles_and_is_audited()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var member = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [CrmModule.Permissions.CompaniesRead], member);
+        var platformAdmin = await CreatePlatformAdministratorAsync();
+        using var client = await LoginAsync(platformAdmin);
+        using var memberClient = await LoginAsync(member);
+        Assert.Equal(HttpStatusCode.OK, (await memberClient.GetAsync("/api/crm/companies")).StatusCode);
+
+        // Firma kullanıcısı modül açıp kapatamaz.
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await memberClient.PutAsJsonAsync($"/api/platform/tenants/{tenant.Id}/modules/crm", new SetTenantModuleRequest(false))).StatusCode);
+
+        var url = $"/api/platform/tenants/{tenant.Id}/modules/crm";
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(false))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await memberClient.GetAsync("/api/crm/companies")).StatusCode);
+
+        // Aynı durum ikinci kez denetim kaydı yazmaz.
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(false))).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(true))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await memberClient.GetAsync("/api/crm/companies")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await client.PutAsJsonAsync($"/api/platform/tenants/{tenant.Id}/modules/core", new SetTenantModuleRequest(false))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await client.PutAsJsonAsync($"/api/platform/tenants/{tenant.Id}/modules/yok", new SetTenantModuleRequest(true))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.PutAsJsonAsync($"/api/platform/tenants/{Guid.NewGuid()}/modules/crm", new SetTenantModuleRequest(true))).StatusCode);
+
+        using var scope = factory.OpenScope(tenant.Id);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var changes = await db.AuditLog.AsNoTracking()
+            .Where(a => a.EntityKey == "core.tenant" && a.RecordId == tenant.Id)
+            .OrderBy(a => a.OccurredAt)
+            .ToListAsync();
+        Assert.Equal(2, changes.Count);
+        Assert.All(changes, c => Assert.Equal(platformAdmin.Id, c.UserId));
+        Assert.Contains("crm", changes[0].Changes);
+    }
+
+    [Fact]
+    public async Task Catalog_lists_modules_permissions_templates_and_how_many_tenants_use_them()
+    {
+        var platformAdmin = await CreatePlatformAdministratorAsync();
+        using var client = await LoginAsync(platformAdmin);
+
+        var before = await client.GetFromJsonAsync<List<CatalogModuleDto>>("/api/platform/catalog");
+        var core = before!.Single(m => m.Key == "core");
+        Assert.True(core.IsAlwaysEnabled);
+        Assert.Null(core.EnabledTenantCount);
+        var crm = before!.Single(m => m.Key == "crm");
+        Assert.Contains(crm.Permissions, p => p.Key == CrmModule.Permissions.CompaniesRead && p.ResourceName.Length > 0);
+        Assert.Contains(crm.Templates, t => t.Key == "crm.sales-rep");
+
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var after = await client.GetFromJsonAsync<List<CatalogModuleDto>>("/api/platform/catalog");
+        Assert.True(after!.Single(m => m.Key == "crm").EnabledTenantCount > crm.EnabledTenantCount);
     }
 
     private async Task<ModulixUser> CreatePlatformAdministratorAsync()

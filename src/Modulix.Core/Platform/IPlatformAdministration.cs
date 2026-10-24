@@ -38,6 +38,9 @@ public sealed record TenantCreation(
 /// <summary><see cref="ExistingAccount"/>: yöneticinin e-postası platformda kayıtlıydı; üyelik hemen etkin oldu.</summary>
 public sealed record TenantCreationResult(PlatformTenantDetail Tenant, bool ExistingAccount);
 
+/// <summary>Bir modülün kaç firmada açık olduğu (yalnızca açık firmalar sayılır).</summary>
+public sealed record ModuleUsage(string ModuleKey, int EnabledTenantCount);
+
 /// <summary>
 /// Platform yönetimi (Y4): firmaları açar, kapatır ve ilk yöneticiyi davet eder. Çağıran platform yöneticisi olmalıdır
 /// (API her istekte <see cref="IsPlatformAdministratorAsync"/> ile denetler).
@@ -79,4 +82,15 @@ public interface IPlatformAdministration
     /// </summary>
     Task<InvitationResult> InviteAdministratorAsync(
         Guid tenantId, string email, string displayName, string publicUrl, Guid actingUserId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Firmada bir modülü açar veya kapatır (Y4b). Veri silinmez; rollerdeki izinler korunur ve modül yeniden açılınca
+    /// geçerli olur. Değişiklik firmanın bir sonraki isteğinde geçerlidir ve firmanın denetim kaydına <c>core.tenant</c>
+    /// olarak yazılır. Durum zaten istenen gibiyse bir şey yapılmaz. Bilinmeyen veya çekirdek modül için
+    /// <see cref="ArgumentException"/> (ParamName <c>moduleKey</c>).
+    /// </summary>
+    Task SetModuleAsync(Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken);
+
+    /// <summary>Katalogdaki modüllerin (çekirdek hariç) kaç açık firmada açık olduğu, katalog sırasıyla.</summary>
+    Task<IReadOnlyList<ModuleUsage>> GetModuleUsageAsync(CancellationToken cancellationToken);
 }
