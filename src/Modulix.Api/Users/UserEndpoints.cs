@@ -26,8 +26,9 @@ public static class UserEndpoints
             Run(() => admin.ResendInvitationAsync(membershipId, PublicUrl.Resolve(http), ct)));
         users.MapDelete("/{membershipId:guid}/invitation", (Guid membershipId, IUserAdministration admin, CancellationToken ct) =>
             Run(() => admin.CancelInvitationAsync(membershipId, ct)));
-        users.MapPost("/{membershipId:guid}/disable", (Guid membershipId, IUserAdministration admin, CancellationToken ct) =>
-            Run(() => admin.DisableAsync(membershipId, ct)));
+        users.MapPost("/{membershipId:guid}/disable", DisableAsync);
+        users.MapGet("/{membershipId:guid}/owned-records", GetOwnedRecordsAsync);
+        users.MapPost("/{membershipId:guid}/transfer-records", TransferRecordsAsync);
         users.MapPost("/{membershipId:guid}/enable", (Guid membershipId, IUserAdministration admin, CancellationToken ct) =>
             Run(() => admin.EnableAsync(membershipId, ct)));
         users.MapPost("/{membershipId:guid}/password-reset", (Guid membershipId, HttpContext http, IUserAdministration admin, CancellationToken ct) =>
@@ -48,6 +49,54 @@ public static class UserEndpoints
 
     private static async Task<IResult> GetAsync(Guid membershipId, IUserAdministration admin, CancellationToken ct) =>
         await admin.GetAsync(membershipId, ct) is { } user ? Results.Ok(ToDto(user)) : NotFound();
+
+    /// <summary>
+    /// Gövde isteğe bağlıdır (kayıtları devralacak üye) ve elle okunur: gövde parametresi içerik türü olmayan isteği
+    /// uç noktaya hiç ulaştırmaz (Accepts meta verisi de öyle).
+    /// </summary>
+    private static async Task<IResult> DisableAsync(Guid membershipId, HttpRequest http, IUserAdministration admin, CancellationToken ct)
+    {
+        DisableUserRequest? request = null;
+        if (http.HasJsonContentType())
+        {
+            try
+            {
+                request = await http.ReadFromJsonAsync<DisableUserRequest>(ct);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "İstek gövdesi okunamadı.");
+            }
+        }
+
+        return await Run(() => admin.DisableAsync(membershipId, request?.TransferToMembershipId, ct));
+    }
+
+    private static async Task<IResult> GetOwnedRecordsAsync(Guid membershipId, IUserAdministration admin, CancellationToken ct)
+    {
+        try
+        {
+            var owned = await admin.GetOwnedRecordsAsync(membershipId, ct);
+            return Results.Ok(owned.Select(o => new OwnedRecordsDto(o.EntityKey, o.Label, o.Count)).ToList());
+        }
+        catch (Exception ex) when (ToProblem(ex) is { } problem)
+        {
+            return problem;
+        }
+    }
+
+    private static async Task<IResult> TransferRecordsAsync(
+        Guid membershipId, TransferRecordsRequest request, IUserAdministration admin, CancellationToken ct)
+    {
+        try
+        {
+            return Results.Ok(new TransferRecordsResponse(await admin.TransferRecordsAsync(membershipId, request.ToMembershipId, ct)));
+        }
+        catch (Exception ex) when (ToProblem(ex) is { } problem)
+        {
+            return problem;
+        }
+    }
 
     private static async Task<IResult> InviteAsync(InviteUserRequest request, HttpContext http, IUserAdministration admin, CancellationToken ct)
     {
@@ -82,6 +131,8 @@ public static class UserEndpoints
     {
         UserAdministrationException { Error: UserAdministrationError.NotFound } => NotFound(),
         UserAdministrationException { Error: UserAdministrationError.AdministratorRequired } ex =>
+            Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ex.Message, detail: ex.Message),
+        UserAdministrationException { Error: UserAdministrationError.PermissionDenied } ex =>
             Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ex.Message, detail: ex.Message),
         UserAdministrationException { Error: UserAdministrationError.TooManyRequests } ex =>
             Results.Problem(statusCode: StatusCodes.Status429TooManyRequests, title: ex.Message),

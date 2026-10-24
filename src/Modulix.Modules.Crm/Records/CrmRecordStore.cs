@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
@@ -15,7 +16,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     where TEntity : CrmEntity, new()
 {
     /// <summary>Sorumlu alanının adı; oluştururken boş bırakılırsa isteği yapan kullanıcı atanır.</summary>
-    protected const string OwnerField = "ownerId";
+    protected const string OwnerField = OwnedRecordType.OwnerField;
 
     private static readonly IReadOnlyDictionary<string, RecordFilter<TEntity>> NoFilters = new Dictionary<string, RecordFilter<TEntity>>();
 

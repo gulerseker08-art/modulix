@@ -54,6 +54,14 @@ public sealed class CrmModule : IModule
         new(Permissions.ActivitiesWrite, "Aktivite ekler, düzenler ve siler"),
     ];
 
+    /// <summary>Devre dışı bırakılan kişinin firmaları, açık fırsatları ve açık aktiviteleri devredilir.</summary>
+    IReadOnlyList<OwnedRecordType> IModule.OwnedRecords { get; } =
+    [
+        new(Entities.Company, "firma"),
+        new(Entities.Opportunity, "açık fırsat", new Dictionary<string, string> { ["open"] = "true" }),
+        new(Entities.Activity, "açık aktivite", new Dictionary<string, string> { ["open"] = "true" }),
+    ];
+
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<CrmStoreContext>();

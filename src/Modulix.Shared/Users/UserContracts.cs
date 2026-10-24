@@ -37,6 +37,16 @@ public sealed record InviteUserRequest(string Email, string DisplayName, IReadOn
 /// <summary><see cref="ExistingAccount"/>: kişinin hesabı vardı; üyelik hemen etkin oldu ve bilgi e-postası gitti.</summary>
 public sealed record InviteUserResponse(UserDto User, bool ExistingAccount);
 
+/// <summary>Kişinin sorumlu olduğu bir kayıt türü; <see cref="Count"/> boşsa işlemi yapan bu kayıtları göremiyor.</summary>
+public sealed record OwnedRecordsDto(string EntityKey, string Label, int? Count);
+
+/// <summary><see cref="TransferToMembershipId"/> verilirse kişinin kayıtları önce bu üyeye devredilir.</summary>
+public sealed record DisableUserRequest(Guid? TransferToMembershipId);
+
+public sealed record TransferRecordsRequest(Guid ToMembershipId);
+
+public sealed record TransferRecordsResponse(int Transferred);
+
 public sealed record InvitationInfoResponse(string TenantName, string Email, string DisplayName);
 
 public sealed record AcceptInvitationRequest(Guid MembershipId, string Token, string Password);

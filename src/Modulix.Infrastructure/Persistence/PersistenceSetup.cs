@@ -53,6 +53,7 @@ public static class PersistenceSetup
         // Kullanıcı yönetimi (Y2); UserManager'ı host kaydeder (AddModulixAuth).
         services.AddScoped<IUserAdministration, UserAdministration>();
         services.AddScoped<AccountLinks>();
+        services.AddScoped<RecordHandover>();
         return services;
     }
 

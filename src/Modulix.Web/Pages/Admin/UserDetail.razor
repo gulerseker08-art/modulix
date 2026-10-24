@@ -74,7 +74,12 @@
             {
                 <div class="alert alert-warning confirm" role="alertdialog">
                     <p>@pending.Question</p>
-                    <button type="button" class="btn btn-danger" disabled="@busy" @onclick="() => RunAsync(pending)">@pending.Label</button>
+                    @if (pending.Handover)
+                    {
+                        <HandoverChoice Owned="owned" Receivers="receivers" Required="pending.Url.EndsWith(TransferPath)" @bind-Selected="receiverId" />
+                    }
+                    <button type="button" class="btn btn-danger" disabled="@(busy || (pending.Url.EndsWith(TransferPath) && receiverId is null))"
+                            @onclick="() => RunAsync(pending)">@pending.Label</button>
                     <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = null">Vazgeç</button>
                 </div>
             }
@@ -101,7 +106,12 @@
     private UserDto? user;
     private IReadOnlyList<RoleDto> roles = [];
     private HashSet<Guid> selectedRoles = [];
+    private const string TransferPath = "/transfer-records";
+
     private AccountAction? confirming;
+    private IReadOnlyList<OwnedRecordsDto>? owned;
+    private IReadOnlyList<UserDto> receivers = [];
+    private Guid? receiverId;
     private string? message;
     private string? notice;
     private bool busy;
@@ -109,7 +119,11 @@
     /// <summary>Yönetici olmayan kullanıcı yöneticinin hesabında işlem yapamaz (sunucu da reddeder).</summary>
     private bool Locked => user is { IsAdministrator: true } && !Session.IsAdministrator;
 
-    private sealed record AccountAction(string Label, string Hint, string Url, bool Delete, string Done, string? Question, bool Danger);
+    /// <summary><see cref="Handover"/>: onayda kişinin kayıtları ve devralacak kişi seçimi gösterilir.</summary>
+    private sealed record AccountAction(
+        string Label, string Hint, string Url, bool Delete, string Done, string? Question, bool Danger, bool Handover = false);
+
+    private int OwnedTotal => owned?.Sum(o => o.Count ?? 0) ?? 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -127,7 +141,13 @@
         user = result.Value;
         message = result.Error;
         selectedRoles = user?.Roles.Select(r => r.Id).ToHashSet() ?? [];
+
+        // Devre dışı kişinin üzerinde kalan kayıtlar sonradan da devredilebilir.
+        owned = user?.Status == UserStatus.Disabled ? await LoadOwnedAsync() : null;
     }
+
+    private async Task<IReadOnlyList<OwnedRecordsDto>?> LoadOwnedAsync() =>
+        (await Api.GetAsync<List<OwnedRecordsDto>>($"/api/users/{MembershipId}/owned-records")).Value;
 
     private IEnumerable<AccountAction> Actions()
     {
@@ -148,13 +168,19 @@
                 {
                     yield return new("Devre dışı bırak", "Kişi bu kuruluşa erişemez; kayıtları ve diğer kuruluşlardaki üyelikleri kalır.",
                         $"{url}/disable", false, "Kullanıcı devre dışı bırakıldı.",
-                        $"{user.DisplayName} devre dışı bırakılsın mı? Bir sonraki işleminde erişimi kesilir.", true);
+                        $"{user.DisplayName} devre dışı bırakılsın mı? Bir sonraki işleminde erişimi kesilir.", true, Handover: true);
                 }
 
                 break;
             case UserStatus.Disabled:
                 yield return new("Yeniden etkinleştir", "Kişi rolleriyle birlikte erişimini geri alır.", $"{url}/enable", false,
                     "Kullanıcı yeniden etkinleştirildi.", null, false);
+                if (OwnedTotal > 0)
+                {
+                    yield return new("Kayıtlarını devret", $"Kişinin üzerinde {HandoverChoice.Describe(owned!)} var.", $"{url}{TransferPath}", false,
+                        "Tamamlandı.", $"{user.DisplayName} kişisinin kayıtları kime devredilsin?", false, Handover: true);
+                }
+
                 break;
         }
 
@@ -165,22 +191,36 @@
         }
     }
 
-    private Task Start(AccountAction action)
+    private async Task Start(AccountAction action)
     {
+        if (action.Handover)
+        {
+            receiverId = null;
+            owned = await LoadOwnedAsync();
+            var active = await Api.GetAsync<UserPageResponse>("/api/users?status=Active&pageSize=100");
+            receivers = active.Value?.Items.Where(u => u.MembershipId != MembershipId).ToList() ?? [];
+        }
+
         if (action.Question is not null)
         {
             confirming = action;
-            return Task.CompletedTask;
+            return;
         }
 
-        return RunAsync(action);
+        await RunAsync(action);
     }
 
     private async Task RunAsync(AccountAction action)
     {
         busy = true;
         notice = null;
-        var result = action.Delete ? await Api.DeleteAsync(action.Url) : await Api.PostAsync<bool>(action.Url, new { });
+        object body = action switch
+        {
+            { Handover: true } when action.Url.EndsWith(TransferPath) => new TransferRecordsRequest(receiverId!.Value),
+            { Handover: true } => new DisableUserRequest(receiverId),
+            _ => new { },
+        };
+        var result = action.Delete ? await Api.DeleteAsync(action.Url) : await Api.PostAsync<bool>(action.Url, body);
         busy = false;
         confirming = null;
 
@@ -197,7 +237,9 @@
         }
 
         await LoadAsync();
-        notice = action.Done;
+        notice = action.Handover && receiverId is not null
+            ? $"{action.Done} Kayıtlar {receivers.FirstOrDefault(r => r.MembershipId == receiverId)?.DisplayName} kişisine devredildi."
+            : action.Done;
     }
 
     private async Task SaveRolesAsync()

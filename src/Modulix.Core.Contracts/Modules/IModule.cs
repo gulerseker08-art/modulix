@@ -22,6 +22,13 @@ public interface IModule
     /// <summary>Modülün tanımladığı izinler. Rollere yalnızca bu listedeki izinler atanabilir.</summary>
     IReadOnlyList<PermissionDefinition> Permissions { get; }
 
+    /// <summary>
+    /// Kişiye atanan (sorumlusu olan) kayıt türleri. Kullanıcı devre dışı bırakılırken bu kayıtlar başka bir üyeye
+    /// devredilebilir (ADR-0004). Devri çekirdek, kayıt boru hattıyla yapar: sorumlu alanı
+    /// <see cref="OwnedRecordType.OwnerField"/> adında olmalı, kayıt deposu aynı adla filtre sunmalıdır.
+    /// </summary>
+    IReadOnlyList<OwnedRecordType> OwnedRecords => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {
@@ -30,3 +37,14 @@ public interface IModule
 
 /// <summary>Bir izin. <see cref="Key"/> biçimi: "modül.kaynak.işlem" (ör. "crm.companies.read").</summary>
 public sealed record PermissionDefinition(string Key, string DisplayName);
+
+/// <summary>
+/// Kişiye atanan kayıt türü (ADR-0004). <see cref="Label"/> sayıyla birlikte gösterilir (ör. "12 firma").
+/// <see cref="Filters"/> devredilecek kayıtları daraltır (ör. "open" = "true": yalnızca açık fırsatlar; kapanmış
+/// kayıtlar geçmiş olarak eski sorumlusunda kalır).
+/// </summary>
+public sealed record OwnedRecordType(string EntityKey, string Label, IReadOnlyDictionary<string, string>? Filters = null)
+{
+    /// <summary>Sorumlu alanının ve filtresinin adı; değeri kullanıcı kimliğidir.</summary>
+    public const string OwnerField = "ownerId";
+}
