@@ -49,6 +49,13 @@ public enum AuditAction
 
     /// <summary>Kayıtlar dışa aktarıldı (ör. denetim kaydının CSV'si, Y5).</summary>
     Exported = 4,
+
+    // Oturum olayları (Y5b): kayıt türü core.account, kayıt kişinin hesabıdır.
+    SignedIn = 5,
+    SignInFailed = 6,
+    LockedOut = 7,
+    PasswordReset = 8,
+    InvitationAccepted = 9,
 }
 
 /// <summary>Audit kaydı: kim, ne, ne zaman. <see cref="Changes"/>: alan → { old, new }.</summary>

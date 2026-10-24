@@ -1086,3 +1086,46 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 .audit-table td[data-label="Tarih"] {
     white-space: nowrap;
 }
+
+/* Kayıt geçmişi (Y5b). */
+.history-list .item-main strong {
+    font-weight: 600;
+}
+
+.history-action {
+    font-weight: 400;
+    color: inherit !important;
+    font-size: inherit !important;
+}
+
+.history-changes {
+    list-style: none;
+    padding: 0;
+    margin: 0.35rem 0 0;
+    font-size: 0.875rem;
+}
+
+    .history-changes li {
+        display: block;
+        padding: 0.1rem 0;
+        border: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .history-changes span {
+        color: inherit;
+        font-size: inherit;
+    }
+
+    .history-changes .history-field {
+        color: var(--mx-muted);
+    }
+
+    .history-changes .history-old {
+        text-decoration: line-through;
+        color: var(--mx-muted);
+    }
+
+.audit-changes td:first-child, .audit-changes th:first-child {
+    white-space: nowrap;
+}

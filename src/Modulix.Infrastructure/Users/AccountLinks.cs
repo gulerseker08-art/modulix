@@ -16,6 +16,9 @@ public sealed record AccountLinkResult(ModulixUser? User, Guid? TenantId, bool I
 {
     public bool Succeeded => User is not null;
 
+    /// <summary>Davet kabulünde etkinleşen üyeliklerin firmaları (kişinin bekleyen tüm davetleri).</summary>
+    public IReadOnlyList<Guid> AcceptedTenantIds { get; init; } = [];
+
     public static AccountLinkResult Invalid { get; } = new(null, null, true, []);
 
     public static AccountLinkResult WeakPassword(IdentityResult result) =>
@@ -68,7 +71,7 @@ public sealed class AccountLinks(ModulixDbContext db, UserManager<ModulixUser> u
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return new AccountLinkResult(user, membership.TenantId, false, []);
+        return new AccountLinkResult(user, membership.TenantId, false, []) { AcceptedTenantIds = [.. pending.Select(m => m.TenantId)] };
     }
 
     /// <summary>Şifreyi bağlantıyla değiştirir; hesap kilitliyse kilidi de açar. Oturum açmaz.</summary>

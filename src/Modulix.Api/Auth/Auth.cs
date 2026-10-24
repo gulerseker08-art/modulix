@@ -3,7 +3,10 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
+using Modulix.Core.Records;
+using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Users;
@@ -107,6 +110,7 @@ public static class AuthEndpoints
         UserManager<ModulixUser> users,
         SignInManager<ModulixUser> signIn,
         IMembershipDirectory directory,
+        AccountAudit audit,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrEmpty(request.Password))
@@ -114,15 +118,22 @@ public static class AuthEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "E-posta ve şifre zorunludur.");
         }
 
+        var client = Client(http);
         var user = await users.FindByEmailAsync(request.Email.Trim());
         if (user is null)
         {
+            audit.UnknownAccount(client);
             return InvalidCredentials();
         }
 
+        // Hatalı şifre ve kilitlenme kişinin üye olduğu tüm firmaların denetim kaydına yazılır (Y5b).
+        var wasLockedOut = await users.IsLockedOutAsync(user);
         var result = await signIn.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
         if (result.IsLockedOut)
         {
+            await (wasLockedOut
+                ? audit.RecordAsync(user, AuditAction.SignInFailed, null, client, ct, AccountAuditReasons.Locked)
+                : audit.RecordAsync(user, AuditAction.LockedOut, null, client, ct));
             return Results.Problem(
                 statusCode: StatusCodes.Status423Locked,
                 title: "Hesap geçici olarak kilitlendi.",
@@ -131,6 +142,7 @@ public static class AuthEndpoints
 
         if (!result.Succeeded)
         {
+            await audit.RecordAsync(user, AuditAction.SignInFailed, null, client, ct, AccountAuditReasons.WrongPassword);
             return InvalidCredentials();
         }
 
@@ -140,6 +152,7 @@ public static class AuthEndpoints
         if (active is not null)
         {
             await directory.RecordSignInAsync(active.MembershipId, ct);
+            await audit.RecordAsync(user, AuditAction.SignedIn, [active.TenantId], client, ct);
         }
 
         await IssueSessionAsync(http, signIn, user, active?.TenantId);
@@ -176,6 +189,7 @@ public static class AuthEndpoints
         UserManager<ModulixUser> users,
         SignInManager<ModulixUser> signIn,
         IMembershipDirectory directory,
+        AccountAudit audit,
         CancellationToken ct)
     {
         var user = await users.GetUserAsync(principal);
@@ -191,7 +205,9 @@ public static class AuthEndpoints
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Bu tenant'a erişiminiz yok.");
         }
 
+        // Firma seçmek o firmaya giriştir; denetim kaydına yalnızca seçilen firmada yazılır.
         await directory.RecordSignInAsync(membership.MembershipId, ct);
+        await audit.RecordAsync(user, AuditAction.SignedIn, [membership.TenantId], Client(http), ct);
         await IssueSessionAsync(http, signIn, user, membership.TenantId);
         var memberships = await directory.GetActiveForUserAsync(user.Id, ct);
         return Results.Ok(ToResponse(user, membership.TenantId, memberships));
@@ -209,6 +225,7 @@ public static class AuthEndpoints
         AccountLinks links,
         SignInManager<ModulixUser> signIn,
         IMembershipDirectory directory,
+        AccountAudit audit,
         CancellationToken ct)
     {
         var result = await links.AcceptInvitationAsync(request.MembershipId, request.Token, request.Password, ct);
@@ -220,6 +237,7 @@ public static class AuthEndpoints
         }
 
         var user = result.User!;
+        await audit.RecordAsync(user, AuditAction.InvitationAccepted, result.AcceptedTenantIds, Client(http), ct);
         var memberships = await directory.GetActiveForUserAsync(user.Id, ct);
         var active = memberships.SingleOrDefault(m => m.TenantId == result.TenantId);
         if (active is not null)
@@ -231,7 +249,8 @@ public static class AuthEndpoints
         return Results.Ok(ToResponse(user, active?.TenantId, memberships));
     }
 
-    private static async Task<IResult> ResetPasswordAsync(ResetPasswordRequest request, AccountLinks links, CancellationToken ct)
+    private static async Task<IResult> ResetPasswordAsync(
+        ResetPasswordRequest request, HttpContext http, AccountLinks links, AccountAudit audit, CancellationToken ct)
     {
         var result = await links.ResetPasswordAsync(request.UserId, request.Token, request.Password, ct);
         if (!result.Succeeded)
@@ -241,8 +260,12 @@ public static class AuthEndpoints
                 : WeakPassword(result);
         }
 
+        await audit.RecordAsync(result.User!, AuditAction.PasswordReset, null, Client(http), ct);
         return Results.NoContent();
     }
+
+    private static AccountClient Client(HttpContext http) =>
+        new(http.Connection.RemoteIpAddress?.ToString(), http.Request.Headers.UserAgent.ToString() is { Length: > 0 } agent ? agent : null);
 
     private static async Task IssueSessionAsync(HttpContext http, SignInManager<ModulixUser> signIn, ModulixUser user, Guid? tenantId)
     {

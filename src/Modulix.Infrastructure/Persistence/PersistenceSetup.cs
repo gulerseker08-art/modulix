@@ -58,6 +58,7 @@ public static class PersistenceSetup
         services.AddScoped<UserAdministration>();
         services.AddScoped<IUserAdministration>(sp => sp.GetRequiredService<UserAdministration>());
         services.AddScoped<AccountLinks>();
+        services.AddScoped<AccountAudit>();
         services.AddScoped<RecordHandover>();
 
         // Platform yönetimi (Y4); ITenantScopeFactory'yi host kaydeder (tenant bağlamını o kurar).

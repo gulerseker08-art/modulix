@@ -40,8 +40,11 @@ public static class AuditEndpoints
         IAuditLog log, CancellationToken ct)
     {
         var result = await log.QueryAsync(Query(userId, entityKey, action, source, from, to, page ?? 1), ct);
-        return Results.Ok(new AuditPageResponse(result.Items.Select(ToDto).ToList(), result.Page, result.PageSize, result.TotalCount));
+        return Results.Ok(ToResponse(result));
     }
+
+    internal static AuditPageResponse ToResponse(AuditLogPage page) =>
+        new(page.Items.Select(ToDto).ToList(), page.Page, page.PageSize, page.TotalCount);
 
     private static async Task<AuditFiltersResponse> GetFiltersAsync(IAuditLog log, ModuleCatalog catalog, CancellationToken ct) =>
         new(
