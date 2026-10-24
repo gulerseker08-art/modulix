@@ -121,6 +121,7 @@ public static class AuthEndpoints
         var group = app.MapGroup("/api/auth").WithTags("Auth");
 
         group.MapPost("/login", LoginAsync).AllowAnonymous();
+        group.MapPost("/login/two-factor", TwoFactorLoginAsync).AllowAnonymous();
         group.MapPost("/logout", LogoutAsync).RequireAuthorization();
         group.MapGet("/me", MeAsync).RequireAuthorization();
         group.MapPost("/active-tenant", SelectTenantAsync).RequireAuthorization();
@@ -169,10 +170,7 @@ public static class AuthEndpoints
             await (wasLockedOut
                 ? audit.RecordAsync(user, AuditAction.SignInFailed, null, client, ct, AccountAuditReasons.Locked)
                 : audit.RecordAsync(user, AuditAction.LockedOut, null, client, ct));
-            return Results.Problem(
-                statusCode: StatusCodes.Status423Locked,
-                title: "Hesap geçici olarak kilitlendi.",
-                detail: "Çok sayıda hatalı deneme yapıldı. 15 dakika sonra tekrar deneyin.");
+            return Locked();
         }
 
         if (!result.Succeeded)
@@ -180,6 +178,74 @@ public static class AuthEndpoints
             await audit.RecordAsync(user, AuditAction.SignInFailed, null, client, ct, AccountAuditReasons.WrongPassword);
             return InvalidCredentials();
         }
+
+        // İki adımlı doğrulama (Y7b): oturum ikinci adımdan sonra açılır. Kişi 5 dakika geçerli ayrı bir çerezle hatırlanır.
+        if (user.TwoFactorEnabled)
+        {
+            var pending = new ClaimsIdentity([new Claim(ClaimTypes.Name, user.Id.ToString())], IdentityConstants.TwoFactorUserIdScheme);
+            await http.SignInAsync(IdentityConstants.TwoFactorUserIdScheme, new ClaimsPrincipal(pending));
+            return Results.Json(new LoginChallengeResponse(true), statusCode: StatusCodes.Status202Accepted);
+        }
+
+        return await CompleteSignInAsync(http, user, signIn, directory, audit, names, sessions, ct);
+    }
+
+    /// <summary>Girişin ikinci adımı: uygulamadaki kod veya bir kurtarma kodu. Hatalı kodlar hatalı şifre gibi sayılır ve kilitler.</summary>
+    private static async Task<IResult> TwoFactorLoginAsync(
+        TwoFactorLoginRequest request,
+        HttpContext http,
+        UserManager<ModulixUser> users,
+        SignInManager<ModulixUser> signIn,
+        IMembershipDirectory directory,
+        AccountAudit audit,
+        TenantDisplayNames names,
+        UserSessions sessions,
+        TwoFactorAccounts twoFactor,
+        CancellationToken ct)
+    {
+        var user = await signIn.GetTwoFactorAuthenticationUserAsync();
+        if (user is null || !user.TwoFactorEnabled)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Girişin süresi doldu. E-posta ve şifrenizle yeniden giriş yapın.");
+        }
+
+        var client = Client(http);
+        if (await users.IsLockedOutAsync(user))
+        {
+            await audit.RecordAsync(user, AuditAction.SignInFailed, null, client, ct, AccountAuditReasons.Locked);
+            return Locked();
+        }
+
+        if (await twoFactor.VerifySignInAsync(user, request.Code, PublicUrl.Resolve(http), client, ct) == TwoFactorCodeResult.Invalid)
+        {
+            await users.AccessFailedAsync(user);
+            if (await users.IsLockedOutAsync(user))
+            {
+                await audit.RecordAsync(user, AuditAction.LockedOut, null, client, ct);
+                await http.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme);
+                return Locked();
+            }
+
+            await audit.RecordAsync(user, AuditAction.SignInFailed, null, client, ct, AccountAuditReasons.WrongTwoFactorCode);
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Kod doğru değil. Uygulamadaki güncel kodu veya bir kurtarma kodunu girin.");
+        }
+
+        await users.ResetAccessFailedCountAsync(user);
+        await http.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme);
+        return await CompleteSignInAsync(http, user, signIn, directory, audit, names, sessions, ct);
+    }
+
+    private static async Task<IResult> CompleteSignInAsync(
+        HttpContext http,
+        ModulixUser user,
+        SignInManager<ModulixUser> signIn,
+        IMembershipDirectory directory,
+        AccountAudit audit,
+        TenantDisplayNames names,
+        UserSessions sessions,
+        CancellationToken ct)
+    {
+        var client = Client(http);
 
         // Tek üyelik varsa o tenant otomatik seçilir; birden fazlaysa kullanıcı seçer.
         var memberships = await directory.GetActiveForUserAsync(user.Id, ct);
@@ -210,7 +276,7 @@ public static class AuthEndpoints
         ClaimsPrincipal principal,
         UserManager<ModulixUser> users,
         IMembershipDirectory directory,
-        ITenantContextAccessor tenant,
+        HttpTenantContextAccessor tenant,
         TenantDisplayNames names,
         CancellationToken ct)
     {
@@ -220,8 +286,10 @@ public static class AuthEndpoints
             return Results.Unauthorized();
         }
 
+        // Firma iki adımlı doğrulama istiyorsa (Y7b) firma seçili kalır ama ekranlar kurulum yapılana kadar açılmaz.
         var memberships = await directory.GetActiveForUserAsync(user.Id, ct);
-        return Results.Ok(await ToResponseAsync(user, tenant.Current?.TenantId, memberships, names, ct));
+        var response = await ToResponseAsync(user, tenant.Current?.TenantId ?? tenant.TwoFactorRequiredTenantId, memberships, names, ct);
+        return Results.Ok(response with { TwoFactorRequired = tenant.TwoFactorRequiredTenantId is not null });
     }
 
     private static async Task<IResult> SelectTenantAsync(
@@ -356,7 +424,8 @@ public static class AuthEndpoints
             user.DisplayName,
             activeTenantId,
             memberships.Select(m => new MembershipDto(m.TenantId, m.TenantName, m.TenantSlug, shown.GetValueOrDefault(m.TenantId))).ToList(),
-            user.IsPlatformAdministrator);
+            user.IsPlatformAdministrator,
+            user.TwoFactorEnabled);
     }
 
     private static IResult InvalidLink(string message) =>
@@ -367,6 +436,12 @@ public static class AuthEndpoints
             new Dictionary<string, string[]> { ["password"] = [.. result.PasswordErrors] },
             title: "Şifre kurallara uymuyor.",
             statusCode: StatusCodes.Status422UnprocessableEntity);
+
+    private static IResult Locked() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status423Locked,
+            title: "Hesap geçici olarak kilitlendi.",
+            detail: "Çok sayıda hatalı deneme yapıldı. 15 dakika sonra tekrar deneyin.");
 
     // Kullanıcının var olup olmadığı belli edilmez.
     private static IResult InvalidCredentials() =>

@@ -32,6 +32,7 @@ public sealed class AccountAudit(ModulixDbContext db, ITenantScopeFactory tenant
     /// <param name="reason">Başarısız girişin nedeni (<see cref="AccountAuditReasons"/>).</param>
     /// <param name="before">Değişen hesap alanlarının eski değerleri (ör. ad); yeni değerler <paramref name="details"/>'tadır.</param>
     /// <param name="details">Olaya eklenecek alanlar (ör. yeni ad, kapatılan oturum sayısı).</param>
+    /// <param name="actorId">İşlemi kişi değil başkası yaptıysa o (ör. platform yöneticisinin sıfırlaması).</param>
     public async Task RecordAsync(
         ModulixUser user,
         AuditAction action,
@@ -40,7 +41,8 @@ public sealed class AccountAudit(ModulixDbContext db, ITenantScopeFactory tenant
         CancellationToken cancellationToken,
         string? reason = null,
         JsonObject? before = null,
-        JsonObject? details = null)
+        JsonObject? details = null,
+        Guid? actorId = null)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(client);
@@ -70,7 +72,7 @@ public sealed class AccountAudit(ModulixDbContext db, ITenantScopeFactory tenant
             var services = scope.ServiceProvider;
             services.GetRequiredService<IAuditWriter>().Add(new AuditEntry(
                 tenantId,
-                user.Id,
+                actorId ?? user.Id,
                 CoreModule.AuditedEntityKeys.Account,
                 user.Id,
                 action,

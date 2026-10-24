@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
+using QRCoder;
 using Modulix.Api.Auth;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
@@ -30,6 +31,13 @@ public static class AccountEndpoints
         account.MapDelete("/sessions/{sessionId:guid}", CloseSessionAsync);
         account.MapPost("/sessions/close-others", CloseOtherSessionsAsync);
 
+        // İki adımlı doğrulama (Y7b).
+        account.MapGet("/two-factor", GetTwoFactorAsync);
+        account.MapPost("/two-factor/setup", StartTwoFactorAsync);
+        account.MapPost("/two-factor/enable", EnableTwoFactorAsync);
+        account.MapPost("/two-factor/disable", DisableTwoFactorAsync);
+        account.MapPost("/two-factor/recovery-codes", RegenerateRecoveryCodesAsync);
+
         return app;
     }
 
@@ -54,14 +62,14 @@ public static class AccountEndpoints
         HttpContext http,
         UserManager<ModulixUser> users,
         SignInManager<ModulixUser> signIn,
-        ITenantContextAccessor tenant,
+        HttpTenantContextAccessor tenant,
         AccountSecurity account,
         CancellationToken ct) =>
         RunAsync(principal, users, async user =>
         {
             var sessionId = AuthEndpoints.SessionId(principal)!.Value;
             await account.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword, sessionId, AuthEndpoints.Client(http), ct);
-            await AuthEndpoints.IssueSessionAsync(http, signIn, user, tenant.Current?.TenantId, sessionId);
+            await AuthEndpoints.IssueSessionAsync(http, signIn, user, tenant.Current?.TenantId ?? tenant.TwoFactorRequiredTenantId, sessionId);
             return Results.NoContent();
         });
 
@@ -115,6 +123,68 @@ public static class AccountEndpoints
 
             return Results.Ok(new CloseSessionsResponse(closed));
         });
+
+    private static Task<IResult> GetTwoFactorAsync(
+        ClaimsPrincipal principal, UserManager<ModulixUser> users, TwoFactorAccounts twoFactor, CancellationToken ct) =>
+        RunAsync(principal, users, async user =>
+        {
+            var status = await twoFactor.GetStatusAsync(user);
+            return Results.Ok(new TwoFactorStatusResponse(status.Enabled, status.RecoveryCodesLeft, await twoFactor.RequiringTenantsAsync(user.Id, ct)));
+        });
+
+    private static Task<IResult> StartTwoFactorAsync(
+        StartTwoFactorRequest request, ClaimsPrincipal principal, UserManager<ModulixUser> users, TwoFactorAccounts twoFactor) =>
+        RunAsync(principal, users, async user =>
+        {
+            var setup = await twoFactor.BeginSetupAsync(user, request.CurrentPassword);
+            using var data = QRCodeGenerator.GenerateQrCode(setup.Uri, QRCodeGenerator.ECCLevel.Q);
+            var png = new PngByteQRCode(data).GetGraphic(5);
+            return Results.Ok(new TwoFactorSetupResponse(setup.SharedKey, $"data:image/png;base64,{Convert.ToBase64String(png)}"));
+        });
+
+    /// <summary>Açma ve kapatma güvenlik damgasını yeniler; bu oturumun çerezi aynı oturumla yeniden yazılır.</summary>
+    private static Task<IResult> EnableTwoFactorAsync(
+        EnableTwoFactorRequest request,
+        ClaimsPrincipal principal,
+        HttpContext http,
+        UserManager<ModulixUser> users,
+        SignInManager<ModulixUser> signIn,
+        HttpTenantContextAccessor tenant,
+        TwoFactorAccounts twoFactor,
+        CancellationToken ct) =>
+        RunAsync(principal, users, async user =>
+        {
+            var codes = await twoFactor.EnableAsync(user, request.Code, AuthEndpoints.Client(http), ct);
+            await ReissueAsync(http, signIn, user, principal, tenant);
+            return Results.Ok(new RecoveryCodesResponse(codes));
+        });
+
+    private static Task<IResult> DisableTwoFactorAsync(
+        DisableTwoFactorRequest request,
+        ClaimsPrincipal principal,
+        HttpContext http,
+        UserManager<ModulixUser> users,
+        SignInManager<ModulixUser> signIn,
+        HttpTenantContextAccessor tenant,
+        TwoFactorAccounts twoFactor,
+        CancellationToken ct) =>
+        RunAsync(principal, users, async user =>
+        {
+            await twoFactor.DisableAsync(user, request.CurrentPassword, request.Code, AuthEndpoints.Client(http), ct);
+            await ReissueAsync(http, signIn, user, principal, tenant);
+            return Results.NoContent();
+        });
+
+    private static Task<IResult> RegenerateRecoveryCodesAsync(
+        RegenerateRecoveryCodesRequest request, ClaimsPrincipal principal, HttpContext http, UserManager<ModulixUser> users,
+        TwoFactorAccounts twoFactor, CancellationToken ct) =>
+        RunAsync(principal, users, async user =>
+            Results.Ok(new RecoveryCodesResponse(await twoFactor.RegenerateRecoveryCodesAsync(user, request.CurrentPassword, AuthEndpoints.Client(http), ct))));
+
+    private static Task ReissueAsync(
+        HttpContext http, SignInManager<ModulixUser> signIn, ModulixUser user, ClaimsPrincipal principal, HttpTenantContextAccessor tenant) =>
+        AuthEndpoints.IssueSessionAsync(
+            http, signIn, user, tenant.Current?.TenantId ?? tenant.TwoFactorRequiredTenantId, AuthEndpoints.SessionId(principal)!.Value);
 
     private static Task RecordClosedAsync(AccountAudit audit, ModulixUser user, HttpContext http, int closed, CancellationToken ct) =>
         audit.RecordAsync(user, AuditAction.SessionsClosed, null, AuthEndpoints.Client(http), ct,

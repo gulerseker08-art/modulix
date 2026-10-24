@@ -5,6 +5,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Platform;
+using Modulix.Infrastructure.Users;
 using Modulix.Shared.Access;
 using Modulix.Shared.Platform;
 using Modulix.Shared.Users;
@@ -38,6 +39,13 @@ public static class PlatformEndpoints
         platform.MapPut("/tenants/{tenantId:guid}/modules/{moduleKey}", (Guid tenantId, string moduleKey, SetTenantModuleRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
             Run(() => admin.SetModuleAsync(tenantId, moduleKey, request.Enabled, UserId(user), ct)));
         platform.MapGet("/catalog", GetCatalogAsync);
+
+        // Y7b: hesap düzeyinde; kişinin hangi firmalarda olduğu fark etmez. İşlem kişinin firmalarının denetim kaydına yazılır.
+        platform.MapPost("/users/reset-two-factor", async (
+                ResetTwoFactorRequest request, ClaimsPrincipal user, HttpContext http, TwoFactorAccounts twoFactor, CancellationToken ct) =>
+            await twoFactor.ResetAsync(request.Email, UserId(user), Auth.AuthEndpoints.Client(http), ct)
+                ? Results.NoContent()
+                : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bu e-postayla kayıtlı hesap yok."));
 
         return app;
     }

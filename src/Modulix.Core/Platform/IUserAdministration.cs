@@ -18,10 +18,17 @@ public sealed record TenantUser(
     bool IsCurrentUser)
 {
     public bool IsAdministrator => Roles.Any(r => r.IsSystem);
+
+    /// <summary>İki adımlı doğrulama açık mı (Y7b); hesaba aittir, firmaya değil.</summary>
+    public bool TwoFactorEnabled { get; init; }
 }
 
 /// <summary>Kullanıcı listesi sorgusu. Arama ad ve e-postada yapılır; sayfa 1'den başlar.</summary>
-public sealed record UserQuery(string? Search, MembershipStatus? Status, Guid? RoleId, int Page, int PageSize);
+public sealed record UserQuery(string? Search, MembershipStatus? Status, Guid? RoleId, int Page, int PageSize)
+{
+    /// <summary>İki adımlı doğrulaması açık (true) ya da kapalı (false) olanlar (Y7b).</summary>
+    public bool? TwoFactorEnabled { get; init; }
+}
 
 public sealed record UserPage(IReadOnlyList<TenantUser> Items, int Page, int PageSize, int TotalCount);
 

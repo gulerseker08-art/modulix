@@ -16,6 +16,11 @@ public enum AuditOperation
     PasswordChanged = 10,
     PasswordResetRequested = 11,
     SessionsClosed = 12,
+    TwoFactorEnabled = 13,
+    TwoFactorDisabled = 14,
+    RecoveryCodesRegenerated = 15,
+    SignedInWithRecoveryCode = 16,
+    TwoFactorReset = 17,
 }
 
 public enum AuditSource
@@ -75,6 +80,11 @@ public static class AuditText
         AuditOperation.PasswordChanged => "Şifresini değiştirdi",
         AuditOperation.PasswordResetRequested => "Şifre sıfırlama bağlantısı istedi",
         AuditOperation.SessionsClosed => "Oturum kapattı",
+        AuditOperation.TwoFactorEnabled => "İki adımlı doğrulamayı açtı",
+        AuditOperation.TwoFactorDisabled => "İki adımlı doğrulamayı kapattı",
+        AuditOperation.RecoveryCodesRegenerated => "Kurtarma kodlarını yeniledi",
+        AuditOperation.SignedInWithRecoveryCode => "Kurtarma koduyla giriş yaptı",
+        AuditOperation.TwoFactorReset => "İki adımlı doğrulaması sıfırlandı",
         _ => action.ToString(),
     };
 

@@ -67,6 +67,11 @@ internal sealed class UserAdministration(
             members = members.Where(m => m.Membership.Status == status);
         }
 
+        if (query.TwoFactorEnabled is { } twoFactor)
+        {
+            members = members.Where(m => m.User.TwoFactorEnabled == twoFactor);
+        }
+
         if (query.RoleId is { } roleId)
         {
             members = members.Where(m => db.MembershipRoles.Any(mr => mr.MembershipId == m.Membership.Id && mr.RoleId == roleId));
@@ -556,7 +561,10 @@ internal sealed class UserAdministration(
             membership.InvitedAt,
             membership.LastSignInAt,
             IsLockedOut(user),
-            membership.Id == tenant.MembershipId);
+            membership.Id == tenant.MembershipId)
+        {
+            TwoFactorEnabled = user.TwoFactorEnabled,
+        };
 
     private void AuditStatus(TenantContext tenant, Membership membership, MembershipStatus before) =>
         Audit(tenant, membership.Id, AuditAction.Updated,

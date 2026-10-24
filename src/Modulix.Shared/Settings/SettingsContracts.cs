@@ -59,4 +59,5 @@ public static class SettingKeys
     public const string TimeZone = "core.regional.time-zone";
     public const string Currency = "core.regional.currency";
     public const string Format = "core.regional.format";
+    public const string RequireTwoFactor = "core.security.require-two-factor";
 }

@@ -1,7 +1,11 @@
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Api.Platform;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
+using Modulix.Core.Settings;
+using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
 using Modulix.Shared.Auth;
 
@@ -20,6 +24,18 @@ public static class ModulixClaimTypes
 public sealed class HttpTenantContextAccessor : ITenantContextAccessor
 {
     public TenantContext? Current { get; set; }
+
+    /// <summary>
+    /// Oturumdaki firma iki adımlı doğrulamayı zorunlu kılıyor ve kişinin doğrulaması kapalı (Y7b): bağlam oluşmaz,
+    /// firma uç noktaları 403 ve <see cref="TenantProblems.TwoFactorRequired"/> döner; kişi önce kurulumu yapar.
+    /// </summary>
+    public Guid? TwoFactorRequiredTenantId { get; set; }
+}
+
+public static class TenantProblems
+{
+    /// <summary>403 sorun ayrıntısının <c>code</c> alanı: firma iki adımlı doğrulama istiyor.</summary>
+    public const string TwoFactorRequired = "two-factor-required";
 }
 
 /// <summary>
@@ -29,7 +45,8 @@ public sealed class HttpTenantContextAccessor : ITenantContextAccessor
 /// </summary>
 public sealed class TenantContextMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext context, HttpTenantContextAccessor accessor, IMembershipDirectory directory)
+    public async Task InvokeAsync(
+        HttpContext context, HttpTenantContextAccessor accessor, IMembershipDirectory directory, ITenantSettings settings, ModulixDbContext db)
     {
         var principal = context.User;
         if (principal.Identity?.IsAuthenticated == true
@@ -40,6 +57,14 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             if (membership is not null)
             {
                 accessor.Current = new TenantContext(membership.TenantId, userId, membership.MembershipId);
+
+                // Firma iki adımlı doğrulamayı zorunlu kılıyorsa kapalı olan kişi önce kurulumu yapar (Y7b).
+                if (await settings.GetValueAsync(CoreModule.SettingKeys.RequireTwoFactor, context.RequestAborted) == CoreModule.SettingValues.Yes
+                    && !await db.Users.AnyAsync(u => u.Id == userId && u.TwoFactorEnabled, context.RequestAborted))
+                {
+                    accessor.Current = null;
+                    accessor.TwoFactorRequiredTenantId = membership.TenantId;
+                }
             }
         }
 
@@ -48,15 +73,21 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
 }
 
 /// <summary>Aktif ve doğrulanmış tenant yoksa isteği 403 ile durdurur.</summary>
-public sealed class RequireTenantFilter(ITenantContextAccessor tenant) : IEndpointFilter
+public sealed class RequireTenantFilter(HttpTenantContextAccessor tenant) : IEndpointFilter
 {
     public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
-        tenant.Current is null
-            ? ValueTask.FromResult<object?>(Results.Problem(
-                statusCode: StatusCodes.Status403Forbidden,
-                title: "Aktif tenant yok.",
-                detail: "Bir tenant seçin. Üyeliğiniz kaldırıldıysa bu tenant'a artık erişemezsiniz."))
-            : next(context);
+        tenant.Current is not null
+            ? next(context)
+            : ValueTask.FromResult<object?>(tenant.TwoFactorRequiredTenantId is not null
+                ? Results.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "Bu firma iki adımlı doğrulama istiyor.",
+                    detail: "Devam etmeden önce Hesabım sayfasından iki adımlı doğrulamayı açın.",
+                    extensions: new Dictionary<string, object?> { ["code"] = TenantProblems.TwoFactorRequired })
+                : Results.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "Aktif tenant yok.",
+                    detail: "Bir tenant seçin. Üyeliğiniz kaldırıldıysa bu tenant'a artık erişemezsiniz."));
 }
 
 public static class TenancySetup

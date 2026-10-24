@@ -59,10 +59,19 @@ public sealed class CoreModule : IModule
         public const string TimeZone = "core.regional.time-zone";
         public const string Currency = "core.regional.currency";
         public const string Format = "core.regional.format";
+        public const string RequireTwoFactor = "core.security.require-two-factor";
+    }
+
+    /// <summary>Evet/Hayır ayarlarının değerleri.</summary>
+    public static class SettingValues
+    {
+        public const string Yes = "true";
+        public const string No = "false";
     }
 
     private const string ProfileGroup = "Firma profili";
     private const string RegionalGroup = "Bölgesel ayarlar";
+    private const string SecurityGroup = "Güvenlik";
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
     [
@@ -95,6 +104,14 @@ public sealed class CoreModule : IModule
         new(SettingKeys.Format, "Tarih ve sayı biçimi", RegionalGroup, SettingType.Choice, RegionalOptions.DefaultFormat)
         {
             Options = RegionalOptions.Formats,
+        },
+
+        // Y7b: açıkken iki adımlı doğrulaması kapalı biri bu firmanın ekranlarına giremez, önce kurulumu yapar.
+        new(SettingKeys.RequireTwoFactor, "İki adımlı doğrulama zorunlu", SecurityGroup, SettingType.Choice, SettingValues.No)
+        {
+            Description = "Açıksa iki adımlı doğrulaması kapalı kullanıcılar firmaya girmeden önce doğrulama uygulamasını kurar. "
+                + "Açabilmek için sizin iki adımlı doğrulamanız açık olmalı.",
+            Options = [new(SettingValues.No, "Hayır"), new(SettingValues.Yes, "Evet")],
         },
     ];
 
@@ -137,7 +154,7 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.Account, "Hesap", null, new Dictionary<string, string>
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["ip"] = "IP adresi", ["userAgent"] = "Tarayıcı",
-            ["reason"] = "Neden", ["sessions"] = "Kapatılan oturum",
+            ["reason"] = "Neden", ["sessions"] = "Kapatılan oturum", ["recoveryCodesLeft"] = "Kalan kurtarma kodu",
         }, "email")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
@@ -146,6 +163,7 @@ public sealed class CoreModule : IModule
                 {
                     [AccountAuditReasons.WrongPassword] = "Hatalı şifre",
                     [AccountAuditReasons.Locked] = "Hesap kilitliyken deneme",
+                    [AccountAuditReasons.WrongTwoFactorCode] = "Hatalı doğrulama kodu",
                 },
             },
         },
@@ -157,4 +175,5 @@ public static class AccountAuditReasons
 {
     public const string WrongPassword = "WrongPassword";
     public const string Locked = "Locked";
+    public const string WrongTwoFactorCode = "WrongTwoFactorCode";
 }

@@ -78,3 +78,6 @@ public static class TenantStateText
         _ => state.ToString(),
     };
 }
+
+/// <summary>Telefonunu ve kurtarma kodlarını kaybeden kişinin iki adımlı doğrulamasını sıfırlar (Y7b).</summary>
+public sealed record ResetTwoFactorRequest(string Email);

@@ -81,6 +81,18 @@ internal static class UserEmails
             ("Giriş sayfası", link),
             "Bu e-posta bilgi amaçlıdır.");
 
+    public static EmailMessage RecoveryCodeUsed(string to, string displayName, int left, string link) =>
+        Build(
+            to,
+            displayName,
+            "Modülix hesabınıza kurtarma koduyla girildi",
+            [
+                $"Modülix hesabınıza bir kurtarma koduyla giriş yapıldı. {left} kurtarma kodunuz kaldı.",
+                "Doğrulama uygulamanıza erişemiyorsanız Hesabım sayfasından uygulamayı yeniden kurun ve kodlarınızı yenileyin.",
+            ],
+            ("Hesabıma git", link),
+            "Bu girişi siz yapmadıysanız hemen şifrenizi değiştirin ve kuruluşunuzun yöneticisine bildirin.");
+
     private static EmailMessage Build(
         string to, string displayName, string subject, string[] paragraphs, (string Text, string Url) action, string footer)
     {

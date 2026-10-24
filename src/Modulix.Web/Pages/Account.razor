@@ -5,9 +5,23 @@
 <PageTitle>Hesabım · Modulix</PageTitle>
 
 @* Kişinin kendi hesabı (Y7a). Bilgiler kişiye aittir: değişiklik üye olduğu bütün kuruluşlarda geçerlidir. *@
-<AuthGate>
+<AuthGate AllowWithoutTwoFactor="true">
     <h1>Hesabım</h1>
     <p class="text-muted">Bu bilgiler size aittir; birden fazla kuruluşta çalışıyorsanız hepsinde geçerlidir.</p>
+
+    @if (Session.TwoFactorRequired)
+    {
+        <div class="alert alert-warning" role="alert">
+            <strong>@Session.ActiveTenantName</strong> iki adımlı doğrulama istiyor. Firmanın ekranlarına geçmeden önce
+            <a href="hesabim#iki-adim">doğrulama uygulamanızı kurun</a>.
+        </div>
+    }
+    else if (RecoveryCodeUsed)
+    {
+        <div class="alert alert-warning" role="status">
+            Kurtarma koduyla giriş yaptınız. Telefonunuza erişemiyorsanız iki adımlı doğrulamayı kapatıp yeniden kurun ya da kurtarma kodlarınızı yenileyin.
+        </div>
+    }
 
     @if (loadError is not null)
     {
@@ -66,6 +80,8 @@
             <div class="form-text">Şifre değişince bu oturum açık kalır, diğer cihazlardaki oturumlarınız kapanır.</div>
         </section>
 
+        <TwoFactorSection />
+
         <section class="record-form settings-group">
             <h2>Açık oturumlar</h2>
             <Notice Text="@sessionNotice" Failed="sessionFailed" />
@@ -108,6 +124,10 @@
 </AuthGate>
 
 @code {
+    [SupplyParameterFromQuery(Name = "kurtarma")] public int? RecoveryCode { get; set; }
+
+    private bool RecoveryCodeUsed => RecoveryCode == 1;
+
     private AccountProfileResponse? profile;
     private List<SessionDto>? sessions;
     private string? loadError;

@@ -9,6 +9,7 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <!-- Blazor WebAssembly arayüzünü (Modulix.Web) API ile aynı adresten sunar. -->
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.13" />
+    <PackageReference Include="QRCoder" Version="1.8.*" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Modulix.Core.Contracts\Modulix.Core.Contracts.csproj" />

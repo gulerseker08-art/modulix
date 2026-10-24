@@ -64,6 +64,7 @@ public static class PersistenceSetup
         services.AddScoped<AccountAudit>();
         services.AddScoped<UserSessions>();
         services.AddScoped<AccountSecurity>();
+        services.AddScoped<TwoFactorAccounts>();
         services.AddMemoryCache();
         services.AddScoped<RecordHandover>();
 

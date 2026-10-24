@@ -21,3 +21,22 @@ public sealed record CloseSessionsResponse(int Closed);
 public sealed record ForgotPasswordRequest(string Email);
 
 public sealed record ConfirmEmailChangeRequest(Guid UserId, string Email, string Token);
+
+// İki adımlı doğrulama (Y7b): /api/account/two-factor.
+
+/// <summary><see cref="RequiredBy"/>: zorunlu kılan firmalar; açıkken kapatılamaz, kapalıyken o firmalara girilemez.</summary>
+public sealed record TwoFactorStatusResponse(bool Enabled, int RecoveryCodesLeft, IReadOnlyList<string> RequiredBy);
+
+public sealed record StartTwoFactorRequest(string CurrentPassword);
+
+/// <summary>Doğrulama uygulamasına girilecek anahtar ve aynı bilginin QR kodu (PNG, data: adresi).</summary>
+public sealed record TwoFactorSetupResponse(string SharedKey, string QrCode);
+
+public sealed record EnableTwoFactorRequest(string Code);
+
+public sealed record DisableTwoFactorRequest(string CurrentPassword, string Code);
+
+public sealed record RegenerateRecoveryCodesRequest(string CurrentPassword);
+
+/// <summary>Kurtarma kodları yalnızca bir kez gösterilir.</summary>
+public sealed record RecoveryCodesResponse(IReadOnlyList<string> Codes);
