@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Authorization;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
@@ -119,11 +120,16 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>Tenant'ta rol oluşturur ve verilen kullanıcılara (üyelikleri üzerinden) atar.</summary>
-    public async Task<RoleSummary> CreateRoleAsync(Guid tenantId, IReadOnlyCollection<string> permissions, params ModulixUser[] assignTo)
+    public Task<RoleSummary> CreateRoleAsync(Guid tenantId, IReadOnlyCollection<string> permissions, params ModulixUser[] assignTo) =>
+        CreateRoleAsync(tenantId, permissions, RecordScope.All, assignTo);
+
+    /// <summary>Kayıt kapsamlı rol (Y8); verilen kullanıcıların rolleri bu rolle değiştirilir.</summary>
+    public async Task<RoleSummary> CreateRoleAsync(
+        Guid tenantId, IReadOnlyCollection<string> permissions, RecordScope recordScope, params ModulixUser[] assignTo)
     {
         using var scope = OpenScope(tenantId);
         var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
-        var role = await roles.CreateAsync($"Rol {Guid.NewGuid():N}"[..20], permissions, CancellationToken.None);
+        var role = await roles.CreateAsync($"Rol {Guid.NewGuid():N}"[..20], permissions, CancellationToken.None, scope: recordScope);
 
         foreach (var user in assignTo)
         {

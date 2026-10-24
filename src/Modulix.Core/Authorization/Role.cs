@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 
@@ -22,11 +23,12 @@ public sealed class Role : ITenantEntity
         // EF Core için
     }
 
-    public Role(string name, IEnumerable<string> permissions)
+    public Role(string name, IEnumerable<string> permissions, RecordScope scope = RecordScope.All)
     {
         Id = Guid.CreateVersion7();
         Rename(name);
         SetPermissions(permissions);
+        SetScope(scope);
         CreatedAt = DateTimeOffset.UtcNow;
     }
 
@@ -53,6 +55,9 @@ public sealed class Role : ITenantEntity
     /// <summary>Tenant'ın yönetici rolü: tüm izinleri verir, düzenlenemez.</summary>
     public bool IsSystem { get; private set; }
 
+    /// <summary>Kayıt kapsamı (Y8): rolün izinleri hangi kayıtlarda geçerli. Sistem rolünde her zaman tüm kayıtlar.</summary>
+    public RecordScope Scope { get; private set; } = RecordScope.All;
+
     /// <summary>
     /// Aynı adlı eski bir rolü sistem rolüne çevirir (sistem rolü öncesi oluşturulmuş "Yönetici" rolleri için).
     /// İzin listesi boşaltılır; sistem rolü izinlerini katalogdan alır.
@@ -61,6 +66,18 @@ public sealed class Role : ITenantEntity
     {
         IsSystem = true;
         Permissions = [];
+        Scope = RecordScope.All;
+    }
+
+    public void SetScope(RecordScope scope)
+    {
+        EnsureEditable();
+        if (!Enum.IsDefined(scope))
+        {
+            throw new ArgumentException("Geçersiz kayıt kapsamı.", nameof(scope));
+        }
+
+        Scope = scope;
     }
 
     public void Rename(string name)

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
+using Modulix.Core.Teams;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
@@ -48,6 +49,10 @@ public class ModulixDbContext(
     public DbSet<Role> Roles => Set<Role>();
 
     public DbSet<MembershipRole> MembershipRoles => Set<MembershipRole>();
+
+    public DbSet<Team> Teams => Set<Team>();
+
+    public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
 
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 

@@ -50,7 +50,12 @@ public sealed record PermissionGrantDto(string Key, IReadOnlyList<UserRoleDto> G
 /// "Bu kullanıcı neye erişebilir": <see cref="Permissions"/> kişinin geçerli izinleri, <see cref="Assignable"/> tenant için
 /// açık modüllerin tüm izinleri (ekran matrisi bunlarla çizer).
 /// </summary>
-public sealed record UserAccessDto(bool IsAdministrator, IReadOnlyList<PermissionDto> Assignable, IReadOnlyList<PermissionGrantDto> Permissions);
+public sealed record UserAccessDto(
+    bool IsAdministrator,
+    IReadOnlyList<PermissionDto> Assignable,
+    IReadOnlyList<PermissionGrantDto> Permissions,
+    RecordScope Scope = RecordScope.All,
+    IReadOnlyList<string>? Teams = null);
 
 /// <summary><see cref="TransferToMembershipId"/> verilirse kişinin kayıtları önce bu üyeye devredilir.</summary>
 public sealed record DisableUserRequest(Guid? TransferToMembershipId);

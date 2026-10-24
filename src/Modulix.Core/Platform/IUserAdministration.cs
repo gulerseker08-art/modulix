@@ -65,7 +65,14 @@ public sealed record OwnedRecordSummary(string EntityKey, string Label, int? Cou
 public sealed record PermissionGrant(string Key, IReadOnlyList<UserRole> GrantedBy);
 
 /// <summary>Kişinin aktif tenant'taki geçerli izinleri (açık modüllerinkiler), anahtara göre sıralı.</summary>
-public sealed record UserAccess(bool IsAdministrator, IReadOnlyList<PermissionGrant> Permissions);
+public sealed record UserAccess(bool IsAdministrator, IReadOnlyList<PermissionGrant> Permissions)
+{
+    /// <summary>Kayıt kapsamı (Y8): rollerin en genişi.</summary>
+    public Contracts.Authorization.RecordScope Scope { get; init; } = Contracts.Authorization.RecordScope.All;
+
+    /// <summary>Kişinin ekipleri (ada göre); "ekibinin kayıtları" bunların üyelerini kapsar.</summary>
+    public IReadOnlyList<string> Teams { get; init; } = [];
+}
 
 public sealed class UserAdministrationException(UserAdministrationError error, string message) : Exception(message)
 {

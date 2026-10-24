@@ -1,4 +1,5 @@
 using System.Globalization;
+using Modulix.Shared.Access;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Crm;
 
@@ -20,9 +21,15 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
 
     public IReadOnlyList<TenantMemberResponse> Members { get; private set; } = [];
 
+    /// <summary>Sorumlu olarak atanabilecek üyeler: kişinin kayıt kapsamındakiler (Y8). Adlar için <see cref="Members"/> kullanılır.</summary>
+    public IReadOnlyList<TenantMemberResponse> AssignableMembers { get; private set; } = [];
+
     public async Task LoadAsync(bool contacts = false, bool opportunities = false)
     {
         Members = (await api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members")).Value ?? [];
+        AssignableMembers = session.Scope == RecordScope.All && session.Access is not null
+            ? Members
+            : (await api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members?assignable=true")).Value ?? [];
 
         if (session.Can(CrmAccess.CompaniesRead))
         {

@@ -33,7 +33,7 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Rol</th><th>İzinler</th><th>Üyeler</th></tr>
+                <tr><th>Rol</th><th>İzinler</th><th>Kayıt kapsamı</th><th>Üyeler</th></tr>
             </thead>
             <tbody>
                 @foreach (var role in roles)
@@ -47,6 +47,7 @@
                             }
                         </td>
                         <td data-label="İzinler">@(role.IsSystem ? "Tüm izinler, düzenlenemez" : $"{role.Permissions.Count} izin")</td>
+                        <td data-label="Kayıt kapsamı">@RecordScopeLabels.Of(role.Scope)</td>
                         <td data-label="Üyeler">@role.MemberCount</td>
                     </tr>
                 }

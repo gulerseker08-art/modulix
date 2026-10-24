@@ -1,0 +1,209 @@
+@page "/yonetim/ekipler/{TeamId:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(team?.Name ?? "Ekip") · Modulix</PageTitle>
+
+<AuthGate Permission="@CoreAccess.ManageUsers">
+    <a class="back-link" href="yonetim/ekipler">← Ekipler</a>
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (team is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        <div class="page-header">
+            <h1>@team.Name</h1>
+        </div>
+
+        <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>Ekip bilgileri</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="teamName">Ekip adı *</label>
+                    <input id="teamName" class="form-control" maxlength="100" @bind="name" @bind:event="oninput" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="teamDescription">Açıklama</label>
+                    <input id="teamDescription" class="form-control" maxlength="500" @bind="description" @bind:event="oninput" />
+                    <FieldError Field="description" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary"
+                        disabled="@(busy || string.IsNullOrWhiteSpace(name) || (name.Trim() == team.Name && (description ?? "") == (team.Description ?? "")))">Kaydet</button>
+            </div>
+        </form>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Üyeler</h2></div>
+            @if (members is null)
+            {
+                <p class="text-muted">Yükleniyor…</p>
+            }
+            else if (members.Count == 0)
+            {
+                <p class="text-muted">Firmada etkin kullanıcı yok.</p>
+            }
+            else
+            {
+                <p class="text-muted small">@selected.Count kişi seçili. Değişiklik, kişilerin bir sonraki işleminde geçerli olur.</p>
+                <div class="role-picker">
+                    @foreach (var member in members)
+                    {
+                        <label class="form-check">
+                            <input class="form-check-input" type="checkbox" checked="@selected.Contains(member.MembershipId)"
+                                   @onchange="e => Toggle(member.MembershipId, e.Value is true)" />
+                            <span class="form-check-label">@member.DisplayName <small class="text-muted">· @member.Email</small></span>
+                        </label>
+                    }
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveMembersAsync">Üyeleri kaydet</button>
+                </div>
+            }
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Ekibi sil</h2></div>
+            @if (!deleting)
+            {
+                <div class="account-actions">
+                    <div>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => deleting = true">Ekibi sil</button>
+                        <small class="text-muted">Üyelerin kayıtlarına dokunulmaz; yalnızca ekip ilişkisi kalkar.</small>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-warning confirm" role="alertdialog">
+                    <p>"@team.Name" ekibi silinsin mi? "Ekibinin kayıtları" kapsamındaki üyeler artık birbirlerinin kayıtlarını görmez.</p>
+                    <button type="button" class="btn btn-danger" disabled="@busy" @onclick="DeleteAsync">Ekibi sil</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => deleting = false">Vazgeç</button>
+                </div>
+            }
+        </section>
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid TeamId { get; set; }
+
+    private TeamDetailDto? team;
+    private List<UserDto>? members;
+    private HashSet<Guid> selected = [];
+    private string name = string.Empty;
+    private string? description;
+    private bool busy;
+    private bool deleting;
+    private string? message;
+    private string? notice;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(CoreAccess.ManageUsers))
+        {
+            return;
+        }
+
+        var result = await Api.GetAsync<TeamDetailDto>($"/api/teams/{TeamId}");
+        message = result.Error;
+        if (result.Value is { } loaded)
+        {
+            Show(loaded);
+
+            // Davet bekleyenler de eklenebilir; devre dışı olanlar gösterilmez (ekipteyse yine işaretli kalır).
+            var users = await Api.GetAsync<UserPageResponse>("/api/users?pageSize=100");
+            members = users.Value?.Items
+                .Where(u => u.Status != UserStatus.Disabled || selected.Contains(u.MembershipId))
+                .OrderBy(u => u.DisplayName)
+                .ToList() ?? [];
+        }
+    }
+
+    private void Show(TeamDetailDto loaded)
+    {
+        team = loaded;
+        name = loaded.Name;
+        description = loaded.Description;
+        selected = loaded.Members.Select(m => m.MembershipId).ToHashSet();
+    }
+
+    private void Toggle(Guid membershipId, bool on)
+    {
+        if (on)
+        {
+            selected.Add(membershipId);
+        }
+        else
+        {
+            selected.Remove(membershipId);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        notice = null;
+        var result = await Api.PutAsync<TeamDetailDto>($"/api/teams/{TeamId}", new SaveTeamRequest(name, description));
+        busy = false;
+        errors = result.FieldErrors;
+        if (result.Value is { } saved)
+        {
+            Show(saved);
+            (notice, message) = ("Ekip kaydedildi.", null);
+            return;
+        }
+
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+    }
+
+    private async Task SaveMembersAsync()
+    {
+        busy = true;
+        notice = null;
+        var result = await Api.PutAsync<TeamDetailDto>($"/api/teams/{TeamId}/members", new SetTeamMembersRequest(selected.ToList()));
+        busy = false;
+        if (result.Value is { } saved)
+        {
+            Show(saved);
+            (notice, message) = ($"Üyeler kaydedildi ({saved.Members.Count} kişi).", null);
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/teams/{TeamId}");
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            (message, deleting) = (result.Error, false);
+            return;
+        }
+
+        Navigation.NavigateTo("yonetim/ekipler");
+    }
+}

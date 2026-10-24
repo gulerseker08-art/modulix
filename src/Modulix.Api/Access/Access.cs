@@ -133,7 +133,7 @@ public static class AccessEndpoints
 
         var permissions = (await access.GetPermissionsAsync(ct)).Order(StringComparer.Ordinal).ToList();
         var myRoles = await roles.GetMembershipRolesAsync(tenant.Current!.MembershipId, ct) ?? [];
-        return Results.Ok(new MyAccessResponse(enabled, permissions, myRoles.Any(r => r.IsSystem)));
+        return Results.Ok(new MyAccessResponse(enabled, permissions, myRoles.Any(r => r.IsSystem), (Shared.Access.RecordScope)await access.GetScopeAsync(ct)));
     }
 
     private static async Task<IResult> ListRolesAsync(IRoleService roles, CancellationToken ct) =>
@@ -163,7 +163,9 @@ public static class AccessEndpoints
         ModuleCatalog catalog, IModuleEntitlements entitlements, ITenantContextAccessor tenant, CancellationToken ct)
     {
         var enabled = await entitlements.GetEnabledAsync(tenant.Current!.TenantId, ct);
-        return Results.Ok(catalog.TemplatesFor(enabled).Select(t => new RoleTemplateDto(t.Key, t.Name, t.Description, t.Permissions)).ToList());
+        return Results.Ok(catalog.TemplatesFor(enabled)
+            .Select(t => new RoleTemplateDto(t.Key, t.Name, t.Description, t.Permissions, (Shared.Access.RecordScope)t.Scope))
+            .ToList());
     }
 
     /// <summary>"Bu rolde kimler var": rolün üyeleri, ada göre sıralı ve sayfalı.</summary>
@@ -186,7 +188,8 @@ public static class AccessEndpoints
     {
         try
         {
-            var role = await roles.CreateAsync(request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId);
+            var role = await roles.CreateAsync(
+                request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId, ToScope(request.Scope) ?? Core.Contracts.Authorization.RecordScope.All);
             return Results.Created($"/api/roles/{role.Id}", ToDto(role));
         }
         catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
@@ -200,7 +203,7 @@ public static class AccessEndpoints
     {
         try
         {
-            var role = await roles.UpdateAsync(roleId, request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId);
+            var role = await roles.UpdateAsync(roleId, request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId, ToScope(request.Scope));
             return role is null ? RoleNotFound() : Results.Ok(ToDto(role));
         }
         catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
@@ -237,7 +240,12 @@ public static class AccessEndpoints
         CancellationToken ct) =>
         UserEndpoints.Run(() => users.SetRolesAsync(membershipId, request.RoleIds ?? [], ct));
 
-    private static RoleDto ToDto(RoleSummary role) => new(role.Id, role.Name, role.Permissions, role.IsSystem, role.MemberCount);
+    private static RoleDto ToDto(RoleSummary role) =>
+        new(role.Id, role.Name, role.Permissions, role.IsSystem, role.MemberCount, (Shared.Access.RecordScope)role.Scope);
+
+    // Tanımsız değer Role.SetScope'ta alan hatası olur.
+    private static Core.Contracts.Authorization.RecordScope? ToScope(Shared.Access.RecordScope? scope) =>
+        scope is { } value ? (Core.Contracts.Authorization.RecordScope)value : null;
 
     private static IResult RoleNotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Rol bulunamadı.");

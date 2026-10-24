@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
@@ -36,13 +37,18 @@ internal sealed class RoleService(
     }
 
     public async Task<RoleSummary> CreateAsync(
-        string name, IReadOnlyCollection<string> permissions, CancellationToken cancellationToken, Guid? actingMembershipId = null)
+        string name,
+        IReadOnlyCollection<string> permissions,
+        CancellationToken cancellationToken,
+        Guid? actingMembershipId = null,
+        RecordScope scope = RecordScope.All)
     {
         var tenant = RequireTenant();
-        var role = new Role(name, permissions);
+        var role = new Role(name, permissions, scope);
         EnsureKnownPermissions(role);
         await EnsureUniqueNameAsync(role.Name, exceptRoleId: null, cancellationToken);
         await EnsureActorMayChangeAsync(actingMembershipId, role.Permissions, cancellationToken);
+        await EnsureActorMayGrantScopeAsync(actingMembershipId, role.Scope, cancellationToken);
 
         db.Roles.Add(role);
         AuditRole(tenant, role.Id, AuditAction.Created, before: null, after: Snapshot(role));
@@ -51,7 +57,12 @@ internal sealed class RoleService(
     }
 
     public async Task<RoleSummary?> UpdateAsync(
-        Guid roleId, string name, IReadOnlyCollection<string> permissions, CancellationToken cancellationToken, Guid? actingMembershipId = null)
+        Guid roleId,
+        string name,
+        IReadOnlyCollection<string> permissions,
+        CancellationToken cancellationToken,
+        Guid? actingMembershipId = null,
+        RecordScope? scope = null)
     {
         var tenant = RequireTenant();
         var role = await db.Roles.SingleOrDefaultAsync(r => r.Id == roleId, cancellationToken);
@@ -62,14 +73,25 @@ internal sealed class RoleService(
 
         var before = Snapshot(role);
         var previous = role.Permissions;
+        var previousScope = role.Scope;
         role.Rename(name);
         role.SetPermissions(permissions);
+        if (scope is { } wanted)
+        {
+            role.SetScope(wanted);
+        }
+
         EnsureKnownPermissions(role);
         await EnsureUniqueNameAsync(role.Name, role.Id, cancellationToken);
 
         // Eklenen ve çıkarılan izinler; değişmeyenler (ör. kapalı modülün izni) denetlenmez.
         var changed = previous.Except(role.Permissions).Concat(role.Permissions.Except(previous)).ToList();
         await EnsureActorMayChangeAsync(actingMembershipId, changed, cancellationToken);
+        if (role.Scope != previousScope)
+        {
+            // Daraltmak da genişletmek de rolün üyelerini etkiler; ikisi de işlemi yapanın kapsamıyla sınırlıdır.
+            await EnsureActorMayGrantScopeAsync(actingMembershipId, (RecordScope)Math.Min((int)role.Scope, (int)previousScope), cancellationToken);
+        }
 
         var after = Snapshot(role);
         if (!JsonNode.DeepEquals(before, after))
@@ -321,6 +343,23 @@ internal sealed class RoleService(
         }
     }
 
+    /// <summary>Yönetici olmayan kişi kendi kapsamından geniş bir kapsamla (ör. kendisi "yalnızca benim"ken "tüm kayıtlar") rol düzenleyemez.</summary>
+    private async Task EnsureActorMayGrantScopeAsync(Guid? actingMembershipId, RecordScope scope, CancellationToken cancellationToken)
+    {
+        if (actingMembershipId is not { } actor || scope == RecordScope.Own)
+        {
+            return;
+        }
+
+        var access = await GetActorAccessAsync(actor, cancellationToken);
+        if (!access.IsAdministrator && scope < access.Scope)
+        {
+            throw new UserAdministrationException(
+                UserAdministrationError.PermissionDenied,
+                "Kendi kayıt kapsamınızdan geniş bir kapsamla rol düzenleyemezsiniz.");
+        }
+    }
+
     private async Task<MembershipAccess> GetActorAccessAsync(Guid actingMembershipId, CancellationToken cancellationToken) =>
         await membershipPermissions.GetAsync(
             actingMembershipId, await entitlements.GetEnabledAsync(RequireTenant().TenantId, cancellationToken), cancellationToken);
@@ -368,10 +407,11 @@ internal sealed class RoleService(
         ["name"] = role.Name,
         ["isSystem"] = role.IsSystem,
         ["permissions"] = new JsonArray([.. role.Permissions.Select(p => JsonValue.Create(p))]),
+        ["scope"] = role.Scope.ToString(),
     };
 
     private static JsonArray RoleNames(IEnumerable<Guid> roleIds, IReadOnlyDictionary<Guid, string> names) =>
         new([.. roleIds.Select(id => names.GetValueOrDefault(id, id.ToString())).Order(StringComparer.Ordinal).Select(n => JsonValue.Create(n))]);
 
-    private static RoleSummary ToSummary(Role role) => new(role.Id, role.Name, role.Permissions, role.IsSystem);
+    private static RoleSummary ToSummary(Role role) => new(role.Id, role.Name, role.Permissions, role.IsSystem) { Scope = role.Scope };
 }

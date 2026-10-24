@@ -345,7 +345,14 @@ internal sealed class UserAdministration(
             .Order(StringComparer.Ordinal)
             .Select(p => new PermissionGrant(p, access.RolesGranting(p).Select(r => new UserRole(r.Id, r.Name, r.IsSystem)).ToList()))
             .ToList();
-        return new UserAccess(access.IsAdministrator, grants);
+        var teams = await (
+            from member in db.TeamMembers.AsNoTracking()
+            join team in db.Teams.AsNoTracking() on member.TeamId equals team.Id
+            where member.MembershipId == membershipId
+            orderby team.Name
+            select team.Name)
+            .ToListAsync(cancellationToken);
+        return new UserAccess(access.IsAdministrator, grants) { Scope = access.Scope, Teams = teams };
     }
 
     public async Task<int> TransferRecordsAsync(Guid membershipId, Guid toMembershipId, CancellationToken cancellationToken)

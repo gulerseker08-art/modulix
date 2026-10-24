@@ -47,6 +47,9 @@ public sealed class SessionState(ApiClient api)
     /// <summary>Yönetici (sistem) rolü var mı? Yönetici rolünü vermek ve yöneticileri yönetmek yalnızca ona açıktır.</summary>
     public bool IsAdministrator => Access?.IsAdministrator == true;
 
+    /// <summary>Kayıt kapsamı (Y8); erişim yüklenmediyse en dar kapsam.</summary>
+    public RecordScope Scope => Access?.Scope ?? RecordScope.Own;
+
     /// <summary>İzinlerden en az biri var mı?</summary>
     public bool CanAny(IEnumerable<string> permissions) => permissions.Any(Can);
 

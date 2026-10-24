@@ -204,6 +204,15 @@ Doğrulama uygulamasıyla (TOTP: Google/Microsoft Authenticator vb.) çalışır
 - **Kayıp telefon ve kodlar**: yalnızca platform yöneticisi sıfırlar (Platform sayfası, `POST /api/platform/users/reset-two-factor`): doğrulama kapanır, kişinin tüm oturumları kapatılır.
 - Denetim kaydına "Hesap" olarak açma, kapatma, kod yenileme, kurtarma koduyla giriş ve sıfırlama yazılır (sıfırlamada işlemi yapan platform yöneticisidir).
 
+### Ekipler ve kayıt kapsamı (Y8a)
+
+Roller "hangi tür kaydı", kayıt kapsamı "hangi kayıtları" belirler. Kapsam rol başınadır: **Tüm kayıtlar**, **Ekibinin kayıtları** (kendisinin ve ekip arkadaşlarının sorumlu olduğu kayıtlar) ya da **Yalnızca kendi kayıtları**. Kişinin birden fazla rolü varsa en geniş kapsam geçerlidir; Yönetici her zaman tüm kayıtları görür. Mevcut roller "Tüm kayıtlar" ile başlar; "Satış temsilcisi" şablonu "Yalnızca kendi kayıtları" önerir.
+
+- Kapsam yalnızca sorumlu alanı olan kayıt türlerine uygulanır (`IRecordStore.OwnerField`; CRM'de firma, fırsat, aktivite). Boru hattı (`IDataScopeService`) listede kapsamı sorguya koyar (`RecordQuery.Owners`), böylece sayfalama ve toplam doğru kalır; kapsam dışındaki tek kayıt 404 döner. Sorumlu kapsam dışına atanamaz (422, `ownerId`). Sorumlusu boş kayıt yalnızca "Tüm kayıtlar"da görünür.
+- **Ekipler** (Yönetim → Ekipler, `core.users.manage`): `/api/teams` (liste, ekle, düzenle, sil), `PUT /api/teams/{id}/members`, kullanıcı ayrıntısında `GET/PUT /api/users/{üyelik}/teams`. Bir kişi birden fazla ekipte olabilir; ekip silinince yalnızca ekip ilişkisi kalkar. Değişiklikler denetim kaydına "Ekip" olarak yazılır.
+- `GET /api/tenant/members?assignable=true`: kişinin sorumlu atayabileceği üyeler. `GET /api/tenant/access` ve kullanıcının "Erişim" görünümü kapsamı (ve ekipleri) gösterir.
+- Yönetici olmayan rol yöneticisi kendi kapsamından geniş kapsam veremez (403).
+
 ## CRM modülü
 
 İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.

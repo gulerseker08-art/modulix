@@ -110,6 +110,7 @@ app.MapAccountEndpoints();
 app.MapTenantEndpoints();
 app.MapAccessEndpoints();
 app.MapUserEndpoints();
+app.MapTeamEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapPlatformEndpoints();

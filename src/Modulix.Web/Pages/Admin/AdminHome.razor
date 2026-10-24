@@ -30,7 +30,8 @@
     private static readonly (string Title, string Description, string Permission, string? Href)[] Sections =
     [
         ("Kullanıcılar", "Davet, rol atama, devre dışı bırakma, şifre sıfırlama", CoreAccess.ManageUsers, "yonetim/kullanicilar"),
-        ("Roller", "Roller ve izinleri, izin matrisi", CoreAccess.ManageRoles, "yonetim/roller"),
+        ("Ekipler", "Ekip ve departmanlar; \"ekibinin kayıtları\" kapsamı", CoreAccess.ManageUsers, "yonetim/ekipler"),
+        ("Roller", "Roller, izinleri ve kayıt kapsamı", CoreAccess.ManageRoles, "yonetim/roller"),
         ("Firma ayarları", "Firma profili, saat dilimi, para birimi", CoreAccess.ManageSettings, "yonetim/ayarlar"),
         ("Denetim kaydı", "Kim, neyi, ne zaman değiştirdi", CoreAccess.ReadAudit, "yonetim/denetim"),
     ];

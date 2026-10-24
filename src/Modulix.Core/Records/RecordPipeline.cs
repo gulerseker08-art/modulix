@@ -29,7 +29,7 @@ public sealed class RecordPipeline(
         }
 
         var data = await store!.FindAsync(record.Id, cancellationToken);
-        if (data is null || !await dataScope.CanAccessAsync(tenant!, data, RecordOperation.Read, cancellationToken))
+        if (data is null || !await InScopeAsync(tenant!, store!, data, cancellationToken))
         {
             // Kapsam dışı kayıt, var olmayan kayıtla aynı cevabı alır; varlığı belli edilmez.
             return NotFound<RecordData>();
@@ -49,6 +49,8 @@ public sealed class RecordPipeline(
         var search = query.Search?.Trim();
         var normalized = query with
         {
+            // Kapsam sorguda uygulanır; sayfalama ve toplam sayı doğru kalır.
+            Owners = store!.OwnerField is null ? null : await dataScope.GetOwnersAsync(tenant!, cancellationToken),
             Page = Math.Max(1, query.Page),
             PageSize = Math.Clamp(query.PageSize, 1, RecordQuery.MaxPageSize),
             Search = string.IsNullOrEmpty(search) ? null : search[..Math.Min(search.Length, RecordQuery.MaxSearchLength)],
@@ -62,24 +64,14 @@ public sealed class RecordPipeline(
         RecordPage page;
         try
         {
-            page = await store!.QueryAsync(normalized, cancellationToken);
+            page = await store.QueryAsync(normalized, cancellationToken);
         }
         catch (RecordValidationException invalid)
         {
             return Invalid<RecordPage>(invalid.Errors);
         }
 
-        // v0: kapsam sonuç üzerinde uygulanır. E4'te kapsam sorguya taşınır (sayfalama doğru kalsın diye).
-        var visible = new List<RecordData>(page.Items.Count);
-        foreach (var item in page.Items)
-        {
-            if (await dataScope.CanAccessAsync(tenant!, item, RecordOperation.Read, cancellationToken))
-            {
-                visible.Add(item);
-            }
-        }
-
-        return RecordResult<RecordPage>.Ok(page with { Items = visible });
+        return RecordResult<RecordPage>.Ok(page);
     }
 
     public async Task<RecordResult<RecordData>> CreateAsync(RecordCommand command, CancellationToken cancellationToken)
@@ -99,6 +91,11 @@ public sealed class RecordPipeline(
         try
         {
             var created = await store.CreateAsync(command.Values, cancellationToken);
+            if (!await InScopeAsync(tenant!, store, created, cancellationToken))
+            {
+                return OwnerOutOfScope<RecordData>(store);
+            }
+
             Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<RecordData>.Ok(created);
@@ -127,7 +124,7 @@ public sealed class RecordPipeline(
         }
 
         var before = await store!.FindAsync(id, cancellationToken);
-        if (before is null || !await dataScope.CanAccessAsync(tenant!, before, RecordOperation.Update, cancellationToken))
+        if (before is null || !await InScopeAsync(tenant!, store, before, cancellationToken))
         {
             return NotFound<RecordData>();
         }
@@ -144,6 +141,11 @@ public sealed class RecordPipeline(
             if (updated is null)
             {
                 return NotFound<RecordData>();
+            }
+
+            if (!await InScopeAsync(tenant!, store, updated, cancellationToken))
+            {
+                return OwnerOutOfScope<RecordData>(store);
             }
 
             Record(tenant!, command.Source, updated.EntityKey, updated.Id, AuditAction.Updated, DomainEventTypes.RecordUpdated, before.Values, updated.Values);
@@ -169,7 +171,7 @@ public sealed class RecordPipeline(
         }
 
         var before = await store!.FindAsync(record.Id, cancellationToken);
-        if (before is null || !await dataScope.CanAccessAsync(tenant!, before, RecordOperation.Delete, cancellationToken))
+        if (before is null || !await InScopeAsync(tenant!, store, before, cancellationToken))
         {
             return NotFound<bool>();
         }
@@ -190,6 +192,28 @@ public sealed class RecordPipeline(
             return RecordResult<bool>.Fail(RecordErrorCode.Conflict, conflict.Message);
         }
     }
+
+    /// <summary>
+    /// Adım 4, veri kapsamı: kayıt türünün sorumlu alanı varsa sorumlu kişinin kapsamında olmalıdır. Sorumlusu boş kayıt
+    /// yalnızca "tüm kayıtlar" kapsamında görünür. Kapsam istek başına bir kez hesaplanır (servis saklar).
+    /// </summary>
+    private async Task<bool> InScopeAsync(TenantContext tenant, IRecordStore store, RecordData record, CancellationToken cancellationToken)
+    {
+        if (store.OwnerField is not { } field || await dataScope.GetOwnersAsync(tenant, cancellationToken) is not { } owners)
+        {
+            return true;
+        }
+
+        return record.Values.TryGetPropertyValue(field, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            && Guid.TryParse(text, out var owner)
+            && owners.Contains(owner);
+    }
+
+    // Oluşturulan ya da güncellenen kaydın sorumlusu kapsam dışında: kayıt yazılmaz.
+    private static RecordResult<T> OwnerOutOfScope<T>(IRecordStore store) =>
+        Invalid<T>([new RecordFieldError(store.OwnerField!, "Bu kişiyi sorumlu atayamazsınız: kayıt kapsamınızın dışında.")]);
 
     /// <summary>Adım 1-3: tenant, lisans, yetki. Geçemezse hazır hata sonucu döner.</summary>
     private async Task<(RecordResult<T>? Gate, TenantContext? Tenant, IRecordStore? Store)> AuthorizeAsync<T>(

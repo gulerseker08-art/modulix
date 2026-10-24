@@ -53,6 +53,12 @@ public sealed record RecordQuery(
     public const int MaxPageSize = 200;
 
     public const int MaxFilters = 10;
+
+    /// <summary>
+    /// Veri kapsamı (Y8): doluysa yalnızca sorumlusu bu kullanıcılardan biri olan kayıtlar döner; sorumlusu boş kayıt
+    /// dönmez. Boru hattı doldurur (çağıranın verdiği değer yok sayılır); sorumlu alanı olmayan depo bunu yok sayar.
+    /// </summary>
+    public IReadOnlySet<Guid>? Owners { get; init; }
 }
 
 public sealed record RecordPage(IReadOnlyList<RecordData> Items, int Page, int PageSize, int TotalCount);
@@ -123,6 +129,12 @@ public interface IRecordStore
     /// İzin, modülü tenant için açık ve kullanıcının rollerinden birinde varsa geçer.
     /// </summary>
     string? PermissionFor(RecordOperation operation) => null;
+
+    /// <summary>
+    /// Sorumlu alanının adı (değeri kullanıcı kimliği); varsa veri kapsamı (Y8) bu alana göre uygulanır ve depo
+    /// <see cref="RecordQuery.Owners"/>'ı sorguda uygulamalıdır. Null ise kayıt türü kapsamdan etkilenmez.
+    /// </summary>
+    string? OwnerField => null;
 
     IReadOnlyList<RecordFieldError> Validate(RecordOperation operation, JsonObject values);
 
