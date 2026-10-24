@@ -6,7 +6,9 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Users;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Users;
 
 namespace Modulix.Api.Auth;
 
@@ -67,7 +69,13 @@ public static class AuthSetup
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             })
             .AddEntityFrameworkStores<ModulixDbContext>()
-            .AddSignInManager();
+            .AddSignInManager()
+            .AddErrorDescriber<TurkishIdentityErrorDescriber>()
+
+            // Şifre sıfırlama (varsayılan sağlayıcı, 24 saat) ve davet (7 gün) bağlantıları: AccountTokens.
+            .AddDefaultTokenProviders()
+            .AddTokenProvider<InvitationTokenProvider>(AccountTokens.InvitationProvider);
+        services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = AccountTokens.PasswordResetLifespan);
 
         services.AddAuthorization();
         return services;
@@ -84,6 +92,11 @@ public static class AuthEndpoints
         group.MapPost("/logout", LogoutAsync).RequireAuthorization();
         group.MapGet("/me", MeAsync).RequireAuthorization();
         group.MapPost("/active-tenant", SelectTenantAsync).RequireAuthorization();
+
+        // E-postadaki bağlantılar (Y2): oturum gerektirmez; token doğrulanır.
+        group.MapGet("/invitation", GetInvitationAsync).AllowAnonymous();
+        group.MapPost("/accept-invitation", AcceptInvitationAsync).AllowAnonymous();
+        group.MapPost("/reset-password", ResetPasswordAsync).AllowAnonymous();
 
         return app;
     }
@@ -123,10 +136,14 @@ public static class AuthEndpoints
 
         // Tek üyelik varsa o tenant otomatik seçilir; birden fazlaysa kullanıcı seçer.
         var memberships = await directory.GetActiveForUserAsync(user.Id, ct);
-        Guid? activeTenantId = memberships.Count == 1 ? memberships[0].TenantId : null;
+        var active = memberships.Count == 1 ? memberships[0] : null;
+        if (active is not null)
+        {
+            await directory.RecordSignInAsync(active.MembershipId, ct);
+        }
 
-        await IssueSessionAsync(http, signIn, user, activeTenantId);
-        return Results.Ok(ToResponse(user, activeTenantId, memberships));
+        await IssueSessionAsync(http, signIn, user, active?.TenantId);
+        return Results.Ok(ToResponse(user, active?.TenantId, memberships));
     }
 
     private static async Task<IResult> LogoutAsync(SignInManager<ModulixUser> signIn)
@@ -174,9 +191,57 @@ public static class AuthEndpoints
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Bu tenant'a erişiminiz yok.");
         }
 
+        await directory.RecordSignInAsync(membership.MembershipId, ct);
         await IssueSessionAsync(http, signIn, user, membership.TenantId);
         var memberships = await directory.GetActiveForUserAsync(user.Id, ct);
         return Results.Ok(ToResponse(user, membership.TenantId, memberships));
+    }
+
+    private static async Task<IResult> GetInvitationAsync(Guid uyelik, string? token, AccountLinks links, CancellationToken ct) =>
+        await links.FindInvitationAsync(uyelik, token, ct) is { } invitation
+            ? Results.Ok(new InvitationInfoResponse(invitation.TenantName, invitation.Email, invitation.DisplayName))
+            : InvalidLink("Davet bağlantısı geçersiz veya süresi dolmuş. Kuruluşunuzun yöneticisinden yeni davet isteyin.");
+
+    /// <summary>Şifreyi belirler, daveti kabul eder ve davet eden tenant'ta oturum açar.</summary>
+    private static async Task<IResult> AcceptInvitationAsync(
+        AcceptInvitationRequest request,
+        HttpContext http,
+        AccountLinks links,
+        SignInManager<ModulixUser> signIn,
+        IMembershipDirectory directory,
+        CancellationToken ct)
+    {
+        var result = await links.AcceptInvitationAsync(request.MembershipId, request.Token, request.Password, ct);
+        if (!result.Succeeded)
+        {
+            return result.InvalidLink
+                ? InvalidLink("Davet bağlantısı geçersiz veya süresi dolmuş. Kuruluşunuzun yöneticisinden yeni davet isteyin.")
+                : WeakPassword(result);
+        }
+
+        var user = result.User!;
+        var memberships = await directory.GetActiveForUserAsync(user.Id, ct);
+        var active = memberships.SingleOrDefault(m => m.TenantId == result.TenantId);
+        if (active is not null)
+        {
+            await directory.RecordSignInAsync(active.MembershipId, ct);
+        }
+
+        await IssueSessionAsync(http, signIn, user, active?.TenantId);
+        return Results.Ok(ToResponse(user, active?.TenantId, memberships));
+    }
+
+    private static async Task<IResult> ResetPasswordAsync(ResetPasswordRequest request, AccountLinks links, CancellationToken ct)
+    {
+        var result = await links.ResetPasswordAsync(request.UserId, request.Token, request.Password, ct);
+        if (!result.Succeeded)
+        {
+            return result.InvalidLink
+                ? InvalidLink("Şifre sıfırlama bağlantısı geçersiz, kullanılmış veya süresi dolmuş. Yöneticinizden yeni bağlantı isteyin.")
+                : WeakPassword(result);
+        }
+
+        return Results.NoContent();
     }
 
     private static async Task IssueSessionAsync(HttpContext http, SignInManager<ModulixUser> signIn, ModulixUser user, Guid? tenantId)
@@ -197,6 +262,15 @@ public static class AuthEndpoints
             user.DisplayName,
             activeTenantId,
             memberships.Select(m => new MembershipDto(m.TenantId, m.TenantName, m.TenantSlug)).ToList());
+
+    private static IResult InvalidLink(string message) =>
+        Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: message);
+
+    private static IResult WeakPassword(AccountLinkResult result) =>
+        Results.ValidationProblem(
+            new Dictionary<string, string[]> { ["password"] = [.. result.PasswordErrors] },
+            title: "Şifre kurallara uymuyor.",
+            statusCode: StatusCodes.Status422UnprocessableEntity);
 
     // Kullanıcının var olup olmadığı belli edilmez.
     private static IResult InvalidCredentials() =>

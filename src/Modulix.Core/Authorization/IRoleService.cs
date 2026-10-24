@@ -37,8 +37,12 @@ public interface IRoleService
     /// <summary>
     /// Üyeliğin rollerini verilen listeyle değiştirir. Üyelik aktif tenant'a ait değilse <c>false</c>.
     /// Değişiklik tenant'ı etkin yöneticisiz bırakacaksa <see cref="RoleConflictException"/>.
+    /// <paramref name="actingMembershipId"/> verilirse (kullanıcı isteği) yönetici kuralı da uygulanır: yönetici rolünü
+    /// vermek veya bir yöneticinin rollerini değiştirmek için işlemi yapan da yönetici olmalıdır; değilse
+    /// <see cref="Platform.UserAdministrationException"/>. Kural yönetici kilidi altında denetlenir.
     /// </summary>
-    Task<bool> SetMembershipRolesAsync(Guid membershipId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken);
+    Task<bool> SetMembershipRolesAsync(
+        Guid membershipId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken, Guid? actingMembershipId = null);
 
     /// <summary>Üyeliğin rolleri; üyelik aktif tenant'a ait değilse <c>null</c>.</summary>
     Task<IReadOnlyList<RoleSummary>?> GetMembershipRolesAsync(Guid membershipId, CancellationToken cancellationToken);

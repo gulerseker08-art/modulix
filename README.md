@@ -111,7 +111,7 @@ Geçerli izin = kullanıcının rollerindeki izinler ∩ tenant için açık mod
 
 | İzin | Ne verir |
 | --- | --- |
-| `core.users.manage` | Kullanıcıların rollerini atar (kullanıcı ekleme ekranı Y2'de) |
+| `core.users.manage` | Kullanıcıları davet eder, rollerini atar, devre dışı bırakır, şifre sıfırlama bağlantısı gönderir (Y2) |
 | `core.roles.manage` | Rolleri ve izinlerini tanımlar |
 | `core.settings.manage` | Firma ayarlarını yazar (`core.tenant-setting`); okumak için izin gerekmez |
 | `core.audit.read` | Denetim kaydını okur (ekranı Y5'te) |
@@ -120,6 +120,18 @@ Geçerli izin = kullanıcının rollerindeki izinler ∩ tenant için açık mod
 - **Son yönetici korunur:** etkin üyeliği olan son yöneticinin Yönetici rolü kaldırılamaz (409). Kural `AdministratorGuard` içindedir; aynı anda birbirinin yetkisini kaldırmaya çalışan iki yöneticiden yalnızca biri geçer.
 - Rol oluşturma, rol düzenleme ve rol atamaları denetim kaydına yazılır (`core.role`, `core.membership`).
 - Arayüzde yönetim izinlerinden biri olan kullanıcı menüde **Yönetim** bölümünü görür (`/yonetim`). Modül açıp kapatmak için şimdilik bir uç nokta yoktur (platform yöneticisi rolü sonraki görev); kodda `IModuleEntitlements.SetEnabledAsync` kullanılır.
+
+### Kullanıcı yönetimi (Y2)
+
+Ekran: **Yönetim → Kullanıcılar** (`/yonetim/kullanicilar`). Uç noktalar `/api/users` altındadır ve `core.users.manage` ister; kimlik üyelik kimliğidir, başka tenant'ın üyeliği 404 döner.
+
+- **Davet:** `POST /api/users/invitations` (e-posta, ad, roller). E-posta kayıtlı değilse şifresiz hesap ve "Davet bekliyor" üyeliği oluşur, kişiye `/davet?uyelik=…&token=…` bağlantısı gider; kişi şifresini belirler ve doğrudan giriş yapar. Bağlantı 7 gün geçerli ve tek kullanımlıktır (şifre belirlenince hesabın güvenlik damgası değişir). E-posta başka bir tenant'ta kayıtlıysa üyelik hemen etkin olur ve bilgi e-postası gider; şifre değişmez. Zaten üyeyse 409. Daveti yeniden gönderme (1 dakikada bir) ve iptal etme vardır; iptal edilen davetin bağlantısı çalışmaz.
+- **Sınır:** tenant başına saatte en fazla 50 davet (`Users:MaxInvitationsPerHour`); aşılırsa 429.
+- **Devre dışı bırakma:** `POST /api/users/{id}/disable` ve `/enable`. Kişi kendini devre dışı bırakamaz; son etkin yönetici korunur. Devre dışı üye bir sonraki isteğinde 403 alır; diğer tenant'lardaki üyelikleri ve kayıtları kalır.
+- **Şifre sıfırlama ve kilit:** yönetici kişiye 24 saat geçerli bir bağlantı gönderir (`/sifre-sifirla`); şifreyi görmez ve belirlemez. 5 hatalı denemeyle kilitlenen hesabın kilidi açılabilir. Hesap birden fazla tenant'ta kullanılıyorsa ikisi de hepsini etkiler; e-postada isteyen tenant yazılır.
+- **Yönetici kuralı:** Yönetici rolünü vermek veya almak ve bir yöneticinin hesabında işlem yapmak yalnızca yöneticiye açıktır (403). Böylece `core.users.manage` izni olan biri kendini yönetici yapamaz. Rol atamasında kural yönetici kilidi altında denetlenir.
+- Davet, iptal, durum değişikliği, şifre sıfırlama isteği ve kilit açma `core.membership` kaydı olarak denetim kaydına yazılır. Son giriş, giriş ve tenant seçiminde güncellenir.
+- **E-postadaki bağlantılar** `App:PublicUrl` adresiyle oluşturulur (ör. `https://app.firmaniz.com`). Canlı ortamda zorunludur: isteğin adresine güvenilirse saldırgan, kendi sunucusuna giden şifre sıfırlama bağlantıları ürettirebilir. Development'ta boşsa isteğin adresi kullanılır. Yerelde e-postalar Mailpit'te görünür (http://localhost:8025).
 
 ## CRM modülü
 

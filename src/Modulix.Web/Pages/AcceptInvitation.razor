@@ -1,0 +1,87 @@
+@page "/davet"
+@using Modulix.Shared.Auth
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>Daveti kabul et · Modulix</PageTitle>
+
+@* E-postadaki davet bağlantısı: kişi şifresini belirler ve davet eden kuruluşta oturum açar. *@
+<div class="narrow">
+    <h1>Daveti kabul et</h1>
+
+    @if (invitation is null)
+    {
+        @if (linkError is not null)
+        {
+            <div class="alert alert-danger" role="alert">@linkError</div>
+            <a href="giris">Giriş sayfasına git</a>
+        }
+        else
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        <p>
+            <strong>@invitation.TenantName</strong> sizi Modülix'e davet etti. Hesabınız: <strong>@invitation.Email</strong>.
+            Şifrenizi belirleyin; ardından doğrudan giriş yapılır.
+        </p>
+
+        @if (message is not null)
+        {
+            <div class="alert alert-danger" role="alert">@message</div>
+        }
+
+        <PasswordForm Errors="errors" Busy="busy" Submit="AcceptAsync" ButtonText="Şifremi belirle ve giriş yap" Email="@invitation.Email" />
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "uyelik")] public Guid? MembershipId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "token")] public string? Token { get; set; }
+
+    private InvitationInfoResponse? invitation;
+    private string? linkError;
+    private string? message;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (MembershipId is null || string.IsNullOrEmpty(Token))
+        {
+            linkError = "Davet bağlantısı eksik. E-postadaki bağlantıyı açın.";
+            return;
+        }
+
+        var result = await Api.GetAsync<InvitationInfoResponse>($"/api/auth/invitation?uyelik={MembershipId}&token={Uri.EscapeDataString(Token)}");
+        invitation = result.Value;
+        linkError = result.Error;
+    }
+
+    private async Task AcceptAsync(string password)
+    {
+        busy = true;
+        var result = await Api.PostAsync<MeResponse>("/api/auth/accept-invitation", new AcceptInvitationRequest(MembershipId!.Value, Token!, password));
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            errors = result.FieldErrors;
+            if (result.Status == System.Net.HttpStatusCode.BadRequest)
+            {
+                invitation = null;
+                linkError = result.Error;
+            }
+
+            return;
+        }
+
+        await Session.RefreshAsync();
+        Navigation.NavigateTo(Session.HasActiveTenant ? string.Empty : "tenant");
+    }
+}

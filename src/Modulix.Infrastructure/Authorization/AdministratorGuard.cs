@@ -19,6 +19,9 @@ internal sealed class AdministratorGuard(ModulixDbContext db)
     public const string LastAdministratorMessage =
         "Kuruluşta en az bir yönetici kalmalı. Önce başka bir kullanıcıya Yönetici rolü verin.";
 
+    public const string AdministratorRequiredMessage =
+        "Yönetici rolünü ve yöneticilerin hesaplarını yalnızca bir yönetici değiştirebilir.";
+
     /// <summary>Aktif tenant'ın sistem rolünü kilitler ve kimliğini döner; tenant'ta sistem rolü yoksa <c>null</c>.</summary>
     public async Task<Guid?> LockAsync(CancellationToken cancellationToken)
     {
@@ -40,6 +43,18 @@ internal sealed class AdministratorGuard(ModulixDbContext db)
         }
 
         return systemRoleId;
+    }
+
+    /// <summary>
+    /// İşlemi yapan üyelik yönetici değilse <see cref="UserAdministrationException"/> (yönetici rolüne veya bir
+    /// yöneticiye dokunan işlemler). Kilit altında çağrılırsa işlem sürerken yöneticiliği kaldırılamaz.
+    /// </summary>
+    public async Task EnsureIsAdministratorAsync(Guid systemRoleId, Guid actingMembershipId, CancellationToken cancellationToken)
+    {
+        if (!await db.MembershipRoles.AnyAsync(mr => mr.MembershipId == actingMembershipId && mr.RoleId == systemRoleId, cancellationToken))
+        {
+            throw new UserAdministrationException(UserAdministrationError.AdministratorRequired, AdministratorRequiredMessage);
+        }
     }
 
     /// <summary>

@@ -60,6 +60,43 @@ public class MembershipTests
     }
 
     [Fact]
+    public void Invited_membership_becomes_active_only_by_accepting()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var membership = Membership.CreateInvited(Guid.NewGuid(), Guid.NewGuid(), awaitsAcceptance: true, at);
+        Assert.Equal(MembershipStatus.Invited, membership.Status);
+        Assert.Equal(at, membership.InvitedAt);
+        Assert.Throws<InvalidOperationException>(membership.Disable);
+        Assert.Throws<InvalidOperationException>(membership.Enable);
+
+        membership.AcceptInvitation();
+
+        Assert.True(membership.IsActive);
+        Assert.Throws<InvalidOperationException>(membership.AcceptInvitation);
+        Assert.Throws<InvalidOperationException>(() => membership.MarkInvitationSent(at));
+    }
+
+    [Fact]
+    public void Invitation_for_an_existing_account_is_active_at_once()
+    {
+        var membership = Membership.CreateInvited(Guid.NewGuid(), Guid.NewGuid(), awaitsAcceptance: false, DateTimeOffset.UtcNow);
+        Assert.True(membership.IsActive);
+    }
+
+    [Fact]
+    public void Only_disabled_membership_can_be_enabled()
+    {
+        var membership = new Membership(Guid.NewGuid(), Guid.NewGuid());
+        Assert.Throws<InvalidOperationException>(membership.Enable);
+
+        membership.Disable();
+        Assert.Throws<InvalidOperationException>(membership.Disable);
+        membership.Enable();
+
+        Assert.True(membership.IsActive);
+    }
+
+    [Fact]
     public void Empty_ids_are_rejected()
     {
         Assert.Throws<ArgumentException>(() => new Membership(Guid.Empty, Guid.NewGuid()));

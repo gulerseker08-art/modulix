@@ -1,0 +1,10 @@
+@* Kullanıcının durumu; hesap kilitliyse ayrıca "Kilitli". *@
+<span class="badge user-@User.Status.ToString().ToLowerInvariant()">@UserLabels.Of(User.Status)</span>
+@if (User.IsLockedOut)
+{
+    <span class="badge user-locked">Kilitli</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public UserDto User { get; set; } = default!;
+}

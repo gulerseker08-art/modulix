@@ -1,0 +1,148 @@
+@page "/yonetim/kullanicilar"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Kullanıcılar · Modulix</PageTitle>
+
+<AuthGate Permission="@CoreAccess.ManageUsers">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Kullanıcılar</h1>
+        @if (!inviting)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => inviting = true">Kullanıcı davet et</button>
+        }
+    </div>
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (inviting)
+    {
+        <InviteUserForm Roles="roles" CanGrantAdministrator="Session.IsAdministrator" Invited="InvitedAsync" Cancelled="() => inviting = false" />
+    }
+
+    <div class="filters" role="group" aria-label="Durum">
+        <button type="button" class="chip @(status is null ? "active" : null)" @onclick="() => FilterAsync(null)">Tümü</button>
+        @foreach (var value in Enum.GetValues<UserStatus>())
+        {
+            <button type="button" class="chip @(status == value ? "active" : null)" @onclick="() => FilterAsync(value)">@UserLabels.Of(value)</button>
+        }
+    </div>
+
+    <form class="search has-select" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <input class="form-control" type="search" placeholder="Ad veya e-posta ara" @bind="search" />
+        <select class="form-select" aria-label="Rol" @bind="roleId" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm roller</option>
+            @foreach (var role in roles)
+            {
+                <option value="@role.Id">@role.Name</option>
+            }
+        </select>
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (page is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Kullanıcı yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead>
+                <tr><th>Ad</th><th>E-posta</th><th>Roller</th><th>Durum</th><th>Son giriş</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var user in page.Items)
+                {
+                    <tr>
+                        <td data-label="Ad" class="primary">
+                            <a href="yonetim/kullanicilar/@user.MembershipId">@user.DisplayName</a>
+                            @if (user.IsCurrentUser)
+                            {
+                                <small class="text-muted"> (siz)</small>
+                            }
+                        </td>
+                        <td data-label="E-posta">@user.Email</td>
+                        <td data-label="Roller">@RoleNames(user)</td>
+                        <td data-label="Durum"><UserStatusBadge User="user" /></td>
+                        <td data-label="Son giriş">@(user.LastSignInAt is { } at ? CrmLabels.Time(at) : "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private UserPageResponse? page;
+    private IReadOnlyList<RoleDto> roles = [];
+    private string? search;
+    private UserStatus? status;
+    private Guid? roleId;
+    private bool inviting;
+    private string? message;
+    private string? notice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ManageUsers))
+        {
+            roles = (await Api.GetAsync<List<RoleDto>>("/api/roles")).Value ?? [];
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task FilterAsync(UserStatus? value)
+    {
+        status = value;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"/api/users?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (status is { } s)
+        {
+            url += $"&status={s}";
+        }
+
+        if (roleId is { } r)
+        {
+            url += $"&roleId={r}";
+        }
+
+        var result = await Api.GetAsync<UserPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private async Task InvitedAsync(InviteUserResponse response)
+    {
+        inviting = false;
+        notice = response.ExistingAccount
+            ? $"{response.User.DisplayName} zaten Modülix kullanıyordu; kuruluşunuza eklendi ve bilgilendirildi."
+            : $"{response.User.Email} adresine davet gönderildi.";
+        await LoadAsync(1);
+    }
+
+    private static string RoleNames(UserDto user) =>
+        user.Roles.Count == 0 ? "—" : string.Join(", ", user.Roles.Select(r => r.Name));
+}

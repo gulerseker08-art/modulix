@@ -30,6 +30,9 @@ public sealed class SessionState(ApiClient api)
 
     public bool Can(string permission) => Access?.Permissions.Contains(permission) == true;
 
+    /// <summary>Yönetici (sistem) rolü var mı? Yönetici rolünü vermek ve yöneticileri yönetmek yalnızca ona açıktır.</summary>
+    public bool IsAdministrator => Access?.IsAdministrator == true;
+
     /// <summary>İzinlerden en az biri var mı?</summary>
     public bool CanAny(IEnumerable<string> permissions) => permissions.Any(Can);
 
@@ -62,6 +65,13 @@ public sealed class SessionState(ApiClient api)
         loading = ReloadAsync();
         await loading;
         return null;
+    }
+
+    /// <summary>Oturumu ve erişimi sunucudan yeniden okur (ör. kendi rolleri değişti, davet kabul edilip oturum açıldı).</summary>
+    public async Task RefreshAsync()
+    {
+        loading = ReloadAsync();
+        await loading;
     }
 
     public async Task LogoutAsync()

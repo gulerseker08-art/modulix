@@ -36,6 +36,9 @@ internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Members
         builder.HasIndex(m => new { m.TenantId, m.UserId }).IsUnique();
         builder.HasIndex(m => m.UserId);
 
+        // Saatlik davet sınırı tenant'ın son davetlerini sayar.
+        builder.HasIndex(m => new { m.TenantId, m.InvitedAt });
+
         // Kayıtlar silinmez; tenant kapatma ve üyelik devre dışı bırakma durum alanıyla yapılır.
         builder.HasOne<Tenant>().WithMany().HasForeignKey(m => m.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ModulixUser>().WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Restrict);
