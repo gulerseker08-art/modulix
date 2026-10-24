@@ -8,14 +8,15 @@ using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Shared.Access;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Users;
 using static Modulix.Core.Modules.CoreModule.Permissions;
 using static Modulix.Modules.Crm.CrmModule.Permissions;
 
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// Y3a: rol ekranlarının sunucu tarafı. Yetki yükseltmeye karşı kural, rol silme ve üye taşıma, kapalı modül izinleri,
-/// değişikliğin bir sonraki istekte geçerli olması.
+/// Y3: rol ekranlarının sunucu tarafı. Yetki yükseltmeye karşı kural, rol silme ve üye taşıma, kapalı modül izinleri,
+/// değişikliğin bir sonraki istekte geçerli olması; hazır roller ve "kim neye erişebilir" görünümleri.
 /// </summary>
 public class RoleManagementTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
@@ -148,6 +149,69 @@ public class RoleManagementTests(ModulixApiFactory factory) : IClassFixture<Modu
 
         await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
         Assert.Equal(HttpStatusCode.OK, (await memberClient.GetAsync("/api/records/crm.company")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Templates_are_offered_only_for_enabled_modules()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var admin = await factory.CreateUserAsync(tenant);
+        await MakeAdministratorAsync(tenant.Id, admin);
+        using var client = await LoginAsync(admin);
+
+        var templates = await client.GetFromJsonAsync<List<RoleTemplateDto>>("/api/roles/templates");
+        Assert.Equal(["crm.sales-rep", "core.read-only"], templates!.Select(t => t.Key));
+        Assert.All(templates![1].Permissions, p => Assert.StartsWith("crm.", p));
+        Assert.All(templates[1].Permissions, p => Assert.EndsWith(".read", p));
+
+        // Şablonun izinleriyle rol oluşturulabilir.
+        var sales = templates[0];
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/roles", new SaveRoleRequest(sales.Name, sales.Permissions))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Role_members_and_a_users_access_match_what_the_server_enforces()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        var other = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var admin = await factory.CreateUserAsync(tenant);
+        var member = await factory.CreateUserAsync(tenant);
+        var roleManager = await factory.CreateUserAsync(tenant);
+        await MakeAdministratorAsync(tenant.Id, admin);
+        var readers = await factory.CreateRoleAsync(tenant.Id, [CompaniesRead, ContactsRead], member);
+        var writers = await factory.CreateRoleAsync(tenant.Id, [CompaniesRead, CompaniesWrite]);
+        await factory.CreateRoleAsync(tenant.Id, [ManageRoles], roleManager);
+        var foreign = await factory.CreateRoleAsync(other.Id, []);
+        var memberMembership = await factory.GetMembershipIdAsync(member.Id, tenant.Id);
+        using var client = await LoginAsync(admin);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/memberships/{memberMembership}/roles", new SetMembershipRolesRequest([readers.Id, writers.Id]))).StatusCode);
+
+        // Rol yöneticisi de rolün üyelerini görür; başka tenant'ın rolü 404.
+        using var roleClient = await LoginAsync(roleManager);
+        var members = await roleClient.GetFromJsonAsync<UserPageResponse>($"/api/roles/{readers.Id}/members");
+        Assert.Equal([member.Id], members!.Items.Select(u => u.UserId));
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/roles/{foreign.Id}/members")).StatusCode);
+
+        var access = await client.GetFromJsonAsync<UserAccessDto>($"/api/users/{memberMembership}/access");
+        Assert.False(access!.IsAdministrator);
+        Assert.Equal([CompaniesRead, CompaniesWrite, ContactsRead], access.Permissions.Select(p => p.Key));
+        Assert.Equal([readers.Name, writers.Name], access.Permissions.Single(p => p.Key == CompaniesRead).GrantedBy.Select(r => r.Name).Order());
+        Assert.Contains(access.Assignable, p => p.Key == ManageUsers);
+
+        using var memberClient = await LoginAsync(member);
+        var enforced = await memberClient.GetFromJsonAsync<MyAccessResponse>("/api/tenant/access");
+        Assert.Equal(enforced!.Permissions, access.Permissions.Select(p => p.Key));
+
+        var adminAccess = await client.GetFromJsonAsync<UserAccessDto>(
+            $"/api/users/{await factory.GetMembershipIdAsync(admin.Id, tenant.Id)}/access");
+        Assert.True(adminAccess!.IsAdministrator);
+        Assert.Equal(adminAccess.Assignable.Count, adminAccess.Permissions.Count);
+
+        // Kullanıcı yönetimi izni olmayan rol yöneticisi kişinin erişimini göremez.
+        Assert.Equal(HttpStatusCode.Forbidden, (await roleClient.GetAsync($"/api/users/{memberMembership}/access")).StatusCode);
     }
 
     private async Task<RoleSummary> MakeAdministratorAsync(Guid tenantId, ModulixUser user)

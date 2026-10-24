@@ -40,11 +40,29 @@
                 değiştirilemez, rol silinemez.
             </div>
             <PermissionMatrix Permissions="permissions" Selected="AllKeys" ReadOnly="true" />
+            <RoleMembers RoleId="role.Id" />
         }
         else
         {
             <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
                 <div class="form-grid">
+                    @if (IsNew && templates.Count > 0)
+                    {
+                        <div>
+                            <label class="form-label" for="template">Şablondan başla</label>
+                            <select id="template" class="form-select" value="@templateKey" @onchange="e => ApplyTemplate(e.Value as string)">
+                                <option value="">Boş rol</option>
+                                @foreach (var template in templates)
+                                {
+                                    <option value="@template.Key">@template.Name</option>
+                                }
+                            </select>
+                            @if (Template is { } chosen)
+                            {
+                                <small class="text-muted">@chosen.Description Oluşturmadan önce izinleri değiştirebilirsiniz.</small>
+                            }
+                        </div>
+                    }
                     <div>
                         <label class="form-label" for="roleName">Rol adı *</label>
                         <input id="roleName" class="form-control" maxlength="100" @bind="name" />
@@ -59,6 +77,11 @@
 
                 <PermissionMatrix Permissions="permissions" Selected="selected" CanGrant="CanGrant" />
                 <FieldError Field="permissions" Errors="errors" />
+
+                @if (skippedFromTemplate > 0)
+                {
+                    <p class="text-muted">Şablondaki @skippedFromTemplate izin sizde olmadığı için eklenmedi.</p>
+                }
 
                 @if (HiddenCount > 0)
                 {
@@ -75,6 +98,8 @@
 
             @if (role is not null)
             {
+                <RoleMembers RoleId="role.Id" />
+
                 <section class="detail-section">
                     <div class="section-header"><h2>Rolü sil</h2></div>
                     @if (!deleting)
@@ -133,8 +158,14 @@
     /// <summary>Kopyalanan rol: yeni rol formu onun izinleri ve "(kopya)" adıyla açılır.</summary>
     [SupplyParameterFromQuery(Name = "kopya")] public Guid? CopyOf { get; set; }
 
+    /// <summary>Hazır rol (ör. "crm.sales-rep"): yeni rol formu şablonun adı ve izinleriyle açılır.</summary>
+    [SupplyParameterFromQuery(Name = "sablon")] public string? TemplateKey { get; set; }
+
     private IReadOnlyList<PermissionDto> permissions = [];
     private IReadOnlyList<RoleDto> roles = [];
+    private IReadOnlyList<RoleTemplateDto> templates = [];
+    private string? templateKey;
+    private int skippedFromTemplate;
     private RoleDto? role;
     private HashSet<string> selected = [];
     private string name = string.Empty;
@@ -147,6 +178,8 @@
     private IReadOnlyDictionary<string, string[]>? errors;
 
     private bool IsNew => RoleId is null;
+
+    private RoleTemplateDto? Template => templates.FirstOrDefault(t => t.Key == templateKey);
 
     private HashSet<string> AllKeys => permissions.Select(p => p.Key).ToHashSet();
 
@@ -188,9 +221,36 @@
             var source = roles.FirstOrDefault(r => r.Id == CopyOf && !r.IsSystem);
             name = source is null ? string.Empty : $"{source.Name} (kopya)";
             selected = source?.Permissions.ToHashSet() ?? [];
+            templateKey = null;
+            skippedFromTemplate = 0;
+            templates = source is null ? (await Api.GetAsync<List<RoleTemplateDto>>("/api/roles/templates")).Value ?? [] : [];
+            ApplyTemplate(TemplateKey);
         }
 
         loaded = true;
+    }
+
+    /// <summary>
+    /// Şablonun izinlerini forma koyar; kişinin veremeyeceği izinler atlanır. Ad boşsa veya önceki şablonun adıysa şablonun
+    /// adı yazılır, kişinin yazdığı ad korunur.
+    /// </summary>
+    private void ApplyTemplate(string? key)
+    {
+        var previous = Template;
+        templateKey = string.IsNullOrEmpty(key) ? null : key;
+        if (Template is not { } template)
+        {
+            skippedFromTemplate = 0;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(name) || name == previous?.Name)
+        {
+            name = template.Name;
+        }
+
+        selected = template.Permissions.Where(CanGrant).ToHashSet();
+        skippedFromTemplate = template.Permissions.Count - selected.Count;
     }
 
     private bool CanGrant(string permission) => Session.IsAdministrator || Session.Can(permission);

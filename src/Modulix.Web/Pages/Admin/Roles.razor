@@ -52,11 +52,26 @@
                 }
             </tbody>
         </table>
+
+        @if (roles.All(r => r.IsSystem) && templates.Count > 0)
+        {
+            <h2 class="h5">Hazır rollerle başlayın</h2>
+            <p class="text-muted">Şablon, yeni rol formunu doldurur; oluşturmadan önce izinleri değiştirebilirsiniz.</p>
+            <div class="tiles">
+                @foreach (var template in templates)
+                {
+                    <a class="tile" href="yonetim/roller/yeni?sablon=@Uri.EscapeDataString(template.Key)">
+                        <strong>@template.Name</strong><span>@template.Description</span>
+                    </a>
+                }
+            </div>
+        }
     }
 </AuthGate>
 
 @code {
     private IReadOnlyList<RoleDto>? roles;
+    private IReadOnlyList<RoleTemplateDto> templates = [];
     private string? message;
 
     protected override async Task OnInitializedAsync()
@@ -67,6 +82,12 @@
             var result = await Api.GetAsync<List<RoleDto>>("/api/roles");
             roles = result.Value?.OrderByDescending(r => r.IsSystem).ToList();
             message = result.Error;
+
+            // Yalnızca Yönetici rolü varken hazır roller önerilir.
+            if (roles?.All(r => r.IsSystem) == true)
+            {
+                templates = (await Api.GetAsync<List<RoleTemplateDto>>("/api/roles/templates")).Value ?? [];
+            }
         }
     }
 }

@@ -67,6 +67,8 @@
             </div>
         </section>
 
+        <UserAccessPanel MembershipId="MembershipId" Disabled="user.Status == UserStatus.Disabled" Version="accessVersion" />
+
         <section class="detail-section">
             <div class="section-header"><h2>Hesap</h2></div>
 
@@ -115,6 +117,7 @@
     private string? message;
     private string? notice;
     private bool busy;
+    private int accessVersion;
 
     /// <summary>Yönetici olmayan kullanıcı yöneticinin hesabında işlem yapamaz (sunucu da reddeder).</summary>
     private bool Locked => user is { IsAdministrator: true } && !Session.IsAdministrator;
@@ -256,6 +259,7 @@
         }
 
         await LoadAsync();
+        accessVersion++;
         notice = "Roller kaydedildi.";
         if (user?.IsCurrentUser == true)
         {

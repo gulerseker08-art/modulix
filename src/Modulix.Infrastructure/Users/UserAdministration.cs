@@ -8,6 +8,7 @@ using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Authorization;
@@ -33,6 +34,8 @@ internal sealed class UserAdministration(
     IEmailQueue emails,
     IAuditWriter audit,
     RecordHandover handover,
+    MembershipPermissions membershipPermissions,
+    IModuleEntitlements entitlements,
     TimeProvider time,
     IOptions<UserAdministrationOptions> options) : IUserAdministration
 {
@@ -307,6 +310,20 @@ internal sealed class UserAdministration(
         var tenant = RequireTenant();
         var (membership, _) = await LoadAsync(tenant, membershipId, cancellationToken);
         return await handover.CountAsync(membership.UserId, cancellationToken);
+    }
+
+    public async Task<UserAccess> GetAccessAsync(Guid membershipId, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        await LoadAsync(tenant, membershipId, cancellationToken);
+        var access = await membershipPermissions.GetAsync(
+            membershipId, await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken), cancellationToken);
+
+        var grants = access.Permissions
+            .Order(StringComparer.Ordinal)
+            .Select(p => new PermissionGrant(p, access.RolesGranting(p).Select(r => new UserRole(r.Id, r.Name, r.IsSystem)).ToList()))
+            .ToList();
+        return new UserAccess(access.IsAdministrator, grants);
     }
 
     public async Task<int> TransferRecordsAsync(Guid membershipId, Guid toMembershipId, CancellationToken cancellationToken)

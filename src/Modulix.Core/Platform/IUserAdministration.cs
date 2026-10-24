@@ -54,6 +54,12 @@ public enum UserAdministrationError
 /// <summary>Kişinin sorumlu olduğu bir kayıt türünün sayısı; işlemi yapan bu kayıtları göremiyorsa <see cref="Count"/> boştur.</summary>
 public sealed record OwnedRecordSummary(string EntityKey, string Label, int? Count);
 
+/// <summary>Kişinin bir geçerli izni ve onu veren roller.</summary>
+public sealed record PermissionGrant(string Key, IReadOnlyList<UserRole> GrantedBy);
+
+/// <summary>Kişinin aktif tenant'taki geçerli izinleri (açık modüllerinkiler), anahtara göre sıralı.</summary>
+public sealed record UserAccess(bool IsAdministrator, IReadOnlyList<PermissionGrant> Permissions);
+
 public sealed class UserAdministrationException(UserAdministrationError error, string message) : Exception(message)
 {
     public UserAdministrationError Error { get; } = error;
@@ -103,6 +109,12 @@ public interface IUserAdministration
 
     /// <summary>Kişinin sorumlu olduğu kayıtların türlere göre sayısı (tenant için açık modüllerin <c>OwnedRecords</c>'u).</summary>
     Task<IReadOnlyList<OwnedRecordSummary>> GetOwnedRecordsAsync(Guid membershipId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Kişinin bu tenant'taki geçerli izinleri ve her izni veren roller ("bu kullanıcı neye erişebilir"). Hesap,
+    /// sunucunun her istekte uyguladığıyla aynıdır.
+    /// </summary>
+    Task<UserAccess> GetAccessAsync(Guid membershipId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Kişinin sorumlu olduğu kayıtları başka bir etkin üyeye devreder ve devredilen kayıt sayısını döner. Her kayıt

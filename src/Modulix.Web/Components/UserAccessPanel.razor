@@ -1,0 +1,70 @@
+@* "Bu kullanıcı neye erişebilir": kişinin geçerli izinleri, rol formundaki matrisle ve salt okunur. Kutunun ipucu izni
+   veren rolleri gösterir. Sunucu aynı hesabı her istekte uygular. *@
+@inject ApiClient Api
+
+<section class="detail-section">
+    <div class="section-header"><h2>Erişim</h2></div>
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    else if (access is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else
+    {
+        <p class="text-muted">
+            @if (access.IsAdministrator)
+            {
+                @:Yönetici rolü tüm izinleri verir.
+            }
+            else if (access.Permissions.Count == 0)
+            {
+                @:Kişinin bu kuruluşta hiçbir izni yok; yalnızca giriş yapabilir.
+            }
+            else
+            {
+                @($"{access.Permissions.Count} izin. ")
+                @(string.Join(" · ", RoleSummaries()))
+            }
+            @(Disabled ? " Kişi devre dışı olduğu için şu an hiçbirini kullanamaz." : null)
+        </p>
+        <PermissionMatrix Permissions="access.Assignable" Selected="granted" ReadOnly="true" Describe="Describe" />
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid MembershipId { get; set; }
+
+    /// <summary>Üyelik devre dışıysa izinler rollerinde durur ama kullanılamaz.</summary>
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>Roller değişince artırılır; erişim yeniden okunur.</summary>
+    [Parameter] public int Version { get; set; }
+
+    private UserAccessDto? access;
+    private HashSet<string> granted = [];
+    private string? message;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var result = await Api.GetAsync<UserAccessDto>($"/api/users/{MembershipId}/access");
+        access = result.Value;
+        message = result.Error;
+        granted = access?.Permissions.Select(p => p.Key).ToHashSet() ?? [];
+    }
+
+    private string? Describe(string key) =>
+        access?.Permissions.FirstOrDefault(p => p.Key == key) is { } grant
+            ? $"Veren rol: {string.Join(", ", grant.GrantedBy.Select(r => r.Name))}"
+            : "Kişide bu izin yok";
+
+    // "Satış temsilcisi: 8 izin" gibi; kişi birden fazla rolden aynı izni alabilir.
+    private IEnumerable<string> RoleSummaries() =>
+        access!.Permissions
+            .SelectMany(p => p.GrantedBy.Select(r => (r.Name, p.Key)))
+            .GroupBy(x => x.Name)
+            .OrderBy(g => g.Key)
+            .Select(g => $"{g.Key}: {g.Count()} izin");
+}

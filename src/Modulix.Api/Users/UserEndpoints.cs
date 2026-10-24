@@ -1,5 +1,6 @@
 using Modulix.Api.Access;
 using Modulix.Core.Authorization;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Shared.Users;
@@ -28,6 +29,7 @@ public static class UserEndpoints
             Run(() => admin.CancelInvitationAsync(membershipId, ct)));
         users.MapPost("/{membershipId:guid}/disable", DisableAsync);
         users.MapGet("/{membershipId:guid}/owned-records", GetOwnedRecordsAsync);
+        users.MapGet("/{membershipId:guid}/access", GetAccessAsync);
         users.MapPost("/{membershipId:guid}/transfer-records", TransferRecordsAsync);
         users.MapPost("/{membershipId:guid}/enable", (Guid membershipId, IUserAdministration admin, CancellationToken ct) =>
             Run(() => admin.EnableAsync(membershipId, ct)));
@@ -78,6 +80,24 @@ public static class UserEndpoints
         {
             var owned = await admin.GetOwnedRecordsAsync(membershipId, ct);
             return Results.Ok(owned.Select(o => new OwnedRecordsDto(o.EntityKey, o.Label, o.Count)).ToList());
+        }
+        catch (Exception ex) when (ToProblem(ex) is { } problem)
+        {
+            return problem;
+        }
+    }
+
+    /// <summary>"Bu kullanıcı neye erişebilir": geçerli izinler, veren rollerle; matris için açık modüllerin izinleri.</summary>
+    private static async Task<IResult> GetAccessAsync(
+        Guid membershipId, IUserAdministration admin, ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct)
+    {
+        try
+        {
+            var result = await admin.GetAccessAsync(membershipId, ct);
+            return Results.Ok(new UserAccessDto(
+                result.IsAdministrator,
+                await AccessEndpoints.AssignablePermissionsAsync(catalog, access, ct),
+                result.Permissions.Select(p => new PermissionGrantDto(p.Key, p.GrantedBy.Select(r => new UserRoleDto(r.Id, r.Name, r.IsSystem)).ToList())).ToList()));
         }
         catch (Exception ex) when (ToProblem(ex) is { } problem)
         {

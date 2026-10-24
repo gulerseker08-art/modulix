@@ -23,6 +23,9 @@ public sealed record MyAccessResponse(IReadOnlyList<string> EnabledModules, IRea
 /// </summary>
 public sealed record RoleDto(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false, int MemberCount = 0);
 
+/// <summary>Hazır rol önerisi; "Şablondan başla" ile yeni rol formunu doldurur.</summary>
+public sealed record RoleTemplateDto(string Key, string Name, string Description, IReadOnlyList<string> Permissions);
+
 public sealed record SaveRoleRequest(string Name, IReadOnlyList<string> Permissions);
 
 public sealed record SetMembershipRolesRequest(IReadOnlyList<Guid> RoleIds);

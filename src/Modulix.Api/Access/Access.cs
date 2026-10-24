@@ -90,6 +90,9 @@ public static class AccessEndpoints
         roles.MapGet("/", ListRolesAsync)
             .RequireAnyPermission(CoreModule.Permissions.ManageRoles, CoreModule.Permissions.ManageUsers);
         roles.MapGet("/permissions", ListAssignablePermissionsAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
+        roles.MapGet("/templates", ListTemplatesAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
+        roles.MapGet("/{roleId:guid}/members", ListMembersAsync)
+            .RequireAnyPermission(CoreModule.Permissions.ManageRoles, CoreModule.Permissions.ManageUsers);
         roles.MapPost("/", CreateRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
         roles.MapPut("/{roleId:guid}", UpdateRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
         roles.MapDelete("/{roleId:guid}", DeleteRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
@@ -136,8 +139,11 @@ public static class AccessEndpoints
     private static async Task<IResult> ListRolesAsync(IRoleService roles, CancellationToken ct) =>
         Results.Ok((await roles.ListAsync(ct)).Select(ToDto).ToList());
 
+    private static async Task<IResult> ListAssignablePermissionsAsync(ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct) =>
+        Results.Ok(await AssignablePermissionsAsync(catalog, access, ct));
+
     /// <summary>Rollere atanabilecek izinler: yalnızca tenant için açık modüllerinkiler.</summary>
-    private static async Task<IResult> ListAssignablePermissionsAsync(ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct)
+    internal static async Task<List<PermissionDto>> AssignablePermissionsAsync(ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct)
     {
         var permissions = new List<PermissionDto>();
         foreach (var module in catalog.Modules)
@@ -149,7 +155,29 @@ public static class AccessEndpoints
             }
         }
 
-        return Results.Ok(permissions);
+        return permissions;
+    }
+
+    /// <summary>Hazır roller (ADR-0005): açık modüllerin şablonları ve "Salt okur".</summary>
+    private static async Task<IResult> ListTemplatesAsync(
+        ModuleCatalog catalog, IModuleEntitlements entitlements, ITenantContextAccessor tenant, CancellationToken ct)
+    {
+        var enabled = await entitlements.GetEnabledAsync(tenant.Current!.TenantId, ct);
+        return Results.Ok(catalog.TemplatesFor(enabled).Select(t => new RoleTemplateDto(t.Key, t.Name, t.Description, t.Permissions)).ToList());
+    }
+
+    /// <summary>"Bu rolde kimler var": rolün üyeleri, ada göre sıralı ve sayfalı.</summary>
+    private static async Task<IResult> ListMembersAsync(
+        Guid roleId, int? page, IRoleService roles, IUserAdministration users, CancellationToken ct)
+    {
+        if ((await roles.ListAsync(ct)).All(r => r.Id != roleId))
+        {
+            return RoleNotFound();
+        }
+
+        var result = await users.ListAsync(new UserQuery(null, null, roleId, page ?? 1, 50), ct);
+        return Results.Ok(new Shared.Users.UserPageResponse(
+            result.Items.Select(UserEndpoints.ToDto).ToList(), result.Page, result.PageSize, result.TotalCount));
     }
 
     // Rol uç noktaları kullanıcı yönetimiyle aynı hata biçimini kullanır: mesaj başlıktadır, alan hatası alanın altında.

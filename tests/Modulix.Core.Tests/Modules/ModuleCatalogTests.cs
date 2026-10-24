@@ -109,9 +109,36 @@ public class ModuleCatalogTests
     public void Resource_of_a_permission_is_the_part_between_module_and_action(string permission, string resource) =>
         Assert.Equal(resource, AccessKeys.ResourceOf(permission));
 
+    [Fact]
+    public void Templates_come_from_enabled_modules_and_read_only_covers_their_read_permissions()
+    {
+        var sales = new TestModule("sales", ["sales.orders.read", "sales.orders.write"],
+            [new RoleTemplate("sales.clerk", "Satış", "", ["sales.orders.read", "sales.orders.write"])]);
+        var stock = new TestModule("stock", ["stock.items.read"], [new RoleTemplate("stock.keeper", "Depo", "", ["stock.items.read"])]);
+        var catalog = ModuleCatalog.Create(sales, stock);
+
+        var templates = catalog.TemplatesFor(new HashSet<string> { "sales" });
+        Assert.Equal(["sales.clerk", ModuleCatalog.ReadOnlyTemplateKey], templates.Select(t => t.Key));
+        Assert.Equal(["sales.orders.read"], templates[^1].Permissions);
+
+        Assert.Empty(catalog.TemplatesFor(new HashSet<string>()));
+    }
+
+    [Fact]
+    public void Template_with_another_modules_permission_or_foreign_key_is_rejected()
+    {
+        var foreignPermission = new TestModule("sales", ["sales.orders.read"],
+            [new RoleTemplate("sales.clerk", "Satış", "", [CoreModule.Permissions.ManageUsers])]);
+        var foreignKey = new TestModule("sales", ["sales.orders.read"],
+            [new RoleTemplate("stock.clerk", "Satış", "", ["sales.orders.read"])]);
+
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(foreignPermission));
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(foreignKey));
+    }
+
     private static IModule Module(string key, params string[] permissions) => new TestModule(key, permissions);
 
-    private sealed class TestModule(string key, string[] permissions) : IModule
+    private sealed class TestModule(string key, string[] permissions, IReadOnlyList<RoleTemplate>? templates = null) : IModule
     {
         public string Key => key;
 
@@ -119,5 +146,7 @@ public class ModuleCatalogTests
 
         public IReadOnlyList<PermissionDefinition> Permissions { get; } =
             permissions.Select(p => new PermissionDefinition(p, p)).ToList();
+
+        public IReadOnlyList<RoleTemplate> RoleTemplates { get; } = templates ?? [];
     }
 }
