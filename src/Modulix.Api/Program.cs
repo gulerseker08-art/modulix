@@ -5,11 +5,13 @@ using Modulix.Api.Development;
 using Modulix.Api.Email;
 using Modulix.Api.Records;
 using Modulix.Api.Tenancy;
+using Modulix.Api.Users;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Modules;
 using Modulix.Infrastructure.Email;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Records;
+using Modulix.Infrastructure.Users;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Logistics;
 
@@ -40,6 +42,9 @@ builder.Services.AddModulixRecords();
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 builder.Services.AddModulixEmail();
 builder.Services.AddHostedService<EmailDispatchWorker>();
+
+// Kullanıcı yönetimi: davet sınırı "Users" bölümünde; e-postadaki bağlantıların kökü App:PublicUrl (üretimde zorunlu).
+builder.Services.Configure<UserAdministrationOptions>(builder.Configuration.GetSection(UserAdministrationOptions.SectionName));
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ModulixDbContext>("database");
 
@@ -88,6 +93,7 @@ app.MapHealthChecks("/health");
 app.MapAuthEndpoints();
 app.MapTenantEndpoints();
 app.MapAccessEndpoints();
+app.MapUserEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 

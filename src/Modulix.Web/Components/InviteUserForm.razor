@@ -1,0 +1,72 @@
+@* Kullanıcı davet formu; Kullanıcılar sayfası kullanır. Yönetici rolü yalnızca yöneticiye seçenek olarak görünür
+   (asıl denetim sunucudadır). *@
+@inject ApiClient Api
+
+<form class="record-form" novalidate @onsubmit="InviteAsync" @onsubmit:preventDefault>
+    <h2>Kullanıcı davet et</h2>
+    <p class="text-muted">
+        Kişiye şifresini belirleyeceği bir bağlantı gönderilir (7 gün geçerli). E-posta başka bir kuruluşta zaten
+        kullanılıyorsa kişi hemen eklenir ve bilgilendirilir.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="inviteEmail">E-posta *</label>
+            <input id="inviteEmail" class="form-control" type="email" autocomplete="off" @bind="email" />
+            <FieldError Field="email" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="inviteName">Ad soyad *</label>
+            <input id="inviteName" class="form-control" maxlength="200" @bind="displayName" />
+            <FieldError Field="displayName" Errors="errors" />
+        </div>
+        <fieldset class="span-all">
+            <legend class="form-label">Roller</legend>
+            <RolePicker Roles="Roles" Selected="selected" CanGrantAdministrator="CanGrantAdministrator" />
+            <FieldError Field="roleIds" Errors="errors" />
+        </fieldset>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" disabled="@busy">Davet gönder</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+    </div>
+</form>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<RoleDto> Roles { get; set; } = [];
+
+    [Parameter] public bool CanGrantAdministrator { get; set; }
+
+    [Parameter] public EventCallback<InviteUserResponse> Invited { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private readonly HashSet<Guid> selected = [];
+    private string email = string.Empty;
+    private string displayName = string.Empty;
+    private string? message;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private bool busy;
+
+    private async Task InviteAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<InviteUserResponse>("/api/users/invitations", new InviteUserRequest(email, displayName, selected.ToList()));
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            errors = result.FieldErrors;
+            return;
+        }
+
+        await Invited.InvokeAsync(result.Value!);
+    }
+}

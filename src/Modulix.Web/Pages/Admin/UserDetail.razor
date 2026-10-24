@@ -1,0 +1,223 @@
+@page "/yonetim/kullanicilar/{MembershipId:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(user?.DisplayName ?? "Kullanıcı") · Modulix</PageTitle>
+
+<AuthGate Permission="@CoreAccess.ManageUsers">
+    <a class="back-link" href="yonetim/kullanicilar">← Kullanıcılar</a>
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (user is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <h1>@user.DisplayName</h1>
+                <div class="header-meta">
+                    <UserStatusBadge User="user" />
+                    @if (user.IsAdministrator)
+                    {
+                        <span class="badge tag">Yönetici</span>
+                    }
+                    @if (user.IsCurrentUser)
+                    {
+                        <span class="badge tag">Siz</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <dl class="detail-grid">
+            <div><dt>E-posta</dt><dd>@user.Email</dd></div>
+            <div><dt>Son giriş</dt><dd>@(user.LastSignInAt is { } at ? CrmLabels.Time(at) : "—")</dd></div>
+            <div><dt>Eklenme</dt><dd>@CrmLabels.Time(user.CreatedAt)</dd></div>
+            @if (user.InvitedAt is { } invitedAt)
+            {
+                <div><dt>Son davet</dt><dd>@CrmLabels.Time(invitedAt)</dd></div>
+            }
+        </dl>
+
+        @if (Locked)
+        {
+            <div class="alert alert-info">Bu kullanıcı bir yönetici. Hesabında yalnızca bir yönetici işlem yapabilir.</div>
+        }
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Roller</h2></div>
+            <RolePicker Roles="roles" Selected="selectedRoles" CanGrantAdministrator="Session.IsAdministrator" />
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" disabled="@(busy || Locked)" @onclick="SaveRolesAsync">Rolleri kaydet</button>
+            </div>
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Hesap</h2></div>
+
+            @if (confirming is { } pending)
+            {
+                <div class="alert alert-warning confirm" role="alertdialog">
+                    <p>@pending.Question</p>
+                    <button type="button" class="btn btn-danger" disabled="@busy" @onclick="() => RunAsync(pending)">@pending.Label</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = null">Vazgeç</button>
+                </div>
+            }
+            else
+            {
+                <div class="account-actions">
+                    @foreach (var action in Actions())
+                    {
+                        <div>
+                            <button type="button" class="btn @(action.Danger ? "btn-outline-danger" : "btn-outline-primary")"
+                                    disabled="@(busy || Locked)" @onclick="() => Start(action)">@action.Label</button>
+                            <small class="text-muted">@action.Hint</small>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid MembershipId { get; set; }
+
+    private UserDto? user;
+    private IReadOnlyList<RoleDto> roles = [];
+    private HashSet<Guid> selectedRoles = [];
+    private AccountAction? confirming;
+    private string? message;
+    private string? notice;
+    private bool busy;
+
+    /// <summary>Yönetici olmayan kullanıcı yöneticinin hesabında işlem yapamaz (sunucu da reddeder).</summary>
+    private bool Locked => user is { IsAdministrator: true } && !Session.IsAdministrator;
+
+    private sealed record AccountAction(string Label, string Hint, string Url, bool Delete, string Done, string? Question, bool Danger);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ManageUsers))
+        {
+            roles = (await Api.GetAsync<List<RoleDto>>("/api/roles")).Value ?? [];
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<UserDto>($"/api/users/{MembershipId}");
+        user = result.Value;
+        message = result.Error;
+        selectedRoles = user?.Roles.Select(r => r.Id).ToHashSet() ?? [];
+    }
+
+    private IEnumerable<AccountAction> Actions()
+    {
+        var url = $"/api/users/{MembershipId}";
+        switch (user!.Status)
+        {
+            case UserStatus.Invited:
+                yield return new("Daveti yeniden gönder", "Yeni bağlantı 7 gün geçerli olur.", $"{url}/invitation/resend", false,
+                    "Davet yeniden gönderildi.", null, false);
+                yield return new("Daveti iptal et", "Bağlantı çalışmaz; kişi listeden çıkar.", $"{url}/invitation", true,
+                    "Davet iptal edildi.", $"{user.Email} adresine gönderilen davet iptal edilsin mi?", true);
+                break;
+            case UserStatus.Active:
+                yield return new("Şifre sıfırlama bağlantısı gönder",
+                    "Kişi yeni şifresini kendisi belirler (24 saat geçerli). Diğer kuruluşlardaki girişi de bu şifreyle olur.",
+                    $"{url}/password-reset", false, $"Şifre sıfırlama bağlantısı {user.Email} adresine gönderildi.", null, false);
+                if (!user.IsCurrentUser)
+                {
+                    yield return new("Devre dışı bırak", "Kişi bu kuruluşa erişemez; kayıtları ve diğer kuruluşlardaki üyelikleri kalır.",
+                        $"{url}/disable", false, "Kullanıcı devre dışı bırakıldı.",
+                        $"{user.DisplayName} devre dışı bırakılsın mı? Bir sonraki işleminde erişimi kesilir.", true);
+                }
+
+                break;
+            case UserStatus.Disabled:
+                yield return new("Yeniden etkinleştir", "Kişi rolleriyle birlikte erişimini geri alır.", $"{url}/enable", false,
+                    "Kullanıcı yeniden etkinleştirildi.", null, false);
+                break;
+        }
+
+        if (user.IsLockedOut)
+        {
+            yield return new("Kilidi aç", "Hesap hatalı şifre denemeleri yüzünden kilitlendi.", $"{url}/unlock", false,
+                "Hesabın kilidi açıldı.", null, false);
+        }
+    }
+
+    private Task Start(AccountAction action)
+    {
+        if (action.Question is not null)
+        {
+            confirming = action;
+            return Task.CompletedTask;
+        }
+
+        return RunAsync(action);
+    }
+
+    private async Task RunAsync(AccountAction action)
+    {
+        busy = true;
+        notice = null;
+        var result = action.Delete ? await Api.DeleteAsync(action.Url) : await Api.PostAsync<bool>(action.Url, new { });
+        busy = false;
+        confirming = null;
+
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        if (action.Delete)
+        {
+            Navigation.NavigateTo("yonetim/kullanicilar");
+            return;
+        }
+
+        await LoadAsync();
+        notice = action.Done;
+    }
+
+    private async Task SaveRolesAsync()
+    {
+        busy = true;
+        notice = null;
+        var result = await Api.PutAsync<bool>($"/api/memberships/{MembershipId}/roles", new SetMembershipRolesRequest(selectedRoles.ToList()));
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        await LoadAsync();
+        notice = "Roller kaydedildi.";
+        if (user?.IsCurrentUser == true)
+        {
+            await Session.RefreshAsync();
+        }
+    }
+}

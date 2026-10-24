@@ -10,6 +10,7 @@ using Modulix.Core.Platform;
 using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Modules;
 using Modulix.Infrastructure.Tenancy;
+using Modulix.Infrastructure.Users;
 
 namespace Modulix.Infrastructure.Persistence;
 
@@ -48,6 +49,10 @@ public static class PersistenceSetup
         services.AddScoped<AdministratorGuard>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<ICurrentAccess, CurrentAccess>();
+
+        // Kullanıcı yönetimi (Y2); UserManager'ı host kaydeder (AddModulixAuth).
+        services.AddScoped<IUserAdministration, UserAdministration>();
+        services.AddScoped<AccountLinks>();
         return services;
     }
 

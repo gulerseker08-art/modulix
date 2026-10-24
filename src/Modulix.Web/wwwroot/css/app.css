@@ -872,3 +872,72 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
         grid-auto-columns: minmax(12rem, 1fr);
     }
 }
+
+/* Kullanıcı yönetimi (Y2) */
+.badge.user-active {
+    background: #dcf3ef;
+    color: #0f6b61;
+}
+
+.badge.user-disabled {
+    background: #eef0f5;
+    color: #4b5573;
+}
+
+.badge.user-invited {
+    background: #fdf0d5;
+    color: #8a5a00;
+}
+
+.badge.user-locked {
+    background: #fde2e1;
+    color: #a12622;
+}
+
+.role-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+
+.account-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+    .account-actions > div {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.75rem;
+    }
+
+.confirm p {
+    margin-bottom: 0.75rem;
+}
+
+.confirm .btn {
+    margin-right: 0.5rem;
+}
+
+.search .form-select {
+    max-width: 14rem;
+}
+
+@media (max-width: 767.98px) {
+    /* Arama kutusu tam satır; rol seçimi ve düğme alt satırda. */
+    .search.has-select {
+        flex-wrap: wrap;
+    }
+
+        .search.has-select .form-control {
+            flex: 1 1 100%;
+        }
+
+        .search.has-select .form-select {
+            flex: 1;
+            max-width: none;
+        }
+}

@@ -203,9 +203,10 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
                 clientA.PutAsJsonAsync($"/api/memberships/{membershipB}/roles", new SetMembershipRolesRequest([])),
                 clientB.PutAsJsonAsync($"/api/memberships/{membershipA}/roles", new SetMembershipRolesRequest([])));
 
-            Assert.Equal(
-                [HttpStatusCode.NoContent, HttpStatusCode.Conflict],
-                results.Select(r => r.StatusCode).OrderBy(s => (int)s));
+            // İkinci istek ya son yönetici kuralına (409) ya da artık yönetici olmadığı için yönetici kuralına (403) takılır.
+            var statuses = results.Select(r => r.StatusCode).OrderBy(s => (int)s).ToList();
+            Assert.Equal(HttpStatusCode.NoContent, statuses[0]);
+            Assert.Contains(statuses[1], new[] { HttpStatusCode.Forbidden, HttpStatusCode.Conflict });
 
             using var scope = factory.OpenScope(tenant.Id);
             var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();

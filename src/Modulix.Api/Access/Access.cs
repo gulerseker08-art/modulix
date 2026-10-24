@@ -1,8 +1,10 @@
 using Modulix.Api.Tenancy;
+using Modulix.Api.Users;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
+using Modulix.Core.Platform;
 using Modulix.Shared.Access;
 
 namespace Modulix.Api.Access;
@@ -113,7 +115,8 @@ public static class AccessEndpoints
         return Results.Ok(modules);
     }
 
-    private static async Task<IResult> GetMyAccessAsync(ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct)
+    private static async Task<IResult> GetMyAccessAsync(
+        ModuleCatalog catalog, ICurrentAccess access, IRoleService roles, ITenantContextAccessor tenant, CancellationToken ct)
     {
         var enabled = new List<string>();
         foreach (var module in catalog.Modules)
@@ -125,7 +128,8 @@ public static class AccessEndpoints
         }
 
         var permissions = (await access.GetPermissionsAsync(ct)).Order(StringComparer.Ordinal).ToList();
-        return Results.Ok(new MyAccessResponse(enabled, permissions));
+        var myRoles = await roles.GetMembershipRolesAsync(tenant.Current!.MembershipId, ct) ?? [];
+        return Results.Ok(new MyAccessResponse(enabled, permissions, myRoles.Any(r => r.IsSystem)));
     }
 
     private static async Task<IResult> ListRolesAsync(IRoleService roles, CancellationToken ct) =>
@@ -182,27 +186,13 @@ public static class AccessEndpoints
         return assigned is null ? MembershipNotFound() : Results.Ok(assigned.Select(ToDto).ToList());
     }
 
-    private static async Task<IResult> SetMembershipRolesAsync(
+    /// <summary>Yönetici kuralı kullanıcı yönetimindedir: yönetici rolünü yalnızca yönetici verir veya alır.</summary>
+    private static Task<IResult> SetMembershipRolesAsync(
         Guid membershipId,
         SetMembershipRolesRequest request,
-        IRoleService roles,
-        CancellationToken ct)
-    {
-        try
-        {
-            return await roles.SetMembershipRolesAsync(membershipId, request.RoleIds ?? [], ct)
-                ? Results.NoContent()
-                : MembershipNotFound();
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(ex);
-        }
-        catch (RoleConflictException ex)
-        {
-            return Conflict(ex);
-        }
-    }
+        IUserAdministration users,
+        CancellationToken ct) =>
+        UserEndpoints.Run(() => users.SetRolesAsync(membershipId, request.RoleIds ?? [], ct));
 
     private static RoleDto ToDto(RoleSummary role) => new(role.Id, role.Name, role.Permissions, role.IsSystem);
 

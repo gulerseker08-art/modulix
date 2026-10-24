@@ -92,7 +92,8 @@ internal sealed class RoleService(
         return ToSummary(role);
     }
 
-    public async Task<bool> SetMembershipRolesAsync(Guid membershipId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken)
+    public async Task<bool> SetMembershipRolesAsync(
+        Guid membershipId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken, Guid? actingMembershipId = null)
     {
         ArgumentNullException.ThrowIfNull(roleIds);
         var tenant = RequireTenant();
@@ -114,6 +115,13 @@ internal sealed class RoleService(
         var systemRoleId = await administrators.LockAsync(cancellationToken);
         var current = await db.MembershipRoles.Where(mr => mr.MembershipId == membershipId).ToListAsync(cancellationToken);
         var currentIds = current.Select(mr => mr.RoleId).ToHashSet();
+
+        if (actingMembershipId is { } actor
+            && systemRoleId is { } system
+            && (currentIds.Contains(system) || wanted.Contains(system)))
+        {
+            await administrators.EnsureIsAdministratorAsync(system, actor, cancellationToken);
+        }
 
         if (systemRoleId is { } systemId && currentIds.Contains(systemId) && !wanted.Contains(systemId))
         {

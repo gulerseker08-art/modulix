@@ -14,4 +14,7 @@ public interface IMembershipDirectory
 
     /// <summary>Etkin üyelik yoksa veya tenant kapalıysa <c>null</c>.</summary>
     Task<MembershipSummary?> FindActiveAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken);
+
+    /// <summary>Üyeliğin son giriş zamanını şimdi yapar (giriş ve tenant seçiminde).</summary>
+    Task RecordSignInAsync(Guid membershipId, CancellationToken cancellationToken);
 }

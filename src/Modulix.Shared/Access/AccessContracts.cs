@@ -7,8 +7,11 @@ public sealed record ModuleDto(string Key, string DisplayName, bool IsEnabled);
 
 public sealed record PermissionDto(string Key, string DisplayName, string ModuleKey);
 
-/// <summary>Oturumdaki kullanıcının aktif tenant'taki erişimi; arayüz menüleri buna göre gösterir.</summary>
-public sealed record MyAccessResponse(IReadOnlyList<string> EnabledModules, IReadOnlyList<string> Permissions);
+/// <summary>
+/// Oturumdaki kullanıcının aktif tenant'taki erişimi; arayüz menüleri buna göre gösterir.
+/// <see cref="IsAdministrator"/>: Yönetici (sistem) rolü var; yönetici rolünü vermek gibi işlemler yalnızca ona açıktır.
+/// </summary>
+public sealed record MyAccessResponse(IReadOnlyList<string> EnabledModules, IReadOnlyList<string> Permissions, bool IsAdministrator = false);
 
 /// <summary>Sistem rolünde (<see cref="IsSystem"/>, "Yönetici") izin listesi boştur: rol tüm izinleri verir ve düzenlenemez.</summary>
 public sealed record RoleDto(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false);
