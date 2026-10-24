@@ -35,6 +35,13 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         builder.PrimitiveCollection(r => r.Permissions).IsRequired();
         builder.Property(r => r.CreatedAt).IsRequired();
         builder.HasIndex(r => new { r.TenantId, r.Name }).IsUnique();
+        builder.Property(r => r.IsSystem).IsRequired();
+
+        // Her tenant'ta en fazla bir sistem rolü ("Yönetici").
+        builder.HasIndex(r => r.TenantId)
+            .IsUnique()
+            .HasFilter("[IsSystem] = 1")
+            .HasDatabaseName("IX_Roles_TenantId_SystemRole");
 
         // Rol atamaları (TenantId, RoleId) ile bağlanır: başka tenant'ın rolü veritabanı düzeyinde de atanamaz.
         builder.HasAlternateKey(r => new { r.TenantId, r.Id });

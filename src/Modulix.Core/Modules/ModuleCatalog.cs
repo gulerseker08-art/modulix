@@ -71,6 +71,9 @@ public sealed class ModuleCatalog
 
     public bool ContainsPermission(string permissionKey) => permissions.ContainsKey(permissionKey);
 
+    /// <summary>Katalogdaki tüm izin anahtarları; sistem rolü (<see cref="Authorization.Role.IsSystem"/>) bunları verir.</summary>
+    public IEnumerable<string> PermissionKeys => permissions.Keys;
+
     /// <summary>Tenant entitlement'ından bağımsız olarak her zaman açık modüller (yalnızca Core).</summary>
     public static bool IsAlwaysEnabled(string moduleKey) => moduleKey == CoreModule.ModuleKey;
 

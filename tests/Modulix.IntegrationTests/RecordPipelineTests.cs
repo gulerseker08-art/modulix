@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Modules;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Shared.Auth;
@@ -103,8 +104,9 @@ public class RecordPipelineTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.True(errors.ContainsKey("renk"));
         Assert.Equal("ValidationFailed", body["code"]!.GetValue<string>());
 
+        // Kurulumdaki rol ataması da denetim kaydına düşer (Y1); burada yalnızca ayar kayıtlarına bakılır.
         using var scope = factory.OpenScope(tenantId);
-        Assert.Equal(0, await Db(scope).AuditLog.CountAsync());
+        Assert.Equal(0, await Db(scope).AuditLog.CountAsync(a => a.EntityKey == "core.tenant-setting"));
     }
 
     [Fact]
@@ -191,6 +193,9 @@ public class RecordPipelineTests(ModulixApiFactory factory) : IClassFixture<Modu
     {
         var tenant = await factory.CreateTenantAsync();
         var user = await factory.CreateUserAsync(tenant);
+
+        // Ayar yazmak core.settings.manage ister (Y1); okuma izni gerektirmez.
+        await factory.CreateRoleAsync(tenant.Id, [CoreModule.Permissions.ManageSettings], user);
         var client = factory.CreateBrowserClient();
         var me = await LoginAsync(client, user.Email!);
         Assert.Equal(tenant.Id, me.ActiveTenantId);

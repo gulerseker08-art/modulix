@@ -112,7 +112,7 @@ public static class DemoDataSeeder
         });
     }
 
-    /// <summary>Tenant'ta tüm izinleri olan "Yönetici" rolünü oluşturur ve tenant'ın tüm üyelerine atar.</summary>
+    /// <summary>Tenant'ın sistem rolünü ("Yönetici": tüm izinler) oluşturur ve tenant'ın tüm üyelerine atar.</summary>
     private static async Task EnsureAdministratorsAsync(IServiceProvider services, Tenant tenant, CancellationToken ct)
     {
         using var scope = services.CreateScope();
@@ -121,16 +121,10 @@ public static class DemoDataSeeder
         scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current =
             new TenantContext(tenant.Id, Guid.Empty, Guid.Empty);
 
-        var catalog = scope.ServiceProvider.GetRequiredService<ModuleCatalog>();
         var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
         var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
 
-        const string name = "Yönetici";
-        var allPermissions = catalog.Modules.SelectMany(m => m.Permissions).Select(p => p.Key).ToList();
-        var existing = (await roles.ListAsync(ct)).SingleOrDefault(r => r.Name == name);
-        var admin = existing is null
-            ? await roles.CreateAsync(name, allPermissions, ct)
-            : await roles.UpdateAsync(existing.Id, name, allPermissions, ct) ?? existing;
+        var admin = await roles.EnsureSystemRoleAsync(ct);
 
         var membershipIds = await db.Memberships.Where(m => m.TenantId == tenant.Id).Select(m => m.Id).ToListAsync(ct);
         foreach (var membershipId in membershipIds)

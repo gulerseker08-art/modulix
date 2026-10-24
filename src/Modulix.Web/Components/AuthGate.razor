@@ -14,7 +14,8 @@ else if (Session.IsSignedIn && Session.HasActiveTenant)
     {
         <div class="alert alert-warning">Bu modül kuruluşunuz için açık değil.</div>
     }
-    else if (Permission is not null && !Session.Can(Permission))
+    else if ((Permission is not null && !Session.Can(Permission))
+             || (AnyPermission is not null && !Session.CanAny(AnyPermission)))
     {
         <div class="alert alert-warning">Bu ekranı görüntüleme yetkiniz yok. Yöneticinizden rol isteyin.</div>
     }
@@ -32,6 +33,9 @@ else if (Session.IsSignedIn && Session.HasActiveTenant)
 
     /// <summary>İzin anahtarı (ör. "crm.companies.read").</summary>
     [Parameter] public string? Permission { get; set; }
+
+    /// <summary>İzinlerden en az biri yeterli (ör. yönetim giriş sayfası).</summary>
+    [Parameter] public IReadOnlyList<string>? AnyPermission { get; set; }
 
     protected override async Task OnInitializedAsync()
     {

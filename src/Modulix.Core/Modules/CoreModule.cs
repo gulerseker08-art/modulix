@@ -9,7 +9,15 @@ public sealed class CoreModule : IModule
 
     public static class Permissions
     {
+        /// <summary>Kullanıcıları ve üyeliklerin rollerini yönetir.</summary>
+        public const string ManageUsers = "core.users.manage";
+
         public const string ManageRoles = "core.roles.manage";
+
+        /// <summary>Firma ayarlarını yazar; okumak için izin gerekmez.</summary>
+        public const string ManageSettings = "core.settings.manage";
+
+        public const string ReadAudit = "core.audit.read";
     }
 
     public string Key => ModuleKey;
@@ -18,6 +26,9 @@ public sealed class CoreModule : IModule
 
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
     [
-        new(Permissions.ManageRoles, "Rolleri ve kullanıcıların rollerini yönetir"),
+        new(Permissions.ManageUsers, "Kullanıcıları ve kullanıcıların rollerini yönetir"),
+        new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir"),
+        new(Permissions.ManageSettings, "Firma ayarlarını değiştirir"),
+        new(Permissions.ReadAudit, "Denetim kaydını görüntüler"),
     ];
 }

@@ -45,6 +45,7 @@ public static class PersistenceSetup
 
         // Modül hakları ve izinler; ModuleCatalog'u host kaydeder (AddModulixModules).
         services.AddScoped<IModuleEntitlements, ModuleEntitlements>();
+        services.AddScoped<AdministratorGuard>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<ICurrentAccess, CurrentAccess>();
         return services;

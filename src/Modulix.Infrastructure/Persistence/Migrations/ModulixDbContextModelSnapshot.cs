@@ -118,6 +118,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -131,6 +134,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Roles_TenantId_SystemRole")
+                        .HasFilter("[IsSystem] = 1");
 
                     b.HasIndex("TenantId", "Name")
                         .IsUnique();

@@ -28,6 +28,27 @@ public static class AccessEndpointFilters
         return builder;
     }
 
+    /// <summary>Aktif tenant ve verilen izinlerden en az biri; yoksa 403.</summary>
+    public static TBuilder RequireAnyPermission<TBuilder>(this TBuilder builder, params string[] permissions)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        if (permissions.Length == 0 || permissions.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException("En az bir izin gerekli.", nameof(permissions));
+        }
+
+        builder.AddEndpointFilter<TBuilder, RequireTenantFilter>();
+        builder.AddEndpointFilter(async (context, next) =>
+        {
+            var access = context.HttpContext.RequestServices.GetRequiredService<ICurrentAccess>();
+            var granted = await access.GetPermissionsAsync(context.HttpContext.RequestAborted);
+            return permissions.Any(granted.Contains)
+                ? await next(context)
+                : Forbidden($"Bu işlem için şu izinlerden biri gerekir: {string.Join(", ", permissions)}.");
+        });
+        return builder;
+    }
+
     /// <summary>Aktif tenant ister ve modül tenant için kapalıysa 403 döner.</summary>
     public static TBuilder RequireModule<TBuilder>(this TBuilder builder, string moduleKey)
         where TBuilder : IEndpointConventionBuilder
@@ -61,16 +82,19 @@ public static class AccessEndpoints
 
         var roles = app.MapGroup("/api/roles")
             .RequireAuthorization()
-            .RequirePermission(CoreModule.Permissions.ManageRoles)
             .WithTags("Roles");
-        roles.MapGet("/", ListRolesAsync);
-        roles.MapGet("/permissions", ListAssignablePermissionsAsync);
-        roles.MapPost("/", CreateRoleAsync);
-        roles.MapPut("/{roleId:guid}", UpdateRoleAsync);
 
+        // Kullanıcı yöneticisi de rol listesini görür: kullanıcıya rol atarken seçer.
+        roles.MapGet("/", ListRolesAsync)
+            .RequireAnyPermission(CoreModule.Permissions.ManageRoles, CoreModule.Permissions.ManageUsers);
+        roles.MapGet("/permissions", ListAssignablePermissionsAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
+        roles.MapPost("/", CreateRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
+        roles.MapPut("/{roleId:guid}", UpdateRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
+
+        // Rol atamak kullanıcı yönetimidir: rolleri tanımlamak (core.roles.manage) ayrı bir yetkidir.
         var memberships = app.MapGroup("/api/memberships/{membershipId:guid}/roles")
             .RequireAuthorization()
-            .RequirePermission(CoreModule.Permissions.ManageRoles)
+            .RequirePermission(CoreModule.Permissions.ManageUsers)
             .WithTags("Roles");
         memberships.MapGet("/", GetMembershipRolesAsync);
         memberships.MapPut("/", SetMembershipRolesAsync);
@@ -146,6 +170,10 @@ public static class AccessEndpoints
         {
             return BadRequest(ex);
         }
+        catch (RoleConflictException ex)
+        {
+            return Conflict(ex);
+        }
     }
 
     private static async Task<IResult> GetMembershipRolesAsync(Guid membershipId, IRoleService roles, CancellationToken ct)
@@ -170,12 +198,19 @@ public static class AccessEndpoints
         {
             return BadRequest(ex);
         }
+        catch (RoleConflictException ex)
+        {
+            return Conflict(ex);
+        }
     }
 
-    private static RoleDto ToDto(RoleSummary role) => new(role.Id, role.Name, role.Permissions);
+    private static RoleDto ToDto(RoleSummary role) => new(role.Id, role.Name, role.Permissions, role.IsSystem);
 
     private static IResult BadRequest(ArgumentException ex) =>
         Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Geçersiz istek.", detail: ex.Message);
+
+    private static IResult Conflict(RoleConflictException ex) =>
+        Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "İşlem yapılamadı.", detail: ex.Message);
 
     private static IResult RoleNotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Rol bulunamadı.");

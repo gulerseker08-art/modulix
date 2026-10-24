@@ -48,14 +48,19 @@ internal sealed class CurrentAccess(
         if (permissions is null)
         {
             // Roller ve atamalar tenant verisidir: sorgu filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür.
-            var granted = await (
+            var roles = await (
                 from assignment in db.MembershipRoles.AsNoTracking()
                 join role in db.Roles.AsNoTracking() on assignment.RoleId equals role.Id
                 where assignment.MembershipId == tenant.MembershipId
-                select role.Permissions)
+                select new { role.IsSystem, role.Permissions })
                 .ToListAsync(cancellationToken);
 
-            permissions = catalog.EffectivePermissions(granted.SelectMany(p => p), await GetEnabledModulesAsync(cancellationToken));
+            // Sistem rolü ("Yönetici") katalogdaki tüm izinleri verir; yeni açılan modülün izinleri de kendiliğinden gelir.
+            var granted = roles.Any(r => r.IsSystem)
+                ? catalog.PermissionKeys
+                : roles.SelectMany(r => r.Permissions);
+
+            permissions = catalog.EffectivePermissions(granted, await GetEnabledModulesAsync(cancellationToken));
         }
 
         return permissions;

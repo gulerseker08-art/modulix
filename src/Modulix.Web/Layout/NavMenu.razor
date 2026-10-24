@@ -37,6 +37,16 @@
                 }
             }
         }
+
+        @if (Session.CanAny(CoreAccess.AdministrationPermissions))
+        {
+            <div class="nav-section px-3">Yönetim</div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="yonetim">
+                    <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> Yönetim
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
