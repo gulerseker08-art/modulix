@@ -8,6 +8,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
+using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.Infrastructure.Records;
@@ -196,13 +197,13 @@ public static class RecordsSetup
 {
     /// <summary>
     /// Kayıt boru hattı ve Core'un kayıt türleri. Lisans adımı modül haklarını, yetki adımı rollerin izinlerini
-    /// denetler (E4). Veri kapsamı için v0 varsayılanı TryAdd ile kaydedilir; gerçek uygulaması sonra gelir.
+    /// denetler (E4), veri kapsamı adımı rollerin kayıt kapsamını ve ekipleri uygular (Y8).
     /// </summary>
     public static IServiceCollection AddModulixRecords(this IServiceCollection services)
     {
         services.TryAddScoped<IEntitlementService, ModuleEntitlementService>();
         services.TryAddScoped<IPermissionService, StorePermissionService>();
-        services.TryAddScoped<IDataScopeService, TenantWideDataScope>();
+        services.TryAddScoped<IDataScopeService, MembershipDataScope>();
 
         services.AddScoped<IAuditWriter, EfAuditWriter>();
         services.AddScoped<IDomainEventOutbox, EfDomainEventOutbox>();

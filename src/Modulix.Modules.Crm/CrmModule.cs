@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Records;
@@ -73,7 +74,11 @@ public sealed class CrmModule : IModule
                 Permissions.ContactsRead, Permissions.ContactsWrite,
                 Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite,
                 Permissions.ActivitiesRead, Permissions.ActivitiesWrite,
-            ]),
+            ])
+        {
+            // Y8: temsilci yalnızca sorumlusu olduğu kayıtları görür; ekip lideri için kapsam rolde genişletilir.
+            Scope = RecordScope.Own,
+        },
     ];
 
     /// <summary>Denetim kaydı (Y5): alanların görünen adları; seçenek adları arayüzdekilerle aynıdır.</summary>

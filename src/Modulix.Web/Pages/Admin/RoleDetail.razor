@@ -78,6 +78,30 @@
                 <PermissionMatrix Permissions="permissions" Selected="selected" CanGrant="CanGrant" />
                 <FieldError Field="permissions" Errors="errors" />
 
+                <fieldset class="scope-choice">
+                    <legend class="form-label">Kayıt kapsamı</legend>
+                    <p class="text-muted small">
+                        İzinler hangi tür kayıtları, kapsam hangi kayıtları göreceğini belirler. Sorumlusu olan kayıtlara (firma,
+                        fırsat, aktivite) uygulanır. Kişinin birden fazla rolü varsa en geniş kapsam geçerlidir.
+                    </p>
+                    @foreach (var option in ScopeOptions)
+                    {
+                        var id = $"scope-{option}";
+                        <div class="form-check">
+                            <input id="@id" class="form-check-input" type="radio" name="scope" checked="@(scope == option)"
+                                   disabled="@(!CanGrantScope(option))" @onchange="() => scope = option" />
+                            <label class="form-check-label" for="@id">
+                                <strong>@RecordScopeLabels.Of(option)</strong> <span class="text-muted">@RecordScopeLabels.Describe(option)</span>
+                            </label>
+                        </div>
+                    }
+                    @if (ScopeOptions.Any(o => !CanGrantScope(o)))
+                    {
+                        <small class="text-muted">Kendi kapsamınızdan geniş bir kapsam veremezsiniz.</small>
+                    }
+                    <FieldError Field="scope" Errors="errors" />
+                </fieldset>
+
                 @if (skippedFromTemplate > 0)
                 {
                     <p class="text-muted">Şablondaki @skippedFromTemplate izin sizde olmadığı için eklenmedi.</p>
@@ -169,6 +193,7 @@
     private RoleDto? role;
     private HashSet<string> selected = [];
     private string name = string.Empty;
+    private RecordScope scope = RecordScope.All;
     private Guid? moveTo;
     private bool loaded;
     private bool deleting;
@@ -214,6 +239,7 @@
             message ??= role is null ? "Rol bulunamadı." : null;
             name = role?.Name ?? string.Empty;
             selected = role?.Permissions.ToHashSet() ?? [];
+            scope = role?.Scope ?? RecordScope.All;
         }
         else
         {
@@ -221,6 +247,7 @@
             var source = roles.FirstOrDefault(r => r.Id == CopyOf && !r.IsSystem);
             name = source is null ? string.Empty : $"{source.Name} (kopya)";
             selected = source?.Permissions.ToHashSet() ?? [];
+            scope = source?.Scope ?? (Session.IsAdministrator ? RecordScope.All : Session.Scope);
             templateKey = null;
             skippedFromTemplate = 0;
             templates = source is null ? (await Api.GetAsync<List<RoleTemplateDto>>("/api/roles/templates")).Value ?? [] : [];
@@ -250,10 +277,17 @@
         }
 
         selected = template.Permissions.Where(CanGrant).ToHashSet();
+        scope = CanGrantScope(template.Scope) ? template.Scope : Session.Scope;
         skippedFromTemplate = template.Permissions.Count - selected.Count;
     }
 
     private bool CanGrant(string permission) => Session.IsAdministrator || Session.Can(permission);
+
+    private static readonly RecordScope[] ScopeOptions = [RecordScope.All, RecordScope.Team, RecordScope.Own];
+
+    // Sunucu da denetler: yönetici olmayan kişi kendi kapsamından geniş kapsam veremez, geniş kapsamlı rolü daraltamaz.
+    private bool CanGrantScope(RecordScope option) =>
+        Session.IsAdministrator || (option >= Session.Scope && (role is null || role.Scope >= Session.Scope));
 
     // Yönetici rolüne yalnızca yönetici taşıyabilir (sunucu da denetler).
     private IEnumerable<RoleDto> MoveTargets() =>
@@ -263,7 +297,7 @@
     {
         busy = true;
         notice = null;
-        var request = new SaveRoleRequest(name, selected.Order(StringComparer.Ordinal).ToList());
+        var request = new SaveRoleRequest(name, selected.Order(StringComparer.Ordinal).ToList(), scope);
         var result = IsNew
             ? await Api.PostAsync<RoleDto>("/api/roles", request)
             : await Api.PutAsync<RoleDto>($"/api/roles/{RoleId}", request);
@@ -284,7 +318,7 @@
             return;
         }
 
-        role = role! with { Name = result.Value!.Name, Permissions = result.Value.Permissions };
+        role = role! with { Name = result.Value!.Name, Permissions = result.Value.Permissions, Scope = result.Value.Scope };
         selected = role.Permissions.ToHashSet();
         message = null;
         errors = null;

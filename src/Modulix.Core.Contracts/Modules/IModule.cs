@@ -75,7 +75,11 @@ public sealed record OwnedRecordType(string EntityKey, string Label, IReadOnlyDi
 /// Hazır rol önerisi (ADR-0005). <see cref="Key"/> modül anahtarıyla başlar (ör. "crm.sales-rep") ve değişmez;
 /// <see cref="Permissions"/> modülün kendi izinleridir. Şablondan oluşturulan rol sıradan bir roldür; şablona bağlı kalmaz.
 /// </summary>
-public sealed record RoleTemplate(string Key, string Name, string Description, IReadOnlyList<string> Permissions);
+public sealed record RoleTemplate(string Key, string Name, string Description, IReadOnlyList<string> Permissions)
+{
+    /// <summary>Önerilen kayıt kapsamı (Y8); rol oluşturulurken kullanılır.</summary>
+    public Authorization.RecordScope Scope { get; init; } = Authorization.RecordScope.All;
+}
 
 /// <summary>
 /// Denetim kaydında bir kayıt türü (Y5). <see cref="Fields"/>: alanın teknik adı → görünen adı (ör. "status" → "Durum").

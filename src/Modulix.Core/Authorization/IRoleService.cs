@@ -1,10 +1,16 @@
+using Modulix.Core.Contracts.Authorization;
+
 namespace Modulix.Core.Authorization;
 
 /// <summary>
 /// Rol özeti. Sistem rolünde (<see cref="IsSystem"/>) <see cref="Permissions"/> boştur: rol, tenant için açık
 /// tüm modüllerin tüm izinlerini verir. <see cref="MemberCount"/> yalnızca listede doldurulur.
 /// </summary>
-public sealed record RoleSummary(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false, int MemberCount = 0);
+public sealed record RoleSummary(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false, int MemberCount = 0)
+{
+    /// <summary>Kayıt kapsamı (Y8).</summary>
+    public RecordScope Scope { get; init; } = RecordScope.All;
+}
 
 /// <summary>
 /// İstek kurallara uygun ama tenant'ın durumuyla çelişiyor: sistem rolünü düzenlemek veya son yöneticinin
@@ -22,6 +28,7 @@ public sealed class RoleConflictException(string message) : Exception(message);
 /// <c>actingMembershipId</c> verilirse (kullanıcı isteği) yetki yükseltmeye karşı kural uygulanır: yönetici olmayan kişi
 /// bir role yalnızca kendisinde olan izni ekleyebilir veya rolden çıkarabilir; değilse
 /// <see cref="Platform.UserAdministrationException"/> (<see cref="Platform.UserAdministrationError.PermissionDenied"/>).
+/// Aynı kural kapsamda da geçerlidir: yönetici olmayan kişi bir role kendi kapsamından geniş kapsam veremez.
 /// </summary>
 public interface IRoleService
 {
@@ -29,11 +36,20 @@ public interface IRoleService
     Task<IReadOnlyList<RoleSummary>> ListAsync(CancellationToken cancellationToken);
 
     Task<RoleSummary> CreateAsync(
-        string name, IReadOnlyCollection<string> permissions, CancellationToken cancellationToken, Guid? actingMembershipId = null);
+        string name,
+        IReadOnlyCollection<string> permissions,
+        CancellationToken cancellationToken,
+        Guid? actingMembershipId = null,
+        RecordScope scope = RecordScope.All);
 
-    /// <summary>Rol bu tenant'ta yoksa <c>null</c>.</summary>
+    /// <summary>Rol bu tenant'ta yoksa <c>null</c>. <paramref name="scope"/> verilmezse kapsam değişmez.</summary>
     Task<RoleSummary?> UpdateAsync(
-        Guid roleId, string name, IReadOnlyCollection<string> permissions, CancellationToken cancellationToken, Guid? actingMembershipId = null);
+        Guid roleId,
+        string name,
+        IReadOnlyCollection<string> permissions,
+        CancellationToken cancellationToken,
+        Guid? actingMembershipId = null,
+        RecordScope? scope = null);
 
     /// <summary>
     /// Rolü siler; rol bu tenant'ta yoksa <c>false</c>. Sistem rolü silinemez (<see cref="RoleConflictException"/>).

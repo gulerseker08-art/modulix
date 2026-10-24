@@ -37,6 +37,9 @@ public sealed class CoreModule : IModule
     public static class AuditedEntityKeys
     {
         public const string Role = "core.role";
+
+        /// <summary>Ekip (Y8): ad, açıklama ve üyeler.</summary>
+        public const string Team = "core.team";
         public const string Membership = "core.membership";
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
@@ -119,7 +122,20 @@ public sealed class CoreModule : IModule
     [
         new(AuditedEntityKeys.Role, "Rol", null, new Dictionary<string, string>
         {
-            ["name"] = "Ad", ["permissions"] = "İzinler", ["isSystem"] = "Sistem rolü",
+            ["name"] = "Ad", ["permissions"] = "İzinler", ["isSystem"] = "Sistem rolü", ["scope"] = "Kayıt kapsamı",
+        }, "name")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["scope"] = new Dictionary<string, string>
+                {
+                    ["All"] = "Tüm kayıtlar", ["Team"] = "Ekibinin kayıtları", ["Own"] = "Yalnızca kendi kayıtları",
+                },
+            },
+        },
+        new(AuditedEntityKeys.Team, "Ekip", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["description"] = "Açıklama", ["members"] = "Üyeler",
         }, "name"),
         new(AuditedEntityKeys.Membership, "Kullanıcı", null, new Dictionary<string, string>
         {

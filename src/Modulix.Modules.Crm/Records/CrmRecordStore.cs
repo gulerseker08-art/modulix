@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Modules;
@@ -44,6 +45,11 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     public string? PermissionFor(RecordOperation operation) =>
         operation == RecordOperation.Read ? ReadPermission : WritePermission;
 
+    /// <summary>Sorumlusu olan kayıtlarda veri kapsamı (Y8) sorumlu alanına göre uygulanır.</summary>
+    string? IRecordStore.OwnerField => IsOwned ? OwnerField : null;
+
+    private static bool IsOwned => typeof(IOwnedEntity).IsAssignableFrom(typeof(TEntity));
+
     public IReadOnlyList<RecordFieldError> Validate(RecordOperation operation, JsonObject values)
     {
         var errors = new List<RecordFieldError>();
@@ -79,6 +85,10 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
         var source = ApplyFilters(Data.Set<TEntity>().AsNoTracking(), query.Filters);
+        if (query.Owners is { } owners && IsOwned)
+        {
+            source = source.Where(OwnedBy(owners));
+        }
         if (query.Search is { } term)
         {
             source = Search(source, term);
@@ -92,6 +102,16 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             .ToListAsync(cancellationToken);
 
         return new RecordPage(items.Select(ToData).ToList(), query.Page, query.PageSize, total);
+    }
+
+    // e => owners.Contains(e.OwnerId): kapsam sorguda uygulanır, sayfalama ve toplam doğru kalır. Sorumlusu boş kayıt eşleşmez.
+    private static Expression<Func<TEntity, bool>> OwnedBy(IReadOnlySet<Guid> owners)
+    {
+        var ids = owners.Select(id => (Guid?)id).ToList();
+        var entity = Expression.Parameter(typeof(TEntity), "e");
+        var owner = Expression.Property(entity, nameof(IOwnedEntity.OwnerId));
+        var contains = Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), [typeof(Guid?)], Expression.Constant(ids), owner);
+        return Expression.Lambda<Func<TEntity, bool>>(contains, entity);
     }
 
     public async Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken)

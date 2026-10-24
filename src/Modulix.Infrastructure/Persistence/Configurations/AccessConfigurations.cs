@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Modulix.Core.Authorization;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
+using Modulix.Core.Teams;
 
 namespace Modulix.Infrastructure.Persistence.Configurations;
 
@@ -36,6 +37,7 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         builder.Property(r => r.CreatedAt).IsRequired();
         builder.HasIndex(r => new { r.TenantId, r.Name }).IsUnique();
         builder.Property(r => r.IsSystem).IsRequired();
+        builder.Property(r => r.Scope).IsRequired().HasDefaultValue(Core.Contracts.Authorization.RecordScope.All);
 
         // Her tenant'ta en fazla bir sistem rolü ("Yönetici").
         builder.HasIndex(r => r.TenantId)
@@ -70,5 +72,50 @@ internal sealed class MembershipRoleConfiguration : IEntityTypeConfiguration<Mem
             .HasForeignKey(mr => new { mr.TenantId, mr.RoleId })
             .HasPrincipalKey(r => new { r.TenantId, r.Id })
             .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
+{
+    public void Configure(EntityTypeBuilder<Team> builder)
+    {
+        // Tenant verisi (Y8): core şemasında; Row-Level Security ile korunur (migration: TenantIsolationSql).
+        builder.ToTable("Teams", DatabaseSchemas.Core);
+        builder.HasKey(t => t.Id);
+        builder.Property(t => t.Id).ValueGeneratedNever();
+        builder.Property(t => t.TenantId).IsRequired();
+        builder.Property(t => t.Name).HasMaxLength(Team.NameMaxLength).IsRequired();
+        builder.Property(t => t.Description).HasMaxLength(Team.DescriptionMaxLength);
+        builder.Property(t => t.CreatedAt).IsRequired();
+        builder.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
+        builder.HasAlternateKey(t => new { t.TenantId, t.Id });
+    }
+}
+
+internal sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMember>
+{
+    public void Configure(EntityTypeBuilder<TeamMember> builder)
+    {
+        builder.ToTable("TeamMembers", DatabaseSchemas.Core);
+        builder.HasKey(tm => tm.Id);
+        builder.Property(tm => tm.Id).ValueGeneratedNever();
+        builder.Property(tm => tm.TenantId).IsRequired();
+        builder.HasIndex(tm => new { tm.TenantId, tm.TeamId, tm.MembershipId }).IsUnique();
+
+        // Kapsam hesabı kişinin ekiplerinden başlar.
+        builder.HasIndex(tm => new { tm.TenantId, tm.MembershipId });
+
+        // Bileşik yabancı anahtarlar: ekip de üyelik de aynı tenant'ta olmak zorundadır. Ekip ya da üyelik (ör. iptal
+        // edilen davet) silinince ekip üyeliği de silinir.
+        builder.HasOne<Team>()
+            .WithMany()
+            .HasForeignKey(tm => new { tm.TenantId, tm.TeamId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Membership>()
+            .WithMany()
+            .HasForeignKey(tm => new { tm.TenantId, tm.MembershipId })
+            .HasPrincipalKey(m => new { m.TenantId, m.Id })
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

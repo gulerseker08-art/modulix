@@ -48,6 +48,11 @@ internal sealed class CurrentAccess(
         return permissions;
     }
 
+    public async Task<RecordScope> GetScopeAsync(CancellationToken cancellationToken) =>
+        tenantAccessor.Current is { } tenant
+            ? await membershipPermissions.GetScopeAsync(tenant.MembershipId, cancellationToken)
+            : RecordScope.Own;
+
     private async Task<IReadOnlySet<string>> GetEnabledModulesAsync(CancellationToken cancellationToken) =>
         enabledModules ??= await entitlements.GetEnabledAsync(tenantAccessor.Current!.TenantId, cancellationToken);
 }

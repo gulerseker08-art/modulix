@@ -9,12 +9,14 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Settings;
+using Modulix.Core.Teams;
 using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Modules;
 using Modulix.Infrastructure.Platform;
 using Modulix.Infrastructure.Settings;
+using Modulix.Infrastructure.Teams;
 using Modulix.Infrastructure.Tenancy;
 using Modulix.Infrastructure.Users;
 
@@ -55,6 +57,7 @@ public static class PersistenceSetup
         services.AddScoped<AdministratorGuard>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<MembershipPermissions>();
+        services.AddScoped<ITeamService, TeamService>();
         services.AddScoped<ICurrentAccess, CurrentAccess>();
 
         // Kullanıcı yönetimi (Y2); UserManager'ı host kaydeder (AddModulixAuth).

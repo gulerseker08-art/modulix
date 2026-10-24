@@ -17,4 +17,7 @@ public interface ICurrentAccess
 
     /// <summary>Kullanıcının aktif tenant'taki geçerli izinleri.</summary>
     Task<IReadOnlySet<string>> GetPermissionsAsync(CancellationToken cancellationToken);
+
+    /// <summary>Kullanıcının kayıt kapsamı (Y8): rollerinin en genişi. Aktif tenant yoksa yalnızca kendi kayıtları.</summary>
+    Task<RecordScope> GetScopeAsync(CancellationToken cancellationToken);
 }

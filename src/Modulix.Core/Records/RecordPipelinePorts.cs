@@ -19,9 +19,14 @@ public interface IPermissionService
     Task<bool> HasPermissionAsync(TenantContext tenant, string entityKey, RecordOperation operation, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Veri kapsamı (Y8): kişinin hangi kullanıcıların sorumlu olduğu kayıtları görebileceği. Boru hattı bunu sorumlu alanı
+/// olan kayıt türlerine (<see cref="IRecordStore.OwnerField"/>) uygular: listede sorguda, tek kayıtta sorumluya bakarak.
+/// </summary>
 public interface IDataScopeService
 {
-    Task<bool> CanAccessAsync(TenantContext tenant, RecordData record, RecordOperation operation, CancellationToken cancellationToken);
+    /// <summary>Null: tüm kayıtlar. Aksi halde yalnızca sorumlusu bu kullanıcılardan biri olan kayıtlar.</summary>
+    Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken);
 }
 
 public sealed class AllowAllEntitlements : IEntitlementService
@@ -37,8 +42,8 @@ public sealed class AllowAllPermissions : IPermissionService
 
 public sealed class TenantWideDataScope : IDataScopeService
 {
-    public Task<bool> CanAccessAsync(TenantContext tenant, RecordData record, RecordOperation operation, CancellationToken cancellationToken) =>
-        Task.FromResult(true);
+    public Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlySet<Guid>?>(null);
 }
 
 public enum AuditAction

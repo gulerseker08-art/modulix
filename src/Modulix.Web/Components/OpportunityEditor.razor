@@ -74,7 +74,7 @@
             <label class="form-label" for="ownerId">Sorumlu</label>
             <select id="ownerId" class="form-select" @bind="form.OwnerId">
                 <option value="">@(Opportunity is null ? "Ben" : "—")</option>
-                @foreach (var member in Lookups.Members)
+                @foreach (var member in Lookups.AssignableMembers)
                 {
                     <option value="@member.UserId">@member.DisplayName</option>
                 }

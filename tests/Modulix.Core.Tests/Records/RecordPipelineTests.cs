@@ -126,6 +126,19 @@ public class RecordPipelineTests
     }
 
     [Fact]
+    public async Task Record_with_owner_out_of_scope_is_not_created()
+    {
+        _inScope = false;
+
+        var result = await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a", ["ownerId"] = Guid.NewGuid().ToString() }), default);
+
+        Assert.Equal(RecordErrorCode.ValidationFailed, result.Error!.Code);
+        Assert.Equal("ownerId", Assert.Single(result.Error.FieldErrors!).Field);
+        Assert.Empty(_audit.Entries);
+        Assert.Equal(0, _unitOfWork.Saves);
+    }
+
+    [Fact]
     public async Task Unknown_entity_is_rejected()
     {
         var result = await Pipeline().GetAsync(new RecordRef("crm.yok", Guid.NewGuid()), default);
@@ -170,8 +183,9 @@ public class RecordPipelineTests
         public Task<bool> HasPermissionAsync(TenantContext tenant, string entityKey, RecordOperation operation, CancellationToken cancellationToken) =>
             Task.FromResult(allow());
 
-        public Task<bool> CanAccessAsync(TenantContext tenant, RecordData record, RecordOperation operation, CancellationToken cancellationToken) =>
-            Task.FromResult(allow());
+        // Kapsam dışı: hiçbir sorumlunun kaydı görünmez.
+        public Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlySet<Guid>?>(allow() ? null : new HashSet<Guid>());
     }
 
     private sealed class FakeStore : IRecordStore
@@ -181,6 +195,8 @@ public class RecordPipelineTests
         public string EntityKey => Entity;
 
         public string FeatureKey => "test.notes";
+
+        public string? OwnerField => "ownerId";
 
         public IReadOnlyList<RecordFieldError> Validate(RecordOperation operation, JsonObject values) =>
             values.ContainsKey("text") ? [] : [new RecordFieldError("text", "Zorunlu.")];

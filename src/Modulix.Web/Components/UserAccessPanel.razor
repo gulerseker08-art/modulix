@@ -30,6 +30,13 @@
             }
             @(Disabled ? " Kişi devre dışı olduğu için şu an hiçbirini kullanamaz." : null)
         </p>
+        <p class="scope-line">
+            <strong>Kayıt kapsamı:</strong> @RecordScopeLabels.Of(access.Scope)
+            @if (access.Scope == RecordScope.Team)
+            {
+                @(access.Teams is { Count: > 0 } teams ? $" ({string.Join(", ", teams)})" : " (henüz bir ekipte değil; yalnızca kendi kayıtlarını görür)")
+            }
+        </p>
         <PermissionMatrix Permissions="access.Assignable" Selected="granted" ReadOnly="true" Describe="Describe" />
     }
 </section>

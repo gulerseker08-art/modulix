@@ -4,6 +4,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Api.Platform;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
+using Modulix.Core.Records;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
@@ -114,9 +115,17 @@ public static class TenancySetup
             .AddEndpointFilter<RequireTenantFilter>()
             .WithTags("Tenant");
 
-        // Sorumlu seçimi için üye adları; her üye görebilir (e-posta ve rol bilgisi verilmez).
-        app.MapGet("/api/tenant/members", async (ITenantMembers members, CancellationToken ct) =>
-                (await members.ListActiveAsync(ct)).Select(m => new TenantMemberResponse(m.UserId, m.DisplayName)).ToList())
+        // Sorumlu seçimi için üye adları; her üye görebilir (e-posta ve rol bilgisi verilmez). assignable=true: yalnızca
+        // kişinin kayıt kapsamındaki üyeler (Y8), yani sorumlu olarak atayabileceği ve süzgeçte seçebileceği kişiler.
+        app.MapGet("/api/tenant/members", async (
+                bool? assignable, ITenantMembers members, IDataScopeService scope, ITenantContextAccessor tenant, CancellationToken ct) =>
+            {
+                var owners = assignable == true ? await scope.GetOwnersAsync(tenant.Current!, ct) : null;
+                return (await members.ListActiveAsync(ct))
+                    .Where(m => owners is null || owners.Contains(m.UserId))
+                    .Select(m => new TenantMemberResponse(m.UserId, m.DisplayName))
+                    .ToList();
+            })
             .RequireAuthorization()
             .AddEndpointFilter<RequireTenantFilter>()
             .WithTags("Tenant");

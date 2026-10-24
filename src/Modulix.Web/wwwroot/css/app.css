@@ -1204,3 +1204,16 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 .setup-steps {
     padding-left: 1.25rem;
 }
+
+/* Kayıt kapsamı (Y8). */
+.scope-choice {
+    margin: 1.25rem 0;
+}
+
+.scope-choice .form-check {
+    margin-bottom: 0.35rem;
+}
+
+.scope-line {
+    margin-bottom: 0.75rem;
+}

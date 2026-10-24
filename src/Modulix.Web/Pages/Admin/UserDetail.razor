@@ -67,6 +67,31 @@
             </div>
         </section>
 
+        <section class="detail-section">
+            <div class="section-header"><h2>Ekipler</h2></div>
+            @if (teams.Count == 0)
+            {
+                <p class="text-muted">Tanımlı ekip yok. <a href="yonetim/ekipler">Ekip ekleyin</a>.</p>
+            }
+            else
+            {
+                <p class="text-muted small">"Ekibinin kayıtları" kapsamındaki kişi, ekip arkadaşlarının sorumlu olduğu kayıtları da görür.</p>
+                <div class="role-picker">
+                    @foreach (var team in teams)
+                    {
+                        <label class="form-check">
+                            <input class="form-check-input" type="checkbox" checked="@selectedTeams.Contains(team.Id)"
+                                   @onchange="e => ToggleTeam(team.Id, e.Value is true)" />
+                            <span class="form-check-label">@team.Name <small class="text-muted">· @team.MemberCount üye</small></span>
+                        </label>
+                    }
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveTeamsAsync">Ekipleri kaydet</button>
+                </div>
+            }
+        </section>
+
         <UserAccessPanel MembershipId="MembershipId" Disabled="user.Status == UserStatus.Disabled" Version="accessVersion" />
 
         <section class="detail-section">
@@ -108,6 +133,8 @@
     private UserDto? user;
     private IReadOnlyList<RoleDto> roles = [];
     private HashSet<Guid> selectedRoles = [];
+    private IReadOnlyList<TeamDto> teams = [];
+    private HashSet<Guid> selectedTeams = [];
     private const string TransferPath = "/transfer-records";
 
     private AccountAction? confirming;
@@ -135,6 +162,7 @@
         {
             roles = (await Api.GetAsync<List<RoleDto>>("/api/roles")).Value ?? [];
             await LoadAsync();
+            await LoadTeamsAsync();
         }
     }
 
@@ -247,6 +275,41 @@
         notice = action.Handover && receiverId is not null
             ? $"{action.Done} Kayıtlar {receivers.FirstOrDefault(r => r.MembershipId == receiverId)?.DisplayName} kişisine devredildi."
             : action.Done;
+    }
+
+    private async Task LoadTeamsAsync()
+    {
+        teams = (await Api.GetAsync<List<TeamDto>>("/api/teams")).Value ?? [];
+        selectedTeams = ((await Api.GetAsync<List<TeamDto>>($"/api/users/{MembershipId}/teams")).Value ?? []).Select(t => t.Id).ToHashSet();
+    }
+
+    private void ToggleTeam(Guid teamId, bool on)
+    {
+        if (on)
+        {
+            selectedTeams.Add(teamId);
+        }
+        else
+        {
+            selectedTeams.Remove(teamId);
+        }
+    }
+
+    private async Task SaveTeamsAsync()
+    {
+        busy = true;
+        notice = null;
+        var result = await Api.PutAsync<bool>($"/api/users/{MembershipId}/teams", new SetMembershipTeamsRequest(selectedTeams.ToList()));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        await LoadTeamsAsync();
+        accessVersion++;
+        notice = "Ekipler kaydedildi.";
     }
 
     private async Task SaveRolesAsync()
