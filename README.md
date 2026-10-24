@@ -143,6 +143,8 @@ Ekran: **Yönetim → Roller** (`/yonetim/roller`). Uç noktalar `/api/roles` al
 - **Silme:** `DELETE /api/roles/{id}`. Üyesi olan rol için `?moveTo={rolId}` gerekir (yoksa 409): üyeler o role taşınır, taşıma ve silme tek işlemdedir. Üye taşımak rol atamasıdır, bu yüzden `core.users.manage` de gerekir; hedef Yönetici rolüyse işlemi yapan yönetici olmalıdır. Sistem rolü silinemez. Silme ve taşıma denetim kaydına yazılır.
 - **Kopyalama:** "Kopyala", yeni rol formunu aynı izinlerle ve "(kopya)" adıyla açar.
 - `GET /api/roles` her rolün üye sayısını (`memberCount`) da döner. Rol değişikliği, rolün üyelerinin bir sonraki isteğinde geçerli olur.
+- **Hazır roller (Y3b, [ADR-0005](docs/adr/0005-rol-sablonlari.md)):** modüller önerdikleri rolleri `IModule.RoleTemplates` ile bildirir (CRM "Satış temsilcisi", Lojistik "Operasyon"); çekirdek açık modüllerin tüm görüntüleme izinleriyle "Salt okur" şablonunu ekler. `GET /api/roles/templates` yalnızca açık modüllerin şablonlarını döner. Yeni rol formunda "Şablondan başla"; yalnızca Yönetici rolü varken rol listesi şablonları kart olarak önerir.
+- **Kim neye erişebilir:** rol detayında "Bu rolde kimler var" (`GET /api/roles/{id}/members`, `core.roles.manage` veya `core.users.manage`); kullanıcı detayında "Erişim": kişinin geçerli izinleri ve her izni veren roller (`GET /api/users/{id}/access`, `core.users.manage`). Hesap sunucunun her istekte uyguladığıyla aynıdır (`MembershipPermissions`).
 
 ## CRM modülü
 

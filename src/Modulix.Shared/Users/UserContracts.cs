@@ -1,3 +1,5 @@
+using Modulix.Shared.Access;
+
 namespace Modulix.Shared.Users;
 
 // Kullanıcı yönetimi (/api/users) ile davet ve şifre sıfırlama bağlantılarının (/api/auth) sözleşmeleri.
@@ -39,6 +41,15 @@ public sealed record InviteUserResponse(UserDto User, bool ExistingAccount);
 
 /// <summary>Kişinin sorumlu olduğu bir kayıt türü; <see cref="Count"/> boşsa işlemi yapan bu kayıtları göremiyor.</summary>
 public sealed record OwnedRecordsDto(string EntityKey, string Label, int? Count);
+
+/// <summary>Kişinin bir geçerli izni ve onu veren roller.</summary>
+public sealed record PermissionGrantDto(string Key, IReadOnlyList<UserRoleDto> GrantedBy);
+
+/// <summary>
+/// "Bu kullanıcı neye erişebilir": <see cref="Permissions"/> kişinin geçerli izinleri, <see cref="Assignable"/> tenant için
+/// açık modüllerin tüm izinleri (ekran matrisi bunlarla çizer).
+/// </summary>
+public sealed record UserAccessDto(bool IsAdministrator, IReadOnlyList<PermissionDto> Assignable, IReadOnlyList<PermissionGrantDto> Permissions);
 
 /// <summary><see cref="TransferToMembershipId"/> verilirse kişinin kayıtları önce bu üyeye devredilir.</summary>
 public sealed record DisableUserRequest(Guid? TransferToMembershipId);

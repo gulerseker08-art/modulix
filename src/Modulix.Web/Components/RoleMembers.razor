@@ -1,0 +1,63 @@
+@* "Bu rolde kimler var": rol detayında rolün üyeleri. Kullanıcı yöneticisi kişiye tıklayıp detayını açar. *@
+@inject ApiClient Api
+@inject SessionState Session
+
+<section class="detail-section">
+    <div class="section-header"><h2>Bu rolde kimler var</h2></div>
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    else if (page is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Bu rolde kimse yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead>
+                <tr><th>Ad</th><th>E-posta</th><th>Durum</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var user in page.Items)
+                {
+                    <tr>
+                        <td data-label="Ad" class="primary">
+                            @if (Session.Can(CoreAccess.ManageUsers))
+                            {
+                                <a href="yonetim/kullanicilar/@user.MembershipId">@user.DisplayName</a>
+                            }
+                            else
+                            {
+                                @user.DisplayName
+                            }
+                        </td>
+                        <td data-label="E-posta">@user.Email</td>
+                        <td data-label="Durum"><UserStatusBadge User="user" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid RoleId { get; set; }
+
+    private UserPageResponse? page;
+    private string? message;
+
+    protected override Task OnParametersSetAsync() => LoadAsync(1);
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var result = await Api.GetAsync<UserPageResponse>($"/api/roles/{RoleId}/members?page={pageNumber}");
+        page = result.Value;
+        message = result.Error;
+    }
+}

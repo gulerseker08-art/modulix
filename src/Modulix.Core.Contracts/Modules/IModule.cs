@@ -29,6 +29,12 @@ public interface IModule
     /// </summary>
     IReadOnlyList<OwnedRecordType> OwnedRecords => [];
 
+    /// <summary>
+    /// Modülün önerdiği hazır roller (ADR-0005): rol ekranında "Şablondan başla" olarak sunulur. Şablon yalnızca kendi
+    /// modülünün izinlerini içerir; modül tenant için kapalıysa şablon görünmez.
+    /// </summary>
+    IReadOnlyList<RoleTemplate> RoleTemplates => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {
@@ -52,3 +58,9 @@ public sealed record OwnedRecordType(string EntityKey, string Label, IReadOnlyDi
     /// <summary>Sorumlu alanının ve filtresinin adı; değeri kullanıcı kimliğidir.</summary>
     public const string OwnerField = "ownerId";
 }
+
+/// <summary>
+/// Hazır rol önerisi (ADR-0005). <see cref="Key"/> modül anahtarıyla başlar (ör. "crm.sales-rep") ve değişmez;
+/// <see cref="Permissions"/> modülün kendi izinleridir. Şablondan oluşturulan rol sıradan bir roldür; şablona bağlı kalmaz.
+/// </summary>
+public sealed record RoleTemplate(string Key, string Name, string Description, IReadOnlyList<string> Permissions);

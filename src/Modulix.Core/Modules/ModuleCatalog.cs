@@ -45,6 +45,8 @@ public sealed class ModuleCatalog
                     throw new InvalidOperationException($"İzin iki kez tanımlı: '{permission.Key}'.");
                 }
             }
+
+            ValidateTemplates(module);
         }
 
         if (!this.modules.ContainsKey(CoreModule.ModuleKey))
@@ -54,6 +56,9 @@ public sealed class ModuleCatalog
 
         Modules = [.. this.modules.Values.OrderBy(m => m.Key, StringComparer.Ordinal)];
     }
+
+    /// <summary>"Salt okur" şablonu: açık modüllerin tüm görüntüleme izinleri; çekirdek tanımlar.</summary>
+    public const string ReadOnlyTemplateKey = "core.read-only";
 
     /// <summary>Core modülü ve verilen modüllerden katalog oluşturur.</summary>
     public static ModuleCatalog Create(params IModule[] modules)
@@ -94,7 +99,50 @@ public sealed class ModuleCatalog
             .ToHashSet(StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// Tenant için açık modüllerin hazır rolleri (ADR-0005), modül sırasıyla; sonda "Salt okur": açık modüllerin tüm
+    /// görüntüleme izinleri, yönetim izni olmadan. Hiçbir modül açık değilse "Salt okur" da yoktur.
+    /// </summary>
+    public IReadOnlyList<RoleTemplate> TemplatesFor(IReadOnlySet<string> enabledModules)
+    {
+        ArgumentNullException.ThrowIfNull(enabledModules);
+        var open = Modules.Where(m => !IsAlwaysEnabled(m.Key) && IsEnabled(m.Key, enabledModules)).ToList();
+        var templates = open.SelectMany(m => m.RoleTemplates).ToList();
+
+        var reads = open.SelectMany(m => m.Permissions).Select(p => p.Key)
+            .Where(k => k.EndsWith(".read", StringComparison.Ordinal))
+            .ToList();
+        if (reads.Count > 0)
+        {
+            templates.Add(new RoleTemplate(
+                ReadOnlyTemplateKey, "Salt okur", "Açık modüllerin tüm kayıtlarını görüntüler; düzenleyemez ve yönetim yapamaz.", reads));
+        }
+
+        return templates;
+    }
+
     /// <summary>Modül katalogda var ve tenant için açık mı?</summary>
     public bool IsEnabled(string moduleKey, IReadOnlySet<string> enabledModules) =>
         ContainsModule(moduleKey) && (IsAlwaysEnabled(moduleKey) || enabledModules.Contains(moduleKey));
+
+    // Şablon anahtarı modülle başlar; izinleri modülün kendi izinleridir (modüller birbirinin iznini bilmez).
+    private static void ValidateTemplates(IModule module)
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var template in module.RoleTemplates)
+        {
+            if (!template.Key.StartsWith(module.Key + ".", StringComparison.Ordinal) || !keys.Add(template.Key))
+            {
+                throw new InvalidOperationException(
+                    $"Geçersiz veya tekrar eden rol şablonu anahtarı: '{template.Key}' ({module.Key}). Biçim: '{module.Key}.ad'.");
+            }
+
+            var foreign = template.Permissions.Where(p => module.Permissions.All(d => d.Key != p)).ToList();
+            if (foreign.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"'{template.Key}' şablonunda modülün tanımlamadığı izin var: {string.Join(", ", foreign)}.");
+            }
+        }
+    }
 }

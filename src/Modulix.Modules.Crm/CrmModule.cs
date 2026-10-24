@@ -62,6 +62,20 @@ public sealed class CrmModule : IModule
         new(Entities.Activity, "açık aktivite", new Dictionary<string, string> { ["open"] = "true" }),
     ];
 
+    IReadOnlyList<RoleTemplate> IModule.RoleTemplates { get; } =
+    [
+        new(
+            "crm.sales-rep",
+            "Satış temsilcisi",
+            "Firmaları, kişileri, fırsatları ve aktiviteleri görüntüler ve düzenler.",
+            [
+                Permissions.CompaniesRead, Permissions.CompaniesWrite,
+                Permissions.ContactsRead, Permissions.ContactsWrite,
+                Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite,
+                Permissions.ActivitiesRead, Permissions.ActivitiesWrite,
+            ]),
+    ];
+
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<CrmStoreContext>();

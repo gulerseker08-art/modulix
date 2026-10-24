@@ -30,4 +30,17 @@ public sealed class LogisticsModule : IModule
         new(Permissions.CostsRead, "Maliyetleri görüntüler", "Maliyetler"),
         new(Permissions.CostsWrite, "Maliyet ekler ve düzenler", "Maliyetler"),
     ];
+
+    IReadOnlyList<RoleTemplate> IModule.RoleTemplates { get; } =
+    [
+        new(
+            "logistics.operations",
+            "Operasyon",
+            "Sevkiyatları ve taşıyıcıları görüntüler ve düzenler; maliyetleri görüntüler.",
+            [
+                Permissions.ShipmentsRead, Permissions.ShipmentsWrite,
+                Permissions.CarriersRead, Permissions.CarriersWrite,
+                Permissions.CostsRead,
+            ]),
+    ];
 }

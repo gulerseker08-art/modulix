@@ -4,12 +4,20 @@ using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.Infrastructure.Authorization;
 
-/// <summary>Bir üyeliğin aktif tenant'taki erişimi: yönetici mi ve geçerli izinleri.</summary>
-internal sealed record MembershipAccess(bool IsAdministrator, IReadOnlySet<string> Permissions);
+/// <summary>Bir üyeliğin aktif tenant'taki erişimi: yönetici mi, geçerli izinleri ve izinleri veren rolleri.</summary>
+internal sealed record MembershipAccess(bool IsAdministrator, IReadOnlySet<string> Permissions, IReadOnlyList<GrantingRole> Roles)
+{
+    /// <summary>İzni veren roller; sistem rolü her izni verir.</summary>
+    public IEnumerable<GrantingRole> RolesGranting(string permission) =>
+        Permissions.Contains(permission) ? Roles.Where(r => r.IsSystem || r.Permissions.Contains(permission)) : [];
+}
+
+internal sealed record GrantingRole(Guid Id, string Name, bool IsSystem, IReadOnlyList<string> Permissions);
 
 /// <summary>
 /// Üyeliğin rollerinden ve tenant'ın açık modüllerinden geçerli izinleri hesaplar. Oturumdaki kişinin erişimi
-/// (<see cref="CurrentAccess"/>) ve rol düzenlerken işlemi yapanın sınırı aynı hesabı kullanır.
+/// (<see cref="CurrentAccess"/>), rol düzenlerken işlemi yapanın sınırı ve kullanıcı detayındaki "Erişim" görünümü aynı
+/// hesabı kullanır; ekranda görünen ile sunucunun uyguladığı ayrışmaz.
 /// </summary>
 internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog catalog)
 {
@@ -20,12 +28,13 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
             from assignment in db.MembershipRoles.AsNoTracking()
             join role in db.Roles.AsNoTracking() on assignment.RoleId equals role.Id
             where assignment.MembershipId == membershipId
-            select new { role.IsSystem, role.Permissions })
+            orderby role.Name
+            select new GrantingRole(role.Id, role.Name, role.IsSystem, role.Permissions))
             .ToListAsync(cancellationToken);
 
         // Sistem rolü ("Yönetici") katalogdaki tüm izinleri verir; yeni açılan modülün izinleri de kendiliğinden gelir.
         var isAdministrator = roles.Any(r => r.IsSystem);
         var granted = isAdministrator ? catalog.PermissionKeys : roles.SelectMany(r => r.Permissions);
-        return new MembershipAccess(isAdministrator, catalog.EffectivePermissions(granted, enabledModules));
+        return new MembershipAccess(isAdministrator, catalog.EffectivePermissions(granted, enabledModules), roles);
     }
 }
