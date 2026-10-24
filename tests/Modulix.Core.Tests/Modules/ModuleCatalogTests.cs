@@ -102,6 +102,13 @@ public class ModuleCatalogTests
         Assert.Throws<InvalidOperationException>(() => services.AddModulixModules(Module("core")));
     }
 
+    [Theory]
+    [InlineData("crm.companies.read", "companies")]
+    [InlineData("core.users.manage", "users")]
+    [InlineData("sales.order-lines.items.write", "order-lines.items")]
+    public void Resource_of_a_permission_is_the_part_between_module_and_action(string permission, string resource) =>
+        Assert.Equal(resource, AccessKeys.ResourceOf(permission));
+
     private static IModule Module(string key, params string[] permissions) => new TestModule(key, permissions);
 
     private sealed class TestModule(string key, string[] permissions) : IModule

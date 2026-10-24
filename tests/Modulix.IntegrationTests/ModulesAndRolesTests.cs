@@ -74,7 +74,8 @@ public class ModulesAndRolesTests(ModulixApiFactory factory) : IClassFixture<Mod
         await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
         var admin = await factory.CreateUserAsync(tenant);
         var member = await factory.CreateUserAsync(tenant);
-        await factory.CreateRoleAsync(tenant.Id, [ManageRoles, ManageUsers], admin);
+        // Yönetici olmayan rol yöneticisi yalnızca kendisinde olan izni verebilir (Y3).
+        await factory.CreateRoleAsync(tenant.Id, [ManageRoles, ManageUsers, CompaniesRead], admin);
         using var adminClient = await LoginAsync(admin.Email!);
 
         var assignable = await adminClient.GetFromJsonAsync<List<PermissionDto>>("/api/roles/permissions");

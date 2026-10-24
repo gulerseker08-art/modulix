@@ -26,11 +26,11 @@
 </AuthGate>
 
 @code {
-    // Href boş olan bölümün ekranı henüz yok (Y3, Y5, Y6); kart "Yakında" olarak görünür.
+    // Href boş olan bölümün ekranı henüz yok (Y5, Y6); kart "Yakında" olarak görünür.
     private static readonly (string Title, string Description, string Permission, string? Href)[] Sections =
     [
         ("Kullanıcılar", "Davet, rol atama, devre dışı bırakma, şifre sıfırlama", CoreAccess.ManageUsers, "yonetim/kullanicilar"),
-        ("Roller", "Roller ve izinleri", CoreAccess.ManageRoles, null),
+        ("Roller", "Roller ve izinleri, izin matrisi", CoreAccess.ManageRoles, "yonetim/roller"),
         ("Firma ayarları", "Dil, para birimi, saat dilimi, logo", CoreAccess.ManageSettings, null),
         ("Denetim kaydı", "Kim, neyi, ne zaman değiştirdi", CoreAccess.ReadAudit, null),
     ];

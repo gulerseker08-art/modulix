@@ -26,9 +26,9 @@ public sealed class CoreModule : IModule
 
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
     [
-        new(Permissions.ManageUsers, "Kullanıcıları ve kullanıcıların rollerini yönetir"),
-        new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir"),
-        new(Permissions.ManageSettings, "Firma ayarlarını değiştirir"),
-        new(Permissions.ReadAudit, "Denetim kaydını görüntüler"),
+        new(Permissions.ManageUsers, "Kullanıcıları ve kullanıcıların rollerini yönetir", "Kullanıcılar"),
+        new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir", "Roller"),
+        new(Permissions.ManageSettings, "Firma ayarlarını değiştirir", "Firma ayarları"),
+        new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
     ];
 }

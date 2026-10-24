@@ -1,0 +1,251 @@
+@page "/yonetim/roller/yeni"
+@page "/yonetim/roller/{RoleId:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsNew ? "Yeni rol" : role?.Name ?? "Rol") · Modulix</PageTitle>
+
+<AuthGate Permission="@CoreAccess.ManageRoles">
+    <a class="back-link" href="yonetim/roller">← Roller</a>
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (!loaded)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (IsNew || role is not null)
+    {
+        <div class="page-header">
+            <h1>@(IsNew ? "Yeni rol" : role!.Name)</h1>
+            @if (role is { IsSystem: false })
+            {
+                <a class="btn btn-outline-secondary" href="yonetim/roller/yeni?kopya=@role.Id">Kopyala</a>
+            }
+        </div>
+
+        @if (role is { IsSystem: true })
+        {
+            <div class="alert alert-info">
+                Yönetici rolü tüm izinleri verir; sonradan açılan modüllerin izinleri de kendiliğinden gelir. Adı ve izinleri
+                değiştirilemez, rol silinemez.
+            </div>
+            <PermissionMatrix Permissions="permissions" Selected="AllKeys" ReadOnly="true" />
+        }
+        else
+        {
+            <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="roleName">Rol adı *</label>
+                        <input id="roleName" class="form-control" maxlength="100" @bind="name" />
+                        <FieldError Field="name" Errors="errors" />
+                    </div>
+                </div>
+
+                @if (!Session.IsAdministrator)
+                {
+                    <p class="text-muted">Yalnızca kendinizde olan izinleri verebilir veya kaldırabilirsiniz; diğerleri kilitli görünür.</p>
+                }
+
+                <PermissionMatrix Permissions="permissions" Selected="selected" CanGrant="CanGrant" />
+                <FieldError Field="permissions" Errors="errors" />
+
+                @if (HiddenCount > 0)
+                {
+                    <p class="text-muted">
+                        Bu rolde kapalı modüllere ait @HiddenCount izin var. Bu izinler korunur ve modül yeniden açılınca geçerli olur.
+                    </p>
+                }
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@busy">@(IsNew ? "Rolü oluştur" : "Kaydet")</button>
+                    <a class="btn btn-outline-secondary" href="yonetim/roller">Vazgeç</a>
+                </div>
+            </form>
+
+            @if (role is not null)
+            {
+                <section class="detail-section">
+                    <div class="section-header"><h2>Rolü sil</h2></div>
+                    @if (!deleting)
+                    {
+                        <div class="account-actions">
+                            <div>
+                                <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => deleting = true">Rolü sil</button>
+                                <small class="text-muted">
+                                    @(role.MemberCount == 0 ? "Rolün üyesi yok." : $"Rolde {role.MemberCount} kişi var; silmeden önce başka bir role taşınırlar.")
+                                </small>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning confirm" role="alertdialog">
+                            @if (role.MemberCount == 0)
+                            {
+                                <p>"@role.Name" rolü silinsin mi?</p>
+                            }
+                            else if (!Session.Can(CoreAccess.ManageUsers))
+                            {
+                                <p>
+                                    Bu rolde @role.MemberCount kişi var. Üyeleri başka bir role taşımak kullanıcıların rolünü değiştirir;
+                                    bunun için kullanıcı yönetme izni de gerekir.
+                                </p>
+                            }
+                            else
+                            {
+                                <p>Bu rolde @role.MemberCount kişi var. Silmeden önce hangi role taşınsınlar?</p>
+                                <div class="mb-3">
+                                    <label class="form-label" for="moveTo">Taşınacak rol</label>
+                                    <select id="moveTo" class="form-select" @bind="moveTo">
+                                        <option value="">Seçin</option>
+                                        @foreach (var target in MoveTargets())
+                                        {
+                                            <option value="@target.Id">@target.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+
+                            <button type="button" class="btn btn-danger" disabled="@(busy || !CanDelete)" @onclick="DeleteAsync">Rolü sil</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => deleting = false">Vazgeç</button>
+                        </div>
+                    }
+                </section>
+            }
+        }
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid? RoleId { get; set; }
+
+    /// <summary>Kopyalanan rol: yeni rol formu onun izinleri ve "(kopya)" adıyla açılır.</summary>
+    [SupplyParameterFromQuery(Name = "kopya")] public Guid? CopyOf { get; set; }
+
+    private IReadOnlyList<PermissionDto> permissions = [];
+    private IReadOnlyList<RoleDto> roles = [];
+    private RoleDto? role;
+    private HashSet<string> selected = [];
+    private string name = string.Empty;
+    private Guid? moveTo;
+    private bool loaded;
+    private bool deleting;
+    private bool busy;
+    private string? message;
+    private string? notice;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    private bool IsNew => RoleId is null;
+
+    private HashSet<string> AllKeys => permissions.Select(p => p.Key).ToHashSet();
+
+    /// <summary>Formda görünmeyen (modülü kapalı) izinler; kaydederken korunur.</summary>
+    private int HiddenCount => selected.Count(k => permissions.All(p => p.Key != k));
+
+    private bool CanDelete => role is { MemberCount: 0 } || (moveTo is not null && Session.Can(CoreAccess.ManageUsers));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(CoreAccess.ManageRoles))
+        {
+            return;
+        }
+
+        loaded = false;
+        deleting = false;
+        moveTo = null;
+        errors = null;
+        message = null;
+
+        var permissionResult = await Api.GetAsync<List<PermissionDto>>("/api/roles/permissions");
+        var roleResult = await Api.GetAsync<List<RoleDto>>("/api/roles");
+        permissions = permissionResult.Value ?? [];
+        roles = roleResult.Value ?? [];
+        message = permissionResult.Error ?? roleResult.Error;
+
+        if (RoleId is { } id)
+        {
+            role = roles.FirstOrDefault(r => r.Id == id);
+            message ??= role is null ? "Rol bulunamadı." : null;
+            name = role?.Name ?? string.Empty;
+            selected = role?.Permissions.ToHashSet() ?? [];
+        }
+        else
+        {
+            role = null;
+            var source = roles.FirstOrDefault(r => r.Id == CopyOf && !r.IsSystem);
+            name = source is null ? string.Empty : $"{source.Name} (kopya)";
+            selected = source?.Permissions.ToHashSet() ?? [];
+        }
+
+        loaded = true;
+    }
+
+    private bool CanGrant(string permission) => Session.IsAdministrator || Session.Can(permission);
+
+    // Yönetici rolüne yalnızca yönetici taşıyabilir (sunucu da denetler).
+    private IEnumerable<RoleDto> MoveTargets() =>
+        roles.Where(r => r.Id != role!.Id && (!r.IsSystem || Session.IsAdministrator)).OrderBy(r => r.Name);
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        notice = null;
+        var request = new SaveRoleRequest(name, selected.Order(StringComparer.Ordinal).ToList());
+        var result = IsNew
+            ? await Api.PostAsync<RoleDto>("/api/roles", request)
+            : await Api.PutAsync<RoleDto>($"/api/roles/{RoleId}", request);
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            errors = result.FieldErrors;
+            return;
+        }
+
+        // Kendi rolü değiştiyse menü ve izinler hemen güncellensin.
+        await Session.RefreshAsync();
+        if (IsNew)
+        {
+            Navigation.NavigateTo($"yonetim/roller/{result.Value!.Id}");
+            return;
+        }
+
+        role = role! with { Name = result.Value!.Name, Permissions = result.Value.Permissions };
+        selected = role.Permissions.ToHashSet();
+        message = null;
+        errors = null;
+        notice = "Rol kaydedildi.";
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var url = $"/api/roles/{role!.Id}" + (role.MemberCount > 0 ? $"?moveTo={moveTo}" : string.Empty);
+        var result = await Api.DeleteAsync(url);
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            deleting = false;
+            return;
+        }
+
+        await Session.RefreshAsync();
+        Navigation.NavigateTo("yonetim/roller");
+    }
+}

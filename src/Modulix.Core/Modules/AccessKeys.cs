@@ -23,6 +23,14 @@ public static partial class AccessKeys
         return dot > 0 ? permissionKey[..dot] : permissionKey;
     }
 
+    /// <summary>İzin anahtarının kaynağı: modül ile işlem arasındaki bölüm (ör. "crm.companies.read" → "companies").</summary>
+    public static string ResourceOf(string permissionKey)
+    {
+        var first = permissionKey.IndexOf('.');
+        var last = permissionKey.LastIndexOf('.');
+        return first > 0 && last > first ? permissionKey[(first + 1)..last] : permissionKey;
+    }
+
     [GeneratedRegex("^[a-z][a-z0-9]+$", RegexOptions.CultureInvariant)]
     private static partial Regex ModuleKeyPattern();
 

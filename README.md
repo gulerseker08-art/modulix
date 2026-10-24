@@ -112,7 +112,7 @@ Geçerli izin = kullanıcının rollerindeki izinler ∩ tenant için açık mod
 | İzin | Ne verir |
 | --- | --- |
 | `core.users.manage` | Kullanıcıları davet eder, rollerini atar, devre dışı bırakır, şifre sıfırlama bağlantısı gönderir (Y2) |
-| `core.roles.manage` | Rolleri ve izinlerini tanımlar |
+| `core.roles.manage` | Rolleri ve izinlerini tanımlar (Y3) |
 | `core.settings.manage` | Firma ayarlarını yazar (`core.tenant-setting`); okumak için izin gerekmez |
 | `core.audit.read` | Denetim kaydını okur (ekranı Y5'te) |
 
@@ -133,6 +133,16 @@ Ekran: **Yönetim → Kullanıcılar** (`/yonetim/kullanicilar`). Uç noktalar `
 - **Kayıt devri (Y2b, [ADR-0004](docs/adr/0004-kayit-devri.md)):** devre dışı bırakırken kişinin sorumlu olduğu kayıtlar başka bir etkin üyeye devredilebilir (`POST /api/users/{id}/disable` gövdesi `{ "transferToMembershipId": … }`); devre dışı kişinin kayıtları sonradan da devredilir (`/transfer-records`). Sayılar: `GET /api/users/{id}/owned-records`. CRM'de firmalar, açık fırsatlar ve açık aktiviteler devredilir; kapanmış olanlar eski sorumlusunda kalır. Devir kayıt boru hattından geçer: işlemi yapanın kayıtları düzenleme izni olmalı, her kayıt denetim kaydına düşer; devir ve devre dışı bırakma birlikte yapılır ya da hiç yapılmaz. Yeni bir modül, sorumlu alanı `ownerId` olan kayıt türlerini `IModule.OwnedRecords` ile bildirir.
 - Davet, iptal, durum değişikliği, şifre sıfırlama isteği ve kilit açma `core.membership` kaydı olarak denetim kaydına yazılır. Son giriş, giriş ve tenant seçiminde güncellenir.
 - **E-postadaki bağlantılar** `App:PublicUrl` adresiyle oluşturulur (ör. `https://app.firmaniz.com`). Canlı ortamda zorunludur: isteğin adresine güvenilirse saldırgan, kendi sunucusuna giden şifre sıfırlama bağlantıları ürettirebilir. Development'ta boşsa isteğin adresi kullanılır. Yerelde e-postalar Mailpit'te görünür (http://localhost:8025).
+
+### Roller ve izinler (Y3)
+
+Ekran: **Yönetim → Roller** (`/yonetim/roller`). Uç noktalar `/api/roles` altındadır ve `core.roles.manage` ister.
+
+- **İzin matrisi:** rol formunda izinler modüle ve kaynağa göre gruplanır (Firmalar, Sevkiyatlar…; sütunlar görüntüleme ve düzenleme). Satır adı `PermissionDefinition.ResourceName`'den gelir; verilmezse anahtardaki kaynak adı kullanılır. Düzenleme seçilince görüntüleme de seçilir. Yalnızca tenant için açık modüllerin izinleri görünür; kapalı modülün izni rolde korunur ve modül açılınca yeniden geçerli olur.
+- **Yetki yükseltmeye karşı kural:** yönetici olmayan kişi bir role yalnızca kendisinde olan izni ekleyebilir veya rolden çıkarabilir (403). Böylece `core.roles.manage` izni olan biri kendine başka izin veremez. Yönetici her izni verir.
+- **Silme:** `DELETE /api/roles/{id}`. Üyesi olan rol için `?moveTo={rolId}` gerekir (yoksa 409): üyeler o role taşınır, taşıma ve silme tek işlemdedir. Üye taşımak rol atamasıdır, bu yüzden `core.users.manage` de gerekir; hedef Yönetici rolüyse işlemi yapan yönetici olmalıdır. Sistem rolü silinemez. Silme ve taşıma denetim kaydına yazılır.
+- **Kopyalama:** "Kopyala", yeni rol formunu aynı izinlerle ve "(kopya)" adıyla açar.
+- `GET /api/roles` her rolün üye sayısını (`memberCount`) da döner. Rol değişikliği, rolün üyelerinin bir sonraki isteğinde geçerli olur.
 
 ## CRM modülü
 

@@ -1,0 +1,149 @@
+@* İzin matrisi: modül başına bir tablo, her satır bir kaynak (Firmalar, Sevkiyatlar…), sütunlar görüntüleme ve
+   düzenleme. Okuma/yazma kalıbına uymayan izni olan modül (ör. yönetim) izin adlarıyla liste olarak gösterilir.
+   Seçim verilen kümede tutulur. Kişinin veremeyeceği izin kilitli görünür; asıl denetim sunucudadır. *@
+@foreach (var module in Modules())
+{
+    var grantable = module.Permissions.Where(p => CanToggle(p.Key)).ToList();
+    <section class="permission-module" aria-label="@module.Name">
+        <header>
+            <h3>@module.Name</h3>
+            @if (!ReadOnly && grantable.Count > 0)
+            {
+                <label class="form-check">
+                    <input class="form-check-input" type="checkbox" checked="@grantable.All(p => Selected.Contains(p.Key))"
+                           @onchange="e => SetAll(grantable, e.Value is true)" />
+                    <span class="form-check-label">Tümü</span>
+                </label>
+            }
+        </header>
+        @if (module.IsMatrix)
+        {
+            <table class="permission-matrix">
+                <thead>
+                    <tr><th scope="col">Kaynak</th><th scope="col">Görüntüleme</th><th scope="col">Düzenleme</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in module.Rows)
+                    {
+                        <tr>
+                            <th scope="row">@row.Name</th>
+                            <td>@if (row.Read is { } read) { @Box(read, $"{row.Name}: görüntüleme") }</td>
+                            <td>@if (row.Write is { } write) { @Box(write, $"{row.Name}: düzenleme") }</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="permission-list">
+                @foreach (var permission in module.Permissions)
+                {
+                    <label class="form-check">
+                        @Box(permission, permission.DisplayName)
+                        <span class="form-check-label">@permission.DisplayName</span>
+                    </label>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private const string ReadSuffix = ".read";
+    private const string WriteSuffix = ".write";
+
+    [Parameter, EditorRequired] public IReadOnlyList<PermissionDto> Permissions { get; set; } = [];
+
+    [Parameter, EditorRequired] public HashSet<string> Selected { get; set; } = [];
+
+    /// <summary>İzin verilebilir mi? Verilmezse kutu kilitlidir (yönetici olmayan, kendinde olmayan izni veremez).</summary>
+    [Parameter] public Func<string, bool> CanGrant { get; set; } = _ => true;
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    [Parameter] public EventCallback SelectedChanged { get; set; }
+
+    private sealed record Row(string Name, PermissionDto? Read, PermissionDto? Write, IReadOnlyList<PermissionDto> Others);
+
+    /// <summary>
+    /// <see cref="IsMatrix"/>: her kaynağın okuma/yazma izni var. Değilse (ör. yönetim izinleri) izinler adlarıyla liste
+    /// olarak gösterilir.
+    /// </summary>
+    private sealed record ModuleGroup(string Key, string Name, IReadOnlyList<PermissionDto> Permissions, IReadOnlyList<Row> Rows)
+    {
+        public bool IsMatrix => Rows.All(r => r.Others.Count == 0);
+    }
+
+    private bool CanToggle(string key) => !ReadOnly && CanGrant(key);
+
+    // Yönetim (core) izinleri en sonda; diğer modüller API'nin verdiği sırada.
+    private IEnumerable<ModuleGroup> Modules() =>
+        Permissions
+            .GroupBy(p => p.ModuleKey)
+            .OrderBy(g => g.Key == CoreAccess.ModuleKey)
+            .Select(g => new ModuleGroup(
+                g.Key,
+                g.Key == CoreAccess.ModuleKey ? "Yönetim" : g.First().ModuleName,
+                g.ToList(),
+                g.GroupBy(p => p.ResourceName)
+                    .Select(r => new Row(
+                        r.Key,
+                        r.FirstOrDefault(p => p.Key.EndsWith(ReadSuffix, StringComparison.Ordinal)),
+                        r.FirstOrDefault(p => p.Key.EndsWith(WriteSuffix, StringComparison.Ordinal)),
+                        r.Where(p => !p.Key.EndsWith(ReadSuffix, StringComparison.Ordinal) && !p.Key.EndsWith(WriteSuffix, StringComparison.Ordinal)).ToList()))
+                    .ToList()));
+
+    private RenderFragment Box(PermissionDto permission, string label) =>
+        @<input class="form-check-input" type="checkbox" aria-label="@label"
+                title="@(CanGrant(permission.Key) || ReadOnly ? permission.DisplayName : "Bu izin sizde olmadığı için veremez veya kaldıramazsınız.")"
+                checked="@Selected.Contains(permission.Key)" disabled="@(!CanToggle(permission.Key))"
+                @onchange="e => ToggleAsync(permission, e.Value is true)" />;
+
+    /// <summary>Düzenleme görüntülemeyi gerektirir: düzenleme seçilince görüntüleme de seçilir, görüntüleme kalkınca düzenleme de kalkar.</summary>
+    private async Task ToggleAsync(PermissionDto permission, bool on)
+    {
+        Set(permission.Key, on);
+        if (on && permission.Key.EndsWith(WriteSuffix, StringComparison.Ordinal))
+        {
+            Pair(permission, WriteSuffix, ReadSuffix, on: true);
+        }
+        else if (!on && permission.Key.EndsWith(ReadSuffix, StringComparison.Ordinal))
+        {
+            Pair(permission, ReadSuffix, WriteSuffix, on: false);
+        }
+
+        await SelectedChanged.InvokeAsync();
+    }
+
+    private void Pair(PermissionDto permission, string fromSuffix, string toSuffix, bool on)
+    {
+        var key = permission.Key[..^fromSuffix.Length] + toSuffix;
+        if (Permissions.Any(p => p.Key == key) && CanToggle(key))
+        {
+            Set(key, on);
+        }
+    }
+
+    private async Task SetAll(IEnumerable<PermissionDto> permissions, bool on)
+    {
+        foreach (var permission in permissions)
+        {
+            Set(permission.Key, on);
+        }
+
+        await SelectedChanged.InvokeAsync();
+    }
+
+    private void Set(string key, bool on)
+    {
+        if (on)
+        {
+            Selected.Add(key);
+        }
+        else
+        {
+            Selected.Remove(key);
+        }
+    }
+}

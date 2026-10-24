@@ -44,14 +44,14 @@ public sealed class CrmModule : IModule
 
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
     [
-        new(Permissions.CompaniesRead, "Firmaları görüntüler"),
-        new(Permissions.CompaniesWrite, "Firma ekler, düzenler ve siler"),
-        new(Permissions.ContactsRead, "Kişileri görüntüler"),
-        new(Permissions.ContactsWrite, "Kişi ekler, düzenler ve siler"),
-        new(Permissions.OpportunitiesRead, "Fırsatları görüntüler"),
-        new(Permissions.OpportunitiesWrite, "Fırsat ekler, düzenler ve siler"),
-        new(Permissions.ActivitiesRead, "Aktiviteleri görüntüler"),
-        new(Permissions.ActivitiesWrite, "Aktivite ekler, düzenler ve siler"),
+        new(Permissions.CompaniesRead, "Firmaları görüntüler", "Firmalar"),
+        new(Permissions.CompaniesWrite, "Firma ekler, düzenler ve siler", "Firmalar"),
+        new(Permissions.ContactsRead, "Kişileri görüntüler", "Kişiler"),
+        new(Permissions.ContactsWrite, "Kişi ekler, düzenler ve siler", "Kişiler"),
+        new(Permissions.OpportunitiesRead, "Fırsatları görüntüler", "Fırsatlar"),
+        new(Permissions.OpportunitiesWrite, "Fırsat ekler, düzenler ve siler", "Fırsatlar"),
+        new(Permissions.ActivitiesRead, "Aktiviteleri görüntüler", "Aktiviteler"),
+        new(Permissions.ActivitiesWrite, "Aktivite ekler, düzenler ve siler", "Aktiviteler"),
     ];
 
     /// <summary>Devre dışı bırakılan kişinin firmaları, açık fırsatları ve açık aktiviteleri devredilir.</summary>

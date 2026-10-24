@@ -1,0 +1,72 @@
+@page "/yonetim/roller"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Roller · Modulix</PageTitle>
+
+<AuthGate Permission="@CoreAccess.ManageRoles">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Roller</h1>
+        <a class="btn btn-primary" href="yonetim/roller/yeni">Yeni rol</a>
+    </div>
+
+    <p class="text-muted">
+        Rol, kişinin hangi kayıtları görüntüleyip düzenleyebileceğini belirler. Bir kişinin birden fazla rolü olabilir;
+        izinleri birleşir. Değişiklik, rolün üyelerinin bir sonraki işleminde geçerli olur.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (roles is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead>
+                <tr><th>Rol</th><th>İzinler</th><th>Üyeler</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var role in roles)
+                {
+                    <tr>
+                        <td data-label="Rol" class="primary">
+                            <a href="yonetim/roller/@role.Id">@role.Name</a>
+                            @if (role.IsSystem)
+                            {
+                                <span class="badge tag">Sistem rolü</span>
+                            }
+                        </td>
+                        <td data-label="İzinler">@(role.IsSystem ? "Tüm izinler, düzenlenemez" : $"{role.Permissions.Count} izin")</td>
+                        <td data-label="Üyeler">@role.MemberCount</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private IReadOnlyList<RoleDto>? roles;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ManageRoles))
+        {
+            var result = await Api.GetAsync<List<RoleDto>>("/api/roles");
+            roles = result.Value?.OrderByDescending(r => r.IsSystem).ToList();
+            message = result.Error;
+        }
+    }
+}
