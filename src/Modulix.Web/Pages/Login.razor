@@ -43,7 +43,7 @@
         {
             // Yalnızca uygulama içi adreslere dönülür.
             var target = ReturnUrl is { Length: > 0 } url && !url.Contains("//") && !url.Contains(':') ? url : string.Empty;
-            Navigation.NavigateTo(Session.HasActiveTenant ? target : "tenant");
+            Navigation.NavigateTo(Session.HasActiveTenant ? target : Session.NoTenantHome);
         }
     }
 }

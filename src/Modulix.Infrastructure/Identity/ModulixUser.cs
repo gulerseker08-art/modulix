@@ -13,4 +13,10 @@ public class ModulixUser : IdentityUser<Guid>
     public string DisplayName { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// Platform yöneticisi (Y4): firmaları ve modül haklarını yönetir; firmalara bağlı değildir. Firma verisini görmez
+    /// (RLS atlanmaz). Yalnızca komut satırıyla atanır: <c>-- platform-admin e-posta</c>.
+    /// </summary>
+    public bool IsPlatformAdministrator { get; set; }
 }

@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Api.Platform;
 using Modulix.Core.Platform;
+using Modulix.Infrastructure.Platform;
 using Modulix.Shared.Auth;
 
 namespace Modulix.Api.Tenancy;
@@ -60,6 +62,7 @@ public static class TenancySetup
     {
         services.AddScoped<HttpTenantContextAccessor>();
         services.AddScoped<ITenantContextAccessor>(sp => sp.GetRequiredService<HttpTenantContextAccessor>());
+        services.AddSingleton<ITenantScopeFactory, TenantScopeFactory>();
         return services;
     }
 

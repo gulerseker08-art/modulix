@@ -102,7 +102,18 @@ internal sealed class UserAdministration(
         return ToUser(row.Membership, row.User, rolesByMembership, tenant);
     }
 
-    public async Task<InvitationResult> InviteAsync(UserInvitation invitation, CancellationToken cancellationToken)
+    public Task<InvitationResult> InviteAsync(UserInvitation invitation, CancellationToken cancellationToken) =>
+        InviteCoreAsync(invitation, byPlatform: false, cancellationToken);
+
+    /// <summary>
+    /// Platform yöneticisinin daveti (Y4): aktif bağlam firmanın bağlamıdır ama işlemi yapan firmanın üyesi değildir,
+    /// bu yüzden Yönetici rolünü vermek için yönetici olma kuralı uygulanmaz (platform API'si yetkiyi denetler).
+    /// Açık bir işlem varsa ona katılır; firma açılışında davet de aynı işlemde oluşur.
+    /// </summary>
+    internal Task<InvitationResult> InviteAsPlatformAsync(UserInvitation invitation, CancellationToken cancellationToken) =>
+        InviteCoreAsync(invitation, byPlatform: true, cancellationToken);
+
+    private async Task<InvitationResult> InviteCoreAsync(UserInvitation invitation, bool byPlatform, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(invitation);
         var tenant = RequireTenant();
@@ -120,7 +131,7 @@ internal sealed class UserAdministration(
             throw new ArgumentException($"Bu kuruluşta bulunmayan rol: {string.Join(", ", missing)}.", "roleIds");
         }
 
-        if (assignable.Any(r => r.IsSystem))
+        if (!byPlatform && assignable.Any(r => r.IsSystem))
         {
             await EnsureActorIsAdministratorAsync(tenant, cancellationToken);
         }
@@ -128,7 +139,9 @@ internal sealed class UserAdministration(
         var now = time.GetUtcNow();
         await EnsureInvitationAllowanceAsync(tenant, now, cancellationToken);
 
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
 
         var user = await users.FindByEmailAsync(email);
         if (user is not null
@@ -183,7 +196,10 @@ internal sealed class UserAdministration(
         });
 
         await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
 
         var created = await GetAsync(membership.Id, cancellationToken);
         return new InvitationResult(created!, existingAccount);

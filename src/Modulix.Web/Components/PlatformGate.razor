@@ -1,0 +1,48 @@
+@* Platform ekranları (Y4) için: oturum ve platform yöneticiliği ister; aktif firma gerekmez. Asıl denetim
+   sunucudadır (bayrak her istekte okunur); bu yalnızca kullanıcıyı doğru ekrana götürür. *@
+@implements IDisposable
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+@if (!Session.IsLoaded)
+{
+    <p class="text-muted">Yükleniyor…</p>
+}
+else if (Session.IsSignedIn)
+{
+    @if (!Session.IsPlatformAdministrator)
+    {
+        <div class="alert alert-warning">Bu alan platform yöneticilerine açıktır.</div>
+    }
+    else
+    {
+        @ChildContent
+    }
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.Changed += OnChanged;
+        await Session.EnsureLoadedAsync();
+        Redirect();
+    }
+
+    private void OnChanged()
+    {
+        Redirect();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Redirect()
+    {
+        if (Session.IsLoaded && !Session.IsSignedIn)
+        {
+            Navigation.NavigateTo($"giris?donus={Uri.EscapeDataString(Navigation.ToBaseRelativePath(Navigation.Uri))}");
+        }
+    }
+
+    public void Dispose() => Session.Changed -= OnChanged;
+}

@@ -9,6 +9,7 @@ using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Modules;
+using Modulix.Infrastructure.Platform;
 using Modulix.Infrastructure.Tenancy;
 using Modulix.Infrastructure.Users;
 
@@ -52,9 +53,13 @@ public static class PersistenceSetup
         services.AddScoped<ICurrentAccess, CurrentAccess>();
 
         // Kullanıcı yönetimi (Y2); UserManager'ı host kaydeder (AddModulixAuth).
-        services.AddScoped<IUserAdministration, UserAdministration>();
+        services.AddScoped<UserAdministration>();
+        services.AddScoped<IUserAdministration>(sp => sp.GetRequiredService<UserAdministration>());
         services.AddScoped<AccountLinks>();
         services.AddScoped<RecordHandover>();
+
+        // Platform yönetimi (Y4); ITenantScopeFactory'yi host kaydeder (tenant bağlamını o kurar).
+        services.AddScoped<IPlatformAdministration, PlatformAdministration>();
         return services;
     }
 
