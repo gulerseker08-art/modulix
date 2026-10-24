@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Persistence;
@@ -10,8 +12,10 @@ namespace Modulix.Infrastructure.Records;
 /// <summary>
 /// Tenant ayarları için kayıt deposu ("core.tenant-setting"). Alanlar: key (oluşturulduktan sonra
 /// değişmez), value. Boru hattının ilk gerçek kullanıcısıdır; modül entity'leri aynı kalıbı izler.
+/// Yalnızca modüllerin tanımladığı ayarlar (Y6) ve tanıma uyan değerler yazılır; modülü kapalı ayar yazılamaz.
 /// </summary>
-internal sealed class TenantSettingRecordStore(ModulixDbContext db) : IRecordStore
+internal sealed class TenantSettingRecordStore(
+    ModulixDbContext db, ModuleCatalog catalog, IModuleEntitlements entitlements, ITenantContextAccessor tenantAccessor) : IRecordStore
 {
     public const string Key = "core.tenant-setting";
 
@@ -40,32 +44,31 @@ internal sealed class TenantSettingRecordStore(ModulixDbContext db) : IRecordSto
             }
         }
 
+        SettingDefinition? definition = null;
         if (operation == RecordOperation.Create)
         {
             if (ReadString(values, KeyField) is not { } key)
             {
                 errors.Add(new RecordFieldError(KeyField, "Anahtar zorunludur."));
             }
+            else if (catalog.FindSetting(key) is { } found)
+            {
+                definition = found.Definition;
+            }
             else
             {
-                try
-                {
-                    TenantSetting.NormalizeKey(key);
-                }
-                catch (ArgumentException exception)
-                {
-                    errors.Add(new RecordFieldError(KeyField, exception.Message.Split(" (Parameter")[0]));
-                }
+                errors.Add(new RecordFieldError(KeyField, "Tanımlı bir ayar değil."));
             }
         }
 
+        // Güncellemede anahtar kayıttadır; değer UpdateAsync'te tanıma göre denetlenir.
         if (ReadString(values, ValueField) is not { } value)
         {
             errors.Add(new RecordFieldError(ValueField, "Değer zorunludur ve metin olmalıdır."));
         }
-        else if (value.Length > TenantSetting.ValueMaxLength)
+        else if (definition is not null && SettingRules.Validate(definition, value) is { } error)
         {
-            errors.Add(new RecordFieldError(ValueField, $"Değer en fazla {TenantSetting.ValueMaxLength} karakter olabilir."));
+            errors.Add(new RecordFieldError(ValueField, error));
         }
 
         return errors;
@@ -90,11 +93,13 @@ internal sealed class TenantSettingRecordStore(ModulixDbContext db) : IRecordSto
         return new RecordPage(items.Select(ToData).ToList(), query.Page, query.PageSize, total);
     }
 
-    public Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken)
+    public async Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken)
     {
-        var setting = new TenantSetting(ReadString(values, KeyField)!, ReadString(values, ValueField)!);
+        var key = ReadString(values, KeyField)!;
+        await EnsureWritableAsync(key, ReadString(values, ValueField)!, cancellationToken);
+        var setting = new TenantSetting(key, ReadString(values, ValueField)!);
         db.TenantSettings.Add(setting);
-        return Task.FromResult(ToData(setting));
+        return ToData(setting);
     }
 
     public async Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken)
@@ -106,6 +111,7 @@ internal sealed class TenantSettingRecordStore(ModulixDbContext db) : IRecordSto
         }
 
         EnsureVersion(setting, expectedVersion);
+        await EnsureWritableAsync(setting.Key, ReadString(values, ValueField)!, cancellationToken);
         setting.SetValue(ReadString(values, ValueField)!);
         return ToData(setting);
     }
@@ -121,6 +127,22 @@ internal sealed class TenantSettingRecordStore(ModulixDbContext db) : IRecordSto
         EnsureVersion(setting, expectedVersion);
         db.TenantSettings.Remove(setting);
         return true;
+    }
+
+    // Tanımı kaldırılmış ayar veya modülü kapalı ayar yazılamaz; değer tanıma uymalıdır.
+    private async Task EnsureWritableAsync(string key, string value, CancellationToken cancellationToken)
+    {
+        var tenant = tenantAccessor.Current ?? throw new InvalidOperationException("Aktif tenant olmadan ayar yazılamaz.");
+        if (catalog.FindSetting(key) is not { } found
+            || !catalog.IsEnabled(found.ModuleKey, await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken)))
+        {
+            throw new RecordValidationException([new RecordFieldError(KeyField, "Bu ayar bu firmada kullanılamıyor.")]);
+        }
+
+        if (SettingRules.Validate(found.Definition, value) is { } error)
+        {
+            throw new RecordValidationException([new RecordFieldError(ValueField, error)]);
+        }
     }
 
     private static void EnsureVersion(TenantSetting setting, long? expectedVersion)

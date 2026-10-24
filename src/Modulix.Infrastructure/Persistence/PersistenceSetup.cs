@@ -8,10 +8,12 @@ using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
+using Modulix.Core.Settings;
 using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Modules;
 using Modulix.Infrastructure.Platform;
+using Modulix.Infrastructure.Settings;
 using Modulix.Infrastructure.Tenancy;
 using Modulix.Infrastructure.Users;
 
@@ -66,6 +68,7 @@ public static class PersistenceSetup
 
         // Denetim kaydı okuma (Y5).
         services.AddScoped<IAuditLog, AuditLog>();
+        services.AddScoped<ITenantSettings, TenantSettings>();
         return services;
     }
 

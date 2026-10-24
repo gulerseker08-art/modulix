@@ -218,7 +218,8 @@ public class RecordPipelineTests(ModulixApiFactory factory) : IClassFixture<Modu
 
     private static RecordWriteRequest Write(JsonObject values, long? version = null) => new(values, version);
 
-    private static string UniqueKey() => $"test.{Guid.NewGuid():N}";
+    // Her test kendi firmasını açar; anahtar tanımlı bir ayar olmalıdır (Y6).
+    private static string UniqueKey() => CoreModule.SettingKeys.Address;
 
     private static ModulixDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
 }

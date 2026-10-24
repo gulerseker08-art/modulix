@@ -330,10 +330,20 @@ internal sealed class AuditLog(
             }
         }
 
+        // Seçenekli ad alanında seçeneğin adı (ör. ayar anahtarı yerine ayarın adı).
+        string? Part(AuditedEntity entity, Dictionary<string, string> values, string field) =>
+            values.GetValueOrDefault(field) is { } value
+                && entity.Options.TryGetValue(field, out var options) && options.TryGetValue(value, out var label)
+                ? label
+                : values.GetValueOrDefault(field);
+
         return parts.ToDictionary(
             p => p.Key,
-            p => string.Join(" ", catalog.FindAuditedEntity(p.Key.Item1)!.TitleFields
-                .Select(f => p.Value.GetValueOrDefault(f)).Where(v => !string.IsNullOrWhiteSpace(v))));
+            p =>
+            {
+                var entity = catalog.FindAuditedEntity(p.Key.Item1)!;
+                return string.Join(" ", entity.TitleFields.Select(f => Part(entity, p.Value, f)).Where(v => !string.IsNullOrWhiteSpace(v)));
+            });
     }
 
     private static IEnumerable<(string Field, JsonNode? Value)> Values(JsonObject changes) =>
