@@ -40,6 +40,9 @@ public sealed class CoreModule : IModule
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
         public const string Audit = "core.audit";
+
+        /// <summary>Oturum olayları (giriş, hatalı şifre, kilitlenme, şifre sıfırlama, davet kabulü); kayıt kişinin hesabıdır.</summary>
+        public const string Account = "core.account";
     }
 
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
@@ -77,5 +80,26 @@ public sealed class CoreModule : IModule
         {
             ["filters"] = "Filtreler", ["rows"] = "Satır sayısı",
         }),
+        new(AuditedEntityKeys.Account, "Oturum", null, new Dictionary<string, string>
+        {
+            ["email"] = "E-posta", ["ip"] = "IP adresi", ["userAgent"] = "Tarayıcı", ["reason"] = "Neden",
+        }, "email")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["reason"] = new Dictionary<string, string>
+                {
+                    [AccountAuditReasons.WrongPassword] = "Hatalı şifre",
+                    [AccountAuditReasons.Locked] = "Hesap kilitliyken deneme",
+                },
+            },
+        },
     ];
+}
+
+/// <summary>Başarısız giriş nedenleri (<c>core.account</c> kaydının <c>reason</c> alanı).</summary>
+public static class AccountAuditReasons
+{
+    public const string WrongPassword = "WrongPassword";
+    public const string Locked = "Locked";
 }

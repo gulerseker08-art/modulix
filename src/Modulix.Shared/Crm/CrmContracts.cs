@@ -24,6 +24,12 @@ public static class CrmAccess
     public const string ActivitiesWrite = "crm.activities.write";
 }
 
+/// <summary>Kayıt türü anahtarları; kayıt geçmişi (<c>/api/records/{tür}/{id}/history</c>) bunlarla çağrılır.</summary>
+public static class CrmEntityKeys
+{
+    public const string Company = "crm.company";
+}
+
 public sealed record CrmPage<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
 public static class CrmLimits

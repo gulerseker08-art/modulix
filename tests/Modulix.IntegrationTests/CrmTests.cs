@@ -271,6 +271,7 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
         Assert.Equal(
             ((IModule)new CrmModule()).Permissions.Select(p => p.Key).Order(),
             typeof(CrmAccess).GetFields().Where(f => f.Name != nameof(CrmAccess.ModuleKey)).Select(f => (string)f.GetValue(null)!).Order());
+        Assert.Contains(((IModule)new CrmModule()).AuditedEntities, e => e.EntityKey == CrmEntityKeys.Company);
     }
 
     [Fact]

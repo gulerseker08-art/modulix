@@ -1,5 +1,7 @@
 using System.Text.Json.Nodes;
+using Modulix.Api.Audit;
 using Modulix.Api.Tenancy;
+using Modulix.Core.Audit;
 using Modulix.Core.Contracts.Records;
 using Modulix.Shared.Records;
 
@@ -11,6 +13,8 @@ namespace Modulix.Api.Records;
 /// </summary>
 public static class RecordEndpoints
 {
+    public const int HistoryPageSize = 20;
+
     public static IEndpointRouteBuilder MapRecordEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/records/{entityKey}")
@@ -31,6 +35,21 @@ public static class RecordEndpoints
         {
             var result = await pipeline.GetAsync(new RecordRef(entityKey, id), ct);
             return result.IsSuccess ? Results.Ok(ToResponse(result.Value!)) : ToProblem(result.Error!);
+        });
+
+        // Kayıt geçmişi (Y5b): kaydı görebilen herkes görür; core.audit.read gerekmez. Kayıt önce boru hattından
+        // okunur, böylece izin, modül ve kaydın varlığı aynı kurallarla denetlenir.
+        group.MapGet("/{id:guid}/history", async (string entityKey, Guid id, int? page, IRecordPipeline pipeline, IAuditLog log, CancellationToken ct) =>
+        {
+            var record = new RecordRef(entityKey, id);
+            var readable = await pipeline.GetAsync(record, ct);
+            if (!readable.IsSuccess)
+            {
+                return ToProblem(readable.Error!);
+            }
+
+            var history = await log.GetRecordHistoryAsync(record, page ?? 1, HistoryPageSize, ct);
+            return Results.Ok(AuditEndpoints.ToResponse(history));
         });
 
         group.MapPost("", async (string entityKey, RecordWriteRequest request, IRecordPipeline pipeline, CancellationToken ct) =>

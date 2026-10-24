@@ -52,7 +52,7 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
 
         // Filtreler.
         Assert.Equal(1, (await client.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company&action=Created"))!.TotalCount);
-        Assert.Equal(0, (await client.GetFromJsonAsync<AuditPageResponse>($"/api/audit?userId={outsider.Id}"))!.TotalCount);
+        Assert.Equal(0, (await client.GetFromJsonAsync<AuditPageResponse>($"/api/audit?entityKey=crm.company&userId={outsider.Id}"))!.TotalCount);
         Assert.Equal(0, (await client.GetFromJsonAsync<AuditPageResponse>("/api/audit?source=Import"))!.TotalCount);
         var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(3)).ToString("yyyy-MM-dd");
         var tomorrow = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(3)).AddDays(1).ToString("yyyy-MM-dd");

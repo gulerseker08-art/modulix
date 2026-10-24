@@ -1,0 +1,114 @@
+@inject ApiClient Api
+
+@* Kayıt geçmişi (Y5b): kaydın oluşturulması ve değişiklikleri; kaydı görebilen herkes görür. Kişi, fırsat ve aktivite
+   detay ekranları da aynı bileşeni kullanır. Version değişince (kayıt düzenlenince) yeniden yüklenir. *@
+<section class="detail-section record-history">
+    <div class="section-header">
+        <h2>Değişiklik geçmişi</h2>
+    </div>
+    @if (error is not null)
+    {
+        <p class="text-muted">@error</p>
+    }
+    else if (entries is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (entries.Count == 0)
+    {
+        <p class="text-muted">Henüz kayıtlı değişiklik yok.</p>
+    }
+    else
+    {
+        <ul class="item-list history-list">
+            @foreach (var entry in entries)
+            {
+                <li>
+                    <div class="item-main">
+                        <strong>@entry.UserName <span class="history-action">@AuditText.Of(entry.Action).ToLower(Culture)</span></strong>
+                        <span>@CrmLabels.Time(entry.OccurredAt)@(entry.Source == AuditSource.Api ? null : $" · {AuditText.Of(entry.Source)}")</span>
+                        @if (entry.Changes.Count == 0 && entry.Action == AuditOperation.Updated)
+                        {
+                            <span>Kaydetti, alan değişmedi.</span>
+                        }
+                        else if (entry.Changes.Count > 0)
+                        {
+                            <ul class="history-changes">
+                                @foreach (var change in entry.Changes)
+                                {
+                                    <li>
+                                        <span class="history-field">@change.Label: </span>
+                                        @switch (entry.Action)
+                                        {
+                                            case AuditOperation.Created:
+                                                <span>@Value(change.New)</span>
+                                                break;
+                                            case AuditOperation.Deleted:
+                                                <span>@Value(change.Old)</span>
+                                                break;
+                                            default:
+                                                <span class="history-old">@Value(change.Old)</span>
+                                                <span aria-label="yerine"> → </span>
+                                                <span>@Value(change.New)</span>
+                                                break;
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+        @if (entries.Count < total)
+        {
+            <button type="button" class="btn btn-link btn-sm" disabled="@loading" @onclick="MoreAsync">Daha eski değişiklikler</button>
+        }
+    }
+</section>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+
+    private List<AuditEntryDto>? entries;
+    private int total;
+    private int page;
+    private bool loading;
+    private string? error;
+    private (string, Guid, long)? loaded;
+
+    [Parameter, EditorRequired] public string EntityKey { get; set; } = default!;
+
+    [Parameter, EditorRequired] public Guid RecordId { get; set; }
+
+    [Parameter] public long Version { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loaded == (EntityKey, RecordId, Version))
+        {
+            return;
+        }
+
+        loaded = (EntityKey, RecordId, Version);
+        entries = null;
+        page = 0;
+        await MoreAsync();
+    }
+
+    private async Task MoreAsync()
+    {
+        loading = true;
+        var result = await Api.GetAsync<AuditPageResponse>($"/api/records/{EntityKey}/{RecordId}/history?page={page + 1}");
+        loading = false;
+        error = result.Error;
+        if (result.Value is { } next)
+        {
+            entries = [.. entries ?? [], .. next.Items];
+            total = next.TotalCount;
+            page = next.Page;
+        }
+    }
+
+    private static string Value(string? value) => string.IsNullOrEmpty(value) ? "boş" : value;
+}

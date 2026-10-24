@@ -85,6 +85,22 @@ internal sealed class AuditLog(
         return items;
     }
 
+    public async Task<AuditLogPage> GetRecordHistoryAsync(RecordRef record, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
+
+        var entries = Filter(new AuditQuery(EntityKey: record.EntityKey, RecordId: record.Id));
+        var total = await entries.CountAsync(cancellationToken);
+        var rows = await entries
+            .OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new AuditLogPage(await DescribeAsync(rows, cancellationToken, recordReadable: true), page, pageSize, total);
+    }
+
     // Kayıtlar tenant verisidir: sorgu filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür.
     private IQueryable<AuditLogEntry> Filter(AuditQuery query)
     {
@@ -127,7 +143,9 @@ internal sealed class AuditLog(
         return entries;
     }
 
-    private async Task<IReadOnlyList<AuditLogItem>> DescribeAsync(IReadOnlyList<AuditLogEntry> entries, CancellationToken cancellationToken)
+    /// <param name="recordReadable">Okur kaydın kendisini görebiliyor (kayıt geçmişi): kaydın değerleri gizlenmez.</param>
+    private async Task<IReadOnlyList<AuditLogItem>> DescribeAsync(
+        IReadOnlyList<AuditLogEntry> entries, CancellationToken cancellationToken, bool recordReadable = false)
     {
         if (entries.Count == 0)
         {
@@ -150,7 +168,7 @@ internal sealed class AuditLog(
         foreach (var (entry, entity, changes) in parsed)
         {
             records.Add((entry.EntityKey, entry.RecordId));
-            if (entity is null || !Visible(entity))
+            if (entity is null || !(recordReadable || Visible(entity)))
             {
                 continue;
             }
@@ -215,8 +233,11 @@ internal sealed class AuditLog(
         return parsed.Select(row =>
         {
             var (entry, entity, changes) = row;
-            var visible = Visible(entity);
-            var fields = changes.Select(change =>
+            var visible = recordReadable || Visible(entity);
+
+            // Alanlar modülün tanım sırasıyla (ör. önce ad); tanımsız alanlar sonda.
+            var order = entity?.Fields.Keys.Select((key, index) => (key, index)).ToDictionary(p => p.key, p => p.index) ?? [];
+            var fields = changes.OrderBy(change => order.GetValueOrDefault(change.Key, int.MaxValue)).Select(change =>
             {
                 var label = entity?.Fields.GetValueOrDefault(change.Key) ?? change.Key;
                 if (!visible)
@@ -242,7 +263,7 @@ internal sealed class AuditLog(
                 entry.EntityKey,
                 entity?.DisplayName ?? entry.EntityKey,
                 entry.RecordId,
-                Title(entry.EntityKey, entry.RecordId),
+                recordReadable ? titles.GetValueOrDefault((entry.EntityKey, entry.RecordId)) : Title(entry.EntityKey, entry.RecordId),
                 entry.Action,
                 entry.Source,
                 !visible,

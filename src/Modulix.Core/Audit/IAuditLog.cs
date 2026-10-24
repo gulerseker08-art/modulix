@@ -72,4 +72,10 @@ public interface IAuditLog
     /// <see cref="AuditExportTooLargeException"/>. Dışa aktarma da denetim kaydına (<c>core.audit</c>) yazılır.
     /// </summary>
     Task<IReadOnlyList<AuditLogItem>> ExportAsync(AuditQuery query, int limit, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Bir kaydın geçmişi (Y5b), en yeni üstte. <c>core.audit.read</c> gerekmez: çağıran kaydı görebildiğini doğrulamış
+    /// olmalıdır (API kaydı kayıt boru hattından okur), bu yüzden değerler gizlenmez.
+    /// </summary>
+    Task<AuditLogPage> GetRecordHistoryAsync(RecordRef record, int page, int pageSize, CancellationToken cancellationToken);
 }

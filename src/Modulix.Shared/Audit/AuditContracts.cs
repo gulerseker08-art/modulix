@@ -8,6 +8,11 @@ public enum AuditOperation
     Updated = 2,
     Deleted = 3,
     Exported = 4,
+    SignedIn = 5,
+    SignInFailed = 6,
+    LockedOut = 7,
+    PasswordReset = 8,
+    InvitationAccepted = 9,
 }
 
 public enum AuditSource
@@ -59,6 +64,11 @@ public static class AuditText
         AuditOperation.Updated => "Değiştirdi",
         AuditOperation.Deleted => "Sildi",
         AuditOperation.Exported => "Dışa aktardı",
+        AuditOperation.SignedIn => "Giriş yaptı",
+        AuditOperation.SignInFailed => "Giriş başarısız",
+        AuditOperation.LockedOut => "Hesap kilitlendi",
+        AuditOperation.PasswordReset => "Şifresini sıfırladı",
+        AuditOperation.InvitationAccepted => "Daveti kabul etti",
         _ => action.ToString(),
     };
 
