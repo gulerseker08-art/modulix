@@ -30,10 +30,20 @@ jobs:
       - name: Kodu al
         uses: actions/checkout@v5
 
-      - name: .NET SDK (global.json)
+            - name: SDK ayarlarini goster
+        run: |
+          git rev-parse HEAD
+          cat global.json
+
+      - name: .NET SDK kurulumu
         uses: actions/setup-dotnet@v5
         with:
-          global-json-file: global.json
+          dotnet-version: '10.0.100'
+
+      - name: Kurulu SDK kontrolu
+        run: |
+          dotnet --list-sdks
+          dotnet --version
 
       # Her calismada yeni, yalnizca bu calismaya ozel sifreler. Kayitlarda gizlenir.
       - name: Gecici veritabani sifreleri
