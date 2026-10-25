@@ -8,6 +8,7 @@ using Modulix.Core.Teams;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
+using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Email;
@@ -55,6 +56,10 @@ public class ModulixDbContext(
     public DbSet<Team> Teams => Set<Team>();
 
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+
+    public DbSet<Company> Companies => Set<Company>();
+
+    public DbSet<Branch> Branches => Set<Branch>();
 
     public DbSet<CustomField> CustomFields => Set<CustomField>();
 

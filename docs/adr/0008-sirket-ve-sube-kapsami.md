@@ -1,6 +1,6 @@
 # ADR-0008: Tenant içi şirket ve şube kapsamı
 
-- **Durum:** Taslak, 25 Ekim 2026
+- **Durum:** Kabul edildi, 25 Ekim 2026 (geçiş adım 1 uygulandı)
 - **Karar:** Tenant, bir veya daha fazla işletici şirket (`core.company`) barındırır. Her tenant tablosu bilinçli olarak "ortak" ya da "şirket kapsamlı" sınıflandırılır; şirket kapsamlı kayıt `CompanyId` taşır ve şirket sınırı, tenant sınırı gibi sunucuda, oturumdan belirlenir
 - **Yol haritası:** Ç22 (minimum D1, tam D2); envanter bulgusu B4
 
@@ -92,9 +92,14 @@ Karşılıklı belge, borç/alacak ve mutabakat ileriki pakettir (Ç22.4). Farkl
 - Şirket süzgeci veritabanında değil uygulamadadır: boru hattını atlayan kod şirket sınırını da atlar. Bu yüzden "doğrudan `DbContext`'e yazma yasağı" ve uç nokta koruma testleri şirket kapsamı için de bağlayıcıdır.
 - Mevcut `ownerId` ve kayıt kapsamı (Y8a) değişmez; şirket kapsamı onların üstüne eklenir.
 
-## Açık sorular (kabulden önce karar gerekir)
+## Kabulde verilen kararlar
 
-1. Aktif şirket oturumda mı (sunucu tarafı) yoksa her istekte özel bir başlıkla mı taşınsın? Öneri: oturumda tutulur, değişiklik ayrı bir uçla yapılır.
-2. Şirket seçmeli sınıf ilk sürümde gerekli mi, yoksa yalnızca ortak ve şirket kapsamlı ile mi başlansın?
-3. Kullanıcıya hiç şirket bağı verilmemişse varsayılan: hiçbir şirket (güvenli) mi, yoksa yalnızca ortak veri mi? Öneri: yalnızca ortak veri.
-4. Şirket kapatılınca veri politikası: yalnızca okunur arşiv mi, silme mi? (B3 silme politikasıyla birlikte ele alınabilir.)
+- **Aktif şirket:** oturumda (sunucu tarafı) tutulur; değişiklik ayrı bir uçla yapılır, başlıkla taşınmaz.
+- **Sınıflar:** ilk sürümde yalnızca ortak ve şirket kapsamlı vardır. "Şirket seçmeli" sınıf, ilk tablo gerektirdiğinde (teklif, görev, dosya) bu ADR'ye eklenir.
+- **Şirket bağı olmayan kullanıcı:** yalnızca ortak veriyi görür.
+- **Şirket kapatma:** silme politikasıyla (envanter B3) birlikte karara bağlanır; o zamana kadar şirket silinmez, varsayılan şirket hiç silinemez.
+
+## Uygulama durumu
+
+- Adım 1 yapıldı: `core.Companies` ve `core.Branches` (RLS'li), `ICompanyShared` / `ICompanyScoped`, mevcut bütün tenant tablolarının "ortak" işaretlenmesi, mevcut tenantlara tenant adıyla varsayılan şirket (migration `SirketVeSube`), yeni tenant açılışında varsayılan şirket, `TableInventoryTests` içinde "her tablo tam bir kapsam sınıfında" kapısı.
+- Kalan: adım 2 (üyelik–şirket bağı, oturumda aktif şirket), adım 3 (boru hattında kapsam adımı, olay zarfında `CompanyId`).

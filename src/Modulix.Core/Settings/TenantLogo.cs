@@ -7,7 +7,7 @@ namespace Modulix.Core.Settings;
 /// SVG kabul edilmez (içinde betik taşıyabilir). Tür, uzantıya veya istemcinin söylediğine değil dosyanın ilk
 /// baytlarına bakılarak belirlenir.
 /// </summary>
-public sealed class TenantLogo : ITenantEntity
+public sealed class TenantLogo : ITenantEntity, ICompanyShared
 {
     public const int MaxBytes = 256 * 1024;
     public const string Png = "image/png";

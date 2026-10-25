@@ -22,7 +22,7 @@ public sealed record CustomFieldOption(string Key, string Label, bool Active = t
 /// çünkü kayıtlardaki değerler buna bağlıdır. Alan silinmez, arşivlenir: değerler kayıtlarda kalır, geri alınabilir.
 /// Tenant verisidir; Row-Level Security ile korunur.
 /// </summary>
-public sealed class CustomField : ITenantEntity
+public sealed class CustomField : ITenantEntity, ICompanyShared
 {
     public const int LabelMaxLength = 100;
     public const int KeyMaxLength = 40;

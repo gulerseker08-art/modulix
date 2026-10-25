@@ -7,7 +7,7 @@ namespace Modulix.Core.Settings;
 /// Tenant'a özel ayar (ör. "locale", "currency"). Faz 1 Core kapsamındaki "tenant ayarları"nın
 /// saklama katmanıdır ve tenant izolasyonunun ilk korunan tablosudur.
 /// </summary>
-public sealed partial class TenantSetting : ITenantEntity
+public sealed partial class TenantSetting : ITenantEntity, ICompanyShared
 {
     public const int KeyMaxLength = 100;
     public const int ValueMaxLength = 4000;

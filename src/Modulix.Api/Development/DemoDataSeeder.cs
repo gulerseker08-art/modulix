@@ -8,6 +8,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
+using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Modules.Crm;
 
@@ -133,6 +134,8 @@ public static class DemoDataSeeder
         var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
 
         var admin = await roles.EnsureSystemRoleAsync(ct);
+        await DefaultCompany.EnsureAsync(db, tenant.Name, ct);
+        await db.SaveChangesAsync(ct);
 
         var membershipIds = await db.Memberships.Where(m => m.TenantId == tenant.Id).Select(m => m.Id).ToListAsync(ct);
         foreach (var membershipId in membershipIds)

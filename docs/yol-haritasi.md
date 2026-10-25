@@ -321,7 +321,7 @@ Bağımlılık: Ç0–Ç2, Ç20 minimum. Onay gereken adımlar Ç6 kullanır. S�
 - Ç21.5 Görünürlük: Uçtan uca süreç kartı; kullanıcı yalnızca yetkili olduğu adım ve alanları görür. Kabul: Satış kullanıcısı sürecin ilerlediğini görürken gizli bordro maliyetini göremez.
 Ç22 — Tenant içi şirket, şube ve organizasyon [YENİ / minimum D1, tam D2]
 Bağımlılık: Ç0, Y2–Y3. Amaç: Tenantı müşteri firma kartı veya tek tüzel kişiyle karıştırmamak.
-Durum (25 Ekim 2026): Tasarım taslağı [ADR-0008](adr/0008-sirket-ve-sube-kapsami.md)'de, kabul bekliyor (4 açık soru). Kod yok.
+Durum (25 Ekim 2026): [ADR-0008](adr/0008-sirket-ve-sube-kapsami.md) kabul edildi. Adım 1 yapıldı (şirket ve şube tabloları, varsayılan şirket, kapsam sınıfı kapısı). Kalan: üyelik–şirket bağı ve aktif şirket (adım 2), boru hattı kapsamı (adım 3).
 - Ç22.1 Organizasyon modeli: Tenantın işletici tüzel kişileri, şube, departman, ekip ve lokasyon ayrı anlamlarla modellenir. Kabul: Müşteri Taraf kaydı şirket sahibi hesabıyla aynı varlık değildir.
 - Ç22.2 Kayıt kapsamı: Tenant ortak ana veri ile şirket özel işlem/finans kayıtları sınıflandırılır. Her tabloda kapsam bilinçli seçilir. Kabul: Aynı tenantın şirket A muhasebecisi B faturalarını izin olmadan göremez.
 - Ç22.3 Kullanıcı bağları: Birden çok şirket/şube görevi, geçici vekalet ve varsayılan çalışma kapsamı. Kabul: Ekrandaki aktif şirket değiştirmek yetki kazanımı sağlamaz.

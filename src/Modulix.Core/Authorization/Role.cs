@@ -12,7 +12,7 @@ namespace Modulix.Core.Authorization;
 /// Her tenant'ta bir sistem rolü ("Yönetici", <see cref="IsSystem"/>) bulunur: izin listesi tutmaz, tenant için
 /// açık tüm modüllerin tüm izinlerini verir; adı ve izinleri değiştirilemez. Son yöneticinin bu rolü kaldırılamaz.
 /// </summary>
-public sealed class Role : ITenantEntity
+public sealed class Role : ITenantEntity, ICompanyShared
 {
     public const int NameMaxLength = 100;
 

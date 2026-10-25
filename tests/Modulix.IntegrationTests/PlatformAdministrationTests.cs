@@ -103,6 +103,11 @@ public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IC
         var opened = Assert.Single(audit);
         Assert.Equal(AuditAction.Created, opened.Action);
         Assert.Equal(platformAdmin.Id, opened.UserId);
+
+        // Firmayla birlikte firma adıyla varsayılan işletici şirket açılır (ADR-0008).
+        var company = Assert.Single(await db.Companies.AsNoTracking().ToListAsync());
+        Assert.Equal("Yeni Firma", company.Name);
+        Assert.True(company.IsDefault);
     }
 
     [Fact]
