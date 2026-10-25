@@ -245,6 +245,17 @@ Fırsat aşaması, firma durumu, firma kaynağı ve aktivite tipi artık firman�
 - Tabloya (`meta.ChoiceLists`, RLS'li) yalnızca firmanın düzenlediği liste yazılır. Düzenlenmemiş listede koddaki varsayılan geçerlidir. Değişiklikler denetim kaydına "Liste" olarak yazılır. Kayıt geçmişi değerleri firmanın adlarıyla gösterir.
 - `GET /api/choice-lists` her üyeye açıktır. Düzenleme `GET /api/customization/lists` ve `PUT /api/customization/lists/{anahtar}` üzerinden yapılır; gövdede liste tamamıyla, sırasıyla verilir.
 
+### Sektör profilleri (Y9c)
+
+Profil, bir sektör için hazır başlangıç paketidir: modüller, özel alanlar ve liste değerleri. Dört profil kodda tanımlıdır (`Modulix.Api/Customization/SectorProfiles.cs`): Genel, Lojistik firması, Klinik, Üretici. Tanımlar açılışta modül kataloğuna göre doğrulanır; bilinmeyen modül, kayıt türü, liste veya kategori varsa uygulama açılmaz.
+
+- Profil yalnızca ekler. Aynı adlı alan (arşivdekiler dahil) ve aynı adlı liste değeri (büyük/küçük harf fark etmez) atlanır; firmanın mevcut alanları ve değerleri değişmez. Yeni liste değeri kendi kategorisinin son değerinin arkasına eklenir. Alanlar ve değerler Y9a/Y9b servisleriyle eklenir, yani aynı kurallar ve denetim kayıtları geçerlidir. Hepsi tek işlemdir.
+- Profil yeniden uygulanabilir; o gün eksik olanlar eklenir. Profil tanımı sonradan değişirse firmalara kendiliğinden yansımaz.
+- Firmanın profili `platform.Tenants.ProfileKey` (ve uygulama zamanı) olarak tutulur; uygulama firmanın denetim kaydına `core.tenant` "Sektör profili" olarak yazılır.
+- Platform yöneticisi firmayı açarken profil seçer (`CreateTenantRequest.Profile`); ekran profilin modüllerini önceden işaretler, değiştirilebilir. Firma detayından mevcut firmaya önizlemeyle uygular; bu yolda profilin kapalı modülleri de açılır (`GET /api/platform/profiles`, `GET`/`POST /api/platform/tenants/{id}/profile/{anahtar}`).
+- Firma yöneticisi Yönetim → Sektör profili'nden uygular (`/yonetim/sektor-profili`, `core.customization.manage`; `GET /api/customization/profiles`, `GET /{anahtar}/preview`, `POST /{anahtar}/apply`). Modül açamaz: kapalı modülün alanları ve değerleri eklenmez, önizlemede ayrıca belirtilir.
+- Menü sırası profilden gelmez: şimdilik yalnızca CRM'in ekranları var.
+
 ## CRM modülü
 
 İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.

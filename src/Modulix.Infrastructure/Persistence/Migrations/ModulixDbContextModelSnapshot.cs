@@ -311,6 +311,13 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<DateTimeOffset?>("ProfileAppliedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ProfileKey")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(50)

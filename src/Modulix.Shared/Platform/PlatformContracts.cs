@@ -19,7 +19,9 @@ public sealed record PlatformTenantDto(
     DateTimeOffset CreatedAt,
     int ActiveMemberCount,
     int AdministratorCount,
-    IReadOnlyList<string> EnabledModules);
+    IReadOnlyList<string> EnabledModules,
+    string? ProfileKey = null,
+    DateTimeOffset? ProfileAppliedAt = null);
 
 public sealed record PlatformTenantPageResponse(IReadOnlyList<PlatformTenantDto> Items, int Page, int PageSize, int TotalCount);
 
@@ -27,14 +29,18 @@ public sealed record TenantAdministratorDto(Guid MembershipId, string DisplayNam
 
 public sealed record PlatformTenantDetailResponse(PlatformTenantDto Tenant, IReadOnlyList<TenantAdministratorDto> Administrators);
 
-/// <summary>Firma açma. <see cref="RoleTemplates"/>: oluşturulacak hazır rollerin anahtarları (seçilen modüllerden).</summary>
+/// <summary>
+/// Firma açma. <see cref="RoleTemplates"/>: oluşturulacak hazır rollerin anahtarları (seçilen modüllerden).
+/// <see cref="Profile"/>: uygulanacak sektör profili (Y9c); alanları ve liste değerleri seçilen modüllerde eklenir.
+/// </summary>
 public sealed record CreateTenantRequest(
     string Name,
     string Slug,
     IReadOnlyList<string>? Modules,
     IReadOnlyList<string>? RoleTemplates,
     string AdministratorEmail,
-    string AdministratorName);
+    string AdministratorName,
+    string? Profile = null);
 
 /// <summary><see cref="ExistingAccount"/>: yöneticinin hesabı vardı; davet yerine bilgi e-postası gitti.</summary>
 public sealed record CreateTenantResponse(PlatformTenantDetailResponse Tenant, bool ExistingAccount);

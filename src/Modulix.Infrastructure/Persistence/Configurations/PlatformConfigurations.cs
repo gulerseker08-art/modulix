@@ -17,6 +17,7 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.HasIndex(t => t.Slug).IsUnique();
         builder.Property(t => t.Status).IsRequired();
         builder.Property(t => t.CreatedAt).IsRequired();
+        builder.Property(t => t.ProfileKey).HasMaxLength(Modulix.Core.Customization.SectorProfileCatalog.KeyMaxLength);
         builder.Ignore(t => t.IsActive);
     }
 }

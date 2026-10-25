@@ -12,6 +12,7 @@ using Modulix.Api.Settings;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Customization;
 using Modulix.Core.Modules;
 using Modulix.Infrastructure.Email;
 using Modulix.Infrastructure.Persistence;
@@ -40,6 +41,9 @@ builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
 
 builder.Services.AddModulixModules(ModulixModules.Create());
+
+// Sektör profilleri (Y9c): tanımlar açılışta modül kataloğuna göre doğrulanır.
+builder.Services.AddSingleton(sp => new SectorProfileCatalog(SectorProfiles.Create(), sp.GetRequiredService<ModuleCatalog>()));
 
 builder.Services.AddModulixRecords();
 
@@ -114,6 +118,7 @@ app.MapUserEndpoints();
 app.MapTeamEndpoints();
 app.MapCustomFieldEndpoints();
 app.MapChoiceListEndpoints();
+app.MapSectorProfileEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapPlatformEndpoints();

@@ -26,7 +26,7 @@
 
     @if (creating && modules is not null)
     {
-        <CreateTenantForm Modules="modules" Created="CreatedAsync" Cancelled="() => creating = false" />
+        <CreateTenantForm Modules="modules" Profiles="profiles" Created="CreatedAsync" Cancelled="() => creating = false" />
     }
 
     <div class="filters" role="group" aria-label="Durum">
@@ -90,6 +90,7 @@
 @code {
     private PlatformTenantPageResponse? page;
     private PlatformModulesResponse? modules;
+    private IReadOnlyList<SectorProfileDto> profiles = [];
     private string? search;
     private TenantState? status;
     private bool creating;
@@ -100,6 +101,7 @@
     {
         var result = await Api.GetAsync<PlatformModulesResponse>("/api/platform/modules");
         modules = result.Value;
+        profiles = (await Api.GetAsync<List<SectorProfileDto>>("/api/platform/profiles")).Value ?? [];
         if (result.IsSuccess)
         {
             await LoadAsync(1);

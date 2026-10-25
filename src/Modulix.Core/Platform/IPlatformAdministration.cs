@@ -1,3 +1,5 @@
+using Modulix.Core.Customization;
+
 namespace Modulix.Core.Platform;
 
 /// <summary>Platform yöneticisinin gördüğü firma: platform tablolarındaki bilgiler ve sayılar; firma verisi değildir.</summary>
@@ -9,7 +11,9 @@ public sealed record PlatformTenant(
     DateTimeOffset CreatedAt,
     int ActiveMemberCount,
     int AdministratorCount,
-    IReadOnlyList<string> EnabledModules);
+    IReadOnlyList<string> EnabledModules,
+    string? ProfileKey = null,
+    DateTimeOffset? ProfileAppliedAt = null);
 
 /// <summary>Firma listesi sorgusu. Arama ad ve kısa adda yapılır; sayfa 1'den başlar.</summary>
 public sealed record PlatformTenantQuery(string? Search, TenantStatus? Status, int Page, int PageSize);
@@ -24,7 +28,8 @@ public sealed record PlatformTenantDetail(PlatformTenant Tenant, IReadOnlyList<T
 /// <summary>
 /// Firma açılışı. <see cref="Modules"/>: açılacak modüller (çekirdek her zaman açıktır). <see cref="RoleTemplates"/>:
 /// oluşturulacak hazır roller (ADR-0005); seçilen modüllerin şablonlarından olmalıdır. <see cref="PublicUrl"/>:
-/// e-postadaki bağlantıların kökü.
+/// e-postadaki bağlantıların kökü. <see cref="Profile"/>: uygulanacak sektör profili (Y9c); modülleri açmaz, profilin
+/// alanları ve liste değerleri seçilen modüllerde eklenir (ekran profilin modüllerini önceden seçer).
 /// </summary>
 public sealed record TenantCreation(
     string Name,
@@ -33,7 +38,8 @@ public sealed record TenantCreation(
     IReadOnlyCollection<string> RoleTemplates,
     string AdministratorEmail,
     string AdministratorName,
-    string PublicUrl);
+    string PublicUrl,
+    string? Profile = null);
 
 /// <summary><see cref="ExistingAccount"/>: yöneticinin e-postası platformda kayıtlıydı; üyelik hemen etkin oldu.</summary>
 public sealed record TenantCreationResult(PlatformTenantDetail Tenant, bool ExistingAccount);
@@ -90,6 +96,15 @@ public interface IPlatformAdministration
     /// <see cref="ArgumentException"/> (ParamName <c>moduleKey</c>).
     /// </summary>
     Task SetModuleAsync(Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sektör profilinin firmaya ekleyeceği şeyler (Y9c); platform yöneticisi kapalı modülleri de açar. Tanımsız profil için
+    /// null; firma yoksa <see cref="UserAdministrationException"/> (NotFound).
+    /// </summary>
+    Task<ProfilePlan?> PreviewProfileAsync(Guid tenantId, string profileKey, CancellationToken cancellationToken);
+
+    /// <summary>Profili uygular (yalnızca ekler) ve firmanın denetim kaydına yazar. Tanımsız profil için null.</summary>
+    Task<ProfilePlan?> ApplyProfileAsync(Guid tenantId, string profileKey, Guid actingUserId, CancellationToken cancellationToken);
 
     /// <summary>Katalogdaki modüllerin (çekirdek hariç) kaç açık firmada açık olduğu, katalog sırasıyla.</summary>
     Task<IReadOnlyList<ModuleUsage>> GetModuleUsageAsync(CancellationToken cancellationToken);

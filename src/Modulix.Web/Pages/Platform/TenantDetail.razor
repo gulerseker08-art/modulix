@@ -38,6 +38,7 @@
             <div><dt>Açılış</dt><dd>@CrmLabels.Time(tenant.CreatedAt)</dd></div>
             <div><dt>Etkin üye</dt><dd>@tenant.ActiveMemberCount</dd></div>
             <div><dt>Açık modüller</dt><dd>@ModuleNames(tenant.EnabledModules)</dd></div>
+            <div><dt>Sektör profili</dt><dd>@ProfileName(tenant.ProfileKey)</dd></div>
         </dl>
 
         @if (modules is not null)
@@ -51,6 +52,38 @@
                                   Enabled="tenant.EnabledModules.Contains(module.Key)" ShowLabel="true"
                                   Changed="error => ModuleChangedAsync(module, error)" />
                 }
+            </section>
+        }
+
+        @if (profiles.Count > 0)
+        {
+            <section class="detail-section">
+                <div class="section-header"><h2>Sektör profili</h2></div>
+                <p class="text-muted">
+                    Profil yalnızca ekler: eksik modülleri açar, eksik alanları ve liste değerlerini ekler. Firmanın mevcut alanları ve
+                    değerleri değişmez. Uygulama firmanın denetim kaydına yazılır.
+                </p>
+                <div class="inline-form">
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label" for="profileKey">Profil</label>
+                            <select id="profileKey" class="form-select" value="@profileKey" @onchange="e => PreviewProfileAsync((string?)e.Value)">
+                                <option value="">Seçin</option>
+                                @foreach (var profile in profiles)
+                                {
+                                    <option value="@profile.Key">@profile.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    @if (plan is not null)
+                    {
+                        <ProfilePreview Plan="plan" />
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="ApplyProfileAsync">Profili uygula</button>
+                        </div>
+                    }
+                </div>
             </section>
         }
 
@@ -158,6 +191,9 @@
 
     private PlatformTenantDetailResponse? detail;
     private PlatformModulesResponse? modules;
+    private IReadOnlyList<SectorProfileDto> profiles = [];
+    private string? profileKey;
+    private ProfilePlanDto? plan;
     private string newName = string.Empty;
     private string inviteEmail = string.Empty;
     private string inviteName = string.Empty;
@@ -171,6 +207,7 @@
     protected override async Task OnParametersSetAsync()
     {
         modules = (await Api.GetAsync<PlatformModulesResponse>("/api/platform/modules")).Value;
+        profiles = (await Api.GetAsync<List<SectorProfileDto>>("/api/platform/profiles")).Value ?? [];
         await LoadAsync();
     }
 
@@ -245,6 +282,47 @@
         await LoadAsync();
         Show(success: error is null ? $"{module.DisplayName} {(wasEnabled ? "kapatıldı. Veri silinmedi." : "açıldı.")}" : null, error: error);
     }
+
+    private async Task PreviewProfileAsync(string? key)
+    {
+        profileKey = string.IsNullOrEmpty(key) ? null : key;
+        plan = null;
+        if (profileKey is not null)
+        {
+            var result = await Api.GetAsync<ProfilePlanDto>($"/api/platform/tenants/{TenantId}/profile/{Uri.EscapeDataString(profileKey)}");
+            plan = result.Value;
+            Show(error: result.Error);
+        }
+    }
+
+    private async Task ApplyProfileAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<ProfilePlanDto>($"/api/platform/tenants/{TenantId}/profile/{Uri.EscapeDataString(profileKey!)}", new { });
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Show(error: result.Error);
+            return;
+        }
+
+        var applied = result.Value!;
+        profileKey = null;
+        plan = null;
+        await LoadAsync();
+        Show(success: applied.IsEmpty
+            ? $"{applied.ProfileName} profili kaydedildi; eklenecek bir şey yoktu."
+            : $"{applied.ProfileName} profili uygulandı: {Summary(applied)}.");
+    }
+
+    private static string Summary(ProfilePlanDto plan) => string.Join(", ", new[]
+    {
+        plan.ModulesToEnable.Count > 0 ? $"{plan.ModulesToEnable.Count} modül" : null,
+        plan.Fields.Count > 0 ? $"{plan.Fields.Count} alan" : null,
+        plan.ListValues.Count > 0 ? $"{plan.ListValues.Count} liste değeri" : null,
+    }.Where(p => p is not null));
+
+    private string ProfileName(string? key) => key is null ? "—" : profiles.FirstOrDefault(p => p.Key == key)?.Name ?? key;
 
     private void Show(string? success = null, string? error = null)
     {

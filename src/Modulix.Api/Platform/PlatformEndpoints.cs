@@ -1,7 +1,9 @@
 using System.Security.Claims;
+using Modulix.Api.Customization;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Customization;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Platform;
@@ -39,6 +41,35 @@ public static class PlatformEndpoints
         platform.MapPut("/tenants/{tenantId:guid}/modules/{moduleKey}", (Guid tenantId, string moduleKey, SetTenantModuleRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
             Run(() => admin.SetModuleAsync(tenantId, moduleKey, request.Enabled, UserId(user), ct)));
         platform.MapGet("/catalog", GetCatalogAsync);
+
+        // Sektör profilleri (Y9c): platform yöneticisi profilin kapalı modüllerini de açar.
+        platform.MapGet("/profiles", (SectorProfileCatalog profiles) => SectorProfileEndpoints.ToDto(profiles));
+        platform.MapGet("/tenants/{tenantId:guid}/profile/{key}", async (Guid tenantId, string key, IPlatformAdministration admin, ModuleCatalog modules, CancellationToken ct) =>
+        {
+            try
+            {
+                return await admin.PreviewProfileAsync(tenantId, key, ct) is { } plan
+                    ? Results.Ok(SectorProfileEndpoints.ToDto(plan, modules))
+                    : SectorProfileEndpoints.NotFound();
+            }
+            catch (Exception ex) when (ToProblem(ex) is { } problem)
+            {
+                return problem;
+            }
+        });
+        platform.MapPost("/tenants/{tenantId:guid}/profile/{key}", async (Guid tenantId, string key, ClaimsPrincipal user, IPlatformAdministration admin, ModuleCatalog modules, CancellationToken ct) =>
+        {
+            try
+            {
+                return await admin.ApplyProfileAsync(tenantId, key, UserId(user), ct) is { } plan
+                    ? Results.Ok(SectorProfileEndpoints.ToDto(plan, modules))
+                    : SectorProfileEndpoints.NotFound();
+            }
+            catch (Exception ex) when (ToProblem(ex) is { } problem)
+            {
+                return problem;
+            }
+        });
 
         // Y7b: hesap düzeyinde; kişinin hangi firmalarda olduğu fark etmez. İşlem kişinin firmalarının denetim kaydına yazılır.
         platform.MapPost("/users/reset-two-factor", async (
@@ -103,7 +134,8 @@ public static class PlatformEndpoints
                     request.RoleTemplates ?? [],
                     request.AdministratorEmail,
                     request.AdministratorName,
-                    PublicUrl.Resolve(http)),
+                    PublicUrl.Resolve(http),
+                    string.IsNullOrWhiteSpace(request.Profile) ? null : request.Profile),
                 UserId(user),
                 ct);
             return Results.Created($"/api/platform/tenants/{result.Tenant.Tenant.Id}", new CreateTenantResponse(ToDto(result.Tenant), result.ExistingAccount));
@@ -160,7 +192,9 @@ public static class PlatformEndpoints
         tenant.CreatedAt,
         tenant.ActiveMemberCount,
         tenant.AdministratorCount,
-        tenant.EnabledModules);
+        tenant.EnabledModules,
+        tenant.ProfileKey,
+        tenant.ProfileAppliedAt);
 
     private static PlatformTenantDetailResponse ToDto(PlatformTenantDetail detail) => new(
         ToDto(detail.Tenant),

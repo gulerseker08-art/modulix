@@ -68,6 +68,7 @@ public static class PersistenceSetup
         services.AddScoped<ChoiceListService>();
         services.AddScoped<IChoiceListService>(sp => sp.GetRequiredService<ChoiceListService>());
         services.AddScoped<IChoiceLists>(sp => sp.GetRequiredService<ChoiceListService>());
+        services.AddScoped<ISectorProfileService, SectorProfileService>();
         services.AddScoped<ICurrentAccess, CurrentAccess>();
 
         // Kullanıcı yönetimi (Y2); UserManager'ı host kaydeder (AddModulixAuth).
