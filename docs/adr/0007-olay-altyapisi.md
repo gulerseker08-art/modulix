@@ -171,6 +171,14 @@ Payload, kaydın bütün değişen alanlarını içerir; hassas alanlar da (Y8b,
 - Alıcı gönderim anında hâlâ etkin üye değilse veya kaydı okuyamıyorsa e-posta yazılmaz, teslim başarılı sayılır.
 - Teslim ve e-posta aynı işlemde yazıldığı için olay tekrar teslim edilse de ikinci e-posta oluşmaz.
 
+## Yol haritasıyla ilişkisi
+
+- **K5 (bağımsız modüller):** abone başka modülün tablosuna yazmaz ve ORM varlığını kullanmaz; tepkisini kendi kayıtlarında veya ortak kayıtta, kayıt boru hattından gösterir. Olay, modüller arasındaki tek bağdır; zarf ve olay türleri Contracts'tadır.
+- **K14 (süreç sahipliği):** olay bir bildirimdir, emir değildir. Olayı alan modül, kendi kayıtlarındaki işlemi kendi kurallarıyla doğrular ve gerekirse yapmaz (ör. "sevkiyat teslim edildi" olayı fatura taslağı açar, faturayı kesinleştirmez). Abonenin reddi hata değildir; teslim başarılı sayılır, gerekiyorsa abone kendi kaydına gerekçe yazar.
+- **Ç0.3 (kayıt boru hattı):** olay boru hattının son adımında, audit ile birlikte ve aynı işlemde hazırlanır (bugünkü adım 7-8). Abonenin yaptığı değişiklik de aynı boru hattından geçer; abone için kestirme yol yoktur.
+- **Ç0.5 (tutarlılık ve sürüm):** sıra numarası kaydın eşzamanlılık sürümüdür; correlation isteğin izidir ve zincir boyunca taşınır; olay sürümleme kuralı yukarıdadır. Ç0.5'in API sürümleme ve hata zarfı kararları webhook yüküne (Ç11a.4) de uygulanır.
+- **Bağımlılıklar:** Ç0 (kayıt sözleşmesi ve iş komutları) modül olaylarının kaynağıdır; ilk adım bugünkü kayıt olaylarıyla başlar, iş olayları Ç0.4 ile eklenir. Ç13 (güvenlik) tenant bağlamı, sistem kimliği, hassas alan süzgeci ve saklama süresinin dayandığı kurallardır; Ç13a.2'nin iki tenant'lı negatif testleri işleyiciyi de kapsar. Ç14 (canlı ortam) olay yaşı metriği, health ve alarm ister; işleyicinin ayrı süreçte çalışması (K11) Ç14'ün dağıtım kararıdır.
+
 ## Ç2 ile ilişkisi
 
 - İşleyici şimdilik kendi döngüsünde çalışır (`EventDispatchWorker`), e-posta işleyicisi gibi. Ç2 (arka plan işleri) geldiğinde ikisi ortak çerçeveye taşınır (Ç2.5): gözlemleme, kira ve heartbeat ortaklaşır, sürekli okuma döngüsü cron tetikleyicisine dönüştürülmez. Temizlik Ç2'de zamanlanmış iş olur.
