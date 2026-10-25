@@ -1,5 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Events;
 using Modulix.Core.Settings;
 
 namespace Modulix.Core.Modules;
@@ -38,6 +41,16 @@ public sealed class CoreModule : IModule
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
     ];
 
+    /// <summary>Çekirdeğin olay abonelikleri (ADR-0007).</summary>
+    public static class Subscriptions
+    {
+        /// <summary>
+        /// Kayıt başkasına atanınca yeni sorumluya e-posta. Kayıt türleri, modüllerin <see cref="IModule.OwnedRecords"/>
+        /// ile bildirdiği türlerdir (katalog doldurur); yeni modül ek iş yapmadan katılır.
+        /// </summary>
+        public const string AssignmentEmail = "core.assignment-email";
+    }
+
     /// <summary>Denetim kayıt türleri (Y5). Yönetim kayıtlarının değerleri her denetim okuruna açıktır.</summary>
     public static class AuditedEntityKeys
     {
@@ -58,6 +71,11 @@ public sealed class CoreModule : IModule
 
         /// <summary>Oturum olayları (giriş, hatalı şifre, kilitlenme, şifre sıfırlama, davet kabulü); kayıt kişinin hesabıdır.</summary>
         public const string Account = "core.account";
+
+        /// <summary>
+        /// Olay teslimi (ADR-0007): platform yöneticisinin yeniden deneme ve atlama işlemleri; kaydın kimliği teslimin kimliğidir.
+        /// </summary>
+        public const string EventDelivery = "core.event-delivery";
     }
 
     /// <summary>Çekirdeğin firma ayarları (Y6): firma profili ve bölgesel ayarlar.</summary>
@@ -218,6 +236,20 @@ public sealed class CoreModule : IModule
         {
             ["filters"] = "Filtreler", ["rows"] = "Satır sayısı",
         }),
+        new(AuditedEntityKeys.EventDelivery, "Olay teslimi", null, new Dictionary<string, string>
+        {
+            ["status"] = "Durum", ["attemptCount"] = "Deneme sayısı", ["subscription"] = "Abonelik", ["eventId"] = "Olay",
+            ["eventType"] = "Olay türü", ["entityKey"] = "Kayıt türü", ["recordId"] = "Kayıt",
+        }, "subscription")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string>
+                {
+                    ["Pending"] = "Bekliyor", ["Succeeded"] = "Başarılı", ["Failed"] = "Başarısız", ["Skipped"] = "Atlandı",
+                },
+            },
+        },
         new(AuditedEntityKeys.Account, "Hesap", null, new Dictionary<string, string>
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["ip"] = "IP adresi", ["userAgent"] = "Tarayıcı",
@@ -235,6 +267,18 @@ public sealed class CoreModule : IModule
             },
         },
     ];
+
+    /// <summary>
+    /// Atama e-postası: sırası önemsiz, izin bildirmez (alıcının yetkisi gönderim anında, kendi kimliğiyle denetlenir).
+    /// Kayıt türleri boş bırakılır; katalog modüllerin sorumlu atanan kayıt türleriyle doldurur.
+    /// </summary>
+    IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
+    [
+        EventSubscription.For<AssignmentEmailSubscriber>(
+            Subscriptions.AssignmentEmail, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
+    ];
+
+    public void ConfigureServices(IServiceCollection services) => services.AddScoped<AssignmentEmailSubscriber>();
 
     /// <summary>Kişinin çalıştığı firma: kişisi olan taraf silinemez.</summary>
     IReadOnlyList<SharedRecordReference> IModule.SharedRecordReferences { get; } =

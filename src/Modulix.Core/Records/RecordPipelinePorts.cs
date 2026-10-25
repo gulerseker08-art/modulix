@@ -113,7 +113,11 @@ public sealed record AuditEntry(
     AuditAction Action,
     JsonObject Changes,
     ExecutionSource Source,
-    string? CorrelationId);
+    string? CorrelationId)
+{
+    /// <summary>Değişikliği yapan olay aboneliği (ADR-0007, ör. "core.assignment-email"); kişinin değişikliğinde boş.</summary>
+    public string? Subscription { get; init; }
+}
 
 /// <summary>
 /// Outbox'a yazılacak olay (ADR-0007); zarfın alanları <see cref="Contracts.Events.EventEnvelope"/>'ta açıklanır.

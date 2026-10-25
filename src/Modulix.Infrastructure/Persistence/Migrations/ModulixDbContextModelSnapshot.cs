@@ -630,6 +630,74 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("EmailMessages", "platform");
                 });
 
+            modelBuilder.Entity("Modulix.Infrastructure.Events.EventDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("EntityKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid?>("LeaseToken")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("Ordered")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("RecordId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long?>("Sequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Subscription")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId");
+
+                    b.HasIndex("Status", "CompletedAt");
+
+                    b.HasIndex("Status", "NextAttemptAt");
+
+                    b.HasIndex("TenantId", "Subscription", "EventId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Subscription", "EntityKey", "RecordId", "Sequence");
+
+                    b.ToTable("EventDeliveries", "platform");
+                });
+
             modelBuilder.Entity("Modulix.Infrastructure.Identity.ModulixUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -769,6 +837,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Source")
                         .HasColumnType("int");
+
+                    b.Property<string>("Subscription")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
@@ -1197,6 +1269,15 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId", "TeamId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Infrastructure.Events.EventDelivery", b =>
+                {
+                    b.HasOne("Modulix.Infrastructure.Records.OutboxMessage", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

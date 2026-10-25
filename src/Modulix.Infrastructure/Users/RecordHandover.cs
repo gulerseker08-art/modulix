@@ -1,9 +1,14 @@
 using System.Text.Json.Nodes;
+using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
+using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.Infrastructure.Users;
 
@@ -12,9 +17,17 @@ namespace Modulix.Infrastructure.Users;
 /// (<see cref="IModule.OwnedRecords"/>), devir kayıt boru hattıyla, sorumlu alanını güncelleyerek yapılır. Böylece her
 /// kayıt için yetki, doğrulama (yeni sorumlu etkin üye mi), denetim kaydı ve olay normal düzenlemedeki gibi uygulanır.
 /// Yalnızca tenant için açık modüllere bakılır. Çağıran işlemi açar; bir kayıt başarısız olursa hata fırlatılır ve
-/// işlem geri alınmalıdır.
+/// işlem geri alınmalıdır. Olaylara devir nedeni yazılır (<see cref="EventReasons.Transfer"/>): atama e-postası kayıt
+/// başına gitmez, yeni sorumluya devirle aynı işlemde tek özet e-postası gider (ADR-0007).
 /// </summary>
-internal sealed class RecordHandover(ModuleCatalog catalog, ICurrentAccess access, IRecordPipeline pipeline)
+internal sealed class RecordHandover(
+    ModuleCatalog catalog,
+    ICurrentAccess access,
+    IRecordPipeline pipeline,
+    ITenantContextAccessor tenantAccessor,
+    INotificationRecipients recipients,
+    IEmailQueue emails,
+    ModulixDbContext db)
 {
     private const int BatchSize = RecordQuery.MaxPageSize;
 
@@ -36,6 +49,7 @@ internal sealed class RecordHandover(ModuleCatalog catalog, ICurrentAccess acces
     public async Task<int> TransferAsync(Guid fromUserId, Guid toUserId, CancellationToken cancellationToken)
     {
         var moved = 0;
+        var counts = new List<(string Label, int Count)>();
         var values = new JsonObject { [OwnedRecordType.OwnerField] = toUserId.ToString() };
 
         foreach (var type in await EnabledTypesAsync(cancellationToken))
@@ -43,6 +57,7 @@ internal sealed class RecordHandover(ModuleCatalog catalog, ICurrentAccess acces
             // Devredilen kayıt filtreden çıkar; ilk sayfa boşalana kadar okunur. Aynı kayıt tekrar gelirse (güncelleme
             // sorumluyu değiştirmediyse) döngü durdurulur.
             var seen = new HashSet<Guid>();
+            var movedOfType = 0;
             while (true)
             {
                 var page = await pipeline.QueryAsync(Query(type, fromUserId, BatchSize), cancellationToken);
@@ -64,18 +79,48 @@ internal sealed class RecordHandover(ModuleCatalog catalog, ICurrentAccess acces
                     }
 
                     var updated = await pipeline.UpdateAsync(
-                        new RecordCommand(type.EntityKey, record.Id, values.DeepClone().AsObject()), cancellationToken);
+                        new RecordCommand(type.EntityKey, record.Id, values.DeepClone().AsObject()) { Reason = EventReasons.Transfer },
+                        cancellationToken);
                     if (!updated.IsSuccess)
                     {
                         throw Failure(type, updated.Error!);
                     }
 
-                    moved++;
+                    movedOfType++;
                 }
+            }
+
+            if (movedOfType > 0)
+            {
+                counts.Add((type.Label, movedOfType));
+                moved += movedOfType;
             }
         }
 
+        await NotifyReceiverAsync(fromUserId, toUserId, counts, cancellationToken);
         return moved;
+    }
+
+    // Devri yapan kendine devrettiyse e-posta yok; alıcı etkin üye değilse yazılmaz.
+    private async Task NotifyReceiverAsync(Guid fromUserId, Guid toUserId, IReadOnlyList<(string Label, int Count)> counts, CancellationToken cancellationToken)
+    {
+        var actorId = tenantAccessor.Current?.UserId;
+        if (counts.Count == 0 || toUserId == actorId || await recipients.FindAsync(toUserId, cancellationToken) is not { } recipient)
+        {
+            return;
+        }
+
+        var names = await db.Users.AsNoTracking()
+            .Where(u => u.Id == fromUserId || u.Id == actorId)
+            .ToDictionaryAsync(u => u.Id, u => u.DisplayName, cancellationToken);
+        emails.Enqueue(UserEmails.RecordsTransferred(
+            recipient.Email,
+            recipient.DisplayName,
+            actorId is { } actor && names.TryGetValue(actor, out var actorName) ? actorName : "Firma yöneticisi",
+            names.GetValueOrDefault(fromUserId) ?? "Bir kullanıcı",
+            string.Join(", ", counts.Select(c => $"{c.Count} {c.Label}")),
+            recipients.Link(string.Empty)));
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<IReadOnlyList<OwnedRecordType>> EnabledTypesAsync(CancellationToken cancellationToken)

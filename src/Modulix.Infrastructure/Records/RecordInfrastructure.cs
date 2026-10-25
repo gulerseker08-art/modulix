@@ -36,6 +36,7 @@ public sealed class AuditLogEntry : ITenantEntity
         Changes = entry.Changes.ToJsonString();
         Source = entry.Source;
         CorrelationId = entry.CorrelationId;
+        Subscription = entry.Subscription;
         OccurredAt = DateTimeOffset.UtcNow;
     }
 
@@ -57,6 +58,9 @@ public sealed class AuditLogEntry : ITenantEntity
     public ExecutionSource Source { get; private set; }
 
     public string? CorrelationId { get; private set; }
+
+    /// <summary>Değişikliği yapan olay aboneliği (ADR-0007); kişi boştur (sistem), kaynak arka plan işidir.</summary>
+    public string? Subscription { get; private set; }
 
     public DateTimeOffset OccurredAt { get; private set; }
 }
@@ -136,6 +140,12 @@ public sealed class OutboxMessage
 
     /// <summary>Dağıtımla ilgili not (ör. derinlik sınırı aşıldı, dağıtılmadı). Payload veya alan değeri içermez.</summary>
     public string? LastError { get; private set; }
+
+    public void MarkDispatched(DateTimeOffset now, string? note = null)
+    {
+        DispatchedAt = now;
+        LastError = note;
+    }
 }
 
 internal sealed class AuditLogEntryConfiguration : IEntityTypeConfiguration<AuditLogEntry>
@@ -148,6 +158,7 @@ internal sealed class AuditLogEntryConfiguration : IEntityTypeConfiguration<Audi
         builder.Property(a => a.EntityKey).HasMaxLength(AuditLogEntry.EntityKeyMaxLength).IsRequired();
         builder.Property(a => a.Changes).IsRequired();
         builder.Property(a => a.CorrelationId).HasMaxLength(AuditLogEntry.CorrelationIdMaxLength);
+        builder.Property(a => a.Subscription).HasMaxLength(ModuleCatalog.SubscriptionKeyMaxLength);
         builder.HasIndex(a => new { a.TenantId, a.EntityKey, a.RecordId, a.OccurredAt });
 
         // Denetim kaydı ekranı (Y5): en yeni üstte, kullanıcıya göre filtre.

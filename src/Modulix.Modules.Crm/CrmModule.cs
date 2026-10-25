@@ -88,9 +88,9 @@ public sealed class CrmModule : IModule
     /// <summary>Devre dışı bırakılan kişinin firmaları, açık fırsatları ve açık aktiviteleri devredilir.</summary>
     IReadOnlyList<OwnedRecordType> IModule.OwnedRecords { get; } =
     [
-        new(Entities.Company, "firma"),
-        new(Entities.Opportunity, "açık fırsat", new Dictionary<string, string> { ["open"] = "true" }),
-        new(Entities.Activity, "açık aktivite", new Dictionary<string, string> { ["open"] = "true" }),
+        new(Entities.Company, "firma") { Path = "crm/firmalar/{id}" },
+        new(Entities.Opportunity, "açık fırsat", new Dictionary<string, string> { ["open"] = "true" }) { Path = "crm/firsatlar" },
+        new(Entities.Activity, "açık aktivite", new Dictionary<string, string> { ["open"] = "true" }) { Path = "crm/aktiviteler" },
     ];
 
     IReadOnlyList<RoleTemplate> IModule.RoleTemplates { get; } =

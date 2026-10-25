@@ -14,7 +14,16 @@ public static class DomainEventTypes
     public const string RecordUpdated = "RecordUpdated";
     public const string RecordDeleted = "RecordDeleted";
 
-    public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal) { RecordCreated, RecordUpdated, RecordDeleted };
+    /// <summary>
+    /// Üretilen olay türleri ve şu anki sürümleri. Sürüm, bir alanın anlamı veya biçimi değişince artar (alan eklemek
+    /// artırmaz); katalog, bu sürümü okuyamayan aboneliği açılışta reddeder.
+    /// </summary>
+    public static IReadOnlyDictionary<string, int> SchemaVersions { get; } = new Dictionary<string, int>(StringComparer.Ordinal)
+    {
+        [RecordCreated] = 1,
+        [RecordUpdated] = 1,
+        [RecordDeleted] = 1,
+    };
 }
 
 /// <summary>Olayın nedeni (<see cref="EventEnvelope.Reason"/>); abonelikler buna göre davranabilir.</summary>

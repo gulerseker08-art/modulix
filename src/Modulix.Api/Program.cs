@@ -6,6 +6,7 @@ using Modulix.Api.Crm;
 using Modulix.Api.Customization;
 using Modulix.Api.Development;
 using Modulix.Api.Email;
+using Modulix.Api.Events;
 using Modulix.Api.Platform;
 using Modulix.Api.Records;
 using Modulix.Api.Settings;
@@ -15,6 +16,7 @@ using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Customization;
 using Modulix.Core.Modules;
 using Modulix.Infrastructure.Email;
+using Modulix.Infrastructure.Events;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Records;
 using Modulix.Infrastructure.Users;
@@ -52,13 +54,20 @@ builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailO
 builder.Services.AddModulixEmail();
 builder.Services.AddHostedService<EmailDispatchWorker>();
 
+// Olaylar (ADR-0007): outbox'taki olaylar abonelere dağıtılır ve teslim edilir. Ayarlar "Events" bölümünde.
+builder.Services.Configure<EventOptions>(builder.Configuration.GetSection(EventOptions.SectionName));
+builder.Services.AddModulixEvents();
+builder.Services.AddHostedService<EventDispatchWorker>();
+
 // Kullanıcı yönetimi: davet sınırı "Users" bölümünde; e-postadaki bağlantıların kökü App:PublicUrl (üretimde zorunlu).
 builder.Services.Configure<UserAdministrationOptions>(builder.Configuration.GetSection(UserAdministrationOptions.SectionName));
+builder.Services.Configure<PublicLinkOptions>(builder.Configuration.GetSection(PublicLinkOptions.SectionName));
 
 // Hesap güvenliği (Y7a): "Şifremi unuttum" sınırları "Account" bölümünde.
 builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection(AccountOptions.SectionName));
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<ModulixDbContext>("database");
+    .AddDbContextCheck<ModulixDbContext>("database")
+    .AddCheck<EventHealthCheck>("events");
 
 var app = builder.Build();
 
@@ -122,6 +131,7 @@ app.MapSectorProfileEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapPlatformEndpoints();
+app.MapPlatformEventEndpoints();
 app.MapAuditEndpoints();
 app.MapSettingsEndpoints();
 

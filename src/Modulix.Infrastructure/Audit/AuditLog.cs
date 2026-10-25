@@ -283,7 +283,8 @@ internal sealed class AuditLog(
                 entry.Source,
                 !visible,
                 fields,
-                entry.CorrelationId);
+                entry.CorrelationId,
+                entry.Subscription);
         }).ToList();
     }
 

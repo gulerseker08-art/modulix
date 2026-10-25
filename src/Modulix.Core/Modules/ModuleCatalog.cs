@@ -1,4 +1,6 @@
+using System.Text.RegularExpressions;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Settings;
@@ -9,8 +11,11 @@ namespace Modulix.Core.Modules;
 /// Uygulamada kayıtlı modüller ve izinleri. Açılışta bir kez oluşturulur; anahtar biçimi,
 /// tekrar eden modül veya izin, modül anahtarıyla başlamayan izin varsa uygulama açılmaz.
 /// </summary>
-public sealed class ModuleCatalog
+public sealed partial class ModuleCatalog
 {
+    /// <summary>Abonelik anahtarının en fazla uzunluğu (teslim satırında saklanır).</summary>
+    public const int SubscriptionKeyMaxLength = 100;
+
     private readonly Dictionary<string, IModule> modules;
     private readonly Dictionary<string, PermissionDefinition> permissions;
     private readonly Dictionary<string, AuditedEntity> auditedEntities = new(StringComparer.Ordinal);
@@ -19,6 +24,7 @@ public sealed class ModuleCatalog
     private readonly Dictionary<string, (string ModuleKey, CustomizableEntity Entity)> customizable = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, ChoiceListDefinition List)> choiceLists = new(StringComparer.Ordinal);
     private readonly List<SharedRecordAccess> sharedAccess = [];
+    private readonly Dictionary<string, (string ModuleKey, EventSubscription Subscription)> subscriptions = new(StringComparer.Ordinal);
 
     public ModuleCatalog(IEnumerable<IModule> modules)
     {
@@ -121,6 +127,15 @@ public sealed class ModuleCatalog
                 }
             }
 
+            foreach (var subscription in module.EventSubscriptions)
+            {
+                ValidateSubscription(module, subscription);
+                if (!subscriptions.TryAdd(subscription.Key, (module.Key, subscription)))
+                {
+                    throw new InvalidOperationException($"Olay aboneliği iki kez tanımlı: '{subscription.Key}'.");
+                }
+            }
+
             foreach (var setting in module.Settings)
             {
                 ValidateSetting(module.Key, setting);
@@ -146,6 +161,32 @@ public sealed class ModuleCatalog
         if (!this.modules.ContainsKey(CoreModule.ModuleKey))
         {
             throw new InvalidOperationException($"Katalogda '{CoreModule.ModuleKey}' modülü yok.");
+        }
+
+        // Atama e-postası modüllerin sorumlu atanan kayıt türlerine gider (ADR-0007); yeni modül ek iş yapmadan katılır.
+        // Sorumlu atanan tür yoksa abonelik de yoktur (boş liste "bütün türler" demektir).
+        if (subscriptions.TryGetValue(CoreModule.Subscriptions.AssignmentEmail, out var assignment))
+        {
+            var owned = this.modules.Values.SelectMany(m => m.OwnedRecords).Select(t => t.EntityKey).Distinct().Order(StringComparer.Ordinal).ToList();
+            if (owned.Count == 0)
+            {
+                subscriptions.Remove(assignment.Subscription.Key);
+            }
+            else
+            {
+                subscriptions[assignment.Subscription.Key] = (assignment.ModuleKey, assignment.Subscription with { EntityKeys = owned });
+            }
+        }
+
+        // Abonelikler başka modüllerin kayıt türlerine bağlanabilir; türler bütün modüller okunduktan sonra denetlenir.
+        foreach (var (moduleKey, subscription) in subscriptions.Values)
+        {
+            var unknown = subscription.EntityKeys.Where(k => !auditedEntities.ContainsKey(k)).ToList();
+            if (unknown.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"'{subscription.Key}' aboneliğinde bilinmeyen kayıt türü: {string.Join(", ", unknown)} ({moduleKey}).");
+            }
         }
 
         Modules = [.. this.modules.Values.OrderBy(m => m.Key, StringComparer.Ordinal)];
@@ -218,6 +259,18 @@ public sealed class ModuleCatalog
     /// <summary>Ortak kayıt türüne başvuran alanlar (ADR-0006), modül sırasıyla.</summary>
     public IEnumerable<SharedRecordReference> SharedReferencesTo(string entityKey) =>
         Modules.SelectMany(m => m.SharedRecordReferences).Where(r => r.SharedEntityKey == entityKey);
+
+    /// <summary>Olay aboneliği ve modülü (ADR-0007); tanımlı değilse null.</summary>
+    public (string ModuleKey, EventSubscription Subscription)? FindSubscription(string key) =>
+        subscriptions.TryGetValue(key, out var subscription) ? subscription : null;
+
+    /// <summary>Olayın gideceği abonelikler (tür ve kayıt türü eşleşen), anahtar sırasıyla.</summary>
+    public IEnumerable<(string ModuleKey, EventSubscription Subscription)> SubscriptionsFor(string eventType, string entityKey) =>
+        subscriptions.Values.Where(s => s.Subscription.Matches(eventType, entityKey)).OrderBy(s => s.Subscription.Key, StringComparer.Ordinal);
+
+    /// <summary>Tüm olay abonelikleri, modül ve tanım sırasıyla.</summary>
+    public IEnumerable<(string ModuleKey, EventSubscription Subscription)> EventSubscriptions =>
+        Modules.SelectMany(m => m.EventSubscriptions).Where(s => subscriptions.ContainsKey(s.Key)).Select(s => subscriptions[s.Key]);
 
     /// <summary>Kayıt türünün listeye bağlı alanlarının listeleri.</summary>
     public IEnumerable<ChoiceListDefinition> ChoiceListsOf(string entityKey) =>
@@ -295,6 +348,51 @@ public sealed class ModuleCatalog
     /// <summary>Modül katalogda var ve tenant için açık mı?</summary>
     public bool IsEnabled(string moduleKey, IReadOnlySet<string> enabledModules) =>
         ContainsModule(moduleKey) && (IsAlwaysEnabled(moduleKey) || enabledModules.Contains(moduleKey));
+
+    // Anahtar modülle başlar; olay türleri bilinir ve abone en güncel sürümü okuyabilir; izinler modülün kendi izinleridir;
+    // abone sınıfı IEventSubscriber uygular. Kayıt türleri kurucunun sonunda, bütün modüller okununca denetlenir.
+    private static void ValidateSubscription(IModule module, EventSubscription subscription)
+    {
+        var key = subscription.Key;
+        if (!key.StartsWith(module.Key + ".", StringComparison.Ordinal) || key.Length > SubscriptionKeyMaxLength || !SubscriptionKeyPattern().IsMatch(key))
+        {
+            throw new InvalidOperationException(
+                $"Geçersiz olay aboneliği anahtarı: '{key}' ({module.Key}). Biçim: '{module.Key}.ad' (küçük harf, rakam, tire).");
+        }
+
+        if (subscription.EventTypes.Count == 0)
+        {
+            throw new InvalidOperationException($"'{key}' aboneliğinde olay türü yok.");
+        }
+
+        foreach (var eventType in subscription.EventTypes)
+        {
+            if (!DomainEventTypes.SchemaVersions.TryGetValue(eventType, out var version))
+            {
+                throw new InvalidOperationException($"'{key}' aboneliğinde bilinmeyen olay türü: '{eventType}'.");
+            }
+
+            if (subscription.MaxSchemaVersion < version)
+            {
+                throw new InvalidOperationException(
+                    $"'{key}' aboneliği '{eventType}' olayının {version}. sürümünü okuyamıyor (en fazla {subscription.MaxSchemaVersion}).");
+            }
+        }
+
+        var foreign = subscription.Permissions.Where(p => module.Permissions.All(d => d.Key != p)).ToList();
+        if (foreign.Count > 0)
+        {
+            throw new InvalidOperationException($"'{key}' aboneliğinde modülün tanımlamadığı izin var: {string.Join(", ", foreign)}.");
+        }
+
+        if (!typeof(IEventSubscriber).IsAssignableFrom(subscription.Subscriber) || subscription.Subscriber.IsAbstract)
+        {
+            throw new InvalidOperationException($"'{key}' aboneliğinin abonesi {subscription.Subscriber.Name} IEventSubscriber uygulamıyor.");
+        }
+    }
+
+    [GeneratedRegex("^[a-z][a-z0-9]*(\\.[a-z0-9]+(-[a-z0-9]+)*)+$")]
+    private static partial Regex SubscriptionKeyPattern();
 
     // Ayar anahtarı modülle başlar ve kayıtlı anahtar biçimindedir; varsayılan değer tanıma uyar.
     private static void ValidateSetting(string moduleKey, SettingDefinition setting)

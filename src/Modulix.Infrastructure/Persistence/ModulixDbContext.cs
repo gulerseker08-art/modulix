@@ -11,6 +11,7 @@ using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Email;
+using Modulix.Infrastructure.Events;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Records;
 
@@ -62,6 +63,8 @@ public class ModulixDbContext(
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public DbSet<EventDelivery> EventDeliveries => Set<EventDelivery>();
 
     public DbSet<QueuedEmail> EmailMessages => Set<QueuedEmail>();
 

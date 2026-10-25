@@ -5,6 +5,7 @@ using Modulix.Core.Audit;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
@@ -81,6 +82,7 @@ public static class PersistenceSetup
         services.AddScoped<TwoFactorAccounts>();
         services.AddMemoryCache();
         services.AddScoped<RecordHandover>();
+        services.AddScoped<INotificationRecipients, NotificationRecipients>();
 
         // Platform yönetimi (Y4); ITenantScopeFactory'yi host kaydeder (tenant bağlamını o kurar).
         services.AddScoped<IPlatformAdministration, PlatformAdministration>();

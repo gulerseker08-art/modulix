@@ -39,7 +39,8 @@ public sealed record AuditFieldChangeDto(string Field, string Label, string? Old
 
 /// <summary>
 /// Denetim kaydının bir satırı. <see cref="ValuesHidden"/>: okurun bu kayıt türünü görüntüleme izni yok; değişen
-/// alanların adları görünür, değerleri ve kaydın adı gizlidir.
+/// alanların adları görünür, değerleri ve kaydın adı gizlidir. <see cref="Subscription"/>: değişikliği yapan olay
+/// aboneliği (kaynak arka plan işi).
 /// </summary>
 public sealed record AuditEntryDto(
     Guid Id,
@@ -53,7 +54,8 @@ public sealed record AuditEntryDto(
     AuditOperation Action,
     AuditSource Source,
     bool ValuesHidden,
-    IReadOnlyList<AuditFieldChangeDto> Changes);
+    IReadOnlyList<AuditFieldChangeDto> Changes,
+    string? Subscription = null);
 
 public sealed record AuditPageResponse(IReadOnlyList<AuditEntryDto> Items, int Page, int PageSize, int TotalCount);
 
@@ -99,4 +101,8 @@ public static class AuditText
         AuditSource.AiTool => "AI",
         _ => source.ToString(),
     };
+
+    /// <summary>Kaynak ve varsa değişikliği yapan abonelik (ör. "Arka plan işi · core.assignment-email").</summary>
+    public static string Of(AuditSource source, string? subscription) =>
+        subscription is null ? Of(source) : $"{Of(source)} · {subscription}";
 }
