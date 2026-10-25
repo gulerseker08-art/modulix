@@ -64,6 +64,9 @@ public sealed record RecordQuery(
     /// </summary>
     public IReadOnlySet<Guid>? Owners { get; init; }
 
+    /// <summary>Ç22: sunucunun belirlediği erişilebilir şirketler; şirket kapsamlı depolar sorguda zorunlu uygular.</summary>
+    public IReadOnlySet<Guid>? AccessibleCompanyIds { get; init; }
+
     /// <summary>
     /// Özel alan filtreleri (Y9a): özel alan anahtarı → değer. Boru hattı doğrular ve <see cref="Filters"/>'tan
     /// ("custom.anahtar" adıyla gelir) buraya taşır; depo özel alan JSON'unda eşitlikle süzer.
@@ -166,6 +169,9 @@ public interface IRecordStore
     /// <see cref="RecordQuery.Owners"/>'ı sorguda uygulamalıdır. Null ise kayıt türü kapsamdan etkilenmez.
     /// </summary>
     string? OwnerField => null;
+
+    /// <summary>Ç22: yalnızca şirket kapsamlı kayıt depoları true döner; CompanyId alanı zorunludur.</summary>
+    bool IsCompanyScoped => false;
 
     /// <summary>
     /// Özel alanları saklar mı (Y9a)? Öyleyse depo <see cref="RecordFields.Custom"/> değerini (boru hattının doğrulayıp
