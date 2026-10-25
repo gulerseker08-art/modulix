@@ -44,3 +44,29 @@ internal sealed class BranchConfiguration : IEntityTypeConfiguration<Branch>
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class MembershipCompanyConfiguration : IEntityTypeConfiguration<MembershipCompany>
+{
+    public void Configure(EntityTypeBuilder<MembershipCompany> builder)
+    {
+        // Üyeliğin şirket görevi (ADR-0008, adım 2): tenant verisidir; Row-Level Security ile korunur (migration: TenantIsolationSql).
+        builder.ToTable("MembershipCompanies", DatabaseSchemas.Core);
+        builder.HasKey(mc => mc.Id);
+        builder.Property(mc => mc.Id).ValueGeneratedNever();
+        builder.Property(mc => mc.TenantId).IsRequired();
+        builder.Property(mc => mc.MembershipId).IsRequired();
+        builder.Property(mc => mc.CompanyId).IsRequired();
+        builder.Property(mc => mc.CreatedAt).IsRequired();
+
+        // Aynı üyeliğe aynı şirket iki kez verilmez; erişilebilir şirket sorgusu bu üyelik üzerinden çalışır.
+        builder.HasIndex(mc => new { mc.MembershipId, mc.CompanyId }).IsUnique();
+        builder.HasIndex(mc => mc.CompanyId);
+
+        // Bileşik yabancı anahtar: görev ile şirket aynı tenant'ta olmak zorundadır. Şirket silinmeden önce görevleri kaldırılır.
+        builder.HasOne<Company>()
+            .WithMany()
+            .HasForeignKey(mc => new { mc.TenantId, mc.CompanyId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}

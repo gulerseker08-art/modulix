@@ -47,6 +47,18 @@ public sealed class SessionState(ApiClient api)
     /// <summary>Yönetici (sistem) rolü var mı? Yönetici rolünü vermek ve yöneticileri yönetmek yalnızca ona açıktır.</summary>
     public bool IsAdministrator => Access?.IsAdministrator == true;
 
+    /// <summary>Erişilebilir işletici şirketler (ADR-0008); yönetici için tenant'ın hepsidir.</summary>
+    public IReadOnlyList<OperatingCompanyDto> Companies => Access?.Companies ?? [];
+
+    /// <summary>Aktif işletici şirket; erişim yoksa <c>null</c> (yalnızca ortak veri).</summary>
+    public Guid? ActiveCompanyId => Access?.ActiveCompanyId;
+
+    /// <summary>Aktif şirketin adı; yoksa <c>null</c>.</summary>
+    public string? ActiveCompanyName => Companies.FirstOrDefault(c => c.Id == ActiveCompanyId)?.Name;
+
+    /// <summary>Şirket seçici yalnızca birden fazla şirkete erişim varsa gösterilir (ADR-0008; tek şirketli tenant'ta görünmez).</summary>
+    public bool HasMultipleCompanies => Companies.Count > 1;
+
     /// <summary>Kayıt kapsamı (Y8); erişim yüklenmediyse en dar kapsam.</summary>
     public RecordScope Scope => Access?.Scope ?? RecordScope.Own;
 
@@ -112,6 +124,19 @@ public sealed class SessionState(ApiClient api)
 
         loading = ReloadAsync();
         await loading;
+        return null;
+    }
+
+    /// <summary>Aktif işletici şirketi değiştirir (ADR-0008); sunucu erişilebilir olduğunu doğrular, sonra oturum yeniden okunur.</summary>
+    public async Task<string?> SelectCompanyAsync(Guid companyId)
+    {
+        var result = await api.PostAsync<bool>("/api/auth/active-company", new SelectCompanyRequest(companyId));
+        if (!result.IsSuccess)
+        {
+            return result.Error;
+        }
+
+        await RefreshAsync();
         return null;
     }
 

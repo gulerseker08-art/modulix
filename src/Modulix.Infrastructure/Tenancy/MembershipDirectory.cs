@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Persistence;
 
@@ -32,4 +33,32 @@ internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time
         db.Memberships
             .Where(m => m.Id == membershipId)
             .ExecuteUpdateAsync(set => set.SetProperty(m => m.LastSignInAt, time.GetUtcNow()), cancellationToken);
+
+    public async Task<CompanyAccess> GetAccessibleCompaniesAsync(Guid membershipId, CancellationToken cancellationToken)
+    {
+        // Yönetici (sistem rolü, ADR-0008 kararı) tenant'ın bütün şirketlerine erişir. Roller tenant verisidir: RLS yalnızca
+        // aktif tenant'ınkileri döndürür.
+        var isAdministrator = await (
+            from assignment in db.MembershipRoles.AsNoTracking()
+            join role in db.Roles.AsNoTracking() on assignment.RoleId equals role.Id
+            where assignment.MembershipId == membershipId && role.IsSystem
+            select assignment.Id)
+            .AnyAsync(cancellationToken);
+
+        // Şirketler RLS altındadır: sorgu yalnızca aktif tenant'ın şirketlerini döndürür. Yönetici hepsini; diğerleri yalnızca
+        // görevlendirildikleri şirketleri görür.
+        IQueryable<Company> companies = isAdministrator
+            ? db.Companies.AsNoTracking()
+            : from company in db.Companies.AsNoTracking()
+              join membershipCompany in db.MembershipCompanies.AsNoTracking() on company.Id equals membershipCompany.CompanyId
+              where membershipCompany.MembershipId == membershipId
+              select company;
+
+        var summaries = await companies
+            .OrderBy(c => c.Name)
+            .Select(c => new CompanySummary(c.Id, c.Name, c.IsDefault))
+            .ToListAsync(cancellationToken);
+
+        return new CompanyAccess(summaries, isAdministrator);
+    }
 }

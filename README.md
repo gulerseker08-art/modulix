@@ -69,10 +69,25 @@ Kimlik doğrulama ASP.NET Core Identity ve şifreli, `HttpOnly`, `Secure`, `Same
 | `POST /api/auth/login` | Giriş. Tek üyelik varsa o tenant otomatik seçilir. 5 hatalı denemede hesap 15 dakika kilitlenir. |
 | `GET /api/auth/me` | Kullanıcı, etkin üyelikleri ve aktif tenant. |
 | `POST /api/auth/active-tenant` | Aktif tenant seçimi. Yalnızca etkin üyeliği olan tenant seçilebilir. |
+| `POST /api/auth/active-company` | Aktif işletici şirket seçimi (ADR-0008). Yalnızca o oturumda erişilebilir şirket seçilebilir. |
 | `GET /api/tenant/current` | Aktif tenant; yoksa 403. |
 | `POST /api/auth/logout` | Çıkış. |
 
 Aktif tenant her istekte veritabanından yeniden doğrulanır: üyelik devre dışı bırakılır veya tenant kapatılırsa erişim bir sonraki istekte kalkar. İstemcinin gönderdiği bir başlık veya parametre tenant belirlemez.
+
+### İşletici şirketler ve aktif şirket (ADR-0008)
+
+Bir tenant birden fazla **işletici şirket** (`core.Companies`) barındırabilir; bunlar sizin belge kesen, hesap tutan tüzel kişilerinizdir (müşteri firma `core.party` değildir). Her tenant'ın en az bir **varsayılan şirketi** vardır. Aktif şirket oturumda sunucu tarafında tutulur (`modulix:company_id` claim'i) ve her istekte erişilebilir şirketlere karşı yeniden doğrulanır; açık bir seçim yoksa veya erişilemezse varsayılan şirkete düşer.
+
+Erişilebilir şirketler: **yönetici** (sistem rolü) tenant'ın bütün şirketlerine erişir; yönetici olmayan kullanıcı yalnızca üyeliğine atanan şirketleri görür (`core.MembershipCompanies`), hiç atama yoksa yalnızca ortak veriyi görür. Erişilebilir şirketler ve aktif şirket `GET /api/tenant/access` ile gelir; arayüzdeki şirket seçici yalnızca birden fazla şirkete erişim varsa görünür.
+
+| Uç nokta | Ne yapar | İzin |
+| --- | --- | --- |
+| `GET /api/companies` | İşletici şirketleri listeler | `core.companies.manage` |
+| `POST /api/companies`, `PUT /api/companies/{id}` | Şirket ekler, yeniden adlandırır (varsayılan şirket silinmez/kapatılmaz) | `core.companies.manage` |
+| `GET`/`PUT /api/memberships/{id}/companies` | Bir üyeliğin şirket görevleri | `core.companies.manage` |
+
+Şirket oluşturma/yeniden adlandırma ve şirket görevi değişikliği denetim kaydına yazılır. Bu sürümde şirket süzgeci yalnızca erişim listesindedir; kayıtların şirkete göre süzülmesi (adım 3) henüz yoktur, bütün tenant tabloları "ortak"tır.
 
 **Örnek kullanıcılar** (yalnızca geliştirme, `scripts\db-up.ps1` oluşturur; şifre `Modulix.Demo1`):
 

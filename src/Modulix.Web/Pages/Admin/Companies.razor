@@ -1,0 +1,162 @@
+@page "/yonetim/sirketler"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Şirketler · Modulix</PageTitle>
+
+@* İşletici şirketler (ADR-0008). Müşteri firma (CRM) değildir: belge kesen, hesap tutan kendi tüzel kişilerinizdir. *@
+<AuthGate Permission="@CoreAccess.ManageCompanies">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Şirketler</h1>
+    </div>
+
+    <p class="text-muted">
+        İşletici şirket, sizin belge kesen, hesap tutan tüzel kişinizdir (müşteri firma değildir). Bir tenant altında birden
+        fazla şirket, aynı kullanıcı, müşteri ve ürünleri paylaşır; ileride fatura ve cari gibi kayıtlar şirkete göre ayrılır.
+        Yöneticiler bütün şirketlere erişir; diğer kullanıcıların erişimini <a href="yonetim/kullanicilar">Kullanıcılar</a>
+        sayfasından verebilirsiniz.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <form class="record-form settings-group" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+        <h2>Yeni şirket</h2>
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="companyName">Şirket adı *</label>
+                <input id="companyName" class="form-control" maxlength="200" placeholder="ör. A Depolama Ltd." @bind="name" @bind:event="oninput" />
+                <FieldError Field="name" Errors="errors" />
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name))">Şirket ekle</button>
+        </div>
+    </form>
+
+    @if (companies is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead>
+                <tr><th>Şirket</th><th>Varsayılan</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var company in companies)
+                {
+                    <tr>
+                        <td data-label="Şirket" class="primary">
+                            @if (editingId == company.Id)
+                            {
+                                <input class="form-control" maxlength="200" @bind="editName" @bind:event="oninput" />
+                                <FieldError Field="name" Errors="errors" />
+                            }
+                            else
+                            {
+                                @company.Name
+                            }
+                        </td>
+                        <td data-label="Varsayılan">@(company.IsDefault ? "Evet" : "—")</td>
+                        <td class="row-actions">
+                            @if (editingId == company.Id)
+                            {
+                                <button type="button" class="btn btn-sm btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(editName))"
+                                        @onclick="() => SaveRenameAsync(company.Id)">Kaydet</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CancelEdit">Vazgeç</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(company)">Yeniden adlandır</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private IReadOnlyList<OperatingCompanyDto>? companies;
+    private string name = string.Empty;
+    private Guid? editingId;
+    private string editName = string.Empty;
+    private string? message;
+    private bool busy;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ManageCompanies))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<OperatingCompanyDto>>("/api/companies");
+        companies = result.Value;
+        message = result.Error;
+    }
+
+    private async Task CreateAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<OperatingCompanyDto>("/api/companies", new SaveOperatingCompanyRequest(name));
+        busy = false;
+        errors = result.FieldErrors;
+        if (result.IsSuccess)
+        {
+            name = string.Empty;
+            errors = null;
+            await LoadAsync();
+            await Session.RefreshAsync();
+            return;
+        }
+
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+    }
+
+    private void StartEdit(OperatingCompanyDto company)
+    {
+        editingId = company.Id;
+        editName = company.Name;
+        errors = null;
+    }
+
+    private void CancelEdit()
+    {
+        editingId = null;
+        errors = null;
+    }
+
+    private async Task SaveRenameAsync(Guid companyId)
+    {
+        busy = true;
+        var result = await Api.PutAsync<OperatingCompanyDto>($"/api/companies/{companyId}", new SaveOperatingCompanyRequest(editName));
+        busy = false;
+        errors = result.FieldErrors;
+        if (result.IsSuccess)
+        {
+            editingId = null;
+            errors = null;
+            await LoadAsync();
+            await Session.RefreshAsync();
+            return;
+        }
+
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+    }
+}

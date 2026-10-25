@@ -61,6 +61,8 @@ public class ModulixDbContext(
 
     public DbSet<Branch> Branches => Set<Branch>();
 
+    public DbSet<MembershipCompany> MembershipCompanies => Set<MembershipCompany>();
+
     public DbSet<CustomField> CustomFields => Set<CustomField>();
 
     public DbSet<TenantChoiceList> ChoiceLists => Set<TenantChoiceList>();

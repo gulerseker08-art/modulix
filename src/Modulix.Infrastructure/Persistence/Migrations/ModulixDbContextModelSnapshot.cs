@@ -443,6 +443,35 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Companies", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Organization.MembershipCompany", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("MembershipId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("MembershipId", "CompanyId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "CompanyId");
+
+                    b.ToTable("MembershipCompanies", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Platform.Membership", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1300,6 +1329,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Modulix.Core.Organization.Branch", b =>
+                {
+                    b.HasOne("Modulix.Core.Organization.Company", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CompanyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Organization.MembershipCompany", b =>
                 {
                     b.HasOne("Modulix.Core.Organization.Company", null)
                         .WithMany()

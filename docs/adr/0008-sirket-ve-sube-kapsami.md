@@ -1,6 +1,6 @@
 # ADR-0008: Tenant içi şirket ve şube kapsamı
 
-- **Durum:** Kabul edildi, 25 Ekim 2026 (geçiş adım 1 uygulandı)
+- **Durum:** Kabul edildi, 25 Ekim 2026 (geçiş adım 1-2 uygulandı)
 - **Karar:** Tenant, bir veya daha fazla işletici şirket (`core.company`) barındırır. Her tenant tablosu bilinçli olarak "ortak" ya da "şirket kapsamlı" sınıflandırılır; şirket kapsamlı kayıt `CompanyId` taşır ve şirket sınırı, tenant sınırı gibi sunucuda, oturumdan belirlenir
 - **Yol haritası:** Ç22 (minimum D1, tam D2); envanter bulgusu B4
 
@@ -102,4 +102,6 @@ Karşılıklı belge, borç/alacak ve mutabakat ileriki pakettir (Ç22.4). Farkl
 ## Uygulama durumu
 
 - Adım 1 yapıldı: `core.Companies` ve `core.Branches` (RLS'li), `ICompanyShared` / `ICompanyScoped`, mevcut bütün tenant tablolarının "ortak" işaretlenmesi, mevcut tenantlara tenant adıyla varsayılan şirket (migration `SirketVeSube`), yeni tenant açılışında varsayılan şirket, `TableInventoryTests` içinde "her tablo tam bir kapsam sınıfında" kapısı.
-- Kalan: adım 2 (üyelik–şirket bağı, oturumda aktif şirket), adım 3 (boru hattında kapsam adımı, olay zarfında `CompanyId`).
+- Adım 2 yapıldı: `core.MembershipCompanies` (RLS'li, `ICompanyShared`) üyelik–şirket bağı ve mevcut etkin üyeliklere varsayılan şirketi veren geri dolum (migration `UyelikSirketBagi`). Aktif şirket oturumda `modulix:company_id` claim'inde tutulur; `CompanyContextMiddleware` her istekte erişilebilir şirketlere karşı doğrular, erişilemeyen veya eksik seçim varsayılan şirkete düşer. Kabulde verilen karar: yönetici (sistem rolü) bütün şirketlere erişir; yönetici olmayan yalnızca görevlendirildiği şirketleri görür. Aktif şirket `/api/auth/active-company` ile seçilir (başlıkla taşınmaz). Şirket yönetimi `core.companies.manage` izniyle `/api/companies` ve `/api/memberships/{id}/companies` uçlarında; şirket oluşturma/yeniden adlandırma ve şirket görevi değişikliği denetim kaydına yazılır (`core.company`, `core.membership`). Arayüzde şirket seçici (yalnızca >1 şirket) ve "Şirketler" yönetim ekranı.
+- Adım 2'de ertelendi: "aktif şirket reddi" denetim kaydı yazılmadı (erişilemeyen şirket seçimi yalnızca 403 döner); `AuditAction` için uygun bir eylem değeri yok, ilgili eylem geldiğinde eklenecek. Şirket kapatma, silme politikasıyla (envanter B3) birlikte karara bağlı olduğundan adım 2 kapsamı dışında (şirket oluştur/adlandır/görev ver-al var).
+- Kalan: adım 3 (kayıt boru hattında kapsam süzgeci, olay zarfında `CompanyId`), adım 4-5 (CRM tablolarının "ortak" teyidi zaten var; şube/vekâlet/şirket başına ayarlar).

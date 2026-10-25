@@ -26,6 +26,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Özelleştirme (Y9): özel alanlar, listeler ve sektör profili.</summary>
         public const string ManageCustomization = "core.customization.manage";
+
+        /// <summary>İşletici şirketleri ve kullanıcıların şirket görevlerini yönetir (ADR-0008).</summary>
+        public const string ManageCompanies = "core.companies.manage";
     }
 
     public string Key => ModuleKey;
@@ -39,6 +42,7 @@ public sealed class CoreModule : IModule
         new(Permissions.ManageSettings, "Firma ayarlarını değiştirir", "Firma ayarları"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
+        new(Permissions.ManageCompanies, "İşletici şirketleri ve kullanıcıların şirket görevlerini yönetir", "Şirketler"),
     ];
 
     /// <summary>Çekirdeğin olay abonelikleri (ADR-0007).</summary>
@@ -65,6 +69,9 @@ public sealed class CoreModule : IModule
         /// <summary>Seçim listesi (Y9b); kaydın kimliği firmanın liste satırının kimliğidir.</summary>
         public const string ChoiceList = "core.choice-list";
         public const string Membership = "core.membership";
+
+        /// <summary>İşletici şirket (ADR-0008): ad ve varsayılan olup olmadığı; kaydın kimliği şirketin kimliğidir.</summary>
+        public const string Company = "core.company";
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
         public const string Audit = "core.audit";
@@ -185,9 +192,14 @@ public sealed class CoreModule : IModule
         {
             ["list"] = "Liste", ["values"] = "Değerler",
         }, "list"),
+        new(AuditedEntityKeys.Company, "Şirket", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["isDefault"] = "Varsayılan",
+        }, "name"),
         new(AuditedEntityKeys.Membership, "Kullanıcı", null, new Dictionary<string, string>
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["status"] = "Durum", ["roles"] = "Roller",
+            ["companies"] = "Şirketler",
             ["invitedAt"] = "Davet", ["lockedOut"] = "Kilit", ["passwordResetRequestedAt"] = "Şifre sıfırlama bağlantısı",
             ["sessionsClosedAt"] = "Oturumları kapatıldı",
         }, "displayName")

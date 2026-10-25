@@ -6,6 +6,9 @@ public sealed record LoginRequest(string Email, string Password);
 
 public sealed record SelectTenantRequest(Guid TenantId);
 
+/// <summary>Aktif işletici şirketi değiştirir (ADR-0008, adım 2); şirket oturumda sunucuda tutulur, başlıkla taşınmaz.</summary>
+public sealed record SelectCompanyRequest(Guid CompanyId);
+
 /// <summary><see cref="DisplayName"/>: firmanın ayarladığı görünen ad (Y6b); yoksa <see cref="TenantName"/> gösterilir.</summary>
 public sealed record MembershipDto(Guid TenantId, string TenantName, string TenantSlug, string? DisplayName = null)
 {

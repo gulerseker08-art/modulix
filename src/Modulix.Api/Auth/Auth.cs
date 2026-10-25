@@ -79,7 +79,7 @@ public static class AuthSetup
                     return Task.CompletedTask;
                 }
 
-                foreach (var type in new[] { ModulixClaimTypes.TenantId, ModulixClaimTypes.SessionId })
+                foreach (var type in new[] { ModulixClaimTypes.TenantId, ModulixClaimTypes.SessionId, ModulixClaimTypes.CompanyId })
                 {
                     if (context.CurrentPrincipal?.FindFirst(type) is { } claim)
                     {
@@ -125,6 +125,7 @@ public static class AuthEndpoints
         group.MapPost("/logout", LogoutAsync).RequireAuthorization();
         group.MapGet("/me", MeAsync).RequireAuthorization();
         group.MapPost("/active-tenant", SelectTenantAsync).RequireAuthorization();
+        group.MapPost("/active-company", SelectCompanyAsync).RequireAuthorization().AddEndpointFilter<RequireTenantFilter>();
 
         // E-postadaki bağlantılar (Y2): oturum gerektirmez; token doğrulanır.
         group.MapGet("/invitation", GetInvitationAsync).AllowAnonymous();
@@ -324,6 +325,35 @@ public static class AuthEndpoints
         return Results.Ok(await ToResponseAsync(user, membership.TenantId, memberships, names, ct));
     }
 
+    /// <summary>
+    /// Aktif işletici şirketi değiştirir (ADR-0008, adım 2). İstemciye güvenmez: şirketin bu oturumda erişilebilir
+    /// olduğu sunucuda doğrulanır (aktif şirket bağlamı her istekte yeniden hesaplanır). Seçim oturum çerezine yazılır.
+    /// </summary>
+    private static async Task<IResult> SelectCompanyAsync(
+        SelectCompanyRequest request,
+        ClaimsPrincipal principal,
+        HttpContext http,
+        UserManager<ModulixUser> users,
+        SignInManager<ModulixUser> signIn,
+        HttpTenantContextAccessor tenant,
+        ICompanyContextAccessor company,
+        CancellationToken ct)
+    {
+        var user = await users.GetUserAsync(principal);
+        if (user is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        if (company.Current is not { } companyContext || !companyContext.CanAccess(request.CompanyId))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Bu şirkete erişiminiz yok.");
+        }
+
+        await IssueSessionAsync(http, signIn, user, tenant.Current!.TenantId, SessionId(principal)!.Value, request.CompanyId);
+        return Results.NoContent();
+    }
+
     private static async Task<IResult> GetInvitationAsync(Guid uyelik, string? token, AccountLinks links, CancellationToken ct) =>
         await links.FindInvitationAsync(uyelik, token, ct) is { } invitation
             ? Results.Ok(new InvitationInfoResponse(invitation.TenantName, invitation.Email, invitation.DisplayName))
@@ -401,7 +431,7 @@ public static class AuthEndpoints
 
     /// <summary>Oturum çerezini yazar; şifre değişince (güvenlik damgası yenilenir) aynı oturumla yeniden yazılır.</summary>
     internal static async Task IssueSessionAsync(
-        HttpContext http, SignInManager<ModulixUser> signIn, ModulixUser user, Guid? tenantId, Guid sessionId)
+        HttpContext http, SignInManager<ModulixUser> signIn, ModulixUser user, Guid? tenantId, Guid sessionId, Guid? companyId = null)
     {
         var principal = await signIn.CreateUserPrincipalAsync(user);
         var identity = (ClaimsIdentity)principal.Identity!;
@@ -409,6 +439,12 @@ public static class AuthEndpoints
         if (tenantId is { } id)
         {
             identity.AddClaim(new Claim(ModulixClaimTypes.TenantId, id.ToString()));
+        }
+
+        // Aktif şirket yalnızca açık seçimle (ADR-0008 "ayrı bir uç") yazılır; yoksa varsayılan her istekte hesaplanır.
+        if (companyId is { } company)
+        {
+            identity.AddClaim(new Claim(ModulixClaimTypes.CompanyId, company.ToString()));
         }
 
         await http.SignInAsync(IdentityConstants.ApplicationScheme, principal, new AuthenticationProperties { IsPersistent = false });

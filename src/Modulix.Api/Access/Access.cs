@@ -120,7 +120,13 @@ public static class AccessEndpoints
     }
 
     private static async Task<IResult> GetMyAccessAsync(
-        ModuleCatalog catalog, ICurrentAccess access, IRoleService roles, ITenantContextAccessor tenant, CancellationToken ct)
+        ModuleCatalog catalog,
+        ICurrentAccess access,
+        IRoleService roles,
+        ITenantContextAccessor tenant,
+        IMembershipDirectory directory,
+        ICompanyContextAccessor company,
+        CancellationToken ct)
     {
         var enabled = new List<string>();
         foreach (var module in catalog.Modules)
@@ -133,7 +139,18 @@ public static class AccessEndpoints
 
         var permissions = (await access.GetPermissionsAsync(ct)).Order(StringComparer.Ordinal).ToList();
         var myRoles = await roles.GetMembershipRolesAsync(tenant.Current!.MembershipId, ct) ?? [];
-        return Results.Ok(new MyAccessResponse(enabled, permissions, myRoles.Any(r => r.IsSystem), (Shared.Access.RecordScope)await access.GetScopeAsync(ct)));
+
+        // Erişilebilir işletici şirketler ve aktif olanı (ADR-0008): şirket seçici ve kapsam göstergesi bunu kullanır.
+        var companyAccess = await directory.GetAccessibleCompaniesAsync(tenant.Current!.MembershipId, ct);
+        var companies = companyAccess.Companies.Select(c => new OperatingCompanyDto(c.Id, c.Name, c.IsDefault)).ToList();
+
+        return Results.Ok(new MyAccessResponse(
+            enabled,
+            permissions,
+            myRoles.Any(r => r.IsSystem),
+            (Shared.Access.RecordScope)await access.GetScopeAsync(ct),
+            companies,
+            company.Current?.ActiveCompanyId));
     }
 
     private static async Task<IResult> ListRolesAsync(IRoleService roles, CancellationToken ct) =>
