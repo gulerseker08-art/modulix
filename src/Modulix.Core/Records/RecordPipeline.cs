@@ -18,7 +18,6 @@ namespace Modulix.Core.Records;
 /// </summary>
 public sealed class RecordPipeline(
     ITenantContextAccessor tenantAccessor,
-    ICompanyContextAccessor companyAccessor,
     IRecordStoreRegistry stores,
     IEntitlementService entitlements,
     IPermissionService permissions,
@@ -28,7 +27,8 @@ public sealed class RecordPipeline(
     IAuditWriter audit,
     IDomainEventOutbox outbox,
     IUnitOfWork unitOfWork,
-    EventHandlingScope? handling = null) : IRecordPipeline
+    EventHandlingScope? handling = null,
+    ICompanyContextAccessor? companyAccessor = null) : IRecordPipeline
 {
     public async Task<RecordResult<RecordData>> GetAsync(RecordRef record, CancellationToken cancellationToken)
     {
@@ -63,7 +63,7 @@ public sealed class RecordPipeline(
         {
             // Kapsam sorguda uygulanır; sayfalama ve toplam sayı doğru kalır.
             Owners = store!.OwnerField is null ? null : await dataScope.GetOwnersAsync(tenant!, cancellationToken),
-            AccessibleCompanyIds = store.IsCompanyScoped ? companyAccessor.Current?.AccessibleCompanyIds ?? new HashSet<Guid>() : null,
+            AccessibleCompanyIds = store.IsCompanyScoped ? companyAccessor?.Current?.AccessibleCompanyIds ?? new HashSet<Guid>() : null,
             Page = Math.Max(1, query.Page),
             PageSize = Math.Clamp(query.PageSize, 1, RecordQuery.MaxPageSize),
             Search = string.IsNullOrEmpty(search) ? null : search[..Math.Min(search.Length, RecordQuery.MaxSearchLength)],
@@ -261,7 +261,7 @@ public sealed class RecordPipeline(
     {
         if (store.IsCompanyScoped)
         {
-            if (companyAccessor.Current is not { } company
+            if (companyAccessor?.Current is not { } company
                 || !record.Values.TryGetPropertyValue("companyId", out var companyNode)
                 || companyNode is not JsonValue companyValue
                 || !companyValue.TryGetValue<string>(out var companyText)
@@ -365,7 +365,7 @@ public sealed class RecordPipeline(
         }
 
         // Şirket kapsamlı depoların liste sorguları da şirket süzgecini uygulamak zorundadır.
-        if (store.IsCompanyScoped && companyAccessor.Current is null)
+        if (store.IsCompanyScoped && companyAccessor?.Current is null)
         {
             return (RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, "Şirket bağlamı bulunamadı."), null, null);
         }
