@@ -104,6 +104,7 @@ Bağımlılık: Ç9, Ç20, Ç23.
 5. Çekirdek epikler
 Ç0 — Mimari temel, domain sınırları ve kayıt sözleşmesi [YENİ / D0]
 Amaç: Mevcut geliştirmelerin üzerine güvenilir bir modül geliştirme sözleşmesi koymak. Bağımlılık: Yok; mevcut yapı üzerinden doğrulama yapılır. Çıktı: Domain haritası, modül şablonu, ADR ve mimari testler.
+Durum (25 Ekim 2026): Envanter ve mevcut varlıkların domain haritası [envanter.md](envanter.md)'de. Ç0.2 ve Ç0.3'ün atlama kapıları test edildi; açık bulgular: zorunlu sürüm (Ç0.5, B1), iş komutu (Ç0.4, B2), silme politikası (Ç0.6, B3).
 - Ç0.1 Domain haritası: Her varlık için sahibi, tenant/şirket kapsamı, ana veri/işlem ayrımı ve izin modeli yazılır. Kabul: Teklif, sevkiyat, personel ve fatura için iki farklı yazma sahibi bulunmaz.
 - Ç0.2 Proje sınırları: Domain, uygulama, persistence, kayıt adaptörü ve contracts ayrılır. Modüller diğer modülün tablosuna ulaşamaz; izinli referanslar test edilir. Kabul: Yasak proje referansı CI'ı düşürür.
 - Ç0.3 Kayıt boru hattı: Tenant ve hak → komut/alan yetkisi → domain doğrulaması → eşzamanlılık → transaction → audit/outbox; hook sıraları açık olur. Kabul: Genel /api/records ucu dahil hiçbir yol onay/kesinleştirme kuralını atlayamaz.
@@ -326,6 +327,7 @@ Bağımlılık: Ç0, Y2–Y3. Amaç: Tenantı müşteri firma kartı veya tek t�
 - Ç22.4 Şirketler arası işlem: Karşılıklı belge, borç/alacak ve mutabakat ileriki paket olarak ayrı tasarlanır. Kabul: Farklı şirketlerin hesap hareketi tek defterde karışmaz; otomatik konsolidasyon ilk kapsam sayılmaz.
 Ç23 — Mimari kalite, test ve teslim kapıları [YENİ / D0, sürekli]
 Bağımlılık: Ç0. Ç13 ve Ç14 için kalite kapılarını sağlar. Amaç: “Tamamlandı” beyanını ölçülebilir kanıta dönüştürmek.
+Durum (25 Ekim 2026): Beyanlar kanıtlarıyla [envanter.md](envanter.md)'de. Yeni kapılar: tablo sınıflandırması ve RLS, uç nokta koruma matrisi, modül veri erişimi. Eksik: E2E, restore provası, güvenlik taraması (B7, B8).
 - Ç23.1 Test katmanları: Domain kuralı birim testleri; transaction/RLS için gerçek SQL Server entegrasyon; sözleşme ve kritik uçtan uca akış. Kabul: In-memory test RLS kanıtı sayılmaz; build'de mimari sınırlar kontrol edilir.
 - Ç23.2 Negatif matris: İki tenant, iki şirket, farklı rol, kapalı modül, gizli alan; API/import/rapor/arama/AI yolları. Kabul: Yeni tenant tablosu envanter ve izolasyon testine girmeden birleşmez.
 - Ç23.3 Dayanıklılık ve yük: Tekrar/sıra dışı olay, worker çökmesi, entegratör timeout, iki kullanıcılı çakışma ve tenant gürültüsü. Kabul: Mutabakat ve idempotency sonuçları iş kaydı üzerinden doğrulanır.
