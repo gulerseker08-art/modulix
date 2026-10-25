@@ -76,6 +76,12 @@ public interface IModule
     /// <summary>Modülün ortak kayda başvuran alanları (ADR-0006); çekirdek ortak kaydın kullanımını bunlarla sayar.</summary>
     IReadOnlyList<SharedRecordReference> SharedRecordReferences => [];
 
+    /// <summary>
+    /// Olay abonelikleri (ADR-0007): modül başka modüllerin değişikliğine bunlarla tepki verir. Anahtar modül anahtarıyla
+    /// başlar; izinler modülün kendi izinleridir; abone sınıfı <see cref="ConfigureServices"/>'te scoped kaydedilir.
+    /// </summary>
+    IReadOnlyList<Events.EventSubscription> EventSubscriptions => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {

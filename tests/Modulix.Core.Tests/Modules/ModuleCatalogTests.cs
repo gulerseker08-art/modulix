@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Modules;
@@ -204,7 +205,74 @@ public class ModuleCatalogTests
         Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(sales));
     }
 
+    [Fact]
+    public void Event_subscriptions_are_found_by_event_and_record_type()
+    {
+        var sales = new TestModule("sales", ["sales.orders.read"])
+        {
+            AuditedEntities = [new AuditedEntity("sales.order", "Sipariş", null, new Dictionary<string, string>())],
+            EventSubscriptions =
+            [
+                EventSubscription.For<NoopSubscriber>("sales.party-renamed", [DomainEventTypes.RecordUpdated], [SharedEntities.Party], ["sales.orders.read"]),
+                EventSubscription.For<NoopSubscriber>("sales.any-change", [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []),
+            ],
+        };
+
+        var catalog = ModuleCatalog.Create(sales);
+
+        Assert.Equal(["sales.any-change", "sales.party-renamed"], catalog.SubscriptionsFor(DomainEventTypes.RecordUpdated, SharedEntities.Party).Select(s => s.Subscription.Key));
+        Assert.Equal(["sales.any-change"], catalog.SubscriptionsFor(DomainEventTypes.RecordCreated, "sales.order").Select(s => s.Subscription.Key));
+        Assert.Empty(catalog.SubscriptionsFor(DomainEventTypes.RecordDeleted, "sales.order"));
+        Assert.Equal("sales", catalog.FindSubscription("sales.party-renamed")!.Value.ModuleKey);
+        Assert.Null(catalog.FindSubscription("sales.yok"));
+    }
+
+    public static TheoryData<EventSubscription> InvalidSubscriptions() =>
+    [
+        // Anahtar modülle başlamıyor veya biçimsiz.
+        EventSubscription.For<NoopSubscriber>("crm.listener", [DomainEventTypes.RecordUpdated], [], []),
+        EventSubscription.For<NoopSubscriber>("sales.Listener", [DomainEventTypes.RecordUpdated], [], []),
+        EventSubscription.For<NoopSubscriber>("sales", [DomainEventTypes.RecordUpdated], [], []),
+
+        // Olay türü yok veya bilinmiyor.
+        EventSubscription.For<NoopSubscriber>("sales.listener", [], [], []),
+        EventSubscription.For<NoopSubscriber>("sales.listener", ["StatusChanged"], [], []),
+
+        // Kayıt türü bilinmiyor.
+        EventSubscription.For<NoopSubscriber>("sales.listener", [DomainEventTypes.RecordUpdated], ["crm.yok"], []),
+
+        // Başka modülün izni.
+        EventSubscription.For<NoopSubscriber>("sales.listener", [DomainEventTypes.RecordUpdated], [], [CoreModule.Permissions.ManageUsers]),
+
+        // Abone sınıfı IEventSubscriber değil; olayın güncel sürümünü okuyamıyor.
+        new("sales.listener", [DomainEventTypes.RecordUpdated], [], [], typeof(string)),
+        EventSubscription.For<NoopSubscriber>("sales.listener", [DomainEventTypes.RecordUpdated], [], []) with { MaxSchemaVersion = 0 },
+    ];
+
+    [Theory]
+    [MemberData(nameof(InvalidSubscriptions))]
+    public void Invalid_event_subscription_is_rejected(EventSubscription subscription)
+    {
+        var sales = new TestModule("sales", ["sales.orders.read"]) { EventSubscriptions = [subscription] };
+
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(sales));
+    }
+
+    [Fact]
+    public void Duplicate_event_subscription_is_rejected()
+    {
+        var subscription = EventSubscription.For<NoopSubscriber>("sales.listener", [DomainEventTypes.RecordUpdated], [], []);
+        var sales = new TestModule("sales", []) { EventSubscriptions = [subscription, subscription] };
+
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(sales));
+    }
+
     private static IModule Module(string key, params string[] permissions) => new TestModule(key, permissions);
+
+    private sealed class NoopSubscriber : IEventSubscriber
+    {
+        public Task HandleAsync(EventEnvelope envelope, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
 
     private sealed class TestModule(string key, string[] permissions, IReadOnlyList<RoleTemplate>? templates = null) : IModule
     {
@@ -222,5 +290,9 @@ public class ModuleCatalogTests
         public IReadOnlyList<SharedRecordAccess> SharedRecordAccess { get; init; } = [];
 
         public IReadOnlyList<SharedRecordReference> SharedRecordReferences { get; init; } = [];
+
+        public IReadOnlyList<AuditedEntity> AuditedEntities { get; init; } = [];
+
+        public IReadOnlyList<EventSubscription> EventSubscriptions { get; init; } = [];
     }
 }
