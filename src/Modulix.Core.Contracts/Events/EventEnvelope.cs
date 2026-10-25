@@ -65,6 +65,8 @@ public sealed record EventEnvelope(
     DateTimeOffset OccurredAt)
 {
     /// <summary>Olayın nedeni (ör. <see cref="EventReasons.Transfer"/>); çoğu olayda boş.</summary>
+    public Guid? CompanyId { get; init; }
+
     public string? Reason { get; init; }
 
     /// <summary>Payload'dan çıkarılan hassas alanların adları: alan değişti ama değeri aboneye gizli.</summary>

@@ -85,6 +85,7 @@ public sealed class OutboxMessage
     {
         Id = Guid.CreateVersion7();
         TenantId = domainEvent.TenantId;
+        CompanyId = domainEvent.CompanyId;
         EventType = domainEvent.EventType;
         SchemaVersion = domainEvent.SchemaVersion;
         EntityKey = domainEvent.EntityKey;
@@ -105,6 +106,8 @@ public sealed class OutboxMessage
     public Guid Id { get; private set; }
 
     public Guid TenantId { get; private set; }
+
+    public Guid? CompanyId { get; private set; }
 
     public string EventType { get; private set; } = string.Empty;
 
