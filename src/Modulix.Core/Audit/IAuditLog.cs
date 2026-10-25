@@ -27,7 +27,7 @@ public sealed record AuditFieldChange(string Field, string Label, string? Old, s
 /// <summary>
 /// Denetim kaydının bir satırı. <see cref="ValuesHidden"/>: okurun bu kayıt türünü görüntüleme izni yok; değişen
 /// alanların adları görünür, değerleri ve kaydın adı gizlidir. <see cref="UserName"/>: firmanın üyesi olmayan platform
-/// yöneticisi için "Modülix platform yöneticisi".
+/// yöneticisi için "Modülix platform yöneticisi". <see cref="Subscription"/>: değişikliği yapan olay aboneliği (ADR-0007).
 /// </summary>
 public sealed record AuditLogItem(
     Guid Id,
@@ -43,7 +43,8 @@ public sealed record AuditLogItem(
     ExecutionSource Source,
     bool ValuesHidden,
     IReadOnlyList<AuditFieldChange> Changes,
-    string? CorrelationId);
+    string? CorrelationId,
+    string? Subscription = null);
 
 /// <summary>Denetim kaydında işlem yapmış bir kişi (kullanıcı filtresi için).</summary>
 public sealed record AuditActor(Guid UserId, string Name);

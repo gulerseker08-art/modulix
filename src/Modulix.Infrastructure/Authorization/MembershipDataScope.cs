@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Events;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
 
@@ -9,14 +10,19 @@ namespace Modulix.Infrastructure.Authorization;
 /// <summary>
 /// Boru hattının veri kapsamı adımı (Y8): kişinin rollerindeki en geniş kapsam. "Ekibimin kayıtları"nda kişi ve ekip
 /// arkadaşları (kişinin ekiplerinden herhangi birindeki herkes) sorumlu olabilir. İstek başına bir kez hesaplanır
-/// (scoped); rol veya ekip değişikliği bir sonraki istekte geçerli olur.
+/// (scoped); rol veya ekip değişikliği bir sonraki istekte geçerli olur. Olay abonesinin kapsamı tenant genelidir (ADR-0007).
 /// </summary>
-internal sealed class MembershipDataScope(ModulixDbContext db, MembershipPermissions permissions) : IDataScopeService
+internal sealed class MembershipDataScope(ModulixDbContext db, MembershipPermissions permissions, EventHandlingScope handling) : IDataScopeService
 {
     private (Guid MembershipId, IReadOnlySet<Guid>? Owners)? cached;
 
     public async Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken)
     {
+        if (handling.Subscription is not null)
+        {
+            return null;
+        }
+
         if (cached is { } hit && hit.MembershipId == tenant.MembershipId)
         {
             return hit.Owners;

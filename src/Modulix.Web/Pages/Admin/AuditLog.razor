@@ -103,7 +103,7 @@
                         <td data-label="Kayıt türü">@entry.EntityName</td>
                         <td data-label="Kayıt" class="primary">@RecordTitle(entry)</td>
                         <td data-label="İşlem">@AuditText.Of(entry.Action)</td>
-                        <td data-label="Kaynak">@AuditText.Of(entry.Source)</td>
+                        <td data-label="Kaynak">@AuditText.Of(entry.Source, entry.Subscription)</td>
                     </tr>
                     @if (open)
                     {

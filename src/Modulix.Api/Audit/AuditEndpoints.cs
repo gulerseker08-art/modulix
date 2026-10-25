@@ -82,7 +82,7 @@ public static class AuditEndpoints
                 item.EntityName,
                 item.ValuesHidden ? AuditText.Hidden : item.RecordTitle,
                 AuditText.Of((AuditOperation)item.Action),
-                AuditText.Of((AuditSource)item.Source),
+                AuditText.Of((AuditSource)item.Source, item.Subscription),
             ];
 
             if (item.Changes.Count == 0)
@@ -133,7 +133,8 @@ public static class AuditEndpoints
         (AuditOperation)item.Action,
         (AuditSource)item.Source,
         item.ValuesHidden,
-        item.Changes.Select(c => new AuditFieldChangeDto(c.Field, c.Label, c.Old, c.New, c.Hidden)).ToList());
+        item.Changes.Select(c => new AuditFieldChangeDto(c.Field, c.Label, c.Old, c.New, c.Hidden)).ToList(),
+        item.Subscription);
 
     private static void AppendRow(StringBuilder csv, IEnumerable<string?> cells)
     {

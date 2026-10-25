@@ -376,7 +376,10 @@ public sealed class RecordPipeline(
 
         var correlation = cause?.CorrelationId ?? Activity.Current?.TraceId.ToString();
         var changes = RecordDiff.Compute(RecordCustomFields.Flatten(before), RecordCustomFields.Flatten(after));
-        audit.Add(new AuditEntry(tenant.TenantId, tenant.UserId, entityKey, recordId, action, changes, source, correlation));
+        audit.Add(new AuditEntry(tenant.TenantId, tenant.UserId, entityKey, recordId, action, changes, source, correlation)
+        {
+            Subscription = handling?.Subscription,
+        });
         outbox.Add(new DomainEvent(tenant.TenantId, eventType, entityKey, recordId, changes.DeepClone().AsObject())
         {
             Sequence = sequence,

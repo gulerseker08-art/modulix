@@ -26,7 +26,7 @@
                 <li>
                     <div class="item-main">
                         <strong>@entry.UserName <span class="history-action">@AuditText.Of(entry.Action).ToLower(Culture)</span></strong>
-                        <span>@CrmLabels.Time(entry.OccurredAt)@(entry.Source == AuditSource.Api ? null : $" · {AuditText.Of(entry.Source)}")</span>
+                        <span>@CrmLabels.Time(entry.OccurredAt)@(entry.Source == AuditSource.Api ? null : $" · {AuditText.Of(entry.Source, entry.Subscription)}")</span>
                         @if (entry.Changes.Count == 0 && entry.Action == AuditOperation.Updated)
                         {
                             <span>Kaydetti, alan değişmedi.</span>
