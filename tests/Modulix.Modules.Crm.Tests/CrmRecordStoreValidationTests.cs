@@ -66,7 +66,8 @@ public class CrmRecordStoreValidationTests
     [InlineData("stage", "\"won\"", true)]
     [InlineData("stage", "\"5\"", false)]
     [InlineData("stage", "\"Kazanıldı\"", false)]
-    [InlineData("stage", "null", false)]
+    [InlineData("stage", "null", true)]
+    [InlineData("stage", "\"\"", true)]
     [InlineData("amount", "1500.25", true)]
     [InlineData("amount", "1500.255", false)]
     [InlineData("amount", "-1", false)]
@@ -114,7 +115,7 @@ public class CrmRecordStoreValidationTests
 
     [Theory]
     [InlineData("status", "\"Customer\"", true)]
-    [InlineData("status", "null", false)]
+    [InlineData("status", "null", true)]
     [InlineData("status", "\"Müşteri\"", false)]
     [InlineData("source", "\"Referral\"", true)]
     [InlineData("source", "null", true)]

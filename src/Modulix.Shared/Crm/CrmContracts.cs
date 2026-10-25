@@ -106,7 +106,10 @@ public sealed record CompanyDto(
     string? Notes,
     JsonObject? Custom = null);
 
-/// <summary>Sorumlu boş bırakılırsa kaydı oluşturan kullanıcı atanır.</summary>
+/// <summary>
+/// Sorumlu boş bırakılırsa kaydı oluşturan kullanıcı atanır. Liste alanları (durum, aşama, tip) boş bırakılırsa yeni
+/// kayıtta firmanın varsayılan değeri atanır, güncellemede mevcut değer kalır.
+/// </summary>
 public sealed record SaveCompanyRequest(
     string Name,
     string? TaxNumber = null,
@@ -118,7 +121,7 @@ public sealed record SaveCompanyRequest(
     long? Version = null,
     string? Address = null,
     string? Industry = null,
-    string Status = CompanyStatus.Prospect,
+    string? Status = null,
     string? Source = null,
     string? Tags = null,
     Guid? OwnerId = null,
@@ -178,7 +181,7 @@ public sealed record SaveOpportunityRequest(
     string Title,
     Guid CompanyId,
     Guid? ContactId = null,
-    string Stage = OpportunityStage.Lead,
+    string? Stage = null,
     decimal? Amount = null,
     string Currency = "TRY",
     DateOnly? ExpectedCloseDate = null,
@@ -215,7 +218,7 @@ public sealed record ActivityDto(
 
 public sealed record SaveActivityRequest(
     string Subject,
-    string Type = ActivityType.Task,
+    string? Type = null,
     DateTimeOffset? DueAt = null,
     DateTimeOffset? CompletedAt = null,
     Guid? CompanyId = null,

@@ -74,7 +74,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             {
                 errors.Add(new RecordFieldError(name, "Bilinmeyen alan."));
             }
-            else if (field.Parse(node).Error is { } error)
+            else if (!field.IsOmitted(node) && field.Parse(node).Error is { } error)
             {
                 errors.Add(new RecordFieldError(name, error));
             }
@@ -144,8 +144,9 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             owner.Write(entity, context.CurrentUserId);
         }
 
-        // Verilmeyen zorunlu liste alanı firmanın listesindeki ilk etkin değeri alır (ör. ilk aşama).
-        foreach (var field in Fields.Where(f => f.ChoiceListKey is not null && !f.Nullable && !values.ContainsKey(f.Name)))
+        // Verilmeyen (veya boş gönderilen) zorunlu liste alanı listenin varsayılanını alır: tanımın varsayılanı etkinse o,
+        // değilse ilk etkin değer (ör. ilk aşama).
+        foreach (var field in Fields.Where(f => f.ChoiceListKey is not null && !f.Nullable && (!values.ContainsKey(f.Name) || f.IsOmitted(values[f.Name]))))
         {
             var list = await context.ChoiceLists.GetAsync(field.ChoiceListKey!, cancellationToken);
             field.Write(entity, list.DefaultValue?.Key);
@@ -255,6 +256,11 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             }
 
             var field = FieldsByName[name];
+            if (field.IsOmitted(node))
+            {
+                continue;
+            }
+
             var value = field.Parse(node).Value;
 
             if (field.Exists is { } exists && value is Guid id && !await exists(context, id, cancellationToken))
