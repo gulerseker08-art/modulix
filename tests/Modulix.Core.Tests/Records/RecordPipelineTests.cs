@@ -1,7 +1,9 @@
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
+using Modulix.Core.Events;
 using Modulix.Core.Records;
 
 namespace Modulix.Core.Tests.Records;
@@ -21,6 +23,7 @@ public class RecordPipelineTests
     private bool _inScope = true;
     private readonly HashSet<string> _hidden = [];
     private readonly List<CustomFieldInfo> _customFields = [];
+    private readonly EventHandlingScope _handling = new();
 
     private RecordPipeline Pipeline() => new(
         _tenant,
@@ -32,7 +35,8 @@ public class RecordPipelineTests
         new CustomFields(_customFields),
         _audit,
         _outbox,
-        _unitOfWork);
+        _unitOfWork,
+        _handling);
 
     [Fact]
     public async Task Without_active_tenant_nothing_happens()
@@ -287,6 +291,48 @@ public class RecordPipelineTests
         Assert.Equal("a", delete.Changes["text"]!["old"]!.GetValue<string>());
         Assert.False(((JsonObject)delete.Changes["text"]!).ContainsKey("new"));
         Assert.Equal(DomainEventTypes.RecordDeleted, _outbox.Events[^1].EventType);
+    }
+
+    [Fact]
+    public async Task Events_carry_sequence_actor_source_and_reason()
+    {
+        var created = (await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default)).Value!;
+        await Pipeline().UpdateAsync(
+            new RecordCommand(Entity, created.Id, new JsonObject { ["text"] = "b" }, Source: ExecutionSource.Import) { Reason = EventReasons.Transfer },
+            default);
+        await Pipeline().DeleteAsync(new RecordRef(Entity, created.Id), null, default, ExecutionSource.AiTool);
+
+        var (create, update, delete) = (_outbox.Events[0], _outbox.Events[1], _outbox.Events[2]);
+        Assert.Equal([1L, 2L, 3L], [create.Sequence!.Value, update.Sequence!.Value, delete.Sequence!.Value]);
+        Assert.All(_outbox.Events, e => Assert.Equal(_tenant.Current!.UserId, e.UserId));
+        Assert.All(_outbox.Events, e => Assert.Equal(1, e.SchemaVersion));
+        Assert.All(_outbox.Events, e => Assert.Equal(0, e.Depth));
+        Assert.All(_outbox.Events, e => Assert.Null(e.CausationId));
+        Assert.Equal([ExecutionSource.Api, ExecutionSource.Import, ExecutionSource.AiTool], _outbox.Events.Select(e => e.Source));
+        Assert.Equal([null, EventReasons.Transfer, null], _outbox.Events.Select(e => e.Reason));
+
+        // Silmenin kaynağı da komuttan gelir; denetim kaydı olayla aynıdır.
+        Assert.Equal(ExecutionSource.AiTool, _audit.Entries[^1].Source);
+    }
+
+    [Fact]
+    public async Task Change_made_by_subscriber_is_linked_to_triggering_event()
+    {
+        var trigger = new EventEnvelope(
+            Guid.NewGuid(), _tenant.Current!.TenantId, DomainEventTypes.RecordUpdated, 1, "crm.company", Guid.NewGuid(), 4,
+            Guid.NewGuid(), ExecutionSource.Api, "iz-123", CausationId: null, Depth: 2, new JsonObject(), DateTimeOffset.UtcNow);
+        _handling.Begin(trigger, "test.subscription");
+
+        await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default);
+
+        var produced = Assert.Single(_outbox.Events);
+        Assert.Equal(trigger.Id, produced.CausationId);
+        Assert.Equal("iz-123", produced.CorrelationId);
+        Assert.Equal(3, produced.Depth);
+        Assert.Equal(ExecutionSource.BackgroundJob, produced.Source);
+        var audit = Assert.Single(_audit.Entries);
+        Assert.Equal(ExecutionSource.BackgroundJob, audit.Source);
+        Assert.Equal("iz-123", audit.CorrelationId);
     }
 
     private static RecordCommand Command(JsonObject values) => new(Entity, null, values);

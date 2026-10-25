@@ -34,7 +34,11 @@ public sealed record RecordCommand(
     Guid? Id,
     JsonObject Values,
     long? ExpectedVersion = null,
-    ExecutionSource Source = ExecutionSource.Api);
+    ExecutionSource Source = ExecutionSource.Api)
+{
+    /// <summary>Değişikliğin nedeni; olaya yazılır (ör. <see cref="Events.EventReasons.Transfer"/>), abonelikler buna göre davranır.</summary>
+    public string? Reason { get; init; }
+}
 
 /// <summary>
 /// Sayfalı liste isteği. <see cref="Search"/> verilirse kayıt deposu kendi arama alanlarında arar.
@@ -128,7 +132,9 @@ public interface IRecordPipeline
 
     Task<RecordResult<RecordData>> UpdateAsync(RecordCommand command, CancellationToken cancellationToken);
 
-    Task<RecordResult<bool>> DeleteAsync(RecordRef record, long? expectedVersion, CancellationToken cancellationToken);
+    /// <param name="source">İşlemi kim başlattı; denetim kaydına ve olaya yazılır.</param>
+    Task<RecordResult<bool>> DeleteAsync(
+        RecordRef record, long? expectedVersion, CancellationToken cancellationToken, ExecutionSource source = ExecutionSource.Api);
 }
 
 /// <summary>
