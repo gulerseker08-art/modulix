@@ -115,14 +115,27 @@ public sealed record AuditEntry(
     ExecutionSource Source,
     string? CorrelationId);
 
-public sealed record DomainEvent(Guid TenantId, string EventType, string EntityKey, Guid RecordId, JsonObject Payload);
-
-public static class DomainEventTypes
+/// <summary>
+/// Outbox'a yazılacak olay (ADR-0007); zarfın alanları <see cref="Contracts.Events.EventEnvelope"/>'ta açıklanır.
+/// Boru hattı doldurur; çağıranlar yalnızca nedeni verir (<see cref="RecordCommand.Reason"/>).
+/// </summary>
+public sealed record DomainEvent(Guid TenantId, string EventType, string EntityKey, Guid RecordId, JsonObject Payload)
 {
-    public const string RecordCreated = "RecordCreated";
-    public const string RecordUpdated = "RecordUpdated";
-    public const string RecordDeleted = "RecordDeleted";
-    public const string StatusChanged = "StatusChanged";
+    public int SchemaVersion { get; init; } = 1;
+
+    public long? Sequence { get; init; }
+
+    public Guid UserId { get; init; }
+
+    public ExecutionSource Source { get; init; } = ExecutionSource.Api;
+
+    public string? CorrelationId { get; init; }
+
+    public Guid? CausationId { get; init; }
+
+    public int Depth { get; init; }
+
+    public string? Reason { get; init; }
 }
 
 public interface IAuditWriter

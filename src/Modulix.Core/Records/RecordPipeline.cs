@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Events;
 
 namespace Modulix.Core.Records;
 
@@ -11,6 +13,8 @@ namespace Modulix.Core.Records;
 /// Kayıt, audit ve olay tek seferde yazılır; biri başarısız olursa hiçbiri yazılmaz.
 /// Hassas alanlar (Y8b) yetki adımında belirlenir: okumada çıkarılır, yazmada reddedilir, süzmede kullanılamaz.
 /// Özel alanlar (Y9a) doğrulama adımında tanımlarına göre denetlenir ve kaydın mevcut özel alanlarıyla birleştirilir.
+/// Olay zarfı (ADR-0007) burada dolar: sıra numarası kaydın yeni sürümü, kişi ve kaynak denetim kaydıyla aynı; abonenin
+/// yaptığı değişiklik tetikleyen olaya bağlanır (<see cref="EventHandlingScope"/>).
 /// </summary>
 public sealed class RecordPipeline(
     ITenantContextAccessor tenantAccessor,
@@ -22,7 +26,8 @@ public sealed class RecordPipeline(
     ICustomFieldProvider customFields,
     IAuditWriter audit,
     IDomainEventOutbox outbox,
-    IUnitOfWork unitOfWork) : IRecordPipeline
+    IUnitOfWork unitOfWork,
+    EventHandlingScope? handling = null) : IRecordPipeline
 {
     public async Task<RecordResult<RecordData>> GetAsync(RecordRef record, CancellationToken cancellationToken)
     {
@@ -134,7 +139,7 @@ public sealed class RecordPipeline(
                 return OwnerOutOfScope<RecordData>(store);
             }
 
-            Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values);
+            Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values, created.Version, command.Reason);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<RecordData>.Ok(Present(created, hidden, custom));
         }
@@ -200,7 +205,7 @@ public sealed class RecordPipeline(
                 return OwnerOutOfScope<RecordData>(store);
             }
 
-            Record(tenant!, command.Source, updated.EntityKey, updated.Id, AuditAction.Updated, DomainEventTypes.RecordUpdated, before.Values, updated.Values);
+            Record(tenant!, command.Source, updated.EntityKey, updated.Id, AuditAction.Updated, DomainEventTypes.RecordUpdated, before.Values, updated.Values, updated.Version, command.Reason);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<RecordData>.Ok(Present(updated, hidden, custom));
         }
@@ -214,7 +219,8 @@ public sealed class RecordPipeline(
         }
     }
 
-    public async Task<RecordResult<bool>> DeleteAsync(RecordRef record, long? expectedVersion, CancellationToken cancellationToken)
+    public async Task<RecordResult<bool>> DeleteAsync(
+        RecordRef record, long? expectedVersion, CancellationToken cancellationToken, ExecutionSource source = ExecutionSource.Api)
     {
         var (gate, tenant, store) = await AuthorizeAsync<bool>(record.EntityKey, RecordOperation.Delete, cancellationToken);
         if (gate is not null)
@@ -235,7 +241,7 @@ public sealed class RecordPipeline(
                 return NotFound<bool>();
             }
 
-            Record(tenant!, ExecutionSource.Api, before.EntityKey, before.Id, AuditAction.Deleted, DomainEventTypes.RecordDeleted, before.Values, after: null);
+            Record(tenant!, source, before.EntityKey, before.Id, AuditAction.Deleted, DomainEventTypes.RecordDeleted, before.Values, after: null, before.Version + 1, reason: null);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<bool>.Ok(true);
         }
@@ -346,7 +352,10 @@ public sealed class RecordPipeline(
         return (null, tenant, store);
     }
 
-    /// <summary>Adım 7-8: audit ve olay; kayıtla birlikte yazılmak üzere hazırlanır.</summary>
+    /// <summary>
+    /// Adım 7-8: audit ve olay; kayıtla birlikte yazılmak üzere hazırlanır. Abonenin değişikliğinde kaynak arka plan
+    /// işidir, correlation tetikleyen olaydan gelir.
+    /// </summary>
     private void Record(
         TenantContext tenant,
         ExecutionSource source,
@@ -355,11 +364,29 @@ public sealed class RecordPipeline(
         AuditAction action,
         string eventType,
         JsonObject? before,
-        JsonObject? after)
+        JsonObject? after,
+        long sequence,
+        string? reason)
     {
+        var cause = handling?.Event;
+        if (cause is not null)
+        {
+            source = ExecutionSource.BackgroundJob;
+        }
+
+        var correlation = cause?.CorrelationId ?? Activity.Current?.TraceId.ToString();
         var changes = RecordDiff.Compute(RecordCustomFields.Flatten(before), RecordCustomFields.Flatten(after));
-        audit.Add(new AuditEntry(tenant.TenantId, tenant.UserId, entityKey, recordId, action, changes, source, Activity.Current?.TraceId.ToString()));
-        outbox.Add(new DomainEvent(tenant.TenantId, eventType, entityKey, recordId, changes.DeepClone().AsObject()));
+        audit.Add(new AuditEntry(tenant.TenantId, tenant.UserId, entityKey, recordId, action, changes, source, correlation));
+        outbox.Add(new DomainEvent(tenant.TenantId, eventType, entityKey, recordId, changes.DeepClone().AsObject())
+        {
+            Sequence = sequence,
+            UserId = tenant.UserId,
+            Source = source,
+            CorrelationId = correlation,
+            CausationId = cause?.Id,
+            Depth = cause is null ? 0 : cause.Depth + 1,
+            Reason = reason,
+        });
     }
 
     private static RecordResult<T> NotFound<T>() => RecordResult<T>.Fail(RecordErrorCode.NotFound, "Kayıt bulunamadı.");

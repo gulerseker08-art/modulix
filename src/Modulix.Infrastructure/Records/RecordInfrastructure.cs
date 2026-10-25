@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Events;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Authorization;
@@ -61,26 +62,40 @@ public sealed class AuditLogEntry : ITenantEntity
 }
 
 /// <summary>
-/// Outbox (platform.OutboxMessages). Olaylar kaydın kendisiyle aynı işlemde yazılır; işleyici (E12)
-/// sonradan yayınlar. İşleyici tüm tenant'ları tarayacağı için tablo platform şemasındadır; her satır
-/// TenantId taşır ve işleyici olayı o tenant'ın bağlamında işler.
+/// Outbox (platform.OutboxMessages), olay zarfı (ADR-0007). Olaylar kaydın kendisiyle aynı işlemde yazılır; dağıtıcı
+/// (<c>EventDispatcher</c>) sonradan abonelere teslim satırı olarak dağıtır. Dağıtıcı tüm tenant'ları tarayacağı için tablo
+/// platform şemasındadır; her satır TenantId taşır ve abone olayı o tenant'ın bağlamında işler.
 /// </summary>
 public sealed class OutboxMessage
 {
+    public const int EventTypeMaxLength = 100;
+    public const int ReasonMaxLength = 50;
+    public const int LastErrorMaxLength = 2000;
+
     private OutboxMessage()
     {
         // EF Core için
     }
 
-    public OutboxMessage(DomainEvent domainEvent)
+    public OutboxMessage(DomainEvent domainEvent, DateTimeOffset now)
     {
         Id = Guid.CreateVersion7();
         TenantId = domainEvent.TenantId;
         EventType = domainEvent.EventType;
+        SchemaVersion = domainEvent.SchemaVersion;
         EntityKey = domainEvent.EntityKey;
         RecordId = domainEvent.RecordId;
+        Sequence = domainEvent.Sequence;
+        UserId = domainEvent.UserId;
+        Source = domainEvent.Source;
+        CorrelationId = domainEvent.CorrelationId is { Length: > AuditLogEntry.CorrelationIdMaxLength } correlation
+            ? correlation[..AuditLogEntry.CorrelationIdMaxLength]
+            : domainEvent.CorrelationId;
+        CausationId = domainEvent.CausationId;
+        Depth = domainEvent.Depth;
+        Reason = domainEvent.Reason;
         Payload = domainEvent.Payload.ToJsonString();
-        OccurredAt = DateTimeOffset.UtcNow;
+        OccurredAt = now;
     }
 
     public Guid Id { get; private set; }
@@ -89,18 +104,37 @@ public sealed class OutboxMessage
 
     public string EventType { get; private set; } = string.Empty;
 
+    public int SchemaVersion { get; private set; }
+
     public string EntityKey { get; private set; } = string.Empty;
 
     public Guid RecordId { get; private set; }
 
+    /// <summary>Kaydın değişiklikten sonraki sürümü; aynı kaydın olayları aboneye bu sırayla teslim edilir. Boşsa sırasız.</summary>
+    public long? Sequence { get; private set; }
+
+    /// <summary>İşlemi yapan kişi; abonenin değişikliğinde boş (sistem).</summary>
+    public Guid UserId { get; private set; }
+
+    public ExecutionSource Source { get; private set; }
+
+    public string? CorrelationId { get; private set; }
+
+    public Guid? CausationId { get; private set; }
+
+    public int Depth { get; private set; }
+
+    public string? Reason { get; private set; }
+
+    /// <summary>JSON: { "alan": { "old": ..., "new": ... } }. Hassas alanlar dahil tam fark; süzgeç teslimde uygulanır.</summary>
     public string Payload { get; private set; } = "{}";
 
     public DateTimeOffset OccurredAt { get; private set; }
 
-    public DateTimeOffset? ProcessedAt { get; private set; }
+    /// <summary>Abonelere dağıtıldığı (teslim satırlarının açıldığı) zaman; boşsa dağıtılmayı bekler.</summary>
+    public DateTimeOffset? DispatchedAt { get; private set; }
 
-    public int AttemptCount { get; private set; }
-
+    /// <summary>Dağıtımla ilgili not (ör. derinlik sınırı aşıldı, dağıtılmadı). Payload veya alan değeri içermez.</summary>
     public string? LastError { get; private set; }
 }
 
@@ -129,11 +163,17 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
         builder.ToTable("OutboxMessages", DatabaseSchemas.Platform);
         builder.HasKey(o => o.Id);
         builder.Property(o => o.Id).ValueGeneratedNever();
-        builder.Property(o => o.EventType).HasMaxLength(100).IsRequired();
+        builder.Property(o => o.EventType).HasMaxLength(OutboxMessage.EventTypeMaxLength).IsRequired();
+        builder.Property(o => o.SchemaVersion).HasDefaultValue(1);
         builder.Property(o => o.EntityKey).HasMaxLength(AuditLogEntry.EntityKeyMaxLength).IsRequired();
+        builder.Property(o => o.Source).HasDefaultValue(ExecutionSource.Api);
+        builder.Property(o => o.CorrelationId).HasMaxLength(AuditLogEntry.CorrelationIdMaxLength);
+        builder.Property(o => o.Reason).HasMaxLength(OutboxMessage.ReasonMaxLength);
         builder.Property(o => o.Payload).IsRequired();
-        builder.Property(o => o.LastError).HasMaxLength(2000);
-        builder.HasIndex(o => new { o.ProcessedAt, o.OccurredAt });
+        builder.Property(o => o.LastError).HasMaxLength(OutboxMessage.LastErrorMaxLength);
+
+        // Dağıtıcı dağıtılmamış olayları yazılış sırasıyla okur; temizlik dağıtım zamanına bakar.
+        builder.HasIndex(o => new { o.DispatchedAt, o.OccurredAt });
     }
 }
 
@@ -142,9 +182,9 @@ internal sealed class EfAuditWriter(ModulixDbContext db) : IAuditWriter
     public void Add(AuditEntry entry) => db.AuditLog.Add(new AuditLogEntry(entry));
 }
 
-internal sealed class EfDomainEventOutbox(ModulixDbContext db) : IDomainEventOutbox
+internal sealed class EfDomainEventOutbox(ModulixDbContext db, TimeProvider time) : IDomainEventOutbox
 {
-    public void Add(DomainEvent domainEvent) => db.OutboxMessages.Add(new OutboxMessage(domainEvent));
+    public void Add(DomainEvent domainEvent) => db.OutboxMessages.Add(new OutboxMessage(domainEvent, time.GetUtcNow()));
 }
 
 internal sealed class EfUnitOfWork(ModulixDbContext db) : IUnitOfWork
@@ -216,6 +256,8 @@ public static class RecordsSetup
         services.TryAddScoped<IDataScopeService, MembershipDataScope>();
         services.TryAddScoped<IFieldAccessService, PermissionFieldAccess>();
 
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<EventHandlingScope>();
         services.AddScoped<IAuditWriter, EfAuditWriter>();
         services.AddScoped<IDomainEventOutbox, EfDomainEventOutbox>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();

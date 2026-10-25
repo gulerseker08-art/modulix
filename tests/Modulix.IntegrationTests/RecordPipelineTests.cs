@@ -4,6 +4,10 @@ using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Api.Tenancy;
+using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
@@ -59,11 +63,45 @@ public class RecordPipelineTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Equal("ikinci", changes["value"]!["new"]!.GetValue<string>());
         Assert.False(changes.ContainsKey("key"));
 
-        var events = await db.OutboxMessages.Where(o => o.RecordId == created.Id).Select(o => o.EventType).ToListAsync();
-        Assert.Equal(3, events.Count);
-        Assert.Contains(DomainEventTypes.RecordCreated, events);
-        Assert.Contains(DomainEventTypes.RecordUpdated, events);
-        Assert.Contains(DomainEventTypes.RecordDeleted, events);
+        // Olay zarfı (ADR-0007): sıra numarası kaydın yeni sürümü (silmede son sürüm + 1), kişi ve iz denetim kaydıyla aynı.
+        var events = await db.OutboxMessages.Where(o => o.RecordId == created.Id).OrderBy(o => o.Sequence).ToListAsync();
+        Assert.Equal(
+            [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated, DomainEventTypes.RecordDeleted],
+            events.Select(e => e.EventType));
+        Assert.Equal([1L, 2L, 3L], events.Select(e => e.Sequence!.Value));
+        Assert.All(events, e => Assert.Equal(userId, e.UserId));
+        Assert.All(events, e => Assert.Equal(1, e.SchemaVersion));
+        Assert.All(events, e => Assert.Equal(ExecutionSource.Api, e.Source));
+        Assert.All(events, e => Assert.Null(e.DispatchedAt));
+        Assert.Equal(audit.Select(a => a.CorrelationId), events.Select(e => e.CorrelationId));
+    }
+
+    /// <summary>Ç1.1: olay kaydın kendisiyle aynı işlemde yazılır; işlem geri alınınca olay da yoktur.</summary>
+    [Fact]
+    public async Task Rolled_back_transaction_writes_no_event()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        var user = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [CoreModule.Permissions.ManageSettings], user);
+        var membershipId = await factory.GetMembershipIdAsync(user.Id, tenant.Id);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(tenant.Id, user.Id, membershipId);
+            var db = Db(scope);
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            var result = await scope.ServiceProvider.GetRequiredService<IRecordPipeline>().CreateAsync(
+                new RecordCommand("core.tenant-setting", null, new JsonObject { ["key"] = UniqueKey(), ["value"] = "geri alınacak" }),
+                CancellationToken.None);
+            Assert.True(result.IsSuccess);
+            Assert.True(await db.OutboxMessages.AnyAsync(o => o.TenantId == tenant.Id));
+
+            // Onaylanmadan kapanır: geri alınır.
+        }
+
+        using var check = factory.OpenScope(tenant.Id);
+        Assert.False(await Db(check).OutboxMessages.AnyAsync(o => o.TenantId == tenant.Id));
+        Assert.False(await Db(check).AuditLog.AnyAsync(a => a.EntityKey == "core.tenant-setting"));
     }
 
     [Fact]
