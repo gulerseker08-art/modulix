@@ -18,9 +18,9 @@
         <div>
             <label class="form-label" for="status">Durum</label>
             <select id="status" class="form-select" @bind="form.Status">
-                @foreach (var status in Enum.GetValues<CompanyStatus>())
+                @foreach (var status in Lookups.Choices(CrmLists.CompanyStatus, source?.Status))
                 {
-                    <option value="@status">@CrmLabels.Of(status)</option>
+                    <option value="@status.Key">@status.Label</option>
                 }
             </select>
             <FieldError Field="status" Errors="errors" />
@@ -45,9 +45,9 @@
             <label class="form-label" for="source">Kaynak</label>
             <select id="source" class="form-select" @bind="form.Source">
                 <option value="">—</option>
-                @foreach (var source in Enum.GetValues<CompanySource>())
+                @foreach (var value in Lookups.Choices(CrmLists.CompanySource, source?.Source))
                 {
-                    <option value="@source">@CrmLabels.Of(source)</option>
+                    <option value="@value.Key">@value.Label</option>
                 }
             </select>
             <FieldError Field="source" Errors="errors" />
@@ -143,7 +143,7 @@
                     Source = c.Source, Tags = c.Tags, OwnerId = c.OwnerId, Notes = c.Notes,
                     Custom = c.Custom?.DeepClone().AsObject() ?? [],
                 }
-                : new CompanyForm();
+                : new CompanyForm { Status = Lookups.DefaultOf(CrmLists.CompanyStatus) ?? CompanyStatus.Prospect };
             errors = null;
             message = null;
         }
@@ -154,7 +154,7 @@
         busy = true;
         var request = new SaveCompanyRequest(
             form.Name, form.TaxNumber, form.Phone, form.Email, form.Website, form.City, form.Notes, form.Version,
-            form.Address, form.Industry, form.Status, form.Source, form.Tags, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom));
+            form.Address, form.Industry, form.Status, string.IsNullOrEmpty(form.Source) ? null : form.Source, form.Tags, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom));
         var result = form.Id is { } id
             ? await Api.PutAsync<CompanyDto>($"{Url}/{id}", request)
             : await Api.PostAsync<CompanyDto>(Url, request);
@@ -209,9 +209,9 @@
 
         public string? Industry { get; set; }
 
-        public CompanyStatus Status { get; set; } = CompanyStatus.Prospect;
+        public string Status { get; set; } = CompanyStatus.Prospect;
 
-        public CompanySource? Source { get; set; }
+        public string? Source { get; set; }
 
         public string? Tags { get; set; }
 

@@ -35,6 +35,22 @@ public static class CrmEntityKeys
     public const string Activity = "crm.activity";
 }
 
+/// <summary>CRM'in düzenlenebilir seçim listeleri (Y9b) ve kategorileri; sunucudaki CrmModule ile aynıdır.</summary>
+public static class CrmLists
+{
+    public const string OpportunityStage = "crm.opportunity-stage";
+    public const string CompanyStatus = "crm.company-status";
+    public const string CompanySource = "crm.company-source";
+    public const string ActivityType = "crm.activity-type";
+
+    public static class StageCategories
+    {
+        public const string Open = "open";
+        public const string Won = "won";
+        public const string Lost = "lost";
+    }
+}
+
 public sealed record CrmPage<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
 public static class CrmLimits
@@ -53,23 +69,23 @@ public static class CrmLimits
     public const int LostReasonMaxLength = 500;
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompanyStatus>))]
-public enum CompanyStatus
+/// <summary>Firma durumunun hazır değerleri (Y9b: firma listeyi düzenleyebilir, değer bir anahtardır).</summary>
+public static class CompanyStatus
 {
-    Prospect = 1,
-    Customer = 2,
-    Inactive = 3,
+    public const string Prospect = "Prospect";
+    public const string Customer = "Customer";
+    public const string Inactive = "Inactive";
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompanySource>))]
-public enum CompanySource
+/// <summary>Firma kaynağının hazır değerleri.</summary>
+public static class CompanySource
 {
-    Referral = 1,
-    Website = 2,
-    Event = 3,
-    Advertising = 4,
-    ColdCall = 5,
-    Other = 6,
+    public const string Referral = "Referral";
+    public const string Website = "Website";
+    public const string Event = "Event";
+    public const string Advertising = "Advertising";
+    public const string ColdCall = "ColdCall";
+    public const string Other = "Other";
 }
 
 public sealed record CompanyDto(
@@ -83,8 +99,8 @@ public sealed record CompanyDto(
     string? City,
     string? Address,
     string? Industry,
-    CompanyStatus Status,
-    CompanySource? Source,
+    string Status,
+    string? Source,
     string? Tags,
     Guid? OwnerId,
     string? Notes,
@@ -102,8 +118,8 @@ public sealed record SaveCompanyRequest(
     long? Version = null,
     string? Address = null,
     string? Industry = null,
-    CompanyStatus Status = CompanyStatus.Prospect,
-    CompanySource? Source = null,
+    string Status = CompanyStatus.Prospect,
+    string? Source = null,
     string? Tags = null,
     Guid? OwnerId = null,
     JsonObject? Custom = null);
@@ -131,15 +147,15 @@ public sealed record SaveContactRequest(
     long? Version = null,
     JsonObject? Custom = null);
 
-[JsonConverter(typeof(JsonStringEnumConverter<OpportunityStage>))]
-public enum OpportunityStage
+/// <summary>Fırsat aşamasının hazır değerleri. Kapalı aşamayı kategoriden anlayın (<see cref="CrmLists.StageCategories"/>).</summary>
+public static class OpportunityStage
 {
-    Lead = 1,
-    Qualified = 2,
-    Proposal = 3,
-    Negotiation = 4,
-    Won = 5,
-    Lost = 6,
+    public const string Lead = "Lead";
+    public const string Qualified = "Qualified";
+    public const string Proposal = "Proposal";
+    public const string Negotiation = "Negotiation";
+    public const string Won = "Won";
+    public const string Lost = "Lost";
 }
 
 public sealed record OpportunityDto(
@@ -148,7 +164,7 @@ public sealed record OpportunityDto(
     string Title,
     Guid CompanyId,
     Guid? ContactId,
-    OpportunityStage Stage,
+    string Stage,
     decimal? Amount,
     string Currency,
     DateOnly? ExpectedCloseDate,
@@ -162,7 +178,7 @@ public sealed record SaveOpportunityRequest(
     string Title,
     Guid CompanyId,
     Guid? ContactId = null,
-    OpportunityStage Stage = OpportunityStage.Lead,
+    string Stage = OpportunityStage.Lead,
     decimal? Amount = null,
     string Currency = "TRY",
     DateOnly? ExpectedCloseDate = null,
@@ -173,20 +189,20 @@ public sealed record SaveOpportunityRequest(
     Guid? OwnerId = null,
     JsonObject? Custom = null);
 
-[JsonConverter(typeof(JsonStringEnumConverter<ActivityType>))]
-public enum ActivityType
+/// <summary>Aktivite tipinin hazır değerleri.</summary>
+public static class ActivityType
 {
-    Call = 1,
-    Meeting = 2,
-    Email = 3,
-    Task = 4,
-    Note = 5,
+    public const string Call = "Call";
+    public const string Meeting = "Meeting";
+    public const string Email = "Email";
+    public const string Task = "Task";
+    public const string Note = "Note";
 }
 
 public sealed record ActivityDto(
     Guid Id,
     long Version,
-    ActivityType Type,
+    string Type,
     string Subject,
     DateTimeOffset? DueAt,
     DateTimeOffset? CompletedAt,
@@ -199,7 +215,7 @@ public sealed record ActivityDto(
 
 public sealed record SaveActivityRequest(
     string Subject,
-    ActivityType Type = ActivityType.Task,
+    string Type = ActivityType.Task,
     DateTimeOffset? DueAt = null,
     DateTimeOffset? CompletedAt = null,
     Guid? CompanyId = null,

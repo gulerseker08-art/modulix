@@ -44,9 +44,9 @@
         <div>
             <label class="form-label" for="stage">Aşama</label>
             <select id="stage" class="form-select" @bind="form.Stage">
-                @foreach (var stage in Enum.GetValues<OpportunityStage>())
+                @foreach (var stage in Lookups.Choices(CrmLists.OpportunityStage, source?.Stage))
                 {
-                    <option value="@stage">@CrmLabels.Of(stage)</option>
+                    <option value="@stage.Key">@stage.Label</option>
                 }
             </select>
             <FieldError Field="stage" Errors="errors" />
@@ -86,7 +86,7 @@
             </select>
             <FieldError Field="ownerId" Errors="errors" />
         </div>
-        @if (form.Stage == OpportunityStage.Lost || !string.IsNullOrEmpty(form.LostReason))
+        @if (Lookups.IsLost(form.Stage) || !string.IsNullOrEmpty(form.LostReason))
         {
             <div class="span-all">
                 <label class="form-label" for="lostReason">Kaybedilme nedeni</label>
@@ -154,7 +154,7 @@
                 LostReason = o.LostReason, OwnerId = o.OwnerId, Notes = o.Notes,
                     Custom = o.Custom?.DeepClone().AsObject() ?? [],
             }
-            : new OpportunityForm { CompanyId = FixedCompanyId };
+            : new OpportunityForm { CompanyId = FixedCompanyId, Stage = Lookups.DefaultOf(CrmLists.OpportunityStage) ?? OpportunityStage.Lead };
         errors = null;
         message = null;
     }
@@ -215,7 +215,7 @@
 
         public Guid? ContactId { get; set; }
 
-        public OpportunityStage Stage { get; set; } = OpportunityStage.Lead;
+        public string Stage { get; set; } = OpportunityStage.Lead;
 
         public int? Probability { get; set; }
 

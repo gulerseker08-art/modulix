@@ -56,7 +56,7 @@
                              @ondragleave="() => dropTarget = null"
                              @ondrop="() => DropAsync(column.Stage)">
                         <header>
-                            <span class="badge stage-@column.Stage.ToString().ToLowerInvariant()">@CrmLabels.Of(column.Stage)</span>
+                            <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, column.Stage)">@Lookups.Label(CrmLists.OpportunityStage, column.Stage)</span>
                             <span class="count">@column.Page.TotalCount</span>
                             @if (ShowAmounts)
                             {
@@ -84,10 +84,10 @@
                                 {
                                     <div class="card-actions">
                                         <select class="form-select form-select-sm" aria-label="Aşama" value="@opportunity.Stage"
-                                                @onchange="e => MoveAsync(opportunity, Enum.Parse<OpportunityStage>((string)e.Value!))">
-                                            @foreach (var stage in Enum.GetValues<OpportunityStage>())
+                                                @onchange="e => MoveAsync(opportunity, (string)e.Value!)">
+                                            @foreach (var stage in Lookups.Choices(CrmLists.OpportunityStage, opportunity.Stage))
                                             {
-                                                <option value="@stage">@CrmLabels.Of(stage)</option>
+                                                <option value="@stage.Key">@stage.Label</option>
                                             }
                                         </select>
                                         <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(opportunity)">Düzenle</button>
@@ -131,7 +131,7 @@
                     <tr>
                         <td data-label="Başlık" class="primary">@opportunity.Title</td>
                         <td data-label="Firma"><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></td>
-                        <td data-label="Aşama"><span class="badge stage-@opportunity.Stage.ToString().ToLowerInvariant()">@CrmLabels.Of(opportunity.Stage)</span></td>
+                        <td data-label="Aşama"><span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span></td>
                         @if (ShowAmounts)
                         {
                             <td data-label="Tutar" class="text-end">@FormatAmount(opportunity)</td>
@@ -167,7 +167,7 @@
     private IReadOnlyList<BoardColumn>? columns;
     private OpportunityDto? selected;
     private OpportunityDto? dragged;
-    private OpportunityStage? dropTarget;
+    private string? dropTarget;
     private bool editing;
     private bool board = true;
     private bool mine;
@@ -218,11 +218,15 @@
     {
         if (board)
         {
-            var results = await Task.WhenAll(Enum.GetValues<OpportunityStage>().Select(async stage =>
-                (Stage: stage, Result: await Api.GetAsync<CrmPage<OpportunityDto>>($"{Url}?stage={stage}&pageSize={ColumnSize}{Filters()}"))));
+            // Sütunlar firmanın aşama sırasıyla (Y9b); pasif aşama yalnızca üzerinde fırsat varsa görünür.
+            var stages = Lookups.ValuesOf(CrmLists.OpportunityStage);
+            var results = await Task.WhenAll(stages.Select(async stage =>
+                (Stage: stage, Result: await Api.GetAsync<CrmPage<OpportunityDto>>(
+                    $"{Url}?stage={Uri.EscapeDataString(stage.Key)}&pageSize={ColumnSize}{Filters()}"))));
             message = results.Select(r => r.Result.Error).FirstOrDefault(e => e is not null);
             columns = results
-                .Select(r => new BoardColumn(r.Stage, r.Result.Value ?? new CrmPage<OpportunityDto>([], 1, ColumnSize, 0)))
+                .Where(r => r.Stage.Active || r.Result.Value?.TotalCount > 0)
+                .Select(r => new BoardColumn(r.Stage.Key, r.Result.Value ?? new CrmPage<OpportunityDto>([], 1, ColumnSize, 0)))
                 .ToList();
             return;
         }
@@ -232,7 +236,7 @@
         message = result.Error;
     }
 
-    private async Task DropAsync(OpportunityStage stage)
+    private async Task DropAsync(string stage)
     {
         dropTarget = null;
         if (dragged is { } opportunity)
@@ -242,15 +246,15 @@
         }
     }
 
-    /// <summary>Aşamayı değiştirir. Kaybedildi'ye taşınan fırsat için nedeni sormak üzere form açılır.</summary>
-    private async Task MoveAsync(OpportunityDto opportunity, OpportunityStage stage)
+    /// <summary>Aşamayı değiştirir. Kaybedildi kategorisindeki aşamaya taşınan fırsat için nedeni sormak üzere form açılır.</summary>
+    private async Task MoveAsync(OpportunityDto opportunity, string stage)
     {
         if (opportunity.Stage == stage)
         {
             return;
         }
 
-        if (stage == OpportunityStage.Lost)
+        if (Lookups.IsLost(stage))
         {
             Open(opportunity with { Stage = stage });
             return;
@@ -274,5 +278,5 @@
         await LoadAsync(page?.Page ?? 1);
     }
 
-    private sealed record BoardColumn(OpportunityStage Stage, CrmPage<OpportunityDto> Page);
+    private sealed record BoardColumn(string Stage, CrmPage<OpportunityDto> Page);
 }

@@ -42,6 +42,31 @@ public sealed class CrmModule : IModule
         public const string Activity = "crm.activity";
     }
 
+    /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
+    public static class Lists
+    {
+        public const string OpportunityStage = "crm.opportunity-stage";
+        public const string CompanyStatus = "crm.company-status";
+        public const string CompanySource = "crm.company-source";
+        public const string ActivityType = "crm.activity-type";
+    }
+
+    /// <summary>Fırsat aşamasının kategorileri: kazanılan ve kaybedilen fırsat kapanmıştır (devir, açık fırsat süzgeci).</summary>
+    public static class StageCategories
+    {
+        public const string Open = "open";
+        public const string Won = "won";
+        public const string Lost = "lost";
+    }
+
+    /// <summary>Firma durumunun kategorileri.</summary>
+    public static class CompanyStatusCategories
+    {
+        public const string Prospect = "prospect";
+        public const string Customer = "customer";
+        public const string Inactive = "inactive";
+    }
+
     public string Key => ModuleKey;
 
     public string DisplayName => "CRM";
@@ -103,7 +128,68 @@ public sealed class CrmModule : IModule
         new(Entities.Activity, "Aktivite"),
     ];
 
-    /// <summary>Denetim kaydı (Y5): alanların görünen adları; seçenek adları arayüzdekilerle aynıdır.</summary>
+    /// <summary>
+    /// Seçim listeleri (Y9b). Hazır değerlerin anahtarları eski enum adlarıdır; kayıtlarda ve API'de bunlar durur.
+    /// Firma adlarını, sırasını ve etkinliğini değiştirir; yeni değer eklerken kategorisini seçer.
+    /// </summary>
+    IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
+    [
+        new(
+            Lists.OpportunityStage,
+            "Fırsat aşamaları",
+            Entities.Opportunity,
+            "stage",
+            Required: true,
+            [new(StageCategories.Open, "Açık"), new(StageCategories.Won, "Kazanıldı"), new(StageCategories.Lost, "Kaybedildi")],
+            [
+                new("Lead", "Aday", StageCategories.Open),
+                new("Qualified", "Nitelikli", StageCategories.Open),
+                new("Proposal", "Teklif", StageCategories.Open),
+                new("Negotiation", "Pazarlık", StageCategories.Open),
+                new("Won", "Kazanıldı", StageCategories.Won),
+                new("Lost", "Kaybedildi", StageCategories.Lost),
+            ]),
+        new(
+            Lists.CompanyStatus,
+            "Firma durumu",
+            Entities.Company,
+            "status",
+            Required: true,
+            [
+                new(CompanyStatusCategories.Prospect, "Potansiyel"),
+                new(CompanyStatusCategories.Customer, "Müşteri"),
+                new(CompanyStatusCategories.Inactive, "Pasif"),
+            ],
+            [
+                new("Prospect", "Potansiyel", CompanyStatusCategories.Prospect),
+                new("Customer", "Müşteri", CompanyStatusCategories.Customer),
+                new("Inactive", "Pasif", CompanyStatusCategories.Inactive),
+            ]),
+        new(
+            Lists.CompanySource,
+            "Firma kaynağı",
+            Entities.Company,
+            "source",
+            Required: false,
+            [],
+            [
+                new("Referral", "Tavsiye"), new("Website", "Web sitesi"), new("Event", "Etkinlik / fuar"),
+                new("Advertising", "Reklam"), new("ColdCall", "Soğuk arama"), new("Other", "Diğer"),
+            ]),
+        new(
+            Lists.ActivityType,
+            "Aktivite tipi",
+            Entities.Activity,
+            "type",
+            Required: true,
+            [],
+            [new("Call", "Arama"), new("Meeting", "Toplantı"), new("Email", "E-posta"), new("Task", "Görev"), new("Note", "Not")])
+        {
+            Default = "Task",
+        },
+    ];
+
+    /// <summary>Denetim kaydı (Y5): alanların görünen adları. Liste alanlarının değer adları firmanın listesinden gelir (Y9b).</summary>
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
     [
         new(Entities.Company, "Firma (CRM)", Permissions.CompaniesRead, new Dictionary<string, string>
@@ -113,15 +199,6 @@ public sealed class CrmModule : IModule
             ["tags"] = "Etiketler", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
         }, "name")
         {
-            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
-            {
-                ["status"] = new Dictionary<string, string> { ["Prospect"] = "Potansiyel", ["Customer"] = "Müşteri", ["Inactive"] = "Pasif" },
-                ["source"] = new Dictionary<string, string>
-                {
-                    ["Referral"] = "Tavsiye", ["Website"] = "Web sitesi", ["Event"] = "Etkinlik / fuar", ["Advertising"] = "Reklam",
-                    ["ColdCall"] = "Soğuk arama", ["Other"] = "Diğer",
-                },
-            },
             UserFields = ["ownerId"],
         },
         new(Entities.Contact, "Kişi (CRM)", Permissions.ContactsRead, new Dictionary<string, string>
@@ -141,14 +218,6 @@ public sealed class CrmModule : IModule
             ["lostReason"] = "Kaybetme nedeni", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
         }, "title")
         {
-            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
-            {
-                ["stage"] = new Dictionary<string, string>
-                {
-                    ["Lead"] = "Aday", ["Qualified"] = "Nitelikli", ["Proposal"] = "Teklif", ["Negotiation"] = "Pazarlık",
-                    ["Won"] = "Kazanıldı", ["Lost"] = "Kaybedildi",
-                },
-            },
             UserFields = ["ownerId"],
             References = new Dictionary<string, string> { ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact },
         },
@@ -158,13 +227,6 @@ public sealed class CrmModule : IModule
             ["contactId"] = "Kişi", ["opportunityId"] = "Fırsat", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
         }, "subject")
         {
-            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
-            {
-                ["type"] = new Dictionary<string, string>
-                {
-                    ["Call"] = "Arama", ["Meeting"] = "Toplantı", ["Email"] = "E-posta", ["Task"] = "Görev", ["Note"] = "Not",
-                },
-            },
             UserFields = ["ownerId"],
             References = new Dictionary<string, string>
             {

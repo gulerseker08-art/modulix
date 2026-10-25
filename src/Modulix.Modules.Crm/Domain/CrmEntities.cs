@@ -44,23 +44,8 @@ public interface IOwnedEntity
     Guid? OwnerId { get; }
 }
 
-public enum CompanyStatus
-{
-    Prospect = 1,
-    Customer = 2,
-    Inactive = 3,
-}
-
-/// <summary>Müşterinin bize nereden geldiği.</summary>
-public enum CompanySource
-{
-    Referral = 1,
-    Website = 2,
-    Event = 3,
-    Advertising = 4,
-    ColdCall = 5,
-    Other = 6,
-}
+// Seçim alanları (Y9b) firmanın düzenleyebildiği listelerden değer anahtarı taşır (CrmModule.ChoiceLists); hazır
+// değerlerin anahtarları eski enum adlarıdır (ör. "Proposal"). Varsayılanlar boru hattında listenin ilk etkin değeridir.
 
 public sealed class Company : CrmEntity, IOwnedEntity
 {
@@ -91,9 +76,10 @@ public sealed class Company : CrmEntity, IOwnedEntity
 
     public string? Industry { get; internal set; }
 
-    public CompanyStatus Status { get; internal set; } = CompanyStatus.Prospect;
+    public string Status { get; internal set; } = string.Empty;
 
-    public CompanySource? Source { get; internal set; }
+    /// <summary>Müşterinin bize nereden geldiği.</summary>
+    public string? Source { get; internal set; }
 
     /// <summary>Virgülle ayrılmış etiketler (ör. "öncelikli, ihracat").</summary>
     public string? Tags { get; internal set; }
@@ -124,16 +110,6 @@ public sealed class Contact : CrmEntity
     public string? Notes { get; internal set; }
 }
 
-public enum OpportunityStage
-{
-    Lead = 1,
-    Qualified = 2,
-    Proposal = 3,
-    Negotiation = 4,
-    Won = 5,
-    Lost = 6,
-}
-
 public sealed class Opportunity : CrmEntity, IOwnedEntity
 {
     public const int TitleMaxLength = 200;
@@ -147,7 +123,7 @@ public sealed class Opportunity : CrmEntity, IOwnedEntity
 
     public Guid? ContactId { get; internal set; }
 
-    public OpportunityStage Stage { get; internal set; } = OpportunityStage.Lead;
+    public string Stage { get; internal set; } = string.Empty;
 
     public decimal? Amount { get; internal set; }
 
@@ -167,20 +143,11 @@ public sealed class Opportunity : CrmEntity, IOwnedEntity
     public string? Notes { get; internal set; }
 }
 
-public enum ActivityType
-{
-    Call = 1,
-    Meeting = 2,
-    Email = 3,
-    Task = 4,
-    Note = 5,
-}
-
 public sealed class Activity : CrmEntity, IOwnedEntity
 {
     public const int SubjectMaxLength = 200;
 
-    public ActivityType Type { get; internal set; } = ActivityType.Task;
+    public string Type { get; internal set; } = string.Empty;
 
     public string Subject { get; internal set; } = string.Empty;
 

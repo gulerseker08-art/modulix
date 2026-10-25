@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Modulix.Core.Contracts.Customization;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Persistence;
@@ -41,7 +42,8 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.Property(c => c.City).HasMaxLength(Company.CityMaxLength);
         builder.Property(c => c.Address).HasMaxLength(Company.AddressMaxLength);
         builder.Property(c => c.Industry).HasMaxLength(Company.IndustryMaxLength);
-        builder.Property(c => c.Status).IsRequired();
+        builder.Property(c => c.Status).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(c => c.Source).HasMaxLength(ChoiceValueKeys.MaxLength);
         builder.Property(c => c.Tags).HasMaxLength(Company.TagsMaxLength);
         builder.Property(c => c.Notes).HasMaxLength(Company.NotesMaxLength);
         builder.HasIndex(c => new { c.TenantId, c.Name });
@@ -79,7 +81,7 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
     {
         CrmTables.ConfigureCommon(builder, "Opportunities");
         builder.Property(o => o.Title).HasMaxLength(Opportunity.TitleMaxLength).IsRequired();
-        builder.Property(o => o.Stage).IsRequired();
+        builder.Property(o => o.Stage).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
         builder.Property(o => o.Amount).HasPrecision(18, 2);
         builder.Property(o => o.Currency).HasMaxLength(Opportunity.CurrencyLength).IsFixedLength().IsUnicode(false).IsRequired();
         builder.Property(o => o.LostReason).HasMaxLength(Opportunity.LostReasonMaxLength);
@@ -105,7 +107,7 @@ internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
     public void Configure(EntityTypeBuilder<Activity> builder)
     {
         CrmTables.ConfigureCommon(builder, "Activities");
-        builder.Property(a => a.Type).IsRequired();
+        builder.Property(a => a.Type).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
         builder.Property(a => a.Subject).HasMaxLength(Activity.SubjectMaxLength).IsRequired();
         builder.Property(a => a.Notes).HasMaxLength(Company.NotesMaxLength);
         builder.HasIndex(a => new { a.TenantId, a.DueAt });

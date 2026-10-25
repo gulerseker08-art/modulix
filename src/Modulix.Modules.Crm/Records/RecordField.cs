@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Customization;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Records;
@@ -46,6 +47,9 @@ internal sealed class RecordField<TEntity>
     /// <summary>Bağlı kayıt bulunamazsa gösterilen mesaj.</summary>
     public string? NotFoundMessage { get; init; }
 
+    /// <summary>Değeri firmanın seçim listesinden gelen alan (Y9b); depo değeri listeye göre denetler.</summary>
+    public string? ChoiceListKey { get; init; }
+
     public ParsedValue Parse(JsonNode? node)
     {
         // Boş metin de boş değer sayılır; zorunlu alanlarda "zorunludur" hatası verir.
@@ -69,7 +73,7 @@ internal readonly record struct ParsedValue(object? Value, string? Error)
     public static ParsedValue Fail(string error) => new(null, error);
 }
 
-/// <summary>Alan türleri. Biçimler: metin, sayı, tarih "yyyy-MM-dd", zaman ISO 8601, seçenek adı ("Won"), kimlik GUID.</summary>
+/// <summary>Alan türleri. Biçimler: metin, sayı, tarih "yyyy-MM-dd", zaman ISO 8601, liste değeri anahtarı ("Won"), kimlik GUID.</summary>
 internal static class Field
 {
     public static RecordField<T> Text<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set, bool required = false) =>
@@ -130,24 +134,20 @@ internal static class Field
             e => get(e) is { } value ? value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : null,
             (e, v) => set(e, (DateTimeOffset?)v));
 
-    public static RecordField<T> Choice<T, TEnum>(string name, Func<T, TEnum> get, Action<T, TEnum> set)
-        where TEnum : struct, Enum =>
-        new(name, required: false, nullable: false, node =>
-                node.GetValueKind() == JsonValueKind.String && FilterValue.Choice<TEnum>(node.GetValue<string>()) is { } value
-                    ? ParsedValue.Of(value)
-                    : ParsedValue.Fail($"Geçerli değerler: {string.Join(", ", Enum.GetNames<TEnum>())}."),
-            e => get(e).ToString(),
-            (e, v) => set(e, (TEnum)v!));
-
-    /// <summary>Boş bırakılabilen seçenek.</summary>
-    public static RecordField<T> OptionalChoice<T, TEnum>(string name, Func<T, TEnum?> get, Action<T, TEnum?> set)
-        where TEnum : struct, Enum =>
-        new(name, required: false, nullable: true, node =>
-                node.GetValueKind() == JsonValueKind.String && FilterValue.Choice<TEnum>(node.GetValue<string>()) is { } value
-                    ? ParsedValue.Of(value)
-                    : ParsedValue.Fail($"Geçerli değerler: {string.Join(", ", Enum.GetNames<TEnum>())}."),
-            e => get(e)?.ToString(),
-            (e, v) => set(e, (TEnum?)v));
+    /// <summary>
+    /// Firmanın seçim listesinden bir değer (Y9b, ör. fırsat aşaması). Burada yalnızca anahtarın biçimi denetlenir;
+    /// listede olup olmadığını ve etkinliğini depo aktif tenant'ın listesine bakarak denetler.
+    /// </summary>
+    public static RecordField<T> ListChoice<T>(string name, string listKey, Func<T, string?> get, Action<T, string?> set, bool required = true) =>
+        new(name, required: false, nullable: !required, node =>
+                node.GetValueKind() == JsonValueKind.String && node.GetValue<string>().Trim() is var key && ChoiceValueKeys.IsValid(key)
+                    ? ParsedValue.Of(key)
+                    : ParsedValue.Fail("Listede olmayan değer."),
+            e => get(e) is { Length: > 0 } value ? value : null,
+            (e, v) => set(e, (string?)v))
+        {
+            ChoiceListKey = listKey,
+        };
 
     /// <summary>Yüzde: 0-100 arası tam sayı.</summary>
     public static RecordField<T> Percent<T>(string name, Func<T, int?> get, Action<T, int?> set) =>

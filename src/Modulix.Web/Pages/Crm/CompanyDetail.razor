@@ -30,7 +30,7 @@
             <div>
                 <h1>@company.Name</h1>
                 <div class="header-meta">
-                    <span class="badge status-@company.Status.ToString().ToLowerInvariant()">@CrmLabels.Of(company.Status)</span>
+                    <span class="badge status-@Lookups.Badge(CrmLists.CompanyStatus, company.Status)">@Lookups.Label(CrmLists.CompanyStatus, company.Status)</span>
                     @foreach (var tag in CrmLabels.Tags(company.Tags))
                     {
                         <span class="badge tag">@tag</span>
@@ -70,7 +70,7 @@
             }
             @if (company.Source is { } source)
             {
-                <div><dt>Kaynak</dt><dd>@CrmLabels.Of(source)</dd></div>
+                <div><dt>Kaynak</dt><dd>@Lookups.Label(CrmLists.CompanySource, source)</dd></div>
             }
             @if (company.Phone is { } phone)
             {
@@ -142,7 +142,7 @@
                                 <div class="item-main">
                                     <strong>@activity.Subject</strong>
                                     <span>
-                                        @CrmLabels.Of(activity.Type)
+                                        @Lookups.Label(CrmLists.ActivityType, activity.Type)
                                         @if (activity.DueAt is { } due) { <text> · @CrmLabels.Time(due)</text> }
                                         @if (activity.OwnerId is not null) { <text> · @Lookups.MemberName(activity.OwnerId)</text> }
                                         @if (activity.CompletedAt is not null) { <text> · Tamamlandı</text> }
@@ -187,12 +187,12 @@
                                 <div class="item-main">
                                     <strong>@opportunity.Title</strong>
                                     <span>
-                                        <span class="badge stage-@opportunity.Stage.ToString().ToLowerInvariant()">@CrmLabels.Of(opportunity.Stage)</span>
+                                        <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span>
                                         @if (opportunity.Amount is { } amount) { <text> @CrmLabels.Amount(amount, opportunity.Currency)</text> }
                                         @if (opportunity.Probability is { } probability) { <text> · %@probability</text> }
                                         @if (opportunity.OwnerId is not null) { <text> · @Lookups.MemberName(opportunity.OwnerId)</text> }
                                     </span>
-                                    @if (opportunity.Stage == OpportunityStage.Lost && opportunity.LostReason is { } reason)
+                                    @if (Lookups.IsLost(opportunity.Stage) && opportunity.LostReason is { } reason)
                                     {
                                         <span>Neden: @reason</span>
                                     }
@@ -272,9 +272,10 @@
     [Inject] private NavigationManager Navigation { get; set; } = default!;
 
     private IEnumerable<OpportunityDto> OpenOpportunities =>
-        opportunities?.Where(o => o.Stage is not (OpportunityStage.Won or OpportunityStage.Lost)) ?? [];
+        opportunities?.Where(o => !Lookups.IsClosed(o.Stage)) ?? [];
 
-    private IEnumerable<OpportunityDto> WonOpportunities => opportunities?.Where(o => o.Stage == OpportunityStage.Won) ?? [];
+    // Açık ve kazanılmış sayılan aşamalar firmanın listesindeki kategoriden gelir (Y9b).
+    private IEnumerable<OpportunityDto> WonOpportunities => opportunities?.Where(o => Lookups.IsWon(o.Stage)) ?? [];
 
     private string? OverdueText
     {

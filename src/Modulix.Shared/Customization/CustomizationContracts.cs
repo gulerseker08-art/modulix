@@ -64,3 +64,29 @@ public sealed record SaveCustomFieldRequest(
     IReadOnlyList<SaveCustomFieldOption>? Options = null);
 
 public sealed record ReorderCustomFieldsRequest(string EntityKey, IReadOnlyList<Guid> Ids);
+
+public sealed record ChoiceCategoryDto(string Key, string Name);
+
+/// <param name="BuiltIn">Hazır değer: anahtarı ve kategorisi değişmez.</param>
+public sealed record ChoiceValueDto(string Key, string Label, string? Category, bool Active, bool BuiltIn);
+
+/// <summary>
+/// Firmanın seçim listesi (Y9b), sırasıyla. Kayıtta <see cref="Field"/> alanının değeri bir <see cref="ChoiceValueDto.Key"/>'dir.
+/// Pasif değer yeni kayıtta seçilemez; onu taşıyan kayıtta kalır. <see cref="Default"/> yeni kayıtta önerilen değerdir.
+/// </summary>
+public sealed record ChoiceListDto(
+    string Key,
+    string Name,
+    string EntityKey,
+    string Field,
+    bool Required,
+    IReadOnlyList<ChoiceCategoryDto> Categories,
+    IReadOnlyList<ChoiceValueDto> Values,
+    string? Default,
+    bool Customized);
+
+/// <summary>Listedeki değer; <see cref="Key"/> boşsa yeni değerdir ve <see cref="Category"/> seçilir.</summary>
+public sealed record SaveChoiceValue(string? Key, string Label, string? Category = null, bool Active = true);
+
+/// <summary>Listenin tamamı, istenen sırayla. Verilmeyen eski değer silinmez, pasif kalır.</summary>
+public sealed record SaveChoiceListRequest(IReadOnlyList<SaveChoiceValue> Values);

@@ -1260,3 +1260,39 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 .record-table tr.is-archived td {
     color: var(--mx-muted);
 }
+
+/* Seçim listeleri (Y9b): değer, kategori, etkinlik ve sıra tek satırda; dar ekranda alt alta. */
+.choice-rows {
+    margin-bottom: 0.75rem;
+}
+
+    /* Kategori sütunu sabit genişlikte: seçim kutusu (yeni değer) ve rozet (hazır değer) alt alta hizalanır. */
+    .choice-row .form-select,
+    .choice-row .badge.category {
+        flex: 0 0 10rem;
+        width: 10rem;
+    }
+
+    .choice-row .badge.category {
+        text-align: center;
+    }
+
+    .choice-row .order {
+        flex: none;
+        white-space: nowrap;
+    }
+
+    .choice-row.is-archived .form-control {
+        color: var(--mx-muted);
+    }
+
+@media (max-width: 575.98px) {
+    .choice-row {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+        .choice-row .form-control {
+            flex-basis: 100%;
+        }
+}

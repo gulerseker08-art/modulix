@@ -206,6 +206,36 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("CustomFields", "meta");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Customization.TenantChoiceList", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ListKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ValuesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ListKey")
+                        .IsUnique();
+
+                    b.ToTable("ChoiceLists", "meta");
+                });
+
             modelBuilder.Entity("Modulix.Core.Modules.ModuleEntitlement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -715,8 +745,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("int");
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
@@ -785,11 +817,14 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
-                    b.Property<int?>("Source")
-                        .HasColumnType("int");
+                    b.Property<string>("Source")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<string>("Tags")
                         .HasMaxLength(200)
@@ -930,8 +965,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<int?>("Probability")
                         .HasColumnType("int");
 
-                    b.Property<int>("Stage")
-                        .HasColumnType("int");
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");

@@ -59,6 +59,13 @@ public interface IModule
     /// </summary>
     IReadOnlyList<CustomizableEntity> CustomizableEntities => [];
 
+    /// <summary>
+    /// Firmanın düzenleyebildiği seçim listeleri (Y9b): bir kayıt alanının değerleri (ör. fırsat aşaması). Hazır değerler
+    /// kodda tanımlıdır; firma adlarını, sırasını ve etkinliğini değiştirir, yeni değer ekler. Kod değere değil kategoriye
+    /// bakar (ör. "kazanıldı"). Anahtar modül anahtarıyla başlar.
+    /// </summary>
+    IReadOnlyList<ChoiceListDefinition> ChoiceLists => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {
@@ -88,6 +95,30 @@ public sealed record SensitiveFields(string EntityKey, string Permission, IReadO
 
 /// <summary>Özel alan eklenebilen kayıt türü ve tanım ekranındaki adı (ör. "Fırsat").</summary>
 public sealed record CustomizableEntity(string EntityKey, string DisplayName);
+
+/// <summary>
+/// Düzenlenebilir seçim listesi (Y9b). <see cref="Field"/>, <see cref="EntityKey"/> türünün kayıt alanıdır; değeri listedeki
+/// bir anahtardır. <see cref="Required"/> listede değer boş bırakılamaz, verilmezse ilk etkin değer atanır.
+/// <see cref="Categories"/> boş değilse her değer bir kategoriye bağlıdır ve her kategoride en az bir etkin değer kalır.
+/// </summary>
+public sealed record ChoiceListDefinition(
+    string Key,
+    string DisplayName,
+    string EntityKey,
+    string Field,
+    bool Required,
+    IReadOnlyList<ChoiceCategory> Categories,
+    IReadOnlyList<ChoiceValueDefinition> Values)
+{
+    /// <summary>Yeni kayıtta değer verilmezse atanan hazır değer; verilmezse (veya pasifse) ilk etkin değer.</summary>
+    public string? Default { get; init; }
+}
+
+/// <summary>Kategori: kodun anladığı anlam (ör. "won" → "Kazanıldı").</summary>
+public sealed record ChoiceCategory(string Key, string DisplayName);
+
+/// <summary>Hazır değer. Anahtarı değişmez (kayıtlarda ve API'de bu yazılır).</summary>
+public sealed record ChoiceValueDefinition(string Key, string Label, string? Category = null);
 
 /// <summary>
 /// Hazır rol önerisi (ADR-0005). <see cref="Key"/> modül anahtarıyla başlar (ör. "crm.sales-rep") ve değişmez;

@@ -32,9 +32,43 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
 
     public IEnumerable<CustomFieldDto> ListFieldsOf(string entityKey) => FieldsOf(entityKey).Where(f => f.ShowInList);
 
+    /// <summary>Firmanın seçim listeleri (Y9b): aşama, durum, kaynak, aktivite tipi; sırası ve adları firmanındır.</summary>
+    public IReadOnlyList<ChoiceListDto> ChoiceLists { get; private set; } = [];
+
+    /// <summary>Seçilebilecek değerler: etkinler ve (pasifse) kaydın mevcut değeri.</summary>
+    public IEnumerable<ChoiceValueDto> Choices(string listKey, string? current = null) =>
+        ValuesOf(listKey).Where(v => v.Active || v.Key == current);
+
+    public IReadOnlyList<ChoiceValueDto> ValuesOf(string listKey) => ChoiceLists.FirstOrDefault(l => l.Key == listKey)?.Values ?? [];
+
+    /// <summary>Değerin adı; listede yoksa (liste yüklenmeden) anahtarın kendisi.</summary>
+    public string Label(string listKey, string? key) =>
+        key is null ? string.Empty : ValuesOf(listKey).FirstOrDefault(v => v.Key == key)?.Label ?? key;
+
+    /// <summary>Yeni kayıtta önerilen değer: listenin varsayılanı.</summary>
+    public string? DefaultOf(string listKey) => ChoiceLists.FirstOrDefault(l => l.Key == listKey)?.Default;
+
+    public string? CategoryOf(string listKey, string? key) => ValuesOf(listKey).FirstOrDefault(v => v.Key == key)?.Category;
+
+    public bool IsWon(string stage) => CategoryOf(CrmLists.OpportunityStage, stage) == CrmLists.StageCategories.Won;
+
+    public bool IsLost(string stage) => CategoryOf(CrmLists.OpportunityStage, stage) == CrmLists.StageCategories.Lost;
+
+    public bool IsClosed(string stage) => IsWon(stage) || IsLost(stage);
+
+    /// <summary>Rozet rengi: hazır değerin kendi rengi, firmanın eklediği değerde kategorisinin rengi.</summary>
+    public string Badge(string listKey, string? key)
+    {
+        var value = ValuesOf(listKey).FirstOrDefault(v => v.Key == key);
+        return value is null or { BuiltIn: true }
+            ? (key ?? string.Empty).ToLowerInvariant()
+            : value.Category == CrmLists.StageCategories.Open ? "qualified" : value.Category ?? "custom";
+    }
+
     public async Task LoadAsync(bool contacts = false, bool opportunities = false)
     {
         CustomFields = (await api.GetAsync<List<CustomFieldDto>>("/api/custom-fields")).Value ?? [];
+        ChoiceLists = (await api.GetAsync<List<ChoiceListDto>>("/api/choice-lists")).Value ?? [];
         Members = (await api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members")).Value ?? [];
         AssignableMembers = session.Scope == RecordScope.All && session.Access is not null
             ? Members
@@ -66,7 +100,7 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
     public string OpportunityTitle(Guid? id) => id is null ? string.Empty : Opportunities.FirstOrDefault(o => o.Id == id)?.Title ?? "—";
 }
 
-/// <summary>Seçeneklerin Türkçe adları ve sayı/tarih biçimleri.</summary>
+/// <summary>Sayı, tarih ve etiket biçimleri. Seçim değerlerinin adları firmanın listesindedir (<see cref="CrmLookups.Label"/>).</summary>
 public static class CrmLabels
 {
     // Biçimler ve saat dilimi firmanın bölgesel ayarlarından gelir (Y6b, Regional).
@@ -77,47 +111,7 @@ public static class CrmLabels
     public static string Time(DateTimeOffset time) =>
         Regional.ToTenant(time).ToString($"{Regional.DatePattern} {Regional.TimePattern}", CultureInfo.InvariantCulture);
 
-    public static string Of(OpportunityStage stage) => stage switch
-    {
-        OpportunityStage.Lead => "Aday",
-        OpportunityStage.Qualified => "Nitelikli",
-        OpportunityStage.Proposal => "Teklif",
-        OpportunityStage.Negotiation => "Pazarlık",
-        OpportunityStage.Won => "Kazanıldı",
-        OpportunityStage.Lost => "Kaybedildi",
-        _ => stage.ToString(),
-    };
-
-    public static string Of(CompanyStatus status) => status switch
-    {
-        CompanyStatus.Prospect => "Potansiyel",
-        CompanyStatus.Customer => "Müşteri",
-        CompanyStatus.Inactive => "Pasif",
-        _ => status.ToString(),
-    };
-
-    public static string Of(CompanySource source) => source switch
-    {
-        CompanySource.Referral => "Tavsiye",
-        CompanySource.Website => "Web sitesi",
-        CompanySource.Event => "Etkinlik / fuar",
-        CompanySource.Advertising => "Reklam",
-        CompanySource.ColdCall => "Soğuk arama",
-        CompanySource.Other => "Diğer",
-        _ => source.ToString(),
-    };
-
     /// <summary>Etiket metnini ("a, b") ayrı etiketlere böler.</summary>
     public static IEnumerable<string> Tags(string? tags) =>
         (tags ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-    public static string Of(ActivityType type) => type switch
-    {
-        ActivityType.Call => "Arama",
-        ActivityType.Meeting => "Toplantı",
-        ActivityType.Email => "E-posta",
-        ActivityType.Task => "Görev",
-        ActivityType.Note => "Not",
-        _ => type.ToString(),
-    };
 }

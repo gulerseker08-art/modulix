@@ -20,6 +20,8 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     protected const string OwnerField = OwnedRecordType.OwnerField;
 
     private static readonly IReadOnlyDictionary<string, RecordFilter<TEntity>> NoFilters = new Dictionary<string, RecordFilter<TEntity>>();
+    private static readonly IReadOnlyDictionary<string, AsyncRecordFilter<TEntity>> NoAsyncFilters =
+        new Dictionary<string, AsyncRecordFilter<TEntity>>();
 
     private Dictionary<string, RecordField<TEntity>>? fieldsByName;
 
@@ -36,6 +38,9 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
     /// <summary>Listede kullanılabilen filtreler (sorgu parametresi adı → filtre).</summary>
     protected virtual IReadOnlyDictionary<string, RecordFilter<TEntity>> Filters => NoFilters;
+
+    /// <summary>Veri okuyan filtreler (ör. seçim listesinin kategorisine göre); adları <see cref="Filters"/>'takilerle çakışmaz.</summary>
+    protected virtual IReadOnlyDictionary<string, AsyncRecordFilter<TEntity>> AsyncFilters => NoAsyncFilters;
 
     private IModuleData Data => context.Data;
 
@@ -93,7 +98,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
-        var source = ApplyFilters(Data.Set<TEntity>().AsNoTracking(), query.Filters);
+        var source = await ApplyFiltersAsync(Data.Set<TEntity>().AsNoTracking(), query.Filters, cancellationToken);
         if (query.Owners is { } owners && IsOwned)
         {
             source = source.Where(OwnedBy(owners));
@@ -133,10 +138,17 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     public async Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken)
     {
         var entity = new TEntity();
-        await ApplyAsync(entity, values, cancellationToken);
+        await ApplyAsync(entity, values, isNew: true, cancellationToken);
         if (FieldsByName.TryGetValue(OwnerField, out var owner) && owner.Read(entity) is null)
         {
             owner.Write(entity, context.CurrentUserId);
+        }
+
+        // Verilmeyen zorunlu liste alanı firmanın listesindeki ilk etkin değeri alır (ör. ilk aşama).
+        foreach (var field in Fields.Where(f => f.ChoiceListKey is not null && !f.Nullable && !values.ContainsKey(f.Name)))
+        {
+            var list = await context.ChoiceLists.GetAsync(field.ChoiceListKey!, cancellationToken);
+            field.Write(entity, list.DefaultValue?.Key);
         }
 
         Data.Set<TEntity>().Add(entity);
@@ -153,7 +165,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
         EnsureVersion(entity, expectedVersion);
         var before = ToData(entity).Values;
-        await ApplyAsync(entity, values, cancellationToken);
+        await ApplyAsync(entity, values, isNew: false, cancellationToken);
 
         if (!JsonNode.DeepEquals(before, ToData(entity).Values))
         {
@@ -181,7 +193,8 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
     protected abstract IQueryable<TEntity> Search(IQueryable<TEntity> source, string term);
 
-    private IQueryable<TEntity> ApplyFilters(IQueryable<TEntity> source, IReadOnlyDictionary<string, string>? filters)
+    private async Task<IQueryable<TEntity>> ApplyFiltersAsync(
+        IQueryable<TEntity> source, IReadOnlyDictionary<string, string>? filters, CancellationToken cancellationToken)
     {
         if (filters is null)
         {
@@ -191,11 +204,16 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         var errors = new List<RecordFieldError>();
         foreach (var (name, value) in filters)
         {
-            if (!Filters.TryGetValue(name, out var filter))
+            var filtered = Filters.TryGetValue(name, out var filter)
+                ? filter(source, value, context)
+                : AsyncFilters.TryGetValue(name, out var asyncFilter)
+                    ? await asyncFilter(source, value, context, cancellationToken)
+                    : null;
+            if (filter is null && !AsyncFilters.ContainsKey(name))
             {
                 errors.Add(new RecordFieldError(name, "Bilinmeyen filtre."));
             }
-            else if (filter(source, value, context) is { } filtered)
+            else if (filtered is not null)
             {
                 source = filtered;
             }
@@ -220,8 +238,11 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         return new RecordData(EntityKey, entity.Id, entity.Version, values);
     }
 
-    /// <summary>Yalnızca verilen alanları yazar (kısmi güncelleme). Değerler <see cref="Validate"/>'ten geçmiştir.</summary>
-    private async Task ApplyAsync(TEntity entity, JsonObject values, CancellationToken cancellationToken)
+    /// <summary>
+    /// Yalnızca verilen alanları yazar (kısmi güncelleme). Değerler <see cref="Validate"/>'ten geçmiştir. Liste alanının
+    /// değeri firmanın listesinde olmalıdır; pasif değer yalnızca kayıtta zaten varsa kalabilir.
+    /// </summary>
+    private async Task ApplyAsync(TEntity entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
         var errors = new List<RecordFieldError>();
 
@@ -241,6 +262,19 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
                 // Başka tenant'ın kaydı da "bulunamadı" sayılır; varlığı belli edilmez.
                 errors.Add(new RecordFieldError(name, field.NotFoundMessage ?? "Kayıt bulunamadı."));
                 continue;
+            }
+
+            if (field.ChoiceListKey is { } listKey && value is string key)
+            {
+                var choice = (await context.ChoiceLists.GetAsync(listKey, cancellationToken)).Find(key);
+                var unchanged = !isNew && choice is not null && field.Read(entity)?.GetValue<string>() == choice.Key;
+                if (choice is null || (!choice.Active && !unchanged))
+                {
+                    errors.Add(new RecordFieldError(name, choice is null ? "Listede olmayan değer." : "Bu değer artık kullanılmıyor."));
+                    continue;
+                }
+
+                value = choice.Key;
             }
 
             field.Write(entity, value);

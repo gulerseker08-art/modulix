@@ -47,6 +47,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Özel alan tanımı (Y9a); kaydın kimliği alanın kimliğidir.</summary>
         public const string CustomField = "core.custom-field";
+
+        /// <summary>Seçim listesi (Y9b); kaydın kimliği firmanın liste satırının kimliğidir.</summary>
+        public const string ChoiceList = "core.choice-list";
         public const string Membership = "core.membership";
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
@@ -159,6 +162,10 @@ public sealed class CoreModule : IModule
                 },
             },
         },
+        new(AuditedEntityKeys.ChoiceList, "Liste", null, new Dictionary<string, string>
+        {
+            ["list"] = "Liste", ["values"] = "Değerler",
+        }, "list"),
         new(AuditedEntityKeys.Membership, "Kullanıcı", null, new Dictionary<string, string>
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["status"] = "Durum", ["roles"] = "Roller",
