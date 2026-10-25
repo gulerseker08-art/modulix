@@ -26,6 +26,7 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
     private const string ManageRoles = CoreModule.Permissions.ManageRoles;
     private const string ManageSettings = CoreModule.Permissions.ManageSettings;
     private const string ReadAudit = CoreModule.Permissions.ReadAudit;
+    private const string ManageCustomization = CoreModule.Permissions.ManageCustomization;
 
     [Fact]
     public void Shared_access_keys_match_the_core_module()
@@ -99,7 +100,7 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
         using var client = await LoginAsync(admin);
 
         var before = await client.GetFromJsonAsync<MyAccessResponse>("/api/tenant/access");
-        Assert.Equal([ReadAudit, ManageRoles, ManageSettings, ManageUsers], before!.Permissions);
+        Assert.Equal([ReadAudit, ManageCustomization, ManageRoles, ManageSettings, ManageUsers], before!.Permissions);
 
         // Sonradan açılan modülün izinleri yöneticiye kendiliğinden gelir.
         await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);

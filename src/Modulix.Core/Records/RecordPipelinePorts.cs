@@ -38,6 +38,18 @@ public interface IFieldAccessService
     Task<IReadOnlySet<string>> GetHiddenFieldsAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken);
 }
 
+/// <summary>Özel alanlar (Y9a): kayıt türünün etkin (arşivlenmemiş) alan tanımları, sıraya göre. İstek boyunca saklanabilir.</summary>
+public interface ICustomFieldProvider
+{
+    Task<IReadOnlyList<Customization.CustomFieldInfo>> GetFieldsAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken);
+}
+
+public sealed class NoCustomFields : ICustomFieldProvider
+{
+    public Task<IReadOnlyList<Customization.CustomFieldInfo>> GetFieldsAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Customization.CustomFieldInfo>>([]);
+}
+
 public sealed class AllFieldsVisible : IFieldAccessService
 {
     private static readonly IReadOnlySet<string> None = new HashSet<string>();

@@ -19,6 +19,9 @@ public sealed class CoreModule : IModule
         public const string ManageSettings = "core.settings.manage";
 
         public const string ReadAudit = "core.audit.read";
+
+        /// <summary>Özelleştirme (Y9): özel alanlar, listeler ve sektör profili.</summary>
+        public const string ManageCustomization = "core.customization.manage";
     }
 
     public string Key => ModuleKey;
@@ -31,6 +34,7 @@ public sealed class CoreModule : IModule
         new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir", "Roller"),
         new(Permissions.ManageSettings, "Firma ayarlarını değiştirir", "Firma ayarları"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
+        new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
     ];
 
     /// <summary>Denetim kayıt türleri (Y5). Yönetim kayıtlarının değerleri her denetim okuruna açıktır.</summary>
@@ -40,6 +44,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Ekip (Y8): ad, açıklama ve üyeler.</summary>
         public const string Team = "core.team";
+
+        /// <summary>Özel alan tanımı (Y9a); kaydın kimliği alanın kimliğidir.</summary>
+        public const string CustomField = "core.custom-field";
         public const string Membership = "core.membership";
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
@@ -137,6 +144,21 @@ public sealed class CoreModule : IModule
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["members"] = "Üyeler",
         }, "name"),
+        new(AuditedEntityKeys.CustomField, "Özel alan", null, new Dictionary<string, string>
+        {
+            ["entity"] = "Kayıt türü", ["label"] = "Ad", ["key"] = "Anahtar", ["type"] = "Tip", ["required"] = "Zorunlu",
+            ["showInList"] = "Listede göster", ["options"] = "Seçenekler", ["archived"] = "Arşivlendi",
+        }, "label")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["type"] = new Dictionary<string, string>
+                {
+                    ["Text"] = "Metin", ["MultilineText"] = "Çok satırlı metin", ["Number"] = "Sayı", ["Date"] = "Tarih",
+                    ["YesNo"] = "Evet/hayır", ["Choice"] = "Seçim listesi", ["MultiChoice"] = "Çoklu seçim",
+                },
+            },
+        },
         new(AuditedEntityKeys.Membership, "Kullanıcı", null, new Dictionary<string, string>
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["status"] = "Durum", ["roles"] = "Roller",

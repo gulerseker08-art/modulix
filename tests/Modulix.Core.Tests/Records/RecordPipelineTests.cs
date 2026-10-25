@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Customization;
 using Modulix.Core.Records;
 
 namespace Modulix.Core.Tests.Records;
@@ -19,6 +20,7 @@ public class RecordPipelineTests
     private bool _permitted = true;
     private bool _inScope = true;
     private readonly HashSet<string> _hidden = [];
+    private readonly List<CustomFieldInfo> _customFields = [];
 
     private RecordPipeline Pipeline() => new(
         _tenant,
@@ -27,6 +29,7 @@ public class RecordPipelineTests
         new Gate(() => _permitted),
         new Gate(() => _inScope),
         new HiddenFields(_hidden),
+        new CustomFields(_customFields),
         _audit,
         _outbox,
         _unitOfWork);
@@ -193,6 +196,77 @@ public class RecordPipelineTests
     }
 
     [Fact]
+    public async Task Custom_fields_are_validated_merged_and_audited_per_field()
+    {
+        AddCustomField("arac_tipi", CustomFieldType.Choice, required: true, options: ["tir", "kamyon"]);
+        AddCustomField("km", CustomFieldType.Number);
+
+        var missing = await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default);
+        Assert.Equal("custom.arac_tipi", Assert.Single(missing.Error!.FieldErrors!).Field);
+
+        var invalid = await Pipeline().CreateAsync(
+            Command(new JsonObject { ["text"] = "a", ["custom"] = new JsonObject { ["arac_tipi"] = "gemi", ["km"] = "çok", ["yok"] = 1 } }), default);
+        Assert.Equal(["custom.arac_tipi", "custom.km", "custom.yok"], invalid.Error!.FieldErrors!.Select(e => e.Field).Order());
+        AssertNothingWritten();
+
+        var created = (await Pipeline().CreateAsync(
+            Command(new JsonObject { ["text"] = "a", ["custom"] = new JsonObject { ["arac_tipi"] = "tir", ["km"] = 120 } }), default)).Value!;
+        Assert.Equal("tir", created.Values["custom"]!["arac_tipi"]!.GetValue<string>());
+        Assert.Equal("tir", _audit.Entries[^1].Changes["custom.arac_tipi"]!["new"]!.GetValue<string>());
+
+        // Özel alan gönderilmeyen güncelleme değerleri korur; null siler; zorunlu alan boşaltılamaz.
+        await Pipeline().UpdateAsync(new RecordCommand(Entity, created.Id, new JsonObject { ["text"] = "b" }), default);
+        Assert.Equal(120, _store.Records[created.Id].Values["custom"]!["km"]!.GetValue<decimal>());
+        await Pipeline().UpdateAsync(new RecordCommand(Entity, created.Id, new JsonObject { ["text"] = "b", ["custom"] = new JsonObject { ["km"] = null } }), default);
+        Assert.False(_store.Records[created.Id].Values["custom"]!.AsObject().ContainsKey("km"));
+        Assert.Equal("tir", _store.Records[created.Id].Values["custom"]!["arac_tipi"]!.GetValue<string>());
+        var cleared = await Pipeline().UpdateAsync(
+            new RecordCommand(Entity, created.Id, new JsonObject { ["text"] = "b", ["custom"] = new JsonObject { ["arac_tipi"] = null } }), default);
+        Assert.Equal(RecordErrorCode.ValidationFailed, cleared.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Archived_custom_field_is_kept_but_not_returned()
+    {
+        AddCustomField("not", CustomFieldType.Text);
+        var created = (await Pipeline().CreateAsync(
+            Command(new JsonObject { ["text"] = "a", ["custom"] = new JsonObject { ["not"] = "gizli değil" } }), default)).Value!;
+
+        _customFields.Clear();
+        var read = (await Pipeline().GetAsync(new RecordRef(Entity, created.Id), default)).Value!;
+        await Pipeline().UpdateAsync(new RecordCommand(Entity, created.Id, new JsonObject { ["text"] = "b", ["custom"] = new JsonObject() }), default);
+
+        Assert.Empty(read.Values["custom"]!.AsObject());
+        Assert.Equal("gizli değil", _store.Records[created.Id].Values["custom"]!["not"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Only_choice_custom_fields_can_be_filtered()
+    {
+        AddCustomField("arac_tipi", CustomFieldType.Choice, options: ["tir"]);
+        AddCustomField("not", CustomFieldType.Text);
+
+        var ok = await Pipeline().QueryAsync(new RecordQuery(Entity, Filters: new Dictionary<string, string> { ["custom.arac_tipi"] = "tir" }), default);
+        var text = await Pipeline().QueryAsync(new RecordQuery(Entity, Filters: new Dictionary<string, string> { ["custom.not"] = "x" }), default);
+        var option = await Pipeline().QueryAsync(new RecordQuery(Entity, Filters: new Dictionary<string, string> { ["custom.arac_tipi"] = "gemi" }), default);
+
+        Assert.True(ok.IsSuccess);
+        Assert.Equal("tir", _store.LastQuery!.CustomFilters!["arac_tipi"]);
+        Assert.Empty(_store.LastQuery.Filters!);
+        Assert.Equal(RecordErrorCode.ValidationFailed, text.Error!.Code);
+        Assert.Equal(RecordErrorCode.ValidationFailed, option.Error!.Code);
+    }
+
+    [Fact]
+    public void Custom_field_keys_are_derived_from_turkish_labels()
+    {
+        Assert.Equal("arac_tipi", CustomFieldRules.KeyFrom("Araç tipi", new HashSet<string>()));
+        Assert.Equal("guzergah_2", CustomFieldRules.KeyFrom(" Güzergâh! ", new HashSet<string> { "guzergah" }));
+        Assert.Equal("a_2026_hedefi", CustomFieldRules.KeyFrom("2026 hedefi", new HashSet<string>()));
+        Assert.Equal("alan", CustomFieldRules.KeyFrom("—", new HashSet<string>()));
+    }
+
+    [Fact]
     public async Task Unknown_entity_is_rejected()
     {
         var result = await Pipeline().GetAsync(new RecordRef("crm.yok", Guid.NewGuid()), default);
@@ -216,6 +290,11 @@ public class RecordPipelineTests
     }
 
     private static RecordCommand Command(JsonObject values) => new(Entity, null, values);
+
+    private void AddCustomField(string key, CustomFieldType type, bool required = false, string[]? options = null) =>
+        _customFields.Add(new CustomFieldInfo(
+            Guid.NewGuid(), Entity, key, key, type, required, ShowInList: false, _customFields.Count, Archived: false,
+            [.. (options ?? []).Select(o => new CustomFieldOption(o, o))]));
 
     private void AssertNothingWritten()
     {
@@ -248,6 +327,12 @@ public class RecordPipelineTests
             Task.FromResult(hidden);
     }
 
+    private sealed class CustomFields(IReadOnlyList<CustomFieldInfo> fields) : ICustomFieldProvider
+    {
+        public Task<IReadOnlyList<CustomFieldInfo>> GetFieldsAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<CustomFieldInfo>>([.. fields]);
+    }
+
     private sealed class FakeStore : IRecordStore
     {
         public Dictionary<Guid, RecordData> Records { get; } = [];
@@ -258,14 +343,21 @@ public class RecordPipelineTests
 
         public string? OwnerField => "ownerId";
 
+        public bool SupportsCustomFields => true;
+
+        public RecordQuery? LastQuery { get; private set; }
+
         public IReadOnlyList<RecordFieldError> Validate(RecordOperation operation, JsonObject values) =>
             values.ContainsKey("text") ? [] : [new RecordFieldError("text", "Zorunlu.")];
 
         public Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(Records.TryGetValue(id, out var data) ? data with { Values = (JsonObject)data.Values.DeepClone() } : null);
 
-        public Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken) =>
-            Task.FromResult(new RecordPage(Records.Values.ToList(), query.Page, query.PageSize, Records.Count));
+        public Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
+        {
+            LastQuery = query;
+            return Task.FromResult(new RecordPage(Records.Values.ToList(), query.Page, query.PageSize, Records.Count));
+        }
 
         public Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken)
         {

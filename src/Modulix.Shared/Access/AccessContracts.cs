@@ -74,6 +74,10 @@ public static class CoreAccess
     public const string ManageSettings = "core.settings.manage";
     public const string ReadAudit = "core.audit.read";
 
+    /// <summary>Özelleştirme (Y9): özel alanlar, listeler ve sektör profili.</summary>
+    public const string ManageCustomization = "core.customization.manage";
+
     /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
-    public static IReadOnlyList<string> AdministrationPermissions { get; } = [ManageUsers, ManageRoles, ManageSettings, ReadAudit];
+    public static IReadOnlyList<string> AdministrationPermissions { get; } =
+        [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization];
 }

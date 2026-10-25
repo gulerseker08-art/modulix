@@ -2,6 +2,7 @@ using System.Globalization;
 using Modulix.Shared.Access;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Crm;
+using Modulix.Shared.Customization;
 
 namespace Modulix.Web.Services;
 
@@ -24,8 +25,16 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
     /// <summary>Sorumlu olarak atanabilecek üyeler: kişinin kayıt kapsamındakiler (Y8). Adlar için <see cref="Members"/> kullanılır.</summary>
     public IReadOnlyList<TenantMemberResponse> AssignableMembers { get; private set; } = [];
 
+    /// <summary>Firmanın özel alanları (Y9a), tanım sırasıyla; formlar, listeler ve ayrıntılar bunlarla çizilir.</summary>
+    public IReadOnlyList<CustomFieldDto> CustomFields { get; private set; } = [];
+
+    public IEnumerable<CustomFieldDto> FieldsOf(string entityKey) => CustomFields.Where(f => f.EntityKey == entityKey);
+
+    public IEnumerable<CustomFieldDto> ListFieldsOf(string entityKey) => FieldsOf(entityKey).Where(f => f.ShowInList);
+
     public async Task LoadAsync(bool contacts = false, bool opportunities = false)
     {
+        CustomFields = (await api.GetAsync<List<CustomFieldDto>>("/api/custom-fields")).Value ?? [];
         Members = (await api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members")).Value ?? [];
         AssignableMembers = session.Scope == RecordScope.All && session.Access is not null
             ? Members

@@ -50,12 +50,21 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
     private static bool IsOwned => typeof(IOwnedEntity).IsAssignableFrom(typeof(TEntity));
 
+    /// <summary>Tüm CRM kayıtlarına özel alan eklenebilir (Y9a); değerler <see cref="CrmEntity.CustomFields"/>'ta saklanır.</summary>
+    public bool SupportsCustomFields => true;
+
     public IReadOnlyList<RecordFieldError> Validate(RecordOperation operation, JsonObject values)
     {
         var errors = new List<RecordFieldError>();
 
         foreach (var (name, node) in values)
         {
+            if (name == RecordFields.Custom)
+            {
+                // Boru hattı tanımlara göre doğrulamış ve birleştirmiştir.
+                continue;
+            }
+
             if (!FieldsByName.TryGetValue(name, out var field))
             {
                 errors.Add(new RecordFieldError(name, "Bilinmeyen alan."));
@@ -92,6 +101,13 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         if (query.Search is { } term)
         {
             source = Search(source, term);
+        }
+
+        foreach (var (key, value) in query.CustomFilters ?? new Dictionary<string, string>())
+        {
+            // Anahtar tanımdan gelir (harf, rakam, alt çizgi); yol yine de tırnaklı yazılır.
+            var path = $"$.\"{key}\"";
+            source = source.Where(e => JsonFunctions.Value(e.CustomFields, path) == value);
         }
 
         var total = await source.CountAsync(cancellationToken);
@@ -200,6 +216,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             values[field.Name] = field.Read(entity);
         }
 
+        values[RecordFields.Custom] = entity.CustomFields is null ? new JsonObject() : JsonNode.Parse(entity.CustomFields);
         return new RecordData(EntityKey, entity.Id, entity.Version, values);
     }
 
@@ -210,6 +227,12 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
         foreach (var (name, node) in values)
         {
+            if (name == RecordFields.Custom)
+            {
+                entity.CustomFields = node is JsonObject { Count: > 0 } custom ? custom.ToJsonString() : null;
+                continue;
+            }
+
             var field = FieldsByName[name];
             var value = field.Parse(node).Value;
 

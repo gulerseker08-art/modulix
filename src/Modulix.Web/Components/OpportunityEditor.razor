@@ -99,6 +99,7 @@
             <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
             <FieldError Field="notes" Errors="errors" />
         </div>
+        <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
     </div>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
@@ -128,6 +129,8 @@
 
     [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
 
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Opportunity)];
+
     [Parameter] public EventCallback<OpportunityDto> Saved { get; set; }
 
     [Parameter] public EventCallback Deleted { get; set; }
@@ -149,6 +152,7 @@
                 Id = o.Id, Version = o.Version, Title = o.Title, CompanyId = o.CompanyId, ContactId = o.ContactId, Stage = o.Stage,
                 Probability = o.Probability, Amount = o.Amount, Currency = o.Currency, ExpectedCloseDate = o.ExpectedCloseDate,
                 LostReason = o.LostReason, OwnerId = o.OwnerId, Notes = o.Notes,
+                    Custom = o.Custom?.DeepClone().AsObject() ?? [],
             }
             : new OpportunityForm { CompanyId = FixedCompanyId };
         errors = null;
@@ -166,7 +170,7 @@
         busy = true;
         var request = new SaveOpportunityRequest(
             form.Title, companyId, form.ContactId, form.Stage, form.Amount, form.Currency, form.ExpectedCloseDate, form.Notes, form.Version,
-            form.Probability, form.LostReason, form.OwnerId);
+            form.Probability, form.LostReason, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom));
         var result = form.Id is { } id
             ? await Api.PutAsync<OpportunityDto>($"{Url}/{id}", request)
             : await Api.PostAsync<OpportunityDto>(Url, request);
@@ -199,6 +203,8 @@
 
     private sealed class OpportunityForm
     {
+        public System.Text.Json.Nodes.JsonObject Custom { get; set; } = [];
+
         public Guid? Id { get; init; }
 
         public long? Version { get; init; }

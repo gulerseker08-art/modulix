@@ -222,6 +222,18 @@ Bazı alanlar kaydı görebilen herkese açık değildir. Modül hassas alanlar�
 - Denetim kaydında ve kayıt geçmişinde alan satırı görünür ama değeri "Gizli" yazar (`AuditFieldChangeDto.Hidden`).
 - Ekranlar: izni olmayan için fırsat listesinde Tutar ve Olasılık sütunları, huni kartlarındaki tutar, toplamlar ve düzenleyicideki iki alan gösterilmez.
 
+### Özel alanlar (Y9a)
+
+Firma kendi alanlarını ekleyebilir (ör. fırsatta "Araç tipi"). Tanım ekranı Yönetim → Özel alanlar'dır (`/yonetim/ozel-alanlar`) ve `core.customization.manage` ("Özelleştirme") ister. Modül hangi kayıt türlerinin özelleştirilebileceğini `IModule.CustomizableEntities` ile söyler; CRM'de firma, kişi, fırsat ve aktivite.
+
+- Tipler: kısa metin, uzun metin, sayı, tarih, evet/hayır, seçim listesi, çoklu seçim. Kayıt türü başına en fazla 30 alan. Anahtar etiketten bir kez üretilir ve değişmez; etiket sonradan değiştirilebilir.
+- Tanımlar `meta.CustomFields` tablosundadır (RLS'li). Değerler kaydın kendi tablosunda `CustomFields` JSON sütununda durur; kayıt verisinde `custom` nesnesi olarak gelir ve gider.
+- Boru hattı değerleri tipine göre doğrular ve normalleştirir; bilinmeyen alan ve yanlış tip 422'dir. Zorunlu alan eklerken doldurulmalıdır; güncellemede yalnızca boş gönderilirse hata verir (huni sürüklemesi engellenmez). Güncellemede `custom` gönderilmezse değerler korunur.
+- Alan silinmez, arşivlenir: değerleri kayıtta kalır, geri alındığında yeniden görünür. Seçenekler de pasifleştirilir; pasif seçenek yalnızca zaten seçili olan kayıtta kalabilir.
+- Seçim listesi alanına göre süzme: `custom.<anahtar>=<seçenek>` (`/api/records`).
+- Denetim kaydı alan tanımlarını "Özel alan" olarak, kayıt değişikliklerini alanın etiketiyle yazar.
+- `GET /api/custom-fields` her üyeye açıktır (ekranlar formları buradan kurar). Ekranlarda alanlar formun sonunda "Ek bilgiler" bölümünde çıkar; "Listede göster" seçilenler listede sütun olur; firma ayrıntısı dolu değerleri gösterir.
+
 ## CRM modülü
 
 İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.

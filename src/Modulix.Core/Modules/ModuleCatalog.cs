@@ -14,6 +14,7 @@ public sealed class ModuleCatalog
     private readonly Dictionary<string, AuditedEntity> auditedEntities = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, SettingDefinition Definition)> settings = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<SensitiveFields>> sensitiveFields = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string ModuleKey, CustomizableEntity Entity)> customizable = new(StringComparer.Ordinal);
 
     public ModuleCatalog(IEnumerable<IModule> modules)
     {
@@ -72,6 +73,15 @@ public sealed class ModuleCatalog
                 }
 
                 (sensitiveFields.TryGetValue(sensitive.EntityKey, out var list) ? list : sensitiveFields[sensitive.EntityKey] = []).Add(sensitive);
+            }
+
+            foreach (var entity in module.CustomizableEntities)
+            {
+                if (!entity.EntityKey.StartsWith(module.Key + ".", StringComparison.Ordinal) || !customizable.TryAdd(entity.EntityKey, (module.Key, entity)))
+                {
+                    throw new InvalidOperationException(
+                        $"Geçersiz veya tekrar eden özelleştirilebilir kayıt türü: '{entity.EntityKey}' ({module.Key}).");
+                }
             }
 
             foreach (var setting in module.Settings)
@@ -148,6 +158,14 @@ public sealed class ModuleCatalog
             : NoFields;
 
     private static readonly IReadOnlySet<string> NoFields = new HashSet<string>();
+
+    /// <summary>Özel alan eklenebilen kayıt türü ve modülü (Y9a); tanımlı değilse null.</summary>
+    public (string ModuleKey, CustomizableEntity Entity)? FindCustomizable(string entityKey) =>
+        customizable.TryGetValue(entityKey, out var entity) ? entity : null;
+
+    /// <summary>Özel alan eklenebilen kayıt türleri, modül ve tanım sırasıyla.</summary>
+    public IEnumerable<(string ModuleKey, CustomizableEntity Entity)> CustomizableEntities =>
+        Modules.SelectMany(m => m.CustomizableEntities.Select(e => (m.Key, e)));
 
     public PermissionDefinition? FindPermission(string permissionKey) => permissions.GetValueOrDefault(permissionKey);
 
