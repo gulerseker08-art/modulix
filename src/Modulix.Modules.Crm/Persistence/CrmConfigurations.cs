@@ -23,6 +23,7 @@ internal static class CrmTables
         builder.Property(e => e.CreatedAt).IsRequired();
         builder.Property(e => e.UpdatedAt).IsRequired();
         builder.Property(e => e.Version).IsConcurrencyToken();
+        builder.Property(e => e.CustomFields);
         builder.HasAlternateKey(e => new { e.TenantId, e.Id });
     }
 }

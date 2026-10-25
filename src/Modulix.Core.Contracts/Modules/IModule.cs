@@ -53,6 +53,12 @@ public interface IModule
     /// </summary>
     IReadOnlyList<SensitiveFields> SensitiveFields => [];
 
+    /// <summary>
+    /// Firmanın özel alan ekleyebildiği kayıt türleri (Y9a). Türün kayıt deposu özel alanları saklamalıdır
+    /// (<see cref="Records.IRecordStore.SupportsCustomFields"/>). Anahtar modül anahtarıyla başlar.
+    /// </summary>
+    IReadOnlyList<CustomizableEntity> CustomizableEntities => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {
@@ -79,6 +85,9 @@ public sealed record OwnedRecordType(string EntityKey, string Label, IReadOnlyDi
 
 /// <summary>Bir kayıt türünün, <see cref="Permission"/> olmadan görülemeyen alanları (ör. fırsat tutarı, maaş).</summary>
 public sealed record SensitiveFields(string EntityKey, string Permission, IReadOnlyList<string> Fields);
+
+/// <summary>Özel alan eklenebilen kayıt türü ve tanım ekranındaki adı (ör. "Fırsat").</summary>
+public sealed record CustomizableEntity(string EntityKey, string DisplayName);
 
 /// <summary>
 /// Hazır rol önerisi (ADR-0005). <see cref="Key"/> modül anahtarıyla başlar (ör. "crm.sales-rep") ve değişmez;

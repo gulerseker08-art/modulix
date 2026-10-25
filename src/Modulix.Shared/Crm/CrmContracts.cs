@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace Modulix.Shared.Crm;
@@ -29,6 +30,9 @@ public static class CrmAccess
 public static class CrmEntityKeys
 {
     public const string Company = "crm.company";
+    public const string Contact = "crm.contact";
+    public const string Opportunity = "crm.opportunity";
+    public const string Activity = "crm.activity";
 }
 
 public sealed record CrmPage<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
@@ -83,7 +87,8 @@ public sealed record CompanyDto(
     CompanySource? Source,
     string? Tags,
     Guid? OwnerId,
-    string? Notes);
+    string? Notes,
+    JsonObject? Custom = null);
 
 /// <summary>Sorumlu boş bırakılırsa kaydı oluşturan kullanıcı atanır.</summary>
 public sealed record SaveCompanyRequest(
@@ -100,7 +105,8 @@ public sealed record SaveCompanyRequest(
     CompanyStatus Status = CompanyStatus.Prospect,
     CompanySource? Source = null,
     string? Tags = null,
-    Guid? OwnerId = null);
+    Guid? OwnerId = null,
+    JsonObject? Custom = null);
 
 public sealed record ContactDto(
     Guid Id,
@@ -111,7 +117,8 @@ public sealed record ContactDto(
     string? Title,
     string? Email,
     string? Phone,
-    string? Notes);
+    string? Notes,
+    JsonObject? Custom = null);
 
 public sealed record SaveContactRequest(
     string FirstName,
@@ -121,7 +128,8 @@ public sealed record SaveContactRequest(
     string? Email = null,
     string? Phone = null,
     string? Notes = null,
-    long? Version = null);
+    long? Version = null,
+    JsonObject? Custom = null);
 
 [JsonConverter(typeof(JsonStringEnumConverter<OpportunityStage>))]
 public enum OpportunityStage
@@ -147,7 +155,8 @@ public sealed record OpportunityDto(
     int? Probability,
     string? LostReason,
     Guid? OwnerId,
-    string? Notes);
+    string? Notes,
+    JsonObject? Custom = null);
 
 public sealed record SaveOpportunityRequest(
     string Title,
@@ -161,7 +170,8 @@ public sealed record SaveOpportunityRequest(
     long? Version = null,
     int? Probability = null,
     string? LostReason = null,
-    Guid? OwnerId = null);
+    Guid? OwnerId = null,
+    JsonObject? Custom = null);
 
 [JsonConverter(typeof(JsonStringEnumConverter<ActivityType>))]
 public enum ActivityType
@@ -184,7 +194,8 @@ public sealed record ActivityDto(
     Guid? ContactId,
     Guid? OpportunityId,
     Guid? OwnerId,
-    string? Notes);
+    string? Notes,
+    JsonObject? Custom = null);
 
 public sealed record SaveActivityRequest(
     string Subject,
@@ -196,4 +207,5 @@ public sealed record SaveActivityRequest(
     Guid? OpportunityId = null,
     string? Notes = null,
     long? Version = null,
-    Guid? OwnerId = null);
+    Guid? OwnerId = null,
+    JsonObject? Custom = null);

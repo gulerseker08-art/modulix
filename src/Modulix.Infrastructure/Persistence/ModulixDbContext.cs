@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
+using Modulix.Core.Customization;
 using Modulix.Core.Teams;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
@@ -54,6 +55,8 @@ public class ModulixDbContext(
 
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
 
+    public DbSet<CustomField> CustomFields => Set<CustomField>();
+
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
@@ -83,6 +86,11 @@ public class ModulixDbContext(
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens", DatabaseSchemas.Platform);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ModulixDbContext).Assembly);
+
+        // Özel alan filtreleri (Y9a): modüller sorguda JsonFunctions.Value kullanır.
+        modelBuilder.HasDbFunction(typeof(JsonFunctions).GetMethod(nameof(JsonFunctions.Value))!)
+            .HasName("JSON_VALUE")
+            .IsBuiltIn();
         ApplyModuleModels(modelBuilder);
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes()

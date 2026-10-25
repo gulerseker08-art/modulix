@@ -48,7 +48,7 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th></th><th>Konu</th><th>Tür</th><th>Tarih</th><th>Firma</th><th>Atanan</th><th></th></tr>
+                <tr><th></th><th>Konu</th><th>Tür</th><th>Tarih</th><th>Firma</th><th>Atanan</th>@foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Activity)) { <th>@field.Label</th> }<th></th></tr>
             </thead>
             <tbody>
                 @foreach (var activity in page.Items)
@@ -71,6 +71,10 @@
                             }
                         </td>
                         <td data-label="Atanan">@Lookups.MemberName(activity.OwnerId)</td>
+                        @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Activity))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, activity.Custom)</td>
+                        }
                         <td class="actions">
                             @if (Session.Can(CrmAccess.ActivitiesWrite))
                             {

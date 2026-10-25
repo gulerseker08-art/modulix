@@ -100,6 +100,17 @@
             {
                 <div class="span-all"><dt>Notlar</dt><dd class="notes">@notes</dd></div>
             }
+            @* Özel alanlar (Y9a): boş olanlar gösterilmez. *@
+            @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Company))
+            {
+                var text = CustomFieldText.Format(field, company.Custom);
+                @if (text.Length > 0)
+                {
+                    <div class="@(field.Type is CustomFieldType.MultilineText ? "span-all" : null)">
+                        <dt>@field.Label</dt><dd class="@(field.Type is CustomFieldType.MultilineText ? "notes" : null)">@text</dd>
+                    </div>
+                }
+            }
         </dl>
 
         @if (Session.Can(CrmAccess.ActivitiesRead))

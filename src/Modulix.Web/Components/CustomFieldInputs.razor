@@ -1,0 +1,124 @@
+@* Formdaki "Ek bilgiler" bölümü (Y9a): firmanın özel alanları, tipine uygun kontrolle. Form ızgarasının içine konur. *@
+@using System.Globalization
+@using System.Text.Json.Nodes
+
+@if (Fields.Count > 0)
+{
+    <h3 class="span-all form-section">Ek bilgiler</h3>
+    @foreach (var field in Fields)
+    {
+        var id = $"custom-{field.Key}";
+        var wide = field.Type is CustomFieldType.MultilineText or CustomFieldType.MultiChoice;
+        <div class="@(wide ? "span-all" : null)">
+            @if (field.Type == CustomFieldType.MultiChoice)
+            {
+                <fieldset>
+                    <legend class="form-label">@field.Label@(field.Required ? " *" : null)</legend>
+                    <div class="check-list">
+                        @foreach (var option in Selectable(field))
+                        {
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" checked="@Selected(field).Contains(option.Key)"
+                                       @onchange="e => Toggle(field, option.Key, (bool)e.Value!)" />
+                                <span class="form-check-label">@option.Label</span>
+                            </label>
+                        }
+                    </div>
+                </fieldset>
+            }
+            else
+            {
+                <label class="form-label" for="@id">@field.Label@(field.Required ? " *" : null)</label>
+                @switch (field.Type)
+                {
+                    case CustomFieldType.MultilineText:
+                        <textarea id="@id" class="form-control" rows="3" maxlength="4000" value="@Text(field)"
+                                  @onchange="e => SetText(field, e.Value as string)"></textarea>
+                        break;
+                    case CustomFieldType.Number:
+                        <input id="@id" class="form-control" type="number" step="any" inputmode="decimal" value="@Text(field)"
+                               @onchange="e => SetNumber(field, e.Value as string)" />
+                        break;
+                    case CustomFieldType.Date:
+                        <input id="@id" class="form-control" type="date" value="@Text(field)" @onchange="e => SetText(field, e.Value as string)" />
+                        break;
+                    case CustomFieldType.YesNo:
+                        <select id="@id" class="form-select" value="@Text(field)" @onchange="e => SetYesNo(field, e.Value as string)">
+                            <option value="">—</option>
+                            <option value="true">Evet</option>
+                            <option value="false">Hayır</option>
+                        </select>
+                        break;
+                    case CustomFieldType.Choice:
+                        <select id="@id" class="form-select" value="@Text(field)" @onchange="e => SetText(field, e.Value as string)">
+                            <option value="">—</option>
+                            @foreach (var option in Selectable(field))
+                            {
+                                <option value="@option.Key">@option.Label</option>
+                            }
+                        </select>
+                        break;
+                    default:
+                        <input id="@id" class="form-control" maxlength="500" value="@Text(field)" @onchange="e => SetText(field, e.Value as string)" />
+                        break;
+                }
+            }
+            <FieldError Field="@($"custom.{field.Key}")" Errors="Errors" />
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<CustomFieldDto> Fields { get; set; } = [];
+
+    /// <summary>Formun özel alan değerleri; bileşen yerinde değiştirir.</summary>
+    [Parameter, EditorRequired] public JsonObject Values { get; set; } = [];
+
+    [Parameter] public IReadOnlyDictionary<string, string[]>? Errors { get; set; }
+
+    // Pasif seçenek yeni değer olarak seçilemez; kayıtta zaten varsa listede kalır.
+    private IEnumerable<CustomFieldOptionDto> Selectable(CustomFieldDto field)
+    {
+        var current = field.Type == CustomFieldType.Choice ? [Text(field)] : Selected(field);
+        return field.Options.Where(o => o.Active || current.Contains(o.Key));
+    }
+
+    private string Text(CustomFieldDto field) => Values[field.Key] switch
+    {
+        null => string.Empty,
+        JsonValue v when v.GetValueKind() is System.Text.Json.JsonValueKind.String => v.GetValue<string>(),
+        var v => v.ToJsonString(),
+    };
+
+    private HashSet<string> Selected(CustomFieldDto field) =>
+        Values[field.Key] is JsonArray array ? array.Select(i => i!.GetValue<string>()).ToHashSet() : [];
+
+    private void SetText(CustomFieldDto field, string? text) =>
+        Values[field.Key] = string.IsNullOrWhiteSpace(text) ? null : JsonValue.Create(text);
+
+    // Geçersiz sayı metin olarak gider; sunucu "Sayı olmalıdır" der.
+    private void SetNumber(CustomFieldDto field, string? text) =>
+        Values[field.Key] = string.IsNullOrWhiteSpace(text)
+            ? null
+            : decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? JsonValue.Create(number) : JsonValue.Create(text);
+
+    private void SetYesNo(CustomFieldDto field, string? text) =>
+        Values[field.Key] = text switch { "true" => JsonValue.Create(true), "false" => JsonValue.Create(false), _ => null };
+
+    private void Toggle(CustomFieldDto field, string key, bool on)
+    {
+        var selected = Selected(field);
+        if (on)
+        {
+            selected.Add(key);
+        }
+        else
+        {
+            selected.Remove(key);
+        }
+
+        Values[field.Key] = selected.Count == 0
+            ? null
+            : new JsonArray([.. field.Options.Where(o => selected.Contains(o.Key)).Select(o => (JsonNode?)JsonValue.Create(o.Key))]);
+    }
+}

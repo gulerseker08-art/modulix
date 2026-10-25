@@ -27,6 +27,9 @@ public abstract class CrmEntity : ITenantEntity
     /// <summary>Her değişiklikte artar; eşzamanlı güncellemeleri yakalamak için kullanılır.</summary>
     public long Version { get; private set; }
 
+    /// <summary>Firmanın tanımladığı özel alanların değerleri (Y9a), JSON nesnesi; boşsa null. Boru hattı doğrular.</summary>
+    public string? CustomFields { get; internal set; }
+
     internal void Touch()
     {
         UpdatedAt = DateTimeOffset.UtcNow;

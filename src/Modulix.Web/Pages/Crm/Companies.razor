@@ -50,7 +50,7 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ad</th><th>Durum</th><th>Şehir</th><th>Sorumlu</th><th>Telefon</th><th></th></tr>
+                <tr><th>Ad</th><th>Durum</th><th>Şehir</th><th>Sorumlu</th><th>Telefon</th>@foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Company)) { <th>@field.Label</th> }<th></th></tr>
             </thead>
             <tbody>
                 @foreach (var company in page.Items)
@@ -61,6 +61,10 @@
                         <td data-label="Şehir">@company.City</td>
                         <td data-label="Sorumlu">@Lookups.MemberName(company.OwnerId)</td>
                         <td data-label="Telefon">@company.Phone</td>
+                        @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Company))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, company.Custom)</td>
+                        }
                         <td class="actions">
                             @if (Session.Can(CrmAccess.CompaniesWrite))
                             {

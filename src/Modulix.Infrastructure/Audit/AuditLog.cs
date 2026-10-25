@@ -158,8 +158,9 @@ internal sealed class AuditLog(
         bool Visible(AuditedEntity? entity) =>
             viewer.IsAdministrator || entity?.ReadPermission is not { } permission || viewer.Permissions.Contains(permission);
 
+        var custom = await CustomFieldsAsync(entries, cancellationToken);
         var parsed = entries
-            .Select(e => (Entry: e, Entity: catalog.FindAuditedEntity(e.EntityKey), Changes: Parse(e.Changes)))
+            .Select(e => (Entry: e, Entity: WithCustomFields(catalog.FindAuditedEntity(e.EntityKey), custom), Changes: Parse(e.Changes)))
             .ToList();
 
         // Değerlerde geçen kişiler ve bağlı kayıtlar; yalnızca okurun görebildiği satırlardan.
@@ -278,6 +279,46 @@ internal sealed class AuditLog(
                 fields,
                 entry.CorrelationId);
         }).ToList();
+    }
+
+    // Kayıtlardaki özel alanlar (Y9a) "custom.anahtar" adıyla yazılır; adları ve seçenek adları tanımlardan gelir
+    // (arşivlenmiş alanlar dahil: geçmiş değerler anlamını korur).
+    private async Task<ILookup<string, Core.Customization.CustomField>> CustomFieldsAsync(
+        IReadOnlyList<AuditLogEntry> entries, CancellationToken cancellationToken)
+    {
+        var entityKeys = entries.Select(e => e.EntityKey).Where(k => catalog.FindCustomizable(k) is not null).Distinct().ToList();
+        if (entityKeys.Count == 0)
+        {
+            return Enumerable.Empty<Core.Customization.CustomField>().ToLookup(f => f.EntityKey);
+        }
+
+        var fields = await db.CustomFields.AsNoTracking()
+            .Where(f => entityKeys.Contains(f.EntityKey))
+            .OrderBy(f => f.SortOrder)
+            .ToListAsync(cancellationToken);
+        return fields.ToLookup(f => f.EntityKey);
+    }
+
+    private static AuditedEntity? WithCustomFields(AuditedEntity? entity, ILookup<string, Core.Customization.CustomField> custom)
+    {
+        if (entity is null || !custom.Contains(entity.EntityKey))
+        {
+            return entity;
+        }
+
+        var fields = new Dictionary<string, string>(entity.Fields);
+        var options = new Dictionary<string, IReadOnlyDictionary<string, string>>(entity.Options);
+        foreach (var field in custom[entity.EntityKey])
+        {
+            var name = RecordFields.CustomPrefix + field.Key;
+            fields[name] = field.Label;
+            if (field.HasOptions)
+            {
+                options[name] = field.Options.ToDictionary(o => o.Key, o => o.Label, StringComparer.Ordinal);
+            }
+        }
+
+        return entity with { Fields = fields, Options = options };
     }
 
     /// <summary>Kişi adları: firmanın üyesi (veya eski üyesi) adıyla, üye olmayan platform yöneticisi sabit adla görünür.</summary>

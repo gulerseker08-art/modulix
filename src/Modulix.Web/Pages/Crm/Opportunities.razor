@@ -122,7 +122,7 @@
                     {
                         <th class="text-end">Tutar</th><th>Olasılık</th>
                     }
-                    <th>Sorumlu</th><th>Kapanış</th><th></th>
+                    <th>Sorumlu</th><th>Kapanış</th>@foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Opportunity)) { <th>@field.Label</th> }<th></th>
                 </tr>
             </thead>
             <tbody>
@@ -139,6 +139,10 @@
                         }
                         <td data-label="Sorumlu">@Lookups.MemberName(opportunity.OwnerId)</td>
                         <td data-label="Kapanış">@(opportunity.ExpectedCloseDate is { } date ? CrmLabels.Date(date) : null)</td>
+                        @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Opportunity))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, opportunity.Custom)</td>
+                        }
                         <td class="actions">
                             @if (Session.Can(CrmAccess.OpportunitiesWrite))
                             {

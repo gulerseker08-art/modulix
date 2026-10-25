@@ -65,6 +65,7 @@
                     <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
                     <FieldError Field="notes" Errors="errors" />
                 </div>
+                <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
@@ -94,7 +95,7 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ad soyad</th><th>Firma</th><th>Unvan</th><th>Telefon</th><th>E-posta</th><th></th></tr>
+                <tr><th>Ad soyad</th><th>Firma</th><th>Unvan</th><th>Telefon</th><th>E-posta</th>@foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Contact)) { <th>@field.Label</th> }<th></th></tr>
             </thead>
             <tbody>
                 @foreach (var contact in page.Items)
@@ -110,6 +111,10 @@
                         <td data-label="Unvan">@contact.Title</td>
                         <td data-label="Telefon">@contact.Phone</td>
                         <td data-label="E-posta">@contact.Email</td>
+                        @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Contact))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, contact.Custom)</td>
+                        }
                         <td class="actions">
                             @if (Session.Can(CrmAccess.ContactsWrite))
                             {
@@ -164,6 +169,7 @@
         Email = contact.Email,
         Phone = contact.Phone,
         Notes = contact.Notes,
+        Custom = contact.Custom?.DeepClone().AsObject() ?? [],
     });
 
     private void Open(ContactForm value)
@@ -178,7 +184,8 @@
     private async Task SaveAsync()
     {
         busy = true;
-        var request = new SaveContactRequest(form!.FirstName, form.LastName, form.CompanyId, form.Title, form.Email, form.Phone, form.Notes, form.Version);
+        var request = new SaveContactRequest(form!.FirstName, form.LastName, form.CompanyId, form.Title, form.Email, form.Phone, form.Notes, form.Version,
+            Custom: CustomFieldText.ForSave(CustomFields, form.Custom));
         var result = form.Id is { } id
             ? await Api.PutAsync<ContactDto>($"{Url}/{id}", request)
             : await Api.PostAsync<ContactDto>(Url, request);
@@ -211,8 +218,12 @@
         message = result.Error;
     }
 
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Contact)];
+
     private sealed class ContactForm
     {
+        public System.Text.Json.Nodes.JsonObject Custom { get; set; } = [];
+
         public Guid? Id { get; init; }
 
         public long? Version { get; init; }

@@ -94,6 +94,15 @@ public sealed class CrmModule : IModule
         new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability"]),
     ];
 
+    /// <summary>Özel alanlar (Y9a): firma dört kayıt türüne de kendi alanlarını ekleyebilir.</summary>
+    IReadOnlyList<CustomizableEntity> IModule.CustomizableEntities { get; } =
+    [
+        new(Entities.Company, "Firma"),
+        new(Entities.Contact, "Kişi"),
+        new(Entities.Opportunity, "Fırsat"),
+        new(Entities.Activity, "Aktivite"),
+    ];
+
     /// <summary>Denetim kaydı (Y5): alanların görünen adları; seçenek adları arayüzdekilerle aynıdır.</summary>
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
     [

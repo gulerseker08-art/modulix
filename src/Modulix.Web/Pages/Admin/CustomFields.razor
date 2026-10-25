@@ -1,0 +1,294 @@
+@page "/yonetim/ozel-alanlar"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Özel alanlar · Modulix</PageTitle>
+
+@* Özel alanlar (Y9a). Alanlar formun sonundaki "Ek bilgiler" bölümünde çıkar; anahtar ve tip kaydedildikten sonra değişmez. *@
+<AuthGate Permission="@CoreAccess.ManageCustomization">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Özel alanlar</h1>
+    </div>
+
+    <p class="text-muted">
+        Kayıtlara firmanıza özgü alanlar ekleyin (ör. fırsatta "Araç tipi"). Alanlar formda "Ek bilgiler" bölümünde çıkar.
+        Silinen alan arşivlenir: değerleri kayıtlarda kalır, geri aldığınızda yeniden görünür.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (entities is { Count: > 0 })
+    {
+        <div class="filters">
+            <div class="segmented" role="group" aria-label="Kayıt türü">
+                @foreach (var entity in entities)
+                {
+                    <button type="button" class="chip @(entity.Key == entityKey ? "active" : null)" @onclick="() => SelectAsync(entity.Key)">@entity.Name</button>
+                }
+            </div>
+        </div>
+
+        @if (form is not null)
+        {
+            <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <h2>@(form.Id is null ? "Yeni alan" : "Alanı düzenle")</h2>
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="fieldLabel">Alan adı *</label>
+                        <input id="fieldLabel" class="form-control" maxlength="100" placeholder="ör. Araç tipi" @bind="form.Label" @bind:event="oninput" />
+                        <FieldError Field="label" Errors="errors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="fieldType">Tip</label>
+                        @if (form.Id is null)
+                        {
+                            <select id="fieldType" class="form-select" @bind="form.Type">
+                                @foreach (var type in Enum.GetValues<CustomFieldType>())
+                                {
+                                    <option value="@type">@CustomFieldTypeLabels.Of(type)</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <input id="fieldType" class="form-control" value="@CustomFieldTypeLabels.Of(form.Type)" disabled />
+                            <div class="form-text">Tip kaydedildikten sonra değişmez.</div>
+                        }
+                    </div>
+                    <div class="span-all check-list">
+                        <label class="form-check">
+                            <input class="form-check-input" type="checkbox" @bind="form.Required" />
+                            <span class="form-check-label">Zorunlu</span>
+                        </label>
+                        <label class="form-check">
+                            <input class="form-check-input" type="checkbox" @bind="form.ShowInList" />
+                            <span class="form-check-label">Listede göster</span>
+                        </label>
+                    </div>
+                    @if (CustomFieldTypeLabels.HasOptions(form.Type))
+                    {
+                        <fieldset class="span-all">
+                            <legend class="form-label">Seçenekler</legend>
+                            @for (var i = 0; i < form.Options.Count; i++)
+                            {
+                                var option = form.Options[i];
+                                var index = i;
+                                <div class="option-row">
+                                    <input class="form-control" maxlength="100" aria-label="Seçenek @(index + 1)" @bind="option.Label" />
+                                    <label class="form-check">
+                                        <input class="form-check-input" type="checkbox" @bind="option.Active" />
+                                        <span class="form-check-label">Etkin</span>
+                                    </label>
+                                    @if (option.Key is null)
+                                    {
+                                        <button type="button" class="btn btn-link btn-sm" @onclick="() => form.Options.RemoveAt(index)">Kaldır</button>
+                                    }
+                                </div>
+                            }
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form.Options.Add(new OptionForm())">Seçenek ekle</button>
+                            <div class="form-text">Kullanılmış bir seçenek silinmez; pasife alın. Pasif seçenek yeni kayıtta seçilemez.</div>
+                            <FieldError Field="options" Errors="errors" />
+                        </fieldset>
+                    }
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(form.Label))">
+                        @(form.Id is null ? "Alanı ekle" : "Kaydet")
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                </div>
+            </form>
+        }
+        else
+        {
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" @onclick="New">Yeni alan</button>
+            </div>
+        }
+
+        @if (fields is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+        else if (fields.Count == 0)
+        {
+            <p class="text-muted">Bu kayıt türünde özel alan yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <thead>
+                    <tr><th>Alan</th><th>Tip</th><th>Zorunlu</th><th>Listede</th><th>Sıra</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var field in fields)
+                    {
+                        var active = Active.ToList();
+                        var position = active.IndexOf(field);
+                        <tr class="@(field.Archived ? "is-archived" : null)">
+                            <td data-label="Alan" class="primary">
+                                @field.Label
+                                @if (field.Archived) { <span class="badge text-bg-secondary ms-1">Arşivde</span> }
+                            </td>
+                            <td data-label="Tip">@CustomFieldTypeLabels.Of(field.Type)@(field.Options.Count > 0 ? $" ({field.Options.Count(o => o.Active)} seçenek)" : null)</td>
+                            <td data-label="Zorunlu">@(field.Required ? "Evet" : "Hayır")</td>
+                            <td data-label="Listede">@(field.ShowInList ? "Evet" : "Hayır")</td>
+                            <td data-label="Sıra">
+                                @if (!field.Archived)
+                                {
+                                    <button type="button" class="btn btn-link btn-sm" aria-label="Yukarı" disabled="@(busy || position == 0)" @onclick="() => MoveAsync(field, -1)">↑</button>
+                                    <button type="button" class="btn btn-link btn-sm" aria-label="Aşağı" disabled="@(busy || position == active.Count - 1)" @onclick="() => MoveAsync(field, 1)">↓</button>
+                                }
+                            </td>
+                            <td class="actions">
+                                @if (field.Archived)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => SetArchivedAsync(field, false)">Geri al</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(field)">Düzenle</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => SetArchivedAsync(field, true)">Arşivle</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+    else if (entities is not null)
+    {
+        <p class="text-muted">Özel alan eklenebilecek bir modül açık değil.</p>
+    }
+</AuthGate>
+
+@code {
+    private IReadOnlyList<CustomizableEntityDto>? entities;
+    private string? entityKey;
+    private List<CustomFieldDto>? fields;
+    private FieldForm? form;
+    private string? message;
+    private bool busy;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    private IEnumerable<CustomFieldDto> Active => fields?.Where(f => !f.Archived) ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ManageCustomization))
+        {
+            var result = await Api.GetAsync<List<CustomizableEntityDto>>("/api/customization/entities");
+            entities = result.Value;
+            message = result.Error;
+            if (entities is { Count: > 0 })
+            {
+                await SelectAsync(entities[0].Key);
+            }
+        }
+    }
+
+    private async Task SelectAsync(string key)
+    {
+        entityKey = key;
+        form = null;
+        errors = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<CustomFieldDto>>($"/api/customization/fields?entityKey={Uri.EscapeDataString(entityKey!)}");
+        // Etkin alanlar sırasıyla, arşivdekiler sonda.
+        fields = result.Value?.OrderBy(f => f.Archived).ToList();
+        message = result.Error;
+    }
+
+    private void New()
+    {
+        form = new FieldForm { Options = [new OptionForm(), new OptionForm()] };
+        errors = null;
+    }
+
+    private void Edit(CustomFieldDto field)
+    {
+        form = new FieldForm
+        {
+            Id = field.Id, Label = field.Label, Type = field.Type, Required = field.Required, ShowInList = field.ShowInList,
+            Options = [.. field.Options.Select(o => new OptionForm { Key = o.Key, Label = o.Label, Active = o.Active })],
+        };
+        errors = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var options = CustomFieldTypeLabels.HasOptions(form!.Type)
+            ? form.Options.Where(o => o.Key is not null || !string.IsNullOrWhiteSpace(o.Label)).Select(o => new SaveCustomFieldOption(o.Key, o.Label, o.Active)).ToList()
+            : null;
+        var request = new SaveCustomFieldRequest(entityKey!, form.Label, form.Type, form.Required, form.ShowInList, options);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<CustomFieldDto>($"/api/customization/fields/{id}", request)
+            : await Api.PostAsync<CustomFieldDto>("/api/customization/fields", request);
+        busy = false;
+        errors = result.FieldErrors;
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+        }
+    }
+
+    private async Task SetArchivedAsync(CustomFieldDto field, bool archived)
+    {
+        busy = true;
+        var result = await Api.PostAsync<CustomFieldDto>($"/api/customization/fields/{field.Id}/{(archived ? "archive" : "restore")}", new { });
+        busy = false;
+        message = result.Error;
+        await LoadAsync();
+    }
+
+    private async Task MoveAsync(CustomFieldDto field, int direction)
+    {
+        var order = Active.ToList();
+        var index = order.IndexOf(field);
+        order.RemoveAt(index);
+        order.Insert(index + direction, field);
+        busy = true;
+        var result = await Api.PutAsync<bool>("/api/customization/fields/order", new ReorderCustomFieldsRequest(entityKey!, [.. order.Select(f => f.Id)]));
+        busy = false;
+        message = result.Error;
+        await LoadAsync();
+    }
+
+    private sealed class FieldForm
+    {
+        public Guid? Id { get; init; }
+
+        public string Label { get; set; } = string.Empty;
+
+        public CustomFieldType Type { get; set; } = CustomFieldType.Text;
+
+        public bool Required { get; set; }
+
+        public bool ShowInList { get; set; }
+
+        public List<OptionForm> Options { get; set; } = [];
+    }
+
+    private sealed class OptionForm
+    {
+        public string? Key { get; init; }
+
+        public string Label { get; set; } = string.Empty;
+
+        public bool Active { get; set; } = true;
+    }
+}

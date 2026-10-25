@@ -59,6 +59,25 @@ public sealed record RecordQuery(
     /// dönmez. Boru hattı doldurur (çağıranın verdiği değer yok sayılır); sorumlu alanı olmayan depo bunu yok sayar.
     /// </summary>
     public IReadOnlySet<Guid>? Owners { get; init; }
+
+    /// <summary>
+    /// Özel alan filtreleri (Y9a): özel alan anahtarı → değer. Boru hattı doğrular ve <see cref="Filters"/>'tan
+    /// ("custom.anahtar" adıyla gelir) buraya taşır; depo özel alan JSON'unda eşitlikle süzer.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? CustomFilters { get; init; }
+}
+
+/// <summary>Kayıt değerlerindeki ortak alan adları.</summary>
+public static class RecordFields
+{
+    /// <summary>
+    /// Özel alanlar (Y9a): <c>{ "anahtar": değer }</c> nesnesi. Boru hattı tanımlara göre doğrular ve birleştirir; depo
+    /// nesneyi olduğu gibi saklar ve okurken aynı adla verir.
+    /// </summary>
+    public const string Custom = "custom";
+
+    /// <summary>Hata ve filtre adlarında özel alanın öneki (ör. "custom.arac_tipi").</summary>
+    public const string CustomPrefix = Custom + ".";
 }
 
 public sealed record RecordPage(IReadOnlyList<RecordData> Items, int Page, int PageSize, int TotalCount);
@@ -135,6 +154,12 @@ public interface IRecordStore
     /// <see cref="RecordQuery.Owners"/>'ı sorguda uygulamalıdır. Null ise kayıt türü kapsamdan etkilenmez.
     /// </summary>
     string? OwnerField => null;
+
+    /// <summary>
+    /// Özel alanları saklar mı (Y9a)? Öyleyse depo <see cref="RecordFields.Custom"/> değerini (boru hattının doğrulayıp
+    /// birleştirdiği nesnenin tamamı) saklar, okurken aynı adla verir ve <see cref="RecordQuery.CustomFilters"/>'ı uygular.
+    /// </summary>
+    bool SupportsCustomFields => false;
 
     IReadOnlyList<RecordFieldError> Validate(RecordOperation operation, JsonObject values);
 

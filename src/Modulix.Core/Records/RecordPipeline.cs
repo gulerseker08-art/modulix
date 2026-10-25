@@ -10,6 +10,7 @@ namespace Modulix.Core.Records;
 /// tenant → lisans → yetki → veri kapsamı → doğrulama → kayıt → audit → olay.
 /// Kayıt, audit ve olay tek seferde yazılır; biri başarısız olursa hiçbiri yazılmaz.
 /// Hassas alanlar (Y8b) yetki adımında belirlenir: okumada çıkarılır, yazmada reddedilir, süzmede kullanılamaz.
+/// Özel alanlar (Y9a) doğrulama adımında tanımlarına göre denetlenir ve kaydın mevcut özel alanlarıyla birleştirilir.
 /// </summary>
 public sealed class RecordPipeline(
     ITenantContextAccessor tenantAccessor,
@@ -18,6 +19,7 @@ public sealed class RecordPipeline(
     IPermissionService permissions,
     IDataScopeService dataScope,
     IFieldAccessService fieldAccess,
+    ICustomFieldProvider customFields,
     IAuditWriter audit,
     IDomainEventOutbox outbox,
     IUnitOfWork unitOfWork) : IRecordPipeline
@@ -31,6 +33,7 @@ public sealed class RecordPipeline(
         }
 
         var hidden = await fieldAccess.GetHiddenFieldsAsync(tenant!, store!.EntityKey, cancellationToken);
+        var custom = await CustomFieldsAsync(tenant!, store, cancellationToken);
         var data = await store.FindAsync(record.Id, cancellationToken);
         if (data is null || !await InScopeAsync(tenant!, store!, data, cancellationToken))
         {
@@ -38,7 +41,7 @@ public sealed class RecordPipeline(
             return NotFound<RecordData>();
         }
 
-        return RecordResult<RecordData>.Ok(Strip(data, hidden));
+        return RecordResult<RecordData>.Ok(Present(data, hidden, custom));
     }
 
     public async Task<RecordResult<RecordPage>> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
@@ -71,6 +74,18 @@ public sealed class RecordPipeline(
             return Invalid<RecordPage>([new RecordFieldError(hiddenFilter, "Bu alana göre süzme yetkiniz yok.")]);
         }
 
+        var custom = await CustomFieldsAsync(tenant!, store, cancellationToken);
+        if (store.SupportsCustomFields)
+        {
+            var (filters, customFilters, filterErrors) = RecordCustomFields.SplitFilters(custom, normalized.Filters);
+            if (filterErrors.Count > 0)
+            {
+                return Invalid<RecordPage>(filterErrors);
+            }
+
+            normalized = normalized with { Filters = filters, CustomFilters = customFilters };
+        }
+
         RecordPage page;
         try
         {
@@ -81,7 +96,7 @@ public sealed class RecordPipeline(
             return Invalid<RecordPage>(invalid.Errors);
         }
 
-        return RecordResult<RecordPage>.Ok(hidden.Count == 0 ? page : page with { Items = [.. page.Items.Select(i => Strip(i, hidden))] });
+        return RecordResult<RecordPage>.Ok(page with { Items = [.. page.Items.Select(i => Present(i, hidden, custom))] });
     }
 
     public async Task<RecordResult<RecordData>> CreateAsync(RecordCommand command, CancellationToken cancellationToken)
@@ -98,7 +113,14 @@ public sealed class RecordPipeline(
             return HiddenFieldDenied<RecordData>();
         }
 
-        var errors = store.Validate(RecordOperation.Create, values);
+        var custom = await CustomFieldsAsync(tenant!, store, cancellationToken);
+        var errors = new List<RecordFieldError>();
+        if (store.SupportsCustomFields)
+        {
+            (values, errors) = RecordCustomFields.Prepare(custom, RecordOperation.Create, values, before: null);
+        }
+
+        errors.AddRange(store.Validate(RecordOperation.Create, values));
         if (errors.Count > 0)
         {
             return Invalid<RecordData>(errors);
@@ -114,7 +136,7 @@ public sealed class RecordPipeline(
 
             Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values);
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            return RecordResult<RecordData>.Ok(Strip(created, hidden));
+            return RecordResult<RecordData>.Ok(Present(created, hidden, custom));
         }
         catch (RecordValidationException invalid)
         {
@@ -152,7 +174,14 @@ public sealed class RecordPipeline(
             return HiddenFieldDenied<RecordData>();
         }
 
-        var errors = store.Validate(RecordOperation.Update, values);
+        var custom = await CustomFieldsAsync(tenant!, store, cancellationToken);
+        var errors = new List<RecordFieldError>();
+        if (store.SupportsCustomFields)
+        {
+            (values, errors) = RecordCustomFields.Prepare(custom, RecordOperation.Update, values, before.Values);
+        }
+
+        errors.AddRange(store.Validate(RecordOperation.Update, values));
         if (errors.Count > 0)
         {
             return Invalid<RecordData>(errors);
@@ -173,7 +202,7 @@ public sealed class RecordPipeline(
 
             Record(tenant!, command.Source, updated.EntityKey, updated.Id, AuditAction.Updated, DomainEventTypes.RecordUpdated, before.Values, updated.Values);
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            return RecordResult<RecordData>.Ok(Strip(updated, hidden));
+            return RecordResult<RecordData>.Ok(Present(updated, hidden, custom));
         }
         catch (RecordValidationException invalid)
         {
@@ -233,6 +262,14 @@ public sealed class RecordPipeline(
             && Guid.TryParse(text, out var owner)
             && owners.Contains(owner);
     }
+
+    // Özel alanı olan türde etkin alan tanımları; diğerlerinde boş (veritabanına gidilmez).
+    private async Task<IReadOnlyList<Customization.CustomFieldInfo>> CustomFieldsAsync(
+        TenantContext tenant, IRecordStore store, CancellationToken cancellationToken) =>
+        store.SupportsCustomFields ? await customFields.GetFieldsAsync(tenant, store.EntityKey, cancellationToken) : [];
+
+    private static RecordData Present(RecordData data, IReadOnlySet<string> hidden, IReadOnlyList<Customization.CustomFieldInfo> custom) =>
+        Strip(data.Values.ContainsKey(RecordFields.Custom) ? RecordCustomFields.Present(data, custom) : data, hidden);
 
     // Kayıt, gizli alanları çıkarılmış haliyle verilir (kopya; depo verisi değişmez).
     private static RecordData Strip(RecordData data, IReadOnlySet<string> hidden)
@@ -320,7 +357,7 @@ public sealed class RecordPipeline(
         JsonObject? before,
         JsonObject? after)
     {
-        var changes = RecordDiff.Compute(before, after);
+        var changes = RecordDiff.Compute(RecordCustomFields.Flatten(before), RecordCustomFields.Flatten(after));
         audit.Add(new AuditEntry(tenant.TenantId, tenant.UserId, entityKey, recordId, action, changes, source, Activity.Current?.TraceId.ToString()));
         outbox.Add(new DomainEvent(tenant.TenantId, eventType, entityKey, recordId, changes.DeepClone().AsObject()));
     }

@@ -86,6 +86,7 @@
             <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
             <FieldError Field="notes" Errors="errors" />
         </div>
+        <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
     </div>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
@@ -115,6 +116,8 @@
 
     [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
 
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Activity)];
+
     [Parameter] public EventCallback<ActivityDto> Saved { get; set; }
 
     [Parameter] public EventCallback Deleted { get; set; }
@@ -136,6 +139,7 @@
                 Id = a.Id, Version = a.Version, Type = a.Type, Subject = a.Subject, DueAt = a.DueAt is { } due ? Regional.ToTenant(due).DateTime : null,
                 CompletedAt = a.CompletedAt, Completed = a.CompletedAt is not null, CompanyId = a.CompanyId, ContactId = a.ContactId,
                 OpportunityId = a.OpportunityId, OwnerId = a.OwnerId, Notes = a.Notes,
+                    Custom = a.Custom?.DeepClone().AsObject() ?? [],
             }
             : new ActivityForm { CompanyId = FixedCompanyId };
         errors = null;
@@ -151,7 +155,7 @@
         // Formdaki saat firmanın saat dilimindedir.
         var dueAt = form.DueAt is { } local ? Regional.FromTenant(local) : (DateTimeOffset?)null;
         var request = new SaveActivityRequest(
-            form.Subject, form.Type, dueAt, completedAt, form.CompanyId, form.ContactId, form.OpportunityId, form.Notes, form.Version, form.OwnerId);
+            form.Subject, form.Type, dueAt, completedAt, form.CompanyId, form.ContactId, form.OpportunityId, form.Notes, form.Version, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom));
         var result = form.Id is { } id
             ? await Api.PutAsync<ActivityDto>($"{Url}/{id}", request)
             : await Api.PostAsync<ActivityDto>(Url, request);
@@ -184,6 +188,8 @@
 
     private sealed class ActivityForm
     {
+        public System.Text.Json.Nodes.JsonObject Custom { get; set; } = [];
+
         public Guid? Id { get; init; }
 
         public long? Version { get; init; }

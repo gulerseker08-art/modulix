@@ -92,6 +92,7 @@
             <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
             <FieldError Field="notes" Errors="errors" />
         </div>
+        <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
     </div>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
@@ -116,6 +117,8 @@
 
     [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
 
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Company)];
+
     [Parameter] public EventCallback<CompanyDto> Saved { get; set; }
 
     [Parameter] public EventCallback Deleted { get; set; }
@@ -138,6 +141,7 @@
                     Id = c.Id, Version = c.Version, Name = c.Name, TaxNumber = c.TaxNumber, Phone = c.Phone, Email = c.Email,
                     Website = c.Website, City = c.City, Address = c.Address, Industry = c.Industry, Status = c.Status,
                     Source = c.Source, Tags = c.Tags, OwnerId = c.OwnerId, Notes = c.Notes,
+                    Custom = c.Custom?.DeepClone().AsObject() ?? [],
                 }
                 : new CompanyForm();
             errors = null;
@@ -150,7 +154,7 @@
         busy = true;
         var request = new SaveCompanyRequest(
             form.Name, form.TaxNumber, form.Phone, form.Email, form.Website, form.City, form.Notes, form.Version,
-            form.Address, form.Industry, form.Status, form.Source, form.Tags, form.OwnerId);
+            form.Address, form.Industry, form.Status, form.Source, form.Tags, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom));
         var result = form.Id is { } id
             ? await Api.PutAsync<CompanyDto>($"{Url}/{id}", request)
             : await Api.PostAsync<CompanyDto>(Url, request);
@@ -183,6 +187,8 @@
 
     private sealed class CompanyForm
     {
+        public System.Text.Json.Nodes.JsonObject Custom { get; set; } = [];
+
         public Guid? Id { get; init; }
 
         public long? Version { get; init; }
