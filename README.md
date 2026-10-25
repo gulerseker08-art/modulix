@@ -299,6 +299,7 @@ Listeler filtre alır; bilinmeyen filtre veya geçersiz değer 422 döner. `owne
 - Firma, fırsat ve aktivitenin bir sorumlusu vardır; oluştururken boş bırakılırsa kaydı oluşturan kullanıcı atanır. Sorumlu, kuruluşun etkin üyesi olmalıdır.
 
 - Tüm işlemler kayıt boru hattından geçer: modül tenant için kapalıysa veya izin yoksa 403, başka tenant'ın kaydı 404, başka tenant'ın kaydına bağlanmak 422 döner. Bağlı kaydı olan firma silinemez (409). Audit ve outbox kaydı otomatik yazılır.
+- **Sürüm zorunludur (B1):** `/api/crm/...` ve `/api/records/...` üzerinde güncelleme (`version` gövdede) ve silme (`?version=`) okunan sürümü ister; sürümsüz istek 428 (`code: VersionRequired`) alır, değişmiş sürüm 409 kalır. Zorunluluk yalnızca bu HTTP uç noktalarındadır; kayıt devri ve olay aboneleri gibi arka plan işleri boru hattını doğrudan çağırır, etkilenmez.
 - Aynı kayıtlara genel uçtan da ulaşılır (`/api/records/crm.company` vb.); aynı izinler geçerlidir.
 - Arayüz API ile aynı adresten sunulur: `https://localhost:7026` → giriş, kuruluş seçimi, Firmalar / Kişiler / Fırsatlar / Aktiviteler. Telefonda listeler kart görünümüne döner.
 - Firma adına tıklayınca firma detay sayfası açılır: kişiler, fırsatlar ve aktiviteler tek ekranda; aktivite ve fırsat oradan eklenir. Fırsatlar sayfası varsayılan olarak satış hunisini (aşama sütunları, sürükle bırak) gösterir. Aktiviteler sayfası "Bugün" görünümüyle açılır (bugüne kadar yapılması gereken açık işlerim).

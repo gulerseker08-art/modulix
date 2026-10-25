@@ -99,7 +99,7 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
         Assert.Equal(OpportunityStage.Won, (await won.Content.ReadFromJsonAsync<OpportunityDto>())!.Stage);
 
         // Bağlı kayıtları olan firma silinemez.
-        var delete = await client.DeleteAsync($"/api/crm/companies/{company.Id}");
+        var delete = await client.DeleteAsync($"/api/crm/companies/{company.Id}?version={company.Version}");
         Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/crm/companies/{company.Id}")).StatusCode);
     }
@@ -114,8 +114,11 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
         var companyOfA = await CreateCompanyAsync(a, "A Firması");
 
         Assert.Equal(HttpStatusCode.NotFound, (await b.GetAsync($"/api/crm/companies/{companyOfA.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await b.PutAsJsonAsync($"/api/crm/companies/{companyOfA.Id}", new SaveCompanyRequest("Ele geçirildi"))).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await b.DeleteAsync($"/api/crm/companies/{companyOfA.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.PreconditionRequired, (await a.PutAsJsonAsync($"/api/crm/companies/{companyOfA.Id}", new SaveCompanyRequest("Sürümsüz"))).StatusCode);
+        Assert.Equal(HttpStatusCode.PreconditionRequired, (await a.DeleteAsync($"/api/crm/companies/{companyOfA.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.PreconditionRequired, (await a.PutAsJsonAsync($"/api/records/{CrmModule.Entities.Company}/{companyOfA.Id}", new RecordWriteRequest(new JsonObject()))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await b.PutAsJsonAsync($"/api/crm/companies/{companyOfA.Id}", new SaveCompanyRequest("Ele geçirildi", Version: companyOfA.Version))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await b.DeleteAsync($"/api/crm/companies/{companyOfA.Id}?version={companyOfA.Version}")).StatusCode);
         Assert.DoesNotContain((await b.GetFromJsonAsync<CrmPage<CompanyDto>>("/api/crm/companies"))!.Items, c => c.Id == companyOfA.Id);
 
         var link = await b.PostAsJsonAsync("/api/crm/contacts", new SaveContactRequest("Mehmet", "Kaya", companyOfA.Id));

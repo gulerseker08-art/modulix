@@ -4,8 +4,8 @@ using System.Text.Json.Serialization;
 namespace Modulix.Shared.Crm;
 
 // CRM uç noktalarının (/api/crm/...) sözleşmeleri. Alan adları kayıt boru hattındaki teknik adlarla
-// aynıdır (camelCase); sunucu aynı kuralları yeniden doğrular. Kaydetme isteklerinde Version verilirse
-// eşzamanlı değişiklik 409 ile reddedilir. Listeler sayfalıdır: CrmPage<T>.
+// aynıdır (camelCase); sunucu aynı kuralları yeniden doğrular. Güncelleme ve silmede Version zorunludur (yoksa 428);
+// değişmiş sürüm 409 ile reddedilir. Listeler sayfalıdır: CrmPage<T>.
 
 /// <summary>
 /// Modül ve izin anahtarları; arayüz menüleri ve ekranları buna göre gösterir. Sunucudaki

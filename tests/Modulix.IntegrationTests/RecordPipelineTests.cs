@@ -116,8 +116,8 @@ public class RecordPipelineTests(ModulixApiFactory factory) : IClassFixture<Modu
 
         Assert.Equal(HttpStatusCode.NotFound, (await stranger.GetAsync($"{Url}/{created.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
-            (await stranger.PutAsJsonAsync($"{Url}/{created.Id}", Write(new JsonObject { ["value"] = "x" }))).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await stranger.DeleteAsync($"{Url}/{created.Id}")).StatusCode);
+            (await stranger.PutAsJsonAsync($"{Url}/{created.Id}", Write(new JsonObject { ["value"] = "x" }, version: created.Version))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.DeleteAsync($"{Url}/{created.Id}?version={created.Version}")).StatusCode);
 
         var list = await stranger.GetFromJsonAsync<RecordPageResponse>(Url);
         Assert.DoesNotContain(list!.Items, i => i.Id == created.Id);
