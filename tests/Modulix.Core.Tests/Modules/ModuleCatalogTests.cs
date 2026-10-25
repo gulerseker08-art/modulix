@@ -259,6 +259,23 @@ public class ModuleCatalogTests
     }
 
     [Fact]
+    public void Assignment_email_follows_the_record_types_modules_assign_to_people()
+    {
+        var sales = new TestModule("sales", [])
+        {
+            AuditedEntities = [new AuditedEntity("sales.order", "Sipariş", null, new Dictionary<string, string>())],
+            OwnedRecords = [new OwnedRecordType("sales.order", "sipariş")],
+        };
+
+        var withOwned = ModuleCatalog.Create(sales).FindSubscription(CoreModule.Subscriptions.AssignmentEmail)!.Value.Subscription;
+
+        Assert.Equal(["sales.order"], withOwned.EntityKeys);
+        Assert.False(withOwned.Ordered);
+        Assert.Empty(ModuleCatalog.Create(Module("billing")).SubscriptionsFor(DomainEventTypes.RecordUpdated, "sales.order"));
+        Assert.Null(ModuleCatalog.Create(Module("billing")).FindSubscription(CoreModule.Subscriptions.AssignmentEmail));
+    }
+
+    [Fact]
     public void Duplicate_event_subscription_is_rejected()
     {
         var subscription = EventSubscription.For<NoopSubscriber>("sales.listener", [DomainEventTypes.RecordUpdated], [], []);
@@ -294,5 +311,7 @@ public class ModuleCatalogTests
         public IReadOnlyList<AuditedEntity> AuditedEntities { get; init; } = [];
 
         public IReadOnlyList<EventSubscription> EventSubscriptions { get; init; } = [];
+
+        public IReadOnlyList<OwnedRecordType> OwnedRecords { get; init; } = [];
     }
 }

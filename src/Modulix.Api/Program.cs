@@ -61,6 +61,7 @@ builder.Services.AddHostedService<EventDispatchWorker>();
 
 // Kullanıcı yönetimi: davet sınırı "Users" bölümünde; e-postadaki bağlantıların kökü App:PublicUrl (üretimde zorunlu).
 builder.Services.Configure<UserAdministrationOptions>(builder.Configuration.GetSection(UserAdministrationOptions.SectionName));
+builder.Services.Configure<PublicLinkOptions>(builder.Configuration.GetSection(PublicLinkOptions.SectionName));
 
 // Hesap güvenliği (Y7a): "Şifremi unuttum" sınırları "Account" bölümünde.
 builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection(AccountOptions.SectionName));

@@ -163,6 +163,21 @@ public sealed partial class ModuleCatalog
             throw new InvalidOperationException($"Katalogda '{CoreModule.ModuleKey}' modülü yok.");
         }
 
+        // Atama e-postası modüllerin sorumlu atanan kayıt türlerine gider (ADR-0007); yeni modül ek iş yapmadan katılır.
+        // Sorumlu atanan tür yoksa abonelik de yoktur (boş liste "bütün türler" demektir).
+        if (subscriptions.TryGetValue(CoreModule.Subscriptions.AssignmentEmail, out var assignment))
+        {
+            var owned = this.modules.Values.SelectMany(m => m.OwnedRecords).Select(t => t.EntityKey).Distinct().Order(StringComparer.Ordinal).ToList();
+            if (owned.Count == 0)
+            {
+                subscriptions.Remove(assignment.Subscription.Key);
+            }
+            else
+            {
+                subscriptions[assignment.Subscription.Key] = (assignment.ModuleKey, assignment.Subscription with { EntityKeys = owned });
+            }
+        }
+
         // Abonelikler başka modüllerin kayıt türlerine bağlanabilir; türler bütün modüller okunduktan sonra denetlenir.
         foreach (var (moduleKey, subscription) in subscriptions.Values)
         {
@@ -255,7 +270,7 @@ public sealed partial class ModuleCatalog
 
     /// <summary>Tüm olay abonelikleri, modül ve tanım sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, EventSubscription Subscription)> EventSubscriptions =>
-        Modules.SelectMany(m => m.EventSubscriptions.Select(s => subscriptions[s.Key]));
+        Modules.SelectMany(m => m.EventSubscriptions).Where(s => subscriptions.ContainsKey(s.Key)).Select(s => subscriptions[s.Key]);
 
     /// <summary>Kayıt türünün listeye bağlı alanlarının listeleri.</summary>
     public IEnumerable<ChoiceListDefinition> ChoiceListsOf(string entityKey) =>

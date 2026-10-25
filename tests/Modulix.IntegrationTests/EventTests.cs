@@ -32,6 +32,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
     [
         CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite,
         CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.OpportunitiesWrite, CrmModule.Permissions.OpportunityAmountsRead,
+        CrmModule.Permissions.ActivitiesRead, CrmModule.Permissions.ActivitiesWrite,
     ];
 
     private readonly ModulixApiFactory factory;
@@ -44,6 +45,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         this.factory = factory;
         EventProbe.Reset();
         host = factory.WithWebHostBuilder(builder => builder
+            .UseSetting("App:PublicUrl", "https://app.modulix.test")
             .ConfigureTestServices(services =>
             {
                 services.AddLogging(logging => logging.AddProvider(logs));
@@ -98,7 +100,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         }
 
         Assert.Empty(EventProbe.Calls.Where(c => c.Envelope.TenantId == other.TenantId));
-        var deliveries = await DeliveriesAsync(company.Id);
+        var deliveries = await TestDeliveriesAsync(company.Id);
         Assert.Equal(2, deliveries.Count);
         Assert.All(deliveries, d => Assert.Equal(EventDeliveryStatus.Succeeded, d.Status));
         Assert.All(deliveries, d => Assert.Equal(1, d.AttemptCount));
@@ -114,7 +116,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
 
         await DrainAsync();
 
-        Assert.Empty(await DeliveriesAsync(company.Id));
+        Assert.Empty(await TestDeliveriesAsync(company.Id));
         using var scope = host.Services.CreateScope();
         var message = await Db(scope).OutboxMessages.SingleAsync(o => o.RecordId == company.Id);
         Assert.NotNull(message.DispatchedAt);
@@ -152,6 +154,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         var company = await CreateCompanyAsync(actor, "Kira");
         await DispatchAsync();
         await SkipAsync(company.Id, EventTestModule.Unordered);
+        await SkipAsync(company.Id, CoreModule.Subscriptions.AssignmentEmail);
 
         EventProbe.Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var slow = DeliverAsync();
@@ -357,7 +360,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
 
         Assert.Empty(EventProbe.Calls);
         Assert.All(await DeliveriesAsync(a.Id), d => Assert.Equal((EventDeliveryStatus.Skipped, "Firma kapalı."), (d.Status, d.LastError)));
-        Assert.All(await DeliveriesAsync(b.Id), d => Assert.Equal(EventDeliveryStatus.Skipped, d.Status));
+        Assert.All(await TestDeliveriesAsync(b.Id), d => Assert.Equal((EventDeliveryStatus.Skipped, "Aboneliğin modülü firmada kapalı."), (d.Status, d.LastError)));
     }
 
     [Fact]
@@ -407,9 +410,181 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         Assert.False((await MeasureAsync()).IsDispatchDelayed);
     }
 
-    private sealed record Actor(Guid TenantId, Guid UserId, Guid MembershipId);
+    /// <summary>Atama e-postası (core.assignment-email): yeni sorumluya bir kez, kodlanmış içerikle ve bağlantıyla.</summary>
+    [Fact]
+    public async Task Assignment_email_goes_to_the_new_owner_once()
+    {
+        var actor = await ActorAsync();
+        var owner = await MemberAsync(actor, CrmModule.Permissions.CompaniesRead);
+        var company = await SaveAsync(actor, new RecordCommand(CrmModule.Entities.Company, null, new JsonObject
+        {
+            ["name"] = "Acme <b>& Ortakları</b>", [OwnerField] = owner.UserId.ToString(),
+        }));
 
-    private async Task<Actor> ActorAsync(bool eventModule = true)
+        await DrainAsync();
+        await DrainAsync();
+
+        var email = Assert.Single(await AssignmentEmailsAsync(owner.Email));
+        Assert.Equal(actor.TenantId, email.TenantId);
+        Assert.Contains("Acme &lt;b&gt;&amp; Ortakları&lt;/b&gt;", email.HtmlBody);
+        Assert.DoesNotContain("<b>&", email.HtmlBody);
+        Assert.Contains($"https://app.modulix.test/crm/firmalar/{company.Id}", email.HtmlBody);
+        Assert.Contains("Firma (CRM)", email.HtmlBody);
+        var delivery = Assert.Single(await DeliveriesAsync(company.Id, CoreModule.Subscriptions.AssignmentEmail));
+        Assert.Equal((EventDeliveryStatus.Succeeded, 1), (delivery.Status, delivery.AttemptCount));
+
+        // Sorumlu değişmeyen güncelleme e-posta göndermez; başkasına atama yeni e-posta gönderir.
+        await UpdateCompanyAsync(actor, company.Id, "Acme Yeni");
+        await DrainAsync();
+        Assert.Single(await AssignmentEmailsAsync(owner.Email));
+    }
+
+    [Fact]
+    public async Task Self_assignment_and_unassignment_send_no_email()
+    {
+        var actor = await ActorAsync();
+        var owner = await MemberAsync(actor, CrmModule.Permissions.CompaniesRead);
+        var own = await CreateCompanyAsync(actor, "Kendime");
+        var assigned = await SaveAsync(actor, new RecordCommand(CrmModule.Entities.Company, null, new JsonObject
+        {
+            ["name"] = "Önce atanan", [OwnerField] = owner.UserId.ToString(),
+        }));
+        await DrainAsync();
+        Assert.Single(await AssignmentEmailsAsync(owner.Email));
+
+        await SaveAsync(actor, new RecordCommand(CrmModule.Entities.Company, assigned.Id, new JsonObject { [OwnerField] = actor.UserId.ToString() }));
+        await DrainAsync();
+
+        Assert.Empty(await AssignmentEmailsAsync(await EmailOfAsync(actor.UserId)));
+        Assert.Single(await AssignmentEmailsAsync(owner.Email));
+        Assert.All(await DeliveriesAsync(own.Id, CoreModule.Subscriptions.AssignmentEmail), d => Assert.Equal(EventDeliveryStatus.Succeeded, d.Status));
+    }
+
+    [Fact]
+    public async Task Recipient_who_cannot_read_the_record_or_left_gets_no_email()
+    {
+        var actor = await ActorAsync();
+        var blind = await MemberAsync(actor);
+        var leaving = await MemberAsync(actor, CrmModule.Permissions.CompaniesRead);
+        var hidden = await SaveAsync(actor, new RecordCommand(CrmModule.Entities.Company, null, new JsonObject
+        {
+            ["name"] = "Göremez", [OwnerField] = blind.UserId.ToString(),
+        }));
+        var left = await SaveAsync(actor, new RecordCommand(CrmModule.Entities.Company, null, new JsonObject
+        {
+            ["name"] = "Ayrıldı", [OwnerField] = leaving.UserId.ToString(),
+        }));
+        await factory.DisableMembershipAsync(leaving.UserId, actor.TenantId);
+
+        await DrainAsync();
+
+        Assert.Empty(await AssignmentEmailsAsync(blind.Email));
+        Assert.Empty(await AssignmentEmailsAsync(leaving.Email));
+        Assert.Equal(EventDeliveryStatus.Succeeded, Assert.Single(await DeliveriesAsync(hidden.Id, CoreModule.Subscriptions.AssignmentEmail)).Status);
+        Assert.Equal(EventDeliveryStatus.Succeeded, Assert.Single(await DeliveriesAsync(left.Id, CoreModule.Subscriptions.AssignmentEmail)).Status);
+    }
+
+    /// <summary>ADR-0004 ile: devir olaylara "transfer" yazar; atama e-postası kayıt başına gitmez, tek özet gider.</summary>
+    [Fact]
+    public async Task Transfer_sends_one_summary_instead_of_an_email_per_record()
+    {
+        var actor = await ActorAsync(administrator: true);
+        var previous = await MemberAsync(actor, CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite);
+        var receiver = await MemberAsync(actor, CrmModule.Permissions.CompaniesRead);
+        for (var i = 0; i < 3; i++)
+        {
+            await SaveAsync(actor, new RecordCommand(CrmModule.Entities.Company, null, new JsonObject
+            {
+                ["name"] = $"Devredilen {i}", [OwnerField] = previous.UserId.ToString(),
+            }));
+        }
+
+        await DrainAsync();
+        Assert.Equal(3, (await AssignmentEmailsAsync(previous.Email)).Count);
+
+        using (var scope = host.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(actor.TenantId, actor.UserId, actor.MembershipId);
+            var moved = await scope.ServiceProvider.GetRequiredService<IUserAdministration>()
+                .TransferRecordsAsync(previous.MembershipId, receiver.MembershipId, CancellationToken.None);
+            Assert.Equal(3, moved);
+        }
+
+        await DrainAsync();
+
+        Assert.Empty(await AssignmentEmailsAsync(receiver.Email));
+        var summary = Assert.Single(await EmailsAsync(receiver.Email));
+        Assert.Equal("Kayıtlar size devredildi", summary.Subject);
+        Assert.Contains("3 firma", summary.HtmlBody);
+
+        using var check = host.Services.CreateScope();
+        var transfers = await Db(check).OutboxMessages
+            .Where(o => o.TenantId == actor.TenantId && o.Reason == EventReasons.Transfer)
+            .CountAsync();
+        Assert.Equal(3, transfers);
+    }
+
+    /// <summary>Ç1.3: bir abone başarısız, diğeri başarılı; yeniden denemede ikinci atama e-postası oluşmaz.</summary>
+    [Fact]
+    public async Task Retrying_a_failed_subscriber_does_not_repeat_the_assignment_email()
+    {
+        var actor = await ActorAsync();
+        var owner = await MemberAsync(actor, CrmModule.Permissions.CompaniesRead);
+        var company = await SaveAsync(actor, new RecordCommand(CrmModule.Entities.Company, null, new JsonObject
+        {
+            ["name"] = "Tekrar", [OwnerField] = owner.UserId.ToString(),
+        }));
+        var failures = 0;
+        EventProbe.Fails = (subscription, envelope) =>
+            subscription == EventTestModule.Recorder && envelope.RecordId == company.Id && Interlocked.Increment(ref failures) == 1;
+
+        await DrainAsync();
+        Assert.Equal(EventDeliveryStatus.Pending, Assert.Single(await DeliveriesAsync(company.Id, EventTestModule.Recorder)).Status);
+        time.Advance(EventDispatcher.RetryDelay(1) * 1.2);
+        await DrainAsync();
+
+        Assert.Equal(EventDeliveryStatus.Succeeded, Assert.Single(await DeliveriesAsync(company.Id, EventTestModule.Recorder)).Status);
+        var assignment = Assert.Single(await DeliveriesAsync(company.Id, CoreModule.Subscriptions.AssignmentEmail));
+        Assert.Equal((EventDeliveryStatus.Succeeded, 1), (assignment.Status, assignment.AttemptCount));
+        Assert.Single(await AssignmentEmailsAsync(owner.Email));
+    }
+
+    private const string OwnerField = "ownerId";
+
+    private sealed record Actor(Tenant Tenant, Guid UserId, Guid MembershipId)
+    {
+        public Guid TenantId => Tenant.Id;
+    }
+
+    private sealed record Member(Guid UserId, Guid MembershipId, string Email);
+
+    private async Task<Member> MemberAsync(Actor actor, params string[] permissions)
+    {
+        var user = await factory.CreateUserAsync(actor.Tenant);
+        if (permissions.Length > 0)
+        {
+            await factory.CreateRoleAsync(actor.TenantId, permissions, user);
+        }
+
+        return new Member(user.Id, await factory.GetMembershipIdAsync(user.Id, actor.TenantId), user.Email!);
+    }
+
+    private async Task<string> EmailOfAsync(Guid userId)
+    {
+        using var scope = host.Services.CreateScope();
+        return await Db(scope).Users.Where(u => u.Id == userId).Select(u => u.Email!).SingleAsync();
+    }
+
+    private async Task<List<Modulix.Infrastructure.Email.QueuedEmail>> EmailsAsync(string address)
+    {
+        using var scope = host.Services.CreateScope();
+        return await Db(scope).EmailMessages.AsNoTracking().Where(e => e.ToAddress == address).ToListAsync();
+    }
+
+    private async Task<List<Modulix.Infrastructure.Email.QueuedEmail>> AssignmentEmailsAsync(string address) =>
+        [.. (await EmailsAsync(address)).Where(e => e.Subject == "Size bir kayıt atandı")];
+
+    private async Task<Actor> ActorAsync(bool eventModule = true, bool administrator = false)
     {
         var tenant = await factory.CreateTenantAsync();
         await SetModuleAsync(tenant.Id, CrmModule.ModuleKey, enabled: true);
@@ -419,8 +594,8 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         }
 
         var user = await factory.CreateUserAsync(tenant);
-        await factory.CreateRoleAsync(tenant.Id, AllCrmPermissions, user);
-        return new Actor(tenant.Id, user.Id, await factory.GetMembershipIdAsync(user.Id, tenant.Id));
+        await factory.CreateRoleAsync(tenant.Id, administrator ? [.. AllCrmPermissions, CoreModule.Permissions.ManageUsers] : AllCrmPermissions, user);
+        return new Actor(tenant, user.Id, await factory.GetMembershipIdAsync(user.Id, tenant.Id));
     }
 
     private async Task SetModuleAsync(Guid tenantId, string moduleKey, bool enabled)
@@ -506,6 +681,10 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
             .OrderBy(d => d.Sequence).ThenBy(d => d.Subscription)
             .ToListAsync();
     }
+
+    // Test modülünün abonelikleri (çekirdeğin atama aboneliği hariç).
+    private async Task<List<EventDelivery>> TestDeliveriesAsync(Guid recordId) =>
+        [.. (await DeliveriesAsync(recordId)).Where(d => d.Subscription.StartsWith(EventTestModule.ModuleKey + ".", StringComparison.Ordinal))];
 
     private async Task<bool> EventExistsAsync(Guid recordId)
     {

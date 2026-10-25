@@ -93,18 +93,34 @@ internal static class UserEmails
             ("Hesabıma git", link),
             "Bu girişi siz yapmadıysanız hemen şifrenizi değiştirin ve kuruluşunuzun yöneticisine bildirin.");
 
+    /// <summary>
+    /// Kayıt devri (ADR-0004, ADR-0007): devirde kayıt başına atama e-postası gitmez; yeni sorumluya tek özet gider.
+    /// <paramref name="link"/> yoksa (App:PublicUrl ayarlı değil) bağlantı konmaz.
+    /// </summary>
+    public static EmailMessage RecordsTransferred(string to, string displayName, string transferredBy, string previousOwner, string summary, string? link) =>
+        Build(
+            to,
+            displayName,
+            "Kayıtlar size devredildi",
+            [
+                $"{transferredBy}, {previousOwner} kişisinin kayıtlarını size devretti: {summary}.",
+                "Bu kayıtların sorumlusu artık sizsiniz.",
+            ],
+            link is null ? null : ("Modülix'i aç", link),
+            "Bu e-posta bilgi amaçlıdır.");
+
     private static EmailMessage Build(
-        string to, string displayName, string subject, string[] paragraphs, (string Text, string Url) action, string footer)
+        string to, string displayName, string subject, string[] paragraphs, (string Text, string Url)? action, string footer)
     {
         var html = string.Concat(
             $"<p>Merhaba {Encode(displayName)},</p>",
             string.Concat(paragraphs.Select(p => $"<p>{Encode(p)}</p>")),
-            $"<p><a href=\"{Encode(action.Url)}\">{Encode(action.Text)}</a></p>",
+            action is { } a ? $"<p><a href=\"{Encode(a.Url)}\">{Encode(a.Text)}</a></p>" : string.Empty,
             $"<p style=\"color:#666\">{Encode(footer)}</p>");
 
         var text = string.Join(
             "\n\n",
-            [$"Merhaba {displayName},", .. paragraphs, $"{action.Text}: {action.Url}", footer]);
+            [$"Merhaba {displayName},", .. paragraphs, .. action is { } b ? [$"{b.Text}: {b.Url}"] : Array.Empty<string>(), footer]);
 
         return new EmailMessage(to, subject, html) { ToName = displayName, TextBody = text };
     }

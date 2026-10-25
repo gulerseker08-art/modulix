@@ -26,7 +26,8 @@ public interface IModule
     /// <summary>
     /// Kişiye atanan (sorumlusu olan) kayıt türleri. Kullanıcı devre dışı bırakılırken bu kayıtlar başka bir üyeye
     /// devredilebilir (ADR-0004). Devri çekirdek, kayıt boru hattıyla yapar: sorumlu alanı
-    /// <see cref="OwnedRecordType.OwnerField"/> adında olmalı, kayıt deposu aynı adla filtre sunmalıdır.
+    /// <see cref="OwnedRecordType.OwnerField"/> adında olmalı, kayıt deposu aynı adla filtre sunmalıdır. Kayıt başkasına
+    /// atanınca yeni sorumluya e-posta gider (ADR-0007, çekirdeğin atama aboneliği); modül ek iş yapmaz.
     /// </summary>
     IReadOnlyList<OwnedRecordType> OwnedRecords => [];
 
@@ -104,6 +105,12 @@ public sealed record OwnedRecordType(string EntityKey, string Label, IReadOnlyDi
 {
     /// <summary>Sorumlu alanının ve filtresinin adı; değeri kullanıcı kimliğidir.</summary>
     public const string OwnerField = "ownerId";
+
+    /// <summary>
+    /// Kaydın arayüzdeki adresi (uygulama köküne göre); <c>{id}</c> kaydın kimliğiyle değişir (ör. "crm/firmalar/{id}").
+    /// Atama e-postasındaki bağlantı budur (ADR-0007); verilmezse bağlantı konmaz.
+    /// </summary>
+    public string? Path { get; init; }
 }
 
 /// <summary>Bir kayıt türünün, <see cref="Permission"/> olmadan görülemeyen alanları (ör. fırsat tutarı, maaş).</summary>
