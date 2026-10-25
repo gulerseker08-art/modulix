@@ -7,6 +7,7 @@ using Modulix.Api.Customization;
 using Modulix.Api.Development;
 using Modulix.Api.Email;
 using Modulix.Api.Events;
+using Modulix.Api.Organization;
 using Modulix.Api.Platform;
 using Modulix.Api.Records;
 using Modulix.Api.Settings;
@@ -116,6 +117,7 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseMiddleware<TenantContextMiddleware>();
+app.UseMiddleware<CompanyContextMiddleware>();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
@@ -124,6 +126,7 @@ app.MapAccountEndpoints();
 app.MapTenantEndpoints();
 app.MapAccessEndpoints();
 app.MapUserEndpoints();
+app.MapCompanyEndpoints();
 app.MapTeamEndpoints();
 app.MapCustomFieldEndpoints();
 app.MapChoiceListEndpoints();

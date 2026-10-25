@@ -14,9 +14,31 @@ public sealed record PermissionDto(string Key, string DisplayName, string Module
 /// <summary>
 /// Oturumdaki kullanıcının aktif tenant'taki erişimi; arayüz menüleri buna göre gösterir.
 /// <see cref="IsAdministrator"/>: Yönetici (sistem) rolü var; yönetici rolünü vermek gibi işlemler yalnızca ona açıktır.
+/// <see cref="Companies"/> ve <see cref="ActiveCompanyId"/>: erişilebilir işletici şirketler ve aktif olanı (ADR-0008);
+/// şirket seçici yalnızca birden fazla şirket erişilebilirse gösterilir. Erişim yoksa liste boş, aktif şirket <c>null</c>'dır.
 /// </summary>
 public sealed record MyAccessResponse(
-    IReadOnlyList<string> EnabledModules, IReadOnlyList<string> Permissions, bool IsAdministrator = false, RecordScope Scope = RecordScope.All);
+    IReadOnlyList<string> EnabledModules,
+    IReadOnlyList<string> Permissions,
+    bool IsAdministrator = false,
+    RecordScope Scope = RecordScope.All,
+    IReadOnlyList<OperatingCompanyDto>? Companies = null,
+    Guid? ActiveCompanyId = null)
+{
+    public IReadOnlyList<OperatingCompanyDto> Companies { get; init; } = Companies ?? [];
+}
+
+/// <summary>
+/// Erişilebilir bir işletici şirket (ADR-0008); müşteri firma (CRM <c>CompanyDto</c>, Taraf) değildir.
+/// <see cref="IsDefault"/>: tenant'ın varsayılan şirketi.
+/// </summary>
+public sealed record OperatingCompanyDto(Guid Id, string Name, bool IsDefault);
+
+/// <summary>İşletici şirket oluşturma veya yeniden adlandırma isteği (ADR-0008); CRM müşteri firmasından (Taraf) ayrıdır.</summary>
+public sealed record SaveOperatingCompanyRequest(string Name);
+
+/// <summary>Üyeliğin şirket görevlerini verilen kümeye eşitler (ADR-0008).</summary>
+public sealed record SetMembershipCompaniesRequest(IReadOnlyList<Guid> CompanyIds);
 
 /// <summary>
 /// Rolün kayıt kapsamı (Y8): izinler "hangi tür kaydı", kapsam "hangi kayıtları" söyler. Sorumlusu olan kayıtlara
@@ -77,7 +99,10 @@ public static class CoreAccess
     /// <summary>Özelleştirme (Y9): özel alanlar, listeler ve sektör profili.</summary>
     public const string ManageCustomization = "core.customization.manage";
 
+    /// <summary>İşletici şirketler ve kullanıcıların şirket görevleri (ADR-0008).</summary>
+    public const string ManageCompanies = "core.companies.manage";
+
     /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
-        [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization];
+        [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies];
 }

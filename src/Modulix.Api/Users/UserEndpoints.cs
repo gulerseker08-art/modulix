@@ -2,6 +2,7 @@ using Modulix.Api.Access;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Modules;
+using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Shared.Users;
 
@@ -162,6 +163,7 @@ public static class UserEndpoints
             Results.Problem(statusCode: StatusCodes.Status429TooManyRequests, title: ex.Message),
         UserAdministrationException ex => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message),
         RoleConflictException ex => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message),
+        CompanyConflictException ex => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message),
         ArgumentException ex => Results.ValidationProblem(
             new Dictionary<string, string[]> { [ex.ParamName ?? string.Empty] = [FieldMessage(ex)] },
             title: "Lütfen işaretli alanları düzeltin.",

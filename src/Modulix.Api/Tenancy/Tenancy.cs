@@ -19,6 +19,12 @@ public static class ModulixClaimTypes
 
     /// <summary>Sunucudaki oturum (Y7a, <c>platform.UserSessions</c>); her istekte kapatılmadığı denetlenir.</summary>
     public const string SessionId = "modulix:session_id";
+
+    /// <summary>
+    /// Aktif işletici şirket (ADR-0008, adım 2). Yalnızca kişinin açık seçimini taşır; yoksa varsayılan şirket her istekte
+    /// hesaplanır. Yalnızca sunucu yazar (şifreli oturum çerezinde) ve her istekte erişilebilir şirketlere karşı doğrulanır.
+    /// </summary>
+    public const string CompanyId = "modulix:company_id";
 }
 
 /// <summary>İstek başına aktif tenant bağlamı; <see cref="TenantContextMiddleware"/> doldurur.</summary>
@@ -73,6 +79,39 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
     }
 }
 
+/// <summary>İstek başına aktif şirket bağlamı; <see cref="CompanyContextMiddleware"/> doldurur (ADR-0008, adım 2).</summary>
+public sealed class HttpCompanyContextAccessor : ICompanyContextAccessor
+{
+    public CompanyContext? Current { get; set; }
+}
+
+/// <summary>
+/// Aktif tenant kurulduktan sonra aktif şirketi oturumdan belirler ve her istekte erişilebilir şirketlere karşı doğrular
+/// (ADR-0008, adım 2). Oturumdaki şirket claim'i yalnızca kişinin açık seçimidir; erişilemeyen veya eksik bir değer
+/// varsayılan şirkete düşer. İstemcinin gönderdiği bir başlık veya parametre aktif şirketi belirlemez.
+/// <see cref="TenantContextMiddleware"/>'den sonra çalışır.
+/// </summary>
+public sealed class CompanyContextMiddleware(RequestDelegate next)
+{
+    public async Task InvokeAsync(HttpContext context, HttpTenantContextAccessor tenant, HttpCompanyContextAccessor company, IMembershipDirectory directory)
+    {
+        if (tenant.Current is { } current)
+        {
+            var access = await directory.GetAccessibleCompaniesAsync(current.MembershipId, context.RequestAborted);
+            var accessibleIds = access.Companies.Select(c => c.Id).ToHashSet();
+
+            // Oturumdaki açık seçim erişilebilirse o; değilse varsayılan şirket; o da yoksa ilk erişilebilir; hiç erişim yoksa null.
+            Guid? active = Guid.TryParse(context.User.FindFirst(ModulixClaimTypes.CompanyId)?.Value, out var claimed) && accessibleIds.Contains(claimed)
+                ? claimed
+                : access.Companies.FirstOrDefault(c => c.IsDefault)?.Id ?? access.Companies.FirstOrDefault()?.Id;
+
+            company.Current = new CompanyContext(active, accessibleIds, access.IsAllCompanies);
+        }
+
+        await next(context);
+    }
+}
+
 /// <summary>Aktif ve doğrulanmış tenant yoksa isteği 403 ile durdurur.</summary>
 public sealed class RequireTenantFilter(HttpTenantContextAccessor tenant) : IEndpointFilter
 {
@@ -97,6 +136,8 @@ public static class TenancySetup
     {
         services.AddScoped<HttpTenantContextAccessor>();
         services.AddScoped<ITenantContextAccessor>(sp => sp.GetRequiredService<HttpTenantContextAccessor>());
+        services.AddScoped<HttpCompanyContextAccessor>();
+        services.AddScoped<ICompanyContextAccessor>(sp => sp.GetRequiredService<HttpCompanyContextAccessor>());
         services.AddSingleton<ITenantScopeFactory, TenantScopeFactory>();
         return services;
     }

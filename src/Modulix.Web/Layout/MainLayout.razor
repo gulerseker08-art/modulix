@@ -29,6 +29,20 @@
                 {
                     <a href="tenant">Kuruluş değiştir</a>
                 }
+                @* İşletici şirket seçici (ADR-0008): yalnızca birden fazla şirkete erişim varsa görünür. *@
+                @if (Session.HasMultipleCompanies)
+                {
+                    <label class="company-switcher">
+                        <span class="visually-hidden">Aktif şirket</span>
+                        <select class="form-select form-select-sm" disabled="@companyBusy"
+                                @onchange="OnCompanyChanged" value="@Session.ActiveCompanyId">
+                            @foreach (var company in Session.Companies)
+                            {
+                                <option value="@company.Id">@company.Name</option>
+                            }
+                        </select>
+                    </label>
+                }
                 <button type="button" class="btn btn-link" @onclick="LogoutAsync">Çıkış</button>
             }
         </div>
@@ -46,7 +60,19 @@
         await Session.EnsureLoadedAsync();
     }
 
+    private bool companyBusy;
+
     private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task OnCompanyChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var companyId) && companyId != Session.ActiveCompanyId)
+        {
+            companyBusy = true;
+            await Session.SelectCompanyAsync(companyId);
+            companyBusy = false;
+        }
+    }
 
     private async Task LogoutAsync()
     {

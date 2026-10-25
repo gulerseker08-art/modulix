@@ -8,6 +8,7 @@ using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
+using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
@@ -120,6 +121,42 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         return await db.Memberships.Where(m => m.UserId == userId && m.TenantId == tenantId).Select(m => m.Id).SingleAsync();
+    }
+
+    /// <summary>
+    /// Tenant'a işletici şirket ekler (ADR-0008). Fabrikanın <see cref="CreateTenantAsync"/>'i varsayılan şirket oluşturmaz
+    /// (gerçek akış platform yönetimindedir); şirket testleri ihtiyaçlarını bu yardımcıyla kurar.
+    /// </summary>
+    public async Task<Company> CreateCompanyAsync(Guid tenantId, string? name = null, bool isDefault = false)
+    {
+        using var scope = OpenScope(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var company = new Company(name ?? $"Şirket {Guid.NewGuid():N}"[..24], isDefault);
+        db.Companies.Add(company);
+        await db.SaveChangesAsync();
+        return company;
+    }
+
+    /// <summary>Kullanıcıyı tenant'ın yöneticisi yapar (sistem rolü): ADR-0008'e göre bütün şirketlere erişir.</summary>
+    public async Task MakeAdministratorAsync(Guid tenantId, params ModulixUser[] users)
+    {
+        using var scope = OpenScope(tenantId);
+        var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+        var system = await roles.EnsureSystemRoleAsync(CancellationToken.None);
+        foreach (var user in users)
+        {
+            var membershipId = await GetMembershipIdAsync(user.Id, tenantId);
+            Assert.True(await roles.SetMembershipRolesAsync(membershipId, [system.Id], CancellationToken.None));
+        }
+    }
+
+    /// <summary>Üyeliğe bir işletici şirket görevi verir (ADR-0008).</summary>
+    public async Task AssignCompanyAsync(Guid tenantId, Guid membershipId, Guid companyId)
+    {
+        using var scope = OpenScope(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        db.MembershipCompanies.Add(new MembershipCompany(membershipId, companyId));
+        await db.SaveChangesAsync();
     }
 
     /// <summary>Tenant'ta rol oluşturur ve verilen kullanıcılara (üyelikleri üzerinden) atar.</summary>

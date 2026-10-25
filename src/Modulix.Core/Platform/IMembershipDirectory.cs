@@ -3,6 +3,16 @@ namespace Modulix.Core.Platform;
 /// <summary>Bir kullanıcının etkin üyeliği; tenant da etkin olmalıdır.</summary>
 public sealed record MembershipSummary(Guid MembershipId, Guid TenantId, string TenantName, string TenantSlug);
 
+/// <summary>Aktif tenant'ın bir işletici şirketi (ADR-0008).</summary>
+public sealed record CompanySummary(Guid Id, string Name, bool IsDefault);
+
+/// <summary>
+/// Üyeliğin erişebildiği işletici şirketler (ADR-0008, adım 2). Yönetici (sistem rolü) tenant'ın bütün şirketlerine
+/// erişir (<see cref="IsAllCompanies"/>); yönetici olmayan yalnızca görevlendirildiği şirketleri görür. Şirketler ada
+/// göre sıralıdır.
+/// </summary>
+public sealed record CompanyAccess(IReadOnlyList<CompanySummary> Companies, bool IsAllCompanies);
+
 /// <summary>
 /// Üyelik sorguları. Aktif tenant her istekte bu servisle yeniden doğrulanır; üyelik
 /// devre dışı bırakılırsa veya tenant kapatılırsa erişim bir sonraki istekte kalkar.
@@ -17,4 +27,10 @@ public interface IMembershipDirectory
 
     /// <summary>Üyeliğin son giriş zamanını şimdi yapar (giriş ve tenant seçiminde).</summary>
     Task RecordSignInAsync(Guid membershipId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Üyeliğin erişebildiği işletici şirketler (ADR-0008, adım 2). Aktif tenant'ın oturum bağlamında çağrılır;
+    /// Row-Level Security yalnızca aktif tenant'ın şirketlerini döndürür.
+    /// </summary>
+    Task<CompanyAccess> GetAccessibleCompaniesAsync(Guid membershipId, CancellationToken cancellationToken);
 }
