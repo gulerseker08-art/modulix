@@ -71,6 +71,11 @@ public sealed class CoreModule : IModule
 
         /// <summary>Oturum olayları (giriş, hatalı şifre, kilitlenme, şifre sıfırlama, davet kabulü); kayıt kişinin hesabıdır.</summary>
         public const string Account = "core.account";
+
+        /// <summary>
+        /// Olay teslimi (ADR-0007): platform yöneticisinin yeniden deneme ve atlama işlemleri; kaydın kimliği teslimin kimliğidir.
+        /// </summary>
+        public const string EventDelivery = "core.event-delivery";
     }
 
     /// <summary>Çekirdeğin firma ayarları (Y6): firma profili ve bölgesel ayarlar.</summary>
@@ -231,6 +236,20 @@ public sealed class CoreModule : IModule
         {
             ["filters"] = "Filtreler", ["rows"] = "Satır sayısı",
         }),
+        new(AuditedEntityKeys.EventDelivery, "Olay teslimi", null, new Dictionary<string, string>
+        {
+            ["status"] = "Durum", ["attemptCount"] = "Deneme sayısı", ["subscription"] = "Abonelik", ["eventId"] = "Olay",
+            ["eventType"] = "Olay türü", ["entityKey"] = "Kayıt türü", ["recordId"] = "Kayıt",
+        }, "subscription")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string>
+                {
+                    ["Pending"] = "Bekliyor", ["Succeeded"] = "Başarılı", ["Failed"] = "Başarısız", ["Skipped"] = "Atlandı",
+                },
+            },
+        },
         new(AuditedEntityKeys.Account, "Hesap", null, new Dictionary<string, string>
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["ip"] = "IP adresi", ["userAgent"] = "Tarayıcı",

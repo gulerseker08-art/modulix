@@ -539,6 +539,7 @@ public static class EventSetup
     {
         services.AddSingleton<EventMetrics>();
         services.AddScoped<EventDispatcher>();
+        services.AddScoped<IEventAdministration, EventAdministration>();
         return services;
     }
 }

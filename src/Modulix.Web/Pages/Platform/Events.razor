@@ -1,0 +1,249 @@
+@page "/platform/olaylar"
+@inject ApiClient Api
+
+<PageTitle>Olaylar · Platform · Modulix</PageTitle>
+
+@* Olay teslimleri (ADR-0007): bekleyen, bekletilen ve başarısız teslimler; yeniden dene ve atla. Olayın içeriği (payload) gösterilmez. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>Olaylar</h1>
+    <p class="text-muted">
+        Modüllerin birbirine ve bildirimlere ilettiği olayların abonelere teslimi. Başarısız teslim kendiliğinden yeniden
+        denenir; sınır dolunca burada bekler. Sıralı abonede başarısız teslim, aynı kaydın sonraki teslimlerini bekletir.
+        Yeniden deneme ve atlama firmanın denetim kaydına yazılır.
+    </p>
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (summary is not null)
+    {
+        <div class="tiles">
+            <div class="tile"><strong>@summary.Pending</strong><span>Bekleyen</span></div>
+            <div class="tile"><strong>@summary.Held</strong><span>Bekletilen</span></div>
+            <div class="tile"><strong>@summary.Failed</strong><span>Başarısız</span></div>
+            <div class="tile"><strong>@Age(summary.OldestUndispatched)</strong><span>En eski dağıtılmamış olay</span></div>
+            <div class="tile"><strong>@Age(summary.OldestPending)</strong><span>En eski bekleyen teslim</span></div>
+        </div>
+
+        <div class="filters" role="group" aria-label="Durum">
+            <button type="button" class="chip @(state is null ? "active" : null)" @onclick="() => StateAsync(null)">Tümü</button>
+            @foreach (var value in Enum.GetValues<EventDeliveryStateDto>())
+            {
+                <button type="button" class="chip @(state == value ? "active" : null)" @onclick="() => StateAsync(value)">@EventStateText.Of(value)</button>
+            }
+        </div>
+
+        <form class="record-form audit-filters" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <div class="row g-2">
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label" for="eventTenant">Firma kimliği</label>
+                    <input id="eventTenant" class="form-control" @bind="tenantId" placeholder="Tümü" />
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label" for="eventSubscription">Abonelik</label>
+                    <select id="eventSubscription" class="form-select" @bind="subscription">
+                        <option value="">Tümü</option>
+                        @foreach (var key in summary.Subscriptions)
+                        {
+                            <option value="@key">@key</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-sm-6 col-lg-2">
+                    <label class="form-label" for="eventType">Olay türü</label>
+                    <select id="eventType" class="form-select" @bind="eventType">
+                        <option value="">Tümü</option>
+                        @foreach (var type in summary.EventTypes)
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-sm-6 col-lg-2">
+                    <label class="form-label" for="eventFrom">Başlangıç (UTC)</label>
+                    <input id="eventFrom" class="form-control" type="date" @bind="from" />
+                </div>
+                <div class="col-sm-6 col-lg-2">
+                    <label class="form-label" for="eventTo">Bitiş (UTC)</label>
+                    <input id="eventTo" class="form-control" type="date" @bind="to" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-outline-secondary">Süz</button>
+                <button type="button" class="btn btn-outline-primary" disabled="@(busy || page is not { TotalCount: > 0 })" @onclick="() => ActAsync(Retry, null)">Süzülenleri yeniden dene</button>
+                <button type="button" class="btn btn-outline-danger" disabled="@(busy || page is not { TotalCount: > 0 })" @onclick="() => ActAsync(Skip, null)">Süzülenleri atla</button>
+            </div>
+        </form>
+    }
+
+    @if (page is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Teslim yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead>
+                <tr><th>Açılış</th><th>Firma</th><th>Abonelik</th><th>Olay</th><th>Kayıt</th><th>Durum</th><th>Deneme</th><th>Son hata</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var delivery in page.Items)
+                {
+                    <tr>
+                        <td data-label="Açılış">@CrmLabels.Time(delivery.CreatedAt)</td>
+                        <td data-label="Firma" class="primary"><a href="platform/firmalar/@delivery.TenantId">@delivery.TenantName</a></td>
+                        <td data-label="Abonelik"><code>@delivery.Subscription</code></td>
+                        <td data-label="Olay">@delivery.EventType <small class="text-muted">@delivery.EventId</small></td>
+                        <td data-label="Kayıt">@delivery.EntityKey <small class="text-muted">@delivery.RecordId@(delivery.Sequence is { } seq ? $" · #{seq}" : null)</small></td>
+                        <td data-label="Durum">
+                            @EventStateText.Of(delivery.State)
+                            @if (delivery.HoldingBack > 0)
+                            {
+                                <span class="badge user-locked" title="Aynı kaydın sonraki teslimleri bunu bekliyor.">@delivery.HoldingBack teslimi bekletiyor</span>
+                            }
+                            @if (delivery.State == EventDeliveryStateDto.Pending && delivery.AttemptCount > 0)
+                            {
+                                <small class="text-muted d-block">Sonraki deneme @CrmLabels.Time(delivery.NextAttemptAt)</small>
+                            }
+                        </td>
+                        <td data-label="Deneme">@delivery.AttemptCount</td>
+                        <td data-label="Son hata"><small>@delivery.LastError</small></td>
+                        <td data-label="">
+                            @if (delivery.State is EventDeliveryStateDto.Failed or EventDeliveryStateDto.Pending or EventDeliveryStateDto.Held)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-primary" disabled="@busy" @onclick="() => ActAsync(Retry, delivery.Id)">Yeniden dene</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="() => ActAsync(Skip, delivery.Id)">Atla</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</PlatformGate>
+
+@code {
+    private const string Retry = "retry";
+    private const string Skip = "skip";
+
+    private EventSummaryResponse? summary;
+    private EventDeliveryPageResponse? page;
+    private EventDeliveryStateDto? state = EventDeliveryStateDto.Failed;
+    private string? tenantId;
+    private string? subscription;
+    private string? eventType;
+    private DateOnly? from;
+    private DateOnly? to;
+    private bool busy;
+    private string? message;
+    private string? notice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSummaryAsync();
+        if (summary is not null)
+        {
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadSummaryAsync()
+    {
+        var result = await Api.GetAsync<EventSummaryResponse>("/api/platform/events/summary");
+        summary = result.Value ?? summary;
+        message = result.Error;
+    }
+
+    private async Task StateAsync(EventDeliveryStateDto? value)
+    {
+        state = value;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        if (!string.IsNullOrWhiteSpace(tenantId) && !Guid.TryParse(tenantId, out _))
+        {
+            message = "Firma kimliği geçerli değil.";
+            return;
+        }
+
+        var filter = Filter();
+        var query = new List<string> { $"page={pageNumber}" };
+        Add(query, "tenantId", filter.TenantId?.ToString());
+        Add(query, "subscription", filter.Subscription);
+        Add(query, "eventType", filter.EventType);
+        Add(query, "state", filter.State?.ToString());
+        Add(query, "from", filter.From?.ToString("yyyy-MM-dd"));
+        Add(query, "to", filter.To?.ToString("yyyy-MM-dd"));
+
+        var result = await Api.GetAsync<EventDeliveryPageResponse>($"/api/platform/events/deliveries?{string.Join('&', query)}");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private async Task ActAsync(string action, Guid? id)
+    {
+        busy = true;
+        notice = null;
+        var request = id is { } one ? new EventDeliveryActionRequest([one], null) : new EventDeliveryActionRequest(null, Filter());
+        var result = await Api.PostAsync<EventDeliveryActionResponse>($"/api/platform/events/deliveries/{action}", request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            var changed = result.Value!.Changed;
+            notice = changed == 0
+                ? "Değişen teslim yok: teslim çalışıyor veya bitmiş olabilir."
+                : action == Retry ? $"{changed} teslim yeniden denenecek." : $"{changed} teslim atlandı.";
+            await LoadSummaryAsync();
+            await LoadAsync(page?.Page ?? 1);
+        }
+        else
+        {
+            message = result.Error;
+        }
+    }
+
+    private EventDeliveryFilterDto Filter() => new(
+        Guid.TryParse(tenantId, out var tenant) ? tenant : null,
+        string.IsNullOrEmpty(subscription) ? null : subscription,
+        string.IsNullOrEmpty(eventType) ? null : eventType,
+        state,
+        from,
+        to);
+
+    private static void Add(List<string> query, string name, string? value)
+    {
+        if (!string.IsNullOrEmpty(value))
+        {
+            query.Add($"{name}={Uri.EscapeDataString(value)}");
+        }
+    }
+
+    private static string Age(DateTimeOffset? since)
+    {
+        if (since is not { } at)
+        {
+            return "—";
+        }
+
+        var age = DateTimeOffset.UtcNow - at;
+        return age.TotalMinutes < 1 ? "1 dk'dan az" : age.TotalHours < 1 ? $"{age.TotalMinutes:0} dk" : $"{age.TotalHours:0.#} sa";
+    }
+}

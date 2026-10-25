@@ -1,4 +1,8 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -15,9 +19,12 @@ using Modulix.Core.Events;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Events;
+using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Logistics;
+using Modulix.Shared.Auth;
+using Modulix.Shared.Platform;
 
 namespace Modulix.IntegrationTests;
 
@@ -99,7 +106,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
             Assert.Equal([actor.TenantId], call.VisibleTenants);
         }
 
-        Assert.Empty(EventProbe.Calls.Where(c => c.Envelope.TenantId == other.TenantId));
+        Assert.DoesNotContain(EventProbe.Calls, c => c.Envelope.TenantId == other.TenantId);
         var deliveries = await TestDeliveriesAsync(company.Id);
         Assert.Equal(2, deliveries.Count);
         Assert.All(deliveries, d => Assert.Equal(EventDeliveryStatus.Succeeded, d.Status));
@@ -549,7 +556,125 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         Assert.Single(await AssignmentEmailsAsync(owner.Email));
     }
 
+    /// <summary>
+    /// Platform ekranı: başarısız ve bekletilen teslimler payload olmadan listelenir; yeniden deneme sayaçları sıfırlar,
+    /// teslimin firmasının denetim kaydına yazılır ve bekletilen teslimi de serbest bırakır.
+    /// </summary>
+    [Fact]
+    public async Task Platform_screen_lists_failures_without_payload_and_retries_with_audit()
+    {
+        var actor = await ActorAsync();
+        var company = await CreateCompanyAsync(actor, "Gizli Değer 4242");
+        await UpdateCompanyAsync(actor, company.Id, "Gizli Değer 4243");
+        EventProbe.Fails = (subscription, envelope) => subscription == EventTestModule.Recorder && envelope.RecordId == company.Id;
+        EventProbe.PermanentFailure = true;
+        await DrainAsync();
+
+        var admin = await factory.CreateUserAsync();
+        await SetPlatformAdministratorAsync(admin.Id);
+        using var client = await LoginAsync(admin.Email!);
+
+        var summary = (await client.GetFromJsonAsync<EventSummaryResponse>("/api/platform/events/summary"))!;
+        Assert.True(summary.Failed >= 1 && summary.Held >= 1);
+        Assert.Contains(EventTestModule.Recorder, summary.Subscriptions);
+
+        var body = await client.GetStringAsync($"/api/platform/events/deliveries?tenantId={actor.TenantId}&subscription={EventTestModule.Recorder}");
+        Assert.DoesNotContain("4242", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("4243", body, StringComparison.Ordinal);
+        var page = JsonSerializer.Deserialize<EventDeliveryPageResponse>(body, JsonSerializerOptions.Web)!;
+        Assert.Equal(2, page.TotalCount);
+        var failed = Assert.Single(page.Items, d => d.State == EventDeliveryStateDto.Failed);
+        Assert.Equal(1, failed.HoldingBack);
+        Assert.Equal(DomainEventTypes.RecordCreated, failed.EventType);
+        Assert.Equal(actor.Tenant.Name, failed.TenantName);
+        var held = Assert.Single(page.Items, d => d.State == EventDeliveryStateDto.Held);
+
+        var onlyFailed = (await client.GetFromJsonAsync<EventDeliveryPageResponse>(
+            $"/api/platform/events/deliveries?tenantId={actor.TenantId}&state={EventDeliveryStateDto.Failed}"))!;
+        Assert.Equal([failed.Id], onlyFailed.Items.Select(d => d.Id));
+
+        // Çalışmakta veya bitmiş teslim değişmez; başarısız olan sıfırlanır ve hemen zamanlanır.
+        var succeeded = Assert.Single(await DeliveriesAsync(company.Id, EventTestModule.Unordered), d => d.Sequence == company.Version);
+        var retry = await client.PostAsJsonAsync("/api/platform/events/deliveries/retry", new EventDeliveryActionRequest([failed.Id, succeeded.Id], null));
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        Assert.Equal(1, (await retry.Content.ReadFromJsonAsync<EventDeliveryActionResponse>())!.Changed);
+        var reset = Assert.Single(await DeliveriesAsync(company.Id, EventTestModule.Recorder), d => d.Id == failed.Id);
+        Assert.Equal((EventDeliveryStatus.Pending, 0, (string?)null), (reset.Status, reset.AttemptCount, reset.LastError));
+
+        using (var scope = host.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(actor.TenantId, actor.UserId, actor.MembershipId);
+            var audit = await Db(scope).AuditLog.SingleAsync(a => a.EntityKey == CoreModule.AuditedEntityKeys.EventDelivery && a.RecordId == failed.Id);
+            Assert.Equal(admin.Id, audit.UserId);
+            Assert.Contains(EventTestModule.Recorder, audit.Changes);
+            Assert.Contains(failed.EventId.ToString(), audit.Changes);
+            Assert.DoesNotContain("4242", audit.Changes, StringComparison.Ordinal);
+        }
+
+        // Abone düzelince yeniden denenen ve bekletilen teslim sırayla çalışır.
+        EventProbe.Fails = (_, _) => false;
+        await DrainAsync();
+        Assert.All(await DeliveriesAsync(company.Id, EventTestModule.Recorder), d => Assert.Equal(EventDeliveryStatus.Succeeded, d.Status));
+        Assert.Contains(EventProbe.CallsOf(EventTestModule.Recorder, company.Id), c => c.Envelope.Id == held.EventId);
+    }
+
+    [Fact]
+    public async Task Platform_screen_skips_filtered_deliveries_and_is_closed_to_others()
+    {
+        var actor = await ActorAsync();
+        var a = await CreateCompanyAsync(actor, "Atlanacak 1");
+        var b = await CreateCompanyAsync(actor, "Atlanacak 2");
+        EventProbe.Fails = (subscription, _) => subscription == EventTestModule.Recorder;
+        EventProbe.PermanentFailure = true;
+        await DrainAsync();
+
+        var admin = await factory.CreateUserAsync();
+        await SetPlatformAdministratorAsync(admin.Id);
+        using var client = await LoginAsync(admin.Email!);
+        var skip = await client.PostAsJsonAsync(
+            "/api/platform/events/deliveries/skip",
+            new EventDeliveryActionRequest(null, new EventDeliveryFilterDto(actor.TenantId, EventTestModule.Recorder, State: EventDeliveryStateDto.Failed)));
+        Assert.Equal(2, (await skip.Content.ReadFromJsonAsync<EventDeliveryActionResponse>())!.Changed);
+        foreach (var company in new[] { a, b })
+        {
+            var delivery = Assert.Single(await DeliveriesAsync(company.Id, EventTestModule.Recorder));
+            Assert.Equal((EventDeliveryStatus.Skipped, "Platform yöneticisi atladı."), (delivery.Status, delivery.LastError));
+        }
+
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await client.PostAsJsonAsync("/api/platform/events/deliveries/skip", new EventDeliveryActionRequest(null, null))).StatusCode);
+
+        // Firma yöneticisi dahil, platform yöneticisi olmayan kimse göremez.
+        var member = await MemberAsync(actor, CoreModule.Permissions.ManageUsers);
+        using var memberClient = await LoginAsync(member.Email);
+        Assert.Equal(HttpStatusCode.Forbidden, (await memberClient.GetAsync("/api/platform/events/deliveries")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await memberClient.PostAsJsonAsync("/api/platform/events/deliveries/retry", new EventDeliveryActionRequest([Guid.NewGuid()], null))).StatusCode);
+    }
+
     private const string OwnerField = "ownerId";
+
+    private async Task SetPlatformAdministratorAsync(Guid userId)
+    {
+        using var scope = host.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ModulixUser>>();
+        var stored = (await users.FindByIdAsync(userId.ToString()))!;
+        stored.IsPlatformAdministrator = true;
+        Assert.True((await users.UpdateAsync(stored)).Succeeded);
+    }
+
+    private async Task<HttpClient> LoginAsync(string email)
+    {
+        var client = host.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            HandleCookies = true,
+            AllowAutoRedirect = false,
+        });
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, ModulixApiFactory.Password));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return client;
+    }
 
     private sealed record Actor(Tenant Tenant, Guid UserId, Guid MembershipId)
     {

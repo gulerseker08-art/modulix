@@ -131,6 +131,7 @@ app.MapSectorProfileEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapPlatformEndpoints();
+app.MapPlatformEventEndpoints();
 app.MapAuditEndpoints();
 app.MapSettingsEndpoints();
 
