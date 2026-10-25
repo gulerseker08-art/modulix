@@ -150,6 +150,12 @@ public interface IRecordStore
     string? PermissionFor(RecordOperation operation) => null;
 
     /// <summary>
+    /// İşlem için yeterli izinler: biri yeterlidir (ör. ortak kayıtlar birden fazla modülün izniyle açılır, ADR-0006).
+    /// Null ise <see cref="PermissionFor"/> geçerlidir; boş liste kimseye izin vermez.
+    /// </summary>
+    IReadOnlyList<string>? AnyPermissionFor(RecordOperation operation) => null;
+
+    /// <summary>
     /// Sorumlu alanının adı (değeri kullanıcı kimliği); varsa veri kapsamı (Y8) bu alana göre uygulanır ve depo
     /// <see cref="RecordQuery.Owners"/>'ı sorguda uygulamalıdır. Null ise kayıt türü kapsamdan etkilenmez.
     /// </summary>

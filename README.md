@@ -256,6 +256,24 @@ Profil, bir sektör için hazır başlangıç paketidir: modüller, özel alanla
 - Firma yöneticisi Yönetim → Sektör profili'nden uygular (`/yonetim/sektor-profili`, `core.customization.manage`; `GET /api/customization/profiles`, `GET /{anahtar}/preview`, `POST /{anahtar}/apply`). Modül açamaz: kapalı modülün alanları ve değerleri eklenmez, önizlemede ayrıca belirtilir.
 - Menü sırası profilden gelmez: şimdilik yalnızca CRM'in ekranları var.
 
+### Ortak firma ve kişi kaydı (Ç3a)
+
+Firma (taraf) ve kişi çekirdekte tek kayıttır ([ADR-0006](docs/adr/0006-ortak-firma-ve-kisi.md)). Modüller kendi bilgilerini bu kayda bağlı uzantılarda tutar: CRM firması ve CRM kişisi bu kayıtların CRM uzantısıdır. Lojistik ve sonraki modüller yeni firma tablosu açmaz, aynı kaydı kullanır.
+
+- Kayıtlar `core.Parties` ve `core.People` tablolarında durur; ikisi de RLS'lidir. Genel uç: `/api/records/core.party` ve `/api/records/core.person`.
+  - Taraf alanları: `kind` (`Organization` / `Individual`), `name`, `taxOffice`, `taxNumber`, `phone`, `email`, `website`, `city`, `address`. Filtre: `taxNumber`.
+  - Kişi alanları: `firstName`, `lastName`, `email`, `phone`, `title`, `partyId` (çalıştığı taraf). Filtreler: `partyId`, `email`.
+- **CRM API'si değişmedi:** `crm.company` ad, vergi no, telefon, e-posta, web sitesi, şehir ve adresi aynı adlarla alır ve döndürür; bu alanlar tarafa yazılır. Yanıtta `partyId` da gelir. CRM kişisinin ad, soyad, unvan, e-posta ve telefonu ortak kişidedir (`personId`). Durum, kaynak, sektör, etiketler, sorumlu, notlar ve özel alanlar CRM'de kalır.
+- **Vergi numarası kesin eşleşmedir:** vergi numarası tenant içinde tekildir. Yeni CRM firması, aynı vergi numaralı bir tarafla açılırsa yeni taraf oluşmaz, firma o tarafa bağlanır. Boş gönderilen taraf alanları taraftaki değeri silmez. Tarafın zaten bir CRM firması varsa 422 döner (`taxNumber`). Başka bir tarafın vergi numarasını vermek de 422'dir.
+- **Mevcut kayda bağlama:** genel uçta oluştururken `partyId` (firma) veya `personId` (kişi) verilebilir. Bağlantı sonradan değiştirilemez (422).
+- **Çalıştığı firma:** CRM kişisinin firması verildiğinde ya da değiştiğinde, ortak kişinin `partyId`'si o firmanın tarafına eşitlenir.
+- **Yetki:** modül, ortak kaydı hangi izinleriyle okuyup yazdığını `IModule.SharedRecordAccess` ile bildirir. CRM'de taraf için `crm.companies.read` / `.write`, kişi için `crm.contacts.read` / `.write` gerekir. Bu izinlerden birine sahip olan, açık modüllerden birinde ortak kaydı okur ya da yazar. Bildirmeyen modülün izinleri ortak kayda erişim vermez. Kayıt kapsamı (Y8a) uzantıya uygulanır, ortak kayda uygulanmaz.
+- **Silme:** ortak kayda başvuran alanlar `IModule.SharedRecordReferences` ile bildirilir. Kullanılan taraf ya da kişi silinemez; 409 yanıtı nerede kullanıldığını söyler (ör. "1 CRM firması, 2 kişi"). CRM firması silinince taraf kalır.
+- **Sürüm:** CRM firmasının ve kişisinin sürümü, kendi sürümüyle ortak kaydın sürümünden oluşur. Başka bir modül ortak kaydı değiştirdiyse eski sürümle gelen CRM güncellemesi 409 alır.
+- **Denetim:** değişiklik, hangi kayıt üzerinden yapıldıysa onun denetim kaydına yazılır. CRM formundan değişen ünvan `crm.company`, ortak kayıt üzerinden değişen ünvan `core.party` kaydında görünür.
+- `SharedRecords` migration'ı mevcut firmaları taraflara, kişileri ortak kişilere taşır; kimlikler aynı kalır.
+- Henüz yok: kullanıcının (üyeliğin) kişiye bağlanması, benzer kayıt uyarısı ve birleştirme aracı.
+
 ## CRM modülü
 
 İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.
@@ -272,8 +290,8 @@ Listeler filtre alır; bilinmeyen filtre veya geçersiz değer 422 döner. `owne
 
 | Kaynak | Filtreler |
 | --- | --- |
-| Firmalar | `status` (Prospect, Customer, Inactive), `ownerId` |
-| Kişiler | `companyId` |
+| Firmalar | `status` (Prospect, Customer, Inactive), `ownerId`, `partyId` |
+| Kişiler | `companyId`, `personId` |
 | Fırsatlar | `companyId`, `contactId`, `stage`, `open=true` (kazanılmamış ve kaybedilmemiş), `ownerId` |
 | Aktiviteler | `companyId`, `contactId`, `opportunityId`, `open=true`, `dueBefore=<ISO zaman>`, `ownerId` |
 
@@ -290,6 +308,7 @@ Listeler filtre alır; bilinmeyen filtre veya geçersiz değer 422 döner. `owne
 2. `Records`: her entity için bir kayıt deposu (`CrmRecordStore` kalıbı); `IModule.ConfigureServices` içinde kaydedilir.
 3. `Program.cs` → `ModulixModules.Create()` listesine modülü ekleyin, uç noktaları `MapCrmEndpoints` gibi eşleyin.
 4. Migration üretin ve her tablo için `TenantIsolationSql.AddTable` ekleyin; eklenmezse `Every_tenant_table_is_protected_by_row_level_security` testi kırılır.
+5. Müşteri, tedarikçi, taşıyıcı ya da kişi tutan modül yeni firma veya kişi tablosu açmaz. Ortak kayda (`Party`, `Person`) bağlanan bir uzantı entity'si yazar, `SharedRecordAccess` ve `SharedRecordReferences` bildirir (CRM'deki `Company` / `CompanyRecordStore` kalıbı, ADR-0006).
 
 ## E-posta
 

@@ -47,13 +47,15 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
         var updated = (await update.Content.ReadFromJsonAsync<CompanyDto>())!;
         Assert.Equal("Ankara", updated.City);
         Assert.Null(updated.Email);
-        Assert.Equal(2, updated.Version);
+
+        // Sürüm firmanın ve ortak taraf kaydının (ADR-0006) sürümlerinden oluşur; her değişiklikte artar.
+        Assert.True(updated.Version > created.Version);
 
         var list = (await client.GetFromJsonAsync<CrmPage<CompanyDto>>("/api/crm/companies?search=Acme"))!;
         Assert.Equal(created.Id, Assert.Single(list.Items).Id);
         Assert.Empty((await client.GetFromJsonAsync<CrmPage<CompanyDto>>("/api/crm/companies?search=yok-boyle-firma"))!.Items);
 
-        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/crm/companies/{created.Id}?version=2")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/crm/companies/{created.Id}?version={updated.Version}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/crm/companies/{created.Id}")).StatusCode);
 
         using var scope = factory.OpenScope(tenantId);

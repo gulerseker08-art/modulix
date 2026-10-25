@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Modules.Crm.Domain;
@@ -47,32 +48,20 @@ public interface IOwnedEntity
 // Seçim alanları (Y9b) firmanın düzenleyebildiği listelerden değer anahtarı taşır (CrmModule.ChoiceLists); hazır
 // değerlerin anahtarları eski enum adlarıdır (ör. "Proposal"). Varsayılanlar boru hattında listenin ilk etkin değeridir.
 
+/// <summary>
+/// CRM firması: ortak taraf kaydının (ADR-0006) CRM uzantısı. Ünvan, vergi no, iletişim ve adres taraftadır; Lojistik
+/// gibi diğer modüller aynı tarafı kullanır. Burada yalnızca CRM'e özgü bilgiler durur. Bir tarafın en fazla bir CRM firması olur.
+/// </summary>
 public sealed class Company : CrmEntity, IOwnedEntity
 {
-    public const int NameMaxLength = 200;
-    public const int TaxNumberMaxLength = 20;
-    public const int PhoneMaxLength = 30;
-    public const int EmailMaxLength = 254;
-    public const int WebsiteMaxLength = 200;
-    public const int CityMaxLength = 100;
     public const int NotesMaxLength = 4000;
     public const int IndustryMaxLength = 100;
-    public const int AddressMaxLength = 500;
     public const int TagsMaxLength = 200;
 
-    public string Name { get; internal set; } = string.Empty;
+    public Guid PartyId { get; private set; }
 
-    public string? TaxNumber { get; internal set; }
-
-    public string? Phone { get; internal set; }
-
-    public string? Email { get; internal set; }
-
-    public string? Website { get; internal set; }
-
-    public string? City { get; internal set; }
-
-    public string? Address { get; internal set; }
+    /// <summary>Kayıt deposu her zaman yükler (<c>Include</c>); yeni firmada <see cref="AttachParty"/> ile atanır.</summary>
+    public Party Party { get; private set; } = null!;
 
     public string? Industry { get; internal set; }
 
@@ -87,27 +76,37 @@ public sealed class Company : CrmEntity, IOwnedEntity
     public Guid? OwnerId { get; internal set; }
 
     public string? Notes { get; internal set; }
+
+    /// <summary>Yeni firmayı ortak tarafa bağlar (yeni açılan veya mevcut).</summary>
+    internal void AttachParty(Party party)
+    {
+        Party = party;
+        PartyId = party.Id;
+    }
 }
 
+/// <summary>
+/// CRM kişisi: ortak kişi kaydının (ADR-0006) CRM uzantısı. Ad, unvan ve iletişim kişidedir. Bir kişinin en fazla bir CRM
+/// kişisi olur. Firma CRM'e aittir; kişinin çalıştığı taraf firmanın tarafına eşitlenir.
+/// </summary>
 public sealed class Contact : CrmEntity
 {
-    public const int NameMaxLength = 100;
-    public const int TitleMaxLength = 100;
+    public Guid PersonId { get; private set; }
 
-    public string FirstName { get; internal set; } = string.Empty;
-
-    public string LastName { get; internal set; } = string.Empty;
+    /// <summary>Kayıt deposu her zaman yükler (<c>Include</c>); yeni kişide <see cref="AttachPerson"/> ile atanır.</summary>
+    public Person Person { get; private set; } = null!;
 
     /// <summary>Kişinin çalıştığı firma; aynı tenant'ta olmak zorundadır.</summary>
     public Guid? CompanyId { get; internal set; }
 
-    public string? Title { get; internal set; }
-
-    public string? Email { get; internal set; }
-
-    public string? Phone { get; internal set; }
-
     public string? Notes { get; internal set; }
+
+    /// <summary>Yeni kişiyi ortak kişiye bağlar (yeni açılan veya mevcut).</summary>
+    internal void AttachPerson(Person person)
+    {
+        Person = person;
+        PersonId = person.Id;
+    }
 }
 
 public sealed class Opportunity : CrmEntity, IOwnedEntity

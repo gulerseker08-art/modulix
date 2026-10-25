@@ -48,6 +48,9 @@ internal sealed class RecordField<TEntity>
     /// <summary>Bağlı kayıt bulunamazsa gösterilen mesaj.</summary>
     public string? NotFoundMessage { get; init; }
 
+    /// <summary>Yalnızca oluştururken verilebilir (ör. bağlanılan ortak kaydın kimliği); depo kendisi yazar.</summary>
+    public bool CreateOnly { get; init; }
+
     /// <summary>Değeri firmanın seçim listesinden gelen alan (Y9b); depo değeri listeye göre denetler.</summary>
     public string? ChoiceListKey { get; init; }
 
@@ -184,6 +187,16 @@ internal static class Field
         {
             Exists = (context, id, ct) => context.Data.Set<TTarget>().AnyAsync(t => t.Id == id, ct),
             NotFoundMessage = notFoundMessage,
+        };
+
+    /// <summary>
+    /// Ortak kaydın kimliği (ADR-0006, ör. "partyId"): okurken verilir; oluştururken verilirse yeni kayıt o ortak kayda
+    /// bağlanır (depo <c>PrepareNewAsync</c>'te), sonra değiştirilemez.
+    /// </summary>
+    public static RecordField<T> SharedId<T>(string name, Func<T, Guid> get) =>
+        new(name, required: false, nullable: true, ParseId, e => get(e) is var value && value != Guid.Empty ? value.ToString() : null, (_, _) => { })
+        {
+            CreateOnly = true,
         };
 
     private static ParsedValue ParseId(JsonNode node) =>

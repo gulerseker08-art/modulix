@@ -1,4 +1,5 @@
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Settings;
 
 namespace Modulix.Core.Modules;
@@ -192,6 +193,27 @@ public sealed class CoreModule : IModule
         {
             ["key"] = "Ayar", ["value"] = "Değer",
         }, "key"),
+        // Ortak kayıtlar (ADR-0006): değerleri ortak kaydı kullanan her modülün okuruna açık olduğu için denetim okuruna da açıktır.
+        new(SharedEntities.Party, "Firma (ortak kayıt)", null, new Dictionary<string, string>
+        {
+            ["kind"] = "Tür", ["name"] = "Ünvan", ["taxOffice"] = "Vergi dairesi", ["taxNumber"] = "Vergi no", ["phone"] = "Telefon",
+            ["email"] = "E-posta", ["website"] = "Web sitesi", ["city"] = "Şehir", ["address"] = "Adres",
+        }, "name")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["kind"] = new Dictionary<string, string> { ["Organization"] = "Tüzel kişi", ["Individual"] = "Gerçek kişi" },
+            },
+        },
+        new(SharedEntities.Person, "Kişi (ortak kayıt)", null, new Dictionary<string, string>
+        {
+            ["firstName"] = "Ad", ["lastName"] = "Soyad", ["email"] = "E-posta", ["phone"] = "Telefon", ["title"] = "Unvan",
+            ["partyId"] = "Firma",
+        })
+        {
+            TitleFields = ["firstName", "lastName"],
+            References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party },
+        },
         new(AuditedEntityKeys.Audit, "Denetim kaydı", null, new Dictionary<string, string>
         {
             ["filters"] = "Filtreler", ["rows"] = "Satır sayısı",
@@ -212,6 +234,12 @@ public sealed class CoreModule : IModule
                 },
             },
         },
+    ];
+
+    /// <summary>Kişinin çalıştığı firma: kişisi olan taraf silinemez.</summary>
+    IReadOnlyList<SharedRecordReference> IModule.SharedRecordReferences { get; } =
+    [
+        new(SharedEntities.Party, SharedEntities.Person, "partyId", "kişi"),
     ];
 }
 

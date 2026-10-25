@@ -90,6 +90,7 @@ Pilot sırasının en kritik çekirdek işi. CRM'deki firma, lojistikte yükleyi
   - Modüller arası **kayıt referansı sözleşmesi:** bir modülün kaydı başka modülün kaydına kayıt türü + kimlikle bağlanır; boru hattı referansın varlığını, aynı tenant'ta olduğunu ve okuyanın görebildiğini denetler. Seçim kutuları (lookup) için ortak arama ucu.
   - Tekilleştirme: aynı vergi numarasıyla ikinci taraf açılmaz; birleştirme (merge) aracı.
   - Mevcut CRM firmalarını Taraf'a, CRM kişilerini ve mevcut kullanıcıları Kişi'ye taşıyan migration.
+  - **Durum:** ilk adım tamam: ortak kayıtlar, modül bildirimleri, CRM'in ortak kayda geçişi ve veri taşıma. Kalanlar: kullanıcı–kişi bağı, benzer kayıt uyarısı, birleştirme aracı.
 - **Ç3b · Adres ve konum (D2):** ülke, il, ilçe, mahalle sözlüğü; yapılandırılmış adres; taraf başına çoklu adres (fatura, sevk, depo); isteğe bağlı koordinat. Lojistikte yükleme/boşaltma noktası, antrepoda depo adresi bunu kullanır.
 - **Ç3c · Ölçü birimi ve ürün/kalem (D3):** birim sözlüğü (adet, kg, m³, palet, TEU) ve dönüşümler; ortak ürün/hizmet kartı (antrepoda stok kalemi, muhasebede fatura satırı, lojistikte navlun hizmeti).
 - **Ç3d · Para birimi ve döviz kuru (D2):** para birimi sözlüğü, TCMB günlük kurları (Ç2 işi), kayıt tarihindeki kurla çevirme, tutar + para birimi ortak tipi. Navlun ve maliyet hesapları (K7) döviz cinsinden olabildiği için Lojistik'ten önce gelir.

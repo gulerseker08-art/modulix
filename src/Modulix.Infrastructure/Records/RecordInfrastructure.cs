@@ -184,13 +184,23 @@ internal sealed class ModuleEntitlementService(ITenantContextAccessor tenantAcce
 
 /// <summary>
 /// Boru hattının yetki adımı: kayıt deposunun işlem için istediği izin (<see cref="IRecordStore.PermissionFor"/>)
-/// kullanıcının rollerinde var ve modülü açık mı? İzin istemeyen depo için aktif tenant yeterlidir.
+/// kullanıcının rollerinde var ve modülü açık mı? İzin istemeyen depo için aktif tenant yeterlidir. Depo birden fazla
+/// izin sayıyorsa (<see cref="IRecordStore.AnyPermissionFor"/>) biri yeterlidir.
 /// </summary>
 internal sealed class StorePermissionService(IRecordStoreRegistry stores, ICurrentAccess access) : IPermissionService
 {
-    public async Task<bool> HasPermissionAsync(TenantContext tenant, string entityKey, RecordOperation operation, CancellationToken cancellationToken) =>
-        stores.Find(entityKey)?.PermissionFor(operation) is not { } permission
-        || await access.HasPermissionAsync(permission, cancellationToken);
+    public async Task<bool> HasPermissionAsync(TenantContext tenant, string entityKey, RecordOperation operation, CancellationToken cancellationToken)
+    {
+        var store = stores.Find(entityKey);
+        if (store?.AnyPermissionFor(operation) is { } any)
+        {
+            var granted = await access.GetPermissionsAsync(cancellationToken);
+            return any.Any(granted.Contains);
+        }
+
+        return store?.PermissionFor(operation) is not { } permission
+            || await access.HasPermissionAsync(permission, cancellationToken);
+    }
 }
 
 public static class RecordsSetup
@@ -213,6 +223,8 @@ public static class RecordsSetup
         services.AddScoped<IRecordPipeline, RecordPipeline>();
 
         services.AddScoped<IRecordStore, TenantSettingRecordStore>();
+        services.AddScoped<IRecordStore, PartyRecordStore>();
+        services.AddScoped<IRecordStore, PersonRecordStore>();
         return services;
     }
 }

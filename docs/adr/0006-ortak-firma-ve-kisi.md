@@ -1,7 +1,7 @@
 # ADR-0006: Ortak firma ve kişi kaydı
 
-- **Durum:** Taslak, 25 Ekim 2026
-- **Karar:** Firma (Taraf) ve kişi çekirdekte tek kayıttır; modüller kendi bilgilerini bu kayda bağlı uzantı tablolarında tutar ve ortak kayda `Modulix.Core.Contracts` üzerinden erişir
+- **Durum:** Kabul edildi, 25 Ekim 2026
+- **Karar:** Firma (Taraf) ve kişi çekirdekte tek kayıttır; modüller kendi bilgilerini bu kayda bağlı uzantı tablolarında tutar, ortak kaydın sınıfları ve bildirimleri `Modulix.Core.Contracts`'tadır
 
 ## Problem
 
@@ -33,8 +33,8 @@ Yol haritasındaki K3 kararı, modüller arası her yeni sözleşme için ADR is
 
 | Kayıt | Alanlar | Kural |
 | --- | --- | --- |
-| **Taraf** (`core.party`) | tür (tüzel/gerçek kişi), ünvan, vergi dairesi, vergi no veya TCKN, telefon, e-posta, web sitesi, adres, şehir | Aynı tenant'ta aynı vergi no / TCKN ile ikinci taraf açılamaz (409). TCKN hassas alandır (Y8b). |
-| **Kişi** (`core.person`) | ad, soyad, e-posta, telefon, TCKN, çalıştığı taraf (isteğe bağlı), unvan, bağlı üyelik (isteğe bağlı) | Bir üyeliğe en fazla bir kişi bağlanır. Çalıştığı taraf boşsa kişi firmanın kendi personeli veya bağımsızdır. TCKN hassas alandır. |
+| **Taraf** (`core.party`) | tür (tüzel/gerçek kişi), ünvan, vergi dairesi, vergi no veya TCKN, telefon, e-posta, web sitesi, adres, şehir | Aynı tenant'ta aynı vergi no / TCKN ile ikinci taraf açılamaz (422, `taxNumber`). |
+| **Kişi** (`core.person`) | ad, soyad, e-posta, telefon, unvan, çalıştığı taraf (isteğe bağlı); sonra bağlı üyelik ve TCKN | Bir üyeliğe en fazla bir kişi bağlanır. Çalıştığı taraf boşsa kişi firmanın kendi personeli veya bağımsızdır. TCKN İK ile gelir ve hassas alandır (Y8b). |
 
 Adres ilk aşamada düz metindir; yapılandırılmış ve çoklu adres Ç3b'de gelir.
 
@@ -51,7 +51,8 @@ Adres ilk aşamada düz metindir; yapılandırılmış ve çoklu adres Ç3b'de g
 - Modül yalnızca kendine özgü bilgiyi kendi şemasında, ortak kaydın kimliğiyle (`PartyId`, `PersonId`) tutar. Ortak alanlar uzantıda tekrarlanmaz.
 - Rol ayrı bir etiket değildir, uzantının varlığından anlaşılır: CRM uzantısı olan taraf "CRM firması", Lojistik taşıyıcı uzantısı olan taraf "taşıyıcı", İK çalışan uzantısı olan kişi "çalışan"dır. Aynı taraf veya kişinin birden fazla uzantısı olabilir.
 - Uzantı ve ortak kayıt dışarıya tek kayıt olarak verilir: `crm.company` bugünkü alanlarını (ad, vergi no, telefon…) aynen döndürür ve kabul eder, yanına `partyId` eklenir. Mevcut CRM API'si ve ekranları değişmez.
-- Uzantının deposu ortak alanları `IPartyDirectory` / `IPersonDirectory` (Contracts) ile okur ve yazar. Yazma aynı işlemde hazırlanır: uzantı ve ortak kayıt birlikte kaydedilir ya da hiçbiri.
+- Ortak kaydın entity sınıfları (`Party`, `Person`) Contracts'tadır; tabloları çekirdekte yapılandırılır. Uzantı entity'si ortak kayda navigation ile bağlanır (`Company.Party`) ve deposu ortak alanları bu navigation üzerinden okur ve yazar (`IModuleData`). Uzantı ve ortak kayıt aynı işlemde kaydedilir ya da hiçbiri; ikisinin de sürümü vardır, başka bir modülün araya giren değişikliği 409 verir.
+- Uzantı oluşturulurken mevcut bir ortak kayda bağlanabilir (`partyId` / `personId`, yalnızca oluştururken; sonra değişmez). Bağlanırken boş gönderilen ortak alanlar mevcut değeri silmez.
 - Örnekler:
 
 | Modül | Uzantı | Tuttuğu bilgi |
@@ -73,7 +74,8 @@ Adres ilk aşamada düz metindir; yapılandırılmış ve çoklu adres Ç3b'de g
 ### Arama, tekilleştirme ve birleştirme
 
 - Seçim kutuları için ortak arama: ad, vergi no, e-posta, telefon (`/api/records/core.party?search=`).
-- Oluşturmadan önce benzer kayıtlar gösterilir (aynı vergi no kesin, benzer ad ve aynı e-posta/telefon olası eşleşme). Kullanıcı mevcut kaydı seçerse yeni uzantı mevcut ortak kayda bağlanır.
+- **Vergi numarası kesin eşleşmedir:** yeni uzantı, aynı vergi numaralı bir tarafla oluşturulursa yeni taraf açılmaz, mevcut tarafa bağlanır (ör. Lojistik'te açılmış müşteri CRM'e eklenir). O tarafın aynı türden uzantısı zaten varsa 422 (`taxNumber`).
+- Oluşturmadan önce olası eşleşmeler gösterilir (benzer ad, aynı e-posta/telefon); kullanıcı mevcut kaydı seçerse yeni uzantı ona bağlanır.
 - **Birleştirme:** iki taraftan veya iki kişiden biri seçilir, diğerinin uzantıları ve referansları ona taşınır, eski kayıt silinir. Modüller ortak kayda başvuran alanlarını `IModule` üzerinden bildirir; taşıma ADR-0004'teki gibi bu bildirimle ve kayıt boru hattından yapılır, tek işlemdir, denetim kaydına yazılır. Aynı türden iki uzantı çakışırsa (iki CRM firması) kullanıcı hangisinin kalacağını seçer.
 
 ### Silme ve modül kapatma
@@ -84,15 +86,15 @@ Adres ilk aşamada düz metindir; yapılandırılmış ve çoklu adres Ç3b'de g
 
 ### Denetim ve olaylar
 
-- Ortak alan değişikliği ortak kaydın denetim kaydına (`core.party`, `core.person`) yazılır, uzantı alanları uzantınınkine. CRM firma ayrıntısındaki "Değişiklik geçmişi" ikisini birlikte gösterir.
+- Değişiklik, hangi kayıt üzerinden yapıldıysa onun denetim kaydına yazılır: CRM firma formundan değişen ünvan `crm.company` kaydında, ortak kayıt ekranından (veya başka bir modülden) değişen ünvan o kaydın denetim kaydında görünür. Uzantının "Değişiklik geçmişi"nde bağlı ortak kaydın geçmişinin de gösterilmesi sonraki adımdır.
 - Ortak kayıt değişince olay yayınlanır (Ç1); modüller gerekiyorsa dinler (ör. Muhasebe ünvan değişikliğini not eder).
 
 ## Geçiş
 
-1. Çekirdek tabloları, `IPartyDirectory` / `IPersonDirectory` sözleşmeleri, bildirimler ve genel uç.
-2. Migration: her CRM firması için Taraf, her CRM kişisi için Kişi, her üyelik için Kişi oluşur. Aynı vergi numaralı CRM firmaları otomatik birleştirilmez; migration raporlar, birleştirme aracıyla elle yapılır. Taşınan alanlar CRM tablolarından kaldırılır.
-3. CRM deposu ortak alanları ortak kayıttan okur ve yazar; API değişmez. Firma ve kişi formlarında benzer kayıt uyarısı.
-4. Kullanıcı daveti ve kullanıcı ayrıntısı kişiyle bağlanır.
+1. Çekirdek tabloları, entity sınıfları, bildirimler ve genel uç (`core.party`, `core.person`).
+2. Migration: her CRM firması için Taraf, her CRM kişisi için Kişi oluşur (kimlikleri aynı kalır). CRM'de vergi numarası zaten tekil olduğu için çakışma olmaz. Taşınan alanlar CRM tablolarından kaldırılır.
+3. CRM deposu ortak alanları ortak kayıttan okur ve yazar; API değişmez.
+4. Sonraki adımlar: üyelikler için Kişi, kullanıcı daveti ve kullanıcı ayrıntısının kişiyle bağlanması; benzer kayıt uyarısı; birleştirme aracı; uzantı geçmişinde ortak kaydın geçmişi.
 
 ## Sonuçlar
 
@@ -101,7 +103,7 @@ Adres ilk aşamada düz metindir; yapılandırılmış ve çoklu adres Ç3b'de g
 - Ortak kayıt üzerinden her modül her müşterinin adını görebilir. Firma adı ve vergi numarası tenant içinde gizli bilgi sayılmaz; iletişim dışındaki ticari bilgiler (sorumlu, notlar, tutarlar) uzantıda kalır.
 - Uzantı ile ortak kaydı birleştiren sorgular iki tabloya bakar; ad ve vergi no aramaları için ortak kayıtta indeks gerekir.
 
-## Açık noktalar
+## Kabulde verilen kararlar
 
-- **Ortak alanı kim düzenler:** taslakta, ortak kaydı yazma izni bildiren herhangi bir modülde yazma izni olan düzenler (ör. CRM'deki satış temsilcisi, Lojistik'te de kullanılan müşterinin ünvanını değiştirebilir). Muhasebe geldiğinde, faturası kesilmiş carinin ünvan ve vergi bilgisinin değişmesi onaya bağlanabilir.
-- **Kapsam:** "yalnızca kendi kayıtları" kapsamındaki kişinin seçim kutusunda bütün firma adlarını görmesi kabul edilebilir mi? Kabul edilmezse arama yalnızca kapsamındaki uzantılara bağlı tarafları döndürür; o zaman aynı firmayı ikinci kez açma riski doğar.
+- **Ortak alanı kim düzenler:** ortak kaydı yazma izni bildiren herhangi bir modülde yazma izni olan düzenler (ör. CRM'deki satış temsilcisi, Lojistik'te de kullanılan müşterinin ünvanını değiştirebilir). Muhasebe geldiğinde, faturası kesilmiş carinin ünvan ve vergi bilgisinin değişmesi onaya bağlanabilir.
+- **Kapsam:** "yalnızca kendi kayıtları" kapsamındaki kişi seçim kutusunda bütün tarafların adını görür; aynı firmanın ikinci kez açılmasını önlemek bundan önemlidir.
