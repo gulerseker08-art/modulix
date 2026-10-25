@@ -144,6 +144,16 @@ public class ChoiceListTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         Assert.Equal(ActivityType.Meeting, lists.Single(l => l.Key == CrmLists.ActivityType).Default);
         var second = await repClient.PostAsJsonAsync("/api/records/crm.activity", new RecordWriteRequest(new JsonObject { ["subject"] = "Görüş" }));
         Assert.Equal(ActivityType.Meeting, (await second.Content.ReadFromJsonAsync<RecordResponse>())!.Values["type"]!.GetValue<string>());
+
+        // Tipli uç nokta da tip verilmezse varsayılanı atar ("Görev"i varsaymaz); güncellemede tip verilmezse değişmez.
+        var typed = await PostAsync<ActivityDto>(repClient, "/api/crm/activities", new SaveActivityRequest("Toplantı ayarla"));
+        Assert.Equal(ActivityType.Meeting, typed.Type);
+        var call = await PostAsync<ActivityDto>(repClient, "/api/crm/activities", new SaveActivityRequest("Geri ara", ActivityType.Call));
+        var updated = await repClient.PutAsJsonAsync($"/api/crm/activities/{call.Id}", new SaveActivityRequest("Geri ara (yarın)", Version: call.Version));
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        Assert.Equal(ActivityType.Call, (await updated.Content.ReadFromJsonAsync<ActivityDto>())!.Type);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await repClient.PostAsJsonAsync(
+            "/api/crm/activities", new SaveActivityRequest("Görev aç", ActivityType.Task))).StatusCode);
     }
 
     private async Task<(Core.Platform.Tenant Tenant, ModulixUser Admin, ModulixUser Rep)> SetUpAsync()

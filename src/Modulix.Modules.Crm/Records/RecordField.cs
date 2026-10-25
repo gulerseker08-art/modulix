@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -50,16 +51,25 @@ internal sealed class RecordField<TEntity>
     /// <summary>Değeri firmanın seçim listesinden gelen alan (Y9b); depo değeri listeye göre denetler.</summary>
     public string? ChoiceListKey { get; init; }
 
+    /// <summary>
+    /// Boş bırakılamayan liste alanı (ör. aktivite tipi) boş gönderilirse verilmemiş sayılır: yeni kayıtta listenin
+    /// varsayılanı atanır, güncellemede mevcut değer kalır. Böylece pasif bir hazır değer istemcinin varsayılanı olmaz.
+    /// </summary>
+    public bool IsOmitted(JsonNode? node) => ChoiceListKey is not null && !Nullable && IsEmpty(node);
+
     public ParsedValue Parse(JsonNode? node)
     {
         // Boş metin de boş değer sayılır; zorunlu alanlarda "zorunludur" hatası verir.
-        if (node is null || (node.GetValueKind() == JsonValueKind.String && string.IsNullOrWhiteSpace(node.GetValue<string>())))
+        if (IsEmpty(node))
         {
             return Nullable ? ParsedValue.Of(null) : ParsedValue.Fail(Required ? "Bu alan zorunludur." : "Bu alan boş bırakılamaz.");
         }
 
         return parse(node);
     }
+
+    private static bool IsEmpty([NotNullWhen(false)] JsonNode? node) =>
+        node is null || (node.GetValueKind() == JsonValueKind.String && string.IsNullOrWhiteSpace(node.GetValue<string>()));
 
     public JsonNode? Read(TEntity entity) => read(entity);
 

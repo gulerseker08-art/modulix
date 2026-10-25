@@ -241,7 +241,7 @@ Fırsat aşaması, firma durumu, firma kaynağı ve aktivite tipi artık firman�
 - Modül listelerini `IModule.ChoiceLists` ile tanımlar. Hazır değerlerin anahtarı eski enum adıdır (ör. `Proposal`), bu yüzden API ve kayıtlar değişmez. Migration sayı kolonlarını bu metin anahtarlara çevirir.
 - Kod değere değil kategoriye bakar. Fırsat aşamasında Açık / Kazanıldı / Kaybedildi, firma durumunda Potansiyel / Müşteri / Pasif vardır. `open=true` süzgeci ve devir, kategorisi Kazanıldı ya da Kaybedildi olmayan aşamaları açık sayar. Yeni değer bir kategori seçer. Hazır değerin kategorisi değişmez. Her kategoride en az bir etkin değer kalmalıdır.
 - Değer silinmez: listeden çıkarılan değer pasif kalır. Pasif değer yeni kayıtta seçilemez ama onu taşıyan kayıt aynen kaydedilebilir. Listede olmayan değer 422 döner.
-- Değer verilmezse listenin varsayılanı atanır: tanımın varsayılanı etkinse odur, değilse ilk etkin değerdir.
+- Değer verilmezse (ya da `null` veya boş gönderilirse) yeni kayıtta listenin varsayılanı atanır: tanımın varsayılanı etkinse odur, değilse ilk etkin değerdir. Güncellemede verilmeyen değer değişmez. Tipli CRM istekleri de (`status`, `stage`, `type`) bir hazır değeri varsaymaz; böylece ör. "Görev" pasife alınınca tip göndermeyen istek hata almaz.
 - Tabloya (`meta.ChoiceLists`, RLS'li) yalnızca firmanın düzenlediği liste yazılır. Düzenlenmemiş listede koddaki varsayılan geçerlidir. Değişiklikler denetim kaydına "Liste" olarak yazılır. Kayıt geçmişi değerleri firmanın adlarıyla gösterir.
 - `GET /api/choice-lists` her üyeye açıktır. Düzenleme `GET /api/customization/lists` ve `PUT /api/customization/lists/{anahtar}` üzerinden yapılır; gövdede liste tamamıyla, sırasıyla verilir.
 
