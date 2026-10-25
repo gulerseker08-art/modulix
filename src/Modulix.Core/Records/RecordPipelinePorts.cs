@@ -128,6 +128,9 @@ public sealed record AuditEntry(
 /// </summary>
 public sealed record DomainEvent(Guid TenantId, string EventType, string EntityKey, Guid RecordId, JsonObject Payload)
 {
+    /// <summary>İşlemin işletici şirketi; ortak kayıtlarda boş olabilir.</summary>
+    public Guid? CompanyId { get; init; }
+
     public int SchemaVersion { get; init; } = 1;
 
     public long? Sequence { get; init; }
