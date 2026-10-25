@@ -16,6 +16,7 @@
 | K7 | Bütün hesaplamalar Modulix'te yapılır: navlun, ardiye, bordro, vergi ve muhasebe. Dış sistemlere yalnızca yasal bildirim ve e-belge için bağlanılır, hesap yaptırılmaz. Hesaplamaların ortak altyapısı çekirdektedir (Ç18). |
 | K8 | e-İrsaliye Lojistik modülüyle birlikte gelir; entegratör çerçevesi bu yüzden D2'dedir (Ç11b). |
 | K9 | Antrepo hem gümrüklü antrepoyu hem genel (gümrüksüz) depoyu destekler. Depo işlemleri (kabul, adres, stok, çıkış, sayım) ortaktır; gümrük, bunun üzerine depo veya alan bazında açılan bir katmandır. Pilot gümrüklü antrepodur. |
+| K10 | **Bir kavram bir kez tanımlanır.** Firma (müşteri, tedarikçi, taşıyıcı) ve kişi (kullanıcı, çalışan, müşteri yetkilisi, sürücü) çekirdekte tek kayıttır. CRM'de tanımlanan müşteri Lojistik, Antrepo ve Muhasebe'de yeniden açılmaz; sisteme kullanıcı olarak eklenen kişi İK'da yeniden tanımlanmaz. Modüller ortak kaydı kendi verileriyle genişletir (Ç3a). |
 
 ## Mevcut durum
 
@@ -79,11 +80,16 @@ E-posta işleyicisi ve outbox işleyicisi kendi döngüleriyle çalışıyor. Lo
 
 Pilot sırasının en kritik çekirdek işi. CRM'deki firma, lojistikte yükleyici/alıcı, antrepoda ardiye müşterisi, muhasebede cari hesaptır. Her modül kendi müşteri tablosunu tutarsa aynı firma dört kez girilir ve modüller birbirine proje referansı veremediği için (K5) bağ kurulamaz.
 
-- **Ç3a · Taraf (cari) ve kayıt referansı (D1):**
-  - Çekirdekte ortak **Taraf** kaydı: ünvan, vergi dairesi/no veya TCKN, tür (tüzel/gerçek kişi), iletişim. CRM firması bu kayda bağlanır; diğer modüller yeni firma açmaz, Taraf'a referans verir.
+- **Ç3a · Ortak firma ve kişi kaydı, kayıt referansı (D1):** K10'un uygulanışı.
+  - **Taraf (firma):** ünvan, vergi dairesi/no veya TCKN, tür (tüzel/gerçek kişi), iletişim. CRM firması bu kayda bağlanır; diğer modüller yeni firma açmaz, Taraf'a referans verir.
+  - **Kişi:** ad, iletişim, TCKN (hassas alan, Y8b). Bir kişi bir firmanın yetkilisi olabilir (CRM kişisi), sisteme giriş yapan bir kullanıcı olabilir (üyelik kişiye bağlanır) ya da yalnızca kayıt olarak var olabilir (kullanıcı olmayan sürücü veya depo personeli). Kullanıcı daveti mevcut bir kişiden yapılabilir; davet edilen kişi zaten varsa yeni kişi açılmaz.
+  - **Roller:** aynı Taraf hem müşteri hem tedarikçi olabilir; aynı kişi hem kullanıcı hem çalışan hem sürücü olabilir. Rol ayrı bir kayıt değil, ortak kayda eklenen bir etikettir.
+  - **Modül uzantıları:** her modül yalnızca kendine özgü bilgiyi kendi şemasında, ortak kaydın kimliğiyle tutar. Örnekler: Lojistik'te müşterinin varsayılan tarifesi, taşıyıcının araç filosu; İK'da çalışanın işe giriş tarihi, ücreti; Lojistik'te sürücünün ehliyet bilgisi; Muhasebe'de carinin hesap kodu ve vadesi. Ortak alanlar (ünvan, vergi no, telefon, adres) uzantıda tekrarlanmaz; biri değiştirince her modülde değişmiş görünür.
+  - **Yetki:** ortak kaydın temel bilgilerini, onu kullanan herhangi bir modülde okuma izni olan görür (ör. sevkiyat izni olan, sevkiyattaki müşterinin adını görür). Uzantı verisi kendi modülünün izniyle korunur (ör. ücret yalnızca İK izniyle). Kişisel veriler hassas alan kuralına (Y8b) tabidir.
+  - **Kim oluşturur:** ortak kayıt, onu ilk ihtiyaç duyan modülden oluşturulur (ör. CRM açık değilse Lojistik ekranından yeni müşteri). Oluşturmadan önce benzer kayıtlar (ad, vergi no, e-posta, telefon) gösterilir.
   - Modüller arası **kayıt referansı sözleşmesi:** bir modülün kaydı başka modülün kaydına kayıt türü + kimlikle bağlanır; boru hattı referansın varlığını, aynı tenant'ta olduğunu ve okuyanın görebildiğini denetler. Seçim kutuları (lookup) için ortak arama ucu.
   - Tekilleştirme: aynı vergi numarasıyla ikinci taraf açılmaz; birleştirme (merge) aracı.
-  - Mevcut CRM firmalarını Taraf'a taşıyan migration.
+  - Mevcut CRM firmalarını Taraf'a, CRM kişilerini ve mevcut kullanıcıları Kişi'ye taşıyan migration.
 - **Ç3b · Adres ve konum (D2):** ülke, il, ilçe, mahalle sözlüğü; yapılandırılmış adres; taraf başına çoklu adres (fatura, sevk, depo); isteğe bağlı koordinat. Lojistikte yükleme/boşaltma noktası, antrepoda depo adresi bunu kullanır.
 - **Ç3c · Ölçü birimi ve ürün/kalem (D3):** birim sözlüğü (adet, kg, m³, palet, TEU) ve dönüşümler; ortak ürün/hizmet kartı (antrepoda stok kalemi, muhasebede fatura satırı, lojistikte navlun hizmeti).
 - **Ç3d · Para birimi ve döviz kuru (D2):** para birimi sözlüğü, TCMB günlük kurları (Ç2 işi), kayıt tarihindeki kurla çevirme, tutar + para birimi ortak tipi. Navlun ve maliyet hesapları (K7) döviz cinsinden olabildiği için Lojistik'ten önce gelir.
@@ -230,7 +236,7 @@ Bütün hesaplamalar Modulix'te yapılır (K7). Navlun, ardiye, bordro ve vergi 
 | --- | :-: | :-: | :-: | :-: | :-: |
 | Ç1 Olay altyapısı | ✔ | ✔ | ✔ | ✔ | ✔ |
 | Ç2 Arka plan işleri | ○ | ✔ | ✔ | ✔ | ✔ |
-| Ç3a Taraf ve kayıt referansı | ✔ | ✔ | ✔ | ○ | ✔ |
+| Ç3a Ortak firma ve kişi kaydı | ✔ | ✔ | ✔ | ✔ | ✔ |
 | Ç3b Adres ve konum | ○ | ✔ | ✔ | ✔ | ✔ |
 | Ç3c Birim ve ürün kartı | | ○ | ✔ | | ✔ |
 | Ç3d Para birimi ve kur | ○ | ✔ | ✔ | | ✔ |
@@ -256,7 +262,7 @@ Modüllerin ayrıntısı, sırası gelince bu dosyada açılır. Her modül CRM 
 
 ### M1 · CRM (pilot)
 
-- Firma kaydının ortak Taraf'a (Ç3a) bağlanması
+- Firma ve kişi kayıtlarının ortak kayda (Ç3a) bağlanması
 - Teklif yönetimi (kalemler, PDF, onay)
 - Lojistiğe özel alanlar ve listeler (Lojistik firması profili)
 - Pilot verisinin içe aktarılması (Ç7)
@@ -294,7 +300,7 @@ Gümrüklü antrepo ve genel depo aynı modüldedir (K9). Ortak depo katmanı he
 
 ### M4 · İK
 
-- Personel özlük kartı ve belgeleri
+- Personel özlük kartı ve belgeleri (ortak Kişi kaydının İK uzantısı; kullanıcı olan kişi yeniden tanımlanmaz)
 - Organizasyon yapısı ve pozisyonlar
 - İzin talepleri ve onay
 - Puantaj ve vardiya
