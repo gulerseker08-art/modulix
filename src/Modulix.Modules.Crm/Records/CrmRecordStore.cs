@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Records;
@@ -12,6 +13,8 @@ namespace Modulix.Modules.Crm.Records;
 /// CRM kayıt depolarının ortak kalıbı; yeni bir sektör modülü de aynısını izler. Alt sınıf yalnızca
 /// anahtarı, izinleri, alan listesini, filtreleri, sıralamayı ve aramayı verir. Kaydetmez: boru hattı kaydı,
 /// audit'i ve olayı tek seferde yazar. Tenant filtresi ve RLS <see cref="IModuleData"/> üzerinden uygulanır.
+/// Ortak kaydın uzantısı olan entity (ADR-0006, ör. firma → taraf) ortak kaydı <see cref="Load"/> ile yükler, yeni kayıtta
+/// <see cref="PrepareNewAsync"/> ile bağlar ve <see cref="SharedOf"/> ile verir; ortak alanlar navigation üzerinden yazılır.
 /// </summary>
 internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IRecordStore
     where TEntity : CrmEntity, new()
@@ -43,6 +46,12 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     protected virtual IReadOnlyDictionary<string, AsyncRecordFilter<TEntity>> AsyncFilters => NoAsyncFilters;
 
     private IModuleData Data => context.Data;
+
+    /// <summary>Kayıt depolarının servisleri.</summary>
+    protected CrmStoreContext Context => context;
+
+    /// <summary>Adıyla alan (ör. bağlama kararında değeri okumak için).</summary>
+    protected RecordField<TEntity> FieldNamed(string name) => FieldsByName[name];
 
     private Dictionary<string, RecordField<TEntity>> FieldsByName =>
         fieldsByName ??= Fields.ToDictionary(f => f.Name, StringComparer.Ordinal);
@@ -92,13 +101,13 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
     public async Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken)
     {
-        var entity = await Data.Set<TEntity>().AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await Load(Data.Set<TEntity>().AsNoTracking()).SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         return entity is null ? null : ToData(entity);
     }
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
-        var source = await ApplyFiltersAsync(Data.Set<TEntity>().AsNoTracking(), query.Filters, cancellationToken);
+        var source = await ApplyFiltersAsync(Load(Data.Set<TEntity>().AsNoTracking()), query.Filters, cancellationToken);
         if (query.Owners is { } owners && IsOwned)
         {
             source = source.Where(OwnedBy(owners));
@@ -138,7 +147,14 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     public async Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken)
     {
         var entity = new TEntity();
+        (values, var linked) = await PrepareNewAsync(entity, values, cancellationToken);
+        var sharedBefore = linked ? SharedState(entity) : null;
         await ApplyAsync(entity, values, isNew: true, cancellationToken);
+        if (linked && SharedChanged(entity, sharedBefore))
+        {
+            SharedOf(entity)!.Touch();
+        }
+
         if (FieldsByName.TryGetValue(OwnerField, out var owner) && owner.Read(entity) is null)
         {
             owner.Write(entity, context.CurrentUserId);
@@ -158,19 +174,26 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
     public async Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken)
     {
-        var entity = await Data.Set<TEntity>().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await Load(Data.Set<TEntity>()).SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         if (entity is null)
         {
             return null;
         }
 
         EnsureVersion(entity, expectedVersion);
-        var before = ToData(entity).Values;
+        var sharedBefore = SharedState(entity);
+        var before = OwnValues(entity, sharedBefore);
         await ApplyAsync(entity, values, isNew: false, cancellationToken);
 
-        if (!JsonNode.DeepEquals(before, ToData(entity).Values))
+        // Ortak alanların değişikliği ortak kaydın, diğerleri uzantının sürümünü artırır; kaydın sürümü ikisinden oluşur.
+        if (!JsonNode.DeepEquals(before, OwnValues(entity, sharedBefore)))
         {
             entity.Touch();
+        }
+
+        if (SharedChanged(entity, sharedBefore))
+        {
+            SharedOf(entity)!.Touch();
         }
 
         return ToData(entity);
@@ -178,7 +201,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
     public async Task<bool> DeleteAsync(Guid id, long? expectedVersion, CancellationToken cancellationToken)
     {
-        var entity = await Data.Set<TEntity>().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await Load(Data.Set<TEntity>()).SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         if (entity is null)
         {
             return false;
@@ -188,6 +211,48 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         Data.Set<TEntity>().Remove(entity);
         return true;
     }
+
+    /// <summary>Entity'yle birlikte yüklenecekler (ör. ortak kayıt: <c>Include(c =&gt; c.Party)</c>).</summary>
+    protected virtual IQueryable<TEntity> Load(IQueryable<TEntity> source) => source;
+
+    /// <summary>
+    /// Yeni kaydı alanlar yazılmadan önce hazırlar (ör. ortak kayda bağlar). <c>Linked</c>: mevcut bir ortak kayda
+    /// bağlandı; o zaman değişen ortak alanlar ortak kaydın sürümünü artırır. Veriye bağlı kural geçmezse
+    /// <see cref="RecordValidationException"/>.
+    /// </summary>
+    protected virtual Task<(JsonObject Values, bool Linked)> PrepareNewAsync(TEntity entity, JsonObject values, CancellationToken cancellationToken) =>
+        Task.FromResult((values, false));
+
+    /// <summary>Alanlar yazıldıktan sonra (ör. ortak kaydı eşitlemek için); oluşturma ve güncellemede çağrılır.</summary>
+    protected virtual Task AppliedAsync(TEntity entity, JsonObject values, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>Entity'nin uzantısı olduğu ortak kayıt; yoksa null.</summary>
+    protected virtual SharedEntity? SharedOf(TEntity entity) => null;
+
+    /// <summary>Ortak kaydın alanları (değişip değişmediğini anlamak için); ortak kaydı olmayanda null.</summary>
+    protected virtual JsonObject? SharedState(TEntity entity) => null;
+
+    private bool SharedChanged(TEntity entity, JsonObject? before) =>
+        before is not null && !JsonNode.DeepEquals(before, SharedState(entity));
+
+    // Kaydın ortak kayda ait olmayan alanları.
+    private JsonObject OwnValues(TEntity entity, JsonObject? shared)
+    {
+        var values = ToData(entity).Values;
+        foreach (var (name, _) in shared ?? [])
+        {
+            values.Remove(name);
+        }
+
+        return values;
+    }
+
+    /// <summary>
+    /// Kaydın sürümü: ortak kaydın uzantısında iki sürümden oluşur (yeni kayıtta 1), böylece başka bir modülün ortak kayıtta
+    /// yaptığı değişiklik de eski sürümle gelen güncellemeyi 409 ile durdurur. Her değişiklikte artar.
+    /// </summary>
+    private long RecordVersion(TEntity entity) =>
+        SharedOf(entity) is { } shared ? entity.Version + shared.Version - 1 : entity.Version;
 
     /// <summary>Liste sırası. Eşit kayıtlar kimliğe göre sıralanır; sayfalar kararlı kalır.</summary>
     protected abstract IOrderedQueryable<TEntity> Order(IQueryable<TEntity> source);
@@ -236,7 +301,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         }
 
         values[RecordFields.Custom] = entity.CustomFields is null ? new JsonObject() : JsonNode.Parse(entity.CustomFields);
-        return new RecordData(EntityKey, entity.Id, entity.Version, values);
+        return new RecordData(EntityKey, entity.Id, RecordVersion(entity), values);
     }
 
     /// <summary>
@@ -262,6 +327,17 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             }
 
             var value = field.Parse(node).Value;
+
+            if (field.CreateOnly)
+            {
+                // Oluştururken PrepareNewAsync kullanır; sonra değiştirilemez (boş değer verilmemiş sayılır).
+                if (!isNew && value is not null && !JsonNode.DeepEquals(field.Read(entity), JsonValue.Create(value.ToString())))
+                {
+                    errors.Add(new RecordFieldError(name, "Oluşturulduktan sonra değiştirilemez."));
+                }
+
+                continue;
+            }
 
             if (field.Exists is { } exists && value is Guid id && !await exists(context, id, cancellationToken))
             {
@@ -290,14 +366,16 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         {
             throw new RecordValidationException(errors);
         }
+
+        await AppliedAsync(entity, values, cancellationToken);
     }
 
-    private static void EnsureVersion(TEntity entity, long? expectedVersion)
+    private void EnsureVersion(TEntity entity, long? expectedVersion)
     {
-        if (expectedVersion is { } expected && expected != entity.Version)
+        if (expectedVersion is { } expected && expected != RecordVersion(entity))
         {
             throw new RecordConflictException(
-                $"Kayıt siz düzenlerken değişti (beklenen sürüm {expected}, güncel sürüm {entity.Version}). Güncel halini alıp tekrar deneyin.");
+                $"Kayıt siz düzenlerken değişti (beklenen sürüm {expected}, güncel sürüm {RecordVersion(entity)}). Güncel halini alıp tekrar deneyin.");
         }
     }
 }

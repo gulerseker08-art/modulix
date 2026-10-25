@@ -1,3 +1,7 @@
+using System.Text.Json.Nodes;
+using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Records;
@@ -5,9 +9,14 @@ namespace Modulix.Modules.Crm.Records;
 // Kayıt türleri: "crm.company", "crm.contact", "crm.opportunity", "crm.activity".
 // Alan ve filtre adları API'de ve audit kaydında görünen teknik kimliklerdir; değiştirmeyin.
 // Sorumlu filtresi "ownerId=me" isteği yapan kullanıcıyı seçer.
+// Firma ve kişi ortak kaydın uzantısıdır (ADR-0006): ad, vergi no, iletişim gibi alanlar API'de aynı adlarla durur ama
+// ortak kayda (Party, Person) yazılır; aynı kaydı diğer modüller de kullanır.
 
 internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordStore<Company>(context)
 {
+    /// <summary>Taraftaki alanlar. Mevcut tarafa bağlanırken boş gönderilenler taraftaki değeri silmez.</summary>
+    private static readonly string[] PartyFields = ["name", "taxNumber", "phone", "email", "website", "city", "address"];
+
     public override string EntityKey => CrmModule.Entities.Company;
 
     protected override string ReadPermission => CrmModule.Permissions.CompaniesRead;
@@ -16,13 +25,14 @@ internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordSto
 
     protected override IReadOnlyList<RecordField<Company>> Fields { get; } =
     [
-        Field.Text<Company>("name", Company.NameMaxLength, c => c.Name, (c, v) => c.Name = v!, required: true),
-        Field.Text<Company>("taxNumber", Company.TaxNumberMaxLength, c => c.TaxNumber, (c, v) => c.TaxNumber = v),
-        Field.Text<Company>("phone", Company.PhoneMaxLength, c => c.Phone, (c, v) => c.Phone = v),
-        Field.Email<Company>("email", Company.EmailMaxLength, c => c.Email, (c, v) => c.Email = v),
-        Field.Text<Company>("website", Company.WebsiteMaxLength, c => c.Website, (c, v) => c.Website = v),
-        Field.Text<Company>("city", Company.CityMaxLength, c => c.City, (c, v) => c.City = v),
-        Field.Text<Company>("address", Company.AddressMaxLength, c => c.Address, (c, v) => c.Address = v),
+        Field.SharedId<Company>("partyId", c => c.PartyId),
+        Field.Text<Company>("name", Party.NameMaxLength, c => c.Party.Name, (c, v) => c.Party.Name = v!, required: true),
+        Field.Text<Company>("taxNumber", Party.TaxNumberMaxLength, c => c.Party.TaxNumber, (c, v) => c.Party.TaxNumber = v),
+        Field.Text<Company>("phone", Party.PhoneMaxLength, c => c.Party.Phone, (c, v) => c.Party.Phone = v),
+        Field.Email<Company>("email", Party.EmailMaxLength, c => c.Party.Email, (c, v) => c.Party.Email = v),
+        Field.Text<Company>("website", Party.WebsiteMaxLength, c => c.Party.Website, (c, v) => c.Party.Website = v),
+        Field.Text<Company>("city", Party.CityMaxLength, c => c.Party.City, (c, v) => c.Party.City = v),
+        Field.Text<Company>("address", Party.AddressMaxLength, c => c.Party.Address, (c, v) => c.Party.Address = v),
         Field.Text<Company>("industry", Company.IndustryMaxLength, c => c.Industry, (c, v) => c.Industry = v),
         Field.ListChoice<Company>("status", CrmModule.Lists.CompanyStatus, c => c.Status, (c, v) => c.Status = v!),
         Field.ListChoice<Company>("source", CrmModule.Lists.CompanySource, c => c.Source, (c, v) => c.Source = v, required: false),
@@ -34,6 +44,7 @@ internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordSto
     protected override IReadOnlyDictionary<string, RecordFilter<Company>> Filters { get; } = new Dictionary<string, RecordFilter<Company>>
     {
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
+        ["partyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PartyId == id) : null,
     };
 
     protected override IReadOnlyDictionary<string, AsyncRecordFilter<Company>> AsyncFilters { get; } =
@@ -43,17 +54,75 @@ internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordSto
                 await FilterValue.ChoiceAsync(v, CrmModule.Lists.CompanyStatus, ctx, ct) is { } status ? q.Where(c => c.Status == status) : null,
         };
 
-    protected override IOrderedQueryable<Company> Order(IQueryable<Company> source) => source.OrderBy(c => c.Name);
+    protected override IQueryable<Company> Load(IQueryable<Company> source) => source.Include(c => c.Party);
+
+    protected override IOrderedQueryable<Company> Order(IQueryable<Company> source) => source.OrderBy(c => c.Party.Name);
 
     protected override IQueryable<Company> Search(IQueryable<Company> source, string term) =>
-        source.Where(c => c.Name.Contains(term)
-            || (c.TaxNumber != null && c.TaxNumber.Contains(term))
-            || (c.City != null && c.City.Contains(term))
+        source.Where(c => c.Party.Name.Contains(term)
+            || (c.Party.TaxNumber != null && c.Party.TaxNumber.Contains(term))
+            || (c.Party.City != null && c.Party.City.Contains(term))
             || (c.Tags != null && c.Tags.Contains(term)));
+
+    /// <summary>
+    /// Yeni firma bir tarafa bağlanır: "partyId" verildiyse o tarafa, aynı vergi numaralı taraf varsa ona (vergi
+    /// numarası kesin eşleşmedir, ör. Lojistik'te açılmış müşteri CRM'e eklenir), yoksa yeni tarafa. Tarafın zaten bir
+    /// CRM firması varsa doğrulama hatası. Mevcut tarafa bağlanırken boş gönderilen taraf alanları değeri silmez.
+    /// </summary>
+    protected override async Task<(JsonObject Values, bool Linked)> PrepareNewAsync(Company entity, JsonObject values, CancellationToken cancellationToken)
+    {
+        var parties = Context.Data.Set<Party>();
+        var (field, party) = FieldNamed("partyId").Parse(values["partyId"]).Value is Guid partyId
+            ? ("partyId", await parties.SingleOrDefaultAsync(p => p.Id == partyId, cancellationToken)
+                ?? throw new RecordValidationException([new RecordFieldError("partyId", "Firma bulunamadı.")]))
+            : FieldNamed("taxNumber").Parse(values["taxNumber"]).Value is string taxNumber
+                ? ("taxNumber", await parties.SingleOrDefaultAsync(p => p.TaxNumber == taxNumber, cancellationToken))
+                : ("taxNumber", null);
+
+        if (party is null)
+        {
+            entity.AttachParty(new Party());
+            return (values, false);
+        }
+
+        if (await Context.Data.Set<Company>().AnyAsync(c => c.PartyId == party.Id, cancellationToken))
+        {
+            throw new RecordValidationException([new RecordFieldError(field,
+                field == "partyId" ? "Bu firma CRM'de zaten kayıtlı." : "Bu vergi numarasıyla kayıtlı bir firma var.")]);
+        }
+
+        entity.AttachParty(party);
+        var kept = values.DeepClone().AsObject();
+        foreach (var name in PartyFields.Where(n => kept.TryGetPropertyValue(n, out var node) && FieldNamed(n).Parse(node).Value is null))
+        {
+            kept.Remove(name);
+        }
+
+        return (kept, true);
+    }
+
+    /// <summary>Vergi numarası taraflar arasında tekildir; başka bir tarafın numarası verilirse alan hatası (409 değil).</summary>
+    protected override async Task AppliedAsync(Company entity, JsonObject values, CancellationToken cancellationToken)
+    {
+        if (entity.Party.TaxNumber is { } number
+            && await Context.Data.Set<Party>().AnyAsync(p => p.TaxNumber == number && p.Id != entity.PartyId, cancellationToken))
+        {
+            throw new RecordValidationException([new RecordFieldError("taxNumber", "Bu vergi numarasıyla kayıtlı bir firma var.")]);
+        }
+    }
+
+    protected override SharedEntity SharedOf(Company entity) => entity.Party;
+
+    protected override JsonObject SharedState(Company entity) => new()
+    {
+        ["name"] = entity.Party.Name, ["taxNumber"] = entity.Party.TaxNumber, ["phone"] = entity.Party.Phone,
+        ["email"] = entity.Party.Email, ["website"] = entity.Party.Website, ["city"] = entity.Party.City, ["address"] = entity.Party.Address,
+    };
 }
 
 internal sealed class ContactRecordStore(CrmStoreContext context) : CrmRecordStore<Contact>(context)
 {
+
     public override string EntityKey => CrmModule.Entities.Contact;
 
     protected override string ReadPermission => CrmModule.Permissions.ContactsRead;
@@ -62,25 +131,75 @@ internal sealed class ContactRecordStore(CrmStoreContext context) : CrmRecordSto
 
     protected override IReadOnlyList<RecordField<Contact>> Fields { get; } =
     [
-        Field.Text<Contact>("firstName", Contact.NameMaxLength, c => c.FirstName, (c, v) => c.FirstName = v!, required: true),
-        Field.Text<Contact>("lastName", Contact.NameMaxLength, c => c.LastName, (c, v) => c.LastName = v!, required: true),
+        Field.SharedId<Contact>("personId", c => c.PersonId),
+        Field.Text<Contact>("firstName", Person.NameMaxLength, c => c.Person.FirstName, (c, v) => c.Person.FirstName = v!, required: true),
+        Field.Text<Contact>("lastName", Person.NameMaxLength, c => c.Person.LastName, (c, v) => c.Person.LastName = v!, required: true),
         Field.Reference<Contact, Company>("companyId", "Firma bulunamadı.", c => c.CompanyId, (c, v) => c.CompanyId = v),
-        Field.Text<Contact>("title", Contact.TitleMaxLength, c => c.Title, (c, v) => c.Title = v),
-        Field.Email<Contact>("email", Company.EmailMaxLength, c => c.Email, (c, v) => c.Email = v),
-        Field.Text<Contact>("phone", Company.PhoneMaxLength, c => c.Phone, (c, v) => c.Phone = v),
+        Field.Text<Contact>("title", Person.TitleMaxLength, c => c.Person.Title, (c, v) => c.Person.Title = v),
+        Field.Email<Contact>("email", Person.EmailMaxLength, c => c.Person.Email, (c, v) => c.Person.Email = v),
+        Field.Text<Contact>("phone", Person.PhoneMaxLength, c => c.Person.Phone, (c, v) => c.Person.Phone = v),
         Field.Text<Contact>("notes", Company.NotesMaxLength, c => c.Notes, (c, v) => c.Notes = v),
     ];
 
     protected override IReadOnlyDictionary<string, RecordFilter<Contact>> Filters { get; } = new Dictionary<string, RecordFilter<Contact>>
     {
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.CompanyId == id) : null,
+        ["personId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PersonId == id) : null,
     };
 
+    protected override IQueryable<Contact> Load(IQueryable<Contact> source) => source.Include(c => c.Person);
+
     protected override IOrderedQueryable<Contact> Order(IQueryable<Contact> source) =>
-        source.OrderBy(c => c.LastName).ThenBy(c => c.FirstName);
+        source.OrderBy(c => c.Person.LastName).ThenBy(c => c.Person.FirstName);
 
     protected override IQueryable<Contact> Search(IQueryable<Contact> source, string term) =>
-        source.Where(c => c.FirstName.Contains(term) || c.LastName.Contains(term) || (c.Email != null && c.Email.Contains(term)));
+        source.Where(c => c.Person.FirstName.Contains(term)
+            || c.Person.LastName.Contains(term)
+            || (c.Person.Email != null && c.Person.Email.Contains(term)));
+
+    /// <summary>
+    /// Yeni kişi "personId" verildiyse o ortak kişiye bağlanır (kişinin zaten bir CRM kişisi varsa doğrulama hatası), yoksa
+    /// yeni ortak kişi açılır. E-posta kesin eşleşme sayılmaz; aynı adresli iki kişi olabilir.
+    /// </summary>
+    protected override async Task<(JsonObject Values, bool Linked)> PrepareNewAsync(Contact entity, JsonObject values, CancellationToken cancellationToken)
+    {
+        if (FieldNamed("personId").Parse(values["personId"]).Value is not Guid personId)
+        {
+            entity.AttachPerson(new Person());
+            return (values, false);
+        }
+
+        var person = await Context.Data.Set<Person>().SingleOrDefaultAsync(p => p.Id == personId, cancellationToken)
+            ?? throw new RecordValidationException([new RecordFieldError("personId", "Kişi bulunamadı.")]);
+        if (await Context.Data.Set<Contact>().AnyAsync(c => c.PersonId == person.Id, cancellationToken))
+        {
+            throw new RecordValidationException([new RecordFieldError("personId", "Bu kişi CRM'de zaten kayıtlı.")]);
+        }
+
+        entity.AttachPerson(person);
+        return (values, true);
+    }
+
+    /// <summary>Kişinin çalıştığı taraf, CRM'deki firmasının tarafıdır; firma verildiğinde (veya kaldırıldığında) eşitlenir.</summary>
+    protected override async Task AppliedAsync(Contact entity, JsonObject values, CancellationToken cancellationToken)
+    {
+        if (!values.ContainsKey("companyId"))
+        {
+            return;
+        }
+
+        entity.Person.PartyId = entity.CompanyId is { } companyId
+            ? await Context.Data.Set<Company>().Where(c => c.Id == companyId).Select(c => (Guid?)c.PartyId).SingleOrDefaultAsync(cancellationToken)
+            : null;
+    }
+
+    protected override SharedEntity SharedOf(Contact entity) => entity.Person;
+
+    protected override JsonObject SharedState(Contact entity) => new()
+    {
+        ["firstName"] = entity.Person.FirstName, ["lastName"] = entity.Person.LastName, ["title"] = entity.Person.Title,
+        ["email"] = entity.Person.Email, ["phone"] = entity.Person.Phone, ["partyId"] = entity.Person.PartyId?.ToString(),
+    };
 }
 
 internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecordStore<Opportunity>(context)

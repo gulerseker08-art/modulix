@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Persistence;
@@ -34,23 +35,20 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
     public void Configure(EntityTypeBuilder<Company> builder)
     {
         CrmTables.ConfigureCommon(builder, "Companies");
-        builder.Property(c => c.Name).HasMaxLength(Company.NameMaxLength).IsRequired();
-        builder.Property(c => c.TaxNumber).HasMaxLength(Company.TaxNumberMaxLength);
-        builder.Property(c => c.Phone).HasMaxLength(Company.PhoneMaxLength);
-        builder.Property(c => c.Email).HasMaxLength(Company.EmailMaxLength);
-        builder.Property(c => c.Website).HasMaxLength(Company.WebsiteMaxLength);
-        builder.Property(c => c.City).HasMaxLength(Company.CityMaxLength);
-        builder.Property(c => c.Address).HasMaxLength(Company.AddressMaxLength);
         builder.Property(c => c.Industry).HasMaxLength(Company.IndustryMaxLength);
         builder.Property(c => c.Status).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
         builder.Property(c => c.Source).HasMaxLength(ChoiceValueKeys.MaxLength);
         builder.Property(c => c.Tags).HasMaxLength(Company.TagsMaxLength);
         builder.Property(c => c.Notes).HasMaxLength(Company.NotesMaxLength);
-        builder.HasIndex(c => new { c.TenantId, c.Name });
         builder.HasIndex(c => new { c.TenantId, c.OwnerId });
 
-        // Vergi numarası tenant içinde tekildir; boş bırakılan kayıtlar bu kurala girmez (SQL Server filtreli indeks üretir).
-        builder.HasIndex(c => new { c.TenantId, c.TaxNumber }).IsUnique();
+        // Ortak taraf (ADR-0006): bir tarafın en fazla bir CRM firması olur. Ünvan ve vergi no tekilliği taraftadır.
+        builder.HasOne(c => c.Party)
+            .WithMany()
+            .HasForeignKey(c => new { c.TenantId, c.PartyId })
+            .HasPrincipalKey(p => new { p.TenantId, p.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(c => new { c.TenantId, c.PartyId }).IsUnique();
     }
 }
 
@@ -59,13 +57,15 @@ internal sealed class ContactConfiguration : IEntityTypeConfiguration<Contact>
     public void Configure(EntityTypeBuilder<Contact> builder)
     {
         CrmTables.ConfigureCommon(builder, "Contacts");
-        builder.Property(c => c.FirstName).HasMaxLength(Contact.NameMaxLength).IsRequired();
-        builder.Property(c => c.LastName).HasMaxLength(Contact.NameMaxLength).IsRequired();
-        builder.Property(c => c.Title).HasMaxLength(Contact.TitleMaxLength);
-        builder.Property(c => c.Email).HasMaxLength(Company.EmailMaxLength);
-        builder.Property(c => c.Phone).HasMaxLength(Company.PhoneMaxLength);
         builder.Property(c => c.Notes).HasMaxLength(Company.NotesMaxLength);
-        builder.HasIndex(c => new { c.TenantId, c.LastName, c.FirstName });
+
+        // Ortak kişi (ADR-0006): bir kişinin en fazla bir CRM kişisi olur.
+        builder.HasOne(c => c.Person)
+            .WithMany()
+            .HasForeignKey(c => new { c.TenantId, c.PersonId })
+            .HasPrincipalKey(p => new { p.TenantId, p.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(c => new { c.TenantId, c.PersonId }).IsUnique();
 
         builder.HasOne<Company>()
             .WithMany()

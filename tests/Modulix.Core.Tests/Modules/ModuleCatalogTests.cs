@@ -1,4 +1,5 @@
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Modules;
 
 namespace Modulix.Core.Tests.Modules;
@@ -161,6 +162,48 @@ public class ModuleCatalogTests
         Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(sales));
     }
 
+    [Fact]
+    public void Shared_record_access_collects_declared_permissions()
+    {
+        var sales = new TestModule("sales", ["sales.customers.read", "sales.customers.write"])
+        {
+            SharedRecordAccess = [new SharedRecordAccess(SharedEntities.Party, "sales.customers.read", "sales.customers.write")],
+            SharedRecordReferences = [new SharedRecordReference(SharedEntities.Party, "sales.customer", "partyId", "müşteri")],
+        };
+
+        var catalog = ModuleCatalog.Create(sales);
+
+        Assert.Equal("sales.customers.read", Assert.Single(catalog.SharedAccessTo(SharedEntities.Party)).ReadPermission);
+        Assert.Empty(catalog.SharedAccessTo(SharedEntities.Person));
+        Assert.Contains(catalog.SharedReferencesTo(SharedEntities.Party), r => r.EntityKey == "sales.customer");
+        Assert.Contains(catalog.SharedReferencesTo(SharedEntities.Party), r => r.EntityKey == SharedEntities.Person);
+    }
+
+    [Theory]
+    [InlineData("core.unknown", "sales.customers.read", null)]
+    [InlineData(SharedEntities.Party, CoreModule.Permissions.ManageUsers, null)]
+    [InlineData(SharedEntities.Party, "sales.customers.read", "sales.orders.write")]
+    public void Shared_record_access_must_name_a_shared_record_and_own_permissions(string entityKey, string read, string? write)
+    {
+        var sales = new TestModule("sales", ["sales.customers.read"])
+        {
+            SharedRecordAccess = [new SharedRecordAccess(entityKey, read, write)],
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(sales));
+    }
+
+    [Fact]
+    public void Shared_record_reference_must_come_from_the_modules_own_record()
+    {
+        var sales = new TestModule("sales", [])
+        {
+            SharedRecordReferences = [new SharedRecordReference(SharedEntities.Party, "crm.company", "partyId", "firma")],
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(sales));
+    }
+
     private static IModule Module(string key, params string[] permissions) => new TestModule(key, permissions);
 
     private sealed class TestModule(string key, string[] permissions, IReadOnlyList<RoleTemplate>? templates = null) : IModule
@@ -175,5 +218,9 @@ public class ModuleCatalogTests
         public IReadOnlyList<RoleTemplate> RoleTemplates { get; } = templates ?? [];
 
         public IReadOnlyList<SensitiveFields> SensitiveFields { get; init; } = [];
+
+        public IReadOnlyList<SharedRecordAccess> SharedRecordAccess { get; init; } = [];
+
+        public IReadOnlyList<SharedRecordReference> SharedRecordReferences { get; init; } = [];
     }
 }

@@ -1,5 +1,6 @@
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Settings;
 
 namespace Modulix.Core.Modules;
@@ -17,6 +18,7 @@ public sealed class ModuleCatalog
     private readonly Dictionary<string, List<SensitiveFields>> sensitiveFields = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, CustomizableEntity Entity)> customizable = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, ChoiceListDefinition List)> choiceLists = new(StringComparer.Ordinal);
+    private readonly List<SharedRecordAccess> sharedAccess = [];
 
     public ModuleCatalog(IEnumerable<IModule> modules)
     {
@@ -92,6 +94,30 @@ public sealed class ModuleCatalog
                 if (!choiceLists.TryAdd(list.Key, (module.Key, list)))
                 {
                     throw new InvalidOperationException($"Seçim listesi iki kez tanımlı: '{list.Key}'.");
+                }
+            }
+
+            foreach (var access in module.SharedRecordAccess)
+            {
+                if (!SharedEntities.All.Contains(access.EntityKey)
+                    || !module.Permissions.Any(p => p.Key == access.ReadPermission)
+                    || (access.WritePermission is { } write && !module.Permissions.Any(p => p.Key == write)))
+                {
+                    throw new InvalidOperationException(
+                        $"Geçersiz ortak kayıt erişimi: '{access.EntityKey}' ({module.Key}). Kayıt türü ortak kayıt, izinler modülün olmalı.");
+                }
+
+                sharedAccess.Add(access);
+            }
+
+            foreach (var reference in module.SharedRecordReferences)
+            {
+                if (!SharedEntities.All.Contains(reference.SharedEntityKey)
+                    || !reference.EntityKey.StartsWith(module.Key + ".", StringComparison.Ordinal)
+                    || string.IsNullOrWhiteSpace(reference.Field))
+                {
+                    throw new InvalidOperationException(
+                        $"Geçersiz ortak kayıt referansı: '{reference.EntityKey}.{reference.Field}' ({module.Key}).");
                 }
             }
 
@@ -185,6 +211,13 @@ public sealed class ModuleCatalog
     /// <summary>Seçim listeleri, modül ve tanım sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, ChoiceListDefinition List)> ChoiceLists =>
         Modules.SelectMany(m => m.ChoiceLists.Select(l => (m.Key, l)));
+
+    /// <summary>Ortak kayıt türünü kullanan modüllerin bildirdiği izinler (ADR-0006).</summary>
+    public IEnumerable<SharedRecordAccess> SharedAccessTo(string entityKey) => sharedAccess.Where(a => a.EntityKey == entityKey);
+
+    /// <summary>Ortak kayıt türüne başvuran alanlar (ADR-0006), modül sırasıyla.</summary>
+    public IEnumerable<SharedRecordReference> SharedReferencesTo(string entityKey) =>
+        Modules.SelectMany(m => m.SharedRecordReferences).Where(r => r.SharedEntityKey == entityKey);
 
     /// <summary>Kayıt türünün listeye bağlı alanlarının listeleri.</summary>
     public IEnumerable<ChoiceListDefinition> ChoiceListsOf(string entityKey) =>

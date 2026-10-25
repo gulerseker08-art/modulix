@@ -88,6 +88,7 @@ public static class CompanySource
     public const string Other = "Other";
 }
 
+/// <summary>CRM firması. Ad, vergi no, iletişim ve adres ortak firma kaydındadır (<see cref="PartyId"/>, ADR-0006).</summary>
 public sealed record CompanyDto(
     Guid Id,
     long Version,
@@ -104,11 +105,13 @@ public sealed record CompanyDto(
     string? Tags,
     Guid? OwnerId,
     string? Notes,
-    JsonObject? Custom = null);
+    JsonObject? Custom = null,
+    Guid? PartyId = null);
 
 /// <summary>
 /// Sorumlu boş bırakılırsa kaydı oluşturan kullanıcı atanır. Liste alanları (durum, aşama, tip) boş bırakılırsa yeni
-/// kayıtta firmanın varsayılan değeri atanır, güncellemede mevcut değer kalır.
+/// kayıtta firmanın varsayılan değeri atanır, güncellemede mevcut değer kalır. Yeni firmanın vergi numarası, başka bir
+/// modülde açılmış bir firmanınkiyle aynıysa yeni ortak kayıt açılmaz, o firmaya bağlanır (ADR-0006).
 /// </summary>
 public sealed record SaveCompanyRequest(
     string Name,
@@ -137,7 +140,8 @@ public sealed record ContactDto(
     string? Email,
     string? Phone,
     string? Notes,
-    JsonObject? Custom = null);
+    JsonObject? Custom = null,
+    Guid? PersonId = null);
 
 public sealed record SaveContactRequest(
     string FirstName,

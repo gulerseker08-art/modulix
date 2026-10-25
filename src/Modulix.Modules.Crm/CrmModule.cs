@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Records;
 
 namespace Modulix.Modules.Crm;
@@ -196,20 +197,21 @@ public sealed class CrmModule : IModule
         {
             ["name"] = "Ad", ["taxNumber"] = "Vergi no", ["phone"] = "Telefon", ["email"] = "E-posta", ["website"] = "Web sitesi",
             ["city"] = "Şehir", ["address"] = "Adres", ["industry"] = "Sektör", ["status"] = "Durum", ["source"] = "Kaynak",
-            ["tags"] = "Etiketler", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+            ["tags"] = "Etiketler", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar", ["partyId"] = "Ortak firma kaydı",
         }, "name")
         {
             UserFields = ["ownerId"],
+            References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party },
         },
         new(Entities.Contact, "Kişi (CRM)", Permissions.ContactsRead, new Dictionary<string, string>
         {
             ["firstName"] = "Ad", ["lastName"] = "Soyad", ["companyId"] = "Firma", ["title"] = "Unvan", ["email"] = "E-posta",
-            ["phone"] = "Telefon", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+            ["phone"] = "Telefon", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar", ["personId"] = "Ortak kişi kaydı",
         })
         {
             TitleFields = ["firstName", "lastName"],
             UserFields = ["ownerId"],
-            References = new Dictionary<string, string> { ["companyId"] = Entities.Company },
+            References = new Dictionary<string, string> { ["companyId"] = Entities.Company, ["personId"] = SharedEntities.Person },
         },
         new(Entities.Opportunity, "Fırsat (CRM)", Permissions.OpportunitiesRead, new Dictionary<string, string>
         {
@@ -233,6 +235,22 @@ public sealed class CrmModule : IModule
                 ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact, ["opportunityId"] = Entities.Opportunity,
             },
         },
+    ];
+
+    /// <summary>
+    /// Ortak kayıtlar (ADR-0006): firma ve kişi izinleri, firmalar ve kişiler tarafların ve ortak kişilerin uzantısı olduğu
+    /// için ortak kaydı da açar. Firma silinince taraf kalır; taraf, CRM firması varken silinemez.
+    /// </summary>
+    IReadOnlyList<SharedRecordAccess> IModule.SharedRecordAccess { get; } =
+    [
+        new(SharedEntities.Party, Permissions.CompaniesRead, Permissions.CompaniesWrite),
+        new(SharedEntities.Person, Permissions.ContactsRead, Permissions.ContactsWrite),
+    ];
+
+    IReadOnlyList<SharedRecordReference> IModule.SharedRecordReferences { get; } =
+    [
+        new(SharedEntities.Party, Entities.Company, "partyId", "CRM firması"),
+        new(SharedEntities.Person, Entities.Contact, "personId", "CRM kişisi"),
     ];
 
     public void ConfigureServices(IServiceCollection services)

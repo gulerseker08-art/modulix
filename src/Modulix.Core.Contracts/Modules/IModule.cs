@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.SharedRecords;
 
 namespace Modulix.Core.Contracts.Modules;
 
@@ -65,6 +66,15 @@ public interface IModule
     /// bakar (ör. "kazanıldı"). Anahtar modül anahtarıyla başlar.
     /// </summary>
     IReadOnlyList<ChoiceListDefinition> ChoiceLists => [];
+
+    /// <summary>
+    /// Modülün kullandığı ortak kayıt türleri ve onları okuyup yazmaya yeten izinleri (ADR-0006, ör. CRM: Taraf okuma
+    /// "crm.companies.read"). Bildirmeyen modülün izinleri ortak kayda erişim vermez.
+    /// </summary>
+    IReadOnlyList<SharedRecordAccess> SharedRecordAccess => [];
+
+    /// <summary>Modülün ortak kayda başvuran alanları (ADR-0006); çekirdek ortak kaydın kullanımını bunlarla sayar.</summary>
+    IReadOnlyList<SharedRecordReference> SharedRecordReferences => [];
 
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
