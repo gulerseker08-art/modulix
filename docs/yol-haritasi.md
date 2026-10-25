@@ -80,10 +80,10 @@ E-posta işleyicisi ve outbox işleyicisi kendi döngüleriyle çalışıyor. Lo
 
 Pilot sırasının en kritik çekirdek işi. CRM'deki firma, lojistikte yükleyici/alıcı, antrepoda ardiye müşterisi, muhasebede cari hesaptır. Her modül kendi müşteri tablosunu tutarsa aynı firma dört kez girilir ve modüller birbirine proje referansı veremediği için (K5) bağ kurulamaz.
 
-- **Ç3a · Ortak firma ve kişi kaydı, kayıt referansı (D1):** K10'un uygulanışı.
+- **Ç3a · Ortak firma ve kişi kaydı, kayıt referansı (D1):** K10'un uygulanışı; ayrıntılar [ADR-0006](adr/0006-ortak-firma-ve-kisi.md).
   - **Taraf (firma):** ünvan, vergi dairesi/no veya TCKN, tür (tüzel/gerçek kişi), iletişim. CRM firması bu kayda bağlanır; diğer modüller yeni firma açmaz, Taraf'a referans verir.
   - **Kişi:** ad, iletişim, TCKN (hassas alan, Y8b). Bir kişi bir firmanın yetkilisi olabilir (CRM kişisi), sisteme giriş yapan bir kullanıcı olabilir (üyelik kişiye bağlanır) ya da yalnızca kayıt olarak var olabilir (kullanıcı olmayan sürücü veya depo personeli). Kullanıcı daveti mevcut bir kişiden yapılabilir; davet edilen kişi zaten varsa yeni kişi açılmaz.
-  - **Roller:** aynı Taraf hem müşteri hem tedarikçi olabilir; aynı kişi hem kullanıcı hem çalışan hem sürücü olabilir. Rol ayrı bir kayıt değil, ortak kayda eklenen bir etikettir.
+  - **Roller:** aynı Taraf hem müşteri hem tedarikçi olabilir; aynı kişi hem kullanıcı hem çalışan hem sürücü olabilir. Rol ayrı bir kayıt değildir, modül uzantısının varlığından anlaşılır (taşıyıcı uzantısı olan taraf taşıyıcıdır).
   - **Modül uzantıları:** her modül yalnızca kendine özgü bilgiyi kendi şemasında, ortak kaydın kimliğiyle tutar. Örnekler: Lojistik'te müşterinin varsayılan tarifesi, taşıyıcının araç filosu; İK'da çalışanın işe giriş tarihi, ücreti; Lojistik'te sürücünün ehliyet bilgisi; Muhasebe'de carinin hesap kodu ve vadesi. Ortak alanlar (ünvan, vergi no, telefon, adres) uzantıda tekrarlanmaz; biri değiştirince her modülde değişmiş görünür.
   - **Yetki:** ortak kaydın temel bilgilerini, onu kullanan herhangi bir modülde okuma izni olan görür (ör. sevkiyat izni olan, sevkiyattaki müşterinin adını görür). Uzantı verisi kendi modülünün izniyle korunur (ör. ücret yalnızca İK izniyle). Kişisel veriler hassas alan kuralına (Y8b) tabidir.
   - **Kim oluşturur:** ortak kayıt, onu ilk ihtiyaç duyan modülden oluşturulur (ör. CRM açık değilse Lojistik ekranından yeni müşteri). Oluşturmadan önce benzer kayıtlar (ad, vergi no, e-posta, telefon) gösterilir.
