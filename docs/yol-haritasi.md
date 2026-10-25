@@ -113,6 +113,7 @@ Amaç: Mevcut geliştirmelerin üzerine güvenilir bir modül geliştirme sözle
 Ç1 — Olay altyapısı ve güvenilir teslim [GENİŞLETME / D1 / ADR]
 Bağımlılık: Ç0, Ç13, Ç14. İlk kullanım: Atama bildirimi; sonraki kullanım modüller arası süreçler.
 ADR: [ADR-0007 Olay altyapısı](adr/0007-olay-altyapisi.md) (kabul edildi).
+Durum (25 Ekim 2026): ADR'nin geçiş adımları 1-6 yapıldı. Olay zarfı, abone başına teslim (`EventDeliveries`), dağıtıcı ve işleyici (kira, heartbeat, sıra, yeniden deneme, dead-letter, saklama), sistem kimliği ve hassas alan süzgeci, atama e-postası, platform "Olaylar" ekranı, ölçümler ve health hazır; kabul testleri entegrasyon testi olarak yazıldı. Kalan: modül iş olayları (Ç0.4), webhook (Ç11a.4), işleyicinin Ç2 çerçevesine taşınması ve ayrı süreçte çalışması (K11).
 - Ç1.1 Transactional outbox: İş kaydı ve olay aynı veritabanı transaction'ında yazılır. Zarf: eventId, tenant, aggregateId/type, sürüm, sequence, occurredAt, correlation/causation ve gerekli asgari veri. Kabul: Rollback edilen işlemden olay çıkmaz.
 - Ç1.2 Dispatcher ve lease: Worker atomik sahiplenme, süreli kilit, heartbeat ve çökme sonrası tekrar alma uygular. Tenant bağlamı doğrulanmış üretici kaydından kurulur. Kabul: İki worker ve kilit süresi aşımı senaryosu veri kaybı yaratmaz.
 - Ç1.3 Abone bazlı inbox: Başarı her abone için ayrı tutulur; tenant+subscriber+eventId benzersizliği ve mümkünse iş etkisiyle aynı transaction. Kabul: Bildirim başarılı, muhasebe başarısızsa yalnızca başarısız abone yeniden çalışır; aynı fatura iki kez oluşmaz.

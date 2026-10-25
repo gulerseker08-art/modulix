@@ -35,7 +35,7 @@
 
         <div class="filters" role="group" aria-label="Durum">
             <button type="button" class="chip @(state is null ? "active" : null)" @onclick="() => StateAsync(null)">Tümü</button>
-            @foreach (var value in Enum.GetValues<EventDeliveryStateDto>())
+            @foreach (var value in States)
             {
                 <button type="button" class="chip @(state == value ? "active" : null)" @onclick="() => StateAsync(value)">@EventStateText.Of(value)</button>
             }
@@ -139,6 +139,12 @@
 </PlatformGate>
 
 @code {
+    private static readonly EventDeliveryStateDto[] States =
+    [
+        EventDeliveryStateDto.Pending, EventDeliveryStateDto.Held, EventDeliveryStateDto.Failed,
+        EventDeliveryStateDto.Succeeded, EventDeliveryStateDto.Skipped,
+    ];
+
     private const string Retry = "retry";
     private const string Skip = "skip";
 
