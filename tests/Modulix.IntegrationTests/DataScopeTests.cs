@@ -54,7 +54,7 @@ public class DataScopeTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         Assert.Equal(HttpStatusCode.NotFound, (await rep1Client.GetAsync($"/api/crm/companies/{rep2Company.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
             (await rep1Client.PutAsJsonAsync($"/api/crm/companies/{rep2Company.Id}", new SaveCompanyRequest("Ele geçir", Version: rep2Company.Version))).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await rep1Client.DeleteAsync($"/api/crm/companies/{rep2Company.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await rep1Client.DeleteAsync($"/api/crm/companies/{rep2Company.Id}?version={rep2Company.Version}")).StatusCode);
 
         var assignToOther = await rep1Client.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Başkasına", OwnerId: rep2.Id));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, assignToOther.StatusCode);

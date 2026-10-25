@@ -62,6 +62,11 @@ public static class RecordEndpoints
 
         group.MapPut("/{id:guid}", async (string entityKey, Guid id, RecordWriteRequest request, IRecordPipeline pipeline, CancellationToken ct) =>
         {
+            if (request.Version is null)
+            {
+                return VersionRequired();
+            }
+
             var result = await pipeline.UpdateAsync(
                 new RecordCommand(entityKey, id, request.Values ?? new JsonObject(), request.Version), ct);
             return result.IsSuccess ? Results.Ok(ToResponse(result.Value!)) : ToProblem(result.Error!);
@@ -69,6 +74,11 @@ public static class RecordEndpoints
 
         group.MapDelete("/{id:guid}", async (string entityKey, Guid id, long? version, IRecordPipeline pipeline, CancellationToken ct) =>
         {
+            if (version is null)
+            {
+                return VersionRequired();
+            }
+
             var result = await pipeline.DeleteAsync(new RecordRef(entityKey, id), version, ct);
             return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error!);
         });
@@ -90,6 +100,14 @@ public static class RecordEndpoints
 
         return filters.Count == 0 ? null : filters;
     }
+
+    /// <summary>Güncelleme ve silme kaydın okunan sürümünü ister; sürümsüz istek son yazanın ezmesine yol açacağı için 428 alır.</summary>
+    internal static IResult VersionRequired() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status428PreconditionRequired,
+            title: "Kaydın sürümü gerekli.",
+            detail: "Güncelleme ve silme isteğinde okuduğunuz kaydın version değeri gönderilmelidir.",
+            extensions: new Dictionary<string, object?> { ["code"] = "VersionRequired" });
 
     private static RecordResponse ToResponse(RecordData data) => new(data.EntityKey, data.Id, data.Version, data.Values);
 

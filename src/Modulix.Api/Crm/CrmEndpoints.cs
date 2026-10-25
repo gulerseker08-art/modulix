@@ -95,12 +95,22 @@ public static class CrmEndpoints
             }
 
             var (values, version) = ToValues(request);
+            if (version is null)
+            {
+                return RecordEndpoints.VersionRequired();
+            }
+
             var result = await pipeline.UpdateAsync(new RecordCommand(entityKey, id, values, version), ct);
             return result.IsSuccess ? Results.Ok(ToDto<TDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         }
 
         public async Task<IResult> DeleteAsync(Guid id, long? version, IRecordPipeline pipeline, CancellationToken ct)
         {
+            if (version is null)
+            {
+                return RecordEndpoints.VersionRequired();
+            }
+
             var result = await pipeline.DeleteAsync(new RecordRef(entityKey, id), version, ct);
             return result.IsSuccess ? Results.NoContent() : RecordEndpoints.ToProblem(result.Error!);
         }

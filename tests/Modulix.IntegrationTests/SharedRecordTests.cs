@@ -96,7 +96,7 @@ public class SharedRecordTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var linkedCompany = (await linked.Content.ReadFromJsonAsync<RecordResponse>())!;
         Assert.Equal(other.Id.ToString(), linkedCompany.Values["partyId"]!.GetValue<string>());
         var relink = await client.PutAsJsonAsync($"/api/records/{CrmModule.Entities.Company}/{linkedCompany.Id}",
-            new RecordWriteRequest(new JsonObject { ["partyId"] = party.Id.ToString() }));
+            new RecordWriteRequest(new JsonObject { ["partyId"] = party.Id.ToString() }, linkedCompany.Version));
         Assert.Equal(["Oluşturulduktan sonra değiştirilemez."], (await ValidationProblemAsync(relink)).Errors["partyId"]);
 
         var taken = await client.PutAsJsonAsync($"/api/crm/companies/{linkedCompany.Id}",
@@ -112,17 +112,17 @@ public class SharedRecordTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var company = await PostAsync<CompanyDto>(client, "/api/crm/companies", new SaveCompanyRequest("Zeta"));
         var contact = await PostAsync<ContactDto>(client, "/api/crm/contacts", new SaveContactRequest("Selin", "Ak", company.Id));
 
-        var inUse = await client.DeleteAsync($"{Parties}/{company.PartyId}");
+        var inUse = await DeleteCurrentAsync(client, $"{Parties}/{company.PartyId}");
         Assert.Equal(HttpStatusCode.Conflict, inUse.StatusCode);
         var problem = (await inUse.Content.ReadFromJsonAsync<ProblemDetails>())!;
         Assert.Contains("1 CRM firması", problem.Title);
         Assert.Contains("1 kişi", problem.Title);
 
-        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/crm/contacts/{contact.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"{People}/{contact.PersonId}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/crm/companies/{company.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await DeleteCurrentAsync(client, $"/api/crm/contacts/{contact.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await DeleteCurrentAsync(client, $"{People}/{contact.PersonId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await DeleteCurrentAsync(client, $"/api/crm/companies/{company.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"{Parties}/{company.PartyId}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"{Parties}/{company.PartyId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await DeleteCurrentAsync(client, $"{Parties}/{company.PartyId}")).StatusCode);
     }
 
     [Fact]
@@ -191,6 +191,13 @@ public class SharedRecordTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var response = await client.PostAsJsonAsync(url, request);
         Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<T>())!;
+    }
+
+    /// <summary>Silme sürüm ister: kaydın güncel sürümü okunup gönderilir.</summary>
+    private static async Task<HttpResponseMessage> DeleteCurrentAsync(HttpClient client, string url)
+    {
+        var current = (await client.GetFromJsonAsync<JsonNode>(url))!;
+        return await client.DeleteAsync($"{url}?version={current["version"] ?? current["Version"]}");
     }
 
     private static async Task<ValidationProblemDetails> ValidationProblemAsync(HttpResponseMessage response)
