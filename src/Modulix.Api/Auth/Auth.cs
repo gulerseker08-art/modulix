@@ -337,6 +337,7 @@ public static class AuthEndpoints
         SignInManager<ModulixUser> signIn,
         HttpTenantContextAccessor tenant,
         ICompanyContextAccessor company,
+        AccountAudit audit,
         CancellationToken ct)
     {
         var user = await users.GetUserAsync(principal);
@@ -347,6 +348,8 @@ public static class AuthEndpoints
 
         if (company.Current is not { } companyContext || !companyContext.CanAccess(request.CompanyId))
         {
+            // Yetkisiz şirket seçimi güvenlik denetiminde görünür; erişim yine reddedilir.
+            await audit.RecordAsync(user, AuditAction.CompanySelectionDenied, [tenant.Current!.TenantId], Client(http), ct);
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Bu şirkete erişiminiz yok.");
         }
 

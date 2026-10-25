@@ -102,6 +102,9 @@ public enum AuditAction
     RecoveryCodesRegenerated = 15,
     SignedInWithRecoveryCode = 16,
     TwoFactorReset = 17,
+
+    /// <summary>Yetkisiz aktif şirket seçimi reddedildi (Ç22).</summary>
+    CompanySelectionDenied = 18,
 }
 
 /// <summary>Audit kaydı: kim, ne, ne zaman. <see cref="Changes"/>: alan → { old, new }.</summary>
