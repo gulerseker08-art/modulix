@@ -383,6 +383,7 @@ public sealed class RecordPipeline(
         outbox.Add(new DomainEvent(tenant.TenantId, eventType, entityKey, recordId, changes.DeepClone().AsObject())
         {
             Sequence = sequence,
+            CompanyId = storeCompanyId(after ?? before) ?? cause?.CompanyId,
             UserId = tenant.UserId,
             Source = source,
             CorrelationId = correlation,
@@ -391,6 +392,11 @@ public sealed class RecordPipeline(
             Reason = reason,
         });
     }
+
+    private static Guid? storeCompanyId(JsonObject? values) =>
+        values is not null && values.TryGetPropertyValue("companyId", out var node)
+        && node is JsonValue value && value.TryGetValue<string>(out var text)
+        && Guid.TryParse(text, out var id) ? id : null;
 
     private static RecordResult<T> NotFound<T>() => RecordResult<T>.Fail(RecordErrorCode.NotFound, "Kayıt bulunamadı.");
 
