@@ -57,6 +57,8 @@ public class ModulixDbContext(
 
     public DbSet<CustomField> CustomFields => Set<CustomField>();
 
+    public DbSet<TenantChoiceList> ChoiceLists => Set<TenantChoiceList>();
+
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();

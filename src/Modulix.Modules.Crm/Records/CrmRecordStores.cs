@@ -24,8 +24,8 @@ internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordSto
         Field.Text<Company>("city", Company.CityMaxLength, c => c.City, (c, v) => c.City = v),
         Field.Text<Company>("address", Company.AddressMaxLength, c => c.Address, (c, v) => c.Address = v),
         Field.Text<Company>("industry", Company.IndustryMaxLength, c => c.Industry, (c, v) => c.Industry = v),
-        Field.Choice<Company, CompanyStatus>("status", c => c.Status, (c, v) => c.Status = v),
-        Field.OptionalChoice<Company, CompanySource>("source", c => c.Source, (c, v) => c.Source = v),
+        Field.ListChoice<Company>("status", CrmModule.Lists.CompanyStatus, c => c.Status, (c, v) => c.Status = v!),
+        Field.ListChoice<Company>("source", CrmModule.Lists.CompanySource, c => c.Source, (c, v) => c.Source = v, required: false),
         Field.Text<Company>("tags", Company.TagsMaxLength, c => c.Tags, (c, v) => c.Tags = v),
         Field.Owner<Company>(OwnerField, c => c.OwnerId, (c, v) => c.OwnerId = v),
         Field.Text<Company>("notes", Company.NotesMaxLength, c => c.Notes, (c, v) => c.Notes = v),
@@ -33,9 +33,15 @@ internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordSto
 
     protected override IReadOnlyDictionary<string, RecordFilter<Company>> Filters { get; } = new Dictionary<string, RecordFilter<Company>>
     {
-        ["status"] = (q, v, _) => FilterValue.Choice<CompanyStatus>(v) is { } status ? q.Where(c => c.Status == status) : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
     };
+
+    protected override IReadOnlyDictionary<string, AsyncRecordFilter<Company>> AsyncFilters { get; } =
+        new Dictionary<string, AsyncRecordFilter<Company>>
+        {
+            ["status"] = async (q, v, ctx, ct) =>
+                await FilterValue.ChoiceAsync(v, CrmModule.Lists.CompanyStatus, ctx, ct) is { } status ? q.Where(c => c.Status == status) : null,
+        };
 
     protected override IOrderedQueryable<Company> Order(IQueryable<Company> source) => source.OrderBy(c => c.Name);
 
@@ -90,7 +96,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
         Field.Text<Opportunity>("title", Opportunity.TitleMaxLength, o => o.Title, (o, v) => o.Title = v!, required: true),
         Field.Reference<Opportunity, Company>("companyId", "Firma bulunamadı.", o => o.CompanyId, (o, v) => o.CompanyId = v!.Value, required: true),
         Field.Reference<Opportunity, Contact>("contactId", "Kişi bulunamadı.", o => o.ContactId, (o, v) => o.ContactId = v),
-        Field.Choice<Opportunity, OpportunityStage>("stage", o => o.Stage, (o, v) => o.Stage = v),
+        Field.ListChoice<Opportunity>("stage", CrmModule.Lists.OpportunityStage, o => o.Stage, (o, v) => o.Stage = v!),
         Field.Money<Opportunity>("amount", o => o.Amount, (o, v) => o.Amount = v),
         Field.Currency<Opportunity>("currency", o => o.Currency, (o, v) => o.Currency = v),
         Field.Date<Opportunity>("expectedCloseDate", o => o.ExpectedCloseDate, (o, v) => o.ExpectedCloseDate = v),
@@ -100,17 +106,34 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
         Field.Text<Opportunity>("notes", Company.NotesMaxLength, o => o.Notes, (o, v) => o.Notes = v),
     ];
 
-    /// <summary>"open=true": kazanılmamış ve kaybedilmemiş fırsatlar.</summary>
     protected override IReadOnlyDictionary<string, RecordFilter<Opportunity>> Filters { get; } = new Dictionary<string, RecordFilter<Opportunity>>
     {
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.CompanyId == id) : null,
         ["contactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.ContactId == id) : null,
-        ["stage"] = (q, v, _) => FilterValue.Choice<OpportunityStage>(v) is { } stage ? q.Where(o => o.Stage == stage) : null,
-        ["open"] = (q, v, _) => FilterValue.Bool(v) is { } open
-            ? q.Where(o => (o.Stage != OpportunityStage.Won && o.Stage != OpportunityStage.Lost) == open)
-            : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(o => o.OwnerId == owner) : null,
     };
+
+    /// <summary>
+    /// "open=true": kazanılmamış ve kaybedilmemiş fırsatlar. Kapalı aşamalar firmanın listesindeki kategoriden gelir (Y9b):
+    /// firmanın eklediği "Kazanıldı" kategorili aşama da fırsatı kapatır.
+    /// </summary>
+    protected override IReadOnlyDictionary<string, AsyncRecordFilter<Opportunity>> AsyncFilters { get; } =
+        new Dictionary<string, AsyncRecordFilter<Opportunity>>
+        {
+            ["stage"] = async (q, v, ctx, ct) =>
+                await FilterValue.ChoiceAsync(v, CrmModule.Lists.OpportunityStage, ctx, ct) is { } stage ? q.Where(o => o.Stage == stage) : null,
+            ["open"] = async (q, v, ctx, ct) =>
+            {
+                if (FilterValue.Bool(v) is not { } open)
+                {
+                    return null;
+                }
+
+                var stages = await ctx.ChoiceLists.GetAsync(CrmModule.Lists.OpportunityStage, ct);
+                var closed = stages.KeysIn(CrmModule.StageCategories.Won).Concat(stages.KeysIn(CrmModule.StageCategories.Lost)).ToList();
+                return open ? q.Where(o => !closed.Contains(o.Stage)) : q.Where(o => closed.Contains(o.Stage));
+            },
+        };
 
     protected override IOrderedQueryable<Opportunity> Order(IQueryable<Opportunity> source) =>
         source.OrderByDescending(o => o.CreatedAt);
@@ -129,7 +152,7 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
 
     protected override IReadOnlyList<RecordField<Activity>> Fields { get; } =
     [
-        Field.Choice<Activity, ActivityType>("type", a => a.Type, (a, v) => a.Type = v),
+        Field.ListChoice<Activity>("type", CrmModule.Lists.ActivityType, a => a.Type, (a, v) => a.Type = v!),
         Field.Text<Activity>("subject", Activity.SubjectMaxLength, a => a.Subject, (a, v) => a.Subject = v!, required: true),
         Field.Time<Activity>("dueAt", a => a.DueAt, (a, v) => a.DueAt = v),
         Field.Time<Activity>("completedAt", a => a.CompletedAt, (a, v) => a.CompletedAt = v),

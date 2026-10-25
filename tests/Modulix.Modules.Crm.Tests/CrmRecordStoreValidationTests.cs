@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -10,7 +11,7 @@ namespace Modulix.Modules.Crm.Tests;
 /// <summary>CRM kayıt depolarının alan doğrulaması (veritabanı gerektirmez).</summary>
 public class CrmRecordStoreValidationTests
 {
-    private static readonly CrmStoreContext NoData = new(new NoModuleData(), new NoMembers(), new NoTenant());
+    private static readonly CrmStoreContext NoData = new(new NoModuleData(), new NoMembers(), new NoChoiceLists(), new NoTenant());
 
     [Fact]
     public void Create_requires_required_fields()
@@ -114,7 +115,7 @@ public class CrmRecordStoreValidationTests
     [Theory]
     [InlineData("status", "\"Customer\"", true)]
     [InlineData("status", "null", false)]
-    [InlineData("status", "\"Musteri\"", false)]
+    [InlineData("status", "\"Müşteri\"", false)]
     [InlineData("source", "\"Referral\"", true)]
     [InlineData("source", "null", true)]
     [InlineData("source", "\"1\"", false)]
@@ -148,6 +149,13 @@ public class CrmRecordStoreValidationTests
 
         public Task<bool> IsActiveMemberAsync(Guid userId, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("Doğrulama üyelere erişmemeli.");
+    }
+
+    // Doğrulama yalnızca anahtarın biçimine bakar; listede olup olmadığını depo yazarken firmanın listesiyle denetler.
+    private sealed class NoChoiceLists : IChoiceLists
+    {
+        public Task<ChoiceList> GetAsync(string listKey, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Doğrulama listelere erişmemeli.");
     }
 
     private sealed class NoTenant : ITenantContextAccessor

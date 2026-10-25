@@ -6,6 +6,8 @@
 
 main {
     flex: 1;
+    /* Geniş içerik (ör. çok aşamalı satış hunisi) sayfayı değil kendi alanını kaydırır. */
+    min-width: 0;
 }
 
 .sidebar {

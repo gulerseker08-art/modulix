@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Audit;
+using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -21,6 +22,7 @@ internal sealed class AuditLog(
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
     MembershipPermissions membershipPermissions,
+    IChoiceLists choiceLists,
     IAuditWriter audit) : IAuditLog
 {
     public const int MaxPageSize = 100;
@@ -159,8 +161,12 @@ internal sealed class AuditLog(
             viewer.IsAdministrator || entity?.ReadPermission is not { } permission || viewer.Permissions.Contains(permission);
 
         var custom = await CustomFieldsAsync(entries, cancellationToken);
+        var lists = await ChoiceListsAsync(entries, cancellationToken);
         var parsed = entries
-            .Select(e => (Entry: e, Entity: WithCustomFields(catalog.FindAuditedEntity(e.EntityKey), custom), Changes: Parse(e.Changes)))
+            .Select(e => (
+                Entry: e,
+                Entity: WithChoiceLists(WithCustomFields(catalog.FindAuditedEntity(e.EntityKey), custom), lists),
+                Changes: Parse(e.Changes)))
             .ToList();
 
         // Değerlerde geçen kişiler ve bağlı kayıtlar; yalnızca okurun görebildiği satırlardan.
@@ -319,6 +325,36 @@ internal sealed class AuditLog(
         }
 
         return entity with { Fields = fields, Options = options };
+    }
+
+    // Liste alanlarının (Y9b) değer adları firmanın listesinden gelir: yeniden adlandırılan değer eski kayıtlarda da yeni
+    // adıyla görünür; pasif değerler de listededir.
+    private async Task<ILookup<string, (string Field, ChoiceList List)>> ChoiceListsAsync(
+        IReadOnlyList<AuditLogEntry> entries, CancellationToken cancellationToken)
+    {
+        var lists = new List<(string EntityKey, string Field, ChoiceList List)>();
+        foreach (var definition in entries.Select(e => e.EntityKey).Distinct().SelectMany(catalog.ChoiceListsOf))
+        {
+            lists.Add((definition.EntityKey, definition.Field, await choiceLists.GetAsync(definition.Key, cancellationToken)));
+        }
+
+        return lists.ToLookup(l => l.EntityKey, l => (l.Field, l.List));
+    }
+
+    private static AuditedEntity? WithChoiceLists(AuditedEntity? entity, ILookup<string, (string Field, ChoiceList List)> lists)
+    {
+        if (entity is null || !lists.Contains(entity.EntityKey))
+        {
+            return entity;
+        }
+
+        var options = new Dictionary<string, IReadOnlyDictionary<string, string>>(entity.Options);
+        foreach (var (field, list) in lists[entity.EntityKey])
+        {
+            options[field] = list.Values.ToDictionary(v => v.Key, v => v.Label, StringComparer.Ordinal);
+        }
+
+        return entity with { Options = options };
     }
 
     /// <summary>Kişi adları: firmanın üyesi (veya eski üyesi) adıyla, üye olmayan platform yöneticisi sabit adla görünür.</summary>

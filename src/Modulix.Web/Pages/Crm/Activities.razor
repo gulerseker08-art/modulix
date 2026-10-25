@@ -62,7 +62,7 @@
                             }
                         </td>
                         <td data-label="Konu" class="primary">@activity.Subject</td>
-                        <td data-label="Tür">@CrmLabels.Of(activity.Type)</td>
+                        <td data-label="Tür">@Lookups.Label(CrmLists.ActivityType, activity.Type)</td>
                         <td data-label="Tarih">@(activity.DueAt is { } due ? CrmLabels.Time(due) : null)@(IsOverdue(activity) ? " · gecikti" : null)</td>
                         <td data-label="Firma">
                             @if (activity.CompanyId is { } companyId)

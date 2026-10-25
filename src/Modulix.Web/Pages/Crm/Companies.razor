@@ -27,9 +27,9 @@
     <div class="filters" role="group" aria-label="Durum">
         <button type="button" class="chip @(status is null && !mine ? "active" : null)" @onclick="() => FilterAsync(null, false)">Tümü</button>
         <button type="button" class="chip @(mine ? "active" : null)" @onclick="() => FilterAsync(null, true)">Benim firmalarım</button>
-        @foreach (var value in Enum.GetValues<CompanyStatus>())
+        @foreach (var value in Lookups.Choices(CrmLists.CompanyStatus, status))
         {
-            <button type="button" class="chip @(status == value ? "active" : null)" @onclick="() => FilterAsync(value, false)">@CrmLabels.Of(value)</button>
+            <button type="button" class="chip @(status == value.Key ? "active" : null)" @onclick="() => FilterAsync(value.Key, false)">@value.Label</button>
         }
     </div>
 
@@ -57,7 +57,7 @@
                 {
                     <tr>
                         <td data-label="Ad" class="primary"><a href="crm/firmalar/@company.Id">@company.Name</a></td>
-                        <td data-label="Durum"><span class="badge status-@company.Status.ToString().ToLowerInvariant()">@CrmLabels.Of(company.Status)</span></td>
+                        <td data-label="Durum"><span class="badge status-@Lookups.Badge(CrmLists.CompanyStatus, company.Status)">@Lookups.Label(CrmLists.CompanyStatus, company.Status)</span></td>
                         <td data-label="Şehir">@company.City</td>
                         <td data-label="Sorumlu">@Lookups.MemberName(company.OwnerId)</td>
                         <td data-label="Telefon">@company.Phone</td>
@@ -87,7 +87,7 @@
     private bool editing;
     private string? message;
     private string? search;
-    private CompanyStatus? status;
+    private string? status;
     private bool mine;
 
     protected override async Task OnInitializedAsync()
@@ -100,7 +100,7 @@
         }
     }
 
-    private async Task FilterAsync(CompanyStatus? value, bool onlyMine)
+    private async Task FilterAsync(string? value, bool onlyMine)
     {
         status = value;
         mine = onlyMine;
@@ -112,7 +112,7 @@
         var url = $"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
         if (status is { } s)
         {
-            url += $"&status={s}";
+            url += $"&status={Uri.EscapeDataString(s)}";
         }
 
         if (mine)

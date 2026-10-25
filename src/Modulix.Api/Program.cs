@@ -113,6 +113,7 @@ app.MapAccessEndpoints();
 app.MapUserEndpoints();
 app.MapTeamEndpoints();
 app.MapCustomFieldEndpoints();
+app.MapChoiceListEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapPlatformEndpoints();

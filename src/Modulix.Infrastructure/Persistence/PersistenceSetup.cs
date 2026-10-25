@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Audit;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
@@ -64,6 +65,9 @@ public static class PersistenceSetup
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());
         services.AddScoped<ICustomFieldProvider>(sp => sp.GetRequiredService<CustomFieldService>());
+        services.AddScoped<ChoiceListService>();
+        services.AddScoped<IChoiceListService>(sp => sp.GetRequiredService<ChoiceListService>());
+        services.AddScoped<IChoiceLists>(sp => sp.GetRequiredService<ChoiceListService>());
         services.AddScoped<ICurrentAccess, CurrentAccess>();
 
         // Kullanıcı yönetimi (Y2); UserManager'ı host kaydeder (AddModulixAuth).

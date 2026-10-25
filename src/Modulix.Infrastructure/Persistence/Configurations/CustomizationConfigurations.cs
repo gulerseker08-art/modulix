@@ -26,3 +26,21 @@ internal sealed class CustomFieldConfiguration : IEntityTypeConfiguration<Custom
         builder.HasAlternateKey(f => new { f.TenantId, f.Id });
     }
 }
+
+internal sealed class TenantChoiceListConfiguration : IEntityTypeConfiguration<TenantChoiceList>
+{
+    public void Configure(EntityTypeBuilder<TenantChoiceList> builder)
+    {
+        // Tenant verisi (Y9b): yalnızca firmanın düzenlediği listeler; Row-Level Security ile korunur.
+        builder.ToTable("ChoiceLists", DatabaseSchemas.Meta);
+        builder.HasKey(l => l.Id);
+        builder.Property(l => l.Id).ValueGeneratedNever();
+        builder.Property(l => l.TenantId).IsRequired();
+        builder.Property(l => l.ListKey).HasMaxLength(TenantChoiceList.ListKeyMaxLength).IsRequired();
+        builder.Property(l => l.ValuesJson).IsRequired();
+        builder.Property(l => l.UpdatedAt).IsRequired();
+        builder.Ignore(l => l.Values);
+        builder.HasIndex(l => new { l.TenantId, l.ListKey }).IsUnique();
+        builder.HasAlternateKey(l => new { l.TenantId, l.Id });
+    }
+}

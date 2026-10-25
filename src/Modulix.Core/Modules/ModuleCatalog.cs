@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Settings;
 
@@ -15,6 +16,7 @@ public sealed class ModuleCatalog
     private readonly Dictionary<string, (string ModuleKey, SettingDefinition Definition)> settings = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<SensitiveFields>> sensitiveFields = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, CustomizableEntity Entity)> customizable = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string ModuleKey, ChoiceListDefinition List)> choiceLists = new(StringComparer.Ordinal);
 
     public ModuleCatalog(IEnumerable<IModule> modules)
     {
@@ -81,6 +83,15 @@ public sealed class ModuleCatalog
                 {
                     throw new InvalidOperationException(
                         $"Geçersiz veya tekrar eden özelleştirilebilir kayıt türü: '{entity.EntityKey}' ({module.Key}).");
+                }
+            }
+
+            foreach (var list in module.ChoiceLists)
+            {
+                ValidateChoiceList(module.Key, list);
+                if (!choiceLists.TryAdd(list.Key, (module.Key, list)))
+                {
+                    throw new InvalidOperationException($"Seçim listesi iki kez tanımlı: '{list.Key}'.");
                 }
             }
 
@@ -166,6 +177,42 @@ public sealed class ModuleCatalog
     /// <summary>Özel alan eklenebilen kayıt türleri, modül ve tanım sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, CustomizableEntity Entity)> CustomizableEntities =>
         Modules.SelectMany(m => m.CustomizableEntities.Select(e => (m.Key, e)));
+
+    /// <summary>Düzenlenebilir seçim listesi ve modülü (Y9b); tanımlı değilse null.</summary>
+    public (string ModuleKey, ChoiceListDefinition List)? FindChoiceList(string listKey) =>
+        choiceLists.TryGetValue(listKey, out var list) ? list : null;
+
+    /// <summary>Seçim listeleri, modül ve tanım sırasıyla.</summary>
+    public IEnumerable<(string ModuleKey, ChoiceListDefinition List)> ChoiceLists =>
+        Modules.SelectMany(m => m.ChoiceLists.Select(l => (m.Key, l)));
+
+    /// <summary>Kayıt türünün listeye bağlı alanlarının listeleri.</summary>
+    public IEnumerable<ChoiceListDefinition> ChoiceListsOf(string entityKey) =>
+        choiceLists.Values.Select(l => l.List).Where(l => l.EntityKey == entityKey);
+
+    // Anahtarlar modülün; değer anahtarı harfle başlar (kayıtta ve süzgeçte metin olarak durur). Kategori varsa her
+    // değer bilinen bir kategoriye bağlıdır ve her kategoride en az bir hazır değer vardır.
+    private static void ValidateChoiceList(string moduleKey, ChoiceListDefinition list)
+    {
+        var prefix = moduleKey + ".";
+        var keys = list.Values.Select(v => v.Key).ToList();
+        var categories = list.Categories.Select(c => c.Key).ToHashSet(StringComparer.Ordinal);
+        if (!list.Key.StartsWith(prefix, StringComparison.Ordinal)
+            || !list.EntityKey.StartsWith(prefix, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(list.Field)
+            || keys.Count == 0
+            || keys.Distinct(StringComparer.Ordinal).Count() != keys.Count
+            || !keys.All(ChoiceValueKeys.IsValid)
+            || (list.Default is { } preferred && !keys.Contains(preferred))
+            || categories.Count != list.Categories.Count
+            || (categories.Count == 0
+                ? list.Values.Any(v => v.Category is not null)
+                : list.Values.Any(v => v.Category is null || !categories.Contains(v.Category))
+                    || categories.Any(c => list.Values.All(v => v.Category != c))))
+        {
+            throw new InvalidOperationException($"Geçersiz seçim listesi tanımı: '{list.Key}' ({moduleKey}).");
+        }
+    }
 
     public PermissionDefinition? FindPermission(string permissionKey) => permissions.GetValueOrDefault(permissionKey);
 

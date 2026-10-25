@@ -18,9 +18,9 @@
         <div>
             <label class="form-label" for="type">Tür</label>
             <select id="type" class="form-select" @bind="form.Type">
-                @foreach (var type in Enum.GetValues<ActivityType>())
+                @foreach (var type in Lookups.Choices(CrmLists.ActivityType, source?.Type))
                 {
-                    <option value="@type">@CrmLabels.Of(type)</option>
+                    <option value="@type.Key">@type.Label</option>
                 }
             </select>
             <FieldError Field="type" Errors="errors" />
@@ -141,7 +141,7 @@
                 OpportunityId = a.OpportunityId, OwnerId = a.OwnerId, Notes = a.Notes,
                     Custom = a.Custom?.DeepClone().AsObject() ?? [],
             }
-            : new ActivityForm { CompanyId = FixedCompanyId };
+            : new ActivityForm { CompanyId = FixedCompanyId, Type = Lookups.DefaultOf(CrmLists.ActivityType) ?? ActivityType.Task };
         errors = null;
         message = null;
     }
@@ -194,7 +194,7 @@
 
         public long? Version { get; init; }
 
-        public ActivityType Type { get; set; } = ActivityType.Task;
+        public string Type { get; set; } = ActivityType.Task;
 
         public string Subject { get; set; } = string.Empty;
 

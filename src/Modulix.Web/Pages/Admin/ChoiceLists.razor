@@ -1,0 +1,180 @@
+@page "/yonetim/listeler"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Listeler · Modulix</PageTitle>
+
+@* Seçim listeleri (Y9b): fırsat aşamaları, firma durumu, kaynak, aktivite tipi. Değer silinmez, pasife alınır; kod kategoriye bakar. *@
+<AuthGate Permission="@CoreAccess.ManageCustomization">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Listeler</h1>
+    </div>
+
+    <p class="text-muted">
+        Seçim listelerini firmanıza göre düzenleyin: değerlerin adını ve sırasını değiştirin, yeni değer ekleyin. Kullanılan değer
+        silinmez, pasife alınır: yeni kayıtta seçilemez, onu taşıyan kayıtlar bozulmaz. Satış hunisinin sütunları aşama sırasıyla çizilir.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (lists is { Count: > 0 })
+    {
+        <div class="filters">
+            <div class="segmented" role="group" aria-label="Liste">
+                @foreach (var list in lists)
+                {
+                    <button type="button" class="chip @(list.Key == current?.Key ? "active" : null)" @onclick="() => Select(list)">@list.Name</button>
+                }
+            </div>
+        </div>
+
+        @if (current is not null)
+        {
+            <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <h2>@current.Name</h2>
+                @if (current.Categories.Count > 0)
+                {
+                    <p class="form-text">
+                        Her değer bir kategoriye bağlıdır (@string.Join(", ", current.Categories.Select(c => c.Name))); uygulama değere değil
+                        kategoriye bakar. Hazır değerlerin kategorisi değişmez; her kategoride en az bir etkin değer kalmalıdır.
+                    </p>
+                }
+                <div class="choice-rows">
+                    @for (var i = 0; i < rows.Count; i++)
+                    {
+                        var row = rows[i];
+                        var index = i;
+                        <div class="option-row choice-row @(row.Active ? null : "is-archived")">
+                            <input class="form-control" maxlength="60" aria-label="Değer @(index + 1)" @bind="row.Label" />
+                            @if (current.Categories.Count > 0)
+                            {
+                                @if (row.Key is null)
+                                {
+                                    <select class="form-select" aria-label="Kategori" @bind="row.Category">
+                                        <option value="">Kategori seçin</option>
+                                        @foreach (var category in current.Categories)
+                                        {
+                                            <option value="@category.Key">@category.Name</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <span class="badge category">@CategoryName(row.Category)</span>
+                                }
+                            }
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" @bind="row.Active" />
+                                <span class="form-check-label">Etkin</span>
+                            </label>
+                            <span class="order">
+                                <button type="button" class="btn btn-link btn-sm" aria-label="Yukarı" disabled="@(index == 0)" @onclick="() => Move(index, -1)">↑</button>
+                                <button type="button" class="btn btn-link btn-sm" aria-label="Aşağı" disabled="@(index == rows.Count - 1)" @onclick="() => Move(index, 1)">↓</button>
+                            </span>
+                            @if (row.Key is null)
+                            {
+                                <button type="button" class="btn btn-link btn-sm" @onclick="() => rows.RemoveAt(index)">Kaldır</button>
+                            }
+                        </div>
+                    }
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Add">Değer ekle</button>
+                <FieldError Field="values" Errors="errors" />
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Select(current)">Vazgeç</button>
+                </div>
+            </form>
+        }
+    }
+    else if (lists is not null)
+    {
+        <p class="text-muted">Düzenlenebilir listesi olan bir modül açık değil.</p>
+    }
+</AuthGate>
+
+@code {
+    private List<ChoiceListDto>? lists;
+    private ChoiceListDto? current;
+    private List<RowForm> rows = [];
+    private string? message;
+    private string? notice;
+    private bool busy;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ManageCustomization))
+        {
+            var result = await Api.GetAsync<List<ChoiceListDto>>("/api/customization/lists");
+            lists = result.Value;
+            message = result.Error;
+            if (lists is { Count: > 0 })
+            {
+                Select(lists[0]);
+            }
+        }
+    }
+
+    private string CategoryName(string? key) => current?.Categories.FirstOrDefault(c => c.Key == key)?.Name ?? string.Empty;
+
+    private void Select(ChoiceListDto list)
+    {
+        current = list;
+        rows = [.. list.Values.Select(v => new RowForm { Key = v.Key, Label = v.Label, Category = v.Category, Active = v.Active })];
+        errors = null;
+        notice = null;
+    }
+
+    private void Add() => rows.Add(new RowForm());
+
+    private void Move(int index, int direction)
+    {
+        var row = rows[index];
+        rows.RemoveAt(index);
+        rows.Insert(index + direction, row);
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        notice = null;
+        var request = new SaveChoiceListRequest([
+            .. rows
+                .Where(r => r.Key is not null || !string.IsNullOrWhiteSpace(r.Label))
+                .Select(r => new SaveChoiceValue(r.Key, r.Label, r.Key is null && !string.IsNullOrEmpty(r.Category) ? r.Category : null, r.Active)),
+        ]);
+        var result = await Api.PutAsync<ChoiceListDto>($"/api/customization/lists/{Uri.EscapeDataString(current!.Key)}", request);
+        busy = false;
+        errors = result.FieldErrors;
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+        if (result.Value is { } saved)
+        {
+            lists![lists.FindIndex(l => l.Key == saved.Key)] = saved;
+            Select(saved);
+            notice = "Liste kaydedildi.";
+        }
+    }
+
+    private sealed class RowForm
+    {
+        public string? Key { get; init; }
+
+        public string Label { get; set; } = string.Empty;
+
+        public string? Category { get; set; }
+
+        public bool Active { get; set; } = true;
+    }
+}

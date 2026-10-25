@@ -133,8 +133,14 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
         Assert.Contains("email", problem.Errors.Keys);
 
         var generic = await ValidationProblemAsync(await client.PostAsJsonAsync($"/api/records/{CrmModule.Entities.Opportunity}",
-            new RecordWriteRequest(new JsonObject { ["title"] = "x", ["stage"] = "Bilinmiyor", ["amount"] = -5, ["extra"] = 1 })));
+            new RecordWriteRequest(new JsonObject { ["title"] = "x", ["stage"] = "5", ["amount"] = -5, ["extra"] = 1 })));
         Assert.Equal(new[] { "amount", "companyId", "extra", "stage" }, generic.Errors.Keys.Order());
+
+        // Biçimi doğru ama firmanın listesinde olmayan değer (Y9b) kayıt yazılırken reddedilir.
+        var company = await CreateCompanyAsync(client, "Liste");
+        var unknown = await ValidationProblemAsync(await client.PostAsJsonAsync($"/api/records/{CrmModule.Entities.Opportunity}",
+            new RecordWriteRequest(new JsonObject { ["title"] = "x", ["companyId"] = company.Id.ToString(), ["stage"] = "Bilinmiyor" })));
+        Assert.Equal(["Listede olmayan değer."], unknown.Errors["stage"]);
     }
 
     [Fact]
