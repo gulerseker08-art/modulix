@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/gulerseker08-art/modulix/actions/workflows/ci.yml/badge.svg)](https://github.com/gulerseker08-art/modulix/actions/workflows/ci.yml)
 
-AI destekli, modüler, multi-tenant kurumsal iş yönetim platformu. Faz 1: Core + CRM + Lojistik, tüm ekranlar mobil uyumlu.
+AI destekli, modüler, multi-tenant kurumsal iş yönetim platformu: birden fazla sektörün iş süreçleri aynı SaaS üzerinde. Pilot sektör lojistik; sıra Çekirdek → CRM → Lojistik → Antrepo → İK → Muhasebe. Tüm ekranlar mobil uyumlu.
 
-Mimari kararlar `docs/adr` klasöründedir.
+Mimari kararlar `docs/adr` klasöründe, yol haritası [`docs/yol-haritasi.md`](docs/yol-haritasi.md) dosyasındadır.
 
 ## Gereksinimler
 
