@@ -1,0 +1,125 @@
+@page "/yonetim/sektor-profili"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Sektör profili · Modulix</PageTitle>
+
+@* Sektör profili (Y9c): hazır alanlar ve liste değerleri. Bir kez uygulanır ve yalnızca ekler; önce önizleme gösterilir. *@
+<AuthGate Permission="@CoreAccess.ManageCustomization">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Sektör profili</h1>
+    </div>
+
+    <p class="text-muted">
+        Profil, sektörünüz için hazır alanlar ve liste değerleri ekler. Yalnızca eksikler eklenir: mevcut alanlarınız ve değerleriniz
+        değişmez, aynı adlı olanlar atlanır. Eklenenleri sonra Özel alanlar ve Listeler sayfalarından düzenleyebilirsiniz.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (profiles is not null)
+    {
+        <p>
+            Firmanın profili:
+            <strong>@(CurrentName ?? "Uygulanmadı")</strong>
+            @if (profiles.AppliedAt is { } appliedAt)
+            {
+                <span class="text-muted"> · @CrmLabels.Time(appliedAt)</span>
+            }
+        </p>
+
+        <div class="profile-cards">
+            @foreach (var profile in profiles.Profiles)
+            {
+                <button type="button" class="profile-card @(profile.Key == selected ? "active" : null)" aria-pressed="@(profile.Key == selected)"
+                        @onclick="() => PreviewAsync(profile.Key)">
+                    <strong>@profile.Name</strong>
+                    <span>@profile.Description</span>
+                    @if (profile.Key == profiles.Current)
+                    {
+                        <span class="badge category">Uygulandı</span>
+                    }
+                </button>
+            }
+        </div>
+
+        @if (plan is not null)
+        {
+            <section class="record-form settings-group" aria-live="polite">
+                <h2>@plan.ProfileName</h2>
+                <ProfilePreview Plan="plan" Applied="applied" />
+                @if (!applied)
+                {
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" disabled="@busy" @onclick="ApplyAsync">
+                            @(plan.IsEmpty ? "Profili firmaya kaydet" : "Profili uygula")
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">Vazgeç</button>
+                    </div>
+                }
+            </section>
+        }
+    }
+</AuthGate>
+
+@code {
+    private SectorProfilesResponse? profiles;
+    private ProfilePlanDto? plan;
+    private string? selected;
+    private bool applied;
+    private bool busy;
+    private string? message;
+
+    private string? CurrentName => profiles?.Profiles.FirstOrDefault(p => p.Key == profiles.Current)?.Name ?? profiles?.Current;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ManageCustomization))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<SectorProfilesResponse>("/api/customization/profiles");
+        profiles = result.Value;
+        message = result.Error;
+    }
+
+    private async Task PreviewAsync(string key)
+    {
+        selected = key;
+        applied = false;
+        plan = null;
+        var result = await Api.GetAsync<ProfilePlanDto>($"/api/customization/profiles/{Uri.EscapeDataString(key)}/preview");
+        plan = result.Value;
+        message = result.Error;
+    }
+
+    private async Task ApplyAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<ProfilePlanDto>($"/api/customization/profiles/{Uri.EscapeDataString(selected!)}/apply", new { });
+        busy = false;
+        message = result.Error;
+        if (result.Value is { } done)
+        {
+            plan = done;
+            applied = true;
+            await LoadAsync();
+        }
+    }
+
+    private void Cancel()
+    {
+        selected = null;
+        plan = null;
+    }
+}

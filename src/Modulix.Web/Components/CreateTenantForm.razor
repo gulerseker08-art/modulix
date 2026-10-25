@@ -1,5 +1,5 @@
 @* Firma açma formu (Y4); Firmalar sayfası kullanır. Açılış sunucuda tek işlemdir: firma, Yönetici rolü, modüller,
-   hazır roller ve ilk yöneticinin daveti birlikte oluşur. *@
+   hazır roller, sektör profili (Y9c) ve ilk yöneticinin daveti birlikte oluşur. *@
 @inject ApiClient Api
 
 <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
@@ -36,6 +36,24 @@
             <input id="adminName" class="form-control" maxlength="200" @bind="administratorName" />
             <FieldError Field="administratorName" Errors="errors" />
         </div>
+        @if (Profiles.Count > 0)
+        {
+            <div class="span-all">
+                <label class="form-label" for="tenantProfile">Sektör profili</label>
+                <select id="tenantProfile" class="form-select" value="@profile" @onchange="e => SelectProfile((string?)e.Value)">
+                    <option value="">Profil yok</option>
+                    @foreach (var item in Profiles)
+                    {
+                        <option value="@item.Key">@item.Name</option>
+                    }
+                </select>
+                <small class="text-muted">
+                    @(Profiles.FirstOrDefault(p => p.Key == profile)?.Description
+                        ?? "Profil, sektöre göre hazır alanlar ve liste değerleri ekler; modüllerini aşağıda önceden seçer.")
+                </small>
+                <FieldError Field="profile" Errors="errors" />
+            </div>
+        }
         <fieldset class="span-all">
             <legend class="form-label">Açılacak modüller</legend>
             @foreach (var module in Modules.Modules)
@@ -76,12 +94,16 @@
 @code {
     [Parameter, EditorRequired] public PlatformModulesResponse Modules { get; set; } = default!;
 
+    /// <summary>Sektör profilleri (Y9c); seçilen profilin modülleri önceden işaretlenir, sonra değiştirilebilir.</summary>
+    [Parameter] public IReadOnlyList<SectorProfileDto> Profiles { get; set; } = [];
+
     [Parameter] public EventCallback<CreateTenantResponse> Created { get; set; }
 
     [Parameter] public EventCallback Cancelled { get; set; }
 
     private readonly HashSet<string> modules = [];
     private readonly HashSet<string> templates = [];
+    private string? profile;
     private string name = string.Empty;
     private string slug = string.Empty;
     private bool slugEdited;
@@ -114,6 +136,17 @@
         templates.IntersectWith(Templates.Select(t => t.Key));
     }
 
+    private void SelectProfile(string? key)
+    {
+        profile = string.IsNullOrEmpty(key) ? null : key;
+        if (Profiles.FirstOrDefault(p => p.Key == profile) is { } selected)
+        {
+            modules.Clear();
+            modules.UnionWith(selected.Modules.Where(m => Modules.Modules.Any(x => x.Key == m)));
+            templates.IntersectWith(Templates.Select(t => t.Key));
+        }
+    }
+
     private static void Toggle(HashSet<string> set, string key, bool on)
     {
         if (on)
@@ -138,7 +171,7 @@
     {
         busy = true;
         var result = await Api.PostAsync<CreateTenantResponse>("/api/platform/tenants", new CreateTenantRequest(
-            name, slug, [.. modules], [.. templates], administratorEmail, administratorName));
+            name, slug, [.. modules], [.. templates], administratorEmail, administratorName, profile));
         busy = false;
 
         if (!result.IsSuccess)

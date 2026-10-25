@@ -90,3 +90,27 @@ public sealed record SaveChoiceValue(string? Key, string Label, string? Category
 
 /// <summary>Listenin tamamı, istenen sırayla. Verilmeyen eski değer silinmez, pasif kalır.</summary>
 public sealed record SaveChoiceListRequest(IReadOnlyList<SaveChoiceValue> Values);
+
+/// <summary>Sektör profili (Y9c); <see cref="Modules"/> profilin önerdiği modüllerin anahtarları.</summary>
+public sealed record SectorProfileDto(string Key, string Name, string Description, IReadOnlyList<string> Modules);
+
+/// <summary>Firmanın profili (yoksa null) ve seçilebilecek profiller.</summary>
+public sealed record SectorProfilesResponse(string? Current, DateTimeOffset? AppliedAt, IReadOnlyList<SectorProfileDto> Profiles);
+
+/// <summary>Eklenecek (veya eklenen) alan: kayıt türünün adı, alanın adı, tipi ve seçenekleri.</summary>
+public sealed record ProfileFieldDto(string EntityName, string Label, CustomFieldType Type, IReadOnlyList<string> Options);
+
+public sealed record ProfileListValueDto(string ListName, string Label);
+
+/// <summary>
+/// Profilin firmaya ekleyeceği şeyler ("Şunlar eklenecek"). <see cref="ModulesToEnable"/> ve <see cref="UnavailableModules"/>
+/// modül adlarıdır; kapalı kalan modülün alanları ve değerleri eklenmez. Mevcut alan ve değer değişmez.
+/// </summary>
+public sealed record ProfilePlanDto(
+    string Profile,
+    string ProfileName,
+    IReadOnlyList<string> ModulesToEnable,
+    IReadOnlyList<string> UnavailableModules,
+    IReadOnlyList<ProfileFieldDto> Fields,
+    IReadOnlyList<ProfileListValueDto> ListValues,
+    bool IsEmpty);

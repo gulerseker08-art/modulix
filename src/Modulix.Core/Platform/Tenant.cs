@@ -41,7 +41,20 @@ public sealed partial class Tenant
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>En son uygulanan sektör profili (Y9c); profil uygulanmadıysa null.</summary>
+    public string? ProfileKey { get; private set; }
+
+    public DateTimeOffset? ProfileAppliedAt { get; private set; }
+
     public bool IsActive => Status == TenantStatus.Active;
+
+    /// <summary>Profilin uygulandığını kaydeder. Profil firma verisini yalnızca ekler; burada yalnızca anahtarı tutulur.</summary>
+    public void ApplyProfile(string profileKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(profileKey);
+        ProfileKey = profileKey;
+        ProfileAppliedAt = DateTimeOffset.UtcNow;
+    }
 
     public void Rename(string name)
     {

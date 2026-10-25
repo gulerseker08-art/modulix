@@ -7,6 +7,7 @@ using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Customization;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
@@ -27,6 +28,7 @@ public interface ITenantScopeFactory
 internal sealed class PlatformAdministration(
     ModulixDbContext db,
     ModuleCatalog catalog,
+    SectorProfileCatalog profiles,
     ITenantScopeFactory tenantScopes) : IPlatformAdministration
 {
     public const int MaxPageSize = 50;
@@ -89,6 +91,10 @@ internal sealed class PlatformAdministration(
         var tenant = new Tenant(name, slug);
         var modules = ValidateModules(creation.Modules ?? []);
         var templates = ValidateTemplates(creation.RoleTemplates ?? [], modules);
+        if (creation.Profile is { } profileKey && profiles.Find(profileKey) is null)
+        {
+            throw new ArgumentException($"Tanımsız sektör profili: '{profileKey}'.", "profile");
+        }
 
         if (await db.Tenants.AnyAsync(t => t.Slug == tenant.Slug, cancellationToken))
         {
@@ -133,6 +139,12 @@ internal sealed class PlatformAdministration(
             ["roles"] = new JsonArray([.. templates.Select(t => JsonValue.Create(t.Name))]),
         });
         await tenantDb.SaveChangesAsync(cancellationToken);
+
+        // Profil seçilen modüllere eklenir; modül listesi yöneticinin seçimidir (ekran profilin modüllerini önceden seçer).
+        if (creation.Profile is { } profile)
+        {
+            await services.GetRequiredService<ISectorProfileService>().ApplyAsync(profile, enableModules: false, cancellationToken);
+        }
 
         InvitationResult invitation;
         try
@@ -231,6 +243,23 @@ internal sealed class PlatformAdministration(
         await entitlements.SetEnabledAsync(tenantId, moduleKey, enabled, cancellationToken);
     }
 
+    public Task<ProfilePlan?> PreviewProfileAsync(Guid tenantId, string profileKey, CancellationToken cancellationToken) =>
+        InTenantAsync(tenantId, Guid.Empty, p => p.PreviewAsync(profileKey, enableModules: true, cancellationToken), cancellationToken);
+
+    public Task<ProfilePlan?> ApplyProfileAsync(Guid tenantId, string profileKey, Guid actingUserId, CancellationToken cancellationToken) =>
+        InTenantAsync(tenantId, actingUserId, p => p.ApplyAsync(profileKey, enableModules: true, cancellationToken), cancellationToken);
+
+    private async Task<T> InTenantAsync<T>(Guid tenantId, Guid actingUserId, Func<ISectorProfileService, Task<T>> action, CancellationToken cancellationToken)
+    {
+        if (!await db.Tenants.AnyAsync(t => t.Id == tenantId, cancellationToken))
+        {
+            throw NotFound();
+        }
+
+        await using var scope = tenantScopes.Create(new TenantContext(tenantId, actingUserId, Guid.Empty));
+        return await action(scope.ServiceProvider.GetRequiredService<ISectorProfileService>());
+    }
+
     public async Task<IReadOnlyList<ModuleUsage>> GetModuleUsageAsync(CancellationToken cancellationToken)
     {
         var counts = await (
@@ -298,7 +327,9 @@ internal sealed class PlatformAdministration(
             tenant.CreatedAt,
             activeMembers,
             administratorCount.Value,
-            [.. catalog.Modules.Select(m => m.Key).Where(modules.Contains)]);
+            [.. catalog.Modules.Select(m => m.Key).Where(modules.Contains)],
+            tenant.ProfileKey,
+            tenant.ProfileAppliedAt);
     }
 
     /// <summary>Yönetici rolündeki üyeler; <paramref name="tenantDb"/> firmanın bağlamında olmalıdır.</summary>

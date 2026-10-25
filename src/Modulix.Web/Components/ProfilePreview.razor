@@ -1,0 +1,43 @@
+@* Sektör profilinin firmaya ekleyeceği şeyler (Y9c, "Şunlar eklenecek"); firma yönetimi ve platform ekranı kullanır. *@
+
+@if (Plan.IsEmpty)
+{
+    <p class="text-muted">Eklenecek bir şey yok: profilin alanları ve değerleri firmada zaten var.</p>
+}
+else
+{
+    <p>@(Applied ? "Şunlar eklendi:" : "Şunlar eklenecek:")</p>
+    <ul class="profile-plan">
+        @if (Plan.ModulesToEnable.Count > 0)
+        {
+            <li><strong>Açılacak modüller:</strong> @string.Join(", ", Plan.ModulesToEnable)</li>
+        }
+        @foreach (var field in Plan.Fields)
+        {
+            <li>
+                <strong>@field.EntityName</strong> kaydına <em>@field.Label</em> alanı (@CustomFieldTypeLabels.Of(field.Type)@(field.Options.Count > 0 ? $": {string.Join(", ", field.Options)}" : null))
+            </li>
+        }
+        @foreach (var value in Plan.ListValues)
+        {
+            <li><strong>@value.ListName</strong> listesine <em>@value.Label</em> değeri</li>
+        }
+    </ul>
+}
+@if (Plan.UnavailableModules.Count > 0)
+{
+    <p class="form-text">
+        @string.Join(", ", Plan.UnavailableModules) modülü firmada kapalı; bu modülün alanları ve değerleri eklenmez. Modülü platform yöneticisi açabilir.
+    </p>
+}
+@if (!Applied)
+{
+    <p class="form-text">Mevcut alanlar ve liste değerleri değişmez; aynı adlı olanlar atlanır.</p>
+}
+
+@code {
+    [Parameter, EditorRequired] public ProfilePlanDto Plan { get; set; } = default!;
+
+    /// <summary>Uygulandıktan sonra gösteriliyorsa true ("Şunlar eklendi").</summary>
+    [Parameter] public bool Applied { get; set; }
+}
