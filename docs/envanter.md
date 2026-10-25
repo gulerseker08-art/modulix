@@ -82,7 +82,7 @@ Her varlığın tek bir yazma sahibi var. Teklif, sevkiyat, personel ve fatura h
   - Öneri: API'de sürümü zorunlu kılmak (sürümsüz istek 428 veya 422). Arka plandaki iç çağıranlar (devir, aboneler) boru hattını doğrudan çağırdığı için etkilenmez. API sözleşmesi değişeceği için karar bekliyor.
 - **B2. İş komutu yok (Ç0.4):** onay ve kesinleştirme kuralı olan ilk işlemle (teklif onayı) birlikte "komut alanı" gerekecek. Yani genel güncellemenin yazamadığı, yalnızca komutun değiştirdiği alanlar. Bugün bu kurala tabi alan yok; genel `/api/records` ucu her alanı yazabiliyor.
 - **B3. Silme politikası (Ç0.6):** CRM kayıtları fiziksel olarak siliniyor. Bağlı kaydı olan firma ve kullanılan ortak kayıt silinemiyor (409, test edildi). Arşiv ve yasal saklama kuralı yok; belge modülleri gelmeden karar gerekmiyor.
-- **B4. Şirket ve şube kapsamı yok (Ç22):** tenant tek işletici şirket gibi davranıyor. Yol haritası sırasındaki 2. madde.
+- **B4. Şirket ve şube kapsamı (Ç22):** ADR-0008 kabul edildi; şirket/şube tabloları ve varsayılan şirket var (adım 1). Henüz yok: üyelik–şirket bağı, aktif şirket ve boru hattında şirket süzgeci (adım 2-3); bugün hiçbir tablo şirket kapsamlı değil, bütün tenant tabloları "ortak".
 - **B5. Lojistik ve AI boş:** "lojistik pilotu" için entity ve uç nokta yok. Bunlar D2 kapsamında.
 - **B6. Uç nokta kapısının sınırı:** gövde isteyen uçlar boş gövdeyle çağrılınca bağlama hatası (400), izin filtresinden önce dönebiliyor. Test bu durumda yalnızca "başarılı dönmedi"yi kanıtlar. GET uçları ve oturum, firma, platform denetimleri tam kanıtlı.
 - **B7. Sürüm kapısı (Ç23.4) eksikleri:**

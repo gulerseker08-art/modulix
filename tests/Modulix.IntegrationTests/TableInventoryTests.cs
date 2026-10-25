@@ -74,6 +74,34 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.True(mismatched.Count == 0, "Şeması tenant sınıfıyla uyuşmayan entity: " + string.Join(", ", mismatched));
     }
 
+    /// <summary>
+    /// Ç22.2 kapsam sınıfı (ADR-0008): her tenant tablosu ya ortaktır (<see cref="ICompanyShared"/>) ya da şirket kapsamlıdır
+    /// (<see cref="ICompanyScoped"/>, CompanyId ile); ikisi birden olamaz. Sınıfsız yeni tablo testi kırar.
+    /// </summary>
+    [Fact]
+    public void Every_tenant_entity_has_exactly_one_company_scope_class()
+    {
+        using var scope = factory.OpenScope(tenantId: null);
+        var problems = new List<string>();
+        foreach (var type in scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Model.GetEntityTypes()
+                     .Where(t => t.GetTableName() is not null && t.BaseType is null && typeof(ITenantEntity).IsAssignableFrom(t.ClrType)))
+        {
+            var shared = typeof(ICompanyShared).IsAssignableFrom(type.ClrType);
+            var scoped = typeof(ICompanyScoped).IsAssignableFrom(type.ClrType);
+            var name = $"{type.ClrType.Name} ({type.GetSchema()}.{type.GetTableName()})";
+            if (shared == scoped)
+            {
+                problems.Add($"{name}: {(shared ? "hem ortak hem şirket kapsamlı" : "kapsam sınıfı yok; ICompanyShared veya ICompanyScoped uygulayın")}.");
+            }
+            else if (scoped && type.FindProperty(nameof(ICompanyScoped.CompanyId)) is not { IsNullable: false })
+            {
+                problems.Add($"{name}: şirket kapsamlı ama CompanyId zorunlu kolon değil.");
+            }
+        }
+
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
+    }
+
     [Fact]
     public void Model_has_no_changes_without_a_migration()
     {

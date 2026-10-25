@@ -3,7 +3,7 @@ using Modulix.Core.Contracts.Tenancy;
 namespace Modulix.Core.Authorization;
 
 /// <summary>Bir üyeliğe atanmış rol. Tenant verisidir; Row-Level Security ile korunur.</summary>
-public sealed class MembershipRole : ITenantEntity
+public sealed class MembershipRole : ITenantEntity, ICompanyShared
 {
     private MembershipRole()
     {

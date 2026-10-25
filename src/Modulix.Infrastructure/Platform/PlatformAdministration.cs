@@ -11,6 +11,7 @@ using Modulix.Core.Customization;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
+using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Users;
 
@@ -125,6 +126,7 @@ internal sealed class PlatformAdministration(
         }
 
         var administrator = await roles.EnsureSystemRoleAsync(cancellationToken);
+        await DefaultCompany.EnsureAsync(tenantDb, tenant.Name, cancellationToken);
         foreach (var template in templates)
         {
             await roles.CreateAsync(template.Name, template.Permissions, cancellationToken, scope: template.Scope);

@@ -15,7 +15,7 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Infrastructure.Records;
 
 /// <summary>Audit kaydı (core.AuditLog). Tenant verisidir: Row-Level Security ile korunur, uygulama değiştiremez veya silemez.</summary>
-public sealed class AuditLogEntry : ITenantEntity
+public sealed class AuditLogEntry : ITenantEntity, ICompanyShared
 {
     public const int EntityKeyMaxLength = 100;
     public const int CorrelationIdMaxLength = 64;

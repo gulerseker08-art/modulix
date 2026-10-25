@@ -11,7 +11,7 @@ public sealed record StoredChoiceValue(string Key, string Label, string? Categor
 /// geçerlidir (<see cref="ChoiceListRules.Resolve"/>). Değerler silinmez, pasifleşir: kayıtlarda anahtarları durur.
 /// Tenant verisidir; Row-Level Security ile korunur.
 /// </summary>
-public sealed class TenantChoiceList : ITenantEntity
+public sealed class TenantChoiceList : ITenantEntity, ICompanyShared
 {
     public const int ListKeyMaxLength = 100;
 

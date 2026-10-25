@@ -6,7 +6,7 @@ namespace Modulix.Core.Teams;
 /// Firmanın ekibi ya da departmanı (Y8, ör. "İstanbul Satış"). "Ekibimin kayıtları" kapsamı ekip arkadaşlarının sorumlu
 /// olduğu kayıtları açar. Bir kişi birden fazla ekipte olabilir. Tenant verisidir; Row-Level Security ile korunur.
 /// </summary>
-public sealed class Team : ITenantEntity
+public sealed class Team : ITenantEntity, ICompanyShared
 {
     public const int NameMaxLength = 100;
     public const int DescriptionMaxLength = 500;
@@ -64,7 +64,7 @@ public sealed class Team : ITenantEntity
 }
 
 /// <summary>Ekip üyeliği: üyelik (firma × kişi) bir ekipte. Tenant verisidir; Row-Level Security ile korunur.</summary>
-public sealed class TeamMember : ITenantEntity
+public sealed class TeamMember : ITenantEntity, ICompanyShared
 {
     private TeamMember()
     {

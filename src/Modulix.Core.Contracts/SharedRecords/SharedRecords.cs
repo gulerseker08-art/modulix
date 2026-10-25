@@ -17,7 +17,7 @@ public static class SharedEntities
 }
 
 /// <summary>Ortak kayıtların ortak alanları. TenantId kaydederken aktif tenant'tan atanır.</summary>
-public abstract class SharedEntity : ITenantEntity
+public abstract class SharedEntity : ITenantEntity, ICompanyShared
 {
     protected SharedEntity()
     {

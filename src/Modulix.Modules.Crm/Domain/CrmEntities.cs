@@ -7,7 +7,7 @@ namespace Modulix.Modules.Crm.Domain;
 // hem doğrulamada hem veritabanı kolonlarında aynı sabitlerden gelir.
 
 /// <summary>Tüm CRM kayıtlarının ortak alanları. TenantId kaydederken aktif tenant'tan atanır.</summary>
-public abstract class CrmEntity : ITenantEntity
+public abstract class CrmEntity : ITenantEntity, ICompanyShared
 {
     protected CrmEntity()
     {
