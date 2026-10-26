@@ -14,6 +14,7 @@ public class RecordPipelineTests
     private const string Entity = "test.note";
 
     private readonly TestTenant _tenant = new() { Current = new TenantContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()) };
+    private readonly TestCompany _company = new();
     private readonly FakeStore _store = new();
     private readonly FakeAudit _audit = new();
     private readonly FakeOutbox _outbox = new();
@@ -27,6 +28,7 @@ public class RecordPipelineTests
 
     private RecordPipeline Pipeline() => new(
         _tenant,
+        _company,
         new RecordStoreRegistry([_store]),
         new Gate(() => _licensed),
         new Gate(() => _permitted),
@@ -335,6 +337,130 @@ public class RecordPipelineTests
         Assert.Equal("iz-123", audit.CorrelationId);
     }
 
+    [Fact]
+    public async Task Company_scoped_query_is_filtered_to_accessible_companies()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        CompanyScoped(active: a, isAdministrator: false, a, b);
+
+        await Pipeline().QueryAsync(new RecordQuery(Entity), default);
+
+        Assert.Equal(new[] { a, b }.Order(), _store.LastQuery!.Companies!.Order());
+    }
+
+    [Fact]
+    public async Task All_companies_administrator_has_no_company_filter()
+    {
+        CompanyScoped(active: Guid.NewGuid(), isAdministrator: true, Guid.NewGuid());
+
+        await Pipeline().QueryAsync(new RecordQuery(Entity), default);
+
+        Assert.Null(_store.LastQuery!.Companies);
+    }
+
+    [Fact]
+    public async Task Shared_store_ignores_company_scope()
+    {
+        // CompanyField null (ortak depo): şirket bağlamı olsa da süzgeç uygulanmaz.
+        _company.Current = new CompanyContext(Guid.NewGuid(), new HashSet<Guid> { Guid.NewGuid() }, IsAllCompanies: false);
+
+        await Pipeline().QueryAsync(new RecordQuery(Entity), default);
+
+        Assert.Null(_store.LastQuery!.Companies);
+    }
+
+    [Fact]
+    public async Task Create_defaults_company_to_active_company()
+    {
+        var active = Guid.NewGuid();
+        CompanyScoped(active, isAdministrator: false, active);
+
+        var created = (await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default)).Value!;
+
+        Assert.Equal(active.ToString(), _store.Records[created.Id].Values["companyId"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Create_with_inaccessible_company_is_rejected()
+    {
+        var active = Guid.NewGuid();
+        CompanyScoped(active, isAdministrator: false, active);
+
+        var result = await Pipeline().CreateAsync(
+            Command(new JsonObject { ["text"] = "a", ["companyId"] = Guid.NewGuid().ToString() }), default);
+
+        Assert.Equal(RecordErrorCode.ValidationFailed, result.Error!.Code);
+        Assert.Equal("companyId", Assert.Single(result.Error.FieldErrors!).Field);
+        AssertNothingWritten();
+    }
+
+    [Fact]
+    public async Task Create_without_any_company_access_is_rejected()
+    {
+        CompanyScoped(active: null, isAdministrator: false);
+
+        var result = await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default);
+
+        Assert.Equal(RecordErrorCode.ValidationFailed, result.Error!.Code);
+        Assert.Equal("companyId", Assert.Single(result.Error.FieldErrors!).Field);
+        AssertNothingWritten();
+    }
+
+    [Fact]
+    public async Task Company_scoped_record_out_of_scope_looks_like_not_found()
+    {
+        var a = Guid.NewGuid();
+        CompanyScoped(a, isAdministrator: false, a);
+        var created = (await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default)).Value!;
+
+        // Erişim yalnızca başka bir şirkete: kaydın şirketi kapsam dışı.
+        CompanyScoped(Guid.NewGuid(), isAdministrator: false, Guid.NewGuid());
+        var read = await Pipeline().GetAsync(new RecordRef(Entity, created.Id), default);
+        var update = await Pipeline().UpdateAsync(new RecordCommand(Entity, created.Id, new JsonObject { ["text"] = "b" }), default);
+        var delete = await Pipeline().DeleteAsync(new RecordRef(Entity, created.Id), null, default);
+
+        Assert.Equal(RecordErrorCode.NotFound, read.Error!.Code);
+        Assert.Equal(RecordErrorCode.NotFound, update.Error!.Code);
+        Assert.Equal(RecordErrorCode.NotFound, delete.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Company_cannot_be_changed_on_update()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        CompanyScoped(a, isAdministrator: false, a, b);
+        var created = (await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default)).Value!;
+
+        var result = await Pipeline().UpdateAsync(
+            new RecordCommand(Entity, created.Id, new JsonObject { ["text"] = "b", ["companyId"] = b.ToString() }), default);
+
+        Assert.Equal(RecordErrorCode.ValidationFailed, result.Error!.Code);
+        Assert.Equal("companyId", Assert.Single(result.Error.FieldErrors!).Field);
+        Assert.Equal(a.ToString(), _store.Records[created.Id].Values["companyId"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Event_carries_company_id_for_scoped_record_and_null_for_shared()
+    {
+        var a = Guid.NewGuid();
+        CompanyScoped(a, isAdministrator: false, a);
+        await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default);
+        Assert.Equal(a, _outbox.Events[^1].CompanyId);
+
+        // Ortak depo: olay şirket taşımaz.
+        _store.CompanyField = null;
+        await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "b" }), default);
+        Assert.Null(_outbox.Events[^1].CompanyId);
+    }
+
+    private void CompanyScoped(Guid? active, bool isAdministrator, params Guid[] accessible)
+    {
+        _store.CompanyField = "companyId";
+        _company.Current = new CompanyContext(active, accessible.ToHashSet(), isAdministrator);
+    }
+
     private static RecordCommand Command(JsonObject values) => new(Entity, null, values);
 
     private void AddCustomField(string key, CustomFieldType type, bool required = false, string[]? options = null) =>
@@ -353,6 +479,11 @@ public class RecordPipelineTests
     private sealed class TestTenant : ITenantContextAccessor
     {
         public TenantContext? Current { get; set; }
+    }
+
+    private sealed class TestCompany : ICompanyContextAccessor
+    {
+        public CompanyContext? Current { get; set; }
     }
 
     private sealed class Gate(Func<bool> allow) : IEntitlementService, IPermissionService, IDataScopeService
@@ -388,6 +519,9 @@ public class RecordPipelineTests
         public string FeatureKey => "test.notes";
 
         public string? OwnerField => "ownerId";
+
+        /// <summary>Null: ortak depo (varsayılan). Doluysa şirket kapsamlı depo gibi davranır (ADR-0008).</summary>
+        public string? CompanyField { get; set; }
 
         public bool SupportsCustomFields => true;
 
