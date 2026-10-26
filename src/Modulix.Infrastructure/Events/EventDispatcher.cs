@@ -432,6 +432,7 @@ public sealed class EventDispatcher(
             payload,
             message.OccurredAt)
         {
+            CompanyId = message.CompanyId,
             Reason = message.Reason,
             HiddenFields = removed,
         };

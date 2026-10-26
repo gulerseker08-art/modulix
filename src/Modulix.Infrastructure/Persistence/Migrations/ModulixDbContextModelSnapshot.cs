@@ -955,6 +955,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CausationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("CorrelationId")
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");

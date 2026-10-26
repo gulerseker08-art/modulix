@@ -18,6 +18,7 @@ namespace Modulix.Core.Records;
 /// </summary>
 public sealed class RecordPipeline(
     ITenantContextAccessor tenantAccessor,
+    ICompanyContextAccessor companyAccessor,
     IRecordStoreRegistry stores,
     IEntitlementService entitlements,
     IPermissionService permissions,
@@ -62,6 +63,8 @@ public sealed class RecordPipeline(
         {
             // Kapsam sorguda uygulanır; sayfalama ve toplam sayı doğru kalır.
             Owners = store!.OwnerField is null ? null : await dataScope.GetOwnersAsync(tenant!, cancellationToken),
+            // Şirket kapsamı (ADR-0008): şirket kapsamlı depoda yalnızca erişilebilir şirketlerin kayıtları.
+            Companies = store.CompanyField is null ? null : CompanyScope(),
             Page = Math.Max(1, query.Page),
             PageSize = Math.Clamp(query.PageSize, 1, RecordQuery.MaxPageSize),
             Search = string.IsNullOrEmpty(search) ? null : search[..Math.Min(search.Length, RecordQuery.MaxSearchLength)],
@@ -125,6 +128,13 @@ public sealed class RecordPipeline(
             (values, errors) = RecordCustomFields.Prepare(custom, RecordOperation.Create, values, before: null);
         }
 
+        // Şirket kapsamı (ADR-0008): şirket kapsamlı kayıt oluşturulurken CompanyId verilmemişse aktif şirkete düşer; verilen
+        // veya düşen değer erişilebilir olmalıdır. Değeri store doğrulamadan önce yerine koyarız.
+        if (store.CompanyField is { } companyField && EnsureWritableCompany(values, companyField) is { } companyError)
+        {
+            errors.Add(companyError);
+        }
+
         errors.AddRange(store.Validate(RecordOperation.Create, values));
         if (errors.Count > 0)
         {
@@ -139,7 +149,7 @@ public sealed class RecordPipeline(
                 return OwnerOutOfScope<RecordData>(store);
             }
 
-            Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values, created.Version, command.Reason);
+            Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values, created.Version, command.Reason, CompanyIdOf(store, created.Values));
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<RecordData>.Ok(Present(created, hidden, custom));
         }
@@ -186,6 +196,12 @@ public sealed class RecordPipeline(
             (values, errors) = RecordCustomFields.Prepare(custom, RecordOperation.Update, values, before.Values);
         }
 
+        // Şirket kapsamlı kaydın şirketi güncellemeyle değiştirilemez (ADR-0008): taşıma ayrı bir komuttur.
+        if (store.CompanyField is { } companyField && ChangesCompany(before.Values, values, companyField))
+        {
+            errors.Add(new RecordFieldError(companyField, "Kaydın şirketi değiştirilemez; taşıma ayrı bir işlemdir."));
+        }
+
         errors.AddRange(store.Validate(RecordOperation.Update, values));
         if (errors.Count > 0)
         {
@@ -205,7 +221,7 @@ public sealed class RecordPipeline(
                 return OwnerOutOfScope<RecordData>(store);
             }
 
-            Record(tenant!, command.Source, updated.EntityKey, updated.Id, AuditAction.Updated, DomainEventTypes.RecordUpdated, before.Values, updated.Values, updated.Version, command.Reason);
+            Record(tenant!, command.Source, updated.EntityKey, updated.Id, AuditAction.Updated, DomainEventTypes.RecordUpdated, before.Values, updated.Values, updated.Version, command.Reason, CompanyIdOf(store, updated.Values));
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<RecordData>.Ok(Present(updated, hidden, custom));
         }
@@ -241,7 +257,7 @@ public sealed class RecordPipeline(
                 return NotFound<bool>();
             }
 
-            Record(tenant!, source, before.EntityKey, before.Id, AuditAction.Deleted, DomainEventTypes.RecordDeleted, before.Values, after: null, before.Version + 1, reason: null);
+            Record(tenant!, source, before.EntityKey, before.Id, AuditAction.Deleted, DomainEventTypes.RecordDeleted, before.Values, after: null, before.Version + 1, reason: null, CompanyIdOf(store, before.Values));
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<bool>.Ok(true);
         }
@@ -257,6 +273,12 @@ public sealed class RecordPipeline(
     /// </summary>
     private async Task<bool> InScopeAsync(TenantContext tenant, IRecordStore store, RecordData record, CancellationToken cancellationToken)
     {
+        // Şirket kapsamı (ADR-0008): şirket kapsamlı kayıt yalnızca erişilebilir şirketlerde görünür.
+        if (!InCompanyScope(store, record))
+        {
+            return false;
+        }
+
         if (store.OwnerField is not { } field || await dataScope.GetOwnersAsync(tenant, cancellationToken) is not { } owners)
         {
             return true;
@@ -268,6 +290,74 @@ public sealed class RecordPipeline(
             && Guid.TryParse(text, out var owner)
             && owners.Contains(owner);
     }
+
+    /// <summary>
+    /// Kaydın işletici şirketi bu oturumda erişilebilir mi (ADR-0008). Ortak depoda (CompanyField null) ya da süzgeç
+    /// yokken (yönetici/arka plan) her zaman doğru. Değeri olmayan şirket kapsamlı kayıt kapsam dışı sayılır.
+    /// </summary>
+    private bool InCompanyScope(IRecordStore store, RecordData record) =>
+        store.CompanyField is not { } field
+        || CompanyScope() is not { } companies
+        || (TryCompanyId(record.Values, field, out var id) && companies.Contains(id));
+
+    /// <summary>
+    /// Şirket okuma kapsamı (ADR-0008): erişilebilir şirketler. Null = süzgeç yok — bütün şirketlere erişen yönetici ya da
+    /// şirket bağlamı olmayan arka plan/sistem (tenant geneli). Boş küme = hiçbir şirkete erişim yok.
+    /// </summary>
+    private IReadOnlySet<Guid>? CompanyScope()
+    {
+        var company = companyAccessor.Current;
+        return company is null || company.IsAllCompanies ? null : company.AccessibleCompanyIds;
+    }
+
+    /// <summary>
+    /// Şirket kapsamlı kayıt oluşturulurken şirketini belirler ve denetler (ADR-0008): değer verilmemişse aktif şirkete
+    /// düşer; verilen veya düşen değer erişilebilir olmalıdır. Şirket bağlamı yoksa (arka plan/sistem) kapsam uygulanmaz.
+    /// Hata varsa alan hatası, yoksa <c>null</c>.
+    /// </summary>
+    private RecordFieldError? EnsureWritableCompany(JsonObject values, string field)
+    {
+        if (companyAccessor.Current is not { } company)
+        {
+            return null;
+        }
+
+        if (!TryCompanyId(values, field, out var requested))
+        {
+            if (company.ActiveCompanyId is not { } active)
+            {
+                return new RecordFieldError(field, "Kayıt oluşturmak için erişebileceğiniz bir şirket seçili olmalı.");
+            }
+
+            values[field] = active.ToString();
+            return null;
+        }
+
+        return company.CanAccess(requested) ? null : new RecordFieldError(field, "Bu şirkete erişiminiz yok.");
+    }
+
+    private static bool ChangesCompany(JsonObject before, JsonObject values, string field)
+    {
+        // Alan güncellemede yoksa mevcut değer korunur; değişiklik sayılmaz.
+        if (!values.TryGetPropertyValue(field, out var node))
+        {
+            return false;
+        }
+
+        return !JsonNode.DeepEquals(node, before.TryGetPropertyValue(field, out var current) ? current : null);
+    }
+
+    private static bool TryCompanyId(JsonObject values, string field, out Guid id)
+    {
+        id = Guid.Empty;
+        return values.TryGetPropertyValue(field, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            && Guid.TryParse(text, out id);
+    }
+
+    private static Guid? CompanyIdOf(IRecordStore store, JsonObject values) =>
+        store.CompanyField is { } field && TryCompanyId(values, field, out var id) ? id : null;
 
     // Özel alanı olan türde etkin alan tanımları; diğerlerinde boş (veritabanına gidilmez).
     private async Task<IReadOnlyList<Customization.CustomFieldInfo>> CustomFieldsAsync(
@@ -366,7 +456,8 @@ public sealed class RecordPipeline(
         JsonObject? before,
         JsonObject? after,
         long sequence,
-        string? reason)
+        string? reason,
+        Guid? companyId)
     {
         var cause = handling?.Event;
         if (cause is not null)
@@ -383,6 +474,7 @@ public sealed class RecordPipeline(
         outbox.Add(new DomainEvent(tenant.TenantId, eventType, entityKey, recordId, changes.DeepClone().AsObject())
         {
             Sequence = sequence,
+            CompanyId = companyId,
             UserId = tenant.UserId,
             Source = source,
             CorrelationId = correlation,

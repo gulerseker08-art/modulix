@@ -65,6 +65,14 @@ public sealed record RecordQuery(
     public IReadOnlySet<Guid>? Owners { get; init; }
 
     /// <summary>
+    /// Şirket kapsamı (ADR-0008, adım 3): doluysa yalnızca <see cref="IRecordStore.CompanyField"/> değeri bu şirketlerden
+    /// biri olan kayıtlar döner. Boş küme hiçbir kayıt döndürmez. Boru hattı doldurur (çağıranın verdiği değer yok sayılır);
+    /// null ise süzgeç yoktur (ortak depo, ya da bütün şirketlere erişen yönetici/arka plan bağlamı). Şirket kapsamlı depo
+    /// bunu <see cref="IRecordStore.CompanyField"/> üzerinden sorguda uygular.
+    /// </summary>
+    public IReadOnlySet<Guid>? Companies { get; init; }
+
+    /// <summary>
     /// Özel alan filtreleri (Y9a): özel alan anahtarı → değer. Boru hattı doğrular ve <see cref="Filters"/>'tan
     /// ("custom.anahtar" adıyla gelir) buraya taşır; depo özel alan JSON'unda eşitlikle süzer.
     /// </summary>
@@ -166,6 +174,14 @@ public interface IRecordStore
     /// <see cref="RecordQuery.Owners"/>'ı sorguda uygulamalıdır. Null ise kayıt türü kapsamdan etkilenmez.
     /// </summary>
     string? OwnerField => null;
+
+    /// <summary>
+    /// Şirket kimliği alanının adı (ADR-0008, adım 3); kayıt türü şirket kapsamlıysa (<see cref="Tenancy.ICompanyScoped"/>)
+    /// verilir, değeri bir işletici şirketin kimliğidir. Varsa boru hattının şirket kapsam adımı bu alana göre uygulanır:
+    /// okumada depo <see cref="RecordQuery.Companies"/>'i sorguda uygulamalı, yazmada boru hattı değerin erişilebilir
+    /// olduğunu doğrular ve güncellemede değişmesine izin vermez. Null ise kayıt türü ortaktır ve şirket kapsamından etkilenmez.
+    /// </summary>
+    string? CompanyField => null;
 
     /// <summary>
     /// Özel alanları saklar mı (Y9a)? Öyleyse depo <see cref="RecordFields.Custom"/> değerini (boru hattının doğrulayıp

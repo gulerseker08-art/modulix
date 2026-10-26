@@ -90,6 +90,7 @@ public sealed class OutboxMessage
         EntityKey = domainEvent.EntityKey;
         RecordId = domainEvent.RecordId;
         Sequence = domainEvent.Sequence;
+        CompanyId = domainEvent.CompanyId;
         UserId = domainEvent.UserId;
         Source = domainEvent.Source;
         CorrelationId = domainEvent.CorrelationId is { Length: > AuditLogEntry.CorrelationIdMaxLength } correlation
@@ -116,6 +117,9 @@ public sealed class OutboxMessage
 
     /// <summary>Kaydın değişiklikten sonraki sürümü; aynı kaydın olayları aboneye bu sırayla teslim edilir. Boşsa sırasız.</summary>
     public long? Sequence { get; private set; }
+
+    /// <summary>Şirket kapsamlı kaydın işletici şirketi (ADR-0008, adım 3); ortak kayıt ve kayıt dışı olayda boş.</summary>
+    public Guid? CompanyId { get; private set; }
 
     /// <summary>İşlemi yapan kişi; abonenin değişikliğinde boş (sistem).</summary>
     public Guid UserId { get; private set; }

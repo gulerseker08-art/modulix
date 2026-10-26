@@ -129,6 +129,9 @@ public sealed record DomainEvent(Guid TenantId, string EventType, string EntityK
 
     public long? Sequence { get; init; }
 
+    /// <summary>Şirket kapsamlı kaydın işletici şirketi (ADR-0008, adım 3); ortak kayıtta boş.</summary>
+    public Guid? CompanyId { get; init; }
+
     public Guid UserId { get; init; }
 
     public ExecutionSource Source { get; init; } = ExecutionSource.Api;

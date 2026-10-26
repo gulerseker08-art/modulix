@@ -64,6 +64,12 @@ public sealed record EventEnvelope(
     JsonObject Payload,
     DateTimeOffset OccurredAt)
 {
+    /// <summary>
+    /// Olayı üreten kaydın işletici şirketi (ADR-0008, adım 3); yalnızca şirket kapsamlı (<see cref="Tenancy.ICompanyScoped"/>)
+    /// kayıtlarda doludur. Ortak kayıt ve kayıt dışı olayda boş. Abone yalnızca kendi kapsamına uyan olayı işler.
+    /// </summary>
+    public Guid? CompanyId { get; init; }
+
     /// <summary>Olayın nedeni (ör. <see cref="EventReasons.Transfer"/>); çoğu olayda boş.</summary>
     public string? Reason { get; init; }
 
