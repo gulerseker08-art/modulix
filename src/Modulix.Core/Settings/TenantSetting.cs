@@ -6,6 +6,11 @@ namespace Modulix.Core.Settings;
 /// <summary>
 /// Tenant'a özel ayar (ör. "locale", "currency"). Faz 1 Core kapsamındaki "tenant ayarları"nın
 /// saklama katmanıdır ve tenant izolasyonunun ilk korunan tablosudur.
+///
+/// Şirket başına ayar (ADR-0008, adım 5): bir ayar tanımı şirket başına yapılabilir (<c>SettingDefinition.PerCompany</c>)
+/// işaretlenirse değeri şirkete göre saklanır; o zaman <see cref="CompanyId"/> ayarın ait olduğu işletici şirkettir.
+/// Tenant geneli ayarlarda <see cref="CompanyId"/> boştur. Tablo yine ortak kapsam sınıfındadır (<see cref="ICompanyShared"/>):
+/// şirket boyutu RLS ile değil, ayar servisinde aktif şirkete göre çözülür.
 /// </summary>
 public sealed partial class TenantSetting : ITenantEntity, ICompanyShared
 {
@@ -17,11 +22,12 @@ public sealed partial class TenantSetting : ITenantEntity, ICompanyShared
         // EF Core için
     }
 
-    public TenantSetting(string key, string value)
+    public TenantSetting(string key, string value, Guid? companyId = null)
     {
         Id = Guid.CreateVersion7();
         Key = NormalizeKey(key);
         Value = ValidateValue(value);
+        CompanyId = companyId == Guid.Empty ? null : companyId;
         UpdatedAt = DateTimeOffset.UtcNow;
         Version = 1;
     }
@@ -30,6 +36,9 @@ public sealed partial class TenantSetting : ITenantEntity, ICompanyShared
 
     /// <summary>Kaydederken aktif tenant'tan atanır; uygulama kodu yazmaz.</summary>
     public Guid TenantId { get; private set; }
+
+    /// <summary>Şirket başına ayarda değerin ait olduğu işletici şirket (ADR-0008); tenant geneli ayarda boştur.</summary>
+    public Guid? CompanyId { get; private set; }
 
     public string Key { get; private set; } = string.Empty;
 

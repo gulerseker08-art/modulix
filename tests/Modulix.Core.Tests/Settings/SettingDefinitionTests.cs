@@ -65,6 +65,18 @@ public class SettingDefinitionTests
         Assert.Equal(valid, SettingRules.Validate(definition, value) is null);
     }
 
+    [Fact]
+    public void Per_company_flag_defaults_to_false_and_is_preserved_in_the_catalog()
+    {
+        // Çerçeve (ADR-0008, adım 5): bir ayar şirket başına yapılabilir işaretlenebilir; varsayılan tenant genelidir.
+        Assert.False(new SettingDefinition("sales.mode", "Mod", "Grup", SettingType.Text).PerCompany);
+
+        var catalog = ModuleCatalog.Create(new SettingsModule(
+            new SettingDefinition("sales.series", "Seri", "Grup", SettingType.Text) { PerCompany = true }));
+
+        Assert.True(catalog.FindSetting("sales.series")!.Value.Definition.PerCompany);
+    }
+
     private sealed class SettingsModule(params SettingDefinition[] settings) : IModule
     {
         public string Key => "sales";

@@ -46,12 +46,16 @@ internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time
             .AnyAsync(cancellationToken);
 
         // Şirketler RLS altındadır: sorgu yalnızca aktif tenant'ın şirketlerini döndürür. Yönetici hepsini; diğerleri yalnızca
-        // görevlendirildikleri şirketleri görür.
+        // görevlendirildikleri şirketleri görür. Geçici vekâlet (ADR-0008, adım 5): yalnızca o an geçerli görevler sayılır,
+        // böylece süresi dolan ya da henüz başlamamış vekâlet erişilebilir şirketlerden kendiliğinden düşer.
+        var now = time.GetUtcNow();
         IQueryable<Company> companies = isAdministrator
             ? db.Companies.AsNoTracking()
             : from company in db.Companies.AsNoTracking()
               join membershipCompany in db.MembershipCompanies.AsNoTracking() on company.Id equals membershipCompany.CompanyId
               where membershipCompany.MembershipId == membershipId
+                    && (membershipCompany.ValidFrom == null || membershipCompany.ValidFrom <= now)
+                    && (membershipCompany.ValidUntil == null || membershipCompany.ValidUntil > now)
               select company;
 
         var summaries = await companies

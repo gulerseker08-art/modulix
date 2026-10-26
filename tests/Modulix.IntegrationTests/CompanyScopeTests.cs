@@ -172,7 +172,7 @@ public class CompanyScopeTests(ModulixApiFactory factory) : IClassFixture<Moduli
         using var adminClient = factory.CreateBrowserClient();
         await LoginAsync(adminClient, admin.Email!);
         var set = await adminClient.PutAsJsonAsync(
-            $"/api/memberships/{memberMembershipId}/companies", new SetMembershipCompaniesRequest([warehouse.Id]));
+            $"/api/memberships/{memberMembershipId}/companies", new SetMembershipCompaniesRequest([new CompanyAssignment(warehouse.Id)]));
         Assert.Equal(HttpStatusCode.NoContent, set.StatusCode);
 
         using var memberClient = factory.CreateBrowserClient();
@@ -180,6 +180,138 @@ public class CompanyScopeTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var access = await GetAccessAsync(memberClient);
         var only = Assert.Single(access.Companies);
         Assert.Equal(warehouse.Id, only.Id);
+    }
+
+    [Fact]
+    public async Task Expired_delegation_is_not_accessible()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.CreateCompanyAsync(tenant.Id, "Ana Şirket", isDefault: true);
+        var delegated = await factory.CreateCompanyAsync(tenant.Id, "Vekâlet A.Ş.");
+        var user = await factory.CreateUserAsync(tenant);
+        var membershipId = await factory.GetMembershipIdAsync(user.Id, tenant.Id);
+        // Dün sona ermiş vekâlet: erişim kendiliğinden kapanmış olmalı (ADR-0008, adım 5).
+        await factory.AssignCompanyAsync(tenant.Id, membershipId, delegated.Id, validUntil: DateTimeOffset.UtcNow.AddDays(-1));
+        using var client = factory.CreateBrowserClient();
+        await LoginAsync(client, user.Email!);
+
+        var access = await GetAccessAsync(client);
+
+        Assert.Empty(access.Companies);
+        Assert.Null(access.ActiveCompanyId);
+    }
+
+    [Fact]
+    public async Task Future_delegation_is_not_yet_accessible()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.CreateCompanyAsync(tenant.Id, "Ana Şirket", isDefault: true);
+        var delegated = await factory.CreateCompanyAsync(tenant.Id, "Vekâlet A.Ş.");
+        var user = await factory.CreateUserAsync(tenant);
+        var membershipId = await factory.GetMembershipIdAsync(user.Id, tenant.Id);
+        // Yarın başlayan vekâlet henüz görünmemeli.
+        await factory.AssignCompanyAsync(tenant.Id, membershipId, delegated.Id, validFrom: DateTimeOffset.UtcNow.AddDays(1));
+        using var client = factory.CreateBrowserClient();
+        await LoginAsync(client, user.Email!);
+
+        Assert.Empty((await GetAccessAsync(client)).Companies);
+    }
+
+    [Fact]
+    public async Task Active_delegation_is_accessible()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.CreateCompanyAsync(tenant.Id, "Ana Şirket", isDefault: true);
+        var delegated = await factory.CreateCompanyAsync(tenant.Id, "Vekâlet A.Ş.");
+        var user = await factory.CreateUserAsync(tenant);
+        var membershipId = await factory.GetMembershipIdAsync(user.Id, tenant.Id);
+        // Yarına kadar geçerli vekâlet: bugün erişilebilir.
+        await factory.AssignCompanyAsync(tenant.Id, membershipId, delegated.Id, validUntil: DateTimeOffset.UtcNow.AddDays(1));
+        using var client = factory.CreateBrowserClient();
+        await LoginAsync(client, user.Email!);
+
+        var access = await GetAccessAsync(client);
+
+        var only = Assert.Single(access.Companies);
+        Assert.Equal(delegated.Id, only.Id);
+        Assert.Equal(delegated.Id, access.ActiveCompanyId);
+    }
+
+    [Fact]
+    public async Task Delegation_with_past_expiry_is_rejected_by_api()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.CreateCompanyAsync(tenant.Id, "Ana Şirket", isDefault: true);
+        var delegated = await factory.CreateCompanyAsync(tenant.Id, "Vekâlet A.Ş.");
+        var admin = await factory.CreateUserAsync(tenant);
+        await factory.MakeAdministratorAsync(tenant.Id, admin);
+        var member = await factory.CreateUserAsync(tenant);
+        var memberMembershipId = await factory.GetMembershipIdAsync(member.Id, tenant.Id);
+        using var client = factory.CreateBrowserClient();
+        await LoginAsync(client, admin.Email!);
+
+        var rejected = await client.PutAsJsonAsync(
+            $"/api/memberships/{memberMembershipId}/companies",
+            new SetMembershipCompaniesRequest([new CompanyAssignment(delegated.Id, ValidUntil: DateTimeOffset.UtcNow.AddDays(-1))]));
+
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+    }
+
+    [Fact]
+    public async Task Branch_management_requires_permission()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        var company = await factory.CreateCompanyAsync(tenant.Id, "Ana Şirket", isDefault: true);
+        var user = await factory.CreateUserAsync(tenant);
+        using var client = factory.CreateBrowserClient();
+        await LoginAsync(client, user.Email!);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"/api/companies/{company.Id}/branches")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Branches_are_created_and_listed_under_their_company()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        var company = await factory.CreateCompanyAsync(tenant.Id, "Ana Şirket", isDefault: true);
+        var user = await factory.CreateUserAsync(tenant);
+        await factory.MakeAdministratorAsync(tenant.Id, user);
+        using var client = factory.CreateBrowserClient();
+        await LoginAsync(client, user.Email!);
+
+        var created = await client.PostAsJsonAsync($"/api/companies/{company.Id}/branches", new SaveBranchRequest("Merkez Şube"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        var duplicate = await client.PostAsJsonAsync($"/api/companies/{company.Id}/branches", new SaveBranchRequest("Merkez Şube"));
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+
+        var branches = (await client.GetFromJsonAsync<List<BranchDto>>($"/api/companies/{company.Id}/branches"))!;
+        var only = Assert.Single(branches);
+        Assert.Equal("Merkez Şube", only.Name);
+        Assert.Equal(company.Id, only.CompanyId);
+    }
+
+    [Fact]
+    public async Task Default_branch_must_belong_to_the_assigned_company()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.CreateCompanyAsync(tenant.Id, "Ana Şirket", isDefault: true);
+        var warehouse = await factory.CreateCompanyAsync(tenant.Id, "Depo A.Ş.");
+        var logistics = await factory.CreateCompanyAsync(tenant.Id, "Lojistik A.Ş.");
+        // Şube lojistik şirketine ait, görev ise depo şirketine veriliyor.
+        var foreignBranch = await factory.CreateBranchAsync(tenant.Id, logistics.Id, "Lojistik Merkez");
+        var admin = await factory.CreateUserAsync(tenant);
+        await factory.MakeAdministratorAsync(tenant.Id, admin);
+        var member = await factory.CreateUserAsync(tenant);
+        var memberMembershipId = await factory.GetMembershipIdAsync(member.Id, tenant.Id);
+        using var client = factory.CreateBrowserClient();
+        await LoginAsync(client, admin.Email!);
+
+        var rejected = await client.PutAsJsonAsync(
+            $"/api/memberships/{memberMembershipId}/companies",
+            new SetMembershipCompaniesRequest([new CompanyAssignment(warehouse.Id, BranchId: foreignBranch.Id)]));
+
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
     }
 
     private static async Task LoginAsync(HttpClient client, string email, bool autoSelected = true)

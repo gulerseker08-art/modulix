@@ -18,7 +18,8 @@ namespace Modulix.Infrastructure.Organization;
 internal sealed class CompanyAdministration(
     ModulixDbContext db,
     ITenantContextAccessor tenantAccessor,
-    IAuditWriter audit) : ICompanyAdministration
+    IAuditWriter audit,
+    TimeProvider time) : ICompanyAdministration
 {
     public async Task<IReadOnlyList<CompanySummary>> ListAsync(CancellationToken cancellationToken) =>
         await db.Companies.AsNoTracking()
@@ -61,7 +62,7 @@ internal sealed class CompanyAdministration(
         return ToSummary(company);
     }
 
-    public async Task<IReadOnlyList<Guid>?> GetMembershipCompaniesAsync(Guid membershipId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<MembershipCompanyAssignment>?> GetMembershipCompaniesAsync(Guid membershipId, CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
         if (!await MembershipBelongsToTenantAsync(membershipId, tenant.TenantId, cancellationToken))
@@ -71,45 +72,109 @@ internal sealed class CompanyAdministration(
 
         return await db.MembershipCompanies.AsNoTracking()
             .Where(mc => mc.MembershipId == membershipId)
-            .Select(mc => mc.CompanyId)
+            .Select(mc => new MembershipCompanyAssignment(mc.CompanyId, mc.ValidFrom, mc.ValidUntil, mc.BranchId))
             .ToListAsync(cancellationToken);
     }
 
     public async Task<bool> SetMembershipCompaniesAsync(
-        Guid membershipId, IReadOnlyCollection<Guid> companyIds, CancellationToken cancellationToken)
+        Guid membershipId, IReadOnlyCollection<MembershipCompanyAssignment> assignments, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(companyIds);
+        ArgumentNullException.ThrowIfNull(assignments);
         var tenant = RequireTenant();
         if (!await MembershipBelongsToTenantAsync(membershipId, tenant.TenantId, cancellationToken))
         {
             return false;
         }
 
-        var wanted = companyIds.ToHashSet();
-        var found = await db.Companies.Where(c => wanted.Contains(c.Id)).Select(c => c.Id).ToListAsync(cancellationToken);
-        var missing = wanted.Except(found).ToList();
+        var wanted = new Dictionary<Guid, MembershipCompanyAssignment>();
+        foreach (var assignment in assignments)
+        {
+            if (!wanted.TryAdd(assignment.CompanyId, assignment))
+            {
+                throw new ArgumentException("Aynı şirket birden fazla kez görevlendirilemez.", nameof(assignments));
+            }
+        }
+
+        // Şirketler bu tenant'ta olmalı.
+        var found = await db.Companies.Where(c => wanted.Keys.Contains(c.Id)).Select(c => c.Id).ToListAsync(cancellationToken);
+        var missing = wanted.Keys.Except(found).ToList();
         if (missing.Count > 0)
         {
-            throw new ArgumentException($"Bu tenant'ta bulunmayan şirket: {string.Join(", ", missing)}.", nameof(companyIds));
+            throw new ArgumentException($"Bu tenant'ta bulunmayan şirket: {string.Join(", ", missing)}.", nameof(assignments));
+        }
+
+        // Seçilen varsayılan şubeler, görevlendirilen şirkete ait olmalı (şube kapsam sınırı değildir, idari bağdır).
+        var branchIds = assignments.Where(a => a.BranchId is not null).Select(a => a.BranchId!.Value).ToHashSet();
+        var branchCompanies = branchIds.Count == 0
+            ? []
+            : await db.Branches.AsNoTracking()
+                .Where(b => branchIds.Contains(b.Id))
+                .ToDictionaryAsync(b => b.Id, b => b.CompanyId, cancellationToken);
+        foreach (var assignment in assignments.Where(a => a.BranchId is not null))
+        {
+            if (!branchCompanies.TryGetValue(assignment.BranchId!.Value, out var branchCompanyId) || branchCompanyId != assignment.CompanyId)
+            {
+                throw new ArgumentException("Varsayılan şube, görevlendirilen şirkete ait olmalıdır.", nameof(assignments));
+            }
         }
 
         var current = await db.MembershipCompanies.Where(mc => mc.MembershipId == membershipId).ToListAsync(cancellationToken);
-        var currentIds = current.Select(mc => mc.CompanyId).ToHashSet();
-        if (currentIds.SetEquals(wanted))
+        var currentByCompany = current.ToDictionary(mc => mc.CompanyId);
+
+        // Denetim "önce" anlık görüntüsü değişiklikten önce alınır.
+        var before = current
+            .Select(mc => (mc.CompanyId, mc.ValidFrom, mc.ValidUntil, mc.BranchId))
+            .ToList();
+        var now = time.GetUtcNow();
+
+        var changed = false;
+        foreach (var removed in current.Where(mc => !wanted.ContainsKey(mc.CompanyId)))
+        {
+            db.MembershipCompanies.Remove(removed);
+            changed = true;
+        }
+
+        foreach (var (companyId, assignment) in wanted)
+        {
+            if (currentByCompany.TryGetValue(companyId, out var existing))
+            {
+                var validityChanged = existing.ValidFrom != assignment.ValidFrom || existing.ValidUntil != assignment.ValidUntil;
+                var branchChanged = existing.BranchId != (assignment.BranchId == Guid.Empty ? null : assignment.BranchId);
+                if (validityChanged)
+                {
+                    RejectPastExpiry(assignment.ValidUntil, now);
+                    existing.SetValidity(assignment.ValidFrom, assignment.ValidUntil);
+                }
+
+                if (branchChanged)
+                {
+                    existing.SetBranch(assignment.BranchId);
+                }
+
+                changed |= validityChanged || branchChanged;
+            }
+            else
+            {
+                RejectPastExpiry(assignment.ValidUntil, now);
+                db.MembershipCompanies.Add(
+                    new MembershipCompany(membershipId, companyId, assignment.ValidFrom, assignment.ValidUntil, assignment.BranchId));
+                changed = true;
+            }
+        }
+
+        if (!changed)
         {
             return true;
         }
 
-        db.MembershipCompanies.RemoveRange(current.Where(mc => !wanted.Contains(mc.CompanyId)));
-        foreach (var companyId in wanted.Except(currentIds))
-        {
-            db.MembershipCompanies.Add(new MembershipCompany(membershipId, companyId));
-        }
-
-        // Denetimde şirket adları gösterilir; görev değişikliği üyeliğin kaydına yazılır.
-        var names = await db.Companies.AsNoTracking()
-            .Where(c => currentIds.Contains(c.Id) || wanted.Contains(c.Id))
+        // Denetimde şirket adı, vekâlet aralığı ve varsayılan şube gösterilir; görev değişikliği üyeliğin kaydına yazılır.
+        var companyNames = await db.Companies.AsNoTracking()
+            .Where(c => currentByCompany.Keys.Contains(c.Id) || wanted.Keys.Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
+        var branchNames = await db.Branches.AsNoTracking()
+            .Where(b => branchIds.Contains(b.Id) || before.Select(x => x.BranchId).Contains(b.Id))
+            .ToDictionaryAsync(b => b.Id, b => b.Name, cancellationToken);
+
         audit.Add(new AuditEntry(
             tenant.TenantId,
             tenant.UserId,
@@ -117,13 +182,27 @@ internal sealed class CompanyAdministration(
             membershipId,
             AuditAction.Updated,
             RecordDiff.Compute(
-                new JsonObject { ["companies"] = CompanyNames(currentIds, names) },
-                new JsonObject { ["companies"] = CompanyNames(wanted, names) }),
+                new JsonObject { ["companies"] = DescribeAssignments(before, companyNames, branchNames) },
+                new JsonObject
+                {
+                    ["companies"] = DescribeAssignments(
+                        wanted.Values.Select(a => (a.CompanyId, a.ValidFrom, a.ValidUntil, a.BranchId == Guid.Empty ? null : a.BranchId)),
+                        companyNames,
+                        branchNames),
+                }),
             ExecutionSource.Api,
             Activity.Current?.TraceId.ToString()));
 
         await db.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    private static void RejectPastExpiry(DateTimeOffset? validUntil, DateTimeOffset now)
+    {
+        if (validUntil is { } until && until <= now)
+        {
+            throw new ArgumentException("Vekâletin bitişi gelecekte olmalıdır.", nameof(validUntil));
+        }
     }
 
     private TenantContext RequireTenant() =>
@@ -160,6 +239,40 @@ internal sealed class CompanyAdministration(
 
     private static CompanySummary ToSummary(Company company) => new(company.Id, company.Name, company.IsDefault);
 
-    private static JsonArray CompanyNames(IEnumerable<Guid> companyIds, IReadOnlyDictionary<Guid, string> names) =>
-        new([.. companyIds.Select(id => names.GetValueOrDefault(id, id.ToString())).Order(StringComparer.Ordinal).Select(n => JsonValue.Create(n))]);
+    // Denetim için görev açıklaması: "Depo A.Ş.", vekâlet aralığı ve varsayılan şube eklenir.
+    private static JsonArray DescribeAssignments(
+        IEnumerable<(Guid CompanyId, DateTimeOffset? ValidFrom, DateTimeOffset? ValidUntil, Guid? BranchId)> assignments,
+        IReadOnlyDictionary<Guid, string> companyNames,
+        IReadOnlyDictionary<Guid, string> branchNames) =>
+        new([.. assignments
+            .Select(a => Describe(a, companyNames, branchNames))
+            .Order(StringComparer.Ordinal)
+            .Select(text => JsonValue.Create(text))]);
+
+    private static string Describe(
+        (Guid CompanyId, DateTimeOffset? ValidFrom, DateTimeOffset? ValidUntil, Guid? BranchId) assignment,
+        IReadOnlyDictionary<Guid, string> companyNames,
+        IReadOnlyDictionary<Guid, string> branchNames)
+    {
+        var text = companyNames.GetValueOrDefault(assignment.CompanyId, assignment.CompanyId.ToString());
+        if (assignment.BranchId is { } branchId)
+        {
+            text += $" — {branchNames.GetValueOrDefault(branchId, branchId.ToString())} şubesi";
+        }
+
+        if (assignment.ValidFrom is { } from && assignment.ValidUntil is { } until)
+        {
+            text += $" ({from:dd.MM.yyyy}–{until:dd.MM.yyyy} vekâlet)";
+        }
+        else if (assignment.ValidUntil is { } onlyUntil)
+        {
+            text += $" ({onlyUntil:dd.MM.yyyy} tarihine kadar vekâlet)";
+        }
+        else if (assignment.ValidFrom is { } onlyFrom)
+        {
+            text += $" ({onlyFrom:dd.MM.yyyy} tarihinden itibaren)";
+        }
+
+        return text;
+    }
 }

@@ -14,25 +14,42 @@ internal sealed class TenantSettings(
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
     ITenantContextAccessor tenantAccessor,
+    ICompanyContextAccessor companyAccessor,
     IRecordPipeline pipeline) : ITenantSettings
 {
     public async Task<IReadOnlyList<TenantSettingValue>> GetAsync(CancellationToken cancellationToken)
     {
         var enabled = await EnabledModulesAsync(cancellationToken);
-        var stored = await db.TenantSettings.AsNoTracking().ToDictionaryAsync(s => s.Key, StringComparer.Ordinal, cancellationToken);
+        var activeCompanyId = companyAccessor.Current?.ActiveCompanyId;
+
+        // Yalnızca tenant geneli (CompanyId boş) ya da aktif şirkete ait satırlar okunur; başka şirketin değeri sızmaz (ADR-0008).
+        var rows = await db.TenantSettings.AsNoTracking()
+            .Where(s => s.CompanyId == null || s.CompanyId == activeCompanyId)
+            .ToListAsync(cancellationToken);
+        var tenantWide = rows.Where(s => s.CompanyId == null).ToDictionary(s => s.Key, StringComparer.Ordinal);
+        var perCompany = activeCompanyId is null
+            ? new Dictionary<string, TenantSetting>(StringComparer.Ordinal)
+            : rows.Where(s => s.CompanyId == activeCompanyId).ToDictionary(s => s.Key, StringComparer.Ordinal);
 
         return [.. catalog.Settings
             .Where(s => catalog.IsEnabled(s.ModuleKey, enabled))
-            .Select(s => stored.TryGetValue(s.Definition.Key, out var row)
-                ? new TenantSettingValue(s.ModuleKey, s.Definition, row.Value, row.Version)
-                : new TenantSettingValue(s.ModuleKey, s.Definition, s.Definition.DefaultValue, 0))];
+            .Select(s =>
+            {
+                var stored = s.Definition.PerCompany ? perCompany : tenantWide;
+                return stored.TryGetValue(s.Definition.Key, out var row)
+                    ? new TenantSettingValue(s.ModuleKey, s.Definition, row.Value, row.Version)
+                    : new TenantSettingValue(s.ModuleKey, s.Definition, s.Definition.DefaultValue, 0);
+            })];
     }
 
     public async Task<string> GetValueAsync(string key, CancellationToken cancellationToken)
     {
         var definition = catalog.FindSetting(key)?.Definition ?? throw new ArgumentException("Tanımlı bir ayar değil.", nameof(key));
-        return await db.TenantSettings.AsNoTracking().Where(s => s.Key == key).Select(s => s.Value).SingleOrDefaultAsync(cancellationToken)
-            ?? definition.DefaultValue;
+        var companyId = definition.PerCompany ? companyAccessor.Current?.ActiveCompanyId : null;
+        return await db.TenantSettings.AsNoTracking()
+            .Where(s => s.Key == key && s.CompanyId == companyId)
+            .Select(s => s.Value)
+            .SingleOrDefaultAsync(cancellationToken) ?? definition.DefaultValue;
     }
 
     public async Task<RecordResult<IReadOnlyList<TenantSettingValue>>> SaveAsync(
@@ -74,16 +91,22 @@ internal sealed class TenantSettings(
             return RecordResult<IReadOnlyList<TenantSettingValue>>.Ok([.. current.Values]);
         }
 
-        var ids = await db.TenantSettings.AsNoTracking()
-            .Where(s => changed.Select(c => c.Key).Contains(s.Key))
-            .ToDictionaryAsync(s => s.Key, s => s.Id, StringComparer.Ordinal, cancellationToken);
+        // Şirket başına ayarın mevcut satırı aktif şirkete, tenant geneli ayarınki CompanyId boş olana denk gelir (ADR-0008).
+        var activeCompanyId = companyAccessor.Current?.ActiveCompanyId;
+        var changedKeys = changed.Select(c => c.Key).ToList();
+        var existing = await db.TenantSettings.AsNoTracking()
+            .Where(s => changedKeys.Contains(s.Key))
+            .Select(s => new { s.Key, s.CompanyId, s.Id })
+            .ToListAsync(cancellationToken);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         foreach (var (key, write) in changed)
         {
-            var result = ids.TryGetValue(key, out var id)
+            var targetCompanyId = current[key].Definition.PerCompany ? activeCompanyId : null;
+            var id = existing.FirstOrDefault(e => e.Key == key && e.CompanyId == targetCompanyId)?.Id;
+            var result = id is { } existingId
                 ? await pipeline.UpdateAsync(
-                    new RecordCommand(TenantSettingRecordStore.Key, id, new JsonObject { ["value"] = write.Value }, write.Version), cancellationToken)
+                    new RecordCommand(TenantSettingRecordStore.Key, existingId, new JsonObject { ["value"] = write.Value }, write.Version), cancellationToken)
                 : await pipeline.CreateAsync(
                     new RecordCommand(TenantSettingRecordStore.Key, null, new JsonObject { ["key"] = key, ["value"] = write.Value }), cancellationToken);
             if (!result.IsSuccess)

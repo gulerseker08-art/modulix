@@ -150,13 +150,25 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         }
     }
 
-    /// <summary>Üyeliğe bir işletici şirket görevi verir (ADR-0008).</summary>
-    public async Task AssignCompanyAsync(Guid tenantId, Guid membershipId, Guid companyId)
+    /// <summary>Üyeliğe bir işletici şirket görevi verir (ADR-0008); geçici vekâlet için tarih, varsayılan şube verilebilir.</summary>
+    public async Task AssignCompanyAsync(
+        Guid tenantId, Guid membershipId, Guid companyId, DateTimeOffset? validFrom = null, DateTimeOffset? validUntil = null, Guid? branchId = null)
     {
         using var scope = OpenScope(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-        db.MembershipCompanies.Add(new MembershipCompany(membershipId, companyId));
+        db.MembershipCompanies.Add(new MembershipCompany(membershipId, companyId, validFrom, validUntil, branchId));
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>Şirkete bir şube ekler (ADR-0008).</summary>
+    public async Task<Branch> CreateBranchAsync(Guid tenantId, Guid companyId, string? name = null)
+    {
+        using var scope = OpenScope(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var branch = new Branch(companyId, name ?? $"Şube {Guid.NewGuid():N}"[..24]);
+        db.Branches.Add(branch);
+        await db.SaveChangesAsync();
+        return branch;
     }
 
     /// <summary>Tenant'ta rol oluşturur ve verilen kullanıcılara (üyelikleri üzerinden) atar.</summary>

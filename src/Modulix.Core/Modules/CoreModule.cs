@@ -72,6 +72,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>İşletici şirket (ADR-0008): ad ve varsayılan olup olmadığı; kaydın kimliği şirketin kimliğidir.</summary>
         public const string Company = "core.company";
+
+        /// <summary>Şube (ADR-0008): ad ve bağlı olduğu şirket; kaydın kimliği şubenin kimliğidir.</summary>
+        public const string Branch = "core.branch";
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
         public const string Audit = "core.audit";
@@ -195,6 +198,10 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.Company, "Şirket", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["isDefault"] = "Varsayılan",
+        }, "name"),
+        new(AuditedEntityKeys.Branch, "Şube", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["company"] = "Şirket",
         }, "name"),
         new(AuditedEntityKeys.Membership, "Kullanıcı", null, new Dictionary<string, string>
         {
