@@ -85,9 +85,16 @@ Erişilebilir şirketler: **yönetici** (sistem rolü) tenant'ın bütün şirke
 | --- | --- | --- |
 | `GET /api/companies` | İşletici şirketleri listeler | `core.companies.manage` |
 | `POST /api/companies`, `PUT /api/companies/{id}` | Şirket ekler, yeniden adlandırır (varsayılan şirket silinmez/kapatılmaz) | `core.companies.manage` |
-| `GET`/`PUT /api/memberships/{id}/companies` | Bir üyeliğin şirket görevleri | `core.companies.manage` |
+| `GET`/`POST /api/companies/{id}/branches`, `PUT /api/companies/{id}/branches/{branchId}` | Şirketin şubelerini listeler, ekler, yeniden adlandırır | `core.companies.manage` |
+| `GET`/`PUT /api/memberships/{id}/companies` | Bir üyeliğin şirket görevleri (tarih ve varsayılan şube ile) | `core.companies.manage` |
 
-Şirket oluşturma/yeniden adlandırma ve şirket görevi değişikliği denetim kaydına yazılır.
+Şirket/şube oluşturma-yeniden adlandırma ve şirket görevi değişikliği denetim kaydına yazılır.
+
+**Geçici vekâlet (adım 5):** Bir şirket görevi `ValidFrom`/`ValidUntil` taşıyabilir (ikisi de boş = süresiz; `ValidUntil` dolu = vekâlet). Süresi dolunca erişim kendiliğinden kapanır — erişilebilir şirketler sorgusu yalnızca o an geçerli görevleri sayar; ayrı bir "doldu" denetim kaydı yazılmaz (ADR-0008 kararı birebir). Geçmişte biten vekâlet reddedilir.
+
+**Şube/lokasyon (adım 5):** Şube (`core.Branches`) idari bir birimdir; **kapsam sınırı değildir** ve hiçbir kaydı süzmez. Bir üyeliğin şirket görevi isteğe bağlı varsayılan şube taşıyabilir; şube, görevlendirilen şirkete ait olmalıdır.
+
+**Şirket başına ayar (adım 5):** Bir ayar tanımı `SettingDefinition.PerCompany` ile şirket başına yapılabilir işaretlenebilir; o zaman değeri aktif işletici şirkete göre saklanır/çözülür (tenant geneli ayarlar eskisi gibi çalışır). Çerçeve kuruldu; ayarın kendisi (numaralama, para birimi, takvim, belge şablonu) ilgili modülün işidir, çekirdek henüz hiçbir ayarı `PerCompany` yapmaz.
 
 **Kayıt şirket kapsamı (adım 3):** Bir kayıt türü şirket kapsamlıysa (`IRecordStore.CompanyField` dolu; ör. ileride fatura, cari hareket) kayıt boru hattı şirketi de uygular: okumada yalnızca erişilebilir şirketlerin kayıtları döner (yönetici ve şirket bağlamı olmayan arka plan/sistem tenant genelini görür), kapsam dışı kayıt "bulunamadı" görünür; oluştururken `CompanyId` verilmemişse aktif şirkete düşer ve erişilebilir olmalıdır; güncelleme kaydın şirketini değiştiremez (taşıma ayrı bir işlemdir). Olay zarfı yalnızca şirket kapsamlı kaydın `CompanyId`'sini taşır (CRM'deki müşteri-firma `companyId`'si sızmaz). Şu an bütün tenant tabloları "ortak"tır; mekanizma ilk şirket kapsamlı modül (Muhasebe/Depo) geldiğinde devreye girer.
 

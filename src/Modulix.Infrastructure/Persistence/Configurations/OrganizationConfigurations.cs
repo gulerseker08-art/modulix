@@ -58,6 +58,13 @@ internal sealed class MembershipCompanyConfiguration : IEntityTypeConfiguration<
         builder.Property(mc => mc.CompanyId).IsRequired();
         builder.Property(mc => mc.CreatedAt).IsRequired();
 
+        // Geçici vekâlet (ADR-0008, adım 5): boş = süresiz görev; dolu = tarihli vekâlet.
+        builder.Property(mc => mc.ValidFrom);
+        builder.Property(mc => mc.ValidUntil);
+
+        // Görevin idari varsayılan şubesi (ADR-0008, adım 5): boş = şube yok. Kapsam sınırı değildir.
+        builder.Property(mc => mc.BranchId);
+
         // Aynı üyeliğe aynı şirket iki kez verilmez; erişilebilir şirket sorgusu bu üyelik üzerinden çalışır.
         builder.HasIndex(mc => new { mc.MembershipId, mc.CompanyId }).IsUnique();
         builder.HasIndex(mc => mc.CompanyId);
@@ -67,6 +74,13 @@ internal sealed class MembershipCompanyConfiguration : IEntityTypeConfiguration<
             .WithMany()
             .HasForeignKey(mc => new { mc.TenantId, mc.CompanyId })
             .HasPrincipalKey(c => new { c.TenantId, c.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Varsayılan şube yabancı anahtarı (basit): şubenin aynı şirkete ait olduğu servis katmanında doğrulanır. Şube
+        // silinmeden önce bu görevdeki varsayılanı kaldırılır.
+        builder.HasOne<Branch>()
+            .WithMany()
+            .HasForeignKey(mc => mc.BranchId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

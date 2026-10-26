@@ -57,9 +57,14 @@ internal sealed class TenantSettingConfiguration : IEntityTypeConfiguration<Modu
         builder.Property(s => s.TenantId).IsRequired();
         builder.Property(s => s.Key).HasMaxLength(Modulix.Core.Settings.TenantSetting.KeyMaxLength).IsRequired();
         builder.Property(s => s.Value).HasMaxLength(Modulix.Core.Settings.TenantSetting.ValueMaxLength).IsRequired();
+        builder.Property(s => s.CompanyId);
         builder.Property(s => s.UpdatedAt).IsRequired();
         builder.Property(s => s.Version).IsConcurrencyToken();
-        builder.HasIndex(s => new { s.TenantId, s.Key }).IsUnique();
+
+        // Şirket başına ayar (ADR-0008, adım 5): tenant geneli ayarda (CompanyId boş) anahtar tektir; şirket başına
+        // ayarda (CompanyId dolu) anahtar şirket başına tektir. İki filtreli benzersiz index bunu ayırır.
+        builder.HasIndex(s => new { s.TenantId, s.Key }).IsUnique().HasFilter("[CompanyId] IS NULL");
+        builder.HasIndex(s => new { s.TenantId, s.CompanyId, s.Key }).IsUnique().HasFilter("[CompanyId] IS NOT NULL");
     }
 }
 

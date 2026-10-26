@@ -216,4 +216,11 @@ public sealed record SettingDefinition(string Key, string DisplayName, string Gr
     public string? Pattern { get; init; }
 
     public string? PatternMessage { get; init; }
+
+    /// <summary>
+    /// Ayarın değeri şirket başına mı tutulur (ADR-0008, adım 5)? <c>true</c> ise değer aktif işletici şirkete göre
+    /// saklanır ve çözülür (numaralama, belge şablonu gibi). <c>false</c> (varsayılan) ise tenant genelidir. Ayarın kendisi
+    /// (ne olduğu, nasıl doğrulandığı) ilgili modülün işidir; buradaki yalnızca ayarın "yeri"dir.
+    /// </summary>
+    public bool PerCompany { get; init; }
 }

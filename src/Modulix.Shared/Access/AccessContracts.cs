@@ -37,8 +37,25 @@ public sealed record OperatingCompanyDto(Guid Id, string Name, bool IsDefault);
 /// <summary>İşletici şirket oluşturma veya yeniden adlandırma isteği (ADR-0008); CRM müşteri firmasından (Taraf) ayrıdır.</summary>
 public sealed record SaveOperatingCompanyRequest(string Name);
 
-/// <summary>Üyeliğin şirket görevlerini verilen kümeye eşitler (ADR-0008).</summary>
-public sealed record SetMembershipCompaniesRequest(IReadOnlyList<Guid> CompanyIds);
+/// <summary>
+/// Bir üyeliğin bir şirkete görevi (ADR-0008, adım 5). <see cref="ValidFrom"/>/<see cref="ValidUntil"/> boşsa süresiz
+/// kalıcı görev; <see cref="ValidUntil"/> dolu ise geçici vekâlettir ve o ana gelince erişim kendiliğinden kapanır.
+/// <see cref="BranchId"/>: görevin idari varsayılan şubesi (kapsam sınırı değildir); boş olabilir.
+/// </summary>
+public sealed record CompanyAssignment(
+    Guid CompanyId,
+    DateTimeOffset? ValidFrom = null,
+    DateTimeOffset? ValidUntil = null,
+    Guid? BranchId = null);
+
+/// <summary>Üyeliğin şirket görevlerini verilen kümeye eşitler (ADR-0008); her görev tarih ve varsayılan şube taşıyabilir.</summary>
+public sealed record SetMembershipCompaniesRequest(IReadOnlyList<CompanyAssignment> Assignments);
+
+/// <summary>Bir işletici şirketin şubesi (ADR-0008); idari birimdir, kapsam sınırı değildir.</summary>
+public sealed record BranchDto(Guid Id, Guid CompanyId, string Name);
+
+/// <summary>Şube oluşturma veya yeniden adlandırma isteği (ADR-0008).</summary>
+public sealed record SaveBranchRequest(string Name);
 
 /// <summary>
 /// Rolün kayıt kapsamı (Y8): izinler "hangi tür kaydı", kapsam "hangi kayıtları" söyler. Sorumlusu olan kayıtlara

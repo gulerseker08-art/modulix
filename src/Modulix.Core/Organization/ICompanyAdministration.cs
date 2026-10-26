@@ -8,6 +8,17 @@ namespace Modulix.Core.Organization;
 public sealed class CompanyConflictException(string message) : Exception(message);
 
 /// <summary>
+/// Bir üyeliğin bir şirkete görevi (ADR-0008, adım 5). <see cref="ValidFrom"/>/<see cref="ValidUntil"/> boşsa süresiz
+/// kalıcı görev; <see cref="ValidUntil"/> dolu ise geçici vekâlettir. <see cref="BranchId"/> görevin idari varsayılan
+/// şubesidir (kapsam sınırı değildir), boş olabilir.
+/// </summary>
+public sealed record MembershipCompanyAssignment(
+    Guid CompanyId,
+    DateTimeOffset? ValidFrom = null,
+    DateTimeOffset? ValidUntil = null,
+    Guid? BranchId = null);
+
+/// <summary>
 /// Aktif tenant'ın işletici şirketleri ve kullanıcıların şirket görevleri (ADR-0008, adım 2). Yapılandırma verisidir;
 /// kayıt boru hattından değil, bu servisten yazılır ve değişiklik aynı işlemde denetim kaydına geçer. Aktif tenant yoksa
 /// yazma işlemleri <see cref="InvalidOperationException"/> fırlatır. Aynı ad için <see cref="CompanyConflictException"/>,
@@ -24,12 +35,14 @@ public interface ICompanyAdministration
     /// <summary>Şirketi yeniden adlandırır. Şirket bulunamazsa <c>null</c>.</summary>
     Task<CompanySummary?> RenameAsync(Guid companyId, string name, CancellationToken cancellationToken);
 
-    /// <summary>Üyeliğin görevlendirildiği şirketlerin kimlikleri. Üyelik bu tenant'ta değilse <c>null</c>.</summary>
-    Task<IReadOnlyList<Guid>?> GetMembershipCompaniesAsync(Guid membershipId, CancellationToken cancellationToken);
+    /// <summary>Üyeliğin görevlendirildiği şirketler (tarih ve varsayılan şube ile). Üyelik bu tenant'ta değilse <c>null</c>.</summary>
+    Task<IReadOnlyList<MembershipCompanyAssignment>?> GetMembershipCompaniesAsync(Guid membershipId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Üyeliğin şirket görevlerini verilen kümeye eşitler. Yönetici (sistem rolü) zaten bütün şirketlere eriştiği için
-    /// görevleri kayıt bütünlüğü içindir. Üyelik bu tenant'ta değilse <c>false</c>, geçersiz şirket için <see cref="ArgumentException"/>.
+    /// Üyeliğin şirket görevlerini verilen kümeye eşitler (ekleme/çıkarma, tarih ve varsayılan şube değişikliği dahil).
+    /// Yönetici (sistem rolü) zaten bütün şirketlere eriştiği için görevleri kayıt bütünlüğü içindir. Üyelik bu tenant'ta
+    /// değilse <c>false</c>; geçersiz şirket, geçersiz vekâlet tarihi veya şirkete ait olmayan şube için <see cref="ArgumentException"/>.
     /// </summary>
-    Task<bool> SetMembershipCompaniesAsync(Guid membershipId, IReadOnlyCollection<Guid> companyIds, CancellationToken cancellationToken);
+    Task<bool> SetMembershipCompaniesAsync(
+        Guid membershipId, IReadOnlyCollection<MembershipCompanyAssignment> assignments, CancellationToken cancellationToken);
 }

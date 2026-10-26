@@ -107,15 +107,41 @@
                 }
                 else
                 {
-                    <p class="text-muted small">Kullanıcı yalnızca erişimi olan şirketlerin kayıtlarını görür. Şirket seçili değilse yalnızca ortak veriyi görür.</p>
+                    <p class="text-muted small">Kullanıcı yalnızca erişimi olan şirketlerin kayıtlarını görür. Şirket seçili değilse yalnızca ortak veriyi görür. Geçici vekâlet için bitiş tarihi girin; süresi dolunca erişim kendiliğinden kapanır.</p>
                     <div class="role-picker">
                         @foreach (var company in companies)
                         {
-                            <label class="form-check">
-                                <input class="form-check-input" type="checkbox" checked="@selectedCompanies.Contains(company.Id)"
-                                       @onchange="e => ToggleCompany(company.Id, e.Value is true)" />
-                                <span class="form-check-label">@company.Name @if (company.IsDefault) { <small class="text-muted">· varsayılan</small> }</span>
-                            </label>
+                            var state = assignments[company.Id];
+                            <div class="company-assignment">
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" checked="@state.Selected"
+                                           @onchange="e => ToggleCompany(company.Id, e.Value is true)" />
+                                    <span class="form-check-label">@company.Name @if (company.IsDefault) { <small class="text-muted">· varsayılan</small> }</span>
+                                </label>
+                                @if (state.Selected)
+                                {
+                                    <div class="company-assignment-detail">
+                                        <label class="small text-muted">
+                                            Vekâlet bitişi (boşsa süresiz)
+                                            <input type="date" class="form-control form-control-sm" value="@(state.ValidUntil?.ToString("yyyy-MM-dd"))"
+                                                   @onchange="e => SetValidUntil(company.Id, e.Value?.ToString())" />
+                                        </label>
+                                        @if (branchesByCompany.TryGetValue(company.Id, out var branches) && branches.Count > 0)
+                                        {
+                                            <label class="small text-muted">
+                                                Varsayılan şube
+                                                <select class="form-select form-select-sm" @onchange="e => SetBranch(company.Id, e.Value?.ToString())">
+                                                    <option value="">—</option>
+                                                    @foreach (var branch in branches)
+                                                    {
+                                                        <option value="@branch.Id" selected="@(state.BranchId == branch.Id)">@branch.Name</option>
+                                                    }
+                                                </select>
+                                            </label>
+                                        }
+                                    </div>
+                                }
+                            </div>
                         }
                     </div>
                     <div class="form-actions">
@@ -169,7 +195,16 @@
     private IReadOnlyList<TeamDto> teams = [];
     private HashSet<Guid> selectedTeams = [];
     private IReadOnlyList<OperatingCompanyDto> companies = [];
-    private HashSet<Guid> selectedCompanies = [];
+    private Dictionary<Guid, CompanyAssignmentState> assignments = [];
+    private Dictionary<Guid, IReadOnlyList<BranchDto>> branchesByCompany = [];
+
+    /// <summary>Ekrandaki bir şirket görevi: seçili mi, geçici vekâlet bitişi ve varsayılan şube (ADR-0008, adım 5).</summary>
+    private sealed class CompanyAssignmentState
+    {
+        public bool Selected { get; set; }
+        public DateTime? ValidUntil { get; set; }
+        public Guid? BranchId { get; set; }
+    }
     private const string TransferPath = "/transfer-records";
 
     private AccountAction? confirming;
@@ -354,27 +389,48 @@
     private async Task LoadCompaniesAsync()
     {
         companies = (await Api.GetAsync<List<OperatingCompanyDto>>("/api/companies")).Value ?? [];
-        selectedCompanies = ((await Api.GetAsync<List<Guid>>($"/api/memberships/{MembershipId}/companies")).Value ?? []).ToHashSet();
+        var current = (await Api.GetAsync<List<CompanyAssignment>>($"/api/memberships/{MembershipId}/companies")).Value ?? [];
+        var byCompany = current.ToDictionary(a => a.CompanyId);
+        assignments = companies.ToDictionary(c => c.Id, c =>
+        {
+            byCompany.TryGetValue(c.Id, out var assignment);
+            return new CompanyAssignmentState
+            {
+                Selected = assignment is not null,
+                ValidUntil = assignment?.ValidUntil?.LocalDateTime.Date,
+                BranchId = assignment?.BranchId,
+            };
+        });
+
+        branchesByCompany = [];
+        foreach (var company in companies)
+        {
+            branchesByCompany[company.Id] = (await Api.GetAsync<List<BranchDto>>($"/api/companies/{company.Id}/branches")).Value ?? [];
+        }
     }
 
-    private void ToggleCompany(Guid companyId, bool on)
-    {
-        if (on)
-        {
-            selectedCompanies.Add(companyId);
-        }
-        else
-        {
-            selectedCompanies.Remove(companyId);
-        }
-    }
+    private void ToggleCompany(Guid companyId, bool on) => assignments[companyId].Selected = on;
+
+    private void SetValidUntil(Guid companyId, string? value) =>
+        assignments[companyId].ValidUntil = DateTime.TryParse(value, out var date) ? date.Date : null;
+
+    private void SetBranch(Guid companyId, string? value) =>
+        assignments[companyId].BranchId = Guid.TryParse(value, out var branchId) ? branchId : null;
 
     private async Task SaveCompaniesAsync()
     {
         busy = true;
         notice = null;
+        var payload = assignments
+            .Where(entry => entry.Value.Selected)
+            .Select(entry => new CompanyAssignment(
+                entry.Key,
+                null,
+                entry.Value.ValidUntil is { } date ? new DateTimeOffset(date.Date, TimeZoneInfo.Local.GetUtcOffset(date.Date)) : null,
+                entry.Value.BranchId))
+            .ToList();
         var result = await Api.PutAsync<bool>(
-            $"/api/memberships/{MembershipId}/companies", new SetMembershipCompaniesRequest(selectedCompanies.ToList()));
+            $"/api/memberships/{MembershipId}/companies", new SetMembershipCompaniesRequest(payload));
         busy = false;
         if (!result.IsSuccess)
         {

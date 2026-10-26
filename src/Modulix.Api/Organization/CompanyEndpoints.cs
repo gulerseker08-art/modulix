@@ -24,6 +24,16 @@ public static class CompanyEndpoints
         companies.MapPost("/", CreateAsync);
         companies.MapPut("/{companyId:guid}", RenameAsync);
 
+        // Şubeler: idari birim (ADR-0008), kapsam sınırı değil. Şirket yönetimine (core.companies.manage) bağlıdır.
+        var branches = app.MapGroup("/api/companies/{companyId:guid}/branches")
+            .RequireAuthorization()
+            .RequirePermission(CoreModule.Permissions.ManageCompanies)
+            .WithTags("Companies");
+
+        branches.MapGet("/", ListBranchesAsync);
+        branches.MapPost("/", CreateBranchAsync);
+        branches.MapPut("/{branchId:guid}", RenameBranchAsync);
+
         // Bir üyeliğin şirket görevleri: şirket yönetimine (core.companies.manage) bağlıdır.
         var memberships = app.MapGroup("/api/memberships/{membershipId:guid}/companies")
             .RequireAuthorization()
@@ -34,6 +44,43 @@ public static class CompanyEndpoints
         memberships.MapPut("/", SetMembershipCompaniesAsync);
 
         return app;
+    }
+
+    private static async Task<IResult> ListBranchesAsync(Guid companyId, IBranchAdministration branches, CancellationToken ct) =>
+        await branches.ListAsync(companyId, ct) is { } list
+            ? Results.Ok(list.Select(b => new BranchDto(b.Id, b.CompanyId, b.Name)).ToList())
+            : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Şirket bulunamadı.");
+
+    private static async Task<IResult> CreateBranchAsync(
+        Guid companyId, SaveBranchRequest request, IBranchAdministration branches, CancellationToken ct)
+    {
+        try
+        {
+            var branch = await branches.CreateAsync(companyId, request.Name, ct);
+            return branch is null
+                ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Şirket bulunamadı.")
+                : Results.Created($"/api/companies/{companyId}/branches/{branch.Id}", new BranchDto(branch.Id, branch.CompanyId, branch.Name));
+        }
+        catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
+        {
+            return problem;
+        }
+    }
+
+    private static async Task<IResult> RenameBranchAsync(
+        Guid companyId, Guid branchId, SaveBranchRequest request, IBranchAdministration branches, CancellationToken ct)
+    {
+        try
+        {
+            var branch = await branches.RenameAsync(companyId, branchId, request.Name, ct);
+            return branch is null
+                ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Şube bulunamadı.")
+                : Results.Ok(new BranchDto(branch.Id, branch.CompanyId, branch.Name));
+        }
+        catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
+        {
+            return problem;
+        }
     }
 
     private static async Task<IResult> ListAsync(ICompanyAdministration companies, CancellationToken ct) =>
@@ -68,8 +115,8 @@ public static class CompanyEndpoints
     }
 
     private static async Task<IResult> GetMembershipCompaniesAsync(Guid membershipId, ICompanyAdministration companies, CancellationToken ct) =>
-        await companies.GetMembershipCompaniesAsync(membershipId, ct) is { } ids
-            ? Results.Ok(ids)
+        await companies.GetMembershipCompaniesAsync(membershipId, ct) is { } assignments
+            ? Results.Ok(assignments.Select(a => new CompanyAssignment(a.CompanyId, a.ValidFrom, a.ValidUntil, a.BranchId)).ToList())
             : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Kullanıcı bulunamadı.");
 
     private static async Task<IResult> SetMembershipCompaniesAsync(
@@ -77,7 +124,10 @@ public static class CompanyEndpoints
     {
         try
         {
-            return await companies.SetMembershipCompaniesAsync(membershipId, request.CompanyIds ?? [], ct)
+            var assignments = (request.Assignments ?? [])
+                .Select(a => new MembershipCompanyAssignment(a.CompanyId, a.ValidFrom, a.ValidUntil, a.BranchId))
+                .ToList();
+            return await companies.SetMembershipCompaniesAsync(membershipId, assignments, ct)
                 ? Results.NoContent()
                 : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Kullanıcı bulunamadı.");
         }

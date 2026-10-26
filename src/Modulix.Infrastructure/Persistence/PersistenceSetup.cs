@@ -66,6 +66,7 @@ public static class PersistenceSetup
         services.AddScoped<MembershipPermissions>();
         services.AddScoped<ITeamService, TeamService>();
         services.AddScoped<ICompanyAdministration, CompanyAdministration>();
+        services.AddScoped<IBranchAdministration, BranchAdministration>();
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());
         services.AddScoped<ICustomFieldProvider>(sp => sp.GetRequiredService<CustomFieldService>());

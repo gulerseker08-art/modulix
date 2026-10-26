@@ -15,7 +15,11 @@ namespace Modulix.Infrastructure.Records;
 /// Yalnızca modüllerin tanımladığı ayarlar (Y6) ve tanıma uyan değerler yazılır; modülü kapalı ayar yazılamaz.
 /// </summary>
 internal sealed class TenantSettingRecordStore(
-    ModulixDbContext db, ModuleCatalog catalog, IModuleEntitlements entitlements, ITenantContextAccessor tenantAccessor) : IRecordStore
+    ModulixDbContext db,
+    ModuleCatalog catalog,
+    IModuleEntitlements entitlements,
+    ITenantContextAccessor tenantAccessor,
+    ICompanyContextAccessor companyAccessor) : IRecordStore
 {
     public const string Key = "core.tenant-setting";
 
@@ -96,10 +100,25 @@ internal sealed class TenantSettingRecordStore(
     public async Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken)
     {
         var key = ReadString(values, KeyField)!;
-        await EnsureWritableAsync(key, ReadString(values, ValueField)!, cancellationToken);
-        var setting = new TenantSetting(key, ReadString(values, ValueField)!);
+        var value = ReadString(values, ValueField)!;
+        await EnsureWritableAsync(key, value, cancellationToken);
+        var setting = new TenantSetting(key, value, ResolveCompanyId(key));
         db.TenantSettings.Add(setting);
         return ToData(setting);
+    }
+
+    // Şirket başına ayarın değeri aktif şirkete yazılır (ADR-0008, adım 5); tenant geneli ayarda boştur. Şirket başına
+    // ayar için aktif şirket yoksa yazılamaz.
+    private Guid? ResolveCompanyId(string key)
+    {
+        if (catalog.FindSetting(key)?.Definition.PerCompany != true)
+        {
+            return null;
+        }
+
+        return companyAccessor.Current?.ActiveCompanyId
+            ?? throw new RecordValidationException(
+                [new RecordFieldError(KeyField, "Bu ayar şirket başına tutulur; değer yazmak için önce bir aktif şirket seçin.")]);
     }
 
     public async Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken)
