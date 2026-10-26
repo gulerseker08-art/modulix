@@ -87,7 +87,9 @@ Erişilebilir şirketler: **yönetici** (sistem rolü) tenant'ın bütün şirke
 | `POST /api/companies`, `PUT /api/companies/{id}` | Şirket ekler, yeniden adlandırır (varsayılan şirket silinmez/kapatılmaz) | `core.companies.manage` |
 | `GET`/`PUT /api/memberships/{id}/companies` | Bir üyeliğin şirket görevleri | `core.companies.manage` |
 
-Şirket oluşturma/yeniden adlandırma ve şirket görevi değişikliği denetim kaydına yazılır. Bu sürümde şirket süzgeci yalnızca erişim listesindedir; kayıtların şirkete göre süzülmesi (adım 3) henüz yoktur, bütün tenant tabloları "ortak"tır.
+Şirket oluşturma/yeniden adlandırma ve şirket görevi değişikliği denetim kaydına yazılır.
+
+**Kayıt şirket kapsamı (adım 3):** Bir kayıt türü şirket kapsamlıysa (`IRecordStore.CompanyField` dolu; ör. ileride fatura, cari hareket) kayıt boru hattı şirketi de uygular: okumada yalnızca erişilebilir şirketlerin kayıtları döner (yönetici ve şirket bağlamı olmayan arka plan/sistem tenant genelini görür), kapsam dışı kayıt "bulunamadı" görünür; oluştururken `CompanyId` verilmemişse aktif şirkete düşer ve erişilebilir olmalıdır; güncelleme kaydın şirketini değiştiremez (taşıma ayrı bir işlemdir). Olay zarfı yalnızca şirket kapsamlı kaydın `CompanyId`'sini taşır (CRM'deki müşteri-firma `companyId`'si sızmaz). Şu an bütün tenant tabloları "ortak"tır; mekanizma ilk şirket kapsamlı modül (Muhasebe/Depo) geldiğinde devreye girer.
 
 **Örnek kullanıcılar** (yalnızca geliştirme, `scripts\db-up.ps1` oluşturur; şifre `Modulix.Demo1`):
 
@@ -359,7 +361,7 @@ dotnet run --project src/Modulix.Api -- test-email ayse@acme.demo
 
 Modüller birbirinin değişikliğine ve bildirimlere olaylarla tepki verir ([ADR-0007](docs/adr/0007-olay-altyapisi.md)). Bir modül başka modülün tablosuna yazmaz; olaya abone olur ve tepkisini kendi kayıtlarında, kayıt boru hattından gösterir.
 
-- **Outbox:** kayıt boru hattı her oluşturma, güncelleme ve silmede `platform.OutboxMessages`'a bir olay yazar; kayıt, denetim kaydı ve olay aynı işlemdedir (işlem geri alınırsa olay da yoktur). Olay türleri `RecordCreated`, `RecordUpdated`, `RecordDeleted` (`DomainEventTypes`, sürüm 1). Zarf (`EventEnvelope`, `Modulix.Core.Contracts.Events`): olay kimliği, tenant, tür ve sürüm, kayıt türü ve kimliği, sıra numarası (kaydın yeni sürümü; silmede son sürüm + 1), işlemi yapan kişi ve kaynak (denetim kaydıyla aynı), correlation (isteğin izi), causation ve derinlik (abonenin değişikliğinden doğan olayda), neden (ör. `transfer`) ve değişen alanların `{ alan: { old, new } }` farkı.
+- **Outbox:** kayıt boru hattı her oluşturma, güncelleme ve silmede `platform.OutboxMessages`'a bir olay yazar; kayıt, denetim kaydı ve olay aynı işlemdedir (işlem geri alınırsa olay da yoktur). Olay türleri `RecordCreated`, `RecordUpdated`, `RecordDeleted` (`DomainEventTypes`, sürüm 1). Zarf (`EventEnvelope`, `Modulix.Core.Contracts.Events`): olay kimliği, tenant, tür ve sürüm, kayıt türü ve kimliği, sıra numarası (kaydın yeni sürümü; silmede son sürüm + 1), işlemi yapan kişi ve kaynak (denetim kaydıyla aynı), correlation (isteğin izi), causation ve derinlik (abonenin değişikliğinden doğan olayda), neden (ör. `transfer`), şirket kapsamlı kaydın işletici şirketi `CompanyId` (ortak kayıtta boş, [ADR-0008](docs/adr/0008-sirket-ve-sube-kapsami.md)) ve değişen alanların `{ alan: { old, new } }` farkı.
 - **Abonelik:** modül `IModule.EventSubscriptions` ile bildirir, abone sınıfını `ConfigureServices`'te scoped kaydeder:
   ```csharp
   EventSubscription.For<PartyRenamedSubscriber>(
