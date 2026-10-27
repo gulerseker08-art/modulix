@@ -3,6 +3,7 @@
 }
 
 .top-row {
+    height: 4rem;
     min-height: 4rem;
 }
 
@@ -82,5 +83,6 @@
         /* Allow sidebar to scroll for tall menus */
         height: calc(100vh - 4rem);
         overflow-y: auto;
+        overflow-x: hidden;
     }
 }
