@@ -1,107 +1,90 @@
 @implements IDisposable
 @inject SessionState Session
+@inject AppNavigation Apps
+@inject NavigationManager Navigation
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">
-            <img src="img/modulix-mark.svg" alt="" width="28" height="28" />
-            <span>modulix</span>
-        </a>
-        <button title="Menü" class="navbar-toggler" @onclick="ToggleNavMenu">
+        <AppLauncher />
+        <button type="button" title="Menü" aria-label="Menü" aria-expanded="@(!collapseNavMenu ? "true" : "false")"
+                class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
     </div>
 </div>
 
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
+    <nav class="nav flex-column" aria-label="Sol menü">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Ana sayfa
+                <AppIcon Name="home" Size="18" /> Ana sayfa
             </NavLink>
         </div>
 
-        @* Menü yalnızca tenant için açık modülleri ve kullanıcının görebildiği ekranları gösterir. *@
-        @if (Session.IsModuleEnabled(CrmAccess.ModuleKey))
+        @* Sol menü yalnızca aktif modülün sayfalarını gösterir; aktif modül route'tan bulunur (yenilemede ve doğrudan bağlantıda da). *@
+        @if (activeRoot is not null)
         {
-            <div class="nav-section px-3">CRM</div>
-            @foreach (var (href, label, permission) in CrmLinks)
+            <div class="nav-section px-3">Aktif modül</div>
+            <div class="nav-module px-3">
+                <AppIcon Name="@activeRoot.Icon" Size="20" />
+                <span>@activeRoot.Name</span>
+            </div>
+            @foreach (AppDefinition app in children)
             {
-                @if (Session.Can(permission))
-                {
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="@href">
-                            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @label
-                        </NavLink>
-                    </div>
-                }
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="@app.Route" Match="@(app.ExactMatch ? NavLinkMatch.All : NavLinkMatch.Prefix)">
+                        <AppIcon Name="@app.Icon" Size="18" /> @app.Name
+                    </NavLink>
+                </div>
             }
-        }
-
-        @if (Session.CanAny(CoreAccess.AdministrationPermissions))
-        {
-            <div class="nav-section px-3">Yönetim</div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="yonetim">
-                    <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> Yönetim
-                </NavLink>
-            </div>
-        }
-
-        @* Platform yöneticisi (Y4): firmalar, modül hakları ve olay teslimleri. Firmaya üye değilse yalnızca bu bölümü görür. *@
-        @if (Session.IsPlatformAdministrator)
-        {
-            <div class="nav-section px-3">Platform</div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="platform" Match="NavLinkMatch.All">
-                    <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> Platform
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="platform/firmalar">
-                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Firmalar
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="platform/moduller">
-                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Modül hakları
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="platform/katalog">
-                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Modül kataloğu
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="platform/olaylar">
-                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Olaylar
-                </NavLink>
-            </div>
         }
     </nav>
 </div>
 
 @code {
-    private static readonly (string Href, string Label, string Permission)[] CrmLinks =
-    [
-        ("crm/firmalar", "Firmalar", CrmAccess.CompaniesRead),
-        ("crm/kisiler", "Kişiler", CrmAccess.ContactsRead),
-        ("crm/firsatlar", "Fırsatlar", CrmAccess.OpportunitiesRead),
-        ("crm/aktiviteler", "Aktiviteler", CrmAccess.ActivitiesRead),
-    ];
-
     private bool collapseNavMenu = true;
+    private AppDefinition? activeRoot;
+    private IReadOnlyList<AppDefinition> children = [];
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
-    protected override void OnInitialized() => Session.Changed += OnChanged;
+    protected override void OnInitialized()
+    {
+        Session.Changed += OnChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+        Recompute();
+    }
 
-    private void OnChanged() => InvokeAsync(StateHasChanged);
+    private void Recompute()
+    {
+        AppDefinition? active = AppNavigation.Resolve(Navigation.ToBaseRelativePath(Navigation.Uri));
+        AppDefinition? root = active is null ? null : Apps.RootOf(active);
+        bool visible = root is not null && Apps.Roots().Any(r => r.Id == root.Id);
+        activeRoot = visible ? root : null;
+        children = activeRoot is null ? [] : Apps.Children(activeRoot.Id);
+    }
+
+    private void OnChanged() =>
+        InvokeAsync(() =>
+        {
+            Recompute();
+            StateHasChanged();
+        });
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        Recompute();
+        StateHasChanged();
+    }
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
     }
 
-    public void Dispose() => Session.Changed -= OnChanged;
+    public void Dispose()
+    {
+        Session.Changed -= OnChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
 }
