@@ -30,6 +30,12 @@ ELSE
     ALTER LOGIN [modulix_migrator] WITH PASSWORD = N'$(MODULIX_MIGRATOR_PASSWORD)';
 GO
 
+-- Tenant basina ayri is veritabani (ADR-0009): migrator yeni tenant veritabanlari olusturabilmeli.
+-- dbcreator yalnizca veritabani olusturma/degistirme yetkisidir; uygulama kullanicisi (modulix_app) bu yetkiye sahip degildir.
+IF IS_SRVROLEMEMBER(N'dbcreator', N'modulix_migrator') = 0
+    ALTER SERVER ROLE [dbcreator] ADD MEMBER [modulix_migrator];
+GO
+
 USE [Modulix];
 GO
 

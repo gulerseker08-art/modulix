@@ -20,7 +20,8 @@ public static class TestEmail
             return "E-posta ayarları eksik: Email:FromAddress ve Email:Smtp:Host gerekli (README, E-posta bölümü).";
         }
 
-        var db = provider.GetRequiredService<ModulixDbContext>();
+        // E-posta kuyruğu platform veritabanındadır (ADR-0009) ve kuyruğa yazma hemen kalıcı kılınır.
+        var db = provider.GetRequiredService<PlatformDbContext>();
         provider.GetRequiredService<IEmailQueue>().Enqueue(new EmailMessage(
             to,
             "Modülix deneme e-postası",
@@ -28,12 +29,13 @@ public static class TestEmail
         {
             TextBody = "Bu bir deneme e-postasıdır. Modülix e-posta ayarları çalışıyor.",
         });
-        var queued = db.ChangeTracker.Entries<QueuedEmail>().Single().Entity;
-        await db.SaveChangesAsync();
 
         await provider.GetRequiredService<EmailDispatcher>().DispatchPendingAsync(CancellationToken.None);
 
-        var result = await db.EmailMessages.AsNoTracking().SingleAsync(e => e.Id == queued.Id);
+        var result = await db.EmailMessages.AsNoTracking()
+            .Where(e => e.ToAddress == to)
+            .OrderByDescending(e => e.CreatedAt)
+            .FirstAsync();
         return result.Status == EmailStatus.Sent
             ? $"Gönderildi: {to} ({settings.Smtp.Host}:{settings.Smtp.Port})."
             : $"Gönderilemedi ({result.Status}): {result.LastError}";

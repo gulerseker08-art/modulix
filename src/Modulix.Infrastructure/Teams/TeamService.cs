@@ -14,7 +14,8 @@ namespace Modulix.Infrastructure.Teams;
 /// Ekipler (Y8). Ekip üyeliği değişikliği ekibin kaydı olarak denetime yazılır (<c>members</c>: üye adları), böylece
 /// "kim, ne zaman, hangi ekibe eklendi" ekibin geçmişinde görünür.
 /// </summary>
-internal sealed class TeamService(ModulixDbContext db, ITenantContextAccessor tenantAccessor, IAuditWriter audit) : ITeamService
+internal sealed class TeamService(
+    ModulixDbContext db, PlatformDbContext platform, ITenantContextAccessor tenantAccessor, IAuditWriter audit) : ITeamService
 {
     public async Task<IReadOnlyList<TeamSummary>> ListAsync(CancellationToken cancellationToken)
     {
@@ -118,7 +119,7 @@ internal sealed class TeamService(ModulixDbContext db, ITenantContextAccessor te
     public async Task<IReadOnlyList<TeamSummary>?> GetMembershipTeamsAsync(Guid membershipId, CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
-        if (!await db.Memberships.AnyAsync(m => m.Id == membershipId && m.TenantId == tenant.TenantId, cancellationToken))
+        if (!await platform.Memberships.AnyAsync(m => m.Id == membershipId && m.TenantId == tenant.TenantId, cancellationToken))
         {
             return null;
         }
@@ -134,7 +135,7 @@ internal sealed class TeamService(ModulixDbContext db, ITenantContextAccessor te
     {
         ArgumentNullException.ThrowIfNull(teamIds);
         var tenant = RequireTenant();
-        if (!await db.Memberships.AnyAsync(m => m.Id == membershipId && m.TenantId == tenant.TenantId, cancellationToken))
+        if (!await platform.Memberships.AnyAsync(m => m.Id == membershipId && m.TenantId == tenant.TenantId, cancellationToken))
         {
             return false;
         }
@@ -198,8 +199,8 @@ internal sealed class TeamService(ModulixDbContext db, ITenantContextAccessor te
     {
         var tenantId = RequireTenant().TenantId;
         return await (
-            from membership in db.Memberships.AsNoTracking()
-            join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
+            from membership in platform.Memberships.AsNoTracking()
+            join user in platform.Users.AsNoTracking() on membership.UserId equals user.Id
             where membership.TenantId == tenantId && membershipIds.Contains(membership.Id)
             orderby user.DisplayName
             select new TeamMemberSummary(membership.Id, user.Id, user.DisplayName, user.Email!))
@@ -209,7 +210,7 @@ internal sealed class TeamService(ModulixDbContext db, ITenantContextAccessor te
     // Üyelikler platform tablosundadır (RLS dışı); tenant'a ait oldukları burada açıkça denetlenir.
     private async Task EnsureMembershipsAsync(TenantContext tenant, IReadOnlySet<Guid> membershipIds, CancellationToken cancellationToken)
     {
-        var found = await db.Memberships
+        var found = await platform.Memberships
             .Where(m => m.TenantId == tenant.TenantId && membershipIds.Contains(m.Id))
             .CountAsync(cancellationToken);
         if (found != membershipIds.Count)

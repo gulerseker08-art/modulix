@@ -10,6 +10,7 @@ using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Tenancy;
 using Modulix.Modules.Crm;
 
 namespace Modulix.Api.Development;
@@ -28,11 +29,12 @@ public static class DemoDataSeeder
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken = default)
     {
         using var scope = services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ModulixUser>>();
+        var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
 
-        var acme = await EnsureTenantAsync(db, "Acme Lojistik", "acme", cancellationToken);
-        var beta = await EnsureTenantAsync(db, "Beta Taşımacılık", "beta", cancellationToken);
+        var acme = await EnsureTenantAsync(db, provisioning, "Acme Lojistik", "acme", cancellationToken);
+        var beta = await EnsureTenantAsync(db, provisioning, "Beta Taşımacılık", "beta", cancellationToken);
 
         var ayse = await EnsureUserAsync(users, "ayse@acme.demo", "Ayşe Yılmaz");
         var mehmet = await EnsureUserAsync(users, "mehmet@beta.demo", "Mehmet Kaya");
@@ -68,8 +70,8 @@ public static class DemoDataSeeder
     private static async Task EnsureCrmSamplesAsync(IServiceProvider services, Tenant tenant, ModulixUser user, CancellationToken ct)
     {
         using var scope = services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-        var membershipId = await db.Memberships.Where(m => m.TenantId == tenant.Id && m.UserId == user.Id).Select(m => m.Id).SingleAsync(ct);
+        var platform = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var membershipId = await platform.Memberships.Where(m => m.TenantId == tenant.Id && m.UserId == user.Id).Select(m => m.Id).SingleAsync(ct);
         scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(tenant.Id, user.Id, membershipId);
 
         var pipeline = scope.ServiceProvider.GetRequiredService<IRecordPipeline>();
@@ -131,13 +133,14 @@ public static class DemoDataSeeder
             new TenantContext(tenant.Id, Guid.Empty, Guid.Empty);
 
         var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
-        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var tenantDb = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var platform = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
 
         var admin = await roles.EnsureSystemRoleAsync(ct);
-        await DefaultCompany.EnsureAsync(db, tenant.Name, ct);
-        await db.SaveChangesAsync(ct);
+        await DefaultCompany.EnsureAsync(tenantDb, tenant.Name, ct);
+        await tenantDb.SaveChangesAsync(ct);
 
-        var membershipIds = await db.Memberships.Where(m => m.TenantId == tenant.Id).Select(m => m.Id).ToListAsync(ct);
+        var membershipIds = await platform.Memberships.Where(m => m.TenantId == tenant.Id).Select(m => m.Id).ToListAsync(ct);
         foreach (var membershipId in membershipIds)
         {
             var assigned = await roles.GetMembershipRolesAsync(membershipId, ct) ?? [];
@@ -148,7 +151,8 @@ public static class DemoDataSeeder
         }
     }
 
-    private static async Task<Tenant> EnsureTenantAsync(ModulixDbContext db, string name, string slug, CancellationToken ct)
+    private static async Task<Tenant> EnsureTenantAsync(
+        PlatformDbContext db, ITenantProvisioningService provisioning, string name, string slug, CancellationToken ct)
     {
         var tenant = await db.Tenants.SingleOrDefaultAsync(t => t.Slug == slug, ct);
         if (tenant is null)
@@ -158,6 +162,9 @@ public static class DemoDataSeeder
             await db.SaveChangesAsync(ct);
         }
 
+        // İş veritabanını kur (ADR-0009; idempotent): zaten kuruluysa işlem yapmaz.
+        await provisioning.PrepareAsync(tenant.Id, ct);
+        await provisioning.CompleteAsync(tenant.Id, ct);
         return tenant;
     }
 
@@ -187,7 +194,7 @@ public static class DemoDataSeeder
         return user;
     }
 
-    private static async Task EnsureMembershipAsync(ModulixDbContext db, Tenant tenant, ModulixUser user, CancellationToken ct)
+    private static async Task EnsureMembershipAsync(PlatformDbContext db, Tenant tenant, ModulixUser user, CancellationToken ct)
     {
         var exists = await db.Memberships.AnyAsync(m => m.TenantId == tenant.Id && m.UserId == user.Id, ct);
         if (!exists)

@@ -295,7 +295,10 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
     /// <summary>Migration'ın veri adımını tek tenant için uygulama kullanıcısıyla çalıştırır (RLS açık).</summary>
     private async Task RunUpgradeAsync(Guid tenantId)
     {
-        var connectionString = factory.Services.GetRequiredService<IConfiguration>().GetConnectionString(PersistenceSetup.AppConnectionName);
+        // ADR-0009: roller tenant veritabanındadır; yükseltme o tenant'ın veritabanında, oturum tenant'ı yazılarak çalışır.
+        var options = factory.Services.GetRequiredService<Modulix.Infrastructure.Tenancy.PlatformDatabaseOptions>();
+        var databaseName = (await factory.TenantDatabaseNameAsync(tenantId))!;
+        var connectionString = Modulix.Infrastructure.Tenancy.TenantDatabaseNaming.ConnectionFor(options.AppConnectionString, databaseName);
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();

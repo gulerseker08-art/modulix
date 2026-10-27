@@ -21,6 +21,7 @@ using Modulix.Core.Platform;
 using Modulix.Infrastructure.Events;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Records;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Logistics;
 using Modulix.Shared.Auth;
@@ -47,6 +48,10 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
     private readonly CapturingLoggerProvider logs = new();
     private readonly WebApplicationFactory<Program> host;
 
+    // ADR-0009: outbox/teslimler tenant başına ayrı veritabanındadır. Test, kullandığı tenant'ları izler; işleyici ve
+    // veri okuma yardımcıları bu tenant'ların bağlamında (ayrı veritabanlarında) çalışır.
+    private readonly List<Guid> tenantIds = [];
+
     public EventTests(ModulixApiFactory factory)
     {
         this.factory = factory;
@@ -63,15 +68,12 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
             }));
     }
 
-    /// <summary>Önceki testlerden kalan olay ve teslimler bu testin işleyicisine karışmaz.</summary>
-    public async Task InitializeAsync()
-    {
-        using var scope = host.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-        await db.Database.ExecuteSqlRawAsync("UPDATE [platform].[OutboxMessages] SET [DispatchedAt] = SYSDATETIMEOFFSET() WHERE [DispatchedAt] IS NULL");
-        await db.Database.ExecuteSqlRawAsync(
-            "UPDATE [platform].[EventDeliveries] SET [Status] = 4, [CompletedAt] = SYSDATETIMEOFFSET() WHERE [Status] IN (1, 3)");
-    }
+    /// <summary>
+    /// ADR-0009: her test kendi tenant'ını ve ayrı iş veritabanını oluşturur; outbox ve teslimler o veritabanında
+    /// izole olduğundan önceki testlerden kalan olay bu testin işleyicisine karışmaz. Eski genel sıfırlama (tek paylaşımlı
+    /// veritabanı varsayımı) gerekmez.
+    /// </summary>
+    public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync() => await host.DisposeAsync();
 
@@ -124,8 +126,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         await DrainAsync();
 
         Assert.Empty(await TestDeliveriesAsync(company.Id));
-        using var scope = host.Services.CreateScope();
-        var message = await Db(scope).OutboxMessages.SingleAsync(o => o.RecordId == company.Id);
+        var message = await OutboxAsync(company.Id);
         Assert.NotNull(message.DispatchedAt);
     }
 
@@ -321,8 +322,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         Assert.Equal(["amount", "probability"], envelope.HiddenFields);
 
         // Outbox tam farkı saklar; süzgeç teslimde uygulanır.
-        using var scope = host.Services.CreateScope();
-        var stored = await Db(scope).OutboxMessages.SingleAsync(o => o.RecordId == opportunity.Id);
+        var stored = await OutboxAsync(opportunity.Id);
         Assert.Contains("1250000", stored.Payload);
     }
 
@@ -338,8 +338,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         var party = await SaveAsync(actor, new RecordCommand(SharedEntities.Party, null, new JsonObject { ["name"] = "Döngü" }), trigger);
         await DrainAsync();
 
-        using var scope = host.Services.CreateScope();
-        var message = await Db(scope).OutboxMessages.SingleAsync(o => o.RecordId == party.Id);
+        var message = await OutboxAsync(party.Id);
         Assert.Equal((EventHandlingScope.MaxDepth + 1, trigger.Id, "zincir"), (message.Depth, message.CausationId, message.CorrelationId));
         Assert.Equal(ExecutionSource.BackgroundJob, message.Source);
         Assert.NotNull(message.DispatchedAt);
@@ -347,7 +346,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         Assert.Empty(await DeliveriesAsync(party.Id));
 
         // Denetim kaydında kişi "sistem", kaynak arka plan işi ve abonelik görünür.
-        scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(actor.TenantId, actor.UserId, actor.MembershipId);
+        using var scope = TenantScope(actor.TenantId);
         var audit = await Db(scope).AuditLog.SingleAsync(a => a.RecordId == party.Id);
         Assert.Equal((Guid.Empty, ExecutionSource.BackgroundJob, EventTestModule.Recorder), (audit.UserId, audit.Source, audit.Subscription));
     }
@@ -524,7 +523,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         Assert.Equal("Kayıtlar size devredildi", summary.Subject);
         Assert.Contains("3 firma", summary.HtmlBody);
 
-        using var check = host.Services.CreateScope();
+        using var check = TenantScope(actor.TenantId);
         var transfers = await Db(check).OutboxMessages
             .Where(o => o.TenantId == actor.TenantId && o.Reason == EventReasons.Transfer)
             .CountAsync();
@@ -697,13 +696,13 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
     private async Task<string> EmailOfAsync(Guid userId)
     {
         using var scope = host.Services.CreateScope();
-        return await Db(scope).Users.Where(u => u.Id == userId).Select(u => u.Email!).SingleAsync();
+        return await Platform(scope).Users.Where(u => u.Id == userId).Select(u => u.Email!).SingleAsync();
     }
 
     private async Task<List<Modulix.Infrastructure.Email.QueuedEmail>> EmailsAsync(string address)
     {
         using var scope = host.Services.CreateScope();
-        return await Db(scope).EmailMessages.AsNoTracking().Where(e => e.ToAddress == address).ToListAsync();
+        return await Platform(scope).EmailMessages.AsNoTracking().Where(e => e.ToAddress == address).ToListAsync();
     }
 
     private async Task<List<Modulix.Infrastructure.Email.QueuedEmail>> AssignmentEmailsAsync(string address) =>
@@ -712,6 +711,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
     private async Task<Actor> ActorAsync(bool eventModule = true, bool administrator = false)
     {
         var tenant = await factory.CreateTenantAsync();
+        tenantIds.Add(tenant.Id);
         await SetModuleAsync(tenant.Id, CrmModule.ModuleKey, enabled: true);
         if (eventModule)
         {
@@ -763,20 +763,49 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
 
     private Task<int> CleanupAsync() => WithDispatcherAsync(d => d.CleanupAsync(CancellationToken.None));
 
-    private async Task<EventBacklog> MeasureAsync()
+    /// <summary>Tenant bağlamlı host kapsamı (ADR-0009): işleyici/veri o tenant'ın ayrı veritabanında çalışır.</summary>
+    private IServiceScope TenantScope(Guid tenantId)
     {
-        using var scope = host.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<EventDispatcher>().MeasureAsync(CancellationToken.None);
+        var scope = host.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(tenantId, Guid.Empty, Guid.Empty);
+        return scope;
     }
 
-    /// <summary>Zamanı gelmiş olay ve teslim kalmayana kadar işleyiciyi çalıştırır.</summary>
+    private async Task<EventBacklog> MeasureAsync()
+    {
+        // Herhangi bir tenant gecikmişse o backlog döner (health degraded); yoksa en son ölçülen.
+        EventBacklog? last = null;
+        foreach (var id in tenantIds.Distinct())
+        {
+            using var scope = TenantScope(id);
+            var backlog = await scope.ServiceProvider.GetRequiredService<EventDispatcher>().MeasureAsync(CancellationToken.None);
+            if (backlog.IsDispatchDelayed)
+            {
+                return backlog;
+            }
+
+            last = backlog;
+        }
+
+        return last ?? new EventBacklog(time.GetUtcNow(), null, null, 0);
+    }
+
+    /// <summary>Zamanı gelmiş olay ve teslim kalmayana kadar işleyiciyi (her tenant'ın veritabanında) çalıştırır.</summary>
     private async Task DrainAsync()
     {
         for (var i = 0; i < 50; i++)
         {
-            using var scope = host.Services.CreateScope();
-            var round = await scope.ServiceProvider.GetRequiredService<EventDispatcher>().RunOnceAsync(CancellationToken.None);
-            if (round is { Dispatched: 0, Delivered: 0 })
+            var dispatched = 0;
+            var delivered = 0;
+            foreach (var id in tenantIds.Distinct())
+            {
+                using var scope = TenantScope(id);
+                var round = await scope.ServiceProvider.GetRequiredService<EventDispatcher>().RunOnceAsync(CancellationToken.None);
+                dispatched += round.Dispatched;
+                delivered += round.Delivered;
+            }
+
+            if (dispatched == 0 && delivered == 0)
             {
                 return;
             }
@@ -785,26 +814,40 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
 
     private async Task<int> WithDispatcherAsync(Func<EventDispatcher, Task<int>> action)
     {
-        using var scope = host.Services.CreateScope();
-        return await action(scope.ServiceProvider.GetRequiredService<EventDispatcher>());
+        var total = 0;
+        foreach (var id in tenantIds.Distinct())
+        {
+            using var scope = TenantScope(id);
+            total += await action(scope.ServiceProvider.GetRequiredService<EventDispatcher>());
+        }
+
+        return total;
     }
 
-    // Platform ekranındaki "Atla" gibi; testte doğrudan.
+    // Platform ekranındaki "Atla" gibi; testte doğrudan. Kayıt hangi tenant'taysa orada güncellenir.
     private async Task SkipAsync(Guid recordId, string subscription, long? sequence = null)
     {
-        using var scope = host.Services.CreateScope();
-        await Db(scope).EventDeliveries
-            .Where(d => d.RecordId == recordId && d.Subscription == subscription && (sequence == null || d.Sequence == sequence))
-            .ExecuteUpdateAsync(set => set.SetProperty(d => d.Status, EventDeliveryStatus.Skipped));
+        foreach (var id in tenantIds.Distinct())
+        {
+            using var scope = TenantScope(id);
+            await Db(scope).EventDeliveries
+                .Where(d => d.RecordId == recordId && d.Subscription == subscription && (sequence == null || d.Sequence == sequence))
+                .ExecuteUpdateAsync(set => set.SetProperty(d => d.Status, EventDeliveryStatus.Skipped));
+        }
     }
 
     private async Task<List<EventDelivery>> DeliveriesAsync(Guid recordId, string? subscription = null)
     {
-        using var scope = host.Services.CreateScope();
-        return await Db(scope).EventDeliveries.AsNoTracking()
-            .Where(d => d.RecordId == recordId && (subscription == null || d.Subscription == subscription))
-            .OrderBy(d => d.Sequence).ThenBy(d => d.Subscription)
-            .ToListAsync();
+        var all = new List<EventDelivery>();
+        foreach (var id in tenantIds.Distinct())
+        {
+            using var scope = TenantScope(id);
+            all.AddRange(await Db(scope).EventDeliveries.AsNoTracking()
+                .Where(d => d.RecordId == recordId && (subscription == null || d.Subscription == subscription))
+                .ToListAsync());
+        }
+
+        return all.OrderBy(d => d.Sequence).ThenBy(d => d.Subscription).ToList();
     }
 
     // Test modülünün abonelikleri (çekirdeğin atama aboneliği hariç).
@@ -813,15 +856,40 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
 
     private async Task<bool> EventExistsAsync(Guid recordId)
     {
-        using var scope = host.Services.CreateScope();
-        return await Db(scope).OutboxMessages.AnyAsync(o => o.RecordId == recordId);
+        foreach (var id in tenantIds.Distinct())
+        {
+            using var scope = TenantScope(id);
+            if (await Db(scope).OutboxMessages.AnyAsync(o => o.RecordId == recordId))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Kaydın olay (outbox) iletisini, bulunduğu tenant veritabanından okur (ADR-0009).</summary>
+    private async Task<OutboxMessage> OutboxAsync(Guid recordId)
+    {
+        foreach (var id in tenantIds.Distinct())
+        {
+            using var scope = TenantScope(id);
+            if (await Db(scope).OutboxMessages.AsNoTracking().SingleOrDefaultAsync(o => o.RecordId == recordId) is { } message)
+            {
+                return message;
+            }
+        }
+
+        throw new InvalidOperationException($"Olay bulunamadı: {recordId}");
     }
 
     private async Task<int> EmailCountAsync(Guid tenantId)
     {
         using var scope = host.Services.CreateScope();
-        return await Db(scope).EmailMessages.CountAsync(e => e.TenantId == tenantId && e.ToAddress.StartsWith("ev-"));
+        return await Platform(scope).EmailMessages.CountAsync(e => e.TenantId == tenantId && e.ToAddress.StartsWith("ev-"));
     }
 
     private static ModulixDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+
+    private static PlatformDbContext Platform(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
 }

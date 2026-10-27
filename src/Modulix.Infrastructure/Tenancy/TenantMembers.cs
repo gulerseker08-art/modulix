@@ -5,7 +5,7 @@ using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.Infrastructure.Tenancy;
 
-internal sealed class TenantMembers(ModulixDbContext db, ITenantContextAccessor tenant) : ITenantMembers
+internal sealed class TenantMembers(PlatformDbContext db, ITenantContextAccessor tenant) : ITenantMembers
 {
     public async Task<IReadOnlyList<TenantMember>> ListActiveAsync(CancellationToken cancellationToken)
     {

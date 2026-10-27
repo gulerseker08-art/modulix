@@ -13,6 +13,7 @@ using Modulix.Core.Platform;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Tenancy;
 using Modulix.Infrastructure.Users;
 
 namespace Modulix.Infrastructure.Platform;
@@ -27,10 +28,11 @@ public interface ITenantScopeFactory
 }
 
 internal sealed class PlatformAdministration(
-    ModulixDbContext db,
+    PlatformDbContext db,
     ModuleCatalog catalog,
     SectorProfileCatalog profiles,
-    ITenantScopeFactory tenantScopes) : IPlatformAdministration
+    ITenantScopeFactory tenantScopes,
+    ITenantProvisioningService provisioning) : IPlatformAdministration
 {
     public const int MaxPageSize = 50;
 
@@ -97,27 +99,46 @@ internal sealed class PlatformAdministration(
             throw new ArgumentException($"Tanımsız sektör profili: '{profileKey}'.", "profile");
         }
 
+        // Yönetici alanları önceden doğrulanır (ADR-0009): platform ve tenant DB işlemleri tek atomik işlem olmadığı için
+        // geç bir doğrulama hatası yarım kurulmuş tenant bırakır. Hızlı başarısızlıkla hiçbir şey oluşturulmaz.
+        try
+        {
+            UserAdministration.ValidateEmail(creation.AdministratorEmail);
+            UserAdministration.ValidateDisplayName(creation.AdministratorName);
+        }
+        catch (ArgumentException exception) when (exception.ParamName is "email" or "displayName")
+        {
+            var field = exception.ParamName == "email" ? "administratorEmail" : "administratorName";
+            throw new ArgumentException(exception.Message.Replace($" (Parameter '{exception.ParamName}')", string.Empty), field);
+        }
+
         if (await db.Tenants.AnyAsync(t => t.Slug == tenant.Slug, cancellationToken))
         {
             throw SlugTaken(tenant.Slug);
         }
+
+        // Tenant kaydı platform DB'sinde oluşur (Pending); iş verisi değildir (ADR-0009).
+        db.Tenants.Add(tenant);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
+        {
+            throw SlugTaken(tenant.Slug);
+        }
+
+        // İş veritabanını oluştur ve migrate et (ADR-0009); kurulum tamamlanana kadar iş API'lerine erişim açılmaz.
+        await provisioning.PrepareAsync(tenant.Id, cancellationToken);
 
         await using var scope = tenantScopes.Create(new TenantContext(tenant.Id, actingUserId, Guid.Empty));
         var services = scope.ServiceProvider;
         var tenantDb = services.GetRequiredService<ModulixDbContext>();
         var roles = services.GetRequiredService<IRoleService>();
 
-        // Firma, roller, modüller, davet ve e-posta kuyruğu aynı bağlantıda, tek işlemde yazılır.
+        // Roller, varsayılan şirket, şablonlar ve denetim kaydı tenant DB'sinde tek işlemde yazılır. Modül hakları ve
+        // yönetici üyeliği platform DB'sindedir (ayrı işlem; ADR-0009).
         await using var transaction = await tenantDb.Database.BeginTransactionAsync(cancellationToken);
-        tenantDb.Tenants.Add(tenant);
-        try
-        {
-            await tenantDb.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
-        {
-            throw SlugTaken(tenant.Slug);
-        }
 
         var entitlements = services.GetRequiredService<IModuleEntitlements>();
         foreach (var module in modules)
@@ -163,6 +184,9 @@ internal sealed class PlatformAdministration(
         }
 
         await transaction.CommitAsync(cancellationToken);
+
+        // Sağlık kontrolünden sonra tenant'ı Active yap; iş API'lerine erişim bundan sonra açılır (ADR-0009).
+        await provisioning.CompleteAsync(tenant.Id, cancellationToken);
 
         var detail = await GetTenantAsync(tenant.Id, cancellationToken)
             ?? throw new InvalidOperationException("Açılan firma okunamadı.");
@@ -226,7 +250,7 @@ internal sealed class PlatformAdministration(
             throw NotFound();
         }
 
-        // Modül hakkı platform tablosundadır; denetim kaydı firma verisidir, ikisi aynı kayıtta yazılır.
+        // Modül hakkı platform DB'sinde, denetim kaydı tenant DB'sindedir (ADR-0009): ayrı veritabanları, ayrı yazılır.
         await using var scope = tenantScopes.Create(new TenantContext(tenantId, actingUserId, Guid.Empty));
         var services = scope.ServiceProvider;
         var tenantDb = services.GetRequiredService<ModulixDbContext>();
@@ -237,12 +261,13 @@ internal sealed class PlatformAdministration(
             return;
         }
 
-        var tenant = await tenantDb.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId, cancellationToken);
+        var tenant = await db.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId, cancellationToken);
         var after = enabled ? before.Append(moduleKey) : before.Where(m => m != moduleKey);
         Audit(services, tenant, actingUserId, AuditAction.Updated,
             new JsonObject { ["modules"] = ModuleList(before) },
             new JsonObject { ["modules"] = ModuleList(after) });
         await entitlements.SetEnabledAsync(tenantId, moduleKey, enabled, cancellationToken);
+        await tenantDb.SaveChangesAsync(cancellationToken); // denetim kaydını tenant DB'sine yaz
     }
 
     public Task<ProfilePlan?> PreviewProfileAsync(Guid tenantId, string profileKey, CancellationToken cancellationToken) =>
@@ -283,14 +308,8 @@ internal sealed class PlatformAdministration(
 
     private async Task ChangeAsync(Guid tenantId, Guid actingUserId, Action<Tenant> change, CancellationToken cancellationToken)
     {
-        if (!await db.Tenants.AnyAsync(t => t.Id == tenantId, cancellationToken))
-        {
-            throw NotFound();
-        }
-
-        await using var scope = tenantScopes.Create(new TenantContext(tenantId, actingUserId, Guid.Empty));
-        var tenantDb = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-        var tenant = await tenantDb.Tenants.SingleAsync(t => t.Id == tenantId, cancellationToken);
+        // Tenant kaydı platform DB'sindedir (ADR-0009); değişiklik orada, denetim kaydı tenant DB'sinde yazılır.
+        var tenant = await db.Tenants.SingleOrDefaultAsync(t => t.Id == tenantId, cancellationToken) ?? throw NotFound();
 
         var before = Snapshot(tenant);
         change(tenant);
@@ -300,8 +319,10 @@ internal sealed class PlatformAdministration(
             return;
         }
 
+        await using var scope = tenantScopes.Create(new TenantContext(tenantId, actingUserId, Guid.Empty));
         Audit(scope.ServiceProvider, tenant, actingUserId, AuditAction.Updated, before, after);
-        await tenantDb.SaveChangesAsync(cancellationToken);
+        await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().SaveChangesAsync(cancellationToken); // denetim: tenant DB
+        await db.SaveChangesAsync(cancellationToken); // tenant kaydı: platform DB
     }
 
     private async Task<PlatformTenant> SummarizeAsync(Tenant tenant, CancellationToken cancellationToken, int? administratorCount = null)
@@ -334,17 +355,31 @@ internal sealed class PlatformAdministration(
             tenant.ProfileAppliedAt);
     }
 
-    /// <summary>Yönetici rolündeki üyeler; <paramref name="tenantDb"/> firmanın bağlamında olmalıdır.</summary>
-    private static async Task<IReadOnlyList<TenantAdministrator>> ListAdministratorsAsync(ModulixDbContext tenantDb, CancellationToken cancellationToken) =>
-        await (
+    /// <summary>
+    /// Yönetici rolündeki üyeler; <paramref name="tenantDb"/> firmanın bağlamında olmalıdır. Sistem rolü atamaları tenant
+    /// DB'sinde, üyelik ve kullanıcı platform DB'sindedir (ADR-0009): iki adımda birleştirilir (cross-database join yok).
+    /// </summary>
+    private async Task<IReadOnlyList<TenantAdministrator>> ListAdministratorsAsync(ModulixDbContext tenantDb, CancellationToken cancellationToken)
+    {
+        var adminMembershipIds = await (
             from assignment in tenantDb.MembershipRoles.AsNoTracking()
             join role in tenantDb.Roles.AsNoTracking() on assignment.RoleId equals role.Id
-            join membership in tenantDb.Memberships.AsNoTracking() on assignment.MembershipId equals membership.Id
-            join user in tenantDb.Users.AsNoTracking() on membership.UserId equals user.Id
             where role.IsSystem
+            select assignment.MembershipId)
+            .ToListAsync(cancellationToken);
+        if (adminMembershipIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await (
+            from membership in db.Memberships.AsNoTracking()
+            join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
+            where adminMembershipIds.Contains(membership.Id)
             orderby user.DisplayName
             select new TenantAdministrator(membership.Id, user.DisplayName, user.Email ?? string.Empty, membership.Status))
             .ToListAsync(cancellationToken);
+    }
 
     private IReadOnlyList<string> ValidateModules(IReadOnlyCollection<string> modules)
     {

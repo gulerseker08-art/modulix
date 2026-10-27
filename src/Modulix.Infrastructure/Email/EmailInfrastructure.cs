@@ -7,7 +7,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Events;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Tenancy;
 
 namespace Modulix.Infrastructure.Email;
 
@@ -23,9 +25,9 @@ public enum EmailStatus
 }
 
 /// <summary>
-/// E-posta kuyruğu (platform.EmailMessages). İşleyici tüm tenant'ların e-postalarını göndereceği için tablo
-/// platform şemasındadır (outbox gibi); her satır varsa TenantId taşır. Platform e-postalarında
-/// (ör. şifre sıfırlama) TenantId boştur.
+/// E-posta kuyruğu (platform.EmailMessages). ADR-0009: kuyruk <b>platform veritabanındadır</b>; tek işleyici tüm
+/// tenant'ların e-postalarını gönderir ve giriş anındaki (aktif tenant olmayan) platform e-postaları da (şifre
+/// sıfırlama, kurtarma kodu) buraya yazılabilir. Her satır varsa <see cref="TenantId"/> taşır; platform e-postasında boştur.
 /// </summary>
 public sealed class QueuedEmail
 {
@@ -178,7 +180,7 @@ public sealed class QueuedEmail
     private static bool HasLineBreak(string value) => value.AsSpan().IndexOfAny('\r', '\n') >= 0;
 }
 
-internal sealed class QueuedEmailConfiguration : IEntityTypeConfiguration<QueuedEmail>
+internal sealed class QueuedEmailConfiguration : IEntityTypeConfiguration<QueuedEmail>, IPlatformConfiguration
 {
     public void Configure(EntityTypeBuilder<QueuedEmail> builder)
     {
@@ -262,10 +264,38 @@ public interface IEmailTransport
     Task SendAsync(OutgoingEmail email, CancellationToken cancellationToken);
 }
 
-internal sealed class EfEmailQueue(ModulixDbContext db, ITenantContextAccessor tenantAccessor, TimeProvider time) : IEmailQueue
+/// <summary>
+/// E-postayı platform kuyruğuna yazar (ADR-0009). Kuyruk platform veritabanındadır; gönderim ertelenir (Pending).
+/// İki durum:
+/// <list type="bullet">
+///   <item><b>Olay teslimi içinde</b> (<see cref="EventHandlingScope"/> etkin): e-posta, isteğin platform bağlamına
+///   eklenir ama <b>burada kaydedilmez</b>; dağıtıcı teslim başarıyla onaylanınca kaydeder (tam-bir-kez). Teslim
+///   iptal/yeniden denemede yazılmaz, böylece bildirim tekrarlanmaz.</item>
+///   <item><b>İstek/giriş akışında</b>: kendi kısa ömürlü platform bağlamında hemen kalıcı kılınır; aktif tenant
+///   olmasa da (şifre sıfırlama vb.) çalışır.</item>
+/// </list>
+/// </summary>
+internal sealed class EfEmailQueue(
+    PlatformDbContext platformDb,
+    PlatformDatabaseOptions platform,
+    ITenantContextAccessor tenantAccessor,
+    EventHandlingScope handling,
+    TimeProvider time) : IEmailQueue
 {
-    public void Enqueue(EmailMessage message) =>
-        db.EmailMessages.Add(new QueuedEmail(message, tenantAccessor.Current?.TenantId, time.GetUtcNow()));
+    public void Enqueue(EmailMessage message)
+    {
+        var email = new QueuedEmail(message, tenantAccessor.Current?.TenantId, time.GetUtcNow());
+        if (handling.Subscription is not null)
+        {
+            // Olay teslimiyle birlikte onaylanır: dağıtıcı başarıda bu bağlamı kaydeder, iptalde kaydetmez.
+            platformDb.EmailMessages.Add(email);
+            return;
+        }
+
+        using var db = PersistenceSetup.CreatePlatformContext(platform.AppConnectionString);
+        db.EmailMessages.Add(email);
+        db.SaveChanges();
+    }
 }
 
 /// <summary>
@@ -273,7 +303,7 @@ internal sealed class EfEmailQueue(ModulixDbContext db, ITenantContextAccessor t
 /// UPDATE ile tek bir işleyiciye alınır, böylece iki kez gönderilmez.
 /// </summary>
 public sealed class EmailDispatcher(
-    ModulixDbContext db,
+    PlatformDbContext db,
     IEmailTransport transport,
     IOptions<EmailOptions> options,
     TimeProvider time,

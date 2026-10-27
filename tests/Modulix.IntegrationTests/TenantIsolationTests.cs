@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Tenancy;
 
 namespace Modulix.IntegrationTests;
 
@@ -42,24 +43,15 @@ public class TenantIsolationTests(ModulixApiFactory factory) : IClassFixture<Mod
     }
 
     [Fact]
-    public async Task Without_active_tenant_no_tenant_rows_are_visible()
+    public async Task Without_active_tenant_no_real_database_is_reached()
     {
-        var (_, _, key) = await TwoTenantsWithSameSettingAsync();
-
-        using var scope = factory.OpenScope(tenantId: null);
-        var count = await Db(scope).TenantSettings.IgnoreQueryFilters().CountAsync(s => s.Key == key);
-
-        Assert.Equal(0, count);
-    }
-
-    [Fact]
-    public async Task Writing_without_active_tenant_is_rejected()
-    {
+        // ADR-0009: aktif tenant yoksa varsayılan iş veritabanına düşülmez; bağlam kullanılamaz nöbetçi veritabanına
+        // çözülür ve sorgu bağlanamaz (gerçek bir tenant/platform verisine erişilmez). EF, bağlantı hatasını
+        // InvalidOperationException içinde sarabildiği için herhangi bir istisna kabul edilir; önemli olan veri dönmemesi.
         using var scope = factory.OpenScope(tenantId: null);
         var db = Db(scope);
-        db.TenantSettings.Add(new TenantSetting(UniqueKey(), "x"));
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
+        var error = await Assert.ThrowsAnyAsync<Exception>(() => db.TenantSettings.AnyAsync());
+        Assert.Contains(TenantDatabaseNaming.NoActiveTenantCatalog, (error.InnerException ?? error).Message);
     }
 
     [Fact]
@@ -135,7 +127,8 @@ public class TenantIsolationTests(ModulixApiFactory factory) : IClassFixture<Mod
     [Fact]
     public async Task Application_user_cannot_disable_the_security_policy()
     {
-        using var scope = factory.OpenScope(tenantId: null);
+        var a = (await factory.CreateTenantAsync()).Id;
+        using var scope = factory.OpenScope(a);
 
         await Assert.ThrowsAsync<SqlException>(() => Db(scope).Database.ExecuteSqlRawAsync(
             $"ALTER SECURITY POLICY {TenantIsolationSql.PolicyName} WITH (STATE = OFF)"));
@@ -145,15 +138,18 @@ public class TenantIsolationTests(ModulixApiFactory factory) : IClassFixture<Mod
     public async Task Every_tenant_table_is_protected_by_row_level_security()
     {
         // Modül tabloları dahil: ITenantEntity olan her tablo politikada olmalı (migration'da TenantIsolationSql.AddTable).
-        using var scope = factory.OpenScope(tenantId: null);
+        // ADR-0009: politika her tenant veritabanındadır; belirli bir tenant DB'sinde denetlenir.
+        var tenant = await factory.CreateTenantAsync();
+        using var scope = factory.OpenScope(tenant.Id);
         var tenantTables = Db(scope).Model.GetEntityTypes()
             .Where(t => typeof(ITenantEntity).IsAssignableFrom(t.ClrType))
             .Select(t => $"{t.GetSchema()}.{t.GetTableName()}")
             .ToHashSet();
         Assert.Contains("crm.Companies", tenantTables);
 
-        var connectionString = scope.ServiceProvider.GetRequiredService<IConfiguration>()
-            .GetConnectionString(PersistenceSetup.MigrationsConnectionName);
+        var options = scope.ServiceProvider.GetRequiredService<PlatformDatabaseOptions>();
+        var databaseName = (await factory.TenantDatabaseNameAsync(tenant.Id))!;
+        var connectionString = TenantDatabaseNaming.ConnectionFor(options.MigrationsConnectionString, databaseName);
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync();
         await using var command = new SqlCommand(

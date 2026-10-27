@@ -31,30 +31,49 @@ namespace Modulix.Infrastructure.Persistence;
 
 public static class PersistenceSetup
 {
-    /// <summary>Uygulamanın bağlantısı (modulix_app): veri okur/yazar, şema değiştiremez.</summary>
+    /// <summary>Platform uygulama bağlantısı (modulix_app): veri okur/yazar, şema değiştiremez.</summary>
     public const string AppConnectionName = "Modulix";
 
-    /// <summary>Migration bağlantısı (modulix_migrator): yalnızca "migrate" komutu kullanır.</summary>
+    /// <summary>Migration bağlantısı (modulix_migrator): 'migrate'/'migrate-tenants' komutları ve provisioning kullanır.</summary>
     public const string MigrationsConnectionName = "ModulixMigrations";
 
     private const string MigrationsHistoryTable = "__EFMigrationsHistory";
 
-    public static IServiceCollection AddModulixPersistence(this IServiceCollection services, string appConnectionString)
+    /// <summary>Platform migration geçmişi (platform DB'sinde).</summary>
+    private const string PlatformHistorySchema = DatabaseSchemas.Platform;
+
+    /// <summary>Tenant migration geçmişi (her tenant DB'sinde); core şeması tenant DB'lerinde her zaman vardır.</summary>
+    private const string TenantHistorySchema = DatabaseSchemas.Core;
+
+    public static IServiceCollection AddModulixPersistence(
+        this IServiceCollection services, string platformAppConnectionString, string platformMigrationsConnectionString)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(appConnectionString);
+        ArgumentException.ThrowIfNullOrWhiteSpace(platformAppConnectionString);
+        ArgumentException.ThrowIfNullOrWhiteSpace(platformMigrationsConnectionString);
 
-        services.AddSingleton<ITenantConnectionResolver>(new SharedDatabaseConnectionResolver(appConnectionString));
+        services.AddMemoryCache();
+        services.AddSingleton(new PlatformDatabaseOptions(platformAppConnectionString, platformMigrationsConnectionString));
+        services.AddSingleton<ITenantDatabaseRegistry, TenantDatabaseRegistry>();
+        services.AddSingleton<ITenantConnectionResolver, TenantConnectionResolver>();
 
-        // Seçenekler istek başına oluşturulur; böylece oturum değerini yazan interceptor o isteğin tenant'ını görür.
+        // Platform bağlamı: sabit merkezi veritabanı (ADR-0009).
+        services.AddDbContext<PlatformDbContext>(options => options.UsePlatformSqlServer(platformAppConnectionString));
+
+        // Tenant bağlamı: bağlantı istek başına aktif tenant'tan çözülür; interceptor o isteğin tenant'ını (RLS) yazar.
         services.AddDbContext<ModulixDbContext>((serviceProvider, options) =>
         {
             var tenantAccessor = serviceProvider.GetService<ITenantContextAccessor>();
             var connectionString = serviceProvider.GetRequiredService<ITenantConnectionResolver>()
                 .GetConnectionString(tenantAccessor?.Current?.TenantId);
 
-            options.UseModulixSqlServer(connectionString)
+            options.UseTenantSqlServer(connectionString)
                 .AddInterceptors(new TenantSessionContextInterceptor(tenantAccessor));
         });
+
+        // Tenant kurulumu ve migration runner (ADR-0009).
+        services.AddScoped<ITenantProvisioningService, TenantProvisioningService>();
+        services.AddScoped<TenantMigrationRunner>();
+
         services.AddScoped<IMembershipDirectory, MembershipDirectory>();
         services.AddScoped<ITenantMembers, TenantMembers>();
         services.AddScoped<IModuleData, ModuleData>();
@@ -84,7 +103,6 @@ public static class PersistenceSetup
         services.AddScoped<UserSessions>();
         services.AddScoped<AccountSecurity>();
         services.AddScoped<TwoFactorAccounts>();
-        services.AddMemoryCache();
         services.AddScoped<RecordHandover>();
         services.AddScoped<INotificationRecipients, NotificationRecipients>();
 
@@ -99,32 +117,43 @@ public static class PersistenceSetup
         return services;
     }
 
-    /// <summary>Bekleyen migration'ları migration kullanıcısıyla uygular. Model, uygulamadaki modüllerle aynı olmalıdır.</summary>
-    public static async Task MigrateAsync(string migrationsConnectionString, ModuleCatalog modules, CancellationToken cancellationToken = default)
+    /// <summary>Platform veritabanının bekleyen migration'larını migration kullanıcısıyla uygular ('migrate' komutu).</summary>
+    public static async Task MigratePlatformAsync(string platformMigrationsConnectionString, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(migrationsConnectionString);
-
-        await using var context = CreateContext(migrationsConnectionString, modules);
+        ArgumentException.ThrowIfNullOrWhiteSpace(platformMigrationsConnectionString);
+        await using var context = CreatePlatformContext(platformMigrationsConnectionString);
         await context.Database.MigrateAsync(cancellationToken);
     }
 
+    /// <summary>Tasarım zamanı ve 'migrate' için platform bağlamı. Tenant bağlamı gerektirmez.</summary>
+    public static PlatformDbContext CreatePlatformContext(string connectionString)
+    {
+        var options = new DbContextOptionsBuilder<PlatformDbContext>();
+        options.UsePlatformSqlServer(connectionString);
+        return new PlatformDbContext(options.Options);
+    }
+
     /// <summary>
-    /// Tenant bağlamı olmayan bağlam: migration ve 'dotnet ef migrations add' (tasarım zamanı) içindir.
-    /// Tenant tablolarında satır göstermez ve yazdırmaz.
+    /// Tenant bağlamı olmayan tenant DbContext'i: tenant DB migration'ı ve 'dotnet ef migrations add' (tasarım zamanı)
+    /// içindir. Belirli bir tenant DB'sine bağlanır; tenant satır kuralları yine çalışır ama aktif tenant yoktur.
     /// </summary>
     public static ModulixDbContext CreateContext(string connectionString, ModuleCatalog modules)
     {
         ArgumentNullException.ThrowIfNull(modules);
-
         var options = new DbContextOptionsBuilder<ModulixDbContext>();
-        options.UseModulixSqlServer(connectionString);
+        options.UseTenantSqlServer(connectionString);
         return new ModulixDbContext(options.Options, tenantAccessor: null, modules);
     }
 
-    internal static DbContextOptionsBuilder UseModulixSqlServer(this DbContextOptionsBuilder builder, string connectionString) =>
+    internal static DbContextOptionsBuilder UsePlatformSqlServer(this DbContextOptionsBuilder builder, string connectionString) =>
+        builder.UseSqlServer(
+            connectionString,
+            sql => sql.MigrationsHistoryTable(MigrationsHistoryTable, PlatformHistorySchema));
+
+    internal static DbContextOptionsBuilder UseTenantSqlServer(this DbContextOptionsBuilder builder, string connectionString) =>
         builder
             .UseSqlServer(
                 connectionString,
-                sql => sql.MigrationsHistoryTable(MigrationsHistoryTable, DatabaseSchemas.Platform))
+                sql => sql.MigrationsHistoryTable(MigrationsHistoryTable, TenantHistorySchema))
             .ReplaceService<IModelCacheKeyFactory, ModuleModelCacheKeyFactory>();
 }

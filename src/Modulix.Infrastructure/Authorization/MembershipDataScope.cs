@@ -12,7 +12,8 @@ namespace Modulix.Infrastructure.Authorization;
 /// arkadaşları (kişinin ekiplerinden herhangi birindeki herkes) sorumlu olabilir. İstek başına bir kez hesaplanır
 /// (scoped); rol veya ekip değişikliği bir sonraki istekte geçerli olur. Olay abonesinin kapsamı tenant genelidir (ADR-0007).
 /// </summary>
-internal sealed class MembershipDataScope(ModulixDbContext db, MembershipPermissions permissions, EventHandlingScope handling) : IDataScopeService
+internal sealed class MembershipDataScope(
+    ModulixDbContext db, PlatformDbContext platform, MembershipPermissions permissions, EventHandlingScope handling) : IDataScopeService
 {
     private (Guid MembershipId, IReadOnlySet<Guid>? Owners)? cached;
 
@@ -31,25 +32,32 @@ internal sealed class MembershipDataScope(ModulixDbContext db, MembershipPermiss
         var owners = await permissions.GetScopeAsync(tenant.MembershipId, cancellationToken) switch
         {
             RecordScope.All => null,
-            RecordScope.Team => await TeamOwnersAsync(db, tenant.MembershipId, tenant.UserId, cancellationToken),
+            RecordScope.Team => await TeamOwnersAsync(db, platform, tenant.MembershipId, tenant.UserId, cancellationToken),
             _ => new HashSet<Guid> { tenant.UserId },
         };
         cached = (tenant.MembershipId, owners);
         return owners;
     }
 
-    /// <summary>Kişi ve kişinin ekiplerinden herhangi birindeki üyeler (kullanıcı kimlikleri).</summary>
+    /// <summary>
+    /// Kişi ve kişinin ekiplerinden herhangi birindeki üyeler (kullanıcı kimlikleri). Ekip üyelikleri tenant
+    /// DB'sindedir, üyelik–kullanıcı eşleştirmesi platform DB'sindedir (ADR-0009): iki adımda birleştirilir.
+    /// </summary>
     internal static async Task<IReadOnlySet<Guid>> TeamOwnersAsync(
-        ModulixDbContext db, Guid membershipId, Guid userId, CancellationToken cancellationToken)
+        ModulixDbContext db, PlatformDbContext platform, Guid membershipId, Guid userId, CancellationToken cancellationToken)
     {
         // Ekip üyelikleri tenant verisidir: sorgu filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür.
         var teamIds = db.TeamMembers.Where(tm => tm.MembershipId == membershipId).Select(tm => tm.TeamId);
-        var teammates = await (
-            from member in db.TeamMembers.AsNoTracking()
-            join membership in db.Memberships.AsNoTracking() on member.MembershipId equals membership.Id
-            where teamIds.Contains(member.TeamId)
-            select membership.UserId)
+        var teammateMembershipIds = await db.TeamMembers.AsNoTracking()
+            .Where(member => teamIds.Contains(member.TeamId))
+            .Select(member => member.MembershipId)
             .Distinct()
+            .ToListAsync(cancellationToken);
+
+        // Üyelik kimliklerini kullanıcı kimliklerine platform DB'sinden çöz (cross-database join yok).
+        var teammates = await platform.Memberships.AsNoTracking()
+            .Where(m => teammateMembershipIds.Contains(m.Id))
+            .Select(m => m.UserId)
             .ToListAsync(cancellationToken);
         return teammates.Append(userId).ToHashSet();
     }

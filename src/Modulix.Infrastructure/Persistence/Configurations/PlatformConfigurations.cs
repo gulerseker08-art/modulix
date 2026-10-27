@@ -5,7 +5,7 @@ using Modulix.Infrastructure.Identity;
 
 namespace Modulix.Infrastructure.Persistence.Configurations;
 
-internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
+internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>, IPlatformConfiguration
 {
     public void Configure(EntityTypeBuilder<Tenant> builder)
     {
@@ -19,10 +19,17 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.CreatedAt).IsRequired();
         builder.Property(t => t.ProfileKey).HasMaxLength(Modulix.Core.Customization.SectorProfileCatalog.KeyMaxLength);
         builder.Ignore(t => t.IsActive);
+        builder.Ignore(t => t.IsProvisioned);
+
+        // Tenant→DB defteri (ADR-0009): hangi veritabanı, kurulum durumu, şema sürümü.
+        builder.Property(t => t.DatabaseName).HasMaxLength(128);
+        builder.HasIndex(t => t.DatabaseName).IsUnique().HasFilter("[DatabaseName] IS NOT NULL");
+        builder.Property(t => t.ProvisioningStatus).IsRequired();
+        builder.Property(t => t.SchemaVersion).HasMaxLength(150);
     }
 }
 
-internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>
+internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>, IPlatformConfiguration
 {
     public void Configure(EntityTypeBuilder<Membership> builder)
     {

@@ -34,31 +34,40 @@ Betik solution'ı, 9 kaynak ve 6 test projesini oluşturur, referansları kurar,
 
 Beklenen son durum: derleme hatasız biter ve `Modulix.ArchitectureTests` içindeki tüm testler başarılı olur.
 
-## Veritabanı (Görev 2)
+## Veritabanı (Görev 2 / ADR-0009)
 
 SQL Server 2025 Developer, Docker içinde çalışır; bilgisayarınıza ayrıca SQL Server kurmanız gerekmez.
+
+Mimari: **ortak platform veritabanı + tenant başına ayrı iş veritabanı** (ADR-0009, Faz 3). İşletim ayrıntıları
+`docs/tenant-isletim.md`; geçmiş veri taşıma/cutover sözleşmesi `docs/tenant-veri-tasima.md`.
 
 | Ayar | Değer |
 | --- | --- |
 | Sunucu | `localhost,14333` (1433 değil; yerel SQL Server'ınızla çakışmasın diye) |
-| Veritabanı | `Modulix` |
+| Platform veritabanı | `Modulix` (kullanıcılar/kimlik, tenant kayıtları + tenant→DB defteri, üyelikler, modül erişimleri, oturumlar, e-posta kuyruğu) |
+| Tenant veritabanı | `modulix_tenant_<benzersiz>` (tenant başına bir tane; o tenant'ın iş verisi, Row-Level Security altında) |
 | Şemalar | `platform`, `core`, `meta`, `crm`, `logistics`, `ai` |
-| `modulix_app` | Uygulamanın kullanıcısı. Veri okur/yazar; tablo veya güvenlik politikası değiştiremez. |
-| `modulix_migrator` | Yalnızca migration komutunun kullanıcısı (db_owner). |
+| `modulix_app` | Uygulamanın kullanıcısı. Veri okur/yazar; tablo veya güvenlik politikası değiştiremez; `core.AuditLog`'u değiştiremez. |
+| `modulix_migrator` | Migration kullanıcısı (db_owner) + sunucuda `dbcreator` (yeni tenant veritabanları oluşturur). |
 | `sa` | Yönetici; SSMS ile bakmak için. |
 
-Şifreler repo kökündeki `.env` dosyasındadır. Bu dosya ilk çalıştırmada rastgele şifrelerle oluşturulur ve git'e gönderilmez. Uygulama bağlantı cümlelerini `dotnet user-secrets` üzerinden okur; kod deposunda şifre bulunmaz.
+Tenant bağlantısı aktif tenant'tan `ITenantConnectionResolver` ile çözülür (şablon bağlantının yalnızca veritabanı adı değişir); istemci veritabanı adı veya bağlantı seçemez, aktif tenant yoksa varsayılan iş veritabanına düşülmez. Yeni tenant açılışında iş veritabanı otomatik kurulur (provisioning; `Pending → Provisioning → Active`).
+
+Şifreler repo kökündeki `.env` dosyasındadır. Bu dosya ilk çalıştırmada rastgele şifrelerle oluşturulur ve git'e gönderilmez. Uygulama bağlantı cümlelerini `dotnet user-secrets` üzerinden okur (`Modulix` = app, `ModulixMigrations` = migrator); kod deposunda şifre bulunmaz.
 
 **SSMS ile bağlanmak:** Sunucu `localhost,14333`, SQL Server Authentication, kullanıcı `sa`, şifre `.env` içindeki `MSSQL_SA_PASSWORD`. Bağlantı penceresinde "Trust server certificate" seçin.
 
-**Yeni migration eklemek:**
+**Yeni migration eklemek** (iki bağlam, ADR-0009):
 
 ```powershell
-dotnet ef migrations add <Ad> --project src/Modulix.Infrastructure --startup-project src/Modulix.Api --output-dir Persistence/Migrations
+# Platform tablosu
+dotnet ef migrations add <Ad> --context PlatformDbContext --project src/Modulix.Infrastructure --startup-project src/Modulix.Api --output-dir Persistence/Migrations/Platform
+# Tenant tablosu (ayrıca RLS'e ekleyin: TenantIsolationSql.AddTable)
+dotnet ef migrations add <Ad> --context ModulixDbContext --project src/Modulix.Infrastructure --startup-project src/Modulix.Api --output-dir Persistence/Migrations/Tenant
 powershell -ExecutionPolicy Bypass -File scripts\db-up.ps1
 ```
 
-Migration'ları `dotnet ef database update` ile değil, `db-up.ps1` (içinde `dotnet run --project src/Modulix.Api -- migrate`) ile uygulayın; böylece yalnızca migration kullanıcısı şema değiştirir.
+Migration'ları `dotnet ef database update` ile değil, `db-up.ps1` ile uygulayın. `db-up.ps1` platform migration'larını (`dotnet run --project src/Modulix.Api -- migrate`) uygular; tenant iş veritabanlarını güncellemek için `dotnet run --project src/Modulix.Api -- migrate-tenants` kullanın. Böylece yalnızca migration kullanıcısı şema değiştirir.
 
 ## Giriş ve aktif tenant (Görev 4)
 

@@ -235,7 +235,7 @@ public class TwoFactorTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
     private async Task<string> LatestEmailBodyAsync(string address)
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
         return (await db.EmailMessages.AsNoTracking().Where(e => e.ToAddress == address).OrderByDescending(e => e.CreatedAt).FirstAsync()).TextBody!;
     }
 

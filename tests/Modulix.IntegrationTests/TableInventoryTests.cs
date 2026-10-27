@@ -1,25 +1,25 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Tenancy;
 
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// Ç23.2 tablo kapısı: veritabanındaki her tablo sınıflandırılmıştır. Platform şeması dışındaki her tablo tenant verisidir ve
-/// Row-Level Security altındadır (okuma filtresi, ekleme ve güncelleme engeli). Platform şemasındaki tablolar RLS dışındadır
-/// ve aşağıda gerekçesiyle listelenir. Yeni tablo bu listeye veya RLS politikasına girmeden testi geçemez; model ile
-/// migration'lar da ayrışamaz.
+/// Ç23.2 / ADR-0009 tablo kapısı: iki veritabanı türündeki her tablo sınıflandırılmıştır.
+/// Platform veritabanında yalnızca listelenen platform tabloları bulunur (RLS dışında). Tenant veritabanında platform
+/// şemasındaki kuyruk tabloları dışında her tablo Row-Level Security altındadır (okuma filtresi, ekleme ve güncelleme
+/// engeli). Yeni tablo bu listelere veya RLS politikasına girmeden testi geçemez; model ile migration'lar da ayrışamaz.
 /// </summary>
 public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
-    /// <summary>Platform tabloları (RLS dışında). TenantId taşıyanların neden tenant bağlamı dışında okunduğu yazılıdır.</summary>
+    /// <summary>Platform veritabanındaki tablolar (RLS dışında). TenantId taşıyanların neden merkezi olduğu yazılıdır.</summary>
     private static readonly Dictionary<string, string> PlatformTables = new()
     {
-        ["platform.__EFMigrationsHistory"] = "Migration geçmişi.",
-        ["platform.Tenants"] = "Firma listesi; platform yöneticisi ve oturum doğrulaması okur.",
+        ["platform.__EFMigrationsHistory"] = "Platform migration geçmişi.",
+        ["platform.Tenants"] = "Firma listesi + tenant→DB defteri ve kurulum durumu (ADR-0009).",
         ["platform.Users"] = "Kimlik hesabı firmadan bağımsızdır; bir kişi birden fazla firmaya üye olabilir.",
         ["platform.UserClaims"] = "Kimlik (ASP.NET Identity).",
         ["platform.UserLogins"] = "Kimlik (ASP.NET Identity).",
@@ -27,43 +27,72 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["platform.UserSessions"] = "Oturumlar kişiye aittir, firmaya değil (Y7a).",
         ["platform.Memberships"] = "TenantId: üyelik, firma seçilmeden önce (giriş, firma listesi) doğrulanır.",
         ["platform.ModuleEntitlements"] = "TenantId: modül hakkını platform yöneticisi yönetir; firma yazamaz.",
-        ["platform.OutboxMessages"] = "TenantId: olay işleyicisi bütün firmaları tarar; abone olayın firmasında çalışır (ADR-0007).",
+        ["platform.EmailMessages"] = "TenantId (boş olabilir): e-posta kuyruğu merkezidir; giriş anındaki e-postaları da taşır (ADR-0009).",
+    };
+
+    /// <summary>Tenant veritabanında RLS dışında kalan tablolar (gerekçesiyle). Tenant DB'si zaten tek tenant içerir.</summary>
+    private static readonly Dictionary<string, string> TenantExemptTables = new()
+    {
+        ["core.__EFMigrationsHistory"] = "Tenant migration geçmişi.",
+        ["platform.OutboxMessages"] = "TenantId: tenant DB'sine ait olay kuyruğu; dağıtım tenant bağlamında çalışır (ADR-0007/0009).",
         ["platform.EventDeliveries"] = "TenantId: aynı gerekçe; payload içermez (ADR-0007).",
-        ["platform.EmailMessages"] = "TenantId: e-posta işleyicisi bütün firmaların kuyruğunu gönderir.",
     };
 
     [Fact]
-    public async Task Every_table_is_row_level_secured_or_a_listed_platform_table()
+    public async Task Platform_database_contains_only_listed_platform_tables()
     {
-        var tables = await TablesAsync();
+        var tables = await TablesAsync(factory.Services.GetRequiredService<PlatformDatabaseOptions>().MigrationsConnectionString);
 
         var problems = new List<string>();
         foreach (var (table, rls) in tables)
         {
-            var platform = table.StartsWith(DatabaseSchemas.Platform + ".", StringComparison.Ordinal);
-            if (platform && !PlatformTables.ContainsKey(table))
+            if (!PlatformTables.ContainsKey(table))
             {
-                problems.Add($"{table}: platform tablosu listede yok; gerekçesiyle TableInventoryTests.PlatformTables'a ekleyin.");
+                problems.Add($"{table}: platform veritabanında beklenmeyen tablo; tenant verisiyse tenant DB'sine taşıyın, değilse PlatformTables'a ekleyin.");
             }
-            else if (!platform && rls != 3)
+            else if (rls != 0)
             {
-                problems.Add($"{table}: tenant tablosu RLS politikasında değil ({rls}/3 koşul); migration'da TenantIsolationSql.AddTable.");
-            }
-            else if (platform && rls != 0)
-            {
-                problems.Add($"{table}: platform tablosu RLS politikasında; tenant verisiyse platform şemasından taşıyın.");
+                problems.Add($"{table}: platform tablosu RLS politikasında olmamalı.");
             }
         }
 
-        problems.AddRange(PlatformTables.Keys.Where(t => !tables.ContainsKey(t)).Select(t => $"{t}: listede var, veritabanında yok."));
+        problems.AddRange(PlatformTables.Keys.Where(t => !tables.ContainsKey(t)).Select(t => $"{t}: listede var, platform veritabanında yok."));
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
+    }
+
+    [Fact]
+    public async Task Tenant_database_tables_are_row_level_secured_or_listed_exempt()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        var options = factory.Services.GetRequiredService<PlatformDatabaseOptions>();
+        var databaseName = (await factory.TenantDatabaseNameAsync(tenant.Id))!;
+        var tables = await TablesAsync(TenantDatabaseNaming.ConnectionFor(options.MigrationsConnectionString, databaseName));
+
+        var problems = new List<string>();
+        foreach (var (table, rls) in tables)
+        {
+            if (TenantExemptTables.ContainsKey(table))
+            {
+                if (rls != 0)
+                {
+                    problems.Add($"{table}: muaf tablo RLS politikasında görünüyor.");
+                }
+            }
+            else if (rls != 3)
+            {
+                problems.Add($"{table}: tenant tablosu RLS politikasında değil ({rls}/3 koşul); migration'da TenantIsolationSql.AddTable.");
+            }
+        }
+
+        problems.AddRange(TenantExemptTables.Keys.Where(t => !tables.ContainsKey(t)).Select(t => $"{t}: muaf listede var, tenant veritabanında yok."));
         Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 
     /// <summary>Tenant verisi (ITenantEntity) platform şemasında durmaz; platform dışındaki her entity tenant verisidir.</summary>
     [Fact]
-    public void Tenant_entities_and_schemas_agree()
+    public async Task Tenant_entities_and_schemas_agree()
     {
-        using var scope = factory.OpenScope(tenantId: null);
+        using var scope = factory.OpenScope((await factory.CreateTenantAsync()).Id);
         var mismatched = scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Model.GetEntityTypes()
             .Where(t => t.GetTableName() is not null && t.BaseType is null)
             .Where(t => typeof(ITenantEntity).IsAssignableFrom(t.ClrType) == (t.GetSchema() == DatabaseSchemas.Platform))
@@ -79,9 +108,9 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
     /// (<see cref="ICompanyScoped"/>, CompanyId ile); ikisi birden olamaz. Sınıfsız yeni tablo testi kırar.
     /// </summary>
     [Fact]
-    public void Every_tenant_entity_has_exactly_one_company_scope_class()
+    public async Task Every_tenant_entity_has_exactly_one_company_scope_class()
     {
-        using var scope = factory.OpenScope(tenantId: null);
+        using var scope = factory.OpenScope((await factory.CreateTenantAsync()).Id);
         var problems = new List<string>();
         foreach (var type in scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Model.GetEntityTypes()
                      .Where(t => t.GetTableName() is not null && t.BaseType is null && typeof(ITenantEntity).IsAssignableFrom(t.ClrType)))
@@ -103,19 +132,26 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
     }
 
     [Fact]
-    public void Model_has_no_changes_without_a_migration()
+    public async Task Tenant_model_has_no_changes_without_a_migration()
     {
-        using var scope = factory.OpenScope(tenantId: null);
+        using var scope = factory.OpenScope((await factory.CreateTenantAsync()).Id);
         Assert.False(
             scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Database.HasPendingModelChanges(),
-            "Modelde migration'ı olmayan değişiklik var: dotnet ef migrations add <Ad> (CLAUDE.md).");
+            "Tenant modelinde migration'ı olmayan değişiklik var: dotnet ef migrations add <Ad> --context ModulixDbContext (CLAUDE.md).");
+    }
+
+    [Fact]
+    public void Platform_model_has_no_changes_without_a_migration()
+    {
+        using var scope = factory.Services.CreateScope();
+        Assert.False(
+            scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Database.HasPendingModelChanges(),
+            "Platform modelinde migration'ı olmayan değişiklik var: dotnet ef migrations add <Ad> --context PlatformDbContext (CLAUDE.md).");
     }
 
     // Tablo → RLS koşulu sayısı (migration kullanıcısı politikayı görebilir).
-    private async Task<Dictionary<string, int>> TablesAsync()
+    private static async Task<Dictionary<string, int>> TablesAsync(string connectionString)
     {
-        var connectionString = factory.Services.GetRequiredService<IConfiguration>()
-            .GetConnectionString(PersistenceSetup.MigrationsConnectionName);
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync();
         await using var command = new SqlCommand(

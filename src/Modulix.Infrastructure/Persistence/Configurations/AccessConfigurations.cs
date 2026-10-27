@@ -7,7 +7,7 @@ using Modulix.Core.Teams;
 
 namespace Modulix.Infrastructure.Persistence.Configurations;
 
-internal sealed class ModuleEntitlementConfiguration : IEntityTypeConfiguration<ModuleEntitlement>
+internal sealed class ModuleEntitlementConfiguration : IEntityTypeConfiguration<ModuleEntitlement>, IPlatformConfiguration
 {
     public void Configure(EntityTypeBuilder<ModuleEntitlement> builder)
     {
@@ -61,12 +61,11 @@ internal sealed class MembershipRoleConfiguration : IEntityTypeConfiguration<Mem
         builder.Property(mr => mr.TenantId).IsRequired();
         builder.HasIndex(mr => new { mr.TenantId, mr.MembershipId, mr.RoleId }).IsUnique();
 
-        // Bileşik yabancı anahtarlar: üyelik de rol de atamayla aynı tenant'ta olmak zorundadır.
-        builder.HasOne<Membership>()
-            .WithMany()
-            .HasForeignKey(mr => new { mr.TenantId, mr.MembershipId })
-            .HasPrincipalKey(m => new { m.TenantId, m.Id })
-            .OnDelete(DeleteBehavior.Restrict);
+        // ADR-0009: üyelik platform DB'sindedir; MembershipId burada düz Guid'dir (cross-database FK yok). Üyeliğin
+        // bu tenant'a ait ve etkin olduğu servis katmanında (tenant çözümleme + platform defteri) doğrulanır.
+        builder.Property(mr => mr.MembershipId).IsRequired();
+
+        // Rol yabancı anahtarı tenant içindedir: başka tenant'ın rolü veritabanı düzeyinde de atanamaz.
         builder.HasOne<Role>()
             .WithMany()
             .HasForeignKey(mr => new { mr.TenantId, mr.RoleId })
@@ -105,17 +104,14 @@ internal sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMem
         // Kapsam hesabı kişinin ekiplerinden başlar.
         builder.HasIndex(tm => new { tm.TenantId, tm.MembershipId });
 
-        // Bileşik yabancı anahtarlar: ekip de üyelik de aynı tenant'ta olmak zorundadır. Ekip ya da üyelik (ör. iptal
-        // edilen davet) silinince ekip üyeliği de silinir.
+        // ADR-0009: üyelik platform DB'sindedir; MembershipId burada düz Guid'dir (cross-database FK yok).
+        builder.Property(tm => tm.MembershipId).IsRequired();
+
+        // Ekip yabancı anahtarı tenant içindedir. Ekip silinince ekip üyeliği de silinir.
         builder.HasOne<Team>()
             .WithMany()
             .HasForeignKey(tm => new { tm.TenantId, tm.TeamId })
             .HasPrincipalKey(t => new { t.TenantId, t.Id })
-            .OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne<Membership>()
-            .WithMany()
-            .HasForeignKey(tm => new { tm.TenantId, tm.MembershipId })
-            .HasPrincipalKey(m => new { m.TenantId, m.Id })
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
