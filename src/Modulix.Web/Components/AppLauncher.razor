@@ -1,0 +1,322 @@
+@implements IAsyncDisposable
+@inject SessionState Session
+@inject AppNavigation Apps
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@* ModüliX logosu + adı: tıklanınca "Tüm Uygulamalar" paneli açılır (sayfanın üzerinde, içeriği kaydırmaz).
+   İki düzey: ana uygulamalar, sonra seçilen uygulamanın alt uygulamaları. Liste AppCatalog'dan ve oturumdan gelir. *@
+<div class="app-launcher">
+    @if (Session.IsSignedIn)
+    {
+        <button type="button" class="navbar-brand brand-button" @ref="brandButton" @onclick="Toggle"
+                aria-haspopup="dialog" aria-expanded="@(isOpen ? "true" : "false")" aria-controls="app-launcher-panel"
+                aria-label="ModüliX uygulama menüsü">
+            <img src="img/modulix-mark.svg" alt="" width="28" height="28" />
+            <span>ModüliX</span>
+        </button>
+    }
+    else
+    {
+        <a class="navbar-brand" href="">
+            <img src="img/modulix-mark.svg" alt="" width="28" height="28" />
+            <span>ModüliX</span>
+        </a>
+    }
+
+    @if (isOpen)
+    {
+        <div id="app-launcher-panel" class="app-panel" role="dialog" aria-labelledby="app-panel-title" tabindex="-1" @ref="panel">
+            <div class="app-panel-head">
+                @if (openRoot is not null)
+                {
+                    <button type="button" class="app-back" @ref="backButton" @onclick="BackToRoot">
+                        <AppIcon Name="arrow-left" Size="16" /> Tüm Uygulamalar
+                    </button>
+                    <h2 id="app-panel-title" class="app-panel-title">
+                        <span class="app-panel-title-icon tone-@ToneClass(openRoot)"><AppIcon Name="@openRoot.Icon" Size="20" /></span>
+                        @openRoot.Name
+                    </h2>
+                }
+                else
+                {
+                    <h2 id="app-panel-title" class="app-panel-title">Tüm Uygulamalar</h2>
+                }
+            </div>
+
+            @if (showSearch)
+            {
+                <div class="app-search">
+                    <label class="visually-hidden" for="app-search-input">Uygulama ara</label>
+                    <AppIcon Name="search" Size="16" />
+                    <input id="app-search-input" type="search" class="form-control" autocomplete="off"
+                           placeholder="Uygulama ara" @ref="searchInput" @bind="Query" @bind:event="oninput" />
+                </div>
+            }
+
+            <div class="app-panel-body">
+                @if (!Session.IsLoaded)
+                {
+                    <p class="app-state" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Uygulamalar yükleniyor…</p>
+                }
+                else if (loadFailed)
+                {
+                    <div class="app-state" role="alert">
+                        <p class="mb-2">Uygulamalar yüklenemedi.</p>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="RetryAsync">Yeniden dene</button>
+                    </div>
+                }
+                else if (listed.Count == 0 && string.IsNullOrWhiteSpace(Query))
+                {
+                    <p class="app-state" role="status">Erişebileceğiniz bir uygulama yok.</p>
+                }
+                else if (visible.Count == 0)
+                {
+                    <p class="app-state" role="status">“@Query” için sonuç bulunamadı.</p>
+                }
+                else
+                {
+                    <ul class="app-grid">
+                        @foreach (AppDefinition app in visible)
+                        {
+                            <li>
+                                @if (openRoot is null && Apps.Children(app.Id).Count > 0)
+                                {
+                                    <button type="button" class="app-tile tone-@ToneClass(app) @(current?.ParentId == app.Id ? "is-current" : null)"
+                                            @onclick="() => OpenRoot(app)" aria-label="@app.Name, alt uygulamalar">
+                                        <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
+                                        <span class="app-tile-name">@app.Name</span>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <a href="@app.Route" class="app-tile tone-@ToneClass(app) @(IsCurrent(app) ? "is-current" : null)"
+                                       aria-current="@(IsCurrent(app) ? "page" : null)" @onclick="() => Close(true)">
+                                        <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
+                                        <span class="app-tile-name">@app.Name</span>
+                                    </a>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private enum FocusTarget
+    {
+        None,
+        Brand,
+        Search,
+        Back,
+    }
+
+    private ElementReference brandButton;
+    private ElementReference panel;
+    private ElementReference searchInput;
+    private ElementReference backButton;
+    private DotNetObjectReference<AppLauncher>? self;
+    private bool attached;
+    private bool isOpen;
+    private string? openRootId;
+    private string query = "";
+    private Guid? lastTenant;
+    private FocusTarget pendingFocus;
+
+    private string Query
+    {
+        get => query;
+        set
+        {
+            query = value ?? "";
+            Recompute();
+        }
+    }
+
+    private AppDefinition? current => AppNavigation.Resolve(Navigation.ToBaseRelativePath(Navigation.Uri));
+
+    // Panelin gösterdiği düzey; seçili uygulama artık görünür değilse (ör. tenant değişti) ilk düzeye döner.
+    private IReadOnlyList<AppDefinition> listed = [];
+    private IReadOnlyList<AppDefinition> visible = [];
+    private AppDefinition? openRoot;
+    private bool showSearch;
+
+    // Erişim bilgisi yüklenemedi: tenant var ama erişim okunamadı (iki adımlı doğrulama beklerken bilerek boştur).
+    private bool loadFailed => Session.IsLoaded && Session.HasActiveTenant && !Session.TwoFactorRequired && Session.Access is null;
+
+    protected override void OnInitialized()
+    {
+        Session.Changed += OnSessionChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+        lastTenant = Session.User?.ActiveTenantId;
+    }
+
+    protected override void OnParametersSet() => Recompute();
+
+    private void Recompute()
+    {
+        IReadOnlyList<AppDefinition> roots = Apps.Roots();
+        openRoot = openRootId is null ? null : roots.FirstOrDefault(r => r.Id == openRootId);
+        if (openRoot is null)
+        {
+            openRootId = null;
+        }
+
+        listed = openRoot is null ? roots : Apps.Children(openRoot.Id);
+        visible = string.IsNullOrWhiteSpace(query)
+            ? listed
+            : listed.Where(a => Matches(a.Name, query.Trim())).ToList();
+        showSearch = Session.IsLoaded && !loadFailed && listed.Count > 0;
+    }
+
+    private static bool Matches(string name, string text) =>
+        System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo
+            .IndexOf(name, text, System.Globalization.CompareOptions.IgnoreCase) >= 0;
+
+    private bool IsCurrent(AppDefinition app) => current?.Id == app.Id;
+
+    private static string ToneClass(AppDefinition app) => app.Tone == AppTone.Teal ? "teal" : "indigo";
+
+    private void OnSessionChanged()
+    {
+        // Tenant değişince panel kapanır ve önceki tenant'ın seçimi/araması kalmaz.
+        Guid? tenant = Session.User?.ActiveTenantId;
+        if (tenant != lastTenant)
+        {
+            lastTenant = tenant;
+            ResetPanel();
+        }
+
+        InvokeAsync(() =>
+        {
+            Recompute();
+            StateHasChanged();
+        });
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (isOpen)
+        {
+            InvokeAsync(() =>
+            {
+                ResetPanel();
+                StateHasChanged();
+            });
+        }
+    }
+
+    private void ResetPanel()
+    {
+        isOpen = false;
+        openRootId = null;
+        query = "";
+    }
+
+    private void Toggle()
+    {
+        if (isOpen)
+        {
+            Close(true);
+            return;
+        }
+
+        isOpen = true;
+        openRootId = null;
+        query = "";
+        pendingFocus = FocusTarget.Search;
+        Recompute();
+    }
+
+    private void Close(bool returnFocus)
+    {
+        ResetPanel();
+        pendingFocus = returnFocus ? FocusTarget.Brand : FocusTarget.None;
+    }
+
+    private void OpenRoot(AppDefinition app)
+    {
+        openRootId = app.Id;
+        query = "";
+        pendingFocus = FocusTarget.Back;
+        Recompute();
+    }
+
+    // Yalnızca panelin ilk düzeyine döner; açık sayfayı değiştirmez.
+    private void BackToRoot()
+    {
+        openRootId = null;
+        query = "";
+        pendingFocus = FocusTarget.Search;
+        Recompute();
+    }
+
+    private async Task RetryAsync() => await Session.RefreshAsync();
+
+    [JSInvokable]
+    public Task Dismiss(bool returnFocus)
+    {
+        if (isOpen)
+        {
+            Close(returnFocus);
+            Recompute();
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (isOpen && !attached)
+        {
+            self ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("modulixAppLauncher.attach", self, panel, brandButton);
+            attached = true;
+        }
+        else if (!isOpen && attached)
+        {
+            await JS.InvokeVoidAsync("modulixAppLauncher.detach");
+            attached = false;
+        }
+
+        FocusTarget target = pendingFocus;
+        pendingFocus = FocusTarget.None;
+        switch (target)
+        {
+            case FocusTarget.Brand:
+                await brandButton.FocusAsync();
+                break;
+            case FocusTarget.Search when showSearch:
+                await searchInput.FocusAsync();
+                break;
+            case FocusTarget.Search:
+                await panel.FocusAsync();
+                break;
+            case FocusTarget.Back:
+                await backButton.FocusAsync();
+                break;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Session.Changed -= OnSessionChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+        if (attached)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("modulixAppLauncher.detach");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+
+        self?.Dispose();
+    }
+}
