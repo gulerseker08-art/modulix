@@ -59,20 +59,20 @@ public class EmailTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
     }
 
     [Fact]
-    public async Task Email_is_not_written_until_caller_saves()
+    public async Task Email_is_persisted_immediately_on_enqueue()
     {
+        // ADR-0009: e-posta kuyruğu platform veritabanındadır ve kuyruğa yazma hemen kalıcı kılınır (iş işleminin tenant
+        // bağlantısını paylaşmaz), böylece aktif tenant olmayan giriş akışlarında da çalışır. Gönderim yine ertelenir.
         await using var host = FakeHost();
         var address = UniqueAddress();
 
         using (var scope = host.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<IEmailQueue>().Enqueue(Message(address));
-
-            // Kaydetmeden kapsam kapanır: işlem geri alınmış gibi.
         }
 
         using var check = host.Services.CreateScope();
-        Assert.False(await Db(check).EmailMessages.AnyAsync(e => e.ToAddress == address));
+        Assert.True(await Db(check).EmailMessages.AnyAsync(e => e.ToAddress == address));
     }
 
     [Fact]
@@ -227,11 +227,13 @@ public class EmailTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
                 new TenantContext(id, Guid.NewGuid(), Guid.NewGuid());
         }
 
-        var db = Db(scope);
+        // ADR-0009: kuyruk platform DB'sine hemen yazılır (EfEmailQueue kendi bağlamını kullanır); kimliği adresten okunur.
         scope.ServiceProvider.GetRequiredService<IEmailQueue>().Enqueue(message);
-        var queued = db.ChangeTracker.Entries<QueuedEmail>().Single().Entity;
-        await db.SaveChangesAsync();
-        return queued.Id;
+        return await Db(scope).EmailMessages.AsNoTracking()
+            .Where(e => e.ToAddress == message.To)
+            .OrderByDescending(e => e.CreatedAt)
+            .Select(e => e.Id)
+            .FirstAsync();
     }
 
     /// <summary>Zamanı gelmiş e-posta kalmayana kadar işleyiciyi çalıştırır.</summary>
@@ -253,7 +255,7 @@ public class EmailTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
         return await Db(scope).EmailMessages.AsNoTracking().SingleAsync(e => e.Id == id);
     }
 
-    private static ModulixDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+    private static PlatformDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
 
     private static EmailMessage Message(string to) => new(to, "Deneme", "<p>Deneme</p>");
 

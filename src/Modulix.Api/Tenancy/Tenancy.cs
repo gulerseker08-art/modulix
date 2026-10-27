@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Api.Platform;
 using Modulix.Core.Modules;
@@ -53,7 +54,7 @@ public static class TenantProblems
 public sealed class TenantContextMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(
-        HttpContext context, HttpTenantContextAccessor accessor, IMembershipDirectory directory, ITenantSettings settings, ModulixDbContext db)
+        HttpContext context, HttpTenantContextAccessor accessor, IMembershipDirectory directory, PlatformDbContext db)
     {
         var principal = context.User;
         if (principal.Identity?.IsAuthenticated == true
@@ -64,6 +65,9 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             if (membership is not null)
             {
                 accessor.Current = new TenantContext(membership.TenantId, userId, membership.MembershipId);
+
+                // ITenantSettings tenant DbContext'ine bağlıdır (ADR-0009); yalnızca aktif tenant kurulduktan SONRA çözülür.
+                var settings = context.RequestServices.GetRequiredService<ITenantSettings>();
 
                 // Firma iki adımlı doğrulamayı zorunlu kılıyorsa kapalı olan kişi önce kurulumu yapar (Y7b).
                 if (await settings.GetValueAsync(CoreModule.SettingKeys.RequireTwoFactor, context.RequestAborted) == CoreModule.SettingValues.Yes

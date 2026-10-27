@@ -18,6 +18,7 @@ namespace Modulix.Infrastructure.Customization;
 /// </summary>
 internal sealed class SectorProfileService(
     ModulixDbContext db,
+    PlatformDbContext platform,
     ITenantContextAccessor tenantAccessor,
     ModuleCatalog catalog,
     SectorProfileCatalog profiles,
@@ -30,7 +31,7 @@ internal sealed class SectorProfileService(
     public async Task<TenantProfile> GetAsync(CancellationToken cancellationToken)
     {
         var tenantId = RequireTenant().TenantId;
-        return await db.Tenants.AsNoTracking()
+        return await platform.Tenants.AsNoTracking()
             .Where(t => t.Id == tenantId)
             .Select(t => new TenantProfile(t.ProfileKey, t.ProfileAppliedAt))
             .SingleAsync(cancellationToken);
@@ -51,7 +52,9 @@ internal sealed class SectorProfileService(
         try
         {
             var plan = await PlanAsync(profile, enableModules, cancellationToken);
-            var row = await db.Tenants.SingleAsync(t => t.Id == tenant.TenantId, cancellationToken);
+
+            // Tenant profil anahtarı platform DB'sindedir (ADR-0009); tenant işi (özel alan/liste/audit) tenant DB'sinde.
+            var row = await platform.Tenants.SingleAsync(t => t.Id == tenant.TenantId, cancellationToken);
             var modulesBefore = await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken);
             var before = Snapshot(row.ProfileKey, modulesBefore);
 
@@ -97,6 +100,10 @@ internal sealed class SectorProfileService(
             {
                 await transaction.CommitAsync(cancellationToken);
             }
+
+            // Tenant işi başarıyla bittikten sonra platform DB'sinde profil anahtarını kaydet (ayrı veritabanı,
+            // ayrı işlem; ADR-0009: platform/tenant tek atomik işlem varsayılmaz).
+            await platform.SaveChangesAsync(cancellationToken);
 
             return plan;
         }

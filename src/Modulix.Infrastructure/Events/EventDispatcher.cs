@@ -47,6 +47,7 @@ public sealed record EventRound(int Dispatched, int Delivered);
 /// </summary>
 public sealed class EventDispatcher(
     ModulixDbContext db,
+    PlatformDbContext platform,
     ModuleCatalog catalog,
     ITenantScopeFactory tenantScopes,
     IServiceScopeFactory scopes,
@@ -150,7 +151,7 @@ public sealed class EventDispatcher(
         }
 
         var tenantIds = events.Select(e => e.TenantId).Distinct().ToList();
-        var enabled = (await db.ModuleEntitlements.AsNoTracking()
+        var enabled = (await platform.ModuleEntitlements.AsNoTracking()
                 .Where(e => tenantIds.Contains(e.TenantId) && e.IsEnabled)
                 .Select(e => new { e.TenantId, e.ModuleKey })
                 .ToListAsync(cancellationToken))
@@ -381,6 +382,11 @@ public sealed class EventDispatcher(
         }
 
         await transaction.CommitAsync(cancellationToken);
+
+        // Abonenin kuyruğa yazdığı e-postalar yalnızca teslim onaylandıktan sonra platform kuyruğuna yazılır
+        // (ADR-0009): teslim iptal/yeniden denemede e-posta tekrarlanmaz. Platform ve tenant ayrı veritabanı olduğundan
+        // bu, teslimle tek atomik işlem değildir; en kötü durumda e-posta en fazla bir kez yazılır.
+        await services.GetRequiredService<PlatformDbContext>().SaveChangesAsync(cancellationToken);
         return true;
     }
 
@@ -392,7 +398,7 @@ public sealed class EventDispatcher(
             return "Abonelik artık tanımlı değil.";
         }
 
-        var status = await db.Tenants.AsNoTracking()
+        var status = await platform.Tenants.AsNoTracking()
             .Where(t => t.Id == delivery.TenantId)
             .Select(t => (TenantStatus?)t.Status)
             .SingleOrDefaultAsync(cancellationToken);
@@ -439,7 +445,7 @@ public sealed class EventDispatcher(
     }
 
     private async Task<IReadOnlySet<string>> EnabledModulesAsync(Guid tenantId, CancellationToken cancellationToken) =>
-        (await db.ModuleEntitlements.AsNoTracking()
+        (await platform.ModuleEntitlements.AsNoTracking()
             .Where(e => e.TenantId == tenantId && e.IsEnabled)
             .Select(e => e.ModuleKey)
             .ToListAsync(cancellationToken))

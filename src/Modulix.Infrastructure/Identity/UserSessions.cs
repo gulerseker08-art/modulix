@@ -12,7 +12,7 @@ public sealed record OpenSession(Guid Id, string Device, string? IpAddress, Date
 /// bırakılınca ya da kişi veya yöneticisi istediğinde oturumlar kapanır. Kapatılan oturumun çerezi bir sonraki istekte
 /// geçersiz olur.
 /// </summary>
-public sealed class UserSessions(ModulixDbContext db, TimeProvider time)
+public sealed class UserSessions(PlatformDbContext db, TimeProvider time)
 {
     /// <summary>Son etkinlik en fazla bu aralıkla yazılır (her istekte yazmamak için).</summary>
     public static readonly TimeSpan TouchInterval = TimeSpan.FromMinutes(5);

@@ -33,7 +33,7 @@ public enum TwoFactorCodeResult
 /// kişinin her firmasının denetim kaydına "Hesap" olarak yazılır.
 /// </summary>
 public sealed class TwoFactorAccounts(
-    ModulixDbContext db,
+    PlatformDbContext db,
     UserManager<ModulixUser> users,
     UserSessions sessions,
     AccountAudit audit,

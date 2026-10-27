@@ -30,7 +30,7 @@ public sealed record AccountLinkResult(ModulixUser? User, Guid? TenantId, bool I
 /// kişinin bekleyen tüm davetleri etkinleşir: hepsi aynı e-posta adresine gitmiştir ve şifre belirlenince güvenlik
 /// damgası değişip diğer davet bağlantıları geçersiz olur.
 /// </summary>
-public sealed class AccountLinks(ModulixDbContext db, UserManager<ModulixUser> users)
+public sealed class AccountLinks(PlatformDbContext db, UserManager<ModulixUser> users)
 {
     public async Task<InvitationInfo?> FindInvitationAsync(Guid membershipId, string? token, CancellationToken cancellationToken)
     {

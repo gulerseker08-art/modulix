@@ -14,7 +14,7 @@ namespace Modulix.Infrastructure.Authorization;
 /// işlem sonuna kadar tutar; aynı anda birbirinin yetkisini kaldırmaya çalışan iki yönetici sırayla işlenir ve
 /// ikincisi güncel durumu görür.
 /// </summary>
-internal sealed class AdministratorGuard(ModulixDbContext db)
+internal sealed class AdministratorGuard(ModulixDbContext db, PlatformDbContext platform)
 {
     public const string LastAdministratorMessage =
         "Kuruluşta en az bir yönetici kalmalı. Önce başka bir kullanıcıya Yönetici rolü verin.";
@@ -63,21 +63,22 @@ internal sealed class AdministratorGuard(ModulixDbContext db)
     /// </summary>
     public async Task EnsureAnotherActiveAdministratorAsync(Guid systemRoleId, Guid membershipId, CancellationToken cancellationToken)
     {
-        var isActive = await db.Memberships.AnyAsync(
+        var isActive = await platform.Memberships.AnyAsync(
             m => m.Id == membershipId && m.Status == MembershipStatus.Active, cancellationToken);
         if (!isActive)
         {
             return;
         }
 
-        var anotherAdministrator = await (
-            from assignment in db.MembershipRoles
-            join membership in db.Memberships on assignment.MembershipId equals membership.Id
-            where assignment.RoleId == systemRoleId
-                  && membership.Id != membershipId
-                  && membership.Status == MembershipStatus.Active
-            select membership.Id)
-            .AnyAsync(cancellationToken);
+        // Sistem rolü atamaları tenant DB'sinde, üyelik durumu platform DB'sindedir (ADR-0009): iki adımda çöz.
+        var otherAdminMembershipIds = await db.MembershipRoles.AsNoTracking()
+            .Where(mr => mr.RoleId == systemRoleId && mr.MembershipId != membershipId)
+            .Select(mr => mr.MembershipId)
+            .ToListAsync(cancellationToken);
+
+        var anotherAdministrator = otherAdminMembershipIds.Count > 0
+            && await platform.Memberships.AsNoTracking()
+                .AnyAsync(m => otherAdminMembershipIds.Contains(m.Id) && m.Status == MembershipStatus.Active, cancellationToken);
 
         if (!anotherAdministrator)
         {

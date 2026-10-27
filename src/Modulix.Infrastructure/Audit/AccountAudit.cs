@@ -26,7 +26,7 @@ public sealed record AccountClient(string? IpAddress, string? UserAgent)
 /// başarılı giriş yalnızca seçilen firmaya, hatalı şifre, kilitlenme ve şifre sıfırlama kişinin etkin üye olduğu tüm
 /// firmalara, davet kabulü daveti kabul edilen firmalara. Kayıtlı olmayan e-postayla deneme hiçbir firmaya yazılmaz.
 /// </summary>
-public sealed class AccountAudit(ModulixDbContext db, ITenantScopeFactory tenantScopes, ILogger<AccountAudit> logger)
+public sealed class AccountAudit(PlatformDbContext db, ITenantScopeFactory tenantScopes, ILogger<AccountAudit> logger)
 {
     /// <param name="tenantIds">Yazılacak firmalar; <c>null</c>: kişinin etkin üye olduğu tüm açık firmalar.</param>
     /// <param name="reason">Başarısız girişin nedeni (<see cref="AccountAuditReasons"/>).</param>

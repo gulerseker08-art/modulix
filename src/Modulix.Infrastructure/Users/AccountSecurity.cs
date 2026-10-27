@@ -44,7 +44,7 @@ public enum EmailChangeResult
 /// <see cref="ArgumentException"/> olarak döner (ParamName alan adıdır).
 /// </summary>
 public sealed class AccountSecurity(
-    ModulixDbContext db,
+    PlatformDbContext db,
     UserManager<ModulixUser> users,
     UserSessions sessions,
     AccountAudit audit,
