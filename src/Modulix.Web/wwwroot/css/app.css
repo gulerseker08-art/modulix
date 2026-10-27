@@ -1346,7 +1346,7 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
         margin-bottom: 0.25rem;
     }
 
-/* ---- ModüliX uygulama paneli (AppLauncher) ---- */
+/* ---- ModuliX uygulama paneli (AppLauncher) ---- */
 .app-launcher {
     display: flex;
     align-items: center;

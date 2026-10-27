@@ -3,7 +3,7 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>@(company?.Name ?? "Firma") · ModüliX</PageTitle>
+<PageTitle>@(company?.Name ?? "Firma") · ModuliX</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.CompaniesRead">
     <a class="back-link" href="crm/firmalar">← Firmalar</a>
