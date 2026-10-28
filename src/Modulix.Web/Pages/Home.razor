@@ -1,5 +1,7 @@
 @page "/"
 @inject SessionState Session
+@inject ApiClient Api
+@inject CrmLookups Lookups
 
 <PageTitle>ModuliX</PageTitle>
 
@@ -9,6 +11,34 @@
 
     @if (Session.IsModuleEnabled(CrmAccess.ModuleKey))
     {
+        @if (counts.Count > 0)
+        {
+            <div class="stat-grid">
+                @foreach (var (label, href, total) in counts)
+                {
+                    <a class="stat-card" href="@href">
+                        <span class="stat-icon"><AppIcon Name="@IconFor(href)" Size="18" /></span>
+                        <span>@label</span>
+                        <strong>@total.ToString("N0", Regional.Numbers)</strong>
+                    </a>
+                }
+            </div>
+        }
+
+        @if (stages.Count > 0)
+        {
+            <div class="chart-grid">
+                <section class="chart-card">
+                    <h2>Fırsatlar · aşamaya göre dağılım</h2>
+                    <DonutChart Slices="stages" Title="Fırsatların aşamaya göre dağılımı" Caption="fırsat" />
+                </section>
+                <section class="chart-card">
+                    <h2>Satış hunisi</h2>
+                    <BarChart Slices="stages" Title="Aşamalardaki fırsat sayıları" />
+                </section>
+            </div>
+        }
+
         <div class="tiles">
             @if (Session.Can(CrmAccess.CompaniesRead))
             {
@@ -33,3 +63,55 @@
         <p>Kuruluşunuz için açık bir modül yok.</p>
     }
 </AuthGate>
+
+@code {
+    private readonly List<(string Label, string Href, int Total)> counts = [];
+    private IReadOnlyList<ChartSlice> stages = [];
+
+    private static string IconFor(string href) => href switch
+    {
+        "crm/firmalar" => "building",
+        "crm/kisiler" => "users",
+        "crm/firsatlar" => "target",
+        _ => "activity",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.IsModuleEnabled(CrmAccess.ModuleKey))
+        {
+            return;
+        }
+
+        var entries = new List<(string Label, string Href, string Url, bool Allowed)>
+        {
+            ("Firmalar", "crm/firmalar", "/api/crm/companies", Session.Can(CrmAccess.CompaniesRead)),
+            ("Kişiler", "crm/kisiler", "/api/crm/contacts", Session.Can(CrmAccess.ContactsRead)),
+            ("Fırsatlar", "crm/firsatlar", "/api/crm/opportunities", Session.Can(CrmAccess.OpportunitiesRead)),
+            ("Aktiviteler", "crm/aktiviteler", "/api/crm/activities", Session.Can(CrmAccess.ActivitiesRead)),
+        };
+
+        // Yalnızca toplam sayı gerekir; tek kayıtlık sayfa yeter.
+        var totals = await Task.WhenAll(entries.Where(e => e.Allowed).Select(async e =>
+            (e.Label, e.Href, Result: await Api.GetAsync<CrmPage<object>>($"{e.Url}?pageSize=1"))));
+        counts.AddRange(totals.Where(t => t.Result.Value is not null).Select(t => (t.Label, t.Href, t.Result.Value!.TotalCount)));
+
+        if (Session.Can(CrmAccess.OpportunitiesRead))
+        {
+            await Lookups.LoadAsync();
+            var values = Lookups.ValuesOf(CrmLists.OpportunityStage);
+            var perStage = await Task.WhenAll(values.Select(async v =>
+                (Value: v, Result: await Api.GetAsync<CrmPage<object>>(
+                    $"/api/crm/opportunities?stage={Uri.EscapeDataString(v.Key)}&pageSize=1"))));
+            stages = perStage
+                .Where(s => s.Result.Value is { TotalCount: > 0 } || s.Value.Active)
+                .Select(s => new ChartSlice(s.Value.Label, s.Result.Value?.TotalCount ?? 0))
+                .ToList();
+            if (stages.All(s => s.Value == 0))
+            {
+                stages = [];
+            }
+        }
+    }
+}

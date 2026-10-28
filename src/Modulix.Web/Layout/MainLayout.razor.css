@@ -11,7 +11,8 @@ main {
 }
 
 .sidebar {
-    background-color: var(--mx-navy);
+    background-color: var(--mx-surface);
+    border-right: 1px solid var(--mx-border);
 }
 
 .top-row {
@@ -41,7 +42,7 @@ main {
         height: 2.25rem;
         margin-right: 0.6rem;
         border-radius: 50%;
-        background: var(--mx-navy);
+        background: var(--mx-indigo);
         color: #fff;
         font-size: 0.8rem;
         font-weight: 600;

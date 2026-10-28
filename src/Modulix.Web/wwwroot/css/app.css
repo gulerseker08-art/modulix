@@ -1,20 +1,20 @@
 /* ---- Modulix teması: tüm renkler buradan gelir ---- */
 :root {
-    --mx-navy: #0e1a33;
-    --mx-navy-soft: #16244a;
-    --mx-indigo: #2e33cf;
-    --mx-indigo-hover: #2428b0;
-    --mx-indigo-rgb: 46, 51, 207;
-    --mx-teal: #1fa99b;
-    --mx-lilac: #e6e5fb;
-    --mx-cream: #f6f4ef;
+    --mx-navy: #111827;
+    --mx-navy-soft: #1f2937;
+    --mx-indigo: #4f46e5;
+    --mx-indigo-hover: #4338ca;
+    --mx-indigo-rgb: 79, 70, 229;
+    --mx-teal: #10b981;
+    --mx-lilac: #eef0ff;
+    --mx-cream: #f4f6fb;
     --mx-surface: #ffffff;
-    --mx-ink: #0e1a33;
+    --mx-ink: #111827;
     --mx-muted: #6b7280;
-    --mx-border: #e7e5ee;
-    --mx-radius: 0.875rem;
-    --mx-shadow: 0 1px 2px rgba(14, 26, 51, 0.04), 0 4px 16px rgba(14, 26, 51, 0.05);
-    --mx-font: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --mx-border: #e8ebf3;
+    --mx-radius: 1rem;
+    --mx-shadow: 0 1px 2px rgba(17, 24, 39, 0.03);
+    --mx-font: 'Public Sans', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
 
     /* Bootstrap'ı aynı renklere bağla */
     --bs-primary: var(--mx-indigo);
@@ -305,7 +305,7 @@ code {
 }
 
 .nav-section {
-    color: #7f8bb0;
+    color: var(--mx-muted);
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.05em;
@@ -1359,7 +1359,7 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
     font-size: 1.35rem;
     font-weight: 700;
     letter-spacing: -0.02em;
-    color: #fff;
+    color: var(--mx-ink);
     text-decoration: none;
 }
 
@@ -1375,7 +1375,7 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 
     .brand-button:hover,
     .brand-button[aria-expanded="true"] {
-        background-color: rgba(255, 255, 255, 0.09);
+        background-color: var(--mx-lilac);
     }
 
 .app-launcher .brand-button:focus-visible,
@@ -1581,4 +1581,290 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 /* Mükerrer önerisi paneli (ADR-0013). */
 .duplicate-box {
     margin-top: 0.25rem;
+}
+
+/* ---- Pano: istatistik kartları ve grafikler ---- */
+:root {
+    --chart-c0: #4f46e5;
+    --chart-c1: #1fa99b;
+    --chart-c2: #f5a524;
+    --chart-c3: #7c83f5;
+    --chart-c4: #e5484d;
+    --chart-c5: #8b93a7;
+}
+
+.chart-c0 { stroke: var(--chart-c0); }
+.chart-c1 { stroke: var(--chart-c1); }
+.chart-c2 { stroke: var(--chart-c2); }
+.chart-c3 { stroke: var(--chart-c3); }
+.chart-c4 { stroke: var(--chart-c4); }
+.chart-c5 { stroke: var(--chart-c5); }
+.chart-bg-c0 { background: var(--chart-c0); }
+.chart-bg-c1 { background: var(--chart-c1); }
+.chart-bg-c2 { background: var(--chart-c2); }
+.chart-bg-c3 { background: var(--chart-c3); }
+.chart-bg-c4 { background: var(--chart-c4); }
+.chart-bg-c5 { background: var(--chart-c5); }
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+    color: inherit;
+    text-decoration: none;
+}
+
+    .stat-card span {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--mx-muted);
+    }
+
+    .stat-card strong {
+        font-size: 1.75rem;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+    }
+
+    .stat-card:hover {
+        border-color: rgba(var(--mx-indigo-rgb), 0.4);
+    }
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.chart-card {
+    padding: 1.25rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+}
+
+    .chart-card h2 {
+        margin: 0 0 1rem;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+.donut-chart {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+    .donut-chart svg {
+        width: 11rem;
+        max-width: 100%;
+    }
+
+.donut-track {
+    stroke: var(--mx-lilac);
+}
+
+.donut-total {
+    font-size: 6px;
+    font-weight: 700;
+    fill: var(--mx-ink);
+}
+
+.donut-caption {
+    font-size: 2.6px;
+    fill: var(--mx-muted);
+}
+
+.chart-legend {
+    flex: 1;
+    min-width: 10rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.875rem;
+}
+
+    .chart-legend li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.3rem 0;
+        border-bottom: 1px solid var(--mx-border);
+    }
+
+        .chart-legend li:last-child {
+            border-bottom: 0;
+        }
+
+    .chart-legend strong {
+        margin-left: auto;
+    }
+
+.chart-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    flex: none;
+}
+
+.bar-row {
+    display: grid;
+    grid-template-columns: 7rem 1fr 2.5rem;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+    font-size: 0.875rem;
+}
+
+.bar-track {
+    height: 0.65rem;
+    border-radius: 999px;
+    background: var(--mx-lilac);
+    overflow: hidden;
+}
+
+.bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+}
+
+.bar-value {
+    text-align: right;
+}
+
+@media (min-width: 768px) {
+    .stat-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .chart-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* ---- Açılır alt bölümler (adresler, telefon ve e-posta) ---- */
+.sub-section {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+    overflow: hidden;
+}
+
+    .sub-section > .section-header {
+        margin: 0;
+        padding: 0.35rem 0.75rem 0.35rem 0;
+    }
+
+        .sub-section > .section-header h3 {
+            flex: 1;
+            min-width: 0;
+            margin: 0;
+            font-size: 1rem;
+        }
+
+.section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+    .section-toggle:hover .section-title {
+        color: var(--mx-indigo);
+    }
+
+    .section-toggle:focus-visible {
+        outline: 2px solid var(--mx-indigo);
+        outline-offset: -2px;
+    }
+
+.section-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.65rem;
+    background: var(--mx-lilac);
+    color: var(--mx-indigo);
+}
+
+.section-title {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.count-pill {
+    padding: 0.1rem 0.6rem;
+    border-radius: 999px;
+    background: var(--mx-lilac);
+    color: var(--mx-indigo);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.section-chevron {
+    display: inline-grid;
+    margin-left: auto;
+    color: var(--mx-muted);
+    transition: transform 0.2s;
+}
+
+.sub-section.closed .section-chevron {
+    transform: rotate(-90deg);
+}
+
+.section-body {
+    padding: 0.75rem 1rem 1rem;
+    border-top: 1px solid var(--mx-border);
+}
+
+    .section-body .item-list {
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+        .section-body .item-list li {
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+/* Pano kartlarındaki simge kutusu */
+.stat-card .stat-icon {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-bottom: 0.4rem;
+    border-radius: 0.65rem;
+    background: var(--mx-lilac);
+    color: var(--mx-indigo);
 }
