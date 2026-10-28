@@ -1,0 +1,217 @@
+@* Yapılandırılmış adresler (ADR-0012): firma düzeyinde (LocationId boş) ya da bir lokasyonun adresleri. Liste ve satır içi düzenleme. *@
+@inject ApiClient Api
+
+<div class="sub-section">
+    <div class="section-header">
+        <h3>@Title</h3>
+        @if (CanWrite && form is null)
+        {
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(null)">Adres ekle</button>
+        }
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label">Tür</label>
+                    <select class="form-select" @bind="form.Type">
+                        @foreach (var (key, label) in CrmAddressTypes.Labels)
+                        {
+                            <option value="@key">@label</option>
+                        }
+                    </select>
+                    <FieldError Field="type" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label">Ülke (ISO kodu)</label>
+                    <input class="form-control" maxlength="2" @bind="form.Country" />
+                    <FieldError Field="country" Errors="errors" />
+                </div>
+                <div class="span-all">
+                    <label class="form-label">Adres satırı 1 *</label>
+                    <input class="form-control" maxlength="@CrmDirectoryLimits.AddressLineMaxLength" @bind="form.Line1" />
+                    <FieldError Field="line1" Errors="errors" />
+                </div>
+                <div class="span-all">
+                    <label class="form-label">Adres satırı 2</label>
+                    <input class="form-control" maxlength="@CrmDirectoryLimits.AddressLineMaxLength" @bind="form.Line2" />
+                    <FieldError Field="line2" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label">İlçe</label>
+                    <input class="form-control" maxlength="@CrmDirectoryLimits.AddressPartMaxLength" @bind="form.District" />
+                    <FieldError Field="district" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label">Şehir</label>
+                    <input class="form-control" maxlength="@CrmDirectoryLimits.AddressPartMaxLength" @bind="form.City" />
+                    <FieldError Field="city" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label">Posta kodu</label>
+                    <input class="form-control" maxlength="@CrmDirectoryLimits.PostalCodeMaxLength" @bind="form.PostalCode" />
+                    <FieldError Field="postalCode" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-check-inline"><input type="checkbox" @bind="form.IsPrimary" /> Ana adres</label>
+                    <FieldError Field="isPrimary" Errors="errors" />
+                </div>
+                @if (form.Id is not null)
+                {
+                    <div>
+                        <label class="form-check-inline"><input type="checkbox" @bind="form.IsActive" /> Aktif</label>
+                    </div>
+                }
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">Vazgeç</button>
+            </div>
+        </form>
+    }
+
+    @if (items is { Count: > 0 })
+    {
+        <ul class="item-list">
+            @foreach (var item in items)
+            {
+                <li class="@(item.IsActive ? null : "done")">
+                    <div class="item-main">
+                        <strong>@item.Line1@(item.Line2 is { Length: > 0 } ? $", {item.Line2}" : null)</strong>
+                        <span>
+                            @string.Join(", ", new[] { item.PostalCode, item.District, item.City, item.Country }.Where(s => !string.IsNullOrWhiteSpace(s)))
+                            · @CrmAddressTypes.Labels.GetValueOrDefault(item.Type, item.Type)
+                            @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">Ana</span> }
+                            @if (!item.IsActive) { <text> · Pasif</text> }
+                        </span>
+                    </div>
+                    @if (CanWrite)
+                    {
+                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">Düzenle</button>
+                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">Sil</button>
+                    }
+                </li>
+            }
+        </ul>
+    }
+    else if (items is not null)
+    {
+        <p class="text-muted">Kayıtlı adres yok.</p>
+    }
+</div>
+
+@code {
+    private const string Url = "/api/crm/addresses";
+
+    private IReadOnlyList<AddressDto>? items;
+    private AddressForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private (Guid, Guid?)? loadedFor;
+
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+
+    [Parameter] public Guid? LocationId { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Adresler";
+
+    [Parameter] public bool CanWrite { get; set; }
+
+    /// <summary>Kaydedilince çağrılır (firma düzeyindeki ana adres eski adres/şehir alanını da değiştirir).</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (CompanyId, LocationId))
+        {
+            return;
+        }
+
+        loadedFor = (CompanyId, LocationId);
+        form = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var query = $"companyId={CompanyId}" + (LocationId is { } location ? $"&locationId={location}" : "&companyLevel=true");
+        items = (await Api.GetAsync<CrmPage<AddressDto>>($"{Url}?{query}&pageSize=100")).Value?.Items ?? [];
+    }
+
+    private void Open(AddressDto? a)
+    {
+        form = a is null
+            ? new AddressForm { IsPrimary = items?.Count == 0, Type = LocationId is null ? "Registered" : "Shipping" }
+            : new AddressForm
+            {
+                Id = a.Id, Version = a.Version, Type = a.Type, Country = a.Country, City = a.City, District = a.District, PostalCode = a.PostalCode,
+                Line1 = a.Line1, Line2 = a.Line2, IsPrimary = a.IsPrimary, IsActive = a.IsActive,
+            };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var f = form!;
+        var request = new SaveAddressRequest(CompanyId, f.Line1, LocationId, f.Type, f.IsPrimary, f.IsActive, f.Country, f.City, f.District,
+            f.PostalCode, f.Line2, f.Version);
+        var result = f.Id is { } id ? await Api.PutAsync<AddressDto>($"{Url}/{id}", request) : await Api.PostAsync<AddressDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+            await Changed.InvokeAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync(AddressDto address)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{address.Id}?version={address.Version}");
+        busy = false;
+        message = result.Error;
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private sealed class AddressForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Type { get; set; } = "Other";
+
+        public string Country { get; set; } = "TR";
+
+        public string? City { get; set; }
+
+        public string? District { get; set; }
+
+        public string? PostalCode { get; set; }
+
+        public string Line1 { get; set; } = string.Empty;
+
+        public string? Line2 { get; set; }
+
+        public bool IsPrimary { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

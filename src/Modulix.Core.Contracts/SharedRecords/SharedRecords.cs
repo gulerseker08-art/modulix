@@ -130,3 +130,15 @@ public sealed record SharedRecordAccess(string EntityKey, string ReadPermission,
 /// sunmalıdır. <see cref="Label"/>: kullanım sayısında gösterilen ad (ör. "CRM firması").
 /// </summary>
 public sealed record SharedRecordReference(string SharedEntityKey, string EntityKey, string Field, string Label);
+
+/// <summary>
+/// Ortak kaydın modül uzantısının kayıt kapsamı (ADR-0010). Genel ortak kayıt uçları (<c>core.party</c>, <c>core.person</c>)
+/// uzantının kapsam kısıtını dolanamaz: modül, çağıranın uzantısını göremediği ortak kayıtları bildirir; bunlar yalnızca
+/// asgari kimlik bilgisiyle (seçim için) verilir, tam profil okunamaz, değiştirilemez ve silinemez. Modül, çağıranın
+/// erişimi başka bir modülden geliyorsa (kendi okuma izni yoksa) kısıt bildirmez. Birden fazla modül varsa en kısıtlısı geçerlidir.
+/// </summary>
+public interface ISharedRecordVisibility
+{
+    /// <summary>Verilen ortak kayıtlardan, çağıranın bu modüldeki kapsamı nedeniyle tam profilini göremeyecek olanların kimlikleri.</summary>
+    Task<IReadOnlySet<Guid>> RestrictedAsync(string sharedEntityKey, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+}

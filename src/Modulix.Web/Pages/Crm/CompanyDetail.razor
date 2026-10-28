@@ -37,27 +37,33 @@
                     }
                 </div>
             </div>
+            <div class="header-actions">
             @if (Session.Can(CrmAccess.CompaniesWrite))
             {
                 <button type="button" class="btn btn-outline-primary" @onclick="() => editingCompany = true">Düzenle</button>
             }
+                @if (Session.Can(CrmAccess.CompaniesMerge))
+                {
+                    <a class="btn btn-outline-secondary" href="@($"crm/firmalar/{Id}/birlestir")">Mükerrer firmayı birleştir</a>
+                }
+            </div>
         </div>
 
         <div class="summary">
             <div class="summary-item">
                 <span>Açık fırsatlar</span>
-                <strong>@OpenOpportunities.Count()</strong>
-                @if (Session.Can(CrmAccess.OpportunityAmountsRead)) { <small>@Totals(OpenOpportunities)</small> }
+                <strong>@Count(summary?.OpenOpportunities)</strong>
+                @if (summary?.OpenTotals is { Count: > 0 } openTotals) { <small>@Totals(openTotals)</small> }
             </div>
             <div class="summary-item">
                 <span>Kazanılan</span>
-                <strong>@WonOpportunities.Count()</strong>
-                @if (Session.Can(CrmAccess.OpportunityAmountsRead)) { <small>@Totals(WonOpportunities)</small> }
+                <strong>@Count(summary?.WonOpportunities)</strong>
+                @if (summary?.WonTotals is { Count: > 0 } wonTotals) { <small>@Totals(wonTotals)</small> }
             </div>
             <div class="summary-item">
                 <span>Açık aktiviteler</span>
-                <strong>@(activities?.Count(a => a.CompletedAt is null) ?? 0)</strong>
-                <small>@OverdueText</small>
+                <strong>@Count(summary?.OpenActivities)</strong>
+                @if (summary?.OverdueActivities is > 0 and var overdue) { <small>@overdue geciken</small> }
             </div>
         </div>
 
@@ -113,6 +119,19 @@
             }
         </dl>
 
+        @* Adresler ve iletişim (ADR-0012): ana kayıtlar yukarıdaki telefon/e-posta/adres alanlarının kaynağıdır. *@
+        <section class="detail-section">
+            <div class="section-header">
+                <h2>Adres ve iletişim</h2>
+            </div>
+            <AddressesSection CompanyId="Id" Title="Adresler" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />
+            <ContactPointsSection CompanyId="Id" Title="Telefon ve e-posta" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />
+        </section>
+
+        <LocationsSection CompanyId="Id" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Lookups="Lookups" />
+
+        <CompanyRelationsSection CompanyId="Id" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Lookups="Lookups" />
+
         @if (Session.Can(CrmAccess.ActivitiesRead))
         {
             <section class="detail-section">
@@ -160,6 +179,7 @@
                 {
                     <p class="text-muted">Henüz aktivite yok.</p>
                 }
+                <Pager Page="activityPage" PageSize="ListSize" TotalCount="activityTotal" PageChanged="ActivityPageChanged" />
             </section>
         }
 
@@ -209,6 +229,7 @@
                 {
                     <p class="text-muted">Henüz fırsat yok.</p>
                 }
+                <Pager Page="opportunityPage" PageSize="ListSize" TotalCount="opportunityTotal" PageChanged="OpportunityPageChanged" />
             </section>
         }
 
@@ -216,34 +237,56 @@
         {
             <section class="detail-section">
                 <div class="section-header">
-                    <h2>Kişiler</h2>
-                    @if (Session.Can(CrmAccess.ContactsWrite))
+                    <h2>Kişiler ve ilişki rolleri</h2>
+                    @if (Session.Can(CrmAccess.ContactsWrite) && !editingLink)
                     {
+                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OpenLink(null)">Kişi ilişkilendir</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => creatingPerson = true">Yeni kişi oluştur</button>
                         <a class="btn btn-outline-secondary btn-sm" href="crm/kisiler">Kişilere git</a>
                     }
                 </div>
-                @if (contacts is { Count: > 0 })
+                @if (creatingPerson)
+                {
+                    <NewCompanyPerson CompanyId="Id" Saved="PersonCreated" Cancelled="() => creatingPerson = false" />
+                }
+                @if (editingLink)
+                {
+                    <CompanyContactEditor CompanyId="Id" Link="selectedLink" Lookups="Lookups" Saved="LinkSaved" Cancelled="() => editingLink = false" />
+                }
+                @if (links is { Count: > 0 })
                 {
                     <ul class="item-list">
-                        @foreach (var contact in contacts)
+                        @foreach (var link in links)
                         {
-                            <li>
+                            <li class="@(link.IsActive ? null : "done")">
                                 <div class="item-main">
-                                    <strong>@contact.FirstName @contact.LastName</strong>
+                                    <strong><a href="crm/kisiler/@link.ContactId">@link.ContactName</a></strong>
                                     <span>
-                                        @contact.Title
-                                        @if (contact.Phone is { } contactPhone) { <text> · </text><a href="tel:@contactPhone">@contactPhone</a> }
-                                        @if (contact.Email is { } contactEmail) { <text> · </text><a href="mailto:@contactEmail">@contactEmail</a> }
+                                        @if (link.IsPrimary) { <span class="badge status-customer">Ana irtibat</span><text> </text> }
+                                        @if (link.IsDecisionMaker) { <span class="badge tag">Karar verici</span><text> </text> }
+                                        @link.JobTitle
+                                        @if (link.Department is { } department) { <text> · @department</text> }
+                                        @foreach (var role in link.Roles) { <span class="badge tag">@CrmRelationshipRoles.Labels.GetValueOrDefault(role, role)</span><text> </text> }
+                                        @if (!link.IsActive) { <text> · Sona erdi: @link.EndDate</text> }
                                     </span>
                                 </div>
+                                @if (Session.Can(CrmAccess.ContactsWrite))
+                                {
+                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenLink(link)">Düzenle</button>
+                                    @if (link.IsActive)
+                                    {
+                                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => EndLinkAsync(link)">Sonlandır</button>
+                                    }
+                                }
                             </li>
                         }
                     </ul>
                 }
-                else if (contacts is not null)
+                else if (links is not null)
                 {
-                    <p class="text-muted">Henüz kişi yok.</p>
+                    <p class="text-muted">Henüz kişi ilişkisi yok.</p>
                 }
+                <Pager Page="contactPage" PageSize="ListSize" TotalCount="contactTotal" PageChanged="ContactPageChanged" />
             </section>
         }
 
@@ -252,11 +295,17 @@
 </AuthGate>
 
 @code {
-    // Bir firmanın ilişkili kayıtları tek sayfada; v1'de her türden ilk 200 kayıt gösterilir.
-    private const int Size = 200;
+    // Listeler sunucuda sayfalanır; özetler (sayı, toplam) sunucuda erişilebilir tüm kayıtlar üzerinden hesaplanır (ADR-0010).
+    private const int ListSize = 20;
+
+    private CompanySummaryDto? summary;
+    private int contactPage = 1, contactTotal, opportunityPage = 1, opportunityTotal, activityPage = 1, activityTotal;
 
     private CompanyDto? company;
-    private IReadOnlyList<ContactDto>? contacts;
+    private IReadOnlyList<CompanyContactDto>? links;
+    private CompanyContactDto? selectedLink;
+    private bool editingLink;
+    private bool creatingPerson;
     private IReadOnlyList<OpportunityDto>? opportunities;
     private IReadOnlyList<ActivityDto>? activities;
     private ActivityDto? selectedActivity;
@@ -270,21 +319,6 @@
     [Parameter] public Guid Id { get; set; }
 
     [Inject] private NavigationManager Navigation { get; set; } = default!;
-
-    private IEnumerable<OpportunityDto> OpenOpportunities =>
-        opportunities?.Where(o => !Lookups.IsClosed(o.Stage)) ?? [];
-
-    // Açık ve kazanılmış sayılan aşamalar firmanın listesindeki kategoriden gelir (Y9b).
-    private IEnumerable<OpportunityDto> WonOpportunities => opportunities?.Where(o => Lookups.IsWon(o.Stage)) ?? [];
-
-    private string? OverdueText
-    {
-        get
-        {
-            var overdue = activities?.Count(IsOverdue) ?? 0;
-            return overdue > 0 ? $"{overdue} geciken" : null;
-        }
-    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -303,17 +337,87 @@
         message = result.Error;
         if (company is null)
         {
+            // Birleştirilmiş eski kimlik (eski bağlantı/yer imi): hedef firmaya yönlendirilir (ADR-0013).
+            if (result.Status == System.Net.HttpStatusCode.NotFound
+                && (await Api.GetAsync<MergedRecordDto>($"/api/crm/companies/merged/{Id}")).Value is { } moved)
+            {
+                Navigation.NavigateTo($"crm/firmalar/{moved.TargetId}", replace: true);
+            }
+
             return;
         }
 
-        await Task.WhenAll(LoadContactsAsync(), LoadOpportunitiesAsync(), LoadActivitiesAsync());
+        await Task.WhenAll(LoadSummaryAsync(), LoadContactsAsync(), LoadOpportunitiesAsync(), LoadActivitiesAsync());
+    }
+
+    private async Task LoadSummaryAsync() => summary = (await Api.GetAsync<CompanySummaryDto>($"/api/crm/companies/{Id}/summary")).Value;
+
+    // Erişim olmayan bölüm sıfır gibi gösterilmez.
+    private static string Count(int? value) => value?.ToString() ?? "—";
+
+    private void OpenLink(CompanyContactDto? link)
+    {
+        selectedLink = link;
+        editingLink = true;
+    }
+
+    private async Task PersonCreated(string? warning)
+    {
+        creatingPerson = false;
+        message = warning;
+        await LoadContactsAsync();
+    }
+
+    // Ana adres/iletişim noktası değişince eski telefon, e-posta, şehir ve adres alanları da değişir.
+    private async Task ReloadCompanyAsync()
+    {
+        var result = await Api.GetAsync<CompanyDto>($"/api/crm/companies/{Id}");
+        company = result.Value ?? company;
+    }
+
+    private async Task LinkSaved()
+    {
+        editingLink = false;
+        await LoadContactsAsync();
+    }
+
+    // İlişkiyi sonlandırmak kişiyi silmez; geçmiş aktivite ve fırsatlar korunur.
+    private async Task EndLinkAsync(CompanyContactDto link)
+    {
+        busy = true;
+        var result = await Api.PutAsync<CompanyContactDto>($"/api/crm/company-contacts/{link.Id}",
+            new SaveCompanyContactRequest(link.CompanyId, link.ContactId, link.Department, link.JobTitle, link.Roles, false,
+                link.IsDecisionMaker, link.StartDate, DateOnly.FromDateTime(DateTime.Today), link.Version));
+        busy = false;
+        message = result.Error;
+        await LoadContactsAsync();
+    }
+
+    private async Task ContactPageChanged(int page)
+    {
+        contactPage = page;
+        await LoadContactsAsync();
+    }
+
+    private async Task OpportunityPageChanged(int page)
+    {
+        opportunityPage = page;
+        await LoadOpportunitiesAsync();
+    }
+
+    private async Task ActivityPageChanged(int page)
+    {
+        activityPage = page;
+        await LoadActivitiesAsync();
     }
 
     private async Task LoadContactsAsync()
     {
         if (Session.Can(CrmAccess.ContactsRead))
         {
-            contacts = (await Api.GetAsync<CrmPage<ContactDto>>($"/api/crm/contacts?companyId={Id}&pageSize={Size}")).Value?.Items ?? [];
+            var page = (await Api.GetAsync<CrmPage<CompanyContactDto>>($"/api/crm/company-contacts?companyId={Id}&page={contactPage}&pageSize={ListSize}")).Value;
+            links = page?.Items ?? [];
+            contactTotal = page?.TotalCount ?? 0;
         }
     }
 
@@ -321,7 +425,9 @@
     {
         if (Session.Can(CrmAccess.OpportunitiesRead))
         {
-            opportunities = (await Api.GetAsync<CrmPage<OpportunityDto>>($"/api/crm/opportunities?companyId={Id}&pageSize={Size}")).Value?.Items ?? [];
+            var page = (await Api.GetAsync<CrmPage<OpportunityDto>>($"/api/crm/opportunities?companyId={Id}&page={opportunityPage}&pageSize={ListSize}")).Value;
+            opportunities = page?.Items ?? [];
+            opportunityTotal = page?.TotalCount ?? 0;
         }
     }
 
@@ -329,7 +435,9 @@
     {
         if (Session.Can(CrmAccess.ActivitiesRead))
         {
-            activities = (await Api.GetAsync<CrmPage<ActivityDto>>($"/api/crm/activities?companyId={Id}&pageSize={Size}")).Value?.Items ?? [];
+            var page = (await Api.GetAsync<CrmPage<ActivityDto>>($"/api/crm/activities?companyId={Id}&page={activityPage}&pageSize={ListSize}")).Value;
+            activities = page?.Items ?? [];
+            activityTotal = page?.TotalCount ?? 0;
         }
     }
 
@@ -339,11 +447,9 @@
     private static string? ActivityClass(ActivityDto activity) =>
         activity.CompletedAt is not null ? "done" : IsOverdue(activity) ? "overdue" : null;
 
-    private static string Totals(IEnumerable<OpportunityDto> items) =>
-        string.Join(" + ", items
-            .Where(o => o.Amount is not null)
-            .GroupBy(o => o.Currency)
-            .Select(g => CrmLabels.Amount(g.Sum(o => o.Amount!.Value), g.Key)));
+    // Para birimleri ayrı ayrı gösterilir; hiçbir zaman toplanıp tek tutar yapılmaz.
+    private static string Totals(IEnumerable<CurrencyTotal> totals) =>
+        string.Join(" + ", totals.Select(t => CrmLabels.Amount(t.Amount, t.Currency)));
 
     private void CompanySaved(CompanyDto saved)
     {
@@ -362,7 +468,7 @@
     private async Task ActivitySaved()
     {
         editingActivity = false;
-        await LoadActivitiesAsync();
+        await Task.WhenAll(LoadActivitiesAsync(), LoadSummaryAsync());
     }
 
     private void OpenOpportunity(OpportunityDto? opportunity)
@@ -374,7 +480,7 @@
     private async Task OpportunitySaved()
     {
         editingOpportunity = false;
-        await LoadOpportunitiesAsync();
+        await Task.WhenAll(LoadOpportunitiesAsync(), LoadSummaryAsync());
     }
 
     private async Task CompleteAsync(ActivityDto activity)
@@ -384,6 +490,6 @@
             $"/api/crm/activities/{activity.Id}", CrmRequests.From(activity) with { CompletedAt = DateTimeOffset.Now });
         busy = false;
         message = result.Error;
-        await LoadActivitiesAsync();
+        await Task.WhenAll(LoadActivitiesAsync(), LoadSummaryAsync());
     }
 }

@@ -56,11 +56,47 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     private Dictionary<string, RecordField<TEntity>> FieldsByName =>
         fieldsByName ??= Fields.ToDictionary(f => f.Name, StringComparer.Ordinal);
 
-    public string? PermissionFor(RecordOperation operation) =>
-        operation == RecordOperation.Read ? ReadPermission : WritePermission;
+    /// <summary>Birleştirme izni (ADR-0013); yalnızca birleştirilebilen depolar verir, diğerlerinde yazma izni geçerlidir.</summary>
+    protected virtual string? MergePermission => null;
+
+    public string? PermissionFor(RecordOperation operation) => operation switch
+    {
+        RecordOperation.Read => ReadPermission,
+        RecordOperation.Merge => MergePermission ?? WritePermission,
+        _ => WritePermission,
+    };
+
+    /// <summary>Kaydın şu andaki (kaydedilmemiş değişiklikleri dahil) hali ve sürümü; birleştirme sonucu için.</summary>
+    protected RecordData Snapshot(TEntity entity) => ToData(entity);
+
+    /// <summary>Kaydın sürümü eşit değilse <see cref="RecordConflictException"/> (birleştirmede ekranın gördüğü sürüm).</summary>
+    protected void EnsureRecordVersion(TEntity entity, long expected) => EnsureVersion(entity, expected);
+
+    /// <summary>Kayıt türünün alanları (birleştirmede alan farkı için).</summary>
+    protected IReadOnlyList<RecordField<TEntity>> AllFields => Fields;
 
     /// <summary>Sorumlusu olan kayıtlarda veri kapsamı (Y8) sorumlu alanına göre uygulanır.</summary>
     string? IRecordStore.OwnerField => IsOwned ? OwnerField : null;
+
+    bool IRecordStore.UsesOwnerScope => UsesScope;
+
+    /// <summary>Veri kapsamı uygulanır mı? Varsayılan: kayıt sorumlu alanı taşıyorsa; başka kayıta bağlı kapsamı olan depo true yapar.</summary>
+    protected virtual bool UsesScope => IsOwned;
+
+    Task<bool> IRecordStore.IsInOwnerScopeAsync(RecordData record, IReadOnlySet<Guid> owners, CancellationToken cancellationToken) =>
+        IsInScopeAsync(record, owners, cancellationToken);
+
+    /// <summary>Kayıt veri kapsamında mı? Varsayılan: sorumlu alanı kapsamdaki kullanıcılardan biri.</summary>
+    protected virtual Task<bool> IsInScopeAsync(RecordData record, IReadOnlySet<Guid> owners, CancellationToken cancellationToken) =>
+        Task.FromResult(record.Values.TryGetPropertyValue(OwnerField, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            && Guid.TryParse(text, out var owner)
+            && owners.Contains(owner));
+
+    /// <summary>Listeye veri kapsamını uygular (sorguda; sayfalama ve toplam doğru kalır).</summary>
+    protected virtual IQueryable<TEntity> ScopeToOwners(IQueryable<TEntity> source, IReadOnlySet<Guid> owners) =>
+        source.Where(OwnedBy(owners));
 
     private static bool IsOwned => typeof(IOwnedEntity).IsAssignableFrom(typeof(TEntity));
 
@@ -108,9 +144,9 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
         var source = await ApplyFiltersAsync(Load(Data.Set<TEntity>().AsNoTracking()), query.Filters, cancellationToken);
-        if (query.Owners is { } owners && IsOwned)
+        if (query.Owners is { } owners && UsesScope)
         {
-            source = source.Where(OwnedBy(owners));
+            source = ScopeToOwners(source, owners);
         }
         if (query.Search is { } term)
         {
@@ -208,9 +244,13 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         }
 
         EnsureVersion(entity, expectedVersion);
+        await BeforeDeleteAsync(entity, cancellationToken);
         Data.Set<TEntity>().Remove(entity);
         return true;
     }
+
+    /// <summary>Kayıt silinmeden önce (ör. kayda ait alt kayıtları kaldırmak için).</summary>
+    protected virtual Task BeforeDeleteAsync(TEntity entity, CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>Entity'yle birlikte yüklenecekler (ör. ortak kayıt: <c>Include(c =&gt; c.Party)</c>).</summary>
     protected virtual IQueryable<TEntity> Load(IQueryable<TEntity> source) => source;

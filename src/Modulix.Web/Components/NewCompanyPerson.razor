@@ -1,0 +1,151 @@
+@* Firma ekranından yeni kişi oluşturup firmaya bağlar (ADR-0011). Kişi ve ilişki kaydı tek istekle oluşur (kişi API'si firmayla
+   birlikte ilişkiyi açar); departman, rol ve ana irtibat gibi ayrıntılar ikinci bir istekle ilişkiye yazılır. İkinci istek
+   başarısız olursa kişi ve ilişki yine de kayıtlıdır; ayrıntılar ilişkinin "Düzenle" ekranından tamamlanır. *@
+@inject ApiClient Api
+
+<form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <h2>Yeni kişi oluştur ve bağla</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="np-first">Ad *</label>
+            <input id="np-first" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.FirstName" />
+            <FieldError Field="firstName" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="np-last">Soyad *</label>
+            <input id="np-last" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.LastName" />
+            <FieldError Field="lastName" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="np-title">Bu firmadaki unvan</label>
+            <input id="np-title" class="form-control" maxlength="@CrmRelationshipLimits.JobTitleMaxLength" @bind="form.Title" />
+            <FieldError Field="title" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="np-dept">Departman</label>
+            <input id="np-dept" class="form-control" maxlength="@CrmRelationshipLimits.DepartmentMaxLength" @bind="form.Department" />
+        </div>
+        <div>
+            <label class="form-label" for="np-email">E-posta</label>
+            <input id="np-email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" @bind="form.Email" />
+            <FieldError Field="email" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="np-phone">Telefon</label>
+            <input id="np-phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
+            <FieldError Field="phone" Errors="errors" />
+        </div>
+        <div class="span-all">
+            <span class="form-label">İlişki rolleri</span>
+            <div class="role-options">
+                @foreach (var (key, label) in CrmRelationshipRoles.Labels)
+                {
+                    <label class="form-check-inline">
+                        <input type="checkbox" checked="@form.Roles.Contains(key)" @onchange="e => Toggle(key, (bool)e.Value!)" /> @label
+                    </label>
+                }
+            </div>
+        </div>
+        <div>
+            <label class="form-check-inline"><input type="checkbox" @bind="form.IsPrimary" /> Ana irtibat</label>
+        </div>
+        <div>
+            <label class="form-check-inline"><input type="checkbox" @bind="form.IsDecisionMaker" /> Karar verici</label>
+        </div>
+    </div>
+    <small class="text-muted">Kişi diğer firmalarla da ilişkilendirilebilir; zaten kayıtlı bir kişiyse "Kişi ilişkilendir"i kullanın.</small>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" disabled="@busy">Oluştur ve bağla</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+    </div>
+</form>
+
+@code {
+    private readonly PersonForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+
+    /// <summary>Kaydedildi; ayrıntılar yazılamadıysa uyarı metni verilir (üst sayfa gösterir).</summary>
+    [Parameter] public EventCallback<string?> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private void Toggle(string key, bool on)
+    {
+        if (on)
+        {
+            form.Roles.Add(key);
+        }
+        else
+        {
+            form.Roles.Remove(key);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        errors = null;
+        message = null;
+        var created = await Api.PostAsync<ContactDto>("/api/crm/contacts",
+            new SaveContactRequest(form.FirstName, form.LastName, CompanyId, form.Title, form.Email, form.Phone));
+        if (!created.IsSuccess)
+        {
+            busy = false;
+            errors = created.FieldErrors;
+            message = created.Error;
+            return;
+        }
+
+        var needsDetails = form.Department is { Length: > 0 } || form.Roles.Count > 0 || form.IsPrimary || form.IsDecisionMaker;
+        if (needsDetails)
+        {
+            var links = (await Api.GetAsync<CrmPage<CompanyContactDto>>(
+                $"/api/crm/company-contacts?contactId={created.Value!.Id}&companyId={CompanyId}&active=true")).Value?.Items;
+            var link = links?.FirstOrDefault();
+            var updated = link is null ? null : await Api.PutAsync<CompanyContactDto>($"/api/crm/company-contacts/{link.Id}",
+                new SaveCompanyContactRequest(CompanyId, created.Value.Id, form.Department, link.JobTitle, [.. form.Roles.Order()],
+                    form.IsPrimary, form.IsDecisionMaker, link.StartDate, null, link.Version));
+            if (updated is null || !updated.IsSuccess)
+            {
+                busy = false;
+                await Saved.InvokeAsync($"Kişi oluşturuldu ve firmaya bağlandı; ancak ilişki ayrıntıları kaydedilemedi ({updated?.Error ?? "ilişki bulunamadı"}). "
+                    + "Ayrıntıları listedeki \"Düzenle\" ile tamamlayın.");
+                return;
+            }
+        }
+
+        busy = false;
+        await Saved.InvokeAsync(null);
+    }
+
+    private sealed class PersonForm
+    {
+        public string FirstName { get; set; } = string.Empty;
+
+        public string LastName { get; set; } = string.Empty;
+
+        public string? Title { get; set; }
+
+        public string? Department { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? Phone { get; set; }
+
+        public HashSet<string> Roles { get; } = [];
+
+        public bool IsPrimary { get; set; }
+
+        public bool IsDecisionMaker { get; set; }
+    }
+}

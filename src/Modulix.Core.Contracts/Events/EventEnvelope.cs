@@ -15,6 +15,12 @@ public static class DomainEventTypes
     public const string RecordDeleted = "RecordDeleted";
 
     /// <summary>
+    /// Kayıt başka bir kayda birleştirildi ve kaldırıldı (ADR-0013). Olay kaynak kaydındır; değişiklik alanı
+    /// <c>mergedInto</c> yeni kimliği verir. Eski kimliğe başvuran modüller buna göre kendi başvurularını yeniler.
+    /// </summary>
+    public const string RecordMerged = "RecordMerged";
+
+    /// <summary>
     /// Üretilen olay türleri ve şu anki sürümleri. Sürüm, bir alanın anlamı veya biçimi değişince artar (alan eklemek
     /// artırmaz); katalog, bu sürümü okuyamayan aboneliği açılışta reddeder.
     /// </summary>
@@ -23,6 +29,7 @@ public static class DomainEventTypes
         [RecordCreated] = 1,
         [RecordUpdated] = 1,
         [RecordDeleted] = 1,
+        [RecordMerged] = 1,
     };
 }
 

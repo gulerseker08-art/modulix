@@ -27,8 +27,23 @@ public static class CrmEndpoints
 
         MapResource<CompanyDto, SaveCompanyRequest>(crm, "companies", CrmModule.Entities.Company,
             CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite);
+        crm.MapGet("/companies/{id:guid}/summary", CompanySummaryEndpoint.GetAsync).RequirePermission(CrmModule.Permissions.CompaniesRead);
+        DuplicateEndpoints.Map(crm);
+        MergeEndpoints.Map(crm);
         MapResource<ContactDto, SaveContactRequest>(crm, "contacts", CrmModule.Entities.Contact,
             CrmModule.Permissions.ContactsRead, CrmModule.Permissions.ContactsWrite);
+        MapResource<CompanyContactDto, SaveCompanyContactRequest>(crm, "company-contacts", CrmModule.Entities.CompanyContact,
+            CrmModule.Permissions.ContactsRead, CrmModule.Permissions.ContactsWrite);
+        MapResource<LocationDto, SaveLocationRequest>(crm, "locations", CrmModule.Entities.Location,
+            CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite);
+        MapResource<AddressDto, SaveAddressRequest>(crm, "addresses", CrmModule.Entities.Address,
+            CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite);
+        MapResource<ContactPointDto, SaveContactPointRequest>(crm, "contact-points", CrmModule.Entities.ContactPoint,
+            CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite);
+        MapResource<PersonContactPointDto, SavePersonContactPointRequest>(crm, "person-contact-points", CrmModule.Entities.PersonContactPoint,
+            CrmModule.Permissions.ContactsRead, CrmModule.Permissions.ContactsWrite);
+        MapResource<CompanyRelationDto, SaveCompanyRelationRequest>(crm, "company-relations", CrmModule.Entities.CompanyRelation,
+            CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite);
         MapResource<OpportunityDto, SaveOpportunityRequest>(crm, "opportunities", CrmModule.Entities.Opportunity,
             CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.OpportunitiesWrite);
         MapResource<ActivityDto, SaveActivityRequest>(crm, "activities", CrmModule.Entities.Activity,

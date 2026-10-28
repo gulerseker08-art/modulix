@@ -1,0 +1,192 @@
+@* İlişkili firmalar (ADR-0012): ana firma / bağlı firma (iştirak) ilişkileri. Ayrı tüzel kişilik ayrı firmadır. İlişkiyi sonlandırmak
+   silmez, geçmişi korur. Kendine bağ ve döngü sunucuda reddedilir. *@
+@inject ApiClient Api
+
+<section class="detail-section">
+    <div class="section-header">
+        <h2>İlişkili firmalar</h2>
+        @if (CanWrite && form is null)
+        {
+            <button type="button" class="btn btn-primary btn-sm" @onclick="Open">Firma bağla</button>
+        }
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label">Bu firma, seçilen firmanın…</label>
+                    <select class="form-select" @bind="form.ThisIsParent">
+                        <option value="@false">bağlı firması (iştiraki)</option>
+                        <option value="@true">ana firmasıdır</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Diğer firma *</label>
+                    <select class="form-select" @bind="form.OtherId">
+                        <option value="">Seçin…</option>
+                        @foreach (var company in Lookups.Companies.Where(c => c.Id != CompanyId))
+                        {
+                            <option value="@company.Id">@company.Name</option>
+                        }
+                    </select>
+                    <FieldError Field="@(form.ThisIsParent ? "childCompanyId" : "parentCompanyId")" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label">Tür</label>
+                    <select class="form-select" @bind="form.Type">
+                        @foreach (var (key, label) in CrmCompanyRelationTypes.Labels)
+                        {
+                            <option value="@key">@label</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Başlangıç</label>
+                    <input class="form-control" type="date" @bind="form.StartDate" />
+                    <FieldError Field="startDate" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">Vazgeç</button>
+            </div>
+        </form>
+    }
+
+    @if (items is { Count: > 0 })
+    {
+        <ul class="item-list">
+            @foreach (var item in items)
+            {
+                var thisIsParent = item.ParentCompanyId == CompanyId;
+                var otherId = thisIsParent ? item.ChildCompanyId : item.ParentCompanyId;
+                <li class="@(item.IsActive ? null : "done")">
+                    <div class="item-main">
+                        <strong><a href="crm/firmalar/@otherId">@(thisIsParent ? item.ChildCompanyName : item.ParentCompanyName)</a></strong>
+                        <span>
+                            @(thisIsParent ? "Bağlı firma" : "Ana firma") · @CrmCompanyRelationTypes.Labels.GetValueOrDefault(item.Type, item.Type)
+                            @if (item.StartDate is { } start) { <text> · @CrmLabels.Date(start)</text> }
+                            @if (!item.IsActive && item.EndDate is { } end) { <text> – Sona erdi: @CrmLabels.Date(end)</text> }
+                        </span>
+                    </div>
+                    @if (CanWrite && item.IsActive)
+                    {
+                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => EndAsync(item)">Sonlandır</button>
+                    }
+                </li>
+            }
+        </ul>
+        <Pager Page="pageNumber" PageSize="PageSize" TotalCount="total" PageChanged="PageChanged" />
+    }
+    else if (items is not null)
+    {
+        <p class="text-muted">Henüz ilişkili firma yok.</p>
+    }
+</section>
+
+@code {
+    private const string Url = "/api/crm/company-relations";
+    private const int PageSize = 20;
+
+    private IReadOnlyList<CompanyRelationDto>? items;
+    private RelationForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private int pageNumber = 1, total;
+    private Guid? loadedFor;
+
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+
+    [Parameter] public bool CanWrite { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == CompanyId)
+        {
+            return;
+        }
+
+        loadedFor = CompanyId;
+        form = null;
+        await LoadAsync();
+    }
+
+    private async Task PageChanged(int page)
+    {
+        pageNumber = page;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var page = (await Api.GetAsync<CrmPage<CompanyRelationDto>>($"{Url}?companyId={CompanyId}&page={pageNumber}&pageSize={PageSize}")).Value;
+        items = page?.Items ?? [];
+        total = page?.TotalCount ?? 0;
+    }
+
+    private void Open()
+    {
+        form = new RelationForm { StartDate = DateOnly.FromDateTime(DateTime.Today) };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (form!.OtherId is not { } other)
+        {
+            errors = new Dictionary<string, string[]> { [form.ThisIsParent ? "childCompanyId" : "parentCompanyId"] = ["Firma seçin."] };
+            return;
+        }
+
+        busy = true;
+        var request = form.ThisIsParent
+            ? new SaveCompanyRelationRequest(CompanyId, other, form.Type, form.StartDate)
+            : new SaveCompanyRelationRequest(other, CompanyId, form.Type, form.StartDate);
+        var result = await Api.PostAsync<CompanyRelationDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    // Sonlandırmak ilişkiyi silmez; geçmişte kalır ve ters yönde yeni bağ kurulabilir.
+    private async Task EndAsync(CompanyRelationDto relation)
+    {
+        busy = true;
+        var result = await Api.PutAsync<CompanyRelationDto>($"{Url}/{relation.Id}", new SaveCompanyRelationRequest(
+            relation.ParentCompanyId, relation.ChildCompanyId, relation.Type, relation.StartDate, DateOnly.FromDateTime(DateTime.Today),
+            relation.Notes, relation.Version));
+        busy = false;
+        message = result.Error;
+        await LoadAsync();
+    }
+
+    private sealed class RelationForm
+    {
+        public bool ThisIsParent { get; set; }
+
+        public Guid? OtherId { get; set; }
+
+        public string Type { get; set; } = "Subsidiary";
+
+        public DateOnly? StartDate { get; set; }
+    }
+}

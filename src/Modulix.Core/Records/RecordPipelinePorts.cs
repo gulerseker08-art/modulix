@@ -105,6 +105,29 @@ public enum AuditAction
 
     /// <summary>Yetkisiz aktif şirket seçimi reddedildi (Ç22).</summary>
     CompanySelectionDenied = 18,
+
+    /// <summary>Kayıt başka bir kayda birleştirilip kaldırıldı (ADR-0013); hedef kayıtta ise birleşen kaydın değişiklikleri Updated gibi yazılır.</summary>
+    Merged = 19,
+}
+
+/// <summary>
+/// Birleştirmede ortak kayda başka modüllerin başvuruları (ADR-0013). Birleştiren modülün kendi başvuruları deposunca
+/// taşınır; diğer modüllerin (<see cref="Modulix.Core.Contracts.SharedRecords.SharedRecordReference"/>) başvuruları burada
+/// bulunur: taşıyabilen depo (<see cref="IReferenceMover"/>) taşır, taşıyamayan engel olur.
+/// </summary>
+public interface ISharedReferenceMerger
+{
+    /// <summary>Kaynak ortak kayda başka modüllerden kaç başvuru var ve hepsi taşınabilir mi.</summary>
+    Task<SharedReferencePlan> PlanAsync(string sharedEntityKey, string ownerPrefix, Guid fromId, CancellationToken cancellationToken);
+
+    /// <summary>Planlanan başvuruları hedefe çevirir (kaydetmez).</summary>
+    Task ApplyAsync(string sharedEntityKey, string ownerPrefix, Guid fromId, Guid toId, CancellationToken cancellationToken);
+}
+
+/// <summary>Taşınacak başvurular (<see cref="Impacts"/>) ve taşınamayanlar (<see cref="Blockers"/>).</summary>
+public sealed record SharedReferencePlan(IReadOnlyList<MergeImpact> Impacts, IReadOnlyList<string> Blockers)
+{
+    public static SharedReferencePlan None { get; } = new([], []);
 }
 
 /// <summary>Audit kaydı: kim, ne, ne zaman. <see cref="Changes"/>: alan → { old, new }.</summary>

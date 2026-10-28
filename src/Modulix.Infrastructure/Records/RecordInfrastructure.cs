@@ -268,6 +268,7 @@ public static class RecordsSetup
         services.TryAddScoped<IEntitlementService, ModuleEntitlementService>();
         services.TryAddScoped<IPermissionService, StorePermissionService>();
         services.TryAddScoped<IDataScopeService, MembershipDataScope>();
+        services.TryAddScoped<IRecordAccess, RecordAccess>();
         services.TryAddScoped<IFieldAccessService, PermissionFieldAccess>();
 
         services.TryAddSingleton(TimeProvider.System);
@@ -276,6 +277,7 @@ public static class RecordsSetup
         services.AddScoped<IDomainEventOutbox, EfDomainEventOutbox>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IRecordStoreRegistry, RecordStoreRegistry>();
+        services.AddScoped<ISharedReferenceMerger, SharedReferenceMerger>();
         services.AddScoped<IRecordPipeline, RecordPipeline>();
 
         services.AddScoped<IRecordStore, TenantSettingRecordStore>();
