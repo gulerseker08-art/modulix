@@ -2,15 +2,28 @@
    düzenleme. İletişim noktası pazarlama izni değildir; aynı e-posta/santral başka kayıtlarda da olabilir. *@
 @inject ApiClient Api
 
-<div class="sub-section">
+<div class="sub-section @(open ? null : "closed")">
     <div class="section-header">
-        <h3>@Title</h3>
+        <h3>
+            <button type="button" class="section-toggle" aria-expanded="@(open ? "true" : "false")"@onclick="() => open = !open">
+                <span class="section-icon"><AppIcon Name="phone" Size="18" /></span>
+                <span class="section-title">@Title</span>
+                @if (items is not null)
+                {
+                    <span class="count-pill">@items.Count</span>
+                }
+                <span class="section-chevron"><AppIcon Name="chevron-down" Size="18" /></span>
+            </button>
+        </h3>
         @if (CanWrite && form is null)
         {
-            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(null)">Ekle</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="OpenNew">Ekle</button>
         }
     </div>
 
+    @if (open)
+    {
+    <div class="section-body">
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
@@ -100,9 +113,12 @@
     {
         <p class="text-muted">Kayıt yok.</p>
     }
+    </div>
+    }
 </div>
 
 @code {
+    private bool open = true;
     private List<PointRow>? items;
     private PointRow? form;
     private IReadOnlyDictionary<string, string[]>? errors;
@@ -160,6 +176,13 @@
             var page = (await Api.GetAsync<CrmPage<ContactPointDto>>($"{Url}?{query}&pageSize=100")).Value;
             items = page?.Items.Select(p => PointRow.From(p.Id, p.Version, p.Channel, p.Type, p.Value, p.IsPrimary, p.IsActive, p.IsShared, p.Note)).ToList() ?? [];
         }
+    }
+
+    // Kapalı bölümde "Ekle" bölümü açar; yoksa form görünmez kalırdı.
+    private void OpenNew()
+    {
+        open = true;
+        Open(null);
     }
 
     private void Open(PointRow? row)

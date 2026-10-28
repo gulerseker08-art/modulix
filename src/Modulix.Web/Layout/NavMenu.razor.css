@@ -1,5 +1,6 @@
 .navbar-toggler {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--mx-lilac);
+    border-color: var(--mx-border);
 }
 
 .top-row {
@@ -21,7 +22,7 @@
     }
 
     .nav-item ::deep a {
-        color: #c3c9db;
+        color: var(--mx-muted);
         border-radius: 0.625rem;
         height: 2.75rem;
         padding: 0 0.85rem;
@@ -37,14 +38,14 @@
     }
 
 .nav-item ::deep a.active {
-    background-color: var(--mx-indigo);
-    color: white;
-    box-shadow: 0 4px 12px rgba(46, 51, 207, 0.35);
+    background-color: var(--mx-lilac);
+    color: var(--mx-indigo);
+    font-weight: 600;
 }
 
 .nav-item ::deep a:hover:not(.active) {
-    background-color: rgba(255,255,255,0.07);
-    color: white;
+    background-color: var(--mx-cream);
+    color: var(--mx-ink);
 }
 
 .nav-item ::deep a:focus-visible {
@@ -59,14 +60,14 @@
     gap: 0.6rem;
     padding-top: 0.35rem;
     padding-bottom: 0.6rem;
-    color: #fff;
+    color: var(--mx-ink);
     font-size: 1.05rem;
     font-weight: 700;
 }
 
     .nav-module ::deep .app-icon {
         flex: none;
-        color: var(--mx-teal);
+        color: var(--mx-indigo);
     }
 
 @media (min-width: 641px) {

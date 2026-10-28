@@ -1,0 +1,22 @@
+@* Yatay çubuk grafik: en büyük değere göre ölçeklenir. Çubuk uzunluğu CSS ile çizilir, ek betik gerekmez. *@
+@{
+    var max = Slices.Count == 0 ? 0 : Slices.Max(s => s.Value);
+}
+<div class="bar-chart" role="img" aria-label="@Title">
+    @for (var i = 0; i < Slices.Count; i++)
+    {
+        // Değeri olan çubuk görünür kalsın diye en az %2; sıfır değer çubuksuz kalır.
+        var width = max > 0 && Slices[i].Value > 0 ? Math.Max(2, (double)(Slices[i].Value / max) * 100) : 0;
+        <div class="bar-row">
+            <span class="bar-label">@Slices[i].Label</span>
+            <span class="bar-track"><span class="bar-fill chart-bg-c@(i % 6)" style="width:@width.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></span></span>
+            <strong class="bar-value">@Slices[i].Value.ToString("N0", Regional.Numbers)</strong>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ChartSlice> Slices { get; set; } = [];
+
+    [Parameter] public string Title { get; set; } = "Çubuk grafik";
+}

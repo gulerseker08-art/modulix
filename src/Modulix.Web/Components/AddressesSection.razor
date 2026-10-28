@@ -1,15 +1,28 @@
 @* Yapılandırılmış adresler (ADR-0012): firma düzeyinde (LocationId boş) ya da bir lokasyonun adresleri. Liste ve satır içi düzenleme. *@
 @inject ApiClient Api
 
-<div class="sub-section">
+<div class="sub-section @(open ? null : "closed")">
     <div class="section-header">
-        <h3>@Title</h3>
+        <h3>
+            <button type="button" class="section-toggle" aria-expanded="@(open ? "true" : "false")"@onclick="() => open = !open">
+                <span class="section-icon"><AppIcon Name="map-pin" Size="18" /></span>
+                <span class="section-title">@Title</span>
+                @if (items is not null)
+                {
+                    <span class="count-pill">@items.Count</span>
+                }
+                <span class="section-chevron"><AppIcon Name="chevron-down" Size="18" /></span>
+            </button>
+        </h3>
         @if (CanWrite && form is null)
         {
-            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(null)">Adres ekle</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="OpenNew">Adres ekle</button>
         }
     </div>
 
+    @if (open)
+    {
+    <div class="section-body">
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
@@ -105,10 +118,14 @@
     {
         <p class="text-muted">Kayıtlı adres yok.</p>
     }
+    </div>
+    }
 </div>
 
 @code {
     private const string Url = "/api/crm/addresses";
+
+    private bool open = true;
 
     private IReadOnlyList<AddressDto>? items;
     private AddressForm? form;
@@ -144,6 +161,13 @@
     {
         var query = $"companyId={CompanyId}" + (LocationId is { } location ? $"&locationId={location}" : "&companyLevel=true");
         items = (await Api.GetAsync<CrmPage<AddressDto>>($"{Url}?{query}&pageSize=100")).Value?.Items ?? [];
+    }
+
+    // Kapalı bölümde "Adres ekle" bölümü açar; yoksa form görünmez kalırdı.
+    private void OpenNew()
+    {
+        open = true;
+        Open(null);
     }
 
     private void Open(AddressDto? a)
