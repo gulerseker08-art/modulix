@@ -1,0 +1,14 @@
+@page "/crm/kisiler/{TargetId:guid}/birlestir"
+@inject SessionState Session
+
+<PageTitle>Kişi birleştir · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ContactsMerge">
+    <MergeWizard Resource="contacts" TargetId="TargetId" SourceId="SourceId" />
+</AuthGate>
+
+@code {
+    [Parameter] public Guid TargetId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "kaynak")] public Guid? SourceId { get; set; }
+}

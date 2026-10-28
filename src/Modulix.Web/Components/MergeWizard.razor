@@ -1,0 +1,244 @@
+@* Mükerrer kayıt birleştirme (ADR-0013): kaynak seçimi → önizleme (alan farkı, etkilenen kayıtlar, engeller) → onay. Kaynak kayıt
+   kaldırılır ve geri alınamaz; bu yüzden önizleme zorunlu, onay açıkça istenir. Birleştirme izni yoksa uç nokta 403 verir. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<a class="back-link" href="@($"{DetailPath}/{TargetId}")">← @Title</a>
+
+<div class="page-header">
+    <h1>Mükerrer @Label birleştir</h1>
+</div>
+
+@if (message is not null)
+{
+    <div class="alert alert-danger" role="alert">@message</div>
+}
+
+@if (targetName is null)
+{
+    @if (message is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+}
+else
+{
+    <p>
+        <strong>Hedef (kalacak kayıt):</strong> @targetName.
+        Kaynak @Label hedefe katılır: bağlı kayıtları hedefe taşınır, kaynak kayıt <strong>kaldırılır</strong> ve bu geri alınamaz.
+        Eski kimlikle gelen bağlantılar hedefe yönlendirilir.
+    </p>
+
+    @if (SourceId is null)
+    {
+        <form class="search" @onsubmit="SearchAsync" @onsubmit:preventDefault>
+            <input class="form-control" type="search" placeholder="Birleştirilecek (kaldırılacak) @Label — ad ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        @if (found is { Count: 0 })
+        {
+            <p class="text-muted">Kayıt bulunamadı.</p>
+        }
+        else if (found is not null)
+        {
+            <ul class="item-list">
+                @foreach (var record in found.Where(r => r.Id != TargetId))
+                {
+                    <li>
+                        <div class="item-main"><strong>@record.Name</strong></div>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Choose(record.Id)">Kaynak olarak seç</button>
+                    </li>
+                }
+            </ul>
+        }
+    }
+    else if (preview is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Önizleme hazırlanıyor…</p>
+        }
+    }
+    else
+    {
+        <p>
+            <strong>Kaynak (kaldırılacak kayıt):</strong> @preview.SourceName
+            <a class="ms-2" href="@($"{DetailPath}/{SourceId}/birlestir?kaynak={TargetId}")">Yönü değiştir</a>
+        </p>
+
+        @if (preview.Blockers.Count > 0)
+        {
+            <div class="alert alert-danger" role="alert">
+                <strong>Birleştirme yapılamaz:</strong>
+                <ul>@foreach (var blocker in preview.Blockers) { <li>@blocker</li> }</ul>
+            </div>
+        }
+
+        <section class="detail-section">
+            <h2>Alanlar</h2>
+            @if (preview.Fields.Count == 0)
+            {
+                <p class="text-muted">İki kayıt aynı değerlere sahip; seçilecek alan yok.</p>
+            }
+            else
+            {
+                <p class="text-muted small">Farklı olan her alan için hangi değerin kalacağını seçin. Seçilmeyen alan hedefte olduğu gibi kalır.</p>
+                <table class="table record-table">
+                    <thead><tr><th>Alan</th><th>Hedefteki değer</th><th>Kaynaktaki değer</th></tr></thead>
+                    <tbody>
+                        @foreach (var field in preview.Fields)
+                        {
+                            <tr>
+                                <td data-label="Alan" class="primary">@FieldLabel(field.Field)</td>
+                                <td data-label="Hedefteki değer">
+                                    <label><input type="radio" name="@("f_" + field.Field)" checked="@(Choice(field) == MergeSide.Target)" @onchange="() => choices[field.Field] = MergeSide.Target" /> @Show(field.Target)</label>
+                                </td>
+                                <td data-label="Kaynaktaki değer">
+                                    <label><input type="radio" name="@("f_" + field.Field)" checked="@(Choice(field) == MergeSide.Source)" @onchange="() => choices[field.Field] = MergeSide.Source" /> @Show(field.Source)</label>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section class="detail-section">
+            <h2>Etkilenen kayıtlar</h2>
+            <ul>
+                @foreach (var impact in preview.Impacts)
+                {
+                    <li>@impact.Count × @impact.Label</li>
+                }
+            </ul>
+        </section>
+
+        <div class="form-actions">
+            <label class="me-3"><input type="checkbox" @bind="confirmed" /> Kaynak kaydın kaldırılacağını ve bunun geri alınamayacağını anladım.</label>
+            <button type="button" class="btn btn-danger" disabled="@(busy || !confirmed || preview.Blockers.Count > 0)" @onclick="MergeAsync">Birleştir</button>
+            <a class="btn btn-outline-secondary" href="@($"{DetailPath}/{TargetId}")">Vazgeç</a>
+        </div>
+    }
+}
+
+@code {
+    private static class MergeSide
+    {
+        public const string Source = "source";
+        public const string Target = "target";
+    }
+
+    private readonly Dictionary<string, string> choices = [];
+    private string? targetName;
+    private string? search;
+    private List<(Guid Id, string Name)>? found;
+    private MergePreviewDto? preview;
+    private string? message;
+    private bool confirmed;
+    private bool busy;
+    private (Guid Target, Guid? Source) loadedFor;
+
+    /// <summary>"companies" veya "contacts".</summary>
+    [Parameter, EditorRequired] public string Resource { get; set; } = "companies";
+
+    [Parameter, EditorRequired] public Guid TargetId { get; set; }
+
+    /// <summary>Kaldırılacak kayıt; boşsa kullanıcı arayarak seçer.</summary>
+    [Parameter] public Guid? SourceId { get; set; }
+
+    private string Label => Resource == "companies" ? "firma" : "kişi";
+
+    private string Title => Resource == "companies" ? "Firma" : "Kişi";
+
+    private string DetailPath => Resource == "companies" ? "crm/firmalar" : "crm/kisiler";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (TargetId, SourceId))
+        {
+            return;
+        }
+
+        loadedFor = (TargetId, SourceId);
+        (message, preview, found, confirmed) = (null, null, null, false);
+        choices.Clear();
+
+        var target = await Api.GetAsync<JsonObject>($"/api/crm/{Resource}/{TargetId}");
+        targetName = target.Value is { } record ? NameOf(record) : null;
+        message = target.Error;
+        if (target.Value is not null && SourceId is { } source)
+        {
+            await PreviewAsync(source);
+        }
+    }
+
+    private static string NameOf(JsonObject record) =>
+        record["name"]?.GetValue<string>() ?? $"{record["firstName"]?.GetValue<string>()} {record["lastName"]?.GetValue<string>()}".Trim();
+
+    private async Task SearchAsync()
+    {
+        var result = await Api.GetAsync<CrmPage<JsonObject>>($"/api/crm/{Resource}?pageSize=20&search={Uri.EscapeDataString(search ?? string.Empty)}");
+        message = result.Error;
+        found = result.Value?.Items.Select(r => (Guid.Parse(r["id"]!.GetValue<string>()), NameOf(r))).ToList();
+    }
+
+    private void Choose(Guid id) => Navigation.NavigateTo($"{DetailPath}/{TargetId}/birlestir?kaynak={id}");
+
+    private async Task PreviewAsync(Guid source)
+    {
+        // Sürümler önizlemeden gelir; birleştirirken aynı sürümlerle gönderilir (arada değişen kayıt 409 verir).
+        var result = await Api.PostAsync<MergePreviewDto>($"/api/crm/{Resource}/{TargetId}/merge/preview", new MergeRecordsRequest(source, 0, 0));
+        message = result.Error;
+        preview = result.Value;
+        if (preview is not null)
+        {
+            foreach (var field in preview.Fields)
+            {
+                choices[field.Field] = field.Suggested;
+            }
+        }
+    }
+
+    private string Choice(MergeFieldDiffDto field) => choices.GetValueOrDefault(field.Field, field.Suggested);
+
+    private async Task MergeAsync()
+    {
+        if (preview is null)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.PostAsync<MergeResultDto>($"/api/crm/{Resource}/{TargetId}/merge",
+            new MergeRecordsRequest(preview.SourceId, preview.SourceVersion, preview.TargetVersion,
+                preview.Fields.ToDictionary(f => f.Field, Choice)));
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo($"{DetailPath}/{result.Value!.TargetId}");
+            return;
+        }
+
+        message = result.Status == System.Net.HttpStatusCode.Conflict
+            ? $"{result.Error} Sayfayı yenileyip önizlemeyi yeniden hazırlayın."
+            : string.Join(" ", result.FieldErrors.SelectMany(e => e.Value).DefaultIfEmpty(result.Error ?? "Birleştirilemedi."));
+    }
+
+    private static string Show(JsonNode? node) => node switch
+    {
+        null => "—",
+        JsonArray array => string.Join(", ", array.Select(Show)),
+        JsonValue value when value.TryGetValue<string>(out var text) => string.IsNullOrWhiteSpace(text) ? "—" : text,
+        _ => node.ToJsonString(),
+    };
+
+    private static string FieldLabel(string field) => field switch
+    {
+        "name" => "Ad", "kind" => "Tür", "taxOffice" => "Vergi dairesi", "taxNumber" => "Vergi / T.C. kimlik no", "phone" => "Telefon",
+        "email" => "E-posta", "website" => "Web sitesi", "city" => "Şehir", "address" => "Adres", "industry" => "Sektör", "status" => "Durum",
+        "source" => "Kaynak", "tags" => "Etiketler", "ownerId" => "Sorumlu", "notes" => "Notlar", "firstName" => "Ad", "lastName" => "Soyad",
+        "title" => "Unvan", _ when field.StartsWith("custom.", StringComparison.Ordinal) => field["custom.".Length..], _ => field,
+    };
+}

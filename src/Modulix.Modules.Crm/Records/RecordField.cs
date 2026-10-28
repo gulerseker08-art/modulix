@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Records;
@@ -187,6 +188,83 @@ internal static class Field
         {
             Exists = (context, id, ct) => context.Data.Set<TTarget>().AnyAsync(t => t.Id == id, ct),
             NotFoundMessage = notFoundMessage,
+        };
+
+    /// <summary>Taraf türü: "Organization" (tüzel) veya "Individual" (gerçek kişi). Boş gönderilirse mevcut tür korunur.</summary>
+    public static RecordField<T> Kind<T>(string name, Func<T, PartyKind> get, Action<T, PartyKind> set) =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() == JsonValueKind.String
+                && Enum.TryParse<PartyKind>(node.GetValue<string>(), ignoreCase: false, out var kind)
+                && Enum.IsDefined(kind)
+                && !char.IsDigit(node.GetValue<string>()[0])
+                    ? ParsedValue.Of(kind)
+                    : ParsedValue.Fail("Organization veya Individual olmalıdır."),
+            e => get(e).ToString(),
+            (e, v) => { if (v is PartyKind kind) { set(e, kind); } });
+
+    /// <summary>Evet/hayır alanı; boş gönderilirse hayır.</summary>
+    public static RecordField<T> Flag<T>(string name, Func<T, bool> get, Action<T, bool> set, bool createOnly = false) =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() is JsonValueKind.True or JsonValueKind.False
+                    ? ParsedValue.Of(node.GetValue<bool>())
+                    : ParsedValue.Fail("true veya false olmalıdır."),
+            e => JsonValue.Create(get(e)),
+            (e, v) => set(e, v is true))
+        {
+            CreateOnly = createOnly,
+        };
+
+    /// <summary>
+    /// Anahtar listesi (ör. ilişki rolleri): metin dizisi, her biri izinli anahtarlardan biri, tekrarsız. Boş dizi ve boş
+    /// değer "rol yok"tur.
+    /// </summary>
+    public static RecordField<T> KeyList<T>(
+        string name, IReadOnlyCollection<string> allowed, int maxLength, Func<T, IReadOnlyList<string>> get, Action<T, string?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                if (node is not JsonArray array || array.Any(n => n is null || n.GetValueKind() != JsonValueKind.String))
+                {
+                    return ParsedValue.Fail("Metin listesi olmalıdır.");
+                }
+
+                var keys = array.Select(n => n!.GetValue<string>().Trim()).ToList();
+                if (keys.FirstOrDefault(k => !allowed.Contains(k)) is { } unknown)
+                {
+                    return ParsedValue.Fail($"Geçersiz değer: {unknown}.");
+                }
+
+                var joined = string.Join(',', keys.Distinct(StringComparer.Ordinal));
+                return joined.Length > maxLength ? ParsedValue.Fail("Çok fazla değer seçildi.") : ParsedValue.Of(joined.Length == 0 ? null : joined);
+            },
+            e => new JsonArray([.. get(e).Select(k => (JsonNode?)JsonValue.Create(k))]),
+            (e, v) => set(e, (string?)v));
+
+    /// <summary>Sabit anahtar listesinden tek değer (ör. adres türü). Boş gönderilirse verilmemiş sayılır: varsayılan/mevcut değer kalır.</summary>
+    public static RecordField<T> Choice<T>(
+        string name, IReadOnlyCollection<string> allowed, Func<T, string> get, Action<T, string> set, bool createOnly = false) =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() == JsonValueKind.String && node.GetValue<string>().Trim() is var key && allowed.Contains(key)
+                    ? ParsedValue.Of(key)
+                    : ParsedValue.Fail($"Şunlardan biri olmalıdır: {string.Join(", ", allowed)}."),
+            e => get(e),
+            (e, v) => { if (v is string key) { set(e, key); } })
+        {
+            CreateOnly = createOnly,
+        };
+
+    /// <summary>Boş olabilen, yalnızca oluştururken verilen kayıt kimliği (ör. adresin lokasyonu); depo <c>PrepareNewAsync</c>'te okur.</summary>
+    public static RecordField<T> CreateOnlyId<T>(string name, Func<T, Guid?> get) =>
+        new(name, required: false, nullable: true, ParseId, e => get(e) is { } value ? value.ToString() : null, (_, _) => { })
+        {
+            CreateOnly = true,
+        };
+
+    /// <summary>Salt okunur görüntü alanı (ör. bağlı kaydın adı): okunur, yazılamaz.</summary>
+    public static RecordField<T> ReadOnly<T>(string name, Func<T, string?> get) =>
+        new(name, required: false, nullable: true, node => ParsedValue.Of(node.GetValueKind() == JsonValueKind.String ? node.GetValue<string>() : null),
+            e => get(e), (_, _) => { })
+        {
+            CreateOnly = true,
         };
 
     /// <summary>

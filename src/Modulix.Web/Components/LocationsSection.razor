@@ -1,0 +1,217 @@
+@* Müşteri lokasyonları (ADR-0012): aynı tüzel kişiliğin şube/depo/fabrika/teslimat noktaları. Ayrı tüzel kişilik için bunun yerine
+   "İlişkili firmalar" bölümünden ayrı firma bağlanır. Her lokasyon açılınca kendi adres ve iletişim noktalarını gösterir. *@
+@inject ApiClient Api
+
+<section class="detail-section">
+    <div class="section-header">
+        <h2>Lokasyonlar</h2>
+        @if (CanWrite && form is null)
+        {
+            <button type="button" class="btn btn-primary btn-sm" @onclick="() => Open(null)">Lokasyon ekle</button>
+        }
+    </div>
+    <p class="text-muted small">Aynı vergi numarasını paylaşan şube, depo veya teslimat noktaları. Ayrı bir tüzel kişilik için ayrı firma açın ve "İlişkili firmalar"dan bağlayın.</p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label">Ad *</label>
+                    <input class="form-control" maxlength="@CrmDirectoryLimits.LocationNameMaxLength" @bind="form.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label">Kod</label>
+                    <input class="form-control" maxlength="@CrmDirectoryLimits.LocationCodeMaxLength" @bind="form.Code" />
+                    <FieldError Field="code" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label">Tür</label>
+                    <select class="form-select" @bind="form.Type">
+                        @foreach (var (key, label) in CrmLocationTypes.Labels)
+                        {
+                            <option value="@key">@label</option>
+                        }
+                    </select>
+                    <FieldError Field="type" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label">Yetkili kişi</label>
+                    <select class="form-select" @bind="form.ContactId">
+                        <option value="">—</option>
+                        @foreach (var contact in Lookups.Contacts)
+                        {
+                            <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
+                        }
+                    </select>
+                    <FieldError Field="contactId" Errors="errors" />
+                </div>
+                <div class="span-all">
+                    <label class="form-label">Notlar</label>
+                    <textarea class="form-control" rows="2" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
+                </div>
+                @if (form.Id is not null)
+                {
+                    <div>
+                        <label class="form-check-inline"><input type="checkbox" @bind="form.IsActive" /> Aktif</label>
+                    </div>
+                }
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger btn-sm ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    @if (items is { Count: > 0 })
+    {
+        <ul class="item-list">
+            @foreach (var item in items)
+            {
+                <li class="@(item.IsActive ? null : "done")">
+                    <div class="item-main">
+                        <strong>@item.Name@(item.Code is { Length: > 0 } ? $" ({item.Code})" : null)</strong>
+                        <span>
+                            @CrmLocationTypes.Labels.GetValueOrDefault(item.Type, item.Type)
+                            @if (!item.IsActive) { <text> · Pasif</text> }
+                            @if (item.ContactId is { } contactId) { <text> · Yetkili: @Lookups.ContactName(contactId)</text> }
+                        </span>
+                        @if (expanded == item.Id)
+                        {
+                            <AddressesSection CompanyId="CompanyId" LocationId="item.Id" Title="Lokasyon adresleri" CanWrite="CanWrite" />
+                            <ContactPointsSection CompanyId="CompanyId" LocationId="item.Id" Title="Lokasyon iletişimi" CanWrite="CanWrite" />
+                        }
+                    </div>
+                    <button type="button" class="btn btn-link btn-sm" aria-expanded="@(expanded == item.Id)"
+                            @onclick="() => expanded = expanded == item.Id ? null : item.Id">@(expanded == item.Id ? "Gizle" : "Adres / iletişim")</button>
+                    @if (CanWrite)
+                    {
+                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">Düzenle</button>
+                    }
+                </li>
+            }
+        </ul>
+        <Pager Page="pageNumber" PageSize="PageSize" TotalCount="total" PageChanged="PageChanged" />
+    }
+    else if (items is not null)
+    {
+        <p class="text-muted">Henüz lokasyon yok.</p>
+    }
+</section>
+
+@code {
+    private const string Url = "/api/crm/locations";
+    private const int PageSize = 20;
+
+    private IReadOnlyList<LocationDto>? items;
+    private LocationForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private int pageNumber = 1, total;
+    private Guid? expanded;
+    private Guid? loadedFor;
+
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+
+    [Parameter] public bool CanWrite { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == CompanyId)
+        {
+            return;
+        }
+
+        loadedFor = CompanyId;
+        form = null;
+        await LoadAsync();
+    }
+
+    private async Task PageChanged(int page)
+    {
+        pageNumber = page;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var page = (await Api.GetAsync<CrmPage<LocationDto>>($"{Url}?companyId={CompanyId}&page={pageNumber}&pageSize={PageSize}")).Value;
+        items = page?.Items ?? [];
+        total = page?.TotalCount ?? 0;
+    }
+
+    private void Open(LocationDto? l)
+    {
+        form = l is null
+            ? new LocationForm()
+            : new LocationForm { Id = l.Id, Version = l.Version, Name = l.Name, Code = l.Code, Type = l.Type, IsActive = l.IsActive, ContactId = l.ContactId, Notes = l.Notes };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var f = form!;
+        var request = new SaveLocationRequest(CompanyId, f.Name, f.Code, f.Type, f.IsActive, f.ContactId, f.Notes, f.Version);
+        var result = f.Id is { } id ? await Api.PutAsync<LocationDto>($"{Url}/{id}", request) : await Api.PostAsync<LocationDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    // Lokasyonla birlikte adresleri ve iletişim noktaları da silinir.
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
+        busy = false;
+        message = result.Error;
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+        }
+    }
+
+    private sealed class LocationForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? Code { get; set; }
+
+        public string Type { get; set; } = "Branch";
+
+        public bool IsActive { get; set; } = true;
+
+        public Guid? ContactId { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}

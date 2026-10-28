@@ -1570,3 +1570,15 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+
+/* Sayfa başlığındaki eylem düğmeleri (ör. Düzenle + Birleştir). */
+.header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* Mükerrer önerisi paneli (ADR-0013). */
+.duplicate-box {
+    margin-top: 0.25rem;
+}

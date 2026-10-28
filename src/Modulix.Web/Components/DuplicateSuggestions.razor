@@ -1,0 +1,106 @@
+@* Mükerrer önerisi (ADR-0013): kayıt açarken/düzenlerken olası eşleşmeleri gösterir. Hiçbir şeyi birleştirmez ya da bağlamaz;
+   kesin eşleşme (vergi no) ile olası eşleşme (ad, e-posta, telefon) ayrı gösterilir, karar kullanıcıdadır. *@
+@inject ApiClient Api
+@inject SessionState Session
+
+<div class="duplicate-box">
+    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="CheckAsync">Benzer kayıt var mı?</button>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger mt-2" role="alert">@message</div>
+    }
+
+    @if (candidates is { Count: 0 })
+    {
+        <p class="text-muted small mt-2">Eşleşen kayıt bulunamadı.</p>
+    }
+    else if (candidates is not null)
+    {
+        <ul class="item-list mt-2">
+            @foreach (var candidate in candidates)
+            {
+                <li>
+                    <div class="item-main">
+                        <strong>
+                            @if (candidate.Id is { } id)
+                            {
+                                <a href="@($"{DetailPath}/{id}")" target="_blank" rel="noopener">@candidate.Name</a>
+                            }
+                            else
+                            {
+                                @candidate.Name
+                            }
+                        </strong>
+                        <span>
+                            @if (candidate.Match == CrmMatchKinds.Exact)
+                            {
+                                <span class="badge status-customer">Kesin eşleşme</span><text> </text>
+                            }
+                            else
+                            {
+                                <span class="badge tag">Olası eşleşme</span><text> </text>
+                            }
+                            @string.Join(" · ", candidate.Reasons)
+                            @if (candidate.TaxNumber is { } tax) { <text> · @tax</text> }
+                            @if (candidate.City is { } city) { <text> · @city</text> }
+                            @if (candidate.Email is { } email) { <text> · @email</text> }
+                        </span>
+                        @if (candidate.Id is null)
+                        {
+                            <small class="text-muted">Bu kayıt başka bir modülde ya da erişiminiz dışında kayıtlı; ayrıntıları görünmez.</small>
+                        }
+                    </div>
+                    @if (ExcludeId is null && candidate.Id is null && candidate.SharedId is { } sharedId && CanUse)
+                    {
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Use.InvokeAsync(sharedId)">Bu kaydı kullan</button>
+                    }
+                    @if (ExcludeId is { } self && candidate.Id is { } other && CanMerge)
+                    {
+                        <a class="btn btn-outline-secondary btn-sm" href="@($"{DetailPath}/{self}/birlestir?kaynak={other}")">Birleştir…</a>
+                    }
+                </li>
+            }
+        </ul>
+        <p class="text-muted small">Olası eşleşmeler otomatik birleştirilmez. Aynı kişi/firma olduğundan eminseniz mevcut kaydı kullanın ya da birleştirin.</p>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<DuplicateCandidateDto>? candidates;
+    private string? message;
+    private bool busy;
+
+    /// <summary>"companies" veya "contacts".</summary>
+    [Parameter, EditorRequired] public string Resource { get; set; } = "companies";
+
+    /// <summary>Sorgu parametreleri (ad → değer); boş değerler gönderilmez.</summary>
+    [Parameter, EditorRequired] public Func<IReadOnlyDictionary<string, string?>> Query { get; set; } = default!;
+
+    /// <summary>Düzenlenen kaydın kimliği; yeni kayıtta null. Kendisi öneriden çıkarılır ve birleştirme bağlantısı açılır.</summary>
+    [Parameter] public Guid? ExcludeId { get; set; }
+
+    /// <summary>Kesin eşleşen ortak kaydı (partyId/personId) yeni kayıt için seçme.</summary>
+    [Parameter] public EventCallback<Guid> Use { get; set; }
+
+    private string DetailPath => Resource == "companies" ? "crm/firmalar" : "crm/kisiler";
+
+    private bool CanUse => Use.HasDelegate;
+
+    private bool CanMerge => Session.Can(Resource == "companies" ? CrmAccess.CompaniesMerge : CrmAccess.ContactsMerge);
+
+    private async Task CheckAsync()
+    {
+        busy = true;
+        var parts = Query().Where(p => !string.IsNullOrWhiteSpace(p.Value)).Select(p => $"{p.Key}={Uri.EscapeDataString(p.Value!.Trim())}").ToList();
+        if (ExcludeId is { } id)
+        {
+            parts.Add($"excludeId={id}");
+        }
+
+        var result = await Api.GetAsync<List<DuplicateCandidateDto>>($"/api/crm/{Resource}/duplicates?{string.Join('&', parts)}");
+        busy = false;
+        message = result.Error;
+        candidates = result.Value;
+    }
+}

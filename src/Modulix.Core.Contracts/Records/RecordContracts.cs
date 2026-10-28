@@ -11,6 +11,9 @@ public enum RecordOperation
     Create = 2,
     Update = 3,
     Delete = 4,
+
+    /// <summary>Kaydı başka bir kayda birleştirme (ADR-0013); yazma izninden ayrı bir izin ister.</summary>
+    Merge = 5,
 }
 
 /// <summary>İşlemi kim başlattı; audit kaydına yazılır.</summary>
@@ -143,7 +146,26 @@ public interface IRecordPipeline
     /// <param name="source">İşlemi kim başlattı; denetim kaydına ve olaya yazılır.</param>
     Task<RecordResult<bool>> DeleteAsync(
         RecordRef record, long? expectedVersion, CancellationToken cancellationToken, ExecutionSource source = ExecutionSource.Api);
+
+    /// <summary>
+    /// Birleştirme önizlemesi (ADR-0013): alan farkları, etkilenen kayıtlar ve engeller. Yazmaz. Kaynak ya da hedef
+    /// çağıranın kapsamında değilse "bulunamadı".
+    /// </summary>
+    Task<RecordResult<MergePreview>> PreviewMergeAsync(string entityKey, MergeRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Kaynak kaydı hedef kayda birleştirir: tek işlemde bağlı kayıtlar taşınır, kaynak kaldırılır; her iki kayıt için audit ve
+    /// olay yazılır. Sürüm uyuşmazlığı, çözülemeyen bağlılık veya yetki eksikliğinde hiçbir şey yazılmaz.
+    /// </summary>
+    Task<RecordResult<MergeResult>> MergeAsync(
+        string entityKey, MergeRequest request, CancellationToken cancellationToken, ExecutionSource source = ExecutionSource.Api);
+
+    /// <summary>Eski (birleştirilmiş) bir kimliğin hangi kayda gittiği; hedefi çağıran göremiyorsa "bulunamadı".</summary>
+    Task<RecordResult<MergeLink>> ResolveMergedAsync(RecordRef record, CancellationToken cancellationToken);
 }
+
+/// <summary>Tamamlanan birleştirme: hedefin yeni hali ve etkilenen kayıtların özeti.</summary>
+public sealed record MergeResult(RecordData Target, Guid SourceId, IReadOnlyList<MergeImpact> Impacts);
 
 /// <summary>
 /// Bir entity'nin saklama uygulaması; modüller kendi entity'leri için yazar. Değişiklikleri yalnızca
@@ -174,6 +196,25 @@ public interface IRecordStore
     /// <see cref="RecordQuery.Owners"/>'ı sorguda uygulamalıdır. Null ise kayıt türü kapsamdan etkilenmez.
     /// </summary>
     string? OwnerField => null;
+
+    /// <summary>
+    /// Kayıt, veri kapsamındaki sorumlulara (<paramref name="owners"/>) göre görünür mü? Varsayılan: <see cref="OwnerField"/>
+    /// değeri kapsamdaysa. Görünürlüğü başka kayıtlara da bağlı olan depo (ör. kişi, bağlı olduğu firmanın kapsamıyla)
+    /// bunu kendisi belirler; o zaman <see cref="RecordQuery.Owners"/> da sorguda aynı kuralla uygulanmalıdır.
+    /// </summary>
+    Task<bool> IsInOwnerScopeAsync(RecordData record, IReadOnlySet<Guid> owners, CancellationToken cancellationToken)
+    {
+        var inScope = OwnerField is { } field
+            && record.Values.TryGetPropertyValue(field, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            && Guid.TryParse(text, out var owner)
+            && owners.Contains(owner);
+        return Task.FromResult(inScope);
+    }
+
+    /// <summary>Veri kapsamı bu depoda uygulanır mı? Varsayılan: sorumlu alanı varsa.</summary>
+    bool UsesOwnerScope => OwnerField is not null;
 
     /// <summary>
     /// Şirket kimliği alanının adı (ADR-0008, adım 3); kayıt türü şirket kapsamlıysa (<see cref="Tenancy.ICompanyScoped"/>)

@@ -75,7 +75,7 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
     public async Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken)
     {
         var entity = await Set.AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
-        return entity is null ? null : ToData(entity);
+        return entity is null ? null : (await RedactAsync([ToData(entity)], cancellationToken))[0];
     }
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
@@ -115,7 +115,7 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
             .Take(query.PageSize)
             .ToListAsync(cancellationToken);
 
-        return new RecordPage([.. items.Select(ToData)], query.Page, query.PageSize, total);
+        return new RecordPage(await RedactAsync([.. items.Select(ToData)], cancellationToken), query.Page, query.PageSize, total);
     }
 
     public async Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken)
@@ -129,7 +129,7 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
     public async Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken)
     {
         var entity = await Set.SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
-        if (entity is null)
+        if (entity is null || await IsRestrictedAsync(id, cancellationToken))
         {
             return null;
         }
@@ -148,7 +148,7 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
     public async Task<bool> DeleteAsync(Guid id, long? expectedVersion, CancellationToken cancellationToken)
     {
         var entity = await Set.SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
-        if (entity is null)
+        if (entity is null || await IsRestrictedAsync(id, cancellationToken))
         {
             return false;
         }
@@ -220,6 +220,53 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
         await CheckAsync(entity, cancellationToken);
     }
 
+    /// <summary>Kapsam kısıtlı kayıtta asgari kimlik olarak kalan alanlar (seçim için); geri kalanı boşaltılır (ADR-0010).</summary>
+    protected abstract IReadOnlySet<string> IdentityFields { get; }
+
+    private async Task<bool> IsRestrictedAsync(Guid id, CancellationToken cancellationToken) =>
+        (await RestrictedAsync([id], cancellationToken)).Contains(id);
+
+    private async Task<IReadOnlySet<Guid>> RestrictedAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
+    {
+        var restricted = new HashSet<Guid>();
+        if (ids.Count == 0)
+        {
+            return restricted;
+        }
+
+        foreach (var visibility in services.GetServices<ISharedRecordVisibility>())
+        {
+            restricted.UnionWith(await visibility.RestrictedAsync(EntityKey, ids, cancellationToken));
+        }
+
+        return restricted;
+    }
+
+    private async Task<IReadOnlyList<RecordData>> RedactAsync(IReadOnlyList<RecordData> items, CancellationToken cancellationToken)
+    {
+        var restricted = await RestrictedAsync([.. items.Select(i => i.Id)], cancellationToken);
+        if (restricted.Count == 0)
+        {
+            return items;
+        }
+
+        return [.. items.Select(item =>
+        {
+            if (!restricted.Contains(item.Id))
+            {
+                return item;
+            }
+
+            var values = new JsonObject();
+            foreach (var (name, node) in item.Values)
+            {
+                values[name] = IdentityFields.Contains(name) ? node?.DeepClone() : null;
+            }
+
+            return item with { Values = values };
+        })];
+    }
+
     private RecordData ToData(TEntity entity)
     {
         var values = new JsonObject();
@@ -246,6 +293,8 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
     : SharedRecordStore<Party>(db, catalog, services)
 {
     public override string EntityKey => SharedEntities.Party;
+
+    protected override IReadOnlySet<string> IdentityFields { get; } = new HashSet<string> { "kind", "name", "taxNumber" };
 
     protected override IReadOnlyList<SharedField<Party>> Fields { get; } =
     [
@@ -288,9 +337,29 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
 
 /// <summary>Kişi: müşteri yetkilisi, çalışan, sürücü...</summary>
 internal sealed class PersonRecordStore(ModulixDbContext db, ModuleCatalog catalog, IServiceProvider services)
-    : SharedRecordStore<Person>(db, catalog, services)
+    : SharedRecordStore<Person>(db, catalog, services), IReferenceMover
 {
+    /// <summary>Kişinin çalıştığı taraf başka bir tarafa birleştirilince kişiler yeni tarafa bağlanır (ADR-0013).</summary>
+    public async Task<int> RepointAsync(string field, Guid fromId, Guid toId, CancellationToken cancellationToken)
+    {
+        if (field != "partyId")
+        {
+            throw new NotSupportedException($"core.person.{field} taşınamaz.");
+        }
+
+        var people = await Set.Where(p => p.PartyId == fromId).ToListAsync(cancellationToken);
+        foreach (var person in people)
+        {
+            person.PartyId = toId;
+            person.Touch();
+        }
+
+        return people.Count;
+    }
+
     public override string EntityKey => SharedEntities.Person;
+
+    protected override IReadOnlySet<string> IdentityFields { get; } = new HashSet<string> { "firstName", "lastName" };
 
     protected override IReadOnlyList<SharedField<Person>> Fields { get; } =
     [

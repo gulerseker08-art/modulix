@@ -1,0 +1,195 @@
+@* Kişi ekleme/düzenleme formu; Kişiler listesi ve kişi detay sayfası kullanır. *@
+@inject ApiClient Api
+
+<form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <h2>@(Contact is null ? "Yeni kişi" : "Kişiyi düzenle")</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (Contact is not null)
+    {
+        <p class="shared-note text-muted">Ad, soyad, telefon ve e-posta bu kişiyi kullanan diğer modüllerde de görünür; burada yaptığınız değişiklik onlara da yansır. Unvan, departman ve rol firma ilişkisine özgüdür ve kişi detayındaki ilişkilerden düzenlenir.</p>
+    }
+
+    <div class="form-grid">
+        <div>
+            <label class="form-label" for="firstName">Ad *</label>
+            <input id="firstName" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.FirstName" />
+            <FieldError Field="firstName" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lastName">Soyad *</label>
+            <input id="lastName" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.LastName" />
+            <FieldError Field="lastName" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="companyId">Firma</label>
+            <select id="companyId" class="form-select" @bind="form.CompanyId">
+                <option value="">—</option>
+                @foreach (var company in Lookups.Companies)
+                {
+                    <option value="@company.Id">@company.Name</option>
+                }
+            </select>
+            <FieldError Field="companyId" Errors="errors" />
+            <small class="text-muted">Birden fazla firma için kişiyi kaydedip firma ilişkilerini kişi detayından yönetin.</small>
+        </div>
+        <div>
+            <label class="form-label" for="ownerId">Sorumlu</label>
+            <select id="ownerId" class="form-select" @bind="form.OwnerId">
+                <option value="">@(form.Id is null ? "Ben" : "—")</option>
+                @foreach (var member in Lookups.AssignableMembers)
+                {
+                    <option value="@member.UserId">@member.DisplayName</option>
+                }
+            </select>
+            <FieldError Field="ownerId" Errors="errors" />
+            <small class="text-muted">Firmaya bağlı kişi firmanın erişim kapsamına göre görünür; sorumlu yalnızca firmasız kişide kapsamı belirler.</small>
+        </div>
+        <div>
+            <label class="form-label" for="title">Unvan</label>
+            <input id="title" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.Title" />
+            <FieldError Field="title" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="email">E-posta (ana)</label>
+            <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" @bind="form.Email" />
+            <FieldError Field="email" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="phone">Telefon (ana)</label>
+            <input id="phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
+            <FieldError Field="phone" Errors="errors" />
+        </div>
+        <div class="span-all">
+            <label class="form-label" for="notes">Notlar</label>
+            <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
+            <FieldError Field="notes" Errors="errors" />
+        </div>
+        <div class="span-all">
+            <DuplicateSuggestions Resource="contacts" Query="DuplicateQuery" ExcludeId="Contact?.Id" />
+        </div>
+        <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        @if (form.Id is not null)
+        {
+            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+        }
+    </div>
+</form>
+
+@code {
+    private const string Url = "/api/crm/contacts";
+
+    private ContactForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private ContactDto? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek kişi; null ise yeni kişi.</summary>
+    [Parameter] public ContactDto? Contact { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<ContactDto> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Contact)];
+
+    /// <summary>Form yalnızca başka bir kişi verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Contact))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Contact;
+        form = Contact is { } c
+            ? new ContactForm
+            {
+                Id = c.Id, Version = c.Version, FirstName = c.FirstName, LastName = c.LastName, CompanyId = c.CompanyId, Title = c.Title,
+                Email = c.Email, Phone = c.Phone, OwnerId = c.OwnerId, Notes = c.Notes, Custom = c.Custom?.DeepClone().AsObject() ?? [],
+            }
+            : new ContactForm();
+        errors = null;
+        message = null;
+    }
+
+    private IReadOnlyDictionary<string, string?> DuplicateQuery() => new Dictionary<string, string?>
+    {
+        ["firstName"] = form.FirstName, ["lastName"] = form.LastName, ["email"] = form.Email, ["phone"] = form.Phone,
+    };
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var request = new SaveContactRequest(form.FirstName, form.LastName, form.CompanyId, form.Title, form.Email, form.Phone, form.Notes, form.Version,
+            Custom: CustomFieldText.ForSave(CustomFields, form.Custom), OwnerId: form.OwnerId);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<ContactDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<ContactDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class ContactForm
+    {
+        public System.Text.Json.Nodes.JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string FirstName { get; set; } = string.Empty;
+
+        public string LastName { get; set; } = string.Empty;
+
+        public Guid? CompanyId { get; set; }
+
+        public string? Title { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? Phone { get; set; }
+
+        public Guid? OwnerId { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}

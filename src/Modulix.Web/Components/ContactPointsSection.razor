@@ -1,0 +1,233 @@
+@* Telefon/e-posta noktaları (ADR-0012): firma, lokasyon ya da kişi (isteğe bağlı olarak tek bir firma–kişi ilişkisi) için liste ve satır içi
+   düzenleme. İletişim noktası pazarlama izni değildir; aynı e-posta/santral başka kayıtlarda da olabilir. *@
+@inject ApiClient Api
+
+<div class="sub-section">
+    <div class="section-header">
+        <h3>@Title</h3>
+        @if (CanWrite && form is null)
+        {
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(null)">Ekle</button>
+        }
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label">Kanal</label>
+                    <select class="form-select" @bind="form.Channel" disabled="@(form.Id is not null)">
+                        <option value="@CrmContactPointTypes.Phone">Telefon</option>
+                        <option value="@CrmContactPointTypes.Email">E-posta</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Tür</label>
+                    <select class="form-select" @bind="form.Type">
+                        @foreach (var (key, label) in CrmContactPointTypes.Labels)
+                        {
+                            <option value="@key">@label</option>
+                        }
+                    </select>
+                    <FieldError Field="type" Errors="errors" />
+                </div>
+                <div class="span-all">
+                    <label class="form-label">Değer *</label>
+                    <input class="form-control" maxlength="@CrmContactPointLimits.ValueMaxLength" @bind="form.Value" />
+                    <FieldError Field="value" Errors="errors" />
+                </div>
+                <div class="span-all">
+                    <label class="form-label">Not (ör. dahili numara)</label>
+                    <input class="form-control" maxlength="@CrmContactPointLimits.NoteMaxLength" @bind="form.Note" />
+                    <FieldError Field="note" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-check-inline"><input type="checkbox" @bind="form.IsPrimary" /> Ana @(form.Channel == CrmContactPointTypes.Phone ? "telefon" : "e-posta")</label>
+                    <FieldError Field="isPrimary" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-check-inline"><input type="checkbox" @bind="form.IsShared" /> Paylaşılan (santral / ortak kutu)</label>
+                </div>
+                @if (form.Id is not null)
+                {
+                    <div>
+                        <label class="form-check-inline"><input type="checkbox" @bind="form.IsActive" /> Aktif</label>
+                    </div>
+                }
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">Vazgeç</button>
+            </div>
+        </form>
+    }
+
+    @if (items is { Count: > 0 })
+    {
+        <ul class="item-list">
+            @foreach (var item in items)
+            {
+                <li class="@(item.IsActive ? null : "done")">
+                    <div class="item-main">
+                        <strong>
+                            @if (item.Channel == CrmContactPointTypes.Email) { <a href="mailto:@item.Value">@item.Value</a> }
+                            else { <a href="tel:@item.Value">@item.Value</a> }
+                        </strong>
+                        <span>
+                            @CrmContactPointTypes.Labels.GetValueOrDefault(item.Type, item.Type)
+                            @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">Ana</span> }
+                            @if (item.IsShared) { <text> · </text><span class="badge tag">Paylaşılan</span> }
+                            @if (!item.IsActive) { <text> · Pasif</text> }
+                            @if (item.Note is { Length: > 0 } note) { <text> · @note</text> }
+                        </span>
+                    </div>
+                    @if (CanWrite)
+                    {
+                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">Düzenle</button>
+                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">Sil</button>
+                    }
+                </li>
+            }
+        </ul>
+    }
+    else if (items is not null)
+    {
+        <p class="text-muted">Kayıt yok.</p>
+    }
+</div>
+
+@code {
+    private List<PointRow>? items;
+    private PointRow? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private (Guid?, Guid?, Guid?, Guid?)? loadedFor;
+
+    [Parameter, EditorRequired] public string Title { get; set; } = "İletişim";
+
+    [Parameter] public bool CanWrite { get; set; }
+
+    /// <summary>Firma sahipli nokta: firma (ve isteğe bağlı lokasyon). Lokasyon yoksa yalnızca firma düzeyindekiler listelenir.</summary>
+    [Parameter] public Guid? CompanyId { get; set; }
+
+    [Parameter] public Guid? LocationId { get; set; }
+
+    /// <summary>Kişi sahipli nokta: kişi (ve isteğe bağlı firma–kişi ilişkisi; yoksa yalnızca kişinin genel noktaları).</summary>
+    [Parameter] public Guid? ContactId { get; set; }
+
+    [Parameter] public Guid? CompanyContactId { get; set; }
+
+    /// <summary>Kaydedilince çağrılır (üst sayfa eski telefon/e-posta aynasını yenileyebilir).</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private bool IsPerson => ContactId is not null;
+
+    private string Url => IsPerson ? "/api/crm/person-contact-points" : "/api/crm/contact-points";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (CompanyId, LocationId, ContactId, CompanyContactId))
+        {
+            return;
+        }
+
+        loadedFor = (CompanyId, LocationId, ContactId, CompanyContactId);
+        form = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        string query;
+        if (IsPerson)
+        {
+            query = $"contactId={ContactId}" + (CompanyContactId is { } link ? $"&companyContactId={link}" : string.Empty);
+            var page = (await Api.GetAsync<CrmPage<PersonContactPointDto>>($"{Url}?{query}&pageSize=100")).Value;
+            items = page?.Items
+                .Where(p => CompanyContactId is not null || p.CompanyContactId is null)
+                .Select(p => PointRow.From(p.Id, p.Version, p.Channel, p.Type, p.Value, p.IsPrimary, p.IsActive, p.IsShared, p.Note)).ToList() ?? [];
+        }
+        else
+        {
+            query = $"companyId={CompanyId}" + (LocationId is { } location ? $"&locationId={location}" : "&companyLevel=true");
+            var page = (await Api.GetAsync<CrmPage<ContactPointDto>>($"{Url}?{query}&pageSize=100")).Value;
+            items = page?.Items.Select(p => PointRow.From(p.Id, p.Version, p.Channel, p.Type, p.Value, p.IsPrimary, p.IsActive, p.IsShared, p.Note)).ToList() ?? [];
+        }
+    }
+
+    private void Open(PointRow? row)
+    {
+        form = row is null ? PointRow.From(null, null, CrmContactPointTypes.Phone, "Work", string.Empty, items?.Count == 0, true, false, null) : row.Copy();
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var f = form!;
+        var result = IsPerson
+            ? await Send<System.Text.Json.Nodes.JsonObject>(new SavePersonContactPointRequest(
+                ContactId!.Value, f.Value, f.Channel, CompanyContactId, f.Type, f.IsPrimary, f.IsActive, f.IsShared, f.Note, f.Version), f.Id)
+            : await Send<System.Text.Json.Nodes.JsonObject>(new SaveContactPointRequest(
+                CompanyId!.Value, f.Value, f.Channel, LocationId, f.Type, f.IsPrimary, f.IsActive, f.IsShared, f.Note, f.Version), f.Id);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+            await Changed.InvokeAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private Task<ApiResult<T>> Send<T>(object request, Guid? id) =>
+        id is { } existing ? Api.PutAsync<T>($"{Url}/{existing}", request) : Api.PostAsync<T>(Url, request);
+
+    private async Task DeleteAsync(PointRow row)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{row.Id}?version={row.Version}");
+        busy = false;
+        message = result.Error;
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private sealed class PointRow
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Channel { get; set; } = string.Empty;
+
+        public string Type { get; set; } = string.Empty;
+
+        public string Value { get; set; } = string.Empty;
+
+        public bool IsPrimary { get; set; }
+
+        public bool IsActive { get; set; }
+
+        public bool IsShared { get; set; }
+
+        public string? Note { get; set; }
+
+        public static PointRow From(Guid? id, long? version, string channel, string type, string value, bool primary, bool active, bool shared, string? note) =>
+            new() { Id = id, Version = version, Channel = channel, Type = type, Value = value, IsPrimary = primary, IsActive = active, IsShared = shared, Note = note };
+
+        public PointRow Copy() => From(Id, Version, Channel, Type, Value, IsPrimary, IsActive, IsShared, Note);
+    }
+}

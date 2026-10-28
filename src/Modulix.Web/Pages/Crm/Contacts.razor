@@ -8,9 +8,9 @@
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ContactsRead">
     <div class="page-header">
         <h1>Kişiler</h1>
-        @if (Session.Can(CrmAccess.ContactsWrite) && form is null)
+        @if (Session.Can(CrmAccess.ContactsWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="New">Yeni kişi</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)">Yeni kişi</button>
         }
     </div>
 
@@ -19,67 +19,24 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    @if (form is not null)
+    @if (editing)
     {
-        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni kişi" : "Kişiyi düzenle")</h2>
-            <div class="form-grid">
-                <div>
-                    <label class="form-label" for="firstName">Ad *</label>
-                    <input id="firstName" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.FirstName" />
-                    <FieldError Field="firstName" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="lastName">Soyad *</label>
-                    <input id="lastName" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.LastName" />
-                    <FieldError Field="lastName" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="companyId">Firma</label>
-                    <select id="companyId" class="form-select" @bind="form.CompanyId">
-                        <option value="">—</option>
-                        @foreach (var company in Lookups.Companies)
-                        {
-                            <option value="@company.Id">@company.Name</option>
-                        }
-                    </select>
-                    <FieldError Field="companyId" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="title">Unvan</label>
-                    <input id="title" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.Title" />
-                    <FieldError Field="title" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="email">E-posta</label>
-                    <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" @bind="form.Email" />
-                    <FieldError Field="email" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="phone">Telefon</label>
-                    <input id="phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
-                    <FieldError Field="phone" Errors="errors" />
-                </div>
-                <div class="span-all">
-                    <label class="form-label" for="notes">Notlar</label>
-                    <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
-                    <FieldError Field="notes" Errors="errors" />
-                </div>
-                <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Vazgeç</button>
-                @if (form.Id is not null)
-                {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
-                }
-            </div>
-        </form>
+        <ContactEditor Contact="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
     }
 
+    @* Filtreler sunucuda uygulanır; sayfalama ve toplam doğru kalır. *@
+    <div class="filters" role="group" aria-label="Filtre">
+        <button type="button" class="chip @(role is null && !withoutCompany && !mine ? "active" : null)" @onclick="() => FilterAsync(null, false, false)">Tümü</button>
+        <button type="button" class="chip @(mine ? "active" : null)" @onclick="() => FilterAsync(null, false, true)">Benim kişilerim</button>
+        <button type="button" class="chip @(withoutCompany ? "active" : null)" @onclick="() => FilterAsync(null, true, false)">Firmasız</button>
+        @foreach (var (key, label) in CrmRelationshipRoles.Labels)
+        {
+            <button type="button" class="chip @(role == key ? "active" : null)" @onclick="() => FilterAsync(key, false, false)">@label</button>
+        }
+    </div>
+
     <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Ad, soyad veya e-posta ara" @bind="search" />
+        <input class="form-control" type="search" placeholder="Ad, soyad, e-posta veya telefon ara" @bind="search" />
         <button type="submit" class="btn btn-outline-secondary">Ara</button>
     </form>
 
@@ -101,7 +58,7 @@
                 @foreach (var contact in page.Items)
                 {
                     <tr>
-                        <td data-label="Ad soyad" class="primary">@contact.FirstName @contact.LastName</td>
+                        <td data-label="Ad soyad" class="primary"><a href="crm/kisiler/@contact.Id">@contact.FirstName @contact.LastName</a></td>
                         <td data-label="Firma">
                             @if (contact.CompanyId is { } companyId)
                             {
@@ -118,7 +75,7 @@
                         <td class="actions">
                             @if (Session.Can(CrmAccess.ContactsWrite))
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(contact)">Düzenle</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(contact)">Düzenle</button>
                             }
                         </td>
                     </tr>
@@ -133,11 +90,13 @@
     private const string Url = "/api/crm/contacts";
 
     private CrmPage<ContactDto>? page;
-    private ContactForm? form;
-    private IReadOnlyDictionary<string, string[]>? errors;
+    private ContactDto? selected;
+    private bool editing;
     private string? message;
     private string? search;
-    private bool busy;
+    private string? role;
+    private bool withoutCompany;
+    private bool mine;
 
     protected override async Task OnInitializedAsync()
     {
@@ -149,97 +108,49 @@
         }
     }
 
+    private async Task FilterAsync(string? roleKey, bool noCompany, bool onlyMine)
+    {
+        role = roleKey;
+        withoutCompany = noCompany;
+        mine = onlyMine;
+        await LoadAsync(1);
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
-        var result = await Api.GetAsync<CrmPage<ContactDto>>($"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}");
+        var url = $"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (role is { } r)
+        {
+            url += $"&role={Uri.EscapeDataString(r)}";
+        }
+
+        if (withoutCompany)
+        {
+            url += "&withoutCompany=true";
+        }
+
+        if (mine)
+        {
+            url += "&ownerId=me";
+        }
+
+        var result = await Api.GetAsync<CrmPage<ContactDto>>(url);
         page = result.Value;
         message = result.Error;
     }
 
-    private void New() => Open(new ContactForm());
-
-    private void Edit(ContactDto contact) => Open(new ContactForm
+    private void Open(ContactDto? contact)
     {
-        Id = contact.Id,
-        Version = contact.Version,
-        FirstName = contact.FirstName,
-        LastName = contact.LastName,
-        CompanyId = contact.CompanyId,
-        Title = contact.Title,
-        Email = contact.Email,
-        Phone = contact.Phone,
-        Notes = contact.Notes,
-        Custom = contact.Custom?.DeepClone().AsObject() ?? [],
-    });
-
-    private void Open(ContactForm value)
-    {
-        form = value;
-        errors = null;
+        selected = contact;
+        editing = true;
         message = null;
     }
 
-    private void Cancel() => form = null;
+    private void Close() => editing = false;
 
-    private async Task SaveAsync()
+    private async Task SavedAsync()
     {
-        busy = true;
-        var request = new SaveContactRequest(form!.FirstName, form.LastName, form.CompanyId, form.Title, form.Email, form.Phone, form.Notes, form.Version,
-            Custom: CustomFieldText.ForSave(CustomFields, form.Custom));
-        var result = form.Id is { } id
-            ? await Api.PutAsync<ContactDto>($"{Url}/{id}", request)
-            : await Api.PostAsync<ContactDto>(Url, request);
-        busy = false;
-
-        if (result.IsSuccess)
-        {
-            form = null;
-            await LoadAsync(page?.Page ?? 1);
-            return;
-        }
-
-        errors = result.FieldErrors;
-        message = result.Error;
-    }
-
-    private async Task DeleteAsync()
-    {
-        busy = true;
-        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
-        busy = false;
-
-        if (result.IsSuccess)
-        {
-            form = null;
-            await LoadAsync(1);
-            return;
-        }
-
-        message = result.Error;
-    }
-
-    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Contact)];
-
-    private sealed class ContactForm
-    {
-        public System.Text.Json.Nodes.JsonObject Custom { get; set; } = [];
-
-        public Guid? Id { get; init; }
-
-        public long? Version { get; init; }
-
-        public string FirstName { get; set; } = string.Empty;
-
-        public string LastName { get; set; } = string.Empty;
-
-        public Guid? CompanyId { get; set; }
-
-        public string? Title { get; set; }
-
-        public string? Email { get; set; }
-
-        public string? Phone { get; set; }
-
-        public string? Notes { get; set; }
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
     }
 }
