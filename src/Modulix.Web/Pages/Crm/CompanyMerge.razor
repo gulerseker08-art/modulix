@@ -1,0 +1,14 @@
+@page "/crm/firmalar/{TargetId:guid}/birlestir"
+@inject SessionState Session
+
+<PageTitle>Firma birleştir · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.CompaniesMerge">
+    <MergeWizard Resource="companies" TargetId="TargetId" SourceId="SourceId" />
+</AuthGate>
+
+@code {
+    [Parameter] public Guid TargetId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "kaynak")] public Guid? SourceId { get; set; }
+}

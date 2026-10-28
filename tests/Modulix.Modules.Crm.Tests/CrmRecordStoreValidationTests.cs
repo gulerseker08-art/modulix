@@ -11,7 +11,7 @@ namespace Modulix.Modules.Crm.Tests;
 /// <summary>CRM kayıt depolarının alan doğrulaması (veritabanı gerektirmez).</summary>
 public class CrmRecordStoreValidationTests
 {
-    private static readonly CrmStoreContext NoData = new(new NoModuleData(), new NoMembers(), new NoChoiceLists(), new NoTenant());
+    private static readonly CrmStoreContext NoData = new(new NoModuleData(), new NoMembers(), new NoChoiceLists(), new NoTenant(), new NoAccess());
 
     [Fact]
     public void Create_requires_required_fields()
@@ -141,6 +141,13 @@ public class CrmRecordStoreValidationTests
         Assert.Equal(CrmModule.Permissions.CompaniesWrite, store.PermissionFor(RecordOperation.Create));
         Assert.Equal(CrmModule.Permissions.CompaniesWrite, store.PermissionFor(RecordOperation.Delete));
         Assert.Equal(CrmModule.ModuleKey, store.FeatureKey.Split('.')[0]);
+    }
+
+    private sealed class NoAccess : IRecordAccess
+    {
+        public Task<IReadOnlySet<Guid>?> GetOwnersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlySet<Guid>?>(null);
+
+        public Task<bool> CanAsync(string entityKey, RecordOperation operation, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 
     private sealed class NoMembers : ITenantMembers

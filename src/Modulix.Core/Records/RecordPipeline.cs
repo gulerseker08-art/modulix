@@ -28,7 +28,8 @@ public sealed class RecordPipeline(
     IAuditWriter audit,
     IDomainEventOutbox outbox,
     IUnitOfWork unitOfWork,
-    EventHandlingScope? handling = null) : IRecordPipeline
+    EventHandlingScope? handling = null,
+    ISharedReferenceMerger? references = null) : IRecordPipeline
 {
     public async Task<RecordResult<RecordData>> GetAsync(RecordRef record, CancellationToken cancellationToken)
     {
@@ -62,7 +63,7 @@ public sealed class RecordPipeline(
         var normalized = query with
         {
             // Kapsam sorguda uygulanır; sayfalama ve toplam sayı doğru kalır.
-            Owners = store!.OwnerField is null ? null : await dataScope.GetOwnersAsync(tenant!, cancellationToken),
+            Owners = !store!.UsesOwnerScope ? null : await dataScope.GetOwnersAsync(tenant!, cancellationToken),
             // Şirket kapsamı (ADR-0008): şirket kapsamlı depoda yalnızca erişilebilir şirketlerin kayıtları.
             Companies = store.CompanyField is null ? null : CompanyScope(),
             Page = Math.Max(1, query.Page),
@@ -267,6 +268,173 @@ public sealed class RecordPipeline(
         }
     }
 
+    public async Task<RecordResult<MergePreview>> PreviewMergeAsync(string entityKey, MergeRequest request, CancellationToken cancellationToken)
+    {
+        var prepared = await PrepareMergeAsync<MergePreview>(entityKey, request, cancellationToken);
+        if (prepared.Gate is not null)
+        {
+            return prepared.Gate;
+        }
+
+        try
+        {
+            var (tenant, store, mergeable) = (prepared.Tenant!, prepared.Store!, prepared.Mergeable!);
+            var preview = await mergeable.PreviewMergeAsync(request, cancellationToken);
+            if (preview is null)
+            {
+                return NotFound<MergePreview>();
+            }
+
+            var plan = await PlanReferencesAsync(store, mergeable, request.SourceId, cancellationToken);
+            return RecordResult<MergePreview>.Ok(preview with
+            {
+                Impacts = [.. preview.Impacts, .. plan.Impacts],
+                Blockers = [.. preview.Blockers, .. plan.Blockers],
+            });
+        }
+        catch (RecordConflictException conflict)
+        {
+            return RecordResult<MergePreview>.Fail(RecordErrorCode.Conflict, conflict.Message);
+        }
+    }
+
+    public async Task<RecordResult<MergeResult>> MergeAsync(
+        string entityKey, MergeRequest request, CancellationToken cancellationToken, ExecutionSource source = ExecutionSource.Api)
+    {
+        var prepared = await PrepareMergeAsync<MergeResult>(entityKey, request, cancellationToken);
+        if (prepared.Gate is not null)
+        {
+            return prepared.Gate;
+        }
+
+        var (tenant, store, mergeable) = (prepared.Tenant!, prepared.Store!, prepared.Mergeable!);
+        try
+        {
+            // Çözülemeyen bağlılık varsa hiçbir şey hazırlanmaz (kısmi birleştirme olmaz).
+            var plan = await PlanReferencesAsync(store, mergeable, request.SourceId, cancellationToken);
+            if (plan.Blockers.Count > 0)
+            {
+                return Invalid<MergeResult>([.. plan.Blockers.Select(b => new RecordFieldError("merge", b))]);
+            }
+
+            // Depo kendi engellerini RecordValidationException ile bildirir (önizleme ve birleştirme aynı yoldan geçer).
+            var outcome = await mergeable.MergeAsync(request, cancellationToken);
+            if (outcome is null)
+            {
+                return NotFound<MergeResult>();
+            }
+
+            if (references is not null && mergeable.SharedEntityKey is { } sharedKey
+                && await mergeable.SharedIdOfAsync(request.SourceId, cancellationToken) is { } sourceShared
+                && await mergeable.SharedIdOfAsync(request.TargetId, cancellationToken) is { } targetShared)
+            {
+                await references.ApplyAsync(sharedKey, OwnerPrefix(store), sourceShared, targetShared, cancellationToken);
+            }
+
+            var before = outcome.TargetBefore.Values;
+            var after = outcome.TargetAfter.Values.DeepClone().AsObject();
+            after["mergedFrom"] = request.SourceId.ToString();
+            var gone = new JsonObject { ["mergedInto"] = request.TargetId.ToString() };
+            Record(tenant, source, entityKey, request.TargetId, AuditAction.Merged, DomainEventTypes.RecordUpdated,
+                before, after, outcome.TargetAfter.Version, reason: null, CompanyIdOf(store, outcome.TargetAfter.Values));
+            Record(tenant, source, entityKey, request.SourceId, AuditAction.Merged, DomainEventTypes.RecordMerged,
+                outcome.SourceBefore.Values, gone, outcome.SourceBefore.Version + 1, reason: null, CompanyIdOf(store, outcome.SourceBefore.Values));
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return RecordResult<MergeResult>.Ok(new MergeResult(outcome.TargetAfter, request.SourceId, [.. outcome.Impacts, .. plan.Impacts]));
+        }
+        catch (RecordValidationException invalid)
+        {
+            return Invalid<MergeResult>(invalid.Errors);
+        }
+        catch (RecordConflictException conflict)
+        {
+            return RecordResult<MergeResult>.Fail(RecordErrorCode.Conflict, conflict.Message);
+        }
+    }
+
+    public async Task<RecordResult<MergeLink>> ResolveMergedAsync(RecordRef record, CancellationToken cancellationToken)
+    {
+        var (gate, tenant, store) = await AuthorizeAsync<MergeLink>(record.EntityKey, RecordOperation.Read, cancellationToken);
+        if (gate is not null)
+        {
+            return gate;
+        }
+
+        if (store is not IMergeableRecordStore mergeable || await mergeable.FindMergeLinkAsync(record.Id, cancellationToken) is not { } link)
+        {
+            return NotFound<MergeLink>();
+        }
+
+        // Hedefi göremeyen, eski kimliğin nereye gittiğini de öğrenmez.
+        var target = await store.FindAsync(link.TargetId, cancellationToken);
+        return target is not null && await InScopeAsync(tenant!, store, target, cancellationToken)
+            ? RecordResult<MergeLink>.Ok(link)
+            : NotFound<MergeLink>();
+    }
+
+    private sealed record PreparedMerge<T>(RecordResult<T>? Gate, TenantContext? Tenant, IRecordStore? Store, IMergeableRecordStore? Mergeable);
+
+    /// <summary>
+    /// Önizleme ve birleştirme ortak adımları: tenant, lisans, birleştirme izni, kaynak ve hedefin okunabilir ve kapsamda
+    /// olması, gizli alan yokluğu. Kaynak daha önce birleştirilmişse (tekrarlanan istek) çakışma olarak hedefi bildirir.
+    /// </summary>
+    private async Task<PreparedMerge<T>> PrepareMergeAsync<T>(string entityKey, MergeRequest request, CancellationToken cancellationToken)
+    {
+        var (gate, tenant, store) = await AuthorizeAsync<T>(entityKey, RecordOperation.Merge, cancellationToken);
+        if (gate is not null)
+        {
+            return new(gate, null, null, null);
+        }
+
+        if (store is not IMergeableRecordStore mergeable)
+        {
+            return new(Invalid<T>([new RecordFieldError("entityKey", "Bu kayıt türü birleştirilemez.")]), null, null, null);
+        }
+
+        if (request.SourceId == request.TargetId || request.SourceId == Guid.Empty || request.TargetId == Guid.Empty)
+        {
+            return new(Invalid<T>([new RecordFieldError("targetId", "Kayıt kendisiyle birleştirilemez.")]), null, null, null);
+        }
+
+        var target = await store.FindAsync(request.TargetId, cancellationToken);
+        var source = await store.FindAsync(request.SourceId, cancellationToken);
+        var targetVisible = target is not null && await InScopeAsync(tenant!, store, target, cancellationToken);
+        if (source is null && targetVisible && await mergeable.FindMergeLinkAsync(request.SourceId, cancellationToken) is { } link)
+        {
+            // Tekrarlanan istek: kaynak zaten kaldırıldı. Sessizce başarı dönmeyiz; hedefin güncel sürümüyle yeniden denenmeli.
+            return new(RecordResult<T>.Fail(RecordErrorCode.Conflict,
+                $"Bu kayıt zaten birleştirilmiş (hedef: {link.TargetId}, {link.MergedAt:O})."), null, null, null);
+        }
+
+        if (source is null || !targetVisible || !await InScopeAsync(tenant!, store, source, cancellationToken))
+        {
+            return new(NotFound<T>(), null, null, null);
+        }
+
+        if ((await fieldAccess.GetHiddenFieldsAsync(tenant!, store.EntityKey, cancellationToken)).Count > 0)
+        {
+            return new(RecordResult<T>.Fail(RecordErrorCode.PermissionDenied,
+                "Görme yetkiniz olmayan alanları olan kayıtları birleştiremezsiniz."), null, null, null);
+        }
+
+        return new(null, tenant, store, mergeable);
+    }
+
+    // Modülün kendi başvuruları deposunca taşınır; ortak kayda başka modüllerden gelenler burada planlanır.
+    private async Task<SharedReferencePlan> PlanReferencesAsync(
+        IRecordStore store, IMergeableRecordStore mergeable, Guid sourceId, CancellationToken cancellationToken)
+    {
+        if (references is null || mergeable.SharedEntityKey is not { } sharedKey
+            || await mergeable.SharedIdOfAsync(sourceId, cancellationToken) is not { } sharedId)
+        {
+            return SharedReferencePlan.None;
+        }
+
+        return await references.PlanAsync(sharedKey, OwnerPrefix(store), sharedId, cancellationToken);
+    }
+
+    private static string OwnerPrefix(IRecordStore store) => store.EntityKey[..(store.EntityKey.IndexOf('.') + 1)];
+
     /// <summary>
     /// Adım 4, veri kapsamı: kayıt türünün sorumlu alanı varsa sorumlu kişinin kapsamında olmalıdır. Sorumlusu boş kayıt
     /// yalnızca "tüm kayıtlar" kapsamında görünür. Kapsam istek başına bir kez hesaplanır (servis saklar).
@@ -279,16 +447,12 @@ public sealed class RecordPipeline(
             return false;
         }
 
-        if (store.OwnerField is not { } field || await dataScope.GetOwnersAsync(tenant, cancellationToken) is not { } owners)
+        if (!store.UsesOwnerScope || await dataScope.GetOwnersAsync(tenant, cancellationToken) is not { } owners)
         {
             return true;
         }
 
-        return record.Values.TryGetPropertyValue(field, out var node)
-            && node is JsonValue value
-            && value.TryGetValue<string>(out var text)
-            && Guid.TryParse(text, out var owner)
-            && owners.Contains(owner);
+        return await store.IsInOwnerScopeAsync(record, owners, cancellationToken);
     }
 
     // Özel alanı olan türde etkin alan tanımları; diğerlerinde boş (veritabanına gidilmez).

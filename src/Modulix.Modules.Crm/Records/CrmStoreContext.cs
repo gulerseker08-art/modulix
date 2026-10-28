@@ -1,13 +1,18 @@
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Persistence;
+using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Modules.Crm.Records;
 
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler: veri, tenant üyeleri, seçim listeleri ve isteği yapan kullanıcı.</summary>
-internal sealed class CrmStoreContext(IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant)
+internal sealed class CrmStoreContext(
+    IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access)
 {
     public IModuleData Data => data;
+
+    /// <summary>İsteği yapan kullanıcının izin ve veri kapsamı (ADR-0010).</summary>
+    public IRecordAccess Access => access;
 
     public ITenantMembers Members => members;
 

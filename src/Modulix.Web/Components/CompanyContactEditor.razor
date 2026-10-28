@@ -1,0 +1,181 @@
+@* Firma–kişi ilişkisi ekleme/düzenleme formu (ADR-0011); firma detay sayfası kullanır. İlişki rolleri güvenlik rolü değildir. *@
+@inject ApiClient Api
+
+<form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <h2>@(Link is null ? "Kişi ilişkilendir" : "İlişkiyi düzenle")</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="form-grid">
+        <div class="span-all">
+            <label class="form-label" for="link-contact">Kişi *</label>
+            @if (Link is null)
+            {
+                <select id="link-contact" class="form-select" @bind="form.ContactId">
+                    <option value="">Seçin…</option>
+                    @foreach (var contact in Lookups.Contacts)
+                    {
+                        <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
+                    }
+                </select>
+            }
+            else
+            {
+                <input id="link-contact" class="form-control" value="@Link.ContactName" disabled />
+            }
+            <FieldError Field="contactId" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="link-title">Bu firmadaki unvan</label>
+            <input id="link-title" class="form-control" maxlength="@CrmRelationshipLimits.JobTitleMaxLength" @bind="form.JobTitle" />
+            <FieldError Field="jobTitle" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="link-department">Departman</label>
+            <input id="link-department" class="form-control" maxlength="@CrmRelationshipLimits.DepartmentMaxLength" @bind="form.Department" />
+            <FieldError Field="department" Errors="errors" />
+        </div>
+        <div class="span-all">
+            <span class="form-label">İlişki rolleri</span>
+            <div class="role-options">
+                @foreach (var (key, label) in CrmRelationshipRoles.Labels)
+                {
+                    <label class="form-check-inline">
+                        <input type="checkbox" checked="@form.Roles.Contains(key)" @onchange="e => ToggleRole(key, (bool)e.Value!)" /> @label
+                    </label>
+                }
+            </div>
+            <FieldError Field="roles" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-check-inline">
+                <input type="checkbox" @bind="form.IsPrimary" /> Ana irtibat
+            </label>
+            <FieldError Field="isPrimary" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-check-inline">
+                <input type="checkbox" @bind="form.IsDecisionMaker" /> Karar verici
+            </label>
+        </div>
+        <div>
+            <label class="form-label" for="link-start">Başlangıç</label>
+            <input id="link-start" class="form-control" type="date" @bind="form.StartDate" />
+            <FieldError Field="startDate" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="link-end">Bitiş (ilişkiyi sonlandırır)</label>
+            <input id="link-end" class="form-control" type="date" @bind="form.EndDate" />
+            <FieldError Field="endDate" Errors="errors" />
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+    </div>
+</form>
+
+@code {
+    private const string Url = "/api/crm/company-contacts";
+
+    private LinkForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private CompanyContactDto? source;
+    private bool initialized;
+
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+
+    /// <summary>Düzenlenecek ilişki; null ise yeni ilişki.</summary>
+    [Parameter] public CompanyContactDto? Link { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!initialized || !ReferenceEquals(source, Link))
+        {
+            initialized = true;
+            source = Link;
+            form = Link is { } l
+                ? new LinkForm
+                {
+                    Id = l.Id, Version = l.Version, ContactId = l.ContactId, Department = l.Department, JobTitle = l.JobTitle,
+                    Roles = [.. l.Roles], IsPrimary = l.IsPrimary, IsDecisionMaker = l.IsDecisionMaker, StartDate = l.StartDate, EndDate = l.EndDate,
+                }
+                : new LinkForm { StartDate = DateOnly.FromDateTime(DateTime.Today) };
+            errors = null;
+            message = null;
+        }
+    }
+
+    private void ToggleRole(string key, bool on)
+    {
+        if (on)
+        {
+            form.Roles.Add(key);
+        }
+        else
+        {
+            form.Roles.Remove(key);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (form.ContactId is not { } contactId)
+        {
+            errors = new Dictionary<string, string[]> { ["contactId"] = ["Kişi seçin."] };
+            return;
+        }
+
+        busy = true;
+        var request = new SaveCompanyContactRequest(
+            CompanyId, contactId, form.Department, form.JobTitle, [.. form.Roles.Order()], form.IsPrimary, form.IsDecisionMaker,
+            form.StartDate, form.EndDate, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<CompanyContactDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<CompanyContactDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class LinkForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? ContactId { get; set; }
+
+        public string? Department { get; set; }
+
+        public string? JobTitle { get; set; }
+
+        public HashSet<string> Roles { get; set; } = [];
+
+        public bool IsPrimary { get; set; }
+
+        public bool IsDecisionMaker { get; set; }
+
+        public DateOnly? StartDate { get; set; }
+
+        public DateOnly? EndDate { get; set; }
+    }
+}

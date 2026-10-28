@@ -1,5 +1,7 @@
+using System.Linq.Expressions;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
@@ -12,10 +14,10 @@ namespace Modulix.Modules.Crm.Records;
 // Firma ve kişi ortak kaydın uzantısıdır (ADR-0006): ad, vergi no, iletişim gibi alanlar API'de aynı adlarla durur ama
 // ortak kayda (Party, Person) yazılır; aynı kaydı diğer modüller de kullanır.
 
-internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordStore<Company>(context)
+internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmRecordStore<Company>(context), IMergeableRecordStore
 {
     /// <summary>Taraftaki alanlar. Mevcut tarafa bağlanırken boş gönderilenler taraftaki değeri silmez.</summary>
-    private static readonly string[] PartyFields = ["name", "taxNumber", "phone", "email", "website", "city", "address"];
+    private static readonly string[] PartyFields = ["name", "kind", "taxOffice", "taxNumber", "phone", "email", "website", "city", "address"];
 
     public override string EntityKey => CrmModule.Entities.Company;
 
@@ -27,6 +29,8 @@ internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordSto
     [
         Field.SharedId<Company>("partyId", c => c.PartyId),
         Field.Text<Company>("name", Party.NameMaxLength, c => c.Party.Name, (c, v) => c.Party.Name = v!, required: true),
+        Field.Kind<Company>("kind", c => c.Party.Kind, (c, v) => c.Party.Kind = v),
+        Field.Text<Company>("taxOffice", Party.TaxOfficeMaxLength, c => c.Party.TaxOffice, (c, v) => { if (v is not null) c.Party.TaxOffice = v; }),
         Field.Text<Company>("taxNumber", Party.TaxNumberMaxLength, c => c.Party.TaxNumber, (c, v) => c.Party.TaxNumber = v),
         Field.Text<Company>("phone", Party.PhoneMaxLength, c => c.Party.Phone, (c, v) => c.Party.Phone = v),
         Field.Email<Company>("email", Party.EmailMaxLength, c => c.Party.Email, (c, v) => c.Party.Email = v),
@@ -45,6 +49,16 @@ internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordSto
     {
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
         ["partyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PartyId == id) : null,
+        // Kesin eşleşme (mükerrer önerisi): vergi numarası. İletişim eşleşmesi yalnızca paylaşılmayan (santral/ortak adres olmayan) noktalarla.
+        ["taxNumber"] = (q, v, _) => v.Trim() is { Length: > 0 and <= Party.TaxNumberMaxLength } number ? q.Where(c => c.Party.TaxNumber == number) : null,
+        ["contactValue"] = (q, v, ctx) => ContactNormalization.IdentityValue(v) is { } value
+            ? q.Where(c => ctx.Data.Set<ContactPoint>().Any(p => p.CompanyId == c.Id && p.IsActive && !p.IsShared && p.NormalizedValue == value))
+            : null,
+        // Şehir hem eski şehir alanında hem aktif adreslerde aranır (ADR-0012).
+        ["city"] = (q, v, ctx) => q.Where(c => c.Party.City == v || ctx.Data.Set<Address>().Any(a => a.CompanyId == c.Id && a.IsActive && a.City == v)),
+        ["kind"] = (q, v, _) => Enum.TryParse<PartyKind>(v, ignoreCase: false, out var kind) && Enum.IsDefined(kind) && !char.IsDigit(v[0])
+            ? q.Where(c => c.Party.Kind == kind)
+            : null,
     };
 
     protected override IReadOnlyDictionary<string, AsyncRecordFilter<Company>> AsyncFilters { get; } =
@@ -58,11 +72,22 @@ internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordSto
 
     protected override IOrderedQueryable<Company> Order(IQueryable<Company> source) => source.OrderBy(c => c.Party.Name);
 
-    protected override IQueryable<Company> Search(IQueryable<Company> source, string term) =>
-        source.Where(c => c.Party.Name.Contains(term)
+    // Ad, vergi no, şehir ve etiketin yanında tüm iletişim noktalarında (ikinci telefon, lokasyon e-postası...) ve adreslerde aranır;
+    // telefon ve adres normalleştirilmiş değerle eşleşir (ADR-0012).
+    protected override IQueryable<Company> Search(IQueryable<Company> source, string term)
+    {
+        var folded = ContactNormalization.FoldText(term);
+        var lower = term.Trim().ToLowerInvariant();
+        var phone = ContactNormalization.NormalizePhone(term);
+        var points = Context.Data.Set<ContactPoint>();
+        var addresses = Context.Data.Set<Address>();
+        return source.Where(c => c.Party.Name.Contains(term)
             || (c.Party.TaxNumber != null && c.Party.TaxNumber.Contains(term))
             || (c.Party.City != null && c.Party.City.Contains(term))
-            || (c.Tags != null && c.Tags.Contains(term)));
+            || (c.Tags != null && c.Tags.Contains(term))
+            || points.Any(p => p.CompanyId == c.Id && (p.NormalizedValue.Contains(lower) || (phone != null && p.NormalizedValue == phone)))
+            || (folded != "" && addresses.Any(a => a.CompanyId == c.Id && a.NormalizedText.Contains(folded))));
+    }
 
     /// <summary>
     /// Yeni firma bir tarafa bağlanır: "partyId" verildiyse o tarafa, aynı vergi numaralı taraf varsa ona (vergi
@@ -104,23 +129,70 @@ internal sealed class CompanyRecordStore(CrmStoreContext context) : CrmRecordSto
     /// <summary>Vergi numarası taraflar arasında tekildir; başka bir tarafın numarası verilirse alan hatası (409 değil).</summary>
     protected override async Task AppliedAsync(Company entity, JsonObject values, CancellationToken cancellationToken)
     {
+        await EnsureTaxNumberFormatAsync(entity, cancellationToken);
         if (entity.Party.TaxNumber is { } number
             && await Context.Data.Set<Party>().AnyAsync(p => p.TaxNumber == number && p.Id != entity.PartyId, cancellationToken))
         {
             throw new RecordValidationException([new RecordFieldError("taxNumber", "Bu vergi numarasıyla kayıtlı bir firma var.")]);
         }
+
+        // Eski telefon/e-posta/şehir/adres alanları yapılandırılmış ana kayıtlara yansır (ADR-0012).
+        await LegacyContactSync.FromCompanyAsync(Context.Data, entity, cancellationToken);
+    }
+
+    /// <summary>
+    /// Tüzel kişide vergi numarası 10, gerçek kişide T.C. kimlik numarası 11 hanelidir (ADR-0006). Yalnızca numara ya da tür
+    /// değiştiğinde denetlenir: eskiden girilmiş serbest biçimli numara, başka alan düzenlenirken hata vermez.
+    /// </summary>
+    private async Task EnsureTaxNumberFormatAsync(Company entity, CancellationToken cancellationToken)
+    {
+        if (entity.Party.TaxNumber is not { } number)
+        {
+            return;
+        }
+
+        var stored = await Context.Data.Set<Party>().AsNoTracking()
+            .Where(p => p.Id == entity.PartyId).Select(p => new { p.TaxNumber, p.Kind }).SingleOrDefaultAsync(cancellationToken);
+        if (stored is not null && stored.TaxNumber == number && stored.Kind == entity.Party.Kind)
+        {
+            return;
+        }
+
+        var length = entity.Party.Kind == PartyKind.Individual ? 11 : 10;
+        if (number.Length != length || !number.All(char.IsAsciiDigit))
+        {
+            throw new RecordValidationException([new RecordFieldError("taxNumber",
+                entity.Party.Kind == PartyKind.Individual ? "T.C. kimlik numarası 11 haneli olmalıdır." : "Vergi numarası 10 haneli olmalıdır.")]);
+        }
+    }
+
+    /// <summary>
+    /// Firma silinirken kendi adresleri ve iletişim noktaları gider; lokasyonu veya firma ilişkisi olan firma silinmez (ADR-0012),
+    /// önce onlar kaldırılır.
+    /// </summary>
+    protected override async Task BeforeDeleteAsync(Company entity, CancellationToken cancellationToken)
+    {
+        var data = Context.Data;
+        if (await data.Set<Location>().AnyAsync(l => l.CompanyId == entity.Id, cancellationToken)
+            || await data.Set<CompanyRelation>().AnyAsync(r => r.ParentCompanyId == entity.Id || r.ChildCompanyId == entity.Id, cancellationToken))
+        {
+            throw new RecordConflictException("Firmanın lokasyonları veya firma ilişkileri var; önce onları kaldırın.");
+        }
+
+        data.Set<Address>().RemoveRange(await data.Set<Address>().Where(a => a.CompanyId == entity.Id).ToListAsync(cancellationToken));
+        data.Set<ContactPoint>().RemoveRange(await data.Set<ContactPoint>().Where(p => p.CompanyId == entity.Id).ToListAsync(cancellationToken));
     }
 
     protected override SharedEntity SharedOf(Company entity) => entity.Party;
 
     protected override JsonObject SharedState(Company entity) => new()
     {
-        ["name"] = entity.Party.Name, ["taxNumber"] = entity.Party.TaxNumber, ["phone"] = entity.Party.Phone,
+        ["name"] = entity.Party.Name, ["kind"] = entity.Party.Kind.ToString(), ["taxOffice"] = entity.Party.TaxOffice, ["taxNumber"] = entity.Party.TaxNumber, ["phone"] = entity.Party.Phone,
         ["email"] = entity.Party.Email, ["website"] = entity.Party.Website, ["city"] = entity.Party.City, ["address"] = entity.Party.Address,
     };
 }
 
-internal sealed class ContactRecordStore(CrmStoreContext context) : CrmRecordStore<Contact>(context)
+internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmRecordStore<Contact>(context), IMergeableRecordStore
 {
 
     public override string EntityKey => CrmModule.Entities.Contact;
@@ -138,6 +210,7 @@ internal sealed class ContactRecordStore(CrmStoreContext context) : CrmRecordSto
         Field.Text<Contact>("title", Person.TitleMaxLength, c => c.Person.Title, (c, v) => c.Person.Title = v),
         Field.Email<Contact>("email", Person.EmailMaxLength, c => c.Person.Email, (c, v) => c.Person.Email = v),
         Field.Text<Contact>("phone", Person.PhoneMaxLength, c => c.Person.Phone, (c, v) => c.Person.Phone = v),
+        Field.Owner<Contact>(OwnerField, c => c.OwnerId, (c, v) => c.OwnerId = v),
         Field.Text<Contact>("notes", Company.NotesMaxLength, c => c.Notes, (c, v) => c.Notes = v),
     ];
 
@@ -145,17 +218,71 @@ internal sealed class ContactRecordStore(CrmStoreContext context) : CrmRecordSto
     {
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.CompanyId == id) : null,
         ["personId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PersonId == id) : null,
+        [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
+        ["withoutCompany"] = (q, v, _) => FilterValue.Bool(v) is { } flag ? q.Where(c => (c.CompanyId == null) == flag) : null,
+        // Mükerrer önerisi: paylaşılmayan aktif iletişim noktasında aynı e-posta/telefon.
+        ["contactValue"] = (q, v, ctx) => ContactNormalization.IdentityValue(v) is { } value
+            ? q.Where(c => ctx.Data.Set<ContactPoint>().Any(p => p.ContactId == c.Id && p.IsActive && !p.IsShared && p.NormalizedValue == value))
+            : null,
+        // Aktif ilişkisinde bu ilişki rolü olan kişiler (ADR-0011).
+        ["role"] = (q, v, ctx) => CrmModule.RelationshipRoles.Contains(v)
+            ? q.Where(c => ctx.Data.Set<CompanyContact>().Any(l => l.ContactId == c.Id && l.IsActive && l.Roles != null && l.Roles.Contains(v)))
+            : null,
     };
+
+    /// <summary>
+    /// Kişi görünürlüğü (ADR-0010): firmaya bağlı kişi firmanın sorumlusuna göre, firmasız kişi kendi sorumlusuna göre
+    /// kapsamdadır. Tüm kayıtlar kapsamında (<c>owners</c> null) herkes görünür; bu ifade yalnızca kısıtlı kapsam içindir.
+    /// </summary>
+    internal static Expression<Func<Contact, bool>> VisibleTo(IModuleData data, IReadOnlySet<Guid> owners)
+    {
+        var ids = owners.Select(id => (Guid?)id).ToList();
+        var companies = data.Set<Company>();
+        var links = data.Set<CompanyContact>();
+        return c => links.Any(l => l.ContactId == c.Id && l.IsActive)
+            ? links.Any(l => l.ContactId == c.Id && l.IsActive && companies.Any(co => co.Id == l.CompanyId && ids.Contains(co.OwnerId)))
+            : ids.Contains(c.OwnerId);
+    }
+
+    protected override IQueryable<Contact> ScopeToOwners(IQueryable<Contact> source, IReadOnlySet<Guid> owners) =>
+        source.Where(VisibleTo(Context.Data, owners));
+
+    protected override async Task<bool> IsInScopeAsync(RecordData record, IReadOnlySet<Guid> owners, CancellationToken cancellationToken)
+    {
+        // Kayıttaki ilişkiler (kayıtlı hal): bağlı firmalardan biri kapsamdaysa görünür.
+        if (await Context.Data.Set<Contact>().AsNoTracking().Where(c => c.Id == record.Id).Where(VisibleTo(Context.Data, owners))
+                .AnyAsync(cancellationToken))
+        {
+            return true;
+        }
+
+        // Henüz kaydedilmemiş yazma (oluşturma/güncelleme sonrası denetim): birincil firma ya da sorumlu.
+        if (record.Values["companyId"] is JsonValue company && company.TryGetValue<string>(out var text) && Guid.TryParse(text, out var companyId))
+        {
+            var owner = await Context.Data.Set<Company>().AsNoTracking()
+                .Where(c => c.Id == companyId).Select(c => c.OwnerId).SingleOrDefaultAsync(cancellationToken);
+            return owner is { } ownerId && owners.Contains(ownerId);
+        }
+
+        return await base.IsInScopeAsync(record, owners, cancellationToken);
+    }
 
     protected override IQueryable<Contact> Load(IQueryable<Contact> source) => source.Include(c => c.Person);
 
     protected override IOrderedQueryable<Contact> Order(IQueryable<Contact> source) =>
         source.OrderBy(c => c.Person.LastName).ThenBy(c => c.Person.FirstName);
 
-    protected override IQueryable<Contact> Search(IQueryable<Contact> source, string term) =>
-        source.Where(c => c.Person.FirstName.Contains(term)
+    // Ad, soyad ve tüm iletişim noktalarında (ikinci e-posta, ilişkiye özel telefon...) aranır; telefon normalleştirilmiş değerle eşleşir.
+    protected override IQueryable<Contact> Search(IQueryable<Contact> source, string term)
+    {
+        var lower = term.Trim().ToLowerInvariant();
+        var phone = ContactNormalization.NormalizePhone(term);
+        var points = Context.Data.Set<ContactPoint>();
+        return source.Where(c => c.Person.FirstName.Contains(term)
             || c.Person.LastName.Contains(term)
-            || (c.Person.Email != null && c.Person.Email.Contains(term)));
+            || (c.Person.Email != null && c.Person.Email.Contains(term))
+            || points.Any(p => p.ContactId == c.Id && (p.NormalizedValue.Contains(lower) || (phone != null && p.NormalizedValue == phone))));
+    }
 
     /// <summary>
     /// Yeni kişi "personId" verildiyse o ortak kişiye bağlanır (kişinin zaten bir CRM kişisi varsa doğrulama hatası), yoksa
@@ -183,14 +310,115 @@ internal sealed class ContactRecordStore(CrmStoreContext context) : CrmRecordSto
     /// <summary>Kişinin çalıştığı taraf, CRM'deki firmasının tarafıdır; firma verildiğinde (veya kaldırıldığında) eşitlenir.</summary>
     protected override async Task AppliedAsync(Contact entity, JsonObject values, CancellationToken cancellationToken)
     {
+        // Eski telefon/e-posta alanları kişinin genel ana noktalarına yansır (ADR-0012).
+        await LegacyContactSync.FromContactAsync(Context.Data, entity, cancellationToken);
+
+        // Eski istemciler sorumluyu göndermez (boş); kişi sorumlusuz kalıp kapsamdan düşmesin diye mevcut sorumlu korunur.
+        if (entity.OwnerId is null)
+        {
+            entity.OwnerId = await Context.Data.Set<Contact>().AsNoTracking()
+                .Where(c => c.Id == entity.Id).Select(c => c.OwnerId).SingleOrDefaultAsync(cancellationToken);
+        }
+
         if (!values.ContainsKey("companyId"))
         {
             return;
         }
 
+        await EnsureCompanyAccessAsync(entity, cancellationToken);
+        await SyncLinksAsync(entity, cancellationToken);
         entity.Person.PartyId = entity.CompanyId is { } companyId
             ? await Context.Data.Set<Company>().Where(c => c.Id == companyId).Select(c => (Guid?)c.PartyId).SingleOrDefaultAsync(cancellationToken)
             : null;
+    }
+
+    /// <summary>
+    /// Eski API'nin tek firma alanı ilişkilere çevrilir (ADR-0011): önceki birincil firmayla ilişki sonlanır, yeni firmayla
+    /// aktif ilişki yoksa açılır; <c>CompanyId</c> yeniden birincil firmaya (en eski aktif ilişki) eşitlenir. Alan değişmediyse
+    /// hiçbir şey yapılmaz, böylece ekranın tüm kaydı yeniden göndermesi çok firmalı kişinin ilişkilerini bozmaz.
+    /// </summary>
+    private async Task SyncLinksAsync(Contact entity, CancellationToken cancellationToken)
+    {
+        var previous = await Context.Data.Set<Contact>().AsNoTracking()
+            .Where(c => c.Id == entity.Id).Select(c => c.CompanyId).SingleOrDefaultAsync(cancellationToken);
+        var desired = entity.CompanyId;
+        if (previous == desired)
+        {
+            return;
+        }
+
+        var links = Context.Data.Set<CompanyContact>();
+        var ended = new List<Guid>();
+        if (previous is { } oldCompany)
+        {
+            foreach (var link in await links.Where(l => l.ContactId == entity.Id && l.CompanyId == oldCompany && l.IsActive).ToListAsync(cancellationToken))
+            {
+                link.EndDate = CompanyLinks.Today;
+                link.IsActive = false;
+                link.IsPrimary = false;
+                link.Touch();
+                ended.Add(link.Id);
+            }
+        }
+
+        var extra = new List<(Guid, DateOnly, DateTimeOffset)>();
+        if (desired is { } newCompany && !await links.AnyAsync(l => l.ContactId == entity.Id && l.CompanyId == newCompany && l.IsActive, cancellationToken))
+        {
+            var added = new CompanyContact
+            {
+                CompanyId = newCompany, ContactId = entity.Id, Contact = entity, JobTitle = entity.Person.Title, StartDate = CompanyLinks.Today,
+            };
+            links.Add(added);
+            extra.Add((newCompany, added.StartDate, added.CreatedAt));
+        }
+        else if (desired is { } existing)
+        {
+            // Zaten aktif ilişkisi olan firma: mevcut ilişki korunur ve sıralamada onun başlangıcı geçerlidir.
+            var start = await links.Where(l => l.ContactId == entity.Id && l.CompanyId == existing && l.IsActive)
+                .Select(l => new { l.StartDate, l.CreatedAt }).FirstAsync(cancellationToken);
+            extra.Add((existing, start.StartDate, start.CreatedAt));
+        }
+
+        entity.CompanyId = await CompanyLinks.PrimaryCompanyAsync(Context.Data, entity.Id, ended, extra, cancellationToken);
+    }
+
+    protected override async Task BeforeDeleteAsync(Contact entity, CancellationToken cancellationToken)
+    {
+        // Kişi silinince ilişkileri de gider (kişiyi silmek bilinçli bir işlemdir; geçmişi korumak için ilişki sonlandırılır).
+        Context.Data.Set<ContactPoint>().RemoveRange(
+            await Context.Data.Set<ContactPoint>().Where(p => p.ContactId == entity.Id).ToListAsync(cancellationToken));
+        Context.Data.Set<CompanyContact>().RemoveRange(
+            await Context.Data.Set<CompanyContact>().Where(l => l.ContactId == entity.Id).ToListAsync(cancellationToken));
+    }
+
+    /// <summary>
+    /// Kişiyi bir firmaya bağlamak için firmayı görme yetkisi gerekir (ADR-0010): firma okuma izni ve firmanın veri kapsamı.
+    /// Erişilemeyen firma, var olmayan firmayla aynı cevabı alır. Firma değişmediyse (ör. ekran kaydı yeniden gönderirken)
+    /// denetlenmez.
+    /// </summary>
+    private async Task EnsureCompanyAccessAsync(Contact entity, CancellationToken cancellationToken)
+    {
+        if (entity.CompanyId is not { } companyId)
+        {
+            return;
+        }
+
+        var stored = await Context.Data.Set<Contact>().AsNoTracking()
+            .Where(c => c.Id == entity.Id).Select(c => c.CompanyId).SingleOrDefaultAsync(cancellationToken);
+        if (stored == companyId)
+        {
+            return;
+        }
+
+        var owner = await Context.Data.Set<Company>().AsNoTracking()
+            .Where(c => c.Id == companyId).Select(c => c.OwnerId).SingleOrDefaultAsync(cancellationToken);
+        var scope = await Context.Access.GetOwnersAsync(cancellationToken);
+        var visible = await Context.Access.CanAsync(CrmModule.Entities.Company, RecordOperation.Read, cancellationToken)
+            && (scope is null || (owner is { } ownerId && scope.Contains(ownerId)));
+        if (!visible)
+        {
+            throw new RecordValidationException([new RecordFieldError("companyId", "Firma bulunamadı.")]);
+        }
     }
 
     protected override SharedEntity SharedOf(Contact entity) => entity.Person;
@@ -241,6 +469,18 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
         {
             ["stage"] = async (q, v, ctx, ct) =>
                 await FilterValue.ChoiceAsync(v, CrmModule.Lists.OpportunityStage, ctx, ct) is { } stage ? q.Where(o => o.Stage == stage) : null,
+            // "stageCategory=won|lost|open": aşamanın kategorisine göre (firmanın eklediği aşamalar dahil).
+            ["stageCategory"] = async (q, v, ctx, ct) =>
+            {
+                var category = v.Trim().ToLowerInvariant();
+                if (category is not (CrmModule.StageCategories.Open or CrmModule.StageCategories.Won or CrmModule.StageCategories.Lost))
+                {
+                    return null;
+                }
+
+                var keys = (await ctx.ChoiceLists.GetAsync(CrmModule.Lists.OpportunityStage, ct)).KeysIn(category).ToList();
+                return q.Where(o => keys.Contains(o.Stage));
+            },
             ["open"] = async (q, v, ctx, ct) =>
             {
                 if (FilterValue.Bool(v) is not { } open)

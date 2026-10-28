@@ -17,7 +17,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -782,6 +782,91 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                     b.ToTable("Activities", "crm");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.Address", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .IsUnicode(false)
+                        .HasColumnType("char(2)")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("District")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Line1")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("Line2")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<Guid?>("LocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("NormalizedText")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("PostalCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "LocationId");
+
+                    b.HasIndex("TenantId", "CompanyId", "LocationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Addresses_PrimaryPerOwner")
+                        .HasFilter("[IsPrimary] = 1 AND [IsActive] = 1");
+
+                    b.ToTable("Addresses", "crm");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Company", b =>
                 {
                     b.Property<Guid>("Id")
@@ -840,6 +925,139 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                     b.ToTable("Companies", "crm");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.CompanyContact", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDecisionMaker")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("JobTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Roles")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CompanyContacts_PrimaryPerCompany")
+                        .HasFilter("[IsPrimary] = 1 AND [IsActive] = 1");
+
+                    b.HasIndex("TenantId", "ContactId");
+
+                    b.HasIndex("TenantId", "CompanyId", "ContactId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CompanyContacts_ActivePair")
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("CompanyContacts", "crm");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.CompanyRelation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ChildCompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("ParentCompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ChildCompanyId");
+
+                    b.HasIndex("TenantId", "ParentCompanyId", "ChildCompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CompanyRelations_ActivePair")
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("CompanyRelations", "crm", t =>
+                        {
+                            t.HasCheckConstraint("CK_CompanyRelations_NoSelf", "[ParentCompanyId] <> [ChildCompanyId]");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Contact", b =>
                 {
                     b.Property<Guid>("Id")
@@ -858,6 +1076,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("PersonId")
                         .HasColumnType("uniqueidentifier");
 
@@ -875,10 +1096,223 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
 
                     b.HasIndex("TenantId", "CompanyId");
 
+                    b.HasIndex("TenantId", "OwnerId");
+
                     b.HasIndex("TenantId", "PersonId")
                         .IsUnique();
 
                     b.ToTable("Contacts", "crm");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.ContactPoint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid?>("CompanyContactId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsShared")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("LocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("NormalizedValue")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "CompanyContactId");
+
+                    b.HasIndex("TenantId", "CompanyId");
+
+                    b.HasIndex("TenantId", "ContactId");
+
+                    b.HasIndex("TenantId", "LocationId");
+
+                    b.HasIndex("TenantId", "Channel", "NormalizedValue");
+
+                    b.HasIndex("TenantId", "CompanyId", "Channel")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContactPoints_PrimaryPerCompany")
+                        .HasFilter("[IsPrimary] = 1 AND [IsActive] = 1 AND [CompanyId] IS NOT NULL AND [LocationId] IS NULL");
+
+                    b.HasIndex("TenantId", "LocationId", "Channel")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContactPoints_PrimaryPerLocation")
+                        .HasFilter("[IsPrimary] = 1 AND [IsActive] = 1 AND [LocationId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ContactId", "CompanyContactId", "Channel")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContactPoints_PrimaryPerContact")
+                        .HasFilter("[IsPrimary] = 1 AND [IsActive] = 1 AND [ContactId] IS NOT NULL");
+
+                    b.ToTable("ContactPoints", "crm", t =>
+                        {
+                            t.HasCheckConstraint("CK_ContactPoints_Owner", "(([CompanyId] IS NOT NULL AND [ContactId] IS NULL) OR ([CompanyId] IS NULL AND [ContactId] IS NOT NULL)) AND ([LocationId] IS NULL OR [CompanyId] IS NOT NULL) AND ([CompanyContactId] IS NULL OR [ContactId] IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.Location", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CompanyId");
+
+                    b.HasIndex("TenantId", "ContactId");
+
+                    b.HasIndex("TenantId", "CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Locations_CodePerCompany")
+                        .HasFilter("[Code] IS NOT NULL");
+
+                    b.ToTable("Locations", "crm");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.MergedRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EntityKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid?>("MergedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "EntityKey", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MergedRecords_Source");
+
+                    b.HasIndex("TenantId", "EntityKey", "TargetId");
+
+                    b.ToTable("MergedRecords", "crm");
                 });
 
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Opportunity", b =>
@@ -1043,6 +1477,24 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.Address", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CompanyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.Location", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "LocationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Company");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Company", b =>
                 {
                     b.HasOne("Modulix.Core.Contracts.SharedRecords.Party", "Party")
@@ -1053,6 +1505,48 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                         .IsRequired();
 
                     b.Navigation("Party");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.CompanyContact", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CompanyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.Contact", "Contact")
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ContactId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("Contact");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.CompanyRelation", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.Company", "ChildCompany")
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ChildCompanyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.Company", "ParentCompany")
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ParentCompanyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ChildCompany");
+
+                    b.Navigation("ParentCompany");
                 });
 
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Contact", b =>
@@ -1071,6 +1565,51 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                         .IsRequired();
 
                     b.Navigation("Person");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.ContactPoint", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.CompanyContact", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CompanyContactId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.Company", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CompanyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.Contact", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ContactId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.Location", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "LocationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.Location", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CompanyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.Contact", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ContactId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Company");
                 });
 
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Opportunity", b =>

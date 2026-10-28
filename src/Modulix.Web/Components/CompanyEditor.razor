@@ -9,6 +9,11 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
+    @if (Company is not null)
+    {
+        <p class="shared-note text-muted">Ad, vergi bilgileri, telefon, e-posta, web sitesi, şehir ve adres bu firmayı kullanan diğer modüllerde (ör. Lojistik) de görünür; burada yaptığınız değişiklik onlara da yansır. Telefon, e-posta, şehir ve adres alanları ana iletişim noktasını/adresi günceller; birden fazla kayıt için firma detayındaki "Adres ve iletişim" bölümünü kullanın.</p>
+    }
+
     <div class="form-grid">
         <div>
             <label class="form-label" for="name">Ad *</label>
@@ -53,7 +58,20 @@
             <FieldError Field="source" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="taxNumber">Vergi no</label>
+            <label class="form-label" for="kind">Tür</label>
+            <select id="kind" class="form-select" @bind="form.Kind">
+                <option value="Organization">Tüzel kişi (şirket)</option>
+                <option value="Individual">Gerçek kişi (şahıs firması)</option>
+            </select>
+            <FieldError Field="kind" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="taxOffice">Vergi dairesi</label>
+            <input id="taxOffice" class="form-control" maxlength="@CrmLimits.TaxOfficeMaxLength" @bind="form.TaxOffice" />
+            <FieldError Field="taxOffice" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="taxNumber">@(form.Kind == "Individual" ? "T.C. kimlik no" : "Vergi no")</label>
             <input id="taxNumber" class="form-control" maxlength="@CrmLimits.TaxNumberMaxLength" @bind="form.TaxNumber" />
             <FieldError Field="taxNumber" Errors="errors" />
         </div>
@@ -92,6 +110,14 @@
             <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
             <FieldError Field="notes" Errors="errors" />
         </div>
+        <div class="span-all">
+            <DuplicateSuggestions Resource="companies" Query="DuplicateQuery" ExcludeId="Company?.Id" Use="UseExisting" />
+            @if (usePartyId is not null)
+            {
+                <p class="alert alert-info mt-2">Mevcut ortak firma kaydı kullanılacak: yeni taraf açılmaz, kaydettiğinizde bu firma için CRM kaydı oluşur. Boş bıraktığınız ortak alanlar kayıttaki değeri silmez.
+                    <button type="button" class="btn btn-link btn-sm" @onclick="() => usePartyId = null">Vazgeç</button></p>
+            }
+        </div>
         <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
     </div>
     <div class="form-actions">
@@ -111,6 +137,7 @@
     private IReadOnlyDictionary<string, string[]>? errors;
     private string? message;
     private bool busy;
+    private Guid? usePartyId;
 
     /// <summary>Düzenlenecek firma; null ise yeni firma.</summary>
     [Parameter] public CompanyDto? Company { get; set; }
@@ -138,7 +165,7 @@
             form = Company is { } c
                 ? new CompanyForm
                 {
-                    Id = c.Id, Version = c.Version, Name = c.Name, TaxNumber = c.TaxNumber, Phone = c.Phone, Email = c.Email,
+                    Id = c.Id, Version = c.Version, Name = c.Name, Kind = c.Kind ?? "Organization", TaxOffice = c.TaxOffice, TaxNumber = c.TaxNumber, Phone = c.Phone, Email = c.Email,
                     Website = c.Website, City = c.City, Address = c.Address, Industry = c.Industry, Status = c.Status,
                     Source = c.Source, Tags = c.Tags, OwnerId = c.OwnerId, Notes = c.Notes,
                     Custom = c.Custom?.DeepClone().AsObject() ?? [],
@@ -149,12 +176,21 @@
         }
     }
 
+    private IReadOnlyDictionary<string, string?> DuplicateQuery() => new Dictionary<string, string?>
+    {
+        ["name"] = form.Name, ["taxNumber"] = form.TaxNumber, ["email"] = form.Email, ["phone"] = form.Phone,
+    };
+
+    // Kesin eşleşen ortak kayıt: yeni firma onun üzerine kurulur (partyId); sunucu yine de denetler.
+    private void UseExisting(Guid partyId) => usePartyId = partyId;
+
     private async Task SaveAsync()
     {
         busy = true;
         var request = new SaveCompanyRequest(
             form.Name, form.TaxNumber, form.Phone, form.Email, form.Website, form.City, form.Notes, form.Version,
-            form.Address, form.Industry, form.Status, string.IsNullOrEmpty(form.Source) ? null : form.Source, form.Tags, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom));
+            form.Address, form.Industry, form.Status, string.IsNullOrEmpty(form.Source) ? null : form.Source, form.Tags, form.OwnerId, CustomFieldText.ForSave(CustomFields, form.Custom),
+            Kind: form.Kind, TaxOffice: form.TaxOffice, PartyId: form.Id is null ? usePartyId : null);
         var result = form.Id is { } id
             ? await Api.PutAsync<CompanyDto>($"{Url}/{id}", request)
             : await Api.PostAsync<CompanyDto>(Url, request);
@@ -194,6 +230,10 @@
         public long? Version { get; init; }
 
         public string Name { get; set; } = string.Empty;
+
+        public string Kind { get; set; } = "Organization";
+
+        public string? TaxOffice { get; set; }
 
         public string? TaxNumber { get; set; }
 
