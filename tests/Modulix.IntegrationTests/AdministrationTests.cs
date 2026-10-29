@@ -107,7 +107,7 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
         await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
         var after = await client.GetFromJsonAsync<MyAccessResponse>("/api/tenant/access");
         Assert.Contains("crm.companies.write", after!.Permissions);
-        Assert.Equal(((IModule)new CoreModule()).Permissions.Count + 32, after.Permissions.Count);
+        Assert.Equal(((IModule)new CoreModule()).Permissions.Count + 34, after.Permissions.Count);
 
         var roles = await client.GetFromJsonAsync<List<RoleDto>>("/api/roles");
         var listed = Assert.Single(roles!);

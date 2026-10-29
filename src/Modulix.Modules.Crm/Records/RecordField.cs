@@ -165,6 +165,38 @@ internal static class Field
             e => get(e) is { } value ? JsonValue.Create(value) : null,
             (e, v) => set(e, (decimal?)v));
 
+    /// <summary>Yüzde oranı: 0–100 arası, en çok 4 ondalık (vergi oranı, indirim yüzdesi).</summary>
+    public static RecordField<T> Rate<T>(string name, Func<T, decimal?> get, Action<T, decimal?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var value))
+                {
+                    return ParsedValue.Fail("Sayı olmalıdır.");
+                }
+
+                return value is < 0 or > 100 || decimal.Round(value, 4) != value
+                    ? ParsedValue.Fail("0 ile 100 arasında, en fazla dört ondalıklı bir oran girin.")
+                    : ParsedValue.Of(value);
+            },
+            e => get(e) is { } value ? JsonValue.Create(value) : null,
+            (e, v) => set(e, (decimal?)v));
+
+    /// <summary>Negatif olmayan miktar ya da birim fiyat: 0 geçerli, en çok 6 ondalık.</summary>
+    public static RecordField<T> Quantity<T>(string name, Func<T, decimal?> get, Action<T, decimal?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var value))
+                {
+                    return ParsedValue.Fail("Sayı olmalıdır.");
+                }
+
+                return value is < 0 or > 999_999_999_999m || decimal.Round(value, 6) != value
+                    ? ParsedValue.Fail("0 veya daha büyük, en fazla altı ondalıklı bir sayı girin.")
+                    : ParsedValue.Of(value);
+            },
+            e => get(e) is { } value ? JsonValue.Create(value) : null,
+            (e, v) => set(e, (decimal?)v));
+
     public static RecordField<T> Currency<T>(string name, Func<T, string> get, Action<T, string> set) =>
         new(name, required: false, nullable: false, node =>
             {
@@ -175,6 +207,18 @@ internal static class Field
             },
             e => get(e),
             (e, v) => set(e, (string)v!));
+
+    /// <summary>Boş bırakılabilen para birimi (ör. yalnızca tutar indiriminde zorunlu); dolu ise üç harfli ISO kodu.</summary>
+    public static RecordField<T> OptionalCurrency<T>(string name, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                var text = ParseText(node, Opportunity.CurrencyLength);
+                return text.Value is string code && code.Length == Opportunity.CurrencyLength && code.All(char.IsAsciiLetter)
+                    ? ParsedValue.Of(code.ToUpperInvariant())
+                    : ParsedValue.Fail("Üç harfli para birimi kodu girin (ör. TRY).");
+            },
+            e => get(e),
+            (e, v) => set(e, (string?)v));
 
     public static RecordField<T> Date<T>(string name, Func<T, DateOnly?> get, Action<T, DateOnly?> set) =>
         new(name, required: false, nullable: true, node =>
