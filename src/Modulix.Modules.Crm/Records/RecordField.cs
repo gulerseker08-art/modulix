@@ -149,6 +149,22 @@ internal static class Field
             e => get(e) is { } value ? JsonValue.Create(value) : null,
             (e, v) => set(e, (decimal?)v));
 
+    /// <summary>Pozitif katsayı (ör. birim dönüşümü): en çok 10 ondalık; sıfır ve negatif reddedilir.</summary>
+    public static RecordField<T> Decimal<T>(string name, Func<T, decimal?> get, Action<T, decimal?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var value))
+                {
+                    return ParsedValue.Fail("Sayı olmalıdır.");
+                }
+
+                return value <= 0 || value > 999_999_999_999m || decimal.Round(value, 10) != value
+                    ? ParsedValue.Fail("Sıfırdan büyük, en fazla on ondalıklı bir sayı girin.")
+                    : ParsedValue.Of(value);
+            },
+            e => get(e) is { } value ? JsonValue.Create(value) : null,
+            (e, v) => set(e, (decimal?)v));
+
     public static RecordField<T> Currency<T>(string name, Func<T, string> get, Action<T, string> set) =>
         new(name, required: false, nullable: false, node =>
             {
