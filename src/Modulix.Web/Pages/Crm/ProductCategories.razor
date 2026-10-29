@@ -1,0 +1,208 @@
+@page "/crm/urun-kategorileri"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Ürün kategorileri · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ProductsRead">
+    <div class="page-header">
+        <h1>Ürün kategorileri</h1>
+        @if (Session.Can(CrmAccess.ProductsWrite) && form is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => form = new()">Yeni kategori</button>
+        }
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni kategori" : "Kategoriyi düzenle")</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="name">Ad *</label>
+                    <input id="name" class="form-control" maxlength="100" @bind="form.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="parent">Üst kategori</label>
+                    <select id="parent" class="form-select" @bind="form.ParentId">
+                        <option value="">—</option>
+                        @foreach (var item in all.Where(c => c.Id != form.Id))
+                        {
+                            <option value="@item.Id">@PathOf(item)</option>
+                        }
+                    </select>
+                    <FieldError Field="parentId" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="active">Durum</label>
+                    <select id="active" class="form-select" @bind="form.IsActive">
+                        <option value="true">Aktif</option>
+                        <option value="false">Pasif</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    @if (!loaded)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (all.Count == 0)
+    {
+        <p class="text-muted">Kategori yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead><tr><th>Kategori</th><th>Durum</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var category in all.OrderBy(PathOf, StringComparer.CurrentCulture))
+                {
+                    <tr>
+                        <td data-label="Kategori" class="primary">@PathOf(category)</td>
+                        <td data-label="Durum"><span class="badge status-@(category.IsActive ? "success" : "muted")">@(category.IsActive ? "Aktif" : "Pasif")</span></td>
+                        <td class="actions">
+                            @if (Session.Can(CrmAccess.ProductsWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(category)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/product-categories";
+
+    private List<ProductCategoryDto> all = [];
+    private bool loaded;
+    private CategoryForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.ProductsRead))
+        {
+            await LoadAsync();
+        }
+    }
+
+    // Ağaç için tüm kategoriler gerekir; sayfa sayfa okunur.
+    private async Task LoadAsync()
+    {
+        var items = new List<ProductCategoryDto>();
+        for (var pageNumber = 1; ; pageNumber++)
+        {
+            var result = await Api.GetAsync<CrmPage<ProductCategoryDto>>($"{Url}?page={pageNumber}&pageSize=100");
+            if (result.Value is not { } chunk)
+            {
+                message = result.Error;
+                break;
+            }
+
+            items.AddRange(chunk.Items);
+            if (items.Count >= chunk.TotalCount || chunk.Items.Count == 0)
+            {
+                break;
+            }
+        }
+
+        all = items;
+        loaded = true;
+    }
+
+    private string PathOf(ProductCategoryDto category)
+    {
+        var names = new List<string> { category.Name };
+        ProductCategoryDto? current = category;
+        for (var depth = 0; current?.ParentId is { } parentId && depth < 20; depth++)
+        {
+            current = all.FirstOrDefault(c => c.Id == parentId);
+            if (current is not null)
+            {
+                names.Insert(0, current.Name);
+            }
+        }
+
+        return string.Join(" › ", names);
+    }
+
+    private void Edit(ProductCategoryDto category)
+    {
+        form = new CategoryForm { Id = category.Id, Version = category.Version, Name = category.Name, ParentId = category.ParentId, IsActive = category.IsActive };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var request = new SaveProductCategoryRequest(form!.Name, form.ParentId, form.IsActive, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<ProductCategoryDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<ProductCategoryDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            errors = null;
+            message = null;
+            await LoadAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class CategoryForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public Guid? ParentId { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

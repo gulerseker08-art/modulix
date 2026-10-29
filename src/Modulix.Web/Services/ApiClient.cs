@@ -59,12 +59,12 @@ public sealed class ApiClient(HttpClient http)
                 HttpStatusCode.Forbidden => problem?.Detail ?? problem?.Title ?? "Bu işlem için yetkiniz yok.",
                 HttpStatusCode.NotFound => problem?.Title ?? "Kayıt bulunamadı.",
                 HttpStatusCode.Conflict => problem?.Title ?? "Kayıt başka biri tarafından değiştirildi.",
-                HttpStatusCode.UnprocessableEntity => "Lütfen işaretli alanları düzeltin.",
+                HttpStatusCode.UnprocessableEntity => problem?.Message ?? "Lütfen işaretli alanları düzeltin.",
                 HttpStatusCode.BadRequest when problem?.Errors is { Count: > 0 } errors => errors.Values.SelectMany(e => e).First(),
                 _ => problem?.Title ?? "Beklenmeyen bir hata oluştu.",
             };
 
-            return ApiResult<T>.Fail(response.StatusCode, message, problem?.Errors);
+            return ApiResult<T>.Fail(response.StatusCode, message, problem?.Errors, problem?.Code);
         }
     }
 
@@ -80,15 +80,16 @@ public sealed class ApiClient(HttpClient http)
         }
     }
 
-    private sealed record ApiProblem(string? Title, string? Detail, Dictionary<string, string[]>? Errors);
+    private sealed record ApiProblem(string? Title, string? Detail, Dictionary<string, string[]>? Errors, string? Code = null, string? Message = null);
 }
 
 public sealed class ApiResult<T>
 {
     private static readonly IReadOnlyDictionary<string, string[]> NoErrors = new Dictionary<string, string[]>();
 
-    private ApiResult(T? value, HttpStatusCode status, string? error, IReadOnlyDictionary<string, string[]>? fieldErrors)
+    private ApiResult(T? value, HttpStatusCode status, string? error, IReadOnlyDictionary<string, string[]>? fieldErrors, string? code = null)
     {
+        Code = code;
         Value = value;
         Status = status;
         Error = error;
@@ -107,8 +108,11 @@ public sealed class ApiResult<T>
 
     public bool IsSuccess => Error is null;
 
+    /// <summary>Sunucunun kararlı hata anahtarı (ör. price-not-found); yoksa null.</summary>
+    public string? Code { get; }
+
     public static ApiResult<T> Ok(T value) => new(value, HttpStatusCode.OK, null, null);
 
-    public static ApiResult<T> Fail(HttpStatusCode status, string error, IReadOnlyDictionary<string, string[]>? fieldErrors = null) =>
-        new(default, status, error, fieldErrors);
+    public static ApiResult<T> Fail(HttpStatusCode status, string error, IReadOnlyDictionary<string, string[]>? fieldErrors = null, string? code = null) =>
+        new(default, status, error, fieldErrors, code);
 }

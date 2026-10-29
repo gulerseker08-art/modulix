@@ -1,6 +1,6 @@
 # ADR-0018: Ürün, hizmet ve fiyat yönetimi
 
-Durum: **Kısmen uygulandı** (29 Ekim 2026). Uygulanan: fiyatlandırma çekirdeği (`Modulix.Core/Pricing`) ve katalog veri modeli (kategori, birim, ürün; `crm.ProductCategories/MeasureUnits/Products`, RLS, uç noktalar, izinler). Uygulanmayan kısımlar en altta.
+Durum: **Kısmen uygulandı** (29 Ekim 2026). Uygulanan: fiyatlandırma çekirdeği (`Modulix.Core.Contracts/Pricing`), katalog (kategori, birim, ürün), fiyat listesi/kademe, vergi, kur, paket bileşeni, indirim politikası, fiyat hesap uç noktası ve yönetim ekranları. Uygulanmayan kısımlar "Uygulama durumu" bölümünün sonundadır.
 
 ## Mevcut durum analizi (kod taramasıyla)
 
@@ -50,7 +50,7 @@ birim fiyat, uygulanan indirim kural kimlikleri ve adımları, vergi oranı/dahi
 hesaplama zamanı ve kural sürümü. Sunucu istemci toplamlarına güvenmez, yeniden hesaplar; taslakta yeniden fiyatlandırma açık
 işlem ve fark gösterimli, kesinleşmişte revizyonla.
 
-## Yapılmayanlar (dürüst durum)
+## Yapılmayanlar (ilk dilim anındaki durum; güncel durum en altta "Uygulama durumu" bölümünde)
 
 Veri modeli/migration, kayıt türleri ve izinler, uç noktalar, yönetim ekranları, kur ve vergi tabloları, indirim kural kaydı ve onay
 kuyruğu, içe aktarma, teklif entegrasyonu, eşzamanlılık (RowVersion), maliyet alanı yetkisi ve entegrasyon testleri **yazılmadı**.
@@ -70,6 +70,37 @@ veri katmanı gerektirir. Backfill gerekmez (mevcut katalog verisi yok); gelecek
 - **İzinler**: `crm.products.read/write`, `crm.product-costs.read` (maliyet hassas alan, Y8b). Eşzamanlılık: kayıt sürümü (409).
 - **Silme**: engeller `RecordConflictException` → 409 (boru hattı silmede doğrulama hatasını yakalamaz).
 - **Backfill**: gerekmez (yeni tablolar). Migration `ProductCatalog`; `migrate-tenants` tenant başına uygular ve hatayı raporlar.
-- **Hâlâ yok**: varyant, paket bileşenleri tablosu, fiyat listesi/kademe tabloları ve fiyat servisi uç noktası, vergi/kur tabloları,
+- **İkinci dilim sonunda yoktu (sonradan yapılanlar için "Uygulama durumu"na bakın)**: varyant, paket bileşenleri tablosu, fiyat listesi/kademe tabloları ve fiyat servisi uç noktası, vergi/kur tabloları,
   indirim kuralı ve onay, ekranlar, içe aktarma, dosya ilişkisi, teklif entegrasyonu, ürün seçici lookup'ı (ADR-0016) ve kategori/etiket
   lookup tanımı. Katalog kayıtları henüz teklif/fırsat satırından başvurulmadığı için "kullanılmış ürün" yalnızca taslak dışı durumla korunur.
+
+## Uygulama durumu (üçüncü dilim: fiyatlandırma ve ekranlar)
+
+Yukarıdaki analiz tablosu ve "Yapılmayanlar" bölümü ilk dilim anındaki durumu anlatır; güncel durum burasıdır.
+
+**Uygulandı ve entegrasyon testiyle doğrulandı** (`PricingTests`, 7 test; `ProductCatalogTests`, 4 test):
+
+| Konu | Karar / davranış |
+|---|---|
+| Fiyat listesi | `PriceList` (kapsam: Default / Customer / Segment; durum: Taslak → Yayımlandı → Arşiv; yöntem: Volume / Graduated) ve `PriceListItem` (ürün başına miktar kademesi, temel birim başına fiyat, `IsFree`). Yayımlanan liste başlığı ve satırları değişmez, silinmez; yalnızca arşive alınır, taslağa dönülmez. Satırsız liste yayımlanamaz; çakışan kademe, ters aralık, negatif fiyat reddedilir (DB CHECK + sunucu doğrulaması). Değişiklik için yeni liste açılır. |
+| Fiyat seçimi | `POST /api/crm/pricing/calculate` (`crm.prices.read`): sunucu her seferinde baştan hesaplar. Açık seçim → müşteri → segment → varsayılan; aynı öncelikte çakışma `price-conflict`, fiyat yoksa `price-not-found` (422, kararlı `code`), süresi dolan / arşivlenen / başka para birimindeki liste kullanılmaz. Ücretsiz satış eksik fiyattan ayrıdır. |
+| Birim | Satış birimi ürünün temel birimine çevrilir (2 kutu × 12 = 24 adet); miktar hassasiyeti ürün kartından doğrulanır. |
+| Vergi | `TaxRate` kod + tarih aralığı + oran (0–100). Ürünün `TaxCategory` alanı kodla eşleşir. Aynı kod için aralıklar çakışamaz. Kategori verilmiş ama geçerli oran yoksa `tax-rate-not-found` (sessiz %0 yok). Kategorisiz ürün %0 ve bu açıklamada belirtilir. |
+| Kur | `ExchangeRate` (çift + gün benzersiz, kaynak ve not, elle giriş). Hesapta yalnızca `DisplayCurrency` istenirse çeviri yapılır: o güne kadarki en yeni doğrudan kur, yoksa ters kur; hiçbiri yoksa `exchange-rate-not-found` (kur uydurulmaz). Yanıt kuru ve kur gününü taşır. |
+| İndirim | `DiscountPolicy` (yüzde ya da tutar, tam biri; öncelik; birleşme; azami toplam %; onay eşiği %; geçerlilik). Hesapta politikalar öncelik sırasıyla ardışık uygulanır, elle indirim sona eklenir, azami sınır aşılırsa sınıra çekilir. Etkin indirim onay eşiğini aşarsa yanıtta `requiresApproval = true`. Eşiği olmayan bir hesapta elle indirim de onay gerektirir olarak işaretlenir. |
+| Paket | `ProductComponent` (paket, bileşen, miktar). Kendine, tekrarlı ya da dolaylı döngüye izin verilmez. Hesap yanıtı bileşenleri miktarla çarpılmış olarak listeler. |
+| Güvenlik | `crm.prices.read/write` yeni izinlerdir (satış temsilcisi şablonuna yalnızca `read` eklendi); katalog izni fiyat izni vermez. Tüm tablolar RLS'li ve bileşik FK'li; başka tenant'ın liste/ürününe bağlanılamaz, hesapta 404 döner. Maliyet hiçbir hesap yanıtında yoktur. |
+| Ekranlar | `Ürün ve hizmetler` (+ paket bileşenleri paneli), `Ürün kategorileri`, `Ölçü birimleri`, `Fiyat listeleri` (satır editörü, yayımla/arşivle), `Vergi ve kur`, `İndirimler`, `Fiyat hesapla`. Derleme doğrulandı; tarayıcıda uçtan uca gezilmedi. |
+| Mimari | Fiyatlandırma çekirdeği `Modulix.Core.Contracts/Pricing` altına taşındı (modüller yalnızca Contracts'a başvurur); fiyat hesabı verisini yalnızca `Records` katmanından okur (`ModuleDataAccessRulesTests`). |
+
+**Yapılmadı / sınırlı** (dürüst durum):
+
+- **Varyant**: yok.
+- **Onay kuyruğu**: yalnızca `requiresApproval` işareti var; onay isteği oluşturma, onaylayan yetkisi ve kuyruk yok (genel onay altyapısı Ç6 yol haritasında, kodda doğrulanamadı).
+- **Paket fiyat modları**: `PackageCalculator` (sabit fiyatın bileşenlere dağıtımı) çekirdekte testli ama hesap uç noktasına bağlanmadı; paketin fiyatı kendi fiyat listesi satırından gelir, bileşenler yalnızca listelenir.
+- **Liste yeni sürümü**: "yeni sürüm olarak kopyala" eylemi yok; değişiklik için yeni liste elle açılır.
+- **Teklif entegrasyonu ve belge toplamı**: teklif modülü (M1.5) yok; satır snapshot'ı ve belge düzeyinde kur sabitleme uygulanamadı. Hesap yanıtı snapshot sözleşmesine uygun alanları taşır, ama saklayan bir belge yoktur.
+- **İçe aktarma** (CSV/Excel), **dosya/görsel ilişkisi**, **ürün seçici lookup tanımı** (ADR-0016) ve kategori/etiket lookup'ı: yok. Genel dosya altyapısı doğrulanamadı.
+- **Katalog yöneticisi rol şablonu**: yok; izinler elle role verilir.
+- **Test boşlukları**: kabul kriterlerinin tamamı arayüzden doğrulanmadı; maliyet yazma kısıtı testi (`ProductCatalogTests`) 200/403/422'yi kabul eden gevşek bir doğrulama yapıyor.
+- **Backfill**: gerekmez (yeni tablolar). Migration `PricingCatalog`; `migrate-tenants` tenant başına uygular.

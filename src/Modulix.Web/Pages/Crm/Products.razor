@@ -1,0 +1,574 @@
+@page "/crm/urunler"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Ürün ve hizmetler · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ProductsRead">
+    <div class="page-header">
+        <h1>Ürün ve hizmetler</h1>
+        @if (Session.Can(CrmAccess.ProductsWrite) && form is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="New">Yeni ürün/hizmet</button>
+        }
+    </div>
+
+    <p class="text-muted">
+        <a href="crm/urun-kategorileri">Kategoriler</a> · <a href="crm/birimler">Ölçü birimleri</a> · <a href="crm/fiyat-listeleri">Fiyat listeleri</a> · <a href="crm/vergi-kur">Vergi ve kur</a> · <a href="crm/indirimler">İndirimler</a> · <a href="crm/fiyat-hesapla">Fiyat hesapla</a>    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni ürün/hizmet" : "Ürün/hizmeti düzenle")</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="code">Kod *</label>
+                    <input id="code" class="form-control" maxlength="50" @bind="form.Code" />
+                    <FieldError Field="code" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="name">Ad *</label>
+                    <input id="name" class="form-control" maxlength="200" @bind="form.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="kind">Tür</label>
+                    <select id="kind" class="form-select" @bind="form.Kind">
+                        @foreach (var kind in CatalogLabels.Kinds)
+                        {
+                            <option value="@kind.Key">@kind.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="kind" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="status">Durum</label>
+                    <select id="status" class="form-select" @bind="form.Status">
+                        @foreach (var status in CatalogLabels.Statuses)
+                        {
+                            <option value="@status.Key">@status.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="status" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="category">Kategori</label>
+                    <select id="category" class="form-select" @bind="form.CategoryId">
+                        <option value="">—</option>
+                        @foreach (var category in categories)
+                        {
+                            <option value="@category.Id">@category.Name</option>
+                        }
+                    </select>
+                    <FieldError Field="categoryId" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="unit">Temel birim *</label>
+                    <select id="unit" class="form-select" @bind="form.BaseUnitId">
+                        <option value="@Guid.Empty">—</option>
+                        @foreach (var unit in units)
+                        {
+                            <option value="@unit.Id">@unit.Code — @unit.Name</option>
+                        }
+                    </select>
+                    <FieldError Field="baseUnitId" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="precision">Miktar hassasiyeti (ondalık)</label>
+                    <input id="precision" class="form-control" type="number" min="0" max="4" @bind="form.QuantityPrecision" />
+                    <FieldError Field="quantityPrecision" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="taxCategory">Vergi kategorisi</label>
+                    <input id="taxCategory" class="form-control" maxlength="30" @bind="form.TaxCategory" />
+                    <FieldError Field="taxCategory" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="includesTax">Fiyatlar</label>
+                    <select id="includesTax" class="form-select" @bind="form.PriceIncludesTax">
+                        <option value="false">Vergi hariç</option>
+                        <option value="true">Vergi dahil</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="chargeType">Ücretlendirme</label>
+                    <select id="chargeType" class="form-select" @bind="form.ChargeType">
+                        @foreach (var charge in CatalogLabels.ChargeTypes)
+                        {
+                            <option value="@charge.Key">@charge.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="chargeType" Errors="errors" />
+                </div>
+                @if (form.ChargeType == "Recurring")
+                {
+                    <div>
+                        <label class="form-label" for="period">Periyot *</label>
+                        <select id="period" class="form-select" @bind="form.RecurringPeriod">
+                            <option value="">—</option>
+                            @foreach (var period in CatalogLabels.RecurringPeriods)
+                            {
+                                <option value="@period.Key">@period.Label</option>
+                            }
+                        </select>
+                        <FieldError Field="recurringPeriod" Errors="errors" />
+                    </div>
+                }
+                <div>
+                    <label class="form-label" for="saleStart">Satış başlangıcı</label>
+                    <input id="saleStart" class="form-control" type="date" @bind="form.SaleStart" />
+                    <FieldError Field="saleStart" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="saleEnd">Satış bitişi</label>
+                    <input id="saleEnd" class="form-control" type="date" @bind="form.SaleEnd" />
+                    <FieldError Field="saleEnd" Errors="errors" />
+                </div>
+                @if (form.Kind == "Service")
+                {
+                    <div>
+                        <label class="form-label" for="duration">Hizmet süresi (dk)</label>
+                        <input id="duration" class="form-control" type="number" min="1" @bind="form.ServiceDurationMinutes" />
+                        <FieldError Field="serviceDurationMinutes" Errors="errors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="delivery">Sunum şekli</label>
+                        <select id="delivery" class="form-select" @bind="form.DeliveryMode">
+                            <option value="">—</option>
+                            @foreach (var mode in CatalogLabels.DeliveryModes)
+                            {
+                                <option value="@mode.Key">@mode.Label</option>
+                            }
+                        </select>
+                        <FieldError Field="deliveryMode" Errors="errors" />
+                    </div>
+                }
+                <div>
+                    <label class="form-label" for="barcode">Barkod</label>
+                    <input id="barcode" class="form-control" maxlength="50" @bind="form.Barcode" />
+                    <FieldError Field="barcode" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="externalCode">Dış kod</label>
+                    <input id="externalCode" class="form-control" maxlength="50" @bind="form.ExternalCode" />
+                    <FieldError Field="externalCode" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="brand">Marka</label>
+                    <input id="brand" class="form-control" maxlength="100" @bind="form.Brand" />
+                    <FieldError Field="brand" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="model">Model</label>
+                    <input id="model" class="form-control" maxlength="100" @bind="form.Model" />
+                    <FieldError Field="model" Errors="errors" />
+                </div>
+                @if (Session.Can(CrmAccess.ProductCostsRead))
+                {
+                    <div>
+                        <label class="form-label" for="cost">Maliyet</label>
+                        <input id="cost" class="form-control" type="number" step="any" min="0" @bind="form.Cost" />
+                        <FieldError Field="cost" Errors="errors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="costCurrency">Maliyet para birimi</label>
+                        <input id="costCurrency" class="form-control" maxlength="3" @bind="form.CostCurrency" />
+                        <FieldError Field="costCurrency" Errors="errors" />
+                    </div>
+                }
+                <div class="span-all">
+                    <label class="form-label" for="tags">Etiketler</label>
+                    <input id="tags" class="form-control" maxlength="500" placeholder="Virgülle ayırın" @bind="form.Tags" />
+                    <FieldError Field="tags" Errors="errors" />
+                </div>
+                <div class="span-all">
+                    <label class="form-label" for="description">Açıklama</label>
+                    <textarea id="description" class="form-control" rows="3" maxlength="4000" @bind="form.Description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Close">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    @if (form?.Id is { } packageId)
+    {
+        <section class="record-form">
+            <h2>Paket bileşenleri</h2>
+            <p class="text-muted">Bu ürüne bileşen eklerseniz paket olarak davranır; fiyat hesabında bileşenler miktarla çarpılarak listelenir. Paket kendisini ya da (dolaylı olarak) kendisini içeren bir ürünü bileşen yapamaz.</p>
+            @if (components.Count == 0)
+            {
+                <p class="text-muted">Bileşen yok.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <thead><tr><th>Bileşen</th><th>Miktar (temel birim)</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var component in components)
+                        {
+                            <tr>
+                                <td data-label="Bileşen" class="primary">@component.ComponentCode — @component.ComponentName</td>
+                                <td data-label="Miktar">@component.Quantity</td>
+                                <td class="actions">
+                                    @if (Session.Can(CrmAccess.ProductsWrite))
+                                    {
+                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteComponentAsync(component)">Sil</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (componentMessage is not null)
+            {
+                <div class="alert alert-danger" role="alert">@componentMessage</div>
+            }
+
+            @if (Session.Can(CrmAccess.ProductsWrite))
+            {
+                <form class="form-grid" novalidate @onsubmit="() => AddComponentAsync(packageId)" @onsubmit:preventDefault>
+                    <div>
+                        <label class="form-label" for="componentProduct">Bileşen ürünü *</label>
+                        <select id="componentProduct" class="form-select" @bind="componentForm.ComponentId">
+                            <option value="@Guid.Empty">—</option>
+                            @foreach (var candidate in allProducts.Where(p => p.Id != packageId))
+                            {
+                                <option value="@candidate.Id">@candidate.Code — @candidate.Name</option>
+                            }
+                        </select>
+                        <FieldError Field="componentId" Errors="componentErrors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="componentQty">Miktar *</label>
+                        <input id="componentQty" class="form-control" type="number" step="any" min="0" @bind="componentForm.Quantity" />
+                        <FieldError Field="quantity" Errors="componentErrors" />
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-outline-primary" disabled="@busy">Bileşen ekle</button>
+                    </div>
+                </form>
+            }
+        </section>
+    }
+
+    <div class="filters" role="group" aria-label="Filtre">
+        <button type="button" class="chip @(status is null && kind is null ? "active" : null)" @onclick="() => FilterAsync(null, null)">Tümü</button>
+        @foreach (var item in CatalogLabels.Kinds)
+        {
+            <button type="button" class="chip @(kind == item.Key ? "active" : null)" @onclick="() => FilterAsync(status, item.Key)">@item.Label</button>
+        }
+        @foreach (var item in CatalogLabels.Statuses)
+        {
+            <button type="button" class="chip @(status == item.Key ? "active" : null)" @onclick="() => FilterAsync(item.Key, kind)">@item.Label</button>
+        }
+    </div>
+
+    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <input class="form-control" type="search" placeholder="Kod, ad, barkod veya etiket ara" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (page is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Kayıt yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead><tr><th>Kod</th><th>Ad</th><th>Tür</th><th>Durum</th><th>Kategori</th><th>Birim</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var product in page.Items)
+                {
+                    <tr>
+                        <td data-label="Kod" class="primary">@product.Code</td>
+                        <td data-label="Ad">@product.Name</td>
+                        <td data-label="Tür">@CatalogLabels.Label(CatalogLabels.Kinds, product.Kind)</td>
+                        <td data-label="Durum"><span class="badge status-@CatalogLabels.Badge(product.Status)">@CatalogLabels.Label(CatalogLabels.Statuses, product.Status)</span></td>
+                        <td data-label="Kategori">@product.CategoryName</td>
+                        <td data-label="Birim">@product.BaseUnitCode</td>
+                        <td class="actions">
+                            @if (Session.Can(CrmAccess.ProductsWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(product)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/products";
+
+    private CrmPage<ProductDto>? page;
+    private List<ProductCategoryDto> categories = [];
+    private List<MeasureUnitDto> units = [];
+    private ProductForm? form;
+    private List<ProductComponentDto> components = [];
+    private List<ProductDto> allProducts = [];
+    private ComponentForm componentForm = new();
+    private IReadOnlyDictionary<string, string[]>? componentErrors;
+    private string? componentMessage;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private string? search;
+    private string? status;
+    private string? kind;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.ProductsRead))
+        {
+            categories = await LoadAllAsync<ProductCategoryDto>("/api/crm/product-categories");
+            units = await LoadAllAsync<MeasureUnitDto>("/api/crm/units");
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task<List<T>> LoadAllAsync<T>(string url)
+    {
+        var items = new List<T>();
+        for (var pageNumber = 1; ; pageNumber++)
+        {
+            var result = await Api.GetAsync<CrmPage<T>>($"{url}?page={pageNumber}&pageSize=100");
+            if (result.Value is not { } chunk)
+            {
+                message = result.Error;
+                break;
+            }
+
+            items.AddRange(chunk.Items);
+            if (items.Count >= chunk.TotalCount || chunk.Items.Count == 0)
+            {
+                break;
+            }
+        }
+
+        return items;
+    }
+
+    private async Task FilterAsync(string? statusValue, string? kindValue)
+    {
+        status = statusValue;
+        kind = kindValue;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (status is not null)
+        {
+            url += $"&status={Uri.EscapeDataString(status)}";
+        }
+
+        if (kind is not null)
+        {
+            url += $"&kind={Uri.EscapeDataString(kind)}";
+        }
+
+        var result = await Api.GetAsync<CrmPage<ProductDto>>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void New()
+    {
+        form = new ProductForm();
+        errors = null;
+        message = null;
+    }
+
+    private async Task LoadComponentsAsync(Guid packageId)
+    {
+        var (loaded, error) = await Api.GetAllAsync<ProductComponentDto>($"/api/crm/product-components?packageId={packageId}");
+        components = loaded;
+        componentMessage = error;
+        if (allProducts.Count == 0)
+        {
+            allProducts = (await Api.GetAllAsync<ProductDto>(Url)).Items;
+        }
+    }
+
+    private async Task AddComponentAsync(Guid packageId)
+    {
+        busy = true;
+        var result = await Api.PostAsync<ProductComponentDto>("/api/crm/product-components",
+            new SaveProductComponentRequest(packageId, componentForm.ComponentId, componentForm.Quantity));
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            componentForm = new ComponentForm();
+            componentErrors = null;
+            await LoadComponentsAsync(packageId);
+            return;
+        }
+
+        componentErrors = result.FieldErrors;
+        componentMessage = result.Error;
+    }
+
+    private async Task DeleteComponentAsync(ProductComponentDto component)
+    {
+        var result = await Api.DeleteAsync($"/api/crm/product-components/{component.Id}?version={component.Version}");
+        if (result.IsSuccess)
+        {
+            await LoadComponentsAsync(component.PackageId);
+            return;
+        }
+
+        componentMessage = result.Error;
+    }
+
+    private async Task Edit(ProductDto p)
+    {
+        form = new ProductForm
+        {
+            Id = p.Id, Version = p.Version, Code = p.Code, Name = p.Name, Description = p.Description, Kind = p.Kind, Status = p.Status,
+            CategoryId = p.CategoryId, BaseUnitId = p.BaseUnitId, ExternalCode = p.ExternalCode, Barcode = p.Barcode, Brand = p.Brand,
+            Model = p.Model, Tags = p.Tags, SaleStart = p.SaleStart?.ToDateTime(TimeOnly.MinValue), SaleEnd = p.SaleEnd?.ToDateTime(TimeOnly.MinValue),
+            TaxCategory = p.TaxCategory, PriceIncludesTax = p.PriceIncludesTax, QuantityPrecision = p.QuantityPrecision, Cost = p.Cost,
+            CostCurrency = p.CostCurrency ?? "TRY", ServiceDurationMinutes = p.ServiceDurationMinutes, DeliveryMode = p.DeliveryMode,
+            ChargeType = p.ChargeType, RecurringPeriod = p.RecurringPeriod,
+        };
+        errors = null;
+        message = null;
+        componentForm = new ComponentForm();
+        componentErrors = null;
+        await LoadComponentsAsync(p.Id);
+    }
+
+    private void Close() => form = null;
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var f = form!;
+        var request = new SaveProductRequest(
+            f.Code, f.Name, f.BaseUnitId, f.Kind, f.Status, Blank(f.Description), f.CategoryId, Blank(f.ExternalCode), Blank(f.Barcode),
+            Blank(f.Brand), Blank(f.Model), Blank(f.Tags),
+            f.SaleStart is { } start ? DateOnly.FromDateTime(start) : null, f.SaleEnd is { } end ? DateOnly.FromDateTime(end) : null,
+            Blank(f.TaxCategory), f.PriceIncludesTax, f.QuantityPrecision, f.Cost, string.IsNullOrWhiteSpace(f.CostCurrency) ? "TRY" : f.CostCurrency,
+            f.Kind == "Service" ? f.ServiceDurationMinutes : null, f.Kind == "Service" ? Blank(f.DeliveryMode) : null,
+            f.ChargeType, f.ChargeType == "Recurring" ? Blank(f.RecurringPeriod) : null, f.Version);
+        var result = f.Id is { } id
+            ? await Api.PutAsync<ProductDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<ProductDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            errors = null;
+            message = null;
+            await LoadAsync(page?.Page ?? 1);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync(page?.Page ?? 1);
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private sealed class ComponentForm
+    {
+        public Guid ComponentId { get; set; }
+
+        public decimal Quantity { get; set; } = 1m;
+    }
+
+    private sealed class ProductForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Code { get; set; } = string.Empty;
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public string Kind { get; set; } = "Product";
+
+        public string Status { get; set; } = "Draft";
+
+        public Guid? CategoryId { get; set; }
+
+        public Guid BaseUnitId { get; set; }
+
+        public string? ExternalCode { get; set; }
+
+        public string? Barcode { get; set; }
+
+        public string? Brand { get; set; }
+
+        public string? Model { get; set; }
+
+        public string? Tags { get; set; }
+
+        public DateTime? SaleStart { get; set; }
+
+        public DateTime? SaleEnd { get; set; }
+
+        public string? TaxCategory { get; set; }
+
+        public bool PriceIncludesTax { get; set; }
+
+        public int QuantityPrecision { get; set; }
+
+        public decimal? Cost { get; set; }
+
+        public string CostCurrency { get; set; } = "TRY";
+
+        public int? ServiceDurationMinutes { get; set; }
+
+        public string? DeliveryMode { get; set; }
+
+        public string ChargeType { get; set; } = "OneTime";
+
+        public string? RecurringPeriod { get; set; }
+    }
+}

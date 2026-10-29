@@ -48,6 +48,8 @@ public static class CrmAccess
     public const string ProductsRead = "crm.products.read";
     public const string ProductsWrite = "crm.products.write";
     public const string ProductCostsRead = "crm.product-costs.read";
+    public const string PricesRead = "crm.prices.read";
+    public const string PricesWrite = "crm.prices.write";
 }
 
 /// <summary>Kayıt türü anahtarları; kayıt geçmişi (<c>/api/records/{tür}/{id}/history</c>) bunlarla çağrılır.</summary>

@@ -1,0 +1,360 @@
+@page "/crm/vergi-kur"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Vergi ve kur · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.PricesRead">
+    <div class="page-header">
+        <h1>Vergi oranları ve döviz kurları</h1>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <section class="record-form">
+        <div class="page-header">
+            <h2>Vergi oranları</h2>
+            @if (Session.Can(CrmAccess.PricesWrite) && taxForm is null)
+            {
+                <button type="button" class="btn btn-primary btn-sm" @onclick="() => taxForm = new()">Yeni oran</button>
+            }
+        </div>
+        <p class="text-muted">Ürünün "vergi kategorisi" bu kodla eşleşir. Oranlar tarih aralığıyla tutulur; aynı kod için aralıklar çakışamaz, yeni oran eskisinin bitiş tarihinde başlar.</p>
+
+        @if (taxForm is not null)
+        {
+            <form class="form-grid" novalidate @onsubmit="SaveTaxAsync" @onsubmit:preventDefault>
+                <div>
+                    <label class="form-label" for="taxCode">Kod *</label>
+                    <input id="taxCode" class="form-control" maxlength="30" @bind="taxForm.Code" />
+                    <FieldError Field="code" Errors="taxErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="taxName">Ad *</label>
+                    <input id="taxName" class="form-control" maxlength="100" @bind="taxForm.Name" />
+                    <FieldError Field="name" Errors="taxErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="taxRate">Oran (%) *</label>
+                    <input id="taxRate" class="form-control" type="number" step="any" min="0" max="100" @bind="taxForm.Rate" />
+                    <FieldError Field="ratePercent" Errors="taxErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="taxFrom">Geçerlilik başı *</label>
+                    <input id="taxFrom" class="form-control" type="date" @bind="taxForm.ValidFrom" />
+                    <FieldError Field="validFrom" Errors="taxErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="taxTo">Geçerlilik sonu (hariç)</label>
+                    <input id="taxTo" class="form-control" type="date" @bind="taxForm.ValidTo" />
+                    <FieldError Field="validTo" Errors="taxErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="taxActive">Durum</label>
+                    <select id="taxActive" class="form-select" @bind="taxForm.IsActive">
+                        <option value="true">Aktif</option>
+                        <option value="false">Pasif</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => taxForm = null">Vazgeç</button>
+                    @if (taxForm.Id is not null)
+                    {
+                        <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteTaxAsync">Sil</button>
+                    }
+                </div>
+            </form>
+        }
+
+        @if (taxes is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+        else if (taxes.Count == 0)
+        {
+            <p class="text-muted">Vergi oranı yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <thead><tr><th>Kod</th><th>Ad</th><th>Oran</th><th>Geçerlilik</th><th>Durum</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var tax in taxes)
+                    {
+                        <tr>
+                            <td data-label="Kod" class="primary">@tax.Code</td>
+                            <td data-label="Ad">@tax.Name</td>
+                            <td data-label="Oran">%@tax.RatePercent</td>
+                            <td data-label="Geçerlilik">@tax.ValidFrom.ToString("yyyy-MM-dd") → @(tax.ValidTo?.ToString("yyyy-MM-dd") ?? "süresiz")</td>
+                            <td data-label="Durum">@(tax.IsActive ? "Aktif" : "Pasif")</td>
+                            <td class="actions">
+                                @if (Session.Can(CrmAccess.PricesWrite))
+                                {
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditTax(tax)">Düzenle</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section class="record-form">
+        <div class="page-header">
+            <h2>Döviz kurları</h2>
+            @if (Session.Can(CrmAccess.PricesWrite) && rateForm is null)
+            {
+                <button type="button" class="btn btn-primary btn-sm" @onclick="() => rateForm = new()">Yeni kur</button>
+            }
+        </div>
+        <p class="text-muted">1 kaynak birim = kur × hedef birim. Kur, geçerli olduğu günden itibaren uygulanır; belgelerde kullanılan kur belgede saklanır, sonradan girilen kur eski belgeyi değiştirmez. Kur yoksa dönüşüm yapılmaz.</p>
+
+        @if (rateForm is not null)
+        {
+            <form class="form-grid" novalidate @onsubmit="SaveRateAsync" @onsubmit:preventDefault>
+                <div>
+                    <label class="form-label" for="rateFrom">Kaynak para birimi *</label>
+                    <input id="rateFrom" class="form-control" maxlength="3" @bind="rateForm.From" />
+                    <FieldError Field="fromCurrency" Errors="rateErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="rateTo">Hedef para birimi *</label>
+                    <input id="rateTo" class="form-control" maxlength="3" @bind="rateForm.To" />
+                    <FieldError Field="toCurrency" Errors="rateErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="rateValue">Kur *</label>
+                    <input id="rateValue" class="form-control" type="number" step="any" min="0" @bind="rateForm.Rate" />
+                    <FieldError Field="rate" Errors="rateErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="rateDay">Geçerli gün *</label>
+                    <input id="rateDay" class="form-control" type="date" @bind="rateForm.ValidOn" />
+                    <FieldError Field="validOn" Errors="rateErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="rateSource">Kaynak</label>
+                    <select id="rateSource" class="form-select" @bind="rateForm.Source">
+                        @foreach (var source in PricingLabels.RateSources)
+                        {
+                            <option value="@source.Key">@source.Label</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="rateNote">Not</label>
+                    <input id="rateNote" class="form-control" maxlength="500" @bind="rateForm.Note" />
+                    <FieldError Field="note" Errors="rateErrors" />
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => rateForm = null">Vazgeç</button>
+                    @if (rateForm.Id is not null)
+                    {
+                        <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteRateAsync">Sil</button>
+                    }
+                </div>
+            </form>
+        }
+
+        @if (rates is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+        else if (rates.Count == 0)
+        {
+            <p class="text-muted">Kur yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <thead><tr><th>Çift</th><th>Kur</th><th>Gün</th><th>Kaynak</th><th>Not</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var rate in rates)
+                    {
+                        <tr>
+                            <td data-label="Çift" class="primary">@rate.FromCurrency → @rate.ToCurrency</td>
+                            <td data-label="Kur">@rate.Rate</td>
+                            <td data-label="Gün">@rate.ValidOn.ToString("yyyy-MM-dd")</td>
+                            <td data-label="Kaynak">@PricingLabels.Label(PricingLabels.RateSources, rate.Source)</td>
+                            <td data-label="Not">@rate.Note</td>
+                            <td class="actions">
+                                @if (Session.Can(CrmAccess.PricesWrite))
+                                {
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditRate(rate)">Düzenle</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+</AuthGate>
+
+@code {
+    private const string TaxUrl = "/api/crm/tax-rates";
+    private const string RateUrl = "/api/crm/exchange-rates";
+
+    private List<TaxRateDto>? taxes;
+    private List<ExchangeRateDto>? rates;
+    private TaxForm? taxForm;
+    private RateForm? rateForm;
+    private IReadOnlyDictionary<string, string[]>? taxErrors;
+    private IReadOnlyDictionary<string, string[]>? rateErrors;
+    private string? message;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.PricesRead))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var (loadedTaxes, taxError) = await Api.GetAllAsync<TaxRateDto>(TaxUrl);
+        var (loadedRates, rateError) = await Api.GetAllAsync<ExchangeRateDto>(RateUrl);
+        taxes = loadedTaxes;
+        rates = loadedRates;
+        message = taxError ?? rateError;
+    }
+
+    private void EditTax(TaxRateDto tax)
+    {
+        taxForm = new TaxForm
+        {
+            Id = tax.Id, Version = tax.Version, Code = tax.Code, Name = tax.Name, Rate = tax.RatePercent,
+            ValidFrom = tax.ValidFrom.ToDateTime(TimeOnly.MinValue), ValidTo = tax.ValidTo?.ToDateTime(TimeOnly.MinValue), IsActive = tax.IsActive,
+        };
+        taxErrors = null;
+    }
+
+    private async Task SaveTaxAsync()
+    {
+        busy = true;
+        var f = taxForm!;
+        var request = new SaveTaxRateRequest(
+            f.Code, f.Name, f.Rate, DateOnly.FromDateTime(f.ValidFrom), f.ValidTo is { } to ? DateOnly.FromDateTime(to) : null, f.IsActive, f.Version);
+        var result = f.Id is { } id
+            ? await Api.PutAsync<TaxRateDto>($"{TaxUrl}/{id}", request)
+            : await Api.PostAsync<TaxRateDto>(TaxUrl, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            taxForm = null;
+            taxErrors = null;
+            await LoadAsync();
+            return;
+        }
+
+        taxErrors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteTaxAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{TaxUrl}/{taxForm!.Id}?version={taxForm.Version}");
+        busy = false;
+        message = result.Error;
+        if (result.IsSuccess)
+        {
+            taxForm = null;
+            await LoadAsync();
+        }
+    }
+
+    private void EditRate(ExchangeRateDto rate)
+    {
+        rateForm = new RateForm
+        {
+            Id = rate.Id, Version = rate.Version, From = rate.FromCurrency, To = rate.ToCurrency, Rate = rate.Rate,
+            ValidOn = rate.ValidOn.ToDateTime(TimeOnly.MinValue), Source = rate.Source, Note = rate.Note,
+        };
+        rateErrors = null;
+    }
+
+    private async Task SaveRateAsync()
+    {
+        busy = true;
+        var f = rateForm!;
+        var request = new SaveExchangeRateRequest(
+            f.From, f.To, f.Rate, DateOnly.FromDateTime(f.ValidOn), f.Source, string.IsNullOrWhiteSpace(f.Note) ? null : f.Note, f.Version);
+        var result = f.Id is { } id
+            ? await Api.PutAsync<ExchangeRateDto>($"{RateUrl}/{id}", request)
+            : await Api.PostAsync<ExchangeRateDto>(RateUrl, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            rateForm = null;
+            rateErrors = null;
+            await LoadAsync();
+            return;
+        }
+
+        rateErrors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteRateAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{RateUrl}/{rateForm!.Id}?version={rateForm.Version}");
+        busy = false;
+        message = result.Error;
+        if (result.IsSuccess)
+        {
+            rateForm = null;
+            await LoadAsync();
+        }
+    }
+
+    private sealed class TaxForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Code { get; set; } = string.Empty;
+
+        public string Name { get; set; } = string.Empty;
+
+        public decimal Rate { get; set; }
+
+        public DateTime ValidFrom { get; set; } = DateTime.Today;
+
+        public DateTime? ValidTo { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+
+    private sealed class RateForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string From { get; set; } = "USD";
+
+        public string To { get; set; } = "TRY";
+
+        public decimal Rate { get; set; }
+
+        public DateTime ValidOn { get; set; } = DateTime.Today;
+
+        public string Source { get; set; } = "Manual";
+
+        public string? Note { get; set; }
+    }
+}

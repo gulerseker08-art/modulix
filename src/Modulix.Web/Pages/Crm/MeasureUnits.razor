@@ -1,0 +1,183 @@
+@page "/crm/birimler"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Ölçü birimleri · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ProductsRead">
+    <div class="page-header">
+        <h1>Ölçü birimleri</h1>
+        @if (Session.Can(CrmAccess.ProductsWrite) && form is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => form = new()">Yeni birim</button>
+        }
+    </div>
+
+    <p class="text-muted">Her birim bir gruba ve o grubun temel birimine katsayıyla bağlıdır (1 kutu = 12 adet için grup "Adet", katsayı 12; temel birimin katsayısı 1'dir). Ürünlerde kullanılan birimin grubu ve katsayısı değiştirilemez.</p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni birim" : "Birimi düzenle")</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="code">Kod *</label>
+                    <input id="code" class="form-control" maxlength="20" @bind="form.Code" />
+                    <FieldError Field="code" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="name">Ad *</label>
+                    <input id="name" class="form-control" maxlength="100" @bind="form.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="group">Grup *</label>
+                    <select id="group" class="form-select" @bind="form.GroupKey">
+                        @foreach (var group in CatalogLabels.UnitGroups)
+                        {
+                            <option value="@group.Key">@group.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="groupKey" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="factor">Temel birime katsayı *</label>
+                    <input id="factor" class="form-control" type="number" step="any" min="0" @bind="form.Factor" />
+                    <FieldError Field="factorToBase" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    @if (page is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Birim yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead><tr><th>Kod</th><th>Ad</th><th>Grup</th><th>Katsayı</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var unit in page.Items)
+                {
+                    <tr>
+                        <td data-label="Kod" class="primary">@unit.Code</td>
+                        <td data-label="Ad">@unit.Name</td>
+                        <td data-label="Grup">@CatalogLabels.Label(CatalogLabels.UnitGroups, unit.GroupKey)</td>
+                        <td data-label="Katsayı">@unit.FactorToBase</td>
+                        <td class="actions">
+                            @if (Session.Can(CrmAccess.ProductsWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(unit)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/units";
+
+    private CrmPage<MeasureUnitDto>? page;
+    private UnitForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.ProductsRead))
+        {
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var result = await Api.GetAsync<CrmPage<MeasureUnitDto>>($"{Url}?page={pageNumber}");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void Edit(MeasureUnitDto unit)
+    {
+        form = new UnitForm { Id = unit.Id, Version = unit.Version, Code = unit.Code, Name = unit.Name, GroupKey = unit.GroupKey, Factor = unit.FactorToBase };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var request = new SaveMeasureUnitRequest(form!.Code, form.Name, form.GroupKey, form.Factor, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<MeasureUnitDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<MeasureUnitDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            errors = null;
+            message = null;
+            await LoadAsync(page?.Page ?? 1);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync(page?.Page ?? 1);
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class UnitForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Code { get; set; } = string.Empty;
+
+        public string Name { get; set; } = string.Empty;
+
+        public string GroupKey { get; set; } = "count";
+
+        public decimal Factor { get; set; } = 1m;
+    }
+}

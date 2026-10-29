@@ -7,6 +7,7 @@ using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Modules.Crm.Opportunities;
+using Modulix.Modules.Crm.Pricing;
 using Modulix.Modules.Crm.Records;
 
 namespace Modulix.Modules.Crm;
@@ -81,6 +82,10 @@ public sealed class CrmModule : IModule
         public const string ProductsRead = "crm.products.read";
         public const string ProductsWrite = "crm.products.write";
         public const string ProductCostsRead = "crm.product-costs.read";
+
+        // Fiyat listeleri, vergi, kur ve indirim politikaları (ADR-0018). Fiyat hesabı (calculate) okuma iznini ister.
+        public const string PricesRead = "crm.prices.read";
+        public const string PricesWrite = "crm.prices.write";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -105,6 +110,12 @@ public sealed class CrmModule : IModule
         public const string ProductCategory = "crm.product-category";
         public const string MeasureUnit = "crm.measure-unit";
         public const string Product = "crm.product";
+        public const string TaxRate = "crm.tax-rate";
+        public const string ExchangeRate = "crm.exchange-rate";
+        public const string PriceList = "crm.price-list";
+        public const string PriceListItem = "crm.price-list-item";
+        public const string ProductComponent = "crm.product-component";
+        public const string DiscountPolicy = "crm.discount-policy";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -219,6 +230,8 @@ public sealed class CrmModule : IModule
         new(Permissions.ProductsRead, "Ürün, hizmet, kategori ve birimleri görüntüler", "Ürün kataloğu"),
         new(Permissions.ProductsWrite, "Ürün, hizmet, kategori ve birim ekler, düzenler", "Ürün kataloğu"),
         new(Permissions.ProductCostsRead, "Ürün maliyetini görür ve düzenler", "Ürün maliyeti"),
+        new(Permissions.PricesRead, "Fiyat listelerini, vergi oranlarını, kurları ve indirim politikalarını görüntüler; fiyat hesaplar", "Fiyatlandırma"),
+        new(Permissions.PricesWrite, "Fiyat listesi, vergi oranı, kur ve indirim politikası ekler, düzenler, yayımlar", "Fiyatlandırma"),
     ];
 
     /// <summary>Devre dışı bırakılan kişinin firmaları, açık fırsatları ve açık aktiviteleri devredilir.</summary>
@@ -241,7 +254,7 @@ public sealed class CrmModule : IModule
                 Permissions.CompaniesRead, Permissions.CompaniesWrite,
                 Permissions.ContactsRead, Permissions.ContactsWrite,
                 Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite, Permissions.OpportunityAmountsRead,
-                Permissions.ProductsRead,
+                Permissions.ProductsRead, Permissions.PricesRead,
                 Permissions.OpportunitiesChangeStage, Permissions.OpportunitiesClose,
                 Permissions.ActivitiesRead, Permissions.ActivitiesWrite, Permissions.ActivitiesReopen,
                 Permissions.LeadsRead, Permissions.LeadsCreate, Permissions.LeadsUpdate,
@@ -617,6 +630,41 @@ public sealed class CrmModule : IModule
         {
             References = new Dictionary<string, string> { ["categoryId"] = Entities.ProductCategory, ["baseUnitId"] = Entities.MeasureUnit },
         },
+        new(Entities.TaxRate, "Vergi oranı (CRM)", Permissions.PricesRead, new Dictionary<string, string>
+        {
+            ["code"] = "Kod", ["name"] = "Ad", ["ratePercent"] = "Oran (%)", ["validFrom"] = "Geçerlilik başı", ["validTo"] = "Geçerlilik sonu", ["isActive"] = "Aktif",
+        }, "name"),
+        new(Entities.ExchangeRate, "Döviz kuru (CRM)", Permissions.PricesRead, new Dictionary<string, string>
+        {
+            ["fromCurrency"] = "Kaynak para birimi", ["toCurrency"] = "Hedef para birimi", ["rate"] = "Kur", ["validOn"] = "Geçerli gün", ["source"] = "Kaynak", ["note"] = "Not",
+        }, "fromCurrency"),
+        new(Entities.PriceList, "Fiyat listesi (CRM)", Permissions.PricesRead, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["currency"] = "Para birimi", ["scope"] = "Kapsam", ["companyId"] = "Firma", ["segment"] = "Segment", ["validFrom"] = "Geçerlilik başı",
+            ["validTo"] = "Geçerlilik sonu", ["status"] = "Durum", ["tierMethod"] = "Kademe yöntemi", ["publishedAt"] = "Yayım zamanı",
+        }, "name")
+        {
+            References = new Dictionary<string, string> { ["companyId"] = Entities.Company },
+        },
+        new(Entities.PriceListItem, "Fiyat listesi satırı (CRM)", Permissions.PricesRead, new Dictionary<string, string>
+        {
+            ["priceListId"] = "Fiyat listesi", ["productId"] = "Ürün", ["minQuantity"] = "Alt miktar", ["maxQuantity"] = "Üst miktar", ["unitPrice"] = "Birim fiyat", ["isFree"] = "Ücretsiz",
+        }, "productId")
+        {
+            References = new Dictionary<string, string> { ["priceListId"] = Entities.PriceList, ["productId"] = Entities.Product },
+        },
+        new(Entities.ProductComponent, "Paket bileşeni (CRM)", Permissions.ProductsRead, new Dictionary<string, string>
+        {
+            ["packageId"] = "Paket", ["componentId"] = "Bileşen", ["quantity"] = "Miktar",
+        }, "componentId")
+        {
+            References = new Dictionary<string, string> { ["packageId"] = Entities.Product, ["componentId"] = Entities.Product },
+        },
+        new(Entities.DiscountPolicy, "İndirim politikası (CRM)", Permissions.PricesRead, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["percent"] = "Yüzde", ["amount"] = "Tutar", ["currency"] = "Para birimi", ["priority"] = "Öncelik", ["stackable"] = "Birleşebilir",
+            ["maxTotalPercent"] = "Azami toplam %", ["approvalAbovePercent"] = "Onay eşiği %", ["validFrom"] = "Geçerlilik başı", ["validTo"] = "Geçerlilik sonu", ["isActive"] = "Aktif",
+        }, "name"),
         new(Entities.LeadForm, "Lead formu (CRM)", Permissions.LeadFormsManage, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["formKey"] = "Form kimliği", ["isActive"] = "Aktif", ["defaultOwnerId"] = "Varsayılan sorumlu",
@@ -717,6 +765,13 @@ public sealed class CrmModule : IModule
         services.AddScoped<IRecordStore, ProductCategoryRecordStore>();
         services.AddScoped<IRecordStore, MeasureUnitRecordStore>();
         services.AddScoped<IRecordStore, ProductRecordStore>();
+        services.AddScoped<IRecordStore, TaxRateRecordStore>();
+        services.AddScoped<IRecordStore, ExchangeRateRecordStore>();
+        services.AddScoped<IRecordStore, PriceListRecordStore>();
+        services.AddScoped<IRecordStore, PriceListItemRecordStore>();
+        services.AddScoped<IRecordStore, ProductComponentRecordStore>();
+        services.AddScoped<IRecordStore, DiscountPolicyRecordStore>();
+        services.AddScoped<IPriceCalculator, PriceCalculator>();
         services.AddScoped<IRecordStore, OpportunityContactRecordStore>();
         services.AddScoped<IRecordStore, OpportunityCompetitorRecordStore>();
         services.AddScoped<OpportunityWorkflowGate>();
