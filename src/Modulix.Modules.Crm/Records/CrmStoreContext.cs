@@ -3,6 +3,7 @@ using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Modules.Crm.Opportunities;
 
 namespace Modulix.Modules.Crm.Records;
 
@@ -10,8 +11,16 @@ namespace Modulix.Modules.Crm.Records;
 internal sealed class CrmStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
     ICurrentAccess permissions, IEnumerable<IActivityLinkTarget> linkTargets, LeadWorkflowGate? leadGate = null,
-    ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null)
+    ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null, OpportunityWorkflowGate? opportunityGate = null,
+    IOpportunityPolicyProvider? policy = null)
 {
+    /// <summary>Fırsat iş akışı kapısı (<see cref="OpportunityWorkflowGate"/>).</summary>
+    public OpportunityWorkflowGate OpportunityGate { get; } = opportunityGate ?? new OpportunityWorkflowGate();
+
+    /// <summary>Tenant ayarlarından gelen fırsat politikası; sağlayıcı yoksa varsayılan (koşulsuz) politika.</summary>
+    public async Task<OpportunityPolicy> GetPolicyAsync(CancellationToken cancellationToken) =>
+        policy is null ? OpportunityPolicy.Default : await policy.GetAsync(cancellationToken);
+
     /// <summary>Çalışan yazma komutunun nedeni (yalnızca güvenilir iç çağıranlar verir, ör. kayıt devri).</summary>
     public string? CommandReason => command?.Reason;
 
@@ -63,6 +72,11 @@ internal static class FilterValue
     /// <summary>Firmanın listesindeki değer (Y9b, pasifler dahil); listede yoksa null. Kayıttaki anahtarı döner.</summary>
     public static async Task<string?> ChoiceAsync(string value, string listKey, CrmStoreContext context, CancellationToken cancellationToken) =>
         ChoiceValueKeys.IsValid(value) ? (await context.ChoiceLists.GetAsync(listKey, cancellationToken)).Find(value)?.Key : null;
+
+    public static DateOnly? Date(string value) =>
+        DateOnly.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date)
+            ? date
+            : null;
 
     public static DateTimeOffset? Time(string value) =>
         DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var time)

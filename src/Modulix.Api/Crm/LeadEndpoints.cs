@@ -290,7 +290,7 @@ internal static class LeadEndpoints
     }
 
     // CSV enjeksiyonuna karşı formül başlatan karakterlerle başlayan hücrelerin başına kesme konur.
-    private static string Csv(string? value)
+    internal static string Csv(string? value)
     {
         if (string.IsNullOrEmpty(value))
         {

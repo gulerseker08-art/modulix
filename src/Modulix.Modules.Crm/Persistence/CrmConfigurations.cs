@@ -110,6 +110,107 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
             .HasForeignKey(o => new { o.TenantId, o.ContactId })
             .HasPrincipalKey(c => new { c.TenantId, c.Id })
             .OnDelete(DeleteBehavior.Restrict);
+
+        // ADR-0017
+        builder.Property(o => o.OpportunityNumber).HasMaxLength(Opportunity.NumberMaxLength).IsRequired();
+        builder.Property(o => o.Description).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.Status).HasMaxLength(Opportunity.StatusMaxLength).IsRequired();
+        builder.Property(o => o.StatusReason).HasMaxLength(Opportunity.LostReasonMaxLength);
+        builder.Property(o => o.Priority).HasMaxLength(10).IsRequired();
+        builder.Property(o => o.Type).HasMaxLength(ChoiceValueKeys.MaxLength);
+        builder.Property(o => o.Source).HasMaxLength(ChoiceValueKeys.MaxLength);
+        builder.Property(o => o.NeedDescription).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.CurrentProblem).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.ExpectedBenefit).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.Scope).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.SuccessCriteria).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.Risks).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.DecisionProcess).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.TargetDecisionDate).HasColumnType("date");
+        builder.Property(o => o.CustomerBudget).HasPrecision(18, 2);
+        builder.Property(o => o.BudgetStatus).HasMaxLength(20).IsRequired();
+        builder.Property(o => o.ActualCloseDate).HasColumnType("date");
+        builder.Property(o => o.WonAmount).HasPrecision(18, 2);
+        builder.Property(o => o.WonCurrency).HasMaxLength(Opportunity.CurrencyLength).IsFixedLength().IsUnicode(false);
+        builder.Property(o => o.WinReason).HasMaxLength(Opportunity.LostReasonMaxLength);
+        builder.Property(o => o.HandoverNote).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.LossReason).HasMaxLength(ChoiceValueKeys.MaxLength);
+        builder.Property(o => o.RecontactDate).HasColumnType("date");
+        builder.Property(o => o.HoldReviewDate).HasColumnType("date");
+        builder.Property(o => o.NextAction).HasMaxLength(Opportunity.ShortMaxLength);
+        builder.Property(o => o.NextActionDate).HasColumnType("date");
+        builder.Property(o => o.ExpectedCloseDate).HasColumnType("date");
+
+        // Numara tenant içinde benzersizdir; liste ve rapor sorguları durum/kapanış tarihi ve sorumluya göre çalışır.
+        builder.HasIndex(o => new { o.TenantId, o.OpportunityNumber }).HasDatabaseName("UX_Opportunities_Number").IsUnique();
+        builder.HasIndex(o => new { o.TenantId, o.Status, o.ExpectedCloseDate });
+        builder.HasIndex(o => new { o.TenantId, o.CompanyId });
+    }
+}
+
+internal sealed class OpportunityContactConfiguration : IEntityTypeConfiguration<OpportunityContact>
+{
+    public void Configure(EntityTypeBuilder<OpportunityContact> builder)
+    {
+        CrmTables.ConfigureCommon(builder, "OpportunityContacts");
+        builder.Property(l => l.Roles).HasMaxLength(OpportunityContact.RolesMaxLength);
+        builder.Property(l => l.Note).HasMaxLength(OpportunityContact.NoteMaxLength);
+        // Bir kişi bir fırsata bir kez bağlanır; rolleri bu ilişkide tutulur.
+        builder.HasIndex(l => new { l.TenantId, l.OpportunityId, l.ContactId }).IsUnique();
+        builder.HasOne<Opportunity>()
+            .WithMany()
+            .HasForeignKey(l => new { l.TenantId, l.OpportunityId })
+            .HasPrincipalKey(o => new { o.TenantId, o.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(l => l.Contact)
+            .WithMany()
+            .HasForeignKey(l => new { l.TenantId, l.ContactId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class OpportunityCompetitorConfiguration : IEntityTypeConfiguration<OpportunityCompetitor>
+{
+    public void Configure(EntityTypeBuilder<OpportunityCompetitor> builder)
+    {
+        CrmTables.ConfigureCommon(builder, "OpportunityCompetitors");
+        builder.Property(c => c.Name).HasMaxLength(Opportunity.ShortMaxLength).IsRequired();
+        builder.Property(c => c.Strengths).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(c => c.Weaknesses).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(c => c.AlternativeAmount).HasPrecision(18, 2);
+        builder.Property(c => c.AlternativeCurrency).HasMaxLength(Opportunity.CurrencyLength).IsFixedLength().IsUnicode(false);
+        builder.Property(c => c.Notes).HasMaxLength(Opportunity.TextMaxLength);
+        builder.HasIndex(c => new { c.TenantId, c.OpportunityId });
+        builder.HasOne<Opportunity>()
+            .WithMany()
+            .HasForeignKey(c => new { c.TenantId, c.OpportunityId })
+            .HasPrincipalKey(o => new { o.TenantId, o.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class OpportunityHistoryConfiguration : IEntityTypeConfiguration<OpportunityHistory>
+{
+    public void Configure(EntityTypeBuilder<OpportunityHistory> builder)
+    {
+        CrmTables.ConfigureCommon(builder, "OpportunityHistory");
+        builder.Property(h => h.Kind).HasMaxLength(20).IsRequired();
+        builder.Property(h => h.FromStage).HasMaxLength(ChoiceValueKeys.MaxLength);
+        builder.Property(h => h.ToStage).HasMaxLength(ChoiceValueKeys.MaxLength);
+        builder.Property(h => h.FromStatus).HasMaxLength(Opportunity.StatusMaxLength);
+        builder.Property(h => h.ToStatus).HasMaxLength(Opportunity.StatusMaxLength);
+        builder.Property(h => h.FromCloseDate).HasColumnType("date");
+        builder.Property(h => h.ToCloseDate).HasColumnType("date");
+        builder.Property(h => h.Reason).HasMaxLength(OpportunityHistory.ReasonMaxLength);
+        builder.Property(h => h.Details).HasMaxLength(Opportunity.TextMaxLength);
+        builder.HasIndex(h => new { h.TenantId, h.OpportunityId, h.At });
+        // Tarihçe fırsatsız anlam taşımaz: fırsat deposu silmeden önce tarihçeyi, kişi ve rakip satırlarını kaldırır.
+        builder.HasOne<Opportunity>()
+            .WithMany()
+            .HasForeignKey(h => new { h.TenantId, h.OpportunityId })
+            .HasPrincipalKey(o => new { o.TenantId, o.Id })
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 

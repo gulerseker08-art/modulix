@@ -24,6 +24,10 @@ public static class CrmAccess
     public const string OpportunitiesRead = "crm.opportunities.read";
     public const string OpportunityAmountsRead = "crm.opportunity-amounts.read";
     public const string OpportunitiesWrite = "crm.opportunities.write";
+    public const string OpportunitiesChangeStage = "crm.opportunities.change-stage";
+    public const string OpportunitiesClose = "crm.opportunities.close";
+    public const string OpportunitiesReopen = "crm.opportunities.reopen";
+    public const string OpportunitiesExport = "crm.opportunities.export";
     public const string ActivitiesRead = "crm.activities.read";
     public const string ActivitiesWrite = "crm.activities.write";
     public const string ActivitiesAssign = "crm.activities.assign";
@@ -55,6 +59,8 @@ public static class CrmEntityKeys
     public const string PersonContactPoint = "crm.person-contact-point";
     public const string CompanyRelation = "crm.company-relation";
     public const string Opportunity = "crm.opportunity";
+    public const string OpportunityContact = "crm.opportunity-contact";
+    public const string OpportunityCompetitor = "crm.opportunity-competitor";
     public const string Activity = "crm.activity";
     public const string Lead = "crm.lead";
 }
@@ -66,6 +72,8 @@ public static class CrmLists
     public const string CompanyStatus = "crm.company-status";
     public const string CompanySource = "crm.company-source";
     public const string ActivityType = "crm.activity-type";
+    public const string OpportunityType = "crm.opportunity-type";
+    public const string OpportunityLossReason = "crm.opportunity-loss-reason";
 
     public static class StageCategories
     {
@@ -213,7 +221,40 @@ public sealed record OpportunityDto(
     Guid? OwnerId,
     string? Notes,
     JsonObject? Custom = null,
-    Guid? SourceLeadId = null);
+    Guid? SourceLeadId = null,
+    string? OpportunityNumber = null,
+    string? Description = null,
+    string Status = OpportunityStatus.Open,
+    string? StatusReason = null,
+    string Priority = "Normal",
+    string? Type = null,
+    string? Source = null,
+    decimal? CustomerBudget = null,
+    string BudgetStatus = OpportunityBudgetStatus.Unknown,
+    string? NeedDescription = null,
+    string? CurrentProblem = null,
+    string? ExpectedBenefit = null,
+    string? Scope = null,
+    string? SuccessCriteria = null,
+    string? Risks = null,
+    string? DecisionProcess = null,
+    DateOnly? TargetDecisionDate = null,
+    string? NextAction = null,
+    DateOnly? NextActionDate = null,
+    DateTimeOffset? LastInteractionAt = null,
+    DateTimeOffset? StageEnteredAt = null,
+    bool ProbabilityManual = false,
+    DateOnly? ActualCloseDate = null,
+    decimal? WonAmount = null,
+    string? WonCurrency = null,
+    string? WinReason = null,
+    string? HandoverNote = null,
+    string? LossReason = null,
+    Guid? WinningCompetitorId = null,
+    DateOnly? RecontactDate = null,
+    DateOnly? HoldReviewDate = null,
+    int ClosureCycle = 1,
+    int CloseDateChangeCount = 0);
 
 public sealed record SaveOpportunityRequest(
     string Title,
@@ -228,7 +269,23 @@ public sealed record SaveOpportunityRequest(
     int? Probability = null,
     string? LostReason = null,
     Guid? OwnerId = null,
-    JsonObject? Custom = null);
+    JsonObject? Custom = null,
+    string? Description = null,
+    string? Priority = null,
+    string? Type = null,
+    string? Source = null,
+    decimal? CustomerBudget = null,
+    string? BudgetStatus = null,
+    string? NeedDescription = null,
+    string? CurrentProblem = null,
+    string? ExpectedBenefit = null,
+    string? Scope = null,
+    string? SuccessCriteria = null,
+    string? Risks = null,
+    string? DecisionProcess = null,
+    DateOnly? TargetDecisionDate = null,
+    string? NextAction = null,
+    DateOnly? NextActionDate = null);
 
 /// <summary>Aktivite tipinin hazır değerleri.</summary>
 public static class ActivityType

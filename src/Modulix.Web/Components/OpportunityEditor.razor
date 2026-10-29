@@ -31,13 +31,50 @@
         </div>
         <div>
             <label class="form-label" for="stage">Aşama</label>
-            <select id="stage" class="form-select" @bind="form.Stage">
-                @foreach (var stage in Lookups.Choices(CrmLists.OpportunityStage, source?.Stage))
+            @if (Opportunity is null)
+            {
+                <select id="stage" class="form-select" @bind="form.Stage">
+                    @foreach (var stage in Lookups.Choices(CrmLists.OpportunityStage).Where(s => s.Category == CrmLists.StageCategories.Open))
+                    {
+                        <option value="@stage.Key">@stage.Label</option>
+                    }
+                </select>
+            }
+            else
+            {
+                // Aşama yalnızca aşama değiştirme / kapatma eylemleriyle değişir (panodaki taşıma ya da fırsat sayfası).
+                <input id="stage" class="form-control" readonly value="@Lookups.Label(CrmLists.OpportunityStage, form.Stage)" />
+            }
+            <FieldError Field="stage" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="priority">Öncelik</label>
+            <select id="priority" class="form-select" @bind="form.Priority">
+                @foreach (var priority in LeadPriority.All)
                 {
-                    <option value="@stage.Key">@stage.Label</option>
+                    <option value="@priority">@LeadPriority.Label(priority)</option>
                 }
             </select>
-            <FieldError Field="stage" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="type">Tür</label>
+            <select id="type" class="form-select" @bind="form.Type">
+                <option value="">—</option>
+                @foreach (var type in Lookups.Choices(CrmLists.OpportunityType, form.Type))
+                {
+                    <option value="@type.Key">@type.Label</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="source">Edinim kaynağı</label>
+            <select id="source" class="form-select" @bind="form.Source">
+                <option value="">—</option>
+                @foreach (var source in Lookups.Choices(CrmLeadLists.Source, form.Source))
+                {
+                    <option value="@source.Key">@source.Label</option>
+                }
+            </select>
         </div>
         @* Tutar ve olasılık hassas alandır (Y8b): izni olmayan görmez; boş gönderilir, sunucu kayıttaki değeri korur. *@
         @if (Session.Can(CrmAccess.OpportunityAmountsRead))
@@ -68,14 +105,60 @@
             <LookupPicker Id="ownerId" LookupKey="crm.opportunity.owner" @bind-Value="form.OwnerId" Placeholder="@(Opportunity is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
             <FieldError Field="ownerId" Errors="errors" />
         </div>
-        @if (Lookups.IsLost(form.Stage) || !string.IsNullOrEmpty(form.LostReason))
+        <div class="span-all">
+            <label class="form-label" for="description">Açıklama</label>
+            <textarea id="description" class="form-control" rows="2" maxlength="4000" @bind="form.Description"></textarea>
+            <FieldError Field="description" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="nextAction">Sonraki aksiyon</label>
+            <input id="nextAction" class="form-control" maxlength="200" @bind="form.NextAction" />
+            <FieldError Field="nextAction" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="nextActionDate">Aksiyon tarihi</label>
+            <input id="nextActionDate" class="form-control" type="date" @bind="form.NextActionDate" />
+            <FieldError Field="nextActionDate" Errors="errors" />
+        </div>
+        @if (Session.Can(CrmAccess.OpportunityAmountsRead))
         {
-            <div class="span-all">
-                <label class="form-label" for="lostReason">Kaybedilme nedeni</label>
-                <input id="lostReason" class="form-control" maxlength="@CrmLimits.LostReasonMaxLength" placeholder="Örn. fiyat yüksek bulundu" @bind="form.LostReason" />
-                <FieldError Field="lostReason" Errors="errors" />
+            <div>
+                <label class="form-label" for="customerBudget">Müşteri bütçesi</label>
+                <input id="customerBudget" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.CustomerBudget" />
+                <FieldError Field="customerBudget" Errors="errors" />
             </div>
         }
+        <div>
+            <label class="form-label" for="budgetStatus">Bütçe durumu</label>
+            <select id="budgetStatus" class="form-select" @bind="form.BudgetStatus">
+                @foreach (var status in OpportunityBudgetStatus.All)
+                {
+                    <option value="@status">@OpportunityBudgetStatus.Label(status)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="targetDecisionDate">Hedef karar tarihi</label>
+            <input id="targetDecisionDate" class="form-control" type="date" @bind="form.TargetDecisionDate" />
+            <FieldError Field="targetDecisionDate" Errors="errors" />
+        </div>
+        <details class="span-all">
+            <summary>İhtiyaç analizi</summary>
+            <label class="form-label" for="needDescription">İhtiyaç</label>
+            <textarea id="needDescription" class="form-control" rows="2" maxlength="4000" @bind="form.NeedDescription"></textarea>
+            <label class="form-label" for="currentProblem">Mevcut sorun</label>
+            <textarea id="currentProblem" class="form-control" rows="2" maxlength="4000" @bind="form.CurrentProblem"></textarea>
+            <label class="form-label" for="expectedBenefit">Beklenen fayda</label>
+            <textarea id="expectedBenefit" class="form-control" rows="2" maxlength="4000" @bind="form.ExpectedBenefit"></textarea>
+            <label class="form-label" for="scope">Kapsam</label>
+            <textarea id="scope" class="form-control" rows="2" maxlength="4000" @bind="form.Scope"></textarea>
+            <label class="form-label" for="successCriteria">Başarı ölçütleri</label>
+            <textarea id="successCriteria" class="form-control" rows="2" maxlength="4000" @bind="form.SuccessCriteria"></textarea>
+            <label class="form-label" for="risks">Riskler ve engeller</label>
+            <textarea id="risks" class="form-control" rows="2" maxlength="4000" @bind="form.Risks"></textarea>
+            <label class="form-label" for="decisionProcess">Karar süreci</label>
+            <textarea id="decisionProcess" class="form-control" rows="2" maxlength="4000" @bind="form.DecisionProcess"></textarea>
+        </details>
         <div class="span-all">
             <label class="form-label" for="notes">Notlar</label>
             <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
@@ -134,6 +217,10 @@
                 Id = o.Id, Version = o.Version, Title = o.Title, CompanyId = o.CompanyId, ContactId = o.ContactId, Stage = o.Stage,
                 Probability = o.Probability, Amount = o.Amount, Currency = o.Currency, ExpectedCloseDate = o.ExpectedCloseDate,
                 LostReason = o.LostReason, OwnerId = o.OwnerId, Notes = o.Notes,
+                Description = o.Description, Priority = o.Priority, Type = o.Type, Source = o.Source, CustomerBudget = o.CustomerBudget,
+                BudgetStatus = o.BudgetStatus, NeedDescription = o.NeedDescription, CurrentProblem = o.CurrentProblem,
+                ExpectedBenefit = o.ExpectedBenefit, Scope = o.Scope, SuccessCriteria = o.SuccessCriteria, Risks = o.Risks,
+                DecisionProcess = o.DecisionProcess, TargetDecisionDate = o.TargetDecisionDate, NextAction = o.NextAction, NextActionDate = o.NextActionDate,
                     Custom = o.Custom?.DeepClone().AsObject() ?? [],
             }
             : new OpportunityForm { CompanyId = FixedCompanyId, Stage = Lookups.DefaultOf(CrmLists.OpportunityStage) ?? OpportunityStage.Lead };
@@ -152,7 +239,12 @@
         busy = true;
         var request = new SaveOpportunityRequest(
             form.Title, companyId, form.ContactId, form.Stage, form.Amount, form.Currency, form.ExpectedCloseDate, form.Notes, form.Version,
-            form.Probability, form.LostReason, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom));
+            form.Probability, form.LostReason, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom),
+            Description: form.Description, Priority: form.Priority, Type: NullIfEmpty(form.Type), Source: NullIfEmpty(form.Source),
+            CustomerBudget: form.CustomerBudget, BudgetStatus: form.BudgetStatus, NeedDescription: form.NeedDescription,
+            CurrentProblem: form.CurrentProblem, ExpectedBenefit: form.ExpectedBenefit, Scope: form.Scope, SuccessCriteria: form.SuccessCriteria,
+            Risks: form.Risks, DecisionProcess: form.DecisionProcess, TargetDecisionDate: form.TargetDecisionDate,
+            NextAction: form.NextAction, NextActionDate: form.NextActionDate);
         var result = form.Id is { } id
             ? await Api.PutAsync<OpportunityDto>($"{Url}/{id}", request)
             : await Api.PostAsync<OpportunityDto>(Url, request);
@@ -167,6 +259,8 @@
         errors = result.FieldErrors;
         message = result.Error;
     }
+
+    private static string? NullIfEmpty(string? text) => string.IsNullOrWhiteSpace(text) ? null : text;
 
     private async Task DeleteAsync()
     {
@@ -209,6 +303,38 @@
         public DateOnly? ExpectedCloseDate { get; set; }
 
         public string? LostReason { get; set; }
+
+        public string? Description { get; set; }
+
+        public string Priority { get; set; } = "Normal";
+
+        public string? Type { get; set; }
+
+        public string? Source { get; set; }
+
+        public decimal? CustomerBudget { get; set; }
+
+        public string BudgetStatus { get; set; } = OpportunityBudgetStatus.Unknown;
+
+        public string? NeedDescription { get; set; }
+
+        public string? CurrentProblem { get; set; }
+
+        public string? ExpectedBenefit { get; set; }
+
+        public string? Scope { get; set; }
+
+        public string? SuccessCriteria { get; set; }
+
+        public string? Risks { get; set; }
+
+        public string? DecisionProcess { get; set; }
+
+        public DateOnly? TargetDecisionDate { get; set; }
+
+        public string? NextAction { get; set; }
+
+        public DateOnly? NextActionDate { get; set; }
 
         public Guid? OwnerId { get; set; }
 

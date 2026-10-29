@@ -191,6 +191,9 @@
     /// <summary>Verilirse aktivite bu Lead'e bağlanır (Lead detay sayfası).</summary>
     [Parameter] public Guid? FixedLeadId { get; set; }
 
+    /// <summary>Verilirse yeni aktivite bu fırsata bağlanır (fırsat sayfası); firma da fırsatın firmasıdır (<see cref="FixedCompanyId"/> ile verilir).</summary>
+    [Parameter] public Guid? FixedOpportunityId { get; set; }
+
     /// <summary>Takvimden hızlı oluşturmada seçilen gün (yeni aktivite için başlangıç).</summary>
     [Parameter] public DateOnly? InitialDay { get; set; }
 
@@ -228,7 +231,7 @@
             }
             : new ActivityForm
             {
-                CompanyId = FixedCompanyId, LeadId = FixedLeadId, Type = Lookups.DefaultOf(CrmLists.ActivityType) ?? ActivityType.Task,
+                CompanyId = FixedCompanyId, LeadId = FixedLeadId, OpportunityId = FixedOpportunityId, Type = Lookups.DefaultOf(CrmLists.ActivityType) ?? ActivityType.Task,
                 StartAt = InitialDay is { } day ? day.ToDateTime(new TimeOnly(9, 0)) : null,
                 EndAt = InitialDay is { } day2 ? day2.ToDateTime(new TimeOnly(10, 0)) : null,
                 DoneAt = Regional.Now.DateTime,

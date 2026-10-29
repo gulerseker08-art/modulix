@@ -31,8 +31,12 @@ public class RecordHandoverTests(ModulixApiFactory factory) : IClassFixture<Modu
         await CreateAsync(client, "crm.company", new JsonObject { ["name"] = "Devir Ltd.", ["ownerId"] = Id(leaver) });
         var openDeal = await CreateAsync(client, "crm.opportunity",
             new JsonObject { ["title"] = "Açık iş", ["companyId"] = company.ToString(), ["ownerId"] = Id(leaver) });
+        // Kapanmış fırsat doğrudan kapalı aşamada açılamaz (ADR-0017): açılır, sonra kazan eylemiyle kapatılır.
         var wonDeal = await CreateAsync(client, "crm.opportunity",
-            new JsonObject { ["title"] = "Kazanılan", ["companyId"] = company.ToString(), ["stage"] = "won", ["ownerId"] = Id(leaver) });
+            new JsonObject { ["title"] = "Kazanılan", ["companyId"] = company.ToString(), ["ownerId"] = Id(leaver) });
+        var wonRecord = await client.GetFromJsonAsync<Modulix.Shared.Crm.OpportunityDto>($"/api/crm/opportunities/{wonDeal}");
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/crm/opportunities/{wonDeal}/win",
+            new Modulix.Shared.Crm.WinOpportunityRequestDto(wonRecord!.Version, WonAmount: 1m))).StatusCode);
         var openTask = await CreateAsync(client, "crm.activity", new JsonObject { ["subject"] = "Ara", ["ownerId"] = Id(leaver) });
         // Açık Lead de devredilir (sorumlu alanı genel uçlardan değişmese de devir nedeniyle değişebilir).
         var openLead = await CreateAsync(client, "crm.lead", new JsonObject { ["subject"] = "Devredilecek Lead", ["lastName"] = "Kaya", ["ownerId"] = Id(leaver) });

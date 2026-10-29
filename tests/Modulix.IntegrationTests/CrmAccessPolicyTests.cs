@@ -299,8 +299,18 @@ public class CrmAccessPolicyTests(ModulixApiFactory factory) : IClassFixture<Mod
     private static async Task CreateOpportunityAsync(
         HttpClient client, Guid companyId, string stage, decimal amount, string currency, Guid? owner = null)
     {
+        // Kapalı aşamada doğrudan açılamaz (ADR-0017): açık açılır, sonra kazan / kaybet eylemiyle kapatılır.
+        var closing = stage is "Won" or "Lost";
         var response = await client.PostAsJsonAsync("/api/crm/opportunities",
-            new SaveOpportunityRequest($"Fırsat {Guid.NewGuid():N}"[..14], companyId, Stage: stage, Amount: amount, Currency: currency, OwnerId: owner));
+            new SaveOpportunityRequest($"Fırsat {Guid.NewGuid():N}"[..14], companyId, Stage: closing ? "Qualified" : stage, Amount: amount, Currency: currency, OwnerId: owner));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        if (closing)
+        {
+            var created = (await response.Content.ReadFromJsonAsync<OpportunityDto>())!;
+            var close = stage == "Won"
+                ? await client.PostAsJsonAsync($"/api/crm/opportunities/{created.Id}/win", new WinOpportunityRequestDto(created.Version))
+                : await client.PostAsJsonAsync($"/api/crm/opportunities/{created.Id}/lose", new LoseOpportunityRequestDto(created.Version, "Price"));
+            Assert.Equal(HttpStatusCode.OK, close.StatusCode);
+        }
     }
 }

@@ -1,0 +1,264 @@
+@page "/crm/firsat-raporu"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Fırsat raporu · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.OpportunitiesRead">
+    <a class="back-link" href="crm/firsatlar">← Fırsatlar</a>
+    <div class="page-header">
+        <h1>Fırsat raporu</h1>
+        @if (Session.Can(CrmAccess.OpportunitiesExport))
+        {
+            <a class="btn btn-outline-secondary" href="api/crm/opportunities/export" download="firsatlar.csv">CSV dışa aktar</a>
+        }
+    </div>
+
+    <form class="filters" @onsubmit="LoadAsync" @onsubmit:preventDefault>
+        <label class="form-label" for="rp-from">Kapanış başlangıç</label>
+        <input id="rp-from" class="form-control" type="date" @bind="from" />
+        <label class="form-label" for="rp-to">Kapanış bitiş</label>
+        <input id="rp-to" class="form-control" type="date" @bind="to" />
+        <button type="submit" class="btn btn-primary" disabled="@busy">Raporu getir</button>
+    </form>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (report is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        @if (report.Truncated)
+        {
+            <div class="alert alert-warning" role="status">Kayıt sayısı sınırı (5000) aşıldı; rapor ilk kayıtlara göredir. Dönemi daraltın.</div>
+        }
+        @if (!report.AmountsVisible)
+        {
+            <div class="alert alert-info" role="status">Tutar izniniz olmadığı için tutarlar gösterilmiyor; yalnızca adetler vardır.</div>
+        }
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Açık fırsatlar</h2></div>
+            <p>@report.OpenCount açık · @report.OnHoldCount beklemede</p>
+            @TotalsTable(report.OpenTotals)
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Aşama dağılımı (açık)</h2></div>
+            <table class="table record-table">
+                <thead><tr><th>Aşama</th><th>Adet</th><th>Tutar</th><th>Ort. kalma (gün)</th></tr></thead>
+                <tbody>
+                    @foreach (var s in report.ByStage)
+                    {
+                        <tr>
+                            <td data-label="Aşama">@Lookups.Label(CrmLists.OpportunityStage, s.Stage)</td>
+                            <td data-label="Adet">@s.Count</td>
+                            <td data-label="Tutar">@Amounts(s.Totals)</td>
+                            <td data-label="Ort. kalma">@(s.AverageDaysInStage?.ToString("0.#") ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Sorumlu bazında</h2></div>
+            <table class="table record-table">
+                <thead><tr><th>Sorumlu</th><th>Açık</th><th>Açık tutar</th><th>Kazanılan</th><th>Kaybedilen</th></tr></thead>
+                <tbody>
+                    @foreach (var o in report.ByOwner)
+                    {
+                        <tr>
+                            <td data-label="Sorumlu">@(o.OwnerId is null ? "Atanmadı" : Lookups.MemberName(o.OwnerId))</td>
+                            <td data-label="Açık">@o.OpenCount</td>
+                            <td data-label="Açık tutar">@Amounts(o.OpenTotals)</td>
+                            <td data-label="Kazanılan">@o.WonCount</td>
+                            <td data-label="Kaybedilen">@o.LostCount</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Tahmini kapanış dönemine göre tahmin (açık fırsatlar)</h2></div>
+            <table class="table record-table">
+                <thead><tr><th>Ay</th><th>Tutar / ağırlıklı</th></tr></thead>
+                <tbody>
+                    @foreach (var m in report.Forecast)
+                    {
+                        <tr><td data-label="Ay">@m.Month</td><td data-label="Tutar">@Amounts(m.Totals, weighted: true)</td></tr>
+                    }
+                </tbody>
+            </table>
+            <p class="text-muted small">Bugünkü kayıt değerlerinden hesaplanır; geçmiş dönem tahmini değildir.</p>
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Kapanışlar (@CrmLabels.Date(report.From) – @CrmLabels.Date(report.To))</h2></div>
+            <dl class="detail-grid">
+                <div><dt>Kazanılan</dt><dd>@report.WonCount</dd></div>
+                <div><dt>Kaybedilen</dt><dd>@report.LostCount</dd></div>
+                <div><dt>İptal edilen</dt><dd>@report.CancelledCount (kazanma oranına girmez)</dd></div>
+                <div><dt>Kazanma oranı</dt><dd>@(report.WinRate is { } rate ? $"%{rate * 100:0.#}" : "Tanımsız (karar verilen fırsat yok)")</dd></div>
+                <div><dt>Ort. satış döngüsü</dt><dd>@(report.AverageCycleDays is { } cycle ? $"{cycle:0.#} gün" : "—")</dd></div>
+                <div><dt>Kazanılan tutar</dt><dd>@Amounts(report.WonTotals)</dd></div>
+            </dl>
+            @if (report.LossReasons.Count > 0)
+            {
+                <h3>Kaybetme nedenleri</h3>
+                <ul class="item-list">
+                    @foreach (var r in report.LossReasons)
+                    {
+                        <li><div class="item-main">@Lookups.Label(CrmLists.OpportunityLossReason, r.Key) <span class="text-muted">@r.Count</span></div></li>
+                    }
+                </ul>
+            }
+            @if (report.CompetitorLosses.Count > 0)
+            {
+                <h3>Rakibe kayıplar</h3>
+                <ul class="item-list">
+                    @foreach (var c in report.CompetitorLosses)
+                    {
+                        <li><div class="item-main">@(c.Name ?? "Bilinmeyen rakip") <span class="text-muted">@c.Count</span></div></li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Dikkat gerektirenler</h2></div>
+            @AttentionList("Kapanış tarihi geçmiş", report.Overdue)
+            @AttentionList("Sonraki aksiyonu olmayan", report.NoNextAction)
+            @AttentionList("Hareketsiz (son etkileşim eşiği aşıldı)", report.Inactive)
+            <h3>Kapanış tarihi ertelenenler</h3>
+            @if (report.Postponed.Count == 0)
+            {
+                <p class="text-muted">Yok.</p>
+            }
+            else
+            {
+                <ul class="item-list">
+                    @foreach (var p in report.Postponed)
+                    {
+                        <li><div class="item-main"><a href="crm/firsatlar/@p.Id">@p.Title</a> <span class="text-muted">@p.ChangeCount kez değişti@(p.ExpectedCloseDate is { } d ? $" · şimdi {CrmLabels.Date(d)}" : null)</span></div></li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Tanımlar</h2></div>
+            <ul>
+                @foreach (var definition in report.Definitions)
+                {
+                    <li>@definition</li>
+                }
+            </ul>
+        </section>
+    }
+</AuthGate>
+
+@code {
+    private OpportunityReportDto? report;
+    private string? message;
+    private bool busy;
+    private DateOnly from = new(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+    private DateOnly to = DateOnly.FromDateTime(DateTime.UtcNow);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.OpportunitiesRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        busy = true;
+        var result = await Api.GetAsync<OpportunityReportDto>($"/api/crm/opportunities/report?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}");
+        busy = false;
+        report = result.Value;
+        message = result.Error;
+    }
+
+    // Para birimleri ayrı ayrı gösterilir; farklı birimler toplanmaz.
+    private string Amounts(IReadOnlyList<OpportunityCurrencyTotal> totals, bool weighted = false)
+    {
+        if (totals.Count == 0)
+        {
+            return "—";
+        }
+
+        return string.Join(" + ", totals.Select(t => t.Amount is null
+            ? $"{t.Count} adet"
+            : $"{CrmLabels.Amount(t.Amount.Value, t.Currency)}{(weighted && t.Weighted is { } w ? $" (ağırlıklı {CrmLabels.Amount(w, t.Currency)})" : null)}"));
+    }
+
+    private RenderFragment TotalsTable(IReadOnlyList<OpportunityCurrencyTotal> totals) => builder =>
+    {
+        if (totals.Count == 0)
+        {
+            builder.AddMarkupContent(0, "<p class=\"text-muted\">Açık fırsat yok.</p>");
+            return;
+        }
+
+        var html = "<table class=\"table record-table\"><thead><tr><th>Para birimi</th><th>Adet</th><th>Tutar</th><th>Ağırlıklı</th><th>Tutarı bilinmeyen</th><th>Olasılığı bilinmeyen</th></tr></thead><tbody>"
+            + string.Concat(totals.Select(t =>
+                $"<tr><td data-label=\"Para birimi\">{System.Net.WebUtility.HtmlEncode(t.Currency)}</td><td data-label=\"Adet\">{t.Count}</td>"
+                + $"<td data-label=\"Tutar\">{(t.Amount is { } a ? CrmLabels.Amount(a, t.Currency) : "—")}</td>"
+                + $"<td data-label=\"Ağırlıklı\">{(t.Weighted is { } w ? CrmLabels.Amount(w, t.Currency) : "—")}</td>"
+                + $"<td data-label=\"Tutarı bilinmeyen\">{t.UnknownAmountCount}</td><td data-label=\"Olasılığı bilinmeyen\">{t.NoProbabilityCount}</td></tr>"))
+            + "</tbody></table>";
+        builder.AddMarkupContent(0, html);
+    };
+
+    private RenderFragment AttentionList(string title, IReadOnlyList<AttentionItem> items) => builder =>
+    {
+        var seq = 0;
+        builder.OpenElement(seq++, "h3");
+        builder.AddContent(seq++, title);
+        builder.CloseElement();
+        if (items.Count == 0)
+        {
+            builder.OpenElement(seq++, "p");
+            builder.AddAttribute(seq++, "class", "text-muted");
+            builder.AddContent(seq++, "Yok.");
+            builder.CloseElement();
+            return;
+        }
+
+        builder.OpenElement(seq++, "ul");
+        builder.AddAttribute(seq++, "class", "item-list");
+        foreach (var item in items)
+        {
+            builder.OpenElement(seq++, "li");
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", "item-main");
+            builder.OpenElement(seq++, "a");
+            builder.AddAttribute(seq++, "href", $"crm/firsatlar/{item.Id}");
+            builder.AddContent(seq++, $"{item.OpportunityNumber} · {item.Title}");
+            builder.CloseElement();
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "text-muted");
+            builder.AddContent(seq++, $" {Lookups.MemberName(item.OwnerId)}{(item.Date is { } d ? $" · {CrmLabels.Date(d)}" : null)}");
+            builder.CloseElement();
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+}

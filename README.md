@@ -341,7 +341,7 @@ Firma (taraf) ve kişi çekirdekte tek kayıttır ([ADR-0006](docs/adr/0006-orta
 | `POST /api/crm/companies/{targetId}/merge/preview`, `POST /api/crm/contacts/{targetId}/merge/preview` | Birleştirme önizlemesi: alan farkları (`suggested`: hedef boşken kaynak), etkilenen kayıtlar ve **engeller** (lokasyon kodu çakışması, firma ilişkisinde döngü, tüzel/gerçek kişi ayrımı, taşınamayan başka modül başvurusu). Yazmaz | `crm.companies.merge` / `crm.contacts.merge` |
 | `POST /api/crm/companies/{targetId}/merge`, `POST /api/crm/contacts/{targetId}/merge` | Kaynağı hedefe birleştirir (gövde: `sourceId`, `sourceVersion`, `targetVersion`, `fieldChoices`). Her iki kayıt çağıranın kapsamında olmalı. Tek işlemde; engel, eski sürüm (409) ya da çakışmada hiçbir şey yazılmaz. Tekrarlanan istek 409 "zaten birleştirilmiş" döner | `crm.companies.merge` / `crm.contacts.merge` |
 | `GET /api/crm/companies/merged/{oldId}`, `GET /api/crm/contacts/merged/{oldId}` | Birleştirilmiş eski kimliğin gittiği kayıt (`targetId`). Hedefi göremeyen çağıran için 404 | `crm.companies.read` / `crm.contacts.read` |
-| `/api/crm/contacts`, `/api/crm/opportunities`, `/api/crm/activities` | Aynı kalıp | `crm.<kaynak>.read` / `.write` |
+| `/api/crm/contacts`, `/api/crm/opportunities`, `/api/crm/activities` | Aynı kalıp (fırsat eylemleri için bkz. Fırsat yönetimi) | `crm.<kaynak>.read` / `.write` |
 | `GET /api/tenant/members` | Kuruluşun etkin üyeleri (sorumlu seçimi) | Aktif tenant |
 
 Listeler filtre alır; bilinmeyen filtre veya geçersiz değer 422 döner. `ownerId=me` isteği yapan kullanıcıdır. Fırsat listesinde `stageCategory=open|won|lost` aşama kategorisine göre süzer. Kişi listesinde `ownerId`, `withoutCompany=true` süzgeçleri vardır.
@@ -463,6 +463,25 @@ Aktivite, CRM'in `crm.Activities` kaydıdır. Yaşam döngüsü **tür ailesine*
 **Arayüz:** *CRM → Aktiviteler*: Liste, Gün, Hafta, Ay, Ajanda görünümleri; Bugün / Gecikenler / Bana atananlar / Ekip / Tüm açıklar; durum-tür-öncelik süzgeçleri; tarayıcıda saklanan kayıtlı görünümler; gün hücresinden hızlı oluşturma; ayrıntı paneli ve eylemler; sürükle-bırak yeniden planlama; toplu seçim. Firma detayı birleşik zaman akışını gösterir. **E-posta durumu "Gönderildi" yalnızca kullanıcının kaydıdır, teslim/okundu anlamına gelmez; bu sürümde e-posta gönderen bir kod ve harici takvim bağlantısı yoktur.**
 
 **Geliştirici:** kural katmanı `Activities/ActivityRules.cs` (saf, birim testli); eylemler `IActivityWorkflow`; kayıt depoları `Records/ActivityRecordStore.cs`, `ActivityChildStores.cs`; görünürlük `ActivityVisibility.cs`. Yeni tablolar (`ActivityLinks`, `ActivityParticipants`) RLS politikasındadır. Yapılmayanlar ve nedenleri ADR-0015 sonunda.
+
+### Fırsat yönetimi ([ADR-0017](docs/adr/0017-firsat-yonetimi.md))
+
+Fırsat; numara (`OP-20261029-AB12CD`, tenant içinde benzersiz), durum (`Open`, `OnHold`, `Won`, `Lost`, `Cancelled`), aşama (Y9b listesi), öncelik, tür, kaynak, ihtiyaç analizi, tutar/olasılık/müşteri bütçesi (bütçe durumu ayrı), tahmini ve gerçek kapanış, sonraki aksiyon ve son müşteri etkileşimi taşır. **Durum–aşama ilişkisi:** Kazanıldı ↔ `won` kategorili aşama, Kaybedildi ↔ `lost`; Açık, Beklemede ve İptal edildi `open` aşamada durur. Çelişkili birleşim kaydedilemez.
+
+**Eylemler** (`POST /api/crm/opportunities/{id}/...`, gövdede `version` zorunlu): `stage` (aşama değiştir), `hold` / `resume` (gerekçe + yeniden değerlendirme tarihi), `win` (kapanış tarihi, kazanılan tutar, neden, devir notu), `lose` (yapılandırılmış neden zorunlu; "Diğer" açıklama ister; kazanan rakip yalnızca rakibe kayıpta; yeniden iletişim tarihi + isteğe bağlı takip aktivitesi), `cancel` (gerekçe; kayıp sayılmaz), `reopen` (ayrı izin, gerekçe, yeni açık aşama, gelecekte kapanış). Durum, aşama (oluşturma sonrası) ve kapanış alanları genel `PUT`/`/api/records` uçlarından yazılamaz; Kanban da `stage` uç noktasını kullanır. Kapanışta açık aktiviteler silinmez ya da devredilmez; yanıtta sayısı (`openActivities`) bildirilir.
+
+| Uç nokta | Açıklama | İzin |
+|---|---|---|
+| `GET /api/crm/opportunities/{id}/history` | Aşama/durum/kapanış tarihi tarihçesi (kapanış tutarları tutar izni ister) | `read` |
+| `/api/crm/opportunity-contacts`, `/api/crm/opportunity-competitors` | Fırsat kişileri (rol ilişkide) ve rakipleri; `opportunityId` süzgeci | `read` / `write` |
+| `GET /api/crm/opportunities/report?from=&to=&ownerId=` | Rapor; tanımları yanıttaki `definitions` | `read` (tutar izni yoksa tutarlar null) |
+| `GET /api/crm/opportunities/export` | CSV, denetim kaydına yazılır | `crm.opportunities.export` |
+
+**Yetkiler:** `change-stage` (aşama, bekletme), `close` (kazan/kaybet/iptal), `reopen`, `export`. `write` izni olan mevcut roller aşama değiştirmeye ve kapatmaya devam eder (geriye uyumluluk); yeniden açma ve dışa aktarma ayrı izindir. **Ayarlar** (Firma ayarları → "CRM Fırsat"): `crm.opportunity.stage-requirements` (aşamaya geçerken dolu olması gereken alanlar), `crm.opportunity.stage-probabilities` (aşama varsayılan olasılığı; elle girilen olasılık ezilmez), `crm.opportunity.stale-days` (hareketsizlik eşiği).
+
+**Liste süzgeçleri:** `status`, `open`, `live` (açık + beklemede), `stage`, `stageCategory`, `priority`, `type`, `source`, `lossReason`, `currency`, `ownerId=me`, `companyId`, `contactId`, `sourceLeadId`, `number`, `closeFrom`/`closeTo`, `actualCloseFrom`/`actualCloseTo`, `closeOverdueBefore=<tarih>`, `noNextAction=true`, `inactiveBefore=<ISO>`, `holdReviewDueBefore=<tarih>`, `closeDatePostponed=true`. Ekranlar: Fırsatlar (pano/liste), Fırsat sayfası (`/crm/firsatlar/{id}`: özet, işlemler, kişiler, rakipler, aktiviteler, tarihçe), Fırsat raporu (`/crm/firsat-raporu`).
+
+**Henüz yok:** çoklu pipeline, teklif entegrasyonu, sipariş/sözleşme devri, tahmin anlık görüntüsü, zamanlanmış bildirimler, toplu işlemler (ayrıntı ADR-0017'de).
 
 ## E-posta
 

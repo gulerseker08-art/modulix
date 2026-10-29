@@ -2,16 +2,20 @@
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
+@inject NavigationManager Navigation
 
 <PageTitle>Fırsatlar · ModuliX</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.OpportunitiesRead">
     <div class="page-header">
         <h1>Fırsatlar</h1>
+        <div class="header-actions">
+            <a class="btn btn-outline-secondary" href="crm/firsat-raporu">Rapor</a>
         @if (Session.Can(CrmAccess.OpportunitiesWrite) && !editing)
         {
             <button type="button" class="btn btn-primary" @onclick="() => Open(null)">Yeni fırsat</button>
         }
+        </div>
     </div>
 
     @if (message is not null)
@@ -30,6 +34,16 @@
             <button type="button" class="chip @(!board ? "active" : null)" @onclick="() => SwitchAsync(false)">Liste</button>
         </div>
         <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@mine" @onclick="ToggleMineAsync">Yalnızca benimkiler</button>
+        <button type="button" class="chip @(overdue ? "active" : null)" aria-pressed="@overdue" @onclick="ToggleOverdueAsync">Kapanışı geçenler</button>
+        <button type="button" class="chip @(noAction ? "active" : null)" aria-pressed="@noAction" @onclick="ToggleNoActionAsync">Aksiyonsuz</button>
+        <label class="visually-hidden" for="status-filter">Durum</label>
+        <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm durumlar</option>
+            @foreach (var s in OpportunityStatus.All)
+            {
+                <option value="@s">@OpportunityStatus.Label(s)</option>
+            }
+        </select>
     </div>
 
     <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
@@ -46,7 +60,7 @@
         else
         {
             <p class="text-muted small board-hint">
-                @(Session.Can(CrmAccess.OpportunitiesWrite) ? "Kartı sürükleyerek veya kartın altındaki listeden aşamasını değiştirin." : null)
+                @(CanMove ? "Kartı sürükleyerek veya kartın altındaki listeden aşamasını değiştirin. Kazanıldı/Kaybedildi sütununa bırakmak fırsat sayfasını açar (kapanış bilgisi istenir)." : null)
             </p>
             <div class="board">
                 @foreach (var column in columns)
@@ -65,9 +79,13 @@
                         </header>
                         @foreach (var opportunity in column.Page.Items)
                         {
-                            <article class="board-card" draggable="@(Session.Can(CrmAccess.OpportunitiesWrite) ? "true" : "false")"
+                            <article class="board-card" draggable="@(CanMove && opportunity.Status == OpportunityStatus.Open ? "true" : "false")"
                                      @ondragstart="() => dragged = opportunity">
-                                <strong>@opportunity.Title</strong>
+                                <a href="crm/firsatlar/@opportunity.Id"><strong>@opportunity.Title</strong></a>
+                                @if (opportunity.Status != OpportunityStatus.Open)
+                                {
+                                    <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span>
+                                }
                                 @if (opportunity.SourceLeadId is { } cardLead && Session.Can(CrmAccess.LeadsRead)) { <a class="small" href="crm/leadler/@cardLead">Kaynak Lead</a> }
                                 <a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a>
                                 @if (ShowAmounts)
@@ -81,7 +99,7 @@
                                 {
                                     <span class="owner">@Lookups.MemberName(opportunity.OwnerId)</span>
                                 }
-                                @if (Session.Can(CrmAccess.OpportunitiesWrite))
+                                @if (CanMove && opportunity.Status == OpportunityStatus.Open)
                                 {
                                     <div class="card-actions">
                                         <select class="form-select form-select-sm" aria-label="Aşama" value="@opportunity.Stage"
@@ -130,14 +148,14 @@
                 @foreach (var opportunity in page.Items)
                 {
                     <tr>
-                        <td data-label="Başlık" class="primary">@opportunity.Title
+                        <td data-label="Başlık" class="primary"><a href="crm/firsatlar/@opportunity.Id">@opportunity.Title</a> <small class="text-muted">@opportunity.OpportunityNumber</small>
                             @if (opportunity.SourceLeadId is { } sourceLead && Session.Can(CrmAccess.LeadsRead))
                             {
                                 <a class="small d-block" href="crm/leadler/@sourceLead">Kaynak Lead</a>
                             }
                         </td>
                         <td data-label="Firma"><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></td>
-                        <td data-label="Aşama"><span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span></td>
+                        <td data-label="Aşama"><span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span> @if (opportunity.Status != OpportunityStatus.Open) { <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span> }</td>
                         @if (ShowAmounts)
                         {
                             <td data-label="Tutar" class="text-end">@FormatAmount(opportunity)</td>
@@ -177,6 +195,9 @@
     private bool editing;
     private bool board = true;
     private bool mine;
+    private bool overdue;
+    private bool noAction;
+    private string status = string.Empty;
     private string? message;
     private string? search;
 
@@ -205,7 +226,11 @@
     private string Filters()
     {
         var filters = $"&search={Uri.EscapeDataString(search ?? string.Empty)}";
-        return mine ? filters + "&ownerId=me" : filters;
+        if (mine) { filters += "&ownerId=me"; }
+        if (overdue) { filters += $"&closeOverdueBefore={DateOnly.FromDateTime(DateTime.UtcNow):yyyy-MM-dd}"; }
+        if (noAction) { filters += "&noNextAction=true"; }
+        if (status.Length > 0) { filters += $"&status={status}"; }
+        return filters;
     }
 
     private async Task SwitchAsync(bool toBoard)
@@ -219,6 +244,21 @@
         mine = !mine;
         await LoadAsync(1);
     }
+
+    private async Task ToggleOverdueAsync()
+    {
+        overdue = !overdue;
+        await LoadAsync(1);
+    }
+
+    private async Task ToggleNoActionAsync()
+    {
+        noAction = !noAction;
+        await LoadAsync(1);
+    }
+
+    // Aşama değiştirme ve kapatma ayrı izinlerdir (yazma izni de kabul edilir); kural ve yetki sunucuda uygulanır.
+    private bool CanMove => Session.Can(CrmAccess.OpportunitiesChangeStage) || Session.Can(CrmAccess.OpportunitiesWrite);
 
     private async Task LoadAsync(int pageNumber)
     {
@@ -252,7 +292,10 @@
         }
     }
 
-    /// <summary>Aşamayı değiştirir. Kaybedildi kategorisindeki aşamaya taşınan fırsat için nedeni sormak üzere form açılır.</summary>
+    /// <summary>
+    /// Aşamayı değiştirir; pano ve fırsat sayfası aynı sunucu kuralını (koşullar, durum, olasılık) kullanır. Kazanıldı/Kaybedildi aşamasına
+    /// bırakma kapanış bilgisi gerektirir: fırsat sayfası açılır, aşama burada değişmez.
+    /// </summary>
     private async Task MoveAsync(OpportunityDto opportunity, string stage)
     {
         if (opportunity.Stage == stage)
@@ -260,14 +303,14 @@
             return;
         }
 
-        if (Lookups.IsLost(stage))
+        if (Lookups.IsClosed(stage))
         {
-            Open(opportunity with { Stage = stage });
+            Navigation.NavigateTo($"crm/firsatlar/{opportunity.Id}");
             return;
         }
 
-        var result = await Api.PutAsync<OpportunityDto>($"{Url}/{opportunity.Id}", CrmRequests.From(opportunity) with { Stage = stage });
-        message = result.Error;
+        var result = await Api.PostAsync<OpportunityActionResultDto>($"{Url}/{opportunity.Id}/stage", new ChangeOpportunityStageRequest(opportunity.Version, stage));
+        message = result.IsSuccess ? null : string.Join(" ", new[] { result.Error }.Concat(result.FieldErrors.Values.SelectMany(v => v)).Where(m => !string.IsNullOrWhiteSpace(m)).Distinct());
         await LoadAsync(1);
     }
 
