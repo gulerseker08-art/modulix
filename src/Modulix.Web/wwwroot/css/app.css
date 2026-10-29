@@ -440,6 +440,23 @@ code {
         color: #58151c;
     }
 
+    /* Fırsat durumları (ADR-0017): beklemede ve iptal edildi kapanış aşaması değildir */
+    .badge.stage-onhold {
+        background: #fdf0d5;
+        color: #8a5a00;
+    }
+
+    .badge.stage-cancelled {
+        background: #eef0f5;
+        color: #4b5573;
+        text-decoration: line-through;
+    }
+
+    .badge.stage-open {
+        background: var(--mx-lilac);
+        color: var(--mx-indigo);
+    }
+
 tr.done td.primary {
     text-decoration: line-through;
     color: var(--bs-secondary-color);

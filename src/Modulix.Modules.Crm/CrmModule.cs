@@ -6,6 +6,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Leads;
+using Modulix.Modules.Crm.Opportunities;
 using Modulix.Modules.Crm.Records;
 
 namespace Modulix.Modules.Crm;
@@ -34,6 +35,13 @@ public sealed class CrmModule : IModule
         public const string ContactsMerge = "crm.contacts.merge";
         public const string OpportunitiesRead = "crm.opportunities.read";
         public const string OpportunitiesWrite = "crm.opportunities.write";
+
+        // Fırsat yaşam döngüsü (ADR-0017). Aşama değiştirme/bekletme ve kapatma (kazan/kaybet/iptal), mevcut rollerin davranışı
+        // bozulmasın diye yazma izniyle de yapılabilir; yeniden açma ve dışa aktarma kesinlikle ayrı izindir ve hiçbir hazır rolde yoktur.
+        public const string OpportunitiesChangeStage = "crm.opportunities.change-stage";
+        public const string OpportunitiesClose = "crm.opportunities.close";
+        public const string OpportunitiesReopen = "crm.opportunities.reopen";
+        public const string OpportunitiesExport = "crm.opportunities.export";
 
         /// <summary>Fırsat tutarı ve olasılığı (Y8b, hassas alan). Olmayan kişi fırsatı görür, bu alanları görmez ve yazamaz.</summary>
         public const string OpportunityAmountsRead = "crm.opportunity-amounts.read";
@@ -82,6 +90,8 @@ public sealed class CrmModule : IModule
         public const string PersonContactPoint = "crm.person-contact-point";
         public const string CompanyRelation = "crm.company-relation";
         public const string Opportunity = "crm.opportunity";
+        public const string OpportunityContact = "crm.opportunity-contact";
+        public const string OpportunityCompetitor = "crm.opportunity-competitor";
         public const string Activity = "crm.activity";
         public const string ActivityLink = "crm.activity-link";
         public const string ActivityParticipant = "crm.activity-participant";
@@ -93,6 +103,8 @@ public sealed class CrmModule : IModule
     public static class Lists
     {
         public const string OpportunityStage = "crm.opportunity-stage";
+        public const string OpportunityType = "crm.opportunity-type";
+        public const string OpportunityLossReason = "crm.opportunity-loss-reason";
         public const string CompanyStatus = "crm.company-status";
         public const string CompanySource = "crm.company-source";
         public const string ActivityType = "crm.activity-type";
@@ -121,6 +133,23 @@ public sealed class CrmModule : IModule
         public const string Won = "won";
         public const string Lost = "lost";
     }
+
+    /// <summary>
+    /// Kaybetme nedeni kategorileri (ADR-0017). Yalnızca <c>competitor</c> kategorisi "rakibe kaybedildi"dir; vazgeçme ve mevcut
+    /// çözümle devam rakibe kayıp sayılmaz. <c>other</c> kategorisinde açıklama zorunludur.
+    /// </summary>
+    public static class LossCategories
+    {
+        public const string Competitor = "competitor";
+        public const string NoDecision = "no-decision";
+        public const string StatusQuo = "status-quo";
+        public const string Fit = "fit";
+        public const string Other = "other";
+    }
+
+    /// <summary>Fırsat–kişi rolleri; adlar Shared'daki <c>OpportunityContactRoles</c> ile aynıdır.</summary>
+    public static IReadOnlyList<string> OpportunityContactRoles { get; } =
+        ["DecisionMaker", "BudgetOwner", "TechnicalEvaluator", "Purchaser", "EndUser", "Champion", "Other"];
 
     /// <summary>İlişki rolü anahtarları (ADR-0011); adlar Shared'daki <c>CrmRelationshipRoles</c> ile aynıdır.</summary>
     public static IReadOnlyList<string> RelationshipRoles { get; } = ["Purchasing", "Finance", "Technical", "Management", "Other"];
@@ -158,6 +187,10 @@ public sealed class CrmModule : IModule
         new(Permissions.ContactsMerge, "Mükerrer kişileri birleştirir", "Kişiler"),
         new(Permissions.OpportunitiesRead, "Fırsatları görüntüler", "Fırsatlar"),
         new(Permissions.OpportunitiesWrite, "Fırsat ekler, düzenler ve siler", "Fırsatlar"),
+        new(Permissions.OpportunitiesChangeStage, "Fırsatın aşamasını değiştirir, beklemeye alır ve çıkarır", "Fırsatlar"),
+        new(Permissions.OpportunitiesClose, "Fırsatı kazanıldı, kaybedildi ya da iptal olarak kapatır", "Fırsatlar"),
+        new(Permissions.OpportunitiesReopen, "Kapanmış fırsatı gerekçeyle yeniden açar", "Fırsatlar"),
+        new(Permissions.OpportunitiesExport, "Fırsat listesini dışa aktarır", "Fırsatlar"),
         new(Permissions.OpportunityAmountsRead, "Fırsat tutarını ve olasılığını görür", "Fırsat tutarları"),
         new(Permissions.ActivitiesRead, "Aktiviteleri görüntüler", "Aktiviteler"),
         new(Permissions.ActivitiesWrite, "Aktivite ekler, düzenler, tamamlar, iptal eder ve siler", "Aktiviteler"),
@@ -181,7 +214,8 @@ public sealed class CrmModule : IModule
     IReadOnlyList<OwnedRecordType> IModule.OwnedRecords { get; } =
     [
         new(Entities.Company, "firma") { Path = "crm/firmalar/{id}" },
-        new(Entities.Opportunity, "açık fırsat", new Dictionary<string, string> { ["open"] = "true" }) { Path = "crm/firsatlar" },
+        // Yürüyen (açık ve beklemedeki) fırsatlar devredilir; kazanılan/kaybedilen/iptal edilen geçmiş olarak eski sorumlusunda kalır.
+        new(Entities.Opportunity, "açık fırsat", new Dictionary<string, string> { ["live"] = "true" }) { Path = "crm/firsatlar/{id}" },
         new(Entities.Activity, "açık aktivite", new Dictionary<string, string> { ["open"] = "true" }) { Path = "crm/aktiviteler" },
         new(Entities.Lead, "açık lead", new Dictionary<string, string> { ["open"] = "true" }) { Path = "crm/leadler/{id}" },
     ];
@@ -196,6 +230,7 @@ public sealed class CrmModule : IModule
                 Permissions.CompaniesRead, Permissions.CompaniesWrite,
                 Permissions.ContactsRead, Permissions.ContactsWrite,
                 Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite, Permissions.OpportunityAmountsRead,
+                Permissions.OpportunitiesChangeStage, Permissions.OpportunitiesClose,
                 Permissions.ActivitiesRead, Permissions.ActivitiesWrite, Permissions.ActivitiesReopen,
                 Permissions.LeadsRead, Permissions.LeadsCreate, Permissions.LeadsUpdate,
                 Permissions.LeadsQualify, Permissions.LeadsDisqualify, Permissions.LeadsConvert,
@@ -225,7 +260,7 @@ public sealed class CrmModule : IModule
     /// </summary>
     IReadOnlyList<SensitiveFields> IModule.SensitiveFields { get; } =
     [
-        new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability"]),
+        new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability", "customerBudget", "wonAmount"]),
     ];
 
     /// <summary>Özel alanlar (Y9a): firma dört kayıt türüne de kendi alanlarını ekleyebilir.</summary>
@@ -261,6 +296,34 @@ public sealed class CrmModule : IModule
                 new("Negotiation", "Pazarlık", StageCategories.Open),
                 new("Won", "Kazanıldı", StageCategories.Won),
                 new("Lost", "Kaybedildi", StageCategories.Lost),
+            ]),
+        new(
+            Lists.OpportunityType,
+            "Fırsat türü",
+            Entities.Opportunity,
+            "type",
+            Required: false,
+            [],
+            [new("NewCustomer", "Yeni müşteri"), new("Upsell", "Mevcut müşteriye ek satış"), new("Renewal", "Yenileme"), new("Other", "Diğer")]),
+        new(
+            Lists.OpportunityLossReason,
+            "Fırsat kaybetme nedeni",
+            Entities.Opportunity,
+            "lossReason",
+            Required: false,
+            // Kategori kaybın niteliğini belirler: yalnızca "competitor" rakibe kayıptır; "other" açıklama ister.
+            [
+                new(LossCategories.Competitor, "Rakibe kaybedildi"), new(LossCategories.NoDecision, "Satın almaktan vazgeçti"),
+                new(LossCategories.StatusQuo, "Mevcut çözümle devam etti"), new(LossCategories.Fit, "Fiyat / bütçe / ürün uyumu"),
+                new(LossCategories.Other, "Diğer"),
+            ],
+            [
+                new("Competitor", "Rakibi seçti", LossCategories.Competitor),
+                new("NoDecision", "Satın almaktan vazgeçti", LossCategories.NoDecision),
+                new("StatusQuo", "Mevcut çözümle devam etti", LossCategories.StatusQuo),
+                new("Price", "Fiyat", LossCategories.Fit), new("Budget", "Bütçe", LossCategories.Fit),
+                new("ProductFit", "Ürün uyumu", LossCategories.Fit), new("Timing", "Zamanlama", LossCategories.Fit),
+                new("Other", "Diğer", LossCategories.Other),
             ]),
         new(
             Lists.CompanyStatus,
@@ -338,6 +401,30 @@ public sealed class CrmModule : IModule
         new(SettingKeys.LeadFirstContactTargetHours, "İlk temas hedefi (takvim saati)", "CRM Lead", SettingType.Text, "24")
         {
             Description = "Lead'in ilk temasının hedeflenen en uzun süresi, takvim saati olarak (iş saati değildir). Boş bırakılırsa hedef uygulanmaz.",
+            Pattern = @"^[1-9][0-9]{0,3}$",
+            PatternMessage = "1-9999 arası tam sayı girin.",
+            MaxLength = 4,
+        },
+        // Fırsat politikası (ADR-0017). Modül ayarları yönetim ekranından düzenlenir; geçersiz biçim kaydedilmez.
+        new(SettingKeys.OpportunityStageRequirements, "Fırsat aşama koşulları", "CRM Fırsat", SettingType.Text,
+            "Proposal=amount|expectedCloseDate;Negotiation=amount|expectedCloseDate|contactId")
+        {
+            Description = "Bir aşamaya geçerken dolu olması gereken alanlar. Biçim: Aşama=alan|alan;Aşama=alan (ör. Proposal=amount|expectedCloseDate). Boş bırakılırsa koşul uygulanmaz.",
+            Pattern = @"^$|^[A-Za-z][A-Za-z0-9_.-]*=[A-Za-z]+(\|[A-Za-z]+)*(;[A-Za-z][A-Za-z0-9_.-]*=[A-Za-z]+(\|[A-Za-z]+)*)*$",
+            PatternMessage = "Biçim: Aşama=alan|alan;Aşama=alan",
+            MaxLength = 400,
+        },
+        new(SettingKeys.OpportunityStageProbabilities, "Fırsat aşama olasılıkları (%)", "CRM Fırsat", SettingType.Text,
+            "Lead=10;Qualified=25;Proposal=50;Negotiation=75")
+        {
+            Description = "Aşamanın varsayılan kazanma olasılığı. Biçim: Aşama=yüzde;Aşama=yüzde. Kullanıcı olasılığı elle girdiyse aşama değişince ezilmez; kazanılanda 100, kaybedilen ve iptalde 0 uygulanır.",
+            Pattern = @"^$|^[A-Za-z][A-Za-z0-9_.-]*=(100|[0-9]{1,2})(;[A-Za-z][A-Za-z0-9_.-]*=(100|[0-9]{1,2}))*$",
+            PatternMessage = "Biçim: Aşama=yüzde;Aşama=yüzde (0-100)",
+            MaxLength = 400,
+        },
+        new(SettingKeys.OpportunityStaleDays, "Fırsat hareketsizlik eşiği (gün)", "CRM Fırsat", SettingType.Text, "30")
+        {
+            Description = "Son müşteri etkileşiminden bu kadar gün geçen açık fırsat hareketsiz sayılır.",
             Pattern = @"^[1-9][0-9]{0,3}$",
             PatternMessage = "1-9999 arası tam sayı girin.",
             MaxLength = 4,
@@ -424,14 +511,41 @@ public sealed class CrmModule : IModule
         {
             ["title"] = "Başlık", ["companyId"] = "Firma", ["contactId"] = "Kişi", ["stage"] = "Aşama", ["amount"] = "Tutar",
             ["currency"] = "Para birimi", ["expectedCloseDate"] = "Tahmini kapanış", ["probability"] = "Olasılık (%)",
-            ["lostReason"] = "Kaybetme nedeni", ["sourceLeadId"] = "Kaynak Lead", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+            ["lostReason"] = "Kaybetme açıklaması", ["sourceLeadId"] = "Kaynak Lead", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+            ["opportunityNumber"] = "Fırsat no", ["description"] = "Açıklama", ["status"] = "Durum", ["statusReason"] = "Durum gerekçesi",
+            ["priority"] = "Öncelik", ["type"] = "Tür", ["source"] = "Kaynak", ["customerBudget"] = "Müşteri bütçesi",
+            ["budgetStatus"] = "Bütçe durumu", ["needDescription"] = "İhtiyaç", ["currentProblem"] = "Mevcut sorun",
+            ["expectedBenefit"] = "Beklenen fayda", ["scope"] = "Kapsam", ["successCriteria"] = "Başarı ölçütleri", ["risks"] = "Riskler",
+            ["decisionProcess"] = "Karar süreci", ["targetDecisionDate"] = "Hedef karar tarihi", ["nextAction"] = "Sonraki aksiyon",
+            ["nextActionDate"] = "Aksiyon tarihi", ["lastInteractionAt"] = "Son müşteri etkileşimi", ["stageEnteredAt"] = "Aşamaya giriş",
+            ["probabilityManual"] = "Olasılık elle girildi", ["actualCloseDate"] = "Gerçek kapanış", ["wonAmount"] = "Kazanılan tutar",
+            ["wonCurrency"] = "Kazanılan para birimi", ["winReason"] = "Kazanma nedeni", ["handoverNote"] = "Devir notu",
+            ["lossReason"] = "Kaybetme nedeni", ["winningCompetitorId"] = "Kazanan rakip", ["recontactDate"] = "Yeniden iletişim",
+            ["holdReviewDate"] = "Yeniden değerlendirme", ["closureCycle"] = "Kapanış döngüsü", ["closeDateChangeCount"] = "Kapanış tarihi değişimi",
         }, "title")
         {
             UserFields = ["ownerId"],
             References = new Dictionary<string, string>
             {
                 ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact, ["sourceLeadId"] = Entities.Lead,
+                ["winningCompetitorId"] = Entities.OpportunityCompetitor,
             },
+        },
+        new(Entities.OpportunityContact, "Fırsat kişisi (CRM)", Permissions.OpportunitiesRead, new Dictionary<string, string>
+        {
+            ["opportunityId"] = "Fırsat", ["contactId"] = "Kişi", ["contactName"] = "Kişi adı", ["roles"] = "Roller", ["isPrimary"] = "Ana irtibat", ["note"] = "Not",
+        })
+        {
+            TitleFields = ["contactName"],
+            References = new Dictionary<string, string> { ["opportunityId"] = Entities.Opportunity, ["contactId"] = Entities.Contact },
+        },
+        new(Entities.OpportunityCompetitor, "Fırsat rakibi (CRM)", Permissions.OpportunitiesRead, new Dictionary<string, string>
+        {
+            ["opportunityId"] = "Fırsat", ["name"] = "Ad", ["strengths"] = "Güçlü yönler", ["weaknesses"] = "Zayıf yönler",
+            ["alternativeAmount"] = "Alternatif teklif tutarı", ["alternativeCurrency"] = "Alternatif teklif para birimi", ["notes"] = "Notlar",
+        }, "name")
+        {
+            References = new Dictionary<string, string> { ["opportunityId"] = Entities.Opportunity },
         },
         new(Entities.Activity, "Aktivite (CRM)", Permissions.ActivitiesRead, new Dictionary<string, string>
         {
@@ -535,12 +649,21 @@ public sealed class CrmModule : IModule
             [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated],
             [Entities.Activity],
             [Permissions.ActivitiesRead, Permissions.ActivitiesViewPrivate, Permissions.LeadsRead, Permissions.LeadsUpdate]),
+        // Tamamlanan fırsat aktivitesinden son müşteri etkileşimini işler; yalnızca bu tek alanı yazar.
+        EventSubscription.For<OpportunityInteractionSubscriber>(
+            "crm.opportunity-interaction",
+            [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated],
+            [Entities.Activity],
+            [Permissions.ActivitiesRead, Permissions.ActivitiesViewPrivate, Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite]),
     ];
 
     /// <summary>Tenant ayar anahtarları.</summary>
     public static class SettingKeys
     {
         public const string LeadFirstContactTargetHours = "crm.lead.first-contact-target-hours";
+        public const string OpportunityStageRequirements = "crm.opportunity.stage-requirements";
+        public const string OpportunityStageProbabilities = "crm.opportunity.stage-probabilities";
+        public const string OpportunityStaleDays = "crm.opportunity.stale-days";
     }
 
     public void ConfigureServices(IServiceCollection services)
@@ -556,6 +679,13 @@ public sealed class CrmModule : IModule
         services.AddScoped<IRecordStore, PersonContactPointRecordStore>();
         services.AddScoped<IRecordStore, CompanyRelationRecordStore>();
         services.AddScoped<IRecordStore, OpportunityRecordStore>();
+        services.AddScoped<IRecordStore, OpportunityContactRecordStore>();
+        services.AddScoped<IRecordStore, OpportunityCompetitorRecordStore>();
+        services.AddScoped<OpportunityWorkflowGate>();
+        services.AddScoped<OpportunityHistoryReader>();
+        services.AddScoped<IOpportunityWorkflow, OpportunityWorkflow>();
+        services.AddScoped<IOpportunityReport, OpportunityReport>();
+        services.AddScoped<OpportunityInteractionSubscriber>();
         services.AddScoped<IRecordStore, ActivityRecordStore>();
         services.AddScoped<IRecordStore, ActivityLinkRecordStore>();
         services.AddScoped<IRecordStore, ActivityParticipantRecordStore>();

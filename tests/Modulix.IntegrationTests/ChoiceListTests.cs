@@ -30,7 +30,7 @@ public class ChoiceListTests(ModulixApiFactory factory) : IClassFixture<ModulixA
 
         var lists = (await adminClient.GetFromJsonAsync<List<ChoiceListDto>>("/api/customization/lists"))!;
         Assert.Equal(
-            [CrmLists.OpportunityStage, CrmLists.CompanyStatus, CrmLists.CompanySource, CrmLists.ActivityType, CrmLeadLists.Source, CrmLeadLists.DisqualificationReason],
+            [CrmLists.OpportunityStage, CrmLists.OpportunityType, CrmLists.OpportunityLossReason, CrmLists.CompanyStatus, CrmLists.CompanySource, CrmLists.ActivityType, CrmLeadLists.Source, CrmLeadLists.DisqualificationReason],
             lists.Select(l => l.Key));
         var stages = lists[0];
         Assert.False(stages.Customized);
@@ -72,10 +72,11 @@ public class ChoiceListTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         Assert.Equal(HttpStatusCode.OK, (await repClient.PutAsJsonAsync($"/api/crm/opportunities/{qualified.Id}",
             new SaveOpportunityRequest("Eski nitelikli (güncel)", company.Id, Stage: OpportunityStage.Qualified, Version: qualified.Version))).StatusCode);
 
-        var moved = await repClient.PutAsJsonAsync($"/api/crm/opportunities/{lead.Id}",
-            new SaveOpportunityRequest(lead.Title, company.Id, Stage: "demo_yapildi", Version: lead.Version));
+        // Aşama değişimi eylem uç noktasıyla yapılır (ADR-0017); genel PUT aşamayı değiştirmez.
+        var moved = await repClient.PostAsJsonAsync($"/api/crm/opportunities/{lead.Id}/stage", new ChangeOpportunityStageRequest(lead.Version, "demo_yapildi"));
         Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
-        await PostAsync<OpportunityDto>(repClient, "/api/crm/opportunities", new SaveOpportunityRequest("Ertelenen", company.Id, Stage: "ertelendi"));
+        var postponed = await PostAsync<OpportunityDto>(repClient, "/api/crm/opportunities", new SaveOpportunityRequest("Ertelenen", company.Id));
+        Assert.Equal(HttpStatusCode.OK, (await repClient.PostAsJsonAsync($"/api/crm/opportunities/{postponed.Id}/lose", new LoseOpportunityRequestDto(postponed.Version, "Timing"))).StatusCode);
 
         // Açık fırsat: kategorisi "Açık" olan aşamalar; firmanın eklediği "Ertelendi" (kaybedildi) kapalıdır.
         var open = (await repClient.GetFromJsonAsync<CrmPage<OpportunityDto>>($"/api/crm/opportunities?companyId={company.Id}&open=true"))!;

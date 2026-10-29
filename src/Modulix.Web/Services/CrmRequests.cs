@@ -10,7 +10,11 @@ public static class CrmRequests
 {
     public static SaveOpportunityRequest From(OpportunityDto o) => new(
         o.Title, o.CompanyId, o.ContactId, o.Stage, o.Amount, o.Currency, o.ExpectedCloseDate, o.Notes, o.Version,
-        o.Probability, o.LostReason, o.OwnerId);
+        o.Probability, o.LostReason, o.OwnerId,
+        Description: o.Description, Priority: o.Priority, Type: o.Type, Source: o.Source, CustomerBudget: o.CustomerBudget, BudgetStatus: o.BudgetStatus,
+        NeedDescription: o.NeedDescription, CurrentProblem: o.CurrentProblem, ExpectedBenefit: o.ExpectedBenefit, Scope: o.Scope,
+        SuccessCriteria: o.SuccessCriteria, Risks: o.Risks, DecisionProcess: o.DecisionProcess, TargetDecisionDate: o.TargetDecisionDate,
+        NextAction: o.NextAction, NextActionDate: o.NextActionDate);
 
     public static SaveActivityRequest From(ActivityDto a) => new(
         a.Subject, a.Type, a.DueAt, a.CompletedAt, a.CompanyId, a.ContactId, a.OpportunityId, a.Notes, a.Version, a.OwnerId,

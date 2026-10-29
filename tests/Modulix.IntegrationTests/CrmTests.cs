@@ -94,9 +94,13 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
         Assert.Equal(due, activity.DueAt);
         Assert.Equal(ActivityType.Meeting, activity.Type);
 
-        var won = await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
+        // Kazanma ayrı bir eylemdir (ADR-0017): genel PUT aşamayı değiştirmez.
+        var put = await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
             new SaveOpportunityRequest("Yıllık bakım", company.Id, contact.Id, OpportunityStage.Won, 130_000m, Version: opportunity.Version));
-        Assert.Equal(OpportunityStage.Won, (await won.Content.ReadFromJsonAsync<OpportunityDto>())!.Stage);
+        var updated = (await put.Content.ReadFromJsonAsync<OpportunityDto>())!;
+        Assert.Equal(OpportunityStage.Proposal, updated.Stage);
+        var won = await client.PostAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}/win", new WinOpportunityRequestDto(updated.Version));
+        Assert.Equal(OpportunityStage.Won, (await won.Content.ReadFromJsonAsync<OpportunityActionResultDto>())!.Opportunity.Stage);
 
         // Bağlı kayıtları olan firma silinemez.
         var delete = await client.DeleteAsync($"/api/crm/companies/{company.Id}?version={company.Version}");
@@ -245,8 +249,9 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
         await PostAsync<ContactDto>(client, "/api/crm/contacts", new SaveContactRequest("Veli", "Can", other.Id));
         var open = await PostAsync<OpportunityDto>(client, "/api/crm/opportunities",
             new SaveOpportunityRequest("Açık", company.Id, Stage: OpportunityStage.Proposal));
-        await PostAsync<OpportunityDto>(client, "/api/crm/opportunities",
-            new SaveOpportunityRequest("Kazanılan", company.Id, Stage: OpportunityStage.Won));
+        var toWin = await PostAsync<OpportunityDto>(client, "/api/crm/opportunities",
+            new SaveOpportunityRequest("Kazanılan", company.Id, Stage: OpportunityStage.Qualified, Amount: 1m));
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/crm/opportunities/{toWin.Id}/win", new WinOpportunityRequestDto(toWin.Version))).StatusCode);
         await PostAsync<OpportunityDto>(client, "/api/crm/opportunities", new SaveOpportunityRequest("Başka", other.Id));
 
         var now = DateTimeOffset.UtcNow;

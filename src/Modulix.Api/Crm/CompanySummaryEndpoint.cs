@@ -35,10 +35,14 @@ internal static class CompanySummaryEndpoint
                 ? false
                 : throw new InvalidOperationException($"Özet hesaplanamadı: {result.Error.Message}");
 
+    // Özet durumdan okunur (ADR-0017): "açık" yalnızca Açık durumdaki fırsattır; beklemede ve iptal edilen açık sayılmaz.
+    private static (string Name, string Value) StatusFilter(string category) =>
+        category == CrmModule.StageCategories.Won ? ("status", "Won") : ("open", "true");
+
     private static async Task<(int? Count, IReadOnlyList<CurrencyTotal>? Totals)> OpportunitiesAsync(
         IRecordPipeline pipeline, Guid companyId, string category, bool amountsVisible)
     {
-        var first = await QueryAsync(pipeline, CrmModule.Entities.Opportunity, companyId, 1, 1, ("stageCategory", category));
+        var first = await QueryAsync(pipeline, CrmModule.Entities.Opportunity, companyId, 1, 1, StatusFilter(category));
         if (!Readable(first))
         {
             return (null, null);
@@ -48,7 +52,7 @@ internal static class CompanySummaryEndpoint
         var sums = new SortedDictionary<string, (decimal Amount, int Count)>(StringComparer.Ordinal);
         for (var page = 1; (page - 1) * RecordQuery.MaxPageSize < total; page++)
         {
-            var result = await QueryAsync(pipeline, CrmModule.Entities.Opportunity, companyId, page, RecordQuery.MaxPageSize, ("stageCategory", category));
+            var result = await QueryAsync(pipeline, CrmModule.Entities.Opportunity, companyId, page, RecordQuery.MaxPageSize, StatusFilter(category));
             if (!Readable(result))
             {
                 return (null, null);

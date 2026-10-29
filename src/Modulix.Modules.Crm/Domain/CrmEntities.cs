@@ -152,6 +152,208 @@ public sealed class Opportunity : CrmEntity, IOwnedEntity
     public Guid? OwnerId { get; internal set; }
 
     public string? Notes { get; internal set; }
+
+    // ---- ADR-0017: yaşam döngüsü, ihtiyaç analizi ve kapanış bilgileri
+
+    public const int NumberMaxLength = 30;
+    public const int TextMaxLength = 4000;
+    public const int ShortMaxLength = 200;
+    public const int StatusMaxLength = 20;
+
+    /// <summary>Tenant içinde benzersiz fırsat numarası (OP-20261029-AB12CD).</summary>
+    public string OpportunityNumber { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    /// <summary>Yaşam döngüsü durumu (<see cref="OpportunityStatus"/>). Aşama ile tutarlılığı iş akışı korur.</summary>
+    public string Status { get; internal set; } = OpportunityStatus.Open;
+
+    /// <summary>Beklemeye alma, iptal ve yeniden açma gerekçesi; durum açık dönünce temizlenir.</summary>
+    public string? StatusReason { get; internal set; }
+
+    public string Priority { get; internal set; } = LeadPriority.Normal;
+
+    /// <summary>Fırsat türü (seçim listesi: yeni müşteri, ek satış, yenileme...).</summary>
+    public string? Type { get; internal set; }
+
+    /// <summary>Edinim kaynağı (Lead kaynak listesi).</summary>
+    public string? Source { get; internal set; }
+
+    public string? NeedDescription { get; internal set; }
+
+    public string? CurrentProblem { get; internal set; }
+
+    public string? ExpectedBenefit { get; internal set; }
+
+    public string? Scope { get; internal set; }
+
+    public string? SuccessCriteria { get; internal set; }
+
+    public string? Risks { get; internal set; }
+
+    public string? DecisionProcess { get; internal set; }
+
+    public DateOnly? TargetDecisionDate { get; internal set; }
+
+    /// <summary>Müşterinin bildirdiği bütçe. null = bilinmiyor; sıfır tutar "bütçe yok" demek değildir, bunu <see cref="BudgetStatus"/> söyler.</summary>
+    public decimal? CustomerBudget { get; internal set; }
+
+    public string BudgetStatus { get; internal set; } = OpportunityBudgetStatus.Unknown;
+
+    public DateOnly? ActualCloseDate { get; internal set; }
+
+    /// <summary>Kazanılan gerçekleşen tutar; tahmini <see cref="Amount"/>'tan ayrıdır.</summary>
+    public decimal? WonAmount { get; internal set; }
+
+    public string? WonCurrency { get; internal set; }
+
+    public string? WinReason { get; internal set; }
+
+    /// <summary>Operasyon ekibine devir notu (kazanımda).</summary>
+    public string? HandoverNote { get; internal set; }
+
+    /// <summary>Yapılandırılmış kaybetme nedeni (seçim listesi). <see cref="LostReason"/> serbest açıklamadır.</summary>
+    public string? LossReason { get; internal set; }
+
+    /// <summary>Kaybedilen fırsatta kazanan rakip (bu fırsatın rakiplerinden biri).</summary>
+    public Guid? WinningCompetitorId { get; internal set; }
+
+    public DateOnly? RecontactDate { get; internal set; }
+
+    public DateOnly? HoldReviewDate { get; internal set; }
+
+    public string? NextAction { get; internal set; }
+
+    public DateOnly? NextActionDate { get; internal set; }
+
+    /// <summary>Son anlamlı müşteri etkileşimi (gerçekleşen temas). "Son güncelleme" (<c>UpdatedAt</c>) ile aynı bilgi değildir.</summary>
+    public DateTimeOffset? LastInteractionAt { get; internal set; }
+
+    /// <summary>Fırsatın bulunduğu aşamaya girdiği an (aşamada bekleme süresi için).</summary>
+    public DateTimeOffset StageEnteredAt { get; internal set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>Olasılığı kullanıcı elle girdiyse true: aşama değişince aşama varsayılanı bunu ezmez.</summary>
+    public bool ProbabilityManual { get; internal set; }
+
+    /// <summary>Kapanış döngüsü: 1'den başlar, her yeniden açmada artar. Raporlar yalnızca fırsatın güncel kapanışını sayar.</summary>
+    public int ClosureCycle { get; internal set; } = 1;
+
+    public int CloseDateChangeCount { get; internal set; }
+}
+
+/// <summary>Fırsat yaşam döngüsü durumları. Aşama kategorisiyle ilişkisi için bkz. ADR-0017.</summary>
+public static class OpportunityStatus
+{
+    public const string Open = "Open";
+    public const string OnHold = "OnHold";
+    public const string Won = "Won";
+    public const string Lost = "Lost";
+    public const string Cancelled = "Cancelled";
+
+    public static IReadOnlyList<string> All { get; } = [Open, OnHold, Won, Lost, Cancelled];
+
+    /// <summary>Kapanmış: kazanıldı, kaybedildi ya da iptal edildi. Beklemedeki fırsat kapanmış değildir.</summary>
+    public static bool IsClosed(string status) => status is Won or Lost or Cancelled;
+
+    /// <summary>Hâlâ yürüyen (açık ya da beklemede) fırsat; devir ve "açık fırsat" süzgecinde bunlar sayılır.</summary>
+    public static bool IsLive(string status) => status is Open or OnHold;
+}
+
+public static class OpportunityBudgetStatus
+{
+    public const string Unknown = "Unknown";
+    public const string Unconfirmed = "Unconfirmed";
+    public const string Confirmed = "Confirmed";
+    public const string None = "None";
+
+    public static IReadOnlyList<string> All { get; } = [Unknown, Unconfirmed, Confirmed, None];
+}
+
+/// <summary>Fırsat tarihçesi kayıt türleri.</summary>
+public static class OpportunityHistoryKinds
+{
+    public const string Created = "Created";
+    public const string Stage = "Stage";
+    public const string Status = "Status";
+    public const string CloseDate = "CloseDate";
+}
+
+/// <summary>
+/// Fırsat–kişi ilişkisi: kişinin karar verici, bütçe sahibi vb. rolü kişi kaydında değil bu fırsatla ilişkisindedir.
+/// </summary>
+public sealed class OpportunityContact : CrmEntity
+{
+    public const int NoteMaxLength = 500;
+    public const int RolesMaxLength = 200;
+
+    public Guid OpportunityId { get; internal set; }
+
+    public Guid ContactId { get; internal set; }
+
+    public string? Roles { get; internal set; }
+
+    public bool IsPrimary { get; internal set; }
+
+    public string? Note { get; internal set; }
+
+    public IReadOnlyList<string> RoleList =>
+        string.IsNullOrEmpty(Roles) ? [] : Roles.Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+    public Contact Contact { get; internal set; } = null!;
+}
+
+/// <summary>Fırsattaki rakip: güçlü/zayıf yönler ve biliniyorsa alternatif teklif. Rakip firma kaydı olmak zorunda değildir.</summary>
+public sealed class OpportunityCompetitor : CrmEntity
+{
+    public Guid OpportunityId { get; internal set; }
+
+    public string Name { get; internal set; } = string.Empty;
+
+    public string? Strengths { get; internal set; }
+
+    public string? Weaknesses { get; internal set; }
+
+    public decimal? AlternativeAmount { get; internal set; }
+
+    public string? AlternativeCurrency { get; internal set; }
+
+    public string? Notes { get; internal set; }
+}
+
+/// <summary>
+/// Fırsat tarihçesi: aşama/durum geçişleri, kapanış ve yeniden açma, kapanış tarihi ertelemeleri. Kayıt boru hattıyla birlikte aynı
+/// işlemde yazılır; hiçbir uçtan değiştirilmez ya da silinmez (fırsat silinince birlikte kalkar). Eski kapanış bilgileri burada korunur.
+/// </summary>
+public sealed class OpportunityHistory : CrmEntity
+{
+    public const int ReasonMaxLength = 1000;
+
+    public Guid OpportunityId { get; internal set; }
+
+    public string Kind { get; internal set; } = OpportunityHistoryKinds.Stage;
+
+    public DateTimeOffset At { get; internal set; } = DateTimeOffset.UtcNow;
+
+    public Guid? ChangedBy { get; internal set; }
+
+    public int Cycle { get; internal set; } = 1;
+
+    public string? FromStage { get; internal set; }
+
+    public string? ToStage { get; internal set; }
+
+    public string? FromStatus { get; internal set; }
+
+    public string? ToStatus { get; internal set; }
+
+    public DateOnly? FromCloseDate { get; internal set; }
+
+    public DateOnly? ToCloseDate { get; internal set; }
+
+    public string? Reason { get; internal set; }
+
+    /// <summary>Kapanış ve yeniden açma anındaki tutar/neden bilgisi (JSON). Hassas tutarlar içerir; tutar izni olmayana verilmez.</summary>
+    public string? Details { get; internal set; }
 }
 
 public sealed class Activity : CrmEntity, IOwnedEntity
