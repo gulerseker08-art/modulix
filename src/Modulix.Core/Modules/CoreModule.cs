@@ -68,6 +68,10 @@ public sealed class CoreModule : IModule
 
         /// <summary>Seçim listesi (Y9b); kaydın kimliği firmanın liste satırının kimliğidir.</summary>
         public const string ChoiceList = "core.choice-list";
+
+        /// <summary>Lookup ayarı (ADR-0016); kaydın kimliği firmanın ayar satırının kimliğidir.</summary>
+        public const string LookupSetting = "core.lookup-setting";
+
         public const string Membership = "core.membership";
 
         /// <summary>İşletici şirket (ADR-0008): ad ve varsayılan olup olmadığı; kaydın kimliği şirketin kimliğidir.</summary>
@@ -195,6 +199,10 @@ public sealed class CoreModule : IModule
         {
             ["list"] = "Liste", ["values"] = "Değerler",
         }, "list"),
+        new(AuditedEntityKeys.LookupSetting, "Lookup ayarı", null, new Dictionary<string, string>
+        {
+            ["lookup"] = "Alan", ["searchable"] = "Aranabilir", ["source"] = "Ayar kaynağı",
+        }, "lookup"),
         new(AuditedEntityKeys.Company, "Şirket", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["isDefault"] = "Varsayılan",

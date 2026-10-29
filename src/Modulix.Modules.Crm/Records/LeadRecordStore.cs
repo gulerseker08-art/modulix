@@ -251,6 +251,9 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
             }
         }
 
+        await LookupGuard.AddContactCompanyErrorAsync(
+            errors, Context, "contactId", entity.ContactId, entity.CompanyId, stored?.ContactId, stored?.CompanyId, cancellationToken);
+
         if (errors.Count > 0)
         {
             throw new RecordValidationException(errors);

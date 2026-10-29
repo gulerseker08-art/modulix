@@ -195,6 +195,39 @@ public class ModuleCatalogTests
     }
 
     [Fact]
+    public void Valid_lookups_are_registered_and_found_by_key()
+    {
+        var sales = new TestModule("sales", [])
+        {
+            Lookups = [new("sales.order.customer", "sales.order", "customerId", "Müşteri", LookupTargetKind.Record, "sales.customer") { LabelFields = ["name"] }],
+        };
+
+        var catalog = ModuleCatalog.Create(sales);
+
+        Assert.Equal("sales", catalog.FindLookup("sales.order.customer")!.Value.ModuleKey);
+        Assert.Null(catalog.FindLookup("sales.order.yok"));
+    }
+
+    [Fact]
+    public void Invalid_or_duplicate_lookups_are_rejected()
+    {
+        static LookupDefinition Record(string key = "sales.order.customer", string source = "sales.order") =>
+            new(key, source, "customerId", "Müşteri", LookupTargetKind.Record, "sales.customer") { LabelFields = ["name"] };
+
+        static TestModule With(params LookupDefinition[] lookups) => new("sales", []) { Lookups = lookups };
+
+        // Başka modülün anahtarı ve kaynağı, etiketsiz kayıt hedefi, hedefli üye lookup'ı, yarım bağımlılık, sınır dışı sayfa boyutu, tekrar.
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(With(Record(key: "stock.order.customer"))));
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(With(Record(source: "stock.order"))));
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(With(Record() with { LabelFields = [] })));
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(With(
+            new LookupDefinition("sales.order.owner", "sales.order", "ownerId", "Sorumlu", LookupTargetKind.Member, "sales.customer"))));
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(With(Record() with { DependsOnField = "companyId" })));
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(With(Record() with { PageSize = RecordLookupLimits.MaxPageSize + 1 })));
+        Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(With(Record(), Record())));
+    }
+
+    [Fact]
     public void Shared_record_reference_must_come_from_the_modules_own_record()
     {
         var sales = new TestModule("sales", [])
@@ -313,5 +346,7 @@ public class ModuleCatalogTests
         public IReadOnlyList<EventSubscription> EventSubscriptions { get; init; } = [];
 
         public IReadOnlyList<OwnedRecordType> OwnedRecords { get; init; } = [];
+
+        public IReadOnlyList<LookupDefinition> Lookups { get; init; } = [];
     }
 }

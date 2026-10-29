@@ -157,13 +157,7 @@
             <div class="action-row">
                 @if (CanAssign)
                 {
-                    <select class="form-select" aria-label="Sorumlu" @bind="assignee">
-                        <option value="">Sorumlu seçin…</option>
-                        @foreach (var member in Lookups.AssignableMembers)
-                        {
-                            <option value="@member.UserId">@member.DisplayName</option>
-                        }
-                    </select>
+                    <LookupPicker Id="lead-assignee" LookupKey="crm.lead.owner" @bind-Value="Assignee" Placeholder="Sorumlu seçin…" />
                     <button type="button" class="btn btn-outline-primary" disabled="@(busy || assignee == Guid.Empty)" @onclick="AssignAsync">Ata</button>
                 }
                 @if (CanStartContacting)
@@ -326,6 +320,12 @@
     private string reason = string.Empty;
     private DateTime? followUp;
     private Guid assignee;
+
+    private Guid? Assignee
+    {
+        get => assignee == Guid.Empty ? null : assignee;
+        set => assignee = value ?? Guid.Empty;
+    }
     private int? targetHours;
     private bool editing;
     private bool addingActivity;

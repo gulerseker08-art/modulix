@@ -125,6 +125,10 @@ internal sealed class LocationRecordStore(CrmStoreContext context) : CrmRecordSt
             {
                 errors.Add(new RecordFieldError("contactId", "Kişi bulunamadı."));
             }
+            else if (stored != contactId && !await LookupGuard.ContactBelongsToCompanyAsync(Context, contactId, entity.CompanyId, cancellationToken))
+            {
+                errors.Add(new RecordFieldError("contactId", "Kişi bu firmayla ilişkili değil."));
+            }
         }
 
         if (errors.Count > 0)

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Modulix.Core.Customization;
+using Modulix.Core.Lookups;
 
 namespace Modulix.Infrastructure.Persistence.Configurations;
 
@@ -41,6 +42,23 @@ internal sealed class TenantChoiceListConfiguration : IEntityTypeConfiguration<T
         builder.Property(l => l.UpdatedAt).IsRequired();
         builder.Ignore(l => l.Values);
         builder.HasIndex(l => new { l.TenantId, l.ListKey }).IsUnique();
+        builder.HasAlternateKey(l => new { l.TenantId, l.Id });
+    }
+}
+
+internal sealed class TenantLookupSettingConfiguration : IEntityTypeConfiguration<TenantLookupSetting>
+{
+    public void Configure(EntityTypeBuilder<TenantLookupSetting> builder)
+    {
+        // Tenant verisi (ADR-0016): yalnızca firmanın özelleştirdiği lookup'lar; Row-Level Security ile korunur.
+        builder.ToTable("LookupSettings", DatabaseSchemas.Meta);
+        builder.HasKey(l => l.Id);
+        builder.Property(l => l.Id).ValueGeneratedNever();
+        builder.Property(l => l.TenantId).IsRequired();
+        builder.Property(l => l.LookupKey).HasMaxLength(TenantLookupSetting.LookupKeyMaxLength).IsRequired();
+        builder.Property(l => l.Version).IsRequired().IsConcurrencyToken();
+        builder.Property(l => l.UpdatedAt).IsRequired();
+        builder.HasIndex(l => new { l.TenantId, l.LookupKey }).IsUnique();
         builder.HasAlternateKey(l => new { l.TenantId, l.Id });
     }
 }

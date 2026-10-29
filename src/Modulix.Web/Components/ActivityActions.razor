@@ -186,12 +186,7 @@
                         case Pending.Reassign:
                             <div class="span-all">
                                 <label class="form-label" for="owner">Yeni sorumlu</label>
-                                <select id="owner" class="form-select" @bind="newOwner">
-                                    @foreach (var member in Lookups.AssignableMembers)
-                                    {
-                                        <option value="@member.UserId">@member.DisplayName</option>
-                                    }
-                                </select>
+                                <LookupPicker Id="owner" LookupKey="crm.activity.owner" @bind-Value="NewOwner" Required="true" />
                             </div>
                             break;
                         default:
@@ -244,6 +239,12 @@
     private DateTime? startDate;
     private DateTime? endDate;
     private Guid newOwner;
+
+    private Guid? NewOwner
+    {
+        get => newOwner == Guid.Empty ? null : newOwner;
+        set => newOwner = value ?? Guid.Empty;
+    }
     private ActivityRelatedDto? related;
     private Guid loadedFor;
 

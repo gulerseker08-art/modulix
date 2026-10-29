@@ -1,0 +1,386 @@
+@* Ortak lookup bileşeni (ADR-0016): N→1 referans alanlarının tek seçimi. Arama, sayfalama, yetki ve bağımlılık sunucuda uygulanır;
+   burası yalnızca sunucunun verdiği sayfayı gösterir. Aranabilir kapalıysa metin girişi yoktur, seçim sayfalı listeden yapılır. *@
+@inject ApiClient Api
+@inject LookupCatalog Catalog
+@inject IJSRuntime Js
+@implements IDisposable
+
+<div class="lookup @(Disabled ? "is-disabled" : null)">
+    @if (Disabled || ReadOnly)
+    {
+        <input id="@Id" class="form-control" value="@SelectedText" readonly disabled="@Disabled" aria-label="@AccessibleName" />
+    }
+    else
+    {
+        <div class="lookup-field">
+            <input id="@Id" @ref="input" class="form-control @(Invalid ? "is-invalid" : null)"
+                   role="combobox" aria-haspopup="listbox" aria-expanded="@(open ? "true" : "false")" aria-controls="@ListId"
+                   aria-autocomplete="@(Searchable ? "list" : "none")" aria-activedescendant="@ActiveOptionId"
+                   aria-required="@(Required ? "true" : null)" aria-invalid="@(Invalid ? "true" : null)" aria-label="@AccessibleName"
+                   autocomplete="off" placeholder="@Placeholder" readonly="@(!Searchable)"
+                   value="@(open && Searchable ? query : SelectedText)"
+                   @onfocus="OpenAsync" @onclick="OpenAsync" @oninput="OnInputAsync" @onkeydown="OnKeyDownAsync" @onfocusout="Close" />
+            @if (current is not null && !Required)
+            {
+                <button type="button" class="lookup-clear" aria-label="Seçimi temizle: @AccessibleName" @onclick="ClearAsync">×</button>
+            }
+            @if (current is not null && canView && selected is { Unavailable: false } && info?.ViewPath is { } path)
+            {
+                <a class="lookup-view" href="@path.Replace("{id}", current.ToString())" aria-label="Seçili kaydı aç: @AccessibleName">Aç</a>
+            }
+        </div>
+
+        <ul id="@ListId" class="lookup-list" role="listbox" aria-label="@AccessibleName" hidden="@(!open)">
+            @for (var i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                var index = i;
+                <li id="@OptionId(index)" role="option" class="lookup-option @(index == active ? "is-active" : null)"
+                    aria-selected="@(item.Id == current ? "true" : "false")"
+                    @onmousedown="() => SelectAsync(item)" @onmousedown:preventDefault>
+                    <span>@item.Label</span>
+                    @if (item.Secondary is not null)
+                    {
+                        <small class="text-muted"> · @item.Secondary</small>
+                    }
+                </li>
+            }
+            @if (open && loading)
+            {
+                <li class="lookup-note" role="presentation">Yükleniyor…</li>
+            }
+            else if (open && error is not null)
+            {
+                <li class="lookup-note text-danger" role="presentation">
+                    @error
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onmousedown="RetryAsync" @onmousedown:preventDefault>Tekrar dene</button>
+                </li>
+            }
+            else if (open && hint is not null)
+            {
+                <li class="lookup-note text-muted" role="presentation">@hint</li>
+            }
+            else if (open && items.Count == 0)
+            {
+                <li class="lookup-note text-muted" role="presentation">Sonuç bulunamadı.</li>
+            }
+            @if (open && !loading && error is null && items.Count < total)
+            {
+                <li class="lookup-note" role="presentation">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onmousedown="MoreAsync" @onmousedown:preventDefault>
+                        Daha fazla göster (@items.Count / @total)
+                    </button>
+                </li>
+            }
+        </ul>
+    }
+
+    <div class="visually-hidden" role="status" aria-live="polite">@announcement</div>
+    @if (current is null && ParentId is null && info?.DependsOnHint is { } dependsHint && !Disabled && !ReadOnly)
+    {
+        <small class="text-muted">@dependsHint</small>
+    }
+    @if (notice is not null)
+    {
+        <small class="text-warning-emphasis d-block">@notice</small>
+    }
+</div>
+
+@code {
+    private ElementReference input;
+    private LookupDto? info;
+    private LookupItemDto? selected;
+    private readonly List<LookupItemDto> items = [];
+    private bool open;
+    private bool loading;
+    private bool canView;
+    private bool guarded;
+    private bool revealPending;
+    private string query = string.Empty;
+    private string? error;
+    private string? hint;
+    private string? notice;
+    private string? announcement;
+    private int total;
+    private int page = 1;
+    private int active = -1;
+    private int sequence;
+    private Guid? current;
+    private Guid? resolvedFor;
+    private bool resolvedOnce;
+    private Guid? lastParent;
+    private bool parentSeen;
+    private CancellationTokenSource? debounce;
+
+    [Parameter, EditorRequired] public string LookupKey { get; set; } = string.Empty;
+
+    /// <summary>Girdinin kimliği; formdaki &lt;label for&gt; buna bağlanır.</summary>
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+
+    [Parameter] public Guid? Value { get; set; }
+
+    [Parameter] public EventCallback<Guid?> ValueChanged { get; set; }
+
+    /// <summary>Bağımlı lookup'ta üst alanın değeri (ör. firma). Değişirse mevcut seçim temizlenir ve kullanıcıya söylenir.</summary>
+    [Parameter] public Guid? ParentId { get; set; }
+
+    [Parameter] public bool Required { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    [Parameter] public bool Invalid { get; set; }
+
+    [Parameter] public string? Placeholder { get; set; } = "Seçin…";
+
+    private bool Searchable => info?.Searchable ?? true;
+
+    private int MinLength => info?.MinSearchLength ?? 2;
+
+    private string AccessibleName => info?.Title ?? "Seçim";
+
+    private string ListId => $"{Id}-list";
+
+    private string OptionId(int index) => $"{Id}-opt-{index}";
+
+    private string? ActiveOptionId => open && active >= 0 && active < items.Count ? OptionId(active) : null;
+
+    private string SelectedText => selected is null
+        ? string.Empty
+        : selected.Unavailable ? "Erişilemeyen kayıt" : selected.Label ?? string.Empty;
+
+    protected override async Task OnInitializedAsync() => info = await Catalog.GetAsync(LookupKey);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (parentSeen && ParentId != lastParent && current is not null)
+        {
+            // Üst alan değişti: seçim yeni üst kayıtla ilişkili olmayabilir. Sessizce saklanmaz; temizlenir ve söylenir (sunucu da kayıtta doğrular).
+            var title = AccessibleName;
+            notice = $"{title} seçimi, bağlı alan değiştiği için temizlendi.";
+            current = null;
+            await ValueChanged.InvokeAsync(null);
+        }
+        else
+        {
+            current = Value;
+        }
+
+        parentSeen = true;
+        lastParent = ParentId;
+
+        if (!resolvedOnce || resolvedFor != current)
+        {
+            resolvedOnce = true;
+            resolvedFor = current;
+            await ResolveSelectedAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            if (!guarded && !Disabled && !ReadOnly)
+            {
+                guarded = true;
+                await Js.InvokeVoidAsync("modulixLookup.guard", input);
+            }
+
+            if (revealPending)
+            {
+                revealPending = false;
+                await Js.InvokeVoidAsync("modulixLookup.reveal", ActiveOptionId);
+            }
+        }
+        catch (JSException)
+        {
+            // Erişilebilirlik yardımcısı yoksa bileşen fare ile çalışmaya devam eder.
+        }
+    }
+
+    // Düzenleme formunda mevcut seçim, ilk sonuç sayfasında olmasa da kimliğiyle çözülür.
+    private async Task ResolveSelectedAsync()
+    {
+        if (current is not { } id)
+        {
+            selected = null;
+            canView = false;
+            return;
+        }
+
+        if (selected?.Id == id)
+        {
+            return;
+        }
+
+        var result = await Api.PostAsync<LookupResolveDto>($"/api/lookups/{Uri.EscapeDataString(LookupKey)}/resolve", new ResolveLookupRequest([id]));
+        selected = result.IsSuccess ? result.Value?.Items.FirstOrDefault() : new LookupItemDto(id, null, null, true);
+        canView = result.IsSuccess && result.Value!.CanView;
+    }
+
+    private async Task OpenAsync()
+    {
+        if (open || Disabled || ReadOnly)
+        {
+            return;
+        }
+
+        open = true;
+        query = string.Empty;
+        active = -1;
+        await LoadAsync(append: false);
+    }
+
+    private void Close()
+    {
+        open = false;
+        debounce?.Cancel();
+        sequence++;
+        loading = false;
+    }
+
+    private async Task OnInputAsync(ChangeEventArgs e)
+    {
+        query = e.Value?.ToString() ?? string.Empty;
+        open = true;
+        debounce?.Cancel();
+        debounce = new CancellationTokenSource();
+        var token = debounce.Token;
+        try
+        {
+            await Task.Delay(300, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        await LoadAsync(append: false);
+    }
+
+    private async Task MoreAsync()
+    {
+        page++;
+        await LoadAsync(append: true);
+    }
+
+    private Task RetryAsync() => LoadAsync(append: items.Count > 0 && page > 1);
+
+    // Her istek bir sıra numarası alır; yanıt geldiğinde numara eskiyse (daha yeni bir arama başlamışsa) sonuç yok sayılır.
+    private async Task LoadAsync(bool append)
+    {
+        var mine = ++sequence;
+        error = null;
+        hint = null;
+        var text = Searchable ? query.Trim() : string.Empty;
+        if (text.Length > 0 && text.Length < MinLength)
+        {
+            items.Clear();
+            total = 0;
+            loading = false;
+            hint = $"Aramak için en az {MinLength} karakter yazın.";
+            return;
+        }
+
+        if (!append)
+        {
+            page = 1;
+        }
+
+        loading = true;
+        var url = $"/api/lookups/{Uri.EscapeDataString(LookupKey)}/search?page={page}";
+        if (text.Length > 0)
+        {
+            url += $"&q={Uri.EscapeDataString(text)}";
+        }
+
+        if (ParentId is { } parent)
+        {
+            url += $"&parentId={parent}";
+        }
+
+        var result = await Api.GetAsync<LookupPageDto>(url);
+        if (mine != sequence)
+        {
+            return;
+        }
+
+        loading = false;
+        if (!result.IsSuccess)
+        {
+            error = result.Error ?? "Liste yüklenemedi.";
+            if (append)
+            {
+                page--;
+            }
+
+            announcement = error;
+            return;
+        }
+
+        if (!append)
+        {
+            items.Clear();
+            active = -1;
+        }
+
+        items.AddRange(result.Value!.Items);
+        total = result.Value.TotalCount;
+        canView = result.Value.CanView;
+        announcement = items.Count == 0 ? "Sonuç bulunamadı." : $"{total} sonuçtan {items.Count} tanesi listelendi.";
+    }
+
+    private async Task SelectAsync(LookupItemDto item)
+    {
+        selected = item;
+        resolvedFor = item.Id;
+        current = item.Id;
+        notice = null;
+        Close();
+        await ValueChanged.InvokeAsync(item.Id);
+    }
+
+    private async Task ClearAsync()
+    {
+        selected = null;
+        resolvedFor = null;
+        current = null;
+        notice = null;
+        Close();
+        await ValueChanged.InvokeAsync(null);
+        await input.FocusAsync();
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                if (!open)
+                {
+                    await OpenAsync();
+                }
+                else if (items.Count > 0)
+                {
+                    active = Math.Min(active + 1, items.Count - 1);
+                    revealPending = true;
+                }
+
+                break;
+            case "ArrowUp" when open && items.Count > 0:
+                active = Math.Max(active - 1, 0);
+                revealPending = true;
+                break;
+            case "Enter" when open && active >= 0 && active < items.Count:
+                await SelectAsync(items[active]);
+                break;
+            case "Escape" when open:
+                Close();
+                break;
+        }
+    }
+
+    public void Dispose() => debounce?.Cancel();
+}

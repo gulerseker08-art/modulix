@@ -1989,3 +1989,19 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
         min-height: 3rem;
     }
 }
+
+/* Ortak lookup bileşeni (ADR-0016) */
+.lookup { position: relative; }
+.lookup-field { position: relative; display: flex; align-items: center; gap: .25rem; }
+.lookup-field .form-control { flex: 1; min-width: 0; min-height: 2.5rem; padding-right: 2.25rem; }
+.lookup-field .form-control[readonly]:not(:disabled) { cursor: pointer; background-color: var(--bs-body-bg); }
+.lookup-clear { position: absolute; right: .35rem; width: 2rem; height: 2rem; border: 0; background: transparent; font-size: 1.25rem; line-height: 1; color: var(--bs-secondary-color, #6c757d); border-radius: .25rem; }
+.lookup-clear:hover, .lookup-clear:focus-visible { background: rgba(0, 0, 0, .06); outline: 2px solid var(--bs-primary, #4f46e5); }
+.lookup-view { white-space: nowrap; font-size: .875rem; padding: .5rem; }
+.lookup-list { position: absolute; z-index: 1050; left: 0; right: 0; margin: .15rem 0 0; padding: .25rem 0; list-style: none; max-height: 18rem; overflow-y: auto; background: var(--bs-body-bg); border: 1px solid var(--bs-border-color, #dee2e6); border-radius: .5rem; box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15); }
+.lookup-list[hidden] { display: none; }
+.lookup-option { padding: .6rem .75rem; min-height: 2.75rem; cursor: pointer; }
+.lookup-option:hover, .lookup-option.is-active { background: rgba(79, 70, 229, .12); }
+.lookup-option[aria-selected="true"] { font-weight: 600; }
+.lookup-note { padding: .5rem .75rem; font-size: .875rem; }
+@media (max-width: 576px) { .lookup-list { position: fixed; left: .5rem; right: .5rem; bottom: .5rem; top: auto; max-height: 55vh; } }

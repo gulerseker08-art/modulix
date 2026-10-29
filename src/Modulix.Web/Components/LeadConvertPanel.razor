@@ -60,13 +60,7 @@
                 </label>
                 @if (existingCompany)
                 {
-                    <select class="form-select" aria-label="Mevcut firma" @bind="companyId">
-                        <option value="">Seçin…</option>
-                        @foreach (var company in Lookups.Companies)
-                        {
-                            <option value="@company.Id">@company.Name</option>
-                        }
-                    </select>
+                    <LookupPicker Id="convert-company" LookupKey="crm.lead.company" @bind-Value="companyId" Required="true" Placeholder="Seçin…" />
                 }
             </fieldset>
             <fieldset class="span-all">
@@ -87,13 +81,7 @@
                 </label>
                 @if (contactMode == 2)
                 {
-                    <select class="form-select" aria-label="Mevcut kişi" @bind="contactId">
-                        <option value="">Seçin…</option>
-                        @foreach (var contact in Lookups.Contacts)
-                        {
-                            <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
-                        }
-                    </select>
+                    <LookupPicker Id="convert-contact" LookupKey="crm.lead.contact" @bind-Value="contactId" ParentId="@(existingCompany ? companyId : null)" Required="true" Placeholder="Seçin…" />
                 }
             </fieldset>
             <div class="span-all">

@@ -334,6 +334,11 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
             }
         }
 
+        await LookupGuard.AddContactCompanyErrorAsync(
+            errors, Context, "contactId", entity.ContactId, entity.CompanyId, stored?.ContactId, stored?.CompanyId, cancellationToken);
+        await LookupGuard.AddOpportunityCompanyErrorAsync(
+            errors, Context, entity.OpportunityId, entity.CompanyId, stored?.OpportunityId, stored?.CompanyId, cancellationToken);
+
         return errors;
     }
 

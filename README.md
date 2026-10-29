@@ -280,6 +280,17 @@ Fırsat aşaması, firma durumu, firma kaynağı ve aktivite tipi artık firman�
 - Tabloya (`meta.ChoiceLists`, RLS'li) yalnızca firmanın düzenlediği liste yazılır. Düzenlenmemiş listede koddaki varsayılan geçerlidir. Değişiklikler denetim kaydına "Liste" olarak yazılır. Kayıt geçmişi değerleri firmanın adlarıyla gösterir.
 - `GET /api/choice-lists` her üyeye açıktır. Düzenleme `GET /api/customization/lists` ve `PUT /api/customization/lists/{anahtar}` üzerinden yapılır; gövdede liste tamamıyla, sırasıyla verilir.
 
+### Lookup alanları ([ADR-0016](docs/adr/0016-lookup-altyapisi.md))
+
+Formlardaki kayıt/üye seçimleri (firma, kişi, fırsat, sorumlu...) ortak `LookupPicker` bileşeniyle yapılır; veri istemciye toplu indirilmez, sunucuda aranır ve sayfalanır. Yönetim → Alan ve Lookup Ayarları (`/yonetim/alan-ve-lookup-ayarlari`, `core.customization.manage`) her alan için **Aranabilir** anahtarını açıp kapatır.
+
+- Tanımlar kodda sabittir (`IModule.Lookups`, CRM için `CrmLookupDefinitions`); firma yalnızca "aranabilir" ayarını `meta.LookupSettings`'e yazar. Ayar yoksa varsayılan (açık) geçerlidir. "Aranabilir", liste filtresi ve global aramadan bağımsızdır ve bir erişim yetkisi değildir.
+- `GET /api/lookups` (her üye), `GET /api/lookups/{anahtar}/search?q=&page=&pageSize=&parentId=`, `POST /api/lookups/{anahtar}/resolve`, `PUT /api/customization/lookups/{anahtar}` (`{ searchable: true|false|null, version }`; eski sürüm 409, `null` varsayılana döner).
+- Arama kapalıyken `q` dolu istek 422 döner; sayfalı gezinme ve kimlikten çözümleme çalışır. `q` en az 2, en çok 100 karakterdir; sayfa en çok 50 sonuçtur.
+- Sonuçlar kayıt boru hattından geçer: arama, toplam ve çözümleme aynı izin/kapsam kurallarını kullanır; erişilemeyen kayıt `unavailable` döner, ad sızmaz.
+- Kayıt sırasında firma/kişi görünürlüğü ve kişi↔firma ilişkisi (fırsat, Lead, aktivite, lokasyon) sunucuda yeniden doğrulanır; değişmeyen eski bağ yeniden denetlenmez.
+- Değişiklikler denetim kaydına `Lookup ayarı` olarak yazılır. Kayıt aramasında `ı/I` ve `i/İ` çiftleri veritabanı kolasyonu yüzünden eşleşmez (ayrıntı ADR-0016).
+
 ### Sektör profilleri (Y9c)
 
 Profil, bir sektör için hazır başlangıç paketidir: modüller, özel alanlar ve liste değerleri. Dört profil kodda tanımlıdır (`Modulix.Api/Customization/SectorProfiles.cs`): Genel, Lojistik firması, Klinik, Üretici. Tanımlar açılışta modül kataloğuna göre doğrulanır; bilinmeyen modül, kayıt türü, liste veya kategori varsa uygulama açılmaz.

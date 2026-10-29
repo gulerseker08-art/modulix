@@ -9,6 +9,7 @@ using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
+using Modulix.Core.Lookups;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
@@ -19,6 +20,7 @@ using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Customization;
 using Modulix.Infrastructure.Identity;
+using Modulix.Infrastructure.Lookups;
 using Modulix.Infrastructure.Modules;
 using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Platform;
@@ -92,6 +94,9 @@ public static class PersistenceSetup
         services.AddScoped<ChoiceListService>();
         services.AddScoped<IChoiceListService>(sp => sp.GetRequiredService<ChoiceListService>());
         services.AddScoped<IChoiceLists>(sp => sp.GetRequiredService<ChoiceListService>());
+        services.AddScoped<LookupService>();
+        services.AddScoped<ILookupSettings>(sp => sp.GetRequiredService<LookupService>());
+        services.AddScoped<ILookupSearch>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ISectorProfileService, SectorProfileService>();
         services.AddScoped<ICurrentAccess, CurrentAccess>();
 

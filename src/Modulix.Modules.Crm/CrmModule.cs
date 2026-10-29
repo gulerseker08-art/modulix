@@ -238,6 +238,9 @@ public sealed class CrmModule : IModule
         new(Entities.Lead, "Lead"),
     ];
 
+    /// <summary>Lookup alanları (ADR-0016); tanımlar <see cref="CrmLookupDefinitions"/>'tadır.</summary>
+    IReadOnlyList<LookupDefinition> IModule.Lookups => CrmLookupDefinitions.All;
+
     /// <summary>
     /// Seçim listeleri (Y9b). Hazır değerlerin anahtarları eski enum adlarıdır; kayıtlarda ve API'de bunlar durur.
     /// Firma adlarını, sırasını ve etkinliğini değiştirir; yeni değer eklerken kategorisini seçer.

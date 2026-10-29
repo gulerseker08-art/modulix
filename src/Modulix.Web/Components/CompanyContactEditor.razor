@@ -14,13 +14,7 @@
             <label class="form-label" for="link-contact">Kişi *</label>
             @if (Link is null)
             {
-                <select id="link-contact" class="form-select" @bind="form.ContactId">
-                    <option value="">Seçin…</option>
-                    @foreach (var contact in Lookups.Contacts)
-                    {
-                        <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
-                    }
-                </select>
+                <LookupPicker Id="link-contact" LookupKey="crm.company-contact.contact" @bind-Value="form.ContactId" Required="true" Placeholder="Seçin…" Invalid="@(errors?.ContainsKey("contactId") == true)" />
             }
             else
             {

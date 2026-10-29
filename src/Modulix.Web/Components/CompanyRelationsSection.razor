@@ -28,14 +28,8 @@
                     </select>
                 </div>
                 <div>
-                    <label class="form-label">Diğer firma *</label>
-                    <select class="form-select" @bind="form.OtherId">
-                        <option value="">Seçin…</option>
-                        @foreach (var company in Lookups.Companies.Where(c => c.Id != CompanyId))
-                        {
-                            <option value="@company.Id">@company.Name</option>
-                        }
-                    </select>
+                    <label class="form-label" for="relation-other">Diğer firma *</label>
+                    <LookupPicker Id="relation-other" LookupKey="crm.company-relation.child" @bind-Value="form.OtherId" Required="true" Placeholder="Seçin…" Invalid="@(errors?.ContainsKey(form.ThisIsParent ? "childCompanyId" : "parentCompanyId") == true)" />
                     <FieldError Field="@(form.ThisIsParent ? "childCompanyId" : "parentCompanyId")" Errors="errors" />
                 </div>
                 <div>

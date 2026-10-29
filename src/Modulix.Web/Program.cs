@@ -11,6 +11,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 builder.Services.AddScoped<ApiClient>();
 builder.Services.AddScoped<SessionState>();
+builder.Services.AddScoped<LookupCatalog>();
 builder.Services.AddScoped<AppNavigation>();
 builder.Services.AddTransient<CrmLookups>();
 

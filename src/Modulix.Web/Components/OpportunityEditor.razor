@@ -20,25 +20,13 @@
         {
             <div>
                 <label class="form-label" for="companyId">Firma *</label>
-                <select id="companyId" class="form-select" @bind="form.CompanyId">
-                    <option value="">Seçin</option>
-                    @foreach (var company in Lookups.Companies)
-                    {
-                        <option value="@company.Id">@company.Name</option>
-                    }
-                </select>
+                <LookupPicker Id="companyId" LookupKey="crm.opportunity.company" @bind-Value="form.CompanyId" Required="true" Invalid="@(errors?.ContainsKey("companyId") == true)" />
                 <FieldError Field="companyId" Errors="errors" />
             </div>
         }
         <div>
             <label class="form-label" for="contactId">Kişi</label>
-            <select id="contactId" class="form-select" @bind="form.ContactId">
-                <option value="">—</option>
-                @foreach (var contact in Lookups.Contacts.Where(c => form.CompanyId is null || c.CompanyId == form.CompanyId))
-                {
-                    <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
-                }
-            </select>
+            <LookupPicker Id="contactId" LookupKey="crm.opportunity.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
             <FieldError Field="contactId" Errors="errors" />
         </div>
         <div>
@@ -77,13 +65,7 @@
         </div>
         <div>
             <label class="form-label" for="ownerId">Sorumlu</label>
-            <select id="ownerId" class="form-select" @bind="form.OwnerId">
-                <option value="">@(Opportunity is null ? "Ben" : "—")</option>
-                @foreach (var member in Lookups.AssignableMembers)
-                {
-                    <option value="@member.UserId">@member.DisplayName</option>
-                }
-            </select>
+            <LookupPicker Id="ownerId" LookupKey="crm.opportunity.owner" @bind-Value="form.OwnerId" Placeholder="@(Opportunity is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
             <FieldError Field="ownerId" Errors="errors" />
         </div>
         @if (Lookups.IsLost(form.Stage) || !string.IsNullOrEmpty(form.LostReason))

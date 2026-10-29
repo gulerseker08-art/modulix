@@ -27,25 +27,13 @@
         </div>
         <div>
             <label class="form-label" for="companyId">Firma</label>
-            <select id="companyId" class="form-select" @bind="form.CompanyId">
-                <option value="">—</option>
-                @foreach (var company in Lookups.Companies)
-                {
-                    <option value="@company.Id">@company.Name</option>
-                }
-            </select>
+            <LookupPicker Id="companyId" LookupKey="crm.contact.company" @bind-Value="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("companyId") == true)" />
             <FieldError Field="companyId" Errors="errors" />
             <small class="text-muted">Birden fazla firma için kişiyi kaydedip firma ilişkilerini kişi detayından yönetin.</small>
         </div>
         <div>
             <label class="form-label" for="ownerId">Sorumlu</label>
-            <select id="ownerId" class="form-select" @bind="form.OwnerId">
-                <option value="">@(form.Id is null ? "Ben" : "—")</option>
-                @foreach (var member in Lookups.AssignableMembers)
-                {
-                    <option value="@member.UserId">@member.DisplayName</option>
-                }
-            </select>
+            <LookupPicker Id="ownerId" LookupKey="crm.contact.owner" @bind-Value="form.OwnerId" Placeholder="@(form.Id is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
             <FieldError Field="ownerId" Errors="errors" />
             <small class="text-muted">Firmaya bağlı kişi firmanın erişim kapsamına göre görünür; sorumlu yalnızca firmasız kişide kapsamı belirler.</small>
         </div>
