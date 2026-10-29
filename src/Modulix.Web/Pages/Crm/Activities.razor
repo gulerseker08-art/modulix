@@ -2,6 +2,7 @@
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
+@inject IJSRuntime Js
 
 <PageTitle>Aktiviteler · ModuliX</PageTitle>
 
@@ -10,113 +11,233 @@
         <h1>Aktiviteler</h1>
         @if (Session.Can(CrmAccess.ActivitiesWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)">Yeni aktivite</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null, null)">Yeni aktivite</button>
         }
     </div>
 
-    @if (message is not null)
-    {
-        <div class="alert alert-danger" role="alert">@message</div>
-    }
+    <Notice Text="@message" Failed="true" />
+    <Notice Text="@bulkMessage" Failed="@bulkFailed" />
 
     @if (editing)
     {
-        <ActivityEditor Activity="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="() => editing = false" />
+        <ActivityEditor Activity="editTarget" InitialDay="initialDay" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="() => editing = false" />
     }
 
     <div class="filters" role="group" aria-label="Görünüm">
-        @foreach (var (value, label) in Views)
+        @foreach (var (value, label) in Modes)
         {
-            <button type="button" class="chip @(view == value ? "active" : null)" @onclick="() => SwitchAsync(value)">@label</button>
+            <button type="button" class="chip @(mode == value ? "active" : null)" aria-pressed="@(mode == value)" @onclick="() => SwitchModeAsync(value)">@label</button>
         }
     </div>
 
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Konu ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    <div class="filters" role="group" aria-label="Hızlı filtre">
+        @foreach (var (value, label) in Quick)
+        {
+            @if (value != QuickFilter.Team || Session.Can(CrmAccess.ActivitiesManageCalendar))
+            {
+                <button type="button" class="chip @(quick == value ? "active" : null)" aria-pressed="@(quick == value)" @onclick="() => SwitchQuickAsync(value)">@label</button>
+            }
+        }
+    </div>
+
+    <form class="filters" @onsubmit="() => ReloadAsync()" @onsubmit:preventDefault>
+        <input class="form-control" type="search" placeholder="Konu ara" aria-label="Konu ara" @bind="search" />
+        <select class="form-select" aria-label="Durum" @bind="status">
+            <option value="">Tüm durumlar</option>
+            @foreach (var s in new[] { ActivityStatus.Open, ActivityStatus.InProgress, ActivityStatus.Blocked, ActivityStatus.Completed, ActivityStatus.NoAnswer, ActivityStatus.NoShow, ActivityStatus.Cancelled })
+            {
+                <option value="@s">@ActivityLabels.Status(ActivityFamily.Task, s)</option>
+            }
+        </select>
+        <select class="form-select" aria-label="Tür" @bind="type">
+            <option value="">Tüm türler</option>
+            @foreach (var t in Lookups.Choices(CrmLists.ActivityType))
+            {
+                <option value="@t.Key">@t.Label</option>
+            }
+        </select>
+        <select class="form-select" aria-label="Öncelik" @bind="priority">
+            <option value="">Tüm öncelikler</option>
+            @foreach (var p in new[] { ActivityPriority.Low, ActivityPriority.Normal, ActivityPriority.High, ActivityPriority.Urgent })
+            {
+                <option value="@p">@ActivityLabels.Priority(p)</option>
+            }
+        </select>
+        <button type="submit" class="btn btn-outline-secondary">Uygula</button>
+        <button type="button" class="btn btn-link" @onclick="SaveViewAsync">Görünümü kaydet</button>
     </form>
 
-    @if (page is null)
+    @if (savedViews.Count > 0)
+    {
+        <div class="filters" role="group" aria-label="Kayıtlı görünümler">
+            @foreach (var saved in savedViews)
+            {
+                <span class="chip-group">
+                    <button type="button" class="chip" @onclick="() => ApplyViewAsync(saved)">@saved.Name</button>
+                    <button type="button" class="chip" aria-label="@(saved.Name) görünümünü sil" @onclick="() => DeleteViewAsync(saved)">×</button>
+                </span>
+            }
+        </div>
+    }
+
+    @if (mode != Mode.List)
+    {
+        <div class="filters" role="group" aria-label="Tarih gezintisi">
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => MoveAsync(-1)">‹ Önceki</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="TodayAsync">Bugün</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => MoveAsync(1)">Sonraki ›</button>
+            <strong aria-live="polite">@Title()</strong>
+        </div>
+    }
+
+    @if (items is null)
     {
         <p class="text-muted">Yükleniyor…</p>
     }
-    else if (page.Items.Count == 0)
+    else if (mode == Mode.List)
     {
-        <p class="text-muted">@(view == View.All ? "Kayıt yok." : "Bu listede yapılacak iş yok.")</p>
+        @if (items.Count == 0)
+        {
+            <p class="text-muted">Bu listede aktivite yok.</p>
+        }
+        else
+        {
+            @if (picked.Count > 0 && Session.Can(CrmAccess.ActivitiesWrite))
+            {
+                <div class="filters" role="group" aria-label="Toplu işlem">
+                    <strong>@picked.Count seçili</strong>
+                    <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick='() => BulkAsync("complete")'>Tamamla</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => BulkAsync("reschedule-by-days")'>@bulkDays gün ertele</button>
+                    <input class="form-control" type="number" min="1" max="366" aria-label="Ertelenecek gün" @bind="bulkDays" style="width:6rem" />
+                    <input class="form-control" placeholder="Gerekçe (iptal / erteleme)" aria-label="Toplu işlem gerekçesi" @bind="bulkReason" />
+                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick='() => BulkAsync("cancel")'>İptal et</button>
+                </div>
+            }
+            <table class="table record-table">
+                <thead>
+                    <tr><th><span class="visually-hidden">Seç</span></th><th>Konu</th><th>Tür</th><th>Durum</th><th>Zaman</th><th>Öncelik</th><th>Firma</th><th>Sorumlu</th>@foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Activity)) { <th>@field.Label</th> }</tr>
+                </thead>
+                <tbody>
+                    @foreach (var activity in items)
+                    {
+                        <tr class="@ActivityLabels.Css(activity)">
+                            <td class="check-cell">
+                                @if (!activity.Masked && ActivityStatus.IsOpen(activity.Status) && Session.Can(CrmAccess.ActivitiesWrite))
+                                {
+                                    <input type="checkbox" aria-label="@activity.Subject seç" checked="@picked.Contains(activity.Id)" @onchange="e => Pick(activity, e)" />
+                                }
+                            </td>
+                            <td data-label="Konu" class="primary"><button type="button" class="btn btn-link" @onclick="() => Select(activity)">@activity.Subject</button></td>
+                            <td data-label="Tür">@(activity.Masked ? null : Lookups.Label(CrmLists.ActivityType, activity.Type))</td>
+                            <td data-label="Durum">@ActivityLabels.Status(ActivityLabels.Family(Lookups, activity.Type), activity.Status)@(ActivityLabels.IsOverdue(activity) ? " · gecikti" : null)</td>
+                            <td data-label="Zaman">@WhenText(activity)</td>
+                            <td data-label="Öncelik">@(activity.Masked ? null : ActivityLabels.Priority(activity.Priority))</td>
+                            <td data-label="Firma">
+                                @if (activity.CompanyId is { } companyId)
+                                {
+                                    <a href="crm/firmalar/@companyId">@Lookups.CompanyName(companyId)</a>
+                                }
+                            </td>
+                            <td data-label="Sorumlu">@Lookups.MemberName(activity.OwnerId)</td>
+                            @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Activity))
+                            {
+                                <td data-label="@field.Label">@(activity.Masked ? null : CustomFieldText.Format(field, activity.Custom))</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <Pager Page="pageNumber" PageSize="PageSize" TotalCount="total" PageChanged="LoadPageAsync" />
+        }
     }
     else
     {
-        <table class="table record-table">
-            <thead>
-                <tr><th></th><th>Konu</th><th>Tür</th><th>Tarih</th><th>Firma</th><th>Atanan</th>@foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Activity)) { <th>@field.Label</th> }<th></th></tr>
-            </thead>
-            <tbody>
-                @foreach (var activity in page.Items)
-                {
-                    <tr class="@RowClass(activity)">
-                        <td class="check-cell">
-                            @if (Session.Can(CrmAccess.ActivitiesWrite) && activity.CompletedAt is null)
-                            {
-                                <button type="button" class="btn btn-outline-secondary btn-sm check" title="Tamamla" aria-label="Tamamla"
-                                        disabled="@busy" @onclick="() => CompleteAsync(activity)">✓</button>
-                            }
-                        </td>
-                        <td data-label="Konu" class="primary">@activity.Subject</td>
-                        <td data-label="Tür">@Lookups.Label(CrmLists.ActivityType, activity.Type)</td>
-                        <td data-label="Tarih">@(activity.DueAt is { } due ? CrmLabels.Time(due) : null)@(IsOverdue(activity) ? " · gecikti" : null)</td>
-                        <td data-label="Firma">
-                            @if (activity.CompanyId is { } companyId)
-                            {
-                                <a href="crm/firmalar/@companyId">@Lookups.CompanyName(companyId)</a>
-                            }
-                        </td>
-                        <td data-label="Atanan">@Lookups.MemberName(activity.OwnerId)</td>
-                        @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Activity))
-                        {
-                            <td data-label="@field.Label">@CustomFieldText.Format(field, activity.Custom)</td>
-                        }
-                        <td class="actions">
-                            @if (Session.Can(CrmAccess.ActivitiesWrite))
-                            {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(activity)">Düzenle</button>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        @if (total > items.Count)
+        {
+            <Notice Text="@($"Bu aralıkta {total} aktivite var, ilk {items.Count} tanesi gösteriliyor. Filtreleri daraltın veya aralığı küçültün.")" Failed="true" />
+        }
+        <ActivityCalendar Mode="CalendarModeOf(mode)" Anchor="anchor" Items="items" CanMove="CanMove"
+                          OnSelect="Select" OnCreate="day => Open(null, day)" OnDayChosen="ChooseDayAsync" OnMove="MoveActivityAsync" />
+    }
+
+    @if (conflictMove is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @conflictMessage
+            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ForceMoveAsync">Çakışmaya rağmen taşı</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => conflictMove = null">Vazgeç</button>
+        </div>
+    }
+
+    @if (selected is not null && !editing)
+    {
+        <ActivityActions Activity="selected" Changed="ChangedAsync" Closed="() => selected = null" EditRequested="a => Open(a, null)" />
     }
 </AuthGate>
 
 @code {
     private const string Url = "/api/crm/activities";
+    private const string ViewsKey = "modulix.activity-views";
+    private const int PageSize = 50;
+    private const int CalendarSize = 200;
 
-    private enum View
+    private enum Mode
+    {
+        List,
+        Day,
+        Week,
+        Month,
+        Agenda,
+    }
+
+    private enum QuickFilter
     {
         Today,
         Overdue,
         Mine,
-        Open,
+        Team,
+        AllOpen,
         All,
     }
 
-    private static readonly (View Value, string Label)[] Views =
+    private sealed record SavedView(string Name, Mode Mode, QuickFilter Quick, string? Status, string? Type, string? Priority);
+
+    private static readonly (Mode Value, string Label)[] Modes =
     [
-        (View.Today, "Bugün"),
-        (View.Overdue, "Geciken"),
-        (View.Mine, "Bana atananlar"),
-        (View.Open, "Tüm açıklar"),
-        (View.All, "Tümü"),
+        (Mode.List, "Liste"), (Mode.Day, "Gün"), (Mode.Week, "Hafta"), (Mode.Month, "Ay"), (Mode.Agenda, "Ajanda"),
     ];
 
-    private CrmPage<ActivityDto>? page;
+    private static readonly (QuickFilter Value, string Label)[] Quick =
+    [
+        (QuickFilter.Today, "Bugün"), (QuickFilter.Overdue, "Gecikenler"), (QuickFilter.Mine, "Bana atananlar"),
+        (QuickFilter.Team, "Ekip"), (QuickFilter.AllOpen, "Tüm açıklar"), (QuickFilter.All, "Tümü"),
+    ];
+
+    private List<ActivityDto>? itemsBacking;
+    private IReadOnlyList<ActivityDto>? items;
+    private int total;
+    private int pageNumber = 1;
     private ActivityDto? selected;
+    private ActivityDto? editTarget;
+    private DateOnly? initialDay;
     private bool editing;
     private bool busy;
-    private View view = View.Today;
+    private Mode mode = Mode.List;
+    private QuickFilter quick = QuickFilter.Today;
+    private DateOnly anchor = DateOnly.FromDateTime(Regional.Now.DateTime);
     private string? message;
+    private string? bulkMessage;
+    private bool bulkFailed;
     private string? search;
+    private string? status;
+    private string? type;
+    private string? priority;
+    private readonly HashSet<Guid> picked = [];
+    private int bulkDays = 1;
+    private string? bulkReason;
+    private List<SavedView> savedViews = [];
+    private (ActivityDto Activity, DateOnly Day)? conflictMove;
+    private string? conflictMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -124,64 +245,276 @@
         if (Session.Can(CrmAccess.ActivitiesRead))
         {
             await Lookups.LoadAsync(contacts: true, opportunities: true);
-            await LoadAsync(1);
+            await LoadViewsAsync();
+            await ReloadAsync();
         }
     }
 
-    private static bool IsOverdue(ActivityDto activity) =>
-        activity.CompletedAt is null && activity.DueAt is { } due && due < DateTimeOffset.Now;
+    // ---- Süzgeçler
 
-    private static string? RowClass(ActivityDto activity) =>
-        activity.CompletedAt is not null ? "done" : IsOverdue(activity) ? "overdue" : null;
+    private static CalendarMode CalendarModeOf(Mode value) => value switch
+    {
+        Mode.Day => CalendarMode.Day,
+        Mode.Week => CalendarMode.Week,
+        Mode.Agenda => CalendarMode.Agenda,
+        _ => CalendarMode.Month,
+    };
 
-    /// <summary>Gün sınırı firmanın saat dilimine göre hesaplanır; "Bugün" gecikenleri de içerir.</summary>
-    private string ViewFilters()
+    /// <summary>Gün sınırları firmanın saat dilimine göre hesaplanır. "Bugün" gecikenleri de içerir.</summary>
+    private string Filters()
     {
         var now = Regional.Now;
         var endOfToday = Regional.FromTenant(now.Date.AddDays(1));
-        return view switch
+        var filters = quick switch
         {
-            View.Today => $"&open=true&ownerId=me&dueBefore={Uri.EscapeDataString(endOfToday.ToString("O"))}",
-            View.Overdue => $"&open=true&ownerId=me&dueBefore={Uri.EscapeDataString(now.ToString("O"))}",
-            View.Mine => "&open=true&ownerId=me",
-            View.Open => "&open=true",
+            QuickFilter.Today => $"&open=true&ownerId=me&dueBefore={Uri.EscapeDataString(endOfToday.ToString("O"))}",
+            QuickFilter.Overdue => $"&overdue={Uri.EscapeDataString(DateTimeOffset.UtcNow.ToString("O"))}&ownerId=me",
+            QuickFilter.Mine => "&open=true&ownerId=me",
+            QuickFilter.Team => "&open=true",
+            QuickFilter.AllOpen => "&open=true",
             _ => string.Empty,
+        };
+        if (mode != Mode.List)
+        {
+            var (from, to) = ActivityCalendar.Window(CalendarModeOf(mode), anchor);
+            filters = $"&range={Uri.EscapeDataString(ActivityLabels.Range(from, to))}" + (quick is QuickFilter.Mine or QuickFilter.Today or QuickFilter.Overdue ? "&ownerId=me" : string.Empty);
+        }
+
+        return filters
+            + (string.IsNullOrEmpty(status) ? null : $"&status={status}")
+            + (string.IsNullOrEmpty(type) ? null : $"&type={type}")
+            + (string.IsNullOrEmpty(priority) ? null : $"&priority={priority}");
+    }
+
+    private async Task ReloadAsync()
+    {
+        pageNumber = 1;
+        await LoadPageAsync(1);
+    }
+
+    private async Task LoadPageAsync(int page)
+    {
+        pageNumber = page;
+        var size = mode == Mode.List ? PageSize : CalendarSize;
+        var result = await Api.GetAsync<CrmPage<ActivityDto>>(
+            $"{Url}?page={page}&pageSize={size}&search={Uri.EscapeDataString(search ?? string.Empty)}{Filters()}");
+        itemsBacking = result.Value?.Items.ToList();
+        items = itemsBacking;
+        total = result.Value?.TotalCount ?? 0;
+        message = result.Error;
+        picked.Clear();
+    }
+
+    private async Task SwitchModeAsync(Mode value)
+    {
+        mode = value;
+        if (mode != Mode.List && quick is QuickFilter.AllOpen or QuickFilter.All)
+        {
+            quick = QuickFilter.Mine;
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task SwitchQuickAsync(QuickFilter value)
+    {
+        quick = value;
+        await ReloadAsync();
+    }
+
+    private async Task MoveAsync(int direction)
+    {
+        anchor = mode switch
+        {
+            Mode.Day => anchor.AddDays(direction),
+            Mode.Week => anchor.AddDays(7 * direction),
+            Mode.Agenda => anchor.AddDays(30 * direction),
+            _ => anchor.AddMonths(direction),
+        };
+        await ReloadAsync();
+    }
+
+    private async Task TodayAsync()
+    {
+        anchor = DateOnly.FromDateTime(Regional.Now.DateTime);
+        await ReloadAsync();
+    }
+
+    private async Task ChooseDayAsync(DateOnly day)
+    {
+        anchor = day;
+        mode = Mode.Day;
+        await ReloadAsync();
+    }
+
+    private string Title()
+    {
+        var tr = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+        var (from, to) = ActivityCalendar.Window(CalendarModeOf(mode), anchor);
+        return mode switch
+        {
+            Mode.Day => from.ToString("d MMMM yyyy dddd", tr),
+            Mode.Month => anchor.ToString("MMMM yyyy", tr),
+            _ => $"{from.ToString("d MMM", tr)} – {to.ToString("d MMM yyyy", tr)}",
         };
     }
 
-    private async Task SwitchAsync(View value)
-    {
-        view = value;
-        await LoadAsync(1);
-    }
+    private static string WhenText(ActivityDto a) =>
+        a.StartAt is not null || a.IsAllDay
+            ? $"{ActivityLabels.Days(a).FirstOrDefault().ToString("d MMM", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))} {ActivityLabels.TimeText(a)}"
+            : a.DueAt is { } due ? CrmLabels.Time(due) : string.Empty;
 
-    private async Task LoadAsync(int pageNumber)
-    {
-        var result = await Api.GetAsync<CrmPage<ActivityDto>>(
-            $"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}{ViewFilters()}");
-        page = result.Value;
-        message = result.Error;
-    }
+    // ---- Seçim, düzenleme
 
-    private void Open(ActivityDto? activity)
+    private void Select(ActivityDto activity)
     {
         selected = activity;
+        editing = false;
+    }
+
+    private void Open(ActivityDto? activity, DateOnly? day)
+    {
+        editTarget = activity;
+        initialDay = day;
         editing = true;
+        selected = null;
         message = null;
     }
 
     private async Task SavedAsync()
     {
         editing = false;
-        await LoadAsync(page?.Page ?? 1);
+        await LoadPageAsync(pageNumber);
     }
 
-    private async Task CompleteAsync(ActivityDto activity)
+    private async Task ChangedAsync(ActivityDto updated)
+    {
+        selected = updated;
+        await LoadPageAsync(pageNumber);
+    }
+
+    private bool CanMove(ActivityDto activity) => Session.Can(CrmAccess.ActivitiesWrite);
+
+    // ---- Sürükle-bırak ile yeniden planlama: yerel saat korunarak yalnızca gün değişir; çakışmayı sunucu bildirir.
+
+    private async Task MoveActivityAsync((ActivityDto Activity, DateOnly Day) move) => await RescheduleToAsync(move.Activity, move.Day, allowConflict: false);
+
+    private async Task ForceMoveAsync()
+    {
+        if (conflictMove is { } move)
+        {
+            conflictMove = null;
+            await RescheduleToAsync(move.Activity, move.Day, allowConflict: true);
+        }
+    }
+
+    private async Task RescheduleToAsync(ActivityDto activity, DateOnly day, bool allowConflict)
+    {
+        var current = ActivityLabels.Days(activity).FirstOrDefault();
+        if (current == default || current == day)
+        {
+            return;
+        }
+
+        var delta = day.DayNumber - current.DayNumber;
+        DateTimeOffset? Shift(DateTimeOffset? value) =>
+            value is { } v ? Regional.FromTenant(Regional.ToTenant(v).DateTime.AddDays(delta)) : null;
+
+        var body = new RescheduleActivityRequest(
+            activity.Version, "Takvimde taşındı", Shift(activity.DueAt), activity.IsAllDay ? null : Shift(activity.StartAt),
+            activity.IsAllDay ? null : Shift(activity.EndAt), activity.IsAllDay, activity.StartDate?.AddDays(delta), activity.EndDate?.AddDays(delta), allowConflict);
+        var result = await Api.PostAsync<ActivityDto>($"{Url}/{activity.Id}/reschedule", body);
+        if (result.IsSuccess)
+        {
+            message = null;
+            await LoadPageAsync(pageNumber);
+            return;
+        }
+
+        if (result.FieldErrors?.ContainsKey("conflict") == true)
+        {
+            conflictMove = (activity, day);
+            conflictMessage = result.FieldErrors["conflict"].FirstOrDefault();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    // ---- Toplu işlem: sonuç kayıt başınadır (kısmi başarı)
+
+    private void Pick(ActivityDto activity, ChangeEventArgs e)
+    {
+        if (e.Value is true)
+        {
+            picked.Add(activity.Id);
+        }
+        else
+        {
+            picked.Remove(activity.Id);
+        }
+    }
+
+    private async Task BulkAsync(string action)
     {
         busy = true;
-        var result = await Api.PutAsync<ActivityDto>($"{Url}/{activity.Id}", CrmRequests.From(activity) with { CompletedAt = DateTimeOffset.Now });
+        var request = new BulkActivityRequest(
+            action, [.. items!.Where(a => picked.Contains(a.Id)).Select(a => new BulkActivityItem(a.Id, a.Version))],
+            Reason: string.IsNullOrWhiteSpace(bulkReason) ? null : bulkReason, Days: action == "reschedule-by-days" ? bulkDays : null);
+        var result = await Api.PostAsync<BulkActivityResultDto>($"{Url}/bulk", request);
         busy = false;
-        message = result.Error;
-        await LoadAsync(page?.Page ?? 1);
+
+        bulkFailed = result.Error is not null || result.Value?.Failed > 0;
+        bulkMessage = result.Value is { } r
+            ? $"{r.Succeeded} kayıt işlendi" + (r.Failed > 0 ? $", {r.Failed} kayıt işlenemedi: {string.Join("; ", r.Failures.Select(f => $"{items!.FirstOrDefault(a => a.Id == f.Id)?.Subject ?? "kayıt"} ({f.Message})"))}" : ".")
+            : result.Error;
+        await LoadPageAsync(pageNumber);
+    }
+
+    // ---- Kişisel kayıtlı görünümler (bu tarayıcıda saklanır; sunucuya gitmez)
+
+    private async Task LoadViewsAsync()
+    {
+        try
+        {
+            var json = await Js.InvokeAsync<string?>("localStorage.getItem", ViewsKey);
+            savedViews = json is null ? [] : System.Text.Json.JsonSerializer.Deserialize<List<SavedView>>(json) ?? [];
+        }
+        catch (Exception)
+        {
+            savedViews = [];
+        }
+    }
+
+    private async Task PersistViewsAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("localStorage.setItem", ViewsKey, System.Text.Json.JsonSerializer.Serialize(savedViews));
+        }
+        catch (Exception)
+        {
+            // Tarayıcı depolama kapalıysa görünüm yalnızca bu oturumda kalır.
+        }
+    }
+
+    private async Task SaveViewAsync()
+    {
+        var name = $"{Modes.First(m => m.Value == mode).Label} · {Quick.First(q => q.Value == quick).Label}";
+        savedViews.RemoveAll(v => v.Name == name);
+        savedViews.Add(new SavedView(name, mode, quick, status, type, priority));
+        await PersistViewsAsync();
+    }
+
+    private async Task ApplyViewAsync(SavedView view)
+    {
+        (mode, quick, status, type, priority) = (view.Mode, view.Quick, view.Status, view.Type, view.Priority);
+        await ReloadAsync();
+    }
+
+    private async Task DeleteViewAsync(SavedView view)
+    {
+        savedViews.Remove(view);
+        await PersistViewsAsync();
     }
 }

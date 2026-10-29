@@ -1,0 +1,161 @@
+@* Aktivite takvimi: ay, hafta, gün ve ajanda görünümleri (ADR-0015). Veriyi çağıran yükler; burada yalnızca çizilir.
+   Her aktivite bir düğmedir (klavyeyle odaklanır, Enter açar); gün hücresine Enter hızlı oluşturur; bir aktiviteyi başka güne
+   sürüklemek yeniden planlamadır (sunucu yetki ve çakışmayı denetler). Son tarih işaretleri (⏰) zaman bloğundan ayrı gösterilir. *@
+
+<div class="cal" role="grid" aria-label="Aktivite takvimi">
+    @if (Mode == CalendarMode.Agenda)
+    {
+        @foreach (var (day, items) in Grouped())
+        {
+            <section class="cal-agenda-day" aria-label="@Heading(day)">
+                <h3>@Heading(day)</h3>
+                <ul class="item-list">
+                    @foreach (var activity in items)
+                    {
+                        <li class="@ActivityLabels.Css(activity)">@Entry(activity)</li>
+                    }
+                </ul>
+            </section>
+        }
+        @if (!Items.Any())
+        {
+            <p class="text-muted">Bu aralıkta aktivite yok.</p>
+        }
+    }
+    else
+    {
+        <div class="cal-grid cal-@Mode.ToString().ToLowerInvariant()">
+            @if (Mode != CalendarMode.Day)
+            {
+                @foreach (var name in WeekdayNames)
+                {
+                    <div class="cal-weekday" role="columnheader">@name</div>
+                }
+            }
+            @foreach (var day in Days())
+            {
+                var items = ItemsOn(day);
+                <div class="cal-cell @(day == Today ? "today" : null) @(Mode == CalendarMode.Month && day.Month != Anchor.Month ? "outside" : null)"
+                     role="gridcell" tabindex="0" aria-label="@Heading(day), @items.Count aktivite"
+                     @onkeydown="e => CellKey(e, day)" @ondragover:preventDefault @ondrop="() => DropAsync(day)">
+                    <div class="cal-date">
+                        <button type="button" class="cal-day-link" @onclick="() => OnCreate.InvokeAsync(day)"
+                                title="Bu güne aktivite ekle" aria-label="@Heading(day) için yeni aktivite">@day.Day</button>
+                    </div>
+                    @foreach (var activity in items.Take(Mode == CalendarMode.Month ? 4 : 50))
+                    {
+                        <div class="cal-item @ActivityLabels.Css(activity)" draggable="@(CanDrag(activity) ? "true" : "false")"
+                             @ondragstart="() => dragging = activity">
+                            @Entry(activity)
+                        </div>
+                    }
+                    @if (Mode == CalendarMode.Month && items.Count > 4)
+                    {
+                        <button type="button" class="btn btn-link btn-sm" @onclick="() => OnDayChosen.InvokeAsync(day)">+@(items.Count - 4) daha</button>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly string[] WeekdayNames = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+
+    private ActivityDto? dragging;
+
+    [Parameter] public CalendarMode Mode { get; set; } = CalendarMode.Month;
+
+    /// <summary>Görünümün odak günü: ay/hafta/gün bu güne göre hesaplanır.</summary>
+    [Parameter] public DateOnly Anchor { get; set; }
+
+    [Parameter] public IReadOnlyList<ActivityDto> Items { get; set; } = [];
+
+    /// <summary>Kullanıcı bu aktiviteyi sürükleyerek taşıyabilir mi? (yetki)</summary>
+    [Parameter] public Func<ActivityDto, bool> CanMove { get; set; } = _ => false;
+
+    [Parameter] public EventCallback<ActivityDto> OnSelect { get; set; }
+
+    [Parameter] public EventCallback<DateOnly> OnCreate { get; set; }
+
+    [Parameter] public EventCallback<DateOnly> OnDayChosen { get; set; }
+
+    [Parameter] public EventCallback<(ActivityDto Activity, DateOnly Day)> OnMove { get; set; }
+
+    private static DateOnly Today => DateOnly.FromDateTime(Regional.Now.DateTime);
+
+    private RenderFragment Entry(ActivityDto activity) => builder =>
+    {
+        var deadlineOnly = activity.StartAt is null && !activity.IsAllDay && activity.DueAt is not null;
+        builder.OpenElement(0, "button");
+        builder.AddAttribute(1, "type", "button");
+        builder.AddAttribute(2, "class", "cal-entry");
+        builder.AddAttribute(3, "title", activity.Masked ? "Meşgul" : $"{activity.Subject} · {ActivityLabels.TimeText(activity)}");
+        builder.AddAttribute(4, "onclick", EventCallback.Factory.Create(this, () => OnSelect.InvokeAsync(activity)));
+        builder.AddContent(5, $"{(deadlineOnly ? "⏰ " : null)}{ActivityLabels.TimeText(activity)} {activity.Subject}");
+        builder.CloseElement();
+    };
+
+    private bool CanDrag(ActivityDto activity) => !activity.Masked && ActivityStatus.IsOpen(activity.Status) && CanMove(activity);
+
+    private async Task DropAsync(DateOnly day)
+    {
+        if (dragging is { } activity)
+        {
+            dragging = null;
+            await OnMove.InvokeAsync((activity, day));
+        }
+    }
+
+    private async Task CellKey(KeyboardEventArgs e, DateOnly day)
+    {
+        if (e.Key == "Enter")
+        {
+            await OnCreate.InvokeAsync(day);
+        }
+    }
+
+    private List<ActivityDto> ItemsOn(DateOnly day) =>
+        [.. Items.Where(a => ActivityLabels.Days(a).Contains(day)).OrderBy(a => a.IsAllDay ? 0 : 1).ThenBy(a => a.StartAt ?? a.DueAt)];
+
+    private IEnumerable<(DateOnly Day, List<ActivityDto> Items)> Grouped() =>
+        Items.SelectMany(a => ActivityLabels.Days(a).Select(d => (Day: d, Activity: a)))
+            .GroupBy(x => x.Day).OrderBy(g => g.Key)
+            .Select(g => (g.Key, g.Select(x => x.Activity).OrderBy(a => a.StartAt ?? a.DueAt).ToList()));
+
+    /// <summary>Görünümün kapsadığı günler (bitiş dahil); sunucu sorgusu da bu pencereyle yapılır.</summary>
+    public static (DateOnly From, DateOnly To) Window(CalendarMode mode, DateOnly anchor)
+    {
+        var weekStart = anchor.AddDays(-(((int)anchor.DayOfWeek + 6) % 7));
+        return mode switch
+        {
+            CalendarMode.Day => (anchor, anchor),
+            CalendarMode.Week => (weekStart, weekStart.AddDays(6)),
+            CalendarMode.Agenda => (anchor, anchor.AddDays(29)),
+            _ => MonthWindow(anchor),
+        };
+    }
+
+    private static (DateOnly, DateOnly) MonthWindow(DateOnly anchor)
+    {
+        var first = new DateOnly(anchor.Year, anchor.Month, 1);
+        var start = first.AddDays(-(((int)first.DayOfWeek + 6) % 7));
+        var last = first.AddMonths(1).AddDays(-1);
+        return (start, last.AddDays(6 - (((int)last.DayOfWeek + 6) % 7)));
+    }
+
+    private IEnumerable<DateOnly> Days()
+    {
+        var (from, to) = Window(Mode, Anchor);
+        for (var day = from; day <= to; day = day.AddDays(1))
+        {
+            yield return day;
+        }
+    }
+
+    private static string Heading(DateOnly day)
+    {
+        var tr = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+        return $"{day.ToString("d MMMM yyyy", tr)} {day.ToString("dddd", tr)}";
+    }
+}

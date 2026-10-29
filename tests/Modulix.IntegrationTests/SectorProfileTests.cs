@@ -135,7 +135,7 @@ public class SectorProfileTests(ModulixApiFactory factory) : IClassFixture<Modul
             ["Ön Görüşme", "Nitelikli", "Teklif", "Pazarlık", "Tedavi planı", "Kazanıldı", "Kaybedildi"],
             lists.Single(l => l.Key == CrmLists.OpportunityStage).Values.Select(v => v.Label));
         Assert.Equal(CrmLists.StageCategories.Open, lists.Single(l => l.Key == CrmLists.OpportunityStage).Values[4].Category);
-        Assert.Equal(["Muayene", "Kontrol"], lists.Single(l => l.Key == CrmLists.ActivityType).Values.TakeLast(2).Select(v => v.Label));
+        Assert.Equal(["Muayene", "Kontrol"], lists.Single(l => l.Key == CrmLists.ActivityType).Values.Where(v => !v.BuiltIn).Select(v => v.Label));
 
         // Firmanın profili en son uygulanandır; yeniden uygulamada eklenecek bir şey kalmaz.
         var state = (await adminClient.GetFromJsonAsync<SectorProfilesResponse>("/api/customization/profiles"))!;

@@ -14,5 +14,7 @@ public static class CrmRequests
 
     public static SaveActivityRequest From(ActivityDto a) => new(
         a.Subject, a.Type, a.DueAt, a.CompletedAt, a.CompanyId, a.ContactId, a.OpportunityId, a.Notes, a.Version, a.OwnerId,
-        LeadId: a.LeadId, Outcome: a.Outcome);
+        LeadId: a.LeadId, Outcome: a.Outcome, Priority: a.Priority, StartAt: a.StartAt, EndAt: a.EndAt, IsAllDay: a.IsAllDay,
+        StartDate: a.StartDate, EndDate: a.EndDate, TimeZone: a.TimeZone, Location: a.Location, OnlineMeetingUrl: a.OnlineMeetingUrl,
+        IsPrivate: a.IsPrivate, EstimatedMinutes: a.EstimatedMinutes, ActualMinutes: a.ActualMinutes);
 }

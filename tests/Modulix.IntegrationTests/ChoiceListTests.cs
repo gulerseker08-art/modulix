@@ -141,7 +141,7 @@ public class ChoiceListTests(ModulixApiFactory factory) : IClassFixture<ModulixA
 
         // Varsayılan "Görev" pasifse listenin ilk etkin değeri atanır.
         Assert.Equal(HttpStatusCode.OK, (await adminClient.PutAsJsonAsync($"/api/customization/lists/{CrmLists.ActivityType}", new SaveChoiceListRequest(
-            [new("Meeting", "Toplantı"), new("Call", "Arama"), new("Task", "Görev", Active: false)]))).StatusCode);
+            [new("Meeting", "Toplantı"), new("Call", "Arama"), new("Email", "E-posta"), new("Visit", "Ziyaret"), new("Note", "Not"), new("Task", "Görev", Active: false)]))).StatusCode);
         var lists = (await repClient.GetFromJsonAsync<List<ChoiceListDto>>("/api/choice-lists"))!;
         Assert.Equal(ActivityType.Meeting, lists.Single(l => l.Key == CrmLists.ActivityType).Default);
         var second = await repClient.PostAsJsonAsync("/api/records/crm.activity", new RecordWriteRequest(new JsonObject { ["subject"] = "Görüş" }));

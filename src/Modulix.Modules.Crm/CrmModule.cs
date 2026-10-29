@@ -4,6 +4,7 @@ using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Modules.Crm.Records;
 
@@ -39,6 +40,21 @@ public sealed class CrmModule : IModule
         public const string ActivitiesRead = "crm.activities.read";
         public const string ActivitiesWrite = "crm.activities.write";
 
+        // Aktivite yaşam döngüsü (ADR-0015). Oluşturma/düzenleme/tamamlama/iptal/silme `write` ile birlikte kalır (mevcut rollerin davranışı
+        // değişmesin diye); aşağıdakiler ayrı izinlerdir.
+
+        /// <summary>Aktiviteyi başkasına atar (kendine almak `write` yeter).</summary>
+        public const string ActivitiesAssign = "crm.activities.assign";
+
+        /// <summary>Kapanmış (tamamlanmış, iptal, ulaşılamadı, katılım olmadı) aktiviteyi yeniden açar.</summary>
+        public const string ActivitiesReopen = "crm.activities.reopen";
+
+        /// <summary>Başkalarının takvimini ve ekip görünümünü görür (yalnız meşguliyet; özel aktivite ayrıntısı değil).</summary>
+        public const string ActivitiesManageCalendar = "crm.activities.manage-calendar";
+
+        /// <summary>Özel aktivitelerin ayrıntısını (başlık, açıklama, ilişkiler) kapsamındaysa görür. Hiçbir hazır role verilmez.</summary>
+        public const string ActivitiesViewPrivate = "crm.activities.view-private";
+
         // Lead yönetimi. Atama, nitelendirme, eleme, dönüşüm ve dışa aktarma ayrı izinlerdir; alan düzenleme izninden bağımsızdır.
         public const string LeadsRead = "crm.leads.read";
         public const string LeadsCreate = "crm.leads.create";
@@ -67,6 +83,8 @@ public sealed class CrmModule : IModule
         public const string CompanyRelation = "crm.company-relation";
         public const string Opportunity = "crm.opportunity";
         public const string Activity = "crm.activity";
+        public const string ActivityLink = "crm.activity-link";
+        public const string ActivityParticipant = "crm.activity-participant";
         public const string Lead = "crm.lead";
         public const string LeadForm = "crm.lead-form";
     }
@@ -142,7 +160,11 @@ public sealed class CrmModule : IModule
         new(Permissions.OpportunitiesWrite, "Fırsat ekler, düzenler ve siler", "Fırsatlar"),
         new(Permissions.OpportunityAmountsRead, "Fırsat tutarını ve olasılığını görür", "Fırsat tutarları"),
         new(Permissions.ActivitiesRead, "Aktiviteleri görüntüler", "Aktiviteler"),
-        new(Permissions.ActivitiesWrite, "Aktivite ekler, düzenler ve siler", "Aktiviteler"),
+        new(Permissions.ActivitiesWrite, "Aktivite ekler, düzenler, tamamlar, iptal eder ve siler", "Aktiviteler"),
+        new(Permissions.ActivitiesAssign, "Aktiviteyi başka kullanıcıya atar", "Aktiviteler"),
+        new(Permissions.ActivitiesReopen, "Kapanmış aktiviteyi yeniden açar", "Aktiviteler"),
+        new(Permissions.ActivitiesManageCalendar, "Ekip takvimini ve başkalarının meşguliyetini görür", "Aktiviteler"),
+        new(Permissions.ActivitiesViewPrivate, "Özel aktivitelerin ayrıntısını görür", "Aktiviteler"),
         new(Permissions.LeadsRead, "Lead'leri görüntüler", "Lead'ler"),
         new(Permissions.LeadsCreate, "Lead oluşturur", "Lead'ler"),
         new(Permissions.LeadsUpdate, "Lead alanlarını düzenler", "Lead'ler"),
@@ -174,7 +196,7 @@ public sealed class CrmModule : IModule
                 Permissions.CompaniesRead, Permissions.CompaniesWrite,
                 Permissions.ContactsRead, Permissions.ContactsWrite,
                 Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite, Permissions.OpportunityAmountsRead,
-                Permissions.ActivitiesRead, Permissions.ActivitiesWrite,
+                Permissions.ActivitiesRead, Permissions.ActivitiesWrite, Permissions.ActivitiesReopen,
                 Permissions.LeadsRead, Permissions.LeadsCreate, Permissions.LeadsUpdate,
                 Permissions.LeadsQualify, Permissions.LeadsDisqualify, Permissions.LeadsConvert,
             ])
@@ -189,7 +211,8 @@ public sealed class CrmModule : IModule
             "Lead'leri toplar, atama bekleyenleri sorumlulara dağıtır ve raporlar.",
             [
                 Permissions.LeadsRead, Permissions.LeadsCreate, Permissions.LeadsUpdate, Permissions.LeadsAssign, Permissions.LeadsExport,
-                Permissions.ActivitiesRead, Permissions.ActivitiesWrite,
+                Permissions.ActivitiesRead, Permissions.ActivitiesWrite, Permissions.ActivitiesAssign, Permissions.ActivitiesReopen,
+                Permissions.ActivitiesManageCalendar,
             ])
         {
             Scope = RecordScope.All,
@@ -269,8 +292,16 @@ public sealed class CrmModule : IModule
             Entities.Activity,
             "type",
             Required: true,
-            [],
-            [new("Call", "Arama"), new("Meeting", "Toplantı"), new("Email", "E-posta"), new("Task", "Görev"), new("Note", "Not")])
+            // Kategori = aktivite ailesi (durum makinesi, ADR-0015). Kategorisiz değer görev gibi davranır; firma yeni tür eklerken aile seçer.
+            [
+                new(ActivityFamily.Task, "Görev"), new(ActivityFamily.Call, "Arama"), new(ActivityFamily.Meeting, "Toplantı"),
+                new(ActivityFamily.Visit, "Müşteri / saha ziyareti"), new(ActivityFamily.Email, "E-posta"),
+            ],
+            [
+                new("Call", "Arama", ActivityFamily.Call), new("Meeting", "Toplantı", ActivityFamily.Meeting),
+                new("Email", "E-posta", ActivityFamily.Email), new("Task", "Görev", ActivityFamily.Task), new("Note", "Not", ActivityFamily.Task),
+                new("Visit", "Ziyaret", ActivityFamily.Visit), new("FollowUp", "Takip", ActivityFamily.Task),
+            ])
         {
             Default = "Task",
         },
@@ -401,15 +432,38 @@ public sealed class CrmModule : IModule
         },
         new(Entities.Activity, "Aktivite (CRM)", Permissions.ActivitiesRead, new Dictionary<string, string>
         {
-            ["type"] = "Tür", ["subject"] = "Konu", ["dueAt"] = "Tarih", ["completedAt"] = "Tamamlanma", ["companyId"] = "Firma",
-            ["contactId"] = "Kişi", ["opportunityId"] = "Fırsat", ["leadId"] = "Lead", ["outcome"] = "Sonuç", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+            ["type"] = "Tür", ["subject"] = "Konu", ["dueAt"] = "Son tarih", ["completedAt"] = "Tamamlanma", ["companyId"] = "Firma",
+            ["contactId"] = "Kişi", ["opportunityId"] = "Fırsat", ["leadId"] = "Lead", ["outcome"] = "Sonuç", ["ownerId"] = "Sorumlu", ["notes"] = "Açıklama",
+            ["status"] = "Durum", ["statusReason"] = "Durum / sonuç açıklaması", ["priority"] = "Öncelik", ["startAt"] = "Başlangıç", ["endAt"] = "Bitiş",
+            ["isAllDay"] = "Tüm gün", ["startDate"] = "Başlangıç günü", ["endDate"] = "Bitiş günü", ["timeZone"] = "Saat dilimi", ["location"] = "Konum",
+            ["onlineMeetingUrl"] = "Çevrim içi toplantı", ["isPrivate"] = "Özel", ["estimatedMinutes"] = "Tahmini süre (dk)", ["actualMinutes"] = "Gerçekleşen süre (dk)",
+            ["rescheduleCount"] = "Ertelenme sayısı", ["previousActivityId"] = "Önceki aktivite", ["source"] = "Kaynak", ["createdBy"] = "Oluşturan",
+            ["externalSource"] = "Dış kaynak", ["externalId"] = "Dış kimlik",
         }, "subject")
         {
-            UserFields = ["ownerId"],
+            UserFields = ["ownerId", "createdBy"],
             References = new Dictionary<string, string>
             {
                 ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact, ["opportunityId"] = Entities.Opportunity, ["leadId"] = Entities.Lead,
+                ["previousActivityId"] = Entities.Activity,
             },
+        },
+        new(Entities.ActivityLink, "Aktivite ilişkisi (CRM)", Permissions.ActivitiesRead, new Dictionary<string, string>
+        {
+            ["activityId"] = "Aktivite", ["entityKey"] = "Kayıt türü", ["recordId"] = "Kayıt", ["isPrimary"] = "Birincil",
+        })
+        {
+            TitleFields = ["entityKey"],
+            References = new Dictionary<string, string> { ["activityId"] = Entities.Activity },
+        },
+        new(Entities.ActivityParticipant, "Aktivite katılımcısı (CRM)", Permissions.ActivitiesRead, new Dictionary<string, string>
+        {
+            ["activityId"] = "Aktivite", ["userId"] = "Kullanıcı", ["contactId"] = "Kişi", ["email"] = "E-posta", ["displayName"] = "Ad", ["role"] = "Rol",
+        })
+        {
+            TitleFields = ["displayName", "email"],
+            UserFields = ["userId"],
+            References = new Dictionary<string, string> { ["activityId"] = Entities.Activity, ["contactId"] = Entities.Contact },
         },
         new(Entities.LeadForm, "Lead formu (CRM)", Permissions.LeadFormsManage, new Dictionary<string, string>
         {
@@ -477,7 +531,7 @@ public sealed class CrmModule : IModule
             "crm.lead-first-contact",
             [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated],
             [Entities.Activity],
-            [Permissions.ActivitiesRead, Permissions.LeadsRead, Permissions.LeadsUpdate]),
+            [Permissions.ActivitiesRead, Permissions.ActivitiesViewPrivate, Permissions.LeadsRead, Permissions.LeadsUpdate]),
     ];
 
     /// <summary>Tenant ayar anahtarları.</summary>
@@ -500,6 +554,14 @@ public sealed class CrmModule : IModule
         services.AddScoped<IRecordStore, CompanyRelationRecordStore>();
         services.AddScoped<IRecordStore, OpportunityRecordStore>();
         services.AddScoped<IRecordStore, ActivityRecordStore>();
+        services.AddScoped<IRecordStore, ActivityLinkRecordStore>();
+        services.AddScoped<IRecordStore, ActivityParticipantRecordStore>();
+        services.AddScoped<IActivityLinkTarget, CompanyLinkTarget>();
+        services.AddScoped<IActivityLinkTarget, ContactLinkTarget>();
+        services.AddScoped<IActivityLinkTarget, OpportunityLinkTarget>();
+        services.AddScoped<IActivityLinkTarget, LeadLinkTarget>();
+        services.AddScoped<ActivityWorkflowGate>();
+        services.AddScoped<IActivityWorkflow, ActivityWorkflow>();
         services.AddScoped<IRecordStore, LeadRecordStore>();
         services.AddScoped<IRecordStore, LeadFormRecordStore>();
         services.AddScoped<ILeadIntake, LeadIntake>();

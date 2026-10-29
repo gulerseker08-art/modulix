@@ -1,0 +1,363 @@
+@* Aktivite ayrıntı paneli ve yaşam döngüsü eylemleri (ADR-0015): başlat, bloke, tamamla (sonuç ve sonraki adım), iptal, yeniden aç,
+   ertele, yeniden ata. Eylemler yalnızca kullanıcının iznine göre görünür; sunucu yine de her birini kayıt başına doğrular.
+   Özel aktivitede ayrıntı yoktur: yalnızca meşguliyet gösterilir. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<section class="detail-section activity-panel" aria-live="polite">
+    <div class="section-header">
+        <h2>@(Activity.Masked ? "Meşgul" : Activity.Subject)</h2>
+        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Closed">Kapat</button>
+    </div>
+
+    <Notice Text="@message" Failed="true" />
+
+    <dl class="detail-list">
+        <dt>Durum</dt>
+        <dd>@ActivityLabels.Status(Family, Activity.Status)@(ActivityLabels.IsOverdue(Activity) ? " · gecikti" : null)@(Activity.RescheduleCount > 0 ? $" · {Activity.RescheduleCount} kez ertelendi" : null)</dd>
+        <dt>Zaman</dt>
+        <dd>@When()</dd>
+        @if (!Activity.Masked)
+        {
+            <dt>Tür / öncelik</dt>
+            <dd>@Lookups.Label(CrmLists.ActivityType, Activity.Type) · @ActivityLabels.Priority(Activity.Priority)</dd>
+            <dt>Sorumlu</dt>
+            <dd>@Lookups.MemberName(Activity.OwnerId)</dd>
+            @if (Activity.StatusReason is not null)
+            {
+                <dt>Açıklama</dt>
+                <dd>@Activity.StatusReason</dd>
+            }
+            @if (Activity.Location is not null)
+            {
+                <dt>Konum</dt>
+                <dd>@Activity.Location</dd>
+            }
+            @if (Activity.OnlineMeetingUrl is not null)
+            {
+                <dt>Çevrim içi</dt>
+                <dd><a href="@(Activity.OnlineMeetingUrl.StartsWith("http") ? Activity.OnlineMeetingUrl : "https://" + Activity.OnlineMeetingUrl)" target="_blank" rel="noopener noreferrer">Toplantıya katıl</a></dd>
+            }
+            @if (Activity.Notes is not null)
+            {
+                <dt>Notlar</dt>
+                <dd class="pre">@Activity.Notes</dd>
+            }
+            @if (related is { } r && (r.Links.Count > 0 || r.HiddenCount > 0))
+            {
+                <dt>İlişkili kayıtlar</dt>
+                <dd>
+                    @string.Join(", ", r.Links.Select(l => l.Title))
+                    @if (r.HiddenCount > 0) { <small class="text-muted"> · +@r.HiddenCount erişiminiz olmayan kayıt</small> }
+                </dd>
+            }
+        }
+    </dl>
+
+    @if (!Activity.Masked)
+    {
+        @if (pending is null)
+        {
+            <div class="form-actions">
+                @if (ActivityStatus.IsOpen(Activity.Status))
+                {
+                    @if (Session.Can(CrmAccess.ActivitiesWrite))
+                    {
+                        @if (Family == ActivityFamily.Task && Activity.Status == ActivityStatus.Open)
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="StartAsync">Başlat</button>
+                        }
+                        @if (Family == ActivityFamily.Task && Activity.Status != ActivityStatus.Blocked)
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => pending = Pending.Block">Bloke et</button>
+                        }
+                        @if (Activity.Status == ActivityStatus.Blocked)
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="UnblockAsync">Engeli kaldır</button>
+                        }
+                        @if (Activity.Status != ActivityStatus.Blocked)
+                        {
+                            <button type="button" class="btn btn-primary btn-sm" @onclick="() => pending = Pending.Complete">@(Family == ActivityFamily.Email ? "Gönderildi olarak kaydet" : "Tamamla")</button>
+                        }
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="StartReschedule">Ertele</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => pending = Pending.Cancel">İptal et</button>
+                    }
+                    @if (Session.Can(CrmAccess.ActivitiesWrite) || Session.Can(CrmAccess.ActivitiesAssign))
+                    {
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => pending = Pending.Reassign">Yeniden ata</button>
+                    }
+                }
+                else if (Session.Can(CrmAccess.ActivitiesReopen))
+                {
+                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => pending = Pending.Reopen">Yeniden aç</button>
+                }
+                @if (Session.Can(CrmAccess.ActivitiesWrite))
+                {
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Edit">Düzenle</button>
+                }
+            </div>
+        }
+        else
+        {
+            <form class="record-form" novalidate @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+                <div class="form-grid">
+                    @switch (pending)
+                    {
+                        case Pending.Complete:
+                            @if (Family != ActivityFamily.Task && Family != ActivityFamily.Email)
+                            {
+                                <div>
+                                    <label class="form-label" for="outcome">Sonuç</label>
+                                    <select id="outcome" class="form-select" @bind="outcome">
+                                        <option value="@ActivityOutcome.Reached">@(Family == ActivityFamily.Call ? "Ulaşıldı" : "Gerçekleşti")</option>
+                                        <option value="@ActivityOutcome.NoAnswer">@(Family == ActivityFamily.Call ? "Ulaşılamadı" : "Katılım olmadı")</option>
+                                    </select>
+                                </div>
+                            }
+                            <div>
+                                <label class="form-label" for="actual">Gerçekleşen süre (dk)</label>
+                                <input id="actual" class="form-control" type="number" min="1" @bind="actualMinutes" />
+                            </div>
+                            <div class="span-all">
+                                <label class="form-label" for="note">Sonuç açıklaması</label>
+                                <textarea id="note" class="form-control" rows="2" maxlength="@CrmLimits.TextMaxLength" @bind="text"></textarea>
+                            </div>
+                            <div class="form-check-row span-all">
+                                <input id="next" class="form-check-input" type="checkbox" @bind="addNext" />
+                                <label class="form-check-label" for="next">Sonraki adım oluştur</label>
+                            </div>
+                            @if (addNext)
+                            {
+                                <div>
+                                    <label class="form-label" for="nsub">Sonraki adım *</label>
+                                    <input id="nsub" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="nextSubject" />
+                                </div>
+                                <div>
+                                    <label class="form-label" for="ntype">Tür</label>
+                                    <select id="ntype" class="form-select" @bind="nextType">
+                                        @foreach (var type in Lookups.Choices(CrmLists.ActivityType))
+                                        {
+                                            <option value="@type.Key">@type.Label</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="form-label" for="ndue">Tarih</label>
+                                    <input id="ndue" class="form-control" type="datetime-local" @bind="nextDue" />
+                                </div>
+                            }
+                            break;
+                        case Pending.Reschedule:
+                            @if (Activity.IsAllDay)
+                            {
+                                <div>
+                                    <label class="form-label" for="sd">Başlangıç günü</label>
+                                    <input id="sd" class="form-control" type="date" @bind="startDate" />
+                                </div>
+                                <div>
+                                    <label class="form-label" for="ed">Bitiş günü</label>
+                                    <input id="ed" class="form-control" type="date" @bind="endDate" />
+                                </div>
+                            }
+                            else
+                            {
+                                @if (Activity.StartAt is not null)
+                                {
+                                    <div>
+                                        <label class="form-label" for="st">Başlangıç</label>
+                                        <input id="st" class="form-control" type="datetime-local" @bind="start" />
+                                    </div>
+                                    <div>
+                                        <label class="form-label" for="en">Bitiş</label>
+                                        <input id="en" class="form-control" type="datetime-local" @bind="end" />
+                                    </div>
+                                }
+                                <div>
+                                    <label class="form-label" for="du">Son tarih</label>
+                                    <input id="du" class="form-control" type="datetime-local" @bind="due" />
+                                </div>
+                            }
+                            <div class="span-all">
+                                <label class="form-label" for="reason">Gerekçe *</label>
+                                <input id="reason" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="text" />
+                            </div>
+                            break;
+                        case Pending.Reassign:
+                            <div class="span-all">
+                                <label class="form-label" for="owner">Yeni sorumlu</label>
+                                <select id="owner" class="form-select" @bind="newOwner">
+                                    @foreach (var member in Lookups.AssignableMembers)
+                                    {
+                                        <option value="@member.UserId">@member.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+                            break;
+                        default:
+                            <div class="span-all">
+                                <label class="form-label" for="reason2">Gerekçe *</label>
+                                <input id="reason2" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="text" />
+                            </div>
+                            break;
+                    }
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Onayla</button>
+                    @if (conflict)
+                    {
+                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => { allowConflict = true; return SubmitAsync(); }">Çakışmaya rağmen planla</button>
+                    }
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Reset">Vazgeç</button>
+                </div>
+            </form>
+        }
+    }
+</section>
+
+@code {
+    private enum Pending
+    {
+        Complete,
+        Cancel,
+        Reopen,
+        Block,
+        Reschedule,
+        Reassign,
+    }
+
+    private Pending? pending;
+    private bool busy;
+    private bool conflict;
+    private bool allowConflict;
+    private string? message;
+    private string? text;
+    private string outcome = ActivityOutcome.Reached;
+    private int? actualMinutes;
+    private bool addNext;
+    private string nextSubject = string.Empty;
+    private string nextType = ActivityType.Task;
+    private DateTime? nextDue;
+    private DateTime? start;
+    private DateTime? end;
+    private DateTime? due;
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private Guid newOwner;
+    private ActivityRelatedDto? related;
+    private Guid loadedFor;
+
+    [Parameter, EditorRequired] public ActivityDto Activity { get; set; } = default!;
+
+    /// <summary>Eylem sonrası yenilenen aktivite (liste ve takvim güncellenir).</summary>
+    [Parameter] public EventCallback<ActivityDto> Changed { get; set; }
+
+    [Parameter] public EventCallback Closed { get; set; }
+
+    [Parameter] public EventCallback<ActivityDto> EditRequested { get; set; }
+
+    private string Family => ActivityLabels.Family(Lookups, Activity.Type);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Activity.Id)
+        {
+            return;
+        }
+
+        loadedFor = Activity.Id;
+        Reset();
+        related = Activity.Masked ? null : (await Api.GetAsync<ActivityRelatedDto>($"/api/crm/activities/{Activity.Id}/related")).Value;
+    }
+
+    private string When()
+    {
+        var text = ActivityLabels.TimeText(Activity);
+        var day = ActivityLabels.Days(Activity).FirstOrDefault();
+        return day == default ? text : $"{day.ToString("d MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))} {text}".Trim();
+    }
+
+    private Task StartAsync() => RunAsync("start", new ActivityVersionRequest(Activity.Version));
+
+    private Task UnblockAsync() => RunAsync("unblock", new ActivityVersionRequest(Activity.Version));
+
+    private Task Edit() => EditRequested.InvokeAsync(Activity);
+
+    private void StartReschedule()
+    {
+        start = Activity.StartAt is { } s ? Regional.ToTenant(s).DateTime : null;
+        end = Activity.EndAt is { } e ? Regional.ToTenant(e).DateTime : null;
+        due = Activity.DueAt is { } d ? Regional.ToTenant(d).DateTime : null;
+        startDate = Activity.StartDate?.ToDateTime(TimeOnly.MinValue);
+        endDate = Activity.EndDate?.ToDateTime(TimeOnly.MinValue);
+        pending = Pending.Reschedule;
+    }
+
+    private void Reset()
+    {
+        pending = null;
+        message = null;
+        text = null;
+        conflict = false;
+        allowConflict = false;
+        addNext = false;
+        nextSubject = string.Empty;
+        outcome = ActivityOutcome.Reached;
+        newOwner = Activity.OwnerId ?? Lookups.AssignableMembers.FirstOrDefault()?.UserId ?? Guid.Empty;
+    }
+
+    private Task SubmitAsync() => pending switch
+    {
+        Pending.Complete => RunAsync("complete", new CompleteActivityRequest(
+            Activity.Version, Family is ActivityFamily.Task or ActivityFamily.Email ? null : outcome, text, ActualMinutes: actualMinutes,
+            NextStep: addNext ? new ActivityNextStepRequest(nextSubject, nextType, nextDue is { } n ? Regional.FromTenant(n) : null) : null)),
+        Pending.Cancel => RunAsync("cancel", new ActivityReasonRequest(Activity.Version, text)),
+        Pending.Reopen => RunAsync("reopen", new ActivityReasonRequest(Activity.Version, text)),
+        Pending.Block => RunAsync("block", new ActivityReasonRequest(Activity.Version, text)),
+        Pending.Reassign => RunAsync("reassign", new ReassignActivityRequest(Activity.Version, newOwner)),
+        Pending.Reschedule => RunAsync("reschedule", Activity.IsAllDay
+            ? new RescheduleActivityRequest(Activity.Version, text, IsAllDay: true, StartDate: ToDay(startDate), EndDate: ToDay(endDate), AllowConflict: allowConflict)
+            : new RescheduleActivityRequest(Activity.Version, text, due is { } d ? Regional.FromTenant(d) : null,
+                start is { } s ? Regional.FromTenant(s) : null, end is { } e ? Regional.FromTenant(e) : null, AllowConflict: allowConflict)),
+        _ => Task.CompletedTask,
+    };
+
+    private static DateOnly? ToDay(DateTime? value) => value is { } v ? DateOnly.FromDateTime(v) : null;
+
+    private async Task RunAsync(string action, object body)
+    {
+        busy = true;
+        message = null;
+        ActivityDto? updated;
+        if (action == "complete")
+        {
+            var result = await Api.PostAsync<CompleteActivityResultDto>($"/api/crm/activities/{Activity.Id}/{action}", body);
+            updated = result.Value?.Activity;
+            message = result.Error;
+            conflict = false;
+        }
+        else
+        {
+            var result = await Api.PostAsync<ActivityDto>($"/api/crm/activities/{Activity.Id}/{action}", body);
+            updated = result.Value;
+            message = result.Error;
+            conflict = result.FieldErrors?.ContainsKey("conflict") == true;
+            if (conflict)
+            {
+                message = result.FieldErrors!["conflict"].FirstOrDefault();
+            }
+            else if (result.FieldErrors is { Count: > 0 } fields)
+            {
+                message = string.Join(" ", fields.SelectMany(f => f.Value));
+            }
+        }
+
+        busy = false;
+        if (updated is not null)
+        {
+            loadedFor = Guid.Empty;
+            pending = null;
+            await Changed.InvokeAsync(updated);
+        }
+    }
+}

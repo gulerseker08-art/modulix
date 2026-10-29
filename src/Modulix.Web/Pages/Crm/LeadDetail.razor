@@ -281,7 +281,7 @@
             }
             else
             {
-                var nextPlanned = activities.Where(a => a.CompletedAt is null && a.DueAt is not null).OrderBy(a => a.DueAt).FirstOrDefault();
+                var nextPlanned = activities.Where(a => ActivityStatus.IsOpen(a.Status) && a.DueAt is not null).OrderBy(a => a.DueAt).FirstOrDefault();
                 var lastDone = activities.Where(a => a.CompletedAt is not null).OrderByDescending(a => a.CompletedAt).FirstOrDefault();
                 <p class="text-muted small">
                     Son tamamlanan: @(lastDone is null ? "yok" : $"{lastDone.Subject} · {CrmLabels.Time(lastDone.CompletedAt!.Value)}")
@@ -290,7 +290,7 @@
                 <ul class="item-list timeline">
                     @foreach (var a in activities.OrderByDescending(x => x.CompletedAt ?? x.DueAt ?? DateTimeOffset.MaxValue))
                     {
-                        var overdue = a.CompletedAt is null && a.DueAt is { } due && due < DateTimeOffset.UtcNow;
+                        var overdue = a.IsOverdue(DateTimeOffset.UtcNow);
                         <li>
                             <div class="item-main">
                                 <strong>@Lookups.Label(CrmLists.ActivityType, a.Type) · @a.Subject</strong>
