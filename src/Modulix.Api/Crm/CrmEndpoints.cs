@@ -44,12 +44,6 @@ public static class CrmEndpoints
             CrmModule.Permissions.ContactsRead, CrmModule.Permissions.ContactsWrite);
         MapResource<CompanyRelationDto, SaveCompanyRelationRequest>(crm, "company-relations", CrmModule.Entities.CompanyRelation,
             CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite);
-        MapResource<ProductCategoryDto, SaveProductCategoryRequest>(crm, "product-categories", CrmModule.Entities.ProductCategory,
-            CrmModule.Permissions.ProductsRead, CrmModule.Permissions.ProductsWrite);
-        MapResource<MeasureUnitDto, SaveMeasureUnitRequest>(crm, "units", CrmModule.Entities.MeasureUnit,
-            CrmModule.Permissions.ProductsRead, CrmModule.Permissions.ProductsWrite);
-        MapResource<ProductDto, SaveProductRequest>(crm, "products", CrmModule.Entities.Product,
-            CrmModule.Permissions.ProductsRead, CrmModule.Permissions.ProductsWrite);
         OpportunityEndpoints.Map(crm);
         MapResource<ActivityDto, SaveActivityRequest>(crm, "activities", CrmModule.Entities.Activity,
             CrmModule.Permissions.ActivitiesRead, CrmModule.Permissions.ActivitiesWrite);
