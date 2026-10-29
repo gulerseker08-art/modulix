@@ -81,7 +81,7 @@
                         <td data-label="Kod" class="primary">@unit.Code</td>
                         <td data-label="Ad">@unit.Name</td>
                         <td data-label="Grup">@CatalogLabels.Label(CatalogLabels.UnitGroups, unit.GroupKey)</td>
-                        <td data-label="Katsayı">@unit.FactorToBase</td>
+                        <td data-label="Katsayı">@unit.FactorToBase.ToString("0.######")</td>
                         <td class="actions">
                             @if (Session.Can(CrmAccess.ProductsWrite))
                             {

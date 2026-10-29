@@ -120,9 +120,9 @@
                         {
                             <tr>
                                 <td data-label="Ürün" class="primary">@item.ProductCode — @item.ProductName</td>
-                                <td data-label="Alt miktar">@item.MinQuantity</td>
-                                <td data-label="Üst miktar">@(item.MaxQuantity?.ToString() ?? "sınırsız")</td>
-                                <td data-label="Birim fiyat">@(item.IsFree ? "Ücretsiz" : $"{item.UnitPrice} {opened.Currency}")</td>
+                                <td data-label="Alt miktar">@item.MinQuantity.ToString("0.######")</td>
+                                <td data-label="Üst miktar">@(item.MaxQuantity?.ToString("0.######") ?? "sınırsız")</td>
+                                <td data-label="Birim fiyat">@(item.IsFree ? "Ücretsiz" : $"{item.UnitPrice.ToString("0.00####")} {opened.Currency}")</td>
                                 <td class="actions">
                                     @if (opened.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
                                     {
