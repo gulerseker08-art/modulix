@@ -464,6 +464,10 @@ Aktivite, CRM'in `crm.Activities` kaydıdır. Yaşam döngüsü **tür ailesine*
 
 **Geliştirici:** kural katmanı `Activities/ActivityRules.cs` (saf, birim testli); eylemler `IActivityWorkflow`; kayıt depoları `Records/ActivityRecordStore.cs`, `ActivityChildStores.cs`; görünürlük `ActivityVisibility.cs`. Yeni tablolar (`ActivityLinks`, `ActivityParticipants`) RLS politikasındadır. Yapılmayanlar ve nedenleri ADR-0015 sonunda.
 
+### Ürün, hizmet ve fiyat yönetimi ([ADR-0018](docs/adr/0018-urun-hizmet-fiyat-yonetimi.md)) — kısmen uygulandı
+
+Kategori (`/api/crm/product-categories`), ölçü birimi (`/api/crm/units`) ve ürün/hizmet kartı (`/api/crm/products`; liste süzgeçleri: `status`, `kind`, `categoryId`, `code`, `sellableOn=yyyy-MM-dd`, arama kod/ad/barkod/etiket) kayıt boru hattından geçer. İzinler: `crm.products.read`, `crm.products.write`, **`crm.product-costs.read`** (maliyet hassas alandır; izni olmayan görmez ve yazamaz, hiçbir hazır role verilmez). Ürün kodu tenant içinde benzersizdir (iki tenant aynı kodu kullanabilir). Yaşam döngüsü Taslak → Aktif ↔ Pasif → Satıştan kaldırılmış (son durum); yalnızca taslak silinebilir, diğerleri 409 alır. Yalnızca aktif ve satış tarih aralığındaki ürün yeni satışta kullanılabilir (`CatalogRules.IsSellable`). Ürünlerde kullanılan birimin grubu/katsayısı değiştirilemez ve silinemez; kategori kendi altına taşınamaz. Fiyat seçimi, indirim, vergi/yuvarlama, birim dönüşümü ve paket hesapları `Modulix.Core/Pricing` altındaki saf çekirdektedir; veri katmanına, ekranlara ve teklif entegrasyonuna henüz bağlı değildir.
+
 ### Fırsat yönetimi ([ADR-0017](docs/adr/0017-firsat-yonetimi.md))
 
 Fırsat; numara (`OP-20261029-AB12CD`, tenant içinde benzersiz), durum (`Open`, `OnHold`, `Won`, `Lost`, `Cancelled`), aşama (Y9b listesi), öncelik, tür, kaynak, ihtiyaç analizi, tutar/olasılık/müşteri bütçesi (bütçe durumu ayrı), tahmini ve gerçek kapanış, sonraki aksiyon ve son müşteri etkileşimi taşır. **Durum–aşama ilişkisi:** Kazanıldı ↔ `won` kategorili aşama, Kaybedildi ↔ `lost`; Açık, Beklemede ve İptal edildi `open` aşamada durur. Çelişkili birleşim kaydedilemez.
