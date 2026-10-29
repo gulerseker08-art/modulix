@@ -162,6 +162,14 @@ public interface IRecordPipeline
 
     /// <summary>Eski (birleştirilmiş) bir kimliğin hangi kayda gittiği; hedefi çağıran göremiyorsa "bulunamadı".</summary>
     Task<RecordResult<MergeLink>> ResolveMergedAsync(RecordRef record, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Birden fazla kayıt işlemini tek veritabanı işleminde çalıştırır (ör. Lead'in firma, kişi ve fırsata dönüşümü). İçeride
+    /// çağrılan her boru hattı işlemi kendi izin, kapsam, audit ve olay adımlarından geçer; ancak hiçbiri <paramref name="work"/>
+    /// başarıyla bitmeden kalıcı olmaz. Sonuç başarısızsa ya da istisna fırlarsa işlemdeki tüm yazımlar geri alınır.
+    /// Zaten açık bir işlem varsa (ör. olay aboneleri) ona katılır ve kararı dış işlem verir.
+    /// </summary>
+    Task<RecordResult<T>> RunAtomicAsync<T>(Func<CancellationToken, Task<RecordResult<T>>> work, CancellationToken cancellationToken);
 }
 
 /// <summary>Tamamlanan birleştirme: hedefin yeni hali ve etkilenen kayıtların özeti.</summary>
@@ -259,4 +267,14 @@ public sealed class RecordValidationException(IReadOnlyList<RecordFieldError> er
     : Exception("Doğrulama hatası.")
 {
     public IReadOnlyList<RecordFieldError> Errors { get; } = errors;
+}
+
+/// <summary>
+/// Şu an boru hattından geçen yazma komutunun nedeni (<see cref="RecordCommand.Reason"/>). Kayıt depoları, yalnızca güvenilir iç
+/// çağıranların (ör. kayıt devri, <see cref="Events.EventReasons.Transfer"/>) verebildiği nedene göre davranışı ayarlayabilir; uç
+/// noktalar neden vermez, istemci veremez. Yazma dışında ya da neden verilmediyse boştur.
+/// </summary>
+public interface IRecordCommandContext
+{
+    string? Reason { get; }
 }

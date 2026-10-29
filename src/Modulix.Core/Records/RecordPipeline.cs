@@ -29,7 +29,8 @@ public sealed class RecordPipeline(
     IDomainEventOutbox outbox,
     IUnitOfWork unitOfWork,
     EventHandlingScope? handling = null,
-    ISharedReferenceMerger? references = null) : IRecordPipeline
+    ISharedReferenceMerger? references = null,
+    RecordCommandContext? commandContext = null) : IRecordPipeline
 {
     public async Task<RecordResult<RecordData>> GetAsync(RecordRef record, CancellationToken cancellationToken)
     {
@@ -142,6 +143,7 @@ public sealed class RecordPipeline(
             return Invalid<RecordData>(errors);
         }
 
+        using var reason = commandContext?.Enter(command.Reason);
         try
         {
             var created = await store.CreateAsync(values, cancellationToken);
@@ -209,6 +211,7 @@ public sealed class RecordPipeline(
             return Invalid<RecordData>(errors);
         }
 
+        using var reason = commandContext?.Enter(command.Reason);
         try
         {
             var updated = await store.UpdateAsync(id, values, command.ExpectedVersion, cancellationToken);
@@ -370,6 +373,19 @@ public sealed class RecordPipeline(
         return target is not null && await InScopeAsync(tenant!, store, target, cancellationToken)
             ? RecordResult<MergeLink>.Ok(link)
             : NotFound<MergeLink>();
+    }
+
+    public async Task<RecordResult<T>> RunAtomicAsync<T>(Func<CancellationToken, Task<RecordResult<T>>> work, CancellationToken cancellationToken)
+    {
+        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        var result = await work(cancellationToken);
+        if (transaction is not null && result.IsSuccess)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        // Başarısız sonuçta (ya da istisnada) işlem commit edilmeden atılır: tüm yazımlar geri alınır.
+        return result;
     }
 
     private sealed record PreparedMerge<T>(RecordResult<T>? Gate, TenantContext? Tenant, IRecordStore? Store, IMergeableRecordStore? Mergeable);

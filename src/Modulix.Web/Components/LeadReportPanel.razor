@@ -1,0 +1,133 @@
+@* Lead raporu (kullanıcının erişim kapsamıyla sınırlı). Tanımlar ekranda yazılıdır: dönem kohortu = dönemde GELEN Lead'ler. *@
+@inject ApiClient Api
+@inject CrmLookups Lookups
+
+<section class="detail-section lead-report">
+    <div class="section-header">
+        <h2>Lead raporu</h2>
+        <div class="filters">
+            <label class="form-label-inline">Başlangıç <input class="form-control" type="date" @bind="from" @bind:after="LoadAsync" /></label>
+            <label class="form-label-inline">Bitiş <input class="form-control" type="date" @bind="to" @bind:after="LoadAsync" /></label>
+        </div>
+    </div>
+    <p class="text-muted small">
+        Dönem kohortu: seçilen tarihler arasında <strong>gelen</strong> Lead'ler. Dağılımlar, ilk temas ve dönüşüm oranı bu kohorta aittir;
+        dönemde yapılan ama önceki dönemde gelmiş Lead'lerin dönüşümü ayrıca "Dönemde yapılan dönüşüm" olarak gösterilir ve orana katılmaz.
+        Süreler takvim saati cinsindendir (iş saati değildir). Payda sıfırsa oran gösterilmez.
+    </p>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
+    else if (report is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else
+    {
+        @if (report.Truncated)
+        {
+            <div class="alert alert-warning" role="alert">Kayıt sayısı rapor sınırını aştı; sayılar eksik olabilir. Tarih aralığını daraltın.</div>
+        }
+        <dl class="summary-grid">
+            <div><dt>Kohorttaki Lead</dt><dd>@report.CohortCount</dd></div>
+            <div><dt>İlk teması olan</dt><dd>@report.WithFirstContact</dd></div>
+            <div><dt>Ort. ilk temas süresi</dt><dd>@Hours(report.AverageFirstContactHours)</dd></div>
+            <div><dt>Medyan ilk temas süresi</dt><dd>@Hours(report.MedianFirstContactHours)</dd></div>
+            <div>
+                <dt>İlk temas hedefi aşımı</dt>
+                <dd>@(report.FirstContactTargetBreaches is { } breaches ? $"{breaches} (hedef {report.FirstContactTargetHours} saat)" : "Hedef tanımlı değil")</dd>
+            </div>
+            <div><dt>Fırsata dönüşen (kohort)</dt><dd>@report.ConvertedFromCohort</dd></div>
+            <div><dt>Dönüşüm oranı</dt><dd>@(report.ConversionRate is { } rate ? $"%{rate * 100:0.#}" : "—")</dd></div>
+            <div><dt>Dönüşüme kadar ort. süre</dt><dd>@Hours(report.AverageHoursToConvert)</dd></div>
+            <div><dt>Dönemde yapılan dönüşüm</dt><dd>@report.ConvertedInPeriod</dd></div>
+        </dl>
+        <div class="report-tables">
+            <div>
+                <h3>Kaynağa göre</h3>
+                @Table(report.BySource, k => k.Length == 0 ? "(belirtilmemiş)" : Lookups.Label(CrmLeadLists.Source, k))
+            </div>
+            <div>
+                <h3>Duruma göre</h3>
+                @Table(report.ByStatus, LeadStatus.Label)
+            </div>
+            <div>
+                <h3>Eleme nedenleri</h3>
+                @Table(report.DisqualificationReasons, k => k.Length == 0 ? "(belirtilmemiş)" : Lookups.Label(CrmLeadLists.DisqualificationReason, k))
+            </div>
+            <div>
+                <h3>Sorumluya göre açık Lead (şu an)</h3>
+                @if (report.OpenByOwner.Count == 0)
+                {
+                    <p class="text-muted">Açık Lead yok.</p>
+                }
+                else
+                {
+                    <table class="table">
+                        <tbody>
+                            @foreach (var row in report.OpenByOwner)
+                            {
+                                <tr><td>@(row.OwnerId is null ? "Atanmadı" : Lookups.MemberName(row.OwnerId))</td><td class="text-end">@row.Count</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private LeadReportDto? report;
+    private string? error;
+    private DateOnly from = DateOnly.FromDateTime(DateTime.Today.AddDays(-30));
+    private DateOnly to = DateOnly.FromDateTime(DateTime.Today);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var start = Regional.FromTenant(from.ToDateTime(TimeOnly.MinValue));
+        var end = Regional.FromTenant(to.AddDays(1).ToDateTime(TimeOnly.MinValue));
+        var result = await Api.GetAsync<LeadReportDto>(
+            $"/api/crm/leads/report?from={Uri.EscapeDataString(start.ToString("O"))}&to={Uri.EscapeDataString(end.ToString("O"))}");
+        report = result.Value;
+        error = result.Error;
+    }
+
+    private static string Hours(double? hours) =>
+        hours is not { } value ? "—" : value < 48 ? $"{value:0.#} saat" : $"{value / 24:0.#} gün";
+
+    private RenderFragment Table(IReadOnlyList<LeadCount> rows, Func<string, string> label) => builder =>
+    {
+        if (rows.Count == 0)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddAttribute(1, "class", "text-muted");
+            builder.AddContent(2, "Kayıt yok.");
+            builder.CloseElement();
+            return;
+        }
+
+        builder.OpenElement(0, "table");
+        builder.AddAttribute(1, "class", "table");
+        builder.OpenElement(2, "tbody");
+        foreach (var row in rows)
+        {
+            builder.OpenElement(3, "tr");
+            builder.OpenElement(4, "td");
+            builder.AddContent(5, label(row.Key));
+            builder.CloseElement();
+            builder.OpenElement(6, "td");
+            builder.AddAttribute(7, "class", "text-end");
+            builder.AddContent(8, row.Count);
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+}

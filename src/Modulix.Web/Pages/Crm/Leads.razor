@@ -1,0 +1,278 @@
+@page "/crm/leadler"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Lead'ler · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.LeadsRead">
+    <div class="page-header">
+        <h1>Lead'ler</h1>
+        <div class="header-actions">
+            @if (Session.Can(CrmAccess.LeadFormsManage))
+            {
+                <a class="btn btn-outline-secondary" href="crm/lead-formlari">Formlar</a>
+            }
+            @if (Session.Can(CrmAccess.LeadsExport))
+            {
+                <a class="btn btn-outline-secondary" href="@ExportUrl()" download="leadler.csv">CSV indir</a>
+            }
+            <button type="button" class="btn btn-outline-secondary" @onclick="ToggleReportAsync">@(showReport ? "Raporu gizle" : "Rapor")</button>
+            @if (Session.Can(CrmAccess.LeadsCreate) && !editing)
+            {
+                <button type="button" class="btn btn-primary" @onclick="() => editing = true">Yeni Lead</button>
+            }
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <LeadEditor Lookups="Lookups" Saved="SavedAsync" Cancelled="() => editing = false" />
+    }
+
+    @if (showReport)
+    {
+        <LeadReportPanel />
+    }
+
+    <div class="filters">
+        @foreach (var view in Views)
+        {
+            @if (view.Visible(Session))
+            {
+                <button type="button" class="chip @(current == view.Key ? "active" : null)" aria-pressed="@(current == view.Key)"
+                        @onclick="() => SelectAsync(view.Key)">@view.Label</button>
+            }
+        }
+    </div>
+    <div class="filters">
+        <select class="form-select" aria-label="Durum" @bind="status" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm durumlar</option>
+            @foreach (var s in LeadStatus.All)
+            {
+                <option value="@s">@LeadStatus.Label(s)</option>
+            }
+        </select>
+        <select class="form-select" aria-label="Kaynak" @bind="source" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm kaynaklar</option>
+            @foreach (var s in Lookups.ValuesOf(CrmLeadLists.Source))
+            {
+                <option value="@s.Key">@s.Label</option>
+            }
+        </select>
+        <select class="form-select" aria-label="Öncelik" @bind="priority" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm öncelikler</option>
+            @foreach (var p in LeadPriority.All)
+            {
+                <option value="@p">@LeadPriority.Label(p)</option>
+            }
+        </select>
+        <select class="form-select" aria-label="Sorumlu" @bind="owner" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm sorumlular</option>
+            @foreach (var member in Lookups.Members)
+            {
+                <option value="@member.UserId">@member.DisplayName</option>
+            }
+        </select>
+        <label class="form-label-inline">Geliş: <input class="form-control" type="date" aria-label="Başlangıç" @bind="from" @bind:after="() => LoadAsync(1)" /></label>
+        <label class="form-label-inline">– <input class="form-control" type="date" aria-label="Bitiş" @bind="to" @bind:after="() => LoadAsync(1)" /></label>
+    </div>
+
+    @if (target is { } hours && current == "firstContactOverdue")
+    {
+        <p class="text-muted small">İlk temas hedefi @hours saat (takvim saati; iş saati değildir).</p>
+    }
+
+    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <input class="form-control" type="search" placeholder="Konu, no, ad, firma ya da e-posta ara" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (page is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Bu görünümde Lead yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead>
+                <tr>
+                    <th>No</th><th>Konu</th><th>Talep sahibi</th><th>Durum</th><th>Öncelik</th><th>Kaynak</th><th>Sorumlu</th><th>Geliş</th><th>İlk temas</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var lead in page.Items)
+                {
+                    <tr>
+                        <td data-label="No"><a href="crm/leadler/@lead.Id">@lead.LeadNumber</a></td>
+                        <td data-label="Konu" class="primary">@lead.Subject</td>
+                        <td data-label="Talep sahibi">@Requester(lead)</td>
+                        <td data-label="Durum"><span class="badge stage-@lead.Status.ToLowerInvariant()">@LeadStatus.Label(lead.Status)</span></td>
+                        <td data-label="Öncelik">@LeadPriority.Label(lead.Priority)</td>
+                        <td data-label="Kaynak">@Lookups.Label(CrmLeadLists.Source, lead.Source)</td>
+                        <td data-label="Sorumlu">@(lead.OwnerId is null ? "Atanmadı" : Lookups.MemberName(lead.OwnerId))</td>
+                        <td data-label="Geliş">@CrmLabels.Time(lead.FirstReceivedAt)</td>
+                        <td data-label="İlk temas">
+                            @if (lead.FirstContactAt is { } contact)
+                            {
+                                @CrmLabels.Time(contact)
+                            }
+                            else if (IsOverdue(lead))
+                            {
+                                <span class="badge stage-lost">Gecikti</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/leads";
+
+    // Görünümler yalnızca süzgeçtir; kapsamı sunucu uygular (kimse yetkisi dışındaki Lead'i listeleyemez).
+    private static readonly ViewDefinition[] Views =
+    [
+        new("all", "Tümü", _ => true),
+        new("mine", "Benim Lead'lerim", _ => true),
+        new("team", "Ekip Lead'leri", s => s.Scope != RecordScope.Own),
+        new("unassigned", "Atama bekleyenler", s => s.Can(CrmAccess.LeadsAssign)),
+        new("firstContactOverdue", "İlk temas gecikmiş", _ => true),
+        new("followUpOverdue", "Takibi geciken", _ => true),
+        new("qualified", "Nitelikli, dönüşmemiş", _ => true),
+    ];
+
+    private CrmPage<LeadDto>? page;
+    private string current = "all";
+    private string? message;
+    private string? search;
+    private string status = string.Empty;
+    private string source = string.Empty;
+    private string priority = string.Empty;
+    private string owner = string.Empty;
+    private DateOnly? from;
+    private DateOnly? to;
+    private bool editing;
+    private bool showReport;
+    private int? target;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.LeadsRead))
+        {
+            await Lookups.LoadAsync(contacts: true);
+            target = (await Api.GetAsync<LeadSettingsDto>($"{Url}/settings")).Value?.FirstContactTargetHours;
+            await LoadAsync(1);
+        }
+    }
+
+    private string Query(int pageNumber)
+    {
+        var parts = new List<string> { $"page={pageNumber}", $"search={Uri.EscapeDataString(search ?? string.Empty)}" };
+        Add(parts, "status", status);
+        Add(parts, "source", source);
+        Add(parts, "priority", priority);
+        Add(parts, "ownerId", owner);
+        if (from is { } f)
+        {
+            parts.Add($"receivedFrom={Uri.EscapeDataString(Regional.FromTenant(f.ToDateTime(TimeOnly.MinValue)).ToString("O"))}");
+        }
+
+        if (to is { } t)
+        {
+            parts.Add($"receivedBefore={Uri.EscapeDataString(Regional.FromTenant(t.AddDays(1).ToDateTime(TimeOnly.MinValue)).ToString("O"))}");
+        }
+
+        switch (current)
+        {
+            case "mine":
+                parts.Add("ownerId=me");
+                break;
+            case "team":
+                parts.Add("ownerNot=me");
+                break;
+            case "unassigned":
+                parts.Add("unassigned=true");
+                break;
+            case "firstContactOverdue" when target is { } hours:
+                parts.Add($"firstContactDueBefore={Uri.EscapeDataString(DateTimeOffset.UtcNow.AddHours(-hours).ToString("O"))}");
+                break;
+            case "firstContactOverdue":
+                // Hedef tanımlı değilse "gecikmiş" kavramı yoktur; hiçbir kaydı gecikmiş göstermemek için geçmişe bir sınır konur.
+                parts.Add("firstContactDueBefore=0001-01-02T00:00:00Z");
+                break;
+            case "followUpOverdue":
+                parts.Add($"followUpDueBefore={Uri.EscapeDataString(DateTimeOffset.UtcNow.ToString("O"))}");
+                break;
+            case "qualified":
+                parts.Add("qualifiedNotConverted=true");
+                break;
+        }
+
+        return string.Join('&', parts);
+    }
+
+    private static void Add(List<string> parts, string name, string value)
+    {
+        if (!string.IsNullOrEmpty(value))
+        {
+            parts.Add($"{name}={Uri.EscapeDataString(value)}");
+        }
+    }
+
+    private string ExportUrl() => $"{Url}/export?{Query(1)}";
+
+    private async Task SelectAsync(string view)
+    {
+        current = view;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var result = await Api.GetAsync<CrmPage<LeadDto>>($"{Url}?{Query(pageNumber)}");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private Task ToggleReportAsync()
+    {
+        showReport = !showReport;
+        return Task.CompletedTask;
+    }
+
+    private async Task SavedAsync(LeadDto lead)
+    {
+        editing = false;
+        await LoadAsync(1);
+    }
+
+    private bool IsOverdue(LeadDto lead) =>
+        target is { } hours && LeadStatus.IsOpen(lead.Status) && lead.Status is LeadStatus.New or LeadStatus.Contacting
+        && lead.FirstContactAt is null && DateTimeOffset.UtcNow - lead.FirstReceivedAt > TimeSpan.FromHours(hours);
+
+    private static string Requester(LeadDto lead)
+    {
+        var name = string.Join(' ', new[] { lead.FirstName, lead.LastName }.Where(n => !string.IsNullOrWhiteSpace(n)));
+        return string.Join(" · ", new[] { name, lead.CompanyName }.Where(n => !string.IsNullOrWhiteSpace(n)));
+    }
+
+    private sealed record ViewDefinition(string Key, string Label, Func<SessionState, bool> Visible);
+}

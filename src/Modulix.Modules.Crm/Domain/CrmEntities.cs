@@ -143,6 +143,12 @@ public sealed class Opportunity : CrmEntity, IOwnedEntity
     /// <summary>Fırsat kaybedildiyse nedeni.</summary>
     public string? LostReason { get; internal set; }
 
+    /// <summary>
+    /// Fırsatın doğduğu Lead (izlenebilirlik). Fırsat aşamalarındaki "Lead/Aday" aşamasından bağımsızdır: o, fırsatın erken
+    /// aşamasıdır; bu alan ise bağımsız Lead sürecinin dönüşüm izidir. Mevcut fırsatlar otomatik Lead'e taşınmaz, alan boş kalır.
+    /// </summary>
+    public Guid? SourceLeadId { get; internal set; }
+
     public Guid? OwnerId { get; internal set; }
 
     public string? Notes { get; internal set; }
@@ -165,6 +171,14 @@ public sealed class Activity : CrmEntity, IOwnedEntity
     public Guid? ContactId { get; internal set; }
 
     public Guid? OpportunityId { get; internal set; }
+
+    /// <summary>Aktivitenin bağlı olduğu Lead (isteğe bağlı); Lead için ayrı bir görev sistemi yoktur, bu aktivite tablosu kullanılır.</summary>
+    public Guid? LeadId { get; internal set; }
+
+    /// <summary>
+    /// Sonuç (<c>ActivityOutcomes</c>): Lead'in "gerçekleşen ilk teması"nı belirlemek için kullanılır. Boş olabilir.
+    /// </summary>
+    public string? Outcome { get; internal set; }
 
     /// <summary>Aktiviteyi yapacak kişi.</summary>
     public Guid? OwnerId { get; internal set; }
@@ -373,4 +387,199 @@ public sealed class MergedRecord : CrmEntity
     public Guid TargetId { get; internal set; }
 
     public Guid? MergedBy { get; internal set; }
+}
+
+/// <summary>
+/// Lead durumları. Durum yalnızca iş akışı eylemleriyle (<c>LeadWorkflow</c>) değişir; genel kayıt uçları durumu yazamaz.
+/// "Atandı" ayrı bir durum değildir: atama <see cref="Lead.OwnerId"/> ile temsil edilir (tek doğruluk kaynağı); atanmamış
+/// Lead'ler "atama bekleyen" görünümünde (sorumlusu boş) listelenir.
+/// </summary>
+public static class LeadStatus
+{
+    public const string New = "New";
+    public const string Contacting = "Contacting";
+    public const string Qualified = "Qualified";
+    public const string Nurturing = "Nurturing";
+    public const string Disqualified = "Disqualified";
+    public const string Converted = "Converted";
+
+    public static IReadOnlyList<string> All { get; } = [New, Contacting, Qualified, Nurturing, Disqualified, Converted];
+
+    /// <summary>Açık: henüz sonuçlanmamış (elenmemiş ve dönüştürülmemiş).</summary>
+    public static IReadOnlyList<string> Open { get; } = [New, Contacting, Qualified, Nurturing];
+
+    public static bool IsOpen(string status) => status is New or Contacting or Qualified or Nurturing;
+}
+
+public static class LeadPriority
+{
+    public const string Low = "Low";
+    public const string Normal = "Normal";
+    public const string High = "High";
+    public const string Urgent = "Urgent";
+
+    public static IReadOnlyList<string> All { get; } = [Low, Normal, High, Urgent];
+}
+
+/// <summary>
+/// Lead: yeterliliği henüz doğrulanmamış satış ilgisi/talebi. Firma, kişi ve fırsattan ayrı bir kayıttır; açılırken firma ya da
+/// kişi oluşturmak gerekmez. Talep sahibinin bilgileri Lead üzerinde ham olarak durur; dönüşümde firma/kişiye kopyalanır.
+/// Mevcut bir müşteriden gelen talep <see cref="CompanyId"/> / <see cref="ContactId"/> ile ona bağlanabilir. Aynı e-posta
+/// tek başına mükerrer kanıtı değildir. İşletici şirket kapsamı yoktur (CRM ana verisi ortaktır, ADR-0008).
+/// </summary>
+public sealed class Lead : CrmEntity, IOwnedEntity
+{
+    public const int SubjectMaxLength = 200;
+    public const int NumberMaxLength = 30;
+    public const int TextMaxLength = 4000;
+    public const int NameMaxLength = 100;
+    public const int ShortMaxLength = 200;
+    public const int EmailMaxLength = 254;
+    public const int PhoneMaxLength = 40;
+    public const int UrlMaxLength = 300;
+    public const int ReasonMaxLength = 500;
+    public const int UtmMaxLength = 100;
+    public const int ExternalIdMaxLength = 200;
+
+    /// <summary>Okunabilir tekil numara (ör. "LD-20261028-7K2M4Q"); oluşturmada üretilir.</summary>
+    public string LeadNumber { get; internal set; } = string.Empty;
+
+    public string Subject { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    public string Status { get; internal set; } = LeadStatus.New;
+
+    /// <summary>Son durum değişikliğinin gerekçesi (eleme/takip/yeniden açma).</summary>
+    public string? StatusReason { get; internal set; }
+
+    public string Priority { get; internal set; } = LeadPriority.Normal;
+
+    // Talep sahibi
+    public string? FirstName { get; internal set; }
+
+    public string? LastName { get; internal set; }
+
+    public string? CompanyName { get; internal set; }
+
+    public string? Email { get; internal set; }
+
+    /// <summary>Arama/eşleştirme için normalleştirilmiş e-posta (kimlik kanıtı değildir).</summary>
+    public string? NormalizedEmail { get; internal set; }
+
+    public string? Phone { get; internal set; }
+
+    public string? NormalizedPhone { get; internal set; }
+
+    public string? JobTitle { get; internal set; }
+
+    public string? Website { get; internal set; }
+
+    /// <summary>Web sitesinden çıkarılan alan adı (mükerrer araması için).</summary>
+    public string? WebsiteDomain { get; internal set; }
+
+    public string? Country { get; internal set; }
+
+    public string? City { get; internal set; }
+
+    /// <summary>Talebin geldiği mevcut müşteri firması (isteğe bağlı).</summary>
+    public Guid? CompanyId { get; internal set; }
+
+    /// <summary>Talebin geldiği mevcut kişi (isteğe bağlı).</summary>
+    public Guid? ContactId { get; internal set; }
+
+    // Talep içeriği
+    public string? ProductInterest { get; internal set; }
+
+    public string? NeedDescription { get; internal set; }
+
+    public decimal? EstimatedBudget { get; internal set; }
+
+    public string Currency { get; internal set; } = Opportunity.DefaultCurrency;
+
+    public DateOnly? TargetPurchaseDate { get; internal set; }
+
+    public string? Industry { get; internal set; }
+
+    // Kaynak
+    public string? Source { get; internal set; }
+
+    public string? SourceDetail { get; internal set; }
+
+    public string? Referrer { get; internal set; }
+
+    /// <summary>Talebi getiren dış kaynak/entegrasyon adı (ör. "web-form:iletisim").</summary>
+    public string? ExternalSource { get; internal set; }
+
+    /// <summary>Dış gönderim kimliği; (ExternalSource, ExternalSubmissionId) çifti teknik tekrarı engeller.</summary>
+    public string? ExternalSubmissionId { get; internal set; }
+
+    public string? UtmSource { get; internal set; }
+
+    public string? UtmMedium { get; internal set; }
+
+    public string? UtmCampaign { get; internal set; }
+
+    /// <summary>Talebin ilk geldiği an (içe aktarmada orijinal zaman olabilir).</summary>
+    public DateTimeOffset FirstReceivedAt { get; internal set; } = DateTimeOffset.UtcNow;
+
+    // Sahiplik
+    public Guid? OwnerId { get; internal set; }
+
+    public DateTimeOffset? AssignedAt { get; internal set; }
+
+    // Takip ve dönüşüm
+    public DateTimeOffset? FirstContactAt { get; internal set; }
+
+    public DateTimeOffset? FollowUpAt { get; internal set; }
+
+    public DateTimeOffset? QualifiedAt { get; internal set; }
+
+    public DateTimeOffset? DisqualifiedAt { get; internal set; }
+
+    public string? DisqualificationReason { get; internal set; }
+
+    public DateTimeOffset? ConvertedAt { get; internal set; }
+
+    public Guid? ConvertedBy { get; internal set; }
+
+    public Guid? ConvertedCompanyId { get; internal set; }
+
+    public Guid? ConvertedContactId { get; internal set; }
+
+    public Guid? ConvertedOpportunityId { get; internal set; }
+}
+
+/// <summary>
+/// Lead toplama formu / entegrasyonu tanımı. Genel (herkese açık) bir <see cref="FormKey"/> ile tenant içinde tanınır; anahtar
+/// GİZLİ DEĞİLDİR (sayfa kaynağında görünür) ve tek başına yetki vermez. Sunucudan sunucuya çağrılar ayrıca bir entegrasyon sırrı
+/// kullanır; sır yalnızca özeti (<see cref="SecretHash"/>) saklanır, düz değer oluşturulurken bir kez gösterilir ve tarayıcıya gönderilmez.
+/// Form yalnızca Lead oluşturur; durum, sorumlu (varsayılan sorumlu dışında), iş birimi ve rolü istemci belirleyemez.
+/// </summary>
+public sealed class LeadForm : CrmEntity
+{
+    public const int NameMaxLength = 100;
+    public const int KeyLength = 20;
+    public const int OriginsMaxLength = 1000;
+
+    public string Name { get; internal set; } = string.Empty;
+
+    /// <summary>Genel form kimliği (rastgele, tenant içinde benzersiz).</summary>
+    public string FormKey { get; internal set; } = string.Empty;
+
+    public bool IsActive { get; internal set; } = true;
+
+    /// <summary>Gelen Lead'lerin varsayılan sorumlusu; boşsa ya da pasifse Lead atama havuzuna düşer (rastgele atama yapılmaz).</summary>
+    public Guid? DefaultOwnerId { get; internal set; }
+
+    /// <summary>İzin verilen tarayıcı kaynakları (boşluk/virgül/satır ayrık, "https://site.com"). Kimlik doğrulama değildir.</summary>
+    public string? AllowedOrigins { get; internal set; }
+
+    /// <summary>Doluysa yalnızca geçerli sırrı gönderen sunucu çağrıları kabul edilir; tarayıcıdan doğrudan gönderim reddedilir.</summary>
+    public bool ServerOnly { get; internal set; }
+
+    /// <summary>Entegrasyon sırrının SHA-256 özeti (hex); düz sır saklanmaz. Hiçbir yanıtta ya da audit'te yer almaz.</summary>
+    public string? SecretHash { get; internal set; }
+
+    public DateTimeOffset? SecretRotatedAt { get; internal set; }
 }

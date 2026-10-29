@@ -13,5 +13,6 @@ public static class CrmRequests
         o.Probability, o.LostReason, o.OwnerId);
 
     public static SaveActivityRequest From(ActivityDto a) => new(
-        a.Subject, a.Type, a.DueAt, a.CompletedAt, a.CompanyId, a.ContactId, a.OpportunityId, a.Notes, a.Version, a.OwnerId);
+        a.Subject, a.Type, a.DueAt, a.CompletedAt, a.CompanyId, a.ContactId, a.OpportunityId, a.Notes, a.Version, a.OwnerId,
+        LeadId: a.LeadId, Outcome: a.Outcome);
 }

@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
@@ -7,9 +8,19 @@ namespace Modulix.Modules.Crm.Records;
 
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler: veri, tenant üyeleri, seçim listeleri ve isteği yapan kullanıcı.</summary>
 internal sealed class CrmStoreContext(
-    IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access)
+    IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
+    ICurrentAccess permissions, LeadWorkflowGate? leadGate = null, IRecordCommandContext? command = null)
 {
+    /// <summary>Çalışan yazma komutunun nedeni (yalnızca güvenilir iç çağıranlar verir, ör. kayıt devri).</summary>
+    public string? CommandReason => command?.Reason;
+
     public IModuleData Data => data;
+
+    /// <summary>Kullanıcının izinleri (kayıt türünden bağımsız izin sorguları için, ör. Lead ataması).</summary>
+    public ICurrentAccess Permissions => permissions;
+
+    /// <summary>Lead iş akışı kapısı (<see cref="LeadWorkflowGate"/>).</summary>
+    public LeadWorkflowGate LeadGate { get; } = leadGate ?? new LeadWorkflowGate();
 
     /// <summary>İsteği yapan kullanıcının izin ve veri kapsamı (ADR-0010).</summary>
     public IRecordAccess Access => access;

@@ -77,6 +77,20 @@
             </select>
             <FieldError Field="opportunityId" Errors="errors" />
         </div>
+        @if ((form.Type is ActivityType.Call or ActivityType.Meeting or ActivityType.Email) && (form.LeadId is not null || FixedLeadId is not null))
+        {
+            <div>
+                <label class="form-label" for="outcome">Sonuç</label>
+                <select id="outcome" class="form-select" @bind="form.Outcome">
+                    <option value="">—</option>
+                    <option value="@ActivityOutcome.Reached">@ActivityOutcome.Label(ActivityOutcome.Reached)</option>
+                    <option value="@ActivityOutcome.NoAnswer">@ActivityOutcome.Label(ActivityOutcome.NoAnswer)</option>
+                    <option value="@ActivityOutcome.Sent">@ActivityOutcome.Label(ActivityOutcome.Sent)</option>
+                </select>
+                <small class="text-muted">İlk temas yalnızca gerçekleşen temastan (ulaşılan arama, yapılan toplantı, gönderilen e-posta) sayılır.</small>
+                <FieldError Field="outcome" Errors="errors" />
+            </div>
+        }
         <div class="form-check-row">
             <input id="completed" class="form-check-input" type="checkbox" @bind="form.Completed" />
             <label class="form-check-label" for="completed">Tamamlandı</label>
@@ -114,6 +128,9 @@
     /// <summary>Verilirse firma seçilemez (firma detay sayfası).</summary>
     [Parameter] public Guid? FixedCompanyId { get; set; }
 
+    /// <summary>Verilirse aktivite bu Lead'e bağlanır (Lead detay sayfası).</summary>
+    [Parameter] public Guid? FixedLeadId { get; set; }
+
     [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
 
     private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Activity)];
@@ -138,10 +155,10 @@
             {
                 Id = a.Id, Version = a.Version, Type = a.Type, Subject = a.Subject, DueAt = a.DueAt is { } due ? Regional.ToTenant(due).DateTime : null,
                 CompletedAt = a.CompletedAt, Completed = a.CompletedAt is not null, CompanyId = a.CompanyId, ContactId = a.ContactId,
-                OpportunityId = a.OpportunityId, OwnerId = a.OwnerId, Notes = a.Notes,
+                OpportunityId = a.OpportunityId, OwnerId = a.OwnerId, Notes = a.Notes, LeadId = a.LeadId, Outcome = a.Outcome,
                     Custom = a.Custom?.DeepClone().AsObject() ?? [],
             }
-            : new ActivityForm { CompanyId = FixedCompanyId, Type = Lookups.DefaultOf(CrmLists.ActivityType) ?? ActivityType.Task };
+            : new ActivityForm { CompanyId = FixedCompanyId, LeadId = FixedLeadId, Type = Lookups.DefaultOf(CrmLists.ActivityType) ?? ActivityType.Task };
         errors = null;
         message = null;
     }
@@ -155,7 +172,8 @@
         // Formdaki saat firmanın saat dilimindedir.
         var dueAt = form.DueAt is { } local ? Regional.FromTenant(local) : (DateTimeOffset?)null;
         var request = new SaveActivityRequest(
-            form.Subject, form.Type, dueAt, completedAt, form.CompanyId, form.ContactId, form.OpportunityId, form.Notes, form.Version, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom));
+            form.Subject, form.Type, dueAt, completedAt, form.CompanyId, form.ContactId, form.OpportunityId, form.Notes, form.Version, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom),
+            LeadId: form.LeadId ?? FixedLeadId, Outcome: string.IsNullOrEmpty(form.Outcome) ? null : form.Outcome);
         var result = form.Id is { } id
             ? await Api.PutAsync<ActivityDto>($"{Url}/{id}", request)
             : await Api.PostAsync<ActivityDto>(Url, request);
@@ -209,6 +227,10 @@
         public Guid? ContactId { get; set; }
 
         public Guid? OpportunityId { get; set; }
+
+        public Guid? LeadId { get; set; }
+
+        public string? Outcome { get; set; }
 
         public Guid? OwnerId { get; set; }
 

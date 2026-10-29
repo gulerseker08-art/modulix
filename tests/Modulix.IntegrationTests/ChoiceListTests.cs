@@ -29,7 +29,9 @@ public class ChoiceListTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         using var repClient = await LoginAsync(rep);
 
         var lists = (await adminClient.GetFromJsonAsync<List<ChoiceListDto>>("/api/customization/lists"))!;
-        Assert.Equal([CrmLists.OpportunityStage, CrmLists.CompanyStatus, CrmLists.CompanySource, CrmLists.ActivityType], lists.Select(l => l.Key));
+        Assert.Equal(
+            [CrmLists.OpportunityStage, CrmLists.CompanyStatus, CrmLists.CompanySource, CrmLists.ActivityType, CrmLeadLists.Source, CrmLeadLists.DisqualificationReason],
+            lists.Select(l => l.Key));
         var stages = lists[0];
         Assert.False(stages.Customized);
         Assert.Equal(["Lead", "Qualified", "Proposal", "Negotiation", "Won", "Lost"], stages.Values.Select(v => v.Key));

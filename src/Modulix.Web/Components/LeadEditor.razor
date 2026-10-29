@@ -1,0 +1,375 @@
+@* Lead ekleme/düzenleme formu. Durum, sorumlu ve dönüşüm alanları burada değişmez: ilgili eylemler Lead detayındadır.
+   Yeni Lead kaydedilmeden önce olası eşleşmeler gösterilir; aynı e-posta tek başına engel değildir, kullanıcı yine de kaydedebilir. *@
+@inject ApiClient Api
+@inject SessionState Session
+
+<form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <h2>@(Lead is null ? "Yeni Lead" : "Lead'i düzenle")</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="form-grid">
+        <div class="span-all">
+            <label class="form-label" for="lead-subject">Konu *</label>
+            <input id="lead-subject" class="form-control" maxlength="200" @bind="form.Subject" />
+            <FieldError Field="subject" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-first">Ad</label>
+            <input id="lead-first" class="form-control" maxlength="100" @bind="form.FirstName" />
+            <FieldError Field="firstName" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-last">Soyad</label>
+            <input id="lead-last" class="form-control" maxlength="100" @bind="form.LastName" />
+            <FieldError Field="lastName" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-company">Firma adı</label>
+            <input id="lead-company" class="form-control" maxlength="200" @bind="form.CompanyName" />
+            <FieldError Field="companyName" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-title">Unvan</label>
+            <input id="lead-title" class="form-control" maxlength="100" @bind="form.JobTitle" />
+            <FieldError Field="jobTitle" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-email">E-posta</label>
+            <input id="lead-email" class="form-control" type="email" maxlength="254" @bind="form.Email" />
+            <FieldError Field="email" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-phone">Telefon</label>
+            <input id="lead-phone" class="form-control" type="tel" maxlength="40" @bind="form.Phone" />
+            <FieldError Field="phone" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-website">Web sitesi</label>
+            <input id="lead-website" class="form-control" maxlength="300" @bind="form.Website" />
+            <FieldError Field="website" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-city">Şehir</label>
+            <input id="lead-city" class="form-control" maxlength="100" @bind="form.City" />
+            <FieldError Field="city" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-country">Ülke (2 harf)</label>
+            <input id="lead-country" class="form-control" maxlength="2" placeholder="TR" @bind="form.Country" />
+            <FieldError Field="country" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-priority">Öncelik</label>
+            <select id="lead-priority" class="form-select" @bind="form.Priority">
+                @foreach (var priority in LeadPriority.All)
+                {
+                    <option value="@priority">@LeadPriority.Label(priority)</option>
+                }
+            </select>
+            <FieldError Field="priority" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-source">Kaynak</label>
+            <select id="lead-source" class="form-select" @bind="form.Source">
+                <option value="">—</option>
+                @foreach (var source in Lookups.Choices(CrmLeadLists.Source, form.Source))
+                {
+                    <option value="@source.Key">@source.Label</option>
+                }
+            </select>
+            <FieldError Field="source" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-source-detail">Kaynak ayrıntısı</label>
+            <input id="lead-source-detail" class="form-control" maxlength="200" @bind="form.SourceDetail" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-product">İlgilenilen ürün/hizmet</label>
+            <input id="lead-product" class="form-control" maxlength="200" @bind="form.ProductInterest" />
+            <FieldError Field="productInterest" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-industry">Sektör</label>
+            <input id="lead-industry" class="form-control" maxlength="100" @bind="form.Industry" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-budget">Tahmini bütçe (bilinmiyorsa boş)</label>
+            <input id="lead-budget" class="form-control" type="number" step="0.01" min="0" @bind="form.EstimatedBudget" />
+            <FieldError Field="estimatedBudget" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-currency">Para birimi</label>
+            <input id="lead-currency" class="form-control" maxlength="3" @bind="form.Currency" />
+            <FieldError Field="currency" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-target">Hedef satın alma tarihi</label>
+            <input id="lead-target" class="form-control" type="date" @bind="form.TargetPurchaseDate" />
+            <FieldError Field="targetPurchaseDate" Errors="errors" />
+        </div>
+        @if (Lead is null && Session.Can(CrmAccess.LeadsAssign))
+        {
+            <div>
+                <label class="form-label" for="lead-owner">Sorumlu</label>
+                <select id="lead-owner" class="form-select" @bind="form.OwnerId">
+                    <option value="">Ben</option>
+                    @foreach (var member in Lookups.AssignableMembers)
+                    {
+                        <option value="@member.UserId">@member.DisplayName</option>
+                    }
+                </select>
+                <FieldError Field="ownerId" Errors="errors" />
+            </div>
+        }
+        @if (Lookups.Companies.Count > 0)
+        {
+            <div>
+                <label class="form-label" for="lead-existing-company">Mevcut müşteri firması</label>
+                <select id="lead-existing-company" class="form-select" @bind="form.CompanyId">
+                    <option value="">—</option>
+                    @foreach (var company in Lookups.Companies)
+                    {
+                        <option value="@company.Id">@company.Name</option>
+                    }
+                </select>
+                <FieldError Field="companyId" Errors="errors" />
+            </div>
+        }
+        @if (Lookups.Contacts.Count > 0)
+        {
+            <div>
+                <label class="form-label" for="lead-existing-contact">Mevcut kişi</label>
+                <select id="lead-existing-contact" class="form-select" @bind="form.ContactId">
+                    <option value="">—</option>
+                    @foreach (var contact in Lookups.Contacts.Where(c => form.CompanyId is null || c.CompanyId == form.CompanyId))
+                    {
+                        <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
+                    }
+                </select>
+                <FieldError Field="contactId" Errors="errors" />
+            </div>
+        }
+        <div class="span-all">
+            <label class="form-label" for="lead-need">İhtiyaç</label>
+            <textarea id="lead-need" class="form-control" rows="2" maxlength="4000" @bind="form.NeedDescription"></textarea>
+            <FieldError Field="needDescription" Errors="errors" />
+        </div>
+        <div class="span-all">
+            <label class="form-label" for="lead-description">Açıklama / talep metni</label>
+            <textarea id="lead-description" class="form-control" rows="3" maxlength="4000" @bind="form.Description"></textarea>
+            <FieldError Field="description" Errors="errors" />
+        </div>
+        <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
+    </div>
+
+    @if (matches is { Count: > 0 })
+    {
+        <div class="alert alert-warning" role="alert">
+            <strong>Olası eşleşmeler</strong> — aynı kişi farklı bir ihtiyaçla yeniden başvurmuş olabilir; yine de kaydedebilirsiniz.
+            <ul class="item-list">
+                @foreach (var match in matches)
+                {
+                    <li>
+                        <a href="@MatchLink(match)">@match.Title</a>
+                        <span class="text-muted">@MatchKind(match.Kind)@(match.Status is { } status ? $" · {LeadStatus.Label(status)}" : null) · @string.Join(", ", match.Reasons)</span>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" disabled="@busy">@(matches is { Count: > 0 } ? "Yine de kaydet" : "Kaydet")</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        @if (Lead is not null && Session.Can(CrmAccess.LeadsDelete) && Lead.Status != LeadStatus.Converted)
+        {
+            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+        }
+    </div>
+</form>
+
+@code {
+    private const string Url = "/api/crm/leads";
+
+    private LeadForm form = new();
+    private LeadDto? source;
+    private bool initialized;
+    private bool matchesChecked;
+    private IReadOnlyList<LeadMatchDto>? matches;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    /// <summary>Düzenlenecek Lead; null ise yeni Lead.</summary>
+    [Parameter] public LeadDto? Lead { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<LeadDto> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Lead)];
+
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Lead))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Lead;
+        form = Lead is { } l
+            ? new LeadForm
+            {
+                Version = l.Version, Subject = l.Subject, Description = l.Description, Priority = l.Priority, FirstName = l.FirstName,
+                LastName = l.LastName, CompanyName = l.CompanyName, Email = l.Email, Phone = l.Phone, JobTitle = l.JobTitle, Website = l.Website,
+                Country = l.Country, City = l.City, CompanyId = l.CompanyId, ContactId = l.ContactId, ProductInterest = l.ProductInterest,
+                NeedDescription = l.NeedDescription, EstimatedBudget = l.EstimatedBudget, Currency = l.Currency,
+                TargetPurchaseDate = l.TargetPurchaseDate, Industry = l.Industry, Source = l.Source, SourceDetail = l.SourceDetail,
+                Referrer = l.Referrer, UtmSource = l.UtmSource, UtmMedium = l.UtmMedium, UtmCampaign = l.UtmCampaign,
+                Custom = l.Custom?.DeepClone().AsObject() ?? [],
+            }
+            : new LeadForm { Source = "Manual" };
+        errors = null;
+        message = null;
+        matches = null;
+        matchesChecked = false;
+    }
+
+    private static string MatchLink(LeadMatchDto match) => match.Kind switch
+    {
+        "Lead" => $"crm/leadler/{match.Id}",
+        "Company" => $"crm/firmalar/{match.Id}",
+        _ => $"crm/kisiler/{match.Id}",
+    };
+
+    private static string MatchKind(string kind) => kind switch { "Lead" => "Lead", "Company" => "Firma", _ => "Kişi" };
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+
+        // Yeni Lead'de önce olası eşleşmeler gösterilir; kullanıcı onaylayınca ("Yine de kaydet") kayıt yapılır.
+        if (Lead is null && !matchesChecked)
+        {
+            matchesChecked = true;
+            var query = $"?email={Uri.EscapeDataString(form.Email ?? string.Empty)}&phone={Uri.EscapeDataString(form.Phone ?? string.Empty)}"
+                + $"&companyName={Uri.EscapeDataString(form.CompanyName ?? string.Empty)}&website={Uri.EscapeDataString(form.Website ?? string.Empty)}";
+            var found = await Api.GetAsync<List<LeadMatchDto>>($"{Url}/duplicates{query}");
+            if (found.Value is { Count: > 0 } list)
+            {
+                matches = list;
+                busy = false;
+                return;
+            }
+        }
+
+        var request = new SaveLeadRequest(
+            form.Subject, Clean(form.Description), form.Priority, Clean(form.FirstName), Clean(form.LastName), Clean(form.CompanyName),
+            Clean(form.Email), Clean(form.Phone), Clean(form.JobTitle), Clean(form.Website), Clean(form.Country), Clean(form.City),
+            form.CompanyId, form.ContactId, Clean(form.ProductInterest), Clean(form.NeedDescription), form.EstimatedBudget,
+            string.IsNullOrWhiteSpace(form.Currency) ? "TRY" : form.Currency.Trim(), form.TargetPurchaseDate, Clean(form.Industry),
+            Clean(form.Source), Clean(form.SourceDetail), Clean(form.Referrer), Clean(form.UtmSource), Clean(form.UtmMedium),
+            Clean(form.UtmCampaign), Lead is null ? form.OwnerId : null, form.Version, CustomFieldText.ForSave(CustomFields, form.Custom));
+        var result = Lead is { } existing
+            ? await Api.PutAsync<LeadDto>($"{Url}/{existing.Id}", request)
+            : await Api.PostAsync<LeadDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{Lead!.Id}?version={Lead.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    private sealed class LeadForm
+    {
+        public System.Text.Json.Nodes.JsonObject Custom { get; set; } = [];
+
+        public long? Version { get; init; }
+
+        public string Subject { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public string Priority { get; set; } = LeadPriority.Normal;
+
+        public string? FirstName { get; set; }
+
+        public string? LastName { get; set; }
+
+        public string? CompanyName { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? Phone { get; set; }
+
+        public string? JobTitle { get; set; }
+
+        public string? Website { get; set; }
+
+        public string? Country { get; set; }
+
+        public string? City { get; set; }
+
+        public Guid? CompanyId { get; set; }
+
+        public Guid? ContactId { get; set; }
+
+        public string? ProductInterest { get; set; }
+
+        public string? NeedDescription { get; set; }
+
+        public decimal? EstimatedBudget { get; set; }
+
+        public string Currency { get; set; } = "TRY";
+
+        public DateOnly? TargetPurchaseDate { get; set; }
+
+        public string? Industry { get; set; }
+
+        public string? Source { get; set; }
+
+        public string? SourceDetail { get; set; }
+
+        public string? Referrer { get; set; }
+
+        public string? UtmSource { get; set; }
+
+        public string? UtmMedium { get; set; }
+
+        public string? UtmCampaign { get; set; }
+
+        public Guid? OwnerId { get; set; }
+    }
+}

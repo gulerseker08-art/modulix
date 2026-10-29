@@ -1,0 +1,477 @@
+@page "/crm/leadler/{Id:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>@(lead?.LeadNumber ?? "Lead") · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.LeadsRead">
+    <a class="back-link" href="crm/leadler">← Lead'ler</a>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (actionErrors is { Count: > 0 })
+    {
+        <ul class="alert alert-danger">
+            @foreach (var (_, texts) in actionErrors)
+            {
+                @foreach (var text in texts)
+                {
+                    <li>@text</li>
+                }
+            }
+        </ul>
+    }
+
+    @if (lead is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else if (editing)
+    {
+        <LeadEditor Lead="lead" Lookups="Lookups" Saved="LeadSaved" Deleted="LeadDeleted" Cancelled="() => editing = false" />
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <h1>@lead.Subject</h1>
+                <div class="header-meta">
+                    <span>@lead.LeadNumber</span>
+                    <span class="badge stage-@lead.Status.ToLowerInvariant()">@LeadStatus.Label(lead.Status)</span>
+                    <span>Öncelik: @LeadPriority.Label(lead.Priority)</span>
+                    @if (FirstContactOverdue)
+                    {
+                        <span class="badge stage-lost">İlk temas gecikti</span>
+                    }
+                </div>
+            </div>
+            <div class="header-actions">
+                @if (Session.Can(CrmAccess.LeadsUpdate) && lead.Status != LeadStatus.Converted)
+                {
+                    <button type="button" class="btn btn-outline-primary" @onclick="() => editing = true">Düzenle</button>
+                }
+            </div>
+        </div>
+
+        @if (lead.Status == LeadStatus.Converted)
+        {
+            <div class="alert alert-success" role="status">
+                Bu Lead @(lead.ConvertedAt is { } at ? CrmLabels.Time(at) : null) tarihinde fırsata dönüştürüldü
+                (@Lookups.MemberName(lead.ConvertedBy)):
+                @if (lead.ConvertedCompanyId is { } company) { <a href="crm/firmalar/@company">Firma</a> }
+                @if (lead.ConvertedContactId is { } contact) { <text> · </text><a href="crm/kisiler/@contact">Kişi</a> }
+                @if (lead.ConvertedOpportunityId is not null) { <text> · </text><a href="crm/firsatlar">Fırsat</a> }
+            </div>
+        }
+
+        <section class="detail-section">
+            <dl class="detail-grid">
+                <div><dt>Talep sahibi</dt><dd>@(string.Join(' ', new[] { lead.FirstName, lead.LastName }.Where(n => !string.IsNullOrWhiteSpace(n))) is { Length: > 0 } name ? name : "—")</dd></div>
+                <div><dt>Firma adı</dt><dd>@(lead.CompanyName ?? "—")</dd></div>
+                <div><dt>Unvan</dt><dd>@(lead.JobTitle ?? "—")</dd></div>
+                <div><dt>E-posta</dt><dd>@if (lead.Email is { } email) { <a href="mailto:@email">@email</a> } else { <text>—</text> }</dd></div>
+                <div><dt>Telefon</dt><dd>@if (lead.Phone is { } phone) { <a href="tel:@phone">@phone</a> } else { <text>—</text> }</dd></div>
+                <div><dt>Web sitesi</dt><dd>@(lead.Website ?? "—")</dd></div>
+                <div><dt>Konum</dt><dd>@(string.Join(", ", new[] { lead.City, lead.Country }.Where(n => !string.IsNullOrWhiteSpace(n))) is { Length: > 0 } place ? place : "—")</dd></div>
+                @if (lead.CompanyId is { } existingCompany)
+                {
+                    <div><dt>Mevcut müşteri firması</dt><dd><a href="crm/firmalar/@existingCompany">@Lookups.CompanyName(existingCompany)</a></dd></div>
+                }
+                @if (lead.ContactId is { } existingContact)
+                {
+                    <div><dt>Mevcut kişi</dt><dd><a href="crm/kisiler/@existingContact">@Lookups.ContactName(existingContact)</a></dd></div>
+                }
+                <div><dt>İlgilenilen ürün/hizmet</dt><dd>@(lead.ProductInterest ?? "—")</dd></div>
+                <div><dt>Tahmini bütçe</dt><dd>@(lead.EstimatedBudget is { } budget ? CrmLabels.Amount(budget, lead.Currency) : "Bilinmiyor")</dd></div>
+                <div><dt>Hedef satın alma</dt><dd>@(lead.TargetPurchaseDate is { } target ? CrmLabels.Date(target) : "Bilinmiyor")</dd></div>
+                <div><dt>Sektör</dt><dd>@(lead.Industry ?? "—")</dd></div>
+                @if (lead.NeedDescription is { } need)
+                {
+                    <div class="span-all"><dt>İhtiyaç</dt><dd class="notes">@need</dd></div>
+                }
+                @if (lead.Description is { } description)
+                {
+                    <div class="span-all"><dt>Açıklama</dt><dd class="notes">@description</dd></div>
+                }
+                @if (lead.StatusReason is { } statusReason)
+                {
+                    <div class="span-all"><dt>Durum gerekçesi</dt><dd class="notes">@statusReason</dd></div>
+                }
+            </dl>
+        </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Kaynak ve sahiplik</h2></div>
+            <dl class="detail-grid">
+                <div><dt>Kaynak</dt><dd>@(lead.Source is null ? "—" : Lookups.Label(CrmLeadLists.Source, lead.Source))@(lead.SourceDetail is { } sd ? $" · {sd}" : null)</dd></div>
+                <div><dt>İlk geliş</dt><dd>@CrmLabels.Time(lead.FirstReceivedAt)</dd></div>
+                @if (lead.ExternalSource is { } external)
+                {
+                    <div><dt>Dış kaynak</dt><dd>@external</dd></div>
+                }
+                @if (lead.Referrer is { } referrer)
+                {
+                    <div><dt>Yönlendiren</dt><dd>@referrer</dd></div>
+                }
+                @if (lead.UtmSource is not null || lead.UtmMedium is not null || lead.UtmCampaign is not null)
+                {
+                    <div><dt>UTM</dt><dd>@string.Join(" / ", new[] { lead.UtmSource, lead.UtmMedium, lead.UtmCampaign }.Where(u => !string.IsNullOrWhiteSpace(u)))</dd></div>
+                }
+                <div><dt>Sorumlu</dt><dd>@(lead.OwnerId is null ? "Atanmadı" : Lookups.MemberName(lead.OwnerId))@(lead.AssignedAt is { } assigned ? $" · {CrmLabels.Time(assigned)}" : null)</dd></div>
+                <div><dt>İlk temas</dt><dd>@(lead.FirstContactAt is { } first ? CrmLabels.Time(first) : "Henüz yok")</dd></div>
+                @if (lead.FollowUpAt is { } follow)
+                {
+                    <div><dt>Takip tarihi</dt><dd>@CrmLabels.Time(follow)</dd></div>
+                }
+                @if (lead.QualifiedAt is { } qualified)
+                {
+                    <div><dt>Nitelendirme</dt><dd>@CrmLabels.Time(qualified)</dd></div>
+                }
+                @if (lead.DisqualifiedAt is { } disqualified)
+                {
+                    <div><dt>Elenme</dt><dd>@CrmLabels.Time(disqualified) · @Lookups.Label(CrmLeadLists.DisqualificationReason, lead.DisqualificationReason)</dd></div>
+                }
+                @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Lead))
+                {
+                    var text = CustomFieldText.Format(field, lead.Custom);
+                    @if (text.Length > 0)
+                    {
+                        <div><dt>@field.Label</dt><dd>@text</dd></div>
+                    }
+                }
+            </dl>
+        </section>
+
+        <section class="detail-section lead-actions">
+            <div class="section-header"><h2>İşlemler</h2></div>
+            @if (!anyAction)
+            {
+                <p class="text-muted">Bu durumda yapabileceğiniz bir işlem yok.</p>
+            }
+            <div class="action-row">
+                @if (CanAssign)
+                {
+                    <select class="form-select" aria-label="Sorumlu" @bind="assignee">
+                        <option value="">Sorumlu seçin…</option>
+                        @foreach (var member in Lookups.AssignableMembers)
+                        {
+                            <option value="@member.UserId">@member.DisplayName</option>
+                        }
+                    </select>
+                    <button type="button" class="btn btn-outline-primary" disabled="@(busy || assignee == Guid.Empty)" @onclick="AssignAsync">Ata</button>
+                }
+                @if (CanStartContacting)
+                {
+                    <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="StartContactingAsync">İletişime geçiliyor</button>
+                }
+                @if (CanQualify)
+                {
+                    <button type="button" class="btn btn-outline-success" disabled="@busy" @onclick="() => Toggle(PanelName.Qualify)">Nitelendir</button>
+                }
+                @if (CanNurture)
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Toggle(PanelName.Nurture)">Daha sonra takip</button>
+                }
+                @if (CanDisqualify)
+                {
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => Toggle(PanelName.Disqualify)">Ele</button>
+                }
+                @if (CanReopen)
+                {
+                    <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="() => Toggle(PanelName.Reopen)">Yeniden aç</button>
+                }
+                @if (CanConvert)
+                {
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => Toggle(PanelName.Convert)">Fırsata dönüştür</button>
+                }
+            </div>
+
+            @switch (panel)
+            {
+                case "qualify":
+                    <div class="inline-form">
+                        <label class="form-label" for="q-note">Not (isteğe bağlı)</label>
+                        <textarea id="q-note" class="form-control" rows="2" maxlength="500" @bind="note"></textarea>
+                        <small class="text-muted">Nitelendirme için bir ihtiyaç ifadesi, bir iletişim bilgisi ve talep sahibi tanımı gerekir.</small>
+                        <button type="button" class="btn btn-success" disabled="@busy" @onclick="QualifyAsync">Nitelikli yap</button>
+                    </div>
+                    break;
+                case "nurture":
+                    <div class="inline-form">
+                        <label class="form-label" for="n-date">Takip tarihi</label>
+                        <input id="n-date" class="form-control" type="datetime-local" @bind="followUp" />
+                        <small class="text-muted">Tarih girmezseniz, Lead'e bağlı vadeli açık bir aktivite varsa onun tarihi kullanılır.</small>
+                        <label class="form-label" for="n-note">Not</label>
+                        <textarea id="n-note" class="form-control" rows="2" maxlength="500" @bind="note"></textarea>
+                        <button type="button" class="btn btn-secondary" disabled="@busy" @onclick="NurtureAsync">Takibe al</button>
+                    </div>
+                    break;
+                case "disqualify":
+                    <div class="inline-form">
+                        <label class="form-label" for="d-reason">Eleme nedeni *</label>
+                        <select id="d-reason" class="form-select" @bind="reason">
+                            <option value="">Seçin…</option>
+                            @foreach (var r in Lookups.Choices(CrmLeadLists.DisqualificationReason))
+                            {
+                                <option value="@r.Key">@r.Label</option>
+                            }
+                        </select>
+                        <label class="form-label" for="d-note">Not</label>
+                        <textarea id="d-note" class="form-control" rows="2" maxlength="500" @bind="note"></textarea>
+                        <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrEmpty(reason))" @onclick="DisqualifyAsync">Ele</button>
+                    </div>
+                    break;
+                case "reopen":
+                    <div class="inline-form">
+                        <label class="form-label" for="r-reason">Yeniden açma gerekçesi *</label>
+                        <textarea id="r-reason" class="form-control" rows="2" maxlength="500" @bind="note"></textarea>
+                        <button type="button" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(note))" @onclick="ReopenAsync">Yeniden aç</button>
+                    </div>
+                    break;
+                case "convert":
+                    <LeadConvertPanel Lead="lead" Lookups="Lookups" Converted="ConvertedAsync" Cancelled="() => panel = null" />
+                    break;
+            }
+        </section>
+
+        @if (matches is { Count: > 0 })
+        {
+            <section class="detail-section">
+                <div class="section-header"><h2>Olası mükerrer / ilişkili kayıtlar</h2></div>
+                <p class="text-muted small">Aynı e-posta, telefon, firma adı ya da alan adı. Bu yalnızca bir uyarıdır; kayıtlar otomatik silinmez ya da birleştirilmez.</p>
+                <ul class="item-list">
+                    @foreach (var match in matches)
+                    {
+                        <li>
+                            <div class="item-main">
+                                <a href="@MatchLink(match)">@match.Title</a>
+                                <span class="text-muted">@MatchKind(match.Kind)@(match.Status is { } ms ? $" · {LeadStatus.Label(ms)}" : null) · @string.Join(", ", match.Reasons)</span>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+
+        <section class="detail-section">
+            <div class="section-header">
+                <h2>Aktiviteler</h2>
+                @if (Session.Can(CrmAccess.ActivitiesWrite) && !addingActivity && LeadStatus.IsOpen(lead.Status))
+                {
+                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => addingActivity = true">Aktivite ekle</button>
+                }
+            </div>
+            @if (addingActivity)
+            {
+                <ActivityEditor Lookups="Lookups" FixedLeadId="Id" Saved="ActivitySavedAsync" Cancelled="() => addingActivity = false" />
+            }
+            @if (activities is null)
+            {
+                <p class="text-muted">Yükleniyor…</p>
+            }
+            else if (activities.Count == 0)
+            {
+                <p class="text-muted">Bu Lead'e bağlı aktivite yok.</p>
+            }
+            else
+            {
+                var nextPlanned = activities.Where(a => a.CompletedAt is null && a.DueAt is not null).OrderBy(a => a.DueAt).FirstOrDefault();
+                var lastDone = activities.Where(a => a.CompletedAt is not null).OrderByDescending(a => a.CompletedAt).FirstOrDefault();
+                <p class="text-muted small">
+                    Son tamamlanan: @(lastDone is null ? "yok" : $"{lastDone.Subject} · {CrmLabels.Time(lastDone.CompletedAt!.Value)}")
+                    · Sonraki planlı: @(nextPlanned is null ? "yok" : $"{nextPlanned.Subject} · {CrmLabels.Time(nextPlanned.DueAt!.Value)}")
+                </p>
+                <ul class="item-list timeline">
+                    @foreach (var a in activities.OrderByDescending(x => x.CompletedAt ?? x.DueAt ?? DateTimeOffset.MaxValue))
+                    {
+                        var overdue = a.CompletedAt is null && a.DueAt is { } due && due < DateTimeOffset.UtcNow;
+                        <li>
+                            <div class="item-main">
+                                <strong>@Lookups.Label(CrmLists.ActivityType, a.Type) · @a.Subject</strong>
+                                <span class="text-muted">
+                                    @(a.CompletedAt is { } done ? $"Tamamlandı {CrmLabels.Time(done)}" : a.DueAt is { } d ? $"Planlı {CrmLabels.Time(d)}" : "Tarihsiz")
+                                    @(a.Outcome is { } outcome ? $" · {ActivityOutcome.Label(outcome)}" : null)
+                                    · @Lookups.MemberName(a.OwnerId)
+                                </span>
+                                @if (overdue) { <span class="badge stage-lost">Gecikti</span> }
+                            </div>
+                            @if (a.CompletedAt is null && Session.Can(CrmAccess.ActivitiesWrite))
+                            {
+                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => CompleteAsync(a)">Tamamla</button>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <RecordHistory EntityKey="@CrmEntityKeys.Lead" RecordId="Id" Version="lead.Version" />
+    }
+</AuthGate>
+
+@code {
+    private LeadDto? lead;
+    private IReadOnlyList<ActivityDto>? activities;
+    private IReadOnlyList<LeadMatchDto>? matches;
+    private IReadOnlyDictionary<string, string[]>? actionErrors;
+    private string? message;
+    private string? panel;
+    private string? note;
+    private string reason = string.Empty;
+    private DateTime? followUp;
+    private Guid assignee;
+    private int? targetHours;
+    private bool editing;
+    private bool addingActivity;
+    private bool busy;
+
+    [Parameter] public Guid Id { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(CrmAccess.LeadsRead))
+        {
+            return;
+        }
+
+        await Lookups.LoadAsync(contacts: true);
+        targetHours = (await Api.GetAsync<LeadSettingsDto>("/api/crm/leads/settings")).Value?.FirstContactTargetHours;
+        await LoadAsync();
+    }
+
+    private bool CanAssign => lead is not null && Session.Can(CrmAccess.LeadsAssign) && LeadStatus.IsOpen(lead.Status);
+
+    private bool CanStartContacting => lead is not null && Session.Can(CrmAccess.LeadsQualify) && lead.Status is LeadStatus.New or LeadStatus.Nurturing;
+
+    private bool CanQualify => lead is not null && Session.Can(CrmAccess.LeadsQualify) && lead.Status is LeadStatus.New or LeadStatus.Contacting or LeadStatus.Nurturing;
+
+    private bool CanNurture => lead is not null && Session.Can(CrmAccess.LeadsQualify) && lead.Status is LeadStatus.New or LeadStatus.Contacting or LeadStatus.Qualified;
+
+    private bool CanDisqualify => lead is not null && Session.Can(CrmAccess.LeadsDisqualify) && LeadStatus.IsOpen(lead.Status);
+
+    private bool CanReopen => lead is not null && Session.Can(CrmAccess.LeadsDisqualify) && lead.Status == LeadStatus.Disqualified;
+
+    private bool CanConvert => lead is not null && Session.Can(CrmAccess.LeadsConvert) && lead.Status == LeadStatus.Qualified;
+
+    private bool anyAction => CanAssign || CanStartContacting || CanQualify || CanNurture || CanDisqualify || CanReopen || CanConvert;
+
+    private bool FirstContactOverdue =>
+        lead is not null && targetHours is { } hours && lead.FirstContactAt is null && lead.Status is LeadStatus.New or LeadStatus.Contacting
+        && DateTimeOffset.UtcNow - lead.FirstReceivedAt > TimeSpan.FromHours(hours);
+
+    private static class PanelName
+    {
+        public const string Qualify = "qualify";
+        public const string Nurture = "nurture";
+        public const string Disqualify = "disqualify";
+        public const string Reopen = "reopen";
+        public const string Convert = "convert";
+    }
+
+    private void Toggle(string name) => panel = panel == name ? null : name;
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<LeadDto>($"/api/crm/leads/{Id}");
+        lead = result.Value;
+        message = result.Error;
+        if (lead is null)
+        {
+            return;
+        }
+
+        matches = (await Api.GetAsync<List<LeadMatchDto>>($"/api/crm/leads/{Id}/duplicates")).Value;
+        await LoadActivitiesAsync();
+    }
+
+    private async Task LoadActivitiesAsync()
+    {
+        activities = Session.Can(CrmAccess.ActivitiesRead)
+            ? (await Api.GetAsync<CrmPage<ActivityDto>>($"/api/crm/activities?leadId={Id}&pageSize=100")).Value?.Items ?? []
+            : [];
+    }
+
+    private async Task RunAsync(string action, object body)
+    {
+        busy = true;
+        message = null;
+        actionErrors = null;
+        var result = await Api.PostAsync<LeadDto>($"/api/crm/leads/{Id}/{action}", body);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            panel = null;
+            note = null;
+            reason = string.Empty;
+            await LoadAsync();
+            return;
+        }
+
+        message = result.Error;
+        actionErrors = result.FieldErrors;
+    }
+
+    private Task AssignAsync() => RunAsync("assign", new AssignLeadRequest(assignee, lead!.Version));
+
+    private Task StartContactingAsync() => RunAsync("start-contacting", new LeadVersionRequest(lead!.Version));
+
+    private Task QualifyAsync() => RunAsync("qualify", new QualifyLeadRequest(lead!.Version, note));
+
+    private Task NurtureAsync() =>
+        RunAsync("nurture", new NurtureLeadRequest(lead!.Version, followUp is { } local ? Regional.FromTenant(local) : null, note));
+
+    private Task DisqualifyAsync() => RunAsync("disqualify", new DisqualifyLeadRequest(lead!.Version, reason, note));
+
+    private Task ReopenAsync() => RunAsync("reopen", new ReopenLeadRequest(lead!.Version, note ?? string.Empty));
+
+    private async Task ConvertedAsync(ConvertLeadResultDto result)
+    {
+        panel = null;
+        await LoadAsync();
+    }
+
+    private async Task CompleteAsync(ActivityDto activity)
+    {
+        busy = true;
+        var result = await Api.PutAsync<ActivityDto>($"/api/crm/activities/{activity.Id}", CrmRequests.From(activity) with { CompletedAt = DateTimeOffset.UtcNow });
+        busy = false;
+        message = result.Error;
+        // İlk temas olay aboneliğiyle (arka planda) işlenir; kısa bir gecikmeyle Lead'i yenilemek gerekebilir.
+        await LoadAsync();
+    }
+
+    private async Task ActivitySavedAsync(ActivityDto activity)
+    {
+        addingActivity = false;
+        await LoadAsync();
+    }
+
+    private async Task LeadSaved(LeadDto saved)
+    {
+        editing = false;
+        await LoadAsync();
+    }
+
+    private Task LeadDeleted()
+    {
+        lead = null;
+        message = "Lead silindi.";
+        return Task.CompletedTask;
+    }
+
+    private static string MatchLink(LeadMatchDto match) => match.Kind switch
+    {
+        "Lead" => $"crm/leadler/{match.Id}",
+        "Company" => $"crm/firmalar/{match.Id}",
+        _ => $"crm/kisiler/{match.Id}",
+    };
+
+    private static string MatchKind(string kind) => kind switch { "Lead" => "Lead", "Company" => "Firma", _ => "Kişi" };
+}

@@ -355,8 +355,68 @@ Listeler filtre alır; bilinmeyen filtre veya geçersiz değer 422 döner. `owne
 - Tüm işlemler kayıt boru hattından geçer: modül tenant için kapalıysa veya izin yoksa 403, başka tenant'ın kaydı 404, başka tenant'ın kaydına bağlanmak 422 döner. Bağlı kaydı olan firma silinemez (409). Audit ve outbox kaydı otomatik yazılır.
 - **Sürüm zorunludur (B1):** `/api/crm/...` ve `/api/records/...` üzerinde güncelleme (`version` gövdede) ve silme (`?version=`) okunan sürümü ister; sürümsüz istek 428 (`code: VersionRequired`) alır, değişmiş sürüm 409 kalır. Zorunluluk yalnızca bu HTTP uç noktalarındadır; kayıt devri ve olay aboneleri gibi arka plan işleri boru hattını doğrudan çağırır, etkilenmez.
 - Aynı kayıtlara genel uçtan da ulaşılır (`/api/records/crm.company` vb.); aynı izinler geçerlidir.
-- Arayüz API ile aynı adresten sunulur: `https://localhost:7026` → giriş, kuruluş seçimi, Firmalar / Kişiler / Fırsatlar / Aktiviteler. Telefonda listeler kart görünümüne döner.
+- Arayüz API ile aynı adresten sunulur: `https://localhost:7026` → giriş, kuruluş seçimi, Lead'ler / Firmalar / Kişiler / Fırsatlar / Aktiviteler. Telefonda listeler kart görünümüne döner.
 - Firma adına tıklayınca firma detay sayfası açılır: kişiler, fırsatlar ve aktiviteler tek ekranda; aktivite ve fırsat oradan eklenir. Fırsatlar sayfası varsayılan olarak satış hunisini (aşama sütunları, sürükle bırak) gösterir. Aktiviteler sayfası "Bugün" görünümüyle açılır (bugüne kadar yapılması gereken açık işlerim).
+
+### Lead yönetimi (potansiyel müşteri / satış talebi, [ADR-0014](docs/adr/0014-lead-yonetimi.md))
+
+Lead, yeterliliği henüz doğrulanmamış satış ilgisidir; firma, kişi ve fırsattan **ayrı** bir kayıttır (`crm.Leads`). Açılırken firma ya da kişi gerekmez; mevcut müşteriden gelen yeni talep de Lead olabilir; aynı kişi/firma için birden fazla Lead bulunabilir (aynı e-posta tek başına mükerrer kanıtı değildir). Fırsat aşamalarındaki "Lead/Aday" aşaması bundan bağımsızdır; mevcut fırsatlar Lead'e **taşınmaz**.
+
+| Uç nokta | Ne yapar | İzin |
+| --- | --- | --- |
+| `GET /api/crm/leads` (+ `/{id}`) | Liste/detay. Filtreler: `status`, `source`, `priority`, `ownerId` (`me`), `ownerNot=me` (ekip), `companyId`, `contactId`, `open`, `unassigned=true` (atama bekleyenler), `qualifiedNotConverted=true`, `receivedFrom`/`receivedBefore`, `firstContactDueBefore=<ISO>` (temassız ve bu andan önce gelmiş), `followUpDueBefore=<ISO>`, `convertedOpportunityId`; `search` konu, no, ad, firma, e-posta | `crm.leads.read` |
+| `POST`, `PUT /{id}`, `DELETE /{id}?version=` | Oluştur / alanları düzenle / sil. Durum, sorumlu ve dönüşüm alanları bu uçlardan **yazılamaz** (yok sayılır); `ownerId` yalnızca oluştururken, başkası içinse atama izniyle verilebilir | `crm.leads.create` / `.update` / `.delete` |
+| `POST /{id}/assign` `{ownerId, version}` | Sorumluyu değiştirir (hedef etkin üye olmalı; eski/yeni sorumlu audit'e, atama e-postası genel abonelikten) | `crm.leads.assign` |
+| `POST /{id}/start-contacting`, `/qualify` `{note}`, `/nurture` `{followUpAt, note}` | İletişime geç / nitelendir (asgari koşullar) / daha sonra takibe al (tarih ya da vadeli açık aktivite) | `crm.leads.qualify` |
+| `POST /{id}/disqualify` `{reason, note}`, `/reopen` `{reason}` | Ele (neden zorunlu) / elenmiş Lead'i gerekçeyle yeniden aç | `crm.leads.disqualify` |
+| `GET /{id}/conversion-preview`, `POST /{id}/convert` | Dönüşüm önizlemesi ve dönüşüm (mevcut/yeni firma ve kişi, fırsat). Tek işlem; ikinci dönüşüm 409 | `crm.leads.convert` |
+| `GET /duplicates?email=&phone=&companyName=&website=`, `GET /{id}/duplicates` | Olası eşleşmeler (Lead/firma/kişi); yalnızca çağıranın görebildikleri | `crm.leads.read` |
+| `GET /report?from=&to=`, `GET /export` (CSV), `GET /settings` | Rapor, dışa aktarma (audit'e yazılır), ilk temas hedefi | `.read` / `.export` |
+| `/api/crm/lead-forms` (+ `POST /{id}/secret`) | Web formu/entegrasyon tanımı ve sır yenileme | `crm.lead-forms.manage` |
+| `POST /api/public/lead-forms/{firmaKisaAdi}/{formKimligi}` | **Herkese açık** Lead toplama (aşağıda) | Yok (oturumsuz) |
+
+Aktivite ve fırsat uçlarına `leadId` (aktivite filtresi/alanı), `outcome` (aktivite sonucu: `Reached`, `NoAnswer`, `Sent`) ve `sourceLeadId` (fırsat filtresi/alanı, yalnızca dönüşümle yazılır) eklendi.
+
+**Durumlar:** Yeni → İletişim kuruluyor → Nitelikli → Fırsata dönüştürüldü; ayrıca Daha sonra takip ve Elendi. "Atandı" ayrı durum değildir; atama `ownerId`'dir (ADR-0014). Dönüşmüş Lead kapalıdır; elenmiş Lead yetkili kullanıcıca gerekçeyle yeniden açılır. Tüm durum ve sorumlu değişiklikleri kayıt geçmişinde (eski/yeni değer, gerekçe) görünür.
+
+**İlk temas** yalnızca *gerçekleşen* temastan türetilir: tamamlanmış toplantı; sonucu "Ulaşıldı" olan tamamlanmış arama; sonucu "Ulaşıldı/Gönderildi" olan tamamlanmış e-posta. Planlanmış arama, görev ve not temas sayılmaz. Hedef süre tenant ayarı *CRM Lead → İlk temas hedefi (takvim saati)*; çalışma saati takvimi olmadığı için süre **takvim saatidir**. Aktivite tamamlamak Lead'i otomatik nitelendirmez.
+
+**Dönüşüm:** `Nitelikli` Lead için ekran önizleme gösterir; firma (mevcut ya da yeni — gerçek kişi müşteri için `Individual` firma) ve isteğe bağlı kişi seçilir. Yazımlar kullanıcının kendi izinleriyle yapılır (dönüşüm izni tek başına firma/kişi/fırsat oluşturma hakkı vermez), tek işlemdedir (hata olursa hiçbir kayıt kalmaz), mevcut kayıtların verisi değişmez, aktiviteler kopyalanmaz (Lead'e bağlı kalır; fırsattan "Kaynak Lead" bağlantısıyla erişilir).
+
+**Raporlar** kullanıcının erişim kapsamıyla sınırlıdır. Dönem kohortu = dönemde *gelen* Lead'ler; dönüşüm oranı = kohortta dönüşen / kohort (kohort boşsa oran gösterilmez); dönemde yapılan ama önceki dönemde gelmiş Lead'lerin dönüşümü ayrıca "dönemde yapılan dönüşüm"dür. Süreler takvim saati; tanımlar ekranda ve `LeadReportDto` belgesindedir.
+
+#### Web formu / entegrasyon sözleşmesi
+
+Yönetici *CRM → Lead'ler → Formlar* ekranından (ya da `/api/crm/lead-forms`) form tanımlar: ad, varsayılan sorumlu (boş/pasifse Lead atama havuzuna düşer; rastgele kullanıcıya atanmaz), izinli siteler (`https://site.com`, joker/yol yok) ve isteğe bağlı sunucu sırrı. **Form kimliği gizli değildir**; sayfa kaynağında görünür.
+
+```http
+POST /api/public/lead-forms/{firmaKisaAdi}/{formKimligi}
+Content-Type: application/json
+Origin: https://www.ornek.com                 # tarayıcı gönderimi: izinli kaynak olmalı
+X-Lead-Form-Secret: lfs_...                   # yalnızca sunucudan sunucuya (tarayıcıya konmaz)
+
+{
+  "submissionId": "7f3c1e9a-2b4d-4c55-9a10-0d3e5f6a7b8c",
+  "firstName": "Mehmet", "lastName": "Kaya", "companyName": "Kaya Lojistik",
+  "email": "mehmet@ornek.com", "phone": "0532 111 22 33",
+  "message": "10 araçlık filo için bakım teklifi istiyoruz.",
+  "productInterest": "Filo bakımı", "utmSource": "google", "website2": ""
+}
+```
+
+- Yanıt kabulde her zaman `202 {"accepted":true}`'dur (yeni Lead, aynı gönderimin tekrarı, kayıtlı müşteri/e-posta ve bal tuzağı ayırt edilmez). Hatalar: `400` (alan hatası, bilinmeyen alan), `403` (kaynak/sır geçersiz), `404` (form yok/pasif), `413`, `415`, `429`.
+- Yalnızca şu alanlar kabul edilir: `submissionId` (zorunlu, 8-100 karakter), `subject`, `message`, `firstName`, `lastName`, `companyName`, `email`, `phone`, `jobTitle`, `country`, `city`, `productInterest`, `referrer`, `utmSource`, `utmMedium`, `utmCampaign`, `website2` (bal tuzağı; boş olmalı). E-posta ya da telefon, ve ad/soyad/firma adından biri, ve bir talep metni gerekir. `tenantId`, `ownerId`, `status`, `priority`, `source`, iş birimi, rol gibi her alan `400` alır.
+- Aynı `submissionId` tekrarında yeni Lead açılmaz (idempotent); aynı kişinin farklı gönderimi ayrı Lead olur.
+- Hız sınırı: IP + form başına dakikada `LeadIntake:RateLimitPerMinute` (varsayılan 20) → `429`; gövde en fazla 32 KB. Ters vekil arkasında `ForwardedHeaders` yapılandırın.
+- Origin/CORS yalnızca tarayıcı gönderimini sınırlar, kimlik doğrulama **değildir**. Sır oluşturulurken bir kez gösterilir, yalnızca SHA-256 özeti saklanır; "yalnızca sunucu" formlar tarayıcıdan gönderimi reddeder.
+- Gönderim pazarlama izni sayılmaz. İzin/rıza altyapısı henüz yoktur; izin amacı, kaynağı ve zamanı izlemesi açık iştir.
+
+#### Geliştirici notları (Lead)
+
+- Kod: `src/Modulix.Modules.Crm` → `Domain` (`Lead`, `LeadForm`), `Records` (`LeadRecordStore`, `LeadFormRecordStore`, `LeadWorkflowGate`), `Leads` (`ILeadWorkflow`, `ILeadConversion`, `ILeadIntake`, `ILeadFormAdmin`, `LeadRules`, `ILeadQualificationRule`, `LeadFirstContactSubscriber`). Uç noktalar `Modulix.Api/Crm/Lead*.cs`; ekranlar `Modulix.Web/Pages/Crm/Lead*.razor`.
+- Sektör nitelendirme koşulu eklemek: `ILeadQualificationRule` uygulayıp scoped kaydedin (varsayılan `MinimumQualificationRule` sektör bağımsızdır; bütçe/karar verici zorunlu değildir).
+- Çok kayıtlı atomik iş: `IRecordPipeline.RunAtomicAsync`. Olay nedenleri: `LeadEventReasons` (`RecordUpdated` + `reason`).
+- **AI ajan araçları (`SearchLeads` vb.) yapılmadı**: ajan altyapısı yok. `ILeadWorkflow`/`ILeadConversion` ve boru hattı sorguları araç olarak sunulabilecek şekilde tasarlandı; ajan kendiliğinden Lead elemez/birleştirmez/dönüştürmez.
 
 **Yeni bir sektör modülü eklemek** (CRM'i örnek alın):
 

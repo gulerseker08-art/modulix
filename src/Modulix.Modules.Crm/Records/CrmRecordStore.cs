@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
@@ -103,7 +104,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     /// <summary>Tüm CRM kayıtlarına özel alan eklenebilir (Y9a); değerler <see cref="CrmEntity.CustomFields"/>'ta saklanır.</summary>
     public bool SupportsCustomFields => true;
 
-    public IReadOnlyList<RecordFieldError> Validate(RecordOperation operation, JsonObject values)
+    public virtual IReadOnlyList<RecordFieldError> Validate(RecordOperation operation, JsonObject values)
     {
         var errors = new List<RecordFieldError>();
 
@@ -146,7 +147,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         var source = await ApplyFiltersAsync(Load(Data.Set<TEntity>().AsNoTracking()), query.Filters, cancellationToken);
         if (query.Owners is { } owners && UsesScope)
         {
-            source = ScopeToOwners(source, owners);
+            source = await ScopeToOwnersAsync(source, owners, cancellationToken);
         }
         if (query.Search is { } term)
         {
@@ -170,6 +171,10 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         return new RecordPage(items.Select(ToData).ToList(), query.Page, query.PageSize, total);
     }
 
+    /// <summary>Asenkron kapsam uygulamasÄ±; varsayÄ±lan <see cref="ScopeToOwners"/>. Ek izne baÄlÄ± gÃ¶rÃ¼nÃ¼rlÃ¼k (Ã¶r. atanmamÄ±Å Lead) iÃ§in geÃ§ersiz kÄ±lÄ±nÄ±r.</summary>
+    protected virtual Task<IQueryable<TEntity>> ScopeToOwnersAsync(IQueryable<TEntity> source, IReadOnlySet<Guid> owners, CancellationToken cancellationToken) =>
+        Task.FromResult(ScopeToOwners(source, owners));
+
     // e => owners.Contains(e.OwnerId): kapsam sorguda uygulanır, sayfalama ve toplam doğru kalır. Sorumlusu boş kayıt eşleşmez.
     private static Expression<Func<TEntity, bool>> OwnedBy(IReadOnlySet<Guid> owners)
     {
@@ -191,7 +196,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             SharedOf(entity)!.Touch();
         }
 
-        if (FieldsByName.TryGetValue(OwnerField, out var owner) && owner.Read(entity) is null)
+        if (DefaultsOwnerToCurrentUser && FieldsByName.TryGetValue(OwnerField, out var owner) && owner.Read(entity) is null)
         {
             owner.Write(entity, context.CurrentUserId);
         }
@@ -204,6 +209,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             field.Write(entity, list.DefaultValue?.Key);
         }
 
+        OnCreated(entity);
         Data.Set<TEntity>().Add(entity);
         return ToData(entity);
     }
@@ -248,6 +254,14 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         Data.Set<TEntity>().Remove(entity);
         return true;
     }
+
+    /// <summary>Varsayılanlar (sorumlu, liste değerleri) atandıktan sonra, kayıt eklenmeden hemen önce.</summary>
+    protected virtual void OnCreated(TEntity entity)
+    {
+    }
+
+    /// <summary>Sorumlusu verilmeyen yeni kayıt, kaydı oluşturana atanır. Atanmamış kayıt havuzu olan türler (Lead) kapatır.</summary>
+    protected virtual bool DefaultsOwnerToCurrentUser => true;
 
     /// <summary>Kayıt silinmeden önce (ör. kayda ait alt kayıtları kaldırmak için).</summary>
     protected virtual Task BeforeDeleteAsync(TEntity entity, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -335,7 +349,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     private RecordData ToData(TEntity entity)
     {
         var values = new JsonObject();
-        foreach (var field in Fields)
+        foreach (var field in Fields.Where(f => !f.WriteOnly))
         {
             values[field.Name] = field.Read(entity);
         }
@@ -362,6 +376,14 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
             var field = FieldsByName[name];
             if (field.IsOmitted(node))
+            {
+                continue;
+            }
+
+            // Durum gibi alanlar yalnızca iş akışı kapısı açıkken yazılır; genel uçlardan gelen değer yok sayılır.
+            // Sorumlu gibi "güncellemede kapılı" alan, kullanıcı devrinde (ADR-0004, neden: transfer) de değişebilir.
+            var transfer = context.CommandReason == EventReasons.Transfer;
+            if ((field.SystemOnly || (field.GatedOnUpdate && !isNew && !transfer)) && !context.LeadGate.IsOpen)
             {
                 continue;
             }

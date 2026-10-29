@@ -187,6 +187,17 @@ public interface IUnitOfWork
 {
     /// <summary>Hazırlanan tüm değişiklikleri tek işlemde yazar. Çakışmada <see cref="RecordConflictException"/>.</summary>
     Task SaveChangesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Açık bir işlem başlatır; <see cref="IUnitOfWorkTransaction.CommitAsync"/> çağrılmadan atılırsa geri alınır. Zaten işlem
+    /// varsa null döner (katılınır). Varsayılan: işlem desteği olmayan birim (testler).
+    /// </summary>
+    Task<IUnitOfWorkTransaction?> BeginTransactionAsync(CancellationToken cancellationToken) => Task.FromResult<IUnitOfWorkTransaction?>(null);
+}
+
+public interface IUnitOfWorkTransaction : IAsyncDisposable
+{
+    Task CommitAsync(CancellationToken cancellationToken);
 }
 
 public interface IRecordStoreRegistry
@@ -200,4 +211,23 @@ public sealed class RecordStoreRegistry(IEnumerable<IRecordStore> stores) : IRec
         stores.ToDictionary(s => s.EntityKey, StringComparer.OrdinalIgnoreCase);
 
     public IRecordStore? Find(string entityKey) => _stores.GetValueOrDefault(entityKey);
+}
+
+/// <summary>Boru hattı, çalıştırdığı komutun nedenini kayıt depolarına bu sınıf üzerinden bildirir (istek ömürlü).</summary>
+public sealed class RecordCommandContext : IRecordCommandContext
+{
+    public string? Reason { get; private set; }
+
+    /// <summary>Komut süresince nedeni ayarlar; dönen nesne atılınca önceki değer geri gelir (iç içe çağrılarda doğru kalır).</summary>
+    public IDisposable Enter(string? reason)
+    {
+        var previous = Reason;
+        Reason = reason;
+        return new Restore(this, previous);
+    }
+
+    private sealed class Restore(RecordCommandContext context, string? previous) : IDisposable
+    {
+        public void Dispose() => context.Reason = previous;
+    }
 }

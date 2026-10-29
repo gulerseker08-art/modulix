@@ -89,6 +89,16 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
         builder.Property(o => o.Notes).HasMaxLength(Company.NotesMaxLength);
         builder.HasIndex(o => new { o.TenantId, o.Stage });
         builder.HasIndex(o => new { o.TenantId, o.OwnerId });
+        // Bir Lead en fazla bir fırsata dönüşür (dönüşüm iki kez yapılsa bile ikinci fırsat veritabanında da engellenir).
+        builder.HasIndex(o => new { o.TenantId, o.SourceLeadId })
+            .HasDatabaseName("UX_Opportunities_SourceLead")
+            .IsUnique()
+            .HasFilter("[SourceLeadId] IS NOT NULL");
+        builder.HasOne<Lead>()
+            .WithMany()
+            .HasForeignKey(o => new { o.TenantId, o.SourceLeadId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id })
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Company>()
             .WithMany()
@@ -128,6 +138,15 @@ internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
             .WithMany()
             .HasForeignKey(a => new { a.TenantId, a.OpportunityId })
             .HasPrincipalKey(o => new { o.TenantId, o.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Lead aktiviteleri (talimat 8): ayrı bir görev sistemi yok, aktivite tablosu Lead'e bağlanır.
+        builder.Property(a => a.Outcome).HasMaxLength(30);
+        builder.HasIndex(a => new { a.TenantId, a.LeadId });
+        builder.HasOne<Lead>()
+            .WithMany()
+            .HasForeignKey(a => new { a.TenantId, a.LeadId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id })
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -307,5 +326,97 @@ internal sealed class MergedRecordConfiguration : IEntityTypeConfiguration<Merge
             .IsUnique()
             .HasDatabaseName("UX_MergedRecords_Source");
         builder.HasIndex(m => new { m.TenantId, m.EntityKey, m.TargetId });
+    }
+}
+
+internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
+{
+    public void Configure(EntityTypeBuilder<Lead> builder)
+    {
+        CrmTables.ConfigureCommon(builder, "Leads");
+        builder.Property(l => l.LeadNumber).HasMaxLength(Lead.NumberMaxLength).IsRequired();
+        builder.Property(l => l.Subject).HasMaxLength(Lead.SubjectMaxLength).IsRequired();
+        builder.Property(l => l.Description).HasMaxLength(Lead.TextMaxLength);
+        builder.Property(l => l.Status).HasMaxLength(30).IsRequired();
+        builder.Property(l => l.StatusReason).HasMaxLength(Lead.ReasonMaxLength);
+        builder.Property(l => l.Priority).HasMaxLength(20).IsRequired();
+        builder.Property(l => l.FirstName).HasMaxLength(Lead.NameMaxLength);
+        builder.Property(l => l.LastName).HasMaxLength(Lead.NameMaxLength);
+        builder.Property(l => l.CompanyName).HasMaxLength(Lead.ShortMaxLength);
+        builder.Property(l => l.Email).HasMaxLength(Lead.EmailMaxLength);
+        builder.Property(l => l.NormalizedEmail).HasMaxLength(Lead.EmailMaxLength);
+        builder.Property(l => l.Phone).HasMaxLength(Lead.PhoneMaxLength);
+        builder.Property(l => l.NormalizedPhone).HasMaxLength(Lead.PhoneMaxLength);
+        builder.Property(l => l.JobTitle).HasMaxLength(Lead.NameMaxLength);
+        builder.Property(l => l.Website).HasMaxLength(Lead.UrlMaxLength);
+        builder.Property(l => l.WebsiteDomain).HasMaxLength(Lead.UrlMaxLength);
+        builder.Property(l => l.Country).HasMaxLength(Address.CountryLength).IsFixedLength().IsUnicode(false);
+        builder.Property(l => l.City).HasMaxLength(Address.PartMaxLength);
+        builder.Property(l => l.ProductInterest).HasMaxLength(Lead.ShortMaxLength);
+        builder.Property(l => l.NeedDescription).HasMaxLength(Lead.TextMaxLength);
+        builder.Property(l => l.EstimatedBudget).HasPrecision(18, 2);
+        builder.Property(l => l.Currency).HasMaxLength(Opportunity.CurrencyLength).IsFixedLength().IsUnicode(false).IsRequired();
+        builder.Property(l => l.Industry).HasMaxLength(Company.IndustryMaxLength);
+        builder.Property(l => l.Source).HasMaxLength(ChoiceValueKeys.MaxLength);
+        builder.Property(l => l.SourceDetail).HasMaxLength(Lead.ShortMaxLength);
+        builder.Property(l => l.Referrer).HasMaxLength(Lead.UrlMaxLength);
+        builder.Property(l => l.ExternalSource).HasMaxLength(Lead.UtmMaxLength);
+        builder.Property(l => l.ExternalSubmissionId).HasMaxLength(Lead.ExternalIdMaxLength);
+        builder.Property(l => l.UtmSource).HasMaxLength(Lead.UtmMaxLength);
+        builder.Property(l => l.UtmMedium).HasMaxLength(Lead.UtmMaxLength);
+        builder.Property(l => l.UtmCampaign).HasMaxLength(Lead.UtmMaxLength);
+        builder.Property(l => l.DisqualificationReason).HasMaxLength(ChoiceValueKeys.MaxLength);
+
+        builder.HasIndex(l => new { l.TenantId, l.LeadNumber }).IsUnique();
+        builder.HasIndex(l => new { l.TenantId, l.Status, l.OwnerId });
+        builder.HasIndex(l => new { l.TenantId, l.FirstReceivedAt });
+        builder.HasIndex(l => new { l.TenantId, l.NormalizedEmail });
+        builder.HasIndex(l => new { l.TenantId, l.NormalizedPhone });
+
+        // Teknik tekrar (aynı gönderimin yeniden iletilmesi) veritabanı düzeyinde de engellenir; boş değerler tekilleştirilmez.
+        builder.HasIndex(l => new { l.TenantId, l.ExternalSource, l.ExternalSubmissionId })
+            .IsUnique()
+            .HasFilter("[ExternalSource] IS NOT NULL AND [ExternalSubmissionId] IS NOT NULL");
+
+        builder.HasOne<Company>()
+            .WithMany()
+            .HasForeignKey(l => new { l.TenantId, l.CompanyId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Contact>()
+            .WithMany()
+            .HasForeignKey(l => new { l.TenantId, l.ContactId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Dönüşüm izleri: dönüşmüş Lead'in hedef kayıtları silinirse iz kaybolmasın diye silme engellenir.
+        builder.HasOne<Company>()
+            .WithMany()
+            .HasForeignKey(l => new { l.TenantId, l.ConvertedCompanyId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Contact>()
+            .WithMany()
+            .HasForeignKey(l => new { l.TenantId, l.ConvertedContactId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Opportunity>()
+            .WithMany()
+            .HasForeignKey(l => new { l.TenantId, l.ConvertedOpportunityId })
+            .HasPrincipalKey(o => new { o.TenantId, o.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class LeadFormConfiguration : IEntityTypeConfiguration<LeadForm>
+{
+    public void Configure(EntityTypeBuilder<LeadForm> builder)
+    {
+        CrmTables.ConfigureCommon(builder, "LeadForms");
+        builder.Property(f => f.Name).HasMaxLength(LeadForm.NameMaxLength).IsRequired();
+        builder.Property(f => f.FormKey).HasMaxLength(LeadForm.KeyLength).IsRequired();
+        builder.Property(f => f.AllowedOrigins).HasMaxLength(LeadForm.OriginsMaxLength);
+        builder.Property(f => f.SecretHash).HasMaxLength(64).IsFixedLength().IsUnicode(false);
+        builder.HasIndex(f => new { f.TenantId, f.FormKey }).IsUnique();
     }
 }

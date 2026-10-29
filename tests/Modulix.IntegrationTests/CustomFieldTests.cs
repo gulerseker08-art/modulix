@@ -29,7 +29,7 @@ public class CustomFieldTests(ModulixApiFactory factory) : IClassFixture<Modulix
 
         Assert.Equal(HttpStatusCode.Forbidden, (await repClient.GetAsync("/api/customization/fields")).StatusCode);
         var entities = await adminClient.GetFromJsonAsync<List<CustomizableEntityDto>>("/api/customization/entities");
-        Assert.Equal(["crm.company", "crm.contact", "crm.opportunity", "crm.activity"], entities!.Select(e => e.Key));
+        Assert.Equal(["crm.company", "crm.contact", "crm.opportunity", "crm.activity", "crm.lead"], entities!.Select(e => e.Key));
 
         var field = await CreateFieldAsync(adminClient, new SaveCustomFieldRequest(
             "crm.opportunity", "Araç tipi", CustomFieldType.Choice, Required: true, ShowInList: true,

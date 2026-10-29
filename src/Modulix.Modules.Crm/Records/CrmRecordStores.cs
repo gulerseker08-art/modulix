@@ -443,6 +443,8 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
         Field.Text<Opportunity>("title", Opportunity.TitleMaxLength, o => o.Title, (o, v) => o.Title = v!, required: true),
         Field.Reference<Opportunity, Company>("companyId", "Firma bulunamadı.", o => o.CompanyId, (o, v) => o.CompanyId = v!.Value, required: true),
         Field.Reference<Opportunity, Contact>("contactId", "Kişi bulunamadı.", o => o.ContactId, (o, v) => o.ContactId = v),
+        // Kaynak Lead yalnızca dönüşüm işleminde (iş akışı kapısı açıkken) yazılır; genel uçlardan gelen değer yok sayılır.
+        Field.Id<Opportunity>("sourceLeadId", o => o.SourceLeadId, (o, v) => o.SourceLeadId = v).AsSystem(),
         Field.ListChoice<Opportunity>("stage", CrmModule.Lists.OpportunityStage, o => o.Stage, (o, v) => o.Stage = v!),
         Field.Money<Opportunity>("amount", o => o.Amount, (o, v) => o.Amount = v),
         Field.Currency<Opportunity>("currency", o => o.Currency, (o, v) => o.Currency = v),
@@ -457,6 +459,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
     {
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.CompanyId == id) : null,
         ["contactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.ContactId == id) : null,
+        ["sourceLeadId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.SourceLeadId == id) : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(o => o.OwnerId == owner) : null,
     };
 
@@ -518,6 +521,8 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
         Field.Reference<Activity, Company>("companyId", "Firma bulunamadı.", a => a.CompanyId, (a, v) => a.CompanyId = v),
         Field.Reference<Activity, Contact>("contactId", "Kişi bulunamadı.", a => a.ContactId, (a, v) => a.ContactId = v),
         Field.Reference<Activity, Opportunity>("opportunityId", "Fırsat bulunamadı.", a => a.OpportunityId, (a, v) => a.OpportunityId = v),
+        Field.Reference<Activity, Lead>("leadId", "Lead bulunamadı.", a => a.LeadId, (a, v) => a.LeadId = v),
+        Field.OptionalChoice<Activity>("outcome", CrmModule.ActivityOutcomes.All, a => a.Outcome, (a, v) => a.Outcome = v),
         Field.Owner<Activity>(OwnerField, a => a.OwnerId, (a, v) => a.OwnerId = v),
         Field.Text<Activity>("notes", Company.NotesMaxLength, a => a.Notes, (a, v) => a.Notes = v),
     ];
@@ -531,6 +536,8 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(a => a.CompanyId == id) : null,
         ["contactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(a => a.ContactId == id) : null,
         ["opportunityId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(a => a.OpportunityId == id) : null,
+        ["leadId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(a => a.LeadId == id) : null,
+        ["overdue"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(a => a.CompletedAt == null && a.DueAt != null && a.DueAt < time) : null,
         ["open"] = (q, v, _) => FilterValue.Bool(v) is { } open ? q.Where(a => (a.CompletedAt == null) == open) : null,
         ["dueBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(a => a.DueAt != null && a.DueAt < time) : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(a => a.OwnerId == owner) : null,
@@ -539,6 +546,22 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
     /// <summary>Açık aktiviteler önce, en yakın tarihli üstte; tarihsizler sonda.</summary>
     protected override IOrderedQueryable<Activity> Order(IQueryable<Activity> source) =>
         source.OrderBy(a => a.CompletedAt != null).ThenBy(a => a.DueAt == null).ThenBy(a => a.DueAt);
+
+    /// <summary>Bağlanan Lead çağıranın görebildiği bir Lead olmalıdır; erişilemeyen Lead, var olmayan Lead gibi yanıtlanır.</summary>
+    protected override async Task AppliedAsync(Activity entity, JsonObject values, CancellationToken cancellationToken)
+    {
+        if (!values.ContainsKey("leadId") || entity.LeadId is not { } leadId)
+        {
+            return;
+        }
+
+        var stored = await Context.Data.Set<Activity>().AsNoTracking().Where(a => a.Id == entity.Id)
+            .Select(a => a.LeadId).SingleOrDefaultAsync(cancellationToken);
+        if (stored != leadId && !await LeadAccess.IsVisibleAsync(Context, leadId, cancellationToken))
+        {
+            throw new RecordValidationException([new RecordFieldError("leadId", "Lead bulunamadı.")]);
+        }
+    }
 
     protected override IQueryable<Activity> Search(IQueryable<Activity> source, string term) =>
         source.Where(a => a.Subject.Contains(term));

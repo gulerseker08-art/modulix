@@ -36,7 +36,7 @@
 
 Veritabanındaki 27 tablonun hepsi sınıflandırıldı. `TableInventoryTests` yeni tablo geldiğinde sınıfı sorar:
 
-- **Platform şeması dışındaki tablolar (15):** hepsi tenant verisidir ve RLS altındadır (okuma filtresi, ekleme ve güncelleme engeli). Şemaları `core`, `meta` ve `crm`.
+- **Platform şeması dışındaki tablolar (17; Lead ADR-0014 ile `crm.Leads`, `crm.LeadForms` eklendi):** hepsi tenant verisidir ve RLS altındadır (okuma filtresi, ekleme ve güncelleme engeli). Şemaları `core`, `meta` ve `crm`.
 - **Platform şemasındaki tablolar (12):** RLS dışındadır, her biri gerekçesiyle listelidir.
   - `TenantId` taşıyanlar: `Memberships`, `ModuleEntitlements`, `OutboxMessages`, `EventDeliveries`, `EmailMessages`. Bunlar tenant bağlamı kurulmadan okunmak zorundadır: giriş ve firma listesi, platform yöneticisinin hak yönetimi, tüm tenant'ları tarayan işleyiciler.
   - Kimlik ve oturum tabloları kişiye aittir, firmaya değil.
@@ -48,6 +48,7 @@ Veritabanındaki 27 tablonun hepsi sınıflandırıldı. `TableInventoryTests` y
 | --- | --- | --- | --- | --- | --- |
 | Firma (taraf), kişi | `core.Parties`, `core.People` | Çekirdek (ADR-0006) | Tenant | Kayıt boru hattı (`PartyRecordStore`, `PersonRecordStore`) ve CRM uzantısı | Boru hattı |
 | CRM firma, kişi, fırsat, aktivite | `crm.*` | CRM | Tenant, sorumlu kapsamı (Y8) | Kayıt boru hattı (CRM kayıt depoları) | Boru hattı |
+| Lead, Lead formu | `crm.Leads`, `crm.LeadForms` | CRM (ADR-0014) | Tenant, sorumlu kapsamı (Y8); atanmamış Lead atama iznine sahiplere görünür | Kayıt boru hattı (`LeadRecordStore`, `LeadFormRecordStore`); durum/sorumlu/dönüşüm yalnızca `ILeadWorkflow` / `ILeadConversion` / `ILeadIntake` ile | Boru hattı |
 | Firma ayarı | `core.TenantSettings` | Çekirdek | Tenant | Kayıt boru hattı (`TenantSettingRecordStore`) | Boru hattı |
 | Logo | `core.TenantLogos` | Çekirdek | Tenant | `TenantLogoStore` | Kendisi yazar |
 | Rol, rol ataması | `core.Roles`, `core.MembershipRoles` | Çekirdek | Tenant | `RoleService` | Kendisi yazar |
