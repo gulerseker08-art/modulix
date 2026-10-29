@@ -1,0 +1,482 @@
+@page "/crm/fiyat-listeleri"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Fiyat listeleri · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.PricesRead">
+    <div class="page-header">
+        <h1>Fiyat listeleri</h1>
+        @if (Session.Can(CrmAccess.PricesWrite) && form is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="New">Yeni liste</button>
+        }
+    </div>
+
+    <p class="text-muted">Fiyatlar ürünün temel birimi başınadır; kademe aralığı [alt, üst) temel birim miktarıdır. Yayımlanan liste değişmez, yalnızca arşive alınır; değişiklik için yeni liste açın.</p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni fiyat listesi" : "Fiyat listesini düzenle")</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="name">Ad *</label>
+                    <input id="name" class="form-control" maxlength="150" @bind="form.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="currency">Para birimi *</label>
+                    <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
+                    <FieldError Field="currency" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="scope">Kapsam</label>
+                    <select id="scope" class="form-select" @bind="form.Scope">
+                        @foreach (var scope in PricingLabels.Scopes)
+                        {
+                            <option value="@scope.Key">@scope.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="scope" Errors="errors" />
+                </div>
+                @if (form.Scope == "Customer")
+                {
+                    <div>
+                        <label class="form-label" for="company">Firma *</label>
+                        <select id="company" class="form-select" @bind="form.CompanyId">
+                            <option value="">—</option>
+                            @foreach (var company in companies)
+                            {
+                                <option value="@company.Id">@company.Name</option>
+                            }
+                        </select>
+                        <FieldError Field="companyId" Errors="errors" />
+                    </div>
+                }
+                @if (form.Scope == "Segment")
+                {
+                    <div>
+                        <label class="form-label" for="segment">Segment / kanal *</label>
+                        <input id="segment" class="form-control" maxlength="100" @bind="form.Segment" />
+                        <FieldError Field="segment" Errors="errors" />
+                    </div>
+                }
+                <div>
+                    <label class="form-label" for="method">Kademe yöntemi</label>
+                    <select id="method" class="form-select" @bind="form.TierMethod">
+                        @foreach (var method in PricingLabels.TierMethods)
+                        {
+                            <option value="@method.Key">@method.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="tierMethod" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="from">Geçerlilik başı</label>
+                    <input id="from" class="form-control" type="datetime-local" @bind="form.ValidFrom" />
+                    <FieldError Field="validFrom" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="to">Geçerlilik sonu (hariç)</label>
+                    <input id="to" class="form-control" type="datetime-local" @bind="form.ValidTo" />
+                    <FieldError Field="validTo" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    @if (opened is not null)
+    {
+        <section class="record-form">
+            <h2>@opened.Name · satırlar <span class="badge status-@PricingLabels.ListBadge(opened.Status)">@PricingLabels.Label(PricingLabels.ListStatuses, opened.Status)</span></h2>
+            @if (items is null)
+            {
+                <p class="text-muted">Yükleniyor…</p>
+            }
+            else if (items.Count == 0)
+            {
+                <p class="text-muted">Satır yok.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <thead><tr><th>Ürün</th><th>Alt miktar</th><th>Üst miktar (hariç)</th><th>Birim fiyat</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var item in items)
+                        {
+                            <tr>
+                                <td data-label="Ürün" class="primary">@item.ProductCode — @item.ProductName</td>
+                                <td data-label="Alt miktar">@item.MinQuantity</td>
+                                <td data-label="Üst miktar">@(item.MaxQuantity?.ToString() ?? "sınırsız")</td>
+                                <td data-label="Birim fiyat">@(item.IsFree ? "Ücretsiz" : $"{item.UnitPrice} {opened.Currency}")</td>
+                                <td class="actions">
+                                    @if (opened.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
+                                    {
+                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteItemAsync(item)">Sil</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (itemMessage is not null)
+            {
+                <div class="alert alert-danger" role="alert">@itemMessage</div>
+            }
+
+            @if (opened.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
+            {
+                <form class="form-grid" novalidate @onsubmit="AddItemAsync" @onsubmit:preventDefault>
+                    <div>
+                        <label class="form-label" for="itemProduct">Ürün *</label>
+                        <select id="itemProduct" class="form-select" @bind="itemForm.ProductId">
+                            <option value="@Guid.Empty">—</option>
+                            @foreach (var product in products)
+                            {
+                                <option value="@product.Id">@product.Code — @product.Name</option>
+                            }
+                        </select>
+                        <FieldError Field="productId" Errors="itemErrors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="itemMin">Alt miktar *</label>
+                        <input id="itemMin" class="form-control" type="number" step="any" min="0" @bind="itemForm.Min" />
+                        <FieldError Field="minQuantity" Errors="itemErrors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="itemMax">Üst miktar (hariç)</label>
+                        <input id="itemMax" class="form-control" type="number" step="any" min="0" @bind="itemForm.Max" />
+                        <FieldError Field="maxQuantity" Errors="itemErrors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="itemPrice">Birim fiyat *</label>
+                        <input id="itemPrice" class="form-control" type="number" step="any" min="0" disabled="@itemForm.IsFree" @bind="itemForm.Price" />
+                        <FieldError Field="unitPrice" Errors="itemErrors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="itemFree">Ücretsiz satış</label>
+                        <select id="itemFree" class="form-select" @bind="itemForm.IsFree">
+                            <option value="false">Hayır</option>
+                            <option value="true">Evet</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-outline-primary" disabled="@busy">Satır ekle</button>
+                    </div>
+                </form>
+            }
+
+            <div class="form-actions">
+                @if (opened.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
+                {
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick='() => ChangeStatusAsync(opened, "Published")'>Yayımla</button>
+                }
+                @if (opened.Status != "Archived" && Session.Can(CrmAccess.PricesWrite))
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick='() => ChangeStatusAsync(opened, "Archived")'>Arşive al</button>
+                }
+                <button type="button" class="btn btn-outline-secondary" @onclick="CloseItems">Kapat</button>
+            </div>
+        </section>
+    }
+
+    <div class="filters" role="group" aria-label="Durum">
+        <button type="button" class="chip @(status is null ? "active" : null)" @onclick="() => FilterAsync(null)">Tümü</button>
+        @foreach (var item in PricingLabels.ListStatuses)
+        {
+            <button type="button" class="chip @(status == item.Key ? "active" : null)" @onclick="() => FilterAsync(item.Key)">@item.Label</button>
+        }
+    </div>
+
+    @if (page is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Fiyat listesi yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead><tr><th>Ad</th><th>Durum</th><th>Kapsam</th><th>Para birimi</th><th>Geçerlilik</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var list in page.Items)
+                {
+                    <tr>
+                        <td data-label="Ad" class="primary">@list.Name</td>
+                        <td data-label="Durum"><span class="badge status-@PricingLabels.ListBadge(list.Status)">@PricingLabels.Label(PricingLabels.ListStatuses, list.Status)</span></td>
+                        <td data-label="Kapsam">@PricingLabels.Label(PricingLabels.Scopes, list.Scope)@(list.Segment is null ? null : $" · {list.Segment}")@(CompanyName(list.CompanyId))</td>
+                        <td data-label="Para birimi">@list.Currency</td>
+                        <td data-label="Geçerlilik">@Period(list)</td>
+                        <td class="actions">
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => OpenItemsAsync(list)">Satırlar</button>
+                            @if (list.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(list)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/price-lists";
+    private const string ItemsUrl = "/api/crm/price-list-items";
+
+    private CrmPage<PriceListDto>? page;
+    private List<CompanyDto> companies = [];
+    private List<ProductDto> products = [];
+    private PriceListDto? opened;
+    private List<PriceListItemDto>? items;
+    private ListForm? form;
+    private ItemForm itemForm = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private IReadOnlyDictionary<string, string[]>? itemErrors;
+    private string? message;
+    private string? itemMessage;
+    private string? status;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.PricesRead))
+        {
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}";
+        if (status is not null)
+        {
+            url += $"&status={Uri.EscapeDataString(status)}";
+        }
+
+        var result = await Api.GetAsync<CrmPage<PriceListDto>>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private async Task FilterAsync(string? value)
+    {
+        status = value;
+        await LoadAsync(1);
+    }
+
+    private async Task EnsureLookupsAsync()
+    {
+        if (products.Count == 0 && Session.Can(CrmAccess.ProductsRead))
+        {
+            products = (await Api.GetAllAsync<ProductDto>("/api/crm/products")).Items;
+        }
+
+        if (companies.Count == 0 && Session.Can(CrmAccess.CompaniesRead))
+        {
+            companies = (await Api.GetAllAsync<CompanyDto>("/api/crm/companies")).Items;
+        }
+    }
+
+    private string CompanyName(Guid? id) => id is { } value && companies.FirstOrDefault(c => c.Id == value) is { } company ? $" · {company.Name}" : string.Empty;
+
+    private static string Period(PriceListDto list) => list.ValidFrom is null && list.ValidTo is null
+        ? "Süresiz"
+        : $"{list.ValidFrom?.ToLocalTime():yyyy-MM-dd HH:mm} → {(list.ValidTo is { } to ? to.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "…")}";
+
+    private async Task New()
+    {
+        await EnsureLookupsAsync();
+        form = new ListForm();
+        errors = null;
+        message = null;
+    }
+
+    private async Task Edit(PriceListDto list)
+    {
+        await EnsureLookupsAsync();
+        form = new ListForm
+        {
+            Id = list.Id, Version = list.Version, Name = list.Name, Currency = list.Currency, Scope = list.Scope, CompanyId = list.CompanyId,
+            Segment = list.Segment, TierMethod = list.TierMethod, Status = list.Status,
+            ValidFrom = list.ValidFrom?.LocalDateTime, ValidTo = list.ValidTo?.LocalDateTime,
+        };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var f = form!;
+        var request = new SavePriceListRequest(
+            f.Name, f.Currency, f.Scope, f.Scope == "Customer" ? f.CompanyId : null, f.Scope == "Segment" ? f.Segment : null,
+            f.ValidFrom is { } from ? new DateTimeOffset(from) : null, f.ValidTo is { } to ? new DateTimeOffset(to) : null, f.Status, f.TierMethod, f.Version);
+        var result = f.Id is { } id
+            ? await Api.PutAsync<PriceListDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<PriceListDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            errors = null;
+            message = null;
+            await LoadAsync(page?.Page ?? 1);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync(page?.Page ?? 1);
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private async Task OpenItemsAsync(PriceListDto list)
+    {
+        await EnsureLookupsAsync();
+        opened = list;
+        itemForm = new ItemForm();
+        itemErrors = null;
+        itemMessage = null;
+        await ReloadItemsAsync();
+    }
+
+    private void CloseItems()
+    {
+        opened = null;
+        items = null;
+    }
+
+    private async Task ReloadItemsAsync()
+    {
+        var (loaded, error) = await Api.GetAllAsync<PriceListItemDto>($"{ItemsUrl}?priceListId={opened!.Id}");
+        items = loaded;
+        itemMessage = error;
+    }
+
+    private async Task AddItemAsync()
+    {
+        busy = true;
+        var f = itemForm;
+        var result = await Api.PostAsync<PriceListItemDto>(ItemsUrl,
+            new SavePriceListItemRequest(opened!.Id, f.ProductId, f.Min, f.IsFree ? 0m : f.Price, f.Max, f.IsFree));
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            itemForm = new ItemForm { ProductId = f.ProductId };
+            itemErrors = null;
+            itemMessage = null;
+            await ReloadItemsAsync();
+            return;
+        }
+
+        itemErrors = result.FieldErrors;
+        itemMessage = result.Error;
+    }
+
+    private async Task DeleteItemAsync(PriceListItemDto item)
+    {
+        var result = await Api.DeleteAsync($"{ItemsUrl}/{item.Id}?version={item.Version}");
+        if (result.IsSuccess)
+        {
+            await ReloadItemsAsync();
+            return;
+        }
+
+        itemMessage = result.Error;
+    }
+
+    private async Task ChangeStatusAsync(PriceListDto list, string newStatus)
+    {
+        busy = true;
+        var request = new SavePriceListRequest(
+            list.Name, list.Currency, list.Scope, list.CompanyId, list.Segment, list.ValidFrom, list.ValidTo, newStatus, list.TierMethod, list.Version);
+        var result = await Api.PutAsync<PriceListDto>($"{Url}/{list.Id}", request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            opened = result.Value;
+            itemMessage = null;
+            await LoadAsync(page?.Page ?? 1);
+            return;
+        }
+
+        itemMessage = result.Error ?? string.Join(" ", result.FieldErrors?.SelectMany(e => e.Value) ?? []);
+    }
+
+    private sealed class ListForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string Currency { get; set; } = "TRY";
+
+        public string Scope { get; set; } = "Default";
+
+        public Guid? CompanyId { get; set; }
+
+        public string? Segment { get; set; }
+
+        public string TierMethod { get; set; } = "Volume";
+
+        public string Status { get; set; } = "Draft";
+
+        public DateTime? ValidFrom { get; set; }
+
+        public DateTime? ValidTo { get; set; }
+    }
+
+    private sealed class ItemForm
+    {
+        public Guid ProductId { get; set; }
+
+        public decimal Min { get; set; } = 1m;
+
+        public decimal? Max { get; set; }
+
+        public decimal Price { get; set; }
+
+        public bool IsFree { get; set; }
+    }
+}

@@ -1,0 +1,274 @@
+@page "/crm/indirimler"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>İndirim politikaları · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.PricesRead">
+    <div class="page-header">
+        <h1>İndirim politikaları</h1>
+        @if (Session.Can(CrmAccess.PricesWrite) && form is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => form = new()">Yeni politika</button>
+        }
+    </div>
+
+    <p class="text-muted">İndirimler öncelik sırasıyla ardışık uygulanır (%10 + %10 = %19). Onay eşiğini aşan etkin indirim fiyat hesabında "onay gerekir" olarak işaretlenir; azami toplam yüzde aşılırsa indirim o sınıra çekilir.</p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni indirim politikası" : "Politikayı düzenle")</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="name">Ad *</label>
+                    <input id="name" class="form-control" maxlength="150" @bind="form.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="kind">Tür</label>
+                    <select id="kind" class="form-select" @bind="form.ByAmount">
+                        <option value="false">Yüzde</option>
+                        <option value="true">Tutar</option>
+                    </select>
+                </div>
+                @if (form.ByAmount)
+                {
+                    <div>
+                        <label class="form-label" for="amount">Tutar *</label>
+                        <input id="amount" class="form-control" type="number" step="0.01" min="0" @bind="form.Amount" />
+                        <FieldError Field="amount" Errors="errors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="currency">Para birimi *</label>
+                        <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
+                        <FieldError Field="currency" Errors="errors" />
+                    </div>
+                }
+                else
+                {
+                    <div>
+                        <label class="form-label" for="percent">Yüzde *</label>
+                        <input id="percent" class="form-control" type="number" step="any" min="0" max="100" @bind="form.Percent" />
+                        <FieldError Field="percent" Errors="errors" />
+                    </div>
+                }
+                <div>
+                    <label class="form-label" for="priority">Öncelik (küçük önce)</label>
+                    <input id="priority" class="form-control" type="number" min="0" @bind="form.Priority" />
+                    <FieldError Field="priority" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="stackable">Başka indirimle birleşir</label>
+                    <select id="stackable" class="form-select" @bind="form.Stackable">
+                        <option value="true">Evet</option>
+                        <option value="false">Hayır</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="maxTotal">Azami toplam indirim (%)</label>
+                    <input id="maxTotal" class="form-control" type="number" step="any" min="0" max="100" @bind="form.MaxTotalPercent" />
+                    <FieldError Field="maxTotalPercent" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="approval">Onay eşiği (%)</label>
+                    <input id="approval" class="form-control" type="number" step="any" min="0" max="100" @bind="form.ApprovalAbovePercent" />
+                    <FieldError Field="approvalAbovePercent" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="from">Geçerlilik başı</label>
+                    <input id="from" class="form-control" type="date" @bind="form.ValidFrom" />
+                    <FieldError Field="validFrom" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="to">Geçerlilik sonu (dahil)</label>
+                    <input id="to" class="form-control" type="date" @bind="form.ValidTo" />
+                    <FieldError Field="validTo" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="active">Durum</label>
+                    <select id="active" class="form-select" @bind="form.IsActive">
+                        <option value="true">Aktif</option>
+                        <option value="false">Pasif</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    @if (policies is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (policies.Count == 0)
+    {
+        <p class="text-muted">İndirim politikası yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead><tr><th>Ad</th><th>İndirim</th><th>Öncelik</th><th>Sınırlar</th><th>Durum</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var policy in policies)
+                {
+                    <tr>
+                        <td data-label="Ad" class="primary">@policy.Name</td>
+                        <td data-label="İndirim">@(policy.Percent is { } p ? $"%{p}" : $"{policy.Amount} {policy.Currency}")</td>
+                        <td data-label="Öncelik">@policy.Priority@(policy.Stackable ? null : " · birleşmez")</td>
+                        <td data-label="Sınırlar">@Limits(policy)</td>
+                        <td data-label="Durum">@(policy.IsActive ? "Aktif" : "Pasif")</td>
+                        <td class="actions">
+                            @if (Session.Can(CrmAccess.PricesWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(policy)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/discount-policies";
+
+    private List<DiscountPolicyDto>? policies;
+    private PolicyForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.PricesRead))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var (loaded, error) = await Api.GetAllAsync<DiscountPolicyDto>(Url);
+        policies = loaded;
+        message = error;
+    }
+
+    private static string Limits(DiscountPolicyDto policy)
+    {
+        var parts = new List<string>();
+        if (policy.MaxTotalPercent is { } max)
+        {
+            parts.Add($"azami %{max}");
+        }
+
+        if (policy.ApprovalAbovePercent is { } approval)
+        {
+            parts.Add($"%{approval} üstü onay");
+        }
+
+        if (policy.ValidFrom is not null || policy.ValidTo is not null)
+        {
+            parts.Add($"{policy.ValidFrom?.ToString("yyyy-MM-dd") ?? "…"} → {policy.ValidTo?.ToString("yyyy-MM-dd") ?? "…"}");
+        }
+
+        return parts.Count == 0 ? "—" : string.Join(" · ", parts);
+    }
+
+    private void Edit(DiscountPolicyDto policy)
+    {
+        form = new PolicyForm
+        {
+            Id = policy.Id, Version = policy.Version, Name = policy.Name, ByAmount = policy.Amount is not null, Percent = policy.Percent,
+            Amount = policy.Amount, Currency = policy.Currency ?? "TRY", Priority = policy.Priority, Stackable = policy.Stackable,
+            MaxTotalPercent = policy.MaxTotalPercent, ApprovalAbovePercent = policy.ApprovalAbovePercent,
+            ValidFrom = policy.ValidFrom?.ToDateTime(TimeOnly.MinValue), ValidTo = policy.ValidTo?.ToDateTime(TimeOnly.MinValue), IsActive = policy.IsActive,
+        };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var f = form!;
+        var request = new SaveDiscountPolicyRequest(
+            f.Name, f.ByAmount ? null : f.Percent, f.ByAmount ? f.Amount : null, f.ByAmount ? f.Currency : null, f.Priority, f.Stackable,
+            f.MaxTotalPercent, f.ApprovalAbovePercent, f.ValidFrom is { } from ? DateOnly.FromDateTime(from) : null,
+            f.ValidTo is { } to ? DateOnly.FromDateTime(to) : null, f.IsActive, f.Version);
+        var result = f.Id is { } id
+            ? await Api.PutAsync<DiscountPolicyDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<DiscountPolicyDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            errors = null;
+            message = null;
+            await LoadAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
+        busy = false;
+        message = result.Error;
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+        }
+    }
+
+    private sealed class PolicyForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public bool ByAmount { get; set; }
+
+        public decimal? Percent { get; set; }
+
+        public decimal? Amount { get; set; }
+
+        public string Currency { get; set; } = "TRY";
+
+        public int Priority { get; set; }
+
+        public bool Stackable { get; set; } = true;
+
+        public decimal? MaxTotalPercent { get; set; }
+
+        public decimal? ApprovalAbovePercent { get; set; }
+
+        public DateTime? ValidFrom { get; set; }
+
+        public DateTime? ValidTo { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

@@ -14,7 +14,7 @@
     </div>
 
     <p class="text-muted">
-        <a href="crm/urun-kategorileri">Kategoriler</a> · <a href="crm/birimler">Ölçü birimleri</a>    </p>
+        <a href="crm/urun-kategorileri">Kategoriler</a> · <a href="crm/birimler">Ölçü birimleri</a> · <a href="crm/fiyat-listeleri">Fiyat listeleri</a> · <a href="crm/vergi-kur">Vergi ve kur</a> · <a href="crm/indirimler">İndirimler</a> · <a href="crm/fiyat-hesapla">Fiyat hesapla</a>    </p>
 
     @if (message is not null)
     {
@@ -203,6 +203,69 @@
         </form>
     }
 
+    @if (form?.Id is { } packageId)
+    {
+        <section class="record-form">
+            <h2>Paket bileşenleri</h2>
+            <p class="text-muted">Bu ürüne bileşen eklerseniz paket olarak davranır; fiyat hesabında bileşenler miktarla çarpılarak listelenir. Paket kendisini ya da (dolaylı olarak) kendisini içeren bir ürünü bileşen yapamaz.</p>
+            @if (components.Count == 0)
+            {
+                <p class="text-muted">Bileşen yok.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <thead><tr><th>Bileşen</th><th>Miktar (temel birim)</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var component in components)
+                        {
+                            <tr>
+                                <td data-label="Bileşen" class="primary">@component.ComponentCode — @component.ComponentName</td>
+                                <td data-label="Miktar">@component.Quantity</td>
+                                <td class="actions">
+                                    @if (Session.Can(CrmAccess.ProductsWrite))
+                                    {
+                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteComponentAsync(component)">Sil</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (componentMessage is not null)
+            {
+                <div class="alert alert-danger" role="alert">@componentMessage</div>
+            }
+
+            @if (Session.Can(CrmAccess.ProductsWrite))
+            {
+                <form class="form-grid" novalidate @onsubmit="() => AddComponentAsync(packageId)" @onsubmit:preventDefault>
+                    <div>
+                        <label class="form-label" for="componentProduct">Bileşen ürünü *</label>
+                        <select id="componentProduct" class="form-select" @bind="componentForm.ComponentId">
+                            <option value="@Guid.Empty">—</option>
+                            @foreach (var candidate in allProducts.Where(p => p.Id != packageId))
+                            {
+                                <option value="@candidate.Id">@candidate.Code — @candidate.Name</option>
+                            }
+                        </select>
+                        <FieldError Field="componentId" Errors="componentErrors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="componentQty">Miktar *</label>
+                        <input id="componentQty" class="form-control" type="number" step="any" min="0" @bind="componentForm.Quantity" />
+                        <FieldError Field="quantity" Errors="componentErrors" />
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-outline-primary" disabled="@busy">Bileşen ekle</button>
+                    </div>
+                </form>
+            }
+        </section>
+    }
+
     <div class="filters" role="group" aria-label="Filtre">
         <button type="button" class="chip @(status is null && kind is null ? "active" : null)" @onclick="() => FilterAsync(null, null)">Tümü</button>
         @foreach (var item in CatalogLabels.Kinds)
@@ -263,6 +326,11 @@
     private List<ProductCategoryDto> categories = [];
     private List<MeasureUnitDto> units = [];
     private ProductForm? form;
+    private List<ProductComponentDto> components = [];
+    private List<ProductDto> allProducts = [];
+    private ComponentForm componentForm = new();
+    private IReadOnlyDictionary<string, string[]>? componentErrors;
+    private string? componentMessage;
     private IReadOnlyDictionary<string, string[]>? errors;
     private string? message;
     private string? search;
@@ -335,7 +403,49 @@
         message = null;
     }
 
-    private void Edit(ProductDto p)
+    private async Task LoadComponentsAsync(Guid packageId)
+    {
+        var (loaded, error) = await Api.GetAllAsync<ProductComponentDto>($"/api/crm/product-components?packageId={packageId}");
+        components = loaded;
+        componentMessage = error;
+        if (allProducts.Count == 0)
+        {
+            allProducts = (await Api.GetAllAsync<ProductDto>(Url)).Items;
+        }
+    }
+
+    private async Task AddComponentAsync(Guid packageId)
+    {
+        busy = true;
+        var result = await Api.PostAsync<ProductComponentDto>("/api/crm/product-components",
+            new SaveProductComponentRequest(packageId, componentForm.ComponentId, componentForm.Quantity));
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            componentForm = new ComponentForm();
+            componentErrors = null;
+            await LoadComponentsAsync(packageId);
+            return;
+        }
+
+        componentErrors = result.FieldErrors;
+        componentMessage = result.Error;
+    }
+
+    private async Task DeleteComponentAsync(ProductComponentDto component)
+    {
+        var result = await Api.DeleteAsync($"/api/crm/product-components/{component.Id}?version={component.Version}");
+        if (result.IsSuccess)
+        {
+            await LoadComponentsAsync(component.PackageId);
+            return;
+        }
+
+        componentMessage = result.Error;
+    }
+
+    private async Task Edit(ProductDto p)
     {
         form = new ProductForm
         {
@@ -348,6 +458,9 @@
         };
         errors = null;
         message = null;
+        componentForm = new ComponentForm();
+        componentErrors = null;
+        await LoadComponentsAsync(p.Id);
     }
 
     private void Close() => form = null;
@@ -398,6 +511,13 @@
     }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private sealed class ComponentForm
+    {
+        public Guid ComponentId { get; set; }
+
+        public decimal Quantity { get; set; } = 1m;
+    }
 
     private sealed class ProductForm
     {

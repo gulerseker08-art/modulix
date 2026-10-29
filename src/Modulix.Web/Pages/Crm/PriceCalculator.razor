@@ -1,0 +1,257 @@
+@page "/crm/fiyat-hesapla"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Fiyat hesapla · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.PricesRead">
+    <div class="page-header">
+        <h1>Fiyat hesapla</h1>
+    </div>
+
+    <p class="text-muted">Sunucu, fiyat listesini seçer; birimi dönüştürür; indirim, vergi ve yuvarlamayı uygular. Sonuç hiçbir kayıt oluşturmaz; teklif satırı bu hesabı anlık görüntü olarak saklayacaktır.</p>
+
+    <form class="record-form" novalidate @onsubmit="CalculateAsync" @onsubmit:preventDefault>
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="product">Ürün *</label>
+                <select id="product" class="form-select" @bind="form.ProductId">
+                    <option value="@Guid.Empty">—</option>
+                    @foreach (var product in products)
+                    {
+                        <option value="@product.Id">@product.Code — @product.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="quantity">Miktar *</label>
+                <input id="quantity" class="form-control" type="number" step="any" min="0" @bind="form.Quantity" />
+            </div>
+            <div>
+                <label class="form-label" for="unit">Satış birimi</label>
+                <select id="unit" class="form-select" @bind="form.UnitId">
+                    <option value="">Ürünün temel birimi</option>
+                    @foreach (var unit in units)
+                    {
+                        <option value="@unit.Id">@unit.Code — @unit.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="currency">Para birimi *</label>
+                <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
+            </div>
+            <div>
+                <label class="form-label" for="at">Tarih (boşsa şimdi)</label>
+                <input id="at" class="form-control" type="datetime-local" @bind="form.At" />
+            </div>
+            <div>
+                <label class="form-label" for="list">Fiyat listesi (açık seçim)</label>
+                <select id="list" class="form-select" @bind="form.PriceListId">
+                    <option value="">Otomatik seç</option>
+                    @foreach (var list in lists)
+                    {
+                        <option value="@list.Id">@list.Name (@list.Currency)</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="company">Firma</label>
+                <select id="company" class="form-select" @bind="form.CompanyId">
+                    <option value="">—</option>
+                    @foreach (var company in companies)
+                    {
+                        <option value="@company.Id">@company.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="segment">Segment / kanal</label>
+                <input id="segment" class="form-control" @bind="form.Segment" />
+            </div>
+            <div>
+                <label class="form-label" for="manual">Elle indirim (%)</label>
+                <input id="manual" class="form-control" type="number" step="any" min="0" max="100" @bind="form.Manual" />
+            </div>
+            <div>
+                <label class="form-label" for="display">Gösterim para birimi</label>
+                <input id="display" class="form-control" maxlength="3" @bind="form.Display" />
+            </div>
+            @if (policies.Count > 0)
+            {
+                <div class="span-all">
+                    <span class="form-label">İndirim politikaları</span>
+                    @foreach (var policy in policies)
+                    {
+                        <label class="form-check-label me-3">
+                            <input type="checkbox" class="form-check-input" checked="@selectedPolicies.Contains(policy.Id)" @onchange="e => TogglePolicy(policy.Id, e)" />
+                            @policy.Name (@(policy.Percent is { } p ? $"%{p}" : $"{policy.Amount} {policy.Currency}"))
+                        </label>
+                    }
+                </div>
+            }
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" disabled="@busy">Hesapla</button>
+        </div>
+    </form>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @error
+            @if (PricingLabels.ErrorHint(errorCode) is { } hint)
+            {
+                <div>@hint</div>
+            }
+        </div>
+    }
+
+    @if (result is not null)
+    {
+        <section class="record-form" aria-live="polite">
+            <h2>@result.ProductCode — @result.ProductName</h2>
+            <table class="table record-table">
+                <tbody>
+                    <tr><th>Fiyat listesi</th><td>@result.PriceListName (sürüm @result.PriceListVersion)</td></tr>
+                    <tr><th>Miktar</th><td>@result.Quantity (temel birimde @result.BaseQuantity)</td></tr>
+                    <tr><th>Liste bedeli</th><td>@Fmt(result.ListTotal) @result.Currency@(result.IsFree ? " · ücretsiz satış" : null)</td></tr>
+                    <tr><th>İndirimli bedel</th><td>@Fmt(result.DiscountedTotal) @result.Currency (etkin %@result.EffectiveDiscountPercent)</td></tr>
+                    <tr><th>Vergi (%@result.TaxRatePercent, @(result.PriceIncludesTax ? "dahil" : "hariç"))</th><td>@Fmt(result.Tax) @result.Currency</td></tr>
+                    <tr><th>Vergisiz</th><td>@Fmt(result.Net) @result.Currency</td></tr>
+                    <tr><th>Toplam</th><td><strong>@Fmt(result.Gross) @result.Currency</strong></td></tr>
+                    @if (result.Display is { } display)
+                    {
+                        <tr><th>@display.Currency (kur @display.Rate, @display.RateDate.ToString("yyyy-MM-dd"))</th><td>@Fmt(display.Gross) @display.Currency</td></tr>
+                    }
+                </tbody>
+            </table>
+            @if (result.RequiresApproval)
+            {
+                <div class="alert alert-warning" role="status">Bu indirim onay eşiğini aşıyor; onay gerekir.</div>
+            }
+
+            @if (result.DiscountCapApplied)
+            {
+                <div class="alert alert-info" role="status">Azami toplam indirim sınırı uygulandı.</div>
+            }
+
+            @if (result.Components.Count > 0)
+            {
+                <h3>Paket bileşenleri</h3>
+                <ul>
+                    @foreach (var component in result.Components)
+                    {
+                        <li>@component.Code — @component.Name × @component.BaseQuantity</li>
+                    }
+                </ul>
+            }
+
+            <details>
+                <summary>Hesap açıklaması</summary>
+                <ul>
+                    @foreach (var line in result.Explanation)
+                    {
+                        <li>@line</li>
+                    }
+                </ul>
+            </details>
+        </section>
+    }
+</AuthGate>
+
+@code {
+    private List<ProductDto> products = [];
+    private List<MeasureUnitDto> units = [];
+    private List<PriceListDto> lists = [];
+    private List<CompanyDto> companies = [];
+    private List<DiscountPolicyDto> policies = [];
+    private readonly HashSet<Guid> selectedPolicies = [];
+    private readonly CalcForm form = new();
+    private PriceCalculationDto? result;
+    private string? error;
+    private string? errorCode;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(CrmAccess.PricesRead))
+        {
+            return;
+        }
+
+        if (Session.Can(CrmAccess.ProductsRead))
+        {
+            products = (await Api.GetAllAsync<ProductDto>("/api/crm/products?status=Active")).Items;
+            units = (await Api.GetAllAsync<MeasureUnitDto>("/api/crm/units")).Items;
+        }
+
+        lists = (await Api.GetAllAsync<PriceListDto>("/api/crm/price-lists?status=Published")).Items;
+        policies = (await Api.GetAllAsync<DiscountPolicyDto>("/api/crm/discount-policies?active=true")).Items;
+        if (Session.Can(CrmAccess.CompaniesRead))
+        {
+            companies = (await Api.GetAllAsync<CompanyDto>("/api/crm/companies")).Items;
+        }
+    }
+
+    private void TogglePolicy(Guid id, ChangeEventArgs e)
+    {
+        if (e.Value is true)
+        {
+            selectedPolicies.Add(id);
+        }
+        else
+        {
+            selectedPolicies.Remove(id);
+        }
+    }
+
+    private static string Fmt(decimal value) => value.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"));
+
+    private async Task CalculateAsync()
+    {
+        busy = true;
+        error = null;
+        errorCode = null;
+        result = null;
+        var f = form;
+        var request = new PriceCalculationRequestDto(
+            f.ProductId, f.Quantity, f.Currency, f.UnitId, f.At is { } at ? new DateTimeOffset(at) : null, f.PriceListId, f.CompanyId,
+            string.IsNullOrWhiteSpace(f.Segment) ? null : f.Segment, [.. selectedPolicies], f.Manual, string.IsNullOrWhiteSpace(f.Display) ? null : f.Display);
+        var response = await Api.PostAsync<PriceCalculationDto>("/api/crm/pricing/calculate", request);
+        busy = false;
+
+        if (response.IsSuccess)
+        {
+            result = response.Value;
+            return;
+        }
+
+        error = response.Error;
+        errorCode = response.Code;
+    }
+
+    private sealed class CalcForm
+    {
+        public Guid ProductId { get; set; }
+
+        public decimal Quantity { get; set; } = 1m;
+
+        public Guid? UnitId { get; set; }
+
+        public string Currency { get; set; } = "TRY";
+
+        public DateTime? At { get; set; }
+
+        public Guid? PriceListId { get; set; }
+
+        public Guid? CompanyId { get; set; }
+
+        public string? Segment { get; set; }
+
+        public decimal? Manual { get; set; }
+
+        public string? Display { get; set; }
+    }
+}
