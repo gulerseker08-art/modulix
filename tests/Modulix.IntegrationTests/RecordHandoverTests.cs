@@ -34,12 +34,14 @@ public class RecordHandoverTests(ModulixApiFactory factory) : IClassFixture<Modu
         var wonDeal = await CreateAsync(client, "crm.opportunity",
             new JsonObject { ["title"] = "Kazanılan", ["companyId"] = company.ToString(), ["stage"] = "won", ["ownerId"] = Id(leaver) });
         var openTask = await CreateAsync(client, "crm.activity", new JsonObject { ["subject"] = "Ara", ["ownerId"] = Id(leaver) });
+        // Açık Lead de devredilir (sorumlu alanı genel uçlardan değişmese de devir nedeniyle değişebilir).
+        var openLead = await CreateAsync(client, "crm.lead", new JsonObject { ["subject"] = "Devredilecek Lead", ["lastName"] = "Kaya", ["ownerId"] = Id(leaver) });
         var doneTask = await CreateAsync(client, "crm.activity",
             new JsonObject { ["subject"] = "Arandı", ["completedAt"] = DateTimeOffset.UtcNow.ToString("O"), ["ownerId"] = Id(leaver) });
 
         var owned = await client.GetFromJsonAsync<List<OwnedRecordsDto>>($"/api/users/{leaverMembership}/owned-records");
-        Assert.Equal([2, 1, 1], owned!.Select(o => o.Count));
-        Assert.Equal(["firma", "açık fırsat", "açık aktivite"], owned!.Select(o => o.Label));
+        Assert.Equal([2, 1, 1, 1], owned!.Select(o => o.Count));
+        Assert.Equal(["firma", "açık fırsat", "açık aktivite", "açık lead"], owned!.Select(o => o.Label));
 
         var disabled = await client.PostAsJsonAsync($"/api/users/{leaverMembership}/disable", new DisableUserRequest(receiverMembership));
         Assert.Equal(HttpStatusCode.NoContent, disabled.StatusCode);
@@ -48,6 +50,7 @@ public class RecordHandoverTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Equal(Id(receiver), await OwnerAsync(client, "crm.company", company));
         Assert.Equal(Id(receiver), await OwnerAsync(client, "crm.opportunity", openDeal));
         Assert.Equal(Id(receiver), await OwnerAsync(client, "crm.activity", openTask));
+        Assert.Equal(Id(receiver), await OwnerAsync(client, "crm.lead", openLead));
         Assert.Equal(Id(leaver), await OwnerAsync(client, "crm.opportunity", wonDeal));
         Assert.Equal(Id(leaver), await OwnerAsync(client, "crm.activity", doneTask));
 

@@ -1,0 +1,207 @@
+@* Lead'i fırsata dönüştürme: aktarılacak bilgilerin önizlemesi, mevcut/yeni firma ve kişi seçimi. Mevcut kayıtların verisi değişmez;
+   yazımlar kullanıcının kendi yetkileriyle ve tek işlemde yapılır (hata olursa hiçbir kayıt kalmaz). *@
+@inject ApiClient Api
+@inject SessionState Session
+
+<section class="detail-section convert-panel">
+    <div class="section-header">
+        <h2>Fırsata dönüştür</h2>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (errors is { Count: > 0 })
+    {
+        <ul class="alert alert-danger">
+            @foreach (var (field, texts) in errors)
+            {
+                @foreach (var text in texts)
+                {
+                    <li>@text</li>
+                }
+            }
+        </ul>
+    }
+
+    @if (preview is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (preview.Blockers.Count > 0)
+    {
+        <div class="alert alert-warning">@string.Join(" ", preview.Blockers)</div>
+    }
+    else
+    {
+        <p class="text-muted small">
+            Aktarılacak: talep sahibinin bilgileri yeni firma/kişiye, Lead konusu ve bütçesi fırsata geçer. Aktiviteler kopyalanmaz; Lead'e bağlı kalır ve
+            fırsattan kaynak Lead üzerinden erişilir. Mevcut firma ve kişilerin bilgileri Lead verisiyle değiştirilmez.
+        </p>
+        <div class="form-grid">
+            <fieldset class="span-all">
+                <legend class="form-label">Firma *</legend>
+                <label class="form-check">
+                    <input type="radio" name="company-mode" checked="@(!existingCompany)" @onchange="() => existingCompany = false" />
+                    Yeni firma oluştur (@(preview.CompanyKind == "Individual" ? "gerçek kişi" : "kuruluş"))
+                </label>
+                @if (!existingCompany)
+                {
+                    <input class="form-control" aria-label="Firma adı" placeholder="Firma / müşteri adı" maxlength="200" @bind="companyName" />
+                    <select class="form-select" aria-label="Firma türü" @bind="companyKind">
+                        <option value="Organization">Kuruluş</option>
+                        <option value="Individual">Gerçek kişi</option>
+                    </select>
+                }
+                <label class="form-check">
+                    <input type="radio" name="company-mode" checked="@existingCompany" @onchange="() => existingCompany = true" />
+                    Mevcut firmaya bağla
+                </label>
+                @if (existingCompany)
+                {
+                    <select class="form-select" aria-label="Mevcut firma" @bind="companyId">
+                        <option value="">Seçin…</option>
+                        @foreach (var company in Lookups.Companies)
+                        {
+                            <option value="@company.Id">@company.Name</option>
+                        }
+                    </select>
+                }
+            </fieldset>
+            <fieldset class="span-all">
+                <legend class="form-label">Kişi</legend>
+                <label class="form-check">
+                    <input type="radio" name="contact-mode" checked="@(contactMode == 0)" @onchange="() => contactMode = 0" /> Kişi olmadan
+                </label>
+                <label class="form-check">
+                    <input type="radio" name="contact-mode" checked="@(contactMode == 1)" @onchange="() => contactMode = 1" /> Yeni kişi oluştur
+                </label>
+                @if (contactMode == 1)
+                {
+                    <input class="form-control" aria-label="Kişi adı" placeholder="Ad" maxlength="100" @bind="firstName" />
+                    <input class="form-control" aria-label="Kişi soyadı" placeholder="Soyad" maxlength="100" @bind="lastName" />
+                }
+                <label class="form-check">
+                    <input type="radio" name="contact-mode" checked="@(contactMode == 2)" @onchange="() => contactMode = 2" /> Mevcut kişiye bağla
+                </label>
+                @if (contactMode == 2)
+                {
+                    <select class="form-select" aria-label="Mevcut kişi" @bind="contactId">
+                        <option value="">Seçin…</option>
+                        @foreach (var contact in Lookups.Contacts)
+                        {
+                            <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
+                        }
+                    </select>
+                }
+            </fieldset>
+            <div class="span-all">
+                <label class="form-label" for="opp-title">Fırsat adı *</label>
+                <input id="opp-title" class="form-control" maxlength="200" @bind="title" />
+            </div>
+            @if (Session.Can(CrmAccess.OpportunityAmountsRead))
+            {
+                <div>
+                    <label class="form-label" for="opp-amount">Tutar</label>
+                    <input id="opp-amount" class="form-control" type="number" step="0.01" min="0" @bind="amount" />
+                </div>
+                <div>
+                    <label class="form-label" for="opp-currency">Para birimi</label>
+                    <input id="opp-currency" class="form-control" maxlength="3" @bind="currency" />
+                </div>
+            }
+            <div>
+                <label class="form-label" for="opp-close">Tahmini kapanış</label>
+                <input id="opp-close" class="form-control" type="date" @bind="closeDate" />
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="ConvertAsync">Dönüştür</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        </div>
+    }
+</section>
+
+@code {
+    private LeadConversionPreviewDto? preview;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private bool existingCompany;
+    private int contactMode;
+    private string? companyName;
+    private string companyKind = "Organization";
+    private Guid? companyId;
+    private Guid? contactId;
+    private string? firstName;
+    private string? lastName;
+    private string title = string.Empty;
+    private decimal? amount;
+    private string currency = "TRY";
+    private DateOnly? closeDate;
+
+    [Parameter, EditorRequired] public LeadDto Lead { get; set; } = default!;
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<ConvertLeadResultDto> Converted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<LeadConversionPreviewDto>($"/api/crm/leads/{Lead.Id}/conversion-preview");
+        message = result.Error;
+        if (result.Value is not { } p)
+        {
+            return;
+        }
+
+        preview = p;
+        companyName = p.CompanyName;
+        companyKind = p.CompanyKind;
+        companyId = p.ExistingCompanyId;
+        existingCompany = p.ExistingCompanyId is not null;
+        contactId = p.ExistingContactId;
+        contactMode = p.ExistingContactId is not null ? 2 : 0;
+        firstName = p.ContactFirstName;
+        lastName = p.ContactLastName;
+        title = p.OpportunityTitle;
+        amount = p.Amount;
+        currency = p.Currency;
+        closeDate = p.ExpectedCloseDate;
+    }
+
+    private async Task ConvertAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var request = new ConvertLeadRequest(
+            Lead.Version,
+            CompanyId: existingCompany ? companyId : null,
+            CreateCompany: !existingCompany,
+            CompanyName: existingCompany ? null : companyName,
+            CompanyKind: existingCompany ? null : companyKind,
+            ContactId: contactMode == 2 ? contactId : null,
+            CreateContact: contactMode == 1,
+            ContactFirstName: contactMode == 1 ? firstName : null,
+            ContactLastName: contactMode == 1 ? lastName : null,
+            OpportunityTitle: title,
+            Amount: Session.Can(CrmAccess.OpportunityAmountsRead) ? amount : null,
+            Currency: Session.Can(CrmAccess.OpportunityAmountsRead) ? currency : null,
+            ExpectedCloseDate: closeDate);
+        var result = await Api.PostAsync<ConvertLeadResultDto>($"/api/crm/leads/{Lead.Id}/convert", request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Converted.InvokeAsync(result.Value);
+            return;
+        }
+
+        message = result.Error;
+        errors = result.FieldErrors;
+    }
+}

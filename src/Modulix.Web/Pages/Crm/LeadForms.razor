@@ -1,0 +1,235 @@
+@page "/crm/lead-formlari"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+@inject NavigationManager Navigation
+
+<PageTitle>Lead formları · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.LeadFormsManage">
+    <a class="back-link" href="crm/leadler">← Lead'ler</a>
+    <div class="page-header">
+        <h1>Lead formları ve entegrasyonlar</h1>
+        @if (!editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)">Yeni form</button>
+        }
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (secret is not null)
+    {
+        <div class="alert alert-warning" role="alert">
+            <strong>Entegrasyon sırrı (yalnızca şimdi görünür; kaydedin):</strong>
+            <code class="d-block user-select-all">@secret</code>
+            Bu sırrı yalnızca sunucunuzda saklayın; tarayıcıya, sayfa kaynağına ya da mobil uygulamaya koymayın. Yenilemek eskisini hemen geçersiz kılar.
+        </div>
+    }
+
+    <p class="text-muted small">
+        Form kimliği gizli değildir (sayfa kaynağında görünür); tek başına yalnızca izinli siteden ve yalnızca izinli alanlarla Lead oluşturabilir.
+        İzinli kaynaklar tarayıcı gönderimini sınırlar ama kimlik doğrulama değildir. Her gönderim bir pazarlama izni sayılmaz.
+    </p>
+
+    @if (editing)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(selected is null ? "Yeni form" : "Formu düzenle")</h2>
+            <div class="form-grid">
+                <div class="span-all">
+                    <label class="form-label" for="form-name">Ad *</label>
+                    <input id="form-name" class="form-control" maxlength="100" @bind="name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="form-owner">Varsayılan sorumlu</label>
+                    <select id="form-owner" class="form-select" @bind="ownerId">
+                        <option value="">Atama havuzu (kimseye atama)</option>
+                        @foreach (var member in Lookups.Members)
+                        {
+                            <option value="@member.UserId">@member.DisplayName</option>
+                        }
+                    </select>
+                    <small class="text-muted">Sorumlu pasifse Lead havuza düşer; rastgele kullanıcıya atanmaz.</small>
+                    <FieldError Field="defaultOwnerId" Errors="errors" />
+                </div>
+                <div class="span-all">
+                    <label class="form-label" for="form-origins">İzinli siteler (her satıra bir kaynak)</label>
+                    <textarea id="form-origins" class="form-control" rows="2" placeholder="https://www.ornek.com" @bind="origins"></textarea>
+                    <FieldError Field="allowedOrigins" Errors="errors" />
+                </div>
+                <div class="form-check-row">
+                    <input id="form-active" class="form-check-input" type="checkbox" @bind="active" />
+                    <label class="form-check-label" for="form-active">Aktif</label>
+                </div>
+                <div class="form-check-row">
+                    <input id="form-server" class="form-check-input" type="checkbox" @bind="serverOnly" />
+                    <label class="form-check-label" for="form-server">Yalnızca sunucudan (sırlı) gönderim</label>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => editing = false">Vazgeç</button>
+                @if (selected is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    @if (forms is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (forms.Count == 0)
+    {
+        <p class="text-muted">Henüz form yok.</p>
+    }
+    else
+    {
+        @foreach (var form in forms)
+        {
+            <section class="detail-section">
+                <div class="section-header">
+                    <h2>@form.Name @(form.IsActive ? null : "(pasif)")</h2>
+                    <div class="header-actions">
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(form)">Düzenle</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => RotateAsync(form)">
+                            @(form.SecretRotatedAt is null ? "Sır oluştur" : "Sırrı yenile")
+                        </button>
+                    </div>
+                </div>
+                <dl class="detail-grid">
+                    <div><dt>Form kimliği</dt><dd><code>@form.FormKey</code></dd></div>
+                    <div><dt>Varsayılan sorumlu</dt><dd>@(form.DefaultOwnerId is null ? "Atama havuzu" : Lookups.MemberName(form.DefaultOwnerId))</dd></div>
+                    <div><dt>İzinli siteler</dt><dd>@(string.IsNullOrWhiteSpace(form.AllowedOrigins) ? "—" : form.AllowedOrigins)</dd></div>
+                    <div><dt>Sır</dt><dd>@(form.SecretRotatedAt is { } at ? $"Üretildi {CrmLabels.Time(at)}" : "Yok")@(form.ServerOnly ? " · tarayıcı gönderimi kapalı" : null)</dd></div>
+                </dl>
+                <details>
+                    <summary>Entegrasyon örneği</summary>
+                    <pre class="code-sample">POST @Endpoint(form)
+Content-Type: application/json
+Origin: @(FirstOrigin(form))
+@(form.SecretRotatedAt is null ? null : "X-Lead-Form-Secret: <sunucuda saklanan sır>  (yalnızca sunucudan sunucuya)\n")
+{
+  "submissionId": "benzersiz-gonderim-kimligi",
+  "firstName": "Mehmet", "lastName": "Kaya",
+  "email": "mehmet@ornek.com", "phone": "0532 111 22 33",
+  "message": "Filo bakımı için teklif istiyoruz.",
+  "website2": ""
+}</pre>
+                    <p class="text-muted small">
+                        Yanıt her zaman 202 <code>{"accepted":true}</code> döner (kayıtlı müşteri/e-posta belli edilmez). Aynı <code>submissionId</code> tekrar gönderilirse yeni Lead açılmaz.
+                        <code>website2</code> görünmez bal tuzağı alanıdır; boş bırakın. Tenant, durum, sorumlu ve öncelik alanları gönderilemez.
+                    </p>
+                </details>
+            </section>
+        }
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/lead-forms";
+
+    private IReadOnlyList<LeadFormDto>? forms;
+    private LeadFormDto? selected;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private string? secret;
+    private string name = string.Empty;
+    private Guid? ownerId;
+    private string? origins;
+    private bool active = true;
+    private bool serverOnly;
+    private bool editing;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.LeadFormsManage))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<CrmPage<LeadFormDto>>($"{Url}?pageSize=100");
+        forms = result.Value?.Items;
+        message = result.Error;
+    }
+
+    private string Endpoint(LeadFormDto form)
+    {
+        var slug = Session.User?.Memberships.FirstOrDefault(m => m.TenantId == Session.User.ActiveTenantId)?.TenantSlug ?? "{firma-kisa-adi}";
+        return $"{Navigation.BaseUri.TrimEnd('/')}/api/public/lead-forms/{slug}/{form.FormKey}";
+    }
+
+    private static string FirstOrigin(LeadFormDto form) =>
+        (form.AllowedOrigins ?? string.Empty).Split(['\n', ',', ' ', ';'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "https://www.ornek.com";
+
+    private void Open(LeadFormDto? form)
+    {
+        selected = form;
+        name = form?.Name ?? string.Empty;
+        ownerId = form?.DefaultOwnerId;
+        origins = form?.AllowedOrigins;
+        active = form?.IsActive ?? true;
+        serverOnly = form?.ServerOnly ?? false;
+        errors = null;
+        message = null;
+        editing = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var request = new SaveLeadFormRequest(name, active, ownerId, string.IsNullOrWhiteSpace(origins) ? null : origins.Trim(), serverOnly, selected?.Version);
+        var result = selected is { } existing
+            ? await Api.PutAsync<LeadFormDto>($"{Url}/{existing.Id}", request)
+            : await Api.PostAsync<LeadFormDto>(Url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            editing = false;
+            await LoadAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{selected!.Id}?version={selected.Version}");
+        busy = false;
+        if (result.IsSuccess)
+        {
+            editing = false;
+            await LoadAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private async Task RotateAsync(LeadFormDto form)
+    {
+        busy = true;
+        secret = null;
+        var result = await Api.PostAsync<LeadFormSecretDto>($"{Url}/{form.Id}/secret", new LeadVersionRequest(form.Version));
+        busy = false;
+        message = result.Error;
+        secret = result.Value?.Secret;
+        await LoadAsync();
+    }
+}

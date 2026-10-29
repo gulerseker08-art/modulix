@@ -1,0 +1,53 @@
+@* Firma/kişi detayında ilişkili Lead'ler: talebin geldiği mevcut müşteri olarak bağlı olanlar ve bu kayda dönüşmüş olanlar. Yalnızca
+   kullanıcının görebildiği Lead'ler gelir (sunucu kapsamı uygular); Lead okuma izni yoksa bölüm hiç görünmez. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+@if (Session.Can(CrmAccess.LeadsRead) && leads is { Count: > 0 })
+{
+    <section class="detail-section">
+        <div class="section-header"><h2>İlişkili Lead'ler</h2></div>
+        <ul class="item-list">
+            @foreach (var lead in leads)
+            {
+                <li>
+                    <div class="item-main">
+                        <a href="crm/leadler/@lead.Id">@lead.LeadNumber · @lead.Subject</a>
+                        <span class="text-muted">
+                            <span class="badge stage-@lead.Status.ToLowerInvariant()">@LeadStatus.Label(lead.Status)</span>
+                            @(IsConvertedHere(lead) ? " · bu kayda dönüştü" : " · talep bu müşteriden geldi") · @CrmLabels.Time(lead.FirstReceivedAt)
+                        </span>
+                    </div>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    private List<LeadDto>? leads;
+    private (Guid?, Guid?) loaded;
+
+    [Parameter] public Guid? CompanyId { get; set; }
+
+    [Parameter] public Guid? ContactId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loaded == (CompanyId, ContactId) || !Session.Can(CrmAccess.LeadsRead))
+        {
+            return;
+        }
+
+        loaded = (CompanyId, ContactId);
+        var queries = CompanyId is { } company
+            ? new[] { $"companyId={company}", $"convertedCompanyId={company}" }
+            : ContactId is { } contact ? [$"contactId={contact}", $"convertedContactId={contact}"] : [];
+        var pages = await Task.WhenAll(queries.Select(q => Api.GetAsync<CrmPage<LeadDto>>($"/api/crm/leads?{q}&pageSize=50")));
+        leads = pages.SelectMany(p => p.Value?.Items ?? []).DistinctBy(l => l.Id).OrderByDescending(l => l.FirstReceivedAt).ToList();
+    }
+
+    private bool IsConvertedHere(LeadDto lead) =>
+        (CompanyId is not null && lead.ConvertedCompanyId == CompanyId) || (ContactId is not null && lead.ConvertedContactId == ContactId);
+}

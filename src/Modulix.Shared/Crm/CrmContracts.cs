@@ -26,6 +26,17 @@ public static class CrmAccess
     public const string OpportunitiesWrite = "crm.opportunities.write";
     public const string ActivitiesRead = "crm.activities.read";
     public const string ActivitiesWrite = "crm.activities.write";
+
+    public const string LeadsRead = "crm.leads.read";
+    public const string LeadsCreate = "crm.leads.create";
+    public const string LeadsUpdate = "crm.leads.update";
+    public const string LeadsDelete = "crm.leads.delete";
+    public const string LeadsAssign = "crm.leads.assign";
+    public const string LeadsQualify = "crm.leads.qualify";
+    public const string LeadsDisqualify = "crm.leads.disqualify";
+    public const string LeadsConvert = "crm.leads.convert";
+    public const string LeadsExport = "crm.leads.export";
+    public const string LeadFormsManage = "crm.lead-forms.manage";
 }
 
 /// <summary>Kayıt türü anahtarları; kayıt geçmişi (<c>/api/records/{tür}/{id}/history</c>) bunlarla çağrılır.</summary>
@@ -41,6 +52,7 @@ public static class CrmEntityKeys
     public const string CompanyRelation = "crm.company-relation";
     public const string Opportunity = "crm.opportunity";
     public const string Activity = "crm.activity";
+    public const string Lead = "crm.lead";
 }
 
 /// <summary>CRM'in düzenlenebilir seçim listeleri (Y9b) ve kategorileri; sunucudaki CrmModule ile aynıdır.</summary>
@@ -196,7 +208,8 @@ public sealed record OpportunityDto(
     string? LostReason,
     Guid? OwnerId,
     string? Notes,
-    JsonObject? Custom = null);
+    JsonObject? Custom = null,
+    Guid? SourceLeadId = null);
 
 public sealed record SaveOpportunityRequest(
     string Title,
@@ -235,7 +248,9 @@ public sealed record ActivityDto(
     Guid? OpportunityId,
     Guid? OwnerId,
     string? Notes,
-    JsonObject? Custom = null);
+    JsonObject? Custom = null,
+    Guid? LeadId = null,
+    string? Outcome = null);
 
 public sealed record SaveActivityRequest(
     string Subject,
@@ -248,7 +263,9 @@ public sealed record SaveActivityRequest(
     string? Notes = null,
     long? Version = null,
     Guid? OwnerId = null,
-    JsonObject? Custom = null);
+    JsonObject? Custom = null,
+    Guid? LeadId = null,
+    string? Outcome = null);
 
 /// <summary>Para birimi bazında fırsat toplamı. Farklı para birimleri hiçbir zaman toplanıp tek tutar yapılmaz.</summary>
 public sealed record CurrencyTotal(string Currency, decimal Amount, int Count);

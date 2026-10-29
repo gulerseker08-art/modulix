@@ -41,6 +41,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite,
         CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.OpportunitiesWrite, CrmModule.Permissions.OpportunityAmountsRead,
         CrmModule.Permissions.ActivitiesRead, CrmModule.Permissions.ActivitiesWrite,
+        CrmModule.Permissions.LeadsRead, CrmModule.Permissions.LeadsUpdate,
     ];
 
     private readonly ModulixApiFactory factory;

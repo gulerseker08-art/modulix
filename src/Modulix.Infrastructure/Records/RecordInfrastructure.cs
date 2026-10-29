@@ -203,6 +203,18 @@ internal sealed class EfDomainEventOutbox(ModulixDbContext db, TimeProvider time
 
 internal sealed class EfUnitOfWork(ModulixDbContext db) : IUnitOfWork
 {
+    public async Task<IUnitOfWorkTransaction?> BeginTransactionAsync(CancellationToken cancellationToken) =>
+        db.Database.CurrentTransaction is not null
+            ? null
+            : new EfTransaction(await db.Database.BeginTransactionAsync(cancellationToken));
+
+    private sealed class EfTransaction(Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction) : IUnitOfWorkTransaction
+    {
+        public Task CommitAsync(CancellationToken cancellationToken) => transaction.CommitAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => transaction.DisposeAsync();
+    }
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         try
@@ -278,6 +290,8 @@ public static class RecordsSetup
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IRecordStoreRegistry, RecordStoreRegistry>();
         services.AddScoped<ISharedReferenceMerger, SharedReferenceMerger>();
+        services.AddScoped<RecordCommandContext>();
+        services.AddScoped<IRecordCommandContext>(sp => sp.GetRequiredService<RecordCommandContext>());
         services.AddScoped<IRecordPipeline, RecordPipeline>();
 
         services.AddScoped<IRecordStore, TenantSettingRecordStore>();

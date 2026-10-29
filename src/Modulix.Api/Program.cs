@@ -61,6 +61,7 @@ builder.Services.AddHostedService<EmailDispatchWorker>();
 // Olaylar (ADR-0007): outbox'taki olaylar abonelere dağıtılır ve teslim edilir. Ayarlar "Events" bölümünde.
 builder.Services.Configure<EventOptions>(builder.Configuration.GetSection(EventOptions.SectionName));
 builder.Services.AddModulixEvents();
+builder.Services.AddLeadIntakeRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
 
 // Kullanıcı yönetimi: davet sınırı "Users" bölümünde; e-postadaki bağlantıların kökü App:PublicUrl (üretimde zorunlu).
@@ -136,6 +137,7 @@ app.UseHttpsRedirection();
 app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<TenantContextMiddleware>();
 app.UseMiddleware<CompanyContextMiddleware>();
@@ -154,6 +156,7 @@ app.MapChoiceListEndpoints();
 app.MapSectorProfileEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
+app.MapLeadIntakeEndpoints();
 app.MapPlatformEndpoints();
 app.MapPlatformEventEndpoints();
 app.MapAuditEndpoints();

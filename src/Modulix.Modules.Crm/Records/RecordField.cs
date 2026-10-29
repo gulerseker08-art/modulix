@@ -52,6 +52,36 @@ internal sealed class RecordField<TEntity>
     /// <summary>Yalnızca oluştururken verilebilir (ör. bağlanılan ortak kaydın kimliği); depo kendisi yazar.</summary>
     public bool CreateOnly { get; init; }
 
+    /// <summary>
+    /// Yalnızca iş akışı eylemiyle yazılabilen alan (ör. Lead durumu): genel kayıt uçlarından gelen değer sessizce yok sayılır.
+    /// Depo, iş akışı kapısı açıkken yazmaya izin verir.
+    /// </summary>
+    public bool SystemOnly { get; private set; }
+
+    /// <summary>Oluştururken serbest, sonradan yalnızca iş akışı kapısıyla değişebilen alan (ör. Lead sorumlusu).</summary>
+    public bool GatedOnUpdate { get; private set; }
+
+    /// <summary>Yazılır ama hiçbir yanıtta, audit'te ya da olayda okunmaz (ör. entegrasyon sırrının özeti).</summary>
+    public bool WriteOnly { get; private set; }
+
+    public RecordField<TEntity> AsWriteOnly()
+    {
+        WriteOnly = true;
+        return this;
+    }
+
+    public RecordField<TEntity> AsSystem()
+    {
+        SystemOnly = true;
+        return this;
+    }
+
+    public RecordField<TEntity> GatedUpdate()
+    {
+        GatedOnUpdate = true;
+        return this;
+    }
+
     /// <summary>Değeri firmanın seçim listesinden gelen alan (Y9b); depo değeri listeye göre denetler.</summary>
     public string? ChoiceListKey { get; init; }
 
@@ -252,6 +282,15 @@ internal static class Field
             CreateOnly = createOnly,
         };
 
+    /// <summary>Sabit anahtar listesinden isteğe bağlı değer (boş bırakılabilir; boş gönderilirse temizlenir).</summary>
+    public static RecordField<T> OptionalChoice<T>(string name, IReadOnlyCollection<string> allowed, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() == JsonValueKind.String && node.GetValue<string>().Trim() is var key && allowed.Contains(key)
+                    ? ParsedValue.Of(key)
+                    : ParsedValue.Fail($"Şunlardan biri olmalıdır: {string.Join(", ", allowed)}."),
+            e => get(e),
+            (e, v) => set(e, (string?)v));
+
     /// <summary>Boş olabilen, yalnızca oluştururken verilen kayıt kimliği (ör. adresin lokasyonu); depo <c>PrepareNewAsync</c>'te okur.</summary>
     public static RecordField<T> CreateOnlyId<T>(string name, Func<T, Guid?> get) =>
         new(name, required: false, nullable: true, ParseId, e => get(e) is { } value ? value.ToString() : null, (_, _) => { })
@@ -276,6 +315,46 @@ internal static class Field
         {
             CreateOnly = true,
         };
+
+    /// <summary>Boş olabilen kayıt kimliği; varlık denetimi yapmaz (bağı iş akışı servisi kendi doğrulamasıyla kurar).</summary>
+    public static RecordField<T> Id<T>(string name, Func<T, Guid?> get, Action<T, Guid?> set) =>
+        new(name, required: false, nullable: true, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v));
+
+    /// <summary>Telefon: normalleştirilebilir geçerli bir numara (ADR-0012 kuralları).</summary>
+    public static RecordField<T> Phone<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                var text = ParseText(node, maxLength);
+                return text.Error is null && text.Value is string value && ContactNormalization.NormalizePhone(value) is null
+                    ? ParsedValue.Fail("Geçerli bir telefon numarası girin.")
+                    : text;
+            },
+            e => get(e),
+            (e, v) => set(e, (string?)v));
+
+    /// <summary>ISO 3166-1 alfa-2 ülke kodu; büyük harfe çevrilir.</summary>
+    public static RecordField<T> Country<T>(string name, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                var text = ParseText(node, Address.CountryLength);
+                return text.Value is string code && code.Length == Address.CountryLength && code.All(char.IsAsciiLetter)
+                    ? ParsedValue.Of(code.ToUpperInvariant())
+                    : ParsedValue.Fail("İki harfli ülke kodu girin (ör. TR).");
+            },
+            e => get(e),
+            (e, v) => set(e, (string?)v));
+
+    /// <summary>Web adresi: boşluksuz ve en az bir nokta içeren metin (şema isteğe bağlı).</summary>
+    public static RecordField<T> Url<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                var text = ParseText(node, maxLength);
+                return text.Error is null && text.Value is string value && (value.Any(char.IsWhiteSpace) || !value.Contains('.'))
+                    ? ParsedValue.Fail("Geçerli bir web adresi girin.")
+                    : text;
+            },
+            e => get(e),
+            (e, v) => set(e, (string?)v));
 
     private static ParsedValue ParseId(JsonNode node) =>
         node.GetValueKind() == JsonValueKind.String && FilterValue.Id(node.GetValue<string>()) is { } id

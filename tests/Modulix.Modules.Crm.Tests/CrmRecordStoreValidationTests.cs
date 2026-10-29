@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
@@ -11,7 +12,9 @@ namespace Modulix.Modules.Crm.Tests;
 /// <summary>CRM kayıt depolarının alan doğrulaması (veritabanı gerektirmez).</summary>
 public class CrmRecordStoreValidationTests
 {
-    private static readonly CrmStoreContext NoData = new(new NoModuleData(), new NoMembers(), new NoChoiceLists(), new NoTenant(), new NoAccess());
+    private static readonly CrmStoreContext NoData = new(new NoModuleData(), new NoMembers(), new NoChoiceLists(), new NoTenant(), new NoAccess(), new NoPermissions());
+
+    internal static CrmStoreContext NewContext() => new(new NoModuleData(), new NoMembers(), new NoChoiceLists(), new NoTenant(), new NoAccess(), new NoPermissions());
 
     [Fact]
     public void Create_requires_required_fields()
@@ -141,6 +144,17 @@ public class CrmRecordStoreValidationTests
         Assert.Equal(CrmModule.Permissions.CompaniesWrite, store.PermissionFor(RecordOperation.Create));
         Assert.Equal(CrmModule.Permissions.CompaniesWrite, store.PermissionFor(RecordOperation.Delete));
         Assert.Equal(CrmModule.ModuleKey, store.FeatureKey.Split('.')[0]);
+    }
+
+    private sealed class NoPermissions : ICurrentAccess
+    {
+        public Task<bool> IsModuleEnabledAsync(string moduleKey, CancellationToken cancellationToken) => Task.FromResult(true);
+
+        public Task<bool> HasPermissionAsync(string permission, CancellationToken cancellationToken) => Task.FromResult(true);
+
+        public Task<IReadOnlySet<string>> GetPermissionsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>());
+
+        public Task<RecordScope> GetScopeAsync(CancellationToken cancellationToken) => Task.FromResult(RecordScope.All);
     }
 
     private sealed class NoAccess : IRecordAccess

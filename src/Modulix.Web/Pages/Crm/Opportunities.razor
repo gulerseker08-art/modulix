@@ -68,6 +68,7 @@
                             <article class="board-card" draggable="@(Session.Can(CrmAccess.OpportunitiesWrite) ? "true" : "false")"
                                      @ondragstart="() => dragged = opportunity">
                                 <strong>@opportunity.Title</strong>
+                                @if (opportunity.SourceLeadId is { } cardLead && Session.Can(CrmAccess.LeadsRead)) { <a class="small" href="crm/leadler/@cardLead">Kaynak Lead</a> }
                                 <a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a>
                                 @if (ShowAmounts)
                                 {
@@ -129,7 +130,12 @@
                 @foreach (var opportunity in page.Items)
                 {
                     <tr>
-                        <td data-label="Başlık" class="primary">@opportunity.Title</td>
+                        <td data-label="Başlık" class="primary">@opportunity.Title
+                            @if (opportunity.SourceLeadId is { } sourceLead && Session.Can(CrmAccess.LeadsRead))
+                            {
+                                <a class="small d-block" href="crm/leadler/@sourceLead">Kaynak Lead</a>
+                            }
+                        </td>
                         <td data-label="Firma"><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></td>
                         <td data-label="Aşama"><span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span></td>
                         @if (ShowAmounts)

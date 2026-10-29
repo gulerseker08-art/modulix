@@ -48,12 +48,16 @@ public static class CrmEndpoints
             CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.OpportunitiesWrite);
         MapResource<ActivityDto, SaveActivityRequest>(crm, "activities", CrmModule.Entities.Activity,
             CrmModule.Permissions.ActivitiesRead, CrmModule.Permissions.ActivitiesWrite);
+        LeadEndpoints.Map(crm);
 
         return app;
     }
 
-    private static void MapResource<TDto, TSave>(
-        RouteGroupBuilder crm, string path, string entityKey, string readPermission, string writePermission)
+    /// <param name="createPermission">Oluşturma izni; verilmezse yazma izni.</param>
+    /// <param name="deletePermission">Silme izni; verilmezse yazma izni.</param>
+    internal static void MapResource<TDto, TSave>(
+        RouteGroupBuilder crm, string path, string entityKey, string readPermission, string writePermission,
+        string? createPermission = null, string? deletePermission = null)
         where TSave : class
     {
         var resource = new CrmResource<TDto, TSave>(path, entityKey);
@@ -62,9 +66,9 @@ public static class CrmEndpoints
         group.MapGet("", resource.ListAsync).RequirePermission(readPermission);
         group.MapGet("/{id:guid}", resource.GetAsync).RequirePermission(readPermission);
         // Gövde elle okunur (Accepts ile belgelenir): genel tipli parametre ASP.NET route analizörünü çökertiyor.
-        group.MapPost("", resource.CreateAsync).Accepts<TSave>("application/json").RequirePermission(writePermission);
+        group.MapPost("", resource.CreateAsync).Accepts<TSave>("application/json").RequirePermission(createPermission ?? writePermission);
         group.MapPut("/{id:guid}", resource.UpdateAsync).Accepts<TSave>("application/json").RequirePermission(writePermission);
-        group.MapDelete("/{id:guid}", resource.DeleteAsync).RequirePermission(writePermission);
+        group.MapDelete("/{id:guid}", resource.DeleteAsync).RequirePermission(deletePermission ?? writePermission);
     }
 
     /// <summary>Bir CRM kaynağının uç noktaları; her biri tek bir boru hattı çağrısıdır.</summary>
@@ -160,7 +164,7 @@ public static class CrmEndpoints
         return (values, version);
     }
 
-    private static TDto ToDto<TDto>(RecordData data)
+    internal static TDto ToDto<TDto>(RecordData data)
     {
         var json = data.Values.DeepClone().AsObject();
         json["id"] = data.Id;
