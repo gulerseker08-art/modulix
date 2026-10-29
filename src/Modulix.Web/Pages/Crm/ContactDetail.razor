@@ -142,14 +142,14 @@
                     <ul class="item-list">
                         @foreach (var activity in activities)
                         {
-                            <li class="@(activity.CompletedAt is not null ? "done" : null)">
+                            <li class="@(ActivityStatus.IsOpen(activity.Status) ? null : "done")">
                                 <div class="item-main">
                                     <strong>@activity.Subject</strong>
                                     <span>
                                         @Lookups.Label(CrmLists.ActivityType, activity.Type)
                                         @if (activity.DueAt is { } due) { <text> · @CrmLabels.Time(due)</text> }
                                         @if (activity.CompanyId is { } company) { <text> · </text><a href="crm/firmalar/@company">@Lookups.CompanyName(company)</a> }
-                                        @if (activity.CompletedAt is not null) { <text> · Tamamlandı</text> }
+                                        @if (!ActivityStatus.IsOpen(activity.Status)) { <text> · @ActivityLabels.Status(ActivityLabels.Family(Lookups, activity.Type), activity.Status)</text> }
                                     </span>
                                 </div>
                             </li>
@@ -259,7 +259,7 @@
     {
         if (Session.Can(CrmAccess.ActivitiesRead))
         {
-            var page = (await Api.GetAsync<CrmPage<ActivityDto>>($"/api/crm/activities?contactId={Id}&page={activityPage}&pageSize={ListSize}")).Value;
+            var page = (await Api.GetAsync<CrmPage<ActivityDto>>($"/api/crm/activities?related=crm.contact:{Id}&page={activityPage}&pageSize={ListSize}")).Value;
             activities = page?.Items ?? [];
             activityTotal = page?.TotalCount ?? 0;
         }

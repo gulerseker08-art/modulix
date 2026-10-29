@@ -26,6 +26,10 @@ public static class CrmAccess
     public const string OpportunitiesWrite = "crm.opportunities.write";
     public const string ActivitiesRead = "crm.activities.read";
     public const string ActivitiesWrite = "crm.activities.write";
+    public const string ActivitiesAssign = "crm.activities.assign";
+    public const string ActivitiesReopen = "crm.activities.reopen";
+    public const string ActivitiesManageCalendar = "crm.activities.manage-calendar";
+    public const string ActivitiesViewPrivate = "crm.activities.view-private";
 
     public const string LeadsRead = "crm.leads.read";
     public const string LeadsCreate = "crm.leads.create";
@@ -234,8 +238,49 @@ public static class ActivityType
     public const string Email = "Email";
     public const string Task = "Task";
     public const string Note = "Note";
+    public const string Visit = "Visit";
+    public const string FollowUp = "FollowUp";
 }
 
+public static class ActivityStatus
+{
+    public const string Open = "Open";
+    public const string InProgress = "InProgress";
+    public const string Blocked = "Blocked";
+    public const string Completed = "Completed";
+    public const string NoAnswer = "NoAnswer";
+    public const string NoShow = "NoShow";
+    public const string Cancelled = "Cancelled";
+    public const string Draft = "Draft";
+    public const string Queued = "Queued";
+    public const string Sent = "Sent";
+    public const string Failed = "Failed";
+
+    public static bool IsOpen(string status) => status is Open or InProgress or Blocked or Draft or Queued or Failed;
+}
+
+/// <summary>Aktivite ailesi (tür listesinin kategorisi); durum makinesi ve ekran etiketleri aileye göredir.</summary>
+public static class ActivityFamily
+{
+    public const string Task = "task";
+    public const string Call = "call";
+    public const string Meeting = "meeting";
+    public const string Visit = "visit";
+    public const string Email = "email";
+}
+
+public static class ActivityPriority
+{
+    public const string Low = "Low";
+    public const string Normal = "Normal";
+    public const string High = "High";
+    public const string Urgent = "Urgent";
+}
+
+/// <summary>
+/// Aktivite (ADR-0015). <see cref="Masked"/> doluysa kayıt özeldir ve çağıran ayrıntıyı göremez: yalnızca zaman bilgisi ve sorumlu gelir,
+/// konu "Meşgul"dür. Gecikme saklanmaz; <see cref="IsOverdue"/> açık durum ve son tarihten türetilir.
+/// </summary>
 public sealed record ActivityDto(
     Guid Id,
     long Version,
@@ -250,8 +295,35 @@ public sealed record ActivityDto(
     string? Notes,
     JsonObject? Custom = null,
     Guid? LeadId = null,
-    string? Outcome = null);
+    string? Outcome = null,
+    string Status = "Open",
+    string? StatusReason = null,
+    string Priority = "Normal",
+    DateTimeOffset? StartAt = null,
+    DateTimeOffset? EndAt = null,
+    bool IsAllDay = false,
+    DateOnly? StartDate = null,
+    DateOnly? EndDate = null,
+    string? TimeZone = null,
+    string? Location = null,
+    string? OnlineMeetingUrl = null,
+    bool IsPrivate = false,
+    int? EstimatedMinutes = null,
+    int? ActualMinutes = null,
+    int RescheduleCount = 0,
+    Guid? PreviousActivityId = null,
+    string Source = "User",
+    Guid? CreatedBy = null,
+    bool Masked = false)
+{
+    public bool IsOverdue(DateTimeOffset now) => ActivityStatus.IsOpen(Status) && DueAt is { } due && due < now;
+}
 
+/// <summary>
+/// Aktivite kaydetme isteği (PUT kaydın tamamını yazar). Durum, gerekçe, tamamlanma (güncellemede), sonuç (güncellemede) ve
+/// sorumlu (güncellemede) buradan değişmez; bunlar eylem uç noktalarıdır (complete, cancel, reopen, reschedule, reassign...).
+/// Oluştururken <c>CompletedAt</c> verilirse geçmiş tarihli, tamamlanmış bir etkileşim kaydı açılır.
+/// </summary>
 public sealed record SaveActivityRequest(
     string Subject,
     string? Type = null,
@@ -265,7 +337,19 @@ public sealed record SaveActivityRequest(
     Guid? OwnerId = null,
     JsonObject? Custom = null,
     Guid? LeadId = null,
-    string? Outcome = null);
+    string? Outcome = null,
+    string? Priority = null,
+    DateTimeOffset? StartAt = null,
+    DateTimeOffset? EndAt = null,
+    bool IsAllDay = false,
+    DateOnly? StartDate = null,
+    DateOnly? EndDate = null,
+    string? TimeZone = null,
+    string? Location = null,
+    string? OnlineMeetingUrl = null,
+    bool IsPrivate = false,
+    int? EstimatedMinutes = null,
+    int? ActualMinutes = null);
 
 /// <summary>Para birimi bazında fırsat toplamı. Farklı para birimleri hiçbir zaman toplanıp tek tutar yapılmaz.</summary>
 public sealed record CurrencyTotal(string Currency, decimal Amount, int Count);

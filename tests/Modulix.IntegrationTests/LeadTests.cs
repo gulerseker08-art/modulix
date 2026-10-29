@@ -362,10 +362,10 @@ public class LeadTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFact
         var contact = (await client.GetFromJsonAsync<ContactDto>($"/api/crm/contacts/{result.ContactId}"))!;
         Assert.Equal(result.CompanyId, contact.CompanyId);
 
-        // Aktivite kopyalanmaz/çoğaltılmaz: Lead'e bağlı kalır, fırsata bağlı aktivite yoktur.
+        // Aktivite kopyalanmaz/çoğaltılmaz: Lead'e bağlı kalır; fırsatın zaman akışında (ADR-0015) aynı aktivite bir kez görünür.
         var leadActivities = (await client.GetFromJsonAsync<CrmPage<ActivityDto>>($"/api/crm/activities?leadId={lead.Id}"))!;
         Assert.Equal([activity.Id], leadActivities.Items.Select(a => a.Id));
-        Assert.Empty((await client.GetFromJsonAsync<CrmPage<ActivityDto>>($"/api/crm/activities?opportunityId={result.OpportunityId}"))!.Items);
+        Assert.Equal([activity.Id], (await client.GetFromJsonAsync<CrmPage<ActivityDto>>($"/api/crm/activities?opportunityId={result.OpportunityId}"))!.Items.Select(a => a.Id));
         Assert.Equal(1, (await client.GetFromJsonAsync<CrmPage<OpportunityDto>>($"/api/crm/opportunities?sourceLeadId={lead.Id}"))!.TotalCount);
 
         // İkinci dönüşüm isteği ikinci fırsat açmaz; dönüşmüş Lead üzerinde başka eylem de yapılamaz.

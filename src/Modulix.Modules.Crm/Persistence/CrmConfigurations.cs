@@ -115,6 +115,39 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
 
 internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
 {
+    // Yaşam döngüsü, zaman ve ilişki alanları (ADR-0015).
+    private static void ConfigureLifecycle(EntityTypeBuilder<Activity> builder)
+    {
+        builder.Property(a => a.Status).HasMaxLength(20).IsRequired();
+        builder.Property(a => a.StatusReason).HasMaxLength(Activity.ReasonMaxLength);
+        builder.Property(a => a.Priority).HasMaxLength(10).IsRequired();
+        builder.Property(a => a.StartDate).HasColumnType("date");
+        builder.Property(a => a.EndDate).HasColumnType("date");
+        builder.Property(a => a.TimeZone).HasMaxLength(Activity.TimeZoneMaxLength);
+        builder.Property(a => a.Location).HasMaxLength(Activity.LocationMaxLength);
+        builder.Property(a => a.OnlineMeetingUrl).HasMaxLength(Activity.UrlMaxLength);
+        builder.Property(a => a.Source).HasMaxLength(20).IsRequired();
+        builder.Property(a => a.ExternalSource).HasMaxLength(50);
+        builder.Property(a => a.ExternalId).HasMaxLength(Activity.ExternalIdMaxLength);
+
+        // Liste ve takvim sorguları: sorumluya/duruma/zaman aralığına göre. Sorgular sınırlı pencere kullanır.
+        builder.HasIndex(a => new { a.TenantId, a.OwnerId, a.Status, a.DueAt });
+        builder.HasIndex(a => new { a.TenantId, a.StartAt });
+        builder.HasIndex(a => new { a.TenantId, a.StartDate });
+        builder.HasIndex(a => new { a.TenantId, a.PreviousActivityId });
+
+        // Aynı dış olayın iki kez üretilmesini veritabanı engeller (webhook / içe aktarma tekrarı).
+        builder.HasIndex(a => new { a.TenantId, a.ExternalSource, a.ExternalId })
+            .IsUnique()
+            .HasFilter("[ExternalSource] IS NOT NULL AND [ExternalId] IS NOT NULL");
+
+        builder.HasOne<Activity>()
+            .WithMany()
+            .HasForeignKey(a => new { a.TenantId, a.PreviousActivityId })
+            .HasPrincipalKey(a => new { a.TenantId, a.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+
     public void Configure(EntityTypeBuilder<Activity> builder)
     {
         CrmTables.ConfigureCommon(builder, "Activities");
@@ -148,6 +181,8 @@ internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
             .HasForeignKey(a => new { a.TenantId, a.LeadId })
             .HasPrincipalKey(l => new { l.TenantId, l.Id })
             .OnDelete(DeleteBehavior.Restrict);
+
+        ConfigureLifecycle(builder);
     }
 }
 
@@ -418,5 +453,57 @@ internal sealed class LeadFormConfiguration : IEntityTypeConfiguration<LeadForm>
         builder.Property(f => f.AllowedOrigins).HasMaxLength(LeadForm.OriginsMaxLength);
         builder.Property(f => f.SecretHash).HasMaxLength(64).IsFixedLength().IsUnicode(false);
         builder.HasIndex(f => new { f.TenantId, f.FormKey }).IsUnique();
+    }
+}
+
+internal sealed class ActivityLinkConfiguration : IEntityTypeConfiguration<ActivityLink>
+{
+    public void Configure(EntityTypeBuilder<ActivityLink> builder)
+    {
+        CrmTables.ConfigureCommon(builder, "ActivityLinks");
+        builder.Property(l => l.EntityKey).HasMaxLength(ActivityLink.EntityKeyMaxLength).IsRequired();
+
+        // Aynı kayıt bir aktiviteye iki kez bağlanmaz; birincil ilişki aktivite başına en fazla bir tanedir.
+        builder.HasIndex(l => new { l.TenantId, l.ActivityId, l.EntityKey, l.RecordId }).IsUnique();
+        builder.HasIndex(l => new { l.TenantId, l.ActivityId }).IsUnique().HasFilter("[IsPrimary] = 1")
+            .HasDatabaseName("UX_ActivityLinks_Primary");
+
+        // Zaman akışı: bir kaydın aktivitelerini bulmak.
+        builder.HasIndex(l => new { l.TenantId, l.EntityKey, l.RecordId });
+
+        builder.HasOne<Activity>()
+            .WithMany()
+            .HasForeignKey(l => new { l.TenantId, l.ActivityId })
+            .HasPrincipalKey(a => new { a.TenantId, a.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class ActivityParticipantConfiguration : IEntityTypeConfiguration<ActivityParticipant>
+{
+    public void Configure(EntityTypeBuilder<ActivityParticipant> builder)
+    {
+        CrmTables.ConfigureCommon(builder, "ActivityParticipants");
+        builder.Property(p => p.Email).HasMaxLength(ActivityParticipant.EmailMaxLength);
+        builder.Property(p => p.NormalizedEmail).HasMaxLength(ActivityParticipant.EmailMaxLength);
+        builder.Property(p => p.DisplayName).HasMaxLength(ActivityParticipant.NameMaxLength);
+        builder.Property(p => p.Role).HasMaxLength(10).IsRequired();
+
+        builder.HasIndex(p => new { p.TenantId, p.ActivityId, p.UserId }).IsUnique().HasFilter("[UserId] IS NOT NULL");
+        builder.HasIndex(p => new { p.TenantId, p.ActivityId, p.ContactId }).IsUnique().HasFilter("[ContactId] IS NOT NULL");
+        builder.HasIndex(p => new { p.TenantId, p.ActivityId, p.NormalizedEmail }).IsUnique().HasFilter("[NormalizedEmail] IS NOT NULL");
+        // "Katıldığım aktiviteler" ve özel aktivite görünürlüğü.
+        builder.HasIndex(p => new { p.TenantId, p.UserId });
+
+        builder.HasOne<Activity>()
+            .WithMany()
+            .HasForeignKey(p => new { p.TenantId, p.ActivityId })
+            .HasPrincipalKey(a => new { a.TenantId, a.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Contact>()
+            .WithMany()
+            .HasForeignKey(p => new { p.TenantId, p.ContactId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id })
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

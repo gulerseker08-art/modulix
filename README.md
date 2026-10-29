@@ -348,7 +348,7 @@ Listeler filtre alır; bilinmeyen filtre veya geçersiz değer 422 döner. `owne
 | Firmalar | `status` (Prospect, Customer, Inactive), `ownerId`, `partyId` |
 | Kişiler | `companyId`, `personId` |
 | Fırsatlar | `companyId`, `contactId`, `stage`, `open=true` (kazanılmamış ve kaybedilmemiş), `ownerId` |
-| Aktiviteler | `companyId`, `contactId`, `opportunityId`, `open=true`, `dueBefore=<ISO zaman>`, `ownerId` |
+| Aktiviteler | `companyId`, `contactId`, `opportunityId`, `leadId`, `open`, `overdue`, `dueBefore=<ISO zaman>`, `ownerId`, `status`, `type`, `priority`, `related`, `timeline`, `range` (bkz. Aktivite ve takvim yönetimi) |
 
 - Firma, fırsat ve aktivitenin bir sorumlusu vardır; oluştururken boş bırakılırsa kaydı oluşturan kullanıcı atanır. Sorumlu, kuruluşun etkin üyesi olmalıdır.
 
@@ -356,7 +356,7 @@ Listeler filtre alır; bilinmeyen filtre veya geçersiz değer 422 döner. `owne
 - **Sürüm zorunludur (B1):** `/api/crm/...` ve `/api/records/...` üzerinde güncelleme (`version` gövdede) ve silme (`?version=`) okunan sürümü ister; sürümsüz istek 428 (`code: VersionRequired`) alır, değişmiş sürüm 409 kalır. Zorunluluk yalnızca bu HTTP uç noktalarındadır; kayıt devri ve olay aboneleri gibi arka plan işleri boru hattını doğrudan çağırır, etkilenmez.
 - Aynı kayıtlara genel uçtan da ulaşılır (`/api/records/crm.company` vb.); aynı izinler geçerlidir.
 - Arayüz API ile aynı adresten sunulur: `https://localhost:7026` → giriş, kuruluş seçimi, Lead'ler / Firmalar / Kişiler / Fırsatlar / Aktiviteler. Telefonda listeler kart görünümüne döner.
-- Firma adına tıklayınca firma detay sayfası açılır: kişiler, fırsatlar ve aktiviteler tek ekranda; aktivite ve fırsat oradan eklenir. Fırsatlar sayfası varsayılan olarak satış hunisini (aşama sütunları, sürükle bırak) gösterir. Aktiviteler sayfası "Bugün" görünümüyle açılır (bugüne kadar yapılması gereken açık işlerim).
+- Firma adına tıklayınca firma detay sayfası açılır: kişiler, fırsatlar ve aktiviteler tek ekranda; aktivite ve fırsat oradan eklenir. Fırsatlar sayfası varsayılan olarak satış hunisini (aşama sütunları, sürükle bırak) gösterir. Aktiviteler sayfası liste ve takvim (gün, hafta, ay, ajanda) görünümleriyle açılır, varsayılan "Bugün" (bugüne kadar yapılması gereken açık işlerim).
 
 ### Lead yönetimi (potansiyel müşteri / satış talebi, [ADR-0014](docs/adr/0014-lead-yonetimi.md))
 
@@ -425,6 +425,33 @@ X-Lead-Form-Secret: lfs_...                   # yalnızca sunucudan sunucuya (ta
 3. `Program.cs` → `ModulixModules.Create()` listesine modülü ekleyin, uç noktaları `MapCrmEndpoints` gibi eşleyin.
 4. Migration üretin ve her tablo için `TenantIsolationSql.AddTable` ekleyin; eklenmezse `Every_tenant_table_is_protected_by_row_level_security` testi kırılır.
 5. Müşteri, tedarikçi, taşıyıcı ya da kişi tutan modül yeni firma veya kişi tablosu açmaz. Ortak kayda (`Party`, `Person`) bağlanan bir uzantı entity'si yazar, `SharedRecordAccess` ve `SharedRecordReferences` bildirir (CRM'deki `Company` / `CompanyRecordStore` kalıbı, ADR-0006).
+
+### Aktivite ve takvim yönetimi ([ADR-0015](docs/adr/0015-aktivite-ve-takvim.md))
+
+Aktivite, CRM'in `crm.Activities` kaydıdır. Yaşam döngüsü **tür ailesine** göre ayrı durum makineleridir (görev, arama, toplantı/ziyaret, e-posta); durum, tamamlanma, sonuç ve sorumlu yalnızca eylem uç noktalarıyla değişir, düz `PUT` bunları sessizce yok sayar. Gecikme saklanmaz, açık durum ve son tarihten türetilir.
+
+| Uç nokta | Açıklama | İzin |
+| --- | --- | --- |
+| `GET/POST/PUT/DELETE /api/crm/activities` | Kayıt (PUT kaydın tamamını yazar, `version` zorunlu). Oluştururken `completedAt` (+ `outcome`) geçmiş tarihli, tamamlanmış etkileşim kaydı açar | `crm.activities.read` / `write` |
+| `POST /{id}/start`, `/block {reason}`, `/unblock` | Görev: devam ediyor / bloke (neden zorunlu) / engeli kaldır | `write` |
+| `POST /{id}/complete {outcome, note, completedAt, actualMinutes, nextStep}` | Aileye göre Tamamlandı / Ulaşılamadı / Katılım olmadı / Gönderildi. `nextStep` tek işlemde yeni, önceki aktiviteye bağlı aktivite açar | `write` |
+| `POST /{id}/cancel {reason}` | İptal (gerekçe zorunlu) | `write` |
+| `POST /{id}/reopen {reason}` | Kapanmış aktiviteyi yeniden açar (gerekçe zorunlu) | `crm.activities.reopen` |
+| `POST /{id}/reschedule {reason, dueAt, startAt, endAt, isAllDay, startDate, endDate, allowConflict}` | Erteleme; sayaç artar, çakışmada 422 `conflict` | `write` |
+| `POST /{id}/reassign {ownerId}` | Birincil sorumlu; kendine almak `write`, başkasına atamak `crm.activities.assign` | |
+| `POST /bulk {action, items[{id,version}], reason, ownerId, days}` | `complete`, `cancel`, `reopen`, `reassign`, `reschedule-by-days`; en çok 100 kayıt, **kayıt başına** sonuç (kısmi başarı) | kayıt başına |
+| `GET /{id}/related` | Doğrudan ve genel ilişkiler; başlıklar yalnızca görülebilen kayıtlar için, görünmeyenin sayısı | `read` |
+| `/api/crm/activity-links`, `/api/crm/activity-participants` | İlişki ve katılımcı kayıtları (aktivitenin kapsamına ve gizliliğine bağlı) | `read` / `write` |
+
+**Süzgeçler** (liste uçlarında): `open`, `overdue=<ISO>`, `status`, `type`, `priority`, `ownerId=me`, `participant=me`, `previousActivityId`, ilişki: `companyId`, `contactId`, `opportunityId`, `leadId`, `related=<tür>:<id>` (herhangi bir modülün kayıt türü), `timeline=crm.company:<id>` (firma + kişileri + fırsatları + dönüşmüş Lead'leri; aynı aktivite bir kez). **Takvim penceresi:** `range=<başlangıçUTC>|<bitişUTC>|<başlangıçGünü>|<bitişGünü>` en çok 93 gün; sayfa en çok 200.
+
+**Diğer modüllerin aktiviteye bağlanması:** `Modulix.Core.Contracts.Records.IActivityLinkTarget` uygulayıp `services.AddScoped<IActivityLinkTarget, ...>()` ile kaydedin; aktivite çekirdeği değişmez. Hedef, yalnızca çağıran görebiliyorsa var sayılır ve başlığı yalnızca o zaman verilir.
+
+**Özel aktivite** (`isPrivate`): sorumlu, oluşturan, katılımcılar ve `crm.activities.view-private` sahibi ayrıntıyı görür; diğerleri yalnızca "Meşgul" ve zaman bilgisini görür (arama, ilişki süzgeci ve alt kayıtlar dahil). **Olay/audit geçmişi yöneticilere başlığı gösterir** (ADR-0015 bilinen sınır).
+
+**Arayüz:** *CRM → Aktiviteler*: Liste, Gün, Hafta, Ay, Ajanda görünümleri; Bugün / Gecikenler / Bana atananlar / Ekip / Tüm açıklar; durum-tür-öncelik süzgeçleri; tarayıcıda saklanan kayıtlı görünümler; gün hücresinden hızlı oluşturma; ayrıntı paneli ve eylemler; sürükle-bırak yeniden planlama; toplu seçim. Firma detayı birleşik zaman akışını gösterir. **E-posta durumu "Gönderildi" yalnızca kullanıcının kaydıdır, teslim/okundu anlamına gelmez; bu sürümde e-posta gönderen bir kod ve harici takvim bağlantısı yoktur.**
+
+**Geliştirici:** kural katmanı `Activities/ActivityRules.cs` (saf, birim testli); eylemler `IActivityWorkflow`; kayıt depoları `Records/ActivityRecordStore.cs`, `ActivityChildStores.cs`; görünürlük `ActivityVisibility.cs`. Yeni tablolar (`ActivityLinks`, `ActivityParticipants`) RLS politikasındadır. Yapılmayanlar ve nedenleri ADR-0015 sonunda.
 
 ## E-posta
 

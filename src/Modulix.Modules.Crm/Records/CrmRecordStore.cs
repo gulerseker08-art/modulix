@@ -138,20 +138,21 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
     public async Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken)
     {
-        var entity = await Load(Data.Set<TEntity>().AsNoTracking()).SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
-        return entity is null ? null : ToData(entity);
+        var entity = await (await RestrictAsync(Load(Data.Set<TEntity>().AsNoTracking()), cancellationToken)).SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        return entity is null ? null : await ToReadDataAsync([entity], cancellationToken) is [var data] ? data : null;
     }
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
-        var source = await ApplyFiltersAsync(Load(Data.Set<TEntity>().AsNoTracking()), query.Filters, cancellationToken);
+        var source = await ApplyFiltersAsync(
+            await RestrictAsync(Load(Data.Set<TEntity>().AsNoTracking()), cancellationToken), query.Filters, cancellationToken);
         if (query.Owners is { } owners && UsesScope)
         {
             source = await ScopeToOwnersAsync(source, owners, cancellationToken);
         }
         if (query.Search is { } term)
         {
-            source = Search(source, term);
+            source = await SearchAsync(source, term, cancellationToken);
         }
 
         foreach (var (key, value) in query.CustomFilters ?? new Dictionary<string, string>())
@@ -168,7 +169,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             .Take(query.PageSize)
             .ToListAsync(cancellationToken);
 
-        return new RecordPage(items.Select(ToData).ToList(), query.Page, query.PageSize, total);
+        return new RecordPage(await ToReadDataAsync(items, cancellationToken), query.Page, query.PageSize, total);
     }
 
     /// <summary>Asenkron kapsam uygulamasÄ±; varsayÄ±lan <see cref="ScopeToOwners"/>. Ek izne baÄlÄ± gÃ¶rÃ¼nÃ¼rlÃ¼k (Ã¶r. atanmamÄ±Å Lead) iÃ§in geÃ§ersiz kÄ±lÄ±nÄ±r.</summary>
@@ -217,7 +218,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     public async Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken)
     {
         var entity = await Load(Data.Set<TEntity>()).SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
-        if (entity is null)
+        if (entity is null || await IsDetailHiddenAsync(entity, cancellationToken))
         {
             return null;
         }
@@ -244,7 +245,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     public async Task<bool> DeleteAsync(Guid id, long? expectedVersion, CancellationToken cancellationToken)
     {
         var entity = await Load(Data.Set<TEntity>()).SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
-        if (entity is null)
+        if (entity is null || await IsDetailHiddenAsync(entity, cancellationToken))
         {
             return false;
         }
@@ -307,6 +308,36 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     /// </summary>
     private long RecordVersion(TEntity entity) =>
         SharedOf(entity) is { } shared ? entity.Version + shared.Version - 1 : entity.Version;
+
+    /// <summary>İş akışı kapısı açık mı? Durum gibi alanlar yalnızca kapı açıkken yazılır (varsayılan: Lead kapısı).</summary>
+    protected virtual bool GateOpen => context.LeadGate.IsOpen;
+
+    /// <summary>
+    /// Çağıranın ayrıntısını göremeyeceği kayıtların kimlikleri (ör. özel aktivite). Bu kayıtlar okumada <see cref="Mask"/> ile
+    /// daraltılır; güncelleme ve silmede "bulunamadı" gibi yanıtlanır, aramada eşleşmez.
+    /// </summary>
+    protected virtual Task<IReadOnlySet<Guid>> HiddenDetailsAsync(IReadOnlyList<TEntity> items, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>());
+
+    /// <summary>Ayrıntısı gizlenen kaydın çağırana gösterilen daraltılmış hali (ör. yalnızca meşguliyet).</summary>
+    protected virtual RecordData Mask(TEntity entity, RecordData full) => full;
+
+    /// <summary>Kapsamdan bağımsız, her okumada uygulanan kısıt (ör. gizli ayrıntıya bağlı alt kayıtların hiç görünmemesi).</summary>
+    protected virtual Task<IQueryable<TEntity>> RestrictAsync(IQueryable<TEntity> source, CancellationToken cancellationToken) =>
+        Task.FromResult(source);
+
+    /// <summary>Arama; gizli ayrıntıları eşleştirmemek için alt sınıf asenkron geçersiz kılabilir.</summary>
+    protected virtual Task<IQueryable<TEntity>> SearchAsync(IQueryable<TEntity> source, string term, CancellationToken cancellationToken) =>
+        Task.FromResult(Search(source, term));
+
+    private async Task<bool> IsDetailHiddenAsync(TEntity entity, CancellationToken cancellationToken) =>
+        (await HiddenDetailsAsync([entity], cancellationToken)).Contains(entity.Id);
+
+    private async Task<List<RecordData>> ToReadDataAsync(IReadOnlyList<TEntity> items, CancellationToken cancellationToken)
+    {
+        var hidden = await HiddenDetailsAsync(items, cancellationToken);
+        return [.. items.Select(e => hidden.Contains(e.Id) ? Mask(e, ToData(e)) : ToData(e))];
+    }
 
     /// <summary>Liste sırası. Eşit kayıtlar kimliğe göre sıralanır; sayfalar kararlı kalır.</summary>
     protected abstract IOrderedQueryable<TEntity> Order(IQueryable<TEntity> source);
@@ -383,7 +414,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             // Durum gibi alanlar yalnızca iş akışı kapısı açıkken yazılır; genel uçlardan gelen değer yok sayılır.
             // Sorumlu gibi "güncellemede kapılı" alan, kullanıcı devrinde (ADR-0004, neden: transfer) de değişebilir.
             var transfer = context.CommandReason == EventReasons.Transfer;
-            if ((field.SystemOnly || (field.GatedOnUpdate && !isNew && !transfer)) && !context.LeadGate.IsOpen)
+            if ((field.SystemOnly || (field.GatedOnUpdate && !isNew && !transfer)) && !GateOpen)
             {
                 continue;
             }

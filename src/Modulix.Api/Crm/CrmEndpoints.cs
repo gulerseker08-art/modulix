@@ -48,6 +48,7 @@ public static class CrmEndpoints
             CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.OpportunitiesWrite);
         MapResource<ActivityDto, SaveActivityRequest>(crm, "activities", CrmModule.Entities.Activity,
             CrmModule.Permissions.ActivitiesRead, CrmModule.Permissions.ActivitiesWrite);
+        ActivityEndpoints.Map(crm);
         LeadEndpoints.Map(crm);
 
         return app;

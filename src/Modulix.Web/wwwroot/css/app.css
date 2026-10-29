@@ -1868,3 +1868,124 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
     background: var(--mx-lilac);
     color: var(--mx-indigo);
 }
+
+/* ---- Aktivite takvimi (ADR-0015) ---- */
+
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--mx-border);
+    border: 1px solid var(--mx-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+    .cal-grid.cal-day {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+.cal-weekday {
+    padding: 0.35rem;
+    background: var(--mx-surface);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.cal-cell {
+    min-height: 6.5rem;
+    padding: 0.25rem;
+    background: var(--mx-surface);
+}
+
+    .cal-cell:focus-visible {
+        outline: 2px solid var(--mx-indigo);
+        outline-offset: -2px;
+    }
+
+    .cal-cell.today {
+        background: var(--mx-lilac);
+    }
+
+    .cal-cell.outside {
+        opacity: 0.55;
+    }
+
+.cal-date {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.cal-day-link {
+    min-width: 28px;
+    min-height: 28px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--mx-ink);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+    .cal-day-link:hover {
+        background: var(--mx-lilac);
+    }
+
+.cal-item {
+    margin-top: 2px;
+    border-radius: 0.35rem;
+    background: var(--mx-lilac);
+}
+
+    .cal-item.done {
+        opacity: 0.6;
+        text-decoration: line-through;
+    }
+
+    .cal-item.overdue {
+        background: #fde8e8;
+    }
+
+    .cal-item.busy {
+        background: repeating-linear-gradient(45deg, var(--mx-border), var(--mx-border) 4px, var(--mx-surface) 4px, var(--mx-surface) 8px);
+    }
+
+.cal-entry {
+    display: block;
+    width: 100%;
+    min-height: 28px;
+    padding: 0.15rem 0.35rem;
+    border: 0;
+    background: transparent;
+    color: var(--mx-ink);
+    font-size: 0.78rem;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cal-agenda-day h3 {
+    margin: 1rem 0 0.25rem;
+    font-size: 1rem;
+}
+
+.chip-group {
+    display: inline-flex;
+    gap: 2px;
+}
+
+@media (max-width: 720px) {
+    .cal-grid.cal-month, .cal-grid.cal-week {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cal-weekday {
+        display: none;
+    }
+
+    .cal-cell {
+        min-height: 3rem;
+    }
+}

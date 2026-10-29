@@ -45,8 +45,8 @@ internal static class SectorProfiles
             [
                 new(CrmModule.Lists.OpportunityStage, "Ön görüşme", CrmModule.StageCategories.Open),
                 new(CrmModule.Lists.OpportunityStage, "Tedavi planı", CrmModule.StageCategories.Open),
-                new(CrmModule.Lists.ActivityType, "Muayene"),
-                new(CrmModule.Lists.ActivityType, "Kontrol"),
+                new(CrmModule.Lists.ActivityType, "Muayene", "meeting"),
+                new(CrmModule.Lists.ActivityType, "Kontrol", "meeting"),
             ]),
         new(
             "manufacturer",

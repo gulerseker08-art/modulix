@@ -1,5 +1,8 @@
-@* Aktivite ekleme/düzenleme formu; Aktiviteler sayfası ve firma detay sayfası kullanır. *@
+@* Aktivite ekleme/düzenleme formu; Aktiviteler sayfası, firma ve Lead detay sayfaları kullanır. Durum, tamamlanma ve sorumlu değişikliği
+   buradan yapılmaz: bunlar ayrı eylemlerdir (ActivityActions). Yeni kayıtta "geçmişte tamamlandı" işaretlenirse geçmiş tarihli bir
+   etkileşim kaydı açılır. Saatler firmanın saat dilimindedir; tüm gün etkinliği yalnızca takvim günüdür (saat dilimi dönüşümü görmez). *@
 @inject ApiClient Api
+@inject SessionState Session
 
 <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
     <h2>@(Activity is null ? "Yeni aktivite" : "Aktiviteyi düzenle")</h2>
@@ -26,19 +29,68 @@
             <FieldError Field="type" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="dueAt">Tarih ve saat</label>
+            <label class="form-label" for="priority">Öncelik</label>
+            <select id="priority" class="form-select" @bind="form.Priority">
+                @foreach (var priority in new[] { ActivityPriority.Low, ActivityPriority.Normal, ActivityPriority.High, ActivityPriority.Urgent })
+                {
+                    <option value="@priority">@ActivityLabels.Priority(priority)</option>
+                }
+            </select>
+            <FieldError Field="priority" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="dueAt">Son tarih</label>
             <input id="dueAt" class="form-control" type="datetime-local" @bind="form.DueAt" />
             <FieldError Field="dueAt" Errors="errors" />
         </div>
+        <div class="form-check-row">
+            <input id="allday" class="form-check-input" type="checkbox" @bind="form.IsAllDay" />
+            <label class="form-check-label" for="allday">Tüm gün</label>
+        </div>
+        @if (form.IsAllDay)
+        {
+            <div>
+                <label class="form-label" for="startDate">Başlangıç günü</label>
+                <input id="startDate" class="form-control" type="date" @bind="form.StartDate" />
+                <FieldError Field="startDate" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="endDate">Bitiş günü</label>
+                <input id="endDate" class="form-control" type="date" @bind="form.EndDate" />
+                <FieldError Field="endDate" Errors="errors" />
+            </div>
+        }
+        else
+        {
+            <div>
+                <label class="form-label" for="startAt">Başlangıç (zaman bloğu)</label>
+                <input id="startAt" class="form-control" type="datetime-local" @bind="form.StartAt" />
+                <FieldError Field="startAt" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="endAt">Bitiş</label>
+                <input id="endAt" class="form-control" type="datetime-local" @bind="form.EndAt" />
+                <FieldError Field="endAt" Errors="errors" />
+            </div>
+        }
+        <FieldError Field="timeZone" Errors="errors" />
         <div>
-            <label class="form-label" for="ownerId">Atanan</label>
-            <select id="ownerId" class="form-select" @bind="form.OwnerId">
-                <option value="">@(Activity is null ? "Ben" : "—")</option>
-                @foreach (var member in Lookups.AssignableMembers)
-                {
-                    <option value="@member.UserId">@member.DisplayName</option>
-                }
-            </select>
+            <label class="form-label" for="ownerId">Sorumlu</label>
+            @if (Activity is null)
+            {
+                <select id="ownerId" class="form-select" @bind="form.OwnerId">
+                    <option value="">Ben</option>
+                    @foreach (var member in Lookups.AssignableMembers)
+                    {
+                        <option value="@member.UserId">@member.DisplayName</option>
+                    }
+                </select>
+            }
+            else
+            {
+                <input id="ownerId" class="form-control" value="@Lookups.MemberName(Activity.OwnerId)" disabled />
+                <small class="text-muted">Sorumlu "Yeniden ata" eylemiyle değişir.</small>
+            }
             <FieldError Field="ownerId" Errors="errors" />
         </div>
         @if (FixedCompanyId is null)
@@ -77,26 +129,58 @@
             </select>
             <FieldError Field="opportunityId" Errors="errors" />
         </div>
-        @if ((form.Type is ActivityType.Call or ActivityType.Meeting or ActivityType.Email) && (form.LeadId is not null || FixedLeadId is not null))
-        {
-            <div>
-                <label class="form-label" for="outcome">Sonuç</label>
-                <select id="outcome" class="form-select" @bind="form.Outcome">
-                    <option value="">—</option>
-                    <option value="@ActivityOutcome.Reached">@ActivityOutcome.Label(ActivityOutcome.Reached)</option>
-                    <option value="@ActivityOutcome.NoAnswer">@ActivityOutcome.Label(ActivityOutcome.NoAnswer)</option>
-                    <option value="@ActivityOutcome.Sent">@ActivityOutcome.Label(ActivityOutcome.Sent)</option>
-                </select>
-                <small class="text-muted">İlk temas yalnızca gerçekleşen temastan (ulaşılan arama, yapılan toplantı, gönderilen e-posta) sayılır.</small>
-                <FieldError Field="outcome" Errors="errors" />
-            </div>
-        }
-        <div class="form-check-row">
-            <input id="completed" class="form-check-input" type="checkbox" @bind="form.Completed" />
-            <label class="form-check-label" for="completed">Tamamlandı</label>
+        <div>
+            <label class="form-label" for="location">Konum</label>
+            <input id="location" class="form-control" maxlength="300" @bind="form.Location" />
+            <FieldError Field="location" Errors="errors" />
         </div>
+        <div>
+            <label class="form-label" for="online">Çevrim içi toplantı bağlantısı</label>
+            <input id="online" class="form-control" maxlength="500" @bind="form.OnlineMeetingUrl" />
+            <FieldError Field="onlineMeetingUrl" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="estimate">Tahmini süre (dk)</label>
+            <input id="estimate" class="form-control" type="number" min="1" @bind="form.EstimatedMinutes" />
+            <FieldError Field="estimatedMinutes" Errors="errors" />
+        </div>
+        <div class="form-check-row">
+            <input id="private" class="form-check-input" type="checkbox" @bind="form.IsPrivate" />
+            <label class="form-check-label" for="private">Özel (diğerleri yalnızca meşgul görür)</label>
+        </div>
+        @if (Activity is null && Session.Can(CrmAccess.ActivitiesWrite))
+        {
+            <div class="form-check-row span-all">
+                <input id="completed" class="form-check-input" type="checkbox" @bind="form.LogAsDone" />
+                <label class="form-check-label" for="completed">Geçmişte gerçekleşti (tamamlanmış etkileşim olarak kaydet)</label>
+            </div>
+            @if (form.LogAsDone)
+            {
+                <div>
+                    <label class="form-label" for="doneAt">Gerçekleşme zamanı</label>
+                    <input id="doneAt" class="form-control" type="datetime-local" @bind="form.DoneAt" />
+                    <FieldError Field="completedAt" Errors="errors" />
+                </div>
+                @if (form.Type is ActivityType.Call or ActivityType.Meeting or ActivityType.Visit)
+                {
+                    <div>
+                        <label class="form-label" for="outcome">Sonuç</label>
+                        <select id="outcome" class="form-select" @bind="form.Outcome">
+                            <option value="@ActivityOutcome.Reached">@ActivityOutcome.Label(ActivityOutcome.Reached)</option>
+                            <option value="@ActivityOutcome.NoAnswer">@ActivityOutcome.Label(ActivityOutcome.NoAnswer)</option>
+                        </select>
+                        <small class="text-muted">İlk temas yalnızca gerçekleşen temastan (ulaşılan arama, yapılan toplantı) sayılır.</small>
+                        <FieldError Field="outcome" Errors="errors" />
+                    </div>
+                }
+                else if (form.Type == ActivityType.Email)
+                {
+                    <input type="hidden" value="@ActivityOutcome.Sent" />
+                }
+            }
+        }
         <div class="span-all">
-            <label class="form-label" for="notes">Notlar</label>
+            <label class="form-label" for="notes">Açıklama</label>
             <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
             <FieldError Field="notes" Errors="errors" />
         </div>
@@ -131,6 +215,9 @@
     /// <summary>Verilirse aktivite bu Lead'e bağlanır (Lead detay sayfası).</summary>
     [Parameter] public Guid? FixedLeadId { get; set; }
 
+    /// <summary>Takvimden hızlı oluşturmada seçilen gün (yeni aktivite için başlangıç).</summary>
+    [Parameter] public DateOnly? InitialDay { get; set; }
+
     [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
 
     private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Activity)];
@@ -153,12 +240,23 @@
         form = Activity is { } a
             ? new ActivityForm
             {
-                Id = a.Id, Version = a.Version, Type = a.Type, Subject = a.Subject, DueAt = a.DueAt is { } due ? Regional.ToTenant(due).DateTime : null,
-                CompletedAt = a.CompletedAt, Completed = a.CompletedAt is not null, CompanyId = a.CompanyId, ContactId = a.ContactId,
+                Id = a.Id, Version = a.Version, Type = a.Type, Subject = a.Subject, Priority = a.Priority,
+                DueAt = a.DueAt is { } due ? Regional.ToTenant(due).DateTime : null,
+                StartAt = a.StartAt is { } start ? Regional.ToTenant(start).DateTime : null,
+                EndAt = a.EndAt is { } end ? Regional.ToTenant(end).DateTime : null,
+                IsAllDay = a.IsAllDay, StartDate = a.StartDate?.ToDateTime(TimeOnly.MinValue), EndDate = a.EndDate?.ToDateTime(TimeOnly.MinValue),
+                Location = a.Location, OnlineMeetingUrl = a.OnlineMeetingUrl, IsPrivate = a.IsPrivate, EstimatedMinutes = a.EstimatedMinutes,
+                ActualMinutes = a.ActualMinutes, CompanyId = a.CompanyId, ContactId = a.ContactId,
                 OpportunityId = a.OpportunityId, OwnerId = a.OwnerId, Notes = a.Notes, LeadId = a.LeadId, Outcome = a.Outcome,
-                    Custom = a.Custom?.DeepClone().AsObject() ?? [],
+                Custom = a.Custom?.DeepClone().AsObject() ?? [],
             }
-            : new ActivityForm { CompanyId = FixedCompanyId, LeadId = FixedLeadId, Type = Lookups.DefaultOf(CrmLists.ActivityType) ?? ActivityType.Task };
+            : new ActivityForm
+            {
+                CompanyId = FixedCompanyId, LeadId = FixedLeadId, Type = Lookups.DefaultOf(CrmLists.ActivityType) ?? ActivityType.Task,
+                StartAt = InitialDay is { } day ? day.ToDateTime(new TimeOnly(9, 0)) : null,
+                EndAt = InitialDay is { } day2 ? day2.ToDateTime(new TimeOnly(10, 0)) : null,
+                DoneAt = Regional.Now.DateTime,
+            };
         errors = null;
         message = null;
     }
@@ -167,13 +265,24 @@
     {
         busy = true;
 
-        // Tamamlanma zamanı ilk işaretlendiği an olarak kalır; işaret kaldırılınca silinir.
-        var completedAt = form.Completed ? form.CompletedAt ?? DateTimeOffset.Now : (DateTimeOffset?)null;
-        // Formdaki saat firmanın saat dilimindedir.
-        var dueAt = form.DueAt is { } local ? Regional.FromTenant(local) : (DateTimeOffset?)null;
+        // Geçmiş tarihli kayıt yalnızca oluştururken: tamamlanma zamanı ve sonuç verilir (sunucu durumu tamamlanmış yapar).
+        var done = Activity is null && form.LogAsDone;
+        DateTimeOffset? completedAt = done ? Regional.FromTenant(form.DoneAt ?? Regional.Now.DateTime) : null;
+        var outcome = !done ? null : form.Type == ActivityType.Email ? ActivityOutcome.Sent : form.Type == ActivityType.Task || form.Type == ActivityType.Note ? null : form.Outcome ?? ActivityOutcome.Reached;
+        var timed = !form.IsAllDay && form.StartAt is not null;
         var request = new SaveActivityRequest(
-            form.Subject, form.Type, dueAt, completedAt, form.CompanyId, form.ContactId, form.OpportunityId, form.Notes, form.Version, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom),
-            LeadId: form.LeadId ?? FixedLeadId, Outcome: string.IsNullOrEmpty(form.Outcome) ? null : form.Outcome);
+            form.Subject, form.Type, form.DueAt is { } due ? Regional.FromTenant(due) : null, completedAt, form.CompanyId, form.ContactId,
+            form.OpportunityId, form.Notes, form.Version, form.OwnerId, Custom: CustomFieldText.ForSave(CustomFields, form.Custom),
+            LeadId: form.LeadId ?? FixedLeadId, Outcome: outcome, Priority: form.Priority,
+            StartAt: timed ? Regional.FromTenant(form.StartAt!.Value) : null,
+            EndAt: timed && form.EndAt is { } end ? Regional.FromTenant(end) : null,
+            IsAllDay: form.IsAllDay,
+            StartDate: form.IsAllDay && form.StartDate is { } sd ? DateOnly.FromDateTime(sd) : null,
+            EndDate: form.IsAllDay && form.EndDate is { } ed ? DateOnly.FromDateTime(ed) : null,
+            TimeZone: timed ? Regional.Zone.Id : null,
+            Location: string.IsNullOrWhiteSpace(form.Location) ? null : form.Location,
+            OnlineMeetingUrl: string.IsNullOrWhiteSpace(form.OnlineMeetingUrl) ? null : form.OnlineMeetingUrl,
+            IsPrivate: form.IsPrivate, EstimatedMinutes: form.EstimatedMinutes, ActualMinutes: form.ActualMinutes);
         var result = form.Id is { } id
             ? await Api.PutAsync<ActivityDto>($"{Url}/{id}", request)
             : await Api.PostAsync<ActivityDto>(Url, request);
@@ -216,11 +325,33 @@
 
         public string Subject { get; set; } = string.Empty;
 
+        public string Priority { get; set; } = ActivityPriority.Normal;
+
         public DateTime? DueAt { get; set; }
 
-        public DateTimeOffset? CompletedAt { get; init; }
+        public DateTime? StartAt { get; set; }
 
-        public bool Completed { get; set; }
+        public DateTime? EndAt { get; set; }
+
+        public bool IsAllDay { get; set; }
+
+        public DateTime? StartDate { get; set; }
+
+        public DateTime? EndDate { get; set; }
+
+        public string? Location { get; set; }
+
+        public string? OnlineMeetingUrl { get; set; }
+
+        public bool IsPrivate { get; set; }
+
+        public int? EstimatedMinutes { get; set; }
+
+        public int? ActualMinutes { get; set; }
+
+        public bool LogAsDone { get; set; }
+
+        public DateTime? DoneAt { get; set; }
 
         public Guid? CompanyId { get; set; }
 

@@ -86,6 +86,9 @@ internal sealed partial class ContactRecordStore
             MergeSupport.AddImpact(impacts, "Aktivite başvurusu taşınır", 1);
         }
 
+        await ActivityMergeSupport.MoveLinksAsync(data, EntityKey, source.Id, target.Id, impacts, cancellationToken);
+        await ActivityMergeSupport.MoveParticipantsAsync(data, source.Id, target.Id, impacts, cancellationToken);
+
         foreach (var location in await data.Set<Location>().Where(l => l.ContactId == source.Id).ToListAsync(cancellationToken))
         {
             location.ContactId = target.Id;

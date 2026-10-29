@@ -9,7 +9,8 @@ namespace Modulix.Modules.Crm.Records;
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler: veri, tenant üyeleri, seçim listeleri ve isteği yapan kullanıcı.</summary>
 internal sealed class CrmStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
-    ICurrentAccess permissions, LeadWorkflowGate? leadGate = null, IRecordCommandContext? command = null)
+    ICurrentAccess permissions, IEnumerable<IActivityLinkTarget> linkTargets, LeadWorkflowGate? leadGate = null,
+    ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null)
 {
     /// <summary>Çalışan yazma komutunun nedeni (yalnızca güvenilir iç çağıranlar verir, ör. kayıt devri).</summary>
     public string? CommandReason => command?.Reason;
@@ -21,6 +22,12 @@ internal sealed class CrmStoreContext(
 
     /// <summary>Lead iş akışı kapısı (<see cref="LeadWorkflowGate"/>).</summary>
     public LeadWorkflowGate LeadGate { get; } = leadGate ?? new LeadWorkflowGate();
+
+    /// <summary>Aktivite iş akışı kapısı (<see cref="ActivityWorkflowGate"/>).</summary>
+    public ActivityWorkflowGate ActivityGate { get; } = activityGate ?? new ActivityWorkflowGate();
+
+    /// <summary>Aktivite ilişkisine açılmış kayıt türleri (ADR-0015); her modül kendi hedefini kaydeder.</summary>
+    public IReadOnlyList<IActivityLinkTarget> LinkTargets { get; } = [.. linkTargets];
 
     /// <summary>İsteği yapan kullanıcının izin ve veri kapsamı (ADR-0010).</summary>
     public IRecordAccess Access => access;

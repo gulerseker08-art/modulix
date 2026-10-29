@@ -202,6 +202,24 @@ internal static class Field
             e => get(e) is { } value ? JsonValue.Create(value) : null,
             (e, v) => set(e, (int?)v));
 
+    /// <summary>Süre: dakika cinsinden 1..<paramref name="max"/> arası tam sayı.</summary>
+    public static RecordField<T> Minutes<T>(string name, int max, Func<T, int?> get, Action<T, int?> set) =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var minutes) && minutes >= 1 && minutes <= max
+                    ? ParsedValue.Of(minutes)
+                    : ParsedValue.Fail($"1 ile {max} arasında dakika girin."),
+            e => get(e) is { } value ? JsonValue.Create(value) : null,
+            (e, v) => set(e, (int?)v));
+
+    /// <summary>Sayaç: okunur; yalnızca iş akışı yazar (genel uçlardan gelen değer yok sayılır).</summary>
+    public static RecordField<T> Count<T>(string name, Func<T, int> get, Action<T, int> set) =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var count) && count >= 0
+                    ? ParsedValue.Of(count)
+                    : ParsedValue.Fail("Sayı olmalıdır."),
+            e => JsonValue.Create(get(e)),
+            (e, v) => { if (v is int count) { set(e, count); } });
+
     /// <summary>Kaydın sorumlusu: aktif tenant'ın etkin üyesi olan bir kullanıcı.</summary>
     public static RecordField<T> Owner<T>(string name, Func<T, Guid?> get, Action<T, Guid?> set) =>
         new(name, required: false, nullable: true, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v))

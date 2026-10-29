@@ -12,9 +12,9 @@ namespace Modulix.Modules.Crm.Tests;
 /// <summary>CRM kayıt depolarının alan doğrulaması (veritabanı gerektirmez).</summary>
 public class CrmRecordStoreValidationTests
 {
-    private static readonly CrmStoreContext NoData = new(new NoModuleData(), new NoMembers(), new NoChoiceLists(), new NoTenant(), new NoAccess(), new NoPermissions());
+    private static readonly CrmStoreContext NoData = new(new NoModuleData(), new NoMembers(), new NoChoiceLists(), new NoTenant(), new NoAccess(), new NoPermissions(), []);
 
-    internal static CrmStoreContext NewContext() => new(new NoModuleData(), new NoMembers(), new NoChoiceLists(), new NoTenant(), new NoAccess(), new NoPermissions());
+    internal static CrmStoreContext NewContext() => new(new NoModuleData(), new NoMembers(), new NoChoiceLists(), new NoTenant(), new NoAccess(), new NoPermissions(), []);
 
     [Fact]
     public void Create_requires_required_fields()

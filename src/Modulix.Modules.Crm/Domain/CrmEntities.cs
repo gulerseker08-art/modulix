@@ -180,10 +180,72 @@ public sealed class Activity : CrmEntity, IOwnedEntity
     /// </summary>
     public string? Outcome { get; internal set; }
 
-    /// <summary>Aktiviteyi yapacak kişi.</summary>
+    /// <summary>Birincil sorumlu: işi yapmaktan sorumlu tek kişi. Oluşturan (<see cref="CreatedBy"/>), katılımcı ve izleyiciden ayrıdır.</summary>
     public Guid? OwnerId { get; internal set; }
 
+    /// <summary>Açıklama / notlar (aktivitenin açıklama alanı).</summary>
     public string? Notes { get; internal set; }
+
+    // ---- Yaşam döngüsü (ADR-0015). Durum, gerekçe, tamamlanma ve sonuç yalnızca eylem servisiyle değişir.
+
+    public const int ReasonMaxLength = 500;
+    public const int LocationMaxLength = 300;
+    public const int UrlMaxLength = 500;
+    public const int TimeZoneMaxLength = 64;
+    public const int ExternalIdMaxLength = 200;
+    public const int MaxMinutes = 60 * 24 * 14;
+
+    public string Status { get; internal set; } = Activities.ActivityStatus.Open;
+
+    /// <summary>İptal / bloke / yeniden açma gerekçesi (son durum değişikliğininki).</summary>
+    public string? StatusReason { get; internal set; }
+
+    public string Priority { get; internal set; } = Activities.ActivityPriority.Normal;
+
+    // ---- Zaman. Son tarih (DueAt) bir teslim anıdır; zaman bloğu (StartAt/EndAt) takvimde yer tutar. İkisi birbirinden bağımsızdır.
+    // Saatli etkinlik UTC anı olarak saklanır; tüm gün etkinliği saat dilimi dönüşümü olmadan takvim günü (DateOnly) olarak.
+
+    public DateTimeOffset? StartAt { get; internal set; }
+
+    public DateTimeOffset? EndAt { get; internal set; }
+
+    public bool IsAllDay { get; internal set; }
+
+    public DateOnly? StartDate { get; internal set; }
+
+    /// <summary>Tüm gün etkinliğinin son günü (dahil); boşsa tek gün.</summary>
+    public DateOnly? EndDate { get; internal set; }
+
+    /// <summary>Etkinliğin planlandığı IANA saat dilimi (ör. Europe/Istanbul); tekrar ve yerel saat hesapları bu dilime göre yapılır.</summary>
+    public string? TimeZone { get; internal set; }
+
+    public string? Location { get; internal set; }
+
+    public string? OnlineMeetingUrl { get; internal set; }
+
+    /// <summary>Özel aktivite: başlık, açıklama ve ilişkili kayıtlar yalnızca sorumlu, katılımcılar ve özel izin sahibine görünür; diğerleri meşguliyet görür.</summary>
+    public bool IsPrivate { get; internal set; }
+
+    /// <summary>Kullanıcı / otomasyon / entegrasyon / içe aktarma (<c>ActivitySource</c>).</summary>
+    public string Source { get; internal set; } = Activities.ActivitySource.User;
+
+    /// <summary>Kaydı oluşturan kullanıcı; sorumludan farklı olabilir ve sonradan değişmez.</summary>
+    public Guid? CreatedBy { get; internal set; }
+
+    public int? EstimatedMinutes { get; internal set; }
+
+    public int? ActualMinutes { get; internal set; }
+
+    /// <summary>Kaç kez ertelendi; her erteleme ayrıca audit geçmişinde eski/yeni tarih ve gerekçeyle durur.</summary>
+    public int RescheduleCount { get; internal set; }
+
+    /// <summary>Bu aktivitenin "sonraki adım" olarak üretildiği önceki aktivite.</summary>
+    public Guid? PreviousActivityId { get; internal set; }
+
+    /// <summary>Dış sistem (takvim sağlayıcısı, içe aktarma) ve oradaki kimlik; (kaynak, kimlik) çifti tekrar üretimi veritabanında engeller.</summary>
+    public string? ExternalSource { get; internal set; }
+
+    public string? ExternalId { get; internal set; }
 }
 
 /// <summary>

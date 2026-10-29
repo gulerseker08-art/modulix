@@ -99,6 +99,8 @@ internal sealed partial class CompanyRecordStore
             MergeSupport.AddImpact(impacts, "Aktivite taşınır", 1);
         }
 
+        await ActivityMergeSupport.MoveLinksAsync(data, EntityKey, source.Id, target.Id, impacts, cancellationToken);
+
         impacts = [.. impacts.GroupBy(i => i.Label).Select(g => new MergeImpact(g.Key, g.Sum(i => i.Count)))];
         target.Touch();
         if (!JsonNode.DeepEquals(sharedBefore, SharedState(target)))
