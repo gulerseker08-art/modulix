@@ -76,11 +76,6 @@ public sealed class CrmModule : IModule
 
         /// <summary>Lead toplama formlarını/entegrasyonlarını yönetir (sır yenileme dahil). Hiçbir hazır role verilmez.</summary>
         public const string LeadFormsManage = "crm.lead-forms.manage";
-
-        // Ürün/hizmet kataloğu (ADR-0018). Maliyeti görme ayrı izindir; hiçbir hazır role verilmez.
-        public const string ProductsRead = "crm.products.read";
-        public const string ProductsWrite = "crm.products.write";
-        public const string ProductCostsRead = "crm.product-costs.read";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -102,9 +97,6 @@ public sealed class CrmModule : IModule
         public const string ActivityParticipant = "crm.activity-participant";
         public const string Lead = "crm.lead";
         public const string LeadForm = "crm.lead-form";
-        public const string ProductCategory = "crm.product-category";
-        public const string MeasureUnit = "crm.measure-unit";
-        public const string Product = "crm.product";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -216,9 +208,6 @@ public sealed class CrmModule : IModule
         new(Permissions.LeadsConvert, "Nitelikli Lead'i fırsata dönüştürür", "Lead'ler"),
         new(Permissions.LeadsExport, "Lead listesini dışa aktarır", "Lead'ler"),
         new(Permissions.LeadFormsManage, "Lead toplama formlarını ve entegrasyon sırlarını yönetir", "Lead formları"),
-        new(Permissions.ProductsRead, "Ürün, hizmet, kategori ve birimleri görüntüler", "Ürün kataloğu"),
-        new(Permissions.ProductsWrite, "Ürün, hizmet, kategori ve birim ekler, düzenler", "Ürün kataloğu"),
-        new(Permissions.ProductCostsRead, "Ürün maliyetini görür ve düzenler", "Ürün maliyeti"),
     ];
 
     /// <summary>Devre dışı bırakılan kişinin firmaları, açık fırsatları ve açık aktiviteleri devredilir.</summary>
@@ -241,7 +230,6 @@ public sealed class CrmModule : IModule
                 Permissions.CompaniesRead, Permissions.CompaniesWrite,
                 Permissions.ContactsRead, Permissions.ContactsWrite,
                 Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite, Permissions.OpportunityAmountsRead,
-                Permissions.ProductsRead,
                 Permissions.OpportunitiesChangeStage, Permissions.OpportunitiesClose,
                 Permissions.ActivitiesRead, Permissions.ActivitiesWrite, Permissions.ActivitiesReopen,
                 Permissions.LeadsRead, Permissions.LeadsCreate, Permissions.LeadsUpdate,
@@ -273,7 +261,6 @@ public sealed class CrmModule : IModule
     IReadOnlyList<SensitiveFields> IModule.SensitiveFields { get; } =
     [
         new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability", "customerBudget", "wonAmount"]),
-        new(Entities.Product, Permissions.ProductCostsRead, ["cost", "costCurrency"]),
     ];
 
     /// <summary>Özel alanlar (Y9a): firma dört kayıt türüne de kendi alanlarını ekleyebilir.</summary>
@@ -595,28 +582,6 @@ public sealed class CrmModule : IModule
             UserFields = ["userId"],
             References = new Dictionary<string, string> { ["activityId"] = Entities.Activity, ["contactId"] = Entities.Contact },
         },
-        new(Entities.ProductCategory, "Ürün kategorisi (CRM)", Permissions.ProductsRead, new Dictionary<string, string>
-        {
-            ["name"] = "Ad", ["parentId"] = "Üst kategori", ["isActive"] = "Aktif",
-        }, "name")
-        {
-            References = new Dictionary<string, string> { ["parentId"] = Entities.ProductCategory },
-        },
-        new(Entities.MeasureUnit, "Ölçü birimi (CRM)", Permissions.ProductsRead, new Dictionary<string, string>
-        {
-            ["code"] = "Kod", ["name"] = "Ad", ["groupKey"] = "Birim grubu", ["factorToBase"] = "Temel birime katsayı",
-        }, "name"),
-        new(Entities.Product, "Ürün / hizmet (CRM)", Permissions.ProductsRead, new Dictionary<string, string>
-        {
-            ["code"] = "Kod", ["name"] = "Ad", ["description"] = "Açıklama", ["kind"] = "Tür", ["status"] = "Durum", ["categoryId"] = "Kategori",
-            ["baseUnitId"] = "Temel birim", ["externalCode"] = "Dış sistem kodu", ["barcode"] = "Barkod", ["brand"] = "Marka", ["model"] = "Model",
-            ["tags"] = "Etiketler", ["saleStart"] = "Satış başlangıcı", ["saleEnd"] = "Satış bitişi", ["taxCategory"] = "Vergi kategorisi",
-            ["priceIncludesTax"] = "Fiyat vergi dahil", ["quantityPrecision"] = "Miktar hassasiyeti", ["cost"] = "Maliyet", ["costCurrency"] = "Maliyet para birimi",
-            ["serviceDurationMinutes"] = "Hizmet süresi (dk)", ["deliveryMode"] = "Teslim şekli", ["chargeType"] = "Ücretlendirme", ["recurringPeriod"] = "Dönem",
-        }, "name")
-        {
-            References = new Dictionary<string, string> { ["categoryId"] = Entities.ProductCategory, ["baseUnitId"] = Entities.MeasureUnit },
-        },
         new(Entities.LeadForm, "Lead formu (CRM)", Permissions.LeadFormsManage, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["formKey"] = "Form kimliği", ["isActive"] = "Aktif", ["defaultOwnerId"] = "Varsayılan sorumlu",
@@ -714,9 +679,6 @@ public sealed class CrmModule : IModule
         services.AddScoped<IRecordStore, PersonContactPointRecordStore>();
         services.AddScoped<IRecordStore, CompanyRelationRecordStore>();
         services.AddScoped<IRecordStore, OpportunityRecordStore>();
-        services.AddScoped<IRecordStore, ProductCategoryRecordStore>();
-        services.AddScoped<IRecordStore, MeasureUnitRecordStore>();
-        services.AddScoped<IRecordStore, ProductRecordStore>();
         services.AddScoped<IRecordStore, OpportunityContactRecordStore>();
         services.AddScoped<IRecordStore, OpportunityCompetitorRecordStore>();
         services.AddScoped<OpportunityWorkflowGate>();
