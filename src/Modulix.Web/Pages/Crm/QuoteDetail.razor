@@ -430,7 +430,7 @@
                             <li>
                                 <strong>@QuoteLabels.EventLabel(item.Kind)</strong>
                                 <span class="text-muted">@CrmLabels.Time(item.At) · @Lookups.MemberName(item.ActorId)</span>
-                                @if (item.FromStatus != item.ToStatus && item.ToStatus is not null) { <span>(@QuoteLabels.Label(QuoteLabels.Statuses, item.FromStatus) → @QuoteLabels.Label(QuoteLabels.Statuses, item.ToStatus))</span> }
+                                @if (item.FromStatus is not null && item.FromStatus != item.ToStatus && item.ToStatus is not null) { <span>(@QuoteLabels.Label(QuoteLabels.Statuses, item.FromStatus) → @QuoteLabels.Label(QuoteLabels.Statuses, item.ToStatus))</span> }
                                 @if (!string.IsNullOrWhiteSpace(item.Reason)) { <div class="small">@item.Reason</div> }
                             </li>
                         }
