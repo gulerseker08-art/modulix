@@ -8,6 +8,7 @@ using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Modules.Crm.Opportunities;
 using Modulix.Modules.Crm.Pricing;
+using Modulix.Modules.Crm.Quotes;
 using Modulix.Modules.Crm.Records;
 
 namespace Modulix.Modules.Crm;
@@ -86,6 +87,17 @@ public sealed class CrmModule : IModule
         // Fiyat listeleri, vergi, kur ve indirim politikaları (ADR-0018). Fiyat hesabı (calculate) okuma iznini ister.
         public const string PricesRead = "crm.prices.read";
         public const string PricesWrite = "crm.prices.write";
+
+        // Teklif yönetimi (ADR-0019). Maliyet, indirim, elle fiyat, sunum, iç onay ve müşteri kararı kaydı ayrı izinlerdir.
+        public const string QuotesRead = "crm.quotes.read";
+        public const string QuotesWrite = "crm.quotes.write";
+        public const string QuotesDiscount = "crm.quotes.discount";
+        public const string QuotesManualPrice = "crm.quotes.manual-price";
+        public const string QuotesApprove = "crm.quotes.approve";
+        public const string QuotesPresent = "crm.quotes.present";
+        public const string QuotesRecordDecision = "crm.quotes.record-decision";
+        public const string QuotesCancel = "crm.quotes.cancel";
+        public const string QuoteCostsRead = "crm.quote-costs.read";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -116,6 +128,8 @@ public sealed class CrmModule : IModule
         public const string PriceListItem = "crm.price-list-item";
         public const string ProductComponent = "crm.product-component";
         public const string DiscountPolicy = "crm.discount-policy";
+        public const string Quote = "crm.quote";
+        public const string QuoteLine = "crm.quote-line";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -232,6 +246,15 @@ public sealed class CrmModule : IModule
         new(Permissions.ProductCostsRead, "Ürün maliyetini görür ve düzenler", "Ürün maliyeti"),
         new(Permissions.PricesRead, "Fiyat listelerini, vergi oranlarını, kurları ve indirim politikalarını görüntüler; fiyat hesaplar", "Fiyatlandırma"),
         new(Permissions.PricesWrite, "Fiyat listesi, vergi oranı, kur ve indirim politikası ekler, düzenler, yayımlar", "Fiyatlandırma"),
+        new(Permissions.QuotesRead, "Teklifleri görüntüler", "Teklifler"),
+        new(Permissions.QuotesWrite, "Teklif ve kalem ekler, düzenler, revizyon açar, çoğaltır, onaya gönderir", "Teklifler"),
+        new(Permissions.QuotesDiscount, "Tekliflerde satır ve genel indirim uygular", "Teklifler"),
+        new(Permissions.QuotesManualPrice, "Tekliflerde elle birim fiyat girer ve serbest kalem ekler", "Teklifler"),
+        new(Permissions.QuotesApprove, "İç onay bekleyen teklifi onaylar, reddeder ya da değişiklik ister", "Teklifler"),
+        new(Permissions.QuotesPresent, "Onaylı teklifi müşteriye sunar", "Teklifler"),
+        new(Permissions.QuotesRecordDecision, "Müşterinin kabul ya da ret kararını kaydeder", "Teklifler"),
+        new(Permissions.QuotesCancel, "Teklifi gerekçeyle iptal eder", "Teklifler"),
+        new(Permissions.QuoteCostsRead, "Teklif kalemlerinin maliyetini görür ve düzenler", "Teklif maliyeti"),
     ];
 
     /// <summary>Devre dışı bırakılan kişinin firmaları, açık fırsatları ve açık aktiviteleri devredilir.</summary>
@@ -254,7 +277,7 @@ public sealed class CrmModule : IModule
                 Permissions.CompaniesRead, Permissions.CompaniesWrite,
                 Permissions.ContactsRead, Permissions.ContactsWrite,
                 Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite, Permissions.OpportunityAmountsRead,
-                Permissions.ProductsRead, Permissions.PricesRead,
+                Permissions.ProductsRead, Permissions.PricesRead, Permissions.QuotesRead, Permissions.QuotesWrite,
                 Permissions.OpportunitiesChangeStage, Permissions.OpportunitiesClose,
                 Permissions.ActivitiesRead, Permissions.ActivitiesWrite, Permissions.ActivitiesReopen,
                 Permissions.LeadsRead, Permissions.LeadsCreate, Permissions.LeadsUpdate,
@@ -287,6 +310,7 @@ public sealed class CrmModule : IModule
     [
         new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability", "customerBudget", "wonAmount"]),
         new(Entities.Product, Permissions.ProductCostsRead, ["cost", "costCurrency"]),
+        new(Entities.QuoteLine, Permissions.QuoteCostsRead, ["unitCost"]),
     ];
 
     /// <summary>Özel alanlar (Y9a): firma dört kayıt türüne de kendi alanlarını ekleyebilir.</summary>
@@ -454,6 +478,32 @@ public sealed class CrmModule : IModule
             Pattern = @"^[1-9][0-9]{0,3}$",
             PatternMessage = "1-9999 arası tam sayı girin.",
             MaxLength = 4,
+        },
+        new(SettingKeys.QuoteApprovalDiscountPercent, "Teklif iç onay: indirim eşiği (%)", "CRM Teklif", SettingType.Text)
+        {
+            Description = "Toplam indirim bu yüzdeyi aşan teklif iç onay almadan müşteriye sunulamaz. Boş bırakılırsa indirimden onay istenmez.",
+            Pattern = @"^$|^(100|[0-9]{1,2})(.[0-9]{1,2})?$",
+            PatternMessage = "0-100 arası bir yüzde girin.",
+            MaxLength = 6,
+        },
+        new(SettingKeys.QuoteApprovalGrossAbove, "Teklif iç onay: toplam tutar eşiği", "CRM Teklif", SettingType.Text)
+        {
+            Description = "Genel toplamı bu tutarı aşan teklif (teklifin kendi para biriminde) iç onay almadan sunulamaz. Boş bırakılırsa tutardan onay istenmez.",
+            Pattern = @"^$|^[0-9]{1,13}(.[0-9]{1,2})?$",
+            PatternMessage = "Negatif olmayan bir tutar girin.",
+            MaxLength = 16,
+        },
+        new(SettingKeys.QuoteDefaultValidityDays, "Teklif varsayılan geçerlilik süresi (gün)", "CRM Teklif", SettingType.Text, "30")
+        {
+            Description = "Yeni tekliflerde önerilen geçerlilik süresi.",
+            Pattern = @"^[1-9][0-9]{0,3}$",
+            PatternMessage = "1-9999 arası tam sayı girin.",
+            MaxLength = 4,
+        },
+        new(SettingKeys.QuoteAllowSelfApproval, "Teklif iç onay: kendi gönderdiğini onaylama", "CRM Teklif", SettingType.Choice, "false")
+        {
+            Description = "Evet seçilirse teklifi onaya gönderen kişi onaylayan yetkisine sahipse kendi teklifini onaylayabilir. Varsayılan hayırdır.",
+            Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
         },
     ];
 
@@ -665,6 +715,29 @@ public sealed class CrmModule : IModule
             ["name"] = "Ad", ["percent"] = "Yüzde", ["amount"] = "Tutar", ["currency"] = "Para birimi", ["priority"] = "Öncelik", ["stackable"] = "Birleşebilir",
             ["maxTotalPercent"] = "Azami toplam %", ["approvalAbovePercent"] = "Onay eşiği %", ["validFrom"] = "Geçerlilik başı", ["validTo"] = "Geçerlilik sonu", ["isActive"] = "Aktif",
         }, "name"),
+        new(Entities.Quote, "Teklif (CRM)", Permissions.QuotesRead, new Dictionary<string, string>
+        {
+            ["quoteNumber"] = "Teklif no", ["revisionNo"] = "Revizyon", ["title"] = "Başlık", ["description"] = "Açıklama", ["companyId"] = "Firma",
+            ["contactId"] = "Kişi", ["opportunityId"] = "Fırsat", ["priceListId"] = "Fiyat listesi", ["ownerId"] = "Sorumlu", ["status"] = "Durum",
+            ["approvalStatus"] = "Onay durumu", ["deliveryStatus"] = "Gönderim durumu", ["statusReason"] = "Durum gerekçesi", ["issueDate"] = "Düzenleme tarihi",
+            ["validUntil"] = "Geçerlilik bitişi", ["currency"] = "Para birimi", ["priceIncludesTax"] = "Fiyatlar vergi dahil", ["documentDiscountKind"] = "Genel indirim türü",
+            ["documentDiscountValue"] = "Genel indirim", ["paymentTerms"] = "Ödeme koşulları", ["deliveryTerms"] = "Teslimat koşulları",
+            ["commercialTerms"] = "Ticari koşullar", ["internalNotes"] = "İç notlar", ["netTotal"] = "Net toplam", ["taxTotal"] = "Vergi", ["grossTotal"] = "Genel toplam",
+        }, "title")
+        {
+            References = new Dictionary<string, string>
+            {
+                ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact, ["opportunityId"] = Entities.Opportunity, ["priceListId"] = Entities.PriceList,
+            },
+        },
+        new(Entities.QuoteLine, "Teklif kalemi (CRM)", Permissions.QuotesRead, new Dictionary<string, string>
+        {
+            ["quoteId"] = "Teklif", ["name"] = "Ad", ["kind"] = "Tür", ["productId"] = "Ürün", ["quantity"] = "Miktar", ["unitPrice"] = "Birim fiyat",
+            ["discountKind"] = "İndirim türü", ["discountValue"] = "İndirim", ["taxRatePercent"] = "Vergi oranı (%)", ["role"] = "Rol", ["unitCost"] = "Maliyet",
+        }, "name")
+        {
+            References = new Dictionary<string, string> { ["quoteId"] = Entities.Quote, ["productId"] = Entities.Product },
+        },
         new(Entities.LeadForm, "Lead formu (CRM)", Permissions.LeadFormsManage, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["formKey"] = "Form kimliği", ["isActive"] = "Aktif", ["defaultOwnerId"] = "Varsayılan sorumlu",
@@ -747,6 +820,10 @@ public sealed class CrmModule : IModule
         public const string OpportunityStageRequirements = "crm.opportunity.stage-requirements";
         public const string OpportunityStageProbabilities = "crm.opportunity.stage-probabilities";
         public const string OpportunityStaleDays = "crm.opportunity.stale-days";
+        public const string QuoteApprovalDiscountPercent = "crm.quote.approval-discount-percent";
+        public const string QuoteApprovalGrossAbove = "crm.quote.approval-gross-above";
+        public const string QuoteDefaultValidityDays = "crm.quote.default-validity-days";
+        public const string QuoteAllowSelfApproval = "crm.quote.allow-self-approval";
     }
 
     public void ConfigureServices(IServiceCollection services)
@@ -771,6 +848,11 @@ public sealed class CrmModule : IModule
         services.AddScoped<IRecordStore, PriceListItemRecordStore>();
         services.AddScoped<IRecordStore, ProductComponentRecordStore>();
         services.AddScoped<IRecordStore, DiscountPolicyRecordStore>();
+        services.AddScoped<IRecordStore, QuoteRecordStore>();
+        services.AddScoped<IRecordStore, QuoteLineRecordStore>();
+        services.AddScoped<QuoteWorkflowGate>();
+        services.AddScoped<QuoteReader>();
+        services.AddScoped<IQuoteWorkflow, QuoteWorkflow>();
         services.AddScoped<IPriceCalculator, PriceCalculator>();
         services.AddScoped<IRecordStore, OpportunityContactRecordStore>();
         services.AddScoped<IRecordStore, OpportunityCompetitorRecordStore>();

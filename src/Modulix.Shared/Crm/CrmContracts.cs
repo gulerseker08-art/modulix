@@ -50,6 +50,15 @@ public static class CrmAccess
     public const string ProductCostsRead = "crm.product-costs.read";
     public const string PricesRead = "crm.prices.read";
     public const string PricesWrite = "crm.prices.write";
+    public const string QuotesRead = "crm.quotes.read";
+    public const string QuotesWrite = "crm.quotes.write";
+    public const string QuotesDiscount = "crm.quotes.discount";
+    public const string QuotesManualPrice = "crm.quotes.manual-price";
+    public const string QuotesApprove = "crm.quotes.approve";
+    public const string QuotesPresent = "crm.quotes.present";
+    public const string QuotesRecordDecision = "crm.quotes.record-decision";
+    public const string QuotesCancel = "crm.quotes.cancel";
+    public const string QuoteCostsRead = "crm.quote-costs.read";
 }
 
 /// <summary>Kayıt türü anahtarları; kayıt geçmişi (<c>/api/records/{tür}/{id}/history</c>) bunlarla çağrılır.</summary>

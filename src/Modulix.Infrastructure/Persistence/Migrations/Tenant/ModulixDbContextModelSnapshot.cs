@@ -2814,6 +2814,425 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.Quote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ApprovalStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("CalculatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("CalculationPolicyVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CommercialTerms")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CustomerNameSnapshot")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DeliveryStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("DeliveryTerms")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<decimal>("DiscountTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("DocumentDiscountKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal>("DocumentDiscountValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("ExchangeRate")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("decimal(28,10)");
+
+                    b.Property<DateOnly?>("ExchangeRateDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("GrossTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("InternalNotes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateOnly>("IssueDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("ListTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("NetTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("OpportunityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("OptionalNet")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PaymentTerms")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset?>("PresentedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("PriceIncludesTax")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("PriceListId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("QuoteNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("RecurringSummary")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReportingCurrency")
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
+
+                    b.Property<int>("RevisionNo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("StatusReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("TaxTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ValidUntil")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CompanyId");
+
+                    b.HasIndex("TenantId", "ContactId");
+
+                    b.HasIndex("TenantId", "FamilyId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Quotes_FamilyAccepted")
+                        .HasFilter("[Status] = 'Accepted'");
+
+                    b.HasIndex("TenantId", "OpportunityId");
+
+                    b.HasIndex("TenantId", "PriceListId");
+
+                    b.HasIndex("TenantId", "FamilyId", "RevisionNo")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Quotes_FamilyRevision");
+
+                    b.HasIndex("TenantId", "OwnerId", "Status");
+
+                    b.HasIndex("TenantId", "QuoteNumber", "RevisionNo")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Quotes_NumberRevision");
+
+                    b.HasIndex("TenantId", "Status", "ValidUntil");
+
+                    b.ToTable("Quotes", "crm", t =>
+                        {
+                            t.HasCheckConstraint("CK_Quotes_Revision", "[RevisionNo] >= 1");
+
+                            t.HasCheckConstraint("CK_Quotes_Totals", "[NetTotal] >= 0 AND [TaxTotal] >= 0 AND [GrossTotal] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.QuoteEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ToStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "QuoteId", "CreatedAt");
+
+                    b.ToTable("QuoteEvents", "crm");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.QuoteLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("DiscountKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("DocumentDiscountShare")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Gross")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("GroupName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("Included")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSelected")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("LineDiscount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("ListAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("Net")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("ParentStableKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProductCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("decimal(28,10)");
+
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RecurringPeriod")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("StableKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Tax")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal>("TaxRatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("decimal(28,10)");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UnitName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("decimal(28,10)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ProductId");
+
+                    b.HasIndex("TenantId", "QuoteId", "Position");
+
+                    b.HasIndex("TenantId", "QuoteId", "StableKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_QuoteLines_QuoteKey");
+
+                    b.ToTable("QuoteLines", "crm", t =>
+                        {
+                            t.HasCheckConstraint("CK_QuoteLines_Amounts", "[Quantity] > 0 AND [UnitPrice] >= 0 AND [DiscountValue] >= 0");
+
+                            t.HasCheckConstraint("CK_QuoteLines_Tax", "[TaxRatePercent] >= 0 AND [TaxRatePercent] <= 100");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.TaxRate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3303,6 +3722,60 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                     b.Navigation("Component");
 
                     b.Navigation("Package");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.Quote", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.Company", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CompanyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.Contact", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ContactId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.Opportunity", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OpportunityId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.PriceList", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PriceListId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.QuoteEvent", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.Quote", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "QuoteId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.QuoteLine", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.Product", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ProductId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Crm.Domain.Quote", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "QuoteId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

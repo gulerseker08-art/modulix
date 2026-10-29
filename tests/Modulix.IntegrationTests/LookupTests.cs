@@ -33,7 +33,7 @@ public class LookupTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFa
         using var otherAdmin = await LoginAsync(b.Admin);
 
         var defaults = (await rep.GetFromJsonAsync<List<LookupDto>>("/api/lookups"))!;
-        Assert.Equal(16, defaults.Count);
+        Assert.Equal(22, defaults.Count);
         var contactCompany = defaults.Single(l => l.Key == ContactCompany);
         Assert.True(contactCompany.Searchable);
         Assert.False(contactCompany.Customized);

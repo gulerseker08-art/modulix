@@ -1,8 +1,8 @@
 # ADR-0019: Teklif yönetimi (M1.5) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (yalnızca saf çekirdek). Tarih: 2026-10-29.
+Durum: Kısmen uygulandı (çekirdek, sunucu yaşam döngüsü ve ilk ekranlar; PDF/paylaşım/kabul sayfası yok). Tarih: 2026-10-29.
 
-## Mevcut durum (kodla kanıtlı)
+## Mevcut durum (analiz anında, kodla kanıtlı; güncel durum en alttaki "Uygulama durumu"nda)
 
 Tarama: `src/**/*.cs` ve `src/Modulix.Web/Pages` içinde `Quote|Teklif|Proposal`. Sonuç: teklif varlığı, tablosu, uç noktası ve ekranı **yoktur**.
 `Proposal` yalnızca fırsat aşaması anahtarıdır (`CrmModule.cs:321`), `Opportunity.Amount` tahmini tutardır (ADR-0017/7). Fiyat hesabı
@@ -42,3 +42,19 @@ Tenant-başına-DB kabulü (ADR-0009) kodla uyumludur: yeni tablolar `ModulixDbC
 
 Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları, PDF, paylaşım/kabul, dönüşüm, ayarlar, raporlar ve
 **tüm ekranlar** yazılmadı; entegrasyon testleri yok (SQL Server gerekir). Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
+
+## Uygulama durumu (ikinci dilim: veri modeli, sunucu yaşam döngüsü, ilk ekranlar)
+
+**Uygulandı ve entegrasyon testiyle doğrulandı** (`QuoteTests`, 12 test; saf çekirdek için `QuoteCalculatorTests` 14, `QuoteRulesTests` 14):
+
+| Konu | Karar / davranış |
+|---|---|
+| Veri modeli | `crm.Quotes` (başlık, aile/revizyon, üç ayrı durum alanı, para birimi, vergi biçimi, hesaplama politikası sürümü, koşullar, sunucu toplamları), `crm.QuoteLines` (ürün kopyası: kod/ad/açıklama/birim fiyat/vergi oranı; kararlı anahtar; rol; tekrarlayan dönem; maliyet), `crm.QuoteEvents` (tarihçe). Migration `QuoteManagement`; üç tablo RLS'li; bileşik FK'ler tenant sınırını aşmaz. Backfill gerekmez (yeni tablolar); mevcut kayıt yok. |
+| Hesap | Sunucu `QuoteCalculator`; kalem ve başlık toplamı her kalem/indirim değişikliğinde aynı işlemde yeniden hesaplanır. |
+| Yetki | İndirim, elle fiyat/serbest kalem, maliyet ayrı izin; ihlal API'de 422 ile reddedilir. Katalog fiyatı listeden gelir; listeden farklı fiyat elle fiyat izni ister. Pasif ürün yeni kaleme eklenemez. |
+| Yaşam döngüsü | Onaysız sunum, geçersiz/iptal/süresi dolmuş sürümün kabulü, tekrarlanan kabul/iptal sunucuda engellenir; kabul/iptal yarışında sürüm denetimiyle yalnızca biri kazanır. Kabul anında geçerlilik yeniden denetlenir. |
+| Revizyon | Kabul edilmiş sürümden revizyon açılmaz; ailede tek açık taslak; yeni sürüm sunulunca eski `Superseded`. Çoğaltma yeni aile ve yeni numara. |
+| Tenant | Başka tenant'ın teklif/kalem/tarihçesi 404; başka tenant'ın firmasıyla teklif açılamaz. |
+| Ekranlar | `Teklifler` (hızlı görünümler, süzgeçler, sayfalama, aile bazlı görünüm), teklif formu + kalem editörü + işlem çubuğu + tarihçe + revizyon listesi, `Teklif onayları`. Derleme doğrulandı; **tarayıcıda uçtan uca gezilmedi** (bkz. rapor). |
+
+**Hâlâ yapılmadı:** PDF üretimi/hash/şablon, paylaşım bağlantısı (belirteç, hız sınırı) ve müşteri kabul/ret sayfası, gönderim adaptörü ve durumları, revizyon karşılaştırma ekranı, onay kuralı yönetimi (eşik dışı kurallar, sıralı/paralel onay, vekâlet, hatırlatma, kural sürümü kaydı), kur sabitleme ekranı, sipariş/sözleşme dönüşümü (hedef modül yok; yalnızca sözleşme), fırsat entegrasyonları (kabulde kazanma politikası, birincil teklif), aktivite entegrasyonu (takip görevi, geçerlilik hatırlatması), zamanlanmış süre dolumu işi, yönetim ayarları ekranı, raporlar, dışa aktarma, kayıtlı görünümler. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
