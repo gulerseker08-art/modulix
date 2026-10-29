@@ -115,44 +115,20 @@
         {
             <div>
                 <label class="form-label" for="lead-owner">Sorumlu</label>
-                <select id="lead-owner" class="form-select" @bind="form.OwnerId">
-                    <option value="">Ben</option>
-                    @foreach (var member in Lookups.AssignableMembers)
-                    {
-                        <option value="@member.UserId">@member.DisplayName</option>
-                    }
-                </select>
+                <LookupPicker Id="lead-owner" LookupKey="crm.lead.owner" @bind-Value="form.OwnerId" Placeholder="Ben" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
                 <FieldError Field="ownerId" Errors="errors" />
             </div>
         }
-        @if (Lookups.Companies.Count > 0)
-        {
-            <div>
-                <label class="form-label" for="lead-existing-company">Mevcut müşteri firması</label>
-                <select id="lead-existing-company" class="form-select" @bind="form.CompanyId">
-                    <option value="">—</option>
-                    @foreach (var company in Lookups.Companies)
-                    {
-                        <option value="@company.Id">@company.Name</option>
-                    }
-                </select>
-                <FieldError Field="companyId" Errors="errors" />
-            </div>
-        }
-        @if (Lookups.Contacts.Count > 0)
-        {
-            <div>
-                <label class="form-label" for="lead-existing-contact">Mevcut kişi</label>
-                <select id="lead-existing-contact" class="form-select" @bind="form.ContactId">
-                    <option value="">—</option>
-                    @foreach (var contact in Lookups.Contacts.Where(c => form.CompanyId is null || c.CompanyId == form.CompanyId))
-                    {
-                        <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
-                    }
-                </select>
-                <FieldError Field="contactId" Errors="errors" />
-            </div>
-        }
+        <div>
+            <label class="form-label" for="lead-existing-company">Mevcut müşteri firması</label>
+            <LookupPicker Id="lead-existing-company" LookupKey="crm.lead.company" @bind-Value="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("companyId") == true)" />
+            <FieldError Field="companyId" Errors="errors" />
+        </div>
+        <div>
+            <label class="form-label" for="lead-existing-contact">Mevcut kişi</label>
+            <LookupPicker Id="lead-existing-contact" LookupKey="crm.lead.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
+            <FieldError Field="contactId" Errors="errors" />
+        </div>
         <div class="span-all">
             <label class="form-label" for="lead-need">İhtiyaç</label>
             <textarea id="lead-need" class="form-control" rows="2" maxlength="4000" @bind="form.NeedDescription"></textarea>

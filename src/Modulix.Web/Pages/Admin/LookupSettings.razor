@@ -1,0 +1,235 @@
+@page "/yonetim/alan-ve-lookup-ayarlari"
+@inject ApiClient Api
+@inject SessionState Session
+@inject LookupCatalog Catalog
+
+<PageTitle>Alan ve Lookup Ayarları · ModuliX</PageTitle>
+
+@* Lookup alanları (ADR-0016): kullanıcının seçtiği N→1 referans alanları. Teknik tanım kodda sabittir; yönetici yalnızca metin aramasını açıp kapatır. *@
+<AuthGate Permission="@CoreAccess.ManageCustomization">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Alan ve Lookup Ayarları</h1>
+    </div>
+
+    <p class="text-muted">
+        Formlarda başka bir kaydı seçtiren alanlar (ör. kişideki Firma, fırsattaki Sorumlu) ortak bir seçim kutusu kullanır.
+        <strong>Aranabilir</strong> açıkken kutuda yazarak arama yapılır; kapalıyken yazma girişi kalkar ve kayıt sayfalı listeden seçilir.
+        Bu ayar yalnızca arama kutusunu etkiler: kullanıcının hangi kayıtları görebildiği rol ve kayıt kapsamıyla belirlenmeye devam eder,
+        listelerdeki filtreler ve genel arama bundan etkilenmez.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="LoadAsync">Yeniden yükle</button></div>
+    }
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (loading)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (items is { Count: > 0 })
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="lookup-filter">Alan ara</label>
+            <input id="lookup-filter" class="form-control" type="search" placeholder="Alan, kayıt türü veya hedef ara" @bind="filter" @bind:event="oninput" />
+        </div>
+
+        @foreach (var group in Visible.GroupBy(i => i.SourceEntityName))
+        {
+            <section class="settings-group">
+                <h2>@group.Key</h2>
+                <div class="table-responsive">
+                    <table class="table lookup-settings">
+                        <thead>
+                            <tr><th>Alan</th><th>Hedef</th><th>Aranabilir</th><th>Ne değişir?</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in group)
+                            {
+                                var value = Current(item);
+                                var changed = pending.ContainsKey(item.Key);
+                                <tr class="@(changed ? "is-changed" : null)">
+                                    <td data-label="Alan">
+                                        <strong>@item.Title</strong>
+                                        @if (item.DependsOnField is not null)
+                                        {
+                                            <small class="d-block text-muted">Bağımlı alan: seçilen üst kayda göre süzülür.</small>
+                                        }
+                                    </td>
+                                    <td data-label="Hedef">@(item.IsMember ? "Kullanıcı (üye)" : item.TargetEntityName)</td>
+                                    <td data-label="Aranabilir">
+                                        <div class="form-check form-switch">
+                                            <input id="s-@item.Key" class="form-check-input" type="checkbox" role="switch" checked="@value"
+                                                   disabled="@busy" @onchange="e => Set(item, (bool)e.Value!)" />
+                                            <label class="form-check-label" for="s-@item.Key">
+                                                @(value ? "Açık" : "Kapalı")
+                                                @if (!changed && !item.Customized) { <small class="text-muted"> (varsayılan)</small> }
+                                                @if (changed) { <small class="text-warning-emphasis"> (kaydedilmedi)</small> }
+                                            </label>
+                                        </div>
+                                    </td>
+                                    <td data-label="Ne değişir?">
+                                        <small class="text-muted">
+                                            @(value
+                                                ? $"Kutuda yazarak arama yapılır ({item.MinSearchLength}+ karakter). Aranan alanlar: {item.SearchDescription}."
+                                                : "Yazma girişi kalkar; kayıt sayfalı listeden seçilir. Seçili kayıt görünmeye devam eder.")
+                                        </small>
+                                    </td>
+                                    <td>
+                                        @if (item.Customized || (changed && pending[item.Key] is not null))
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => Reset(item)">Varsayılana dön</button>
+                                        }
+                                        @if (rowErrors.TryGetValue(item.Key, out var rowError))
+                                        {
+                                            <div class="invalid-feedback d-block">@rowError</div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-primary" disabled="@(busy || pending.Count == 0)" @onclick="SaveAsync">
+                @(busy ? "Kaydediliyor…" : pending.Count == 0 ? "Kaydet" : $"Kaydet ({pending.Count} değişiklik)")
+            </button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || pending.Count == 0)" @onclick="Discard">Değişiklikleri at</button>
+            @if (pending.Count == 0)
+            {
+                <span class="text-muted">Değişiklik yok.</span>
+            }
+        </div>
+    }
+    else if (!loading && message is null)
+    {
+        <p class="text-muted">Lookup alanı olan bir modül açık değil.</p>
+    }
+</AuthGate>
+
+@code {
+    // Bekleyen değişiklik: anahtar → true/false (firmanın seçimi) ya da null (varsayılana dön).
+    private readonly Dictionary<string, bool?> pending = [];
+    private readonly Dictionary<string, string> rowErrors = [];
+    private List<LookupDto>? items;
+    private string filter = string.Empty;
+    private string? message;
+    private string? notice;
+    private bool loading = true;
+    private bool busy;
+
+    private IEnumerable<LookupDto> Visible => (items ?? []).Where(i => filter.Length == 0
+        || i.Title.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
+        || i.SourceEntityName.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
+        || (i.TargetEntityName ?? "Kullanıcı").Contains(filter, StringComparison.CurrentCultureIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ManageCustomization))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        message = null;
+        var result = await Api.GetAsync<List<LookupDto>>("/api/lookups");
+        loading = false;
+        if (!result.IsSuccess)
+        {
+            message = result.Error ?? "Ayarlar yüklenemedi.";
+            return;
+        }
+
+        items = result.Value ?? [];
+        pending.Clear();
+        rowErrors.Clear();
+    }
+
+    private bool Current(LookupDto item) => pending.TryGetValue(item.Key, out var value) ? value ?? item.DefaultSearchable : item.Searchable;
+
+    // Değer kayıtlı ayara geri dönerse bekleyen değişiklik de kalkar.
+    private void Set(LookupDto item, bool value)
+    {
+        notice = null;
+        if (value == item.Searchable)
+        {
+            pending.Remove(item.Key);
+        }
+        else
+        {
+            pending[item.Key] = value;
+        }
+    }
+
+    private void Reset(LookupDto item)
+    {
+        notice = null;
+        if (!item.Customized)
+        {
+            pending.Remove(item.Key);
+        }
+        else
+        {
+            pending[item.Key] = null;
+        }
+    }
+
+    private void Discard()
+    {
+        pending.Clear();
+        rowErrors.Clear();
+    }
+
+    // Her ayar kendi sürümüyle yazılır; başkası araya girdiyse o satır çakışma gösterir ve diğerleri yine kaydedilir.
+    private async Task SaveAsync()
+    {
+        busy = true;
+        notice = null;
+        message = null;
+        rowErrors.Clear();
+        var saved = 0;
+        foreach (var (key, value) in pending.ToList())
+        {
+            var item = items!.First(i => i.Key == key);
+            var result = await Api.PutAsync<LookupDto>($"/api/customization/lookups/{Uri.EscapeDataString(key)}", new SaveLookupSettingRequest(value, item.Version));
+            if (result.Value is { } updated)
+            {
+                items![items.FindIndex(i => i.Key == key)] = updated;
+                pending.Remove(key);
+                saved++;
+            }
+            else
+            {
+                rowErrors[key] = result.Status == System.Net.HttpStatusCode.Conflict
+                    ? "Ayar siz düzenlerken değişti. Sayfayı yenileyip tekrar deneyin."
+                    : result.Error ?? "Kaydedilemedi.";
+            }
+        }
+
+        busy = false;
+        Catalog.Invalidate();
+        if (saved > 0)
+        {
+            notice = $"{saved} ayar kaydedildi.";
+        }
+
+        if (rowErrors.Count > 0)
+        {
+            message = "Bazı ayarlar kaydedilemedi; ilgili satırlara bakın.";
+        }
+    }
+}

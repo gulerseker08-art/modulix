@@ -78,13 +78,7 @@
             <label class="form-label" for="ownerId">Sorumlu</label>
             @if (Activity is null)
             {
-                <select id="ownerId" class="form-select" @bind="form.OwnerId">
-                    <option value="">Ben</option>
-                    @foreach (var member in Lookups.AssignableMembers)
-                    {
-                        <option value="@member.UserId">@member.DisplayName</option>
-                    }
-                </select>
+                <LookupPicker Id="ownerId" LookupKey="crm.activity.owner" @bind-Value="form.OwnerId" Placeholder="Ben" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
             }
             else
             {
@@ -97,36 +91,18 @@
         {
             <div>
                 <label class="form-label" for="companyId">Firma</label>
-                <select id="companyId" class="form-select" @bind="form.CompanyId">
-                    <option value="">—</option>
-                    @foreach (var company in Lookups.Companies)
-                    {
-                        <option value="@company.Id">@company.Name</option>
-                    }
-                </select>
+                <LookupPicker Id="companyId" LookupKey="crm.activity.company" @bind-Value="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("companyId") == true)" />
                 <FieldError Field="companyId" Errors="errors" />
             </div>
         }
         <div>
             <label class="form-label" for="contactId">Kişi</label>
-            <select id="contactId" class="form-select" @bind="form.ContactId">
-                <option value="">—</option>
-                @foreach (var contact in Lookups.Contacts.Where(c => form.CompanyId is null || c.CompanyId == form.CompanyId))
-                {
-                    <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
-                }
-            </select>
+            <LookupPicker Id="contactId" LookupKey="crm.activity.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
             <FieldError Field="contactId" Errors="errors" />
         </div>
         <div>
             <label class="form-label" for="opportunityId">Fırsat</label>
-            <select id="opportunityId" class="form-select" @bind="form.OpportunityId">
-                <option value="">—</option>
-                @foreach (var opportunity in Lookups.Opportunities.Where(o => form.CompanyId is null || o.CompanyId == form.CompanyId))
-                {
-                    <option value="@opportunity.Id">@opportunity.Title</option>
-                }
-            </select>
+            <LookupPicker Id="opportunityId" LookupKey="crm.activity.opportunity" @bind-Value="form.OpportunityId" ParentId="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("opportunityId") == true)" />
             <FieldError Field="opportunityId" Errors="errors" />
         </div>
         <div>

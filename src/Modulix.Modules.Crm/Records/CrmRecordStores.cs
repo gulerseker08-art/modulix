@@ -218,6 +218,10 @@ internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmR
     {
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.CompanyId == id) : null,
         ["personId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PersonId == id) : null,
+        // Lookup bağımlılığı (ADR-0016): birincil firması ya da aktif ilişkisi bu firma olan kişiler.
+        ["relatedCompanyId"] = (q, v, ctx) => FilterValue.Id(v) is { } id
+            ? q.Where(c => c.CompanyId == id || ctx.Data.Set<CompanyContact>().Any(l => l.ContactId == c.Id && l.CompanyId == id && l.IsActive))
+            : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
         ["withoutCompany"] = (q, v, _) => FilterValue.Bool(v) is { } flag ? q.Where(c => (c.CompanyId == null) == flag) : null,
         // Mükerrer önerisi: paylaşılmayan aktif iletişim noktasında aynı e-posta/telefon.
@@ -502,4 +506,29 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
 
     protected override IQueryable<Opportunity> Search(IQueryable<Opportunity> source, string term) =>
         source.Where(o => o.Title.Contains(term));
+
+    /// <summary>
+    /// Lookup alanlarının sunucu doğrulaması (ADR-0016): bağlanan firma/kişi çağıranın görebildiği kayıt olmalı ve kişi seçili
+    /// firmayla ilişkili olmalıdır. İş akışı (Lead dönüşümü) yazımları ve değişmeyen bağlar denetlenmez.
+    /// </summary>
+    protected override async Task AppliedAsync(Opportunity entity, JsonObject values, CancellationToken cancellationToken)
+    {
+        if (GateOpen)
+        {
+            return;
+        }
+
+        var stored = await Context.Data.Set<Opportunity>().AsNoTracking().Where(o => o.Id == entity.Id)
+            .Select(o => new { o.CompanyId, o.ContactId }).SingleOrDefaultAsync(cancellationToken);
+        var errors = new List<RecordFieldError>();
+        await LookupGuard.AddCompanyErrorAsync(errors, Context, "companyId", entity.CompanyId, stored?.CompanyId, cancellationToken);
+        await LookupGuard.AddContactErrorAsync(errors, Context, "contactId", entity.ContactId, stored?.ContactId, cancellationToken);
+        await LookupGuard.AddContactCompanyErrorAsync(
+            errors, Context, "contactId", entity.ContactId, entity.CompanyId, stored?.ContactId, stored?.CompanyId, cancellationToken);
+        if (errors.Count > 0)
+        {
+            throw new RecordValidationException(errors);
+        }
+    }
+
 }

@@ -42,14 +42,8 @@
                     <FieldError Field="type" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label">Yetkili kişi</label>
-                    <select class="form-select" @bind="form.ContactId">
-                        <option value="">—</option>
-                        @foreach (var contact in Lookups.Contacts)
-                        {
-                            <option value="@contact.Id">@contact.FirstName @contact.LastName</option>
-                        }
-                    </select>
+                    <label class="form-label" for="location-contact">Yetkili kişi</label>
+                    <LookupPicker Id="location-contact" LookupKey="crm.location.contact" @bind-Value="form.ContactId" ParentId="CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
                     <FieldError Field="contactId" Errors="errors" />
                 </div>
                 <div class="span-all">

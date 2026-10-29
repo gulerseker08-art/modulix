@@ -83,6 +83,12 @@ public interface IModule
     /// </summary>
     IReadOnlyList<Events.EventSubscription> EventSubscriptions => [];
 
+    /// <summary>
+    /// Modülün lookup alanları (ADR-0016): kullanıcının seçtiği N→1 referanslar. Tanım kodda sabittir; firma yalnızca
+    /// "aranabilir" ayarını değiştirir. Anahtar modül anahtarıyla başlar.
+    /// </summary>
+    IReadOnlyList<LookupDefinition> Lookups => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {

@@ -23,6 +23,7 @@ public sealed partial class ModuleCatalog
     private readonly Dictionary<string, List<SensitiveFields>> sensitiveFields = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, CustomizableEntity Entity)> customizable = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, ChoiceListDefinition List)> choiceLists = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string ModuleKey, LookupDefinition Lookup)> lookups = new(StringComparer.Ordinal);
     private readonly List<SharedRecordAccess> sharedAccess = [];
     private readonly Dictionary<string, (string ModuleKey, EventSubscription Subscription)> subscriptions = new(StringComparer.Ordinal);
 
@@ -100,6 +101,15 @@ public sealed partial class ModuleCatalog
                 if (!choiceLists.TryAdd(list.Key, (module.Key, list)))
                 {
                     throw new InvalidOperationException($"Seçim listesi iki kez tanımlı: '{list.Key}'.");
+                }
+            }
+
+            foreach (var lookup in module.Lookups)
+            {
+                ValidateLookup(module, lookup);
+                if (!lookups.TryAdd(lookup.Key, (module.Key, lookup)))
+                {
+                    throw new InvalidOperationException($"Lookup iki kez tanımlı: '{lookup.Key}'.");
                 }
             }
 
@@ -253,6 +263,12 @@ public sealed partial class ModuleCatalog
     public IEnumerable<(string ModuleKey, ChoiceListDefinition List)> ChoiceLists =>
         Modules.SelectMany(m => m.ChoiceLists.Select(l => (m.Key, l)));
 
+    /// <summary>Lookup tanımı ve modülü (ADR-0016); tanımlı değilse null.</summary>
+    public (string ModuleKey, LookupDefinition Lookup)? FindLookup(string key) => lookups.TryGetValue(key, out var lookup) ? lookup : null;
+
+    /// <summary>Lookup tanımları, modül ve tanım sırasıyla.</summary>
+    public IEnumerable<(string ModuleKey, LookupDefinition Lookup)> Lookups => Modules.SelectMany(m => m.Lookups.Select(l => (m.Key, l)));
+
     /// <summary>Ortak kayıt türünü kullanan modüllerin bildirdiği izinler (ADR-0006).</summary>
     public IEnumerable<SharedRecordAccess> SharedAccessTo(string entityKey) => sharedAccess.Where(a => a.EntityKey == entityKey);
 
@@ -275,6 +291,24 @@ public sealed partial class ModuleCatalog
     /// <summary>Kayıt türünün listeye bağlı alanlarının listeleri.</summary>
     public IEnumerable<ChoiceListDefinition> ChoiceListsOf(string entityKey) =>
         choiceLists.Values.Select(l => l.List).Where(l => l.EntityKey == entityKey);
+
+    // Lookup anahtarı ve kaynak kayıt türü modülündür; üye lookup'ının hedefi yoktur, kayıt lookup'ının hedefi vardır; bağımlılık ya ikisiyle birlikte tanımlıdır ya hiç.
+    private static void ValidateLookup(IModule module, LookupDefinition lookup)
+    {
+        var prefix = module.Key + ".";
+        if (!lookup.Key.StartsWith(prefix, StringComparison.Ordinal)
+            || !lookup.SourceEntityKey.StartsWith(prefix, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(lookup.Field)
+            || string.IsNullOrWhiteSpace(lookup.Title)
+            || lookup.IsMember != (lookup.TargetEntityKey is null)
+            || (!lookup.IsMember && lookup.LabelFields.Count == 0)
+            || (lookup.DependsOnField is null) != (lookup.DependsOnFilter is null)
+            || lookup.PageSize is < 1 or > RecordLookupLimits.MaxPageSize
+            || lookup.MinSearchLength is < 1 or > 10)
+        {
+            throw new InvalidOperationException($"Geçersiz lookup tanımı: '{lookup.Key}' ({module.Key}).");
+        }
+    }
 
     // Anahtarlar modülün; değer anahtarı harfle başlar (kayıtta ve süzgeçte metin olarak durur). Kategori varsa her
     // değer bilinen bir kategoriye bağlıdır ve her kategoride en az bir hazır değer vardır.

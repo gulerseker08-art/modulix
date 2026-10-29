@@ -293,6 +293,42 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                     b.ToTable("ChoiceLists", "meta");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Lookups.TenantLookupSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LookupKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool?>("Searchable")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "LookupKey")
+                        .IsUnique();
+
+                    b.ToTable("LookupSettings", "meta");
+                });
+
             modelBuilder.Entity("Modulix.Core.Organization.Branch", b =>
                 {
                     b.Property<Guid>("Id")

@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
 using Modulix.Core.Customization;
+using Modulix.Core.Lookups;
 using Modulix.Core.Teams;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
@@ -56,6 +57,8 @@ public class ModulixDbContext(
     public DbSet<CustomField> CustomFields => Set<CustomField>();
 
     public DbSet<TenantChoiceList> ChoiceLists => Set<TenantChoiceList>();
+
+    public DbSet<TenantLookupSetting> LookupSettings => Set<TenantLookupSetting>();
 
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
