@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Api.Access;
 using Modulix.Api.Records;
+using Modulix.Api.Users;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -88,15 +89,29 @@ internal static class QuoteSharingEndpoints
             return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(CrmModule.Permissions.QuotesRead);
 
-        quotes.MapGet("/{id:guid}/share-links", async (Guid id, IQuoteSharing sharing, CancellationToken ct) =>
+        // Listeleme e-posta durumunu kuyruktan okur ve teklifin gönderim durumunu buna eşitler (arka plan işleyicisi tenant DB'sine yazmaz).
+        quotes.MapGet("/{id:guid}/share-links", async (Guid id, IQuoteSharing sharing, QuoteDelivery delivery, CancellationToken ct) =>
         {
             var result = await sharing.ListLinksAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordEndpoints.ToProblem(result.Error!);
+            if (!result.IsSuccess)
+            {
+                return RecordEndpoints.ToProblem(result.Error!);
+            }
+
+            var states = await SyncDeliveryAsync(id, result.Value!, delivery, sharing, ct);
+            return Results.Ok(result.Value!.Select(l => ToDto(l, states.GetValueOrDefault(l.Id))).ToList());
         }).RequirePermission(CrmModule.Permissions.QuotesRead);
 
         quotes.MapPost("/{id:guid}/share-links", async (Guid id, CreateQuoteShareLinkRequest request, QuoteDocumentService documents, IQuoteSharing sharing,
-            IServiceProvider services, CancellationToken ct) =>
+            QuoteDelivery delivery, IRecordPipeline pipeline, ILogger<QuoteDelivery> log, HttpContext http, CancellationToken ct) =>
         {
+            // E-posta isteniyorsa alıcı adresi zorunludur; bağlantı oluşmadan reddedilir.
+            if (request.SendEmail && string.IsNullOrWhiteSpace(request.RecipientEmail))
+            {
+                var message = "E-posta göndermek için alıcı e-postası girin.";
+                return RecordEndpoints.ToProblem(new RecordError(RecordErrorCode.ValidationFailed, message, [new RecordFieldError("recipientEmail", message)]));
+            }
+
             // Belge henüz yoksa (ör. sunum sırasında üretilemediyse) bağlantıdan önce üretilir.
             var document = await documents.EnsureAsync(id, ct);
             if (!document.IsSuccess)
@@ -111,8 +126,34 @@ internal static class QuoteSharingEndpoints
             }
 
             var slug = await documents.TenantSlugAsync(ct);
-            return Results.Created($"/api/crm/quotes/{id}/share-links",
-                new QuoteShareLinkCreatedDto(ToDto(result.Value!.Link), result.Value.Token, $"teklif/{slug}#t={result.Value.Token}"));
+            var path = $"teklif/{slug}#t={result.Value!.Token}";
+            QuoteLinkDelivery? state = null;
+            if (request.SendEmail)
+            {
+                // Bağlantı oluştu; e-posta kuyruğa yazılamazsa durum dürüstçe "Failed" gösterilir (bağlantı yine de elle iletilebilir).
+                try
+                {
+                    var quote = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Quote, id), ct);
+                    var dto = CrmEndpoints.ToDto<QuoteDto>(quote.Value!);
+                    delivery.Enqueue(result.Value.Link.Id, request.RecipientEmail!.Trim(), request.RecipientName, (await documents.SellerNameAsync(ct)),
+                        dto.QuoteNumber, dto.Title, dto.ValidUntil, $"{PublicUrl.Resolve(http)}/{path}");
+                    state = (await delivery.GetAsync([result.Value.Link.Id], ct)).GetValueOrDefault(result.Value.Link.Id)
+                        ?? new QuoteLinkDelivery(QuoteDeliveryStatus.Pending, null, null);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    log.LogWarning(exception, "Teklif {QuoteId} bağlantı e-postası kuyruğa yazılamadı.", id);
+                    state = new QuoteLinkDelivery(QuoteDeliveryStatus.Failed, "E-posta kuyruğa yazılamadı.", null);
+                }
+
+                var all = await sharing.ListLinksAsync(id, ct);
+                if (all.IsSuccess)
+                {
+                    await SyncDeliveryAsync(id, all.Value!, delivery, sharing, ct, (result.Value.Link.Id, state));
+                }
+            }
+
+            return Results.Created($"/api/crm/quotes/{id}/share-links", new QuoteShareLinkCreatedDto(ToDto(result.Value.Link, state), result.Value.Token, path));
         }).RequirePermission(CrmModule.Permissions.QuotesRead);
 
         quotes.MapPost("/{id:guid}/share-links/{linkId:guid}/revoke", async (Guid id, Guid linkId, RevokeQuoteShareLinkRequest request, IQuoteSharing sharing, CancellationToken ct) =>
@@ -253,8 +294,28 @@ internal static class QuoteSharingEndpoints
 
     private static QuoteDocumentDto ToDto(QuoteDocumentInfo d) => new(d.Id, d.RevisionNo, d.FileName, d.SizeBytes, d.Sha256, d.TemplateVersion, d.CreatedAt);
 
-    private static QuoteShareLinkDto ToDto(QuoteShareLinkInfo l) => new(
-        l.Id, l.DocumentId, l.TokenHint, l.RecipientName, l.RecipientEmail, l.ExpiresAt, l.RevokedAt, l.RevokeReason, l.FirstViewedAt, l.CreatedAt, l.State);
+    private static QuoteShareLinkDto ToDto(QuoteShareLinkInfo l, QuoteLinkDelivery? delivery = null) => new(
+        l.Id, l.DocumentId, l.TokenHint, l.RecipientName, l.RecipientEmail, l.ExpiresAt, l.RevokedAt, l.RevokeReason, l.FirstViewedAt, l.CreatedAt, l.State,
+        delivery?.Status ?? QuoteDeliveryStatus.NotSent, delivery?.Error, delivery?.ProviderAcceptedAt);
+
+    /// <summary>
+    /// Bağlantıların e-posta durumunu kuyruktan okur ve teklifin gönderim durumunu (e-postası olan en son bağlantının durumu) başlığa işler.
+    /// Başlık yazımı başarısız olsa da liste dönebilir; durum bir sonraki okumada yeniden eşitlenir.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<Guid, QuoteLinkDelivery>> SyncDeliveryAsync(
+        Guid quoteId, IReadOnlyList<QuoteShareLinkInfo> links, QuoteDelivery delivery, IQuoteSharing sharing, CancellationToken ct,
+        (Guid LinkId, QuoteLinkDelivery? State)? known = null)
+    {
+        var states = (await delivery.GetAsync(links.Select(l => l.Id), ct)).ToDictionary(p => p.Key, p => p.Value);
+        if (known is { State: { } state })
+        {
+            states[known.Value.LinkId] = state;
+        }
+
+        var overall = QuoteDelivery.Overall(links.Select(l => (l.CreatedAt, states.GetValueOrDefault(l.Id))));
+        await sharing.SetDeliveryStatusAsync(quoteId, overall, $"Gönderim durumu: {QuoteDelivery.Label(overall)}", ct);
+        return states;
+    }
 
     /// <summary>Belge verisi ile herkese açık sözleşmenin alan adları aynıdır; JSON üzerinden eşlenir (test ile korunur).</summary>
     private static PublicQuoteView ToDto(QuotePortalView v)
@@ -301,6 +362,12 @@ internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvid
     {
         var id = tenant.Current?.TenantId ?? Guid.Empty;
         return await platform.Tenants.AsNoTracking().Where(t => t.Id == id).Select(t => t.Slug).FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+    }
+
+    public async Task<string> SellerNameAsync(CancellationToken cancellationToken)
+    {
+        var name = (await SellerAsync(cancellationToken)).Name;
+        return name.Length > 100 ? name[..100] : name;
     }
 
     private async Task<QuoteSellerInfo> SellerAsync(CancellationToken cancellationToken)

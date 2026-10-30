@@ -64,6 +64,12 @@ public interface IQuoteSharing
     Task<RecordResult<QuoteShareLinkInfo>> RevokeLinkAsync(Guid quoteId, Guid linkId, string reason, CancellationToken cancellationToken);
 
     Task<RecordResult<IReadOnlyList<QuoteDecisionInfo>>> DecisionsAsync(Guid quoteId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gönderim durumunu teklif başlığına işler (<see cref="QuoteDeliveryStatus"/>). Durum e-posta kuyruğundan okunur; <c>Succeeded</c> yalnızca
+    /// sağlayıcının (SMTP sunucusunun) kabul ettiği anlamına gelir, alıcıya ulaştığı anlamına gelmez. Değişmediyse yazmaz.
+    /// </summary>
+    Task<RecordResult<string>> SetDeliveryStatusAsync(Guid quoteId, string status, string? note, CancellationToken cancellationToken);
 }
 
 // ---- Müşteri portalı (oturumsuz; kimlik doğrulama = bağlantı belirtecine sahip olmak)

@@ -98,6 +98,7 @@ public static class QuoteLabels
         "Cancelled" => "İptal edildi",
         "Superseded" => "Yeni revizyonla geçersizleşti",
         "DocumentGenerated" => "Müşteri belgesi (PDF) sabitlendi",
+        "DeliveryUpdated" => "Gönderim durumu güncellendi",
         "ShareLinkCreated" => "Paylaşım bağlantısı oluşturuldu",
         "ShareLinkRevoked" => "Paylaşım bağlantısı iptal edildi",
         "CustomerViewed" => "Müşteri ilk kez görüntüledi",

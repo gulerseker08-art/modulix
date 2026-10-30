@@ -4,10 +4,14 @@ namespace Modulix.Shared.Crm;
 
 public sealed record QuoteDocumentDto(Guid Id, int RevisionNo, string FileName, int SizeBytes, string Sha256, int TemplateVersion, DateTimeOffset CreatedAt);
 
-/// <summary>Bağlantı durumu <c>State</c>: Active, Expired ya da Revoked. Ham belirteç burada yoktur; yalnızca oluşturma yanıtında döner.</summary>
+/// <summary>
+/// Bağlantı durumu <c>State</c>: Active, Expired ya da Revoked. E-posta durumu <c>DeliveryStatus</c>: NotSent, Pending (kuyrukta), Processing (deneniyor),
+/// Succeeded (sağlayıcı kabul etti; alıcıya ulaştığı anlamına gelmez) ya da Failed. Ham belirteç burada yoktur; yalnızca oluşturma yanıtında döner.
+/// </summary>
 public sealed record QuoteShareLinkDto(
     Guid Id, Guid DocumentId, string TokenHint, string? RecipientName, string? RecipientEmail, DateTimeOffset ExpiresAt, DateTimeOffset? RevokedAt,
-    string? RevokeReason, DateTimeOffset? FirstViewedAt, DateTimeOffset CreatedAt, string State);
+    string? RevokeReason, DateTimeOffset? FirstViewedAt, DateTimeOffset CreatedAt, string State,
+    string DeliveryStatus = "NotSent", string? DeliveryError = null, DateTimeOffset? ProviderAcceptedAt = null);
 
 /// <summary>
 /// Oluşturma yanıtı. <see cref="Path"/> müşteri sayfasının yoludur ve belirteci URL parçasında (#) taşır; parça tarayıcıdan sunucuya
@@ -15,7 +19,7 @@ public sealed record QuoteShareLinkDto(
 /// </summary>
 public sealed record QuoteShareLinkCreatedDto(QuoteShareLinkDto Link, string Token, string Path);
 
-public sealed record CreateQuoteShareLinkRequest(Guid? DocumentId = null, int? ValidDays = null, string? RecipientName = null, string? RecipientEmail = null);
+public sealed record CreateQuoteShareLinkRequest(Guid? DocumentId = null, int? ValidDays = null, string? RecipientName = null, string? RecipientEmail = null, bool SendEmail = false);
 
 public sealed record RevokeQuoteShareLinkRequest(string Reason);
 

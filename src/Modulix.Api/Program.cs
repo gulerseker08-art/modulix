@@ -56,6 +56,7 @@ builder.Services.AddModulixRecords();
 builder.Services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyProvider, Modulix.Api.Crm.OpportunityPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modulix.Api.Crm.QuotePolicyProvider>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDocumentService>();
+builder.Services.AddScoped<Modulix.Api.Crm.QuoteDelivery>();
 
 // E-posta: kuyruk + arka plan gönderici. Ayarlar "Email" bölümünde; SMTP şifresi user-secrets veya ortam değişkeninde.
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));

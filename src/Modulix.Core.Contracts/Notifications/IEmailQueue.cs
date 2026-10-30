@@ -10,6 +10,12 @@ public sealed record EmailMessage(string To, string Subject, string HtmlBody)
     public string? ToName { get; init; }
 
     public string? TextBody { get; init; }
+
+    /// <summary>
+    /// Gönderimi izlemek için çağıranın verdiği anahtar (ör. "crm.quote-link:{id}", en çok 100 karakter). Kuyruk satırında saklanır; çağıran bununla
+    /// gönderim durumunu sorgular. Alıcıya görünmez, içerik değildir.
+    /// </summary>
+    public string? Reference { get; init; }
 }
 
 /// <summary>

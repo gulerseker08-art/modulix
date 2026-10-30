@@ -17,7 +17,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Platform
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -221,6 +221,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Platform
                     b.Property<DateTimeOffset>("NextAttemptAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<DateTimeOffset?>("SentAt")
                         .HasColumnType("datetimeoffset");
 
@@ -252,6 +256,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Platform
                     b.HasIndex("Status", "NextAttemptAt");
 
                     b.HasIndex("TenantId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "Reference");
 
                     b.ToTable("EmailMessages", "platform");
                 });
