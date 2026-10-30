@@ -266,6 +266,10 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         if (workflow && !isNew && gate.EventKind is { } kind && original is not null)
         {
             QuoteHistory.Add(Context, entity, kind, original.Status, entity.Status, gate.Reason);
+            if (gate.Effect is { } effect)
+            {
+                await effect(Context, entity, cancellationToken);
+            }
         }
 
         // Ticari değişiklik bekleyen/verilmiş iç onayı geçersiz kılar; onay belirli içeriğe bağlıdır.

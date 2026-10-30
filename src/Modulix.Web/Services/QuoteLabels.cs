@@ -97,6 +97,12 @@ public static class QuoteLabels
         "Rejected" => "Ret kaydedildi",
         "Cancelled" => "İptal edildi",
         "Superseded" => "Yeni revizyonla geçersizleşti",
+        "DocumentGenerated" => "Müşteri belgesi (PDF) sabitlendi",
+        "ShareLinkCreated" => "Paylaşım bağlantısı oluşturuldu",
+        "ShareLinkRevoked" => "Paylaşım bağlantısı iptal edildi",
+        "CustomerViewed" => "Müşteri ilk kez görüntüledi",
+        "CustomerAccepted" => "Müşteri kabul etti",
+        "CustomerRejected" => "Müşteri reddetti",
         _ => kind,
     };
 

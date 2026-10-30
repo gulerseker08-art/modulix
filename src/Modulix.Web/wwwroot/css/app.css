@@ -2076,3 +2076,72 @@ section[aria-labelledby] > h2 {
     margin-top: .75rem;
     padding-left: 1.1rem;
 }
+
+/* Teklif paylaşımı ve oturumsuz müşteri sayfası (ADR-0019, dilim 3) */
+.quote-sharing .share-url {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: .5rem;
+}
+
+.quote-sharing .share-url input {
+    flex: 1 1 18rem;
+    min-width: 0;
+}
+
+.public-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bs-body-bg, #fff);
+}
+
+.public-content {
+    flex: 1;
+    width: 100%;
+    max-width: 56rem;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 3rem;
+}
+
+.public-footer {
+    text-align: center;
+    font-size: .8rem;
+    padding: 1rem;
+}
+
+.public-quote-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.public-seller {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-bottom: .25rem;
+}
+
+.public-totals {
+    max-width: 22rem;
+    margin-left: auto;
+}
+
+.public-totals .total dt,
+.public-totals .total dd {
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.public-decision {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(0, 0, 0, .15);
+}
+
+.preline {
+    white-space: pre-line;
+}

@@ -1,0 +1,288 @@
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+@* Sunulmuş teklifin müşteri belgesi (PDF), paylaşım bağlantıları ve müşterinin kararı (ADR-0019). Her şey sunucudan gelir; maliyet/iç not yoktur. *@
+<section aria-labelledby="share-title" class="quote-sharing">
+    <h2 id="share-title">Müşteri belgesi ve paylaşım</h2>
+    <Notice Text="@notice" Failed="@noticeFailed" />
+
+    @if (!loaded)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else
+    {
+        <h3 class="h6">Belge (PDF)</h3>
+        @if (documents.Count == 0)
+        {
+            <p class="text-muted">Bu teklif için henüz müşteri belgesi üretilmemiş.</p>
+            @if (CanShare && Quote.Status == "Presented")
+            {
+                <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="GenerateAsync">Belgeyi üret</button>
+            }
+        }
+        else
+        {
+            <ul class="summary-list">
+                @foreach (var document in documents)
+                {
+                    <li>
+                        <a href="api/crm/quotes/@Quote.Id/documents/@document.Id/file" download="@document.FileName">@document.FileName</a>
+                        <span class="text-muted">@(document.SizeBytes / 1024) KB · @CrmLabels.Time(document.CreatedAt) · şablon v@(document.TemplateVersion)</span>
+                        <div class="small text-muted">SHA-256: <code title="@document.Sha256">@document.Sha256[..16]…@document.Sha256[^8..]</code></div>
+                    </li>
+                }
+            </ul>
+            <p class="small text-muted">Belge sunum anında sabitlenir; sonradan firma kartı ya da katalog değişse de müşterinin gördüğü belge aynı kalır.</p>
+        }
+
+        @if (CanShare)
+        {
+            <h3 class="h6">Paylaşım bağlantıları</h3>
+            @if (created is not null)
+            {
+                <div class="alert alert-success" role="status">
+                    <strong>Bağlantı oluşturuldu.</strong> Bu bağlantı <strong>bir daha gösterilmez</strong>; şimdi kopyalayın.
+                    <div class="share-url">
+                        <label class="visually-hidden" for="share-url">Müşteri bağlantısı</label>
+                        <input id="share-url" class="form-control" readonly value="@FullUrl(created)" />
+                        <button type="button" class="btn btn-outline-primary" @onclick="() => CopyAsync(created)">Kopyala</button>
+                        <button type="button" class="btn btn-link" @onclick="() => created = null">Kapat</button>
+                    </div>
+                    <div class="small text-muted">Belirteç adres çubuğunda # işaretinden sonra durur; sunucu günlüklerine ve yönlendiren başlığına girmez.</div>
+                </div>
+            }
+
+            @if (links.Count == 0)
+            {
+                <p class="text-muted">Henüz bağlantı oluşturulmadı.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Paylaşım bağlantıları</caption>
+                    <thead>
+                        <tr><th scope="col">Alıcı</th><th scope="col">Durum</th><th scope="col">Bitiş</th><th scope="col">İlk görüntüleme</th><th scope="col">Bağlantı</th><th scope="col">İşlem</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var link in links)
+                        {
+                            <tr>
+                                <td data-label="Alıcı" class="primary">@(link.RecipientName ?? "—")@if (link.RecipientEmail is not null) { <small class="text-muted"> @link.RecipientEmail</small> }</td>
+                                <td data-label="Durum"><span class="badge stage-@(link.State == "Active" ? "qualified" : "cancelled")">@LinkState(link.State)</span>
+                                    @if (link.RevokeReason is not null) { <div class="small text-muted">@link.RevokeReason</div> }</td>
+                                <td data-label="Bitiş">@CrmLabels.Time(link.ExpiresAt)</td>
+                                <td data-label="İlk görüntüleme">@(link.FirstViewedAt is { } viewed ? CrmLabels.Time(viewed) : "Henüz açılmadı")</td>
+                                <td data-label="Bağlantı"><code>…@link.TokenHint</code></td>
+                                <td class="actions">
+                                    @if (link.State == "Active")
+                                    {
+                                        @if (revoking == link.Id)
+                                        {
+                                            <form @onsubmit="() => RevokeAsync(link)" @onsubmit:preventDefault>
+                                                <label class="visually-hidden" for="revoke-@link.Id">İptal gerekçesi</label>
+                                                <input id="revoke-@link.Id" class="form-control form-control-sm" maxlength="500" placeholder="İptal gerekçesi (zorunlu)" @bind="revokeReason" />
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" disabled="@busy">İptal et</button>
+                                                <button type="button" class="btn btn-link btn-sm" @onclick="() => revoking = null">Vazgeç</button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => StartRevoke(link)">Bağlantıyı iptal et</button>
+                                        }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (Quote.Status == "Presented")
+            {
+                <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+                    <h4 class="h6">Yeni bağlantı</h4>
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label" for="share-name">Alıcı adı</label>
+                            <input id="share-name" class="form-control" maxlength="200" @bind="recipientName" />
+                            <FieldError Errors="@errors" Field="recipientName" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="share-email">Alıcı e-postası</label>
+                            <input id="share-email" class="form-control" type="email" maxlength="254" @bind="recipientEmail" />
+                            <FieldError Errors="@errors" Field="recipientEmail" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="share-days">Geçerlilik (gün)</label>
+                            <input id="share-days" class="form-control" type="number" min="1" max="180" placeholder="Otomatik" @bind="validDays" />
+                            <FieldError Errors="@errors" Field="validDays" />
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" disabled="@busy">Bağlantı oluştur</button>
+                    </div>
+                    <p class="small text-muted">Bağlantı yalnızca bu sürümün sabit belgesini gösterir. E-posta gönderimi bu sürümde yapılmaz; bağlantıyı kendiniz iletirsiniz.</p>
+                </form>
+            }
+        }
+
+        <h3 class="h6">Müşteri kararı</h3>
+        @if (decisions.Count == 0)
+        {
+            <p class="text-muted">Müşteri henüz karar vermedi.</p>
+        }
+        else
+        {
+            <ul class="summary-list">
+                @foreach (var decision in decisions)
+                {
+                    <li>
+                        <strong>@(decision.Decision == "Accepted" ? "Kabul etti" : "Reddetti")</strong>
+                        — @decision.SignerName@(decision.SignerTitle is null ? string.Empty : $", {decision.SignerTitle}")
+                        <span class="text-muted">· @CrmLabels.Time(decision.At)@(decision.SignerEmail is null ? string.Empty : $" · {decision.SignerEmail}")</span>
+                        @if (decision.Reason is not null) { <div class="small">Gerekçe: @decision.Reason</div> }
+                        @if (decision.TermsStatement is not null) { <div class="small text-muted">Onaylanan metin: “@decision.TermsStatement”</div> }
+                        <div class="small text-muted">Belge özeti <code>@decision.DocumentSha256[..12]…</code>@(decision.ClientAddressMasked is null ? string.Empty : $" · istemci {decision.ClientAddressMasked}")</div>
+                    </li>
+                }
+            </ul>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public QuoteDto Quote { get; set; } = default!;
+
+    /// <summary>Panel teklifin kendisini değiştiren bir işlem yaptığında (belge üretimi tarihçeye satır ekler) üst sayfanın yenilenmesi için.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private List<QuoteDocumentDto> documents = [];
+    private List<QuoteShareLinkDto> links = [];
+    private List<QuoteDecisionDto> decisions = [];
+    private QuoteShareLinkCreatedDto? created;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? notice;
+    private bool noticeFailed;
+    private bool loaded;
+    private bool busy;
+    private Guid? revoking;
+    private string revokeReason = string.Empty;
+    private string? recipientName;
+    private string? recipientEmail;
+    private int? validDays;
+    private Guid loadedFor;
+
+    private bool CanShare => Session.Can(CrmAccess.QuotesShare);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Quote.Id && loaded)
+        {
+            return;
+        }
+
+        loadedFor = Quote.Id;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        documents = (await Api.GetAsync<List<QuoteDocumentDto>>($"/api/crm/quotes/{Quote.Id}/documents")).Value ?? [];
+        decisions = (await Api.GetAsync<List<QuoteDecisionDto>>($"/api/crm/quotes/{Quote.Id}/decisions")).Value ?? [];
+        links = CanShare ? (await Api.GetAsync<List<QuoteShareLinkDto>>($"/api/crm/quotes/{Quote.Id}/share-links")).Value ?? [] : [];
+        loaded = true;
+    }
+
+    private async Task GenerateAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        var result = await Api.PostAsync<QuoteDocumentDto>($"/api/crm/quotes/{Quote.Id}/documents", new { });
+        busy = false;
+        Notify(result.IsSuccess ? "Müşteri belgesi üretildi." : result.Error, !result.IsSuccess);
+        await LoadAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task CreateAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        errors = null;
+        var result = await Api.PostAsync<QuoteShareLinkCreatedDto>($"/api/crm/quotes/{Quote.Id}/share-links",
+            new CreateQuoteShareLinkRequest(null, validDays, Blank(recipientName), Blank(recipientEmail)));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            created = result.Value;
+            recipientName = recipientEmail = null;
+            validDays = null;
+            Notify(null);
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        Notify(result.Error, failed: true);
+    }
+
+    private void StartRevoke(QuoteShareLinkDto link)
+    {
+        revoking = link.Id;
+        revokeReason = string.Empty;
+    }
+
+    private async Task RevokeAsync(QuoteShareLinkDto link)
+    {
+        if (busy) { return; }
+        if (string.IsNullOrWhiteSpace(revokeReason))
+        {
+            Notify("İptal gerekçesi zorunludur.", failed: true);
+            return;
+        }
+
+        busy = true;
+        var result = await Api.PostAsync<QuoteShareLinkDto>($"/api/crm/quotes/{Quote.Id}/share-links/{link.Id}/revoke", new RevokeQuoteShareLinkRequest(revokeReason.Trim()));
+        busy = false;
+        Notify(result.IsSuccess ? "Bağlantı iptal edildi; müşteri artık bu bağlantıyla teklifi göremez." : result.Error, !result.IsSuccess);
+        revoking = null;
+        await LoadAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private string FullUrl(QuoteShareLinkCreatedDto link) => Navigation.ToAbsoluteUri(link.Path).ToString();
+
+    private async Task CopyAsync(QuoteShareLinkCreatedDto link)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", FullUrl(link));
+            Notify("Bağlantı panoya kopyalandı.");
+        }
+        catch (JSException)
+        {
+            Notify("Pano erişimi engellendi; bağlantıyı alanı seçip elle kopyalayın.", failed: true);
+        }
+    }
+
+    private static string LinkState(string state) => state switch
+    {
+        "Active" => "Etkin",
+        "Expired" => "Süresi doldu",
+        "Revoked" => "İptal edildi",
+        _ => state,
+    };
+
+    private void Notify(string? text, bool failed = false)
+    {
+        notice = text;
+        noticeFailed = failed;
+    }
+
+    private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+}

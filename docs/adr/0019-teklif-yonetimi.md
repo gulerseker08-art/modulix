@@ -1,6 +1,6 @@
 # ADR-0019: Teklif yönetimi (M1.5) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (çekirdek, sunucu yaşam döngüsü ve ilk ekranlar; PDF/paylaşım/kabul sayfası yok). Tarih: 2026-10-29.
+Durum: Kısmen uygulandı (çekirdek, sunucu yaşam döngüsü, ekranlar, PDF, paylaşım bağlantısı ve müşteri kabul sayfası). Tarih: 2026-10-30.
 
 ## Mevcut durum (analiz anında, kodla kanıtlı; güncel durum en alttaki "Uygulama durumu"nda)
 
@@ -16,7 +16,7 @@ Tenant-başına-DB kabulü (ADR-0009) kodla uyumludur: yeni tablolar `ModulixDbC
 | Veri modeli | Yok | Snapshot, sürüm, aile, RowVersion | `Quote`, `QuoteLine`, onay/gönderim/kabul tabloları, migration + RLS | P0 | — | **Yapılmadı** |
 | Revizyon / eşzamanlılık | Yok | Aynı ailede çelişen kabul | Aile başına tek kabul (filtreli benzersiz indeks) | P0 | Veri modeli | **Yapılmadı** |
 | İç onay | Genel onay altyapısı yok (ADR-0018) | Eşik/kural yönetimi | Kural + istek tabloları | P1 | Veri modeli | **Yapılmadı** |
-| PDF, paylaşım, müşteri kabulü | PDF/dosya altyapısı doğrulanamadı | Belirteç, hız sınırı, hash | Ayrı dilim | P1 | Veri modeli | **Yapılmadı** |
+| PDF, paylaşım, müşteri kabulü | PDF/dosya altyapısı doğrulanamadı | Belirteç, hız sınırı, hash | Üçüncü dilim (aşağıda) | P1 | Veri modeli | **Uygulandı** (gönderim adaptörü hariç) |
 | Ekranlar (liste, düzenleme, detay, onay merkezi, karşılaştırma, müşteri sayfası, ayarlar, rapor) | Yok | — | `Pages/Crm/Quote*.razor` | P1 | API | **Yapılmadı** |
 | Sipariş/sözleşme dönüşümü | Hedef modül yok | Sahte entegrasyon riski | Yalnızca entegrasyon sözleşmesi | P2 | Teklif kabulü | **Yapılmadı** |
 
@@ -57,4 +57,22 @@ Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları
 | Tenant | Başka tenant'ın teklif/kalem/tarihçesi 404; başka tenant'ın firmasıyla teklif açılamaz. |
 | Ekranlar | `Teklifler` (hızlı görünümler, süzgeçler, sayfalama, aile bazlı görünüm), teklif formu + kalem editörü + işlem çubuğu + tarihçe + revizyon listesi, `Teklif onayları`. Derleme doğrulandı; **tarayıcıda uçtan uca gezilmedi** (bkz. rapor). |
 
-**Hâlâ yapılmadı:** PDF üretimi/hash/şablon, paylaşım bağlantısı (belirteç, hız sınırı) ve müşteri kabul/ret sayfası, gönderim adaptörü ve durumları, revizyon karşılaştırma ekranı, onay kuralı yönetimi (eşik dışı kurallar, sıralı/paralel onay, vekâlet, hatırlatma, kural sürümü kaydı), kur sabitleme ekranı, sipariş/sözleşme dönüşümü (hedef modül yok; yalnızca sözleşme), fırsat entegrasyonları (kabulde kazanma politikası, birincil teklif), aktivite entegrasyonu (takip görevi, geçerlilik hatırlatması), zamanlanmış süre dolumu işi, yönetim ayarları ekranı, raporlar, dışa aktarma, kayıtlı görünümler. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
+**Hâlâ yapılmadı (üçüncü dilimden sonra güncel liste en altta):** gönderim adaptörü ve durumları, revizyon karşılaştırma ekranı, onay kuralı yönetimi (eşik dışı kurallar, sıralı/paralel onay, vekâlet, hatırlatma, kural sürümü kaydı), kur sabitleme ekranı, sipariş/sözleşme dönüşümü (hedef modül yok; yalnızca sözleşme), fırsat entegrasyonları (kabulde kazanma politikası, birincil teklif), aktivite entegrasyonu (takip görevi, geçerlilik hatırlatması), zamanlanmış süre dolumu işi, yönetim ayarları ekranı, raporlar, dışa aktarma, kayıtlı görünümler. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
+
+## Uygulama durumu (üçüncü dilim: PDF, paylaşım bağlantısı, müşteri kabulü)
+
+**Uygulandı** (`QuoteSharingTests` 10 entegrasyon testi, `QuoteSharingRulesTests` birim testleri; PDF görünümü ve müşteri sayfası tarayıcıda/PNG çıktısında gözle denetlendi):
+
+| Konu | Karar / davranış |
+|---|---|
+| PDF kütüphanesi | **QuestPDF** (kullanıcı seçimi). Community lisansı yıllık geliri 1 milyon USD altındaki şirketlere ve açık kaynağa ücretsizdir; üstü ücretli lisans ister. Lisans uygunluğu ürün sahibinin sorumluluğundadır. |
+| Belge | Teklif sunulunca (`present` uç noktası) sabit belge üretilir: PDF baytları (`varbinary(max)`, tenant DB, RLS), baytların SHA-256 özeti, şablon sürümü ve müşteri sayfasının gösterdiği veri özeti (JSON). Revizyon başına tek belge (benzersiz indeks); eklenir, değiştirilmez. Üretilemezse sunum geri alınmaz; belge `POST /documents` ile ya da ilk bağlantıda üretilir (o durumda firma kartı güncel haliyle okunur). Maliyet ve iç not belgeye hiç girmez. |
+| Paylaşım bağlantısı | 256 bit rastgele belirteç; veritabanında yalnızca SHA-256 özeti, yöneticiye son 4 karakter. Ham belirteç yalnızca oluşturma yanıtında bir kez döner. Süre (varsayılan geçerlilik+7 gün, en çok 180), iptal (gerekçeli), ilk görüntüleme kaydı. Belirteç URL'nin `#` parçasındadır (`/teklif/{firma}#t=...`) ve API'ye gövdede gider: sunucu erişim günlüğüne ve Referer'a girmez. |
+| Müşteri sayfası | Oturumsuz; tenant kısa adından sunucuda çözülür, "crm.quote-customer" sistem kimliğiyle (yalnızca teklif okuma + karar kaydı izinleri) çalışır. Yalnızca belgenin sabit verisini gösterir. Hız sınırı (IP+tenant, karar için daha sıkı), 8 KB gövde sınırı, `no-store`/`no-referrer`/`noindex`, bilinmeyen/bozuk/başka tenant belirteci için tek tip 404. |
+| Kabul/ret | Açık kabul eylemi: ad soyad, onay kutusu ve onay cümlesi (sunucuda üretilir ve karar kaydına yazılır), görülen belgenin özeti (eskiyse reddedilir). Ret gerekçe ister. Karar teklif geçişiyle **aynı işlemde** ve sürüm denetimiyle yazılır; eşzamanlı iki kabulden biri 409 alır. Geçerlilik kabul anında yeniden denetlenir. Kanıt: imzalayan, ünvan, e-posta, belge özeti, onay metni, maskeli istemci adresi, kullanıcı aracısı. |
+| Durumlar | Yeni revizyon sunulunca eski bağlantı yalnızca bilgi mesajı gösterir; iptal/süre dolmuş bağlantı içerik göstermez; kabul/ret sonrası sonuç sayfası. |
+| Yetki | Yeni `crm.quotes.share` (belge üretimi sunum izniyle de yapılır; bağlantı oluşturma/iptal/listeleme yalnızca `share`). Belge okuma ve müşteri kararları `crm.quotes.read`. |
+| Yazma modeli | Belge, bağlantı ve karar teklif toplamının parçasıdır; ayrı kayıt türü değildir. Teklif güncellemesiyle aynı işlemde (`QuoteWorkflowGate.Effect`) yazılırlar: tarihçe satırı ve sürüm denetimi ortaktır. Teklif değerleri değişmediği için kayıt sürümü artmaz. |
+| Ayarlar | `crm.quote.seller-details`, `crm.quote.footer-note` (belge başlığı/alt bilgisi); satıcı adı `core.profile.display-name`. |
+
+**Bu dilimde de yapılmadı (dürüst durum):** e-posta/gönderim adaptörü ve teslim durumları (`DeliveryStatus` hep `NotSent`; bağlantıyı kullanıcı iletir), sunumda belge üretilemezse otomatik yeniden deneme, belge şablonu özelleştirme (logo, çok dilli), müşteri sayfasında revizyon karşılaştırması, görüntüleme sayacı (yalnızca ilk görüntüleme), eşzamanlı belge üretimi yarışının (benzersiz indeks ihlali) entegrasyon testi, kabul sonrası fırsat/sipariş/sözleşme etkileri, klavye-yalnız ve ekran okuyucu geçişinin elle denenmesi. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.

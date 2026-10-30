@@ -398,6 +398,11 @@
                 }
             </section>
 
+            @if (quote.Status != "Draft")
+            {
+                <QuoteSharingPanel Quote="quote" OnChanged="() => LoadAsync(quote.Id)" />
+            }
+
             @if (family.Count > 1)
             {
                 <section aria-labelledby="rev-title">

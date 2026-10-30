@@ -29,6 +29,7 @@ internal static class QuoteEndpoints
         quotes.MapGet("/{id:guid}/history", HistoryAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/{id:guid}/actions", ActionsAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/settings", SettingsAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
+        QuoteSharingEndpoints.MapInternal(quotes);
 
         // Eylem izinleri serviste denetlenir; uç nokta yalnızca okuma iznini ister ki kayıt yoksa 404 dönsün.
         quotes.MapPost("/{id:guid}/submit-for-approval", (Guid id, QuoteTransitionRequest r, IQuoteWorkflow w, CancellationToken ct) =>
@@ -41,8 +42,29 @@ internal static class QuoteEndpoints
             Run(w.RejectApprovalAsync(id, r.Version, r.Reason ?? string.Empty, ct))).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapPost("/{id:guid}/request-changes", (Guid id, QuoteTransitionRequest r, IQuoteWorkflow w, CancellationToken ct) =>
             Run(w.RequestChangesAsync(id, r.Version, r.Reason ?? string.Empty, ct))).RequirePermission(CrmModule.Permissions.QuotesRead);
-        quotes.MapPost("/{id:guid}/present", (Guid id, QuoteTransitionRequest r, IQuoteWorkflow w, CancellationToken ct) =>
-            Run(w.PresentAsync(id, r.Version, ct))).RequirePermission(CrmModule.Permissions.QuotesRead);
+        quotes.MapPost("/{id:guid}/present", async (Guid id, QuoteTransitionRequest r, IQuoteWorkflow w, QuoteDocumentService documents, ILogger<QuoteDocumentService> log, CancellationToken ct) =>
+        {
+            var result = await w.PresentAsync(id, r.Version, ct);
+            if (result.IsSuccess)
+            {
+                // Müşteri belgesi sunum anında sabitlenir (o günkü ünvan/adres/fiyat). Üretilemezse sunum geri alınmaz; belge sonradan
+                // POST /documents ile ya da ilk bağlantı oluşturulurken üretilir.
+                try
+                {
+                    var document = await documents.EnsureAsync(id, ct);
+                    if (!document.IsSuccess)
+                    {
+                        log.LogWarning("Teklif {QuoteId} sunuldu ancak müşteri belgesi üretilemedi: {Error}", id, document.Error!.Message);
+                    }
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    log.LogError(exception, "Teklif {QuoteId} sunuldu ancak müşteri belgesi üretilirken hata oluştu.", id);
+                }
+            }
+
+            return Ok(result);
+        }).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapPost("/{id:guid}/record-accepted", (Guid id, QuoteTransitionRequest r, IQuoteWorkflow w, CancellationToken ct) =>
             Run(w.RecordAcceptedAsync(id, r.Version, r.Reason, ct))).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapPost("/{id:guid}/record-rejected", (Guid id, QuoteTransitionRequest r, IQuoteWorkflow w, CancellationToken ct) =>
