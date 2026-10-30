@@ -51,6 +51,7 @@ internal static class QuoteEndpoints
         }).RequirePermission(CrmModule.Permissions.OpportunitiesRead);
 
         quotes.MapGet("/report", ReportAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
+        quotes.MapGet("/margin-report", MarginReportAsync).RequirePermission(CrmModule.Permissions.QuoteCostsRead);
         quotes.MapGet("/export", ExportAsync).RequirePermission(CrmModule.Permissions.QuotesExport);
 
         // Eylem izinleri serviste denetlenir; uç nokta yalnızca okuma iznini ister ki kayıt yoksa 404 dönsün.
@@ -166,6 +167,15 @@ internal static class QuoteEndpoints
         var result = await report.BuildAsync(new QuoteReportQuery(from ?? new DateOnly(today.Year, today.Month, 1), to ?? today, ownerId), ct);
         return result.IsSuccess
             ? Results.Ok(JsonSerializer.Deserialize<QuoteReportDto>(JsonSerializer.Serialize(result.Value, JsonSerializerOptions.Web), JsonSerializerOptions.Web))
+            : RecordEndpoints.ToProblem(result.Error!);
+    }
+
+    private static async Task<IResult> MarginReportAsync(DateOnly? from, DateOnly? to, Guid? ownerId, IQuoteReport report, TimeProvider time, CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        var result = await report.BuildMarginAsync(new QuoteReportQuery(from ?? new DateOnly(today.Year, today.Month, 1), to ?? today, ownerId), ct);
+        return result.IsSuccess
+            ? Results.Ok(JsonSerializer.Deserialize<QuoteMarginReportDto>(JsonSerializer.Serialize(result.Value, JsonSerializerOptions.Web), JsonSerializerOptions.Web))
             : RecordEndpoints.ToProblem(result.Error!);
     }
 

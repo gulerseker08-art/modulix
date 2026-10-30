@@ -1,6 +1,9 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
+using Modulix.Modules.Crm.Domain;
+using Modulix.Modules.Crm.Records;
 
 namespace Modulix.Modules.Crm.Quotes;
 
@@ -39,9 +42,24 @@ public sealed record QuoteReportResult(
     IReadOnlyList<QuoteReportItem> NotDelivered,
     IReadOnlyList<string> Definitions);
 
+
+// Marj raporu sonucu (dilim 11). Yalnızca crm.quote-costs.read ile okunur; alan adları Shared'daki QuoteMarginReportDto ile aynıdır.
+public sealed record QuoteMarginTotal(string Currency, int Count, decimal Net, decimal Cost, decimal Margin, double? MarginPercent, int LinesWithoutCost);
+
+public sealed record QuoteMarginOwner(Guid? OwnerId, IReadOnlyList<QuoteMarginTotal> Totals);
+
+public sealed record QuoteMarginItem(Guid Id, string QuoteNumber, int RevisionNo, string Title, Guid? OwnerId, string Status, string Currency, decimal Net, decimal Cost, decimal Margin, double? MarginPercent, int LinesWithoutCost);
+
+public sealed record QuoteMarginReportResult(
+    DateOnly From, DateOnly To, bool Truncated, IReadOnlyList<QuoteMarginTotal> PresentedTotals, IReadOnlyList<QuoteMarginTotal> AcceptedTotals,
+    IReadOnlyList<QuoteMarginOwner> ByOwner, IReadOnlyList<QuoteMarginItem> LowestMargin, IReadOnlyList<QuoteMarginItem> MissingCost, IReadOnlyList<string> Definitions);
+
 public interface IQuoteReport
 {
     Task<RecordResult<QuoteReportResult>> BuildAsync(QuoteReportQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Marj raporu: yalnızca kalem maliyetini görme izni olan kullanıcıya; izinsiz çağırana PermissionDenied.</summary>
+    Task<RecordResult<QuoteMarginReportResult>> BuildMarginAsync(QuoteReportQuery query, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -49,7 +67,7 @@ public interface IQuoteReport
 /// toplamda yer almaz. Rapor yalnızca ailelerin <b>son revizyonunu</b> sayar. Para birimleri toplanmaz (her toplam para birimi bazındadır).
 /// Kalem maliyeti ve iç not rapora hiç girmez (marj raporu yoktur). Hesap bugünkü kayıt değerlerindendir; geçmiş dönem anlık görüntüsü yoktur.
 /// </summary>
-internal sealed class QuoteReport(IRecordPipeline pipeline, TimeProvider time) : IQuoteReport
+internal sealed class QuoteReport(IRecordPipeline pipeline, TimeProvider time, QuoteReader reader, ICurrentAccess access) : IQuoteReport
 {
     /// <summary>Bir okumada en fazla teklif (her okuma için ayrı).</summary>
     public const int MaxRows = 5000;
@@ -131,6 +149,69 @@ internal sealed class QuoteReport(IRecordPipeline pipeline, TimeProvider time) :
             Definitions);
         return RecordResult<QuoteReportResult>.Ok(result);
     }
+
+    public static IReadOnlyList<string> MarginDefinitions { get; } =
+    [
+        "Marj raporu yalnızca kalem maliyetini görme izni (crm.quote-costs.read) olan kullanıcıya açıktır; diğer raporlara maliyet girmez.",
+        "Maliyet = Σ(miktar × birim maliyet), yalnızca ana toplama giren kalemler. Marj = net toplam − maliyet; marj % = marj / net toplam.",
+        "Maliyeti girilmemiş kalem maliyete 0 olarak girmez: o kalem \"maliyeti bilinmeyen\" sayılır ve teklifin marjı eksik maliyetle hesaplanmış olabilir; adedi ayrıca bildirilir.",
+        "Dönem ve kapsam teklif raporuyla aynıdır: ailelerin son revizyonu, sunum tarihi dönemde olanlar (ve karar tarihi dönemde olan kabuller). Para birimleri toplanmaz.",
+        "Maliyet, teklif kalemine kopyalandığı andaki değerdir; katalog maliyeti sonradan değişse de rapor teklifteki değeri kullanır.",
+    ];
+
+    public async Task<RecordResult<QuoteMarginReportResult>> BuildMarginAsync(QuoteReportQuery query, CancellationToken cancellationToken)
+    {
+        if (!await access.HasPermissionAsync(CrmModule.Permissions.QuoteCostsRead, cancellationToken))
+        {
+            return RecordResult<QuoteMarginReportResult>.Fail(RecordErrorCode.PermissionDenied, $"Bu rapor için '{CrmModule.Permissions.QuoteCostsRead}' izni gerekir.");
+        }
+
+        if (query.To < query.From)
+        {
+            return RecordResult<QuoteMarginReportResult>.Fail(RecordErrorCode.ValidationFailed, "Bitiş tarihi başlangıçtan önce olamaz.",
+                [new RecordFieldError("to", "Bitiş tarihi başlangıçtan önce olamaz.")]);
+        }
+
+        var owner = query.OwnerId is { } id ? new Dictionary<string, string> { ["ownerId"] = id.ToString() } : [];
+        var presented = await ReadAsync(Merge(owner, "latestOnly", "true", "presentedFrom", Iso(query.From), "presentedTo", Iso(query.To)), cancellationToken);
+        var decided = await ReadAsync(Merge(owner, "latestOnly", "true", "status", "Accepted", "decidedFrom", Iso(query.From), "decidedTo", Iso(query.To)), cancellationToken);
+        if ((presented.Error ?? decided.Error) is { } error)
+        {
+            return RecordResult<QuoteMarginReportResult>.Fail(error.Code, error.Message, error.FieldErrors);
+        }
+
+        var rows = presented.Rows.Concat(decided.Rows).GroupBy(r => r.Id).Select(g => g.First()).ToList();
+        var lines = (await reader.LinesForQuotesAsync([.. rows.Select(r => r.Id)], cancellationToken)).Where(l => l.Included).ToLookup(l => l.QuoteId);
+        var items = rows.Select(r =>
+        {
+            var quoteLines = lines[r.Id].ToList();
+            var cost = quoteLines.Where(l => l.UnitCost is not null).Sum(l => l.Quantity * l.UnitCost!.Value);
+            var missing = quoteLines.Count(l => l.UnitCost is null);
+            var margin = r.NetTotal - cost;
+            return new QuoteMarginItem(r.Id, r.Number, r.RevisionNo, r.Title, r.OwnerId, r.Status, r.Currency, r.NetTotal, cost, margin,
+                r.NetTotal > 0 ? Math.Round((double)(margin * 100m / r.NetTotal), 2) : null, missing);
+        }).ToList();
+        var byId = items.ToDictionary(i => i.Id);
+
+        var presentedItems = presented.Rows.Select(r => byId[r.Id]).ToList();
+        var acceptedItems = decided.Rows.Select(r => byId[r.Id]).ToList();
+        var owners = items.Select(i => i.OwnerId).Distinct()
+            .Select(o => new QuoteMarginOwner(o, MarginTotals(presentedItems.Where(i => i.OwnerId == o)))).OrderBy(o => o.OwnerId).ToList();
+
+        return RecordResult<QuoteMarginReportResult>.Ok(new QuoteMarginReportResult(
+            query.From, query.To, presented.Truncated || decided.Truncated, MarginTotals(presentedItems), MarginTotals(acceptedItems), owners,
+            [.. presentedItems.Where(i => i.MarginPercent is not null).OrderBy(i => i.MarginPercent).Take(ListLimit)],
+            [.. presentedItems.Where(i => i.LinesWithoutCost > 0).OrderByDescending(i => i.LinesWithoutCost).Take(ListLimit)],
+            MarginDefinitions));
+    }
+
+    private static IReadOnlyList<QuoteMarginTotal> MarginTotals(IEnumerable<QuoteMarginItem> items) =>
+        [.. items.GroupBy(i => i.Currency).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g =>
+        {
+            var net = g.Sum(i => i.Net);
+            var cost = g.Sum(i => i.Cost);
+            return new QuoteMarginTotal(g.Key, g.Count(), net, cost, net - cost, net > 0 ? Math.Round((double)((net - cost) * 100m / net), 2) : null, g.Sum(i => i.LinesWithoutCost));
+        })];
 
     // ---- Okuma
 

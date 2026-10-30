@@ -124,6 +124,35 @@ public class QuoteReportTests(ModulixApiFactory factory) : IClassFixture<Modulix
     }
 
 
+    [Fact]
+    public async Task Margin_report_needs_the_cost_permission_and_computes_margin_from_line_costs()
+    {
+        var s = await SetUpAsync();
+        using var admin = await LoginAsync(s.Admin);
+        using var rep = await LoginAsync(s.Rep);
+
+        // 2 kalem: 1.000 (maliyet 600) + 500 (maliyet yok) → net 1.500, maliyet 600, marj 900 (%60), 1 kalemin maliyeti yok.
+        var quote = await PostAsync<QuoteDto>(admin, "/api/crm/quotes", new SaveQuoteRequest("Marjlı", s.CompanyId, ValidUntil: DateTimeOffset.UtcNow.AddDays(30)));
+        await PostAsync<QuoteLineDto>(admin, "/api/crm/quote-lines", new SaveQuoteLineRequest(quote.Id, "A", "Free", null, 1m, 1000m, null, "None", 0m, 20m, null, "Standard", UnitCost: 600m));
+        await PostAsync<QuoteLineDto>(admin, "/api/crm/quote-lines", new SaveQuoteLineRequest(quote.Id, "B", "Free", null, 1m, 500m, null, "None", 0m, 20m, null, "Standard"));
+        await PostAsync<QuoteLineDto>(admin, "/api/crm/quote-lines", new SaveQuoteLineRequest(quote.Id, "Opsiyon", "Free", null, 1m, 9999m, null, "None", 0m, 20m, null, "Optional", UnitCost: 1m));
+        await TransitionAsync(admin, quote.Id, "present");
+
+        // Maliyet izni olmayan (temsilci) 403; genel raporda maliyet hiç yok.
+        Assert.Equal(HttpStatusCode.Forbidden, (await rep.GetAsync("/api/crm/quotes/margin-report")).StatusCode);
+
+        var response = await admin.GetAsync("/api/crm/quotes/margin-report");
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var report = (await response.Content.ReadFromJsonAsync<QuoteMarginReportDto>())!;
+        var total = Assert.Single(report.PresentedTotals);
+        Assert.Equal(("TRY", 1, 1500m, 600m, 900m, 60.0, 1), (total.Currency, total.Count, total.Net, total.Cost, total.Margin, total.MarginPercent, total.LinesWithoutCost));
+        Assert.Empty(report.AcceptedTotals);
+        var item = Assert.Single(report.LowestMargin);
+        Assert.Equal((quote.Id, 60.0, 1), (item.Id, item.MarginPercent, item.LinesWithoutCost));
+        Assert.Single(report.MissingCost);
+        Assert.NotEmpty(report.Definitions);
+    }
+
     // ---- yardımcılar
 
     private static SaveQuoteLineRequest ToSave(QuoteLineDto l) => new(

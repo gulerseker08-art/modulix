@@ -104,6 +104,57 @@
         @Attention("İç onay bekleyen", "qr-appr", report.AwaitingApproval, null)
         @Attention("Müşteriye gönderilmemiş / gönderimi başarısız", "qr-deliv", report.NotDelivered, "Sunum")
 
+        @if (Session.Can(CrmAccess.QuoteCostsRead))
+        {
+            <section class="detail-section" aria-labelledby="qr-margin">
+                <div class="section-header"><h2 id="qr-margin">Marj (yalnızca maliyet izniyle)</h2></div>
+                @if (margin is null)
+                {
+                    <p class="text-muted">@(marginError ?? "Yükleniyor…")</p>
+                }
+                else
+                {
+                    <h3 class="h6">Sunulan tekliflerde</h3>
+                    @MarginTable(margin.PresentedTotals)
+                    <h3 class="h6">Kabul edilen tekliflerde</h3>
+                    @MarginTable(margin.AcceptedTotals)
+                    @if (margin.ByOwner.Count > 0)
+                    {
+                        <h3 class="h6">Sorumlu bazında (sunulan)</h3>
+                        <ul>
+                            @foreach (var o in margin.ByOwner)
+                            {
+                                <li>@(o.OwnerId is null ? "Atanmadı" : Lookups.MemberName(o.OwnerId)): @MarginLine(o.Totals)</li>
+                            }
+                        </ul>
+                    }
+                    @if (margin.LowestMargin.Count > 0)
+                    {
+                        <h3 class="h6">En düşük marjlı teklifler</h3>
+                        <ul>
+                            @foreach (var item in margin.LowestMargin.Take(10))
+                            {
+                                <li><a href="crm/teklifler/@item.Id">@item.Title (@item.QuoteNumber · V@(item.RevisionNo))</a> — marj @QuoteLabels.Money(item.Margin, item.Currency) (%@Number(item.MarginPercent))@(item.LinesWithoutCost > 0 ? $" · {item.LinesWithoutCost} kalemin maliyeti yok" : null)</li>
+                            }
+                        </ul>
+                    }
+                    @if (margin.MissingCost.Count > 0)
+                    {
+                        <h3 class="h6">Maliyeti eksik teklifler (@margin.MissingCost.Count)</h3>
+                        <ul>
+                            @foreach (var item in margin.MissingCost.Take(10))
+                            {
+                                <li><a href="crm/teklifler/@item.Id">@item.Title (@item.QuoteNumber)</a> — @item.LinesWithoutCost kalem</li>
+                            }
+                        </ul>
+                    }
+                    <ul class="small text-muted">
+                        @foreach (var definition in margin.Definitions) { <li>@definition</li> }
+                    </ul>
+                }
+            </section>
+        }
+
         <section class="detail-section" aria-labelledby="qr-defs">
             <div class="section-header"><h2 id="qr-defs">Tanımlar</h2></div>
             <ul class="small text-muted">
@@ -118,6 +169,8 @@
 
 @code {
     private QuoteReportDto? report;
+    private QuoteMarginReportDto? margin;
+    private string? marginError;
     private DateTime? from = new(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
     private DateTime? to = DateTime.UtcNow.Date;
     private string? message;
@@ -144,6 +197,12 @@
         busy = false;
         report = result.Value;
         message = result.Error;
+        if (Session.Can(CrmAccess.QuoteCostsRead))
+        {
+            var m = await Api.GetAsync<QuoteMarginReportDto>($"/api/crm/quotes/margin-report?{string.Join('&', query)}");
+            margin = m.Value;
+            marginError = m.Error;
+        }
     }
 
     private RenderFragment Totals(IReadOnlyList<QuoteCurrencyTotalDto> totals) => builder =>
@@ -155,6 +214,16 @@
 
     private static string Amounts(IReadOnlyList<QuoteCurrencyTotalDto> totals) =>
         totals.Count == 0 ? "—" : string.Join(" · ", totals.Select(t => $"{QuoteLabels.Money(t.Gross, t.Currency)} ({t.Count} adet)"));
+
+    private RenderFragment MarginTable(IReadOnlyList<QuoteMarginTotalDto> totals) => builder =>
+    {
+        builder.OpenElement(0, "p");
+        builder.AddContent(1, MarginLine(totals));
+        builder.CloseElement();
+    };
+
+    private static string MarginLine(IReadOnlyList<QuoteMarginTotalDto> totals) =>
+        totals.Count == 0 ? "—" : string.Join(" · ", totals.Select(t => $"{t.Currency}: net {t.Net.ToString("N2", Regional.Numbers)}, maliyet {t.Cost.ToString("N2", Regional.Numbers)}, marj {t.Margin.ToString("N2", Regional.Numbers)} (%{Number(t.MarginPercent)}){(t.LinesWithoutCost > 0 ? $", {t.LinesWithoutCost} kalemin maliyeti yok" : string.Empty)} ({t.Count} teklif)"));
 
     private static string Number(double? value) => value is { } v ? v.ToString("0.##", Regional.Numbers) : "—";
 
