@@ -131,6 +131,7 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
         builder.Property(o => o.BudgetStatus).HasMaxLength(20).IsRequired();
         builder.Property(o => o.ActualCloseDate).HasColumnType("date");
         builder.Property(o => o.WonAmount).HasPrecision(18, 2);
+        builder.HasIndex(o => new { o.TenantId, o.PrimaryQuoteId });
         builder.Property(o => o.WonCurrency).HasMaxLength(Opportunity.CurrencyLength).IsFixedLength().IsUnicode(false);
         builder.Property(o => o.WinReason).HasMaxLength(Opportunity.LostReasonMaxLength);
         builder.Property(o => o.HandoverNote).HasMaxLength(Opportunity.TextMaxLength);

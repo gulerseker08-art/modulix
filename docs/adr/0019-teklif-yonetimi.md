@@ -1,6 +1,6 @@
 # ADR-0019: Teklif yönetimi (M1.5) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (çekirdek, yaşam döngüsü, ekranlar, PDF, paylaşım/kabul, onay kuralları, karşılaştırma, e-posta, raporlar, kabul sonrası süreçler ve küçük tamamlamalar; sipariş/sözleşme modülü ve çok adımlı onay yok). Tarih: 2026-10-30.
+Durum: Kısmen uygulandı (çekirdek, yaşam döngüsü, ekranlar, PDF, paylaşım/kabul, onay kuralları, karşılaştırma, e-posta, raporlar, kabul sonrası süreçler, küçük tamamlamalar ve fırsat entegrasyonu; sipariş/sözleşme modülü ve çok adımlı onay yok). Tarih: 2026-10-30.
 
 ## Mevcut durum (analiz anında, kodla kanıtlı; güncel durum en alttaki "Uygulama durumu"nda)
 
@@ -151,3 +151,16 @@ Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları
 | İş kilidi | Süre dolumu turu tenant veritabanında oturum kilidiyle (`sp_getapplock`, `modulix.crm.quote-expiry`) tek örnekte koşar; kilidi alamayan örnek turu atlar (`Skipped`). Durum geçişleri zaten sürüm denetimliydi; kilit gereksiz çakışmayı ve çift e-postayı önler. |
 
 **Bu dilimde de yapılmadı:** takip aktivitesinin teklif yeniden açılınca geri açılması, süresi dolan teklif için müşteriye bildirim (bilinçli: müşteriye yalnızca bağlantı e-postası gider), e-posta şablonu özelleştirme, zaman dilimine göre "09:00" (UTC kullanılır).
+
+## Uygulama durumu (dokuzuncu dilim: fırsat entegrasyonu)
+
+**Uygulandı** (`QuoteOpportunityTests` 2 entegrasyon testi):
+
+| Konu | Karar / davranış |
+|---|---|
+| Esas teklif | `Opportunity.PrimaryQuoteId` (migration `OpportunityPrimaryQuote`, boş değerli sütun + indeks). Fırsatın tutar ve raporlamada esas aldığı tek teklif. Sistem alanı: genel güncelleme ucuyla yazılamaz; `POST /api/crm/opportunities/{id}/primary-quote` (`crm.opportunities.write`, fırsat sürümü ister) ile seçilir ya da kaldırılır. Yalnızca aynı fırsata bağlı, sunulmuş ya da kabul edilmiş teklif esas olabilir. |
+| Otomatik esas | Fırsatın esas teklifi yokken ilk sunulan teklif esas olur; esas teklifin yeni revizyonu sunulunca esas yeni revizyona geçer. Başka bir aileden teklif sunulması esası değiştirmez. Tarihçe işareti `OpportunitySynced` (tek kez). |
+| Tutar eşitleme | Ayar `crm.quote.sync-opportunity-amount` (varsayılan **hayır**): açıksa esas teklif bağlandığında/değiştiğinde **açık** fırsatın tutarı ve para birimi teklifin net toplamıyla eşitlenir; kapalı/beklemede fırsata dokunulmaz. Kapalıyken fırsat tutarı elle girilir (eski davranış). |
+| Ekranlar | Fırsat detayında "Teklifler" bölümü (liste, esas rozeti, esas yap/kaldır, yeni teklif bağlantısı); teklif detayında "Fırsatın esas teklifi" rozeti. |
+
+**Dokuzuncu dilimde de yapılmadı:** ret/süre dolumunda fırsata otomatik aşama/durum değişikliği (yalnızca kabulde kazanma politikası var), esas teklif olmadan fırsat tutarının tekliften türetilmesi, fırsat raporunda esas teklif kırılımı, esas teklif değişikliğinin fırsat tarihçesine ayrı satır olarak yazılması (yalnızca audit).

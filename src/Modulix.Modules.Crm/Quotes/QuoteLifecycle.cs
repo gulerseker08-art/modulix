@@ -43,6 +43,7 @@ public static class QuoteMarkerKinds
     public const string OpportunityWinSkipped = "OpportunityWinSkipped";
     public const string FollowUpScheduled = "FollowUpScheduled";
     public const string FollowUpsClosed = "FollowUpsClosed";
+    public const string OpportunitySynced = "OpportunitySynced";
     public const string ExpiryReminderCreated = "ExpiryReminderCreated";
     public const string Expired = "Expired";
 }
@@ -59,7 +60,7 @@ public static class QuoteMarkerKinds
 /// </list>
 /// </summary>
 internal sealed class QuoteLifecycleSubscriber(
-    IRecordPipeline pipeline, IOpportunityWorkflow opportunities, IActivityWorkflow activities, QuoteMarkers markers, QuoteReader reader,
+    IRecordPipeline pipeline, IOpportunityWorkflow opportunities, IActivityWorkflow activities, QuoteMarkers markers, QuoteReader reader, IQuoteOpportunitySync opportunitySync,
     IQuotePolicyProvider? policyProvider = null) : IEventSubscriber
 {
     private static readonly string[] MarkPermissions = [CrmModule.Permissions.QuotesRead];
@@ -86,9 +87,22 @@ internal sealed class QuoteLifecycleSubscriber(
         {
             await WinOpportunityAsync(record.Value!, cancellationToken);
         }
-        else if (status == QuoteStatus.Presented && reason == "quote.Presented" && policy.FollowUpDays > 0)
+        else if (status == QuoteStatus.Presented && reason == "quote.Presented")
         {
-            await ScheduleFollowUpAsync(record.Value!, policy.FollowUpDays, cancellationToken);
+            // Fırsatın esas teklifi yoksa ilk sunulan teklif esas olur; ayar açıksa fırsat tutarı eşitlenir (işaretle tek kez).
+            if (!await markers.HasAsync(record.Value!.Id, QuoteMarkerKinds.OpportunitySynced, cancellationToken))
+            {
+                var note = await opportunitySync.OnPresentedAsync(record.Value!, policy.SyncOpportunityAmount, cancellationToken);
+                if (note is not null)
+                {
+                    await markers.MarkAsync(record.Value!.Id, QuoteMarkerKinds.OpportunitySynced, note, MarkPermissions, cancellationToken);
+                }
+            }
+
+            if (policy.FollowUpDays > 0)
+            {
+                await ScheduleFollowUpAsync(record.Value!, policy.FollowUpDays, cancellationToken);
+            }
         }
 
         if (FinalReasons.Contains(reason) && status != QuoteStatus.Draft && status != QuoteStatus.Presented)

@@ -28,6 +28,7 @@
                 @if (quote is not null)
                 {
                     <p class="text-muted mb-0">
+                        @if (isPrimaryQuote) { <span class="badge stage-won">Fırsatın esas teklifi</span> }
                         @quote.QuoteNumber · Revizyon V@(quote.RevisionNo)
                         <span class="badge stage-@QuoteLabels.StatusBadge(quote.Status)">@QuoteLabels.Label(QuoteLabels.Statuses, quote.Status)</span>
                         <span class="badge stage-@QuoteLabels.ApprovalBadge(quote.ApprovalStatus)">@QuoteLabels.Label(QuoteLabels.Approvals, quote.ApprovalStatus)</span>
@@ -469,6 +470,7 @@
     private List<QuoteActionStateDto> actions = [];
     private List<QuoteHistoryDto> history = [];
     private QuoteApprovalRequirementDto? requirement;
+    private bool isPrimaryQuote;
     private List<QuoteDto> family = [];
     private QuoteForm form = new();
     private LineForm? lineForm;
@@ -531,6 +533,8 @@
         actions = (await Api.GetAsync<List<QuoteActionStateDto>>($"/api/crm/quotes/{id}/actions")).Value ?? [];
         history = (await Api.GetAsync<List<QuoteHistoryDto>>($"/api/crm/quotes/{id}/history")).Value ?? [];
         requirement = loaded.Status == "Draft" ? (await Api.GetAsync<QuoteApprovalRequirementDto>($"/api/crm/quotes/{id}/approval-requirements")).Value : null;
+        isPrimaryQuote = loaded.OpportunityId is { } oppId && Session.Can(CrmAccess.OpportunitiesRead)
+            && (await Api.GetAsync<OpportunityDto>($"/api/crm/opportunities/{oppId}")).Value?.PrimaryQuoteId == loaded.Id;
         family = (await Api.GetAllAsync<QuoteDto>($"/api/crm/quotes?familyId={loaded.FamilyId}")).Items;
     }
 

@@ -15,9 +15,10 @@ namespace Modulix.Modules.Crm.Quotes;
 /// <param name="OnAcceptWinOpportunity">Teklif kabul edilince bağlı açık fırsat otomatik "kazanıldı" yapılsın mı? Varsayılan hayır (davranış değişmez).</param>
 /// <param name="FollowUpDays">Teklif sunulunca bu kadar gün sonrasına sorumlu için takip aktivitesi açılır; 0 = kapalı.</param>
 /// <param name="ExpiryReminderDays">Geçerliliği bitmeden bu kadar gün önce sorumlu için hatırlatma aktivitesi açılır; 0 = kapalı.</param>
+/// <param name="SyncOpportunityAmount">Esas teklif sunulunca açık fırsatın tutarı teklifin net toplamıyla eşitlensin mi? Varsayılan hayır.</param>
 public sealed record QuotePolicySettings(
     decimal? ApprovalDiscountPercent = null, decimal? ApprovalGrossAbove = null, int DefaultValidityDays = 30, bool AllowSelfApproval = false,
-    bool OnAcceptWinOpportunity = false, int FollowUpDays = 0, int ExpiryReminderDays = 0);
+    bool OnAcceptWinOpportunity = false, int FollowUpDays = 0, int ExpiryReminderDays = 0, bool SyncOpportunityAmount = false);
 
 public interface IQuotePolicyProvider
 {
