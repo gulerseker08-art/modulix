@@ -30,6 +30,10 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
     private readonly System.Collections.Concurrent.ConcurrentBag<string> createdDatabases = [];
     private readonly System.Collections.Concurrent.ConcurrentBag<Guid> createdTenants = [];
 
+    // Dispose sırasında Services artık kullanılamaz (ObjectDisposedException; her test sınıfı "Test Class Cleanup Failure" verip çıkış kodunu 1 yapıyordu):
+    // temizlik için gereken bağlantı ayarları tenant oluşturulurken alınır.
+    private PlatformDatabaseOptions? cleanupOptions;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder) =>
         builder
             .UseEnvironment("Development")
@@ -63,6 +67,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
         var databaseName = await provisioning.PrepareAsync(tenant.Id, CancellationToken.None);
         await provisioning.CompleteAsync(tenant.Id, CancellationToken.None);
+        cleanupOptions ??= Services.GetRequiredService<PlatformDatabaseOptions>();
         createdDatabases.Add(databaseName);
         createdTenants.Add(tenant.Id);
         return tenant;
@@ -74,11 +79,10 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
     /// </summary>
     protected override void Dispose(bool disposing)
     {
-        if (disposing && !createdDatabases.IsEmpty)
+        if (disposing && !createdDatabases.IsEmpty && cleanupOptions is { } options)
         {
             try
             {
-                var options = Services.GetRequiredService<PlatformDatabaseOptions>();
 
                 // Platform kayıtlarını (üyelik, modül hakkı, tenant) temizle; böylece düşen tenant DB'leri platform
                 // defterinde "Active" yetim kayıt bırakmaz (talimat Bölüm 9: yalnızca testin oluşturdukları).
