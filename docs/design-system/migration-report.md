@@ -6,7 +6,7 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 
 ![Açık tema önizlemesi](onizleme-acik.png)
 
-> Önizlemeler gerçek `app.css` ve layout CSS'iyle hazırlanmış statik bir HTML sayfasından alınmıştır (uygulama bu ortamda çalıştırılamadı, bkz. Test sonuçları). Tablo ve sayılar örnek veridir.
+> Önizlemeler gerçek `app.css` ve layout CSS'iyle hazırlanmış statik bir HTML sayfasından alınmıştır (uygulama veritabanı olmadan bu ortamda çalıştırılamadı). Tablo ve sayılar örnek veridir.
 
 ## 1. Mevcut altyapı (envanter)
 
@@ -46,13 +46,13 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | Alan | Durum | Değiştirilen dosyalar | Test sonucu | Eksikler |
 |---|---|---|---|---|
 | Design Tokens | Tamam | `wwwroot/css/app.css` | Kontrast hesabı: bütün metin çiftleri AA; statik önizleme | — |
-| AppShell | Tamam | `Layout/MainLayout.razor(.css)`, `Components/ThemeToggle.razor`, `wwwroot/js/shell.js`, `wwwroot/index.html` | Statik önizleme (1440/390px); derlenemedi | Global arama, bildirim merkezi, yardım (altyapı yok) |
+| AppShell | Tamam | `Layout/MainLayout.razor(.css)`, `Components/ThemeToggle.razor`, `wwwroot/js/shell.js`, `wwwroot/index.html` | CI derleme ✓; statik önizleme (1440/390px) | Global arama, bildirim merkezi, yardım (altyapı yok) |
 | Navigation | Tamam | `Layout/NavMenu.razor(.css)`, `Components/AppLauncher.razor`, `Components/AppIcon.razor`, `Components/BrandLogo.razor` | Statik önizleme (açık, koyu, daraltılmış) | Menü bugün yalnızca aktif modülün sayfalarını gösterir (mevcut davranış korundu) |
 | Form Components | Kısmen | `app.css` (form durumları, `required`, `aria-invalid`) | Önizlemede default/invalid/read-only/disabled | Ayrı Razor bileşenleri (TextField vb.), FileUpload, RichText, kaydedilmemiş değişiklik uyarısı, Kaydet ve Kapat/Yeni |
 | DataGrid | Kısmen | `app.css` (`record-table`) | Önizleme; telefonda kart listesi | Kolon görünürlüğü/yeniden boyutlandırma, kayıtlı görünüm, dışa aktarma, ortak bileşen |
-| Firma/Kişi | Kısmen | `Pages/Crm/Companies.razor`, `Contacts.razor` (PageHeader) | Derlenemedi | Firma detayında 12 kolonlu ana içerik + sağ panel düzeni |
-| Aktiviteler | Kısmen | `Pages/Crm/Activities.razor` (PageHeader) | Derlenemedi | KPI kartları (Bugün/Geciken/Bu hafta/Tamamlanan), haftalık saat çizelgesi, Bugünün aktiviteleri paneli, sağdan açılan detay çekmecesi |
-| Fırsatlar | Kısmen | `Pages/Crm/Opportunities.razor` (PageHeader) | Derlenemedi | Chevron satış hunisi, KPI şeridi, sağ zaman çizelgesi + finansal özet |
+| Firma/Kişi | Kısmen | `Pages/Crm/Companies.razor`, `Contacts.razor` (PageHeader) | CI derleme ✓ | Firma detayında 12 kolonlu ana içerik + sağ panel düzeni |
+| Aktiviteler | Kısmen | `Pages/Crm/Activities.razor` (PageHeader) | CI derleme ✓ | KPI kartları (Bugün/Geciken/Bu hafta/Tamamlanan), haftalık saat çizelgesi, Bugünün aktiviteleri paneli, sağdan açılan detay çekmecesi |
+| Fırsatlar | Kısmen | `Pages/Crm/Opportunities.razor` (PageHeader) | CI derleme ✓ | Chevron satış hunisi, KPI şeridi, sağ zaman çizelgesi + finansal özet |
 | Teklifler | Token/tema | — | — | Detay düzeni |
 | Diğer CRM | Token/tema | Bütün `PageTitle` metinleri | — | — |
 | Yönetim | Token/tema | — | — | Ekrana özel düzen |
@@ -63,8 +63,8 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 
 ## 4. Test sonuçları
 
-- **Derleme (`dotnet build`) ve mimari testler çalıştırılamadı**: bu oturumun ağ izinleri `api.nuget.org`'u engelliyor, NuGet geri yükleme yapılamadı. Razor değişiklikleri küçük tutuldu ve satır satır gözden geçirildi; birleştirmeden önce yerelde `dotnet build` ve `dotnet test tests/Modulix.ArchitectureTests` çalıştırılmalıdır. CI de bunu doğrular.
-- **Entegrasyon testleri** SQL Server gerektirdiği için çalıştırılamadı. Değişiklikler yalnızca `Modulix.Web` arayüz katmanındadır; API, iş kuralları, veritabanı, yetki ve tenant süzgeçleri değişmedi.
+- **CI (GitHub Actions, `workflow_dispatch`, dal `tasarim-sistemi/faz-1`, çalışma 41125845293): başarılı.** Release derleme (null uyarıları hata), migration ve bütün testler geçti: mimari 29/29, Core 211/211, CRM 206/206, entegrasyon (gerçek SQL Server) 371/371. Bu oturumda NuGet erişimi olmadığı için derleme yerelde değil CI'da yapıldı.
+- Değişiklikler yalnızca `Modulix.Web` arayüz katmanındadır; API, iş kuralları, veritabanı, yetki ve tenant süzgeçleri değişmedi. Arayüz için otomatik bileşen testi (bUnit) altyapısı yoktur; kabuk davranışı statik önizlemeyle kontrol edildi, gerçek tarayıcıda elle denenmelidir.
 - **Görsel kontrol**: gerçek CSS dosyalarıyla statik önizleme Playwright/Chromium'da açık, koyu, daraltılmış menü ve 390px mobil olarak çekildi.
 - **Kontrast**: 21 renk çifti hesaplandı. Referanstaki `#64748B` sayfa zemininde 4.47:1 ve aktif menü metni 4.12:1 çıktı; ikisi düzeltildi, şimdi hepsi ≥ 4.5:1 (logo "x" büyük metin, 3.9:1).
 
