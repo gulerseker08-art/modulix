@@ -58,6 +58,7 @@ public static class CrmAccess
     public const string QuotesPresent = "crm.quotes.present";
     public const string QuotesRecordDecision = "crm.quotes.record-decision";
     public const string QuotesCancel = "crm.quotes.cancel";
+    public const string QuotesShare = "crm.quotes.share";
     public const string QuoteCostsRead = "crm.quote-costs.read";
 }
 

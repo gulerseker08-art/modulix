@@ -1,0 +1,333 @@
+@page "/teklif/{Tenant}"
+@layout PublicLayout
+@inject ApiClient Api
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>@(view?.Content is { } c ? $"Teklif {c.QuoteNumber}" : "Teklif") · ModuliX</PageTitle>
+
+@* Oturumsuz müşteri sayfası (ADR-0019). Belirteç adresin # parçasındadır (#t=...): sunucuya, günlüklere ve Referer başlığına gitmez;
+   API çağrılarında gövdede taşınır. Gösterilen her şey belgenin sabitlenmiş verisidir. *@
+
+@if (loading)
+{
+    <p class="text-muted" role="status">Teklif yükleniyor…</p>
+}
+else if (invalid)
+{
+    <div class="alert alert-warning" role="alert">
+        <h1 class="h5">Bağlantı geçersiz</h1>
+        <p class="mb-0">@(problem ?? "Bu teklif bağlantısı geçersiz ya da kaldırılmış. Lütfen teklifi gönderen kişiyle iletişime geçin.")</p>
+    </div>
+}
+else if (view is not null)
+{
+    <article class="public-quote" aria-labelledby="pq-title">
+        @if (view.State != "open")
+        {
+            <div class="alert @(view.State == "accepted" ? "alert-success" : "alert-warning")" role="status" id="pq-state">
+                <strong>@StateTitle(view.State)</strong>
+                <div>@view.Message</div>
+                @if (view.Decision is { } decided)
+                {
+                    <div class="small">@decided.SignerName · @CrmLabels.Time(decided.At)</div>
+                }
+            </div>
+        }
+
+        @if (view.Content is { } content)
+        {
+            <header class="public-quote-header">
+                <div>
+                    <p class="public-seller">@content.Seller.Name</p>
+                    @if (content.Seller.Details is { Length: > 0 } details)
+                    {
+                        <p class="text-muted small">@details</p>
+                    }
+                </div>
+                <dl class="summary-list">
+                    <div><dt>Teklif no</dt><dd>@content.QuoteNumber · V@(content.RevisionNo)</dd></div>
+                    <div><dt>Tarih</dt><dd>@CrmLabels.Date(content.IssueDate)</dd></div>
+                    @if (content.ValidUntil is { } until)
+                    {
+                        <div><dt>Geçerlilik</dt><dd>@CrmLabels.Time(until)</dd></div>
+                    }
+                </dl>
+            </header>
+
+            <h1 id="pq-title" class="h4">@content.Title</h1>
+            <p class="text-muted">
+                @content.CustomerName@if (content.CustomerCity is not null) { <text> · @content.CustomerCity</text> }
+                @if (content.ContactName is { Length: > 0 }) { <text><br />İlgili: @content.ContactName</text> }
+            </p>
+            @if (!string.IsNullOrWhiteSpace(content.Description))
+            {
+                <p>@content.Description</p>
+            }
+
+            <table class="table record-table">
+                <caption class="visually-hidden">Teklif kalemleri</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Kalem</th><th scope="col" class="text-end">Miktar</th><th scope="col" class="text-end">Birim fiyat</th>
+                        <th scope="col" class="text-end">İndirim</th><th scope="col" class="text-end">KDV</th><th scope="col" class="text-end">Net tutar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in content.Lines)
+                    {
+                        <tr>
+                            <td data-label="Kalem" class="primary">
+                                @line.Name
+                                @if (line.Code is not null) { <small class="text-muted"> (@line.Code)</small> }
+                                @if (RoleNote(line) is { } note) { <div class="small text-muted">@note</div> }
+                                @if (!string.IsNullOrWhiteSpace(line.Description)) { <div class="small text-muted">@line.Description</div> }
+                            </td>
+                            <td data-label="Miktar" class="text-end">@line.Quantity.ToString("0.####", Regional.Numbers)@(line.Unit is null ? null : $" {line.Unit}")</td>
+                            <td data-label="Birim fiyat" class="text-end">@line.UnitPrice.ToString("N2", Regional.Numbers)</td>
+                            <td data-label="İndirim" class="text-end">@Discount(line)</td>
+                            <td data-label="KDV" class="text-end">%@line.TaxRatePercent.ToString("0.##", Regional.Numbers)</td>
+                            <td data-label="Net tutar" class="text-end">@(line.Included ? line.Net.ToString("N2", Regional.Numbers) : "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <dl class="summary-list public-totals">
+                <div><dt>Liste toplamı</dt><dd>@QuoteLabels.Money(content.ListTotal, content.Currency)</dd></div>
+                @if (content.DiscountTotal > 0)
+                {
+                    <div><dt>Toplam indirim</dt><dd>-@QuoteLabels.Money(content.DiscountTotal, content.Currency)</dd></div>
+                }
+                <div><dt>Net toplam</dt><dd>@QuoteLabels.Money(content.NetTotal, content.Currency)</dd></div>
+                @foreach (var tax in content.TaxGroups)
+                {
+                    <div><dt>KDV %@tax.RatePercent.ToString("0.##", Regional.Numbers)</dt><dd>@QuoteLabels.Money(tax.Tax, content.Currency)</dd></div>
+                }
+                <div class="total"><dt>Genel toplam</dt><dd>@QuoteLabels.Money(content.GrossTotal, content.Currency)</dd></div>
+            </dl>
+            @if (content.OptionalNet > 0)
+            {
+                <p class="small text-muted">Opsiyonel ve alternatif kalemler toplama dahil değildir (net @QuoteLabels.Money(content.OptionalNet, content.Currency)).</p>
+            }
+
+            @foreach (var (label, text) in Terms(content))
+            {
+                <section>
+                    <h2 class="h6">@label</h2>
+                    <p class="preline">@text</p>
+                </section>
+            }
+
+            <p>
+                <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="DownloadAsync">PDF olarak indir</button>
+                <span class="small text-muted">Belge özeti (SHA-256): <code>@view.DocumentSha256[..16]…</code></span>
+            </p>
+        }
+
+        @if (view.CanDecide)
+        {
+            <section aria-labelledby="pq-decision" class="public-decision">
+                <h2 id="pq-decision" class="h5">Kararınız</h2>
+                <Notice Text="@message" Failed="true" />
+
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="pq-name">Ad soyad *</label>
+                        <input id="pq-name" class="form-control" autocomplete="name" maxlength="200" @bind="signerName" />
+                        <FieldError Errors="@errors" Field="signerName" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="pq-title-input">Ünvan</label>
+                        <input id="pq-title-input" class="form-control" autocomplete="organization-title" maxlength="200" @bind="signerTitle" />
+                        <FieldError Errors="@errors" Field="signerTitle" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="pq-email">E-posta</label>
+                        <input id="pq-email" class="form-control" type="email" autocomplete="email" maxlength="254" @bind="signerEmail" />
+                        <FieldError Errors="@errors" Field="signerEmail" />
+                    </div>
+                </div>
+
+                @if (mode is null)
+                {
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" @onclick='() => mode = "accept"'>Teklifi kabul et</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick='() => mode = "reject"'>Teklifi reddet</button>
+                    </div>
+                }
+                else if (mode == "accept")
+                {
+                    <form novalidate @onsubmit="() => DecideAsync(true)" @onsubmit:preventDefault>
+                        <div class="form-check">
+                            <input id="pq-confirm" class="form-check-input" type="checkbox" @bind="confirm" aria-describedby="pq-statement" />
+                            <label class="form-check-label" for="pq-confirm" id="pq-statement">@view.AcceptanceStatement</label>
+                        </div>
+                        <FieldError Errors="@errors" Field="confirmTerms" />
+                        <FieldError Errors="@errors" Field="documentSha256" />
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" disabled="@busy">Kabulü onayla</button>
+                            <button type="button" class="btn btn-link" @onclick="() => mode = null">Vazgeç</button>
+                        </div>
+                    </form>
+                }
+                else
+                {
+                    <form novalidate @onsubmit="() => DecideAsync(false)" @onsubmit:preventDefault>
+                        <label class="form-label" for="pq-reason">Ret gerekçesi *</label>
+                        <textarea id="pq-reason" class="form-control" rows="3" maxlength="500" @bind="reason"></textarea>
+                        <FieldError Errors="@errors" Field="reason" />
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-outline-danger" disabled="@busy">Reddi onayla</button>
+                            <button type="button" class="btn btn-link" @onclick="() => mode = null">Vazgeç</button>
+                        </div>
+                    </form>
+                }
+            </section>
+        }
+    </article>
+}
+
+@code {
+    [Parameter] public string Tenant { get; set; } = string.Empty;
+
+    private PublicQuoteView? view;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string token = string.Empty;
+    private string? problem;
+    private string? message;
+    private string? mode;
+    private string signerName = string.Empty;
+    private string signerTitle = string.Empty;
+    private string signerEmail = string.Empty;
+    private string reason = string.Empty;
+    private bool confirm;
+    private bool loading = true;
+    private bool invalid;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        token = TokenFromFragment(Navigation.Uri);
+        if (token.Length == 0)
+        {
+            loading = false;
+            invalid = true;
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.PostAsync<PublicQuoteView>($"/api/public/quotes/{Uri.EscapeDataString(Tenant)}/view", new PublicQuoteTokenRequest(token));
+        loading = false;
+        if (result.Value is { } loaded)
+        {
+            view = loaded;
+            invalid = false;
+            return;
+        }
+
+        invalid = true;
+        problem = result.Status == System.Net.HttpStatusCode.NotFound ? null : result.Error;
+    }
+
+    private async Task DecideAsync(bool accept)
+    {
+        if (busy || view is null) { return; }
+        busy = true;
+        errors = null;
+        message = null;
+        var result = await Api.PostAsync<PublicQuoteView>($"/api/public/quotes/{Uri.EscapeDataString(Tenant)}/decision", new PublicQuoteDecisionRequest(
+            token, accept ? "accept" : "reject", signerName, Blank(signerEmail), Blank(signerTitle), accept ? null : Blank(reason), accept && confirm, view.DocumentSha256));
+        busy = false;
+        if (result.Value is { } updated)
+        {
+            view = updated;
+            mode = null;
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+        if (result.Status == System.Net.HttpStatusCode.Conflict)
+        {
+            // Durum değişmiştir (başka karar, iptal, süre): güncel halini göster.
+            await LoadAsync();
+        }
+    }
+
+    private async Task DownloadAsync()
+    {
+        if (busy || view is null) { return; }
+        busy = true;
+        var result = await Api.PostForFileAsync($"/api/public/quotes/{Uri.EscapeDataString(Tenant)}/pdf", new PublicQuoteTokenRequest(token));
+        busy = false;
+        if (result.Value is { } bytes)
+        {
+            await Js.InvokeVoidAsync("modulixDownload", $"{view.QuoteNumber}-V{view.RevisionNo}.pdf", "application/pdf", Convert.ToBase64String(bytes));
+        }
+        else
+        {
+            message = result.Error;
+        }
+    }
+
+    /// <summary>Belirteç adresin # parçasından okunur (#t=...); parça sunucuya gönderilmez.</summary>
+    internal static string TokenFromFragment(string uri)
+    {
+        var index = uri.IndexOf('#');
+        if (index < 0)
+        {
+            return string.Empty;
+        }
+
+        foreach (var part in uri[(index + 1)..].Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (part.StartsWith("t=", StringComparison.Ordinal))
+            {
+                return Uri.UnescapeDataString(part[2..]);
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static string StateTitle(string state) => state switch
+    {
+        "accepted" => "Teklif kabul edildi",
+        "rejected" => "Teklif reddedildi",
+        "expired" => "Geçerlilik süresi doldu",
+        "superseded" => "Yeni revizyon hazırlandı",
+        "cancelled" => "Teklif iptal edildi",
+        "link-expired" => "Bağlantının süresi doldu",
+        "link-revoked" => "Bağlantı iptal edildi",
+        _ => "Teklif",
+    };
+
+    private static string? RoleNote(PublicQuoteLine line) => line.Role switch
+    {
+        "Optional" => line.IsSelected ? "Opsiyonel — seçili (toplama dahil)" : "Opsiyonel — toplama dahil değil",
+        "Alternative" => line.IsSelected ? "Alternatif — seçili (toplama dahil)" : "Alternatif — toplama dahil değil",
+        "PackageChild" => "Paket bileşeni",
+        _ => null,
+    };
+
+    private static string Discount(PublicQuoteLine line) => line.DiscountKind switch
+    {
+        "Percent" when line.DiscountValue > 0 => $"%{line.DiscountValue.ToString("0.##", Regional.Numbers)}",
+        "Amount" when line.DiscountValue > 0 => line.DiscountValue.ToString("N2", Regional.Numbers),
+        _ => "—",
+    };
+
+    private static IEnumerable<(string Label, string Text)> Terms(PublicQuoteContent content)
+    {
+        if (!string.IsNullOrWhiteSpace(content.PaymentTerms)) { yield return ("Ödeme koşulları", content.PaymentTerms); }
+        if (!string.IsNullOrWhiteSpace(content.DeliveryTerms)) { yield return ("Teslimat koşulları", content.DeliveryTerms); }
+        if (!string.IsNullOrWhiteSpace(content.CommercialTerms)) { yield return ("Ticari koşullar", content.CommercialTerms); }
+    }
+
+    private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+}

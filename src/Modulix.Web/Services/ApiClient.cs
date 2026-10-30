@@ -18,6 +18,9 @@ public sealed class ApiClient(HttpClient http)
 
     public Task<ApiResult<T>> PutAsync<T>(string url, object body) => SendAsync<T>(() => http.PutAsJsonAsync(url, body, Json));
 
+    /// <summary>İstek gövdesi JSON, yanıtı dosya olan çağrı (ör. oturumsuz müşteri sayfasının PDF'i; belirteç gövdede gider).</summary>
+    public Task<ApiResult<byte[]>> PostForFileAsync(string url, object body) => SendAsync<byte[]>(() => http.PostAsJsonAsync(url, body, Json));
+
     /// <summary>Gövdesi dosyanın kendisi olan istek (ör. logo).</summary>
     public Task<ApiResult<T>> PutBytesAsync<T>(string url, byte[] body, string contentType) => SendAsync<T>(() =>
     {
@@ -49,6 +52,11 @@ public sealed class ApiClient(HttpClient http)
                     return ApiResult<T>.Ok(typeof(T) == typeof(bool) ? (T)(object)true : default!);
                 }
 
+                if (typeof(T) == typeof(byte[]))
+                {
+                    return ApiResult<T>.Ok((T)(object)await response.Content.ReadAsByteArrayAsync());
+                }
+
                 return ApiResult<T>.Ok((await response.Content.ReadFromJsonAsync<T>(Json))!);
             }
 
@@ -60,6 +68,7 @@ public sealed class ApiClient(HttpClient http)
                 HttpStatusCode.NotFound => problem?.Title ?? "Kayıt bulunamadı.",
                 HttpStatusCode.Conflict => problem?.Title ?? "Kayıt başka biri tarafından değiştirildi.",
                 HttpStatusCode.UnprocessableEntity => problem?.Message ?? "Lütfen işaretli alanları düzeltin.",
+                HttpStatusCode.TooManyRequests => "Çok fazla istek gönderdiniz. Lütfen biraz bekleyip tekrar deneyin.",
                 HttpStatusCode.BadRequest when problem?.Errors is { Count: > 0 } errors => errors.Values.SelectMany(e => e).First(),
                 _ => problem?.Title ?? "Beklenmeyen bir hata oluştu.",
             };

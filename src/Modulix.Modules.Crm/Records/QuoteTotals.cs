@@ -22,11 +22,19 @@ internal sealed class QuoteWorkflowGate
 
     public string? Reason { get; private set; }
 
-    public IDisposable Open(IReadOnlyList<string> permissions, string eventKind, string? reason = null)
+    /// <summary>
+    /// Geçişle aynı işlemde çalışan ek yazma (belge, paylaşım bağlantısı, müşteri kararı). Teklif toplamının parçalarıdır; bu yüzden
+    /// teklifin sürüm denetimine ve audit'ine bağlı yazılırlar (eşzamanlı çakışmada hiçbiri yazılmaz).
+    /// </summary>
+    public Func<CrmStoreContext, Quote, CancellationToken, Task>? Effect { get; private set; }
+
+    public IDisposable Open(
+        IReadOnlyList<string> permissions, string eventKind, string? reason = null, Func<CrmStoreContext, Quote, CancellationToken, Task>? effect = null)
     {
         Permissions = permissions;
         EventKind = eventKind;
         Reason = reason;
+        Effect = effect;
         return new Closer(this);
     }
 
@@ -37,6 +45,7 @@ internal sealed class QuoteWorkflowGate
             gate.Permissions = null;
             gate.EventKind = null;
             gate.Reason = null;
+            gate.Effect = null;
         }
     }
 }

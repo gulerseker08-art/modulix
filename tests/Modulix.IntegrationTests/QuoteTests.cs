@@ -301,7 +301,7 @@ public class QuoteTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
         await TransitionAsync(admin, quote.Id, "cancel", presented.Version, "Proje iptal");
 
         var history = (await admin.GetFromJsonAsync<List<QuoteHistoryDto>>($"/api/crm/quotes/{quote.Id}/history"))!;
-        Assert.Equal(["Created", "Presented", "Cancelled"], history.Select(h => h.Kind).ToArray());
+        Assert.Equal(["Created", "Presented", "DocumentGenerated", "Cancelled"], history.Select(h => h.Kind).ToArray());
         Assert.Equal("Proje iptal", history[^1].Reason);
         Assert.All(history, h => Assert.NotNull(h.ActorId));
 

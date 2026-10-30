@@ -55,6 +55,7 @@ builder.Services.AddSingleton(sp => new SectorProfileCatalog(SectorProfiles.Crea
 builder.Services.AddModulixRecords();
 builder.Services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyProvider, Modulix.Api.Crm.OpportunityPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modulix.Api.Crm.QuotePolicyProvider>();
+builder.Services.AddScoped<Modulix.Api.Crm.QuoteDocumentService>();
 
 // E-posta: kuyruk + arka plan gönderici. Ayarlar "Email" bölümünde; SMTP şifresi user-secrets veya ortam değişkeninde.
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
@@ -65,6 +66,7 @@ builder.Services.AddHostedService<EmailDispatchWorker>();
 builder.Services.Configure<EventOptions>(builder.Configuration.GetSection(EventOptions.SectionName));
 builder.Services.AddModulixEvents();
 builder.Services.AddLeadIntakeRateLimit(builder.Configuration);
+builder.Services.AddQuotePublicRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
 
 // Kullanıcı yönetimi: davet sınırı "Users" bölümünde; e-postadaki bağlantıların kökü App:PublicUrl (üretimde zorunlu).
@@ -161,6 +163,7 @@ app.MapSectorProfileEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapLeadIntakeEndpoints();
+app.MapQuotePublicEndpoints();
 app.MapPlatformEndpoints();
 app.MapPlatformEventEndpoints();
 app.MapAuditEndpoints();

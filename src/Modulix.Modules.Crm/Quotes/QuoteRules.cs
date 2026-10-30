@@ -68,6 +68,9 @@ public static class QuoteAction
     public const string Accept = "accept";
     public const string Reject = "reject";
     public const string Cancel = "cancel";
+
+    /// <summary>Sunulmuş tekliften müşteri belgesi/bağlantısı üretmek (iç eylem; ticari durumu değiştirmez).</summary>
+    public const string Share = "share";
 }
 
 /// <summary>Bir eylemin neden yapılamadığını açıklayan sonuç (kullanıcıya gösterilir).</summary>
@@ -143,6 +146,18 @@ public static class QuoteRules
 
                 return expired
                     ? QuoteRuleResult.Deny("expired", "Teklifin geçerlilik süresi dolmuş.")
+                    : QuoteRuleResult.Ok;
+
+            case QuoteAction.Share:
+                if (status != QuoteStatus.Presented)
+                {
+                    return QuoteRuleResult.Deny(StatusCode(status), status == QuoteStatus.Draft
+                        ? "Taslak teklif paylaşılamaz; önce müşteriye sunun."
+                        : StatusMessage(status));
+                }
+
+                return expired
+                    ? QuoteRuleResult.Deny("expired", "Teklifin geçerlilik süresi dolmuş; paylaşım bağlantısı üretilemez.")
                     : QuoteRuleResult.Ok;
 
             case QuoteAction.Cancel:

@@ -97,6 +97,7 @@ public sealed class CrmModule : IModule
         public const string QuotesPresent = "crm.quotes.present";
         public const string QuotesRecordDecision = "crm.quotes.record-decision";
         public const string QuotesCancel = "crm.quotes.cancel";
+        public const string QuotesShare = "crm.quotes.share";
         public const string QuoteCostsRead = "crm.quote-costs.read";
     }
 
@@ -254,6 +255,7 @@ public sealed class CrmModule : IModule
         new(Permissions.QuotesPresent, "Onaylı teklifi müşteriye sunar", "Teklifler"),
         new(Permissions.QuotesRecordDecision, "Müşterinin kabul ya da ret kararını kaydeder", "Teklifler"),
         new(Permissions.QuotesCancel, "Teklifi gerekçeyle iptal eder", "Teklifler"),
+        new(Permissions.QuotesShare, "Sunulmuş teklif için müşteri belgesi (PDF) ve paylaşım bağlantısı üretir, bağlantıyı iptal eder", "Teklifler"),
         new(Permissions.QuoteCostsRead, "Teklif kalemlerinin maliyetini görür ve düzenler", "Teklif maliyeti"),
     ];
 
@@ -504,6 +506,16 @@ public sealed class CrmModule : IModule
         {
             Description = "Evet seçilirse teklifi onaya gönderen kişi onaylayan yetkisine sahipse kendi teklifini onaylayabilir. Varsayılan hayırdır.",
             Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
+        },
+        new(SettingKeys.QuoteSellerDetails, "Teklif belgesi: satıcı bilgileri", "CRM Teklif", SettingType.Text)
+        {
+            Description = "Müşteri teklif belgesinin (PDF) başlığında firma adının altında görünür: adres, telefon, vergi dairesi/numarası gibi. Boş bırakılabilir.",
+            MaxLength = 300,
+        },
+        new(SettingKeys.QuoteFooterNote, "Teklif belgesi: alt bilgi notu", "CRM Teklif", SettingType.Text)
+        {
+            Description = "Müşteri teklif belgesinin her sayfasının altında görünen kısa not. Boş bırakılabilir.",
+            MaxLength = 200,
         },
     ];
 
@@ -800,6 +812,12 @@ public sealed class CrmModule : IModule
             [DomainEventTypes.RecordDeleted],
             [Entities.LeadForm],
             [Permissions.LeadsRead, Permissions.LeadsCreate, Permissions.LeadFormsManage]),
+        // Herkese açık müşteri teklif sayfasının sistem kimliği (ADR-0019): yalnızca belirteçle bağlı olduğu teklife karar yazar.
+        EventSubscription.For<QuoteCustomerAnchor>(
+            "crm.quote-customer",
+            [DomainEventTypes.RecordDeleted],
+            [Entities.Quote],
+            [Permissions.QuotesRead, Permissions.QuotesRecordDecision]),
         EventSubscription.For<LeadFirstContactSubscriber>(
             "crm.lead-first-contact",
             [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated],
@@ -824,6 +842,8 @@ public sealed class CrmModule : IModule
         public const string QuoteApprovalGrossAbove = "crm.quote.approval-gross-above";
         public const string QuoteDefaultValidityDays = "crm.quote.default-validity-days";
         public const string QuoteAllowSelfApproval = "crm.quote.allow-self-approval";
+        public const string QuoteSellerDetails = "crm.quote.seller-details";
+        public const string QuoteFooterNote = "crm.quote.footer-note";
     }
 
     public void ConfigureServices(IServiceCollection services)
@@ -853,6 +873,9 @@ public sealed class CrmModule : IModule
         services.AddScoped<QuoteWorkflowGate>();
         services.AddScoped<QuoteReader>();
         services.AddScoped<IQuoteWorkflow, QuoteWorkflow>();
+        services.AddScoped<IQuoteSharing, QuoteSharing>();
+        services.AddScoped<IQuoteCustomerPortal, QuoteCustomerPortal>();
+        services.AddScoped<QuoteCustomerAnchor>();
         services.AddScoped<IPriceCalculator, PriceCalculator>();
         services.AddScoped<IRecordStore, OpportunityContactRecordStore>();
         services.AddScoped<IRecordStore, OpportunityCompetitorRecordStore>();
