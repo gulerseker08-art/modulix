@@ -1,6 +1,6 @@
 # ADR-0019: Teklif yönetimi (M1.5) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (çekirdek, yaşam döngüsü, ekranlar, PDF, paylaşım/kabul, onay kuralları, karşılaştırma, e-posta, raporlar, kabul sonrası süreçler, küçük tamamlamalar ve fırsat entegrasyonu; sipariş/sözleşme modülü ve çok adımlı onay yok). Tarih: 2026-10-30.
+Durum: Kısmen uygulandı (çekirdek, yaşam döngüsü, ekranlar, PDF, paylaşım/kabul, onay kuralları, karşılaştırma, e-posta, raporlar, kabul sonrası süreçler, küçük tamamlamalar, fırsat entegrasyonu ve çok adımlı onay/vekâlet; sipariş/sözleşme modülü yok). Tarih: 2026-10-30.
 
 ## Mevcut durum (analiz anında, kodla kanıtlı; güncel durum en alttaki "Uygulama durumu"nda)
 
@@ -164,3 +164,17 @@ Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları
 | Ekranlar | Fırsat detayında "Teklifler" bölümü (liste, esas rozeti, esas yap/kaldır, yeni teklif bağlantısı); teklif detayında "Fırsatın esas teklifi" rozeti. |
 
 **Dokuzuncu dilimde de yapılmadı:** ret/süre dolumunda fırsata otomatik aşama/durum değişikliği (yalnızca kabulde kazanma politikası var), esas teklif olmadan fırsat tutarının tekliften türetilmesi, fırsat raporunda esas teklif kırılımı, esas teklif değişikliğinin fırsat tarihçesine ayrı satır olarak yazılması (yalnızca audit).
+
+## Uygulama durumu (onuncu dilim: çok adımlı onay, vekâlet, onay hatırlatması)
+
+**Uygulandı** (`QuoteMultiStepApprovalTests` 4 entegrasyon testi, `QuoteApprovalStepsTests` 4 birim testi):
+
+| Konu | Karar / davranış |
+|---|---|
+| Adımlar | Onay kuralında `Step` (1–9, varsayılan 1; migration `QuoteApprovalSteps`). Eşleşen kurallar adıma göre gruplanır ve adımlar **sırayla** tamamlanır. Bir adımda adlı onaylayan varsa **hepsinin** (ya da vekillerinin) onayı gerekir (paralel); adlı onaylayan yoksa onay izni olan herhangi birinin tek onayı yeter. Adlı ve adsız kural aynı adımdaysa adlılar belirleyicidir. Genel eşik ayarı tek başına tetiklendiyse tek, adsız adım vardır. |
+| İlerleme | Ara onaylar tarihçeye `StepApproved` olarak yazılır (teklif `Pending` kalır); son adımı tamamlayan onay teklifi `Approved` yapar. İlerleme, son onaya gönderimden sonraki `StepApproved` olaylarından hesaplanır: ticari değişiklik ya da yeni gönderim sayacı sıfırlar. Sıradaki adımın onaylayanı olmayan kullanıcı 403 alır; eylem listesi `approver-restricted` nedenini verir. Ret/değişiklik isteği her zaman akışı bitirir. |
+| Vekâlet | `crm.QuoteApprovalDelegations` (veren → vekil, başlangıç/bitiş, etkin, not; RLS'li). Yönetim `crm.quote-rules.manage` (`/api/crm/quote-approval-delegations`, ekran `crm/onay-vekaletleri`). Vekil, adlı onaylayanın yerine karar verebilir; onay **veren adına** sayılır ve tarihçe "vekâleten" der. Vekilin kendisinin onay izni olmalıdır; vekâlet izin vermez. Kişi kendine vekâlet veremez. Süresi dolmuş/pasif vekâlet sayılmaz (onay anındaki vekâletler esas alınır). |
+| Hatırlatma | Ayar `crm.quote.approval-reminder-hours` (0 = kapalı): onay bu kadar saat bekleyince şu anki adımın henüz onaylamamış adlı onaylayanlarına ve vekillerine bir kez e-posta (`Reference = crm.quote-approval-reminder:{id}`); tarihçe `ApprovalReminderSent`. Adsız adımda alıcı belirlenemediği için gönderilmez. Süre dolumu işi içinde çalışır. |
+| Ekranlar | Kural formunda adım alanı ve sütunu; onay merkezinde adım rozetleri ve "vekâleten" notu; teklif detayında adım özeti; vekâlet yönetimi sayfası. |
+
+**Onuncu dilimde de yapılmadı:** onaylayanın yerine geçen rol/grup tabanlı onay (yalnızca kişi), adım başına ayrı süre sınırı ve otomatik yükseltme (escalation), onay yorumu zorunluluğu, vekâletin kişi tarafından kendi hesabından verilmesi (yalnızca yönetici), ret sonrası aynı gönderimde yeniden onay (yeni gönderim gerekir), ara onay geri çekme.

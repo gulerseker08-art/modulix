@@ -135,6 +135,7 @@ public sealed class CrmModule : IModule
         public const string Quote = "crm.quote";
         public const string QuoteLine = "crm.quote-line";
         public const string QuoteApprovalRule = "crm.quote-approval-rule";
+        public const string QuoteApprovalDelegation = "crm.quote-approval-delegation";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -537,6 +538,13 @@ public sealed class CrmModule : IModule
             Description = "Evet seçilirse açık fırsatın tutarı ve para birimi, esas teklifi müşteriye sunulduğunda (ve esas teklif değiştirildiğinde) teklifin net toplamıyla eşitlenir. Varsayılan hayırdır; fırsat tutarı elle girilir.",
             Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
         },
+        new(SettingKeys.QuoteApprovalReminderHours, "Teklif iç onay hatırlatması (saat)", "CRM Teklif", SettingType.Text, "0")
+        {
+            Description = "Onay bekleyen teklif bu kadar saat karar almadan beklerse, o adımın adlı onaylayanlarına (ve vekillerine) bir kez e-posta hatırlatması gönderilir. Adlı onaylayanı olmayan adımda gönderilmez. 0 kapalıdır.",
+            Pattern = @"^[0-9]{1,3}$",
+            PatternMessage = "0-999 arası tam sayı girin.",
+            MaxLength = 3,
+        },
         new(SettingKeys.QuoteSellerDetails, "Teklif belgesi: satıcı bilgileri", "CRM Teklif", SettingType.Text)
         {
             Description = "Müşteri teklif belgesinin (PDF) başlığında firma adının altında görünür: adres, telefon, vergi dairesi/numarası gibi. Boş bırakılabilir.",
@@ -775,8 +783,15 @@ public sealed class CrmModule : IModule
         new(Entities.QuoteApprovalRule, "Teklif onay kuralı (CRM)", Permissions.QuoteRulesManage, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["priority"] = "Öncelik", ["isActive"] = "Etkin", ["currency"] = "Para birimi",
-            ["minDiscountPercent"] = "İndirim eşiği %", ["minGrossTotal"] = "Genel toplam eşiği", ["approverId"] = "Onaylayan",
+            ["minDiscountPercent"] = "İndirim eşiği %", ["minGrossTotal"] = "Genel toplam eşiği", ["approverId"] = "Onaylayan", ["step"] = "Onay adımı",
         }, "name"),
+        new(Entities.QuoteApprovalDelegation, "Teklif onay vekâleti (CRM)", Permissions.QuoteRulesManage, new Dictionary<string, string>
+        {
+            ["fromUserId"] = "Vekâlet veren", ["toUserId"] = "Vekil", ["startsAt"] = "Başlangıç", ["endsAt"] = "Bitiş", ["isActive"] = "Etkin", ["note"] = "Not",
+        }, "note")
+        {
+            UserFields = ["fromUserId", "toUserId"],
+        },
         new(Entities.QuoteLine, "Teklif kalemi (CRM)", Permissions.QuotesRead, new Dictionary<string, string>
         {
             ["quoteId"] = "Teklif", ["name"] = "Ad", ["kind"] = "Tür", ["productId"] = "Ürün", ["quantity"] = "Miktar", ["unitPrice"] = "Birim fiyat",
@@ -895,6 +910,7 @@ public sealed class CrmModule : IModule
         public const string QuoteFollowUpDays = "crm.quote.follow-up-days";
         public const string QuoteExpiryReminderDays = "crm.quote.expiry-reminder-days";
         public const string QuoteSyncOpportunityAmount = "crm.quote.sync-opportunity-amount";
+        public const string QuoteApprovalReminderHours = "crm.quote.approval-reminder-hours";
     }
 
     public void ConfigureServices(IServiceCollection services)
@@ -922,6 +938,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<IRecordStore, QuoteRecordStore>();
         services.AddScoped<IRecordStore, QuoteLineRecordStore>();
         services.AddScoped<IRecordStore, QuoteApprovalRuleRecordStore>();
+        services.AddScoped<IRecordStore, QuoteApprovalDelegationRecordStore>();
         services.AddScoped<QuoteWorkflowGate>();
         services.AddScoped<QuoteReader>();
         services.AddScoped<IQuoteWorkflow, QuoteWorkflow>();

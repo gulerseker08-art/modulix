@@ -33,6 +33,8 @@ public static class CrmLookupDefinitions
     public const string QuoteOwner = "crm.quote.owner";
     public const string QuoteLineProduct = "crm.quote-line.product";
     public const string QuoteRuleApprover = "crm.quote-approval-rule.approver";
+    public const string QuoteDelegationFrom = "crm.quote-approval-delegation.from";
+    public const string QuoteDelegationTo = "crm.quote-approval-delegation.to";
 
     private static readonly string[] CompanyLabel = ["name"];
     private static readonly string[] CompanySecondary = ["city", "taxNumber"];
@@ -116,6 +118,16 @@ public static class CrmLookupDefinitions
         },
         Owner(QuoteOwner, CrmModule.Entities.Quote, "Sorumlu"),
         new(QuoteRuleApprover, CrmModule.Entities.QuoteApprovalRule, "approverId", "Onaylayan", LookupTargetKind.Member)
+        {
+            SearchDescription = "Üyenin görünen adı",
+            PageSize = 20,
+        },
+        new(QuoteDelegationFrom, CrmModule.Entities.QuoteApprovalDelegation, "fromUserId", "Vekâlet veren", LookupTargetKind.Member)
+        {
+            SearchDescription = "Üyenin görünen adı",
+            PageSize = 20,
+        },
+        new(QuoteDelegationTo, CrmModule.Entities.QuoteApprovalDelegation, "toUserId", "Vekil", LookupTargetKind.Member)
         {
             SearchDescription = "Üyenin görünen adı",
             PageSize = 20,

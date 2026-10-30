@@ -33,6 +33,8 @@ internal static class QuoteEndpoints
 
         CrmEndpoints.MapResource<QuoteApprovalRuleDto, SaveQuoteApprovalRuleRequest>(crm, "quote-approval-rules", CrmModule.Entities.QuoteApprovalRule,
             CrmModule.Permissions.QuoteRulesManage, CrmModule.Permissions.QuoteRulesManage);
+        CrmEndpoints.MapResource<QuoteApprovalDelegationDto, SaveQuoteApprovalDelegationRequest>(crm, "quote-approval-delegations", CrmModule.Entities.QuoteApprovalDelegation,
+            CrmModule.Permissions.QuoteRulesManage, CrmModule.Permissions.QuoteRulesManage);
 
         var quotes = crm.MapGroup("/quotes");
         quotes.MapGet("/{id:guid}/history", HistoryAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
@@ -130,8 +132,9 @@ internal static class QuoteEndpoints
         var result = await workflow.ApprovalRequirementsAsync(id, ct);
         return result.IsSuccess
             ? Results.Ok(new QuoteApprovalRequirementDto(
-                result.Value!.Required, [.. result.Value.Matches.Select(m => new QuoteApprovalMatchDto(m.RuleId, m.RuleVersion, m.Name, m.Reason, m.ApproverId))],
-                result.Value.ThresholdReason, result.Value.Restricted, result.Value.CanDecide, result.Value.Note))
+                result.Value!.Required, [.. result.Value.Matches.Select(m => new QuoteApprovalMatchDto(m.RuleId, m.RuleVersion, m.Name, m.Reason, m.ApproverId, m.Step))],
+                result.Value.ThresholdReason, result.Value.Restricted, result.Value.CanDecide, result.Value.Note,
+                [.. result.Value.Steps.Select(s => new QuoteApprovalStepDto(s.Step, s.Approvers, s.Completed, s.ApprovedBy))], result.Value.CurrentStep, result.Value.ActingAsDelegate))
             : RecordEndpoints.ToProblem(result.Error!);
     }
 
@@ -243,6 +246,7 @@ internal sealed class QuotePolicyProvider(IServiceProvider services) : IQuotePol
             string.Equals(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteOnAcceptWinOpportunity, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
             Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteFollowUpDays, cancellationToken)),
             Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteExpiryReminderDays, cancellationToken)),
-            string.Equals(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteSyncOpportunityAmount, cancellationToken), "true", StringComparison.OrdinalIgnoreCase));
+            string.Equals(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteSyncOpportunityAmount, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
+            Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteApprovalReminderHours, cancellationToken)));
     }
 }

@@ -17,6 +17,9 @@ public sealed class QuoteApprovalRule : CrmEntity
     /// <summary>Küçük sayı önce değerlendirilir ve gösterilir; eşleşme sonucunu değiştirmez.</summary>
     public int Priority { get; internal set; }
 
+    /// <summary>Onay adımı (1..9). Küçük adımlar önce tamamlanır; aynı adımdaki adlı onaylayanların hepsi onaylamalıdır.</summary>
+    public int Step { get; internal set; } = 1;
+
     public bool IsActive { get; internal set; } = true;
 
     /// <summary>Boşsa her para birimi; doluysa yalnızca bu para birimindeki teklifler (tutar koşulu için anlamlıdır).</summary>
