@@ -348,30 +348,20 @@ internal sealed class PlatformAdministration(
     }
 
     /// <summary>
-    /// Yönetici rolündeki üyeler; <paramref name="tenantDb"/> firmanın bağlamında olmalıdır. Sistem rolü atamaları tenant
-    /// bağlamında, üyelik ve kullanıcı platform tablolarındadır (ADR-0020): iki adımda birleştirilir (Dilim 3'te tek sorguya alınabilir).
+    /// Yönetici rolündeki üyeler; <paramref name="tenantDb"/> firmanın bağlamında olmalıdır (sistem rolü atamaları RLS altındadır).
+    /// Atama, üyelik ve kullanıcı tek sorguda birleştirilir (ADR-0020).
     /// </summary>
-    private async Task<IReadOnlyList<TenantAdministrator>> ListAdministratorsAsync(ModulixDbContext tenantDb, CancellationToken cancellationToken)
-    {
-        var adminMembershipIds = await (
+    private static async Task<IReadOnlyList<TenantAdministrator>> ListAdministratorsAsync(ModulixDbContext tenantDb, CancellationToken cancellationToken) =>
+        await (
             from assignment in tenantDb.MembershipRoles.AsNoTracking()
             join role in tenantDb.Roles.AsNoTracking() on assignment.RoleId equals role.Id
+            join membership in tenantDb.Memberships.AsNoTracking() on assignment.MembershipId equals membership.Id
+            join user in tenantDb.Users.AsNoTracking() on membership.UserId equals user.Id
             where role.IsSystem
-            select assignment.MembershipId)
-            .ToListAsync(cancellationToken);
-        if (adminMembershipIds.Count == 0)
-        {
-            return [];
-        }
-
-        return await (
-            from membership in db.Memberships.AsNoTracking()
-            join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
-            where adminMembershipIds.Contains(membership.Id)
             orderby user.DisplayName
             select new TenantAdministrator(membership.Id, user.DisplayName, user.Email ?? string.Empty, membership.Status))
+            .Distinct()
             .ToListAsync(cancellationToken);
-    }
 
     private IReadOnlyList<string> ValidateModules(IReadOnlyCollection<string> modules)
     {

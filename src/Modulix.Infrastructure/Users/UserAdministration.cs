@@ -74,12 +74,8 @@ internal sealed class UserAdministration(
 
         if (query.RoleId is { } roleId)
         {
-            // Rol atamaları tenant bağlamındadır (ADR-0020): o role sahip üyelik kimlikleri önce oradan okunur.
-            var withRole = await db.MembershipRoles.AsNoTracking()
-                .Where(mr => mr.RoleId == roleId)
-                .Select(mr => mr.MembershipId)
-                .ToListAsync(cancellationToken);
-            members = members.Where(m => withRole.Contains(m.Membership.Id));
+            // Rol atamaları RLS altındadır; alt sorgu aynı veritabanında çalışır (ADR-0020).
+            members = members.Where(m => db.MembershipRoles.Any(mr => mr.RoleId == roleId && mr.MembershipId == m.Membership.Id));
         }
 
         var total = await members.CountAsync(cancellationToken);
@@ -171,41 +167,29 @@ internal sealed class UserAdministration(
         var existingAccount = await users.HasPasswordAsync(user);
         var membership = Membership.CreateInvited(tenant.TenantId, user.Id, awaitsAcceptance: !existingAccount, now);
 
-        // Üyelik önce kaydedilir (rol atamaları ona yabancı anahtarla bağlıdır, ADR-0020 Dilim 2), sonra tenant tarafı yazılır;
-        // tenant tarafı başarısız olursa üyelik geri alınır (telafi), böylece rolsüz yetim üyelik kalmaz. Dilim 3'te tek
-        // işleme alınabilir.
+        // Üyelik, rol atamaları ve denetim kaydı tek işlemde yazılır (ADR-0020): hata olursa rolsüz yetim üyelik kalmaz.
+        // Açık bir işlem varsa (firma açılışı) ona katılır. EF ekleme sırasını yabancı anahtara göre kendisi belirler.
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
         db.Memberships.Add(membership);
-        await db.SaveChangesAsync(cancellationToken);
-
-        try
+        foreach (var roleId in roleIds)
         {
-            await using var transaction = db.Database.CurrentTransaction is null
-                ? await db.Database.BeginTransactionAsync(cancellationToken)
-                : null;
-            foreach (var roleId in roleIds)
-            {
-                db.MembershipRoles.Add(new MembershipRole(membership.Id, roleId));
-            }
-
-            Audit(tenant, membership.Id, AuditAction.Created, before: null, after: new JsonObject
-            {
-                ["email"] = email,
-                ["displayName"] = user.DisplayName,
-                ["status"] = membership.Status.ToString(),
-                ["roles"] = new JsonArray([.. assignable.Select(r => r.Name).Order(StringComparer.Ordinal).Select(n => JsonValue.Create(n))]),
-            });
-
-            await db.SaveChangesAsync(cancellationToken);
-            if (transaction is not null)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
+            db.MembershipRoles.Add(new MembershipRole(membership.Id, roleId));
         }
-        catch
+
+        Audit(tenant, membership.Id, AuditAction.Created, before: null, after: new JsonObject
         {
-            db.Memberships.Remove(membership);
-            await db.SaveChangesAsync(CancellationToken.None);
-            throw;
+            ["email"] = email,
+            ["displayName"] = user.DisplayName,
+            ["status"] = membership.Status.ToString(),
+            ["roles"] = new JsonArray([.. assignable.Select(r => r.Name).Order(StringComparer.Ordinal).Select(n => JsonValue.Create(n))]),
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
         }
 
         var context = await LoadEmailContextAsync(tenant, cancellationToken);
@@ -265,8 +249,7 @@ internal sealed class UserAdministration(
         Audit(tenant, membership.Id, AuditAction.Updated,
             new JsonObject { ["invitedAt"] = before }, new JsonObject { ["invitedAt"] = now });
 
-        await db.SaveChangesAsync(cancellationToken); // üyelik: platform DB
-        await db.SaveChangesAsync(cancellationToken);       // denetim kaydı: tenant DB
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task CancelInvitationAsync(Guid membershipId, CancellationToken cancellationToken)
@@ -283,12 +266,10 @@ internal sealed class UserAdministration(
         // Davet bekleyen üyelikte kayıt yoktur (sorumlu olamaz, giriş yapamaz); satır silinir ve bağlantı, üyeliğe bağlı
         // olduğu için çalışmaz. Hesap kalır: kişi başka tenant'ın davetini bekliyor olabilir; yeniden davet edilirse
         // aynı hesap kullanılır (yeni üyelik, yeni bağlantı).
-        // Rol atamaları tenant bağlamında, üyelik platform tablolarında (ADR-0020): önce tenant tarafı, sonra üyelik silinir.
+        // Rol atamaları, denetim kaydı ve üyelik tek kaydetmede silinir (ADR-0020); EF silme sırasını yabancı anahtara göre belirler.
         db.MembershipRoles.RemoveRange(await db.MembershipRoles.Where(mr => mr.MembershipId == membershipId).ToListAsync(cancellationToken));
         Audit(tenant, membershipId, AuditAction.Deleted,
             new JsonObject { ["email"] = user.Email, ["status"] = membership.Status.ToString() }, after: null);
-        await db.SaveChangesAsync(cancellationToken);
-
         db.Memberships.Remove(membership);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -330,28 +311,24 @@ internal sealed class UserAdministration(
             await administrators.EnsureAnotherActiveAdministratorAsync(systemId, membershipId, cancellationToken);
         }
 
-        // Kilit beklenirken başka bir istek durumu değiştirmiş olabilir (üyelik platform tablolarındadır, ADR-0020 Dilim 1).
+        // Kilit beklenirken başka bir istek durumu değiştirmiş olabilir.
         await db.Entry(membership).ReloadAsync(cancellationToken);
         if (membership.Status != MembershipStatus.Active)
         {
             return;
         }
 
-        // Devir ve denetim kaydı tenant bağlamında tek işlemde; üyeliğin devre dışı bırakılması platform tablolarında ayrı
-        // işlemdir (ADR-0020: ayrı SaveChanges adımlarıdır; Dilim 3'te tek işleme alınabilir). Önce kayıtlar devredilir, sonra üyelik kapatılır;
-        // platform yazımı başarısız olursa işlem yeniden denenebilir (kayıtlar zaten doğru sahipte).
+        // Devir, üyeliğin kapatılması ve denetim kaydı tek işlemdedir (ADR-0020). Önce kayıtlar devredilir, sonra üyelik kapatılır.
         if (receiver is not null)
         {
             await handover.TransferAsync(membership.UserId, receiver.UserId, cancellationToken);
         }
 
-        // Durum değişikliği önce bellekte uygulanır ki denetim kaydı yeni durumu yazsın; platform yazımı en sonda olur.
+        // Durum değişikliği önce bellekte uygulanır ki denetim kaydı yeni durumu yazsın.
         membership.Disable();
         AuditStatus(tenant, membership, MembershipStatus.Active);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-
-        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<OwnedRecordSummary>> GetOwnedRecordsAsync(Guid membershipId, CancellationToken cancellationToken)
@@ -413,8 +390,7 @@ internal sealed class UserAdministration(
 
         membership.Enable();
         AuditStatus(tenant, membership, MembershipStatus.Disabled);
-        await db.SaveChangesAsync(cancellationToken); // üyelik: platform DB
-        await db.SaveChangesAsync(cancellationToken);        // denetim kaydı: tenant DB
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task SendPasswordResetAsync(Guid membershipId, string publicUrl, CancellationToken cancellationToken)
@@ -575,11 +551,18 @@ internal sealed class UserAdministration(
         }
     }
 
+    /// <summary>Firma adı ve işlemi yapanın adı tek sorguda (ADR-0020); yapan firmanın üyesi değilse (platform yöneticisi) genel ad kullanılır.</summary>
     private async Task<(string TenantName, string ActorName)> LoadEmailContextAsync(TenantContext tenant, CancellationToken cancellationToken)
     {
-        var tenantName = await db.Tenants.AsNoTracking().Where(t => t.Id == tenant.TenantId).Select(t => t.Name).SingleAsync(cancellationToken);
-        var actorName = await db.Users.AsNoTracking().Where(u => u.Id == tenant.UserId).Select(u => u.DisplayName).SingleOrDefaultAsync(cancellationToken);
-        return (tenantName, actorName ?? "Kuruluşunuzun yöneticisi");
+        var context = await db.Tenants.AsNoTracking()
+            .Where(t => t.Id == tenant.TenantId)
+            .Select(t => new
+            {
+                t.Name,
+                ActorName = db.Users.Where(u => u.Id == tenant.UserId).Select(u => u.DisplayName).FirstOrDefault(),
+            })
+            .SingleAsync(cancellationToken);
+        return (context.Name, context.ActorName ?? "Kuruluşunuzun yöneticisi");
     }
 
     private bool IsLockedOut(ModulixUser user) => user.LockoutEnd is { } end && end > time.GetUtcNow();

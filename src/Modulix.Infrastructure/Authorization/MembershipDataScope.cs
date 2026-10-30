@@ -40,24 +40,19 @@ internal sealed class MembershipDataScope(
     }
 
     /// <summary>
-    /// Kişi ve kişinin ekiplerinden herhangi birindeki üyeler (kullanıcı kimlikleri). Ekip üyelikleri tenant
-    /// bağlamındadır, üyelik–kullanıcı eşleştirmesi platform tablolarındadır (ADR-0020): iki adımda birleştirilir.
+    /// Kişi ve kişinin ekiplerinden herhangi birindeki üyeler (kullanıcı kimlikleri). Ekip üyelikleri tenant verisidir (sorgu
+    /// filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür); üyelik–kullanıcı eşleştirmesi aynı sorguda yapılır (ADR-0020).
     /// </summary>
     internal static async Task<IReadOnlySet<Guid>> TeamOwnersAsync(
         ModulixDbContext db, Guid membershipId, Guid userId, CancellationToken cancellationToken)
     {
-        // Ekip üyelikleri tenant verisidir: sorgu filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür.
         var teamIds = db.TeamMembers.Where(tm => tm.MembershipId == membershipId).Select(tm => tm.TeamId);
-        var teammateMembershipIds = await db.TeamMembers.AsNoTracking()
-            .Where(member => teamIds.Contains(member.TeamId))
-            .Select(member => member.MembershipId)
+        var teammates = await (
+            from member in db.TeamMembers.AsNoTracking()
+            join membership in db.Memberships.AsNoTracking() on member.MembershipId equals membership.Id
+            where teamIds.Contains(member.TeamId)
+            select membership.UserId)
             .Distinct()
-            .ToListAsync(cancellationToken);
-
-        // Üyelik kimliklerini kullanıcı kimliklerine platform tablolarından çöz (Dilim 3'te tek sorguya alınabilir).
-        var teammates = await db.Memberships.AsNoTracking()
-            .Where(m => teammateMembershipIds.Contains(m.Id))
-            .Select(m => m.UserId)
             .ToListAsync(cancellationToken);
         return teammates.Append(userId).ToHashSet();
     }
