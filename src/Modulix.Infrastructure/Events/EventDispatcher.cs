@@ -231,13 +231,14 @@ public sealed class EventDispatcher(
         var completedBefore = now - CompletedRetention;
         var failedBefore = now - FailedRetention;
 
+        // Temizlik bütün tenant'lar içindir (tablolar RLS dışı); tenant sorgu filtresi atlanır.
         var deliveries = await DeleteInChunksAsync(
-            () => db.EventDeliveries.Where(d =>
+            () => db.EventDeliveries.IgnoreQueryFilters().Where(d =>
                 ((d.Status == EventDeliveryStatus.Succeeded || d.Status == EventDeliveryStatus.Skipped) && d.CompletedAt < completedBefore)
                 || (d.Status == EventDeliveryStatus.Failed && d.CompletedAt < failedBefore)),
             cancellationToken);
         var events = await DeleteInChunksAsync(
-            () => db.OutboxMessages.Where(o => o.DispatchedAt < completedBefore && !db.EventDeliveries.Any(d => d.EventId == o.Id)),
+            () => db.OutboxMessages.IgnoreQueryFilters().Where(o => o.DispatchedAt < completedBefore && !db.EventDeliveries.IgnoreQueryFilters().Any(d => d.EventId == o.Id)),
             cancellationToken);
 
         if (deliveries + events > 0)
@@ -248,14 +249,35 @@ public sealed class EventDispatcher(
         return deliveries + events;
     }
 
-    /// <summary>Gözlemleme (Ç14.5): en eski dağıtılmamış olayın ve en eski bekleyen teslimin zamanı, başarısız teslim sayısı.</summary>
-    public async Task<EventBacklog> MeasureAsync(CancellationToken cancellationToken)
+    /// <summary>Gözlemleme (Ç14.5), aktif tenant için: en eski dağıtılmamış olayın ve en eski bekleyen teslimin zamanı, başarısız teslim sayısı.</summary>
+    public Task<EventBacklog> MeasureAsync(CancellationToken cancellationToken) =>
+        MeasureAsync(db.OutboxMessages, db.EventDeliveries, cancellationToken);
+
+    /// <summary>Gözlemleme, bütün tenant'lar için tek sorguyla (işleyici ve /health; ADR-0020 Dilim 3). Tablolar RLS dışıdır.</summary>
+    public Task<EventBacklog> MeasureAllTenantsAsync(CancellationToken cancellationToken) =>
+        MeasureAsync(db.OutboxMessages.IgnoreQueryFilters(), db.EventDeliveries.IgnoreQueryFilters(), cancellationToken);
+
+    /// <summary>
+    /// Dağıtılmamış olayı veya zamanı gelmiş bekleyen teslimi olan tenant'lar (ADR-0020 Dilim 3): işleyici yalnızca bunların
+    /// bağlamında tur atar. Tek sorgudur; tenant sayısıyla büyümez.
+    /// </summary>
+    public async Task<IReadOnlyList<Guid>> TenantsWithPendingWorkAsync(CancellationToken cancellationToken)
     {
-        var oldestEvent = await db.OutboxMessages.Where(o => o.DispatchedAt == null)
+        var now = time.GetUtcNow();
+        return await db.OutboxMessages.IgnoreQueryFilters().Where(o => o.DispatchedAt == null).Select(o => o.TenantId)
+            .Union(db.EventDeliveries.IgnoreQueryFilters()
+                .Where(d => d.Status == EventDeliveryStatus.Pending && d.NextAttemptAt <= now)
+                .Select(d => d.TenantId))
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<EventBacklog> MeasureAsync(IQueryable<OutboxMessage> events, IQueryable<EventDelivery> deliveries, CancellationToken cancellationToken)
+    {
+        var oldestEvent = await events.Where(o => o.DispatchedAt == null)
             .MinAsync(o => (DateTimeOffset?)o.OccurredAt, cancellationToken);
-        var oldestDelivery = await db.EventDeliveries.Where(d => d.Status == EventDeliveryStatus.Pending)
+        var oldestDelivery = await deliveries.Where(d => d.Status == EventDeliveryStatus.Pending)
             .MinAsync(d => (DateTimeOffset?)d.CreatedAt, cancellationToken);
-        var failed = await db.EventDeliveries.CountAsync(d => d.Status == EventDeliveryStatus.Failed, cancellationToken);
+        var failed = await deliveries.CountAsync(d => d.Status == EventDeliveryStatus.Failed, cancellationToken);
         var backlog = new EventBacklog(time.GetUtcNow(), oldestEvent, oldestDelivery, failed);
         metrics.Observe(backlog);
         return backlog;

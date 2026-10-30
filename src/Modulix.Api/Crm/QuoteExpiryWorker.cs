@@ -1,11 +1,13 @@
 using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
+using Modulix.Core.Platform;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
 using Modulix.Modules.Crm;
@@ -120,7 +122,7 @@ public sealed class QuoteExpiryWorker(
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
-                foreach (var tenantId in await Events.EventDispatchWorker.ActiveTenantIdsAsync(scope.ServiceProvider, stoppingToken))
+                foreach (var tenantId in await CrmTenantIdsAsync(scope.ServiceProvider, stoppingToken))
                 {
                     try
                     {
@@ -163,5 +165,17 @@ public sealed class QuoteExpiryWorker(
                 return;
             }
         }
+    }
+
+    /// <summary>CRM modülü açık olan açık tenant'lar (ADR-0020 Dilim 3): yalnızca onlarda tur atılır; tek platform sorgusudur.</summary>
+    internal static async Task<IReadOnlyList<Guid>> CrmTenantIdsAsync(IServiceProvider services, CancellationToken cancellationToken)
+    {
+        var db = services.GetRequiredService<ModulixDbContext>();
+        return await (
+            from tenant in db.Tenants.AsNoTracking()
+            join entitlement in db.ModuleEntitlements.AsNoTracking() on tenant.Id equals entitlement.TenantId
+            where tenant.Status == TenantStatus.Active && entitlement.ModuleKey == CrmModule.ModuleKey && entitlement.IsEnabled
+            select tenant.Id)
+            .ToListAsync(cancellationToken);
     }
 }

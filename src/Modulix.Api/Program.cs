@@ -107,6 +107,15 @@ if (args.Contains(PlatformAdministratorCommand.Name, StringComparer.OrdinalIgnor
     return;
 }
 
+// "tenant-export" / "tenant-delete" komutları: bir tenant'ın bütün verisini TenantId ile dışa aktarır ya da siler (ADR-0020 Dilim 3).
+//   dotnet run --project src/Modulix.Api -- tenant-export acme [--dir exports/acme]
+//   dotnet run --project src/Modulix.Api -- tenant-delete acme --confirm acme
+if (TenantDataCommand.Matches(args))
+{
+    Console.WriteLine(await TenantDataCommand.RunAsync(app.Services, args));
+    return;
+}
+
 // "test-email" komutu: verilen adrese deneme e-postası gönderir ve sonucu yazar; SMTP ayarlarını sınamak içindir.
 //   dotnet run --project src/Modulix.Api -- test-email adres@ornek.com
 if (args.Contains("test-email", StringComparer.OrdinalIgnoreCase))

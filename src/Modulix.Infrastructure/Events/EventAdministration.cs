@@ -7,17 +7,18 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
 using Modulix.Core.Modules;
-using Modulix.Core.Platform;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
+using Modulix.Infrastructure.Records;
 
 namespace Modulix.Infrastructure.Events;
 
 /// <summary>
 /// Olaylar platform ekranı (ADR-0007). Satırlarda olay türü, kayıt türü ve kimliği, abonelik, deneme sayısı ve son hata
-/// görünür; payload okunmaz. Yeniden deneme ve atlama teslimin tenant'ının bağlamında, denetim kaydıyla aynı işlemde
-/// yazılır.
+/// görünür; payload okunmaz. Tek veritabanında (ADR-0020 Dilim 3) bütün tenant'ların teslimleri tek sorguyla okunur
+/// (outbox/teslim tabloları RLS dışıdır; tenant sorgu filtresi platform ekranı için açıkça atlanır). Yeniden deneme ve
+/// atlama teslimin tenant'ının bağlamında, denetim kaydıyla aynı işlemde yazılır.
 /// </summary>
 internal sealed class EventAdministration(
     ModulixDbContext db,
@@ -32,38 +33,15 @@ internal sealed class EventAdministration(
 
     public const string SkippedByAdministrator = "Platform yöneticisi atladı.";
 
-    // ADR-0020: outbox ve teslimler tek veritabanında tenant bağlamıyla okunur (ADR-0020). Platform ekranı bir sorguyla bütün tenant'ları
-    // göremez; açık tenant'lar üzerinde dönülür ve sonuç bellekte birleştirilip süzülür/sayfalanır.
     public async Task<EventSummary> GetSummaryAsync(CancellationToken cancellationToken)
     {
-        var rows = await AllRowsAsync(tenantId: null, cancellationToken);
-        var pending = rows.Where(r => r.Delivery.Status == EventDeliveryStatus.Pending).ToList();
-        DateTimeOffset? oldestEvent = null;
-        foreach (var tenant in await ActiveTenantsAsync(tenantId: null, cancellationToken))
-        {
-            try
-            {
-                await using var scope = tenantScopes.Create(new TenantContext(tenant.Id, Guid.Empty, Guid.Empty));
-                var tenantDb = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-                var oldest = await tenantDb.OutboxMessages.Where(o => o.DispatchedAt == null)
-                    .MinAsync(o => (DateTimeOffset?)o.OccurredAt, cancellationToken);
-                if (oldest is { } at && (oldestEvent is null || at < oldestEvent))
-                {
-                    oldestEvent = at;
-                }
-            }
-            catch (Exception)
-            {
-                // Ulaşılamayan tenant atlanır (tenant başına döngü; ADR-0020 Dilim 3'te sadeleşir).
-            }
-        }
-
+        var pending = Rows().Where(r => r.Delivery.Status == EventDeliveryStatus.Pending);
         return new EventSummary(
-            pending.Count(r => !r.Blocked),
-            pending.Count(r => r.Blocked),
-            rows.Count(r => r.Delivery.Status == EventDeliveryStatus.Failed),
-            oldestEvent,
-            pending.Count == 0 ? null : pending.Min(r => r.Delivery.CreatedAt),
+            await pending.CountAsync(r => !r.Blocked, cancellationToken),
+            await pending.CountAsync(r => r.Blocked, cancellationToken),
+            await Deliveries().CountAsync(d => d.Status == EventDeliveryStatus.Failed, cancellationToken),
+            await Events().Where(o => o.DispatchedAt == null).MinAsync(o => (DateTimeOffset?)o.OccurredAt, cancellationToken),
+            await Deliveries().Where(d => d.Status == EventDeliveryStatus.Pending).MinAsync(d => (DateTimeOffset?)d.CreatedAt, cancellationToken),
             [.. catalog.EventSubscriptions.Select(s => s.Subscription.Key)],
             [.. DomainEventTypes.SchemaVersions.Keys.Order(StringComparer.Ordinal)]);
     }
@@ -74,10 +52,9 @@ internal sealed class EventAdministration(
         var page = Math.Max(1, query.Page);
         var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
-        var all = await AllRowsAsync(query.TenantId, cancellationToken);
-        var rows = Filter(all, query).ToList();
-        var total = rows.Count;
-        var items = rows
+        var rows = Filter(Rows(), query);
+        var total = await rows.CountAsync(cancellationToken);
+        var items = await rows
             .OrderByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id)
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(r => new EventDeliveryItem(
@@ -90,18 +67,19 @@ internal sealed class EventAdministration(
                 r.Delivery.EntityKey,
                 r.Delivery.RecordId,
                 r.Delivery.Sequence,
-                StateOf(r.Delivery.Status, r.Blocked),
+                r.Delivery.Status == EventDeliveryStatus.Pending && r.Blocked ? EventDeliveryState.Held : (EventDeliveryState)(int)r.Delivery.Status,
                 r.Delivery.AttemptCount,
                 r.Delivery.CreatedAt,
                 r.Delivery.NextAttemptAt,
                 r.Delivery.CompletedAt,
                 r.Delivery.LastError,
                 r.Delivery.Status == EventDeliveryStatus.Failed && r.Delivery.Ordered
-                    ? all.Count(n => n.Delivery.TenantId == r.Delivery.TenantId && n.Delivery.Subscription == r.Delivery.Subscription
-                        && n.Delivery.EntityKey == r.Delivery.EntityKey && n.Delivery.RecordId == r.Delivery.RecordId
-                        && n.Delivery.Sequence > r.Delivery.Sequence && n.Delivery.Status == EventDeliveryStatus.Pending)
+                    ? db.EventDeliveries.IgnoreQueryFilters().Count(n =>
+                        n.TenantId == r.Delivery.TenantId && n.Subscription == r.Delivery.Subscription
+                        && n.EntityKey == r.Delivery.EntityKey && n.RecordId == r.Delivery.RecordId
+                        && n.Sequence > r.Delivery.Sequence && n.Status == EventDeliveryStatus.Pending)
                     : 0))
-            .ToList();
+            .ToListAsync(cancellationToken);
 
         return new EventDeliveryPage([.. items], page, pageSize, total);
     }
@@ -113,64 +91,38 @@ internal sealed class EventAdministration(
         ChangeAsync(ids, filter, actingUserId, EventDeliveryStatus.Skipped, cancellationToken);
 
     /// <summary>
-    /// Bekleyen (kiralı değilse) veya başarısız teslimi yeniden zamanlar ya da atlar. Teslimler tenant'larına göre
-    /// gruplanır; her tenant'ta durum değişikliği ve denetim kaydı aynı işlemdedir.
+    /// Bekleyen (kiralı değilse) veya başarısız teslimi yeniden zamanlar ya da atlar. Seçim tek sorguyla yapılır; teslimler
+    /// tenant'larına göre gruplanır ve her tenant'ta durum değişikliği ile denetim kaydı aynı işlemde yazılır.
     /// </summary>
     private async Task<int> ChangeAsync(
         IReadOnlyCollection<Guid>? ids, EventDeliveryQuery? filter, Guid actingUserId, EventDeliveryStatus target, CancellationToken cancellationToken)
     {
-        // ADR-0020: teslimler tek veritabanında tenant bağlamıyla okunur (ADR-0020); her tenant kendi bağlamında, denetim kaydıyla aynı
-        // işlemde değiştirilir. Toplu sınır bütün tenant'lara yayılır.
-        var budget = IEventAdministration.MaxBulk;
-        var changed = 0;
-        foreach (var tenantRef in await ActiveTenantsAsync(filter?.TenantId, cancellationToken))
+        var selected = ids is { Count: > 0 }
+            ? await Deliveries().Where(d => ids.Contains(d.Id)).Select(d => d.Id).Take(IEventAdministration.MaxBulk).ToListAsync(cancellationToken)
+            : filter is not null
+                ? await Filter(Rows(), filter).OrderBy(r => r.Delivery.CreatedAt).Select(r => r.Delivery.Id).Take(IEventAdministration.MaxBulk).ToListAsync(cancellationToken)
+                : [];
+        if (selected.Count == 0)
         {
-            if (budget <= 0)
-            {
-                break;
-            }
+            return 0;
+        }
 
-            await using var scope = tenantScopes.Create(new TenantContext(tenantRef.Id, actingUserId, Guid.Empty));
+        var deliveries = await (
+            from d in Deliveries().AsNoTracking()
+            join e in Events().AsNoTracking() on d.EventId equals e.Id
+            where selected.Contains(d.Id)
+            select new { Delivery = d, e.EventType })
+            .ToListAsync(cancellationToken);
+
+        var changed = 0;
+        foreach (var tenant in deliveries.GroupBy(d => d.Delivery.TenantId))
+        {
+            await using var scope = tenantScopes.Create(new TenantContext(tenant.Key, actingUserId, Guid.Empty));
             var tenantDb = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
             var audit = scope.ServiceProvider.GetRequiredService<IAuditWriter>();
-
-            List<Guid> selected;
-            try
-            {
-                if (ids is { Count: > 0 })
-                {
-                    selected = await tenantDb.EventDeliveries.Where(d => ids.Contains(d.Id)).Select(d => d.Id).Take(budget).ToListAsync(cancellationToken);
-                }
-                else if (filter is not null)
-                {
-                    var rows = await RowsForTenantAsync(tenantRef, tenantDb, cancellationToken);
-                    selected = Filter(rows, filter).OrderBy(r => r.Delivery.CreatedAt).Select(r => r.Delivery.Id).Take(budget).ToList();
-                }
-                else
-                {
-                    selected = [];
-                }
-            }
-            catch (Exception)
-            {
-                // Ulaşılamayan tenant atlanır (tenant başına döngü; ADR-0020 Dilim 3'te sadeleşir); diğer tenant'lar etkilenmez.
-                continue;
-            }
-
-            if (selected.Count == 0)
-            {
-                continue;
-            }
-
-            var deliveries = await (
-                from d in tenantDb.EventDeliveries.AsNoTracking()
-                join e in tenantDb.OutboxMessages.AsNoTracking() on d.EventId equals e.Id
-                where selected.Contains(d.Id)
-                select new { Delivery = d, e.EventType })
-                .ToListAsync(cancellationToken);
-
             await using var transaction = await tenantDb.Database.BeginTransactionAsync(cancellationToken);
-            foreach (var (delivery, eventType) in deliveries.Select(t => (t.Delivery, t.EventType)))
+
+            foreach (var (delivery, eventType) in tenant.Select(t => (t.Delivery, t.EventType)))
             {
                 var now = time.GetUtcNow();
                 var open = tenantDb.EventDeliveries.Where(d =>
@@ -220,7 +172,6 @@ internal sealed class EventAdministration(
                     ExecutionSource.Api,
                     Activity.Current?.TraceId.ToString()));
                 changed++;
-                budget--;
             }
 
             await tenantDb.SaveChangesAsync(cancellationToken);
@@ -230,7 +181,7 @@ internal sealed class EventAdministration(
         return changed;
     }
 
-    private static IEnumerable<Row> Filter(IEnumerable<Row> rows, EventDeliveryQuery query)
+    private static IQueryable<Row> Filter(IQueryable<Row> rows, EventDeliveryQuery query)
     {
         if (query.TenantId is { } tenantId)
         {
@@ -266,59 +217,25 @@ internal sealed class EventAdministration(
         };
     }
 
-    /// <summary>Açık tenant'lar; <paramref name="tenantId"/> verilirse yalnızca o tenant.</summary>
-    private async Task<IReadOnlyList<TenantRef>> ActiveTenantsAsync(Guid? tenantId, CancellationToken cancellationToken)
-    {
-        var query = db.Tenants.AsNoTracking().Where(t => t.Status == TenantStatus.Active);
-        if (tenantId is { } id)
+    // Platform ekranı bütün tenant'ları görür: tenant sorgu filtresi açıkça atlanır (tablolar RLS dışıdır, ADR-0007).
+    private IQueryable<EventDelivery> Deliveries() => db.EventDeliveries.IgnoreQueryFilters();
+
+    private IQueryable<OutboxMessage> Events() => db.OutboxMessages.IgnoreQueryFilters();
+
+    // Teslim, olayın türü, firmanın adı ve sıralı teslimin önceki bitmemiş teslimi bekleyip beklemediği.
+    private IQueryable<Row> Rows() =>
+        from d in Deliveries().AsNoTracking()
+        join e in Events().AsNoTracking() on d.EventId equals e.Id
+        join t in db.Tenants.AsNoTracking() on d.TenantId equals t.Id
+        select new Row
         {
-            query = query.Where(t => t.Id == id);
-        }
-
-        return await query.Select(t => new TenantRef(t.Id, t.Name)).ToListAsync(cancellationToken);
-    }
-
-    /// <summary>Bütün (veya seçili) tenant'ların teslim satırlarını tenant başına okuyup bellekte birleştirir.</summary>
-    private async Task<List<Row>> AllRowsAsync(Guid? tenantId, CancellationToken cancellationToken)
-    {
-        var rows = new List<Row>();
-        foreach (var tenant in await ActiveTenantsAsync(tenantId, cancellationToken))
-        {
-            try
-            {
-                await using var scope = tenantScopes.Create(new TenantContext(tenant.Id, Guid.Empty, Guid.Empty));
-                var tenantDb = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-                rows.AddRange(await RowsForTenantAsync(tenant, tenantDb, cancellationToken));
-            }
-            catch (Exception)
-            {
-                // Bir tenant'ın veritabanına ulaşılamazsa ekran tümden düşmez; o tenant atlanır (tenant başına döngü; ADR-0020 Dilim 3'te sadeleşir).
-            }
-        }
-
-        return rows;
-    }
-
-    // Teslim, olayın türü, firmanın adı ve sıralı teslimin önceki bitmemiş teslimi bekleyip beklemediği (tenant DB'si).
-    private static async Task<List<Row>> RowsForTenantAsync(TenantRef tenant, ModulixDbContext tenantDb, CancellationToken cancellationToken) =>
-        await (
-            from d in tenantDb.EventDeliveries.AsNoTracking()
-            join e in tenantDb.OutboxMessages.AsNoTracking() on d.EventId equals e.Id
-            select new Row
-            {
-                Delivery = d,
-                EventType = e.EventType,
-                TenantName = tenant.Name,
-                Blocked = d.Ordered && tenantDb.EventDeliveries.Any(p =>
-                    p.TenantId == d.TenantId && p.Subscription == d.Subscription && p.EntityKey == d.EntityKey && p.RecordId == d.RecordId
-                    && p.Sequence < d.Sequence && (p.Status == EventDeliveryStatus.Pending || p.Status == EventDeliveryStatus.Failed)),
-            })
-            .ToListAsync(cancellationToken);
-
-    private sealed record TenantRef(Guid Id, string Name);
-
-    private static EventDeliveryState StateOf(EventDeliveryStatus status, bool blocked) =>
-        status == EventDeliveryStatus.Pending && blocked ? EventDeliveryState.Held : (EventDeliveryState)(int)status;
+            Delivery = d,
+            EventType = e.EventType,
+            TenantName = t.Name,
+            Blocked = d.Ordered && db.EventDeliveries.IgnoreQueryFilters().Any(p =>
+                p.TenantId == d.TenantId && p.Subscription == d.Subscription && p.EntityKey == d.EntityKey && p.RecordId == d.RecordId
+                && p.Sequence < d.Sequence && (p.Status == EventDeliveryStatus.Pending || p.Status == EventDeliveryStatus.Failed)),
+        };
 
     private sealed class Row
     {

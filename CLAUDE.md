@@ -15,7 +15,9 @@ dotnet test tests/Modulix.Core.Tests             # birim
 dotnet test tests/Modulix.Modules.Crm.Tests      # birim
 dotnet test tests/Modulix.IntegrationTests       # SQL Server + Mailpit gerekir
 dotnet run --project src/Modulix.Api             # API + arayüz; /health
-dotnet run --project src/Modulix.Api -- migrate  # bekleyen migration'lar (platform + tenant zinciri, aynı DB); db-up.ps1 bunu çağırır
+dotnet run --project src/Modulix.Api -- migrate  # bekleyen migration'lar (tek zincir); db-up.ps1 bunu çağırır
+dotnet run --project src/Modulix.Api -- tenant-export <slug> [--dir <dizin>]   # tenant verisini TenantId ile JSON olarak dışa aktarır
+dotnet run --project src/Modulix.Api -- tenant-delete <slug> --confirm <slug>  # tenant verisini siler (geri alınamaz; önce dışa aktar)
 ```
 
 - Yerel veritabanı: `docker compose up -d --wait sqlserver mailpit && docker compose run --rm db-init` (şifreler `.env`'de; Windows'ta `scripts/db-up.ps1`). Port 14333.
