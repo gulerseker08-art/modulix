@@ -28,6 +28,11 @@ public partial class EndpointProtectionTests(ModulixApiFactory factory) : IClass
         // Herkese açık Lead toplama (ADR-0014): oturumsuzdur; tenant URL'den çözülür, kimlik form sırrı/izinli kaynakla, savunma hız sınırı ve alan listesiyledir.
         "POST /api/public/lead-forms/{tenant}/{formKey}/",
         "OPTIONS /api/public/lead-forms/{tenant}/{formKey}/",
+        // Müşteri teklif sayfası (ADR-0019): oturumsuzdur; kimlik doğrulama bağlantı belirtecine sahip olmaktır (gövdede, özeti saklanır),
+        // tenant URL'den çözülür, hız sınırı ve tek tip 404 uygulanır.
+        "POST /api/public/quotes/{tenant}/view",
+        "POST /api/public/quotes/{tenant}/pdf",
+        "POST /api/public/quotes/{tenant}/decision",
     ];
 
     /// <summary>
