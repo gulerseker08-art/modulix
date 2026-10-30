@@ -209,7 +209,7 @@ internal sealed class CompanyAdministration(
     private TenantContext RequireTenant() =>
         tenantAccessor.Current ?? throw new InvalidOperationException("Aktif tenant olmadan şirketler yönetilemez.");
 
-    // Üyelikler platform DB'sindedir (ADR-0009); atamadan önce üyeliğin bu tenant'a ait olduğu açıkça denetlenir.
+    // Üyelikler platform bağlamındadır (ADR-0020 Dilim 1); atamadan önce üyeliğin bu tenant'a ait olduğu açıkça denetlenir.
     private Task<bool> MembershipBelongsToTenantAsync(Guid membershipId, Guid tenantId, CancellationToken cancellationToken) =>
         platform.Memberships.AnyAsync(m => m.Id == membershipId && m.TenantId == tenantId, cancellationToken);
 

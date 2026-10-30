@@ -49,8 +49,8 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
     private readonly CapturingLoggerProvider logs = new();
     private readonly WebApplicationFactory<Program> host;
 
-    // ADR-0009: outbox/teslimler tenant başına ayrı veritabanındadır. Test, kullandığı tenant'ları izler; işleyici ve
-    // veri okuma yardımcıları bu tenant'ların bağlamında (ayrı veritabanlarında) çalışır.
+    // ADR-0020 Dilim 1: outbox/teslimler tek veritabanında tenant bağlamıyla okunur (ADR-0020). Test, kullandığı tenant'ları izler; işleyici ve
+    // veri okuma yardımcıları bu tenant'ların bağlamında (oturum tenant'ı yazılarak) çalışır.
     private readonly List<Guid> tenantIds = [];
 
     public EventTests(ModulixApiFactory factory)
@@ -70,7 +70,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
     }
 
     /// <summary>
-    /// ADR-0009: her test kendi tenant'ını ve ayrı iş veritabanını oluşturur; outbox ve teslimler o veritabanında
+    /// ADR-0020 Dilim 1: her test kendi tenant'ını oluşturur; outbox ve teslimler o tenant'ın bağlamında (TenantId ile)
     /// izole olduğundan önceki testlerden kalan olay bu testin işleyicisine karışmaz. Eski genel sıfırlama (tek paylaşımlı
     /// veritabanı varsayımı) gerekmez.
     /// </summary>
@@ -764,7 +764,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
 
     private Task<int> CleanupAsync() => WithDispatcherAsync(d => d.CleanupAsync(CancellationToken.None));
 
-    /// <summary>Tenant bağlamlı host kapsamı (ADR-0009): işleyici/veri o tenant'ın ayrı veritabanında çalışır.</summary>
+    /// <summary>Tenant bağlamlı host kapsamı (ADR-0020 Dilim 1): işleyici/veri o tenant'ın bağlamında (oturum tenant'ı) çalışır.</summary>
     private IServiceScope TenantScope(Guid tenantId)
     {
         var scope = host.Services.CreateScope();
@@ -791,7 +791,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         return last ?? new EventBacklog(time.GetUtcNow(), null, null, 0);
     }
 
-    /// <summary>Zamanı gelmiş olay ve teslim kalmayana kadar işleyiciyi (her tenant'ın veritabanında) çalıştırır.</summary>
+    /// <summary>Zamanı gelmiş olay ve teslim kalmayana kadar işleyiciyi (her tenant'ın bağlamında) çalıştırır.</summary>
     private async Task DrainAsync()
     {
         for (var i = 0; i < 50; i++)
@@ -869,7 +869,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         return false;
     }
 
-    /// <summary>Kaydın olay (outbox) iletisini, bulunduğu tenant veritabanından okur (ADR-0009).</summary>
+    /// <summary>Kaydın olay (outbox) iletisini, tenant bağlamıyla okur (ADR-0020 Dilim 1).</summary>
     private async Task<OutboxMessage> OutboxAsync(Guid recordId)
     {
         foreach (var id in tenantIds.Distinct())

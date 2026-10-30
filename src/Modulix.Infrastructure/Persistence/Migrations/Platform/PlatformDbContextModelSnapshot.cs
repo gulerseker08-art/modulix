@@ -156,10 +156,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Platform
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("DatabaseName")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -172,13 +168,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Platform
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<int>("ProvisioningStatus")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SchemaVersion")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -188,10 +177,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Platform
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("DatabaseName")
-                        .IsUnique()
-                        .HasFilter("[DatabaseName] IS NOT NULL");
 
                     b.HasIndex("Slug")
                         .IsUnique();

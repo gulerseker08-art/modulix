@@ -25,7 +25,7 @@ public enum EmailStatus
 }
 
 /// <summary>
-/// E-posta kuyruğu (platform.EmailMessages). ADR-0009: kuyruk <b>platform veritabanındadır</b>; tek işleyici tüm
+/// E-posta kuyruğu (platform.EmailMessages). ADR-0020 Dilim 1: kuyruk <b>platform bağlamındadır</b>; tek işleyici tüm
 /// tenant'ların e-postalarını gönderir ve giriş anındaki (aktif tenant olmayan) platform e-postaları da (şifre
 /// sıfırlama, kurtarma kodu) buraya yazılabilir. Her satır varsa <see cref="TenantId"/> taşır; platform e-postasında boştur.
 /// </summary>
@@ -288,7 +288,7 @@ public interface IEmailTransport
 }
 
 /// <summary>
-/// E-postayı platform kuyruğuna yazar (ADR-0009). Kuyruk platform veritabanındadır; gönderim ertelenir (Pending).
+/// E-postayı platform kuyruğuna yazar (ADR-0020 Dilim 1). Kuyruk platform bağlamındadır; gönderim ertelenir (Pending).
 /// İki durum:
 /// <list type="bullet">
 ///   <item><b>Olay teslimi içinde</b> (<see cref="EventHandlingScope"/> etkin): e-posta, isteğin platform bağlamına
@@ -300,7 +300,7 @@ public interface IEmailTransport
 /// </summary>
 internal sealed class EfEmailQueue(
     PlatformDbContext platformDb,
-    PlatformDatabaseOptions platform,
+    ModulixDatabaseOptions database,
     ITenantContextAccessor tenantAccessor,
     EventHandlingScope handling,
     TimeProvider time) : IEmailQueue
@@ -315,7 +315,7 @@ internal sealed class EfEmailQueue(
             return;
         }
 
-        using var db = PersistenceSetup.CreatePlatformContext(platform.AppConnectionString);
+        using var db = PersistenceSetup.CreatePlatformContext(database.AppConnectionString);
         db.EmailMessages.Add(email);
         db.SaveChanges();
     }

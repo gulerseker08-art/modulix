@@ -66,7 +66,7 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             {
                 accessor.Current = new TenantContext(membership.TenantId, userId, membership.MembershipId);
 
-                // ITenantSettings tenant DbContext'ine bağlıdır (ADR-0009); yalnızca aktif tenant kurulduktan SONRA çözülür.
+                // ITenantSettings tenant DbContext'ine bağlıdır (ADR-0020 Dilim 1); yalnızca aktif tenant kurulduktan SONRA çözülür.
                 var settings = context.RequestServices.GetRequiredService<ITenantSettings>();
 
                 // Firma iki adımlı doğrulamayı zorunlu kılıyorsa kapalı olan kişi önce kurulumu yapar (Y7b).

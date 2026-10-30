@@ -13,7 +13,6 @@ using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
-using Modulix.Infrastructure.Tenancy;
 
 namespace Modulix.IntegrationTests;
 
@@ -26,13 +25,12 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
 {
     public const string Password = "Test.Password1";
 
-    // Bu fabrikanın oluşturduğu tenant iş veritabanları ve platform kayıtları; Dispose yalnızca bunları temizler.
-    private readonly System.Collections.Concurrent.ConcurrentBag<string> createdDatabases = [];
+    // Bu fabrikanın oluşturduğu tenant'lar; Dispose yalnızca bunların platform kayıtlarını temizler.
     private readonly System.Collections.Concurrent.ConcurrentBag<Guid> createdTenants = [];
 
     // Dispose sırasında Services artık kullanılamaz (ObjectDisposedException; her test sınıfı "Test Class Cleanup Failure" verip çıkış kodunu 1 yapıyordu):
     // temizlik için gereken bağlantı ayarları tenant oluşturulurken alınır.
-    private PlatformDatabaseOptions? cleanupOptions;
+    private ModulixDatabaseOptions? cleanupOptions;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) =>
         builder
@@ -64,66 +62,39 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
 
-        // Tenant iş veritabanını kur (ADR-0009); gerçek akıştaki gibi fiziksel olarak ayrı bir veritabanı oluşur.
-        var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
-        var databaseName = await provisioning.PrepareAsync(tenant.Id, CancellationToken.None);
-        await provisioning.CompleteAsync(tenant.Id, CancellationToken.None);
-        cleanupOptions ??= Services.GetRequiredService<PlatformDatabaseOptions>();
-        createdDatabases.Add(databaseName);
+        cleanupOptions ??= Services.GetRequiredService<ModulixDatabaseOptions>();
         createdTenants.Add(tenant.Id);
         return tenant;
     }
 
     /// <summary>
-    /// Yalnızca bu test çalıştırmasının oluşturduğu tenant veritabanlarını siler (talimat Bölüm 9: temizleme yalnızca
-    /// testin oluşturduğu veritabanlarını hedefler). En iyi çaba: hata olursa test başarısını etkilemez.
+    /// Yalnızca bu test çalıştırmasının oluşturduğu tenant'ların platform kayıtlarını (üyelik, modül hakkı, tenant) siler;
+    /// böylece firma listesi test tenant'larıyla şişmez. Tenant iş satırları tek veritabanında TenantId ile kalır
+    /// (ADR-0020); RLS yüzünden rastgele tenant kimlikleriyle kimseye görünmezler. En iyi çaba: hata olursa test
+    /// başarısını etkilemez.
     /// </summary>
     protected override void Dispose(bool disposing)
     {
-        if (disposing && !createdDatabases.IsEmpty && cleanupOptions is { } options)
+        if (disposing && !createdTenants.IsEmpty && cleanupOptions is { } options)
         {
             try
             {
-
-                // Platform kayıtlarını (üyelik, modül hakkı, tenant) temizle; böylece düşen tenant DB'leri platform
-                // defterinde "Active" yetim kayıt bırakmaz (talimat Bölüm 9: yalnızca testin oluşturdukları).
-                using (var platform = new SqlConnection(options.AppConnectionString))
-                {
-                    platform.Open();
-                    foreach (var tenant in createdTenants.Distinct())
-                    {
-                        try
-                        {
-                            using var command = platform.CreateCommand();
-                            command.CommandText =
-                                "DELETE FROM [platform].[Memberships] WHERE [TenantId] = @t;" +
-                                "DELETE FROM [platform].[ModuleEntitlements] WHERE [TenantId] = @t;" +
-                                "DELETE FROM [platform].[Tenants] WHERE [Id] = @t;";
-                            command.Parameters.AddWithValue("@t", tenant);
-                            command.ExecuteNonQuery();
-                        }
-                        catch (SqlException)
-                        {
-                        }
-                    }
-                }
-
-                var master = new SqlConnectionStringBuilder(options.MigrationsConnectionString) { InitialCatalog = "master" }.ConnectionString;
-                using var connection = new SqlConnection(master);
-                connection.Open();
-                foreach (var database in createdDatabases.Distinct())
+                using var platform = new SqlConnection(options.AppConnectionString);
+                platform.Open();
+                foreach (var tenant in createdTenants.Distinct())
                 {
                     try
                     {
-                        using var command = connection.CreateCommand();
+                        using var command = platform.CreateCommand();
                         command.CommandText =
-                            $"IF DB_ID(N'{database}') IS NOT NULL BEGIN " +
-                            $"ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}]; END";
+                            "DELETE FROM [platform].[Memberships] WHERE [TenantId] = @t;" +
+                            "DELETE FROM [platform].[ModuleEntitlements] WHERE [TenantId] = @t;" +
+                            "DELETE FROM [platform].[Tenants] WHERE [Id] = @t;";
+                        command.Parameters.AddWithValue("@t", tenant);
                         command.ExecuteNonQuery();
                     }
                     catch (SqlException)
                     {
-                        // Temizlik en iyi çabadır; kalan test veritabanı db-reset ile toplu silinebilir.
                     }
                 }
             }
@@ -203,31 +174,22 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         return await db.Memberships.Where(m => m.UserId == userId && m.TenantId == tenantId).Select(m => m.Id).SingleAsync();
     }
 
-    /// <summary>Tenant'ın platform defterindeki fiziksel veritabanı adı (ADR-0009); kurulmadıysa <c>null</c>.</summary>
-    public async Task<string?> TenantDatabaseNameAsync(Guid tenantId)
-    {
-        using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
-        return await db.Tenants.Where(t => t.Id == tenantId).Select(t => t.DatabaseName).SingleOrDefaultAsync();
-    }
-
     /// <summary>
-    /// Belirli bir tenant veritabanında (fiziksel) tek değer okur; izolasyonun fiziksel olduğunu kanıtlamak için.
-    /// Row-Level Security'yi geçmek için önce oturum tenant'ı yazılır (<paramref name="sessionTenantId"/>): aranan kaydın
-    /// tenant'ı verildiğinde, kayıt o tenant'ın veritabanında görünür, başka tenant'ın veritabanında görünmez.
+    /// Uygulama kullanıcısıyla ham SQL'den tek değer okur. <paramref name="sessionTenantId"/> verilirse önce oturum
+    /// tenant'ı yazılır ve Row-Level Security yalnızca o tenant'ın satırlarını gösterir; verilmezse hiçbir tenant satırı
+    /// görünmez (ADR-0002, katman 2).
     /// </summary>
-    public async Task<T?> ScalarInTenantDatabaseAsync<T>(
-        string databaseName, Guid sessionTenantId, string sql, params (string Name, object Value)[] parameters)
+    public async Task<T?> ScalarAsync<T>(Guid? sessionTenantId, string sql, params (string Name, object Value)[] parameters)
     {
-        using var scope = Services.CreateScope();
-        var options = scope.ServiceProvider.GetRequiredService<PlatformDatabaseOptions>();
-        await using var connection = new SqlConnection(TenantDatabaseNaming.ConnectionFor(options.AppConnectionString, databaseName));
+        var options = Services.GetRequiredService<ModulixDatabaseOptions>();
+        await using var connection = new SqlConnection(options.AppConnectionString);
         await connection.OpenAsync();
 
-        await using (var session = connection.CreateCommand())
+        if (sessionTenantId is { } tenantId)
         {
+            await using var session = connection.CreateCommand();
             session.CommandText = "EXEC sys.sp_set_session_context @key = N'TenantId', @value = @t;";
-            session.Parameters.AddWithValue("@t", sessionTenantId);
+            session.Parameters.AddWithValue("@t", tenantId);
             await session.ExecuteNonQueryAsync();
         }
 
@@ -241,10 +203,6 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         var result = await command.ExecuteScalarAsync();
         return result is null or DBNull ? default : (T)Convert.ChangeType(result, typeof(T));
     }
-
-    /// <summary>Provisioning servisini açığa çıkarır (idempotentlik ve yeniden deneme testleri için).</summary>
-    public ITenantProvisioningService Provisioning(IServiceScope scope) =>
-        scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
 
     /// <summary>
     /// Tenant'a işletici şirket ekler (ADR-0008). Fabrikanın <see cref="CreateTenantAsync"/>'i varsayılan şirket oluşturmaz

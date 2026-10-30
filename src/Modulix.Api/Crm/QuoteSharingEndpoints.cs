@@ -89,7 +89,7 @@ internal static class QuoteSharingEndpoints
             return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(CrmModule.Permissions.QuotesRead);
 
-        // Listeleme e-posta durumunu kuyruktan okur ve teklifin gönderim durumunu buna eşitler (arka plan işleyicisi tenant DB'sine yazmaz).
+        // Listeleme e-posta durumunu kuyruktan okur ve teklifin gönderim durumunu buna eşitler (arka plan işleyicisi tenant bağlamına yazmaz).
         quotes.MapGet("/{id:guid}/share-links", async (Guid id, IQuoteSharing sharing, QuoteDelivery delivery, CancellationToken ct) =>
         {
             var result = await sharing.ListLinksAsync(id, ct);
@@ -262,7 +262,7 @@ internal static class QuoteSharingEndpoints
     {
         var slug = tenant.Trim().ToLowerInvariant();
         var found = await platform.Tenants.AsNoTracking()
-            .Where(t => t.Slug == slug && t.Status == TenantStatus.Active && t.ProvisioningStatus == TenantProvisioningStatus.Active)
+            .Where(t => t.Slug == slug && t.Status == TenantStatus.Active)
             .Select(t => t.Id)
             .FirstOrDefaultAsync(ct);
         if (found == Guid.Empty)

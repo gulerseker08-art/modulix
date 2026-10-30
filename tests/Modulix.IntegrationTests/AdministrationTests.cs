@@ -295,11 +295,9 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
     /// <summary>Migration'ın veri adımını tek tenant için uygulama kullanıcısıyla çalıştırır (RLS açık).</summary>
     private async Task RunUpgradeAsync(Guid tenantId)
     {
-        // ADR-0009: roller tenant veritabanındadır; yükseltme o tenant'ın veritabanında, oturum tenant'ı yazılarak çalışır.
-        var options = factory.Services.GetRequiredService<Modulix.Infrastructure.Tenancy.PlatformDatabaseOptions>();
-        var databaseName = (await factory.TenantDatabaseNameAsync(tenantId))!;
-        var connectionString = Modulix.Infrastructure.Tenancy.TenantDatabaseNaming.ConnectionFor(options.AppConnectionString, databaseName);
-        await using var connection = new SqlConnection(connectionString);
+        // Yükseltme oturum tenant'ı yazılarak çalışır; RLS yalnızca o tenant'ın rollerini görür (ADR-0002).
+        var options = factory.Services.GetRequiredService<Modulix.Infrastructure.Persistence.ModulixDatabaseOptions>();
+        await using var connection = new SqlConnection(options.AppConnectionString);
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText = $"""

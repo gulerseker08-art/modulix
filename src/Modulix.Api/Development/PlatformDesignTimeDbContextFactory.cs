@@ -4,7 +4,7 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Api.Development;
 
 /// <summary>
-/// Yalnızca 'dotnet ef migrations add ... --context PlatformDbContext' içindir (ADR-0009). Veritabanına bağlanmaz;
+/// Yalnızca 'dotnet ef migrations add ... --context PlatformDbContext' içindir (ADR-0020 Dilim 1). Veritabanına bağlanmaz;
 /// gerçek bir şifre gerekmez. Migration'ları uygulamak için scripts\db-up.ps1 (dotnet run -- migrate) kullanılır.
 /// </summary>
 public sealed class PlatformDesignTimeDbContextFactory : IDesignTimeDbContextFactory<PlatformDbContext>

@@ -61,8 +61,8 @@ internal sealed class MembershipRoleConfiguration : IEntityTypeConfiguration<Mem
         builder.Property(mr => mr.TenantId).IsRequired();
         builder.HasIndex(mr => new { mr.TenantId, mr.MembershipId, mr.RoleId }).IsUnique();
 
-        // ADR-0009: üyelik platform DB'sindedir; MembershipId burada düz Guid'dir (cross-database FK yok). Üyeliğin
-        // bu tenant'a ait ve etkin olduğu servis katmanında (tenant çözümleme + platform defteri) doğrulanır.
+        // ADR-0020 Dilim 1: üyelik platform bağlamındadır; MembershipId burada düz Guid'dir (bağlamlar arası FK yok; ADR-0020 Dilim 2'de gelir). Üyeliğin
+        // bu tenant'a ait ve etkin olduğu servis katmanında (tenant çözümleme + platform kaydı) doğrulanır.
         builder.Property(mr => mr.MembershipId).IsRequired();
 
         // Rol yabancı anahtarı tenant içindedir: başka tenant'ın rolü veritabanı düzeyinde de atanamaz.
@@ -104,7 +104,7 @@ internal sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMem
         // Kapsam hesabı kişinin ekiplerinden başlar.
         builder.HasIndex(tm => new { tm.TenantId, tm.MembershipId });
 
-        // ADR-0009: üyelik platform DB'sindedir; MembershipId burada düz Guid'dir (cross-database FK yok).
+        // ADR-0020 Dilim 1: üyelik platform bağlamındadır; MembershipId burada düz Guid'dir (bağlamlar arası FK yok; ADR-0020 Dilim 2'de gelir).
         builder.Property(tm => tm.MembershipId).IsRequired();
 
         // Ekip yabancı anahtarı tenant içindedir. Ekip silinince ekip üyeliği de silinir.

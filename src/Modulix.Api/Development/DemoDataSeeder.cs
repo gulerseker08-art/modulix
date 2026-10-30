@@ -31,10 +31,9 @@ public static class DemoDataSeeder
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ModulixUser>>();
-        var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
 
-        var acme = await EnsureTenantAsync(db, provisioning, "Acme Lojistik", "acme", cancellationToken);
-        var beta = await EnsureTenantAsync(db, provisioning, "Beta Taşımacılık", "beta", cancellationToken);
+        var acme = await EnsureTenantAsync(db, "Acme Lojistik", "acme", cancellationToken);
+        var beta = await EnsureTenantAsync(db, "Beta Taşımacılık", "beta", cancellationToken);
 
         var ayse = await EnsureUserAsync(users, "ayse@acme.demo", "Ayşe Yılmaz");
         var mehmet = await EnsureUserAsync(users, "mehmet@beta.demo", "Mehmet Kaya");
@@ -151,8 +150,7 @@ public static class DemoDataSeeder
         }
     }
 
-    private static async Task<Tenant> EnsureTenantAsync(
-        PlatformDbContext db, ITenantProvisioningService provisioning, string name, string slug, CancellationToken ct)
+    private static async Task<Tenant> EnsureTenantAsync(PlatformDbContext db, string name, string slug, CancellationToken ct)
     {
         var tenant = await db.Tenants.SingleOrDefaultAsync(t => t.Slug == slug, ct);
         if (tenant is null)
@@ -162,9 +160,6 @@ public static class DemoDataSeeder
             await db.SaveChangesAsync(ct);
         }
 
-        // İş veritabanını kur (ADR-0009; idempotent): zaten kuruluysa işlem yapmaz.
-        await provisioning.PrepareAsync(tenant.Id, ct);
-        await provisioning.CompleteAsync(tenant.Id, ct);
         return tenant;
     }
 

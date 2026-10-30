@@ -20,7 +20,7 @@ public static class TestEmail
             return "E-posta ayarları eksik: Email:FromAddress ve Email:Smtp:Host gerekli (README, E-posta bölümü).";
         }
 
-        // E-posta kuyruğu platform veritabanındadır (ADR-0009) ve kuyruğa yazma hemen kalıcı kılınır.
+        // E-posta kuyruğu platform bağlamındadır (ADR-0020 Dilim 1) ve kuyruğa yazma hemen kalıcı kılınır.
         var db = provider.GetRequiredService<PlatformDbContext>();
         provider.GetRequiredService<IEmailQueue>().Enqueue(new EmailMessage(
             to,

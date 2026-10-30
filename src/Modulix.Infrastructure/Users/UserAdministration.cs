@@ -75,7 +75,7 @@ internal sealed class UserAdministration(
 
         if (query.RoleId is { } roleId)
         {
-            // Rol atamaları tenant DB'sindedir (ADR-0009): o role sahip üyelik kimlikleri önce oradan okunur.
+            // Rol atamaları tenant bağlamındadır (ADR-0020 Dilim 1): o role sahip üyelik kimlikleri önce oradan okunur.
             var withRole = await db.MembershipRoles.AsNoTracking()
                 .Where(mr => mr.RoleId == roleId)
                 .Select(mr => mr.MembershipId)
@@ -172,7 +172,7 @@ internal sealed class UserAdministration(
         var existingAccount = await users.HasPasswordAsync(user);
         var membership = Membership.CreateInvited(tenant.TenantId, user.Id, awaitsAcceptance: !existingAccount, now);
 
-        // ADR-0009: üyelik platform DB'sinde, rol atamaları ve denetim kaydı tenant DB'sindedir. İki ayrı veritabanı
+        // ADR-0020 Dilim 1: üyelik platform bağlamında, rol atamaları ve denetim kaydı tenant bağlamındadır. İki ayrı bağlam
         // tek işlemde yazılamaz: önce üyelik platformda oluşturulur, sonra tenant tarafı yazılır; tenant tarafı
         // başarısız olursa üyelik geri alınır (telafi), böylece rolsüz yetim üyelik kalmaz.
         platform.Memberships.Add(membership);
@@ -284,7 +284,7 @@ internal sealed class UserAdministration(
         // Davet bekleyen üyelikte kayıt yoktur (sorumlu olamaz, giriş yapamaz); satır silinir ve bağlantı, üyeliğe bağlı
         // olduğu için çalışmaz. Hesap kalır: kişi başka tenant'ın davetini bekliyor olabilir; yeniden davet edilirse
         // aynı hesap kullanılır (yeni üyelik, yeni bağlantı).
-        // Rol atamaları tenant DB'sinde, üyelik platform DB'sinde (ADR-0009): önce tenant tarafı, sonra üyelik silinir.
+        // Rol atamaları tenant bağlamında, üyelik platform bağlamında (ADR-0020 Dilim 1): önce tenant tarafı, sonra üyelik silinir.
         db.MembershipRoles.RemoveRange(await db.MembershipRoles.Where(mr => mr.MembershipId == membershipId).ToListAsync(cancellationToken));
         Audit(tenant, membershipId, AuditAction.Deleted,
             new JsonObject { ["email"] = user.Email, ["status"] = membership.Status.ToString() }, after: null);
@@ -331,15 +331,15 @@ internal sealed class UserAdministration(
             await administrators.EnsureAnotherActiveAdministratorAsync(systemId, membershipId, cancellationToken);
         }
 
-        // Kilit beklenirken başka bir istek durumu değiştirmiş olabilir (üyelik platform DB'sindedir, ADR-0009).
+        // Kilit beklenirken başka bir istek durumu değiştirmiş olabilir (üyelik platform bağlamındadır, ADR-0020 Dilim 1).
         await platform.Entry(membership).ReloadAsync(cancellationToken);
         if (membership.Status != MembershipStatus.Active)
         {
             return;
         }
 
-        // Devir ve denetim kaydı tenant DB'sinde tek işlemde; üyeliğin devre dışı bırakılması platform DB'sinde ayrı
-        // işlemdir (ADR-0009: iki DB tek atomik işlem değildir). Önce kayıtlar devredilir, sonra üyelik kapatılır;
+        // Devir ve denetim kaydı tenant bağlamında tek işlemde; üyeliğin devre dışı bırakılması platform bağlamında ayrı
+        // işlemdir (ADR-0020 Dilim 1: iki bağlam tek atomik işlem değildir). Önce kayıtlar devredilir, sonra üyelik kapatılır;
         // platform yazımı başarısız olursa işlem yeniden denenebilir (kayıtlar zaten doğru sahipte).
         if (receiver is not null)
         {
