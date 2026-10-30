@@ -122,7 +122,8 @@ public class ProductCatalogTests(ModulixApiFactory factory) : IClassFixture<Modu
 
         var seen = (await viewer.GetFromJsonAsync<ProductDto>($"/api/crm/products/{created.Id}"))!;
         Assert.Null(seen.Cost);
-        Assert.DoesNotContain("42", await viewer.GetStringAsync("/api/crm/products"));
+        // Ham yanıtta maliyet değeri geçmez ("42" aranmaz: kimliklerdeki rastgele GUID'ler "42" içerebilir, test kararsızlaşır).
+        Assert.DoesNotContain("42.5", await viewer.GetStringAsync("/api/crm/products"));
 
         // Maliyet izni olmayan, maliyet göndererek kayıt açıp güncelleyemez; mevcut maliyet ezilmez.
         var update = await viewer.PutAsJsonAsync($"/api/crm/products/{created.Id}", Save(created) with { Name = "Yeni ad", Cost = 1m });

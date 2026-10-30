@@ -4,8 +4,10 @@
 name: CI
 
 on:
-  # Tum dallar: gorev dallari main'e alinmadan once burada dogrulanir.
+  # main: her birlestirme sonrasi dogrulanir. Gorev dallari pull request uzerinden kosar; push ile de kosarsa ayni
+  # commit iki kez test edilir (dakika ve sure kaybi). Tabani main olmayan (yigili) PR tabani main yapilinca kosar.
   push:
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
