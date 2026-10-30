@@ -361,6 +361,20 @@
 
             <section aria-labelledby="actions-title">
                 <h2 id="actions-title">İşlemler</h2>
+                @if (requirement is { Required: true })
+                {
+                    <div class="alert alert-info" role="status">
+                        <strong>Bu teklif müşteriye sunulmadan önce iç onay gerektiriyor.</strong>
+                        <ul class="mb-0">
+                            @foreach (var match in requirement.Matches)
+                            {
+                                <li>@match.Name — @match.Reason</li>
+                            }
+                            @if (requirement.ThresholdReason is not null) { <li>@requirement.ThresholdReason</li> }
+                        </ul>
+                        @if (requirement.Note is not null) { <div class="small">@requirement.Note</div> }
+                    </div>
+                }
                 @if (reasonAction is not null)
                 {
                     <form class="record-form" novalidate @onsubmit="ConfirmReasonAsync" @onsubmit:preventDefault>
@@ -415,6 +429,7 @@
                                 — <span class="badge stage-@QuoteLabels.StatusBadge(revision.Status)">@QuoteLabels.Label(QuoteLabels.Statuses, revision.Status)</span>
                                 @QuoteLabels.Money(revision.GrossTotal, revision.Currency)
                                 @if (revision.Id == quote.Id) { <text>(bu sayfa)</text> }
+                                else { <a href="crm/teklifler/@quote.Id/karsilastir?with=@revision.Id">Bununla karşılaştır</a> }
                             </li>
                         }
                     </ul>
@@ -453,6 +468,7 @@
     private List<QuoteLineDto> lines = [];
     private List<QuoteActionStateDto> actions = [];
     private List<QuoteHistoryDto> history = [];
+    private QuoteApprovalRequirementDto? requirement;
     private List<QuoteDto> family = [];
     private QuoteForm form = new();
     private LineForm? lineForm;
@@ -514,6 +530,7 @@
         lines = (await Api.GetAllAsync<QuoteLineDto>($"/api/crm/quote-lines?quoteId={id}")).Items;
         actions = (await Api.GetAsync<List<QuoteActionStateDto>>($"/api/crm/quotes/{id}/actions")).Value ?? [];
         history = (await Api.GetAsync<List<QuoteHistoryDto>>($"/api/crm/quotes/{id}/history")).Value ?? [];
+        requirement = loaded.Status == "Draft" ? (await Api.GetAsync<QuoteApprovalRequirementDto>($"/api/crm/quotes/{id}/approval-requirements")).Value : null;
         family = (await Api.GetAllAsync<QuoteDto>($"/api/crm/quotes?familyId={loaded.FamilyId}")).Items;
     }
 

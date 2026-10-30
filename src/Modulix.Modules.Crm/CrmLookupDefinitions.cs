@@ -32,6 +32,7 @@ public static class CrmLookupDefinitions
     public const string QuotePriceList = "crm.quote.price-list";
     public const string QuoteOwner = "crm.quote.owner";
     public const string QuoteLineProduct = "crm.quote-line.product";
+    public const string QuoteRuleApprover = "crm.quote-approval-rule.approver";
 
     private static readonly string[] CompanyLabel = ["name"];
     private static readonly string[] CompanySecondary = ["city", "taxNumber"];
@@ -114,6 +115,11 @@ public static class CrmLookupDefinitions
             ViewPath = "crm/fiyat-listeleri",
         },
         Owner(QuoteOwner, CrmModule.Entities.Quote, "Sorumlu"),
+        new(QuoteRuleApprover, CrmModule.Entities.QuoteApprovalRule, "approverId", "Onaylayan", LookupTargetKind.Member)
+        {
+            SearchDescription = "Üyenin görünen adı",
+            PageSize = 20,
+        },
         new(QuoteLineProduct, CrmModule.Entities.QuoteLine, "productId", "Ürün", LookupTargetKind.Record, CrmModule.Entities.Product)
         {
             LabelFields = ["name"],

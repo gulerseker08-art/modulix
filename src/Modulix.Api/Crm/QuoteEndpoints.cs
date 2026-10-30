@@ -25,11 +25,16 @@ internal static class QuoteEndpoints
         CrmEndpoints.MapResource<QuoteLineDto, SaveQuoteLineRequest>(crm, "quote-lines", CrmModule.Entities.QuoteLine,
             CrmModule.Permissions.QuotesRead, CrmModule.Permissions.QuotesWrite);
 
+        CrmEndpoints.MapResource<QuoteApprovalRuleDto, SaveQuoteApprovalRuleRequest>(crm, "quote-approval-rules", CrmModule.Entities.QuoteApprovalRule,
+            CrmModule.Permissions.QuoteRulesManage, CrmModule.Permissions.QuoteRulesManage);
+
         var quotes = crm.MapGroup("/quotes");
         quotes.MapGet("/{id:guid}/history", HistoryAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/{id:guid}/actions", ActionsAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/settings", SettingsAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         QuoteSharingEndpoints.MapInternal(quotes);
+        quotes.MapGet("/{id:guid}/approval-requirements", ApprovalRequirementsAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
+        quotes.MapGet("/{id:guid}/compare", CompareAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
 
         // Eylem izinleri serviste denetlenir; uç nokta yalnızca okuma iznini ister ki kayıt yoksa 404 dönsün.
         quotes.MapPost("/{id:guid}/submit-for-approval", (Guid id, QuoteTransitionRequest r, IQuoteWorkflow w, CancellationToken ct) =>
@@ -103,6 +108,31 @@ internal static class QuoteEndpoints
         return result.IsSuccess
             ? Results.Ok(result.Value!.Select(a => new QuoteActionStateDto(a.Action, a.Allowed, a.Code, a.Message)).ToList())
             : RecordEndpoints.ToProblem(result.Error!);
+    }
+
+    private static async Task<IResult> ApprovalRequirementsAsync(Guid id, IQuoteWorkflow workflow, CancellationToken ct)
+    {
+        var result = await workflow.ApprovalRequirementsAsync(id, ct);
+        return result.IsSuccess
+            ? Results.Ok(new QuoteApprovalRequirementDto(
+                result.Value!.Required, [.. result.Value.Matches.Select(m => new QuoteApprovalMatchDto(m.RuleId, m.RuleVersion, m.Name, m.Reason, m.ApproverId))],
+                result.Value.ThresholdReason, result.Value.Restricted, result.Value.CanDecide, result.Value.Note))
+            : RecordEndpoints.ToProblem(result.Error!);
+    }
+
+    private static async Task<IResult> CompareAsync(Guid id, Guid with, IQuoteComparison comparison, CancellationToken ct)
+    {
+        var result = await comparison.CompareAsync(with, id, ct);
+        if (!result.IsSuccess)
+        {
+            return RecordEndpoints.ToProblem(result.Error!);
+        }
+
+        static QuoteFieldChangeDto Map(QuoteFieldChange c) => new(c.Field, c.Label, c.Before, c.After);
+        var c = result.Value!;
+        return Results.Ok(new QuoteComparisonDto(
+            c.LeftRevision, c.RightRevision, c.LeftStatus, c.RightStatus, c.Currency, c.RightCurrency, [.. c.Header.Select(Map)], [.. c.Totals.Select(Map)],
+            [.. c.Lines.Select(l => new QuoteLineChangeDto(l.Change, l.StableKey, l.Name, [.. l.Fields.Select(Map)]))]));
     }
 
     private static async Task<IResult> SettingsAsync(IQuotePolicyProvider provider, CancellationToken ct)

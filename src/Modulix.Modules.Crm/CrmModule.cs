@@ -98,6 +98,7 @@ public sealed class CrmModule : IModule
         public const string QuotesRecordDecision = "crm.quotes.record-decision";
         public const string QuotesCancel = "crm.quotes.cancel";
         public const string QuotesShare = "crm.quotes.share";
+        public const string QuoteRulesManage = "crm.quote-rules.manage";
         public const string QuoteCostsRead = "crm.quote-costs.read";
     }
 
@@ -131,6 +132,7 @@ public sealed class CrmModule : IModule
         public const string DiscountPolicy = "crm.discount-policy";
         public const string Quote = "crm.quote";
         public const string QuoteLine = "crm.quote-line";
+        public const string QuoteApprovalRule = "crm.quote-approval-rule";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -256,6 +258,7 @@ public sealed class CrmModule : IModule
         new(Permissions.QuotesRecordDecision, "Müşterinin kabul ya da ret kararını kaydeder", "Teklifler"),
         new(Permissions.QuotesCancel, "Teklifi gerekçeyle iptal eder", "Teklifler"),
         new(Permissions.QuotesShare, "Sunulmuş teklif için müşteri belgesi (PDF) ve paylaşım bağlantısı üretir, bağlantıyı iptal eder", "Teklifler"),
+        new(Permissions.QuoteRulesManage, "Teklif iç onay kurallarını (indirim/tutar eşiği, onaylayan) tanımlar ve değiştirir", "Teklifler"),
         new(Permissions.QuoteCostsRead, "Teklif kalemlerinin maliyetini görür ve düzenler", "Teklif maliyeti"),
     ];
 
@@ -742,6 +745,11 @@ public sealed class CrmModule : IModule
                 ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact, ["opportunityId"] = Entities.Opportunity, ["priceListId"] = Entities.PriceList,
             },
         },
+        new(Entities.QuoteApprovalRule, "Teklif onay kuralı (CRM)", Permissions.QuoteRulesManage, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["description"] = "Açıklama", ["priority"] = "Öncelik", ["isActive"] = "Etkin", ["currency"] = "Para birimi",
+            ["minDiscountPercent"] = "İndirim eşiği %", ["minGrossTotal"] = "Genel toplam eşiği", ["approverId"] = "Onaylayan",
+        }, "name"),
         new(Entities.QuoteLine, "Teklif kalemi (CRM)", Permissions.QuotesRead, new Dictionary<string, string>
         {
             ["quoteId"] = "Teklif", ["name"] = "Ad", ["kind"] = "Tür", ["productId"] = "Ürün", ["quantity"] = "Miktar", ["unitPrice"] = "Birim fiyat",
@@ -870,10 +878,12 @@ public sealed class CrmModule : IModule
         services.AddScoped<IRecordStore, DiscountPolicyRecordStore>();
         services.AddScoped<IRecordStore, QuoteRecordStore>();
         services.AddScoped<IRecordStore, QuoteLineRecordStore>();
+        services.AddScoped<IRecordStore, QuoteApprovalRuleRecordStore>();
         services.AddScoped<QuoteWorkflowGate>();
         services.AddScoped<QuoteReader>();
         services.AddScoped<IQuoteWorkflow, QuoteWorkflow>();
         services.AddScoped<IQuoteSharing, QuoteSharing>();
+        services.AddScoped<IQuoteComparison, QuoteComparisonService>();
         services.AddScoped<IQuoteCustomerPortal, QuoteCustomerPortal>();
         services.AddScoped<QuoteCustomerAnchor>();
         services.AddScoped<IPriceCalculator, PriceCalculator>();
