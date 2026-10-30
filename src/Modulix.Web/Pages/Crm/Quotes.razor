@@ -24,10 +24,10 @@
     }
 
     <div class="filters" role="group" aria-label="Hızlı görünümler">
-        <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@mine" @onclick="ToggleMineAsync">Tekliflerim</button>
-        <button type="button" class="chip @(pending ? "active" : null)" aria-pressed="@pending" @onclick="TogglePendingAsync">Onay bekleyenler</button>
-        <button type="button" class="chip @(expiring ? "active" : null)" aria-pressed="@expiring" @onclick="ToggleExpiringAsync">Süresi yaklaşanlar (7 gün)</button>
-        <button type="button" class="chip @(latestOnly ? "active" : null)" aria-pressed="@latestOnly" @onclick="ToggleLatestAsync">Yalnızca son revizyonlar</button>
+        <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@(mine ? "true" : "false")" @onclick="ToggleMineAsync">Tekliflerim</button>
+        <button type="button" class="chip @(pending ? "active" : null)" aria-pressed="@(pending ? "true" : "false")" @onclick="TogglePendingAsync">Onay bekleyenler</button>
+        <button type="button" class="chip @(expiring ? "active" : null)" aria-pressed="@(expiring ? "true" : "false")" @onclick="ToggleExpiringAsync">Süresi yaklaşanlar (7 gün)</button>
+        <button type="button" class="chip @(latestOnly ? "active" : null)" aria-pressed="@(latestOnly ? "true" : "false")" @onclick="ToggleLatestAsync">Yalnızca son revizyonlar</button>
         <label class="visually-hidden" for="status-filter">Durum</label>
         <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
             <option value="">Tüm durumlar</option>
@@ -55,9 +55,10 @@
     else
     {
         <table class="table record-table">
+            <caption class="visually-hidden">Teklif listesi</caption>
             <thead>
                 <tr>
-                    <th>Teklif</th><th>Müşteri</th><th>Durum</th><th>Onay</th><th class="text-end">Toplam</th><th>Geçerlilik</th><th>Sorumlu</th>
+                    <th scope="col">Teklif</th><th scope="col">Müşteri</th><th scope="col">Durum</th><th scope="col">Onay</th><th scope="col" class="text-end">Toplam</th><th scope="col">Geçerlilik</th><th scope="col">Sorumlu</th>
                 </tr>
             </thead>
             <tbody>

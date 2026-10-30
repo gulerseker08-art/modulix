@@ -45,7 +45,7 @@
         {
             @if (view.Visible(Session))
             {
-                <button type="button" class="chip @(current == view.Key ? "active" : null)" aria-pressed="@(current == view.Key)"
+                <button type="button" class="chip @(current == view.Key ? "active" : null)" aria-pressed="@((current == view.Key) ? "true" : "false")"
                         @onclick="() => SelectAsync(view.Key)">@view.Label</button>
             }
         }

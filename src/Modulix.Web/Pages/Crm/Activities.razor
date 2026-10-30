@@ -26,7 +26,7 @@
     <div class="filters" role="group" aria-label="Görünüm">
         @foreach (var (value, label) in Modes)
         {
-            <button type="button" class="chip @(mode == value ? "active" : null)" aria-pressed="@(mode == value)" @onclick="() => SwitchModeAsync(value)">@label</button>
+            <button type="button" class="chip @(mode == value ? "active" : null)" aria-pressed="@((mode == value) ? "true" : "false")" @onclick="() => SwitchModeAsync(value)">@label</button>
         }
     </div>
 
@@ -35,7 +35,7 @@
         {
             @if (value != QuickFilter.Team || Session.Can(CrmAccess.ActivitiesManageCalendar))
             {
-                <button type="button" class="chip @(quick == value ? "active" : null)" aria-pressed="@(quick == value)" @onclick="() => SwitchQuickAsync(value)">@label</button>
+                <button type="button" class="chip @(quick == value ? "active" : null)" aria-pressed="@((quick == value) ? "true" : "false")" @onclick="() => SwitchQuickAsync(value)">@label</button>
             }
         }
     </div>
