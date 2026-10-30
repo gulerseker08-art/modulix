@@ -107,7 +107,7 @@ testleri geçer ve ayrı PR olarak incelenir.
 Üç dilim 30 Ekim 2026'da `main`'e alındı (PR #72, #73, #74). Aşağıdakiler bilinçli olarak dışarıda bırakıldı; her biri
 kendi dilimi veya ADR'siyle ele alınır.
 
-### Bu ADR'nin sadeleştirme kalıntıları (tek küçük PR)
+### Bu ADR'nin sadeleştirme kalıntıları (uygulandı)
 
 - **Ad çözümlemelerini tek sorguya al.** Üye adı / firma adı eşleştirmeleri hâlâ iki ayrı sorguyla bellekte
   birleştiriliyor; tek bağlamda join yeterlidir. Yerler: `MembershipDataScope.TeamOwnersAsync`,
@@ -117,8 +117,9 @@ kendi dilimi veya ADR'siyle ele alınır.
   tarafı, hata olursa telafi" deseniyle; `SectorProfileService.ApplyAsync` iki ayrı kaydetme adımıyla çalışıyor. Tek
   bağlamda tek transaction yeterlidir; telafi kodu kalkar. Kabul: davet sırasında tenant tarafı başarısız olursa üyelik
   satırı da oluşmaz (geri alma testi), profil uygulaması ya tamamen yazılır ya hiç.
-- **ADR-0018 dipnotu.** Ürün/hizmet ADR'sindeki envanter tablosu "tenant başına ayrı DB: mevcut" diyor; tarihsel kayıt
-  olarak kalır, bu ADR'ye işaret eden dipnot eklendi.
+- **ADR-0018 dipnotu.** Ürün/hizmet ADR'sindeki envanter satırı tarihsel kayıt olarak kalır; bu ADR'ye işaret eden dipnot eklendi.
+- Ayrıca davet iptali, yeniden davet, devre dışı bırakma ve etkinleştirme akışlarındaki çift kaydetme adımları tek kaydetmeye
+  indirildi; `UserAdministration.ListAsync` rol süzgeci alt sorgu oldu. Geri alma testleri: `TransactionalFlowsTests`.
 
 ### Kalıcı sınır (yapılmayacak)
 
