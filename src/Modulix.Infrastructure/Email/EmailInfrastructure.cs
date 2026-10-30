@@ -36,6 +36,7 @@ public sealed class QueuedEmail
     public const int SubjectMaxLength = 400;
     public const int BodyMaxLength = 500_000;
     public const int LastErrorMaxLength = 2000;
+    public const int ReferenceMaxLength = 100;
 
     private QueuedEmail()
     {
@@ -53,6 +54,7 @@ public sealed class QueuedEmail
         Subject = ValidateSubject(message.Subject);
         HtmlBody = ValidateBody(message.HtmlBody, nameof(message.HtmlBody), required: true)!;
         TextBody = ValidateBody(message.TextBody, nameof(message.TextBody), required: false);
+        Reference = ValidateReference(message.Reference);
         Status = EmailStatus.Pending;
         CreatedAt = now;
         NextAttemptAt = now;
@@ -71,6 +73,9 @@ public sealed class QueuedEmail
     public string HtmlBody { get; private set; } = string.Empty;
 
     public string? TextBody { get; private set; }
+
+    /// <summary>Çağıranın gönderimi izlemek için verdiği anahtar (alıcıya görünmez).</summary>
+    public string? Reference { get; private set; }
 
     public EmailStatus Status { get; private set; }
 
@@ -134,6 +139,22 @@ public sealed class QueuedEmail
         return trimmed;
     }
 
+    private static string? ValidateReference(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return null;
+        }
+
+        var trimmed = reference.Trim();
+        if (trimmed.Length > ReferenceMaxLength || HasLineBreak(trimmed))
+        {
+            throw new ArgumentException($"Başvuru anahtarı en fazla {ReferenceMaxLength} karakter olabilir ve satır sonu içeremez.", nameof(reference));
+        }
+
+        return trimmed;
+    }
+
     private static string? ValidateName(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -192,8 +213,10 @@ internal sealed class QueuedEmailConfiguration : IEntityTypeConfiguration<Queued
         builder.Property(e => e.Subject).HasMaxLength(QueuedEmail.SubjectMaxLength).IsRequired();
         builder.Property(e => e.HtmlBody).IsRequired();
         builder.Property(e => e.LastError).HasMaxLength(QueuedEmail.LastErrorMaxLength);
+        builder.Property(e => e.Reference).HasMaxLength(QueuedEmail.ReferenceMaxLength);
         builder.HasIndex(e => new { e.Status, e.NextAttemptAt });
         builder.HasIndex(e => new { e.TenantId, e.CreatedAt });
+        builder.HasIndex(e => new { e.TenantId, e.Reference });
     }
 }
 

@@ -65,7 +65,7 @@
                 <table class="table record-table">
                     <caption class="visually-hidden">Paylaşım bağlantıları</caption>
                     <thead>
-                        <tr><th scope="col">Alıcı</th><th scope="col">Durum</th><th scope="col">Bitiş</th><th scope="col">İlk görüntüleme</th><th scope="col">Bağlantı</th><th scope="col">İşlem</th></tr>
+                        <tr><th scope="col">Alıcı</th><th scope="col">Durum</th><th scope="col">Bitiş</th><th scope="col">İlk görüntüleme</th><th scope="col">E-posta</th><th scope="col">Bağlantı</th><th scope="col">İşlem</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var link in links)
@@ -76,6 +76,15 @@
                                     @if (link.RevokeReason is not null) { <div class="small text-muted">@link.RevokeReason</div> }</td>
                                 <td data-label="Bitiş">@CrmLabels.Time(link.ExpiresAt)</td>
                                 <td data-label="İlk görüntüleme">@(link.FirstViewedAt is { } viewed ? CrmLabels.Time(viewed) : "Henüz açılmadı")</td>
+                                <td data-label="E-posta">
+                                    @if (link.DeliveryStatus == "NotSent") { <span class="text-muted">Gönderilmedi</span> }
+                                    else
+                                    {
+                                        <span class="badge stage-@(link.DeliveryStatus == "Failed" ? "lost" : link.DeliveryStatus == "Succeeded" ? "won" : "onhold")">@QuoteLabels.Label(QuoteLabels.Deliveries, link.DeliveryStatus)</span>
+                                        @if (link.ProviderAcceptedAt is { } accepted) { <div class="small text-muted">@CrmLabels.Time(accepted)</div> }
+                                        @if (link.DeliveryError is not null) { <div class="small text-muted">@link.DeliveryError</div> }
+                                    }
+                                </td>
                                 <td data-label="Bağlantı"><code>…@link.TokenHint</code></td>
                                 <td class="actions">
                                     @if (link.State == "Active")
@@ -116,6 +125,10 @@
                             <input id="share-email" class="form-control" type="email" maxlength="254" @bind="recipientEmail" />
                             <FieldError Errors="@errors" Field="recipientEmail" />
                         </div>
+                        <div class="form-check">
+                            <input id="share-send" class="form-check-input" type="checkbox" @bind="sendEmail" />
+                            <label class="form-check-label" for="share-send">Müşteriye e-postayla gönder (alıcı e-postası gerekir)</label>
+                        </div>
                         <div>
                             <label class="form-label" for="share-days">Geçerlilik (gün)</label>
                             <input id="share-days" class="form-control" type="number" min="1" max="180" placeholder="Otomatik" @bind="validDays" />
@@ -125,7 +138,7 @@
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary" disabled="@busy">Bağlantı oluştur</button>
                     </div>
-                    <p class="small text-muted">Bağlantı yalnızca bu sürümün sabit belgesini gösterir. E-posta gönderimi bu sürümde yapılmaz; bağlantıyı kendiniz iletirsiniz.</p>
+                    <p class="small text-muted">Bağlantı yalnızca bu sürümün sabit belgesini gösterir. E-posta kuyruğa yazılır ve arka planda gönderilir; "Sağlayıcı kabul etti" yalnızca posta sunucusunun kabul ettiği anlamına gelir, alıcıya ulaştığını garanti etmez. İsterseniz bağlantıyı kendiniz de iletebilirsiniz.</p>
                 </form>
             }
         }
@@ -174,6 +187,7 @@
     private string? recipientName;
     private string? recipientEmail;
     private int? validDays;
+    private bool sendEmail;
     private Guid loadedFor;
 
     private bool CanShare => Session.Can(CrmAccess.QuotesShare);
@@ -195,6 +209,13 @@
         decisions = (await Api.GetAsync<List<QuoteDecisionDto>>($"/api/crm/quotes/{Quote.Id}/decisions")).Value ?? [];
         links = CanShare ? (await Api.GetAsync<List<QuoteShareLinkDto>>($"/api/crm/quotes/{Quote.Id}/share-links")).Value ?? [] : [];
         loaded = true;
+
+        // Liste okunurken sunucu teklifin gönderim durumunu kuyruğa göre eşitler; sayfa başlığı eskiyse üst sayfa yenilenir.
+        var overall = links.FirstOrDefault(l => l.DeliveryStatus != "NotSent")?.DeliveryStatus ?? "NotSent";
+        if (CanShare && overall != Quote.DeliveryStatus)
+        {
+            await OnChanged.InvokeAsync();
+        }
     }
 
     private async Task GenerateAsync()
@@ -214,14 +235,21 @@
         busy = true;
         errors = null;
         var result = await Api.PostAsync<QuoteShareLinkCreatedDto>($"/api/crm/quotes/{Quote.Id}/share-links",
-            new CreateQuoteShareLinkRequest(null, validDays, Blank(recipientName), Blank(recipientEmail)));
+            new CreateQuoteShareLinkRequest(null, validDays, Blank(recipientName), Blank(recipientEmail), sendEmail));
         busy = false;
         if (result.IsSuccess)
         {
             created = result.Value;
+            var queued = sendEmail ? result.Value!.Link.DeliveryStatus : null;
             recipientName = recipientEmail = null;
             validDays = null;
-            Notify(null);
+            sendEmail = false;
+            Notify(queued switch
+            {
+                null => null,
+                "Failed" => "Bağlantı oluşturuldu ancak e-posta kuyruğa yazılamadı; bağlantıyı elle iletebilirsiniz.",
+                _ => "Bağlantı oluşturuldu; e-posta gönderim kuyruğuna alındı.",
+            }, queued == "Failed");
             await LoadAsync();
             await OnChanged.InvokeAsync();
             return;

@@ -316,6 +316,29 @@ internal sealed class QuoteSharing(
             d.ClientAddressMasked, d.CreatedAt))]);
     }
 
+    public async Task<RecordResult<string>> SetDeliveryStatusAsync(Guid quoteId, string status, string? note, CancellationToken cancellationToken)
+    {
+        var loaded = await LoadAsync<string>(quoteId, SharePermissions, cancellationToken);
+        if (loaded.Error is { } error)
+        {
+            return error;
+        }
+
+        if (!QuoteDeliveryStatus.All.Contains(status))
+        {
+            return RecordResult<string>.Fail(RecordErrorCode.ValidationFailed, "Geçersiz gönderim durumu.", [new RecordFieldError("deliveryStatus", "Geçersiz gönderim durumu.")]);
+        }
+
+        if (loaded.Quote!.DeliveryStatus == status)
+        {
+            return RecordResult<string>.Ok(status);
+        }
+
+        var result = await Mutate(loaded.Record!, SharePermissions, "DeliveryUpdated", note is null ? null : (note.Length > Quote.ReasonMaxLength ? note[..Quote.ReasonMaxLength] : note),
+            (_, _, _) => Task.CompletedTask, cancellationToken, new JsonObject { ["deliveryStatus"] = status });
+        return result.IsSuccess ? RecordResult<string>.Ok(status) : Failed<string>(result);
+    }
+
     // ---- yardımcılar
 
     private readonly record struct Loaded<T>(RecordData? Record, Quote? Quote, RecordResult<T>? Error);
@@ -343,12 +366,12 @@ internal sealed class QuoteSharing(
     /// <summary>Teklif değerlerine dokunmayan güncelleme: ek yazma, tarihçe satırı ve audit teklifin işleminde birlikte kaydedilir.</summary>
     private async Task<RecordResult<RecordData>> Mutate(
         RecordData record, IReadOnlyList<string> permissions, string eventKind, string? reason, Func<CrmStoreContext, Quote, CancellationToken, Task> effect,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, JsonObject? values = null)
     {
         using (gate.Open(permissions, eventKind, reason, effect))
         {
             return await pipeline.UpdateAsync(
-                new RecordCommand(Key, record.Id, new JsonObject(), record.Version) { Reason = $"quote.{eventKind}" }, cancellationToken);
+                new RecordCommand(Key, record.Id, values ?? new JsonObject(), record.Version) { Reason = $"quote.{eventKind}" }, cancellationToken);
         }
     }
 

@@ -1,6 +1,6 @@
 # ADR-0019: Teklif yönetimi (M1.5) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (çekirdek, sunucu yaşam döngüsü, ekranlar, PDF, paylaşım/kabul sayfası, onay kuralları ve revizyon karşılaştırma). Tarih: 2026-10-30.
+Durum: Kısmen uygulandı (çekirdek, sunucu yaşam döngüsü, ekranlar, PDF, paylaşım/kabul sayfası, onay kuralları, revizyon karşılaştırma ve e-posta gönderimi). Tarih: 2026-10-30.
 
 ## Mevcut durum (analiz anında, kodla kanıtlı; güncel durum en alttaki "Uygulama durumu"nda)
 
@@ -93,3 +93,18 @@ Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları
 | Düzeltme | Bool'a bağlı `select` kutuları ilk açılışta boş görünüyordu (`True`/`true` uyuşmazlığı); katalog sayfalarında da düzeltildi. |
 
 **Dördüncü dilimde de yapılmadı (dürüst durum):** sıralı/paralel çok adımlı onay (aynı teklifte birden çok onaylayanın hepsi), vekâlet/devir, onay hatırlatması ve zaman aşımı, marj tabanlı kural (maliyet gerekir), kural değişikliğinde bekleyen onayların yeniden değerlendirilmesi (değerlendirme karar anında canlı yapılır, gönderim anındaki kural yalnızca tarihçededir), kural yönetimi ekranının klavye-yalnız denemesi, karşılaştırmada alan bazlı metin farkı vurgusu. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
+
+## Uygulama durumu (beşinci dilim: e-posta gönderimi ve gönderim durumu)
+
+**Uygulandı** (`QuoteDeliveryTests` 3 entegrasyon testi; arayüz ve yerel Mailpit'te gönderim tarayıcıda denendi):
+
+| Konu | Karar / davranış |
+|---|---|
+| Gönderim | Paylaşım bağlantısı oluştururken "e-postayla gönder" seçilirse müşteriye bağlantı e-postası platform kuyruğuna (`IEmailQueue`) yazılır ve arka plan işleyicisi gönderir. Ham belirteç sonradan okunamadığı için gönderim yalnızca bağlantı oluşturulurken yapılır; yeniden gönderim yeni bağlantı demektir (eskisi gerekirse iptal edilir). Alıcı e-postası zorunlu (422), `crm.quotes.share` izni gerekir. |
+| Şablon | Konu tek satır; ad, başlık ve firma adı HTML'e kodlanarak eklenir. İçerik yalnızca bağlantı, teklif no/başlık, geçerlilik tarihi ve satıcı adıdır; PDF eklenmez, maliyet/iç not girmez. |
+| İzleme | `EmailMessage.Reference` / `platform.EmailMessages.Reference` (platform migration `EmailReference`, boş değerli sütun + indeks): `crm.quote-link:{bağlantı}`. Tenant DB ile platform DB arasında FK/join yoktur; durum tenant filtresiyle sorgulanır. |
+| Dürüst durum | `NotSent` (e-posta yok), `Pending` (kuyrukta), `Processing` (deneme başladı/tekrar bekliyor), `Succeeded` = **sağlayıcı (SMTP sunucusu) kabul etti** — alıcıya ulaştı anlamına gelmez, `Failed` (kalıcı hata ya da deneme hakkı bitti; hata kısaltılarak gösterilir). Gönderen/SMTP yapılandırılmamışsa e-posta `Pending` bekler; sahte başarı yoktur. Kuyruğa yazılamazsa bağlantı yine oluşur, durum `Failed` olur. |
+| Teklif durumu | `DeliveryStatus` başlık alanı e-postası olan en son bağlantının durumuna eşitlenir. Eşitleme bağlantı listesi okunurken yapılır (kuyruk işleyicisi tenant DB'sine yazmaz); değişim tarihçeye "Gönderim durumu güncellendi" olarak yazılır. |
+| Geliştirme güvenliği | Geliştirme SMTP'si yerel Mailpit'tir (`appsettings.Development.json`); gerçek müşteriye e-posta gitmez. Testler gönderim durumunu kuyruk satırı üzerinden doğrular. |
+
+**Beşinci dilimde de yapılmadı (dürüst durum):** teslim/okundu bildirimi (SMTP bunu vermez; "teslim edildi" hiçbir yerde iddia edilmez), geri dönen/sıçrayan e-posta (bounce) işleme, alıcıya hatırlatma ve süre dolumu bildirimi, e-posta şablonu özelleştirme/çok dilli, gönderimde PDF eki, toplu gönderim, durumun arka planda eşitlenmesi (şimdi liste okunurken), kalıcı hatalı bir e-postanın yeniden denenmesi için ekran düğmesi. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
