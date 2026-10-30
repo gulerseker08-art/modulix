@@ -36,7 +36,7 @@
         <div class="profile-cards">
             @foreach (var profile in profiles.Profiles)
             {
-                <button type="button" class="profile-card @(profile.Key == selected ? "active" : null)" aria-pressed="@(profile.Key == selected)"
+                <button type="button" class="profile-card @(profile.Key == selected ? "active" : null)" aria-pressed="@((profile.Key == selected) ? "true" : "false")"
                         @onclick="() => PreviewAsync(profile.Key)">
                     <strong>@profile.Name</strong>
                     <span>@profile.Description</span>

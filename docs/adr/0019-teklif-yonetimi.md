@@ -190,3 +190,9 @@ Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları
 | İçerik | Dönemde sunulan ve kabul edilen tekliflerin para birimi bazlı net/maliyet/marj toplamları, sorumlu bazında dağılım, en düşük marjlı teklifler, maliyeti eksik teklifler; tanımlar ekranda. Rapor ekranında yalnızca izinli kullanıcıya görünen bölüm. |
 
 **On birinci dilimde de yapılmadı:** katalog maliyetinin tekliften bağımsız güncel maliyetle karşılaştırılması, kategori/ürün bazlı marj kırılımı, marj eşiğine bağlı onay kuralı (maliyet görmeyen onaylayana marj sızdırmamak için ayrı tasarım gerekir), marj raporu dışa aktarma.
+
+## Uygulama durumu (on ikinci dilim: erişilebilirlik denetimi ve yol haritası)
+
+**Yapıldı:** Teklif ekranları (liste, detay, onay merkezi, kurallar, vekâletler, karşılaştırma, rapor, müşteri sayfası) tarayıcıda erişilebilirlik ağacı üzerinden tarandı: adsız denetim ve etiketsiz alan bulunmadı, tablolarda başlık/sütun kapsamı tamamlandı (liste ve karşılaştırma tablolarına `caption`/`scope` eklendi), odak sırası DOM sırasıyla mantıklı, odak stili (`.btn:focus`, `.form-control:focus`) ve `h1`'e yönlendirme odağı mevcut, durum rozetleri her zaman metin taşır, `lang="tr"`. Hızlı görünüm düğmelerinde `aria-pressed` Blazor'un bool işlemesi yüzünden `""`/yok olarak çıkıyordu; `"true"/"false"` olarak düzeltildi (fırsat, aktivite, lead ve sektör profili ekranlarında da). Yol haritası M1.5 durumu alt maddeleriyle (uygulanan/yapılmayan) yazıldı ve kabul kriteri sağlandığı için **tamamlandı sayıldı**; sınırlar aynı maddede listelidir.
+
+**Yapılmadı / doğrulanmadı:** gerçek klavye tuşu gönderimi (tarayıcı paneli çizilmediği için sekme tuşu denemesi yapılamadı; odak sırası ve stili statik olarak doğrulandı), ekran okuyucuyla okuma, renk kontrastı ölçümü, mobil ekran okuyucu, müşteri sayfasının açık (karar verilebilir) durumunun ayrı erişilebilirlik taraması (yalnızca sonuçlanmış durum tarandı).

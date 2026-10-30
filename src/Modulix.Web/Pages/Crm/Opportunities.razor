@@ -33,9 +33,9 @@
             <button type="button" class="chip @(board ? "active" : null)" @onclick="() => SwitchAsync(true)">Satış hunisi</button>
             <button type="button" class="chip @(!board ? "active" : null)" @onclick="() => SwitchAsync(false)">Liste</button>
         </div>
-        <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@mine" @onclick="ToggleMineAsync">Yalnızca benimkiler</button>
-        <button type="button" class="chip @(overdue ? "active" : null)" aria-pressed="@overdue" @onclick="ToggleOverdueAsync">Kapanışı geçenler</button>
-        <button type="button" class="chip @(noAction ? "active" : null)" aria-pressed="@noAction" @onclick="ToggleNoActionAsync">Aksiyonsuz</button>
+        <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@(mine ? "true" : "false")" @onclick="ToggleMineAsync">Yalnızca benimkiler</button>
+        <button type="button" class="chip @(overdue ? "active" : null)" aria-pressed="@(overdue ? "true" : "false")" @onclick="ToggleOverdueAsync">Kapanışı geçenler</button>
+        <button type="button" class="chip @(noAction ? "active" : null)" aria-pressed="@(noAction ? "true" : "false")" @onclick="ToggleNoActionAsync">Aksiyonsuz</button>
         <label class="visually-hidden" for="status-filter">Durum</label>
         <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
             <option value="">Tüm durumlar</option>
