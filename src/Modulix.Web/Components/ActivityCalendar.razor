@@ -1,4 +1,6 @@
 @* Aktivite takvimi: ay, hafta, gün ve ajanda görünümleri (ADR-0015). Veriyi çağıran yükler; burada yalnızca çizilir.
+   Hafta ve gün görünümü saat çizelgesidir: saatli aktiviteler süreleri kadar yer kaplar, çakışanlar yan yana dizilir; tüm gün
+   etkinlikleri ve yalnızca son tarihli işler üstteki "Tüm gün" satırındadır. Renk aktivite ailesinden gelir (fam-* sınıfları).
    Her aktivite bir düğmedir (klavyeyle odaklanır, Enter açar); gün hücresine Enter hızlı oluşturur; bir aktiviteyi başka güne
    sürüklemek yeniden planlamadır (sunucu yetki ve çakışmayı denetler). Son tarih işaretleri (⏰) zaman bloğundan ayrı gösterilir. *@
 
@@ -12,7 +14,7 @@
                 <ul class="item-list">
                     @foreach (var activity in items)
                     {
-                        <li class="@ActivityLabels.Css(activity)">@Entry(activity)</li>
+                        <li class="cal-agenda-item fam-@FamilyClass(activity) @ActivityLabels.Css(activity)">@Entry(activity)</li>
                     }
                 </ul>
             </section>
@@ -21,6 +23,67 @@
         {
             <p class="text-muted">Bu aralıkta aktivite yok.</p>
         }
+    }
+    else if (Mode is CalendarMode.Week or CalendarMode.Day)
+    {
+        var days = Days().ToList();
+        var (startHour, endHour) = HourRange(days);
+        <div class="cal-time cal-time-@Mode.ToString().ToLowerInvariant()" style="--cal-days:@days.Count;--cal-hours:@(endHour - startHour)">
+            <div class="cal-time-row cal-time-header" role="row">
+                <div class="cal-time-gutter" aria-hidden="true"></div>
+                @foreach (var day in days)
+                {
+                    <div class="cal-time-dayhead @(day == Today ? "today" : null)" role="columnheader">
+                        <span class="cal-time-weekday">@WeekdayNames[((int)day.DayOfWeek + 6) % 7]</span>
+                        <button type="button" class="cal-day-link" @onclick="() => OnCreate.InvokeAsync(day)"
+                                title="Bu güne aktivite ekle" aria-label="@Heading(day) için yeni aktivite">@day.Day</button>
+                    </div>
+                }
+            </div>
+            <div class="cal-time-row cal-time-allday" role="row">
+                <div class="cal-time-gutter">Tüm gün</div>
+                @foreach (var day in days)
+                {
+                    var untimed = UntimedOn(day);
+                    <div class="cal-time-allday-cell" role="gridcell" tabindex="0" aria-label="@Heading(day), tüm gün ve son tarihli @untimed.Count aktivite"
+                         @onkeydown="e => CellKey(e, day)" @ondragover:preventDefault @ondrop="() => DropAsync(day)">
+                        @foreach (var activity in untimed)
+                        {
+                            <div class="cal-item fam-@FamilyClass(activity) @ActivityLabels.Css(activity)" draggable="@(CanDrag(activity) ? "true" : "false")"
+                                 @ondragstart="() => dragging = activity">
+                                @Entry(activity)
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="cal-time-row cal-time-body" role="row">
+                <div class="cal-time-gutter cal-time-hours" aria-hidden="true">
+                    @for (var hour = startHour; hour < endHour; hour++)
+                    {
+                        <span>@hour.ToString("00"):00</span>
+                    }
+                </div>
+                @foreach (var day in days)
+                {
+                    <div class="cal-time-col @(day == Today ? "today" : null)" role="gridcell" aria-label="@Heading(day)"
+                         @ondragover:preventDefault @ondrop="() => DropAsync(day)">
+                        @foreach (var segment in Arrange(TimedOn(day)))
+                        {
+                            <div class="cal-event fam-@FamilyClass(segment.Activity) @ActivityLabels.Css(segment.Activity)"
+                                 style="@Position(segment, startHour, endHour)" draggable="@(CanDrag(segment.Activity) ? "true" : "false")"
+                                 @ondragstart="() => dragging = segment.Activity">
+                                @Block(segment.Activity)
+                            </div>
+                        }
+                        @if (day == Today && NowMinutes > startHour * 60 && NowMinutes < endHour * 60)
+                        {
+                            <div class="cal-now" style="top:@(Percent((NowMinutes - startHour * 60) / ((endHour - startHour) * 60.0) * 100))%" aria-hidden="true"></div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
     }
     else
     {
@@ -44,7 +107,7 @@
                     </div>
                     @foreach (var activity in items.Take(Mode == CalendarMode.Month ? 4 : 50))
                     {
-                        <div class="cal-item @ActivityLabels.Css(activity)" draggable="@(CanDrag(activity) ? "true" : "false")"
+                        <div class="cal-item fam-@FamilyClass(activity) @ActivityLabels.Css(activity)" draggable="@(CanDrag(activity) ? "true" : "false")"
                              @ondragstart="() => dragging = activity">
                             @Entry(activity)
                         </div>
@@ -82,6 +145,13 @@
 
     [Parameter] public EventCallback<(ActivityDto Activity, DateOnly Day)> OnMove { get; set; }
 
+    /// <summary>Aktivitenin ailesi (task, call, meeting, visit, email); renk ve ikon buna göre seçilir.</summary>
+    [Parameter] public Func<ActivityDto, string> FamilyOf { get; set; } = _ => ActivityFamily.Task;
+
+    private sealed record Segment(ActivityDto Activity, int From, int To, int Lane, int Lanes);
+
+    private const int MinutesPerDay = 24 * 60;
+
     private static DateOnly Today => DateOnly.FromDateTime(Regional.Now.DateTime);
 
     private RenderFragment Entry(ActivityDto activity) => builder =>
@@ -95,6 +165,135 @@
         builder.AddContent(5, $"{(deadlineOnly ? "⏰ " : null)}{ActivityLabels.TimeText(activity)} {activity.Subject}");
         builder.CloseElement();
     };
+
+    /// <summary>Saat çizelgesindeki blok: üstte saat, altta konu.</summary>
+    private RenderFragment Block(ActivityDto activity) => builder =>
+    {
+        builder.OpenElement(0, "button");
+        builder.AddAttribute(1, "type", "button");
+        builder.AddAttribute(2, "class", "cal-entry");
+        builder.AddAttribute(3, "title", activity.Masked ? "Meşgul" : $"{activity.Subject} · {ActivityLabels.TimeText(activity)}");
+        builder.AddAttribute(4, "onclick", EventCallback.Factory.Create(this, () => OnSelect.InvokeAsync(activity)));
+        builder.OpenElement(5, "span");
+        builder.AddAttribute(6, "class", "cal-entry-time");
+        builder.AddContent(7, ActivityLabels.TimeText(activity));
+        builder.CloseElement();
+        builder.OpenElement(8, "span");
+        builder.AddAttribute(9, "class", "cal-entry-subject");
+        builder.AddContent(10, activity.Masked ? "Meşgul" : activity.Subject);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private string FamilyClass(ActivityDto activity) => activity.Masked ? "busy" : FamilyOf(activity);
+
+    private static bool IsTimed(ActivityDto activity) => !activity.IsAllDay && activity.StartAt is not null;
+
+    private static double NowMinutes => Regional.Now.TimeOfDay.TotalMinutes;
+
+    private List<ActivityDto> UntimedOn(DateOnly day) =>
+        [.. Items.Where(a => !IsTimed(a) && ActivityLabels.Days(a).Contains(day)).OrderBy(a => a.IsAllDay ? 0 : 1).ThenBy(a => a.DueAt)];
+
+    /// <summary>
+    /// Günün saatli aktiviteleri, gün içindeki dakika aralığıyla (firma saat dilimi). Birden fazla güne yayılan blok her günde o güne
+    /// düşen kısmıyla görünür; bitişi olmayan ya da çok kısa blok okunabilsin diye en az 30 dakika yer kaplar.
+    /// </summary>
+    private List<(ActivityDto Activity, int From, int To)> TimedOn(DateOnly day)
+    {
+        var dayStart = day.ToDateTime(TimeOnly.MinValue);
+        var list = new List<(ActivityDto Activity, int From, int To)>();
+        foreach (var activity in Items)
+        {
+            if (!IsTimed(activity))
+            {
+                continue;
+            }
+
+            var start = Regional.ToTenant(activity.StartAt!.Value).DateTime;
+            var end = activity.EndAt is { } endAt && endAt > activity.StartAt ? Regional.ToTenant(endAt).DateTime : start.AddMinutes(30);
+            var from = Math.Max(0, (start - dayStart).TotalMinutes);
+            var to = Math.Min(MinutesPerDay, (end - dayStart).TotalMinutes);
+            if (to <= 0 || from >= MinutesPerDay)
+            {
+                continue;
+            }
+
+            list.Add((activity, (int)from, (int)Math.Min(MinutesPerDay, Math.Max(to, from + 30))));
+        }
+
+        return [.. list.OrderBy(x => x.From).ThenByDescending(x => x.To)];
+    }
+
+    /// <summary>Çakışan blokları şeritlere dizer: birbiriyle çakışan grup aynı genişliği paylaşır.</summary>
+    private static List<Segment> Arrange(List<(ActivityDto Activity, int From, int To)> items)
+    {
+        var result = new List<Segment>();
+        var group = new List<(ActivityDto Activity, int From, int To, int Lane)>();
+        var laneEnds = new List<int>();
+        var groupEnd = -1;
+        foreach (var item in items)
+        {
+            if (group.Count > 0 && item.From >= groupEnd)
+            {
+                Flush();
+            }
+
+            var lane = laneEnds.FindIndex(end => end <= item.From);
+            if (lane < 0)
+            {
+                lane = laneEnds.Count;
+                laneEnds.Add(item.To);
+            }
+            else
+            {
+                laneEnds[lane] = item.To;
+            }
+
+            group.Add((item.Activity, item.From, item.To, lane));
+            groupEnd = Math.Max(groupEnd, item.To);
+        }
+
+        Flush();
+        return result;
+
+        void Flush()
+        {
+            foreach (var entry in group)
+            {
+                result.Add(new Segment(entry.Activity, entry.From, entry.To, entry.Lane, laneEnds.Count));
+            }
+
+            group.Clear();
+            laneEnds.Clear();
+        }
+    }
+
+    /// <summary>Gösterilecek saat aralığı: varsayılan 08–18, daha erken/geç aktivite varsa genişler.</summary>
+    private (int Start, int End) HourRange(List<DateOnly> days)
+    {
+        int start = 8, end = 18;
+        foreach (var day in days)
+        {
+            foreach (var (_, from, to) in TimedOn(day))
+            {
+                start = Math.Min(start, from / 60);
+                end = Math.Max(end, (to + 59) / 60);
+            }
+        }
+
+        return (Math.Clamp(start, 0, 23), Math.Clamp(end, start + 1, 24));
+    }
+
+    private static string Position(Segment segment, int startHour, int endHour)
+    {
+        double span = (endHour - startHour) * 60.0;
+        double top = (segment.From - startHour * 60) / span * 100;
+        double height = (segment.To - segment.From) / span * 100;
+        double width = 100.0 / segment.Lanes;
+        return $"top:{Percent(top)}%;height:{Percent(height)}%;left:{Percent(width * segment.Lane)}%;width:{Percent(width)}%";
+    }
+
+    private static string Percent(double value) => value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
 
     private bool CanDrag(ActivityDto activity) => !activity.Masked && ActivityStatus.IsOpen(activity.Status) && CanMove(activity);
 

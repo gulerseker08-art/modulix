@@ -38,6 +38,17 @@ public static class ActivityLabels
 
     public static bool IsOverdue(ActivityDto activity) => activity.IsOverdue(DateTimeOffset.UtcNow);
 
+    /// <summary>Aktivite ailesinin ikonu (AppIcon adı); takvimde renk de aileden gelir (<c>fam-*</c> sınıfları).</summary>
+    public static string Icon(string? family) => family switch
+    {
+        ActivityFamily.Call => "phone",
+        ActivityFamily.Meeting => "users",
+        ActivityFamily.Visit => "map-pin",
+        ActivityFamily.Email => "mail",
+        ActivityFamily.Task => "check-circle",
+        _ => "clock",
+    };
+
     /// <summary>Satır / kart sınıfı: kapalı kayıt soluk, gecikmiş kayıt vurgulu; kapalı kayıt hiçbir zaman gecikmiş görünmez.</summary>
     public static string? Css(ActivityDto activity) =>
         activity.Masked ? "busy" : !ActivityStatus.IsOpen(activity.Status) ? "done" : IsOverdue(activity) ? "overdue" : null;

@@ -51,7 +51,7 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | Form Components | Kısmen | `app.css` (form durumları, `required`, `aria-invalid`) | Önizlemede default/invalid/read-only/disabled | Ayrı Razor bileşenleri (TextField vb.), FileUpload, RichText, kaydedilmemiş değişiklik uyarısı, Kaydet ve Kapat/Yeni |
 | DataGrid | Kısmen | `app.css` (`record-table`) | Önizleme; telefonda kart listesi | Kolon görünürlüğü/yeniden boyutlandırma, kayıtlı görünüm, dışa aktarma, ortak bileşen |
 | Firma/Kişi | Kısmen | `Pages/Crm/Companies.razor`, `Contacts.razor` (PageHeader) | CI derleme ✓ | Firma detayında 12 kolonlu ana içerik + sağ panel düzeni |
-| Aktiviteler | Kısmen | `Pages/Crm/Activities.razor` (PageHeader) | CI derleme ✓ | KPI kartları (Bugün/Geciken/Bu hafta/Tamamlanan), haftalık saat çizelgesi, Bugünün aktiviteleri paneli, sağdan açılan detay çekmecesi |
+| Aktiviteler | Tamam (faz 2) | `Pages/Crm/Activities.razor`, `Components/ActivityCalendar.razor`, `Components/TodayActivities.razor`, `Components/Drawer.razor`, `Services/ActivityLabels.cs` | CI (bkz. Faz 2); statik önizleme | Saat çizelgesinde blok sürükleyerek saat değiştirme ve yeniden boyutlandırma yok (gün değiştirme var); detay çekmecesinde ayrı sekmeler yok |
 | Fırsatlar | Kısmen | `Pages/Crm/Opportunities.razor` (PageHeader) | CI derleme ✓ | Chevron satış hunisi, KPI şeridi, sağ zaman çizelgesi + finansal özet |
 | Teklifler | Token/tema | — | — | Detay düzeni |
 | Diğer CRM | Token/tema | Bütün `PageTitle` metinleri | — | — |
@@ -82,3 +82,22 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 5. Firma/Kişi detay düzeni (ana içerik + sağ özet), ardından Teklif ve Yönetim ekranları.
 6. Kaydedilmemiş değişiklik uyarısı, "Kaydet ve Kapat / Yeni".
 7. bUnit ile bileşen testleri ve Playwright + axe ile görsel/erişilebilirlik regresyonu (test projesi eklemek mimari kural tablosunu günceller).
+
+
+## Faz 2 — Aktiviteler ekranı
+
+![Aktiviteler](onizleme-aktiviteler.png)
+
+| Özellik | Durum | Not |
+|---|---|---|
+| PageHeader + "Yeni aktivite" | Var | |
+| Özet kartları (Bugün, Geciken, Bu hafta, Tamamlanan) | Var | Her kart, sayısını verdiği görünümü açar. Sayılar mevcut liste uç noktasından `pageSize=1` + `TotalCount` ile gelir; yeni uç nokta yok. Kapsam kullanıcıya atananlardır |
+| Görünümler | Var | Liste, Gün, Hafta, Ay, Ajanda. **Varsayılan görünüm Liste'den Hafta'ya alındı** (referans tasarım); kayıtlı görünümler aynen çalışır |
+| Saat çizelgesi (hafta/gün) | Var | Varsayılan 08–18, daha erken/geç aktivite varsa genişler; çakışanlar yan yana; tüm gün ve yalnızca son tarihli işler üst satırda; bugün sütunu ve şimdiki zaman çizgisi; firma saat dilimi |
+| Türe göre renk | Var | Aile (görev, arama, toplantı, ziyaret, e-posta) → ton; gecikmiş kırmızı çizgi + "gecikti" metni |
+| Sürükle-bırak | Korundu | Başka güne taşıma (saat korunur), sunucu yetki ve çakışmayı denetler; çakışmada "yine de taşı" |
+| Bugünün aktiviteleri paneli | Var | Takvimin sağında (≥1200px), dar ekranda altında; ikon, saat, konu, kişi, firma, tür, durum |
+| Detay / düzenleme çekmecesi | Var | `ActivityActions` ve `ActivityEditor` sağdan açılır; telefonda tam ekran |
+| Tekrarlayan aktivite, hatırlatıcı sekmesi | Yok | Altyapıda yok |
+
+![Düzenleme çekmecesi](onizleme-aktivite-cekmece.png)

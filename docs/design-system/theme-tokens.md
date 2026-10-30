@@ -44,6 +44,10 @@ Bu doygun renkler küçük metinde kullanılmaz. Rozet ve uyarılarda açık zem
 | `--mx-tone-success-*` | `#D1FAE5` / `#065F46` | 6.8:1 |
 | `--mx-tone-warning-*` | `#FEF3C7` / `#92400E` | 6.4:1 |
 | `--mx-tone-danger-*` | `#FEE2E2` / `#991B1B` | 6.8:1 |
+| `--mx-tone-violet-*` | `#EDE9FE` / `#5B21B6` | 7.6:1 |
+| `--mx-tone-teal-*` | `#DDF6F6` / `#0F5F63` | 6.6:1 |
+
+Aktivite aileleri bu tonlara bağlıdır (`fam-*` sınıfları `--fam-bg` / `--fam-fg` verir): görev → teal, arama → violet, toplantı → info, ziyaret → warning, e-posta → success, meşgul (özel) → neutral.
 
 Koyu temada her ton koyu zemin + açık metin olarak yeniden tanımlıdır (en düşük 8:1 civarı).
 

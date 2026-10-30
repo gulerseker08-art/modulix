@@ -25,13 +25,14 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | IconButton | Stil | `<button class="icon-button" aria-label="…">` + `AppIcon` |
 | Badge / StatusBadge | Stil + Var | `badge` + `stage-*`, `status-*`, `user-*` tonları; `TenantStateBadge`, `UserStatusBadge` |
 | Card / SectionCard | Stil | `record-form`, `detail-section`, `detail-grid`, `chart-card`, `tile` |
-| SummaryCard / KPIStatCard | Stil | `summary` + `summary-item`, `stat-grid` + `stat-card` (+ `stat-icon`) |
+| SummaryCard / KPIStatCard | Stil | `summary` + `summary-item`, `stat-grid` + `stat-card` (+ `stat-icon`); tıklanabilir KPI: `kpi-grid` + `button.stat-card.kpi-card.tone-*` |
 | Tabs / segmented | Stil | `filters` + `chip` (`aria-pressed`), `segmented` |
 | Accordion | Stil | `sub-section` + `section-toggle` |
 | Notice / Toast | Var | `Components/Notice.razor` (sayfa içi, `role="status"`/`alert`). Merkezi toast kuyruğu yok |
 | ConfirmationDialog | Stil | `confirm` satır içi onay deseni |
 | EmptyState / ErrorState / Skeleton | Kısmen | `app-state`, `alert`; ortak bileşen yok |
-| Modal / Drawer | Yok | Bugün düzenleme formları sayfa içinde açılır |
+| Drawer | Var | `Components/Drawer.razor` — `Open`, `Label`, `OnClose`; Escape ve arka plan tıklaması kapatır, açılınca odak panele geçer, telefonda tam ekran. İçindeki `record-form`/`detail-section` çerçevesiz çizilir, `form-actions` alta yapışır |
+| Modal | Yok | |
 | Tooltip / DropdownMenu | Stil | `title` ipucu; profil menüsü `menu-list` deseni |
 
 ## Form
@@ -56,5 +57,6 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 |---|---|---|
 | DataGrid | Stil | `table record-table` + `Pager` + `filters`; telefonda kart listesi. Sunucu taraflı sayfalama/süzme mevcut uç noktalardan |
 | Kolon gizleme/sıralama/yeniden boyutlandırma, kayıtlı görünüm, toplu işlem | Kısmen/Yok | Toplu işlem yalnız Aktiviteler'de |
-| Takvim | Var | `ActivityCalendar.razor` (`cal-*` sınıfları) |
+| Takvim | Var | `ActivityCalendar.razor`: ay ızgarası, hafta/gün saat çizelgesi (`cal-time-*`, çakışanlar yan yana, şimdiki zaman çizgisi), ajanda; renk `FamilyOf` → `fam-*` |
+| Günün ajandası | Var | `TodayActivities.razor` |
 | Grafikler | Var | `BarChart.razor`, `DonutChart.razor` (`--chart-c*`) |
