@@ -104,6 +104,7 @@ public static class QuoteLabels
         "OpportunityWinSkipped" => "Bağlı fırsat kazanıldı yapılmadı",
         "FollowUpScheduled" => "Takip aktivitesi açıldı",
         "FollowUpsClosed" => "Takip aktiviteleri otomatik kapatıldı",
+        "OpportunitySynced" => "Fırsat esas teklif/tutar eşitlemesi",
         "ExpiryReminderCreated" => "Süre dolumu hatırlatması açıldı",
         "ShareLinkCreated" => "Paylaşım bağlantısı oluşturuldu",
         "ShareLinkRevoked" => "Paylaşım bağlantısı iptal edildi",

@@ -2160,6 +2160,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                     b.Property<Guid?>("OwnerId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("PrimaryQuoteId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Priority")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -2260,6 +2263,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                         .HasDatabaseName("UX_Opportunities_Number");
 
                     b.HasIndex("TenantId", "OwnerId");
+
+                    b.HasIndex("TenantId", "PrimaryQuoteId");
 
                     b.HasIndex("TenantId", "SourceLeadId")
                         .IsUnique()

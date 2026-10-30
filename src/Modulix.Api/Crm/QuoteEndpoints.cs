@@ -42,6 +42,12 @@ internal static class QuoteEndpoints
         quotes.MapGet("/{id:guid}/approval-requirements", ApprovalRequirementsAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/{id:guid}/compare", CompareAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/{id:guid}/handover", HandoverAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
+        crm.MapPost("/opportunities/{id:guid}/primary-quote", async (Guid id, SetPrimaryQuoteRequest r, IQuoteOpportunitySync sync, CancellationToken ct) =>
+        {
+            var result = await sync.SetPrimaryAsync(id, r.Version, r.QuoteId, ct);
+            return result.IsSuccess ? Results.Ok(CrmEndpoints.ToDto<OpportunityDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(CrmModule.Permissions.OpportunitiesRead);
+
         quotes.MapGet("/report", ReportAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/export", ExportAsync).RequirePermission(CrmModule.Permissions.QuotesExport);
 
@@ -236,6 +242,7 @@ internal sealed class QuotePolicyProvider(IServiceProvider services) : IQuotePol
             string.Equals(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteAllowSelfApproval, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
             string.Equals(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteOnAcceptWinOpportunity, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
             Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteFollowUpDays, cancellationToken)),
-            Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteExpiryReminderDays, cancellationToken)));
+            Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteExpiryReminderDays, cancellationToken)),
+            string.Equals(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteSyncOpportunityAmount, cancellationToken), "true", StringComparison.OrdinalIgnoreCase));
     }
 }

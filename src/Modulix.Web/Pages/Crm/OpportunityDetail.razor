@@ -477,9 +477,60 @@
             }
         </section>
 
-        <section class="detail-section">
-            <div class="section-header"><h2>Teklifler</h2></div>
-            <p class="text-muted">Teklif modülü bu kurulumda yok; fırsata teklif bağlanamaz. Fırsat tutarı elle girilir (tutar kaynağı: elle). Teklif modülü eklendiğinde esas teklif seçimi bu bölümde yapılacaktır.</p>
+        <section class="detail-section" aria-labelledby="opp-quotes">
+            <div class="section-header"><h2 id="opp-quotes">Teklifler</h2>
+                @if (Session.Can(CrmAccess.QuotesWrite) && opportunity.Status == OpportunityStatus.Open)
+                {
+                    <a class="btn btn-outline-primary btn-sm" href="crm/teklifler/yeni?opportunityId=@Id&companyId=@opportunity.CompanyId">Yeni teklif</a>
+                }
+            </div>
+            @if (!Session.Can(CrmAccess.QuotesRead))
+            {
+                <p class="text-muted">Teklifleri görme izniniz yok.</p>
+            }
+            else if (quotes is null)
+            {
+                <p class="text-muted">Yükleniyor…</p>
+            }
+            else if (quotes.Count == 0)
+            {
+                <p class="text-muted">Bu fırsata bağlı teklif yok.</p>
+            }
+            else
+            {
+                <p class="text-muted small">
+                    Esas teklif, fırsatın tutar ve raporlamasında esas alınan tekliftir; ilk sunulan teklif otomatik esas olur, yeni revizyon sunulunca esas yeni revizyona geçer.
+                    @(opportunity.PrimaryQuoteId is null ? "Şu an esas teklif yok; fırsat tutarı elle girilmiştir." : null)
+                </p>
+                <Notice Text="@quoteNotice" Failed="@quoteNoticeFailed" />
+                <table class="table record-table">
+                    <caption class="visually-hidden">Fırsata bağlı teklifler</caption>
+                    <thead><tr><th scope="col">Teklif</th><th scope="col">Durum</th><th scope="col" class="text-end">Net toplam</th><th scope="col">Geçerlilik</th><th scope="col">Esas</th><th scope="col"></th></tr></thead>
+                    <tbody>
+                        @foreach (var quote in quotes)
+                        {
+                            var isPrimary = quote.Id == opportunity.PrimaryQuoteId;
+                            <tr>
+                                <td data-label="Teklif" class="primary"><a href="crm/teklifler/@quote.Id">@quote.Title</a> <small class="text-muted">@quote.QuoteNumber · V@(quote.RevisionNo)</small></td>
+                                <td data-label="Durum"><span class="badge stage-@QuoteLabels.StatusBadge(quote.Status)">@QuoteLabels.Label(QuoteLabels.Statuses, quote.Status)</span></td>
+                                <td data-label="Net toplam" class="text-end">@QuoteLabels.Money(quote.NetTotal, quote.Currency)</td>
+                                <td data-label="Geçerlilik">@(quote.ValidUntil is { } until ? CrmLabels.Time(until) : "—")</td>
+                                <td data-label="Esas">@(isPrimary ? "Esas teklif" : "—")</td>
+                                <td class="actions">
+                                    @if (Session.Can(CrmAccess.OpportunitiesWrite) && !isPrimary && quote.Status is "Presented" or "Accepted")
+                                    {
+                                        <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick="() => SetPrimaryAsync(quote.Id)">Esas teklif yap</button>
+                                    }
+                                    else if (Session.Can(CrmAccess.OpportunitiesWrite) && isPrimary)
+                                    {
+                                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => SetPrimaryAsync(null)">Esas tekliften kaldır</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
         </section>
 
         <section class="detail-section">
@@ -518,6 +569,9 @@
     private IReadOnlyList<OpportunityContactDto>? contacts;
     private IReadOnlyList<OpportunityCompetitorDto>? competitors;
     private IReadOnlyList<ActivityDto>? activities;
+    private IReadOnlyList<QuoteDto>? quotes;
+    private string? quoteNotice;
+    private bool quoteNoticeFailed;
     private IReadOnlyList<OpportunityHistoryDto>? history;
     private IReadOnlyDictionary<string, string[]>? actionErrors;
     private string? message;
@@ -643,6 +697,20 @@
         activities = Session.Can(CrmAccess.ActivitiesRead)
             ? (await Api.GetAsync<CrmPage<ActivityDto>>($"/api/crm/activities?opportunityId={Id}&pageSize=100")).Value?.Items ?? []
             : [];
+        quotes = Session.Can(CrmAccess.QuotesRead)
+            ? (await Api.GetAsync<CrmPage<QuoteDto>>($"/api/crm/quotes?opportunityId={Id}&pageSize=100")).Value?.Items ?? []
+            : [];
+    }
+
+    private async Task SetPrimaryAsync(Guid? quoteId)
+    {
+        if (busy || opportunity is null) { return; }
+        busy = true;
+        var result = await Api.PostAsync<OpportunityDto>($"/api/crm/opportunities/{Id}/primary-quote", new SetPrimaryQuoteRequest(opportunity.Version, quoteId));
+        busy = false;
+        quoteNotice = result.IsSuccess ? (quoteId is null ? "Esas teklif kaldırıldı." : "Esas teklif güncellendi.") : result.Error;
+        quoteNoticeFailed = !result.IsSuccess;
+        await LoadAsync();
     }
 
     private async Task RunAsync(string action, object body)

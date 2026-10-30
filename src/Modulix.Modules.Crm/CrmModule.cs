@@ -532,6 +532,11 @@ public sealed class CrmModule : IModule
             PatternMessage = "0-999 arası tam sayı girin.",
             MaxLength = 3,
         },
+        new(SettingKeys.QuoteSyncOpportunityAmount, "Fırsat tutarını esas tekliften eşitle", "CRM Teklif", SettingType.Choice, "false")
+        {
+            Description = "Evet seçilirse açık fırsatın tutarı ve para birimi, esas teklifi müşteriye sunulduğunda (ve esas teklif değiştirildiğinde) teklifin net toplamıyla eşitlenir. Varsayılan hayırdır; fırsat tutarı elle girilir.",
+            Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
+        },
         new(SettingKeys.QuoteSellerDetails, "Teklif belgesi: satıcı bilgileri", "CRM Teklif", SettingType.Text)
         {
             Description = "Müşteri teklif belgesinin (PDF) başlığında firma adının altında görünür: adres, telefon, vergi dairesi/numarası gibi. Boş bırakılabilir.",
@@ -631,7 +636,7 @@ public sealed class CrmModule : IModule
             ["expectedBenefit"] = "Beklenen fayda", ["scope"] = "Kapsam", ["successCriteria"] = "Başarı ölçütleri", ["risks"] = "Riskler",
             ["decisionProcess"] = "Karar süreci", ["targetDecisionDate"] = "Hedef karar tarihi", ["nextAction"] = "Sonraki aksiyon",
             ["nextActionDate"] = "Aksiyon tarihi", ["lastInteractionAt"] = "Son müşteri etkileşimi", ["stageEnteredAt"] = "Aşamaya giriş",
-            ["probabilityManual"] = "Olasılık elle girildi", ["actualCloseDate"] = "Gerçek kapanış", ["wonAmount"] = "Kazanılan tutar",
+            ["probabilityManual"] = "Olasılık elle girildi", ["actualCloseDate"] = "Gerçek kapanış", ["wonAmount"] = "Kazanılan tutar", ["primaryQuoteId"] = "Esas teklif",
             ["wonCurrency"] = "Kazanılan para birimi", ["winReason"] = "Kazanma nedeni", ["handoverNote"] = "Devir notu",
             ["lossReason"] = "Kaybetme nedeni", ["winningCompetitorId"] = "Kazanan rakip", ["recontactDate"] = "Yeniden iletişim",
             ["holdReviewDate"] = "Yeniden değerlendirme", ["closureCycle"] = "Kapanış döngüsü", ["closeDateChangeCount"] = "Kapanış tarihi değişimi",
@@ -641,7 +646,7 @@ public sealed class CrmModule : IModule
             References = new Dictionary<string, string>
             {
                 ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact, ["sourceLeadId"] = Entities.Lead,
-                ["winningCompetitorId"] = Entities.OpportunityCompetitor,
+                ["winningCompetitorId"] = Entities.OpportunityCompetitor, ["primaryQuoteId"] = Entities.Quote,
             },
         },
         new(Entities.OpportunityContact, "Fırsat kişisi (CRM)", Permissions.OpportunitiesRead, new Dictionary<string, string>
@@ -889,6 +894,7 @@ public sealed class CrmModule : IModule
         public const string QuoteOnAcceptWinOpportunity = "crm.quote.on-accept-win-opportunity";
         public const string QuoteFollowUpDays = "crm.quote.follow-up-days";
         public const string QuoteExpiryReminderDays = "crm.quote.expiry-reminder-days";
+        public const string QuoteSyncOpportunityAmount = "crm.quote.sync-opportunity-amount";
     }
 
     public void ConfigureServices(IServiceCollection services)
@@ -925,6 +931,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<QuoteMarkers>();
         services.AddScoped<IQuoteExpiry, QuoteExpiry>();
         services.AddScoped<IAcceptedQuoteSource, AcceptedQuoteSource>();
+        services.AddScoped<IQuoteOpportunitySync, QuoteOpportunitySync>();
         services.AddScoped<QuoteLifecycleSubscriber>();
         services.AddScoped<QuoteExpiryAnchor>();
         services.AddScoped<IQuoteCustomerPortal, QuoteCustomerPortal>();

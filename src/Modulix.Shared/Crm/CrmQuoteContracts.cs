@@ -131,6 +131,9 @@ public sealed record QuoteTransitionRequest(long Version, string? Reason = null)
 
 public sealed record ReviseQuoteRequest(string Reason);
 
+/// <summary>Fırsatın esas teklifini seçer (boş = kaldır); <see cref="Version"/> fırsatın sürümüdür.</summary>
+public sealed record SetPrimaryQuoteRequest(long Version, Guid? QuoteId);
+
 public sealed record QuoteHistoryDto(Guid Id, string Kind, DateTimeOffset At, Guid? ActorId, string? FromStatus, string? ToStatus, string? Reason);
 
 /// <summary>Kullanıcının görebildiği eylem; Allowed=false ise Message nedenini açıklar.</summary>

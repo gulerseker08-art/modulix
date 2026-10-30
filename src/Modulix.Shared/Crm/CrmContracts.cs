@@ -271,7 +271,8 @@ public sealed record OpportunityDto(
     DateOnly? RecontactDate = null,
     DateOnly? HoldReviewDate = null,
     int ClosureCycle = 1,
-    int CloseDateChangeCount = 0);
+    int CloseDateChangeCount = 0,
+    Guid? PrimaryQuoteId = null);
 
 public sealed record SaveOpportunityRequest(
     string Title,

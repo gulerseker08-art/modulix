@@ -70,6 +70,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
         Field.Time<Opportunity>("stageEnteredAt", o => o.StageEnteredAt, (o, v) => { if (v is { } time) { o.StageEnteredAt = time; } }).AsSystem(),
         // Kapanış bilgileri (yalnızca iş akışı).
         Field.Date<Opportunity>("actualCloseDate", o => o.ActualCloseDate, (o, v) => o.ActualCloseDate = v).AsSystem(),
+        Field.Id<Opportunity>("primaryQuoteId", o => o.PrimaryQuoteId, (o, v) => o.PrimaryQuoteId = v).AsSystem(),
         Field.Money<Opportunity>("wonAmount", o => o.WonAmount, (o, v) => o.WonAmount = v).AsSystem(),
         Field.Text<Opportunity>("wonCurrency", Opportunity.CurrencyLength, o => o.WonCurrency, (o, v) => o.WonCurrency = v).AsSystem(),
         Field.Text<Opportunity>("winReason", Opportunity.LostReasonMaxLength, o => o.WinReason, (o, v) => o.WinReason = v).AsSystem(),

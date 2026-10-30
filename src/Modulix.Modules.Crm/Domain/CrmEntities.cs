@@ -135,6 +135,9 @@ public sealed class Opportunity : CrmEntity, IOwnedEntity
     /// <summary>ISO 4217 kodu (ör. "TRY").</summary>
     public string Currency { get; internal set; } = DefaultCurrency;
 
+    /// <summary>Fırsatın esas teklifi (ADR-0019): tutar eşitleme ve raporlama bu teklife bakar. Yalnızca iş akışıyla yazılır.</summary>
+    public Guid? PrimaryQuoteId { get; internal set; }
+
     public DateOnly? ExpectedCloseDate { get; internal set; }
 
     /// <summary>Kazanma olasılığı (yüzde, 0-100).</summary>
