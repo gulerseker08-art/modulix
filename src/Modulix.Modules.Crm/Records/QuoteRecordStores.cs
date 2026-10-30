@@ -116,6 +116,15 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         ["validTo"] = (q, v, _) => FilterValue.Date(v) is { } d
             ? q.Where(x => x.ValidUntil < new DateTimeOffset(d.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero))
             : null,
+        // Rapor dönemleri (UTC gün sınırları): sunum ve karar tarihi.
+        ["presentedFrom"] = (q, v, _) => FilterValue.Date(v) is { } d ? q.Where(x => x.PresentedAt >= new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)) : null,
+        ["presentedTo"] = (q, v, _) => FilterValue.Date(v) is { } d
+            ? q.Where(x => x.PresentedAt < new DateTimeOffset(d.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero))
+            : null,
+        ["decidedFrom"] = (q, v, _) => FilterValue.Date(v) is { } d ? q.Where(x => x.DecidedAt >= new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)) : null,
+        ["decidedTo"] = (q, v, _) => FilterValue.Date(v) is { } d
+            ? q.Where(x => x.DecidedAt < new DateTimeOffset(d.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero))
+            : null,
         // Aile bazlı görünüm: her ailenin yalnızca son revizyonu (revizyonlar ayrı satış gibi görünmez).
         ["latestOnly"] = (q, v, ctx) => FilterValue.Bool(v) is true
             ? q.Where(x => x.RevisionNo == ctx.Data.Set<Quote>().Where(y => y.FamilyId == x.FamilyId).Max(y => y.RevisionNo))

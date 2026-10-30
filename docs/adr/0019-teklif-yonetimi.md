@@ -1,6 +1,6 @@
 # ADR-0019: Teklif yönetimi (M1.5) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (çekirdek, sunucu yaşam döngüsü, ekranlar, PDF, paylaşım/kabul sayfası, onay kuralları, revizyon karşılaştırma ve e-posta gönderimi). Tarih: 2026-10-30.
+Durum: Kısmen uygulandı (çekirdek, sunucu yaşam döngüsü, ekranlar, PDF, paylaşım/kabul sayfası, onay kuralları, revizyon karşılaştırma, e-posta gönderimi, raporlar ve dışa aktarma). Tarih: 2026-10-30.
 
 ## Mevcut durum (analiz anında, kodla kanıtlı; güncel durum en alttaki "Uygulama durumu"nda)
 
@@ -108,3 +108,18 @@ Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları
 | Geliştirme güvenliği | Geliştirme SMTP'si yerel Mailpit'tir (`appsettings.Development.json`); gerçek müşteriye e-posta gitmez. Testler gönderim durumunu kuyruk satırı üzerinden doğrular. |
 
 **Beşinci dilimde de yapılmadı (dürüst durum):** teslim/okundu bildirimi (SMTP bunu vermez; "teslim edildi" hiçbir yerde iddia edilmez), geri dönen/sıçrayan e-posta (bounce) işleme, alıcıya hatırlatma ve süre dolumu bildirimi, e-posta şablonu özelleştirme/çok dilli, gönderimde PDF eki, toplu gönderim, durumun arka planda eşitlenmesi (şimdi liste okunurken), kalıcı hatalı bir e-postanın yeniden denenmesi için ekran düğmesi. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
+
+## Uygulama durumu (altıncı dilim: raporlar ve dışa aktarma)
+
+**Uygulandı** (`QuoteReportTests` 3 entegrasyon testi; rapor ekranı gerçek geliştirme verisinde tarayıcıda denendi):
+
+| Konu | Karar / davranış |
+|---|---|
+| Rapor | `GET /api/crm/quotes/report?from&to&ownerId` (`crm.quotes.read`; ekran `crm/teklif-raporu`). Kayıt boru hattından okunur: izin ve veri kapsamı liste ekranıyla aynıdır, kapsam dışı teklif hiçbir toplamda yer almaz (temsilci yalnızca kendi tekliflerini görür). Yalnızca ailelerin **son revizyonu** sayılır; revizyonlu aile tek kez. |
+| İçerik | "Şu an": taslak, iç onay bekleyen, müşteride bekleyen (adet ve para birimi bazlı tutar). Dönem: sunulan, kabul, ret, iptal, süresi dolan, kabul oranı (kabul/(kabul+ret)), ortalama karar süresi, ortalama indirim, kabulde ortalama revizyon, sorumlu bazında dağılım. Dikkat listeleri: süresi yaklaşan (7 gün), süresi geçmiş ama hâlâ sunulmuş, iç onay bekleyen, müşteriye gönderilmemiş/gönderimi başarısız. Tanımlar ekranda yazılıdır. |
+| Para birimi | Toplamlar para birimi bazındadır; kur dönüşümü yoktur, birimler karıştırılmaz. |
+| Güvenlik | Kalem maliyeti, marj ve iç not rapora ve dışa aktarmaya hiç girmez (marj raporu bilinçli olarak yoktur). Tutarlar vergi dahil genel toplamdır. |
+| Dışa aktarma | `GET /api/crm/quotes/export` (`crm.quotes.export`, yeni izin): CSV, kayıt boru hattı ve süzgeçlerle (ör. `latestOnly=true`), en çok 5000 satır, formül karakteriyle başlayan hücre etkisizleştirilir, çıkış denetim kaydına yazılır. |
+| Filtreler | `presentedFrom/To`, `decidedFrom/To` (UTC gün sınırı) kayıt süzgeci olarak eklendi. |
+
+**Altıncı dilimde de yapılmadı (dürüst durum):** marj/kârlılık raporu (maliyet izni ve ayrı rapor gerekir), geçmiş dönem anlık görüntüsü (rapor bugünkü kayıt değerlerindendir), teslim/okundu verisi, ret nedeni analizi (serbest metin; yapılandırılmış neden listesi yok), kayıtlı görünümler ve zamanlanmış rapor e-postası, grafikler, kapsam dışı ürün/kategori kırılımı. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.

@@ -99,6 +99,7 @@ public sealed class CrmModule : IModule
         public const string QuotesCancel = "crm.quotes.cancel";
         public const string QuotesShare = "crm.quotes.share";
         public const string QuoteRulesManage = "crm.quote-rules.manage";
+        public const string QuotesExport = "crm.quotes.export";
         public const string QuoteCostsRead = "crm.quote-costs.read";
     }
 
@@ -259,6 +260,7 @@ public sealed class CrmModule : IModule
         new(Permissions.QuotesCancel, "Teklifi gerekçeyle iptal eder", "Teklifler"),
         new(Permissions.QuotesShare, "Sunulmuş teklif için müşteri belgesi (PDF) ve paylaşım bağlantısı üretir, bağlantıyı iptal eder", "Teklifler"),
         new(Permissions.QuoteRulesManage, "Teklif iç onay kurallarını (indirim/tutar eşiği, onaylayan) tanımlar ve değiştirir", "Teklifler"),
+        new(Permissions.QuotesExport, "Teklif listesini CSV olarak dışa aktarır (maliyet ve iç not hariç)", "Teklifler"),
         new(Permissions.QuoteCostsRead, "Teklif kalemlerinin maliyetini görür ve düzenler", "Teklif maliyeti"),
     ];
 
@@ -884,6 +886,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<IQuoteWorkflow, QuoteWorkflow>();
         services.AddScoped<IQuoteSharing, QuoteSharing>();
         services.AddScoped<IQuoteComparison, QuoteComparisonService>();
+        services.AddScoped<IQuoteReport, QuoteReport>();
         services.AddScoped<IQuoteCustomerPortal, QuoteCustomerPortal>();
         services.AddScoped<QuoteCustomerAnchor>();
         services.AddScoped<IPriceCalculator, PriceCalculator>();

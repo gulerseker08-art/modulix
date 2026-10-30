@@ -60,6 +60,7 @@ public static class CrmAccess
     public const string QuotesCancel = "crm.quotes.cancel";
     public const string QuotesShare = "crm.quotes.share";
     public const string QuoteRulesManage = "crm.quote-rules.manage";
+    public const string QuotesExport = "crm.quotes.export";
     public const string QuoteCostsRead = "crm.quote-costs.read";
 }
 
