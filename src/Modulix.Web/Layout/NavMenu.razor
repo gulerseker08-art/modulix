@@ -2,6 +2,7 @@
 @inject SessionState Session
 @inject AppNavigation Apps
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <div class="top-row ps-3 navbar navbar-light">
     <div class="container-fluid">
@@ -16,24 +17,25 @@
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="nav flex-column" aria-label="Sol menü">
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <AppIcon Name="home" Size="18" /> Ana sayfa
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" title="Ana sayfa">
+                <AppIcon Name="home" Size="20" /> <span class="nav-label">Ana sayfa</span>
             </NavLink>
         </div>
 
-        @* Sol menü yalnızca aktif modülün sayfalarını gösterir; aktif modül route'tan bulunur (yenilemede ve doğrudan bağlantıda da). *@
+        @* Sol menü yalnızca aktif modülün sayfalarını gösterir; aktif modül route'tan bulunur (yenilemede ve doğrudan bağlantıda da).
+           Liste AppCatalog metadata'sından, tenant'ın açık modüllerine ve kullanıcının izinlerine göre süzülerek gelir. *@
         @if (activeRoot is not null)
         {
-            <div class="nav-section px-3">Aktif modül</div>
-            <div class="nav-module px-3">
+            <div class="nav-section px-3"><span class="nav-label">Aktif modül</span></div>
+            <div class="nav-module mx-3" title="@activeRoot.Name">
                 <AppIcon Name="@activeRoot.Icon" Size="20" />
-                <span>@activeRoot.Name</span>
+                <span class="nav-label">@activeRoot.Name</span>
             </div>
             @foreach (AppDefinition app in children)
             {
                 <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="@app.Route" Match="@(app.ExactMatch ? NavLinkMatch.All : NavLinkMatch.Prefix)">
-                        <AppIcon Name="@app.Icon" Size="18" /> @app.Name
+                    <NavLink class="nav-link" href="@app.Route" Match="@(app.ExactMatch ? NavLinkMatch.All : NavLinkMatch.Prefix)" title="@app.Name">
+                        <AppIcon Name="@app.Icon" Size="20" /> <span class="nav-label">@app.Name</span>
                     </NavLink>
                 </div>
             }
@@ -41,8 +43,18 @@
     </nav>
 </div>
 
+@* Menüyü daralt / genişlet (yalnızca geniş ekranda; telefonda menü açılır panel olarak çalışır). *@
+<div class="nav-footer px-3">
+    <button type="button" class="nav-collapse-button" @onclick="ToggleSidebarAsync"
+            aria-pressed="@(sidebarCollapsed ? "true" : "false")" title="@(sidebarCollapsed ? "Menüyü genişlet" : "Menüyü daralt")">
+        <AppIcon Name="@(sidebarCollapsed ? "panel-left-open" : "panel-left-close")" Size="20" />
+        <span class="nav-label">@(sidebarCollapsed ? "Menüyü Genişlet" : "Menüyü Daralt")</span>
+    </button>
+</div>
+
 @code {
     private bool collapseNavMenu = true;
+    private bool sidebarCollapsed;
     private AppDefinition? activeRoot;
     private IReadOnlyList<AppDefinition> children = [];
 
@@ -53,6 +65,19 @@
         Session.Changed += OnChanged;
         Navigation.LocationChanged += OnLocationChanged;
         Recompute();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            bool collapsed = await JS.InvokeAsync<bool>("modulixShell.isSidebarCollapsed");
+            if (collapsed)
+            {
+                sidebarCollapsed = true;
+                StateHasChanged();
+            }
+        }
     }
 
     private void Recompute()
@@ -80,6 +105,11 @@
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    private async Task ToggleSidebarAsync()
+    {
+        sidebarCollapsed = await JS.InvokeAsync<bool>("modulixShell.setSidebarCollapsed", !sidebarCollapsed);
     }
 
     public void Dispose()

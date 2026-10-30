@@ -1,13 +1,17 @@
+/* AppShell: sol menü + üst çubuk + içerik. Ölçüler ve renkler tasarım tokenlarından gelir (app.css). */
 .page {
     position: relative;
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
 }
 
-main {
+.app-main {
     flex: 1;
     /* Geniş içerik (ör. çok aşamalı satış hunisi) sayfayı değil kendi alanını kaydırır. */
     min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .sidebar {
@@ -18,60 +22,148 @@ main {
 .top-row {
     background-color: var(--mx-surface);
     border-bottom: 1px solid var(--mx-border);
-    justify-content: flex-end;
-    height: 4rem;
+    height: var(--mx-header-height);
     display: flex;
     align-items: center;
+    justify-content: flex-end;
+    gap: var(--mx-space-4);
 }
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        white-space: nowrap;
-        margin-left: 1.5rem;
+.tenant-logo {
+    margin-right: auto;
+}
+
+.header-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+    min-width: 0;
+}
+
+.company-switcher .form-select {
+    min-width: 12rem;
+}
+
+/* ---- Profil menüsü ---- */
+.profile-menu {
+    position: relative;
+    min-width: 0;
+}
+
+.profile-button {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-3);
+    min-width: 0;
+    max-width: 18rem;
+    padding: var(--mx-space-1) var(--mx-space-2);
+    border: 0;
+    border-radius: var(--mx-radius-button);
+    background: transparent;
+    color: var(--mx-text-primary);
+    text-align: left;
+}
+
+    .profile-button:hover {
+        background: var(--mx-surface-muted);
+    }
+
+.avatar {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 2.375rem;
+    height: 2.375rem;
+    border-radius: 50%;
+    background: var(--mx-brand-navy-light);
+    color: #fff;
+    font-size: var(--mx-fs-label);
+    font-weight: 600;
+}
+
+.session-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.session-name {
+    font-weight: 600;
+    font-size: var(--mx-fs-body);
+}
+
+.session-tenant {
+    font-size: var(--mx-fs-helper);
+    color: var(--mx-text-secondary);
+}
+
+.menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+}
+
+.menu-list {
+    position: absolute;
+    right: 0;
+    top: calc(100% + var(--mx-space-2));
+    z-index: 1050;
+    min-width: 13rem;
+    margin: 0;
+    padding: var(--mx-space-2);
+    list-style: none;
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    box-shadow: var(--mx-shadow-popover);
+}
+
+    .menu-list a, .menu-list button {
+        display: flex;
+        align-items: center;
+        gap: var(--mx-space-3);
+        width: 100%;
+        min-height: var(--mx-control-height);
+        padding: 0 var(--mx-space-3);
+        border: 0;
+        border-radius: var(--mx-radius-input);
+        background: transparent;
+        color: var(--mx-text-primary);
+        font-size: var(--mx-fs-body);
+        font-weight: 500;
+        text-align: left;
         text-decoration: none;
     }
 
-    .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
-        text-decoration: underline;
-    }
-
-    .top-row ::deep .avatar {
-        display: inline-grid;
-        place-items: center;
-        flex: none;
-        width: 2.25rem;
-        height: 2.25rem;
-        margin-right: 0.6rem;
-        border-radius: 50%;
-        background: var(--mx-indigo);
-        color: #fff;
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-
-    .top-row ::deep a:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+        .menu-list a:hover, .menu-list button:hover {
+            background: var(--mx-surface-muted);
+            color: var(--mx-brand-primary);
+        }
 
 @media (max-width: 640.98px) {
     .top-row {
         justify-content: space-between;
-        gap: 0.75rem;
+        gap: var(--mx-space-3);
     }
 
-    .top-row ::deep .avatar {
+    .header-tools {
+        flex: 1;
+        justify-content: flex-end;
+    }
+
+    /* İsim kısalır, menü ekrandan taşmaz. */
+    .profile-button {
+        max-width: 12rem;
+    }
+
+    .session-tenant {
         display: none;
     }
 
-    /* İsim kısalır, bağlantılar ekrandan taşmaz. */
-    .top-row ::deep .session-info {
-        flex: 1 1 0;
+    .company-switcher .form-select {
         min-width: 0;
-        max-width: none;
-    }
-
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        margin-left: 0;
+        max-width: 9rem;
     }
 }
 
@@ -81,26 +173,35 @@ main {
     }
 
     .sidebar {
-        width: 240px;
+        width: var(--mx-sidebar-width);
+        flex: none;
         height: 100vh;
         position: sticky;
         top: 0;
+        display: flex;
+        flex-direction: column;
+        transition: width 0.18s ease;
+    }
+
+    /* Daraltılmış menü: yalnızca ikonlar (durum js/shell.js'de saklanır). */
+    html.sidebar-collapsed .sidebar {
+        width: var(--mx-sidebar-collapsed-width);
     }
 
     .top-row {
         position: sticky;
         top: 0;
-        z-index: 1;
+        z-index: 1020;
     }
 
-    .top-row.auth ::deep a:first-child {
-        flex: 1;
-        text-align: right;
-        width: 0;
+    .top-row, .content {
+        padding-left: var(--mx-space-8) !important;
+        padding-right: var(--mx-space-6) !important;
     }
+}
 
-    .top-row, article {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
+@media (prefers-reduced-motion: reduce) {
+    .sidebar {
+        transition: none;
     }
 }
