@@ -1,6 +1,6 @@
 # ADR-0009: Tenant başına ayrı iş veritabanı (Faz 3)
 
-- **Durum:** Kabul edildi, 26 Ekim 2026
+- **Durum:** Geri alındı, 30 Ekim 2026 (ADR-0020: tek paylaşımlı veritabanına dönüş); kabul edilmişti 26 Ekim 2026
 - **Karar:** Ortak platform veritabanı + tenant başına ayrı iş veritabanı
 - **İlgili:** ADR-0001 (SQL Server), ADR-0002 (tenant stratejisi; bu ADR onun "Faz 3" adımını uygular)
 

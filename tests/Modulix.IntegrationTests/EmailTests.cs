@@ -61,7 +61,7 @@ public class EmailTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
     [Fact]
     public async Task Email_is_persisted_immediately_on_enqueue()
     {
-        // ADR-0009: e-posta kuyruğu platform veritabanındadır ve kuyruğa yazma hemen kalıcı kılınır (iş işleminin tenant
+        // ADR-0020 Dilim 1: e-posta kuyruğu platform bağlamındadır ve kuyruğa yazma hemen kalıcı kılınır (iş işleminin tenant
         // bağlantısını paylaşmaz), böylece aktif tenant olmayan giriş akışlarında da çalışır. Gönderim yine ertelenir.
         await using var host = FakeHost();
         var address = UniqueAddress();
@@ -227,7 +227,7 @@ public class EmailTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
                 new TenantContext(id, Guid.NewGuid(), Guid.NewGuid());
         }
 
-        // ADR-0009: kuyruk platform DB'sine hemen yazılır (EfEmailQueue kendi bağlamını kullanır); kimliği adresten okunur.
+        // ADR-0020 Dilim 1: kuyruk platform bağlamına hemen yazılır (EfEmailQueue kendi bağlamını kullanır); kimliği adresten okunur.
         scope.ServiceProvider.GetRequiredService<IEmailQueue>().Enqueue(message);
         return await Db(scope).EmailMessages.AsNoTracking()
             .Where(e => e.ToAddress == message.To)

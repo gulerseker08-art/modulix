@@ -201,18 +201,14 @@ public class QuotePostAcceptTests(ModulixApiFactory factory) : IClassFixture<Mod
     {
         var s = await SetUpAsync();
         var runner = factory.Services.GetRequiredService<QuoteExpiryRunner>();
-        string connectionString;
-        using (var scope = factory.OpenScope(s.TenantId))
-        {
-            connectionString = scope.ServiceProvider.GetRequiredService<Modulix.Infrastructure.Tenancy.ITenantConnectionResolver>().GetConnectionString(s.TenantId);
-        }
+        var connectionString = factory.Services.GetRequiredService<Modulix.Infrastructure.Persistence.ModulixDatabaseOptions>().AppConnectionString;
 
         await using var other = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
         await other.OpenAsync();
         await using (var take = other.CreateCommand())
         {
             take.CommandText = "DECLARE @r int; EXEC @r = sys.sp_getapplock @Resource = @name, @LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = 0; SELECT @r;";
-            take.Parameters.AddWithValue("@name", QuoteExpiryRunner.LockName);
+            take.Parameters.AddWithValue("@name", QuoteExpiryRunner.LockResource(s.TenantId));
             Assert.True(Convert.ToInt32(await take.ExecuteScalarAsync()) >= 0);
         }
 

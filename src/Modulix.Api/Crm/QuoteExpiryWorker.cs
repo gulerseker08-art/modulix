@@ -8,7 +8,6 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
-using Modulix.Infrastructure.Tenancy;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Quotes;
 
@@ -35,6 +34,9 @@ public sealed class QuoteExpiryRunner(IServiceScopeFactory scopes, TimeProvider 
 {
     public const string LockName = "modulix.crm.quote-expiry";
 
+    /// <summary>Kilit kaynağı tenant başınadır: tek veritabanında (ADR-0020) bir tenant'ın turu diğerini engellemez.</summary>
+    public static string LockResource(Guid tenantId) => $"{LockName}:{tenantId:N}";
+
     public async Task<QuoteExpiryRun> RunTenantAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
@@ -47,9 +49,9 @@ public sealed class QuoteExpiryRunner(IServiceScopeFactory scopes, TimeProvider 
         }
 
         // Kilit ayrı bir bağlantıda, tur boyunca tutulur; kayıt yazımları kendi bağlantılarında olağan akışla devam eder.
-        await using var lockConnection = new SqlConnection(services.GetRequiredService<ITenantConnectionResolver>().GetConnectionString(tenantId));
+        await using var lockConnection = new SqlConnection(services.GetRequiredService<ModulixDatabaseOptions>().AppConnectionString);
         await lockConnection.OpenAsync(cancellationToken);
-        if (!await TryLockAsync(lockConnection, cancellationToken))
+        if (!await TryLockAsync(lockConnection, tenantId, cancellationToken))
         {
             return new QuoteExpiryRun(0, 0, "Başka bir uygulama örneği aynı tenant için çalışıyor; tur atlandı.", Skipped: true);
         }
@@ -69,25 +71,25 @@ public sealed class QuoteExpiryRunner(IServiceScopeFactory scopes, TimeProvider 
         }
         finally
         {
-            await ReleaseLockAsync(lockConnection, cancellationToken);
+            await ReleaseLockAsync(lockConnection, tenantId, cancellationToken);
         }
     }
 
-    private static async Task<bool> TryLockAsync(SqlConnection connection, CancellationToken cancellationToken)
+    private static async Task<bool> TryLockAsync(SqlConnection connection, Guid tenantId, CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
         command.CommandText = "DECLARE @r int; EXEC @r = sys.sp_getapplock @Resource = @name, @LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = 0; SELECT @r;";
-        command.Parameters.AddWithValue("@name", LockName);
+        command.Parameters.AddWithValue("@name", LockResource(tenantId));
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) >= 0;
     }
 
-    private static async Task ReleaseLockAsync(SqlConnection connection, CancellationToken cancellationToken)
+    private static async Task ReleaseLockAsync(SqlConnection connection, Guid tenantId, CancellationToken cancellationToken)
     {
         try
         {
             await using var command = connection.CreateCommand();
             command.CommandText = "EXEC sys.sp_releaseapplock @Resource = @name, @LockOwner = N'Session';";
-            command.Parameters.AddWithValue("@name", LockName);
+            command.Parameters.AddWithValue("@name", LockResource(tenantId));
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
         catch (SqlException)
@@ -98,7 +100,7 @@ public sealed class QuoteExpiryRunner(IServiceScopeFactory scopes, TimeProvider 
 }
 
 /// <summary>
-/// Teklif süre dolumunu düzenli aralıklarla çalıştırır (<c>QuoteExpiry:WorkerEnabled</c> ile kapatılır). Kurulumu tamamlanmış her tenant ayrı
+/// Teklif süre dolumunu düzenli aralıklarla çalıştırır (<c>QuoteExpiry:WorkerEnabled</c> ile kapatılır). Açık her tenant ayrı
 /// çalışır; biri başarısız olursa diğerleri etkilenmez ve bir sonraki turda yeniden denenir.
 /// </summary>
 public sealed class QuoteExpiryWorker(

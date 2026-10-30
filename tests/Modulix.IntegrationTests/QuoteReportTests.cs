@@ -100,7 +100,7 @@ public class QuoteReportTests(ModulixApiFactory factory) : IClassFixture<Modulix
         var s = await SetUpAsync();
         using var admin = await LoginAsync(s.Admin);
         using var rep = await LoginAsync(s.Rep);
-        var quote = await PresentedAsync(admin, s.CompanyId, 1000m, title: "=HYPERLINK(\"http://kotu.example\")", notes: "GIZLI-IC-NOT", cost: 777m);
+        var quote = await PresentedAsync(admin, s.CompanyId, 1000m, title: "=HYPERLINK(\"http://kotu.example\")", notes: "GIZLI-IC-NOT", cost: 777.19m);
 
         Assert.Equal(HttpStatusCode.Forbidden, (await rep.GetAsync("/api/crm/quotes/export")).StatusCode);
 
@@ -110,7 +110,8 @@ public class QuoteReportTests(ModulixApiFactory factory) : IClassFixture<Modulix
         var csv = await response.Content.ReadAsStringAsync();
         Assert.Contains(quote.QuoteNumber, csv);
         Assert.DoesNotContain("GIZLI-IC-NOT", csv);
-        Assert.DoesNotContain("777", csv);
+        Assert.DoesNotContain("777,19", csv);
+        Assert.DoesNotContain("777.19", csv);
         Assert.DoesNotContain("unitCost", csv, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("internalNotes", csv, StringComparison.OrdinalIgnoreCase);
         // Formül karakteriyle başlayan hücre etkisizleştirilir.

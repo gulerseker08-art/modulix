@@ -70,7 +70,7 @@ internal sealed class AdministratorGuard(ModulixDbContext db, PlatformDbContext 
             return;
         }
 
-        // Sistem rolü atamaları tenant DB'sinde, üyelik durumu platform DB'sindedir (ADR-0009): iki adımda çöz.
+        // Sistem rolü atamaları tenant bağlamında, üyelik durumu platform bağlamındadır (ADR-0020 Dilim 1): iki adımda çöz.
         var otherAdminMembershipIds = await db.MembershipRoles.AsNoTracking()
             .Where(mr => mr.RoleId == systemRoleId && mr.MembershipId != membershipId)
             .Select(mr => mr.MembershipId)

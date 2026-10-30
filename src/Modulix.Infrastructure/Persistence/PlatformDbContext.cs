@@ -9,12 +9,12 @@ using Modulix.Infrastructure.Identity;
 namespace Modulix.Infrastructure.Persistence;
 
 /// <summary>
-/// Platform (merkezi) veritabanının DbContext'i (ADR-0009): tenant kayıtları ve yaşam döngüsü, ortak kullanıcı
+/// Platform şemasının DbContext'i (ADR-0020: tek veritabanı, Dilim 1'de ayrı sınırlı bağlam): tenant kayıtları ve yaşam döngüsü, ortak kullanıcı
 /// kimlikleri (Identity), kullanıcı–tenant üyelikleri, platform yöneticileri, modül erişimleri ve açık oturumlar.
-/// Tenant iş verisi burada <b>değildir</b>; o <see cref="ModulixDbContext"/> ile tenant başına ayrı veritabanındadır.
+/// Tenant iş verisi burada <b>değildir</b>; o <see cref="ModulixDbContext"/> ile aynı veritabanının tenant şemalarındadır.
 ///
-/// Tenant DB'si ile platform DB'si arasında cross-database foreign key veya join yoktur: tenant tablolarındaki
-/// <c>MembershipId</c> düz bir <c>Guid</c>'dir ve bu bağlamdaki üyelikle yalnızca mantıksal olarak ilişkilidir.
+/// İki bağlam arasında foreign key veya join yoktur: tenant tablolarındaki <c>MembershipId</c> düz bir <c>Guid</c>'dir
+/// ve bu bağlamdaki üyelikle yalnızca mantıksal olarak ilişkilidir (Dilim 2'de FK geri gelir).
 /// </summary>
 public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> options)
     : IdentityUserContext<ModulixUser, Guid>(options)
@@ -51,7 +51,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 }
 
 /// <summary>
-/// Platform veritabanına ait bir entity yapılandırmasını işaretler (ADR-0009). İki bağlam aynı derlemeyi tarar;
+/// Platform veritabanına ait bir entity yapılandırmasını işaretler (ADR-0020 Dilim 1). İki bağlam aynı derlemeyi tarar;
 /// bu işaret platform tablolarının tenant bağlamına, tenant tablolarının platform bağlamına sızmasını engeller.
 /// </summary>
 public interface IPlatformConfiguration;

@@ -32,8 +32,8 @@ internal sealed class EventAdministration(
 
     public const string SkippedByAdministrator = "Platform yöneticisi atladı.";
 
-    // ADR-0009: outbox ve teslimler tenant başına ayrı veritabanındadır. Platform ekranı bir sorguyla bütün tenant'ları
-    // göremez; kurulumu tamamlanmış tenant'lar üzerinde dönülür ve sonuç bellekte birleştirilip süzülür/sayfalanır.
+    // ADR-0020 Dilim 1: outbox ve teslimler tek veritabanında tenant bağlamıyla okunur (ADR-0020). Platform ekranı bir sorguyla bütün tenant'ları
+    // göremez; açık tenant'lar üzerinde dönülür ve sonuç bellekte birleştirilip süzülür/sayfalanır.
     public async Task<EventSummary> GetSummaryAsync(CancellationToken cancellationToken)
     {
         var rows = await AllRowsAsync(tenantId: null, cancellationToken);
@@ -54,7 +54,7 @@ internal sealed class EventAdministration(
             }
             catch (Exception)
             {
-                // Ulaşılamayan tenant atlanır (ADR-0009 sınırlaması).
+                // Ulaşılamayan tenant atlanır (ADR-0020 Dilim 1 sınırlaması).
             }
         }
 
@@ -119,7 +119,7 @@ internal sealed class EventAdministration(
     private async Task<int> ChangeAsync(
         IReadOnlyCollection<Guid>? ids, EventDeliveryQuery? filter, Guid actingUserId, EventDeliveryStatus target, CancellationToken cancellationToken)
     {
-        // ADR-0009: teslimler tenant başına ayrı veritabanındadır; her tenant kendi bağlamında, denetim kaydıyla aynı
+        // ADR-0020 Dilim 1: teslimler tek veritabanında tenant bağlamıyla okunur (ADR-0020); her tenant kendi bağlamında, denetim kaydıyla aynı
         // işlemde değiştirilir. Toplu sınır bütün tenant'lara yayılır.
         var budget = IEventAdministration.MaxBulk;
         var changed = 0;
@@ -153,7 +153,7 @@ internal sealed class EventAdministration(
             }
             catch (Exception)
             {
-                // Ulaşılamayan tenant atlanır (ADR-0009 sınırlaması); diğer tenant'lar etkilenmez.
+                // Ulaşılamayan tenant atlanır (ADR-0020 Dilim 1 sınırlaması); diğer tenant'lar etkilenmez.
                 continue;
             }
 
@@ -266,10 +266,10 @@ internal sealed class EventAdministration(
         };
     }
 
-    /// <summary>Kurulumu tamamlanmış tenant'lar (ADR-0009); <paramref name="tenantId"/> verilirse yalnızca o tenant.</summary>
+    /// <summary>Açık tenant'lar; <paramref name="tenantId"/> verilirse yalnızca o tenant.</summary>
     private async Task<IReadOnlyList<TenantRef>> ActiveTenantsAsync(Guid? tenantId, CancellationToken cancellationToken)
     {
-        var query = platform.Tenants.AsNoTracking().Where(t => t.ProvisioningStatus == TenantProvisioningStatus.Active);
+        var query = platform.Tenants.AsNoTracking().Where(t => t.Status == TenantStatus.Active);
         if (tenantId is { } id)
         {
             query = query.Where(t => t.Id == id);
@@ -292,7 +292,7 @@ internal sealed class EventAdministration(
             }
             catch (Exception)
             {
-                // Bir tenant'ın veritabanına ulaşılamazsa ekran tümden düşmez; o tenant atlanır (ADR-0009 sınırlaması).
+                // Bir tenant'ın veritabanına ulaşılamazsa ekran tümden düşmez; o tenant atlanır (ADR-0020 Dilim 1 sınırlaması).
             }
         }
 

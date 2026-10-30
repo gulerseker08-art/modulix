@@ -53,7 +53,7 @@ internal sealed class SectorProfileService(
         {
             var plan = await PlanAsync(profile, enableModules, cancellationToken);
 
-            // Tenant profil anahtarı platform DB'sindedir (ADR-0009); tenant işi (özel alan/liste/audit) tenant DB'sinde.
+            // Tenant profil anahtarı platform bağlamındadır (ADR-0020 Dilim 1); tenant işi (özel alan/liste/audit) tenant bağlamında.
             var row = await platform.Tenants.SingleAsync(t => t.Id == tenant.TenantId, cancellationToken);
             var modulesBefore = await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken);
             var before = Snapshot(row.ProfileKey, modulesBefore);
@@ -101,8 +101,8 @@ internal sealed class SectorProfileService(
                 await transaction.CommitAsync(cancellationToken);
             }
 
-            // Tenant işi başarıyla bittikten sonra platform DB'sinde profil anahtarını kaydet (ayrı veritabanı,
-            // ayrı işlem; ADR-0009: platform/tenant tek atomik işlem varsayılmaz).
+            // Tenant işi başarıyla bittikten sonra platform bağlamında profil anahtarını kaydet (ayrı bağlam,
+            // ayrı işlem; ADR-0020 Dilim 1: platform/tenant tek atomik işlem varsayılmaz).
             await platform.SaveChangesAsync(cancellationToken);
 
             return plan;

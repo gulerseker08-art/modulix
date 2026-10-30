@@ -7,7 +7,7 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Infrastructure.Tenancy;
 
 /// <summary>
-/// ADR-0009: platform verisi (üyelik, tenant) her istekte okunur; tenant verisi (erişilebilir şirketler) yalnızca aktif
+/// ADR-0020 Dilim 1: platform verisi (üyelik, tenant) her istekte okunur; tenant verisi (erişilebilir şirketler) yalnızca aktif
 /// tenant varken. Tenant DbContext'i bu yüzden tembel çözülür: aktif tenant olmayan akışlarda (ör. giriş) kurulmaz.
 /// </summary>
 internal sealed class MembershipDirectory(PlatformDbContext platform, IServiceProvider services, TimeProvider time) : IMembershipDirectory

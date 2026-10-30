@@ -31,8 +31,7 @@ internal sealed class PlatformAdministration(
     PlatformDbContext db,
     ModuleCatalog catalog,
     SectorProfileCatalog profiles,
-    ITenantScopeFactory tenantScopes,
-    ITenantProvisioningService provisioning) : IPlatformAdministration
+    ITenantScopeFactory tenantScopes) : IPlatformAdministration
 {
     public const int MaxPageSize = 50;
 
@@ -99,8 +98,9 @@ internal sealed class PlatformAdministration(
             throw new ArgumentException($"Tanımsız sektör profili: '{profileKey}'.", "profile");
         }
 
-        // Yönetici alanları önceden doğrulanır (ADR-0009): platform ve tenant DB işlemleri tek atomik işlem olmadığı için
-        // geç bir doğrulama hatası yarım kurulmuş tenant bırakır. Hızlı başarısızlıkla hiçbir şey oluşturulmaz.
+        // Yönetici alanları önceden doğrulanır: tenant kaydı ile başlangıç verisi iki bağlamda ayrı işlemlerde yazıldığı için
+        // (ADR-0020, Dilim 2'de tek işlem olacak) geç bir doğrulama hatası yarım kurulmuş tenant bırakır. Hızlı başarısızlıkla
+        // hiçbir şey oluşturulmaz.
         try
         {
             UserAdministration.ValidateEmail(creation.AdministratorEmail);
@@ -117,7 +117,7 @@ internal sealed class PlatformAdministration(
             throw SlugTaken(tenant.Slug);
         }
 
-        // Tenant kaydı platform DB'sinde oluşur (Pending); iş verisi değildir (ADR-0009).
+        // Tenant kaydı platform şemasında oluşur; iş verisi değildir.
         db.Tenants.Add(tenant);
         try
         {
@@ -128,16 +128,13 @@ internal sealed class PlatformAdministration(
             throw SlugTaken(tenant.Slug);
         }
 
-        // İş veritabanını oluştur ve migrate et (ADR-0009); kurulum tamamlanana kadar iş API'lerine erişim açılmaz.
-        await provisioning.PrepareAsync(tenant.Id, cancellationToken);
-
         await using var scope = tenantScopes.Create(new TenantContext(tenant.Id, actingUserId, Guid.Empty));
         var services = scope.ServiceProvider;
         var tenantDb = services.GetRequiredService<ModulixDbContext>();
         var roles = services.GetRequiredService<IRoleService>();
 
-        // Roller, varsayılan şirket, şablonlar ve denetim kaydı tenant DB'sinde tek işlemde yazılır. Modül hakları ve
-        // yönetici üyeliği platform DB'sindedir (ayrı işlem; ADR-0009).
+        // Roller, varsayılan şirket, şablonlar ve denetim kaydı tenant bağlamında tek işlemde yazılır. Modül hakları ve
+        // yönetici üyeliği platform bağlamındadır (ayrı işlem; ADR-0020 Dilim 2'de birleşir).
         await using var transaction = await tenantDb.Database.BeginTransactionAsync(cancellationToken);
 
         var entitlements = services.GetRequiredService<IModuleEntitlements>();
@@ -184,9 +181,6 @@ internal sealed class PlatformAdministration(
         }
 
         await transaction.CommitAsync(cancellationToken);
-
-        // Sağlık kontrolünden sonra tenant'ı Active yap; iş API'lerine erişim bundan sonra açılır (ADR-0009).
-        await provisioning.CompleteAsync(tenant.Id, cancellationToken);
 
         var detail = await GetTenantAsync(tenant.Id, cancellationToken)
             ?? throw new InvalidOperationException("Açılan firma okunamadı.");
@@ -250,7 +244,7 @@ internal sealed class PlatformAdministration(
             throw NotFound();
         }
 
-        // Modül hakkı platform DB'sinde, denetim kaydı tenant DB'sindedir (ADR-0009): ayrı veritabanları, ayrı yazılır.
+        // Modül hakkı platform bağlamında, denetim kaydı tenant bağlamındadır (ADR-0020 Dilim 1): ayrı bağlamlar, ayrı yazılır.
         await using var scope = tenantScopes.Create(new TenantContext(tenantId, actingUserId, Guid.Empty));
         var services = scope.ServiceProvider;
         var tenantDb = services.GetRequiredService<ModulixDbContext>();
@@ -267,7 +261,7 @@ internal sealed class PlatformAdministration(
             new JsonObject { ["modules"] = ModuleList(before) },
             new JsonObject { ["modules"] = ModuleList(after) });
         await entitlements.SetEnabledAsync(tenantId, moduleKey, enabled, cancellationToken);
-        await tenantDb.SaveChangesAsync(cancellationToken); // denetim kaydını tenant DB'sine yaz
+        await tenantDb.SaveChangesAsync(cancellationToken); // denetim kaydını tenant bağlamına yaz
     }
 
     public Task<ProfilePlan?> PreviewProfileAsync(Guid tenantId, string profileKey, CancellationToken cancellationToken) =>
@@ -308,7 +302,7 @@ internal sealed class PlatformAdministration(
 
     private async Task ChangeAsync(Guid tenantId, Guid actingUserId, Action<Tenant> change, CancellationToken cancellationToken)
     {
-        // Tenant kaydı platform DB'sindedir (ADR-0009); değişiklik orada, denetim kaydı tenant DB'sinde yazılır.
+        // Tenant kaydı platform bağlamındadır (ADR-0020 Dilim 1); değişiklik orada, denetim kaydı tenant bağlamında yazılır.
         var tenant = await db.Tenants.SingleOrDefaultAsync(t => t.Id == tenantId, cancellationToken) ?? throw NotFound();
 
         var before = Snapshot(tenant);
@@ -357,7 +351,7 @@ internal sealed class PlatformAdministration(
 
     /// <summary>
     /// Yönetici rolündeki üyeler; <paramref name="tenantDb"/> firmanın bağlamında olmalıdır. Sistem rolü atamaları tenant
-    /// DB'sinde, üyelik ve kullanıcı platform DB'sindedir (ADR-0009): iki adımda birleştirilir (cross-database join yok).
+    /// bağlamında, üyelik ve kullanıcı platform bağlamındadır (ADR-0020 Dilim 1): iki adımda birleştirilir (cross-database join yok).
     /// </summary>
     private async Task<IReadOnlyList<TenantAdministrator>> ListAdministratorsAsync(ModulixDbContext tenantDb, CancellationToken cancellationToken)
     {

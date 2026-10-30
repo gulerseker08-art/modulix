@@ -134,14 +134,12 @@ Invoke-Checked dotnet @('user-secrets', 'set', 'ConnectionStrings:ModulixMigrati
 
 # --- 5/6 Migration -------------------------------------------------------------
 
-Write-Step '5/6 Migration uygulaniyor (platform + kurulu tenant veritabanlari)'
+Write-Step '5/6 Migration uygulaniyor (platform + tenant zinciri, ayni veritabani)'
 Invoke-Checked dotnet @('run', '--project', 'src/Modulix.Api', '--', 'migrate')
-# Kurulu tenant is veritabanlarini da guncelle (ADR-0009); ilk kurulumda tenant yoksa bir sey yapmaz.
-Invoke-Checked dotnet @('run', '--project', 'src/Modulix.Api', '--no-build', '--', 'migrate-tenants')
 
 # --- 6/6 Ornek veri ------------------------------------------------------------
 
-Write-Step '6/6 Ornek veri (yalnizca gelistirme; ornek tenantlarin is veritabanlarini da kurar)'
+Write-Step '6/6 Ornek veri (yalnizca gelistirme)'
 Invoke-Checked dotnet @('run', '--project', 'src/Modulix.Api', '--no-build', '--', 'seed')
 
 Write-Host ''

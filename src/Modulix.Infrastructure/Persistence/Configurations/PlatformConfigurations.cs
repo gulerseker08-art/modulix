@@ -19,13 +19,6 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>, IP
         builder.Property(t => t.CreatedAt).IsRequired();
         builder.Property(t => t.ProfileKey).HasMaxLength(Modulix.Core.Customization.SectorProfileCatalog.KeyMaxLength);
         builder.Ignore(t => t.IsActive);
-        builder.Ignore(t => t.IsProvisioned);
-
-        // Tenant→DB defteri (ADR-0009): hangi veritabanı, kurulum durumu, şema sürümü.
-        builder.Property(t => t.DatabaseName).HasMaxLength(128);
-        builder.HasIndex(t => t.DatabaseName).IsUnique().HasFilter("[DatabaseName] IS NOT NULL");
-        builder.Property(t => t.ProvisioningStatus).IsRequired();
-        builder.Property(t => t.SchemaVersion).HasMaxLength(150);
     }
 }
 

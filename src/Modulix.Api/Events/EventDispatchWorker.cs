@@ -37,8 +37,8 @@ public sealed class EventDispatchWorker(
             var round = new EventRound(0, 0);
             try
             {
-                // ADR-0009: outbox ve teslimler tenant başına ayrı veritabanındadır; işleyici kurulu her tenant'ın
-                // bağlamında ayrı çalışır. Tenant kimliği güvenilir platform defterinden okunur.
+                // ADR-0020 Dilim 1: outbox ve teslimler tek veritabanında tenant bağlamıyla okunur (ADR-0020); işleyici açık her tenant'ın
+                // bağlamında ayrı çalışır. Tenant kimliği platform kaydından okunur.
                 var cleanup = lastCleanup is null || time.GetUtcNow() - lastCleanup >= CleanupInterval;
                 await using var scope = scopes.CreateAsyncScope();
                 var tenantScopes = scope.ServiceProvider.GetRequiredService<ITenantScopeFactory>();
@@ -62,7 +62,7 @@ public sealed class EventDispatchWorker(
                     }
                     catch (Exception exception)
                     {
-                        // Bir tenant'ın veritabanına ulaşılamazsa diğerleri etkilenmez; bir sonraki turda tekrar denenir.
+                        // Bir tenant'ın turunda hata olursa diğerleri etkilenmez; bir sonraki turda tekrar denenir.
                         logger.LogWarning(exception, "Tenant {TenantId} olayları bu turda işlenemedi.", tenantId);
                     }
                 }
@@ -96,17 +96,17 @@ public sealed class EventDispatchWorker(
         }
     }
 
-    /// <summary>Kurulumu tamamlanmış tenant'ların kimlikleri (ADR-0009); outbox her birinde ayrıdır.</summary>
+    /// <summary>Açık tenant'ların kimlikleri; outbox tenant bağlamında ayrı ayrı işlenir (ADR-0007).</summary>
     internal static async Task<IReadOnlyList<Guid>> ActiveTenantIdsAsync(IServiceProvider services, CancellationToken cancellationToken) =>
         await services.GetRequiredService<PlatformDbContext>().Tenants.AsNoTracking()
-            .Where(t => t.ProvisioningStatus == TenantProvisioningStatus.Active)
+            .Where(t => t.Status == TenantStatus.Active)
             .Select(t => t.Id)
             .ToListAsync(cancellationToken);
 }
 
 /// <summary>
 /// /health: herhangi bir tenant'ta dağıtılmamış olay 15 dakikadan eskiyse "degraded" (işleyici durmuş veya yetişemiyor).
-/// Outbox tenant başına ayrı veritabanındadır (ADR-0009); kurulu her tenant ayrı ölçülür.
+/// Outbox tenant bağlamındadır (ADR-0020 Dilim 1); açık her tenant ayrı ölçülür.
 /// </summary>
 public sealed class EventHealthCheck(IServiceScopeFactory scopes) : IHealthCheck
 {
@@ -127,7 +127,7 @@ public sealed class EventHealthCheck(IServiceScopeFactory scopes) : IHealthCheck
             }
             catch (Exception)
             {
-                // Bir tenant'ın veritabanına ulaşılamaması sağlık kontrolünü tümden düşürmez; o tenant atlanır.
+                // Bir tenant'ın ölçümünde hata olması sağlık kontrolünü tümden düşürmez; o tenant atlanır.
             }
         }
 

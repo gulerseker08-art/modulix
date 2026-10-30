@@ -15,14 +15,14 @@ using Modulix.Infrastructure.Records;
 namespace Modulix.Infrastructure.Persistence;
 
 /// <summary>
-/// Tenant iş verisinin DbContext'i (ADR-0009): bağlantısı aktif tenant'ın ayrı veritabanına çözülür. Modüller bu
+/// Tenant iş verisinin DbContext'i: bütün tenant'lar tek veritabanındadır (ADR-0002, ADR-0020). Modüller bu
 /// sınıfa erişemez; kayıtlara yalnızca kayıt boru hattı üzerinden ulaşır (talimat Bölüm 3, kural 1). Platform geneli
 /// tablolar (kullanıcılar, tenant kayıtları, üyelikler, modül erişimleri, oturumlar) burada değildir; onlar
-/// <see cref="PlatformDbContext"/> ile merkezi platform veritabanındadır.
+/// <see cref="PlatformDbContext"/> ile aynı veritabanının platform şemasındadır (ADR-0020 Dilim 2'de bağlamlar birleşir).
 ///
 /// Tenant izolasyonu, birinci katman (ADR-0002): <see cref="ITenantEntity"/> uygulayan her entity'ye otomatik sorgu
 /// filtresi uygulanır ve kaydederken TenantId aktif tenant'tan atanır. İkinci katman veritabanındadır
-/// (<see cref="TenantIsolationSql"/>); tenant DB'si tek tenant içerse de korunur.
+/// (<see cref="TenantIsolationSql"/>); filtre unutulsa bile veri sızmaz.
 ///
 /// Modül tabloları: kayıtlı her modülün projesindeki <c>IEntityTypeConfiguration</c> sınıfları modele eklenir
 /// (<see cref="ApplyModuleModels"/>). Modüller bu tablolara <see cref="IModuleData"/> üzerinden erişir.
@@ -76,7 +76,7 @@ public class ModulixDbContext(
     {
         base.OnModelCreating(modelBuilder);
 
-        // Yalnızca tenant entity yapılandırmaları; platform tabloları PlatformDbContext'e aittir (ADR-0009).
+        // Yalnızca tenant entity yapılandırmaları; platform tabloları PlatformDbContext'e aittir (ADR-0020 Dilim 1).
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(ModulixDbContext).Assembly,
             type => !typeof(IPlatformConfiguration).IsAssignableFrom(type));
@@ -93,6 +93,12 @@ public class ModulixDbContext(
         {
             ApplyTenantFilterMethod.MakeGenericMethod(entityType.ClrType).Invoke(this, [modelBuilder]);
         }
+
+        // Outbox ve teslimler ITenantEntity değildir (RLS dışı; işleyici tenant bağlamını açıkça kurar) ama tek veritabanında
+        // (ADR-0020) her tenant bağlamı yalnızca kendi olaylarını görmelidir: ADR-0009'daki fiziksel ayrımın yerini bu
+        // filtre alır. Aktif tenant yoksa hiçbir olay görünmez.
+        modelBuilder.Entity<OutboxMessage>().HasQueryFilter(o => o.TenantId == CurrentTenantId);
+        modelBuilder.Entity<EventDelivery>().HasQueryFilter(d => d.TenantId == CurrentTenantId);
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)

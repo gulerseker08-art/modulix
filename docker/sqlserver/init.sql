@@ -1,5 +1,5 @@
 /*
-  Modulix veritabani kurulumu (ADR-0002).
+  Modulix veritabani kurulumu (ADR-0002, ADR-0020): tek paylasimli veritabani, butun tenant'lar ayni veritabanindadir.
 
   - modulix_migrator: tablo olusturur ve degistirir (db_owner). Yalnizca migration komutu kullanir.
   - modulix_app:      uygulamanin kullanicisi. Veri okur/yazar; tablo, sema veya guvenlik
@@ -28,12 +28,6 @@ IF SUSER_ID(N'modulix_migrator') IS NULL
     CREATE LOGIN [modulix_migrator] WITH PASSWORD = N'$(MODULIX_MIGRATOR_PASSWORD)', CHECK_POLICY = ON, DEFAULT_DATABASE = [Modulix];
 ELSE
     ALTER LOGIN [modulix_migrator] WITH PASSWORD = N'$(MODULIX_MIGRATOR_PASSWORD)';
-GO
-
--- Tenant basina ayri is veritabani (ADR-0009): migrator yeni tenant veritabanlari olusturabilmeli.
--- dbcreator yalnizca veritabani olusturma/degistirme yetkisidir; uygulama kullanicisi (modulix_app) bu yetkiye sahip degildir.
-IF IS_SRVROLEMEMBER(N'dbcreator', N'modulix_migrator') = 0
-    ALTER SERVER ROLE [dbcreator] ADD MEMBER [modulix_migrator];
 GO
 
 USE [Modulix];

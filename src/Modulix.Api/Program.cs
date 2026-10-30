@@ -32,10 +32,10 @@ var builder = WebApplication.CreateBuilder(args);
 //   dotnet run --project src/Modulix.Api -- migrate
 if (args.Contains("migrate", StringComparer.OrdinalIgnoreCase))
 {
-    // Platform veritabanının migration'ları (ADR-0009). Tenant veritabanları için 'migrate-tenants' kullanılır.
+    // Platform ve tenant zincirleri aynı veritabanına uygulanır (ADR-0020); modül tabloları modele girsin diye katalog verilir.
     var migrationsConnection = RequiredConnectionString(builder.Configuration, PersistenceSetup.MigrationsConnectionName);
-    await PersistenceSetup.MigratePlatformAsync(migrationsConnection);
-    Console.WriteLine("Platform migration'ları uygulandı.");
+    await PersistenceSetup.MigrateAsync(migrationsConnection, ModuleCatalog.Create(ModulixModules.Create()));
+    Console.WriteLine("Migration'lar uygulandı.");
     return;
 }
 
@@ -96,24 +96,6 @@ if (args.Contains("seed", StringComparer.OrdinalIgnoreCase))
 
     await DemoDataSeeder.SeedAsync(app.Services);
     Console.WriteLine($"Örnek veri hazır. Kullanıcılar: ayse@acme.demo, mehmet@beta.demo, deniz@ortak.demo, platform yöneticisi platform@modulix.demo (şifre: {DemoDataSeeder.DemoPassword})");
-    return;
-}
-
-// "migrate-tenants" komutu: tenant iş veritabanlarına tenant migration'larını uygular ve çıkar (ADR-0009).
-//   dotnet run --project src/Modulix.Api -- migrate-tenants            (bütün kurulu tenant'lar)
-//   dotnet run --project src/Modulix.Api -- migrate-tenants acme beta  (yalnızca verilen slug'lar)
-if (args.Contains("migrate-tenants", StringComparer.OrdinalIgnoreCase))
-{
-    var slugs = args.SkipWhile(a => !a.Equals("migrate-tenants", StringComparison.OrdinalIgnoreCase)).Skip(1).ToArray();
-    await using var scope = app.Services.CreateAsyncScope();
-    var runner = scope.ServiceProvider.GetRequiredService<Modulix.Infrastructure.Tenancy.TenantMigrationRunner>();
-    var report = await runner.RunAsync(slugs, Modulix.Infrastructure.Tenancy.TenantMigrationRunner.DefaultMaxConcurrency, CancellationToken.None);
-    foreach (var result in report.Results)
-    {
-        Console.WriteLine($"{(result.Succeeded ? "OK  " : "HATA")} {result.Slug} ({result.DatabaseName}): {result.Detail}");
-    }
-
-    Console.WriteLine($"Tenant migration'ları: {report.Succeeded} başarılı, {report.Failed} başarısız.");
     return;
 }
 

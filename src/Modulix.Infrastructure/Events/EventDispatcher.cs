@@ -47,6 +47,7 @@ public sealed record EventRound(int Dispatched, int Delivered);
 /// </summary>
 public sealed class EventDispatcher(
     ModulixDbContext db,
+    ITenantContextAccessor tenantAccessor,
     PlatformDbContext platform,
     ModuleCatalog catalog,
     ITenantScopeFactory tenantScopes,
@@ -98,7 +99,7 @@ public sealed class EventDispatcher(
             SELECT d.[Id], d.[NextAttemptAt],
                    ROW_NUMBER() OVER (PARTITION BY d.[TenantId] ORDER BY d.[NextAttemptAt], d.[Id]) AS [Rank]
             FROM [platform].[EventDeliveries] d
-            WHERE d.[Status] = @pending AND d.[NextAttemptAt] <= @now
+            WHERE d.[TenantId] = @tenant AND d.[Status] = @pending AND d.[NextAttemptAt] <= @now
               AND {NotBlockedSql}
         ) c
         WHERE c.[Rank] <= @perTenant
@@ -193,10 +194,17 @@ public sealed class EventDispatcher(
     /// </summary>
     public async Task<int> DeliverAsync(CancellationToken cancellationToken)
     {
+        // Ham SQL de tenant süzgeci taşır (ADR-0020): dağıtıcı her zaman bir tenant bağlamında çalışır, bağlamsız tur teslim almaz.
+        if (tenantAccessor.Current?.TenantId is not { } tenantId)
+        {
+            return 0;
+        }
+
         var batch = Math.Max(1, options.Value.BatchSize);
         var now = time.GetUtcNow();
         var due = await db.Database.SqlQueryRaw<Guid>(
             DueDeliveriesSql,
+            new SqlParameter("@tenant", tenantId),
             new SqlParameter("@batch", batch),
             new SqlParameter("@pending", (int)EventDeliveryStatus.Pending),
             new SqlParameter("@now", now),
@@ -384,7 +392,7 @@ public sealed class EventDispatcher(
         await transaction.CommitAsync(cancellationToken);
 
         // Abonenin kuyruğa yazdığı e-postalar yalnızca teslim onaylandıktan sonra platform kuyruğuna yazılır
-        // (ADR-0009): teslim iptal/yeniden denemede e-posta tekrarlanmaz. Platform ve tenant ayrı veritabanı olduğundan
+        // (ADR-0020 Dilim 1): teslim iptal/yeniden denemede e-posta tekrarlanmaz. Platform ve tenant bağlamları ayrı işlem kullandığından
         // bu, teslimle tek atomik işlem değildir; en kötü durumda e-posta en fazla bir kez yazılır.
         await services.GetRequiredService<PlatformDbContext>().SaveChangesAsync(cancellationToken);
         return true;
@@ -516,7 +524,8 @@ public sealed class EventDispatcher(
             while (true)
             {
                 await Task.Delay(HeartbeatInterval, time, cancellationToken);
-                await using var scope = scopes.CreateAsyncScope();
+                // Teslimin tenant bağlamında (ADR-0020: olay sorgu filtresi aktif tenant ister).
+                await using var scope = tenantScopes.Create(new TenantContext(delivery.TenantId, Guid.Empty, Guid.Empty));
                 var leaseUntil = time.GetUtcNow() + Lease;
                 await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().EventDeliveries
                     .Where(d => d.Id == delivery.Id && d.LeaseToken == lease && d.Status == EventDeliveryStatus.Pending)

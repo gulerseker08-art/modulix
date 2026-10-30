@@ -41,7 +41,7 @@ internal sealed class MembershipDataScope(
 
     /// <summary>
     /// Kişi ve kişinin ekiplerinden herhangi birindeki üyeler (kullanıcı kimlikleri). Ekip üyelikleri tenant
-    /// DB'sindedir, üyelik–kullanıcı eşleştirmesi platform DB'sindedir (ADR-0009): iki adımda birleştirilir.
+    /// bağlamındadır, üyelik–kullanıcı eşleştirmesi platform bağlamındadır (ADR-0020 Dilim 1): iki adımda birleştirilir.
     /// </summary>
     internal static async Task<IReadOnlySet<Guid>> TeamOwnersAsync(
         ModulixDbContext db, PlatformDbContext platform, Guid membershipId, Guid userId, CancellationToken cancellationToken)
@@ -54,7 +54,7 @@ internal sealed class MembershipDataScope(
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        // Üyelik kimliklerini kullanıcı kimliklerine platform DB'sinden çöz (cross-database join yok).
+        // Üyelik kimliklerini kullanıcı kimliklerine platform bağlamından çöz (cross-database join yok).
         var teammates = await platform.Memberships.AsNoTracking()
             .Where(m => teammateMembershipIds.Contains(m.Id))
             .Select(m => m.UserId)
