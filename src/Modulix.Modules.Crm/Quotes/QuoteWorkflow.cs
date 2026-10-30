@@ -12,8 +12,12 @@ namespace Modulix.Modules.Crm.Quotes;
 /// <param name="ApprovalDiscountPercent">Toplam indirim bu yüzdeyi aşarsa iç onay zorunlu; boşsa indirimden onay gerekmez.</param>
 /// <param name="ApprovalGrossAbove">Genel toplam bu tutarı aşarsa iç onay zorunlu (teklif para biriminde); boşsa sınır yok.</param>
 /// <param name="AllowSelfApproval">Teklifi onaya gönderen kişi kendi teklifini onaylayabilir mi? Varsayılan hayır.</param>
+/// <param name="OnAcceptWinOpportunity">Teklif kabul edilince bağlı açık fırsat otomatik "kazanıldı" yapılsın mı? Varsayılan hayır (davranış değişmez).</param>
+/// <param name="FollowUpDays">Teklif sunulunca bu kadar gün sonrasına sorumlu için takip aktivitesi açılır; 0 = kapalı.</param>
+/// <param name="ExpiryReminderDays">Geçerliliği bitmeden bu kadar gün önce sorumlu için hatırlatma aktivitesi açılır; 0 = kapalı.</param>
 public sealed record QuotePolicySettings(
-    decimal? ApprovalDiscountPercent = null, decimal? ApprovalGrossAbove = null, int DefaultValidityDays = 30, bool AllowSelfApproval = false);
+    decimal? ApprovalDiscountPercent = null, decimal? ApprovalGrossAbove = null, int DefaultValidityDays = 30, bool AllowSelfApproval = false,
+    bool OnAcceptWinOpportunity = false, int FollowUpDays = 0, int ExpiryReminderDays = 0);
 
 public interface IQuotePolicyProvider
 {

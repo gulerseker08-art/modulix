@@ -38,7 +38,8 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             .UseSetting("Email:WorkerEnabled", "false")
 
             // Olay işleyicisi de çalışmaz; olay testleri işleyiciyi kendisi çağırır (EventTests).
-            .UseSetting("Events:WorkerEnabled", "false");
+            .UseSetting("Events:WorkerEnabled", "false")
+            .UseSetting("QuoteExpiry:WorkerEnabled", "false");
 
     /// <summary>Çerezleri saklayan, HTTPS üzerinden konuşan istemci (oturum çerezi Secure).</summary>
     public HttpClient CreateBrowserClient() =>

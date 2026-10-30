@@ -1,6 +1,6 @@
 # ADR-0019: Teklif yönetimi (M1.5) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (çekirdek, sunucu yaşam döngüsü, ekranlar, PDF, paylaşım/kabul sayfası, onay kuralları, revizyon karşılaştırma, e-posta gönderimi, raporlar ve dışa aktarma). Tarih: 2026-10-30.
+Durum: Kısmen uygulandı (çekirdek, yaşam döngüsü, ekranlar, PDF, paylaşım/kabul, onay kuralları, karşılaştırma, e-posta, raporlar ve kabul sonrası süreçler; sipariş/sözleşme modülü ve çok adımlı onay yok). Tarih: 2026-10-30.
 
 ## Mevcut durum (analiz anında, kodla kanıtlı; güncel durum en alttaki "Uygulama durumu"nda)
 
@@ -123,3 +123,18 @@ Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları
 | Filtreler | `presentedFrom/To`, `decidedFrom/To` (UTC gün sınırı) kayıt süzgeci olarak eklendi. |
 
 **Altıncı dilimde de yapılmadı (dürüst durum):** marj/kârlılık raporu (maliyet izni ve ayrı rapor gerekir), geçmiş dönem anlık görüntüsü (rapor bugünkü kayıt değerlerindendir), teslim/okundu verisi, ret nedeni analizi (serbest metin; yapılandırılmış neden listesi yok), kayıtlı görünümler ve zamanlanmış rapor e-postası, grafikler, kapsam dışı ürün/kategori kırılımı. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
+
+## Uygulama durumu (yedinci dilim: kabul sonrası süreçler)
+
+**Uygulandı** (`QuotePostAcceptTests` 5 entegrasyon testi; birim kuralları mevcut kümelerde):
+
+| Konu | Karar / davranış |
+|---|---|
+| Devir sözleşmesi | `Modulix.Core.Contracts.Sales.IAcceptedQuoteSource` / `AcceptedQuote`: kabul edilen sürümün değişmez görünümü (kalemler kararlı anahtarla, toplamlar, kabul eden, belge özeti, koşullar; maliyet ve iç not yok). Sipariş/sözleşme modülü henüz yok; o modül CRM'e bağlanmadan yalnızca Core.Contracts üzerinden okur. Kabul olayı olarak `crm.quote` güncelleme olayı (durum `Accepted`) kullanılır. Görünürlük çağıranın izin/kapsamıyla; kabul edilmemişse ya da kapsam dışıysa `null`. `GET /api/crm/quotes/{id}/handover` aynı görünümü verir. **Gerçek sipariş/sözleşme oluşturma yapılmadı.** |
+| Fırsat kazanma | Ayar `crm.quote.on-accept-win-opportunity` (varsayılan **hayır**, davranış değişmez). Açıksa kabul (müşteri bağlantısıyla ya da iç kayıtla) olayından sonra bağlı **açık** fırsat kazanıldı olarak kapanır; kazanılan tutar teklifin net toplamıdır, gerekçe teklif numarasıdır. Fırsat açık değilse (kapalı/beklemede), bulunamazsa ya da kapanış kuralları engellerse fırsata dokunulmaz ve nedeni teklif tarihçesine `OpportunityWinSkipped` olarak yazılır; kabul asla bozulmaz. İşaret satırı tekrar teslimde ikinci kazanmayı önler. Abonelik `crm.quote-lifecycle` yalnızca gereken izinlerle çalışır (tutar yazımı için `crm.opportunity-amounts.read` dahil). |
+| Takip aktivitesi | Ayar `crm.quote.follow-up-days` (varsayılan 0 = kapalı): teklif sunulunca bu kadar gün sonrasına 09:00 için teklif sorumlusuna "Teklif takibi" aktivitesi açılır (firma ve varsa fırsata bağlı). Tarihçe işaretiyle tek kez. |
+| Süre dolumu işi | `QuoteExpiryWorker` (`QuoteExpiry:WorkerEnabled`, varsayılan açık; `PollIntervalSeconds` 300): kurulu her tenant için sistem kimliğiyle (`crm.quote-expiry`) geçerliliği bitmiş "sunuldu" teklifleri `Expired` yapar (karar tarihi, gerekçe, tarihçe; sürüm denetimli, kabul/iptal yarışında biri kazanır). **Kabul anındaki süre denetimi bu işe bağlı değildir**; iş geç kalsa da süresi dolmuş teklif kabul edilmez. CRM kapalı tenant atlanır. |
+| Süre dolumu hatırlatması | Ayar `crm.quote.expiry-reminder-days` (varsayılan 0 = kapalı): geçerliliği bitmeden bu kadar gün önce, hâlâ bekleyen teklif için sorumluya hatırlatma aktivitesi (bir önceki gün 09:00). Aktivite ve işaret tek işlemde; tek kez. Teklif kabul/ret/iptal edilmişse hatırlatma açılmaz (iş yalnızca "sunuldu" olanlara bakar). |
+| Güvenlik | İki sistem kimliği yalnızca sayılan izinlerle çalışır; kimlik doğrulama yoktur, ağdan erişilemez. Tüm yan etkiler kayıt boru hattından geçer (izin, kapsam, audit, olay). |
+
+**Yedinci dilimde de yapılmadı (dürüst durum):** sipariş/sözleşme oluşturma (hedef modül yok; yalnızca sözleşme ve devir görünümü), "birincil teklif" kavramı ve fırsat tutarının tekliften otomatik eşitlenmesi, takip aktivitesinin teklif sonuçlanınca otomatik kapatılması (takip aktivitesi serbest bir görevdir), kayıp teklifte fırsatı kaybedildi yapma, hatırlatma için e-posta/bildirim (yalnızca aktivite), süre dolumu için zaman dilimi/iş günü hesabı (UTC gün sınırları), işin birden çok uygulama örneğinde yük dağıtımı (sürüm denetimi çift işlemi önler, ama kilitleme yoktur). Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.

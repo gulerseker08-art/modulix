@@ -69,6 +69,9 @@ builder.Services.AddModulixEvents();
 builder.Services.AddLeadIntakeRateLimit(builder.Configuration);
 builder.Services.AddQuotePublicRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
+builder.Services.Configure<Modulix.Api.Crm.QuoteExpiryOptions>(builder.Configuration.GetSection(Modulix.Api.Crm.QuoteExpiryOptions.SectionName));
+builder.Services.AddSingleton<Modulix.Api.Crm.QuoteExpiryRunner>();
+builder.Services.AddHostedService<Modulix.Api.Crm.QuoteExpiryWorker>();
 
 // Kullanıcı yönetimi: davet sınırı "Users" bölümünde; e-postadaki bağlantıların kökü App:PublicUrl (üretimde zorunlu).
 builder.Services.Configure<UserAdministrationOptions>(builder.Configuration.GetSection(UserAdministrationOptions.SectionName));
