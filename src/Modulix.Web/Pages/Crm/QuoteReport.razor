@@ -1,0 +1,193 @@
+@page "/crm/teklif-raporu"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Teklif raporu · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuotesRead">
+    <a class="back-link" href="crm/teklifler">← Teklifler</a>
+    <div class="page-header">
+        <h1>Teklif raporu</h1>
+        @if (Session.Can(CrmAccess.QuotesExport))
+        {
+            <a class="btn btn-outline-secondary" href="api/crm/quotes/export?latestOnly=true" download="teklifler.csv">CSV dışa aktar (son revizyonlar)</a>
+        }
+    </div>
+
+    <form class="filters" @onsubmit="LoadAsync" @onsubmit:preventDefault>
+        <label class="form-label" for="qr-from">Başlangıç</label>
+        <input id="qr-from" class="form-control" type="date" @bind="from" />
+        <label class="form-label" for="qr-to">Bitiş</label>
+        <input id="qr-to" class="form-control" type="date" @bind="to" />
+        <button type="submit" class="btn btn-primary" disabled="@busy">Raporu getir</button>
+    </form>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (report is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        @if (report.Truncated)
+        {
+            <div class="alert alert-warning" role="status">Kayıt sayısı sınırı (5000) aşıldı; rapor ilk kayıtlara göredir. Dönemi daraltın.</div>
+        }
+
+        <section class="detail-section" aria-labelledby="qr-now">
+            <div class="section-header"><h2 id="qr-now">Şu an</h2></div>
+            <dl class="detail-grid">
+                <div><dt>Taslak</dt><dd>@report.DraftCount</dd></div>
+                <div><dt>İç onay bekleyen</dt><dd>@report.PendingApprovalCount</dd></div>
+                <div><dt>Müşteride bekleyen</dt><dd>@report.WaitingCount</dd></div>
+            </dl>
+            <h3 class="h6">Müşteride bekleyen tutar</h3>
+            @Totals(report.WaitingTotals)
+        </section>
+
+        <section class="detail-section" aria-labelledby="qr-period">
+            <div class="section-header"><h2 id="qr-period">Dönem (@CrmLabels.Date(report.From) – @CrmLabels.Date(report.To))</h2></div>
+            <dl class="detail-grid">
+                <div><dt>Sunulan</dt><dd>@report.PresentedCount</dd></div>
+                <div><dt>Kabul</dt><dd>@report.AcceptedCount</dd></div>
+                <div><dt>Ret</dt><dd>@report.RejectedCount</dd></div>
+                <div><dt>İptal</dt><dd>@report.CancelledCount</dd></div>
+                <div><dt>Süresi dolan</dt><dd>@report.ExpiredCount</dd></div>
+                <div><dt>Kabul oranı</dt><dd>@(report.AcceptanceRate is { } rate ? $"%{(rate * 100).ToString("0.#", Regional.Numbers)}" : "—")</dd></div>
+                <div><dt>Ort. karar süresi (gün)</dt><dd>@Number(report.AverageDaysToDecision)</dd></div>
+                <div><dt>Ort. indirim</dt><dd>@(report.AverageDiscountPercent is { } d ? $"%{d.ToString("0.##", Regional.Numbers)}" : "—")</dd></div>
+                <div><dt>Kabulde ort. revizyon</dt><dd>@Number(report.AverageRevisionsToAccept)</dd></div>
+            </dl>
+            <h3 class="h6">Sunulan tutar</h3>
+            @Totals(report.PresentedTotals)
+            <h3 class="h6">Kabul edilen tutar</h3>
+            @Totals(report.AcceptedTotals)
+        </section>
+
+        <section class="detail-section" aria-labelledby="qr-owner">
+            <div class="section-header"><h2 id="qr-owner">Sorumlu bazında</h2></div>
+            @if (report.ByOwner.Count == 0)
+            {
+                <p class="text-muted">Dönemde sunulan ya da sonuçlanan teklif yok.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Sorumlu bazında teklifler</caption>
+                    <thead><tr><th scope="col">Sorumlu</th><th scope="col">Sunulan</th><th scope="col">Kabul</th><th scope="col">Ret</th><th scope="col">Kabul edilen tutar</th></tr></thead>
+                    <tbody>
+                        @foreach (var o in report.ByOwner)
+                        {
+                            <tr>
+                                <td data-label="Sorumlu" class="primary">@(o.OwnerId is null ? "Atanmadı" : Lookups.MemberName(o.OwnerId))</td>
+                                <td data-label="Sunulan">@o.Presented</td>
+                                <td data-label="Kabul">@o.Accepted</td>
+                                <td data-label="Ret">@o.Rejected</td>
+                                <td data-label="Kabul edilen tutar">@Amounts(o.AcceptedTotals)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        @Attention("Süresi yaklaşan (7 gün)", "qr-soon", report.ExpiringSoon, "Geçerlilik")
+        @Attention("Süresi geçmiş ama hâlâ sunulmuş", "qr-over", report.Overdue, "Geçerlilik")
+        @Attention("İç onay bekleyen", "qr-appr", report.AwaitingApproval, null)
+        @Attention("Müşteriye gönderilmemiş / gönderimi başarısız", "qr-deliv", report.NotDelivered, "Sunum")
+
+        <section class="detail-section" aria-labelledby="qr-defs">
+            <div class="section-header"><h2 id="qr-defs">Tanımlar</h2></div>
+            <ul class="small text-muted">
+                @foreach (var definition in report.Definitions)
+                {
+                    <li>@definition</li>
+                }
+            </ul>
+        </section>
+    }
+</AuthGate>
+
+@code {
+    private QuoteReportDto? report;
+    private DateTime? from = new(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+    private DateTime? to = DateTime.UtcNow.Date;
+    private string? message;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.QuotesRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        var query = new List<string>();
+        if (from is { } f) { query.Add($"from={DateOnly.FromDateTime(f):yyyy-MM-dd}"); }
+        if (to is { } t) { query.Add($"to={DateOnly.FromDateTime(t):yyyy-MM-dd}"); }
+        var result = await Api.GetAsync<QuoteReportDto>($"/api/crm/quotes/report?{string.Join('&', query)}");
+        busy = false;
+        report = result.Value;
+        message = result.Error;
+    }
+
+    private RenderFragment Totals(IReadOnlyList<QuoteCurrencyTotalDto> totals) => builder =>
+    {
+        builder.OpenElement(0, "p");
+        builder.AddContent(1, Amounts(totals));
+        builder.CloseElement();
+    };
+
+    private static string Amounts(IReadOnlyList<QuoteCurrencyTotalDto> totals) =>
+        totals.Count == 0 ? "—" : string.Join(" · ", totals.Select(t => $"{QuoteLabels.Money(t.Gross, t.Currency)} ({t.Count} adet)"));
+
+    private static string Number(double? value) => value is { } v ? v.ToString("0.##", Regional.Numbers) : "—";
+
+    private RenderFragment Attention(string title, string id, IReadOnlyList<QuoteReportItemDto> items, string? dateLabel) => builder =>
+    {
+        builder.OpenElement(0, "section");
+        builder.AddAttribute(1, "class", "detail-section");
+        builder.AddAttribute(2, "aria-labelledby", id);
+        builder.AddMarkupContent(3, $"<div class=\"section-header\"><h2 id=\"{id}\">{System.Net.WebUtility.HtmlEncode(title)} ({items.Count})</h2></div>");
+        if (items.Count == 0)
+        {
+            builder.AddMarkupContent(4, "<p class=\"text-muted\">Kayıt yok.</p>");
+        }
+        else
+        {
+            builder.OpenElement(5, "ul");
+            foreach (var item in items)
+            {
+                builder.OpenElement(6, "li");
+                builder.OpenElement(7, "a");
+                builder.AddAttribute(8, "href", $"crm/teklifler/{item.Id}");
+                builder.AddContent(9, $"{item.Title} ({item.QuoteNumber} · V{item.RevisionNo})");
+                builder.CloseElement();
+                builder.AddContent(10, $" — {QuoteLabels.Money(item.Gross, item.Currency)}"
+                    + (item.OwnerId is null ? string.Empty : $" · {Lookups.MemberName(item.OwnerId)}")
+                    + (item.Date is { } d && dateLabel is not null ? $" · {dateLabel}: {CrmLabels.Date(d)}" : string.Empty)
+                    + (item.Note is not null ? $" · {QuoteLabels.Label(QuoteLabels.Deliveries, item.Note)}" : string.Empty));
+                builder.CloseElement();
+            }
+
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+}

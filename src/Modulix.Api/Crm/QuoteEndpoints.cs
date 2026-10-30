@@ -1,4 +1,9 @@
 using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Records;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Api.Access;
 using Modulix.Api.Records;
@@ -35,6 +40,8 @@ internal static class QuoteEndpoints
         QuoteSharingEndpoints.MapInternal(quotes);
         quotes.MapGet("/{id:guid}/approval-requirements", ApprovalRequirementsAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/{id:guid}/compare", CompareAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
+        quotes.MapGet("/report", ReportAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
+        quotes.MapGet("/export", ExportAsync).RequirePermission(CrmModule.Permissions.QuotesExport);
 
         // Eylem izinleri serviste denetlenir; uç nokta yalnızca okuma iznini ister ki kayıt yoksa 404 dönsün.
         quotes.MapPost("/{id:guid}/submit-for-approval", (Guid id, QuoteTransitionRequest r, IQuoteWorkflow w, CancellationToken ct) =>
@@ -133,6 +140,65 @@ internal static class QuoteEndpoints
         return Results.Ok(new QuoteComparisonDto(
             c.LeftRevision, c.RightRevision, c.LeftStatus, c.RightStatus, c.Currency, c.RightCurrency, [.. c.Header.Select(Map)], [.. c.Totals.Select(Map)],
             [.. c.Lines.Select(l => new QuoteLineChangeDto(l.Change, l.StableKey, l.Name, [.. l.Fields.Select(Map)]))]));
+    }
+
+    private static async Task<IResult> ReportAsync(DateOnly? from, DateOnly? to, Guid? ownerId, IQuoteReport report, TimeProvider time, CancellationToken ct)
+    {
+        // Varsayılan dönem: içinde bulunulan ayın başından bugüne.
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        var result = await report.BuildAsync(new QuoteReportQuery(from ?? new DateOnly(today.Year, today.Month, 1), to ?? today, ownerId), ct);
+        return result.IsSuccess
+            ? Results.Ok(JsonSerializer.Deserialize<QuoteReportDto>(JsonSerializer.Serialize(result.Value, JsonSerializerOptions.Web), JsonSerializerOptions.Web))
+            : RecordEndpoints.ToProblem(result.Error!);
+    }
+
+    private const int ExportMaxRows = 5000;
+
+    /// <summary>
+    /// CSV dışa aktarma. Kayıt boru hattından okunur (izin ve veri kapsamı liste ekranıyla aynı); kalem maliyeti ve iç not sütunu yoktur.
+    /// Çıkış denetim kaydına yazılır (kim, kaç kayıt, hangi süzgeç). Hücre başındaki formül karakterleri etkisizleştirilir.
+    /// </summary>
+    private static async Task<IResult> ExportAsync(
+        HttpRequest http, string? search, IRecordPipeline pipeline, ITenantContextAccessor tenant, IAuditWriter audit, IUnitOfWork unitOfWork, CancellationToken ct)
+    {
+        var filters = RecordEndpoints.FiltersFrom(http) ?? new Dictionary<string, string>();
+        var items = new List<RecordData>();
+        for (var page = 1; items.Count < ExportMaxRows; page++)
+        {
+            var result = await pipeline.QueryAsync(new RecordQuery(CrmModule.Entities.Quote, page, RecordQuery.MaxPageSize, search, filters), ct);
+            if (!result.IsSuccess)
+            {
+                return RecordEndpoints.ToProblem(result.Error!);
+            }
+
+            items.AddRange(result.Value!.Items);
+            if (result.Value.Items.Count == 0 || items.Count >= result.Value.TotalCount)
+            {
+                break;
+            }
+        }
+
+        if (tenant.Current is { } current)
+        {
+            audit.Add(new AuditEntry(current.TenantId, current.UserId, CrmModule.Entities.Quote, Guid.Empty, AuditAction.Exported,
+                new JsonObject { ["count"] = items.Count, ["filters"] = string.Join('&', filters.Select(f => $"{f.Key}={f.Value}")) },
+                ExecutionSource.Api, null));
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+
+        string[] columns =
+        [
+            "quoteNumber", "revisionNo", "title", "customerNameSnapshot", "status", "approvalStatus", "deliveryStatus", "currency", "listTotal", "discountTotal",
+            "netTotal", "taxTotal", "grossTotal", "issueDate", "validUntil", "presentedAt", "decidedAt", "ownerId", "companyId",
+        ];
+        var csv = new StringBuilder();
+        csv.AppendLine(string.Join(',', columns));
+        foreach (var item in items)
+        {
+            csv.AppendLine(string.Join(',', columns.Select(c => LeadEndpoints.Csv(item.Values[c]?.ToString()))));
+        }
+
+        return Results.File(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray(), "text/csv; charset=utf-8", "teklifler.csv");
     }
 
     private static async Task<IResult> SettingsAsync(IQuotePolicyProvider provider, CancellationToken ct)
