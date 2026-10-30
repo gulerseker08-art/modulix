@@ -45,6 +45,10 @@ internal sealed class QuoteReader(IModuleData data)
     public async Task<List<QuoteLine>> LinesAsync(Guid quoteId, CancellationToken cancellationToken) =>
         await data.Set<QuoteLine>().AsNoTracking().Where(l => l.QuoteId == quoteId).OrderBy(l => l.Position).ThenBy(l => l.CreatedAt).ToListAsync(cancellationToken);
 
+    /// <summary>Birden çok teklifin kalemleri (marj raporu). Çağıran maliyet iznini kendisi denetlemiş olmalıdır.</summary>
+    public async Task<List<QuoteLine>> LinesForQuotesAsync(IReadOnlyCollection<Guid> quoteIds, CancellationToken cancellationToken) =>
+        quoteIds.Count == 0 ? [] : await data.Set<QuoteLine>().AsNoTracking().Where(l => quoteIds.Contains(l.QuoteId)).ToListAsync(cancellationToken);
+
     public async Task<List<QuoteDocumentMeta>> DocumentsAsync(Guid quoteId, CancellationToken cancellationToken) =>
         await Metas(data.Set<QuoteDocument>().AsNoTracking().Where(d => d.QuoteId == quoteId).OrderByDescending(d => d.CreatedAt)).ToListAsync(cancellationToken);
 

@@ -33,3 +33,14 @@ public sealed record QuoteReportDto(
     IReadOnlyList<QuoteReportItemDto> AwaitingApproval,
     IReadOnlyList<QuoteReportItemDto> NotDelivered,
     IReadOnlyList<string> Definitions);
+
+// Marj raporu (yalnızca crm.quote-costs.read). Alan adları sunucudaki QuoteMarginReportResult ile aynıdır.
+public sealed record QuoteMarginTotalDto(string Currency, int Count, decimal Net, decimal Cost, decimal Margin, double? MarginPercent, int LinesWithoutCost);
+
+public sealed record QuoteMarginOwnerDto(Guid? OwnerId, IReadOnlyList<QuoteMarginTotalDto> Totals);
+
+public sealed record QuoteMarginItemDto(Guid Id, string QuoteNumber, int RevisionNo, string Title, Guid? OwnerId, string Status, string Currency, decimal Net, decimal Cost, decimal Margin, double? MarginPercent, int LinesWithoutCost);
+
+public sealed record QuoteMarginReportDto(
+    DateOnly From, DateOnly To, bool Truncated, IReadOnlyList<QuoteMarginTotalDto> PresentedTotals, IReadOnlyList<QuoteMarginTotalDto> AcceptedTotals,
+    IReadOnlyList<QuoteMarginOwnerDto> ByOwner, IReadOnlyList<QuoteMarginItemDto> LowestMargin, IReadOnlyList<QuoteMarginItemDto> MissingCost, IReadOnlyList<string> Definitions);

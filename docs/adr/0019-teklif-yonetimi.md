@@ -1,6 +1,6 @@
 # ADR-0019: Teklif yönetimi (M1.5) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (çekirdek, yaşam döngüsü, ekranlar, PDF, paylaşım/kabul, onay kuralları, karşılaştırma, e-posta, raporlar, kabul sonrası süreçler, küçük tamamlamalar, fırsat entegrasyonu ve çok adımlı onay/vekâlet; sipariş/sözleşme modülü yok). Tarih: 2026-10-30.
+Durum: Kısmen uygulandı (çekirdek, yaşam döngüsü, ekranlar, PDF, paylaşım/kabul, onay kuralları, karşılaştırma, e-posta, raporlar, kabul sonrası süreçler, küçük tamamlamalar, fırsat entegrasyonu, çok adımlı onay/vekâlet ve marj raporu; sipariş/sözleşme modülü yok). Tarih: 2026-10-30.
 
 ## Mevcut durum (analiz anında, kodla kanıtlı; güncel durum en alttaki "Uygulama durumu"nda)
 
@@ -178,3 +178,15 @@ Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları
 | Ekranlar | Kural formunda adım alanı ve sütunu; onay merkezinde adım rozetleri ve "vekâleten" notu; teklif detayında adım özeti; vekâlet yönetimi sayfası. |
 
 **Onuncu dilimde de yapılmadı:** onaylayanın yerine geçen rol/grup tabanlı onay (yalnızca kişi), adım başına ayrı süre sınırı ve otomatik yükseltme (escalation), onay yorumu zorunluluğu, vekâletin kişi tarafından kendi hesabından verilmesi (yalnızca yönetici), ret sonrası aynı gönderimde yeniden onay (yeni gönderim gerekir), ara onay geri çekme.
+
+## Uygulama durumu (on birinci dilim: marj raporu)
+
+**Uygulandı** (`QuoteReportTests` içinde marj testi):
+
+| Konu | Karar / davranış |
+|---|---|
+| Erişim | `GET /api/crm/quotes/margin-report` yalnızca `crm.quote-costs.read` ile (uç noktada ve serviste denetlenir; izinsiz 403). Genel teklif raporu, dışa aktarma ve müşteri çıktıları maliyet içermemeye devam eder. Teklif kapsamı (izin, veri kapsamı) kayıt boru hattından geçer; kalemler iç okuyucuyla okunur. |
+| Hesap | Maliyet = Σ(miktar × kalem birim maliyeti), yalnızca ana toplama giren kalemler; marj = net − maliyet; marj % = marj / net. Maliyeti olmayan kalem 0 sayılmaz, "maliyeti bilinmeyen" olarak ayrıca raporlanır. Maliyet, kaleme kopyalandığı andaki değerdir. |
+| İçerik | Dönemde sunulan ve kabul edilen tekliflerin para birimi bazlı net/maliyet/marj toplamları, sorumlu bazında dağılım, en düşük marjlı teklifler, maliyeti eksik teklifler; tanımlar ekranda. Rapor ekranında yalnızca izinli kullanıcıya görünen bölüm. |
+
+**On birinci dilimde de yapılmadı:** katalog maliyetinin tekliften bağımsız güncel maliyetle karşılaştırılması, kategori/ürün bazlı marj kırılımı, marj eşiğine bağlı onay kuralı (maliyet görmeyen onaylayana marj sızdırmamak için ayrı tasarım gerekir), marj raporu dışa aktarma.
