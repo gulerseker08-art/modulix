@@ -105,6 +105,8 @@ public static class QuoteLabels
         "FollowUpScheduled" => "Takip aktivitesi açıldı",
         "FollowUpsClosed" => "Takip aktiviteleri otomatik kapatıldı",
         "OpportunitySynced" => "Fırsat esas teklif/tutar eşitlemesi",
+        "StepApproved" => "Onay adımı tamamlandı",
+        "ApprovalReminderSent" => "Onay hatırlatması gönderildi",
         "ExpiryReminderCreated" => "Süre dolumu hatırlatması açıldı",
         "ShareLinkCreated" => "Paylaşım bağlantısı oluşturuldu",
         "ShareLinkRevoked" => "Paylaşım bağlantısı iptal edildi",

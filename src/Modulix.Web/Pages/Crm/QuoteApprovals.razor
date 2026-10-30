@@ -45,6 +45,11 @@
                                     {
                                         <div class="small approval-reasons">
                                             <strong>Onay gerekçesi:</strong>
+                                            @if (requirement.Steps.Count > 1)
+                                            {
+                                                <div>Adımlar: @foreach (var step in requirement.Steps) { <span class="badge stage-@(step.Completed ? "won" : step.Step == requirement.CurrentStep ? "qualified" : "open")">@step.Step. adım @(step.Completed ? "tamam" : step.Step == requirement.CurrentStep ? "bekliyor" : "sırada") · @(step.Approvers.Count == 0 ? "onay izni olan herkes" : string.Join(", ", step.Approvers.Select(a => Lookups.MemberName(a))))</span> }</div>
+                                            }
+                                            @if (requirement.ActingAsDelegate) { <div class="text-muted">Bu onayı vekâleten vereceksiniz.</div> }
                                             @foreach (var match in requirement.Matches) { <div>@match.Name — @match.Reason</div> }
                                             @if (requirement.ThresholdReason is not null) { <div>@requirement.ThresholdReason</div> }
                                             @if (requirement.Note is not null) { <div class="text-danger">@requirement.Note</div> }

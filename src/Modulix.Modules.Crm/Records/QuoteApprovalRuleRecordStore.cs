@@ -23,6 +23,7 @@ internal sealed class QuoteApprovalRuleRecordStore(CrmStoreContext context) : Cr
         Field.Text<QuoteApprovalRule>("name", QuoteApprovalRule.NameMaxLength, r => r.Name, (r, v) => r.Name = v!, required: true),
         Field.Text<QuoteApprovalRule>("description", QuoteApprovalRule.DescriptionMaxLength, r => r.Description, (r, v) => r.Description = v),
         Field.Count<QuoteApprovalRule>("priority", r => r.Priority, (r, v) => r.Priority = v),
+        Field.Count<QuoteApprovalRule>("step", r => r.Step, (r, v) => r.Step = v),
         Field.Flag<QuoteApprovalRule>("isActive", r => r.IsActive, (r, v) => r.IsActive = v),
         Field.OptionalCurrency<QuoteApprovalRule>("currency", r => r.Currency, (r, v) => r.Currency = v),
         Field.Rate<QuoteApprovalRule>("minDiscountPercent", r => r.MinDiscountPercent, (r, v) => r.MinDiscountPercent = v),
@@ -51,6 +52,11 @@ internal sealed class QuoteApprovalRuleRecordStore(CrmStoreContext context) : Cr
         if (entity.MinDiscountPercent is { } percent && (percent < 0 || percent >= 100))
         {
             errors.Add(new RecordFieldError("minDiscountPercent", "İndirim eşiği 0 ile 100 arasında (100 hariç) olmalıdır."));
+        }
+
+        if (entity.Step is < 1 or > 9)
+        {
+            errors.Add(new RecordFieldError("step", "Onay adımı 1 ile 9 arasında olmalıdır."));
         }
 
         if (entity.MinGrossTotal is < 0)

@@ -373,6 +373,10 @@
                             }
                             @if (requirement.ThresholdReason is not null) { <li>@requirement.ThresholdReason</li> }
                         </ul>
+                        @if (requirement.Steps.Count > 1)
+                        {
+                            <div class="small">Onay adımları: @string.Join(" → ", requirement.Steps.Select(s => $"{s.Step}. {(s.Approvers.Count == 0 ? "herkes" : string.Join("/", s.Approvers.Select(a => Lookups.MemberName(a))))}{(s.Completed ? " ✓" : string.Empty)}"))</div>
+                        }
                         @if (requirement.Note is not null) { <div class="small">@requirement.Note</div> }
                     </div>
                 }

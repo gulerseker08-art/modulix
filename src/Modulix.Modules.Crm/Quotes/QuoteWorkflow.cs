@@ -16,9 +16,10 @@ namespace Modulix.Modules.Crm.Quotes;
 /// <param name="FollowUpDays">Teklif sunulunca bu kadar gün sonrasına sorumlu için takip aktivitesi açılır; 0 = kapalı.</param>
 /// <param name="ExpiryReminderDays">Geçerliliği bitmeden bu kadar gün önce sorumlu için hatırlatma aktivitesi açılır; 0 = kapalı.</param>
 /// <param name="SyncOpportunityAmount">Esas teklif sunulunca açık fırsatın tutarı teklifin net toplamıyla eşitlensin mi? Varsayılan hayır.</param>
+/// <param name="ApprovalReminderHours">Onay bu kadar saat beklerse adlı onaylayanlara bir kez hatırlatma e-postası; 0 = kapalı.</param>
 public sealed record QuotePolicySettings(
     decimal? ApprovalDiscountPercent = null, decimal? ApprovalGrossAbove = null, int DefaultValidityDays = 30, bool AllowSelfApproval = false,
-    bool OnAcceptWinOpportunity = false, int FollowUpDays = 0, int ExpiryReminderDays = 0, bool SyncOpportunityAmount = false);
+    bool OnAcceptWinOpportunity = false, int FollowUpDays = 0, int ExpiryReminderDays = 0, bool SyncOpportunityAmount = false, int ApprovalReminderHours = 0);
 
 public interface IQuotePolicyProvider
 {
@@ -105,12 +106,36 @@ internal sealed class QuoteWorkflow(
             ["approvalStatus"] = QuoteApprovalStatus.NotRequired,
         }, "ApprovalWithdrawn", cancellationToken);
 
-    public Task<RecordResult<RecordData>> ApproveAsync(Guid id, long version, string? note, CancellationToken cancellationToken) =>
-        Transition(id, version, QuoteAction.Approve, CrmModule.Permissions.QuotesApprove, note, (q, _) => new JsonObject
+    public async Task<RecordResult<RecordData>> ApproveAsync(Guid id, long version, string? note, CancellationToken cancellationToken)
+    {
+        // Çok adımlı onay: bu onay bütün adımları tamamlıyorsa teklif onaylanır; tamamlamıyorsa yalnızca adım onayı tarihçeye yazılır, onay beklemeye devam eder.
+        var loaded = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
+        if (!loaded.IsSuccess)
         {
-            ["approvalStatus"] = QuoteApprovalStatus.Approved,
-            ["statusReason"] = Trim(note),
-        }, "Approved", cancellationToken, checkSelfApproval: true, checkApprover: true);
+            return loaded;
+        }
+
+        var requirement = await RequirementAsync(loaded.Value!, cancellationToken);
+        var given = new QuoteApprovalGiven(tenant.Current?.UserId ?? Guid.Empty, await OnBehalfOfAsync(cancellationToken));
+        var completes = QuoteApprovalEvaluator.CompletesAll(requirement.Matches, await ApprovalsGivenAsync(id, cancellationToken), given);
+        var current = QuoteApprovalEvaluator.Current(requirement.Steps);
+        var stepLabel = current is null ? null : $"Adım {current.Step}/{requirement.Steps.Count}";
+        var delegateLabel = requirement.ActingAsDelegate ? " (vekâleten)" : string.Empty;
+        var text = Trim(note);
+        if (completes)
+        {
+            return await Transition(id, version, QuoteAction.Approve, CrmModule.Permissions.QuotesApprove, text, (q, _) => new JsonObject
+            {
+                ["approvalStatus"] = QuoteApprovalStatus.Approved,
+                ["statusReason"] = text,
+            }, "Approved", cancellationToken, checkSelfApproval: true, checkApprover: true,
+                historyReason: requirement.Steps.Count > 1 ? $"{stepLabel} onaylandı{delegateLabel}; onay tamamlandı.{(text is null ? string.Empty : $" {text}")}" : (text is null ? (delegateLabel.Length > 0 ? "Onaylandı (vekâleten)." : null) : $"{text}{delegateLabel}"));
+        }
+
+        return await Transition(id, version, QuoteAction.Approve, CrmModule.Permissions.QuotesApprove, text, (q, _) => new JsonObject(), "StepApproved",
+            cancellationToken, checkSelfApproval: true, checkApprover: true,
+            historyReason: $"{stepLabel} onaylandı{delegateLabel}.{(text is null ? string.Empty : $" {text}")}");
+    }
 
     public Task<RecordResult<RecordData>> RejectApprovalAsync(Guid id, long version, string reason, CancellationToken cancellationToken) =>
         Transition(id, version, QuoteAction.RejectApproval, CrmModule.Permissions.QuotesApprove, reason, (q, _) => new JsonObject
@@ -253,7 +278,7 @@ internal sealed class QuoteWorkflow(
 
     private async Task<RecordResult<RecordData>> Transition(
         Guid id, long version, string action, string permission, string? reason, Func<RecordData, DateTimeOffset, JsonObject> build, string eventKind,
-        CancellationToken cancellationToken, bool reasonRequired = false, bool checkSelfApproval = false, bool enrichWithCompanyName = false, bool checkApprover = false)
+        CancellationToken cancellationToken, bool reasonRequired = false, bool checkSelfApproval = false, bool enrichWithCompanyName = false, bool checkApprover = false, string? historyReason = null)
     {
         var loaded = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         if (!loaded.IsSuccess)
@@ -298,7 +323,7 @@ internal sealed class QuoteWorkflow(
 
         var values = build(quote, now);
         RecordResult<RecordData> result;
-        using (gate.Open([permission], eventKind, Trim(reason)))
+        using (gate.Open([permission], eventKind, Trim(historyReason ?? reason)))
         {
             result = await pipeline.UpdateAsync(new RecordCommand(Key, id, values, version) { Reason = $"quote.{eventKind}" }, cancellationToken);
         }
@@ -350,11 +375,53 @@ internal sealed class QuoteWorkflow(
         }
 
         var matches = QuoteApprovalEvaluator.Match(await reader.ActiveRulesAsync(cancellationToken), currency, list, discount, gross);
-        var restricted = QuoteApprovalEvaluator.RestrictedApprovers(matches);
+        var required = threshold is not null || matches.Count > 0;
+        var steps = QuoteApprovalEvaluator.Steps(matches, await ApprovalsGivenAsync(quote.Id, cancellationToken));
+        var current = QuoteApprovalEvaluator.Current(steps);
+        var onBehalfOf = await OnBehalfOfAsync(cancellationToken);
         var user = tenant.Current?.UserId;
-        var canDecide = restricted.Count == 0 || (user is { } id && restricted.Contains(id));
-        var note = restricted.Count > 0 && !canDecide ? "Bu teklifin onayı kural gereği belirli onaylayanlara atanmıştır." : null;
-        return new QuoteApprovalRequirement(threshold is not null || matches.Count > 0, matches, threshold, restricted.Count > 0, canDecide, note);
+        var canDecide = QuoteApprovalEvaluator.CanDecide(current, onBehalfOf);
+        var actingAsDelegate = canDecide && current is { Approvers.Count: > 0 } && user is { } me && !current.Approvers.Contains(me);
+        var restricted = steps.Any(s => s.Approvers.Count > 0);
+        var note = !canDecide
+            ? steps.Count > 1
+                ? $"Bu teklifin onayı kural gereği belirli onaylayanlara atanmıştır; şu an {current!.Step}. adım ({steps.Count} adım) bekleniyor."
+                : "Bu teklifin onayı kural gereği belirli onaylayanlara atanmıştır."
+            : null;
+        return new QuoteApprovalRequirement(required, matches, threshold, restricted, canDecide, note, steps, current?.Step ?? 0, actingAsDelegate);
+    }
+
+    /// <summary>Son gönderimden bu yana verilen adım onayları; her onay, onaylayan ve o an vekili olduğu kişiler adına sayılır.</summary>
+    private async Task<List<QuoteApprovalGiven>> ApprovalsGivenAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var events = await reader.StepApprovalsSinceSubmissionAsync(id, cancellationToken);
+        if (events.Count == 0)
+        {
+            return [];
+        }
+
+        var delegations = await reader.ActiveDelegationsAsync(time.GetUtcNow(), cancellationToken);
+        return [.. events.Where(e => e.ActorId is not null).Select(e => new QuoteApprovalGiven(e.ActorId!.Value,
+            new HashSet<Guid>(delegations.Where(d => d.ToUserId == e.ActorId).Select(d => d.FromUserId)) { e.ActorId!.Value }))];
+    }
+
+    /// <summary>Geçerli kullanıcı + şu an vekili olduğu kişiler.</summary>
+    private async Task<IReadOnlySet<Guid>> OnBehalfOfAsync(CancellationToken cancellationToken)
+    {
+        var set = new HashSet<Guid>();
+        if (tenant.Current?.UserId is { } me && me != Guid.Empty)
+        {
+            set.Add(me);
+            foreach (var d in await reader.ActiveDelegationsAsync(time.GetUtcNow(), cancellationToken))
+            {
+                if (d.ToUserId == me)
+                {
+                    set.Add(d.FromUserId);
+                }
+            }
+        }
+
+        return set;
     }
 
     /// <summary>Onay belirli onaylayanlara atanmışsa ve geçerli kullanıcı onlardan değilse engel mesajı döner.</summary>

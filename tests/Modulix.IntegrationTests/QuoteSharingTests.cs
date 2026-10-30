@@ -202,7 +202,9 @@ public class QuoteSharingTests(ModulixApiFactory factory) : IClassFixture<Moduli
     {
         var s = await SetUpAsync();
         using var admin = await LoginAsync(s.Admin);
-        var quote = await NewQuoteAsync(admin, s.CompanyId, validUntil: DateTimeOffset.UtcNow.AddSeconds(3));
+        // Paralel koşuda istek gecikmeleri birkaç saniyeyi bulabiliyor; süre payı geniş tutulur ve bitiş anı beklenir.
+        var until = DateTimeOffset.UtcNow.AddSeconds(12);
+        var quote = await NewQuoteAsync(admin, s.CompanyId, validUntil: until);
         await AddLineAsync(admin, quote.Id, price: 100m);
         await PresentAsync(admin, quote.Id);
         var token = (await CreateLinkAsync(admin, quote.Id)).Token;
@@ -210,7 +212,8 @@ public class QuoteSharingTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var view = await ViewAsync(anonymous, s.Slug, token);
         Assert.True(view.CanDecide);
 
-        await Task.Delay(TimeSpan.FromSeconds(3.5));
+        var remaining = until - DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1);
+        if (remaining > TimeSpan.Zero) { await Task.Delay(remaining); }
         var late = await DecideAsync(anonymous, s.Slug, token, "accept", view);
         Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
         Assert.Equal("expired", (await ViewAsync(anonymous, s.Slug, token)).State);

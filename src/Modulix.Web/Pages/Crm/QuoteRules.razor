@@ -33,6 +33,12 @@
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
+                    <label class="form-label" for="r-step">Onay adımı (1-9)</label>
+                    <input id="r-step" class="form-control" type="number" min="1" max="9" @bind="form.Step" />
+                    <FieldError Field="step" Errors="errors" />
+                    <div class="form-text">Küçük adımlar önce tamamlanır; aynı adımdaki adlı onaylayanların hepsi onaylamalıdır.</div>
+                </div>
+                <div>
                     <label class="form-label" for="r-priority">Öncelik (küçük önce)</label>
                     <input id="r-priority" class="form-control" type="number" min="0" @bind="form.Priority" />
                     <FieldError Field="priority" Errors="errors" />
@@ -90,13 +96,14 @@
     {
         <table class="table record-table">
             <caption class="visually-hidden">Teklif onay kuralları</caption>
-            <thead><tr><th scope="col">Kural</th><th scope="col">Koşullar (hepsi)</th><th scope="col">Onaylayan</th><th scope="col">Durum</th><th scope="col"></th></tr></thead>
+            <thead><tr><th scope="col">Kural</th><th scope="col">Adım</th><th scope="col">Koşullar (hepsi)</th><th scope="col">Onaylayan</th><th scope="col">Durum</th><th scope="col"></th></tr></thead>
             <tbody>
                 @foreach (var rule in rules)
                 {
                     <tr>
                         <td data-label="Kural" class="primary">@rule.Name <small class="text-muted">öncelik @rule.Priority · sürüm @rule.Version</small>
                             @if (!string.IsNullOrWhiteSpace(rule.Description)) { <div class="small text-muted">@rule.Description</div> }</td>
+                        <td data-label="Adım">@rule.Step</td>
                         <td data-label="Koşullar">@Conditions(rule)</td>
                         <td data-label="Onaylayan">@(rule.ApproverId is null ? "Onay izni olan herkes" : Lookups.MemberName(rule.ApproverId))</td>
                         <td data-label="Durum">@(rule.IsActive ? "Etkin" : "Pasif")</td>
@@ -165,7 +172,7 @@
         form = new RuleForm
         {
             Id = rule.Id, Version = rule.Version, Name = rule.Name, Description = rule.Description, Priority = rule.Priority, IsActive = rule.IsActive,
-            Currency = rule.Currency, MinDiscountPercent = rule.MinDiscountPercent, MinGrossTotal = rule.MinGrossTotal, ApproverId = rule.ApproverId,
+            Currency = rule.Currency, MinDiscountPercent = rule.MinDiscountPercent, MinGrossTotal = rule.MinGrossTotal, ApproverId = rule.ApproverId, Step = rule.Step,
         };
         errors = null;
         Notify(null, false);
@@ -183,7 +190,7 @@
         busy = true;
         var f = form!;
         var request = new SaveQuoteApprovalRuleRequest(
-            f.Name, Blank(f.Description), f.Priority, f.IsActive, Blank(f.Currency)?.ToUpperInvariant(), f.MinDiscountPercent, f.MinGrossTotal, f.ApproverId, f.Version);
+            f.Name, Blank(f.Description), f.Priority, f.IsActive, Blank(f.Currency)?.ToUpperInvariant(), f.MinDiscountPercent, f.MinGrossTotal, f.ApproverId, f.Version, f.Step);
         var result = f.Id is { } id
             ? await Api.PutAsync<QuoteApprovalRuleDto>($"{Url}/{id}", request)
             : await Api.PostAsync<QuoteApprovalRuleDto>(Url, request);
@@ -234,6 +241,8 @@
         public string? Description { get; set; }
 
         public int Priority { get; set; }
+
+        public int Step { get; set; } = 1;
 
         public bool IsActive { get; set; } = true;
 

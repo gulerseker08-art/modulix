@@ -45,6 +45,7 @@ public static class QuoteMarkerKinds
     public const string FollowUpsClosed = "FollowUpsClosed";
     public const string OpportunitySynced = "OpportunitySynced";
     public const string ExpiryReminderCreated = "ExpiryReminderCreated";
+    public const string ApprovalReminderSent = "ApprovalReminderSent";
     public const string Expired = "Expired";
 }
 
@@ -251,6 +252,12 @@ internal static class QuoteOwnerEmails
 {
     public const string ReminderReference = "crm.quote-reminder:";
     public const string ExpiredReference = "crm.quote-expired:";
+    public const string ApprovalReminderReference = "crm.quote-approval-reminder:";
+
+    public static EmailMessage ApprovalReminder(NotificationRecipient to, Quote quote, string? link) => Build(
+        to, quote, $"Onayınızı bekleyen teklif: {OneLine(quote.QuoteNumber)}",
+        $"\"{OneLine(quote.Title)}\" başlıklı {quote.QuoteNumber} numaralı teklif iç onayınızı bekliyor; henüz karar verilmedi.",
+        link, ApprovalReminderReference + quote.Id.ToString("N"));
 
     public static EmailMessage ExpiryReminder(NotificationRecipient to, Quote quote, string? link) => Build(
         to, quote, $"Teklif süresi doluyor: {OneLine(quote.QuoteNumber)}",
@@ -278,7 +285,7 @@ internal static class QuoteOwnerEmails
 }
 
 /// <summary>Zamanlanmış işin bir turunun özeti. <see cref="Skipped"/>: başka bir örnek aynı anda çalıştığı için tur atlandı.</summary>
-public sealed record QuoteExpiryRun(int Expired, int RemindersCreated, string? Warning = null, bool Skipped = false);
+public sealed record QuoteExpiryRun(int Expired, int RemindersCreated, string? Warning = null, bool Skipped = false, int ApprovalRemindersSent = 0);
 
 /// <summary>
 /// Teklif süre dolumu (ADR-0019 dilim 7): geçerliliği bitmiş ama hâlâ "müşteriye sunuldu" teklifleri <c>Expired</c> yapar ve sorumluya e-posta bildirir;
@@ -367,7 +374,62 @@ internal sealed class QuoteExpiry(
             }
         }
 
-        return new QuoteExpiryRun(expired, reminders, warning);
+        var approvalReminders = policy.ApprovalReminderHours > 0 ? await RemindApproversAsync(now.AddHours(-policy.ApprovalReminderHours), now, cancellationToken) : 0;
+        return new QuoteExpiryRun(expired, reminders, warning, ApprovalRemindersSent: approvalReminders);
+    }
+
+    /// <summary>
+    /// Onay bekleyen tekliflerde şu anki adımın adlı onaylayanlarına (ve vekillerine) bir kez e-posta hatırlatması. Adsız adımda alıcı
+    /// belirlenemez (onay izni olan herkes), gönderilmez ve işaretlenmez.
+    /// </summary>
+    private async Task<int> RemindApproversAsync(DateTimeOffset submittedBefore, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var sent = 0;
+        var rules = await reader.ActiveRulesAsync(cancellationToken);
+        var delegations = await reader.ActiveDelegationsAsync(now, cancellationToken);
+        foreach (var quote in await reader.PendingApprovalsAsync(submittedBefore, BatchSize, cancellationToken))
+        {
+            if (await reader.HasEventSinceSubmissionAsync(quote.Id, QuoteMarkerKinds.ApprovalReminderSent, cancellationToken))
+            {
+                continue;
+            }
+
+            var matches = QuoteApprovalEvaluator.Match(rules, quote.Currency, quote.ListTotal, quote.DiscountTotal, quote.GrossTotal);
+            var approvals = (await reader.StepApprovalsSinceSubmissionAsync(quote.Id, cancellationToken)).Where(e => e.ActorId is not null)
+                .Select(e => new QuoteApprovalGiven(e.ActorId!.Value, new HashSet<Guid>(delegations.Where(d => d.ToUserId == e.ActorId).Select(d => d.FromUserId)) { e.ActorId!.Value }));
+            var current = QuoteApprovalEvaluator.Current(QuoteApprovalEvaluator.Steps(matches, approvals));
+            if (current is null || current.Approvers.Count == 0)
+            {
+                continue;
+            }
+
+            var recipientIds = current.Approvers.Where(a => !current.ApprovedBy.Contains(a))
+                .SelectMany(a => delegations.Where(d => d.FromUserId == a).Select(d => d.ToUserId).Prepend(a)).Distinct().ToList();
+            var link = recipients.Link($"crm/teklifler/{quote.Id}");
+            var delivered = 0;
+            foreach (var userId in recipientIds)
+            {
+                if (await recipients.FindAsync(userId, cancellationToken) is { } to)
+                {
+                    try
+                    {
+                        emails.Enqueue(QuoteOwnerEmails.ApprovalReminder(to, quote, link));
+                        delivered++;
+                    }
+                    catch (ArgumentException)
+                    {
+                    }
+                }
+            }
+
+            if (delivered > 0)
+            {
+                await markers.MarkAsync(quote.Id, QuoteMarkerKinds.ApprovalReminderSent, $"{delivered} onaylayana hatırlatma e-postası kuyruğa alındı (adım {current.Step}).", MarkPermissions, cancellationToken);
+                sent++;
+            }
+        }
+
+        return sent;
     }
 
     /// <summary>Sorumluya e-posta; sorumlu yoksa ya da etkin üye değilse sessizce atlanır. Bildirim hatası işin sonucunu bozmaz.</summary>

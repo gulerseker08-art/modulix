@@ -3032,6 +3032,57 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.QuoteApprovalDelegation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("FromUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ToUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "FromUserId", "IsActive");
+
+                    b.HasIndex("TenantId", "ToUserId", "IsActive");
+
+                    b.ToTable("QuoteApprovalDelegations", "crm");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.QuoteApprovalRule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3075,6 +3126,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                     b.Property<int>("Priority")
                         .HasColumnType("int");
 
+                    b.Property<int>("Step")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -3094,6 +3150,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations.Tenant
                     b.ToTable("QuoteApprovalRules", "crm", t =>
                         {
                             t.HasCheckConstraint("CK_QuoteApprovalRules_Condition", "([MinDiscountPercent] IS NOT NULL AND [MinDiscountPercent] >= 0 AND [MinDiscountPercent] < 100) OR ([MinGrossTotal] IS NOT NULL AND [MinGrossTotal] >= 0)");
+
+                            t.HasCheckConstraint("CK_QuoteApprovalRules_Step", "[Step] BETWEEN 1 AND 9");
                         });
                 });
 

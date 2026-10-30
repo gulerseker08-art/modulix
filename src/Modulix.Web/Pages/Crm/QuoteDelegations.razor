@@ -1,0 +1,205 @@
+@page "/crm/onay-vekaletleri"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Teklif onay vekâletleri · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuoteRulesManage">
+    <div class="page-header">
+        <h1>Teklif onay vekâletleri</h1>
+        @if (form is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="NewDelegation">Yeni vekâlet</button>
+        }
+    </div>
+
+    <p class="text-muted">
+        Vekil, kuralda adı geçen onaylayanın yerine onay verebilir; onay işleminde onay <strong>kendi</strong> adına değil, vekâlet veren adına sayılır.
+        Vekilin kendisinin de onay izni (<code>crm.quotes.approve</code>) olmalıdır; vekâlet izin vermez. Süreli ya da süresiz tanımlanabilir.
+    </p>
+
+    <Notice Text="@message" Failed="@failed" />
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni vekâlet" : "Vekâleti düzenle")</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="fromUserId">Vekâlet veren *</label>
+                    <LookupPicker Id="fromUserId" LookupKey="crm.quote-approval-delegation.from" @bind-Value="form.FromUserId" Required="true"
+                                  Invalid="@(errors?.ContainsKey("fromUserId") == true)" />
+                    <FieldError Field="fromUserId" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="toUserId">Vekil *</label>
+                    <LookupPicker Id="toUserId" LookupKey="crm.quote-approval-delegation.to" @bind-Value="form.ToUserId" Required="true"
+                                  Invalid="@(errors?.ContainsKey("toUserId") == true)" />
+                    <FieldError Field="toUserId" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="d-start">Başlangıç</label>
+                    <input id="d-start" class="form-control" type="datetime-local" @bind="form.StartsAt" />
+                    <FieldError Field="startsAt" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="d-end">Bitiş (boş = süresiz)</label>
+                    <input id="d-end" class="form-control" type="datetime-local" @bind="form.EndsAt" />
+                    <FieldError Field="endsAt" Errors="errors" />
+                </div>
+                <div class="form-check">
+                    <input id="d-active" class="form-check-input" type="checkbox" @bind="form.IsActive" />
+                    <label class="form-check-label" for="d-active">Etkin</label>
+                </div>
+                <div class="wide">
+                    <label class="form-label" for="d-note">Not</label>
+                    <input id="d-note" class="form-control" maxlength="300" @bind="form.Note" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    @if (items is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (items.Count == 0)
+    {
+        <p class="text-muted">Tanımlı vekâlet yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Onay vekâletleri</caption>
+            <thead><tr><th scope="col">Vekâlet veren</th><th scope="col">Vekil</th><th scope="col">Dönem</th><th scope="col">Durum</th><th scope="col"></th></tr></thead>
+            <tbody>
+                @foreach (var item in items)
+                {
+                    <tr>
+                        <td data-label="Vekâlet veren" class="primary">@Lookups.MemberName(item.FromUserId)</td>
+                        <td data-label="Vekil">@Lookups.MemberName(item.ToUserId)</td>
+                        <td data-label="Dönem">@CrmLabels.Time(item.StartsAt) → @(item.EndsAt is { } end ? CrmLabels.Time(end) : "süresiz")</td>
+                        <td data-label="Durum">@(item.IsActive ? (item.EndsAt is { } e && e <= DateTimeOffset.UtcNow ? "Süresi doldu" : "Etkin") : "Pasif")</td>
+                        <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(item)">Düzenle</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/quote-approval-delegations";
+
+    private List<QuoteApprovalDelegationDto>? items;
+    private DelegationForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool failed;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.QuoteRulesManage))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var (loaded, error) = await Api.GetAllAsync<QuoteApprovalDelegationDto>(Url);
+        items = loaded;
+        message = error;
+        failed = error is not null;
+    }
+
+    private void NewDelegation()
+    {
+        form = new DelegationForm { StartsAt = DateTime.Now };
+        errors = null;
+        message = null;
+    }
+
+    private void Edit(QuoteApprovalDelegationDto item)
+    {
+        form = new DelegationForm
+        {
+            Id = item.Id, Version = item.Version, FromUserId = item.FromUserId, ToUserId = item.ToUserId, StartsAt = item.StartsAt.LocalDateTime,
+            EndsAt = item.EndsAt?.LocalDateTime, IsActive = item.IsActive, Note = item.Note,
+        };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy || form is null) { return; }
+        busy = true;
+        var request = new SaveQuoteApprovalDelegationRequest(
+            form.FromUserId, form.ToUserId, form.StartsAt is { } s ? new DateTimeOffset(s) : null,
+            form.EndsAt is { } e ? new DateTimeOffset(e) : null, form.IsActive, string.IsNullOrWhiteSpace(form.Note) ? null : form.Note.Trim(), form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<QuoteApprovalDelegationDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<QuoteApprovalDelegationDto>(Url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            form = null;
+            errors = null;
+            message = "Vekâlet kaydedildi.";
+            failed = false;
+            await LoadAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+        failed = true;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (busy || form is null) { return; }
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+        message = result.IsSuccess ? "Vekâlet silindi." : result.Error;
+        failed = !result.IsSuccess;
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+        }
+    }
+
+    private sealed class DelegationForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? FromUserId { get; set; }
+
+        public Guid? ToUserId { get; set; }
+
+        public DateTime? StartsAt { get; set; }
+
+        public DateTime? EndsAt { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public string? Note { get; set; }
+    }
+}

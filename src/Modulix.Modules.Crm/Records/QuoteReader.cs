@@ -35,7 +35,7 @@ internal sealed class QuoteReader(IModuleData data)
     /// <summary>Etkin onay kuralları (değerlendirme sunucu kararıdır; kural yönetimi izni gerekmez).</summary>
     public async Task<List<QuoteApprovalRuleInfo>> ActiveRulesAsync(CancellationToken cancellationToken) =>
         await data.Set<QuoteApprovalRule>().AsNoTracking().Where(r => r.IsActive)
-            .Select(r => new QuoteApprovalRuleInfo(r.Id, r.Version, r.Name, r.Priority, r.Currency, r.MinDiscountPercent, r.MinGrossTotal, r.ApproverId))
+            .Select(r => new QuoteApprovalRuleInfo(r.Id, r.Version, r.Name, r.Priority, r.Currency, r.MinDiscountPercent, r.MinGrossTotal, r.ApproverId, r.Step))
             .ToListAsync(cancellationToken);
 
     public Task<Quote?> QuoteAsync(Guid quoteId, CancellationToken cancellationToken) =>
@@ -90,6 +90,52 @@ internal sealed class QuoteReader(IModuleData data)
             .Where(q => q.Status == QuoteStatus.Presented && q.ValidUntil != null && q.ValidUntil > now && q.ValidUntil <= until
                 && !data.Set<QuoteEvent>().Any(e => e.QuoteId == q.Id && e.Kind == "ExpiryReminderCreated"))
             .OrderBy(q => q.ValidUntil).Take(take).ToListAsync(cancellationToken);
+
+    /// <summary>Son onaya gönderimden bu yana verilen adım onayları (zaman sırasıyla). Gönderim yoksa boş.</summary>
+    public async Task<List<QuoteEvent>> StepApprovalsSinceSubmissionAsync(Guid quoteId, CancellationToken cancellationToken)
+    {
+        var submitted = await data.Set<QuoteEvent>().AsNoTracking().Where(e => e.QuoteId == quoteId && e.Kind == "SubmittedForApproval")
+            .OrderByDescending(e => e.CreatedAt).Select(e => (DateTimeOffset?)e.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+        if (submitted is null)
+        {
+            return [];
+        }
+
+        return await data.Set<QuoteEvent>().AsNoTracking()
+            .Where(e => e.QuoteId == quoteId && e.Kind == "StepApproved" && e.CreatedAt >= submitted)
+            .OrderBy(e => e.CreatedAt).ThenBy(e => e.Id).ToListAsync(cancellationToken);
+    }
+
+    /// <summary>Son gönderimden sonra verilen tarihçe işareti var mı (ör. onay hatırlatması)?</summary>
+    public async Task<bool> HasEventSinceSubmissionAsync(Guid quoteId, string kind, CancellationToken cancellationToken)
+    {
+        var submitted = await data.Set<QuoteEvent>().AsNoTracking().Where(e => e.QuoteId == quoteId && e.Kind == "SubmittedForApproval")
+            .OrderByDescending(e => e.CreatedAt).Select(e => (DateTimeOffset?)e.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+        return submitted is not null && await data.Set<QuoteEvent>().AsNoTracking().AnyAsync(e => e.QuoteId == quoteId && e.Kind == kind && e.CreatedAt >= submitted, cancellationToken);
+    }
+
+    /// <summary>Şu an geçerli vekâletler (veren → vekil).</summary>
+    public async Task<List<QuoteApprovalDelegation>> ActiveDelegationsAsync(DateTimeOffset now, CancellationToken cancellationToken) =>
+        (await data.Set<QuoteApprovalDelegation>().AsNoTracking().Where(d => d.IsActive).ToListAsync(cancellationToken)).Where(d => d.CoversAt(now)).ToList();
+
+    /// <summary>Onay bekleyen taslaklar (son gönderimi <paramref name="before"/> öncesinde olanlar; hatırlatma için).</summary>
+    public async Task<List<Quote>> PendingApprovalsAsync(DateTimeOffset before, int take, CancellationToken cancellationToken)
+    {
+        var pending = await data.Set<Quote>().AsNoTracking()
+            .Where(q => q.Status == QuoteStatus.Draft && q.ApprovalStatus == QuoteApprovalStatus.Pending).OrderBy(q => q.UpdatedAt).Take(take).ToListAsync(cancellationToken);
+        var result = new List<Quote>();
+        foreach (var quote in pending)
+        {
+            var submitted = await data.Set<QuoteEvent>().AsNoTracking().Where(e => e.QuoteId == quote.Id && e.Kind == "SubmittedForApproval")
+                .OrderByDescending(e => e.CreatedAt).Select(e => (DateTimeOffset?)e.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+            if (submitted is { } at && at <= before)
+            {
+                result.Add(quote);
+            }
+        }
+
+        return result;
+    }
 
     private static IQueryable<QuoteDocumentMeta> Metas(IQueryable<QuoteDocument> source) =>
         source.Select(d => new QuoteDocumentMeta(d.Id, d.QuoteId, d.RevisionNo, d.FileName, d.ContentType, d.SizeBytes, d.Sha256, d.TemplateVersion, d.Snapshot, d.CreatedAt));
