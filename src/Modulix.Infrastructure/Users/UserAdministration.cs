@@ -27,7 +27,6 @@ public sealed class UserAdministrationOptions
 
 internal sealed class UserAdministration(
     ModulixDbContext db,
-    PlatformDbContext platform,
     UserManager<ModulixUser> users,
     ITenantContextAccessor tenantAccessor,
     IRoleService roles,
@@ -53,8 +52,8 @@ internal sealed class UserAdministration(
         var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         var members =
-            from membership in platform.Memberships.AsNoTracking()
-            join user in platform.Users.AsNoTracking() on membership.UserId equals user.Id
+            from membership in db.Memberships.AsNoTracking()
+            join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
             where membership.TenantId == tenant.TenantId
             select new { Membership = membership, User = user };
 
@@ -75,7 +74,7 @@ internal sealed class UserAdministration(
 
         if (query.RoleId is { } roleId)
         {
-            // Rol atamaları tenant bağlamındadır (ADR-0020 Dilim 1): o role sahip üyelik kimlikleri önce oradan okunur.
+            // Rol atamaları tenant bağlamındadır (ADR-0020): o role sahip üyelik kimlikleri önce oradan okunur.
             var withRole = await db.MembershipRoles.AsNoTracking()
                 .Where(mr => mr.RoleId == roleId)
                 .Select(mr => mr.MembershipId)
@@ -99,8 +98,8 @@ internal sealed class UserAdministration(
     {
         var tenant = RequireTenant();
         var row = await (
-            from membership in platform.Memberships.AsNoTracking()
-            join user in platform.Users.AsNoTracking() on membership.UserId equals user.Id
+            from membership in db.Memberships.AsNoTracking()
+            join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
             where membership.Id == membershipId && membership.TenantId == tenant.TenantId
             select new { Membership = membership, User = user })
             .SingleOrDefaultAsync(cancellationToken);
@@ -153,7 +152,7 @@ internal sealed class UserAdministration(
 
         var user = await users.FindByEmailAsync(email);
         if (user is not null
-            && await platform.Memberships.AnyAsync(m => m.TenantId == tenant.TenantId && m.UserId == user.Id, cancellationToken))
+            && await db.Memberships.AnyAsync(m => m.TenantId == tenant.TenantId && m.UserId == user.Id, cancellationToken))
         {
             throw new UserAdministrationException(
                 UserAdministrationError.Conflict, "Bu e-posta adresi kuruluşunuzda zaten kayıtlı.");
@@ -172,11 +171,11 @@ internal sealed class UserAdministration(
         var existingAccount = await users.HasPasswordAsync(user);
         var membership = Membership.CreateInvited(tenant.TenantId, user.Id, awaitsAcceptance: !existingAccount, now);
 
-        // ADR-0020 Dilim 1: üyelik platform bağlamında, rol atamaları ve denetim kaydı tenant bağlamındadır. İki ayrı bağlam
-        // tek işlemde yazılamaz: önce üyelik platformda oluşturulur, sonra tenant tarafı yazılır; tenant tarafı
-        // başarısız olursa üyelik geri alınır (telafi), böylece rolsüz yetim üyelik kalmaz.
-        platform.Memberships.Add(membership);
-        await platform.SaveChangesAsync(cancellationToken);
+        // Üyelik önce kaydedilir (rol atamaları ona yabancı anahtarla bağlıdır, ADR-0020 Dilim 2), sonra tenant tarafı yazılır;
+        // tenant tarafı başarısız olursa üyelik geri alınır (telafi), böylece rolsüz yetim üyelik kalmaz. Dilim 3'te tek
+        // işleme alınabilir.
+        db.Memberships.Add(membership);
+        await db.SaveChangesAsync(cancellationToken);
 
         try
         {
@@ -204,8 +203,8 @@ internal sealed class UserAdministration(
         }
         catch
         {
-            platform.Memberships.Remove(membership);
-            await platform.SaveChangesAsync(CancellationToken.None);
+            db.Memberships.Remove(membership);
+            await db.SaveChangesAsync(CancellationToken.None);
             throw;
         }
 
@@ -266,7 +265,7 @@ internal sealed class UserAdministration(
         Audit(tenant, membership.Id, AuditAction.Updated,
             new JsonObject { ["invitedAt"] = before }, new JsonObject { ["invitedAt"] = now });
 
-        await platform.SaveChangesAsync(cancellationToken); // üyelik: platform DB
+        await db.SaveChangesAsync(cancellationToken); // üyelik: platform DB
         await db.SaveChangesAsync(cancellationToken);       // denetim kaydı: tenant DB
     }
 
@@ -284,14 +283,14 @@ internal sealed class UserAdministration(
         // Davet bekleyen üyelikte kayıt yoktur (sorumlu olamaz, giriş yapamaz); satır silinir ve bağlantı, üyeliğe bağlı
         // olduğu için çalışmaz. Hesap kalır: kişi başka tenant'ın davetini bekliyor olabilir; yeniden davet edilirse
         // aynı hesap kullanılır (yeni üyelik, yeni bağlantı).
-        // Rol atamaları tenant bağlamında, üyelik platform bağlamında (ADR-0020 Dilim 1): önce tenant tarafı, sonra üyelik silinir.
+        // Rol atamaları tenant bağlamında, üyelik platform tablolarında (ADR-0020): önce tenant tarafı, sonra üyelik silinir.
         db.MembershipRoles.RemoveRange(await db.MembershipRoles.Where(mr => mr.MembershipId == membershipId).ToListAsync(cancellationToken));
         Audit(tenant, membershipId, AuditAction.Deleted,
             new JsonObject { ["email"] = user.Email, ["status"] = membership.Status.ToString() }, after: null);
         await db.SaveChangesAsync(cancellationToken);
 
-        platform.Memberships.Remove(membership);
-        await platform.SaveChangesAsync(cancellationToken);
+        db.Memberships.Remove(membership);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task DisableAsync(Guid membershipId, Guid? transferToMembershipId, CancellationToken cancellationToken)
@@ -331,15 +330,15 @@ internal sealed class UserAdministration(
             await administrators.EnsureAnotherActiveAdministratorAsync(systemId, membershipId, cancellationToken);
         }
 
-        // Kilit beklenirken başka bir istek durumu değiştirmiş olabilir (üyelik platform bağlamındadır, ADR-0020 Dilim 1).
-        await platform.Entry(membership).ReloadAsync(cancellationToken);
+        // Kilit beklenirken başka bir istek durumu değiştirmiş olabilir (üyelik platform tablolarındadır, ADR-0020 Dilim 1).
+        await db.Entry(membership).ReloadAsync(cancellationToken);
         if (membership.Status != MembershipStatus.Active)
         {
             return;
         }
 
-        // Devir ve denetim kaydı tenant bağlamında tek işlemde; üyeliğin devre dışı bırakılması platform bağlamında ayrı
-        // işlemdir (ADR-0020 Dilim 1: iki bağlam tek atomik işlem değildir). Önce kayıtlar devredilir, sonra üyelik kapatılır;
+        // Devir ve denetim kaydı tenant bağlamında tek işlemde; üyeliğin devre dışı bırakılması platform tablolarında ayrı
+        // işlemdir (ADR-0020: ayrı SaveChanges adımlarıdır; Dilim 3'te tek işleme alınabilir). Önce kayıtlar devredilir, sonra üyelik kapatılır;
         // platform yazımı başarısız olursa işlem yeniden denenebilir (kayıtlar zaten doğru sahipte).
         if (receiver is not null)
         {
@@ -352,7 +351,7 @@ internal sealed class UserAdministration(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        await platform.SaveChangesAsync(cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<OwnedRecordSummary>> GetOwnedRecordsAsync(Guid membershipId, CancellationToken cancellationToken)
@@ -414,7 +413,7 @@ internal sealed class UserAdministration(
 
         membership.Enable();
         AuditStatus(tenant, membership, MembershipStatus.Disabled);
-        await platform.SaveChangesAsync(cancellationToken); // üyelik: platform DB
+        await db.SaveChangesAsync(cancellationToken); // üyelik: platform DB
         await db.SaveChangesAsync(cancellationToken);        // denetim kaydı: tenant DB
     }
 
@@ -505,7 +504,7 @@ internal sealed class UserAdministration(
     private async Task<(Membership Membership, ModulixUser User)> LoadAsync(
         TenantContext tenant, Guid membershipId, CancellationToken cancellationToken)
     {
-        var membership = await platform.Memberships
+        var membership = await db.Memberships
             .SingleOrDefaultAsync(m => m.Id == membershipId && m.TenantId == tenant.TenantId, cancellationToken)
             ?? throw NotFound();
         var user = await users.FindByIdAsync(membership.UserId.ToString()) ?? throw NotFound();
@@ -520,7 +519,7 @@ internal sealed class UserAdministration(
             throw new ArgumentException("Kayıtlar aynı kişiye devredilemez.", "transferToMembershipId");
         }
 
-        var receiver = await platform.Memberships.AsNoTracking()
+        var receiver = await db.Memberships.AsNoTracking()
             .SingleOrDefaultAsync(m => m.Id == toMembershipId && m.TenantId == tenant.TenantId, cancellationToken);
         return receiver is { Status: MembershipStatus.Active }
             ? receiver
@@ -567,7 +566,7 @@ internal sealed class UserAdministration(
     private async Task EnsureInvitationAllowanceAsync(TenantContext tenant, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var since = now - TimeSpan.FromHours(1);
-        var sent = await platform.Memberships.CountAsync(m => m.TenantId == tenant.TenantId && m.InvitedAt > since, cancellationToken);
+        var sent = await db.Memberships.CountAsync(m => m.TenantId == tenant.TenantId && m.InvitedAt > since, cancellationToken);
         if (sent >= options.Value.MaxInvitationsPerHour)
         {
             throw new UserAdministrationException(
@@ -578,8 +577,8 @@ internal sealed class UserAdministration(
 
     private async Task<(string TenantName, string ActorName)> LoadEmailContextAsync(TenantContext tenant, CancellationToken cancellationToken)
     {
-        var tenantName = await platform.Tenants.AsNoTracking().Where(t => t.Id == tenant.TenantId).Select(t => t.Name).SingleAsync(cancellationToken);
-        var actorName = await platform.Users.AsNoTracking().Where(u => u.Id == tenant.UserId).Select(u => u.DisplayName).SingleOrDefaultAsync(cancellationToken);
+        var tenantName = await db.Tenants.AsNoTracking().Where(t => t.Id == tenant.TenantId).Select(t => t.Name).SingleAsync(cancellationToken);
+        var actorName = await db.Users.AsNoTracking().Where(u => u.Id == tenant.UserId).Select(u => u.DisplayName).SingleOrDefaultAsync(cancellationToken);
         return (tenantName, actorName ?? "Kuruluşunuzun yöneticisi");
     }
 

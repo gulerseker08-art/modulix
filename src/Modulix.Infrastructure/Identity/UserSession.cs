@@ -45,7 +45,7 @@ public sealed class UserSession
     public DateTimeOffset? ClosedAt { get; private set; }
 }
 
-internal sealed class UserSessionConfiguration : IEntityTypeConfiguration<UserSession>, IPlatformConfiguration
+internal sealed class UserSessionConfiguration : IEntityTypeConfiguration<UserSession>
 {
     public void Configure(EntityTypeBuilder<UserSession> builder)
     {

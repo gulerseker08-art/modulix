@@ -2,7 +2,7 @@
 
 Modulix: modüler, multi-tenant kurumsal iş yönetim platformu. .NET 10 (ASP.NET Core minimal API + Blazor WebAssembly), EF Core, SQL Server 2025 (Row-Level Security). Kod, yorumlar, commit mesajları ve kullanıcıya dönük metinler **Türkçe**.
 
-Veritabanı modeli (ADR-0002, ADR-0020): **tek paylaşımlı veritabanı** `Modulix`; bütün tenant'lar aynı veritabanındadır, tenant başına ayrı DB yoktur. Platform tabloları (`platform` şeması: kullanıcılar/kimlik, tenant kayıtları, üyelikler, modül erişimleri, oturumlar, e-posta kuyruğu) globaldir ve RLS dışındadır; iş tabloları `TenantId` taşır ve iki katmanla korunur (EF query filter + SQL Server Row-Level Security). İki sınırlı bağlam aynı veritabanına bağlanır: `PlatformDbContext` (platform) ve `ModulixDbContext` (tenant işi); Dilim 2'de birleşecekler (ADR-0020). İşletim: `docs/tenant-isletim.md`.
+Veritabanı modeli (ADR-0002, ADR-0020): **tek paylaşımlı veritabanı** `Modulix`; bütün tenant'lar aynı veritabanındadır, tenant başına ayrı DB yoktur. Platform tabloları (`platform` şeması: kullanıcılar/kimlik, tenant kayıtları, üyelikler, modül erişimleri, oturumlar, e-posta kuyruğu) globaldir ve RLS dışındadır; iş tabloları `TenantId` taşır ve iki katmanla korunur (EF query filter + SQL Server Row-Level Security). Tek `ModulixDbContext` (kimlik ve platform tabloları dahil); `MembershipId` taşıyan tenant tabloları `platform.Memberships`'e bileşik yabancı anahtarla bağlıdır. İşletim: `docs/tenant-isletim.md`.
 
 Ayrıntılı davranış ve uç nokta belgeleri `README.md`'de, mimari kararlar `docs/adr/` altında. Gerekmedikçe README'nin tamamını okuma; ilgili bölümü ara.
 
@@ -19,7 +19,7 @@ dotnet run --project src/Modulix.Api -- migrate  # bekleyen migration'lar (platf
 ```
 
 - Yerel veritabanı: `docker compose up -d --wait sqlserver mailpit && docker compose run --rm db-init` (şifreler `.env`'de; Windows'ta `scripts/db-up.ps1`). Port 14333.
-- Migration (iki zincir, aynı DB): platform için `--context PlatformDbContext --output-dir Persistence/Migrations/Platform`, tenant için `--context ModulixDbContext --output-dir Persistence/Migrations/Tenant`; her ikisi de `--project src/Modulix.Infrastructure --startup-project src/Modulix.Api`. `dotnet ef database update` kullanma. Tek veritabanı bütün tenant'ları etkilediği için migration'lar geriye uyumlu ve kesintisiz olmalı. Yeni tenant tablosu RLS politikasına da eklenir (`TenantIsolationSql.AddTable`).
+- Migration (tek zincir): `dotnet ef migrations add <Ad> --project src/Modulix.Infrastructure --startup-project src/Modulix.Api` (`Persistence/Migrations`). `dotnet ef database update` kullanma. Tek veritabanı bütün tenant'ları etkilediği için migration'lar geriye uyumlu ve kesintisiz olmalı. Yeni tenant tablosu RLS politikasına da eklenir (`TenantIsolationSql.AddTable`).
 - CI (`.github/workflows/ci.yml`) Release modunda derler, migration uygular, mimari + Core + CRM + entegrasyon testlerini çalıştırır. CI'da yüksek/kritik açıklı NuGet paketi derlemeyi durdurur.
 - Değişiklikten sonra en az `dotnet build` ve mimari testleri çalıştır; veritabanı yoksa entegrasyon testlerini çalıştıramadığını açıkça söyle.
 

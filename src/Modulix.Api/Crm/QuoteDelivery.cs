@@ -18,7 +18,7 @@ public sealed record QuoteLinkDelivery(string Status, string? Error, DateTimeOff
 /// alıcıya ulaştığını söylemez. Gönderen/SMTP yapılandırılmamışsa e-posta kuyrukta <c>Pending</c> bekler; hiçbir şey sahte "gönderildi" olmaz.
 /// Geliştirmede SMTP yerel Mailpit'tir, gerçek müşteriye e-posta gitmez.
 /// </summary>
-internal sealed class QuoteDelivery(IEmailQueue emails, PlatformDbContext platform, ITenantContextAccessor tenant)
+internal sealed class QuoteDelivery(IEmailQueue emails, ModulixDbContext platform, ITenantContextAccessor tenant)
 {
     public const string ReferencePrefix = "crm.quote-link:";
 

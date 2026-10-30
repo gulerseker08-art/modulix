@@ -5,7 +5,7 @@ using Modulix.Infrastructure.Identity;
 
 namespace Modulix.Infrastructure.Persistence.Configurations;
 
-internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>, IPlatformConfiguration
+internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 {
     public void Configure(EntityTypeBuilder<Tenant> builder)
     {
@@ -22,7 +22,7 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>, IP
     }
 }
 
-internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>, IPlatformConfiguration
+internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>
 {
     public void Configure(EntityTypeBuilder<Membership> builder)
     {

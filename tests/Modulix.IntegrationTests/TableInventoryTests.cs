@@ -17,8 +17,7 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
     /// <summary>RLS dışında kalan tablolar (gerekçesiyle). TenantId taşıyanların neden RLS dışında olduğu yazılıdır.</summary>
     private static readonly Dictionary<string, string> ExemptTables = new()
     {
-        ["platform.__EFMigrationsHistory"] = "Platform migration zinciri geçmişi (ADR-0020, Dilim 1).",
-        ["core.__EFMigrationsHistory"] = "Tenant migration zinciri geçmişi (ADR-0020, Dilim 1).",
+        ["platform.__EFMigrationsHistory"] = "Migration geçmişi (tek zincir, ADR-0020).",
         ["platform.Tenants"] = "Firma listesi; platform geneli kayıt.",
         ["platform.Users"] = "Kimlik hesabı firmadan bağımsızdır; bir kişi birden fazla firmaya üye olabilir.",
         ["platform.UserClaims"] = "Kimlik (ASP.NET Identity).",
@@ -101,21 +100,12 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
     }
 
     [Fact]
-    public async Task Tenant_model_has_no_changes_without_a_migration()
+    public async Task Model_has_no_changes_without_a_migration()
     {
         using var scope = factory.OpenScope((await factory.CreateTenantAsync()).Id);
         Assert.False(
             scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Database.HasPendingModelChanges(),
-            "Tenant modelinde migration'ı olmayan değişiklik var: dotnet ef migrations add <Ad> --context ModulixDbContext (CLAUDE.md).");
-    }
-
-    [Fact]
-    public void Platform_model_has_no_changes_without_a_migration()
-    {
-        using var scope = factory.Services.CreateScope();
-        Assert.False(
-            scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Database.HasPendingModelChanges(),
-            "Platform modelinde migration'ı olmayan değişiklik var: dotnet ef migrations add <Ad> --context PlatformDbContext (CLAUDE.md).");
+            "Modelde migration'ı olmayan değişiklik var: dotnet ef migrations add <Ad> (CLAUDE.md).");
     }
 
     // Tablo → RLS koşulu sayısı (migration kullanıcısı politikayı görebilir).

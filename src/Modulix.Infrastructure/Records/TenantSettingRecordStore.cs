@@ -16,7 +16,6 @@ namespace Modulix.Infrastructure.Records;
 /// </summary>
 internal sealed class TenantSettingRecordStore(
     ModulixDbContext db,
-    PlatformDbContext platform,
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
     ITenantContextAccessor tenantAccessor,
@@ -165,7 +164,7 @@ internal sealed class TenantSettingRecordStore(
         }
         // Y7b: zorunluluğu açan kendisi iki adımlı doğrulamasız kalıp firmadan dışarıda kalmasın.
         if (key == CoreModule.SettingKeys.RequireTwoFactor && value == CoreModule.SettingValues.Yes
-            && !await platform.Users.AnyAsync(u => u.Id == tenant.UserId && u.TwoFactorEnabled, cancellationToken))
+            && !await db.Users.AnyAsync(u => u.Id == tenant.UserId && u.TwoFactorEnabled, cancellationToken))
         {
             throw new RecordValidationException([new RecordFieldError(ValueField,
                 "Zorunlu kılmadan önce kendi iki adımlı doğrulamanızı açın (Hesabım → İki adımlı doğrulama).")]);

@@ -148,7 +148,7 @@ public class QuoteMultiStepApprovalTests(ModulixApiFactory factory) : IClassFixt
     private async Task<int> QueuedCountAsync(string reference, string address)
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         return await db.EmailMessages.CountAsync(e => e.Reference == reference && e.ToAddress == address);
     }
 

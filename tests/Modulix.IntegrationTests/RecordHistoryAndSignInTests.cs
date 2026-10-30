@@ -154,7 +154,7 @@ public class RecordHistoryAndSignInTests(ModulixApiFactory factory) : IClassFixt
 
             var invited = new ModulixUser { UserName = email, Email = email, DisplayName = "Davetli Kişi" };
             Assert.True((await users.CreateAsync(invited)).Succeeded);
-            var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
             var membership = Membership.CreateInvited(tenant.Id, invited.Id, awaitsAcceptance: true, DateTimeOffset.UtcNow);
             db.Memberships.Add(membership);
             await db.SaveChangesAsync();

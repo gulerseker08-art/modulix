@@ -49,7 +49,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
     private readonly CapturingLoggerProvider logs = new();
     private readonly WebApplicationFactory<Program> host;
 
-    // ADR-0020 Dilim 1: outbox/teslimler tek veritabanında tenant bağlamıyla okunur (ADR-0020). Test, kullandığı tenant'ları izler; işleyici ve
+    // ADR-0020: outbox/teslimler tek veritabanında tenant bağlamıyla okunur (ADR-0020). Test, kullandığı tenant'ları izler; işleyici ve
     // veri okuma yardımcıları bu tenant'ların bağlamında (oturum tenant'ı yazılarak) çalışır.
     private readonly List<Guid> tenantIds = [];
 
@@ -70,7 +70,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
     }
 
     /// <summary>
-    /// ADR-0020 Dilim 1: her test kendi tenant'ını oluşturur; outbox ve teslimler o tenant'ın bağlamında (TenantId ile)
+    /// ADR-0020: her test kendi tenant'ını oluşturur; outbox ve teslimler o tenant'ın bağlamında (TenantId ile)
     /// izole olduğundan önceki testlerden kalan olay bu testin işleyicisine karışmaz. Eski genel sıfırlama (tek paylaşımlı
     /// veritabanı varsayımı) gerekmez.
     /// </summary>
@@ -764,7 +764,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
 
     private Task<int> CleanupAsync() => WithDispatcherAsync(d => d.CleanupAsync(CancellationToken.None));
 
-    /// <summary>Tenant bağlamlı host kapsamı (ADR-0020 Dilim 1): işleyici/veri o tenant'ın bağlamında (oturum tenant'ı) çalışır.</summary>
+    /// <summary>Tenant bağlamlı host kapsamı (ADR-0020): işleyici/veri o tenant'ın bağlamında (oturum tenant'ı) çalışır.</summary>
     private IServiceScope TenantScope(Guid tenantId)
     {
         var scope = host.Services.CreateScope();
@@ -869,7 +869,7 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         return false;
     }
 
-    /// <summary>Kaydın olay (outbox) iletisini, tenant bağlamıyla okur (ADR-0020 Dilim 1).</summary>
+    /// <summary>Kaydın olay (outbox) iletisini, tenant bağlamıyla okur (ADR-0020).</summary>
     private async Task<OutboxMessage> OutboxAsync(Guid recordId)
     {
         foreach (var id in tenantIds.Distinct())
@@ -892,5 +892,5 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
 
     private static ModulixDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
 
-    private static PlatformDbContext Platform(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+    private static ModulixDbContext Platform(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
 }

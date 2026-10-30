@@ -25,7 +25,7 @@ public enum EmailStatus
 }
 
 /// <summary>
-/// E-posta kuyruğu (platform.EmailMessages). ADR-0020 Dilim 1: kuyruk <b>platform bağlamındadır</b>; tek işleyici tüm
+/// E-posta kuyruğu (platform.EmailMessages). ADR-0020: kuyruk <b>platform tablolarındadır</b>; tek işleyici tüm
 /// tenant'ların e-postalarını gönderir ve giriş anındaki (aktif tenant olmayan) platform e-postaları da (şifre
 /// sıfırlama, kurtarma kodu) buraya yazılabilir. Her satır varsa <see cref="TenantId"/> taşır; platform e-postasında boştur.
 /// </summary>
@@ -201,7 +201,7 @@ public sealed class QueuedEmail
     private static bool HasLineBreak(string value) => value.AsSpan().IndexOfAny('\r', '\n') >= 0;
 }
 
-internal sealed class QueuedEmailConfiguration : IEntityTypeConfiguration<QueuedEmail>, IPlatformConfiguration
+internal sealed class QueuedEmailConfiguration : IEntityTypeConfiguration<QueuedEmail>
 {
     public void Configure(EntityTypeBuilder<QueuedEmail> builder)
     {
@@ -288,19 +288,19 @@ public interface IEmailTransport
 }
 
 /// <summary>
-/// E-postayı platform kuyruğuna yazar (ADR-0020 Dilim 1). Kuyruk platform bağlamındadır; gönderim ertelenir (Pending).
+/// E-postayı platform kuyruğuna yazar (ADR-0020). Kuyruk platform tablolarındadır; gönderim ertelenir (Pending).
 /// İki durum:
 /// <list type="bullet">
-///   <item><b>Olay teslimi içinde</b> (<see cref="EventHandlingScope"/> etkin): e-posta, isteğin platform bağlamına
+///   <item><b>Olay teslimi içinde</b> (<see cref="EventHandlingScope"/> etkin): e-posta, isteğin bağlamına
 ///   eklenir ama <b>burada kaydedilmez</b>; dağıtıcı teslim başarıyla onaylanınca kaydeder (tam-bir-kez). Teslim
 ///   iptal/yeniden denemede yazılmaz, böylece bildirim tekrarlanmaz.</item>
-///   <item><b>İstek/giriş akışında</b>: kendi kısa ömürlü platform bağlamında hemen kalıcı kılınır; aktif tenant
+///   <item><b>İstek/giriş akışında</b>: kendi kısa ömürlü bağlamında hemen kalıcı kılınır; aktif tenant
 ///   olmasa da (şifre sıfırlama vb.) çalışır.</item>
 /// </list>
 /// </summary>
 internal sealed class EfEmailQueue(
-    PlatformDbContext platformDb,
-    ModulixDatabaseOptions database,
+    ModulixDbContext db,
+    IServiceScopeFactory scopes,
     ITenantContextAccessor tenantAccessor,
     EventHandlingScope handling,
     TimeProvider time) : IEmailQueue
@@ -311,13 +311,15 @@ internal sealed class EfEmailQueue(
         if (handling.Subscription is not null)
         {
             // Olay teslimiyle birlikte onaylanır: dağıtıcı başarıda bu bağlamı kaydeder, iptalde kaydetmez.
-            platformDb.EmailMessages.Add(email);
+            db.EmailMessages.Add(email);
             return;
         }
 
-        using var db = PersistenceSetup.CreatePlatformContext(database.AppConnectionString);
-        db.EmailMessages.Add(email);
-        db.SaveChanges();
+        // İsteğin bağlamındaki yarım işten bağımsız, ayrı bir bağlamda hemen kalıcı kılınır (aktif tenant gerekmez).
+        using var scope = scopes.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        queue.EmailMessages.Add(email);
+        queue.SaveChanges();
     }
 }
 
@@ -326,7 +328,7 @@ internal sealed class EfEmailQueue(
 /// UPDATE ile tek bir işleyiciye alınır, böylece iki kez gönderilmez.
 /// </summary>
 public sealed class EmailDispatcher(
-    PlatformDbContext db,
+    ModulixDbContext db,
     IEmailTransport transport,
     IOptions<EmailOptions> options,
     TimeProvider time,

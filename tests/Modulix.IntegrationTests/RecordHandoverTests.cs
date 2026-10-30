@@ -149,7 +149,7 @@ public class RecordHandoverTests(ModulixApiFactory factory) : IClassFixture<Modu
     private async Task<Core.Platform.Tenant> TenantAsync(Guid tenantId)
     {
         using var scope = factory.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId);
+        return await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId);
     }
 
     private static async Task<Guid> CreateAsync(HttpClient client, string entityKey, JsonObject values)

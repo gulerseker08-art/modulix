@@ -18,7 +18,6 @@ namespace Modulix.Infrastructure.Customization;
 /// </summary>
 internal sealed class SectorProfileService(
     ModulixDbContext db,
-    PlatformDbContext platform,
     ITenantContextAccessor tenantAccessor,
     ModuleCatalog catalog,
     SectorProfileCatalog profiles,
@@ -31,7 +30,7 @@ internal sealed class SectorProfileService(
     public async Task<TenantProfile> GetAsync(CancellationToken cancellationToken)
     {
         var tenantId = RequireTenant().TenantId;
-        return await platform.Tenants.AsNoTracking()
+        return await db.Tenants.AsNoTracking()
             .Where(t => t.Id == tenantId)
             .Select(t => new TenantProfile(t.ProfileKey, t.ProfileAppliedAt))
             .SingleAsync(cancellationToken);
@@ -53,8 +52,8 @@ internal sealed class SectorProfileService(
         {
             var plan = await PlanAsync(profile, enableModules, cancellationToken);
 
-            // Tenant profil anahtarı platform bağlamındadır (ADR-0020 Dilim 1); tenant işi (özel alan/liste/audit) tenant bağlamında.
-            var row = await platform.Tenants.SingleAsync(t => t.Id == tenant.TenantId, cancellationToken);
+            // Tenant profil anahtarı platform tablolarındadır (ADR-0020); tenant işi (özel alan/liste/audit) tenant bağlamında.
+            var row = await db.Tenants.SingleAsync(t => t.Id == tenant.TenantId, cancellationToken);
             var modulesBefore = await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken);
             var before = Snapshot(row.ProfileKey, modulesBefore);
 
@@ -101,9 +100,8 @@ internal sealed class SectorProfileService(
                 await transaction.CommitAsync(cancellationToken);
             }
 
-            // Tenant işi başarıyla bittikten sonra platform bağlamında profil anahtarını kaydet (ayrı bağlam,
-            // ayrı işlem; ADR-0020 Dilim 1: platform/tenant tek atomik işlem varsayılmaz).
-            await platform.SaveChangesAsync(cancellationToken);
+            // Tenant işi başarıyla bittikten sonra platform tablolarında profil anahtarını kaydet (ayrı SaveChanges adımı; Dilim 3'te tek işleme alınabilir).
+            await db.SaveChangesAsync(cancellationToken);
 
             return plan;
         }

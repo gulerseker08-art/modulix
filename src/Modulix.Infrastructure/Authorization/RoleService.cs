@@ -14,7 +14,6 @@ namespace Modulix.Infrastructure.Authorization;
 
 internal sealed class RoleService(
     ModulixDbContext db,
-    PlatformDbContext platform,
     ITenantContextAccessor tenantAccessor,
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
@@ -368,9 +367,9 @@ internal sealed class RoleService(
     private TenantContext RequireTenant() =>
         tenantAccessor.Current ?? throw new InvalidOperationException("Aktif tenant olmadan roller yönetilemez.");
 
-    // Üyelikler platform bağlamındadır (ADR-0020 Dilim 1); atamadan önce üyeliğin bu tenant'a ait olduğu açıkça denetlenir.
+    // Üyelikler platform tablolarındadır (ADR-0020); atamadan önce üyeliğin bu tenant'a ait olduğu açıkça denetlenir.
     private Task<bool> MembershipBelongsToTenantAsync(Guid membershipId, Guid tenantId, CancellationToken cancellationToken) =>
-        platform.Memberships.AnyAsync(m => m.Id == membershipId && m.TenantId == tenantId, cancellationToken);
+        db.Memberships.AnyAsync(m => m.Id == membershipId && m.TenantId == tenantId, cancellationToken);
 
     private void EnsureKnownPermissions(Role role)
     {

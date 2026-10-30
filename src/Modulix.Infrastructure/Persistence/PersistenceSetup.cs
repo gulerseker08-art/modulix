@@ -41,13 +41,8 @@ public static class PersistenceSetup
 
     private const string MigrationsHistoryTable = "__EFMigrationsHistory";
 
-    /// <summary>
-    /// İki sınırlı bağlam aynı veritabanındadır (ADR-0020, Dilim 1); migration geçmişleri ayrı şemalardaki tablolarda
-    /// tutulur ki zincirler birbirine karışmasın. Dilim 2'de bağlamlar ve zincirler birleşir.
-    /// </summary>
-    private const string PlatformHistorySchema = DatabaseSchemas.Platform;
-
-    private const string TenantHistorySchema = DatabaseSchemas.Core;
+    /// <summary>Tek migration zinciri (ADR-0020, Dilim 2); geçmiş tablosu platform şemasındadır.</summary>
+    private const string MigrationsHistorySchema = DatabaseSchemas.Platform;
 
     public static IServiceCollection AddModulixPersistence(
         this IServiceCollection services, string appConnectionString, string migrationsConnectionString)
@@ -58,15 +53,13 @@ public static class PersistenceSetup
         services.AddMemoryCache();
         services.AddSingleton(new ModulixDatabaseOptions(appConnectionString, migrationsConnectionString));
 
-        // Platform bağlamı: platform şeması (RLS dışı).
-        services.AddDbContext<PlatformDbContext>(options => options.UsePlatformSqlServer(appConnectionString));
-
-        // Tenant bağlamı: aynı veritabanı; interceptor isteğin aktif tenant'ını oturuma yazar, Row-Level Security onu
-        // uygular (ADR-0002). Aktif tenant yoksa hiçbir tenant satırı görünmez ve yazılamaz.
+        // Tek bağlam (ADR-0020): platform tabloları ve bütün tenant'ların iş verisi aynı veritabanında. Interceptor isteğin aktif
+        // tenant'ını oturuma yazar, Row-Level Security onu uygular (ADR-0002). Aktif tenant yoksa hiçbir tenant satırı görünmez
+        // ve yazılamaz; platform tabloları (kimlik, üyelik, tenant kayıtları) tenant bağlamı olmadan da okunur.
         services.AddDbContext<ModulixDbContext>((serviceProvider, options) =>
         {
             var tenantAccessor = serviceProvider.GetService<ITenantContextAccessor>();
-            options.UseTenantSqlServer(appConnectionString)
+            options.UseModulixSqlServer(appConnectionString)
                 .AddInterceptors(new TenantSessionContextInterceptor(tenantAccessor));
         });
 
@@ -117,55 +110,34 @@ public static class PersistenceSetup
     }
 
     /// <summary>
-    /// Bekleyen migration'ları migration kullanıcısıyla uygular ('migrate' komutu): önce platform zinciri, sonra tenant
-    /// zinciri; ikisi de aynı veritabanına gider (ADR-0020). Tek veritabanı bütün tenant'ları etkilediği için
-    /// migration'lar geriye uyumlu ve kesintisiz yazılır.
+    /// Bekleyen migration'ları migration kullanıcısıyla uygular ('migrate' komutu). Tek veritabanı bütün tenant'ları
+    /// etkilediği için migration'lar geriye uyumlu ve kesintisiz yazılır (ADR-0020).
     /// </summary>
     public static async Task MigrateAsync(string migrationsConnectionString, ModuleCatalog modules, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(migrationsConnectionString);
         ArgumentNullException.ThrowIfNull(modules);
 
-        await using (var platform = CreatePlatformContext(migrationsConnectionString))
-        {
-            await platform.Database.MigrateAsync(cancellationToken);
-        }
-
-        await using (var tenant = CreateContext(migrationsConnectionString, modules))
-        {
-            await tenant.Database.MigrateAsync(cancellationToken);
-        }
-    }
-
-    /// <summary>Tasarım zamanı ve 'migrate' için platform bağlamı. Tenant bağlamı gerektirmez.</summary>
-    public static PlatformDbContext CreatePlatformContext(string connectionString)
-    {
-        var options = new DbContextOptionsBuilder<PlatformDbContext>();
-        options.UsePlatformSqlServer(connectionString);
-        return new PlatformDbContext(options.Options);
+        await using var context = CreateContext(migrationsConnectionString, modules);
+        await context.Database.MigrateAsync(cancellationToken);
     }
 
     /// <summary>
-    /// Aktif tenant'ı olmayan tenant DbContext'i: 'migrate' komutu ve 'dotnet ef migrations add' (tasarım zamanı)
+    /// Aktif tenant'ı olmayan DbContext: 'migrate' komutu ve 'dotnet ef migrations add' (tasarım zamanı)
     /// içindir. Tenant satır kuralları yine çalışır ama aktif tenant yoktur; veri okumak için kullanılmaz.
     /// </summary>
     public static ModulixDbContext CreateContext(string connectionString, ModuleCatalog modules)
     {
         ArgumentNullException.ThrowIfNull(modules);
         var options = new DbContextOptionsBuilder<ModulixDbContext>();
-        options.UseTenantSqlServer(connectionString);
+        options.UseModulixSqlServer(connectionString);
         return new ModulixDbContext(options.Options, tenantAccessor: null, modules);
     }
 
-    internal static DbContextOptionsBuilder UsePlatformSqlServer(this DbContextOptionsBuilder builder, string connectionString) =>
-        builder.UseSqlServer(
-            connectionString,
-            sql => sql.MigrationsHistoryTable(MigrationsHistoryTable, PlatformHistorySchema));
-
-    internal static DbContextOptionsBuilder UseTenantSqlServer(this DbContextOptionsBuilder builder, string connectionString) =>
+    internal static DbContextOptionsBuilder UseModulixSqlServer(this DbContextOptionsBuilder builder, string connectionString) =>
         builder
             .UseSqlServer(
                 connectionString,
-                sql => sql.MigrationsHistoryTable(MigrationsHistoryTable, TenantHistorySchema))
+                sql => sql.MigrationsHistoryTable(MigrationsHistoryTable, MigrationsHistorySchema))
             .ReplaceService<IModelCacheKeyFactory, ModuleModelCacheKeyFactory>();
 }

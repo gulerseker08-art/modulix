@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Modulix.Core.Organization;
+using Modulix.Core.Platform;
 
 namespace Modulix.Infrastructure.Persistence.Configurations;
 
@@ -56,6 +57,14 @@ internal sealed class MembershipCompanyConfiguration : IEntityTypeConfiguration<
         builder.Property(mc => mc.TenantId).IsRequired();
         builder.Property(mc => mc.MembershipId).IsRequired();
         builder.Property(mc => mc.CompanyId).IsRequired();
+
+        // Bileşik yabancı anahtar (ADR-0020 Dilim 2): görev ile üyelik aynı tenant'ta olmak zorundadır. Üyelik silinmeden önce
+        // görevleri kaldırılır.
+        builder.HasOne<Membership>()
+            .WithMany()
+            .HasForeignKey(mc => new { mc.TenantId, mc.MembershipId })
+            .HasPrincipalKey(m => new { m.TenantId, m.Id })
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Property(mc => mc.CreatedAt).IsRequired();
 
         // Geçici vekâlet (ADR-0008, adım 5): boş = süresiz görev; dolu = tarihli vekâlet.

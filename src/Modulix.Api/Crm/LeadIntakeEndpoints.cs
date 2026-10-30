@@ -73,7 +73,7 @@ internal static class LeadIntakeEndpoints
     }
 
     private static async Task<IResult> SubmitAsync(
-        string tenant, string formKey, HttpContext http, PlatformDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, string formKey, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
     {
         // Gövde sınırı (Kestrel); salt okunur olduğunda (test sunucusu) uygulanamaz.
         if (http.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } sizeLimit)
@@ -146,7 +146,7 @@ internal static class LeadIntakeEndpoints
     }
 
     private static async Task<IResult> PreflightAsync(
-        string tenant, string formKey, HttpContext http, PlatformDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, string formKey, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
     {
         var origin = http.Request.Headers.Origin.ToString();
         var slug = tenant.Trim().ToLowerInvariant();

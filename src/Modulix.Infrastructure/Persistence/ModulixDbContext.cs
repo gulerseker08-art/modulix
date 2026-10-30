@@ -1,4 +1,6 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
 using Modulix.Core.Customization;
@@ -8,17 +10,20 @@ using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
+using Modulix.Core.Platform;
 using Modulix.Core.Settings;
+using Modulix.Infrastructure.Email;
 using Modulix.Infrastructure.Events;
+using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Records;
 
 namespace Modulix.Infrastructure.Persistence;
 
 /// <summary>
-/// Tenant iş verisinin DbContext'i: bütün tenant'lar tek veritabanındadır (ADR-0002, ADR-0020). Modüller bu
-/// sınıfa erişemez; kayıtlara yalnızca kayıt boru hattı üzerinden ulaşır (talimat Bölüm 3, kural 1). Platform geneli
-/// tablolar (kullanıcılar, tenant kayıtları, üyelikler, modül erişimleri, oturumlar) burada değildir; onlar
-/// <see cref="PlatformDbContext"/> ile aynı veritabanının platform şemasındadır (ADR-0020 Dilim 2'de bağlamlar birleşir).
+/// Tek paylaşımlı veritabanının DbContext'i (ADR-0002, ADR-0020): platform tabloları (kimlik, tenant kayıtları,
+/// üyelikler, modül erişimleri, oturumlar, e-posta kuyruğu; <c>platform</c> şeması, RLS dışı) ve bütün tenant'ların iş
+/// verisi (<c>TenantId</c> taşır) aynı bağlamdadır. Modüller bu sınıfa erişemez; kayıtlara yalnızca kayıt boru hattı
+/// üzerinden ulaşır (talimat Bölüm 3, kural 1).
 ///
 /// Tenant izolasyonu, birinci katman (ADR-0002): <see cref="ITenantEntity"/> uygulayan her entity'ye otomatik sorgu
 /// filtresi uygulanır ve kaydederken TenantId aktif tenant'tan atanır. İkinci katman veritabanındadır
@@ -31,11 +36,27 @@ public class ModulixDbContext(
     DbContextOptions<ModulixDbContext> options,
     ITenantContextAccessor? tenantAccessor = null,
     ModuleCatalog? modules = null)
-    : DbContext(options)
+    : IdentityUserContext<ModulixUser, Guid>(options)
 {
     private static readonly MethodInfo ApplyTenantFilterMethod =
         typeof(ModulixDbContext).GetMethod(nameof(ApplyTenantFilter), BindingFlags.Instance | BindingFlags.NonPublic)!;
 
+    // Platform tabloları (RLS dışı).
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+
+    public DbSet<Membership> Memberships => Set<Membership>();
+
+    public DbSet<ModuleEntitlement> ModuleEntitlements => Set<ModuleEntitlement>();
+
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
+
+    public DbSet<QueuedEmail> EmailMessages => Set<QueuedEmail>();
+
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public DbSet<EventDelivery> EventDeliveries => Set<EventDelivery>();
+
+    // Tenant tabloları (TenantId + RLS).
     public DbSet<TenantSetting> TenantSettings => Set<TenantSetting>();
 
     public DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
@@ -62,10 +83,6 @@ public class ModulixDbContext(
 
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
-    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
-
-    public DbSet<EventDelivery> EventDeliveries => Set<EventDelivery>();
-
     /// <summary>Sorgu filtresinde kullanılır; EF her sorguda yeniden okur. Aktif tenant yoksa hiçbir satır dönmez.</summary>
     private Guid? CurrentTenantId => tenantAccessor?.Current?.TenantId;
 
@@ -76,10 +93,17 @@ public class ModulixDbContext(
     {
         base.OnModelCreating(modelBuilder);
 
-        // Yalnızca tenant entity yapılandırmaları; platform tabloları PlatformDbContext'e aittir (ADR-0020 Dilim 1).
-        modelBuilder.ApplyConfigurationsFromAssembly(
-            typeof(ModulixDbContext).Assembly,
-            type => !typeof(IPlatformConfiguration).IsAssignableFrom(type));
+        // Kimlik tabloları platform geneli kayıtlardır.
+        modelBuilder.Entity<ModulixUser>(user =>
+        {
+            user.ToTable("Users", DatabaseSchemas.Platform);
+            user.Property(u => u.DisplayName).HasMaxLength(ModulixUser.DisplayNameMaxLength).IsRequired();
+        });
+        modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("UserClaims", DatabaseSchemas.Platform);
+        modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins", DatabaseSchemas.Platform);
+        modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens", DatabaseSchemas.Platform);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ModulixDbContext).Assembly);
 
         // Özel alan filtreleri (Y9a): modüller sorguda JsonFunctions.Value kullanır.
         modelBuilder.HasDbFunction(typeof(JsonFunctions).GetMethod(nameof(JsonFunctions.Value))!)

@@ -119,7 +119,7 @@ public class QuoteDeliveryTests(ModulixApiFactory factory) : IClassFixture<Modul
     private async Task FailPermanentlyAsync(string address)
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         var email = await db.EmailMessages.SingleAsync(e => e.ToAddress == address);
         email.MarkAttemptFailed("Sunucu alıcıyı reddetti.", permanent: true, DateTimeOffset.UtcNow, maxAttempts: 5);
         await db.SaveChangesAsync();
@@ -128,7 +128,7 @@ public class QuoteDeliveryTests(ModulixApiFactory factory) : IClassFixture<Modul
     private async Task<QueuedEmail> QueuedAsync(string address)
     {
         using var scope = factory.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().EmailMessages.AsNoTracking().SingleAsync(e => e.ToAddress == address);
+        return await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().EmailMessages.AsNoTracking().SingleAsync(e => e.ToAddress == address);
     }
 
     private static async Task DrainAsync(IServiceProvider services)

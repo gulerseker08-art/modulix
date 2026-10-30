@@ -405,7 +405,7 @@ public partial class UserManagementTests(ModulixApiFactory factory) : IClassFixt
     private async Task<Infrastructure.Email.QueuedEmail> LatestEmailAsync(string address)
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         return await db.EmailMessages.AsNoTracking()
             .Where(e => e.ToAddress == address)
             .OrderByDescending(e => e.CreatedAt)

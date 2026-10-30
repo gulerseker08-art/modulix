@@ -58,7 +58,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         var tenant = new Tenant(name ?? $"Test {suffix}", $"t-{suffix}");
 
         using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
 
@@ -85,8 +85,14 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
                 {
                     try
                     {
+                        // Üyeliğe bağlı tenant satırları (ADR-0020 Dilim 2 yabancı anahtarları) önce, oturum tenant'ı yazılarak
+                        // (RLS) silinir; ardından platform kayıtları.
                         using var command = platform.CreateCommand();
                         command.CommandText =
+                            "EXEC sys.sp_set_session_context @key = N'TenantId', @value = @t;" +
+                            "DELETE FROM [core].[TeamMembers] WHERE [TenantId] = @t;" +
+                            "DELETE FROM [core].[MembershipRoles] WHERE [TenantId] = @t;" +
+                            "DELETE FROM [core].[MembershipCompanies] WHERE [TenantId] = @t;" +
                             "DELETE FROM [platform].[Memberships] WHERE [TenantId] = @t;" +
                             "DELETE FROM [platform].[ModuleEntitlements] WHERE [TenantId] = @t;" +
                             "DELETE FROM [platform].[Tenants] WHERE [Id] = @t;";
@@ -116,7 +122,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         var result = await users.CreateAsync(user, Password);
         Assert.True(result.Succeeded, string.Join("; ", result.Errors.Select(e => e.Description)));
 
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         foreach (var tenant in memberOf)
         {
             db.Memberships.Add(new Membership(tenant.Id, user.Id));
@@ -145,7 +151,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
     public async Task DisableMembershipAsync(Guid userId, Guid tenantId)
     {
         using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         var membership = await db.Memberships.SingleAsync(m => m.UserId == userId && m.TenantId == tenantId);
         membership.Disable();
         await db.SaveChangesAsync();
@@ -154,7 +160,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
     public async Task CloseTenantAsync(Guid tenantId)
     {
         using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Id == tenantId);
         tenant.Close();
         await db.SaveChangesAsync();
@@ -170,7 +176,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
     public async Task<Guid> GetMembershipIdAsync(Guid userId, Guid tenantId)
     {
         using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         return await db.Memberships.Where(m => m.UserId == userId && m.TenantId == tenantId).Select(m => m.Id).SingleAsync();
     }
 

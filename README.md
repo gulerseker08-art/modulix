@@ -51,23 +51,21 @@ korunur: EF global query filter + SQL Server Row-Level Security. İşletim ayrı
 | `modulix_migrator` | Migration kullanıcısı (db_owner). |
 | `sa` | Yönetici; SSMS ile bakmak için. |
 
-İki EF bağlamı aynı veritabanına bağlanır: `PlatformDbContext` (platform şeması) ve `ModulixDbContext` (tenant iş verisi; her bağlantı açılışında aktif tenant oturuma yazılır, RLS onu uygular). Aktif tenant yoksa hiçbir tenant satırı görünmez ve yazılamaz; istemci tenant seçemez. Bağlamlar ADR-0020 Dilim 2'de tek bağlamda birleşecek.
+Tek EF bağlamı vardır: `ModulixDbContext` (kimlik ve platform tabloları dahil). Her bağlantı açılışında aktif tenant oturuma yazılır, RLS onu uygular; aktif tenant yoksa hiçbir tenant satırı görünmez ve yazılamaz; istemci tenant seçemez. `MembershipId` taşıyan tenant tabloları (`core.MembershipRoles`, `core.TeamMembers`, `core.MembershipCompanies`) `platform.Memberships`'e bileşik yabancı anahtarla bağlıdır.
 
 Şifreler repo kökündeki `.env` dosyasındadır. Bu dosya ilk çalıştırmada rastgele şifrelerle oluşturulur ve git'e gönderilmez. Uygulama bağlantı cümlelerini `dotnet user-secrets` üzerinden okur (`Modulix` = app, `ModulixMigrations` = migrator); kod deposunda şifre bulunmaz.
 
 **SSMS ile bağlanmak:** Sunucu `localhost,14333`, SQL Server Authentication, kullanıcı `sa`, şifre `.env` içindeki `MSSQL_SA_PASSWORD`. Bağlantı penceresinde "Trust server certificate" seçin.
 
-**Yeni migration eklemek** (iki zincir, aynı veritabanı):
+**Yeni migration eklemek** (tek zincir, `Persistence/Migrations`):
 
 ```powershell
-# Platform tablosu
-dotnet ef migrations add <Ad> --context PlatformDbContext --project src/Modulix.Infrastructure --startup-project src/Modulix.Api --output-dir Persistence/Migrations/Platform
-# Tenant tablosu (ayrıca RLS'e ekleyin: TenantIsolationSql.AddTable)
-dotnet ef migrations add <Ad> --context ModulixDbContext --project src/Modulix.Infrastructure --startup-project src/Modulix.Api --output-dir Persistence/Migrations/Tenant
+# Yeni tenant tablosunu ayrıca RLS'e ekleyin: TenantIsolationSql.AddTable
+dotnet ef migrations add <Ad> --project src/Modulix.Infrastructure --startup-project src/Modulix.Api
 powershell -ExecutionPolicy Bypass -File scripts\db-up.ps1
 ```
 
-Migration'ları `dotnet ef database update` ile değil, `db-up.ps1` ile uygulayın; `db-up.ps1` iki zinciri de (`dotnet run --project src/Modulix.Api -- migrate`) uygular. Böylece yalnızca migration kullanıcısı şema değiştirir. Tek veritabanı bütün tenant'ları etkilediği için migration'lar geriye uyumlu ve kesintisiz yazılır (önce ekle, sonra taşı, en son kaldır).
+Migration'ları `dotnet ef database update` ile değil, `db-up.ps1` ile uygulayın; `db-up.ps1` bekleyen migration'ları (`dotnet run --project src/Modulix.Api -- migrate`) uygular. Böylece yalnızca migration kullanıcısı şema değiştirir. Tek veritabanı bütün tenant'ları etkilediği için migration'lar geriye uyumlu ve kesintisiz yazılır (önce ekle, sonra taşı, en son kaldır).
 
 ## Giriş ve aktif tenant (Görev 4)
 

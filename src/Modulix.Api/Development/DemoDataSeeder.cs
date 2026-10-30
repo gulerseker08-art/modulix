@@ -29,7 +29,7 @@ public static class DemoDataSeeder
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken = default)
     {
         using var scope = services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ModulixUser>>();
 
         var acme = await EnsureTenantAsync(db, "Acme Lojistik", "acme", cancellationToken);
@@ -69,7 +69,7 @@ public static class DemoDataSeeder
     private static async Task EnsureCrmSamplesAsync(IServiceProvider services, Tenant tenant, ModulixUser user, CancellationToken ct)
     {
         using var scope = services.CreateScope();
-        var platform = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var platform = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         var membershipId = await platform.Memberships.Where(m => m.TenantId == tenant.Id && m.UserId == user.Id).Select(m => m.Id).SingleAsync(ct);
         scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(tenant.Id, user.Id, membershipId);
 
@@ -133,7 +133,7 @@ public static class DemoDataSeeder
 
         var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
         var tenantDb = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-        var platform = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var platform = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
 
         var admin = await roles.EnsureSystemRoleAsync(ct);
         await DefaultCompany.EnsureAsync(tenantDb, tenant.Name, ct);
@@ -150,7 +150,7 @@ public static class DemoDataSeeder
         }
     }
 
-    private static async Task<Tenant> EnsureTenantAsync(PlatformDbContext db, string name, string slug, CancellationToken ct)
+    private static async Task<Tenant> EnsureTenantAsync(ModulixDbContext db, string name, string slug, CancellationToken ct)
     {
         var tenant = await db.Tenants.SingleOrDefaultAsync(t => t.Slug == slug, ct);
         if (tenant is null)
@@ -189,7 +189,7 @@ public static class DemoDataSeeder
         return user;
     }
 
-    private static async Task EnsureMembershipAsync(PlatformDbContext db, Tenant tenant, ModulixUser user, CancellationToken ct)
+    private static async Task EnsureMembershipAsync(ModulixDbContext db, Tenant tenant, ModulixUser user, CancellationToken ct)
     {
         var exists = await db.Memberships.AnyAsync(m => m.TenantId == tenant.Id && m.UserId == user.Id, ct);
         if (!exists)

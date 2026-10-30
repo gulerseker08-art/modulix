@@ -20,8 +20,8 @@ public static class TestEmail
             return "E-posta ayarları eksik: Email:FromAddress ve Email:Smtp:Host gerekli (README, E-posta bölümü).";
         }
 
-        // E-posta kuyruğu platform bağlamındadır (ADR-0020 Dilim 1) ve kuyruğa yazma hemen kalıcı kılınır.
-        var db = provider.GetRequiredService<PlatformDbContext>();
+        // E-posta kuyruğu platform tablolarındadır (ADR-0020) ve kuyruğa yazma hemen kalıcı kılınır.
+        var db = provider.GetRequiredService<ModulixDbContext>();
         provider.GetRequiredService<IEmailQueue>().Enqueue(new EmailMessage(
             to,
             "Modülix deneme e-postası",

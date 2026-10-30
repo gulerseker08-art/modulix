@@ -13,7 +13,7 @@ namespace Modulix.Infrastructure.Authorization;
 /// (scoped); rol veya ekip değişikliği bir sonraki istekte geçerli olur. Olay abonesinin kapsamı tenant genelidir (ADR-0007).
 /// </summary>
 internal sealed class MembershipDataScope(
-    ModulixDbContext db, PlatformDbContext platform, MembershipPermissions permissions, EventHandlingScope handling) : IDataScopeService
+    ModulixDbContext db, MembershipPermissions permissions, EventHandlingScope handling) : IDataScopeService
 {
     private (Guid MembershipId, IReadOnlySet<Guid>? Owners)? cached;
 
@@ -32,7 +32,7 @@ internal sealed class MembershipDataScope(
         var owners = await permissions.GetScopeAsync(tenant.MembershipId, cancellationToken) switch
         {
             RecordScope.All => null,
-            RecordScope.Team => await TeamOwnersAsync(db, platform, tenant.MembershipId, tenant.UserId, cancellationToken),
+            RecordScope.Team => await TeamOwnersAsync(db, tenant.MembershipId, tenant.UserId, cancellationToken),
             _ => new HashSet<Guid> { tenant.UserId },
         };
         cached = (tenant.MembershipId, owners);
@@ -41,10 +41,10 @@ internal sealed class MembershipDataScope(
 
     /// <summary>
     /// Kişi ve kişinin ekiplerinden herhangi birindeki üyeler (kullanıcı kimlikleri). Ekip üyelikleri tenant
-    /// bağlamındadır, üyelik–kullanıcı eşleştirmesi platform bağlamındadır (ADR-0020 Dilim 1): iki adımda birleştirilir.
+    /// bağlamındadır, üyelik–kullanıcı eşleştirmesi platform tablolarındadır (ADR-0020): iki adımda birleştirilir.
     /// </summary>
     internal static async Task<IReadOnlySet<Guid>> TeamOwnersAsync(
-        ModulixDbContext db, PlatformDbContext platform, Guid membershipId, Guid userId, CancellationToken cancellationToken)
+        ModulixDbContext db, Guid membershipId, Guid userId, CancellationToken cancellationToken)
     {
         // Ekip üyelikleri tenant verisidir: sorgu filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür.
         var teamIds = db.TeamMembers.Where(tm => tm.MembershipId == membershipId).Select(tm => tm.TeamId);
@@ -54,8 +54,8 @@ internal sealed class MembershipDataScope(
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        // Üyelik kimliklerini kullanıcı kimliklerine platform bağlamından çöz (cross-database join yok).
-        var teammates = await platform.Memberships.AsNoTracking()
+        // Üyelik kimliklerini kullanıcı kimliklerine platform tablolarından çöz (Dilim 3'te tek sorguya alınabilir).
+        var teammates = await db.Memberships.AsNoTracking()
             .Where(m => teammateMembershipIds.Contains(m.Id))
             .Select(m => m.UserId)
             .ToListAsync(cancellationToken);
