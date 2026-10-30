@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Modules.Crm.Domain;
+using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Quotes;
 
 namespace Modulix.Modules.Crm.Records;
@@ -65,6 +66,15 @@ internal sealed class QuoteReader(IModuleData data)
 
     public Task<QuoteDecision?> LastDecisionAsync(Guid quoteId, CancellationToken cancellationToken) =>
         data.Set<QuoteDecision>().AsNoTracking().Where(d => d.QuoteId == quoteId).OrderByDescending(d => d.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+
+    /// <summary>Teklife bağlı (ActivityLink) ve hâlâ açık aktiviteler; otomatik kapatma için. Yalnızca görev ailesindeki açık durumlar.</summary>
+    public async Task<List<Activity>> LinkedOpenActivitiesAsync(Guid quoteId, CancellationToken cancellationToken)
+    {
+        var ids = data.Set<ActivityLink>().Where(l => l.EntityKey == CrmModule.Entities.Quote && l.RecordId == quoteId).Select(l => l.ActivityId);
+        return await data.Set<Activity>().AsNoTracking()
+            .Where(a => ids.Contains(a.Id) && (a.Status == ActivityStatus.Open || a.Status == ActivityStatus.InProgress || a.Status == ActivityStatus.Blocked))
+            .ToListAsync(cancellationToken);
+    }
 
     public Task<bool> HasEventAsync(Guid quoteId, string kind, CancellationToken cancellationToken) =>
         data.Set<QuoteEvent>().AsNoTracking().AnyAsync(e => e.QuoteId == quoteId && e.Kind == kind, cancellationToken);

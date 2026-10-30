@@ -103,6 +103,7 @@ public static class QuoteLabels
         "OpportunityWon" => "Bağlı fırsat kazanıldı",
         "OpportunityWinSkipped" => "Bağlı fırsat kazanıldı yapılmadı",
         "FollowUpScheduled" => "Takip aktivitesi açıldı",
+        "FollowUpsClosed" => "Takip aktiviteleri otomatik kapatıldı",
         "ExpiryReminderCreated" => "Süre dolumu hatırlatması açıldı",
         "ShareLinkCreated" => "Paylaşım bağlantısı oluşturuldu",
         "ShareLinkRevoked" => "Paylaşım bağlantısı iptal edildi",

@@ -134,6 +134,19 @@ public class QuotePostAcceptTests(ModulixApiFactory factory) : IClassFixture<Mod
         Assert.Equal(s.Admin.Id, activity.OwnerId);
         Assert.Equal(DateTimeOffset.UtcNow.Date.AddDays(2).AddHours(9), activity.DueAt!.Value.UtcDateTime);
         Assert.Single((await admin.GetFromJsonAsync<List<QuoteHistoryDto>>($"/api/crm/quotes/{quote.Id}/history"))!, h => h.Kind == "FollowUpScheduled");
+
+        // Aktivite teklife bağlıdır (ActivityLink); kullanıcı aynı teklife elle başka bir aktivite de bağlar.
+        var links = (await admin.GetFromJsonAsync<CrmPage<ActivityLinkDto>>($"/api/crm/activity-links?activityId={activity.Id}"))!.Items;
+        Assert.Contains(links, l => l.EntityKey == "crm.quote" && l.RecordId == quote.Id);
+        var manual = await PostAsync<ActivityDto>(admin, "/api/crm/activities", new SaveActivityRequest($"Elle not {quote.QuoteNumber}", "FollowUp", DueAt: DateTimeOffset.UtcNow.AddDays(1)));
+        await PostAsync<ActivityLinkDto>(admin, "/api/crm/activity-links", new SaveActivityLinkRequest(manual.Id, "crm.quote", quote.Id));
+
+        // Teklif sonuçlanınca tekliften açılan takip iptal edilir; elle açılan aktivite açık kalır.
+        await RecordAcceptedAsync(admin, quote.Id);
+        await DrainAsync(s.TenantId);
+        Assert.Equal("Cancelled", (await admin.GetFromJsonAsync<ActivityDto>($"/api/crm/activities/{activity.Id}"))!.Status);
+        Assert.Equal("Open", (await admin.GetFromJsonAsync<ActivityDto>($"/api/crm/activities/{manual.Id}"))!.Status);
+        Assert.Single((await admin.GetFromJsonAsync<List<QuoteHistoryDto>>($"/api/crm/quotes/{quote.Id}/history"))!, h => h.Kind == "FollowUpsClosed");
     }
 
     [Fact]
@@ -171,9 +184,55 @@ public class QuotePostAcceptTests(ModulixApiFactory factory) : IClassFixture<Mod
         // Süresi dolan teklif raporda "süresi doldu" olarak sayılır.
         var report = (await admin.GetFromJsonAsync<QuoteReportDto>("/api/crm/quotes/report"))!;
         Assert.Equal(1, report.ExpiredCount);
+
+        // Sorumluya e-posta: hatırlatma ve süre dolumu için birer tane, platform kuyruğunda (gönderim arka plandadır).
+        Assert.Equal(1, await QueuedCountAsync($"crm.quote-reminder:{soon.Id:N}", s.Admin.Email!));
+        Assert.Equal(1, await QueuedCountAsync($"crm.quote-expired:{overdue.Id:N}", s.Admin.Email!));
+        Assert.Equal(0, await QueuedCountAsync($"crm.quote-expired:{later.Id:N}", s.Admin.Email!));
+
+        // Süresi dolan teklifin tekliften açılmış açık aktivitesi yoktu; hatırlatması açılan teklif kabul edilirse hatırlatma kapanır.
+        await RecordAcceptedAsync(admin, soon.Id);
+        await DrainAsync(s.TenantId);
+        Assert.Equal("Cancelled", (await ActivitiesAsync(admin, soon.QuoteNumber)).Single().Status);
+    }
+
+    [Fact]
+    public async Task The_expiry_job_skips_the_round_while_another_instance_holds_the_lock()
+    {
+        var s = await SetUpAsync();
+        var runner = factory.Services.GetRequiredService<QuoteExpiryRunner>();
+        string connectionString;
+        using (var scope = factory.OpenScope(s.TenantId))
+        {
+            connectionString = scope.ServiceProvider.GetRequiredService<Modulix.Infrastructure.Tenancy.ITenantConnectionResolver>().GetConnectionString(s.TenantId);
+        }
+
+        await using var other = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
+        await other.OpenAsync();
+        await using (var take = other.CreateCommand())
+        {
+            take.CommandText = "DECLARE @r int; EXEC @r = sys.sp_getapplock @Resource = @name, @LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = 0; SELECT @r;";
+            take.Parameters.AddWithValue("@name", QuoteExpiryRunner.LockName);
+            Assert.True(Convert.ToInt32(await take.ExecuteScalarAsync()) >= 0);
+        }
+
+        var skipped = await runner.RunTenantAsync(s.TenantId, CancellationToken.None);
+        Assert.True(skipped.Skipped);
+        Assert.Equal((0, 0), (skipped.Expired, skipped.RemindersCreated));
+
+        await other.CloseAsync();
+        var normal = await runner.RunTenantAsync(s.TenantId, CancellationToken.None);
+        Assert.False(normal.Skipped);
     }
 
     // ---- yardımcılar
+
+    private async Task<int> QueuedCountAsync(string reference, string address)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Modulix.Infrastructure.Persistence.PlatformDbContext>();
+        return await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(db.EmailMessages, e => e.Reference == reference && e.ToAddress == address);
+    }
 
     private async Task<List<ActivityDto>> ActivitiesAsync(HttpClient client, string search) =>
         [.. (await client.GetFromJsonAsync<CrmPage<ActivityDto>>($"/api/crm/activities?search={Uri.EscapeDataString(search)}"))!.Items];
