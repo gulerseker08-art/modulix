@@ -101,3 +101,42 @@ testleri geçer ve ayrı PR olarak incelenir.
   yedeği vardır.
 - ADR-0009 "Geri alındı" durumuna geçer; `ITenantConnectionResolver` soyutlaması ileride gerekirse ADR-0002'deki gibi
   yeniden eklenebilir, ancak ölçüm olmadan tenant başına veritabanına dönülmez (yol haritası Ç24.4).
+
+## İleride yapılacaklar
+
+Üç dilim 30 Ekim 2026'da `main`'e alındı (PR #72, #73, #74). Aşağıdakiler bilinçli olarak dışarıda bırakıldı; her biri
+kendi dilimi veya ADR'siyle ele alınır.
+
+### Bu ADR'nin sadeleştirme kalıntıları (tek küçük PR)
+
+- **Ad çözümlemelerini tek sorguya al.** Üye adı / firma adı eşleştirmeleri hâlâ iki ayrı sorguyla bellekte
+  birleştiriliyor; tek bağlamda join yeterlidir. Yerler: `MembershipDataScope.TeamOwnersAsync`,
+  `PlatformAdministration.ListAdministratorsAsync`, `UserAdministration` üye listeleri, `RecordHandover` ad çözümü.
+  Kabul: iki adımlı "önce kimlikleri topla, sonra adları çek" deseni kalmaz; sonuçlar ve sayfalama aynı.
+- **Davet ve sektör profili akışlarını tek işleme al.** `UserAdministration.InviteAsync` "önce üyelik, sonra tenant
+  tarafı, hata olursa telafi" deseniyle; `SectorProfileService.ApplyAsync` iki ayrı kaydetme adımıyla çalışıyor. Tek
+  bağlamda tek transaction yeterlidir; telafi kodu kalkar. Kabul: davet sırasında tenant tarafı başarısız olursa üyelik
+  satırı da oluşmaz (geri alma testi), profil uygulaması ya tamamen yazılır ya hiç.
+- **ADR-0018 dipnotu.** Ürün/hizmet ADR'sindeki envanter tablosu "tenant başına ayrı DB: mevcut" diyor; tarihsel kayıt
+  olarak kalır, bu ADR'ye işaret eden dipnot eklendi.
+
+### Kalıcı sınır (yapılmayacak)
+
+- **Teklif süre dolumu işleyicisi** tenant başına dönmeye devam eder (yalnızca CRM modülü açık tenant'larda). Teklif
+  tabloları Row-Level Security altında olduğundan çapraz tenant tarama mümkün değildir; tenant bağlamı kayıt başına
+  kurulmak zorundadır. Tenant sayısı büyüdüğünde ölçek kapısı yol haritası Ç24.4'tür.
+
+### Ayrı ADR isteyen kurallar (proje kuralları belgesi)
+
+- **"Birim" (BusinessUnit) kapsamı.** Kural belgesi kayıt kapsamını "kendi / takım / birim / şirket / tümü" olarak
+  tanımlar. Kodda `RecordScope` üç seviyedir (`Own`, `Team`, `All`); şirket ve şube ADR-0008 ile erişim sınırı olarak
+  vardır ama kayıt kapsamı seviyesi değildir, "birim" hiç yoktur. Yeni ADR: birim kavramının şirket/şube modeline
+  yerleşimi, `RecordScope.Unit` ve `RecordScope.Company` seviyeleri, kayıt boru hattındaki süzgeç, rol şablonları ve
+  dört test türü (mutlu yol, doğrulama, tenant izolasyonu, yetki).
+- **TR/EN çeviri altyapısı.** Kural belgesi arayüz metinlerinin çeviri altyapısından gelmesini ister; bugün metinler
+  Türkçe olarak Razor dosyalarına ve API hata iletilerine gömülüdür. Yeni ADR: kaynak dosya biçimi (`.resx` veya JSON),
+  Blazor WebAssembly'de kültür seçimi, API sorun ayrıntılarının dili, tenant/kullanıcı dil tercihi, mevcut metinlerin
+  göçü ve eksik çeviri için test kapısı. Kapsamı büyük olduğu için modül modül (önce Core ve giriş akışı) yapılır.
+- **Yapay zekâ denetim kaydı.** "Tüm AI işlemleri denetim kaydına yazılır" kuralı için henüz AI modülü yoktur; ilk AI
+  özelliğinin ADR'sinde denetim kaydı girişi (`ai.*` kayıt türleri, istem ve yanıt özetleri, kişisel veri maskesi) tasarım
+  koşulu olarak yer alır.

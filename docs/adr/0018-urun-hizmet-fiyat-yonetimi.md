@@ -9,7 +9,7 @@ Tarama: `src/**/*.cs` içinde `Product|Price|Currency|Tax|Quote|Discount|Unit` v
 
 | Süreç | Mevcut durum | Kanıt | Eksik veya risk | Yapılacak | Öncelik |
 |---|---|---|---|---|---|
-| Tenant başına ayrı DB | Mevcut | ADR-0009, `ModulixDbContext`, `Migrations/Tenant` | — | Yeni tablolar tenant migration'ına + `TenantIsolationSql.AddTable` | — |
+| Tenant başına ayrı DB (tarihsel; ADR-0020 ile tek veritabanına dönüldü, 30 Ekim 2026) | Geri alındı | ADR-0009 → ADR-0020, `ModulixDbContext`, `Persistence/Migrations` | — | Yeni tablolar tenant migration'ına + `TenantIsolationSql.AddTable` | — |
 | Ürün/hizmet kartı | **Eksik** | Kodda katalog varlığı yok; yalnız serbest metin `Lead.productInterest`, sektör profilinde özel alan "Ürün grubu" (`SectorProfiles.cs:57`) | Fırsat/teklif ürüne bağlanamıyor | Katalog varlıkları (kod, tür, yaşam döngüsü, birim, kategori, vergi kategorisi) | P0 |
 | Kategori, birim grubu | **Eksik** | Yok | — | `UnitGroup/Unit`, `ProductCategory` | P0 |
 | Paket | **Eksik** | Yok | Döngü/mükerrer ücret riski | `ProductComponent` + `PackageCalculator` | P1 |
