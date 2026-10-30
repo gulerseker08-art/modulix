@@ -4,7 +4,7 @@ using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.Infrastructure.Modules;
 
-internal sealed class ModuleEntitlements(PlatformDbContext db, ModuleCatalog catalog) : IModuleEntitlements
+internal sealed class ModuleEntitlements(ModulixDbContext db, ModuleCatalog catalog) : IModuleEntitlements
 {
     public async Task<IReadOnlySet<string>> GetEnabledAsync(Guid tenantId, CancellationToken cancellationToken)
     {

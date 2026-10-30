@@ -18,7 +18,6 @@ namespace Modulix.Infrastructure.Audit;
 
 internal sealed class AuditLog(
     ModulixDbContext db,
-    PlatformDbContext platform,
     ITenantContextAccessor tenantAccessor,
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
@@ -363,11 +362,11 @@ internal sealed class AuditLog(
     private async Task<Dictionary<Guid, AuditUser>> LoadUsersAsync(
         TenantContext tenant, IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken)
     {
-        var accounts = await platform.Users.AsNoTracking()
+        var accounts = await db.Users.AsNoTracking()
             .Where(u => userIds.Contains(u.Id))
             .Select(u => new { u.Id, u.DisplayName, u.Email, u.IsPlatformAdministrator })
             .ToListAsync(cancellationToken);
-        var members = (await platform.Memberships.AsNoTracking()
+        var members = (await db.Memberships.AsNoTracking()
             .Where(m => m.TenantId == tenant.TenantId && userIds.Contains(m.UserId))
             .Select(m => m.UserId)
             .ToListAsync(cancellationToken)).ToHashSet();

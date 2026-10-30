@@ -66,7 +66,7 @@ public sealed class QuoteExpiryRunner(IServiceScopeFactory scopes, TimeProvider 
 
             // Sistem kimliği kapsamında e-posta kuyruğu, teslimle birlikte kaydedilmek üzere bağlama eklenir (EfEmailQueue); burada teslim yok,
             // bu yüzden kuyruk satırları turun sonunda açıkça kaydedilir.
-            await services.GetRequiredService<PlatformDbContext>().SaveChangesAsync(cancellationToken);
+            await services.GetRequiredService<ModulixDbContext>().SaveChangesAsync(cancellationToken);
             return run;
         }
         finally

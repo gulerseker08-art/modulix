@@ -17,7 +17,6 @@ namespace Modulix.Infrastructure.Organization;
 /// </summary>
 internal sealed class CompanyAdministration(
     ModulixDbContext db,
-    PlatformDbContext platform,
     ITenantContextAccessor tenantAccessor,
     IAuditWriter audit,
     TimeProvider time) : ICompanyAdministration
@@ -209,9 +208,9 @@ internal sealed class CompanyAdministration(
     private TenantContext RequireTenant() =>
         tenantAccessor.Current ?? throw new InvalidOperationException("Aktif tenant olmadan şirketler yönetilemez.");
 
-    // Üyelikler platform bağlamındadır (ADR-0020 Dilim 1); atamadan önce üyeliğin bu tenant'a ait olduğu açıkça denetlenir.
+    // Üyelikler platform tablolarındadır (ADR-0020); atamadan önce üyeliğin bu tenant'a ait olduğu açıkça denetlenir.
     private Task<bool> MembershipBelongsToTenantAsync(Guid membershipId, Guid tenantId, CancellationToken cancellationToken) =>
-        platform.Memberships.AnyAsync(m => m.Id == membershipId && m.TenantId == tenantId, cancellationToken);
+        db.Memberships.AnyAsync(m => m.Id == membershipId && m.TenantId == tenantId, cancellationToken);
 
     private async Task EnsureUniqueNameAsync(string name, Guid? exceptCompanyId, CancellationToken cancellationToken)
     {

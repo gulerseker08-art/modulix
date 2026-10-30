@@ -61,7 +61,7 @@ public class EmailTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
     [Fact]
     public async Task Email_is_persisted_immediately_on_enqueue()
     {
-        // ADR-0020 Dilim 1: e-posta kuyruğu platform bağlamındadır ve kuyruğa yazma hemen kalıcı kılınır (iş işleminin tenant
+        // ADR-0020: e-posta kuyruğu platform tablolarındadır ve kuyruğa yazma hemen kalıcı kılınır (iş işleminin tenant
         // bağlantısını paylaşmaz), böylece aktif tenant olmayan giriş akışlarında da çalışır. Gönderim yine ertelenir.
         await using var host = FakeHost();
         var address = UniqueAddress();
@@ -227,7 +227,7 @@ public class EmailTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
                 new TenantContext(id, Guid.NewGuid(), Guid.NewGuid());
         }
 
-        // ADR-0020 Dilim 1: kuyruk platform bağlamına hemen yazılır (EfEmailQueue kendi bağlamını kullanır); kimliği adresten okunur.
+        // ADR-0020: kuyruk platform tablolarına hemen yazılır (EfEmailQueue kendi bağlamını kullanır); kimliği adresten okunur.
         scope.ServiceProvider.GetRequiredService<IEmailQueue>().Enqueue(message);
         return await Db(scope).EmailMessages.AsNoTracking()
             .Where(e => e.ToAddress == message.To)
@@ -255,7 +255,7 @@ public class EmailTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
         return await Db(scope).EmailMessages.AsNoTracking().SingleAsync(e => e.Id == id);
     }
 
-    private static PlatformDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+    private static ModulixDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
 
     private static EmailMessage Message(string to) => new(to, "Deneme", "<p>Deneme</p>");
 

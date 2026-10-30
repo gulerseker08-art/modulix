@@ -52,7 +52,7 @@ Geri dönüş `git revert` ile yapılmaz: ADR-0009'dan sonra 17 tenant migration
 üzerine yazıldı. Hedef eski model, yol bugünkü kodun ileriye doğru düzenlenmesidir. Her dilim tek başına derlenir,
 testleri geçer ve ayrı PR olarak incelenir.
 
-### Dilim 1 — Fiziksel birleştirme (bu PR)
+### Dilim 1 — Fiziksel birleştirme (uygulandı)
 
 - `ModulixDbContext` sabit `Modulix` bağlantısına bağlanır; `ITenantConnectionResolver`, `ITenantDatabaseRegistry`,
   `ITenantProvisioningService`, `TenantMigrationRunner`, `TenantDatabaseNaming` ve `migrate-tenants` komutu kaldırılır.
@@ -73,7 +73,7 @@ testleri geçer ve ayrı PR olarak incelenir.
 - İşletim: `init.sql`'den `dbcreator` kalkar, `db-up.ps1` yalnızca `migrate` çağırır, `docs/tenant-isletim.md` tek
   veritabanı rehberine dönüşür, `docs/tenant-veri-tasima.md` kaldırılır, README ve CLAUDE.md güncellenir.
 
-### Dilim 2 — Bağlam birleştirme
+### Dilim 2 — Bağlam birleştirme (uygulandı)
 
 - İki `DbContext` tek `ModulixDbContext`'te birleşir (Identity tabloları dahil); `IPlatformConfiguration` işareti ve
   tasarım zamanı fabrikalarından biri kalkar.

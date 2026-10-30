@@ -80,7 +80,7 @@ builder.Services.Configure<PublicLinkOptions>(builder.Configuration.GetSection(P
 // Hesap güvenliği (Y7a): "Şifremi unuttum" sınırları "Account" bölümünde.
 builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection(AccountOptions.SectionName));
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<PlatformDbContext>("database")
+    .AddDbContextCheck<ModulixDbContext>("database")
     .AddCheck<EventHealthCheck>("events");
 
 var app = builder.Build();

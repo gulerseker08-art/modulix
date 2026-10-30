@@ -226,7 +226,7 @@ public class QuotePostAcceptTests(ModulixApiFactory factory) : IClassFixture<Mod
     private async Task<int> QueuedCountAsync(string reference, string address)
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<Modulix.Infrastructure.Persistence.PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<Modulix.Infrastructure.Persistence.ModulixDbContext>();
         return await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(db.EmailMessages, e => e.Reference == reference && e.ToAddress == address);
     }
 

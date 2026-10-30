@@ -100,7 +100,7 @@ public static class AuthSetup
                 options.Lockout.MaxFailedAccessAttempts = 5;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             })
-            .AddEntityFrameworkStores<PlatformDbContext>()
+            .AddEntityFrameworkStores<ModulixDbContext>()
             .AddSignInManager()
             .AddErrorDescriber<TurkishIdentityErrorDescriber>()
 

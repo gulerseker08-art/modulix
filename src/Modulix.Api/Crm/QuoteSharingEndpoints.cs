@@ -176,7 +176,7 @@ internal static class QuoteSharingEndpoints
     // ---- herkese açık uçlar
 
     private static async Task<IResult> ViewAsync(
-        string tenant, PublicQuoteTokenRequest request, HttpContext http, PlatformDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicQuoteTokenRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
@@ -195,7 +195,7 @@ internal static class QuoteSharingEndpoints
     }
 
     private static async Task<IResult> PdfAsync(
-        string tenant, PublicQuoteTokenRequest request, HttpContext http, PlatformDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicQuoteTokenRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
@@ -216,7 +216,7 @@ internal static class QuoteSharingEndpoints
     }
 
     private static async Task<IResult> DecisionAsync(
-        string tenant, PublicQuoteDecisionRequest request, HttpContext http, PlatformDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicQuoteDecisionRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
@@ -258,7 +258,7 @@ internal static class QuoteSharingEndpoints
     }
 
     private static async Task<AsyncServiceScope?> OpenAsync(
-        string tenant, HttpContext http, PlatformDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
     {
         var slug = tenant.Trim().ToLowerInvariant();
         var found = await platform.Tenants.AsNoTracking()
@@ -333,7 +333,7 @@ internal static class QuoteSharingEndpoints
 /// Teklif belgesini üretir: belge verisi (modül) → PDF (<see cref="QuotePdf"/>) → sabitleme (modül). Satıcı bilgisi tenant ayarlarından gelir
 /// (modül ayar altyapısına erişemez).
 /// </summary>
-internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvider services, ITenantContextAccessor tenant, PlatformDbContext platform)
+internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvider services, ITenantContextAccessor tenant, ModulixDbContext platform)
 {
     public async Task<RecordResult<QuoteDocumentInfo>> EnsureAsync(Guid quoteId, CancellationToken cancellationToken)
     {

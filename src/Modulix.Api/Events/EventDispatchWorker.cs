@@ -37,7 +37,7 @@ public sealed class EventDispatchWorker(
             var round = new EventRound(0, 0);
             try
             {
-                // ADR-0020 Dilim 1: outbox ve teslimler tek veritabanında tenant bağlamıyla okunur (ADR-0020); işleyici açık her tenant'ın
+                // ADR-0020: outbox ve teslimler tek veritabanında tenant bağlamıyla okunur (ADR-0020); işleyici açık her tenant'ın
                 // bağlamında ayrı çalışır. Tenant kimliği platform kaydından okunur.
                 var cleanup = lastCleanup is null || time.GetUtcNow() - lastCleanup >= CleanupInterval;
                 await using var scope = scopes.CreateAsyncScope();
@@ -98,7 +98,7 @@ public sealed class EventDispatchWorker(
 
     /// <summary>Açık tenant'ların kimlikleri; outbox tenant bağlamında ayrı ayrı işlenir (ADR-0007).</summary>
     internal static async Task<IReadOnlyList<Guid>> ActiveTenantIdsAsync(IServiceProvider services, CancellationToken cancellationToken) =>
-        await services.GetRequiredService<PlatformDbContext>().Tenants.AsNoTracking()
+        await services.GetRequiredService<ModulixDbContext>().Tenants.AsNoTracking()
             .Where(t => t.Status == TenantStatus.Active)
             .Select(t => t.Id)
             .ToListAsync(cancellationToken);
@@ -106,7 +106,7 @@ public sealed class EventDispatchWorker(
 
 /// <summary>
 /// /health: herhangi bir tenant'ta dağıtılmamış olay 15 dakikadan eskiyse "degraded" (işleyici durmuş veya yetişemiyor).
-/// Outbox tenant bağlamındadır (ADR-0020 Dilim 1); açık her tenant ayrı ölçülür.
+/// Outbox tenant bağlamındadır (ADR-0020); açık her tenant ayrı ölçülür.
 /// </summary>
 public sealed class EventHealthCheck(IServiceScopeFactory scopes) : IHealthCheck
 {

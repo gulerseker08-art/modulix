@@ -54,7 +54,7 @@ public static class TenantProblems
 public sealed class TenantContextMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(
-        HttpContext context, HttpTenantContextAccessor accessor, IMembershipDirectory directory, PlatformDbContext db)
+        HttpContext context, HttpTenantContextAccessor accessor, IMembershipDirectory directory, ModulixDbContext db)
     {
         var principal = context.User;
         if (principal.Identity?.IsAuthenticated == true
@@ -66,7 +66,7 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             {
                 accessor.Current = new TenantContext(membership.TenantId, userId, membership.MembershipId);
 
-                // ITenantSettings tenant DbContext'ine bağlıdır (ADR-0020 Dilim 1); yalnızca aktif tenant kurulduktan SONRA çözülür.
+                // ITenantSettings tenant DbContext'ine bağlıdır (ADR-0020); yalnızca aktif tenant kurulduktan SONRA çözülür.
                 var settings = context.RequestServices.GetRequiredService<ITenantSettings>();
 
                 // Firma iki adımlı doğrulamayı zorunlu kılıyorsa kapalı olan kişi önce kurulumu yapar (Y7b).

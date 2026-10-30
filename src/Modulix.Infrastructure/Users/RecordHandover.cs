@@ -27,8 +27,7 @@ internal sealed class RecordHandover(
     ITenantContextAccessor tenantAccessor,
     INotificationRecipients recipients,
     IEmailQueue emails,
-    ModulixDbContext db,
-    PlatformDbContext platform)
+    ModulixDbContext db)
 {
     private const int BatchSize = RecordQuery.MaxPageSize;
 
@@ -111,7 +110,7 @@ internal sealed class RecordHandover(
             return;
         }
 
-        var names = await platform.Users.AsNoTracking()
+        var names = await db.Users.AsNoTracking()
             .Where(u => u.Id == fromUserId || u.Id == actorId)
             .ToDictionaryAsync(u => u.Id, u => u.DisplayName, cancellationToken);
         emails.Enqueue(UserEmails.RecordsTransferred(

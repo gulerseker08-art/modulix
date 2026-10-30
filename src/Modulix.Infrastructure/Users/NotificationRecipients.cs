@@ -24,7 +24,7 @@ public sealed class PublicLinkOptions
 /// </summary>
 internal sealed class NotificationRecipients(
     ITenantContextAccessor tenantAccessor,
-    PlatformDbContext db,
+    ModulixDbContext db,
     IMembershipDirectory memberships,
     ITenantScopeFactory tenantScopes,
     IOptions<PublicLinkOptions> links) : INotificationRecipients

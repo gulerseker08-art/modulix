@@ -14,7 +14,7 @@ namespace Modulix.Infrastructure.Authorization;
 /// işlem sonuna kadar tutar; aynı anda birbirinin yetkisini kaldırmaya çalışan iki yönetici sırayla işlenir ve
 /// ikincisi güncel durumu görür.
 /// </summary>
-internal sealed class AdministratorGuard(ModulixDbContext db, PlatformDbContext platform)
+internal sealed class AdministratorGuard(ModulixDbContext db)
 {
     public const string LastAdministratorMessage =
         "Kuruluşta en az bir yönetici kalmalı. Önce başka bir kullanıcıya Yönetici rolü verin.";
@@ -63,21 +63,21 @@ internal sealed class AdministratorGuard(ModulixDbContext db, PlatformDbContext 
     /// </summary>
     public async Task EnsureAnotherActiveAdministratorAsync(Guid systemRoleId, Guid membershipId, CancellationToken cancellationToken)
     {
-        var isActive = await platform.Memberships.AnyAsync(
+        var isActive = await db.Memberships.AnyAsync(
             m => m.Id == membershipId && m.Status == MembershipStatus.Active, cancellationToken);
         if (!isActive)
         {
             return;
         }
 
-        // Sistem rolü atamaları tenant bağlamında, üyelik durumu platform bağlamındadır (ADR-0020 Dilim 1): iki adımda çöz.
+        // Sistem rolü atamaları tenant bağlamında, üyelik durumu platform tablolarındadır (ADR-0020): iki adımda çöz.
         var otherAdminMembershipIds = await db.MembershipRoles.AsNoTracking()
             .Where(mr => mr.RoleId == systemRoleId && mr.MembershipId != membershipId)
             .Select(mr => mr.MembershipId)
             .ToListAsync(cancellationToken);
 
         var anotherAdministrator = otherAdminMembershipIds.Count > 0
-            && await platform.Memberships.AsNoTracking()
+            && await db.Memberships.AsNoTracking()
                 .AnyAsync(m => otherAdminMembershipIds.Contains(m.Id) && m.Status == MembershipStatus.Active, cancellationToken);
 
         if (!anotherAdministrator)

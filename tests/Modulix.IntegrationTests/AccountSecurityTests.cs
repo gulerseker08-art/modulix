@@ -105,7 +105,7 @@ public partial class AccountSecurityTests(ModulixApiFactory factory) : IClassFix
         var current = (await client.GetFromJsonAsync<List<SessionDto>>("/api/account/sessions"))!.Single();
         await client.PostAsync("/api/auth/logout", null);
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         Assert.NotNull((await db.UserSessions.AsNoTracking().SingleAsync(s => s.Id == current.Id)).ClosedAt);
     }
 
@@ -268,14 +268,14 @@ public partial class AccountSecurityTests(ModulixApiFactory factory) : IClassFix
     private async Task<Infrastructure.Email.QueuedEmail> LatestEmailAsync(string address)
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         return await db.EmailMessages.AsNoTracking().Where(e => e.ToAddress == address).OrderByDescending(e => e.CreatedAt).FirstAsync();
     }
 
     private async Task<int> EmailCountAsync(string address)
     {
         using var scope = factory.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().EmailMessages.CountAsync(e => e.ToAddress == address);
+        return await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().EmailMessages.CountAsync(e => e.ToAddress == address);
     }
 
     private async Task MakeAdministratorAsync(Guid tenantId, ModulixUser user)

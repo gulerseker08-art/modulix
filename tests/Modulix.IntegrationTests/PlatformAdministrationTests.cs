@@ -137,7 +137,7 @@ public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IC
 
         using (var scope = factory.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
             Assert.False(await db.Tenants.AnyAsync(t => t.Slug == slug));
             Assert.False(await db.Users.AnyAsync(u => u.Email == email));
             Assert.False(await db.EmailMessages.AnyAsync(e => e.ToAddress == email));
@@ -310,7 +310,7 @@ public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IC
     private async Task<(Guid Id, string Token)> ReadInvitationAsync(string address)
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         var mail = await db.EmailMessages.AsNoTracking()
             .Where(e => e.ToAddress == address)
             .OrderByDescending(e => e.CreatedAt)
