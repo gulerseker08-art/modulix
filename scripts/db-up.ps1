@@ -134,7 +134,7 @@ Invoke-Checked dotnet @('user-secrets', 'set', 'ConnectionStrings:ModulixMigrati
 
 # --- 5/6 Migration -------------------------------------------------------------
 
-Write-Step '5/6 Migration uygulaniyor (platform + tenant zinciri, ayni veritabani)'
+Write-Step '5/6 Migration uygulaniyor (tek zincir)'
 Invoke-Checked dotnet @('run', '--project', 'src/Modulix.Api', '--', 'migrate')
 
 # --- 6/6 Ornek veri ------------------------------------------------------------
