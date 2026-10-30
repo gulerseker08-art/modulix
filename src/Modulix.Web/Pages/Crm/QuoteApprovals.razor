@@ -41,11 +41,20 @@
                             @if (active?.Id == quote.Id)
                             {
                                 <form @onsubmit="() => DecideAsync(quote)" @onsubmit:preventDefault>
+                                    @if (requirement is not null)
+                                    {
+                                        <div class="small approval-reasons">
+                                            <strong>Onay gerekçesi:</strong>
+                                            @foreach (var match in requirement.Matches) { <div>@match.Name — @match.Reason</div> }
+                                            @if (requirement.ThresholdReason is not null) { <div>@requirement.ThresholdReason</div> }
+                                            @if (requirement.Note is not null) { <div class="text-danger">@requirement.Note</div> }
+                                        </div>
+                                    }
                                     <label class="visually-hidden" for="reason-@quote.Id">Gerekçe</label>
                                     <input id="reason-@quote.Id" class="form-control form-control-sm" placeholder="Gerekçe (red / değişiklik için zorunlu)" maxlength="500" @bind="reason" />
-                                    <button type="button" class="btn btn-primary btn-sm" disabled="@busy" @onclick='() => DecideAsync(quote, "approve")'>Onayla</button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick='() => DecideAsync(quote, "reject-approval")'>Reddet</button>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => DecideAsync(quote, "request-changes")'>Değişiklik iste</button>
+                                    <button type="button" class="btn btn-primary btn-sm" disabled="@(busy || cannotDecide)" @onclick='() => DecideAsync(quote, "approve")'>Onayla</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(busy || cannotDecide)" @onclick='() => DecideAsync(quote, "reject-approval")'>Reddet</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(busy || cannotDecide)" @onclick='() => DecideAsync(quote, "request-changes")'>Değişiklik iste</button>
                                     <button type="button" class="btn btn-link btn-sm" @onclick="() => active = null">Vazgeç</button>
                                 </form>
                             }
@@ -64,6 +73,9 @@
 @code {
     private List<QuoteDto>? items;
     private QuoteDto? active;
+    private QuoteApprovalRequirementDto? requirement;
+
+    private bool cannotDecide => requirement is { CanDecide: false };
     private string reason = string.Empty;
     private string? notice;
     private bool noticeFailed;
@@ -86,10 +98,11 @@
         Notify(error, error is not null);
     }
 
-    private void Open(QuoteDto quote)
+    private async Task Open(QuoteDto quote)
     {
         active = quote;
         reason = string.Empty;
+        requirement = (await Api.GetAsync<QuoteApprovalRequirementDto>($"/api/crm/quotes/{quote.Id}/approval-requirements")).Value;
     }
 
     private async Task DecideAsync(QuoteDto quote, string action = "approve")

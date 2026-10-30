@@ -33,8 +33,8 @@
                 <div>
                     <label class="form-label" for="kind">Tür</label>
                     <select id="kind" class="form-select" @bind="form.ByAmount">
-                        <option value="false">Yüzde</option>
-                        <option value="true">Tutar</option>
+                        <option value="False">Yüzde</option>
+                        <option value="True">Tutar</option>
                     </select>
                 </div>
                 @if (form.ByAmount)
@@ -66,8 +66,8 @@
                 <div>
                     <label class="form-label" for="stackable">Başka indirimle birleşir</label>
                     <select id="stackable" class="form-select" @bind="form.Stackable">
-                        <option value="true">Evet</option>
-                        <option value="false">Hayır</option>
+                        <option value="True">Evet</option>
+                        <option value="False">Hayır</option>
                     </select>
                 </div>
                 <div>
@@ -93,8 +93,8 @@
                 <div>
                     <label class="form-label" for="active">Durum</label>
                     <select id="active" class="form-select" @bind="form.IsActive">
-                        <option value="true">Aktif</option>
-                        <option value="false">Pasif</option>
+                        <option value="True">Aktif</option>
+                        <option value="False">Pasif</option>
                     </select>
                 </div>
             </div>

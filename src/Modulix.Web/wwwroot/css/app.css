@@ -2145,3 +2145,28 @@ section[aria-labelledby] > h2 {
 .preline {
     white-space: pre-line;
 }
+
+/* Revizyon karşılaştırma ve onay gerekçesi (ADR-0019, dilim 4) */
+.compare-lines {
+    list-style: none;
+    padding-left: 0;
+}
+
+.compare-line {
+    padding: .5rem .75rem;
+    margin-bottom: .5rem;
+    border-left: 4px solid rgba(0, 0, 0, .2);
+    background: rgba(0, 0, 0, .02);
+}
+
+.compare-line > ul {
+    margin: .25rem 0 0;
+}
+
+.compare-unchanged {
+    opacity: .7;
+}
+
+.approval-reasons {
+    margin-bottom: .5rem;
+}

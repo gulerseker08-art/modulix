@@ -61,6 +61,9 @@ public interface IQuoteWorkflow
 
     /// <summary>Kullanıcının bu teklif için görebileceği eylemler ve yapılamayanların açıklaması.</summary>
     Task<RecordResult<IReadOnlyList<QuoteActionState>>> ActionsAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Teklifin iç onay gereksinimi: eşleşen kurallar, eşik gerekçesi, onaylayan kısıtı ve geçerli kullanıcının karar yetkisi.</summary>
+    Task<RecordResult<QuoteApprovalRequirement>> ApprovalRequirementsAsync(Guid id, CancellationToken cancellationToken);
 }
 
 internal sealed class QuoteWorkflow(
@@ -75,11 +78,21 @@ internal sealed class QuoteWorkflow(
     private const string Key = CrmModule.Entities.Quote;
     private const string RequiredApproval = "Required";
 
-    public Task<RecordResult<RecordData>> SubmitForApprovalAsync(Guid id, long version, CancellationToken cancellationToken) =>
-        Transition(id, version, QuoteAction.SubmitForApproval, CrmModule.Permissions.QuotesWrite, null, (q, _) => new JsonObject
+    public async Task<RecordResult<RecordData>> SubmitForApprovalAsync(Guid id, long version, CancellationToken cancellationToken)
+    {
+        // Onaya gönderimde eşleşen kurallar ve kural sürümleri tarihçeye yazılır: onay hangi kurala göre istendi, sonradan izlenir.
+        string? note = null;
+        if ((await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken)) is { IsSuccess: true } loaded)
+        {
+            var requirement = await RequirementAsync(loaded.Value!, cancellationToken);
+            note = Truncate(QuoteApprovalEvaluator.HistoryNote(requirement.Matches, requirement.ThresholdReason), Quote.ReasonMaxLength);
+        }
+
+        return await Transition(id, version, QuoteAction.SubmitForApproval, CrmModule.Permissions.QuotesWrite, note, (q, _) => new JsonObject
         {
             ["approvalStatus"] = QuoteApprovalStatus.Pending,
         }, "SubmittedForApproval", cancellationToken);
+    }
 
     public Task<RecordResult<RecordData>> WithdrawApprovalAsync(Guid id, long version, CancellationToken cancellationToken) =>
         Transition(id, version, QuoteAction.WithdrawApproval, CrmModule.Permissions.QuotesWrite, null, (q, _) => new JsonObject
@@ -92,21 +105,21 @@ internal sealed class QuoteWorkflow(
         {
             ["approvalStatus"] = QuoteApprovalStatus.Approved,
             ["statusReason"] = Trim(note),
-        }, "Approved", cancellationToken, checkSelfApproval: true);
+        }, "Approved", cancellationToken, checkSelfApproval: true, checkApprover: true);
 
     public Task<RecordResult<RecordData>> RejectApprovalAsync(Guid id, long version, string reason, CancellationToken cancellationToken) =>
         Transition(id, version, QuoteAction.RejectApproval, CrmModule.Permissions.QuotesApprove, reason, (q, _) => new JsonObject
         {
             ["approvalStatus"] = QuoteApprovalStatus.Rejected,
             ["statusReason"] = Trim(reason),
-        }, "ApprovalRejected", cancellationToken, reasonRequired: true, checkSelfApproval: true);
+        }, "ApprovalRejected", cancellationToken, reasonRequired: true, checkSelfApproval: true, checkApprover: true);
 
     public Task<RecordResult<RecordData>> RequestChangesAsync(Guid id, long version, string reason, CancellationToken cancellationToken) =>
         Transition(id, version, QuoteAction.RequestChanges, CrmModule.Permissions.QuotesApprove, reason, (q, _) => new JsonObject
         {
             ["approvalStatus"] = QuoteApprovalStatus.ChangesRequested,
             ["statusReason"] = Trim(reason),
-        }, "ChangesRequested", cancellationToken, reasonRequired: true, checkSelfApproval: true);
+        }, "ChangesRequested", cancellationToken, reasonRequired: true, checkSelfApproval: true, checkApprover: true);
 
     public Task<RecordResult<RecordData>> PresentAsync(Guid id, long version, CancellationToken cancellationToken) =>
         Transition(id, version, QuoteAction.Present, CrmModule.Permissions.QuotesPresent, null, (q, now) => new JsonObject
@@ -219,6 +232,12 @@ internal sealed class QuoteWorkflow(
         foreach (var (action, permission) in actions.Where(a => granted.Contains(a.Permission)))
         {
             var rule = QuoteRules.Can(action, Status(quote), approval, ValidUntil(quote), now, hasLines);
+            if (rule.Allowed && action is QuoteAction.Approve or QuoteAction.RejectApproval or QuoteAction.RequestChanges
+                && await ApproverRestrictionAsync(quote, cancellationToken) is { } restriction)
+            {
+                rule = QuoteRuleResult.Deny("approver-restricted", restriction);
+            }
+
             list.Add(new QuoteActionState(action, rule.Allowed, rule.Code, rule.Message));
         }
 
@@ -229,7 +248,7 @@ internal sealed class QuoteWorkflow(
 
     private async Task<RecordResult<RecordData>> Transition(
         Guid id, long version, string action, string permission, string? reason, Func<RecordData, DateTimeOffset, JsonObject> build, string eventKind,
-        CancellationToken cancellationToken, bool reasonRequired = false, bool checkSelfApproval = false, bool enrichWithCompanyName = false)
+        CancellationToken cancellationToken, bool reasonRequired = false, bool checkSelfApproval = false, bool enrichWithCompanyName = false, bool checkApprover = false)
     {
         var loaded = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         if (!loaded.IsSuccess)
@@ -261,6 +280,11 @@ internal sealed class QuoteWorkflow(
             return Invalid("Kendi gönderdiğiniz teklifi onaylayamazsınız.", "approvalStatus");
         }
 
+        if (checkApprover && await ApproverRestrictionAsync(quote, cancellationToken) is { } restriction)
+        {
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, restriction);
+        }
+
         if (enrichWithCompanyName && Guid.TryParse(Text(quote, "companyId"), out var companyId))
         {
             var company = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Company, companyId), cancellationToken);
@@ -288,15 +312,54 @@ internal sealed class QuoteWorkflow(
             return approval;
         }
 
-        // Politika onay gerektiriyorsa ve onay alınmadıysa sunum engellenir.
+        // Genel eşik ayarı ya da onay kuralları onay gerektiriyorsa ve onay alınmadıysa sunum engellenir.
+        return (await RequirementAsync(quote, cancellationToken)).Required ? RequiredApproval : approval;
+    }
+
+    public async Task<RecordResult<QuoteApprovalRequirement>> ApprovalRequirementsAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var record = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
+        return record.IsSuccess
+            ? RecordResult<QuoteApprovalRequirement>.Ok(await RequirementAsync(record.Value!, cancellationToken))
+            : RecordResult<QuoteApprovalRequirement>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors);
+    }
+
+    /// <summary>Genel eşik ayarı (varsa) ve eşleşen kurallar birlikte: biri yeterse onay gerekir.</summary>
+    private async Task<QuoteApprovalRequirement> RequirementAsync(RecordData quote, CancellationToken cancellationToken)
+    {
         var policy = await PolicyAsync(cancellationToken);
         var list = Number(quote, "listTotal");
         var discount = Number(quote, "discountTotal");
-        var percent = list > 0 ? discount * 100m / list : 0m;
+        var percent = QuoteApprovalEvaluator.DiscountPercent(list, discount);
         var gross = Number(quote, "grossTotal");
-        var triggered = (policy.ApprovalDiscountPercent is { } limit && percent > limit) || (policy.ApprovalGrossAbove is { } above && gross > above);
-        return triggered ? RequiredApproval : approval;
+        var currency = Text(quote, "currency") ?? "TRY";
+
+        string? threshold = null;
+        if (policy.ApprovalDiscountPercent is { } limit && percent > limit)
+        {
+            threshold = $"Genel ayar: indirim %{percent:0.##} (eşik %{limit:0.##})";
+        }
+        else if (policy.ApprovalGrossAbove is { } above && gross > above)
+        {
+            threshold = $"Genel ayar: genel toplam {gross:N2} {currency} (eşik {above:N2})";
+        }
+
+        var matches = QuoteApprovalEvaluator.Match(await reader.ActiveRulesAsync(cancellationToken), currency, list, discount, gross);
+        var restricted = QuoteApprovalEvaluator.RestrictedApprovers(matches);
+        var user = tenant.Current?.UserId;
+        var canDecide = restricted.Count == 0 || (user is { } id && restricted.Contains(id));
+        var note = restricted.Count > 0 && !canDecide ? "Bu teklifin onayı kural gereği belirli onaylayanlara atanmıştır." : null;
+        return new QuoteApprovalRequirement(threshold is not null || matches.Count > 0, matches, threshold, restricted.Count > 0, canDecide, note);
     }
+
+    /// <summary>Onay belirli onaylayanlara atanmışsa ve geçerli kullanıcı onlardan değilse engel mesajı döner.</summary>
+    private async Task<string?> ApproverRestrictionAsync(RecordData quote, CancellationToken cancellationToken)
+    {
+        var requirement = await RequirementAsync(quote, cancellationToken);
+        return requirement.Restricted && !requirement.CanDecide ? requirement.Note : null;
+    }
+
+    private static string Truncate(string text, int max) => text.Length > max ? text[..max] : text;
 
     private async Task<QuotePolicySettings> PolicyAsync(CancellationToken cancellationToken) =>
         policyProvider is null ? new QuotePolicySettings() : await policyProvider.GetAsync(cancellationToken);

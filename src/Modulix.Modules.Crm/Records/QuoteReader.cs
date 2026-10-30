@@ -31,6 +31,12 @@ internal sealed class QuoteReader(IModuleData data)
         await data.Set<QuoteEvent>().AsNoTracking().Where(e => e.QuoteId == quoteId && e.Kind == "SubmittedForApproval")
             .OrderByDescending(e => e.CreatedAt).Select(e => e.ActorId).FirstOrDefaultAsync(cancellationToken);
 
+    /// <summary>Etkin onay kuralları (değerlendirme sunucu kararıdır; kural yönetimi izni gerekmez).</summary>
+    public async Task<List<QuoteApprovalRuleInfo>> ActiveRulesAsync(CancellationToken cancellationToken) =>
+        await data.Set<QuoteApprovalRule>().AsNoTracking().Where(r => r.IsActive)
+            .Select(r => new QuoteApprovalRuleInfo(r.Id, r.Version, r.Name, r.Priority, r.Currency, r.MinDiscountPercent, r.MinGrossTotal, r.ApproverId))
+            .ToListAsync(cancellationToken);
+
     public Task<Quote?> QuoteAsync(Guid quoteId, CancellationToken cancellationToken) =>
         data.Set<Quote>().AsNoTracking().SingleOrDefaultAsync(q => q.Id == quoteId, cancellationToken);
 

@@ -1,0 +1,248 @@
+@page "/crm/teklif-kurallari"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Teklif onay kuralları · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuoteRulesManage">
+    <div class="page-header">
+        <h1>Teklif onay kuralları</h1>
+        @if (form is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="NewRule">Yeni kural</button>
+        }
+    </div>
+
+    <p class="text-muted">
+        Bir kuralın girilen <strong>tüm koşulları birlikte</strong> sağlanırsa teklif müşteriye sunulmadan önce iç onay ister; <strong>kurallardan biri</strong> yeterlidir.
+        Genel eşik ayarları (CRM Teklif ayarları) da geçerlidir. Onaylayan seçilirse onay yalnızca o kullanıcıdan kabul edilir. Kural değişikliği
+        yeni onaya gönderilen tekliflerde etkilidir; her onaya gönderimde eşleşen kuralların adı ve sürümü teklif geçmişine yazılır.
+    </p>
+
+    <Notice Text="@message" Failed="@(failed)" />
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni kural" : "Kuralı düzenle")</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="r-name">Ad *</label>
+                    <input id="r-name" class="form-control" maxlength="150" @bind="form.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-priority">Öncelik (küçük önce)</label>
+                    <input id="r-priority" class="form-control" type="number" min="0" @bind="form.Priority" />
+                    <FieldError Field="priority" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-discount">İndirim eşiği (%) — aşılırsa</label>
+                    <input id="r-discount" class="form-control" type="number" step="any" min="0" max="99.99" @bind="form.MinDiscountPercent" />
+                    <FieldError Field="minDiscountPercent" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-gross">Genel toplam eşiği — aşılırsa</label>
+                    <input id="r-gross" class="form-control" type="number" step="0.01" min="0" @bind="form.MinGrossTotal" />
+                    <FieldError Field="minGrossTotal" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-currency">Para birimi (tutar için)</label>
+                    <input id="r-currency" class="form-control" maxlength="3" placeholder="Hepsi" @bind="form.Currency" />
+                    <FieldError Field="currency" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="approverId">Onaylayan (isteğe bağlı)</label>
+                    <LookupPicker Id="approverId" LookupKey="crm.quote-approval-rule.approver" @bind-Value="form.ApproverId" Placeholder="Onay izni olan herkes"
+                                  Invalid="@(errors?.ContainsKey("approverId") == true)" />
+                    <FieldError Field="approverId" Errors="errors" />
+                </div>
+                <div class="form-check">
+                    <input id="r-active" class="form-check-input" type="checkbox" @bind="form.IsActive" />
+                    <label class="form-check-label" for="r-active">Kural etkin</label>
+                </div>
+                <div class="wide">
+                    <label class="form-label" for="r-description">Açıklama</label>
+                    <textarea id="r-description" class="form-control" rows="2" maxlength="500" @bind="form.Description"></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    @if (rules is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (rules.Count == 0)
+    {
+        <p class="text-muted">Kural yok; yalnızca genel eşik ayarları uygulanır.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Teklif onay kuralları</caption>
+            <thead><tr><th scope="col">Kural</th><th scope="col">Koşullar (hepsi)</th><th scope="col">Onaylayan</th><th scope="col">Durum</th><th scope="col"></th></tr></thead>
+            <tbody>
+                @foreach (var rule in rules)
+                {
+                    <tr>
+                        <td data-label="Kural" class="primary">@rule.Name <small class="text-muted">öncelik @rule.Priority · sürüm @rule.Version</small>
+                            @if (!string.IsNullOrWhiteSpace(rule.Description)) { <div class="small text-muted">@rule.Description</div> }</td>
+                        <td data-label="Koşullar">@Conditions(rule)</td>
+                        <td data-label="Onaylayan">@(rule.ApproverId is null ? "Onay izni olan herkes" : Lookups.MemberName(rule.ApproverId))</td>
+                        <td data-label="Durum">@(rule.IsActive ? "Etkin" : "Pasif")</td>
+                        <td class="actions">
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(rule)">Düzenle</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/quote-approval-rules";
+
+    private List<QuoteApprovalRuleDto>? rules;
+    private RuleForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool failed;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.QuoteRulesManage))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var (loaded, error) = await Api.GetAllAsync<QuoteApprovalRuleDto>(Url);
+        rules = loaded;
+        Notify(error, error is not null);
+    }
+
+    private static string Conditions(QuoteApprovalRuleDto rule)
+    {
+        var parts = new List<string>();
+        if (rule.MinDiscountPercent is { } percent)
+        {
+            parts.Add($"indirim > %{percent:0.##}");
+        }
+
+        if (rule.MinGrossTotal is { } gross)
+        {
+            parts.Add($"genel toplam > {gross:N2} {rule.Currency ?? "(her para birimi)"}");
+        }
+
+        return string.Join(" ve ", parts);
+    }
+
+    private void NewRule()
+    {
+        form = new RuleForm();
+        errors = null;
+        Notify(null, false);
+    }
+
+    private void Edit(QuoteApprovalRuleDto rule)
+    {
+        form = new RuleForm
+        {
+            Id = rule.Id, Version = rule.Version, Name = rule.Name, Description = rule.Description, Priority = rule.Priority, IsActive = rule.IsActive,
+            Currency = rule.Currency, MinDiscountPercent = rule.MinDiscountPercent, MinGrossTotal = rule.MinGrossTotal, ApproverId = rule.ApproverId,
+        };
+        errors = null;
+        Notify(null, false);
+    }
+
+    private void Cancel()
+    {
+        form = null;
+        errors = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        var f = form!;
+        var request = new SaveQuoteApprovalRuleRequest(
+            f.Name, Blank(f.Description), f.Priority, f.IsActive, Blank(f.Currency)?.ToUpperInvariant(), f.MinDiscountPercent, f.MinGrossTotal, f.ApproverId, f.Version);
+        var result = f.Id is { } id
+            ? await Api.PutAsync<QuoteApprovalRuleDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<QuoteApprovalRuleDto>(Url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            form = null;
+            errors = null;
+            Notify("Kural kaydedildi.", false);
+            await LoadAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Sayfayı yenileyip tekrar deneyin." : result.Error, true);
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
+        busy = false;
+        Notify(result.IsSuccess ? "Kural silindi." : result.Error, !result.IsSuccess);
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+        }
+    }
+
+    private void Notify(string? text, bool isFailure)
+    {
+        message = text;
+        failed = isFailure;
+    }
+
+    private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    private sealed class RuleForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public int Priority { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public string? Currency { get; set; }
+
+        public decimal? MinDiscountPercent { get; set; }
+
+        public decimal? MinGrossTotal { get; set; }
+
+        public Guid? ApproverId { get; set; }
+    }
+}

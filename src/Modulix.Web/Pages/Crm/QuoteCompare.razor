@@ -1,0 +1,218 @@
+@page "/crm/teklifler/{Id:guid}/karsilastir"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>Revizyon karşılaştırma · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuotesRead">
+    @if (notFound)
+    {
+        <div class="alert alert-warning" role="alert">Teklif bulunamadı ya da erişim yetkiniz yok. <a href="crm/teklifler">Tekliflere dön</a></div>
+    }
+    else if (quote is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <h1>Revizyon karşılaştırma</h1>
+                <p class="text-muted mb-0">@quote.Title · @quote.QuoteNumber</p>
+            </div>
+            <div class="header-actions">
+                <a class="btn btn-outline-secondary" href="crm/teklifler/@quote.Id">Teklife dön</a>
+            </div>
+        </div>
+
+        @if (others.Count == 0)
+        {
+            <p class="text-muted">Bu teklif ailesinde karşılaştırılacak başka revizyon yok.</p>
+        }
+        else
+        {
+            <div class="filters">
+                <label class="form-label" for="cmp-with">Karşılaştırılacak revizyon</label>
+                <select id="cmp-with" class="form-select filter-select" value="@withId" @onchange="OnWithChanged">
+                    @foreach (var other in others)
+                    {
+                        <option value="@other.Id">V@(other.RevisionNo) — @QuoteLabels.Label(QuoteLabels.Statuses, other.Status)</option>
+                    }
+                </select>
+                <span class="text-muted">→ V@(quote.RevisionNo) (bu sayfa)</span>
+            </div>
+
+            <Notice Text="@message" Failed="true" />
+
+            @if (comparison is not null)
+            {
+                <p class="text-muted">
+                    <strong>V@(comparison.LeftRevision)</strong> (@QuoteLabels.Label(QuoteLabels.Statuses, comparison.LeftStatus)) ile
+                    <strong>V@(comparison.RightRevision)</strong> (@QuoteLabels.Label(QuoteLabels.Statuses, comparison.RightStatus)) arasındaki farklar. Maliyet ve iç notlar karşılaştırmaya girmez.
+                </p>
+
+                <section aria-labelledby="cmp-totals">
+                    <h2 id="cmp-totals">Tutarlar</h2>
+                    @Changes(comparison.Totals, "Tutar değişmedi.")
+                </section>
+
+                <section aria-labelledby="cmp-header">
+                    <h2 id="cmp-header">Teklif bilgileri</h2>
+                    @Changes(comparison.Header, "Başlık, geçerlilik ve koşullarda değişiklik yok.")
+                </section>
+
+                <section aria-labelledby="cmp-lines">
+                    <h2 id="cmp-lines">Kalemler</h2>
+                    <p class="small text-muted">Kalemler revizyonlar arasında kararlı anahtarla eşlenir; yeniden adlandırılan kalem yeni kalem sayılmaz.</p>
+                    @if (comparison.Lines.Count == 0)
+                    {
+                        <p class="text-muted">Kalem yok.</p>
+                    }
+                    else
+                    {
+                        <ul class="compare-lines">
+                            @foreach (var line in comparison.Lines)
+                            {
+                                <li class="compare-line compare-@line.Change.ToLowerInvariant()">
+                                    <span class="badge stage-@Badge(line.Change)">@ChangeLabel(line.Change)</span>
+                                    <strong>@line.Name</strong>
+                                    @if (line.Fields.Count > 0)
+                                    {
+                                        <ul class="small">
+                                            @foreach (var field in line.Fields)
+                                            {
+                                                <li>@field.Label: @Value(field.Before) → @Value(field.After)</li>
+                                            }
+                                        </ul>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
+        }
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private QuoteDto? quote;
+    private List<QuoteDto> others = [];
+    private QuoteComparisonDto? comparison;
+    private Guid withId;
+    private string? message;
+    private bool notFound;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(CrmAccess.QuotesRead))
+        {
+            return;
+        }
+
+        var loaded = (await Api.GetAsync<QuoteDto>($"/api/crm/quotes/{Id}")).Value;
+        if (loaded is null)
+        {
+            notFound = true;
+            return;
+        }
+
+        quote = loaded;
+        var family = (await Api.GetAllAsync<QuoteDto>($"/api/crm/quotes?familyId={loaded.FamilyId}")).Items;
+        others = [.. family.Where(q => q.Id != loaded.Id).OrderByDescending(q => q.RevisionNo)];
+
+        // Varsayılan: bundan önceki en yakın revizyon; yoksa en yenisi.
+        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Navigation.Uri).Query);
+        var requested = Guid.TryParse(query["with"], out var parsed) ? parsed : (Guid?)null;
+        withId = others.FirstOrDefault(o => o.Id == requested)?.Id
+            ?? others.FirstOrDefault(o => o.RevisionNo < loaded.RevisionNo)?.Id
+            ?? others.FirstOrDefault()?.Id ?? Guid.Empty;
+        await CompareAsync();
+    }
+
+    private async Task OnWithChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var chosen))
+        {
+            withId = chosen;
+            await CompareAsync();
+        }
+    }
+
+    private async Task CompareAsync()
+    {
+        comparison = null;
+        message = null;
+        if (withId == Guid.Empty)
+        {
+            return;
+        }
+
+        var result = await Api.GetAsync<QuoteComparisonDto>($"/api/crm/quotes/{Id}/compare?with={withId}");
+        comparison = result.Value;
+        message = result.Error;
+    }
+
+    private RenderFragment Changes(IReadOnlyList<QuoteFieldChangeDto> changes, string empty) => builder =>
+    {
+        if (changes.Count == 0)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddAttribute(1, "class", "text-muted");
+            builder.AddContent(2, empty);
+            builder.CloseElement();
+            return;
+        }
+
+        builder.OpenElement(3, "table");
+        builder.AddAttribute(4, "class", "table record-table");
+        builder.OpenElement(5, "thead");
+        builder.AddMarkupContent(6, "<tr><th scope=\"col\">Alan</th><th scope=\"col\">Önce</th><th scope=\"col\">Sonra</th></tr>");
+        builder.CloseElement();
+        builder.OpenElement(7, "tbody");
+        foreach (var change in changes)
+        {
+            builder.OpenElement(8, "tr");
+            builder.OpenElement(9, "td");
+            builder.AddAttribute(10, "data-label", "Alan");
+            builder.AddAttribute(11, "class", "primary");
+            builder.AddContent(12, change.Label);
+            builder.CloseElement();
+            builder.OpenElement(13, "td");
+            builder.AddAttribute(14, "data-label", "Önce");
+            builder.AddContent(15, Value(change.Before));
+            builder.CloseElement();
+            builder.OpenElement(16, "td");
+            builder.AddAttribute(17, "data-label", "Sonra");
+            builder.AddContent(18, Value(change.After));
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private static string Value(string? value) => string.IsNullOrEmpty(value) ? "—" : value;
+
+    // Durum her zaman metinle de gösterilir (yalnızca renkle ifade edilmez).
+    private static string ChangeLabel(string change) => change switch
+    {
+        "Added" => "Eklendi",
+        "Removed" => "Kaldırıldı",
+        "Changed" => "Değişti",
+        _ => "Değişmedi",
+    };
+
+    private static string Badge(string change) => change switch
+    {
+        "Added" => "won",
+        "Removed" => "lost",
+        "Changed" => "onhold",
+        _ => "open",
+    };
+}

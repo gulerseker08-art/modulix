@@ -1,6 +1,6 @@
 # ADR-0019: Teklif yönetimi (M1.5) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (çekirdek, sunucu yaşam döngüsü, ekranlar, PDF, paylaşım bağlantısı ve müşteri kabul sayfası). Tarih: 2026-10-30.
+Durum: Kısmen uygulandı (çekirdek, sunucu yaşam döngüsü, ekranlar, PDF, paylaşım/kabul sayfası, onay kuralları ve revizyon karşılaştırma). Tarih: 2026-10-30.
 
 ## Mevcut durum (analiz anında, kodla kanıtlı; güncel durum en alttaki "Uygulama durumu"nda)
 
@@ -15,7 +15,7 @@ Tenant-başına-DB kabulü (ADR-0009) kodla uyumludur: yeni tablolar `ModulixDbC
 | Yaşam döngüsü | Yok | Onaysız sunum, geçersiz sürüm kabulü | `QuoteRules` (yapıldı) + iş akışı servisi | P0 | Veri modeli | Sunucuda engel + entegrasyon testi |
 | Veri modeli | Yok | Snapshot, sürüm, aile, RowVersion | `Quote`, `QuoteLine`, onay/gönderim/kabul tabloları, migration + RLS | P0 | — | **Yapılmadı** |
 | Revizyon / eşzamanlılık | Yok | Aynı ailede çelişen kabul | Aile başına tek kabul (filtreli benzersiz indeks) | P0 | Veri modeli | **Yapılmadı** |
-| İç onay | Genel onay altyapısı yok (ADR-0018) | Eşik/kural yönetimi | Kural + istek tabloları | P1 | Veri modeli | **Yapılmadı** |
+| İç onay | Genel onay altyapısı yok (ADR-0018) | Eşik/kural yönetimi | Kural tablosu + değerlendirme (dördüncü dilim); sıralı/paralel onay yok | P1 | Veri modeli | **Kısmen uygulandı** |
 | PDF, paylaşım, müşteri kabulü | PDF/dosya altyapısı doğrulanamadı | Belirteç, hız sınırı, hash | Üçüncü dilim (aşağıda) | P1 | Veri modeli | **Uygulandı** (gönderim adaptörü hariç) |
 | Ekranlar (liste, düzenleme, detay, onay merkezi, karşılaştırma, müşteri sayfası, ayarlar, rapor) | Yok | — | `Pages/Crm/Quote*.razor` | P1 | API | **Yapılmadı** |
 | Sipariş/sözleşme dönüşümü | Hedef modül yok | Sahte entegrasyon riski | Yalnızca entegrasyon sözleşmesi | P2 | Teklif kabulü | **Yapılmadı** |
@@ -76,3 +76,20 @@ Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları
 | Ayarlar | `crm.quote.seller-details`, `crm.quote.footer-note` (belge başlığı/alt bilgisi); satıcı adı `core.profile.display-name`. |
 
 **Bu dilimde de yapılmadı (dürüst durum):** e-posta/gönderim adaptörü ve teslim durumları (`DeliveryStatus` hep `NotSent`; bağlantıyı kullanıcı iletir), sunumda belge üretilemezse otomatik yeniden deneme, belge şablonu özelleştirme (logo, çok dilli), müşteri sayfasında revizyon karşılaştırması, görüntüleme sayacı (yalnızca ilk görüntüleme), eşzamanlı belge üretimi yarışının (benzersiz indeks ihlali) entegrasyon testi, kabul sonrası fırsat/sipariş/sözleşme etkileri, klavye-yalnız ve ekran okuyucu geçişinin elle denenmesi. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
+
+## Uygulama durumu (dördüncü dilim: onay kuralları ve revizyon karşılaştırma)
+
+**Uygulandı** (`QuoteRuleTests` 5 entegrasyon testi, `QuoteApprovalAndComparisonTests` 8 birim testi; ekranlar tarayıcıda gezildi):
+
+| Konu | Karar / davranış |
+|---|---|
+| Onay kuralı | `crm.QuoteApprovalRules` (RLS'li, migration `QuoteApprovalRules`): ad, öncelik, etkin, indirim eşiği %, genel toplam eşiği, para birimi, isteğe bağlı onaylayan. Yönetim izni `crm.quote-rules.manage`. En az bir koşul zorunlu (veritabanı check kısıtı + depo doğrulaması). |
+| Değerlendirme | Saf `QuoteApprovalEvaluator`: bir kuralın girilen koşulları birlikte sağlanmalı (VE), kurallardan biri yeter (VEYA); eşikler "aşarsa" (büyüktür); tutar koşulu para birimi belirtilmişse yalnızca o para biriminde. Mevcut genel eşik ayarları korunur ve kurallarla birlikte uygulanır (biri yeterli). Eşleşme yoksa onaya gönderim gönüllüdür (davranış değişmedi). |
+| Sunum engeli | Eşleşen kural ya da eşik varken onay alınmadan sunum sunucuda engellenir (409). Onay gereksinimi `GET /api/crm/quotes/{id}/approval-requirements` ile döner; teklif detayı ve onay merkezi gerekçeyi gösterir. |
+| Kural sürümü kaydı | Onaya gönderim tarihçesine eşleşen kuralların adı, sürümü ve eşleşme gerekçesi yazılır (ör. "Yüksek indirim (sürüm 1): İndirim %20 (eşik %10)"). |
+| Onaylayan kısıtı | Eşleşen bir kural onaylayan atamışsa onay/ret/değişiklik isteği yalnızca atananlardan kabul edilir (API 403; eylem listesi `approver-restricted` nedenini verir). Kendi gönderdiğini onaylama yasağı ayrıca geçerlidir. Onaylayan atanmamış kural onay izni olan herkese açıktır. |
+| Karşılaştırma | `GET /api/crm/quotes/{id}/compare?with={otherId}`: aynı ailenin iki revizyonu; kalemler kararlı anahtarla eşlenir (ad değişimi "değişti"dir), başlık/geçerlilik/koşul ve tutar farkları. Maliyet ve iç not girmez; iki teklif de okuma kapsamında olmalı (başka tenant 404). Ekran `crm/teklifler/{id}/karsilastir`, revizyon listesinden "Bununla karşılaştır". |
+| Ekranlar | `Teklif kuralları` (`crm/teklif-kurallari`), karşılaştırma, onay merkezinde gerekçe ve yetkisiz onaylayan için pasif düğmeler. |
+| Düzeltme | Bool'a bağlı `select` kutuları ilk açılışta boş görünüyordu (`True`/`true` uyuşmazlığı); katalog sayfalarında da düzeltildi. |
+
+**Dördüncü dilimde de yapılmadı (dürüst durum):** sıralı/paralel çok adımlı onay (aynı teklifte birden çok onaylayanın hepsi), vekâlet/devir, onay hatırlatması ve zaman aşımı, marj tabanlı kural (maliyet gerekir), kural değişikliğinde bekleyen onayların yeniden değerlendirilmesi (değerlendirme karar anında canlı yapılır, gönderim anındaki kural yalnızca tarihçededir), kural yönetimi ekranının klavye-yalnız denemesi, karşılaştırmada alan bazlı metin farkı vurgusu. Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
