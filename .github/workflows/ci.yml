@@ -30,7 +30,7 @@ jobs:
       - name: Kodu al
         uses: actions/checkout@v5
 
-            - name: SDK ayarlarini goster
+      - name: SDK ayarlarini goster
         run: |
           git rev-parse HEAD
           cat global.json
