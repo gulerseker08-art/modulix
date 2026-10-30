@@ -1,0 +1,140 @@
+@page "/crm/teklifler"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+@inject NavigationManager Navigation
+
+<PageTitle>Teklifler · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuotesRead">
+    <div class="page-header">
+        <h1>Teklifler</h1>
+        <div class="header-actions">
+            @if (Session.Can(CrmAccess.QuotesWrite))
+            {
+                <a class="btn btn-primary" href="crm/teklifler/yeni">Yeni teklif</a>
+            }
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="filters" role="group" aria-label="Hızlı görünümler">
+        <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@mine" @onclick="ToggleMineAsync">Tekliflerim</button>
+        <button type="button" class="chip @(pending ? "active" : null)" aria-pressed="@pending" @onclick="TogglePendingAsync">Onay bekleyenler</button>
+        <button type="button" class="chip @(expiring ? "active" : null)" aria-pressed="@expiring" @onclick="ToggleExpiringAsync">Süresi yaklaşanlar (7 gün)</button>
+        <button type="button" class="chip @(latestOnly ? "active" : null)" aria-pressed="@latestOnly" @onclick="ToggleLatestAsync">Yalnızca son revizyonlar</button>
+        <label class="visually-hidden" for="status-filter">Durum</label>
+        <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm durumlar</option>
+            @foreach (var s in QuoteLabels.Statuses)
+            {
+                <option value="@s.Key">@s.Label</option>
+            }
+        </select>
+    </div>
+
+    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <label class="visually-hidden" for="quote-search">Teklif ara</label>
+        <input id="quote-search" class="form-control" type="search" placeholder="Başlık veya teklif no ara" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (page is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Bu süzgece uyan teklif yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead>
+                <tr>
+                    <th>Teklif</th><th>Müşteri</th><th>Durum</th><th>Onay</th><th class="text-end">Toplam</th><th>Geçerlilik</th><th>Sorumlu</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var quote in page.Items)
+                {
+                    <tr>
+                        <td data-label="Teklif" class="primary">
+                            <a href="crm/teklifler/@quote.Id">@quote.Title</a>
+                            <small class="text-muted">@quote.QuoteNumber · V@(quote.RevisionNo)</small>
+                        </td>
+                        <td data-label="Müşteri"><a href="crm/firmalar/@quote.CompanyId">@Lookups.CompanyName(quote.CompanyId)</a></td>
+                        <td data-label="Durum">
+                            <span class="badge stage-@QuoteLabels.StatusBadge(quote.Status)">@QuoteLabels.Label(QuoteLabels.Statuses, quote.Status)</span>
+                            @if (IsExpiringSoon(quote)) { <span class="badge stage-onhold">Süresi yaklaşıyor</span> }
+                            @if (IsOverdue(quote)) { <span class="badge stage-cancelled">Süresi geçti</span> }
+                        </td>
+                        <td data-label="Onay"><span class="badge stage-@QuoteLabels.ApprovalBadge(quote.ApprovalStatus)">@QuoteLabels.Label(QuoteLabels.Approvals, quote.ApprovalStatus)</span></td>
+                        <td data-label="Toplam" class="text-end">@QuoteLabels.Money(quote.GrossTotal, quote.Currency)</td>
+                        <td data-label="Geçerlilik">@(quote.ValidUntil is { } until ? CrmLabels.Time(until) : "—")</td>
+                        <td data-label="Sorumlu">@Lookups.MemberName(quote.OwnerId)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private CrmPage<QuoteDto>? page;
+    private string? message;
+    private string? status;
+    private string search = string.Empty;
+    private bool mine;
+    private bool pending;
+    private bool expiring;
+    private bool latestOnly = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.QuotesRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"/api/crm/quotes?page={pageNumber}";
+        if (!string.IsNullOrWhiteSpace(search)) { url += $"&search={Uri.EscapeDataString(search.Trim())}"; }
+        if (!string.IsNullOrEmpty(status) && !expiring) { url += $"&status={status}"; }
+        if (mine) { url += "&ownerId=me"; }
+        if (pending) { url += "&approvalStatus=Pending"; }
+        if (expiring)
+        {
+            // Sunulmuş ve önümüzdeki 7 gün içinde (bugün dahil) sona erenler.
+            url += $"&status=Presented&validFrom={DateTime.UtcNow:yyyy-MM-dd}&validTo={DateTime.UtcNow.AddDays(7):yyyy-MM-dd}";
+        }
+
+        if (latestOnly) { url += "&latestOnly=true"; }
+
+        var result = await Api.GetAsync<CrmPage<QuoteDto>>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private Task ToggleMineAsync() { mine = !mine; return LoadAsync(1); }
+
+    private Task TogglePendingAsync() { pending = !pending; return LoadAsync(1); }
+
+    private Task ToggleExpiringAsync() { expiring = !expiring; return LoadAsync(1); }
+
+    private Task ToggleLatestAsync() { latestOnly = !latestOnly; return LoadAsync(1); }
+
+    private static bool IsExpiringSoon(QuoteDto q) =>
+        q.Status == "Presented" && q.ValidUntil is { } until && until > DateTimeOffset.UtcNow && until <= DateTimeOffset.UtcNow.AddDays(7);
+
+    private static bool IsOverdue(QuoteDto q) => q.Status == "Presented" && q.ValidUntil is { } until && until <= DateTimeOffset.UtcNow;
+}

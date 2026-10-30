@@ -64,6 +64,8 @@ public static class AppCatalog
         new("crm.tax-rates", Crm, "Vergi ve kur", "landmark", "crm/vergi-kur", 37, CrmAccess.ModuleKey, CrmAccess.PricesRead),
         new("crm.discounts", Crm, "İndirimler", "zap", "crm/indirimler", 38, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal),
         new("crm.price-calculator", Crm, "Fiyat hesapla", "search", "crm/fiyat-hesapla", 39, CrmAccess.ModuleKey, CrmAccess.PricesRead),
+        new("crm.quotes", Crm, "Teklifler", "file-text", "crm/teklifler", 32, CrmAccess.ModuleKey, CrmAccess.QuotesRead),
+        new("crm.quote-approvals", Crm, "Teklif onayları", "check-circle", "crm/teklif-onaylari", 33, CrmAccess.ModuleKey, CrmAccess.QuotesApprove, Tone: AppTone.Teal),
         new("crm.activities", Crm, "Aktiviteler", "activity", "crm/aktiviteler", 40, CrmAccess.ModuleKey, CrmAccess.ActivitiesRead, Tone: AppTone.Teal),
 
         new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal),

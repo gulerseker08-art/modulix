@@ -1,0 +1,125 @@
+@page "/crm/teklif-onaylari"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Teklif onayları · ModuliX</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuotesApprove">
+    <div class="page-header">
+        <h1>Teklif onayları</h1>
+    </div>
+    <p class="text-muted">İç onay bekleyen teklifler. Onay belirli bir sürüme bağlıdır; teklifin ticari içeriği değişirse onay isteği geçersizleşir ve bu listeden düşer. Kendi gönderdiğiniz teklifi, ayar izin vermedikçe onaylayamazsınız.</p>
+
+    <Notice Text="@notice" Failed="@noticeFailed" />
+
+    @if (items is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (items.Count == 0)
+    {
+        <p class="text-muted">Onay bekleyen teklif yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Onay bekleyen teklifler</caption>
+            <thead>
+                <tr><th scope="col">Teklif</th><th scope="col">Müşteri</th><th scope="col" class="text-end">Toplam</th><th scope="col">İndirim</th><th scope="col">Bekleme</th><th scope="col">İşlem</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var quote in items)
+                {
+                    <tr>
+                        <td data-label="Teklif" class="primary"><a href="crm/teklifler/@quote.Id">@quote.Title</a> <small class="text-muted">@quote.QuoteNumber · V@(quote.RevisionNo)</small></td>
+                        <td data-label="Müşteri">@Lookups.CompanyName(quote.CompanyId)</td>
+                        <td data-label="Toplam" class="text-end">@QuoteLabels.Money(quote.GrossTotal, quote.Currency)</td>
+                        <td data-label="İndirim">@(quote.ListTotal > 0 ? $"%{(quote.DiscountTotal * 100m / quote.ListTotal):0.##}" : "—")</td>
+                        <td data-label="Bekleme">@Waiting(quote)</td>
+                        <td class="actions">
+                            @if (active?.Id == quote.Id)
+                            {
+                                <form @onsubmit="() => DecideAsync(quote)" @onsubmit:preventDefault>
+                                    <label class="visually-hidden" for="reason-@quote.Id">Gerekçe</label>
+                                    <input id="reason-@quote.Id" class="form-control form-control-sm" placeholder="Gerekçe (red / değişiklik için zorunlu)" maxlength="500" @bind="reason" />
+                                    <button type="button" class="btn btn-primary btn-sm" disabled="@busy" @onclick='() => DecideAsync(quote, "approve")'>Onayla</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick='() => DecideAsync(quote, "reject-approval")'>Reddet</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => DecideAsync(quote, "request-changes")'>Değişiklik iste</button>
+                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => active = null">Vazgeç</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(quote)">İncele ve karar ver</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private List<QuoteDto>? items;
+    private QuoteDto? active;
+    private string reason = string.Empty;
+    private string? notice;
+    private bool noticeFailed;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.QuotesApprove))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var (loaded, error) = await Api.GetAllAsync<QuoteDto>("/api/crm/quotes?approvalStatus=Pending&status=Draft");
+        items = loaded;
+        Notify(error, error is not null);
+    }
+
+    private void Open(QuoteDto quote)
+    {
+        active = quote;
+        reason = string.Empty;
+    }
+
+    private async Task DecideAsync(QuoteDto quote, string action = "approve")
+    {
+        if (busy) { return; }
+        if (action != "approve" && string.IsNullOrWhiteSpace(reason))
+        {
+            Notify("Red ve değişiklik isteği için gerekçe zorunludur.", true);
+            return;
+        }
+
+        busy = true;
+        var result = await Api.PostAsync<QuoteDto>($"/api/crm/quotes/{quote.Id}/{action}", new QuoteTransitionRequest(quote.Version, Blank(reason)));
+        busy = false;
+        Notify(result.IsSuccess ? $"{QuoteLabels.Action(action)}: tamamlandı." : result.Error, !result.IsSuccess);
+        active = null;
+        await LoadAsync();
+    }
+
+    private static string Waiting(QuoteDto quote)
+    {
+        var span = DateTimeOffset.UtcNow - (quote.CalculatedAt ?? DateTimeOffset.UtcNow);
+        return span.TotalHours < 1 ? "1 saatten az" : span.TotalDays < 1 ? $"{(int)span.TotalHours} saat" : $"{(int)span.TotalDays} gün";
+    }
+
+    private void Notify(string? text, bool failed)
+    {
+        notice = text;
+        noticeFailed = failed;
+    }
+
+    private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+}

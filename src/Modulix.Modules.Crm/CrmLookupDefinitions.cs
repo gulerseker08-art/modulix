@@ -26,6 +26,12 @@ public static class CrmLookupDefinitions
     public const string OpportunityOwner = "crm.opportunity.owner";
     public const string LeadOwner = "crm.lead.owner";
     public const string ActivityOwner = "crm.activity.owner";
+    public const string QuoteCompany = "crm.quote.company";
+    public const string QuoteContact = "crm.quote.contact";
+    public const string QuoteOpportunity = "crm.quote.opportunity";
+    public const string QuotePriceList = "crm.quote.price-list";
+    public const string QuoteOwner = "crm.quote.owner";
+    public const string QuoteLineProduct = "crm.quote-line.product";
 
     private static readonly string[] CompanyLabel = ["name"];
     private static readonly string[] CompanySecondary = ["city", "taxNumber"];
@@ -88,5 +94,32 @@ public static class CrmLookupDefinitions
         Owner(OpportunityOwner, CrmModule.Entities.Opportunity, "Sorumlu"),
         Owner(LeadOwner, CrmModule.Entities.Lead, "Sorumlu"),
         Owner(ActivityOwner, CrmModule.Entities.Activity, "Sorumlu"),
+        Company(QuoteCompany, CrmModule.Entities.Quote, "companyId", "Firma"),
+        Contact(QuoteContact, CrmModule.Entities.Quote, "contactId", "Kişi"),
+        new(QuoteOpportunity, CrmModule.Entities.Quote, "opportunityId", "Fırsat", LookupTargetKind.Record, CrmModule.Entities.Opportunity)
+        {
+            LabelFields = ["title"],
+            SecondaryFields = ["stage"],
+            SearchDescription = "Fırsat başlığı",
+            ViewPath = "crm/firsatlar",
+            DependsOnField = "companyId",
+            DependsOnFilter = "companyId",
+            DependsOnHint = "Firma seçiliyse fırsatlar o firmayla sınırlanır.",
+        },
+        new(QuotePriceList, CrmModule.Entities.Quote, "priceListId", "Fiyat listesi", LookupTargetKind.Record, CrmModule.Entities.PriceList)
+        {
+            LabelFields = ["name"],
+            SecondaryFields = ["currency"],
+            SearchDescription = "Fiyat listesi adı ve segment",
+            ViewPath = "crm/fiyat-listeleri",
+        },
+        Owner(QuoteOwner, CrmModule.Entities.Quote, "Sorumlu"),
+        new(QuoteLineProduct, CrmModule.Entities.QuoteLine, "productId", "Ürün", LookupTargetKind.Record, CrmModule.Entities.Product)
+        {
+            LabelFields = ["name"],
+            SecondaryFields = ["code"],
+            SearchDescription = "Ürün kodu ve adı",
+            ViewPath = "crm/urunler",
+        },
     ];
 }

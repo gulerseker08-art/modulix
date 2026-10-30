@@ -46,6 +46,17 @@ public static class QuoteDeliveryStatus
     public static readonly IReadOnlyList<string> All = [NotSent, Pending, Processing, Succeeded, Failed];
 }
 
+/// <summary>Kalem türü: ürün, hizmet, paket ana kalemi ya da yetkili kullanıcının serbest açıklamalı kalemi.</summary>
+public static class QuoteLineKind
+{
+    public const string Product = "Product";
+    public const string Service = "Service";
+    public const string Package = "Package";
+    public const string Free = "Free";
+
+    public static readonly IReadOnlyList<string> All = [Product, Service, Package, Free];
+}
+
 public static class QuoteAction
 {
     public const string SubmitForApproval = "submit-for-approval";
@@ -166,4 +177,32 @@ public static class QuoteRules
         QuoteStatus.Expired => "Teklifin geçerlilik süresi dolmuş.",
         _ => "Teklif henüz müşteriye sunulmamış.",
     };
+}
+
+/// <summary>Revizyon ve numara kuralları (saf).</summary>
+public static class QuoteRevisionRules
+{
+    /// <summary>
+    /// Yeni revizyon açılabilir mi? Kabul edilmiş sürümün yeniden yazılması ya da iptal/geçersiz sürümden devam edilmesi
+    /// ayrı bir ticari süreçtir; revizyon yalnızca sunulmuş, reddedilmiş ya da süresi dolmuş sürümden açılır. Engel varsa nedeni döner.
+    /// </summary>
+    public static string? CanRevise(string status) => status switch
+    {
+        QuoteStatus.Presented or QuoteStatus.Rejected or QuoteStatus.Expired => null,
+        QuoteStatus.Draft => "Taslak teklif zaten düzenlenebilir; revizyon gerekmez.",
+        QuoteStatus.Accepted => "Kabul edilmiş teklif yeniden yazılamaz; sonraki ticari değişiklik ayrı süreçtir.",
+        _ => "Bu durumdaki tekliften revizyon açılamaz.",
+    };
+
+    public static string NewNumber(DateTimeOffset createdAt)
+    {
+        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        Span<char> suffix = stackalloc char[6];
+        for (var i = 0; i < suffix.Length; i++)
+        {
+            suffix[i] = alphabet[System.Security.Cryptography.RandomNumberGenerator.GetInt32(alphabet.Length)];
+        }
+
+        return $"TK-{createdAt:yyyyMMdd}-{new string(suffix)}";
+    }
 }
