@@ -1,11 +1,14 @@
 using System.Text.Json.Nodes;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
+using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
+using Modulix.Infrastructure.Tenancy;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Quotes;
 
@@ -24,10 +27,14 @@ public sealed class QuoteExpiryOptions
 
 /// <summary>
 /// Bir tenant için teklif süre dolumu turunu çalıştırır (<see cref="IQuoteExpiry"/>). İş "crm.quote-expiry" sistem kimliğiyle ve kendi tenant
-/// kapsamında çalışır; CRM modülü o tenant için kapalıysa hiçbir şey yapılmaz.
+/// kapsamında çalışır; CRM modülü o tenant için kapalıysa hiçbir şey yapılmaz. Birden fazla uygulama örneği aynı anda çalışabilir: tur, tenant
+/// veritabanında oturum kilidiyle (<c>sp_getapplock</c>) tek örnekte koşar; kilidi alamayan örnek turu atlar (durum geçişleri zaten sürüm
+/// denetimlidir, kilit yalnızca gereksiz çakışmayı ve çift bildirimi önler). Kuyruğa yazılan sorumlu e-postaları turun sonunda kaydedilir.
 /// </summary>
 public sealed class QuoteExpiryRunner(IServiceScopeFactory scopes, TimeProvider time)
 {
+    public const string LockName = "modulix.crm.quote-expiry";
+
     public async Task<QuoteExpiryRun> RunTenantAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
@@ -39,11 +46,54 @@ public sealed class QuoteExpiryRunner(IServiceScopeFactory scopes, TimeProvider 
             return new QuoteExpiryRun(0, 0);
         }
 
-        var cause = new EventEnvelope(
-            Guid.NewGuid(), tenantId, DomainEventTypes.RecordDeleted, 1, CrmModule.Entities.Quote, Guid.Empty, null, Guid.Empty,
-            ExecutionSource.Import, null, null, 0, new JsonObject(), time.GetUtcNow());
-        services.GetRequiredService<EventHandlingScope>().Begin(cause, "crm.quote-expiry");
-        return await services.GetRequiredService<IQuoteExpiry>().RunAsync(time.GetUtcNow(), cancellationToken);
+        // Kilit ayrı bir bağlantıda, tur boyunca tutulur; kayıt yazımları kendi bağlantılarında olağan akışla devam eder.
+        await using var lockConnection = new SqlConnection(services.GetRequiredService<ITenantConnectionResolver>().GetConnectionString(tenantId));
+        await lockConnection.OpenAsync(cancellationToken);
+        if (!await TryLockAsync(lockConnection, cancellationToken))
+        {
+            return new QuoteExpiryRun(0, 0, "Başka bir uygulama örneği aynı tenant için çalışıyor; tur atlandı.", Skipped: true);
+        }
+
+        try
+        {
+            var cause = new EventEnvelope(
+                Guid.NewGuid(), tenantId, DomainEventTypes.RecordDeleted, 1, CrmModule.Entities.Quote, Guid.Empty, null, Guid.Empty,
+                ExecutionSource.Import, null, null, 0, new JsonObject(), time.GetUtcNow());
+            services.GetRequiredService<EventHandlingScope>().Begin(cause, "crm.quote-expiry");
+            var run = await services.GetRequiredService<IQuoteExpiry>().RunAsync(time.GetUtcNow(), cancellationToken);
+
+            // Sistem kimliği kapsamında e-posta kuyruğu, teslimle birlikte kaydedilmek üzere bağlama eklenir (EfEmailQueue); burada teslim yok,
+            // bu yüzden kuyruk satırları turun sonunda açıkça kaydedilir.
+            await services.GetRequiredService<PlatformDbContext>().SaveChangesAsync(cancellationToken);
+            return run;
+        }
+        finally
+        {
+            await ReleaseLockAsync(lockConnection, cancellationToken);
+        }
+    }
+
+    private static async Task<bool> TryLockAsync(SqlConnection connection, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DECLARE @r int; EXEC @r = sys.sp_getapplock @Resource = @name, @LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = 0; SELECT @r;";
+        command.Parameters.AddWithValue("@name", LockName);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) >= 0;
+    }
+
+    private static async Task ReleaseLockAsync(SqlConnection connection, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "EXEC sys.sp_releaseapplock @Resource = @name, @LockOwner = N'Session';";
+            command.Parameters.AddWithValue("@name", LockName);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch (SqlException)
+        {
+            // Bağlantı kapanınca oturum kilidi zaten düşer.
+        }
     }
 }
 
@@ -73,7 +123,7 @@ public sealed class QuoteExpiryWorker(
                     try
                     {
                         var run = await runner.RunTenantAsync(tenantId, stoppingToken);
-                        if (run.Warning is not null)
+                        if (run.Warning is not null && !run.Skipped)
                         {
                             logger.LogWarning("Tenant {TenantId}: {Warning}", tenantId, run.Warning);
                         }

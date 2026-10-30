@@ -1,6 +1,6 @@
 # ADR-0019: Teklif yönetimi (M1.5) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (çekirdek, yaşam döngüsü, ekranlar, PDF, paylaşım/kabul, onay kuralları, karşılaştırma, e-posta, raporlar ve kabul sonrası süreçler; sipariş/sözleşme modülü ve çok adımlı onay yok). Tarih: 2026-10-30.
+Durum: Kısmen uygulandı (çekirdek, yaşam döngüsü, ekranlar, PDF, paylaşım/kabul, onay kuralları, karşılaştırma, e-posta, raporlar, kabul sonrası süreçler ve küçük tamamlamalar; sipariş/sözleşme modülü ve çok adımlı onay yok). Tarih: 2026-10-30.
 
 ## Mevcut durum (analiz anında, kodla kanıtlı; güncel durum en alttaki "Uygulama durumu"nda)
 
@@ -138,3 +138,16 @@ Veri modeli, migration, kayıt depoları, izinler, uç noktalar, onay kuralları
 | Güvenlik | İki sistem kimliği yalnızca sayılan izinlerle çalışır; kimlik doğrulama yoktur, ağdan erişilemez. Tüm yan etkiler kayıt boru hattından geçer (izin, kapsam, audit, olay). |
 
 **Yedinci dilimde de yapılmadı (dürüst durum):** sipariş/sözleşme oluşturma (hedef modül yok; yalnızca sözleşme ve devir görünümü), "birincil teklif" kavramı ve fırsat tutarının tekliften otomatik eşitlenmesi, takip aktivitesinin teklif sonuçlanınca otomatik kapatılması (takip aktivitesi serbest bir görevdir), kayıp teklifte fırsatı kaybedildi yapma, hatırlatma için e-posta/bildirim (yalnızca aktivite), süre dolumu için zaman dilimi/iş günü hesabı (UTC gün sınırları), işin birden çok uygulama örneğinde yük dağıtımı (sürüm denetimi çift işlemi önler, ama kilitleme yoktur). Yol haritası M1.5 maddesi **tamamlandı işaretlenmedi**.
+
+## Uygulama durumu (sekizinci dilim: küçük tamamlamalar)
+
+**Uygulandı** (`QuotePostAcceptTests` 6 test; ilgili kümeler):
+
+| Konu | Karar / davranış |
+|---|---|
+| Teklif bağ hedefi | Aktiviteler teklife `ActivityLink` ile bağlanabilir (`entityKey = crm.quote`; görünürlük teklif okuma izni + veri kapsamı; başlık yalnızca ad/numara). Tekliften açılan takip ve hatırlatma aktiviteleri otomatik bağlanır. |
+| Otomatik kapatma | Teklif sonuçlanınca (kabul, ret, iptal, süre dolumu olayı) teklife bağlı, **tekliften açılmış** (konu öneki "Teklif takibi: " / "Teklif süresi doluyor: ", tür FollowUp) ve hâlâ açık aktiviteler gerekçeyle iptal edilir; tarihçeye `FollowUpsClosed` yazılır (tek kez). Kullanıcının elle açıp teklife bağladığı aktivitelere dokunulmaz. Eski revizyonun `Superseded` olması ayrı olay üretmediği için o revizyonun takibi kapatılmaz (bilinçli sınır). |
+| Sorumluya e-posta | Süre dolumu hatırlatması açıldığında ve teklif `Expired` olduğunda teklif sorumlusuna e-posta kuyruğa yazılır (`platform.EmailMessages.Reference = crm.quote-reminder:{id}` / `crm.quote-expired:{id}`). Sorumlu aktif tenant'ın etkin üyesi değilse atlanır. İçerik yalnızca başlık, numara, tarih ve arayüz bağlantısı; HTML'e kodlanır. Sistem kimliği kapsamında kuyruk satırları turun sonunda açıkça kaydedilir. |
+| İş kilidi | Süre dolumu turu tenant veritabanında oturum kilidiyle (`sp_getapplock`, `modulix.crm.quote-expiry`) tek örnekte koşar; kilidi alamayan örnek turu atlar (`Skipped`). Durum geçişleri zaten sürüm denetimliydi; kilit gereksiz çakışmayı ve çift e-postayı önler. |
+
+**Bu dilimde de yapılmadı:** takip aktivitesinin teklif yeniden açılınca geri açılması, süresi dolan teklif için müşteriye bildirim (bilinçli: müşteriye yalnızca bağlantı e-postası gider), e-posta şablonu özelleştirme, zaman dilimine göre "09:00" (UTC kullanılır).

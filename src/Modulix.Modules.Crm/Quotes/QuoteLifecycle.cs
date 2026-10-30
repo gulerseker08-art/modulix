@@ -1,8 +1,11 @@
 using System.Globalization;
+using System.Net;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Sales;
+using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Opportunities;
 using Modulix.Modules.Crm.Records;
@@ -39,23 +42,30 @@ public static class QuoteMarkerKinds
     public const string OpportunityWon = "OpportunityWon";
     public const string OpportunityWinSkipped = "OpportunityWinSkipped";
     public const string FollowUpScheduled = "FollowUpScheduled";
+    public const string FollowUpsClosed = "FollowUpsClosed";
     public const string ExpiryReminderCreated = "ExpiryReminderCreated";
     public const string Expired = "Expired";
 }
 
 /// <summary>
-/// Teklif yaşam döngüsü aboneliği (<c>crm.quote-lifecycle</c>, ADR-0019 dilim 7): teklif güncelleme olayından, kaydın <b>güncel durumuna</b> bakarak iki
-/// ayarlı yan etki üretir; ayarlar kapalıyken hiçbir şey yapmaz. Teslim en az bir kezdir; işaret satırı ve durum denetimi idempotent yapar.
+/// Teklif yaşam döngüsü aboneliği (<c>crm.quote-lifecycle</c>, ADR-0019 dilim 7): teklif güncelleme olayından, kaydın <b>güncel durumuna</b> bakarak
+/// ayarlı yan etkiler üretir; ayarlar kapalıyken hiçbir şey yapmaz. Teslim en az bir kezdir; işaret satırı ve durum denetimi idempotent yapar.
 /// <list type="bullet">
 ///   <item><b>Kabul</b> (<c>quote.Accepted</c>/<c>quote.CustomerAccepted</c>): ayar açıksa bağlı <i>açık</i> fırsat kazanıldı olur (kazanılan tutar teklifin net
 ///   toplamı). Fırsat zaten kapalı ya da beklemedeyse dokunulmaz. Başarısızlıkta kabul bozulmaz; neden teklif tarihçesine yazılır.</item>
-///   <item><b>Sunum</b> (<c>quote.Presented</c>): ayar &gt; 0 ise sorumlu için takip aktivitesi açılır.</item>
+///   <item><b>Sunum</b> (<c>quote.Presented</c>): ayar &gt; 0 ise sorumlu için takip aktivitesi açılır (teklife bağlı).</item>
+///   <item><b>Sonuçlanma</b> (kabul, ret, iptal, süre dolumu): teklife bağlı, tekliften açılmış ve hâlâ açık takip/hatırlatma aktiviteleri
+///   gerekçeyle iptal edilir. Kullanıcının elle açıp teklife bağladığı aktivitelere dokunulmaz.</item>
 /// </list>
 /// </summary>
 internal sealed class QuoteLifecycleSubscriber(
-    IRecordPipeline pipeline, IOpportunityWorkflow opportunities, QuoteMarkers markers, IQuotePolicyProvider? policyProvider = null) : IEventSubscriber
+    IRecordPipeline pipeline, IOpportunityWorkflow opportunities, IActivityWorkflow activities, QuoteMarkers markers, QuoteReader reader,
+    IQuotePolicyProvider? policyProvider = null) : IEventSubscriber
 {
     private static readonly string[] MarkPermissions = [CrmModule.Permissions.QuotesRead];
+
+    private static readonly string[] FinalReasons =
+        ["quote.Accepted", "quote.CustomerAccepted", "quote.Rejected", "quote.CustomerRejected", "quote.Cancelled", "quote.Expired"];
 
     public async Task HandleAsync(EventEnvelope envelope, CancellationToken cancellationToken)
     {
@@ -79,6 +89,11 @@ internal sealed class QuoteLifecycleSubscriber(
         else if (status == QuoteStatus.Presented && reason == "quote.Presented" && policy.FollowUpDays > 0)
         {
             await ScheduleFollowUpAsync(record.Value!, policy.FollowUpDays, cancellationToken);
+        }
+
+        if (FinalReasons.Contains(reason) && status != QuoteStatus.Draft && status != QuoteStatus.Presented)
+        {
+            await CloseFollowUpsAsync(record.Value!, status!, cancellationToken);
         }
     }
 
@@ -123,13 +138,48 @@ internal sealed class QuoteLifecycleSubscriber(
 
         var presented = DateTimeOffset.TryParse(Text(quote, "presentedAt"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) ? at : DateTimeOffset.UtcNow;
         var due = presented.UtcDateTime.Date.AddDays(days).AddHours(9);
-        var values = QuoteActivities.Values($"Teklif takibi: {Text(quote, "title")} ({Text(quote, "quoteNumber")})", due, quote);
-        var created = await pipeline.CreateAsync(new RecordCommand(CrmModule.Entities.Activity, null, values), cancellationToken);
+        var created = await QuoteActivities.CreateAsync(pipeline, $"{QuoteActivities.FollowUpPrefix}{Text(quote, "title")} ({Text(quote, "quoteNumber")})", due, quote, cancellationToken);
         if (created.IsSuccess)
         {
             await markers.MarkAsync(quote.Id, QuoteMarkerKinds.FollowUpScheduled, $"Takip aktivitesi {due:dd.MM.yyyy} için açıldı.", MarkPermissions, cancellationToken);
         }
     }
+
+    /// <summary>Tekliften açılan (konu öneki bizim) açık aktiviteleri iptal eder; işaret satırı sayıyı ve nedeni tutar.</summary>
+    private async Task CloseFollowUpsAsync(RecordData quote, string status, CancellationToken cancellationToken)
+    {
+        if (await markers.HasAsync(quote.Id, QuoteMarkerKinds.FollowUpsClosed, cancellationToken))
+        {
+            return;
+        }
+
+        var open = (await reader.LinkedOpenActivitiesAsync(quote.Id, cancellationToken)).Where(a => QuoteActivities.IsOurs(a)).ToList();
+        if (open.Count == 0)
+        {
+            return;
+        }
+
+        var reason = $"Teklif sonuçlandı ({QuoteStatusLabel(status)}); takip otomatik kapatıldı.";
+        var closed = 0;
+        foreach (var activity in open)
+        {
+            if ((await activities.CancelAsync(activity.Id, activity.Version, reason, cancellationToken)).IsSuccess)
+            {
+                closed++;
+            }
+        }
+
+        await markers.MarkAsync(quote.Id, QuoteMarkerKinds.FollowUpsClosed, $"{closed} açık takip/hatırlatma aktivitesi kapatıldı.", MarkPermissions, cancellationToken);
+    }
+
+    private static string QuoteStatusLabel(string status) => status switch
+    {
+        QuoteStatus.Accepted => "kabul edildi",
+        QuoteStatus.Rejected => "reddedildi",
+        QuoteStatus.Cancelled => "iptal edildi",
+        QuoteStatus.Expired => "süresi doldu",
+        _ => status,
+    };
 
     private static string? Text(RecordData record, string name) =>
         record.Values[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
@@ -141,13 +191,23 @@ internal sealed class QuoteLifecycleSubscriber(
         record.Values[name] is JsonValue value && value.TryGetValue<int>(out var number) ? number : 1;
 }
 
-/// <summary>Tekliften açılan aktivitelerin ortak değerleri: sorumlu teklifin sorumlusudur; fırsat varsa aynı firmaya bağlıdır.</summary>
+/// <summary>
+/// Tekliften açılan aktiviteler: sorumlu teklifin sorumlusudur, firma ve varsa fırsata bağlıdır, ayrıca teklife <see cref="ActivityLink"/> ile bağlanır.
+/// Konu öneki, otomatik kapatmada "bizim açtığımız" aktiviteyi kullanıcının elle bağladığından ayırır.
+/// </summary>
 internal static class QuoteActivities
 {
-    public static JsonObject Values(string subject, DateTime dueUtc, RecordData quote)
+    public const string FollowUpPrefix = "Teklif takibi: ";
+    public const string ReminderPrefix = "Teklif süresi doluyor: ";
+
+    public static bool IsOurs(Activity activity) =>
+        activity.Type == "FollowUp" && (activity.Subject.StartsWith(FollowUpPrefix, StringComparison.Ordinal) || activity.Subject.StartsWith(ReminderPrefix, StringComparison.Ordinal));
+
+    /// <summary>Aktiviteyi ve teklif bağını oluşturur. Bağ oluşturulamazsa aktivite yine kalır (otomatik kapatma o aktiviteyi bulamaz).</summary>
+    public static async Task<RecordResult<RecordData>> CreateAsync(IRecordPipeline pipeline, string subject, DateTime dueUtc, RecordData quote, CancellationToken cancellationToken)
     {
         string? Text(string name) => quote.Values[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
-        return new JsonObject
+        var created = await pipeline.CreateAsync(new RecordCommand(CrmModule.Entities.Activity, null, new JsonObject
         {
             ["type"] = "FollowUp",
             ["subject"] = subject.Length > 200 ? subject[..200] : subject,
@@ -155,17 +215,62 @@ internal static class QuoteActivities
             ["companyId"] = Text("companyId"),
             ["opportunityId"] = Text("opportunityId"),
             ["ownerId"] = Text("ownerId"),
-        };
+        }), cancellationToken);
+        if (!created.IsSuccess)
+        {
+            return created;
+        }
+
+        await pipeline.CreateAsync(new RecordCommand(CrmModule.Entities.ActivityLink, null, new JsonObject
+        {
+            ["activityId"] = created.Value!.Id.ToString(),
+            ["entityKey"] = CrmModule.Entities.Quote,
+            ["recordId"] = quote.Id.ToString(),
+            ["isPrimary"] = false,
+        }), cancellationToken);
+        return created;
     }
 }
 
-/// <summary>Zamanlanmış işin bir turunun özeti.</summary>
-public sealed record QuoteExpiryRun(int Expired, int RemindersCreated, string? Warning = null);
+/// <summary>Tekliflerle ilgili sorumlu bildirimleri (e-posta). Kullanıcı girdisi HTML'e kodlanır; içerik yalnızca başlık, numara ve tarihtir.</summary>
+internal static class QuoteOwnerEmails
+{
+    public const string ReminderReference = "crm.quote-reminder:";
+    public const string ExpiredReference = "crm.quote-expired:";
+
+    public static EmailMessage ExpiryReminder(NotificationRecipient to, Quote quote, string? link) => Build(
+        to, quote, $"Teklif süresi doluyor: {OneLine(quote.QuoteNumber)}",
+        $"\"{OneLine(quote.Title)}\" başlıklı {quote.QuoteNumber} numaralı teklifin geçerliliği {Date(quote.ValidUntil)} tarihinde sona eriyor; müşteri henüz karar vermedi.",
+        link, ReminderReference + quote.Id.ToString("N"));
+
+    public static EmailMessage Expired(NotificationRecipient to, Quote quote, string? link) => Build(
+        to, quote, $"Teklif süresi doldu: {OneLine(quote.QuoteNumber)}",
+        $"\"{OneLine(quote.Title)}\" başlıklı {quote.QuoteNumber} numaralı teklifin geçerliliği {Date(quote.ValidUntil)} tarihinde doldu ve teklif \"süresi doldu\" durumuna alındı. Gerekirse yeni revizyon açabilirsiniz.",
+        link, ExpiredReference + quote.Id.ToString("N"));
+
+    private static EmailMessage Build(NotificationRecipient to, Quote quote, string subject, string body, string? link, string reference)
+    {
+        var greeting = $"Merhaba {to.DisplayName},";
+        var html = $"<p>{Encode(greeting)}</p><p>{Encode(body)}</p>" + (link is null ? string.Empty : $"<p><a href=\"{Encode(link)}\">Teklifi aç</a></p>");
+        var text = string.Join("\n\n", new[] { greeting, body, link is null ? null : $"Teklifi aç: {link}" }.Where(p => p is not null));
+        return new EmailMessage(to.Email, subject, html) { ToName = to.DisplayName, TextBody = text, Reference = reference };
+    }
+
+    private static string Date(DateTimeOffset? value) => value is { } v ? v.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) : "—";
+
+    private static string OneLine(string value) => string.Join(' ', value.Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)).Trim();
+
+    private static string Encode(string value) => WebUtility.HtmlEncode(value);
+}
+
+/// <summary>Zamanlanmış işin bir turunun özeti. <see cref="Skipped"/>: başka bir örnek aynı anda çalıştığı için tur atlandı.</summary>
+public sealed record QuoteExpiryRun(int Expired, int RemindersCreated, string? Warning = null, bool Skipped = false);
 
 /// <summary>
-/// Teklif süre dolumu (ADR-0019 dilim 7): geçerliliği bitmiş ama hâlâ "müşteriye sunuldu" teklifleri <c>Expired</c> yapar; ayar açıksa bitmeden önce
-/// sorumlu için hatırlatma aktivitesi açar. Kabul anındaki süre denetimi bu işe bağlı değildir (iş geç kalsa da kabul reddedilir). Tekrar çalıştırmak
-/// güvenlidir: durum geçişi sürüm denetimlidir, hatırlatma tarihçe işaretiyle tek kez açılır. Sistem kimliğiyle (<c>crm.quote-expiry</c>) çalışır.
+/// Teklif süre dolumu (ADR-0019 dilim 7): geçerliliği bitmiş ama hâlâ "müşteriye sunuldu" teklifleri <c>Expired</c> yapar ve sorumluya e-posta bildirir;
+/// ayar açıksa bitmeden önce sorumlu için hatırlatma aktivitesi açar ve e-posta bildirir. Kabul anındaki süre denetimi bu işe bağlı değildir (iş geç
+/// kalsa da kabul reddedilir). Tekrar çalıştırmak güvenlidir: durum geçişi sürüm denetimlidir, hatırlatma tarihçe işaretiyle tek kez açılır.
+/// E-postalar yalnızca sorumlu aktif tenant'ın etkin üyesiyse gönderilir. Sistem kimliğiyle (<c>crm.quote-expiry</c>) çalışır.
 /// </summary>
 public interface IQuoteExpiry
 {
@@ -173,7 +278,8 @@ public interface IQuoteExpiry
 }
 
 internal sealed class QuoteExpiry(
-    IRecordPipeline pipeline, QuoteWorkflowGate gate, QuoteReader reader, QuoteMarkers markers, IQuotePolicyProvider? policyProvider = null) : IQuoteExpiry
+    IRecordPipeline pipeline, QuoteWorkflowGate gate, QuoteReader reader, QuoteMarkers markers, IEmailQueue emails, INotificationRecipients recipients,
+    IQuotePolicyProvider? policyProvider = null) : IQuoteExpiry
 {
     private const int BatchSize = 200;
     private static readonly string[] DecisionPermissions = [CrmModule.Permissions.QuotesRecordDecision];
@@ -198,6 +304,7 @@ internal sealed class QuoteExpiry(
             if (result.IsSuccess)
             {
                 expired++;
+                await NotifyOwnerAsync(quote, owner => QuoteOwnerEmails.Expired(owner, quote, recipients.Link($"crm/teklifler/{quote.Id}")), cancellationToken);
             }
 
             // Sürüm çakışması (aynı anda kabul/iptal/revizyon) hata değildir: o teklif zaten başka bir kararla sonuçlanmıştır.
@@ -224,8 +331,7 @@ internal sealed class QuoteExpiry(
                         due = now.UtcDateTime;
                     }
 
-                    var activity = await pipeline.CreateAsync(new RecordCommand(CrmModule.Entities.Activity, null,
-                        QuoteActivities.Values($"Teklif süresi doluyor: {quote.Title} ({quote.QuoteNumber})", due, record.Value!)), ct);
+                    var activity = await QuoteActivities.CreateAsync(pipeline, $"{QuoteActivities.ReminderPrefix}{quote.Title} ({quote.QuoteNumber})", due, record.Value!, ct);
                     if (!activity.IsSuccess)
                     {
                         return RecordResult<bool>.Fail(activity.Error!.Code, activity.Error.Message, activity.Error.FieldErrors);
@@ -238,6 +344,7 @@ internal sealed class QuoteExpiry(
                 if (created is { IsSuccess: true, Value: true })
                 {
                     reminders++;
+                    await NotifyOwnerAsync(quote, owner => QuoteOwnerEmails.ExpiryReminder(owner, quote, recipients.Link($"crm/teklifler/{quote.Id}")), cancellationToken);
                 }
                 else if (!created.IsSuccess)
                 {
@@ -247,6 +354,24 @@ internal sealed class QuoteExpiry(
         }
 
         return new QuoteExpiryRun(expired, reminders, warning);
+    }
+
+    /// <summary>Sorumluya e-posta; sorumlu yoksa ya da etkin üye değilse sessizce atlanır. Bildirim hatası işin sonucunu bozmaz.</summary>
+    private async Task NotifyOwnerAsync(Quote quote, Func<NotificationRecipient, EmailMessage> build, CancellationToken cancellationToken)
+    {
+        if (quote.OwnerId is not { } ownerId || await recipients.FindAsync(ownerId, cancellationToken) is not { } owner)
+        {
+            return;
+        }
+
+        try
+        {
+            emails.Enqueue(build(owner));
+        }
+        catch (ArgumentException)
+        {
+            // Geçersiz adres vb.: bildirim atlanır, teklif durumu değişmez.
+        }
     }
 }
 

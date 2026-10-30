@@ -107,3 +107,25 @@ internal sealed class LeadLinkTarget(IModuleData data, IRecordAccess access, ICu
             ? await data.Set<Lead>().AsNoTracking().Where(l => l.Id == recordId).Select(l => l.Subject).SingleOrDefaultAsync(cancellationToken)
             : null;
 }
+
+/// <summary>Teklif (ADR-0019): tekliften açılan takip/hatırlatma aktiviteleri teklife bağlanır; teklif sonuçlanınca otomatik kapatılır.</summary>
+internal sealed class QuoteLinkTarget(IModuleData data, IRecordAccess access) : CrmActivityLinkTarget(data, access)
+{
+    public override string EntityKey => CrmModule.Entities.Quote;
+
+    protected override Task<bool> ExistsInScopeAsync(Guid recordId, IReadOnlySet<Guid>? owners, CancellationToken cancellationToken)
+    {
+        var query = Data.Set<Quote>().AsNoTracking().Where(q => q.Id == recordId);
+        if (owners is not null)
+        {
+            var ids = Ids(owners);
+            query = query.Where(q => ids.Contains(q.OwnerId));
+        }
+
+        return query.AnyAsync(cancellationToken);
+    }
+
+    // Yalnızca başlık ve numara: tutarlar, maliyet ve iç not aktivite üzerinden taşınmaz.
+    protected override Task<string?> TitleAsync(Guid recordId, CancellationToken cancellationToken) =>
+        Data.Set<Quote>().AsNoTracking().Where(q => q.Id == recordId).Select(q => q.Title + " (" + q.QuoteNumber + " V" + q.RevisionNo + ")").SingleOrDefaultAsync(cancellationToken);
+}
