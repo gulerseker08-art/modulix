@@ -83,7 +83,7 @@ testleri geçer ve ayrı PR olarak incelenir.
   `platform.Memberships`'e yabancı anahtar geri gelir; tenant oluşturma ve davet akışları tek işlemde çalışır.
 - Platform ad çözümlemeleri (üye adı, firma adı) iki adımlı bellek içi birleştirme yerine tek sorgu olur.
 
-### Dilim 3 — Sadeleştirme ve işletim
+### Dilim 3 — Sadeleştirme ve işletim (uygulandı)
 
 - Olay dağıtıcısı, teklif süresi işleyicisi, olay ekranı ve sağlık kontrolü tenant başına döngü yerine tek veritabanı
   taraması yapar (tenant bağlamı yine kayıt başına açıkça kurulur).

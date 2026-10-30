@@ -185,6 +185,7 @@ Platformu işleten ekip için ayrı bir alan: menüde **Platform** (`/platform`)
 
 - **Platform yöneticisi** kullanıcı düzeyinde bir bayraktır (`IsPlatformAdministrator`); firmaya bağlı değildir. Arayüzden atanamaz, komut satırıyla atanır:
   `dotnet run --project src/Modulix.Api -- platform-admin kisi@ornek.com` (kaldırmak için sonuna `--remove`). Hesap yoksa oluşturulur ve şifre belirleme bağlantısı konsola yazılır. Bayrak her istekte veritabanından okunur; kaldırılınca bir sonraki istekte 403.
+- **Tenant verisi dışa aktarma ve silme** yalnızca komut satırındandır (ADR-0020 Dilim 3): `dotnet run --project src/Modulix.Api -- tenant-export acme [--dir <dizin>]` tenant'ın `TenantId` taşıyan bütün satırlarını tablo başına JSON dosyasına yazar (`manifest.json` ile); `-- tenant-delete acme --confirm acme` aynı satırları ve tenant kaydını tek işlemde siler (geri alınamaz; kullanıcı hesapları kalır). Runbook: `docs/tenant-isletim.md`.
 - **Firma verisini görmez:** RLS atlanmaz. Platform yöneticisi yalnızca platform tablolarını (firmalar, üyelikler, modül hakları) ve sayıları görür; firmaya yazılan her şey (roller, denetim kaydı) o firmanın bağlamında yazılır.
 - **Firmalar** (`/platform/firmalar`): ad, kısa ad, durum, etkin üye ve yönetici sayısı, açık modüller; arama ve durum filtresi.
 - **Firma açma** tek işlemdir: firma, Yönetici sistem rolü, seçilen modüller, seçilen hazır roller ve ilk yöneticinin daveti (Y2 akışı) birlikte oluşur. Biri başarısız olursa (ör. kısa ad kullanılıyor, 409) hiçbiri oluşmaz ve e-posta gitmez.

@@ -65,6 +65,7 @@ public static class PersistenceSetup
 
         services.AddScoped<IMembershipDirectory, MembershipDirectory>();
         services.AddScoped<ITenantMembers, TenantMembers>();
+        services.AddScoped<ITenantDataTransfer, TenantDataTransfer>();
         services.AddScoped<IModuleData, ModuleData>();
 
         // Modül hakları ve izinler; ModuleCatalog'u host kaydeder (AddModulixModules).

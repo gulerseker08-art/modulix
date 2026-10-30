@@ -87,16 +87,38 @@ dotnet ef migrations add <Ad> --project src/Modulix.Infrastructure --startup-pro
 
 ## Arka plan işleri
 
-E-posta işleyicisi platform kuyruğunu işler. Olay işleyicisi, teklif süre dolumu işleyicisi ve olay ekranı açık her
-tenant için tenant bağlamını açıkça kurar (oturum değeri → RLS) ve o tenant'ın kayıtlarını işler; bağlamsız sorgu satır
-döndürmez. Teklif süre dolumu kilidi tenant başınadır (`sp_getapplock`, kaynak adı tenant kimliğini içerir). Outbox ve teslim tabloları RLS dışıdır; `ModulixDbContext` bu iki tabloya aktif tenant sorgu filtresi uygular, ham SQL de `TenantId` ile süzer. Dilim 3'te
-bu döngüler tek veritabanı taramasına sadeleşir.
+E-posta işleyicisi platform kuyruğunu işler. Olay işleyicisi her turda tek sorguyla işi olan tenant'ları bulur (outbox/teslim tabloları RLS dışıdır) ve yalnızca
+onların bağlamını kurup (oturum değeri → RLS) olayları işler; sağlık kontrolü ve platform olay ekranı da bütün tenant'ları
+tek sorguyla okur. Teklif süre dolumu işleyicisi CRM modülü açık tenant'larda tenant bağlamıyla döner (teklif tabloları
+RLS altındadır, çapraz tenant okunamaz). Teklif süre dolumu kilidi tenant başınadır (`sp_getapplock`, kaynak adı tenant kimliğini içerir). Outbox ve teslim tabloları RLS dışıdır; `ModulixDbContext` bu iki tabloya aktif tenant sorgu filtresi uygular, ham SQL de `TenantId` ile süzer.
 
 ## Yedekleme, dışa aktarma ve silme
 
-Tek veritabanı yedeklenir. Bir tenant'ın verisi `TenantId` ile eksiksiz dışa aktarılabilir ve silinebilir olmalıdır;
-komut ve runbook Dilim 3'te eklenir. O zamana kadar bir tenant'ın verisi migrator bağlantısıyla, oturum tenant'ı
-yazılarak (`sp_set_session_context 'TenantId'`) tablo tablo okunabilir.
+**Yedek:** tek veritabanı (`Modulix`) bütün tenant'ları içerir; SQL Server tam + log yedeği yeterlidir. Tenant başına yedek yoktur;
+bir tenant'ın verisi aşağıdaki dışa aktarma ile alınır. Geri yüklemede bütün tenant'lar aynı ana döner; tek tenant'ı geri almak
+gerekirse yedek ayrı bir sunucuya yüklenir ve o tenant oradan dışa aktarılır.
+
+**Dışa aktarma (`tenant-export`):** bir tenant'ın bütün satırlarını `TenantId` ile tablo başına bir JSON dosyasına yazar.
+Tablolar koddan değil veritabanı kataloğundan bulunur (`TenantId` kolonu taşıyan her tablo: tenant şemaları ve platform
+şemasındaki üyelik, modül hakkı, e-posta, outbox, teslim); yeni tablo kendiliğinden kapsama girer. `tenant.json` tenant kaydını,
+`manifest.json` tablo ve satır sayılarını içerir. Migration kullanıcısıyla, oturum tenant'ı yazılarak çalışır (RLS ikinci katman).
+
+```bash
+dotnet run --project src/Modulix.Api -- tenant-export acme --dir exports/acme
+```
+
+**Silme (`tenant-delete`):** aynı tabloları tek işlemde boşaltır ve tenant kaydını siler; yabancı anahtar sırası hatadan
+öğrenilir (silinemeyen tablo sonraki turda denenir). Geri alınamaz: komut kısa adın `--confirm` ile tekrar yazılmasını ister,
+önce dışa aktarın. Kullanıcı hesapları (`platform.Users`) kişiye aittir, silinmez; yalnızca üyelikleri kalkar. Hesap silme
+ayrı bir kişisel veri sürecidir. Silme uygulama günlüğüne uyarı olarak yazılır.
+
+```bash
+dotnet run --project src/Modulix.Api -- tenant-delete acme --confirm acme
+```
+
+Runbook (tenant kapatma): 1) firma kapatılır (`Status = Closed`, giriş durur); 2) sözleşme süresi boyunca veri bekletilir;
+3) `tenant-export` ile dışa aktarılıp güvenli yere alınır; 4) `tenant-delete --confirm` çalıştırılır; 5) çıktı (tablo/satır
+sayıları) kayıt altına alınır.
 
 ## Eski tenant veritabanlarının temizliği
 
