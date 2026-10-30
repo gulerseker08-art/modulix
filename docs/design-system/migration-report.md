@@ -51,7 +51,7 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | Form Components | Kısmen | `app.css` (form durumları, `required`, `aria-invalid`) | Önizlemede default/invalid/read-only/disabled | Ayrı Razor bileşenleri (TextField vb.), FileUpload, RichText, kaydedilmemiş değişiklik uyarısı, Kaydet ve Kapat/Yeni |
 | DataGrid | Kısmen | `app.css` (`record-table`) | Önizleme; telefonda kart listesi | Kolon görünürlüğü/yeniden boyutlandırma, kayıtlı görünüm, dışa aktarma, ortak bileşen |
 | Firma/Kişi | Kısmen | `Pages/Crm/Companies.razor`, `Contacts.razor` (PageHeader) | CI derleme ✓ | Firma detayında 12 kolonlu ana içerik + sağ panel düzeni |
-| Aktiviteler | Tamam (faz 2) | `Pages/Crm/Activities.razor`, `Components/ActivityCalendar.razor`, `Components/TodayActivities.razor`, `Components/Drawer.razor`, `Services/ActivityLabels.cs` | CI (bkz. Faz 2); statik önizleme | Saat çizelgesinde blok sürükleyerek saat değiştirme ve yeniden boyutlandırma yok (gün değiştirme var); detay çekmecesinde ayrı sekmeler yok |
+| Aktiviteler | Tamam (faz 2) | `Pages/Crm/Activities.razor`, `Components/ActivityCalendar.razor`, `Components/TodayActivities.razor`, `Components/Drawer.razor`, `Services/ActivityLabels.cs` | CI çalışma 41128200581 ✓ (derleme + 817 test); statik önizleme | Saat çizelgesinde blok sürükleyerek saat değiştirme ve yeniden boyutlandırma yok (gün değiştirme var); detay çekmecesinde ayrı sekmeler yok |
 | Fırsatlar | Kısmen | `Pages/Crm/Opportunities.razor` (PageHeader) | CI derleme ✓ | Chevron satış hunisi, KPI şeridi, sağ zaman çizelgesi + finansal özet |
 | Teklifler | Token/tema | — | — | Detay düzeni |
 | Diğer CRM | Token/tema | Bütün `PageTitle` metinleri | — | — |
