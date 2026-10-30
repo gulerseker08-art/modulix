@@ -66,6 +66,21 @@ internal sealed class QuoteReader(IModuleData data)
     public Task<QuoteDecision?> LastDecisionAsync(Guid quoteId, CancellationToken cancellationToken) =>
         data.Set<QuoteDecision>().AsNoTracking().Where(d => d.QuoteId == quoteId).OrderByDescending(d => d.CreatedAt).FirstOrDefaultAsync(cancellationToken);
 
+    public Task<bool> HasEventAsync(Guid quoteId, string kind, CancellationToken cancellationToken) =>
+        data.Set<QuoteEvent>().AsNoTracking().AnyAsync(e => e.QuoteId == quoteId && e.Kind == kind, cancellationToken);
+
+    /// <summary>Geçerliliği bitmiş ama hâlâ sunulmuş teklifler (en eski önce).</summary>
+    public async Task<List<Quote>> DueForExpiryAsync(DateTimeOffset now, int take, CancellationToken cancellationToken) =>
+        await data.Set<Quote>().AsNoTracking().Where(q => q.Status == QuoteStatus.Presented && q.ValidUntil != null && q.ValidUntil <= now)
+            .OrderBy(q => q.ValidUntil).Take(take).ToListAsync(cancellationToken);
+
+    /// <summary>Geçerliliği <paramref name="until"/> tarihine kadar bitecek, hatırlatması açılmamış sunulmuş teklifler.</summary>
+    public async Task<List<Quote>> DueForReminderAsync(DateTimeOffset now, DateTimeOffset until, int take, CancellationToken cancellationToken) =>
+        await data.Set<Quote>().AsNoTracking()
+            .Where(q => q.Status == QuoteStatus.Presented && q.ValidUntil != null && q.ValidUntil > now && q.ValidUntil <= until
+                && !data.Set<QuoteEvent>().Any(e => e.QuoteId == q.Id && e.Kind == "ExpiryReminderCreated"))
+            .OrderBy(q => q.ValidUntil).Take(take).ToListAsync(cancellationToken);
+
     private static IQueryable<QuoteDocumentMeta> Metas(IQueryable<QuoteDocument> source) =>
         source.Select(d => new QuoteDocumentMeta(d.Id, d.QuoteId, d.RevisionNo, d.FileName, d.ContentType, d.SizeBytes, d.Sha256, d.TemplateVersion, d.Snapshot, d.CreatedAt));
 }

@@ -8,6 +8,7 @@ using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Modules.Crm.Opportunities;
 using Modulix.Modules.Crm.Pricing;
+using Modulix.Core.Contracts.Sales;
 using Modulix.Modules.Crm.Quotes;
 using Modulix.Modules.Crm.Records;
 
@@ -512,6 +513,25 @@ public sealed class CrmModule : IModule
             Description = "Evet seçilirse teklifi onaya gönderen kişi onaylayan yetkisine sahipse kendi teklifini onaylayabilir. Varsayılan hayırdır.",
             Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
         },
+        new(SettingKeys.QuoteOnAcceptWinOpportunity, "Teklif kabulünde fırsatı kazanıldı yap", "CRM Teklif", SettingType.Choice, "false")
+        {
+            Description = "Evet seçilirse müşteri bir teklifi kabul edince (ya da kabul kaydedilince) teklifin bağlı olduğu açık fırsat kazanıldı olarak kapanır; kazanılan tutar teklifin net toplamıdır. Varsayılan hayırdır.",
+            Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
+        },
+        new(SettingKeys.QuoteFollowUpDays, "Teklif sunumundan sonra takip aktivitesi (gün)", "CRM Teklif", SettingType.Text, "0")
+        {
+            Description = "Teklif müşteriye sunulunca bu kadar gün sonrasına teklif sorumlusu için takip aktivitesi açılır. 0 kapalıdır.",
+            Pattern = @"^[0-9]{1,3}$",
+            PatternMessage = "0-999 arası tam sayı girin.",
+            MaxLength = 3,
+        },
+        new(SettingKeys.QuoteExpiryReminderDays, "Teklif süresi dolmadan hatırlatma (gün)", "CRM Teklif", SettingType.Text, "0")
+        {
+            Description = "Müşteride bekleyen teklifin geçerliliği bitmeden bu kadar gün önce sorumlu için hatırlatma aktivitesi açılır. 0 kapalıdır.",
+            Pattern = @"^[0-9]{1,3}$",
+            PatternMessage = "0-999 arası tam sayı girin.",
+            MaxLength = 3,
+        },
         new(SettingKeys.QuoteSellerDetails, "Teklif belgesi: satıcı bilgileri", "CRM Teklif", SettingType.Text)
         {
             Description = "Müşteri teklif belgesinin (PDF) başlığında firma adının altında görünür: adres, telefon, vergi dairesi/numarası gibi. Boş bırakılabilir.",
@@ -828,6 +848,18 @@ public sealed class CrmModule : IModule
             [DomainEventTypes.RecordDeleted],
             [Entities.Quote],
             [Permissions.QuotesRead, Permissions.QuotesRecordDecision]),
+        // Teklif yaşam döngüsü yan etkileri (ADR-0019 dilim 7): kabulde fırsat kazanma, sunumda takip aktivitesi (ikisi de ayarlı).
+        EventSubscription.For<QuoteLifecycleSubscriber>(
+            "crm.quote-lifecycle",
+            [DomainEventTypes.RecordUpdated],
+            [Entities.Quote],
+            [Permissions.QuotesRead, Permissions.CompaniesRead, Permissions.OpportunitiesRead, Permissions.OpportunityAmountsRead, Permissions.OpportunitiesWrite, Permissions.OpportunitiesClose, Permissions.ActivitiesRead, Permissions.ActivitiesWrite]),
+        // Zamanlanmış süre dolumu işinin sistem kimliği: olay işlemez, yalnızca izinlerini tanımlar.
+        EventSubscription.For<QuoteExpiryAnchor>(
+            "crm.quote-expiry",
+            [DomainEventTypes.RecordDeleted],
+            [Entities.Quote],
+            [Permissions.QuotesRead, Permissions.QuotesRecordDecision, Permissions.CompaniesRead, Permissions.OpportunitiesRead, Permissions.ActivitiesRead, Permissions.ActivitiesWrite]),
         EventSubscription.For<LeadFirstContactSubscriber>(
             "crm.lead-first-contact",
             [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated],
@@ -854,6 +886,9 @@ public sealed class CrmModule : IModule
         public const string QuoteAllowSelfApproval = "crm.quote.allow-self-approval";
         public const string QuoteSellerDetails = "crm.quote.seller-details";
         public const string QuoteFooterNote = "crm.quote.footer-note";
+        public const string QuoteOnAcceptWinOpportunity = "crm.quote.on-accept-win-opportunity";
+        public const string QuoteFollowUpDays = "crm.quote.follow-up-days";
+        public const string QuoteExpiryReminderDays = "crm.quote.expiry-reminder-days";
     }
 
     public void ConfigureServices(IServiceCollection services)
@@ -887,6 +922,11 @@ public sealed class CrmModule : IModule
         services.AddScoped<IQuoteSharing, QuoteSharing>();
         services.AddScoped<IQuoteComparison, QuoteComparisonService>();
         services.AddScoped<IQuoteReport, QuoteReport>();
+        services.AddScoped<QuoteMarkers>();
+        services.AddScoped<IQuoteExpiry, QuoteExpiry>();
+        services.AddScoped<IAcceptedQuoteSource, AcceptedQuoteSource>();
+        services.AddScoped<QuoteLifecycleSubscriber>();
+        services.AddScoped<QuoteExpiryAnchor>();
         services.AddScoped<IQuoteCustomerPortal, QuoteCustomerPortal>();
         services.AddScoped<QuoteCustomerAnchor>();
         services.AddScoped<IPriceCalculator, PriceCalculator>();

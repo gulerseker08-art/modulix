@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Sales;
 using Modulix.Core.Settings;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Quotes;
@@ -40,6 +41,7 @@ internal static class QuoteEndpoints
         QuoteSharingEndpoints.MapInternal(quotes);
         quotes.MapGet("/{id:guid}/approval-requirements", ApprovalRequirementsAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/{id:guid}/compare", CompareAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
+        quotes.MapGet("/{id:guid}/handover", HandoverAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/report", ReportAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/export", ExportAsync).RequirePermission(CrmModule.Permissions.QuotesExport);
 
@@ -142,6 +144,12 @@ internal static class QuoteEndpoints
             [.. c.Lines.Select(l => new QuoteLineChangeDto(l.Change, l.StableKey, l.Name, [.. l.Fields.Select(Map)]))]));
     }
 
+    /// <summary>Kabul edilmiş teklifin sonraki modüllere devir görünümü (<see cref="IAcceptedQuoteSource"/>); kabul edilmemişse ya da kapsam dışıysa 404.</summary>
+    private static async Task<IResult> HandoverAsync(Guid id, IAcceptedQuoteSource source, CancellationToken ct) =>
+        await source.GetAsync(id, ct) is { } accepted
+            ? Results.Ok(JsonSerializer.Deserialize<AcceptedQuoteDto>(JsonSerializer.Serialize(accepted, JsonSerializerOptions.Web), JsonSerializerOptions.Web))
+            : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Kabul edilmiş teklif bulunamadı.");
+
     private static async Task<IResult> ReportAsync(DateOnly? from, DateOnly? to, Guid? ownerId, IQuoteReport report, TimeProvider time, CancellationToken ct)
     {
         // Varsayılan dönem: içinde bulunulan ayın başından bugüne.
@@ -217,12 +225,17 @@ internal sealed class QuotePolicyProvider(IServiceProvider services) : IQuotePol
         decimal? Decimal(string? text) =>
             decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var v) && v >= 0 ? v : null;
 
+        static int Days(string? text) => int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value) ? Math.Clamp(value, 0, 999) : 0;
+
         var validity = int.TryParse(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteDefaultValidityDays, cancellationToken),
             NumberStyles.None, CultureInfo.InvariantCulture, out var days) && days > 0 ? days : 30;
         return new QuotePolicySettings(
             Decimal(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteApprovalDiscountPercent, cancellationToken)),
             Decimal(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteApprovalGrossAbove, cancellationToken)),
             validity,
-            string.Equals(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteAllowSelfApproval, cancellationToken), "true", StringComparison.OrdinalIgnoreCase));
+            string.Equals(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteAllowSelfApproval, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
+            string.Equals(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteOnAcceptWinOpportunity, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
+            Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteFollowUpDays, cancellationToken)),
+            Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteExpiryReminderDays, cancellationToken)));
     }
 }
