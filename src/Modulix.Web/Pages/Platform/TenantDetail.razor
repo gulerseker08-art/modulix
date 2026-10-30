@@ -1,7 +1,7 @@
 @page "/platform/firmalar/{TenantId:guid}"
 @inject ApiClient Api
 
-<PageTitle>@(detail?.Tenant.Name ?? "Firma") · Platform · ModuliX</PageTitle>
+<PageTitle>@(detail?.Tenant.Name ?? "Firma") · Platform · Modulix</PageTitle>
 
 <PlatformGate>
     <a class="back-link" href="platform/firmalar">← Firmalar</a>
@@ -236,7 +236,7 @@
         inviteEmail = inviteName = string.Empty;
         await LoadAsync();
         Show(success: invited.ExistingAccount
-            ? $"{invited.Administrator.DisplayName} zaten Modülix kullanıyordu; yönetici olarak eklendi ve bilgilendirildi."
+            ? $"{invited.Administrator.DisplayName} zaten Modulix kullanıyordu; yönetici olarak eklendi ve bilgilendirildi."
             : $"{invited.Administrator.Email} adresine yönetici daveti gönderildi.");
     }
 

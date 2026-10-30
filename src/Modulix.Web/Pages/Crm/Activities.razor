@@ -4,16 +4,15 @@
 @inject CrmLookups Lookups
 @inject IJSRuntime Js
 
-<PageTitle>Aktiviteler · ModuliX</PageTitle>
+<PageTitle>Aktiviteler · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ActivitiesRead">
-    <div class="page-header">
-        <h1>Aktiviteler</h1>
+    <PageHeader Title="Aktiviteler" Icon="activity" Subtitle="Tüm görev, arama, e-posta, toplantı ve ziyaretlerinizi yönetin.">
         @if (Session.Can(CrmAccess.ActivitiesWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null, null)">Yeni aktivite</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null, null)"><span aria-hidden="true">+</span> Yeni aktivite</button>
         }
-    </div>
+    </PageHeader>
 
     <Notice Text="@message" Failed="true" />
     <Notice Text="@bulkMessage" Failed="@bulkFailed" />

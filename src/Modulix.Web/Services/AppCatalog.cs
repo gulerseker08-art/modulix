@@ -10,7 +10,7 @@ public enum AppTone
 }
 
 /// <summary>
-/// Uygulama menüsünün (ModuliX paneli) ve sol menünün ortak tanımı. <see cref="ParentId"/> boşsa ana uygulama (modül
+/// Uygulama menüsünün (Modulix paneli) ve sol menünün ortak tanımı. <see cref="ParentId"/> boşsa ana uygulama (modül
 /// ya da alan), doluysa onun alt uygulamasıdır. Görünürlük <see cref="AppNavigation"/> ile oturumdan hesaplanır;
 /// menüde gizlemek yetkilendirme değildir, route ve sunucu denetimleri aynen geçerlidir.
 /// </summary>

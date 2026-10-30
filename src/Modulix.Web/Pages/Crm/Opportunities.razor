@@ -4,19 +4,16 @@
 @inject CrmLookups Lookups
 @inject NavigationManager Navigation
 
-<PageTitle>Fırsatlar · ModuliX</PageTitle>
+<PageTitle>Fırsatlar · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.OpportunitiesRead">
-    <div class="page-header">
-        <h1>Fırsatlar</h1>
-        <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="crm/firsat-raporu">Rapor</a>
+    <PageHeader Title="Fırsatlar" Icon="target" Subtitle="Satış fırsatlarınızı aşama aşama takip edin.">
+        <a class="btn btn-outline-secondary" href="crm/firsat-raporu">Rapor</a>
         @if (Session.Can(CrmAccess.OpportunitiesWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)">Yeni fırsat</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><span aria-hidden="true">+</span> Yeni fırsat</button>
         }
-        </div>
-    </div>
+    </PageHeader>
 
     @if (message is not null)
     {

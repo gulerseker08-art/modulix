@@ -2,7 +2,7 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Kullanıcılar · ModuliX</PageTitle>
+<PageTitle>Kullanıcılar · Modulix</PageTitle>
 
 <AuthGate Permission="@CoreAccess.ManageUsers">
     <a class="back-link" href="yonetim">← Yönetim</a>
@@ -150,7 +150,7 @@
     {
         inviting = false;
         notice = response.ExistingAccount
-            ? $"{response.User.DisplayName} zaten Modülix kullanıyordu; kuruluşunuza eklendi ve bilgilendirildi."
+            ? $"{response.User.DisplayName} zaten Modulix kullanıyordu; kuruluşunuza eklendi ve bilgilendirildi."
             : $"{response.User.Email} adresine davet gönderildi.";
         await LoadAsync(1);
     }

@@ -3,16 +3,15 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Kişiler · ModuliX</PageTitle>
+<PageTitle>Kişiler · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ContactsRead">
-    <div class="page-header">
-        <h1>Kişiler</h1>
+    <PageHeader Title="Kişiler" Icon="user" Subtitle="Firmalardaki ilgili kişileri ve iletişim bilgilerini yönetin.">
         @if (Session.Can(CrmAccess.ContactsWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)">Yeni kişi</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><span aria-hidden="true">+</span> Yeni kişi</button>
         }
-    </div>
+    </PageHeader>
 
     @if (message is not null)
     {

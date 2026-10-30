@@ -3,7 +3,7 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>@(opportunity?.OpportunityNumber ?? "Fırsat") · ModuliX</PageTitle>
+<PageTitle>@(opportunity?.OpportunityNumber ?? "Fırsat") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.OpportunitiesRead">
     <a class="back-link" href="crm/firsatlar">← Fırsatlar</a>

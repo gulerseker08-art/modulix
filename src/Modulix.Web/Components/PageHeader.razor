@@ -1,0 +1,37 @@
+@* Standart sayfa başlığı (docs/design-system/component-catalog.md → PageHeader):
+   [ikon] başlık + isteğe bağlı açıklama | sağda aksiyonlar (birincil aksiyon en sonda). *@
+<div class="page-header">
+    <div class="page-heading">
+        @if (Icon is not null)
+        {
+            <span class="page-icon" aria-hidden="true"><AppIcon Name="@Icon" Size="24" /></span>
+        }
+        <div>
+            <h1>@Title</h1>
+            @if (Subtitle is not null)
+            {
+                <p class="page-subtitle">@Subtitle</p>
+            }
+        </div>
+    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="header-actions">@ChildContent</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = "";
+
+    /// <summary>AppIcon adı; genellikle sayfanın AppCatalog ikonu.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    /// <summary>Sağdaki aksiyon düğmeleri.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

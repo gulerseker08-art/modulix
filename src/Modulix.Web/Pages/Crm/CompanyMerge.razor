@@ -1,7 +1,7 @@
 @page "/crm/firmalar/{TargetId:guid}/birlestir"
 @inject SessionState Session
 
-<PageTitle>Firma birleştir · ModuliX</PageTitle>
+<PageTitle>Firma birleştir · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.CompaniesMerge">
     <MergeWizard Resource="companies" TargetId="TargetId" SourceId="SourceId" />
