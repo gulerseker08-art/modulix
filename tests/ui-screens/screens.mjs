@@ -95,6 +95,7 @@ await check('Giriş', 'ayse@acme.demo ile giriş yapılır', async () => {
 
 // ---------------------------------------------------------------- Örnek veriyi zenginleştir (bu hafta için aktiviteler)
 let ids = {};
+let detailFacts = [];
 await check('Hazırlık', 'Bu hafta için örnek aktiviteler API ile eklenir', async () => {
     const companies = await (await page.request.get(`${BASE}/api/crm/companies?pageSize=10`)).json();
     const opps = await (await page.request.get(`${BASE}/api/crm/opportunities?pageSize=10`)).json();
@@ -228,9 +229,25 @@ await check('Aktiviteler', 'Bloğa tıklayınca detay çekmecesi açılır, Esca
     await page.waitForSelector('.drawer .activity-panel', { timeout: 10000 });
     const focused = await page.evaluate(() => document.activeElement?.classList.contains('drawer'));
     await shot(page, 'aktivite-detay-cekmece');
+    const facts = await page.$$eval('.drawer .detail-list dd', els => els.map(e => e.textContent.trim()));
+    detailFacts = facts;
     await page.keyboard.press('Escape');
     await page.waitForSelector('.drawer', { state: 'detached', timeout: 5000 });
     return focused ? 'açılınca odak çekmecede' : fail('açıldı ama odak çekmeceye geçmedi');
+});
+
+await check('Aktiviteler', 'Detay çekmecesinde tür etiketi ve sorumlu adı okunur', async () => {
+    const d = detailFacts.join(' | ');
+    if (detailFacts.length === 0) return fail('detay okunamadı');
+    const raw = detailFacts.some(f => /\b(Meeting|Call|Task)\b/.test(f));
+    const noOwner = detailFacts.some(f => f === '—');
+    return !raw && !noOwner ? d : fail(d);
+});
+
+await check('Aktiviteler', 'Süzgeç satırındaki alanlar yan yana durur', async () => {
+    const rows = await page.$$eval('form.filters > .form-control, form.filters > .form-select', els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+    const distinct = new Set(rows).size;
+    return distinct <= 2 ? `${rows.length} alan, ${distinct} satırda` : fail(`${rows.length} alan ${distinct} satıra dağılmış`);
 });
 
 await check('Aktiviteler', 'Bugün panelinden detay açılır, arka plana tıklayınca kapanır', async () => {
@@ -404,6 +421,13 @@ const mobileRoutes = [['ana-sayfa', '', '.profile-button'], ['aktiviteler', 'crm
 if (ids.opportunity) mobileRoutes.push(['firsat', `crm/firsatlar/${ids.opportunity}`, '.pipeline']);
 if (ids.company) mobileRoutes.push(['firma', `crm/firmalar/${ids.company}`, '.record-tabs']);
 if (ids.contact) mobileRoutes.push(['kisi', `crm/kisiler/${ids.contact}`, '.record-tabs']);
+await check('Mobil', 'Aktiviteler telefonda Gün görünümüyle açılır ve bugünün blokları görünür', async () => {
+    await gotoApp(m, 'crm/aktiviteler', '.kpi-grid');
+    await m.waitForSelector('.cal-time-day', { timeout: 20000 });
+    const active = await m.$eval('.segmented .chip.active', el => el.textContent.trim());
+    const events = await m.$$eval('.cal-event', els => els.filter(e => { const r = e.getBoundingClientRect(); return r.right <= window.innerWidth + 1 && r.width > 0; }).length);
+    return active === 'Gün' && events > 0 ? `görünüm=${active}, ekranda ${events} blok` : fail(`görünüm=${active}, ekranda ${events} blok`);
+});
 for (const [name, route, sel] of mobileRoutes) {
     await check('Mobil', `${name}: yatay taşma yok`, async () => {
         await gotoApp(m, route, sel);
