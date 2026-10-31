@@ -346,3 +346,71 @@ internal sealed class ContractSignatureFileConfiguration : IEntityTypeConfigurat
         builder.HasIndex(f => new { f.TenantId, f.SignatoryId });
     }
 }
+
+internal sealed class ContractCommitmentConfiguration : IEntityTypeConfiguration<ContractCommitment>
+{
+    public void Configure(EntityTypeBuilder<ContractCommitment> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractCommitments");
+        builder.Property(c => c.Title).HasMaxLength(ContractCommitment.TitleMaxLength).IsRequired();
+        builder.Property(c => c.Description).HasMaxLength(ContractCommitment.TextMaxLength);
+        builder.Property(c => c.Category).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(c => c.Obligor).HasMaxLength(Contract.StatusMaxLength).IsRequired();
+        builder.Property(c => c.Kind).HasMaxLength(Contract.StatusMaxLength).IsRequired();
+        builder.Property(c => c.Recurrence).HasMaxLength(Contract.StatusMaxLength);
+        builder.Property(c => c.StartDate).HasColumnType("date");
+        builder.Property(c => c.DueDate).HasColumnType("date");
+        builder.Property(c => c.RecurrenceEndDate).HasColumnType("date");
+        builder.Property(c => c.MetricName).HasMaxLength(ContractCommitment.MetricMaxLength);
+        builder.Property(c => c.Unit).HasMaxLength(ContractCommitment.UnitMaxLength);
+        builder.Property(c => c.Direction).HasMaxLength(Contract.StatusMaxLength);
+        builder.Property(c => c.TargetValue).HasPrecision(18, 6);
+        builder.Property(c => c.Tolerance).HasPrecision(18, 6);
+        builder.Property(c => c.ConsequenceNote).HasMaxLength(ContractCommitment.TextMaxLength);
+        builder.Property(c => c.Status).HasMaxLength(Contract.StatusMaxLength).IsRequired();
+        builder.HasIndex(c => new { c.TenantId, c.ContractId, c.Status });
+        builder.HasIndex(c => new { c.TenantId, c.ResponsibleUserId, c.Status });
+        builder.ToTable(t => t.HasCheckConstraint("CK_ContractCommitments_Grace", "[GraceDays] BETWEEN 0 AND 365 AND [EscalateAfterDays] BETWEEN 0 AND 365"));
+
+        builder.HasOne<Contract>().WithMany().HasForeignKey(c => new { c.TenantId, c.ContractId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ContractCommitment>().WithMany().HasForeignKey(c => new { c.TenantId, c.DependsOnCommitmentId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class ContractCommitmentOccurrenceConfiguration : IEntityTypeConfiguration<ContractCommitmentOccurrence>
+{
+    public void Configure(EntityTypeBuilder<ContractCommitmentOccurrence> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractCommitmentOccurrences");
+        builder.Property(o => o.DueDate).HasColumnType("date");
+        builder.Property(o => o.CompletedOn).HasColumnType("date");
+        builder.Property(o => o.Status).HasMaxLength(Contract.StatusMaxLength).IsRequired();
+        builder.Property(o => o.ActualValue).HasPrecision(18, 6);
+        builder.Property(o => o.Note).HasMaxLength(ContractCommitmentOccurrence.NoteMaxLength);
+        builder.Property(o => o.BreachReason).HasMaxLength(Contract.ReasonMaxLength);
+        builder.Property(o => o.FollowUpStatus).HasMaxLength(Contract.StatusMaxLength).IsRequired();
+        builder.Property(o => o.WaiveReason).HasMaxLength(Contract.ReasonMaxLength);
+        // Aynı taahhüt ve dönem için ikinci satır üretilemez (zamanlanmış işin tekrar çalışması mükerrer yaratmaz).
+        builder.HasIndex(o => new { o.TenantId, o.CommitmentId, o.Sequence }).IsUnique().HasDatabaseName("UX_ContractCommitmentOccurrences_Sequence");
+        builder.HasIndex(o => new { o.TenantId, o.ContractId, o.Status, o.DueDate });
+        builder.HasIndex(o => new { o.TenantId, o.Status, o.DueDate });
+
+        builder.HasOne<ContractCommitment>().WithMany().HasForeignKey(o => new { o.TenantId, o.CommitmentId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class ContractCommitmentFileConfiguration : IEntityTypeConfiguration<ContractCommitmentFile>
+{
+    public void Configure(EntityTypeBuilder<ContractCommitmentFile> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractCommitmentFiles");
+        builder.Property(f => f.FileName).HasMaxLength(ContractCommitmentFile.FileNameMaxLength).IsRequired();
+        builder.Property(f => f.ContentType).HasMaxLength(100).IsUnicode(false).IsRequired();
+        builder.Property(f => f.Sha256).HasMaxLength(ContractVersion.HashLength).IsUnicode(false).IsRequired();
+        builder.Property(f => f.Content).IsRequired();
+        builder.HasIndex(f => new { f.TenantId, f.OccurrenceId });
+    }
+}

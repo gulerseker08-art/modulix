@@ -158,6 +158,7 @@ public static class ContractsEndpoints
             ContractsModule.Permissions.ApprovalsManage, ContractsModule.Permissions.ApprovalsManage);
 
         ContractSignatureEndpoints.MapInternal(contracts);
+        ContractCommitmentEndpoints.MapInternal(group, Prefix);
 
         contracts.MapGet("/{id:guid}/versions", async (Guid id, IContractWorkflow workflow, CancellationToken ct) =>
         {

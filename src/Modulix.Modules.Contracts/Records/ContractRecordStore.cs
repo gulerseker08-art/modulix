@@ -190,6 +190,13 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         }
 
         var data = Context.Data;
+        if (await data.Set<ContractCommitmentOccurrence>().AnyAsync(o => o.ContractId == entity.Id && o.Status != OccurrenceStatus.Open, cancellationToken))
+        {
+            throw new RecordConflictException("Gerçekleşmesi kaydedilmiş taahhüdü olan sözleşme silinemez.");
+        }
+
+        data.Set<ContractCommitmentOccurrence>().RemoveRange(await data.Set<ContractCommitmentOccurrence>().Where(o => o.ContractId == entity.Id).ToListAsync(cancellationToken));
+        data.Set<ContractCommitment>().RemoveRange(await data.Set<ContractCommitment>().Where(c => c.ContractId == entity.Id).ToListAsync(cancellationToken));
         data.Set<ContractLine>().RemoveRange(await data.Set<ContractLine>().Where(l => l.ContractId == entity.Id).ToListAsync(cancellationToken));
         data.Set<ContractParty>().RemoveRange(await data.Set<ContractParty>().Where(p => p.ContractId == entity.Id).ToListAsync(cancellationToken));
         data.Set<ContractEvent>().RemoveRange(await data.Set<ContractEvent>().Where(e => e.ContractId == entity.Id).ToListAsync(cancellationToken));
@@ -219,6 +226,13 @@ public static class ContractEventKinds
     public const string SignatureCancelled = "SignatureCancelled";
     public const string SignatureReminded = "SignatureReminded";
     public const string SignatureEventLogged = "SignatureEventLogged";
+    public const string CommitmentDefined = "CommitmentDefined";
+    public const string CommitmentCompleted = "CommitmentCompleted";
+    public const string CommitmentBreached = "CommitmentBreached";
+    public const string CommitmentWaived = "CommitmentWaived";
+    public const string CommitmentCancelled = "CommitmentCancelled";
+    public const string CommitmentEscalated = "CommitmentEscalated";
+    public const string CommitmentEvaluated = "CommitmentEvaluated";
     public const string Cancelled = "Cancelled";
     public const string Revised = "Revised";
     public const string CreatedFromQuote = "CreatedFromQuote";

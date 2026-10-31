@@ -203,3 +203,40 @@ public static class SignatureLabels
         _ => "open",
     };
 }
+
+/// <summary>Taahhüt etiketleri (dilim 7); anahtarlar sunucudaki <c>CommitmentKind</c>, <c>OccurrenceStatus</c> ve <c>FollowUpState</c> ile aynıdır.</summary>
+public static class CommitmentLabels
+{
+    public static IReadOnlyList<(string Key, string Label)> Obligors { get; } = [("Provider", "Hizmet veren (biz)"), ("Customer", "Müşteri"), ("Both", "Her iki taraf")];
+
+    public static IReadOnlyList<(string Key, string Label)> Kinds { get; } = [("OneTime", "Tek seferlik"), ("Periodic", "Dönemsel")];
+
+    public static IReadOnlyList<(string Key, string Label)> Recurrences { get; } = [("Weekly", "Haftalık"), ("Monthly", "Aylık"), ("Quarterly", "Üç aylık"), ("Yearly", "Yıllık")];
+
+    public static IReadOnlyList<(string Key, string Label)> Directions { get; } = [("AtLeast", "En az"), ("AtMost", "En çok"), ("Exactly", "Tam (toleransla)")];
+
+    public static IReadOnlyList<(string Key, string Label)> Statuses { get; } = [("Active", "Etkin"), ("Completed", "Tamamlandı"), ("Cancelled", "İptal edildi")];
+
+    public static IReadOnlyList<(string Key, string Label)> OccurrenceStatuses { get; } =
+        [("Open", "Açık"), ("Fulfilled", "Yerine getirildi"), ("Breached", "İhlal"), ("Waived", "Muaf"), ("Cancelled", "İptal edildi")];
+
+    public static IReadOnlyList<(string Key, string Label)> FollowUps { get; } =
+        [("None", "Takip aktivitesi yok"), ("Created", "Takip aktivitesi açıldı"), ("Unavailable", "Aktivite modülü kapalı"), ("Failed", "Takip aktivitesi açılamadı (yeniden denenecek)")];
+
+    public static string Label(IReadOnlyList<(string Key, string Label)> list, string? key) => list.FirstOrDefault(x => x.Key == key).Label ?? key ?? "—";
+
+    public static string Badge(string status, bool overdue = false) => overdue ? "lost" : status switch
+    {
+        "Fulfilled" or "Completed" => "won",
+        "Breached" => "lost",
+        "Open" or "Active" => "onhold",
+        "Cancelled" or "Waived" => "cancelled",
+        _ => "open",
+    };
+
+    /// <summary>Hedef ve ölçü gösterimi (ör. "en az 99,5 %").</summary>
+    public static string Target(string? metric, string? direction, decimal? target, decimal? tolerance, string? unit) =>
+        metric is null || target is null
+            ? "—"
+            : $"{metric}: {Label(Directions, direction).ToLowerInvariant()} {target.Value.ToString("0.######", Regional.Numbers)}{(string.IsNullOrEmpty(unit) ? string.Empty : " " + unit)}{(tolerance is > 0 ? $" (±{tolerance.Value.ToString("0.######", Regional.Numbers)})" : string.Empty)}";
+}

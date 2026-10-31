@@ -491,6 +491,13 @@
             </div>
         }
 
+        @if (contract is not null && tabs.Rendered(TabCommitments))
+        {
+            <div role="tabpanel" id="tabpanel-@TabCommitments" aria-labelledby="tab-@TabCommitments" class="record-tabpanel" hidden="@tabs.Hidden(TabCommitments)">
+                <ContractCommitmentsPanel Contract="contract" Changed="@(() => LoadAsync(contract.Id))" />
+            </div>
+        }
+
         @if (contract is not null && tabs.Rendered(TabVersions))
         {
             <div role="tabpanel" id="tabpanel-@TabVersions" aria-labelledby="tab-@TabVersions" class="record-tabpanel" hidden="@tabs.Hidden(TabVersions)">
@@ -688,6 +695,7 @@
     private const string TabLines = "lines";
     private const string TabApproval = "approval";
     private const string TabSignature = "signature";
+    private const string TabCommitments = "commitments";
     private const string TabVersions = "versions";
     private const string TabDocuments = "documents";
     private const string TabHistory = "history";
@@ -751,6 +759,7 @@
         new(TabLines, "Kapsam ve kalemler", lines.Count),
         new(TabApproval, "Onay"),
         new(TabSignature, "İmza"),
+        new(TabCommitments, "Taahhütler"),
         new(TabVersions, "Sürümler", versions.Count),
         new(TabDocuments, "Belgeler", documents.Count),
         new(TabHistory, "Tarihçe"),

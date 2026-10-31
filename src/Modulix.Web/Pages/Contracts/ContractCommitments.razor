@@ -1,0 +1,108 @@
+@page "/sozlesmeler/taahhutler"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Sözleşme taahhütleri · Modulix</PageTitle>
+
+<AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
+    <div class="page-header">
+        <h1>Sözleşme taahhütleri</h1>
+    </div>
+    <p class="text-muted">
+        Görebildiğiniz sözleşmelerin taahhüt gerçekleşmeleri. Tamamlamak, muaf tutmak ya da tanımlamak için sözleşmeyi açın (Taahhütler sekmesi). İhlalden sorumluya takip aktivitesi açılır;
+        ceza ya da finansal sonuç otomatik uygulanmaz.
+    </p>
+
+    <Notice Text="@notice" Failed="true" />
+
+    <div class="filters">
+        <div class="form-check">
+            <input id="cl-mine" class="form-check-input" type="checkbox" checked="@mine" @onchange="ToggleMineAsync" />
+            <label class="form-check-label" for="cl-mine">Yalnızca sorumlusu olduklarım</label>
+        </div>
+        <div>
+            <label class="form-label" for="cl-status">Durum</label>
+            <select id="cl-status" class="form-select" value="@status" @onchange="FilterAsync">
+                <option value="Overdue">Gecikmiş</option>
+                <option value="Open">Açık</option>
+                <option value="Breached">İhlal</option>
+                <option value="Fulfilled">Yerine getirildi</option>
+                <option value="Waived">Muaf</option>
+                <option value="">Tümü</option>
+            </select>
+        </div>
+    </div>
+
+    @if (items is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (items.Count == 0)
+    {
+        <p class="text-muted">Bu süzgeçte gerçekleşme yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Taahhüt gerçekleşmeleri</caption>
+            <thead><tr><th scope="col">Taahhüt</th><th scope="col">Sözleşme</th><th scope="col">Dönem</th><th scope="col">Son tarih</th><th scope="col">Durum</th><th scope="col">Sorumlu</th></tr></thead>
+            <tbody>
+                @foreach (var o in items)
+                {
+                    <tr>
+                        <td data-label="Taahhüt" class="primary">@o.CommitmentTitle <small class="text-muted">@Lookups.Label(ContractsAccess.CommitmentCategoryList, o.Category)</small></td>
+                        <td data-label="Sözleşme"><a href="sozlesmeler/@o.ContractId">@o.ContractTitle</a> <small class="text-muted">@o.ContractNumber</small></td>
+                        <td data-label="Dönem">@o.Sequence</td>
+                        <td data-label="Son tarih">@ContractLabels.Date(o.DueDate)@if (o.IsOverdue) { <div class="small text-danger">@o.DaysOverdue gün gecikti</div> }</td>
+                        <td data-label="Durum"><span class="badge stage-@CommitmentLabels.Badge(o.Status, o.IsOverdue && o.Status == "Open")">@CommitmentLabels.Label(CommitmentLabels.OccurrenceStatuses, o.Status)</span></td>
+                        <td data-label="Sorumlu">@(o.ResponsibleUserId is null ? "—" : Lookups.MemberName(o.ResponsibleUserId))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private List<CommitmentOccurrenceDto>? items;
+    private bool mine = true;
+    private string status = "Overdue";
+    private string? notice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(ContractsAccess.ContractsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task ToggleMineAsync(ChangeEventArgs e)
+    {
+        mine = e.Value is true;
+        await ReloadAsync();
+    }
+
+    private async Task FilterAsync(ChangeEventArgs e)
+    {
+        status = e.Value?.ToString() ?? string.Empty;
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        items = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var query = $"mine={(mine ? "true" : "false")}&includeClosed={(status is "Fulfilled" or "Waived" or "" ? "true" : "false")}{(status.Length > 0 ? "&status=" + status : string.Empty)}";
+        var result = await Api.GetAsync<List<CommitmentOccurrenceDto>>($"/api/contracts/commitments/occurrences?{query}");
+        items = result.Value ?? [];
+        notice = result.IsSuccess ? null : result.Error;
+    }
+}
