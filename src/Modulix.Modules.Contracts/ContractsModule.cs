@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
@@ -41,6 +42,15 @@ public sealed class ContractsModule : IModule
 
         /// <summary>Onay kurallarını ve onay vekâletlerini tanımlar (yönetim işlemi; denetim kaydına yazılır). Onaylamaktan ayrıdır.</summary>
         public const string ApprovalsManage = "contracts.approvals.manage";
+
+        /// <summary>İmza isteği başlatır, iptal eder, hatırlatma ve ret kaydeder, simülasyon olayı tetikler. Doğrulamadan ayrıdır.</summary>
+        public const string SignaturesManage = "contracts.signatures.manage";
+
+        /// <summary>Manuel imzayı (imzalı belge taraması) doğrulayıp kaydeder; yöneten kişiden ayrı bir yetkidir.</summary>
+        public const string SignaturesVerify = "contracts.signatures.verify";
+
+        /// <summary>Sağlayıcı olaylarını uygular. Yalnızca sistem kimliğine (webhook) verilir; kullanıcı rollerine atanmamalıdır.</summary>
+        public const string SignaturesProviderEvents = "contracts.signatures.provider-events";
     }
 
     /// <summary>Firma ayarları (Y6).</summary>
@@ -48,6 +58,8 @@ public sealed class ContractsModule : IModule
     {
         public const string AllowSelfApproval = "contracts.approval.allow-self";
         public const string ApprovalDueHours = "contracts.approval.due-hours";
+        public const string SignatureProvider = "contracts.signature.provider";
+        public const string SignatureValidityDays = "contracts.signature.validity-days";
         public const string ProviderName = "contracts.document.provider-name";
         public const string ProviderDetails = "contracts.document.provider-details";
         public const string FooterNote = "contracts.document.footer-note";
@@ -85,6 +97,9 @@ public sealed class ContractsModule : IModule
         new(Permissions.DocumentsGenerate, "Yayımlanmış şablondan sözleşme belgesi (PDF) üretir", "Sözleşme belgeleri"),
         new(Permissions.DocumentsDownload, "Üretilmiş sözleşme belgesini indirir", "Sözleşme belgeleri"),
         new(Permissions.ApprovalsManage, "Sözleşme onay kurallarını ve onay vekâletlerini tanımlar", "Sözleşme onayı"),
+        new(Permissions.SignaturesManage, "Sözleşmeyi imzaya gönderir, imza isteğini iptal eder, hatırlatma ve ret kaydeder", "Sözleşme imzası"),
+        new(Permissions.SignaturesVerify, "Manuel imzayı (imzalı belge) doğrulayıp kaydeder", "Sözleşme imzası"),
+        new(Permissions.SignaturesProviderEvents, "İmza sağlayıcısının olaylarını uygular (yalnızca sistem kimliği; kullanıcıya atanmaz)", "Sözleşme imzası"),
     ];
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
@@ -100,6 +115,18 @@ public sealed class ContractsModule : IModule
             Pattern = @"^[0-9]{1,4}$",
             PatternMessage = "0-9999 arası tam sayı girin.",
             MaxLength = 4,
+        },
+        new(SettingKeys.SignatureProvider, "Sözleşme imzası: sağlayıcı", "Sözleşmeler", SettingType.Choice, "none")
+        {
+            Description = "Yok: yalnızca manuel imza (imzalı belge yüklenir, yetkili doğrular). Simülasyon: yalnızca test içindir; kimseye istek ya da e-posta göndermez ve imzaların hiçbir hukuki değeri yoktur.",
+            Options = [new SettingOption("none", "Yok (yalnızca manuel imza)"), new SettingOption("simulation", "Simülasyon (test; hukuki değeri yoktur)")],
+        },
+        new(SettingKeys.SignatureValidityDays, "Sözleşme imzası: istek geçerlilik süresi (gün)", "Sözleşmeler", SettingType.Text, "14")
+        {
+            Description = "İmza isteği bu kadar gün içinde tamamlanmazsa süresi dolar. 1-90 arası.",
+            Pattern = @"^[0-9]{1,2}$",
+            PatternMessage = "1-90 arası tam sayı girin.",
+            MaxLength = 2,
         },
         new(SettingKeys.ProviderName, "Sözleşme belgesi: hizmet veren ünvanı", "Sözleşmeler", SettingType.Text)
         {
@@ -155,6 +182,14 @@ public sealed class ContractsModule : IModule
             "Sözleşme onay yöneticisi",
             "Sözleşme onay kurallarını ve vekâletlerini tanımlar; sözleşmeleri tutarlarıyla görüntüler.",
             [Permissions.ContractsRead, Permissions.FinancialsRead, Permissions.ApprovalsManage])
+        {
+            Scope = RecordScope.All,
+        },
+        new(
+            "contracts.signature-manager",
+            "Sözleşme imza sorumlusu",
+            "Onaylı sözleşmeyi imzaya gönderir, imza sürecini izler ve manuel imzayı doğrular.",
+            [Permissions.ContractsRead, Permissions.SignaturesManage, Permissions.SignaturesVerify, Permissions.DocumentsDownload])
         {
             Scope = RecordScope.All,
         },
@@ -285,6 +320,19 @@ public sealed class ContractsModule : IModule
         new(SharedEntities.Person, Entities.ContractParty, "personId", "sözleşme tarafı"),
     ];
 
+    /// <summary>
+    /// Sistem kimlikleri (oturumsuz çağıranlar): imza sağlayıcısının webhook çağrısı bu kimlikle, kendi tenant kapsamında ve yalnızca bildirilen izinlerle çalışır.
+    /// Olay işlemez; izinlerini tanımlar.
+    /// </summary>
+    IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
+    [
+        EventSubscription.For<ContractSystemAnchor>(
+            "contracts.signature-webhook",
+            [DomainEventTypes.RecordDeleted],
+            [Entities.Contract],
+            [Permissions.ContractsRead, Permissions.SignaturesProviderEvents]),
+    ];
+
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<ContractsStoreContext>();
@@ -302,6 +350,10 @@ public sealed class ContractsModule : IModule
         services.AddScoped<IRecordStore, ContractApprovalDelegationRecordStore>();
         services.AddScoped<IContractApprovals, ContractApprovals>();
         services.AddScoped<ContractApprovalEngine>();
+        services.AddSingleton<IContractSignatureProvider, SimulationSignatureProvider>();
+        services.AddScoped<IContractSignatureProviders, ContractSignatureProviders>();
+        services.AddScoped<IContractSignatures, ContractSignatures>();
+        services.AddScoped<ContractSystemAnchor>();
         services.AddScoped<IActivityLinkTarget, ContractLinkTarget>();
     }
 }

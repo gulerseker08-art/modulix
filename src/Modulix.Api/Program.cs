@@ -72,6 +72,7 @@ builder.Services.Configure<EventOptions>(builder.Configuration.GetSection(EventO
 builder.Services.AddModulixEvents();
 builder.Services.AddLeadIntakeRateLimit(builder.Configuration);
 builder.Services.AddQuotePublicRateLimit(builder.Configuration);
+builder.Services.AddContractSignatureRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
 builder.Services.Configure<Modulix.Api.Crm.QuoteExpiryOptions>(builder.Configuration.GetSection(Modulix.Api.Crm.QuoteExpiryOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Crm.QuoteExpiryRunner>();
@@ -165,6 +166,7 @@ app.MapCrmEndpoints();
 app.MapContractsEndpoints();
 app.MapLeadIntakeEndpoints();
 app.MapQuotePublicEndpoints();
+app.MapContractSignatureWebhook();
 app.MapPlatformEndpoints();
 app.MapPlatformEventEndpoints();
 app.MapAuditEndpoints();

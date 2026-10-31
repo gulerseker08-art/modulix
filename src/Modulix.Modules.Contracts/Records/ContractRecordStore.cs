@@ -211,6 +211,14 @@ public static class ContractEventKinds
     public const string ApprovalInvalidated = "ApprovalInvalidated";
     public const string ApprovalStepApproved = "ApprovalStepApproved";
     public const string ApprovalReturned = "ApprovalReturned";
+    public const string SignatureRequested = "SignatureRequested";
+    public const string SignatorySigned = "SignatorySigned";
+    public const string SignatureCompleted = "SignatureCompleted";
+    public const string SignatureDeclined = "SignatureDeclined";
+    public const string SignatureExpired = "SignatureExpired";
+    public const string SignatureCancelled = "SignatureCancelled";
+    public const string SignatureReminded = "SignatureReminded";
+    public const string SignatureEventLogged = "SignatureEventLogged";
     public const string Cancelled = "Cancelled";
     public const string Revised = "Revised";
     public const string CreatedFromQuote = "CreatedFromQuote";

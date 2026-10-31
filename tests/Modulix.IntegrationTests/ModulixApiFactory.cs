@@ -24,6 +24,7 @@ namespace Modulix.IntegrationTests;
 public sealed class ModulixApiFactory : WebApplicationFactory<Program>
 {
     public const string Password = "Test.Password1";
+    public const string SignatureWebhookSecret = "test-only-signature-webhook-secret";
 
     // Bu fabrikanın oluşturduğu tenant'lar; Dispose yalnızca bunların platform kayıtlarını temizler.
     private readonly System.Collections.Concurrent.ConcurrentBag<Guid> createdTenants = [];
@@ -41,7 +42,10 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
 
             // Olay işleyicisi de çalışmaz; olay testleri işleyiciyi kendisi çağırır (EventTests).
             .UseSetting("Events:WorkerEnabled", "false")
-            .UseSetting("QuoteExpiry:WorkerEnabled", "false");
+            .UseSetting("QuoteExpiry:WorkerEnabled", "false")
+
+            // Sözleşme imza simülasyonunun webhook gizli anahtarı (yalnızca testlerde; gerçek ortamda ortam değişkeniyle verilir).
+            .UseSetting("ContractSignature:Simulation:WebhookSecret", ModulixApiFactory.SignatureWebhookSecret);
 
     /// <summary>Çerezleri saklayan, HTTPS üzerinden konuşan istemci (oturum çerezi Secure).</summary>
     public HttpClient CreateBrowserClient() =>

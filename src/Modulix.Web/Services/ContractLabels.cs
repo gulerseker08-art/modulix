@@ -160,3 +160,46 @@ public static class TemplateLabels
         _ => key ?? string.Empty,
     };
 }
+
+/// <summary>İmza etiketleri (dilim 6); anahtarlar sunucudaki <c>SignatureRequestStatus</c>, <c>SignatoryStatus</c> ve <c>SignatureAssurance</c> ile aynıdır.</summary>
+public static class SignatureLabels
+{
+    public static IReadOnlyList<(string Key, string Label)> RequestStatuses { get; } =
+    [
+        ("Pending", "İmza bekliyor"), ("PartiallySigned", "Kısmen imzalandı"), ("Completed", "Tamamlandı"), ("Rejected", "Reddedildi"), ("Expired", "Süresi doldu"), ("Cancelled", "İptal edildi"),
+    ];
+
+    public static IReadOnlyList<(string Key, string Label)> SignatoryStatuses { get; } =
+    [
+        ("Waiting", "Sırası gelmedi"), ("Sent", "İmza bekliyor"), ("Viewed", "Görüntüledi"), ("Signed", "İmzaladı"), ("Declined", "Reddetti"), ("Expired", "Süresi doldu"), ("Cancelled", "İptal edildi"),
+    ];
+
+    /// <summary>Güvence düzeyleri birbirine eşit gösterilmez; her biri kendi adıyla ve sınırıyla anılır.</summary>
+    public static IReadOnlyList<(string Key, string Label)> Assurances { get; } =
+    [
+        ("ManualScan", "Islak imza taraması (yetkili doğruladı)"),
+        ("SimulatedElectronic", "Simülasyon (hukuki değeri yok)"),
+        ("ProviderElectronic", "Sağlayıcı: elektronik imza"),
+        ("ProviderQualified", "Sağlayıcı: nitelikli elektronik imza (sağlayıcı bildirimi)"),
+    ];
+
+    public static IReadOnlyList<(string Key, string Label)> EventTypes { get; } =
+    [
+        ("Requested", "İstek açıldı"), ("Sent", "İmzaya sunuldu"), ("Viewed", "Görüntülendi"), ("Signed", "İmzalandı"), ("Declined", "Reddedildi"), ("Reminded", "Hatırlatma kaydedildi"),
+        ("Expired", "Süre doldu"), ("Cancelled", "İptal edildi"), ("Completed", "Tamamlandı"),
+    ];
+
+    public static IReadOnlyList<(string Key, string Label)> Outcomes { get; } =
+        [("Applied", "Uygulandı"), ("Duplicate", "Yinelenen"), ("OutOfOrder", "Sırası bozuk"), ("Rejected", "Reddedildi"), ("Ignored", "Yok sayıldı")];
+
+    public static string Label(IReadOnlyList<(string Key, string Label)> list, string? key) => list.FirstOrDefault(x => x.Key == key).Label ?? key ?? "—";
+
+    public static string Badge(string status) => status switch
+    {
+        "Completed" or "Signed" => "won",
+        "Pending" or "PartiallySigned" or "Sent" or "Viewed" => "onhold",
+        "Rejected" or "Declined" or "Expired" => "lost",
+        "Cancelled" => "cancelled",
+        _ => "open",
+    };
+}
