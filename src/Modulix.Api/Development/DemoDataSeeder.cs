@@ -57,6 +57,7 @@ public static class DemoDataSeeder
         var entitlements = scope.ServiceProvider.GetRequiredService<IModuleEntitlements>();
         await entitlements.SetEnabledAsync(acme.Id, "crm", enabled: true, cancellationToken);
         await entitlements.SetEnabledAsync(acme.Id, "logistics", enabled: true, cancellationToken);
+        await entitlements.SetEnabledAsync(acme.Id, "contracts", enabled: true, cancellationToken);
         await entitlements.SetEnabledAsync(beta.Id, "logistics", enabled: true, cancellationToken);
 
         await EnsureAdministratorsAsync(services, acme, cancellationToken);

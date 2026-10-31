@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
@@ -535,8 +536,9 @@ public sealed class RecordPipeline(
         RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, "Görme yetkiniz olmayan bir alanı değiştiremezsiniz.");
 
     // Oluşturulan ya da güncellenen kaydın sorumlusu kapsam dışında: kayıt yazılmaz.
+    // Kapsamı üst kayıttan türeyen alt kayıt türlerinde (sorumlu alanı yok) hata genel sorumlu alan adıyla verilir.
     private static RecordResult<T> OwnerOutOfScope<T>(IRecordStore store) =>
-        Invalid<T>([new RecordFieldError(store.OwnerField!, "Bu kişiyi sorumlu atayamazsınız: kayıt kapsamınızın dışında.")]);
+        Invalid<T>([new RecordFieldError(store.OwnerField ?? OwnedRecordType.OwnerField, "Bu kişiyi sorumlu atayamazsınız: kayıt kapsamınızın dışında.")]);
 
     /// <summary>Adım 1-3: tenant, lisans, yetki. Geçemezse hazır hata sonucu döner.</summary>
     private async Task<(RecordResult<T>? Gate, TenantContext? Tenant, IRecordStore? Store)> AuthorizeAsync<T>(

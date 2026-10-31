@@ -502,6 +502,20 @@ Fırsat; numara (`OP-20261029-AB12CD`, tenant içinde benzersiz), durum (`Open`,
 
 **Henüz yok:** çoklu pipeline, teklif entegrasyonu, sipariş/sözleşme devri, tahmin anlık görüntüsü, zamanlanmış bildirimler, toplu işlemler (ayrıntı ADR-0017'de).
 
+## Sözleşme modülü ([ADR-0021](docs/adr/0021-sozlesme-yonetimi.md)) — ilk dilim
+
+Modül anahtarı `contracts`, şema `contracts`; sektörden bağımsızdır ve CRM tablolarına bağlanmaz. Müşteri ve ilgili kişi **ortak kayıttır** (`core.party`, `core.person`; ADR-0006), böylece CRM kapalıyken de sözleşme açılır. Tek veritabanında, RLS'li dört tablo: `Contracts`, `ContractParties`, `ContractLines`, `ContractEvents` (migration `ContractManagement`).
+
+Uç noktalar (kayıt boru hattı; başka tenant'ın kaydı 404): `/api/contracts/contracts`, `/api/contracts/contract-parties` (`contractId`, `partyId`, `personId`, `role` süzgeçleri), `/api/contracts/contract-lines` (`contractId`, `kind`), `GET /api/contracts/contracts/{id}/history` (tarihçe). Sözleşme listesi süzgeçleri: `partyId`, `personId`, `previousContractId`, `ownerId=me`, `number`, `type`, `preparationStatus`, `approvalStatus`, `signatureStatus`, `effectiveStatus`, `renewalMode`, `confidentiality`, `currency`, `indefinite`, `startFrom/startTo`, `endFrom/endTo`, `noticeFrom/noticeTo`; arama başlık/numara/açıklama.
+
+- **Dört ayrı durum alanı** (tek alana sıkıştırılmaz; yalnızca iş akışı eylemleri yazar, genel `PUT` yok sayar): hazırlık `Draft|InReview|ReadyToPublish`, onay `NotRequired|Pending|Approved|Rejected|Withdrawn`, imza `NotSent|Pending|PartiallySigned|Completed|Rejected|Expired|Cancelled`, yürürlük `NotInForce|AwaitingStart|Active|Suspended|Expired|Terminated|Cancelled`. İçerik (başlık, taraf, kalem) yalnızca taslakta, onay beklemiyorken ve imzaya gitmemişken düzenlenir (`ContractRules.CanEditContent`); imzalı ya da yürürlük kaydı olan sözleşme silinemez (`CanDelete`). Durum geçişleri ikinci dilimdedir.
+- **Tarihler:** bitiş başlangıçtan önce olamaz; belirsiz süreli sözleşmede bitiş girilmez; yenilemeli (`Manual|Automatic`) sözleşmede yenileme süresi (ay, 1–120) zorunlu, yenilemesizde girilmez; bildirim süresi 0–3650 gün. **Son bildirim tarihi** sunucuda hesaplanır: bitiş − bildirim süresi (`noticeDeadline`, istemci yazamaz).
+- **Toplamlar yalnızca sunucuda** (`QuoteCalculator`, Core.Contracts/Pricing; satır indirimi → vergi; dahil/hariç). Tek seferlik kalemlerin toplamı başlıkta (`netTotal/taxTotal/grossTotal`), dönemsel kalemler (`billingPeriod`: Monthly/Quarterly/Yearly) dönem başına özet JSON'da (`recurringSummary`); dönemsel tutar sözleşme süresiyle çarpılıp genel toplama eklenmez. Sözleşme tek para birimlidir. Açıklama satırı (`kind=Text`) tutar taşımaz.
+- **İzinler:** `contracts.contracts.read`, `contracts.contracts.write`, `contracts.financials.read` (hassas alan: sözleşme bedeli, kalem fiyat/indirim ve tüm tutarlar; izni olmayan sözleşmeyi görür, tutarları görmez, gönderdiği fiyat yok sayılır). Hazır roller: "Sözleşme sorumlusu" (kendi kayıtları), "Sözleşme izleyici" (tutarsız okuma). Veri kapsamı sorumluya göredir; taraf ve kalemler üst sözleşmenin kapsamını izler. Özel alan (Y9a) sözleşmede açıktır; tür (`type`) düzenlenebilir listedir (`contracts.contract-type`).
+- **Lookup'lar (ADR-0016):** `contracts.contract.party|person|owner|previous`, `contracts.contract-party.party|person`; kişi lookup'ı müşteri tarafına bağımlıdır ve kayıt sırasında sunucuda yeniden doğrulanır ("Kişi seçilen müşteriyle ilişkili değil").
+- **Ekranlar:** `Sözleşmeler` (`/sozlesmeler`: hızlı görünümler "Sözleşmelerim", "İmza bekleyen", "Bitişi yaklaşan (90 gün)", "Bildirim süresi yaklaşan (30 gün)"; yürürlük ve tür süzgeci; kritik tarih sütunu), sözleşme sayfası (`/sozlesmeler/yeni`, `/sozlesmeler/{id}`: genel bilgiler, taraflar ve kişiler, kapsam ve kalemler, tarihçe + işlem geçmişi sekmeleri; kaydedilmemiş değişiklik uyarısı; 409'da yenileme uyarısı).
+- **Henüz yok (sonraki dilimler):** durum geçişi eylemleri ve sürüm dondurma, tekliften sözleşme oluşturma, şablon ve PDF, iç onay, imza, taahhüt, yenileme/fesih işi, ek protokol, dashboard, dışa aktarma, kayıtlı görünümler. Ayrıntı ve dilim planı ADR-0021'de.
+
 ## E-posta
 
 Uygulama e-postayı hemen göndermez: `IEmailQueue.Enqueue(...)` e-postayı `platform.EmailMessages` kuyruğuna yazar, arka plandaki işleyici (her 10 saniyede) SMTP ile gönderir. Kuyruğa yazma, çağıranın kaydıyla aynı işlemdedir; kayıt geri alınırsa e-posta da gitmez. Aktif tenant varsa e-posta o tenant'a bağlanır; yoksa platform e-postasıdır (ör. şifre sıfırlama). `IEmailQueue` `Modulix.Core.Contracts` içindedir, modüller de kullanabilir.
@@ -588,6 +602,7 @@ dotnet run --project src/Modulix.Api
 | `Modulix.Infrastructure` | EF Core, SQL Server, RLS, dosya, e-posta | Core, Core.Contracts |
 | `Modulix.Modules.Crm` | Firma, kişi, fırsat, aktivite | Core.Contracts |
 | `Modulix.Modules.Logistics` | Sevkiyat, taşıyıcı, maliyet | Core.Contracts |
+| `Modulix.Modules.Contracts` | Sözleşme yönetimi (şablon, sürüm, onay, imza, taahhüt, yenileme) | Core.Contracts |
 | `Modulix.AI` | LLM katmanı, tool sözleşmesi | Core.Contracts |
 | `Modulix.Shared` | API DTO'ları ve doğrulama kuralları | — |
 | `Modulix.Api` | Host, endpoint'ler | Hepsi |
