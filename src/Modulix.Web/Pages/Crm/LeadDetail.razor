@@ -3,7 +3,7 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>@(lead?.LeadNumber ?? "Lead") · ModuliX</PageTitle>
+<PageTitle>@(lead?.LeadNumber ?? "Lead") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.LeadsRead">
     <a class="back-link" href="crm/leadler">← Lead'ler</a>

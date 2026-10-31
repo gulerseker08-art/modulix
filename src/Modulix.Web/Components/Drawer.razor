@@ -1,0 +1,61 @@
+@* Sağdan açılan çekmece (docs/design-system/component-catalog.md → Drawer). İçerik kendi başlığını ve kapatma düğmesini
+   taşır; çekmece Escape'le ve arka plana tıklayınca da kapanır. Açılınca odak panele geçer, telefonda tam ekran açılır. *@
+@if (Open)
+{
+    <div class="drawer-backdrop" @onclick="CloseAsync"></div>
+    <aside class="drawer @Class" role="dialog" aria-modal="true" aria-label="@Label" tabindex="-1"
+           @ref="panel" @onkeydown="OnKeyDownAsync">
+        @ChildContent
+    </aside>
+}
+
+@code {
+    private ElementReference panel;
+    private bool focusPending;
+    private bool wasOpen;
+
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Ekran okuyucu için çekmecenin adı.</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !wasOpen)
+        {
+            focusPending = true;
+        }
+
+        wasOpen = Open;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusPending && Open)
+        {
+            focusPending = false;
+            await panel.FocusAsync();
+        }
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await CloseAsync();
+        }
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+}

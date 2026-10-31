@@ -4,23 +4,21 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
-@* ModuliX logosu + adı: tıklanınca "Tüm Uygulamalar" paneli açılır (sayfanın üzerinde, içeriği kaydırmaz).
+@* Modulix logosu (BrandLogo): tıklanınca "Tüm Uygulamalar" paneli açılır (sayfanın üzerinde, içeriği kaydırmaz).
    İki düzey: ana uygulamalar, sonra seçilen uygulamanın alt uygulamaları. Liste AppCatalog'dan ve oturumdan gelir. *@
 <div class="app-launcher">
     @if (Session.IsSignedIn)
     {
         <button type="button" class="navbar-brand brand-button" @ref="brandButton" @onclick="Toggle"
                 aria-haspopup="dialog" aria-expanded="@(isOpen ? "true" : "false")" aria-controls="app-launcher-panel"
-                aria-label="ModuliX uygulama menüsü">
-            <img src="img/modulix-mark.svg" alt="" width="28" height="28" />
-            <span>ModuliX</span>
+                aria-label="Modulix uygulama menüsü">
+            <BrandLogo Size="34" />
         </button>
     }
     else
     {
-        <a class="navbar-brand" href="">
-            <img src="img/modulix-mark.svg" alt="" width="28" height="28" />
-            <span>ModuliX</span>
+        <a class="navbar-brand" href="" aria-label="Modulix ana sayfa">
+            <BrandLogo Size="34" />
         </a>
     }
 

@@ -1,74 +1,134 @@
+/* Sol menü (Sidebar). Aktif öğe açık mavi zemin + solda ince vurgu çizgisiyle gösterilir. */
 .navbar-toggler {
-    background-color: var(--mx-lilac);
+    background-color: var(--mx-surface-muted);
     border-color: var(--mx-border);
 }
 
 .top-row {
-    height: 4rem;
-    min-height: 4rem;
+    height: var(--mx-header-height);
+    min-height: var(--mx-header-height);
+    border-bottom: 1px solid var(--mx-border);
 }
 
 .nav-item {
-    font-size: 0.9rem;
-    padding-bottom: 0.5rem;
+    font-size: var(--mx-fs-body);
+    padding-bottom: var(--mx-space-1);
 }
 
     .nav-item:first-of-type {
-        padding-top: 1rem;
+        padding-top: var(--mx-space-4);
     }
 
     .nav-item:last-of-type {
-        padding-bottom: 1rem;
+        padding-bottom: var(--mx-space-4);
     }
 
     .nav-item ::deep a {
-        color: var(--mx-muted);
-        border-radius: 0.625rem;
+        position: relative;
+        color: var(--mx-text-label);
+        border-radius: var(--mx-radius-button);
         height: 2.75rem;
-        padding: 0 0.85rem;
+        padding: 0 var(--mx-space-3);
         display: flex;
         align-items: center;
+        gap: var(--mx-space-3);
         line-height: 2.75rem;
         font-weight: 500;
+        white-space: nowrap;
     }
 
     .nav-item ::deep .app-icon {
         flex: none;
-        margin-right: 0.75rem;
+        color: var(--mx-text-secondary);
     }
 
 .nav-item ::deep a.active {
-    background-color: var(--mx-lilac);
-    color: var(--mx-indigo);
+    background-color: var(--mx-surface-muted);
+    color: var(--mx-tone-brand-fg); /* açık zeminde AA kontrast */
     font-weight: 600;
 }
 
+    /* Aktif öğenin solundaki vurgu çizgisi (renk dışında da ayırt edilir). */
+    .nav-item ::deep a.active::before {
+        content: "";
+        position: absolute;
+        left: calc(-1 * var(--mx-space-3));
+        top: 0.5rem;
+        bottom: 0.5rem;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background: var(--mx-brand-primary);
+    }
+
+    .nav-item ::deep a.active .app-icon {
+        color: var(--mx-brand-primary);
+    }
+
 .nav-item ::deep a:hover:not(.active) {
-    background-color: var(--mx-cream);
-    color: var(--mx-ink);
+    background-color: var(--mx-surface-hover);
+    color: var(--mx-text-primary);
 }
 
 .nav-item ::deep a:focus-visible {
-    outline: 2px solid var(--mx-teal);
+    outline: 2px solid var(--mx-brand-primary);
     outline-offset: 2px;
 }
 
-/* Aktif modülün adı: bölüm başlığının altında belirgin biçimde görünür. */
+/* Aktif modül: koyu lacivert başlık (referans tasarımdaki "CRM" alanı). */
 .nav-module {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding-top: 0.35rem;
-    padding-bottom: 0.6rem;
-    color: var(--mx-ink);
-    font-size: 1.05rem;
+    gap: var(--mx-space-3);
+    margin-top: var(--mx-space-2);
+    margin-bottom: var(--mx-space-2);
+    padding: var(--mx-space-3) var(--mx-space-3);
+    border-radius: var(--mx-radius-button);
+    background: linear-gradient(135deg, var(--mx-brand-navy-light), var(--mx-brand-navy));
+    color: #fff;
+    font-size: var(--mx-fs-body);
     font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
     .nav-module ::deep .app-icon {
         flex: none;
-        color: var(--mx-indigo);
+        color: var(--mx-brand-teal);
     }
+
+/* Menüyü daralt */
+.nav-footer {
+    padding-top: var(--mx-space-3);
+    padding-bottom: var(--mx-space-4);
+    border-top: 1px solid var(--mx-border);
+}
+
+.nav-collapse-button {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-3);
+    width: 100%;
+    height: 2.75rem;
+    padding: 0 var(--mx-space-3);
+    border: 0;
+    border-radius: var(--mx-radius-button);
+    background: transparent;
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-body);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+    .nav-collapse-button:hover {
+        background: var(--mx-surface-hover);
+        color: var(--mx-text-primary);
+    }
+
+@media (max-width: 640.98px) {
+    .nav-footer {
+        display: none;
+    }
+}
 
 @media (min-width: 641px) {
     .navbar-toggler {
@@ -76,14 +136,40 @@
     }
 
     .collapse {
-        /* Never collapse the sidebar for wide screens */
+        /* Geniş ekranda menü hiç kapanmaz */
         display: block;
     }
 
     .nav-scrollable {
-        /* Allow sidebar to scroll for tall menus */
-        height: calc(100vh - 4rem);
+        /* Uzun menü kendi içinde kayar */
+        flex: 1;
+        min-height: 0;
         overflow-y: auto;
         overflow-x: hidden;
+    }
+
+    /* Daraltılmış menü: metinler gizlenir, ikonlar ortalanır; adlar title ile ipucu olarak görünür. */
+    html.sidebar-collapsed .nav-label,
+    html.sidebar-collapsed .nav-section {
+        display: none;
+    }
+
+    html.sidebar-collapsed .nav-item ::deep a,
+    html.sidebar-collapsed .nav-collapse-button,
+    html.sidebar-collapsed .nav-module {
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    html.sidebar-collapsed .nav-item,
+    html.sidebar-collapsed .nav-footer {
+        padding-left: var(--mx-space-3) !important;
+        padding-right: var(--mx-space-3) !important;
+    }
+
+    html.sidebar-collapsed .nav-module {
+        margin-left: var(--mx-space-3) !important;
+        margin-right: var(--mx-space-3) !important;
     }
 }

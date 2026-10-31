@@ -3,13 +3,17 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
+@* Ortak uygulama kabuğu (AppShell): sol menü + üst çubuk + içerik. Bütün oturumlu sayfalar bu düzeni kullanır;
+   yeni modüller ayrı bir kabuk oluşturmaz (docs/design-system/README.md). *@
+<a class="skip-link" href="@SkipHref">İçeriğe geç</a>
+
 <div class="page">
     <div class="sidebar">
         <NavMenu />
     </div>
 
-    <main>
-        <div class="top-row px-4">
+    <div class="app-main">
+        <header class="top-row app-header px-4">
             @if (Session.IsSignedIn)
             {
                 @* Firmanın logosu (Y6b), ayarlanmışsa. *@
@@ -17,40 +21,73 @@
                 {
                     <img class="tenant-logo" src="@logo.Url" alt="@Session.ActiveTenantName" />
                 }
-                <span class="avatar" aria-hidden="true">@Initials(Session.User!.DisplayName)</span>
-                <span class="session-info text-truncate">
-                    <a class="session-link" href="hesabim" title="Hesabım">@Session.User!.DisplayName</a>
-                    @if (Session.ActiveTenantName is { } tenant)
-                    {
-                        <span class="text-muted"> · @tenant</span>
-                    }
-                </span>
-                @if (Session.User.Memberships.Count > 1)
-                {
-                    <a href="tenant">Kuruluş değiştir</a>
-                }
-                @* İşletici şirket seçici (ADR-0008): yalnızca birden fazla şirkete erişim varsa görünür. *@
-                @if (Session.HasMultipleCompanies)
-                {
-                    <label class="company-switcher">
-                        <span class="visually-hidden">Aktif şirket</span>
-                        <select class="form-select form-select-sm" disabled="@companyBusy"
-                                @onchange="OnCompanyChanged" value="@Session.ActiveCompanyId">
-                            @foreach (var company in Session.Companies)
-                            {
-                                <option value="@company.Id">@company.Name</option>
-                            }
-                        </select>
-                    </label>
-                }
-                <button type="button" class="btn btn-link" @onclick="LogoutAsync">Çıkış</button>
-            }
-        </div>
 
-        <article class="content px-4">
+                <div class="header-tools">
+                    @* İşletici şirket seçici (ADR-0008): yalnızca birden fazla şirkete erişim varsa görünür. *@
+                    @if (Session.HasMultipleCompanies)
+                    {
+                        <label class="company-switcher">
+                            <span class="visually-hidden">Aktif şirket</span>
+                            <select class="form-select form-select-sm" disabled="@companyBusy"
+                                    @onchange="OnCompanyChanged" value="@Session.ActiveCompanyId">
+                                @foreach (var company in Session.Companies)
+                                {
+                                    <option value="@company.Id">@company.Name</option>
+                                }
+                            </select>
+                        </label>
+                    }
+
+                    <ThemeToggle />
+
+                    <div class="profile-menu" @onkeydown="OnProfileKeyDown">
+                        <button type="button" class="profile-button" @onclick="ToggleProfile"
+                                aria-haspopup="menu" aria-expanded="@(profileOpen ? "true" : "false")" aria-controls="profile-menu-list">
+                            <span class="avatar" aria-hidden="true">@Initials(Session.User!.DisplayName)</span>
+                            <span class="session-info">
+                                <span class="session-name text-truncate">@Session.User!.DisplayName</span>
+                                @if (Session.ActiveTenantName is { } tenant)
+                                {
+                                    <span class="session-tenant text-truncate">@tenant</span>
+                                }
+                            </span>
+                            <AppIcon Name="chevron-down" Size="18" />
+                        </button>
+
+                        @if (profileOpen)
+                        {
+                            @* Menünün dışına tıklanınca kapanır. *@
+                            <div class="menu-backdrop" @onclick="CloseProfile"></div>
+                            <ul id="profile-menu-list" class="menu-list" role="menu" aria-label="Profil menüsü">
+                                <li role="none">
+                                    <a role="menuitem" href="hesabim" @onclick="CloseProfile">
+                                        <AppIcon Name="user" Size="18" /> Hesabım
+                                    </a>
+                                </li>
+                                @if (Session.User.Memberships.Count > 1)
+                                {
+                                    <li role="none">
+                                        <a role="menuitem" href="tenant" @onclick="CloseProfile">
+                                            <AppIcon Name="repeat" Size="18" /> Kuruluş değiştir
+                                        </a>
+                                    </li>
+                                }
+                                <li role="none">
+                                    <button type="button" role="menuitem" @onclick="LogoutAsync">
+                                        <AppIcon Name="log-out" Size="18" /> Çıkış
+                                    </button>
+                                </li>
+                            </ul>
+                        }
+                    </div>
+                </div>
+            }
+        </header>
+
+        <main id="main-content" class="content px-4" tabindex="-1">
             @Body
-        </article>
-    </main>
+        </main>
+    </div>
 </div>
 
 @code {
@@ -61,8 +98,23 @@
     }
 
     private bool companyBusy;
+    private bool profileOpen;
+
+    private string SkipHref => Navigation.ToBaseRelativePath(Navigation.Uri).Split('#')[0] + "#main-content";
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private void ToggleProfile() => profileOpen = !profileOpen;
+
+    private void CloseProfile() => profileOpen = false;
+
+    private void OnProfileKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            profileOpen = false;
+        }
+    }
 
     private async Task OnCompanyChanged(ChangeEventArgs e)
     {
@@ -76,6 +128,7 @@
 
     private async Task LogoutAsync()
     {
+        profileOpen = false;
         await Session.LogoutAsync();
         Navigation.NavigateTo("giris");
     }

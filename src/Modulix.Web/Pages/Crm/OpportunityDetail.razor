@@ -3,7 +3,7 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>@(opportunity?.OpportunityNumber ?? "Fırsat") · ModuliX</PageTitle>
+<PageTitle>@(opportunity?.OpportunityNumber ?? "Fırsat") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.OpportunitiesRead">
     <a class="back-link" href="crm/firsatlar">← Fırsatlar</a>
@@ -43,31 +43,49 @@
     else
     {
         <div class="page-header">
-            <div>
-                <h1>@opportunity.Title</h1>
-                <div class="header-meta">
-                    <span>@opportunity.OpportunityNumber</span>
-                    <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span>
-                    <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span>
-                    <span>Öncelik: @LeadPriority.Label(opportunity.Priority)</span>
-                    @if (opportunity.Status == OpportunityStatus.Open && opportunity.ExpectedCloseDate is { } due && due < Today)
-                    {
-                        <span class="badge stage-lost">Kapanış tarihi geçti</span>
-                    }
-                    @if (opportunity.Status == OpportunityStatus.OnHold && opportunity.HoldReviewDate is { } holdDue && holdDue <= Today)
-                    {
-                        <span class="badge stage-negotiation">Yeniden değerlendirme zamanı geldi</span>
-                    }
-                    @if (opportunity.Status == OpportunityStatus.Open && InactiveDays is { } days)
-                    {
-                        <span class="badge stage-negotiation">@days gündür etkileşim yok</span>
-                    }
+            <div class="page-heading">
+                <span class="page-icon" aria-hidden="true"><AppIcon Name="target" Size="24" /></span>
+                <div>
+                    <h1>@opportunity.Title</h1>
+                    <p class="page-subtitle">
+                        <a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a>
+                        @if (opportunity.ContactId is not null)
+                        {
+                            <span> · @Lookups.ContactName(opportunity.ContactId)</span>
+                        }
+                        @if (opportunity.OwnerId is not null)
+                        {
+                            <span> · Sorumlu: @Lookups.MemberName(opportunity.OwnerId)</span>
+                        }
+                    </p>
+                    <div class="header-meta">
+                        <span>@opportunity.OpportunityNumber</span>
+                        <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span>
+                        <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span>
+                        <span>Öncelik: @LeadPriority.Label(opportunity.Priority)</span>
+                        @if (opportunity.Status == OpportunityStatus.Open && opportunity.ExpectedCloseDate is { } due && due < Today)
+                        {
+                            <span class="badge stage-lost">Kapanış tarihi geçti</span>
+                        }
+                        @if (opportunity.Status == OpportunityStatus.OnHold && opportunity.HoldReviewDate is { } holdDue && holdDue <= Today)
+                        {
+                            <span class="badge stage-negotiation">Yeniden değerlendirme zamanı geldi</span>
+                        }
+                        @if (opportunity.Status == OpportunityStatus.Open && InactiveDays is { } days)
+                        {
+                            <span class="badge stage-negotiation">@days gündür etkileşim yok</span>
+                        }
+                    </div>
                 </div>
             </div>
             <div class="header-actions">
                 @if (Session.Can(CrmAccess.OpportunitiesWrite))
                 {
-                    <button type="button" class="btn btn-outline-primary" @onclick="() => editing = true">Düzenle</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => editing = true">Düzenle</button>
+                }
+                @if (Session.Can(CrmAccess.QuotesWrite) && opportunity.Status == OpportunityStatus.Open)
+                {
+                    <a class="btn btn-primary" href="crm/teklifler/yeni?opportunityId=@Id&companyId=@opportunity.CompanyId"><span aria-hidden="true">+</span> Yeni teklif</a>
                 }
             </div>
         </div>
@@ -77,490 +95,603 @@
             <div class="alert alert-warning" role="status">@OpportunityStatus.Label(opportunity.Status): @statusReason</div>
         }
 
-        <section class="detail-section">
-            <div class="section-header"><h2>Özet</h2></div>
-            <dl class="detail-grid">
-                <div><dt>Firma</dt><dd><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></dd></div>
-                <div><dt>Ana kişi</dt><dd>@(opportunity.ContactId is null ? "—" : Lookups.ContactName(opportunity.ContactId))</dd></div>
-                <div><dt>Sorumlu</dt><dd>@(opportunity.OwnerId is null ? "—" : Lookups.MemberName(opportunity.OwnerId))</dd></div>
-                <div><dt>Tür</dt><dd>@(opportunity.Type is null ? "—" : Lookups.Label(CrmLists.OpportunityType, opportunity.Type))</dd></div>
-                <div><dt>Edinim kaynağı</dt><dd>@(opportunity.Source is null ? "—" : Lookups.Label(CrmLeadLists.Source, opportunity.Source))</dd></div>
-                @if (opportunity.SourceLeadId is { } leadId && Session.Can(CrmAccess.LeadsRead))
-                {
-                    <div><dt>Kaynak Lead</dt><dd><a href="crm/leadler/@leadId">Lead'i aç</a></dd></div>
-                }
-                @if (ShowAmounts)
-                {
-                    <div><dt>Tahmini tutar</dt><dd>@(opportunity.Amount is { } amount ? CrmLabels.Amount(amount, opportunity.Currency) : "Bilinmiyor")</dd></div>
-                    <div><dt>Olasılık</dt><dd>@(opportunity.Probability is { } p ? $"%{p}" : "Bilinmiyor")@(opportunity.ProbabilityManual ? " (elle girildi)" : " (aşama varsayılanı)")</dd></div>
-                    <div><dt>Ağırlıklı tutar</dt><dd>@(Weighted is { } w ? CrmLabels.Amount(w, opportunity.Currency) : "—")</dd></div>
-                    <div><dt>Müşteri bütçesi</dt><dd>@(opportunity.CustomerBudget is { } budget ? CrmLabels.Amount(budget, opportunity.Currency) : "Bilinmiyor") · @OpportunityBudgetStatus.Label(opportunity.BudgetStatus)</dd></div>
-                }
-                <div><dt>Tahmini kapanış</dt><dd>@(opportunity.ExpectedCloseDate is { } close ? CrmLabels.Date(close) : "—")@(opportunity.CloseDateChangeCount > 0 ? $" · {opportunity.CloseDateChangeCount} kez değişti" : null)</dd></div>
-                <div><dt>Hedef karar tarihi</dt><dd>@(opportunity.TargetDecisionDate is { } decision ? CrmLabels.Date(decision) : "—")</dd></div>
-                <div><dt>Sonraki aksiyon</dt><dd>@(opportunity.NextAction ?? "Tanımsız")@(opportunity.NextActionDate is { } nad ? $" · {CrmLabels.Date(nad)}" : null)</dd></div>
-                <div><dt>Son müşteri etkileşimi</dt><dd>@(opportunity.LastInteractionAt is { } last ? CrmLabels.Time(last) : "Henüz yok")</dd></div>
-                <div><dt>Aşamaya giriş</dt><dd>@(opportunity.StageEnteredAt is { } entered ? $"{CrmLabels.Time(entered)} ({(int)(DateTimeOffset.UtcNow - entered).TotalDays} gün)" : "—")</dd></div>
-                @if (opportunity.Status == OpportunityStatus.OnHold && opportunity.HoldReviewDate is { } holdReview)
-                {
-                    <div><dt>Yeniden değerlendirme</dt><dd>@CrmLabels.Date(holdReview)</dd></div>
-                }
-                @if (OpportunityStatus.IsClosed(opportunity.Status))
-                {
-                    <div><dt>Gerçek kapanış</dt><dd>@(opportunity.ActualCloseDate is { } actual ? CrmLabels.Date(actual) : "—")</dd></div>
-                    @if (opportunity.Status == OpportunityStatus.Won && ShowAmounts)
-                    {
-                        <div><dt>Kazanılan tutar</dt><dd>@(opportunity.WonAmount is { } won ? CrmLabels.Amount(won, opportunity.WonCurrency ?? opportunity.Currency) : "—")</dd></div>
-                    }
-                    @if (opportunity.WinReason is { } winReason)
-                    {
-                        <div><dt>Kazanma nedeni</dt><dd>@winReason</dd></div>
-                    }
-                    @if (opportunity.HandoverNote is { } handover)
-                    {
-                        <div class="span-all"><dt>Operasyona devir notu</dt><dd class="notes">@handover</dd></div>
-                    }
-                    @if (opportunity.LossReason is { } lossReason)
-                    {
-                        <div><dt>Kaybetme nedeni</dt><dd>@Lookups.Label(CrmLists.OpportunityLossReason, lossReason)@(opportunity.LostReason is { } note ? $" · {note}" : null)</dd></div>
-                    }
-                    @if (opportunity.WinningCompetitorId is { } winner)
-                    {
-                        <div><dt>Kazanan rakip</dt><dd>@(competitors?.FirstOrDefault(c => c.Id == winner)?.Name ?? "—")</dd></div>
-                    }
-                    @if (opportunity.RecontactDate is { } recontact)
-                    {
-                        <div><dt>Yeniden iletişim</dt><dd>@CrmLabels.Date(recontact)</dd></div>
-                    }
-                    @if (opportunity.WinningCompetitorId is null && opportunity.Status == OpportunityStatus.Lost && opportunity.LossReason is not null)
-                    {
-                        <div><dt>Rakibe kayıp mı?</dt><dd>@(Lookups.CategoryOf(CrmLists.OpportunityLossReason, opportunity.LossReason) == "competitor" ? "Evet (rakip belirtilmedi)" : "Hayır")</dd></div>
-                    }
-                }
-                @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Opportunity))
-                {
-                    var text = CustomFieldText.Format(field, opportunity.Custom);
-                    @if (text.Length > 0)
-                    {
-                        <div><dt>@field.Label</dt><dd>@text</dd></div>
-                    }
-                }
-                @if (opportunity.Description is { } description)
-                {
-                    <div class="span-all"><dt>Açıklama</dt><dd class="notes">@description</dd></div>
-                }
-                @if (opportunity.Notes is { } notes)
-                {
-                    <div class="span-all"><dt>Notlar</dt><dd class="notes">@notes</dd></div>
-                }
-            </dl>
-        </section>
+        @* Satış hunisi: aşamaya tıklamak işlem panelini açar; aşama kuralları ve doğrulamalar o işlemle sunucuda çalışır. *@
+        <SalesPipeline Stages="PipelineStages" Current="@opportunity.Stage" Status="@opportunity.Status"
+                       CanChangeStage="CanStage" CanClose="CanClose" OnChoose="ChooseStage" />
 
-        <section class="detail-section opportunity-actions">
-            <div class="section-header"><h2>İşlemler</h2></div>
-            @if (!AnyAction)
+        <div class="kpi-strip" role="group" aria-label="Fırsat göstergeleri">
+            @if (ShowAmounts)
             {
-                <p class="text-muted">Bu durumda yapabileceğiniz bir işlem yok.</p>
+                <div class="kpi-item">
+                    <span class="kpi-item-icon tone-brand" aria-hidden="true"><AppIcon Name="wallet" Size="20" /></span>
+                    <span><span class="kpi-item-label">Tahmini tutar</span><strong>@(opportunity.Amount is { } kpiAmount ? CrmLabels.Amount(kpiAmount, opportunity.Currency) : "Bilinmiyor")</strong></span>
+                </div>
+                <div class="kpi-item">
+                    <span class="kpi-item-icon tone-info" aria-hidden="true"><AppIcon Name="percent" Size="20" /></span>
+                    <span><span class="kpi-item-label">Olasılık</span><strong>@(opportunity.Probability is { } kpiP ? $"%{kpiP}" : "Bilinmiyor")</strong><small>@(opportunity.ProbabilityManual ? "elle girildi" : "aşama varsayılanı")</small></span>
+                </div>
             }
-            <div class="action-row">
-                @if (CanStage && opportunity.Status == OpportunityStatus.Open)
-                {
-                    <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="() => Toggle(Panel.Stage)">Aşama değiştir</button>
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Toggle(Panel.Hold)">Beklemeye al</button>
-                }
-                @if (CanStage && opportunity.Status == OpportunityStatus.OnHold)
-                {
-                    <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="ResumeAsync">Beklemeden çıkar</button>
-                }
-                @if (CanClose && opportunity.Status == OpportunityStatus.Open)
-                {
-                    <button type="button" class="btn btn-outline-success" disabled="@busy" @onclick="() => Toggle(Panel.Win)">Kazanıldı</button>
-                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => Toggle(Panel.Lose)">Kaybedildi</button>
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Toggle(Panel.Cancel)">İptal et</button>
-                }
-                @if (CanReopen && OpportunityStatus.IsClosed(opportunity.Status))
-                {
-                    <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="() => Toggle(Panel.Reopen)">Yeniden aç</button>
-                }
+            <div class="kpi-item">
+                <span class="kpi-item-icon tone-warning" aria-hidden="true"><AppIcon Name="calendar" Size="20" /></span>
+                <span><span class="kpi-item-label">Tahmini kapanış</span><strong>@(opportunity.ExpectedCloseDate is { } kpiClose ? CrmLabels.Date(kpiClose) : "—")</strong></span>
             </div>
-
-            @switch (panel)
+            @if (ShowAmounts)
             {
-                case Panel.Stage:
-                    <div class="inline-form">
-                        <label class="form-label" for="o-stage">Yeni aşama</label>
-                        <select id="o-stage" class="form-select" @bind="stage">
-                            @foreach (var s in OpenStages(opportunity.Stage))
-                            {
-                                <option value="@s.Key">@s.Label</option>
-                            }
-                        </select>
-                        <label class="form-label" for="o-stage-note">Gerekçe (isteğe bağlı)</label>
-                        <textarea id="o-stage-note" class="form-control" rows="2" maxlength="1000" @bind="note"></textarea>
-                        <small class="text-muted">Bazı aşamalar için tutar, tahmini kapanış ya da kişi dolu olmalıdır (ayarlardan yönetilir).</small>
-                        <button type="button" class="btn btn-primary" disabled="@(busy || stage == opportunity.Stage)" @onclick="ChangeStageAsync">Aşamayı değiştir</button>
-                    </div>
-                    break;
-                case Panel.Hold:
-                    <div class="inline-form">
-                        <label class="form-label" for="h-reason">Beklemeye alma gerekçesi *</label>
-                        <textarea id="h-reason" class="form-control" rows="2" maxlength="500" @bind="note"></textarea>
-                        <label class="form-label" for="h-date">Yeniden değerlendirme tarihi *</label>
-                        <input id="h-date" class="form-control" type="date" @bind="reviewDate" />
-                        <small class="text-muted">Bekleme kapanış değildir; fırsat açık raporlarına ve tahmine girmez.</small>
-                        <button type="button" class="btn btn-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(note) || reviewDate is null)" @onclick="HoldAsync">Beklemeye al</button>
-                    </div>
-                    break;
-                case Panel.Win:
-                    <div class="inline-form">
-                        <label class="form-label" for="w-date">Gerçek kapanış tarihi</label>
-                        <input id="w-date" class="form-control" type="date" max="@Today.ToString("yyyy-MM-dd")" @bind="closeDate" />
-                        @if (ShowAmounts)
-                        {
-                            <label class="form-label" for="w-amount">Kazanılan tutar</label>
-                            <input id="w-amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="wonAmount" />
-                            <label class="form-label" for="w-currency">Para birimi</label>
-                            <input id="w-currency" class="form-control" maxlength="3" @bind="wonCurrency" />
-                            <small class="text-muted">Boş bırakırsanız tahmini tutar (@(opportunity.Amount is { } a ? CrmLabels.Amount(a, opportunity.Currency) : "bilinmiyor")) kazanılan tutar olur.</small>
-                        }
-                        <label class="form-label" for="w-reason">Kazanma nedeni</label>
-                        <input id="w-reason" class="form-control" maxlength="500" @bind="note" />
-                        <label class="form-label" for="w-handover">Operasyon ekibine devir notu</label>
-                        <textarea id="w-handover" class="form-control" rows="2" maxlength="4000" @bind="handover"></textarea>
-                        <button type="button" class="btn btn-success" disabled="@busy" @onclick="WinAsync">Kazanıldı olarak kapat</button>
-                    </div>
-                    break;
-                case Panel.Lose:
-                    <div class="inline-form">
-                        <label class="form-label" for="l-reason">Kaybetme nedeni *</label>
-                        <select id="l-reason" class="form-select" @bind="lossReason">
-                            <option value="">Seçin…</option>
-                            @foreach (var r in Lookups.Choices(CrmLists.OpportunityLossReason))
-                            {
-                                <option value="@r.Key">@r.Label</option>
-                            }
-                        </select>
-                        <label class="form-label" for="l-note">Açıklama @(Lookups.CategoryOf(CrmLists.OpportunityLossReason, lossReason) == "other" ? "*" : null)</label>
-                        <textarea id="l-note" class="form-control" rows="2" maxlength="500" @bind="note"></textarea>
-                        @if (Lookups.CategoryOf(CrmLists.OpportunityLossReason, lossReason) == "competitor")
-                        {
-                            <label class="form-label" for="l-competitor">Kazanan rakip</label>
-                            <select id="l-competitor" class="form-select" @bind="winnerId">
-                                <option value="">Belirtilmedi</option>
-                                @foreach (var c in competitors ?? [])
-                                {
-                                    <option value="@c.Id">@c.Name</option>
-                                }
-                            </select>
-                            <small class="text-muted">Rakip yoksa önce aşağıdan "Rakipler" bölümüne ekleyin.</small>
-                        }
-                        <label class="form-label" for="l-recontact">Yeniden iletişim tarihi</label>
-                        <input id="l-recontact" class="form-control" type="date" @bind="reviewDate" />
-                        @if (Session.Can(CrmAccess.ActivitiesWrite))
-                        {
-                            <label class="form-check"><input type="checkbox" class="form-check-input" @bind="followUp" /> Bu tarih için takip aktivitesi oluştur</label>
-                        }
-                        <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrEmpty(lossReason))" @onclick="LoseAsync">Kaybedildi olarak kapat</button>
-                    </div>
-                    break;
-                case Panel.Cancel:
-                    <div class="inline-form">
-                        <label class="form-label" for="c-reason">İptal gerekçesi *</label>
-                        <textarea id="c-reason" class="form-control" rows="2" maxlength="500" @bind="note"></textarea>
-                        <small class="text-muted">İptal kayıp değildir: kazanma oranına girmez, fırsat son açık aşamasında kalır.</small>
-                        <button type="button" class="btn btn-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(note))" @onclick="CancelAsync">İptal et</button>
-                    </div>
-                    break;
-                case Panel.Reopen:
-                    <div class="inline-form">
-                        <label class="form-label" for="r-reason">Yeniden açma gerekçesi *</label>
-                        <textarea id="r-reason" class="form-control" rows="2" maxlength="1000" @bind="note"></textarea>
-                        <label class="form-label" for="r-stage">Yeni aşama *</label>
-                        <select id="r-stage" class="form-select" @bind="stage">
-                            @foreach (var s in OpenStages(null))
-                            {
-                                <option value="@s.Key">@s.Label</option>
-                            }
-                        </select>
-                        <label class="form-label" for="r-date">Yeni tahmini kapanış *</label>
-                        <input id="r-date" class="form-control" type="date" min="@Today.ToString("yyyy-MM-dd")" @bind="reviewDate" />
-                        @if (ShowAmounts)
-                        {
-                            <label class="form-label" for="r-prob">Olasılık (%)</label>
-                            <input id="r-prob" class="form-control" type="number" min="0" max="100" step="5" @bind="reopenProbability" />
-                        }
-                        <small class="text-muted">Eski kapanış bilgileri tarihçede kalır; yeni bir kapanış döngüsü başlar.</small>
-                        <button type="button" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(note) || reviewDate is null)" @onclick="ReopenAsync">Yeniden aç</button>
-                    </div>
-                    break;
+                <div class="kpi-item">
+                    <span class="kpi-item-icon tone-success" aria-hidden="true"><AppIcon Name="trending-up" Size="20" /></span>
+                    <span><span class="kpi-item-label">Beklenen gelir</span><strong>@(Weighted is { } kpiW ? CrmLabels.Amount(kpiW, opportunity.Currency) : "—")</strong><small>tutar × olasılık</small></span>
+                </div>
             }
-        </section>
+            <div class="kpi-item">
+                <span class="kpi-item-icon tone-violet" aria-hidden="true"><AppIcon Name="hourglass" Size="20" /></span>
+                <span><span class="kpi-item-label">Aşama süresi</span><strong>@(StageDays is { } kpiDays ? $"{kpiDays} gün" : "—")</strong></span>
+            </div>
+        </div>
 
-        @if (HasNeedAnalysis)
-        {
+        <div class="detail-layout">
+            <div class="detail-main">
+
             <section class="detail-section">
-                <div class="section-header"><h2>İhtiyaç analizi</h2></div>
+                <div class="section-header"><h2>Özet</h2></div>
                 <dl class="detail-grid">
-                    @foreach (var (label, text) in NeedFields)
+                    <div><dt>Firma</dt><dd><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></dd></div>
+                    <div><dt>Ana kişi</dt><dd>@(opportunity.ContactId is null ? "—" : Lookups.ContactName(opportunity.ContactId))</dd></div>
+                    <div><dt>Sorumlu</dt><dd>@(opportunity.OwnerId is null ? "—" : Lookups.MemberName(opportunity.OwnerId))</dd></div>
+                    <div><dt>Tür</dt><dd>@(opportunity.Type is null ? "—" : Lookups.Label(CrmLists.OpportunityType, opportunity.Type))</dd></div>
+                    <div><dt>Edinim kaynağı</dt><dd>@(opportunity.Source is null ? "—" : Lookups.Label(CrmLeadLists.Source, opportunity.Source))</dd></div>
+                    @if (opportunity.SourceLeadId is { } leadId && Session.Can(CrmAccess.LeadsRead))
                     {
-                        if (!string.IsNullOrWhiteSpace(text))
+                        <div><dt>Kaynak Lead</dt><dd><a href="crm/leadler/@leadId">Lead'i aç</a></dd></div>
+                    }
+                    @if (ShowAmounts)
+                    {
+                        <div><dt>Tahmini tutar</dt><dd>@(opportunity.Amount is { } amount ? CrmLabels.Amount(amount, opportunity.Currency) : "Bilinmiyor")</dd></div>
+                        <div><dt>Olasılık</dt><dd>@(opportunity.Probability is { } p ? $"%{p}" : "Bilinmiyor")@(opportunity.ProbabilityManual ? " (elle girildi)" : " (aşama varsayılanı)")</dd></div>
+                        <div><dt>Ağırlıklı tutar</dt><dd>@(Weighted is { } w ? CrmLabels.Amount(w, opportunity.Currency) : "—")</dd></div>
+                        <div><dt>Müşteri bütçesi</dt><dd>@(opportunity.CustomerBudget is { } budget ? CrmLabels.Amount(budget, opportunity.Currency) : "Bilinmiyor") · @OpportunityBudgetStatus.Label(opportunity.BudgetStatus)</dd></div>
+                    }
+                    <div><dt>Tahmini kapanış</dt><dd>@(opportunity.ExpectedCloseDate is { } close ? CrmLabels.Date(close) : "—")@(opportunity.CloseDateChangeCount > 0 ? $" · {opportunity.CloseDateChangeCount} kez değişti" : null)</dd></div>
+                    <div><dt>Hedef karar tarihi</dt><dd>@(opportunity.TargetDecisionDate is { } decision ? CrmLabels.Date(decision) : "—")</dd></div>
+                    <div><dt>Sonraki aksiyon</dt><dd>@(opportunity.NextAction ?? "Tanımsız")@(opportunity.NextActionDate is { } nad ? $" · {CrmLabels.Date(nad)}" : null)</dd></div>
+                    <div><dt>Son müşteri etkileşimi</dt><dd>@(opportunity.LastInteractionAt is { } last ? CrmLabels.Time(last) : "Henüz yok")</dd></div>
+                    <div><dt>Aşamaya giriş</dt><dd>@(opportunity.StageEnteredAt is { } entered ? $"{CrmLabels.Time(entered)} ({(int)(DateTimeOffset.UtcNow - entered).TotalDays} gün)" : "—")</dd></div>
+                    @if (opportunity.Status == OpportunityStatus.OnHold && opportunity.HoldReviewDate is { } holdReview)
+                    {
+                        <div><dt>Yeniden değerlendirme</dt><dd>@CrmLabels.Date(holdReview)</dd></div>
+                    }
+                    @if (OpportunityStatus.IsClosed(opportunity.Status))
+                    {
+                        <div><dt>Gerçek kapanış</dt><dd>@(opportunity.ActualCloseDate is { } actual ? CrmLabels.Date(actual) : "—")</dd></div>
+                        @if (opportunity.Status == OpportunityStatus.Won && ShowAmounts)
                         {
-                            <div class="span-all"><dt>@label</dt><dd class="notes">@text</dd></div>
+                            <div><dt>Kazanılan tutar</dt><dd>@(opportunity.WonAmount is { } won ? CrmLabels.Amount(won, opportunity.WonCurrency ?? opportunity.Currency) : "—")</dd></div>
                         }
+                        @if (opportunity.WinReason is { } winReason)
+                        {
+                            <div><dt>Kazanma nedeni</dt><dd>@winReason</dd></div>
+                        }
+                        @if (opportunity.HandoverNote is { } handover)
+                        {
+                            <div class="span-all"><dt>Operasyona devir notu</dt><dd class="notes">@handover</dd></div>
+                        }
+                        @if (opportunity.LossReason is { } lossReason)
+                        {
+                            <div><dt>Kaybetme nedeni</dt><dd>@Lookups.Label(CrmLists.OpportunityLossReason, lossReason)@(opportunity.LostReason is { } note ? $" · {note}" : null)</dd></div>
+                        }
+                        @if (opportunity.WinningCompetitorId is { } winner)
+                        {
+                            <div><dt>Kazanan rakip</dt><dd>@(competitors?.FirstOrDefault(c => c.Id == winner)?.Name ?? "—")</dd></div>
+                        }
+                        @if (opportunity.RecontactDate is { } recontact)
+                        {
+                            <div><dt>Yeniden iletişim</dt><dd>@CrmLabels.Date(recontact)</dd></div>
+                        }
+                        @if (opportunity.WinningCompetitorId is null && opportunity.Status == OpportunityStatus.Lost && opportunity.LossReason is not null)
+                        {
+                            <div><dt>Rakibe kayıp mı?</dt><dd>@(Lookups.CategoryOf(CrmLists.OpportunityLossReason, opportunity.LossReason) == "competitor" ? "Evet (rakip belirtilmedi)" : "Hayır")</dd></div>
+                        }
+                    }
+                    @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Opportunity))
+                    {
+                        var text = CustomFieldText.Format(field, opportunity.Custom);
+                        @if (text.Length > 0)
+                        {
+                            <div><dt>@field.Label</dt><dd>@text</dd></div>
+                        }
+                    }
+                    @if (opportunity.Description is { } description)
+                    {
+                        <div class="span-all"><dt>Açıklama</dt><dd class="notes">@description</dd></div>
+                    }
+                    @if (opportunity.Notes is { } notes)
+                    {
+                        <div class="span-all"><dt>Notlar</dt><dd class="notes">@notes</dd></div>
                     }
                 </dl>
             </section>
-        }
 
-        <section class="detail-section">
-            <div class="section-header">
-                <h2>Kişiler</h2>
-                @if (Session.Can(CrmAccess.OpportunitiesWrite) && !addingContact)
+            <section class="detail-section opportunity-actions">
+                <div class="section-header"><h2>İşlemler</h2></div>
+                @if (!AnyAction)
                 {
-                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => addingContact = true">Kişi bağla</button>
+                    <p class="text-muted">Bu durumda yapabileceğiniz bir işlem yok.</p>
                 }
-            </div>
-            @if (addingContact)
-            {
-                <div class="inline-form">
-                    <label class="form-label" for="oc-contact">Kişi</label>
-                    <LookupPicker Id="oc-contact" LookupKey="crm.opportunity.contact" @bind-Value="newContact" ParentId="opportunity.CompanyId" Placeholder="Kişi seçin…" />
-                    <fieldset>
-                        <legend class="form-label">Bu fırsattaki rolleri</legend>
-                        @foreach (var role in OpportunityContactRoles.All)
-                        {
-                            <label class="form-check form-check-inline">
-                                <input type="checkbox" class="form-check-input" checked="@newRoles.Contains(role)" @onchange="e => ToggleRole(role, (bool)e.Value!)" /> @OpportunityContactRoles.Label(role)
-                            </label>
-                        }
-                    </fieldset>
-                    <label class="form-check"><input type="checkbox" class="form-check-input" @bind="newPrimary" /> Ana irtibat</label>
-                    <button type="button" class="btn btn-primary" disabled="@(busy || newContact is null)" @onclick="AddContactAsync">Bağla</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => addingContact = false">Vazgeç</button>
+                <div class="action-row">
+                    @if (CanStage && opportunity.Status == OpportunityStatus.Open)
+                    {
+                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="() => Toggle(Panel.Stage)">Aşama değiştir</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Toggle(Panel.Hold)">Beklemeye al</button>
+                    }
+                    @if (CanStage && opportunity.Status == OpportunityStatus.OnHold)
+                    {
+                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="ResumeAsync">Beklemeden çıkar</button>
+                    }
+                    @if (CanClose && opportunity.Status == OpportunityStatus.Open)
+                    {
+                        <button type="button" class="btn btn-outline-success" disabled="@busy" @onclick="() => Toggle(Panel.Win)">Kazanıldı</button>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => Toggle(Panel.Lose)">Kaybedildi</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Toggle(Panel.Cancel)">İptal et</button>
+                    }
+                    @if (CanReopen && OpportunityStatus.IsClosed(opportunity.Status))
+                    {
+                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="() => Toggle(Panel.Reopen)">Yeniden aç</button>
+                    }
                 </div>
-            }
-            @if (contacts is null)
-            {
-                <p class="text-muted">Yükleniyor…</p>
-            }
-            else if (contacts.Count == 0)
-            {
-                <p class="text-muted">Bu fırsata bağlı kişi yok.</p>
-            }
-            else
-            {
-                <ul class="item-list">
-                    @foreach (var link in contacts)
-                    {
-                        <li>
-                            <div class="item-main">
-                                <a href="crm/kisiler/@link.ContactId">@link.ContactName</a>@(link.IsPrimary ? " · ana irtibat" : null)
-                                <span class="text-muted">@(link.Roles.Count == 0 ? "Rol belirtilmedi" : string.Join(", ", link.Roles.Select(OpportunityContactRoles.Label)))@(link.Note is { } cn ? $" · {cn}" : null)</span>
-                            </div>
-                            @if (Session.Can(CrmAccess.OpportunitiesWrite))
-                            {
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveAsync(ContactsPath, link.Id, link.Version)">Kaldır</button>
-                            }
-                        </li>
-                    }
-                </ul>
-            }
-        </section>
 
-        <section class="detail-section">
-            <div class="section-header">
-                <h2>Rakipler</h2>
-                @if (Session.Can(CrmAccess.OpportunitiesWrite) && !addingCompetitor)
+                @switch (panel)
                 {
-                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => addingCompetitor = true">Rakip ekle</button>
+                    case Panel.Stage:
+                        <div class="inline-form">
+                            <label class="form-label" for="o-stage">Yeni aşama</label>
+                            <select id="o-stage" class="form-select" @ref="panelFirst" @bind="stage">
+                                @foreach (var s in OpenStages(opportunity.Stage))
+                                {
+                                    <option value="@s.Key">@s.Label</option>
+                                }
+                            </select>
+                            <label class="form-label" for="o-stage-note">Gerekçe (isteğe bağlı)</label>
+                            <textarea id="o-stage-note" class="form-control" rows="2" maxlength="1000" @bind="note"></textarea>
+                            <small class="text-muted">Bazı aşamalar için tutar, tahmini kapanış ya da kişi dolu olmalıdır (ayarlardan yönetilir).</small>
+                            <button type="button" class="btn btn-primary" disabled="@(busy || stage == opportunity.Stage)" @onclick="ChangeStageAsync">Aşamayı değiştir</button>
+                        </div>
+                        break;
+                    case Panel.Hold:
+                        <div class="inline-form">
+                            <label class="form-label" for="h-reason">Beklemeye alma gerekçesi *</label>
+                            <textarea id="h-reason" class="form-control" rows="2" maxlength="500" @bind="note"></textarea>
+                            <label class="form-label" for="h-date">Yeniden değerlendirme tarihi *</label>
+                            <input id="h-date" class="form-control" type="date" @bind="reviewDate" />
+                            <small class="text-muted">Bekleme kapanış değildir; fırsat açık raporlarına ve tahmine girmez.</small>
+                            <button type="button" class="btn btn-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(note) || reviewDate is null)" @onclick="HoldAsync">Beklemeye al</button>
+                        </div>
+                        break;
+                    case Panel.Win:
+                        <div class="inline-form">
+                            <label class="form-label" for="w-date">Gerçek kapanış tarihi</label>
+                            <input id="w-date" class="form-control" type="date" @ref="panelFirst" max="@Today.ToString("yyyy-MM-dd")" @bind="closeDate" />
+                            @if (ShowAmounts)
+                            {
+                                <label class="form-label" for="w-amount">Kazanılan tutar</label>
+                                <input id="w-amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="wonAmount" />
+                                <label class="form-label" for="w-currency">Para birimi</label>
+                                <input id="w-currency" class="form-control" maxlength="3" @bind="wonCurrency" />
+                                <small class="text-muted">Boş bırakırsanız tahmini tutar (@(opportunity.Amount is { } a ? CrmLabels.Amount(a, opportunity.Currency) : "bilinmiyor")) kazanılan tutar olur.</small>
+                            }
+                            <label class="form-label" for="w-reason">Kazanma nedeni</label>
+                            <input id="w-reason" class="form-control" maxlength="500" @bind="note" />
+                            <label class="form-label" for="w-handover">Operasyon ekibine devir notu</label>
+                            <textarea id="w-handover" class="form-control" rows="2" maxlength="4000" @bind="handover"></textarea>
+                            <button type="button" class="btn btn-success" disabled="@busy" @onclick="WinAsync">Kazanıldı olarak kapat</button>
+                        </div>
+                        break;
+                    case Panel.Lose:
+                        <div class="inline-form">
+                            <label class="form-label" for="l-reason">Kaybetme nedeni *</label>
+                            <select id="l-reason" class="form-select" @ref="panelFirst" @bind="lossReason">
+                                <option value="">Seçin…</option>
+                                @foreach (var r in Lookups.Choices(CrmLists.OpportunityLossReason))
+                                {
+                                    <option value="@r.Key">@r.Label</option>
+                                }
+                            </select>
+                            <label class="form-label" for="l-note">Açıklama @(Lookups.CategoryOf(CrmLists.OpportunityLossReason, lossReason) == "other" ? "*" : null)</label>
+                            <textarea id="l-note" class="form-control" rows="2" maxlength="500" @bind="note"></textarea>
+                            @if (Lookups.CategoryOf(CrmLists.OpportunityLossReason, lossReason) == "competitor")
+                            {
+                                <label class="form-label" for="l-competitor">Kazanan rakip</label>
+                                <select id="l-competitor" class="form-select" @bind="winnerId">
+                                    <option value="">Belirtilmedi</option>
+                                    @foreach (var c in competitors ?? [])
+                                    {
+                                        <option value="@c.Id">@c.Name</option>
+                                    }
+                                </select>
+                                <small class="text-muted">Rakip yoksa önce aşağıdan "Rakipler" bölümüne ekleyin.</small>
+                            }
+                            <label class="form-label" for="l-recontact">Yeniden iletişim tarihi</label>
+                            <input id="l-recontact" class="form-control" type="date" @bind="reviewDate" />
+                            @if (Session.Can(CrmAccess.ActivitiesWrite))
+                            {
+                                <label class="form-check"><input type="checkbox" class="form-check-input" @bind="followUp" /> Bu tarih için takip aktivitesi oluştur</label>
+                            }
+                            <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrEmpty(lossReason))" @onclick="LoseAsync">Kaybedildi olarak kapat</button>
+                        </div>
+                        break;
+                    case Panel.Cancel:
+                        <div class="inline-form">
+                            <label class="form-label" for="c-reason">İptal gerekçesi *</label>
+                            <textarea id="c-reason" class="form-control" rows="2" maxlength="500" @bind="note"></textarea>
+                            <small class="text-muted">İptal kayıp değildir: kazanma oranına girmez, fırsat son açık aşamasında kalır.</small>
+                            <button type="button" class="btn btn-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(note))" @onclick="CancelAsync">İptal et</button>
+                        </div>
+                        break;
+                    case Panel.Reopen:
+                        <div class="inline-form">
+                            <label class="form-label" for="r-reason">Yeniden açma gerekçesi *</label>
+                            <textarea id="r-reason" class="form-control" rows="2" maxlength="1000" @bind="note"></textarea>
+                            <label class="form-label" for="r-stage">Yeni aşama *</label>
+                            <select id="r-stage" class="form-select" @bind="stage">
+                                @foreach (var s in OpenStages(null))
+                                {
+                                    <option value="@s.Key">@s.Label</option>
+                                }
+                            </select>
+                            <label class="form-label" for="r-date">Yeni tahmini kapanış *</label>
+                            <input id="r-date" class="form-control" type="date" min="@Today.ToString("yyyy-MM-dd")" @bind="reviewDate" />
+                            @if (ShowAmounts)
+                            {
+                                <label class="form-label" for="r-prob">Olasılık (%)</label>
+                                <input id="r-prob" class="form-control" type="number" min="0" max="100" step="5" @bind="reopenProbability" />
+                            }
+                            <small class="text-muted">Eski kapanış bilgileri tarihçede kalır; yeni bir kapanış döngüsü başlar.</small>
+                            <button type="button" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(note) || reviewDate is null)" @onclick="ReopenAsync">Yeniden aç</button>
+                        </div>
+                        break;
                 }
-            </div>
-            @if (addingCompetitor)
+            </section>
+
+            @if (HasNeedAnalysis)
             {
-                <div class="inline-form">
-                    <label class="form-label" for="cp-name">Ad *</label>
-                    <input id="cp-name" class="form-control" maxlength="200" @bind="competitorName" />
-                    <label class="form-label" for="cp-strengths">Güçlü yönler</label>
-                    <textarea id="cp-strengths" class="form-control" rows="2" maxlength="4000" @bind="strengths"></textarea>
-                    <label class="form-label" for="cp-weaknesses">Zayıf yönler</label>
-                    <textarea id="cp-weaknesses" class="form-control" rows="2" maxlength="4000" @bind="weaknesses"></textarea>
-                    @if (ShowAmounts)
+                <section class="detail-section">
+                    <div class="section-header"><h2>İhtiyaç analizi</h2></div>
+                    <dl class="detail-grid">
+                        @foreach (var (label, text) in NeedFields)
+                        {
+                            if (!string.IsNullOrWhiteSpace(text))
+                            {
+                                <div class="span-all"><dt>@label</dt><dd class="notes">@text</dd></div>
+                            }
+                        }
+                    </dl>
+                </section>
+            }
+
+            @if (Session.Can(CrmAccess.QuotesRead) && PrimaryQuote is { } lineQuote)
+            {
+                <section class="detail-section" aria-labelledby="opp-lines">
+                    <div class="section-header">
+                        <h2 id="opp-lines">Ürün / hizmet kalemleri</h2>
+                        <a class="btn btn-outline-primary btn-sm" href="crm/teklifler/@lineQuote.Id">Teklifte düzenle</a>
+                    </div>
+                    <p class="text-muted small">Kalemler esas tekliften (@lineQuote.QuoteNumber · V@(lineQuote.RevisionNo)) gelir; tutarlar fiyatlandırma motorunun hesabıdır. Ana toplama girmeyen seçenekler ve paket bileşenleri burada gösterilmez.</p>
+                    @if (primaryLines is null)
                     {
-                        <label class="form-label" for="cp-amount">Alternatif teklif tutarı</label>
-                        <input id="cp-amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="altAmount" />
-                        <label class="form-label" for="cp-currency">Para birimi</label>
-                        <input id="cp-currency" class="form-control" maxlength="3" @bind="altCurrency" />
+                        <p class="text-muted">Yükleniyor…</p>
                     }
-                    <button type="button" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(competitorName))" @onclick="AddCompetitorAsync">Ekle</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => addingCompetitor = false">Vazgeç</button>
+                    else if (!primaryLines.Any(l => l.Included && l.Role != "PackageChild"))
+                    {
+                        <p class="text-muted">Esas teklifte kalem yok.</p>
+                    }
+                    else
+                    {
+                        <table class="table record-table line-table">
+                            <caption class="visually-hidden">Esas teklifin kalemleri</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Ürün / hizmet</th><th scope="col" class="text-end">Miktar</th><th scope="col">Birim</th>
+                                    <th scope="col" class="text-end">Birim fiyat</th><th scope="col" class="text-end">İndirim</th>
+                                    <th scope="col" class="text-end">Vergi</th><th scope="col" class="text-end">Toplam</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var line in primaryLines.Where(l => l.Included && l.Role != "PackageChild").OrderBy(l => l.Position))
+                                {
+                                    <tr>
+                                        <td data-label="Ürün / hizmet" class="primary">@line.Name @if (!string.IsNullOrWhiteSpace(line.ProductCode)) { <small class="text-muted">@line.ProductCode</small> }</td>
+                                        <td data-label="Miktar" class="text-end">@line.Quantity.ToString("0.######", Regional.Numbers)</td>
+                                        <td data-label="Birim">@(line.UnitName ?? "—")</td>
+                                        <td data-label="Birim fiyat" class="text-end">@QuoteLabels.Money(line.UnitPrice, lineQuote.Currency)</td>
+                                        <td data-label="İndirim" class="text-end">@QuoteLabels.Money(line.LineDiscount + line.DocumentDiscountShare, lineQuote.Currency)</td>
+                                        <td data-label="Vergi" class="text-end">%@(line.TaxRatePercent.ToString("0.##", Regional.Numbers))</td>
+                                        <td data-label="Toplam" class="text-end">@QuoteLabels.Money(line.Gross, lineQuote.Currency)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </section>
+            }
+
+            <section class="detail-section">
+                <div class="section-header">
+                    <h2>Kişiler</h2>
+                    @if (Session.Can(CrmAccess.OpportunitiesWrite) && !addingContact)
+                    {
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => addingContact = true">Kişi bağla</button>
+                    }
                 </div>
-            }
-            @if (competitors is null)
-            {
-                <p class="text-muted">Yükleniyor…</p>
-            }
-            else if (competitors.Count == 0)
-            {
-                <p class="text-muted">Bu fırsat için rakip girilmedi.</p>
-            }
-            else
-            {
-                <ul class="item-list">
-                    @foreach (var c in competitors)
-                    {
-                        <li>
-                            <div class="item-main">
-                                <strong>@c.Name</strong>@(opportunity.WinningCompetitorId == c.Id ? " · kazanan rakip" : null)
-                                <span class="text-muted">
-                                    @(c.Strengths is { } s ? $"Güçlü: {s}" : null)
-                                    @(c.Weaknesses is { } w ? $" · Zayıf: {w}" : null)
-                                    @(c.AlternativeAmount is { } alt && c.AlternativeCurrency is { } cur && ShowAmounts ? $" · Alternatif teklif: {CrmLabels.Amount(alt, cur)}" : null)
-                                </span>
-                            </div>
-                            @if (Session.Can(CrmAccess.OpportunitiesWrite))
+                @if (addingContact)
+                {
+                    <div class="inline-form">
+                        <label class="form-label" for="oc-contact">Kişi</label>
+                        <LookupPicker Id="oc-contact" LookupKey="crm.opportunity.contact" @bind-Value="newContact" ParentId="opportunity.CompanyId" Placeholder="Kişi seçin…" />
+                        <fieldset>
+                            <legend class="form-label">Bu fırsattaki rolleri</legend>
+                            @foreach (var role in OpportunityContactRoles.All)
                             {
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveAsync(CompetitorsPath, c.Id, c.Version)">Kaldır</button>
+                                <label class="form-check form-check-inline">
+                                    <input type="checkbox" class="form-check-input" checked="@newRoles.Contains(role)" @onchange="e => ToggleRole(role, (bool)e.Value!)" /> @OpportunityContactRoles.Label(role)
+                                </label>
                             }
-                        </li>
-                    }
-                </ul>
-            }
-        </section>
-
-        <section class="detail-section">
-            <div class="section-header">
-                <h2>Aktiviteler</h2>
-                @if (Session.Can(CrmAccess.ActivitiesWrite) && !addingActivity && opportunity.Status is OpportunityStatus.Open or OpportunityStatus.OnHold)
-                {
-                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => addingActivity = true">Aktivite ekle</button>
+                        </fieldset>
+                        <label class="form-check"><input type="checkbox" class="form-check-input" @bind="newPrimary" /> Ana irtibat</label>
+                        <button type="button" class="btn btn-primary" disabled="@(busy || newContact is null)" @onclick="AddContactAsync">Bağla</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="() => addingContact = false">Vazgeç</button>
+                    </div>
                 }
-            </div>
-            @if (addingActivity)
-            {
-                <ActivityEditor Lookups="Lookups" FixedCompanyId="opportunity.CompanyId" FixedOpportunityId="Id" Saved="ActivitySavedAsync" Cancelled="() => addingActivity = false" />
-            }
-            @if (activities is null)
-            {
-                <p class="text-muted">Yükleniyor…</p>
-            }
-            else if (activities.Count == 0)
-            {
-                <p class="text-muted">Bu fırsata bağlı aktivite yok.</p>
-            }
-            else
-            {
-                var nextPlanned = activities.Where(a => ActivityStatus.IsOpen(a.Status) && a.DueAt is not null).OrderBy(a => a.DueAt).FirstOrDefault();
-                var lastDone = activities.Where(a => a.CompletedAt is not null).OrderByDescending(a => a.CompletedAt).FirstOrDefault();
-                <p class="text-muted small">
-                    Son tamamlanan: @(lastDone is null ? "yok" : $"{lastDone.Subject} · {CrmLabels.Time(lastDone.CompletedAt!.Value)}")
-                    · Sonraki planlı: @(nextPlanned is null ? "yok" : $"{nextPlanned.Subject} · {CrmLabels.Time(nextPlanned.DueAt!.Value)}")
-                </p>
-                <ul class="item-list timeline">
-                    @foreach (var a in activities.OrderByDescending(x => x.CompletedAt ?? x.DueAt ?? DateTimeOffset.MaxValue))
+                @if (contacts is null)
+                {
+                    <p class="text-muted">Yükleniyor…</p>
+                }
+                else if (contacts.Count == 0)
+                {
+                    <p class="text-muted">Bu fırsata bağlı kişi yok.</p>
+                }
+                else
+                {
+                    <ul class="item-list">
+                        @foreach (var link in contacts)
+                        {
+                            <li>
+                                <div class="item-main">
+                                    <a href="crm/kisiler/@link.ContactId">@link.ContactName</a>@(link.IsPrimary ? " · ana irtibat" : null)
+                                    <span class="text-muted">@(link.Roles.Count == 0 ? "Rol belirtilmedi" : string.Join(", ", link.Roles.Select(OpportunityContactRoles.Label)))@(link.Note is { } cn ? $" · {cn}" : null)</span>
+                                </div>
+                                @if (Session.Can(CrmAccess.OpportunitiesWrite))
+                                {
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveAsync(ContactsPath, link.Id, link.Version)">Kaldır</button>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <section class="detail-section">
+                <div class="section-header">
+                    <h2>Rakipler</h2>
+                    @if (Session.Can(CrmAccess.OpportunitiesWrite) && !addingCompetitor)
                     {
-                        <li>
-                            <div class="item-main">
-                                <strong>@Lookups.Label(CrmLists.ActivityType, a.Type) · @a.Subject</strong>
-                                <span class="text-muted">
-                                    @(a.CompletedAt is { } done ? $"Tamamlandı {CrmLabels.Time(done)}" : a.DueAt is { } d ? $"Planlı {CrmLabels.Time(d)}" : "Tarihsiz")
-                                    · @Lookups.MemberName(a.OwnerId)
-                                </span>
-                                @if (a.IsOverdue(DateTimeOffset.UtcNow)) { <span class="badge stage-lost">Gecikti</span> }
-                            </div>
-                        </li>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => addingCompetitor = true">Rakip ekle</button>
                     }
-                </ul>
-            }
-            @if (OpportunityStatus.IsClosed(opportunity.Status))
-            {
-                <p class="text-muted small">Kapanışta açık aktiviteler silinmez ya da otomatik kapatılmaz; açık kalırlar ve burada görünür.</p>
-            }
-        </section>
-
-        <section class="detail-section" aria-labelledby="opp-quotes">
-            <div class="section-header"><h2 id="opp-quotes">Teklifler</h2>
-                @if (Session.Can(CrmAccess.QuotesWrite) && opportunity.Status == OpportunityStatus.Open)
+                </div>
+                @if (addingCompetitor)
                 {
-                    <a class="btn btn-outline-primary btn-sm" href="crm/teklifler/yeni?opportunityId=@Id&companyId=@opportunity.CompanyId">Yeni teklif</a>
+                    <div class="inline-form">
+                        <label class="form-label" for="cp-name">Ad *</label>
+                        <input id="cp-name" class="form-control" maxlength="200" @bind="competitorName" />
+                        <label class="form-label" for="cp-strengths">Güçlü yönler</label>
+                        <textarea id="cp-strengths" class="form-control" rows="2" maxlength="4000" @bind="strengths"></textarea>
+                        <label class="form-label" for="cp-weaknesses">Zayıf yönler</label>
+                        <textarea id="cp-weaknesses" class="form-control" rows="2" maxlength="4000" @bind="weaknesses"></textarea>
+                        @if (ShowAmounts)
+                        {
+                            <label class="form-label" for="cp-amount">Alternatif teklif tutarı</label>
+                            <input id="cp-amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="altAmount" />
+                            <label class="form-label" for="cp-currency">Para birimi</label>
+                            <input id="cp-currency" class="form-control" maxlength="3" @bind="altCurrency" />
+                        }
+                        <button type="button" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(competitorName))" @onclick="AddCompetitorAsync">Ekle</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="() => addingCompetitor = false">Vazgeç</button>
+                    </div>
                 }
+                @if (competitors is null)
+                {
+                    <p class="text-muted">Yükleniyor…</p>
+                }
+                else if (competitors.Count == 0)
+                {
+                    <p class="text-muted">Bu fırsat için rakip girilmedi.</p>
+                }
+                else
+                {
+                    <ul class="item-list">
+                        @foreach (var c in competitors)
+                        {
+                            <li>
+                                <div class="item-main">
+                                    <strong>@c.Name</strong>@(opportunity.WinningCompetitorId == c.Id ? " · kazanan rakip" : null)
+                                    <span class="text-muted">
+                                        @(c.Strengths is { } s ? $"Güçlü: {s}" : null)
+                                        @(c.Weaknesses is { } w ? $" · Zayıf: {w}" : null)
+                                        @(c.AlternativeAmount is { } alt && c.AlternativeCurrency is { } cur && ShowAmounts ? $" · Alternatif teklif: {CrmLabels.Amount(alt, cur)}" : null)
+                                    </span>
+                                </div>
+                                @if (Session.Can(CrmAccess.OpportunitiesWrite))
+                                {
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveAsync(CompetitorsPath, c.Id, c.Version)">Kaldır</button>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <section class="detail-section" aria-labelledby="opp-quotes">
+                <div class="section-header"><h2 id="opp-quotes">Teklifler</h2>
+                    @if (Session.Can(CrmAccess.QuotesWrite) && opportunity.Status == OpportunityStatus.Open)
+                    {
+                        <a class="btn btn-outline-primary btn-sm" href="crm/teklifler/yeni?opportunityId=@Id&companyId=@opportunity.CompanyId">Yeni teklif</a>
+                    }
+                </div>
+                @if (!Session.Can(CrmAccess.QuotesRead))
+                {
+                    <p class="text-muted">Teklifleri görme izniniz yok.</p>
+                }
+                else if (quotes is null)
+                {
+                    <p class="text-muted">Yükleniyor…</p>
+                }
+                else if (quotes.Count == 0)
+                {
+                    <p class="text-muted">Bu fırsata bağlı teklif yok.</p>
+                }
+                else
+                {
+                    <p class="text-muted small">
+                        Esas teklif, fırsatın tutar ve raporlamasında esas alınan tekliftir; ilk sunulan teklif otomatik esas olur, yeni revizyon sunulunca esas yeni revizyona geçer.
+                        @(opportunity.PrimaryQuoteId is null ? "Şu an esas teklif yok; fırsat tutarı elle girilmiştir." : null)
+                    </p>
+                    <Notice Text="@quoteNotice" Failed="@quoteNoticeFailed" />
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Fırsata bağlı teklifler</caption>
+                        <thead><tr><th scope="col">Teklif</th><th scope="col">Durum</th><th scope="col" class="text-end">Net toplam</th><th scope="col">Geçerlilik</th><th scope="col">Esas</th><th scope="col"></th></tr></thead>
+                        <tbody>
+                            @foreach (var quote in quotes)
+                            {
+                                var isPrimary = quote.Id == opportunity.PrimaryQuoteId;
+                                <tr>
+                                    <td data-label="Teklif" class="primary"><a href="crm/teklifler/@quote.Id">@quote.Title</a> <small class="text-muted">@quote.QuoteNumber · V@(quote.RevisionNo)</small></td>
+                                    <td data-label="Durum"><span class="badge stage-@QuoteLabels.StatusBadge(quote.Status)">@QuoteLabels.Label(QuoteLabels.Statuses, quote.Status)</span></td>
+                                    <td data-label="Net toplam" class="text-end">@QuoteLabels.Money(quote.NetTotal, quote.Currency)</td>
+                                    <td data-label="Geçerlilik">@(quote.ValidUntil is { } until ? CrmLabels.Time(until) : "—")</td>
+                                    <td data-label="Esas">@(isPrimary ? "Esas teklif" : "—")</td>
+                                    <td class="actions">
+                                        @if (Session.Can(CrmAccess.OpportunitiesWrite) && !isPrimary && quote.Status is "Presented" or "Accepted")
+                                        {
+                                            <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick="() => SetPrimaryAsync(quote.Id)">Esas teklif yap</button>
+                                        }
+                                        else if (Session.Can(CrmAccess.OpportunitiesWrite) && isPrimary)
+                                        {
+                                            <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => SetPrimaryAsync(null)">Esas tekliften kaldır</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </section>
+
+            <section class="detail-section">
+                <div class="section-header"><h2>Aşama ve durum tarihçesi</h2></div>
+                @if (history is null)
+                {
+                    <p class="text-muted">Yükleniyor…</p>
+                }
+                else
+                {
+                    <table class="table record-table">
+                        <thead><tr><th>Zaman</th><th>Tür</th><th>Değişiklik</th><th>Döngü</th><th>Kullanıcı</th><th>Gerekçe</th></tr></thead>
+                        <tbody>
+                            @foreach (var h in history.OrderByDescending(x => x.At))
+                            {
+                                <tr>
+                                    <td data-label="Zaman">@CrmLabels.Time(h.At)</td>
+                                    <td data-label="Tür">@HistoryKind(h.Kind)</td>
+                                    <td data-label="Değişiklik">@HistoryChange(h)</td>
+                                    <td data-label="Döngü">@h.Cycle</td>
+                                    <td data-label="Kullanıcı">@Lookups.MemberName(h.ChangedBy)</td>
+                                    <td data-label="Gerekçe">@h.Reason</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </section>
+
+            <RecordHistory EntityKey="@CrmEntityKeys.Opportunity" RecordId="Id" Version="opportunity.Version" />
             </div>
-            @if (!Session.Can(CrmAccess.QuotesRead))
-            {
-                <p class="text-muted">Teklifleri görme izniniz yok.</p>
-            }
-            else if (quotes is null)
-            {
-                <p class="text-muted">Yükleniyor…</p>
-            }
-            else if (quotes.Count == 0)
-            {
-                <p class="text-muted">Bu fırsata bağlı teklif yok.</p>
-            }
-            else
-            {
-                <p class="text-muted small">
-                    Esas teklif, fırsatın tutar ve raporlamasında esas alınan tekliftir; ilk sunulan teklif otomatik esas olur, yeni revizyon sunulunca esas yeni revizyona geçer.
-                    @(opportunity.PrimaryQuoteId is null ? "Şu an esas teklif yok; fırsat tutarı elle girilmiştir." : null)
-                </p>
-                <Notice Text="@quoteNotice" Failed="@quoteNoticeFailed" />
-                <table class="table record-table">
-                    <caption class="visually-hidden">Fırsata bağlı teklifler</caption>
-                    <thead><tr><th scope="col">Teklif</th><th scope="col">Durum</th><th scope="col" class="text-end">Net toplam</th><th scope="col">Geçerlilik</th><th scope="col">Esas</th><th scope="col"></th></tr></thead>
-                    <tbody>
-                        @foreach (var quote in quotes)
-                        {
-                            var isPrimary = quote.Id == opportunity.PrimaryQuoteId;
-                            <tr>
-                                <td data-label="Teklif" class="primary"><a href="crm/teklifler/@quote.Id">@quote.Title</a> <small class="text-muted">@quote.QuoteNumber · V@(quote.RevisionNo)</small></td>
-                                <td data-label="Durum"><span class="badge stage-@QuoteLabels.StatusBadge(quote.Status)">@QuoteLabels.Label(QuoteLabels.Statuses, quote.Status)</span></td>
-                                <td data-label="Net toplam" class="text-end">@QuoteLabels.Money(quote.NetTotal, quote.Currency)</td>
-                                <td data-label="Geçerlilik">@(quote.ValidUntil is { } until ? CrmLabels.Time(until) : "—")</td>
-                                <td data-label="Esas">@(isPrimary ? "Esas teklif" : "—")</td>
-                                <td class="actions">
-                                    @if (Session.Can(CrmAccess.OpportunitiesWrite) && !isPrimary && quote.Status is "Presented" or "Accepted")
-                                    {
-                                        <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick="() => SetPrimaryAsync(quote.Id)">Esas teklif yap</button>
-                                    }
-                                    else if (Session.Can(CrmAccess.OpportunitiesWrite) && isPrimary)
-                                    {
-                                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => SetPrimaryAsync(null)">Esas tekliften kaldır</button>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            }
-        </section>
 
-        <section class="detail-section">
-            <div class="section-header"><h2>Aşama ve durum tarihçesi</h2></div>
-            @if (history is null)
-            {
-                <p class="text-muted">Yükleniyor…</p>
-            }
-            else
-            {
-                <table class="table record-table">
-                    <thead><tr><th>Zaman</th><th>Tür</th><th>Değişiklik</th><th>Döngü</th><th>Kullanıcı</th><th>Gerekçe</th></tr></thead>
-                    <tbody>
-                        @foreach (var h in history.OrderByDescending(x => x.At))
+            <aside class="detail-side" aria-label="Fırsat yan paneli">
+                <section class="detail-section side-card" aria-labelledby="opp-activities">
+                    <div class="section-header">
+                        <h2 id="opp-activities">Aktivite zaman çizelgesi</h2>
+                        @if (Session.Can(CrmAccess.ActivitiesWrite) && opportunity.Status is OpportunityStatus.Open or OpportunityStatus.OnHold)
                         {
-                            <tr>
-                                <td data-label="Zaman">@CrmLabels.Time(h.At)</td>
-                                <td data-label="Tür">@HistoryKind(h.Kind)</td>
-                                <td data-label="Değişiklik">@HistoryChange(h)</td>
-                                <td data-label="Döngü">@h.Cycle</td>
-                                <td data-label="Kullanıcı">@Lookups.MemberName(h.ChangedBy)</td>
-                                <td data-label="Gerekçe">@h.Reason</td>
-                            </tr>
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => addingActivity = true"><span aria-hidden="true">+</span> Aktivite ekle</button>
                         }
-                    </tbody>
-                </table>
-            }
-        </section>
+                    </div>
+                    @if (activities is null)
+                    {
+                        <p class="text-muted">Yükleniyor…</p>
+                    }
+                    else if (activities.Count == 0)
+                    {
+                        <p class="text-muted">Bu fırsata bağlı aktivite yok.</p>
+                    }
+                    else
+                    {
+                        var nextPlanned = activities.Where(a => ActivityStatus.IsOpen(a.Status) && a.DueAt is not null).OrderBy(a => a.DueAt).FirstOrDefault();
+                        var lastDone = activities.Where(a => a.CompletedAt is not null).OrderByDescending(a => a.CompletedAt).FirstOrDefault();
+                        <dl class="timeline-summary">
+                            <div><dt>Son tamamlanan</dt><dd>@(lastDone is null ? "yok" : $"{lastDone.Subject} · {CrmLabels.Time(lastDone.CompletedAt!.Value)}")</dd></div>
+                            <div><dt>Sonraki planlı</dt><dd>@(nextPlanned is null ? "yok" : $"{nextPlanned.Subject} · {CrmLabels.Time(nextPlanned.DueAt!.Value)}")</dd></div>
+                        </dl>
+                        <ol class="activity-timeline">
+                            @foreach (var a in activities.OrderByDescending(x => x.CompletedAt ?? x.DueAt ?? DateTimeOffset.MaxValue))
+                            {
+                                var family = ActivityLabels.Family(Lookups, a.Type);
+                                <li class="timeline-item fam-@family @ActivityLabels.Css(a)">
+                                    <span class="timeline-icon" aria-hidden="true"><AppIcon Name="@ActivityLabels.Icon(family)" Size="16" /></span>
+                                    <div class="timeline-body">
+                                        <strong>@a.Subject</strong>
+                                        <span class="timeline-meta">@Lookups.Label(CrmLists.ActivityType, a.Type) · @Lookups.MemberName(a.OwnerId)</span>
+                                        <span class="timeline-meta">
+                                            @(a.CompletedAt is { } done ? $"Tamamlandı {CrmLabels.Time(done)}" : a.DueAt is { } d ? $"Planlı {CrmLabels.Time(d)}" : "Tarihsiz")
+                                        </span>
+                                        @if (a.IsOverdue(DateTimeOffset.UtcNow)) { <span class="badge stage-lost">Gecikti</span> }
+                                    </div>
+                                </li>
+                            }
+                        </ol>
+                    }
+                    @if (OpportunityStatus.IsClosed(opportunity.Status))
+                    {
+                        <p class="text-muted small">Kapanışta açık aktiviteler silinmez ya da otomatik kapatılmaz; açık kalırlar ve burada görünür.</p>
+                    }
+                </section>
 
-        <RecordHistory EntityKey="@CrmEntityKeys.Opportunity" RecordId="Id" Version="opportunity.Version" />
+                @if (ShowAmounts && Session.Can(CrmAccess.QuotesRead))
+                {
+                    <section class="detail-section side-card" aria-labelledby="opp-finance">
+                        <div class="section-header"><h2 id="opp-finance">Finansal özet</h2></div>
+                        @if (PrimaryQuote is { } pq)
+                        {
+                            <p class="text-muted small">Esas teklif: <a href="crm/teklifler/@pq.Id">@pq.QuoteNumber · V@(pq.RevisionNo)</a></p>
+                            <dl class="finance-list">
+                                <div><dt>Liste fiyatı</dt><dd>@QuoteLabels.Money(pq.ListTotal, pq.Currency)</dd></div>
+                                <div><dt>İndirim</dt><dd>−@(QuoteLabels.Money(pq.DiscountTotal, pq.Currency))</dd></div>
+                                <div><dt>Net tutar</dt><dd>@QuoteLabels.Money(pq.NetTotal, pq.Currency)</dd></div>
+                                <div><dt>Vergi</dt><dd>@QuoteLabels.Money(pq.TaxTotal, pq.Currency)</dd></div>
+                                <div class="finance-total"><dt>Genel toplam</dt><dd>@QuoteLabels.Money(pq.GrossTotal, pq.Currency)</dd></div>
+                            </dl>
+                        }
+                        else
+                        {
+                            <p class="text-muted small">Esas teklif yok; fırsat tutarı elle girilmiştir.</p>
+                            <dl class="finance-list">
+                                <div class="finance-total"><dt>Tahmini tutar</dt><dd>@(opportunity.Amount is { } manual ? CrmLabels.Amount(manual, opportunity.Currency) : "Bilinmiyor")</dd></div>
+                            </dl>
+                        }
+                    </section>
+                }
+            </aside>
+        </div>
+
+        <Drawer Open="addingActivity" Label="Yeni aktivite" OnClose="() => addingActivity = false">
+            <ActivityEditor Lookups="Lookups" FixedCompanyId="opportunity.CompanyId" FixedOpportunityId="Id" Saved="ActivitySavedAsync" Cancelled="() => addingActivity = false" />
+        </Drawer>
     }
 </AuthGate>
 
@@ -570,6 +701,9 @@
     private IReadOnlyList<OpportunityCompetitorDto>? competitors;
     private IReadOnlyList<ActivityDto>? activities;
     private IReadOnlyList<QuoteDto>? quotes;
+    private IReadOnlyList<QuoteLineDto>? primaryLines;
+    private ElementReference panelFirst;
+    private bool focusPanel;
     private string? quoteNotice;
     private bool quoteNoticeFailed;
     private IReadOnlyList<OpportunityHistoryDto>? history;
@@ -648,6 +782,48 @@
         }
     }
 
+    private QuoteDto? PrimaryQuote => opportunity?.PrimaryQuoteId is { } primaryId ? quotes?.FirstOrDefault(q => q.Id == primaryId) : null;
+
+    /// <summary>Huni aşamaları: tenant'ın aşama listesi (sıra ve kategori yönetici ayarı), pasifler hariç, güncel aşama dahil.</summary>
+    private IReadOnlyList<Modulix.Shared.Customization.ChoiceValueDto> PipelineStages =>
+        opportunity is null ? [] : Lookups.Choices(CrmLists.OpportunityStage, opportunity.Stage).ToList();
+
+    private int? StageDays => opportunity?.StageEnteredAt is { } entered ? (int)(DateTimeOffset.UtcNow - entered).TotalDays : null;
+
+    /// <summary>Hunide bir aşama seçildi: aşamayı doğrudan değiştirmez, ilgili işlem panelini açar (doğrulama oradan çalışır).</summary>
+    private void ChooseStage(Modulix.Shared.Customization.ChoiceValueDto step)
+    {
+        var category = step.Category ?? CrmLists.StageCategories.Open;
+        var target = category == CrmLists.StageCategories.Won ? Panel.Win : category == CrmLists.StageCategories.Lost ? Panel.Lose : Panel.Stage;
+        if (panel != target)
+        {
+            Toggle(target);
+        }
+
+        if (target == Panel.Stage)
+        {
+            stage = step.Key;
+        }
+
+        focusPanel = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusPanel && panel is not null)
+        {
+            focusPanel = false;
+            try
+            {
+                await panelFirst.FocusAsync();
+            }
+            catch (InvalidOperationException)
+            {
+                // Panelin ilk alanı henüz çizilmediyse odak taşınmaz.
+            }
+        }
+    }
+
     private bool HasNeedAnalysis => NeedFields.Any(f => !string.IsNullOrWhiteSpace(f.Text));
 
     private IEnumerable<(string Label, string? Text)> NeedFields =>
@@ -700,6 +876,9 @@
         quotes = Session.Can(CrmAccess.QuotesRead)
             ? (await Api.GetAsync<CrmPage<QuoteDto>>($"/api/crm/quotes?opportunityId={Id}&pageSize=100")).Value?.Items ?? []
             : [];
+        primaryLines = opportunity.PrimaryQuoteId is { } primaryQuoteId && Session.Can(CrmAccess.QuotesRead)
+            ? (await Api.GetAllAsync<QuoteLineDto>($"/api/crm/quote-lines?quoteId={primaryQuoteId}")).Items
+            : null;
     }
 
     private async Task SetPrimaryAsync(Guid? quoteId)

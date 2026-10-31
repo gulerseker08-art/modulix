@@ -1,7 +1,7 @@
 @page "/platform/firmalar"
 @inject ApiClient Api
 
-<PageTitle>Firmalar · Platform · ModuliX</PageTitle>
+<PageTitle>Firmalar · Platform · Modulix</PageTitle>
 
 <PlatformGate>
     <a class="back-link" href="platform">← Platform</a>
@@ -133,7 +133,7 @@
         var tenant = response.Tenant.Tenant;
         var administrator = response.Tenant.Administrators.FirstOrDefault();
         notice = response.ExistingAccount
-            ? $"{tenant.Name} açıldı. {administrator?.DisplayName} zaten Modülix kullanıyordu; yönetici olarak eklendi ve bilgilendirildi."
+            ? $"{tenant.Name} açıldı. {administrator?.DisplayName} zaten Modulix kullanıyordu; yönetici olarak eklendi ve bilgilendirildi."
             : $"{tenant.Name} açıldı. {administrator?.Email} adresine yönetici daveti gönderildi.";
         await LoadAsync(1);
     }

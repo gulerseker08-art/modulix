@@ -3,7 +3,7 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>@(contact is null ? "Kişi" : $"{contact.FirstName} {contact.LastName}") · ModuliX</PageTitle>
+<PageTitle>@(contact is null ? "Kişi" : $"{contact.FirstName} {contact.LastName}") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ContactsRead">
     <a class="back-link" href="crm/kisiler">← Kişiler</a>

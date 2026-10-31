@@ -1,0 +1,116 @@
+@* Yatay satış hunisi (chevron). Aşamalar tenant'ın fırsat aşaması listesinden gelir (sırası ve kategorileri yönetici ayarıdır);
+   burada sabit aşama yoktur. Geçilen açık aşamalar onay ikonuyla, güncel aşama dolu renkle, kapanış aşamaları kazanıldı/kaybedildi
+   tonuyla gösterilir. Tıklama yalnızca izin varsa etkindir ve aşamayı doğrudan değiştirmez: çağıran, iş kurallarını çalıştıran
+   işlem panelini açar. *@
+
+<ol class="pipeline" aria-label="Satış aşamaları">
+    @for (var i = 0; i < Stages.Count; i++)
+    {
+        var step = Stages[i];
+        var state = StateOf(i, step);
+        <li class="pipeline-step is-@state cat-@(step.Category ?? CrmLists.StageCategories.Open)" aria-current="@(state == "current" ? "step" : null)">
+            @if (CanChoose(step, state))
+            {
+                <button type="button" class="pipeline-label" @onclick="() => OnChoose.InvokeAsync(step)" title="@step.Label aşamasına geçir">
+                    @Content(i, step, state)
+                </button>
+            }
+            else
+            {
+                <span class="pipeline-label">@Content(i, step, state)</span>
+            }
+        </li>
+    }
+</ol>
+
+@code {
+    /// <summary>Gösterilecek aşamalar, listedeki sırasıyla (pasifler hariç, güncel aşama her zaman dahil).</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<Modulix.Shared.Customization.ChoiceValueDto> Stages { get; set; } = [];
+
+    [Parameter, EditorRequired] public string Current { get; set; } = "";
+
+    /// <summary>Fırsat durumu (<see cref="OpportunityStatus"/>): kapalıyken huni salt okunurdur.</summary>
+    [Parameter, EditorRequired] public string Status { get; set; } = "";
+
+    [Parameter] public bool CanChangeStage { get; set; }
+
+    [Parameter] public bool CanClose { get; set; }
+
+    [Parameter] public EventCallback<Modulix.Shared.Customization.ChoiceValueDto> OnChoose { get; set; }
+
+    private int CurrentIndex
+    {
+        get
+        {
+            for (var i = 0; i < Stages.Count; i++)
+            {
+                if (Stages[i].Key == Current)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+    }
+
+    private string StateOf(int index, Modulix.Shared.Customization.ChoiceValueDto step)
+    {
+        var category = step.Category ?? CrmLists.StageCategories.Open;
+        if (step.Key == Current)
+        {
+            return "current";
+        }
+
+        if (category == CrmLists.StageCategories.Open)
+        {
+            // Kapanmış fırsatta bütün açık aşamalar geçilmiş sayılır; açık fırsatta güncelden öncekiler.
+            return OpportunityStatus.IsClosed(Status) && Status != OpportunityStatus.Cancelled
+                ? "done"
+                : index < CurrentIndex ? "done" : "todo";
+        }
+
+        return "todo";
+    }
+
+    private bool CanChoose(Modulix.Shared.Customization.ChoiceValueDto step, string state)
+    {
+        if (Status != OpportunityStatus.Open || state == "current")
+        {
+            return false;
+        }
+
+        return (step.Category ?? CrmLists.StageCategories.Open) == CrmLists.StageCategories.Open ? CanChangeStage : CanClose;
+    }
+
+    private RenderFragment Content(int index, Modulix.Shared.Customization.ChoiceValueDto step, string state) => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", "pipeline-mark");
+        builder.AddAttribute(2, "aria-hidden", "true");
+        if (state == "done")
+        {
+            builder.OpenComponent<AppIcon>(3);
+            builder.AddComponentParameter(4, nameof(AppIcon.Name), "check");
+            builder.AddComponentParameter(5, nameof(AppIcon.Size), 14);
+            builder.CloseComponent();
+        }
+        else
+        {
+            builder.AddContent(6, index + 1);
+        }
+
+        builder.CloseElement();
+        builder.OpenElement(7, "span");
+        builder.AddAttribute(8, "class", "pipeline-name");
+        builder.AddContent(9, step.Label);
+        builder.CloseElement();
+        if (state == "done")
+        {
+            builder.OpenElement(10, "span");
+            builder.AddAttribute(11, "class", "visually-hidden");
+            builder.AddContent(12, " (tamamlandı)");
+            builder.CloseElement();
+        }
+    };
+}

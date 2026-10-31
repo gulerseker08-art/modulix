@@ -1,0 +1,23 @@
+@* Modulix logosu: uygulamadaki tek logo kaynağı (docs/design-system/README.md → Marka).
+   İşaret, onaylı img/modulix-mark.svg dosyasıdır; yazı "Modulix" (M büyük, son x turkuaz vurgulu), slogan isteğe bağlı.
+   Logo metni başka yerde elle yazılmaz; bu bileşen kullanılır. *@
+<span class="brand-logo @(ShowTagline ? null : "no-tagline")">
+    <img class="brand-mark" src="img/modulix-mark.svg" alt="" width="@Size" height="@Size" />
+    <span class="brand-text">
+        <span class="brand-name">Moduli<span class="brand-x">x</span></span>
+        @if (ShowTagline)
+        {
+            <span class="brand-tagline">MODÜLER İŞİN GÜCÜ</span>
+        }
+    </span>
+</span>
+
+@code {
+    /// <summary>İşaretin piksel boyutu.</summary>
+    [Parameter]
+    public int Size { get; set; } = 32;
+
+    /// <summary>Slogan gösterilsin mi; dar alanlarda kapatılır.</summary>
+    [Parameter]
+    public bool ShowTagline { get; set; } = true;
+}
