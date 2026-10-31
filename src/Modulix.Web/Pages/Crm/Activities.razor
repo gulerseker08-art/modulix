@@ -197,7 +197,7 @@
     <Drawer Open="@(selected is not null && !editing)" Label="Aktivite detayı" OnClose="() => selected = null">
         @if (selected is not null)
         {
-            <ActivityActions Activity="selected" Changed="ChangedAsync" Closed="() => selected = null" EditRequested="a => Open(a, null)" />
+            <ActivityActions Activity="selected" Lookups="Lookups" Changed="ChangedAsync" Closed="() => selected = null" EditRequested="a => Open(a, null)" />
         }
     </Drawer>
 
@@ -283,6 +283,12 @@
         {
             await Lookups.LoadAsync(contacts: true, opportunities: true);
             await LoadViewsAsync();
+            // Telefonda yedi günlük saat çizelgesi sığmaz (bugün ekran dışında kalır); varsayılan görünüm Gün olur.
+            if (await Js.InvokeAsync<bool>("modulixShell.isNarrow"))
+            {
+                mode = Mode.Day;
+            }
+
             await Task.WhenAll(ReloadAsync(), LoadOverviewAsync());
         }
     }

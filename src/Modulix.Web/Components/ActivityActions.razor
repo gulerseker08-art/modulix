@@ -3,7 +3,6 @@
    Özel aktivitede ayrıntı yoktur: yalnızca meşguliyet gösterilir. *@
 @inject ApiClient Api
 @inject SessionState Session
-@inject CrmLookups Lookups
 
 <section class="detail-section activity-panel" aria-live="polite">
     <div class="section-header">
@@ -254,6 +253,12 @@
     [Parameter] public EventCallback<ActivityDto> Changed { get; set; }
 
     [Parameter] public EventCallback Closed { get; set; }
+
+    /// <summary>
+    /// Sayfanın yüklediği seçim listeleri ve üyeler. <see cref="CrmLookups"/> geçici (transient) kayıtlıdır; bileşen kendisi
+    /// enjekte etseydi boş bir örnek alır, tür ve sorumlu adı yerine ham anahtar ve "—" görünürdü.
+    /// </summary>
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
 
     [Parameter] public EventCallback<ActivityDto> EditRequested { get; set; }
 

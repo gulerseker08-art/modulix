@@ -1,0 +1,33 @@
+@* Kayıt sayfası sekme çubuğu. Panelleri sayfa çizer: id="tabpanel-{Key}", aria-labelledby="tab-{Key}", hidden="@State.Hidden(Key)".
+   Yetkisi olmayan sekme listeye hiç eklenmez. Telefonda çubuk yatay kayar. *@
+<div class="record-tabs" role="tablist" aria-label="@Label">
+    @foreach (var tab in Tabs)
+    {
+        var active = tab.Key == State.Active;
+        <button type="button" role="tab" id="tab-@tab.Key" class="record-tab @(active ? "active" : null)"
+                aria-selected="@(active ? "true" : "false")" aria-controls="tabpanel-@tab.Key"
+                @onclick="() => SelectAsync(tab.Key)">
+            @tab.Label
+            @if (tab.Count is { } count)
+            {
+                <span class="record-tab-count">@count</span>
+            }
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TabItem> Tabs { get; set; } = [];
+
+    [Parameter, EditorRequired] public TabState State { get; set; } = default!;
+
+    [Parameter] public string Label { get; set; } = "Bölümler";
+
+    [Parameter] public EventCallback<string> Changed { get; set; }
+
+    private async Task SelectAsync(string key)
+    {
+        State.Select(key);
+        await Changed.InvokeAsync(key);
+    }
+}

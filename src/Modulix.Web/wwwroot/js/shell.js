@@ -46,6 +46,7 @@
             return value;
         },
         toggleTheme: () => window.modulixShell.setTheme(window.modulixShell.getTheme() === 'dark' ? 'light' : 'dark'),
+        isNarrow: () => window.matchMedia('(max-width: 767.98px)').matches,
         isSidebarCollapsed: () => root.classList.contains('sidebar-collapsed'),
         setSidebarCollapsed: collapsed => {
             write(sidebarKey, collapsed ? 'true' : 'false');
