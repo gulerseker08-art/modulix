@@ -52,7 +52,7 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | DataGrid | Kısmen | `app.css` (`record-table`) | Önizleme; telefonda kart listesi | Kolon görünürlüğü/yeniden boyutlandırma, kayıtlı görünüm, dışa aktarma, ortak bileşen |
 | Firma/Kişi | Kısmen | `Pages/Crm/Companies.razor`, `Contacts.razor` (PageHeader) | CI derleme ✓ | Firma detayında 12 kolonlu ana içerik + sağ panel düzeni |
 | Aktiviteler | Tamam (faz 2) | `Pages/Crm/Activities.razor`, `Components/ActivityCalendar.razor`, `Components/TodayActivities.razor`, `Components/Drawer.razor`, `Services/ActivityLabels.cs` | CI çalışma 41128200581 ✓ (derleme + 817 test); statik önizleme | Saat çizelgesinde blok sürükleyerek saat değiştirme ve yeniden boyutlandırma yok (gün değiştirme var); detay çekmecesinde ayrı sekmeler yok |
-| Fırsatlar | Tamam (faz 3) | `Pages/Crm/OpportunityDetail.razor`, `Components/SalesPipeline.razor` | CI (bkz. Faz 3); statik önizleme | Fırsat listesi/pano ekranı yalnızca token/tema düzeyinde |
+| Fırsatlar | Tamam (faz 3) | `Pages/Crm/OpportunityDetail.razor`, `Components/SalesPipeline.razor` | CI çalışma 41156483217 ✓ (derleme + 817 test, yeniden çalıştırmada); statik önizleme | Fırsat listesi/pano ekranı yalnızca token/tema düzeyinde |
 | Teklifler | Token/tema | — | — | Detay düzeni |
 | Diğer CRM | Token/tema | Bütün `PageTitle` metinleri | — | — |
 | Yönetim | Token/tema | — | — | Ekrana özel düzen |
@@ -118,3 +118,5 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | Finansal özet | Var | Esas teklifin liste fiyatı, indirim, net, vergi, genel toplam (para birimi teklifinki); esas teklif yoksa elle girilen tahmini tutar |
 | Karar vericiler / rakipler | Korundu | Mevcut kişi rolleri ve rakip bölümleri aynen; ilişkisel lookup (`LookupPicker`) kullanılıyor |
 | Takip et | Yok | Altyapıda takip/abonelik yok |
+
+**CI notu (faz 3):** İlk çalıştırmada `PlatformAdministrationTests.Failed_opening_creates_nothing_and_sends_no_email` son adımda 201 yerine 500 döndü. Bu faz yalnızca `Modulix.Web`, README ve belgeleri değiştirdi; aynı test önceki iki çalışmada geçmişti ve yalnızca başarısız iş yeniden çalıştırılınca bütün testler geçti. Test kararsızdır (flaky); ayrı bir iş kalemi olarak incelenmelidir (aynı kısa adla ikinci tenant açılışı sırasında sunucu hatası).
