@@ -562,6 +562,68 @@
             </div>
         }
 
+        @if (contract is not null && tabs.Rendered(TabDocuments))
+        {
+            <div role="tabpanel" id="tabpanel-@TabDocuments" aria-labelledby="tab-@TabDocuments" class="record-tabpanel" hidden="@tabs.Hidden(TabDocuments)">
+                <section aria-labelledby="documents-title">
+                    <h2 id="documents-title">Belgeler</h2>
+                    <p class="text-muted">Belge yalnızca yayımlanmış şablon sürümünden üretilir; hangi sözleşme sürümü, şablon sürümü ve veriyle üretildiği ile dosya özeti (SHA-256) saklanır. Şablon sonradan değişse de üretilmiş belge değişmez. Şablonlar: <a href="sozlesmeler/sablonlar">Şablon yönetimi</a>.</p>
+                    <div class="form-grid">
+                        <div class="span-6">
+                            <label class="form-label" for="doc-template">Şablon (yayımlanmış)</label>
+                            <select id="doc-template" class="form-select" @bind="documentTemplateId">
+                                <option value="">Şablon seçin…</option>
+                                @foreach (var t in publishedTemplates)
+                                {
+                                    <option value="@t.Id">@($"{t.Name} (V{t.PublishedVersionNo})")@(t.IsExample ? " — ÖRNEK" : "")</option>
+                                }
+                            </select>
+                            <FieldError Field="templateId" Errors="documentErrors" />
+                        </div>
+                        <div class="span-6 align-self-end">
+                            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || !HasDocumentTemplate)" @onclick="PreviewDocumentAsync">Önizle</button>
+                            @if (Session.Can(ContractsAccess.DocumentsGenerate))
+                            {
+                                <button type="button" class="btn btn-primary" disabled="@(busy || !HasDocumentTemplate)" @onclick="GenerateDocumentAsync">Belge üret</button>
+                            }
+                        </div>
+                    </div>
+                    <RenderedDocumentView Preview="documentPreview" />
+                    @if (documents.Count == 0)
+                    {
+                        <p class="text-muted">Henüz üretilmiş belge yok.</p>
+                    }
+                    else
+                    {
+                        <table class="table record-table">
+                            <caption class="visually-hidden">Üretilmiş sözleşme belgeleri</caption>
+                            <thead><tr><th scope="col">Belge</th><th scope="col">Şablon</th><th scope="col">Sözleşme sürümü</th><th scope="col">Durum</th><th scope="col">Özet (SHA-256)</th><th scope="col">Üretim</th></tr></thead>
+                            <tbody>
+                                @foreach (var d in documents)
+                                {
+                                    <tr>
+                                        <td data-label="Belge" class="primary">
+                                            @if (Session.Can(ContractsAccess.DocumentsDownload))
+                                            {
+                                                <a href="api/contracts/contracts/@contract.Id/documents/@d.Id/file" download="@d.FileName">@d.FileName</a>
+                                            }
+                                            else { <span>@d.FileName</span> }
+                                            <small class="text-muted">@(d.SizeBytes / 1024 + 1) KB</small>
+                                        </td>
+                                        <td data-label="Şablon">@d.TemplateName V@(d.TemplateVersionNo) @if (d.IsExample) { <span class="badge stage-lost">Örnek</span> }</td>
+                                        <td data-label="Sözleşme sürümü">V@(d.ContractVersionNo)</td>
+                                        <td data-label="Durum"><span class="badge stage-@(d.IsFinal ? "won" : "onhold")">@(d.IsFinal ? "Kesin (dondurulmuş sürüm)" : "Taslak kopya")</span></td>
+                                        <td data-label="Özet"><code title="@d.Sha256">@d.Sha256[..12]…</code></td>
+                                        <td data-label="Üretim">@CrmLabels.Time(d.CreatedAt) · @Lookups.MemberName(d.CreatedBy)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </section>
+            </div>
+        }
+
         @if (contract is not null && tabs.Rendered(TabHistory))
         {
             <div role="tabpanel" id="tabpanel-@TabHistory" aria-labelledby="tab-@TabHistory" class="record-tabpanel" hidden="@tabs.Hidden(TabHistory)">
@@ -599,6 +661,7 @@
     private const string TabParties = "parties";
     private const string TabLines = "lines";
     private const string TabVersions = "versions";
+    private const string TabDocuments = "documents";
     private const string TabHistory = "history";
 
     [Parameter] public Guid? Id { get; set; }
@@ -611,6 +674,12 @@
     private List<ContractHistoryDto> history = [];
     private List<ContractActionDto> actions = [];
     private List<ContractVersionDto> versions = [];
+    private List<ContractDocumentDto> documents = [];
+    private List<ContractTemplateDto> publishedTemplates = [];
+    private ContractPreviewDto? documentPreview;
+    private IReadOnlyDictionary<string, string[]>? documentErrors;
+    private string? documentTemplateId;
+    private bool HasDocumentTemplate => Guid.TryParse(documentTemplateId, out _);
     private ContractCompareDto? compare;
     private int compareFrom;
     private int compareTo;
@@ -653,6 +722,7 @@
         new(TabParties, "Taraflar ve kişiler", parties.Count),
         new(TabLines, "Kapsam ve kalemler", lines.Count),
         new(TabVersions, "Sürümler", versions.Count),
+        new(TabDocuments, "Belgeler", documents.Count),
         new(TabHistory, "Tarihçe"),
     ];
 
@@ -690,6 +760,10 @@
         actions = (await Api.GetAsync<List<ContractActionDto>>($"/api/contracts/contracts/{id}/actions")).Value ?? [];
         versions = (await Api.GetAsync<List<ContractVersionDto>>($"/api/contracts/contracts/{id}/versions")).Value ?? [];
         compare = null;
+        documents = (await Api.GetAsync<List<ContractDocumentDto>>($"/api/contracts/contracts/{id}/documents")).Value ?? [];
+        publishedTemplates = (await Api.GetAsync<PagedResult<ContractTemplateDto>>($"/api/contracts/templates?status=Published&contractType={Uri.EscapeDataString(contract.Type)}&pageSize=100")).Value?.Items.ToList() ?? [];
+        documentPreview = null;
+        documentErrors = null;
         await ResolveAsync("contracts.contract-party.party", partyNames, parties.Select(p => p.PartyId));
         await ResolveAsync("contracts.contract-party.person", personNames, parties.Select(p => p.PersonId));
     }
@@ -919,6 +993,40 @@
         compareFrom = from;
         compareTo = to;
         if (!result.IsSuccess) { Notify(result.Error, failed: true); }
+    }
+
+    private async Task PreviewDocumentAsync()
+    {
+        if (contract is null || !Guid.TryParse(documentTemplateId, out var templateId)) { return; }
+        busy = true;
+        documentErrors = null;
+        var result = await Api.PostAsync<ContractPreviewDto>($"/api/contracts/contracts/{contract.Id}/documents/preview", new PreviewContractDocumentRequest(templateId));
+        busy = false;
+        documentPreview = result.Value;
+        if (!result.IsSuccess)
+        {
+            documentErrors = result.FieldErrors;
+            Notify(result.Error, failed: true);
+        }
+    }
+
+    private async Task GenerateDocumentAsync()
+    {
+        if (contract is null || !Guid.TryParse(documentTemplateId, out var templateId) || busy) { return; }
+        busy = true;
+        documentErrors = null;
+        var result = await Api.PostAsync<ContractDocumentDto>($"/api/contracts/contracts/{contract.Id}/documents", new GenerateContractDocumentRequest(templateId));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            documentErrors = result.FieldErrors;
+            Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Sayfayı yenileyip tekrar deneyin." : result.Error, failed: true);
+            return;
+        }
+
+        Notify($"Belge üretildi: {result.Value!.FileName}");
+        await LoadAsync(contract.Id);
+        tabs.Select(TabDocuments);
     }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

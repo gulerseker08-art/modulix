@@ -103,6 +103,7 @@ public static class ContractActionLabels
     {
         "Created" => "Oluşturuldu",
         "CreatedFromQuote" => "Kabul edilmiş tekliften oluşturuldu",
+        "DocumentGenerated" => "Belge üretildi",
         "SentToReview" => "İncelemeye gönderildi",
         "MarkedReady" => "Yayıma hazır işaretlendi",
         "ReopenedDraft" => "Taslağa döndü",
@@ -133,4 +134,23 @@ public static class ContractActionLabels
     };
 
     public static string Change(string key) => key switch { "Added" => "Eklendi", "Removed" => "Kaldırıldı", "Changed" => "Değişti", _ => key };
+}
+
+/// <summary>Şablon durum ve eylem etiketleri (dilim 4); anahtarlar sunucudaki <c>TemplateStatus</c> ile aynıdır.</summary>
+public static class TemplateLabels
+{
+    public static IReadOnlyList<(string Key, string Label)> Statuses { get; } =
+        [("Draft", "Taslak"), ("Published", "Yayımlanmış"), ("Archived", "Arşivlenmiş")];
+
+    public static string Label(IReadOnlyList<(string Key, string Label)> list, string? key) => list.FirstOrDefault(x => x.Key == key).Label ?? key ?? "—";
+
+    public static string StatusBadge(string status) => status switch { "Published" => "won", "Archived" => "cancelled", _ => "open" };
+
+    public static string Action(string? key) => key switch
+    {
+        "publish" => "Yayımla",
+        "archive" => "Arşivle",
+        "restore" => "Geri al",
+        _ => key ?? string.Empty,
+    };
 }

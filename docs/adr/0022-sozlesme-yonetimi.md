@@ -57,7 +57,7 @@ Yol haritasında (M1.5i, M1.6) sipariş/sözleşme köprüsü "hedef modül yok"
    `ContractVersions` dondurma ve karşılaştırma.
 3. Tekliften sözleşme: `IAcceptedQuoteSource` tüketimi, kalem sabitleme, mükerrer engeli; firma kartı ve fırsat sekmesi;
    `IActivityLinkTarget`.
-4. Şablonlar ve belge üretimi (sürüm, değişkenler, PDF, özet).
+4. Şablonlar ve belge üretimi (sürüm, değişkenler, PDF, özet) — uygulandı.
 5. İç onay (genel değerlendirici, kurallar, adımlar, vekâlet, iş listesi).
 6. İmza (imzacılar, manuel doğrulama, sağlayıcı arayüzü + simülasyon, webhook).
 7. Taahhütler (dönemsel gerçekleşme, ihlal → aktivite).
@@ -117,3 +117,19 @@ denetimi (imza/yürürlük adımında uygulanacak), onay kuralları/adımlar/vek
 kimlikleri), firma/fırsat sekmesi, `IActivityLinkTarget`; şablon/PDF; iç onay; imza; taahhüt; yenileme/fesih/ek protokol ve zamanlanmış iş;
 dashboard, kayıtlı görünümler, dışa aktarma; CRM kapalı tenant'ta arayüzden yeni müşteri açma (API var, sözleşme formunda hızlı oluşturma
 yok); teslim raporu. Ekranlar tarayıcıda denetlendi (aşağıdaki not), klavye/ekran okuyucu denemesi yapılmadı.
+
+## Uygulama durumu (dördüncü dilim: şablonlar ve belge üretimi)
+
+**Uygulandı ve testle doğrulandı** (birim `ContractTemplateEngineTests` 10; entegrasyon `ContractTemplateTests` 4 senaryo: izinler ve sürüm değişmezliği, üretim ve mühür, eksik veri/yayımlanmamış/arşivli/tür uyumsuzluğu, tenant ve yetki):
+
+| Konu | Karar / davranış |
+|---|---|
+| Şablon dili | Düz metin + beyaz listedeki `{{değişken}}`; HTML ve kod yok, değişken değeri metin olarak basılır (arayüzde Blazor kodlar, PDF'te düz metin). Bloklar (`kalem_tablosu`, `taraflar_listesi`, `imza_alani`, `sayfa_sonu`) tek başına satırdadır. Bilinmeyen değişken kayıtta reddedilir. |
+| Sürüm | `ContractTemplates` düzenlenebilir çalışma kopyasıdır; yayımlama `ContractTemplateVersions`'a değişmez satır (gövde + SHA-256) ekler. Değişiklik yoksa 409. Belge yalnızca yayımlanmış sürümden üretilir. |
+| İzinler | Düzenleme ve yayımlama ayrı (`contracts.templates.edit|publish`); üretim `contracts.documents.generate`, indirme `contracts.documents.download`; finansal değişken kullanan şablon/belge ayrıca `contracts.financials.read` ister. |
+| Üretim | Görünürlük (404) → izin (403) → yayımlanmış sürüm → tür uyumu → finansal izin → dondurulmuş sürüm varsa onun içeriği, yoksa güncel taslak ("taslak kopya") → eksik değer 422 → PDF → SHA-256 → belge satırı ve tarihçe olayı aynı işlemde. |
+| Belge | `ContractDocuments`: şablon sürümü, sözleşme sürümü, SHA-256, üretim anındaki değer anlık görüntüsü; şablon, müşteri kartı ya da sözleşme sonradan değişse de belge değişmez. |
+| PDF | QuestPDF (Community); tekrarlayan tablo başlığı, imza alanı, "Sayfa x / y", örnek ve taslak uyarısı. İlk sayfa görsel olarak PNG'ye çevrilip denetlendi. |
+| Örnek metin | `ContractTemplateSamples`: hukuki inceleme yapılmamış örnek; şablon ve belgede ÖRNEK olarak işaretlidir. |
+
+**Yapılmadı / sınırlar:** kurum logosu (tenant logo deposu yok), çok dilli şablon çevirisi (şablonda dil alanı var, arayüz çevirisi ayrı iş kalemi), şablon içe/dışa aktarma, WYSIWYG düzenleyici (düz metin düzenleyici ve canlı önizleme var), imza alanı yerleşimi sağlayıcıya bağlı değil (dilim 6). Antivirüs taraması gerekmez; dosyayı sunucu üretir. Ekran tarayıcıda denetlendi (şablon listesi, Belgeler sekmesi, önizleme ve eksik veri uyarısı); klavye/ekran okuyucu denemesi yapılmadı.

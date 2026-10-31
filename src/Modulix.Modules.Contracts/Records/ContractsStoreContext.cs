@@ -54,13 +54,18 @@ internal sealed class ContractWorkflowGate
     /// </summary>
     public Func<ContractsStoreContext, Domain.Contract, CancellationToken, Task>? Effect { get; private set; }
 
+    /// <summary>Şablon geçişiyle (yayımlama) aynı işlemde çalışan ek yazma (sürüm satırı). Şablon kaydının sürüm denetimine bağlıdır.</summary>
+    public Func<ContractsStoreContext, Domain.ContractTemplate, CancellationToken, Task>? TemplateEffect { get; private set; }
+
     public IDisposable Open(
-        IReadOnlyList<string> permissions, string eventKind, string? reason = null, Func<ContractsStoreContext, Domain.Contract, CancellationToken, Task>? effect = null)
+        IReadOnlyList<string> permissions, string eventKind, string? reason = null, Func<ContractsStoreContext, Domain.Contract, CancellationToken, Task>? effect = null,
+        Func<ContractsStoreContext, Domain.ContractTemplate, CancellationToken, Task>? templateEffect = null)
     {
         Permissions = permissions;
         EventKind = eventKind;
         Reason = reason;
         Effect = effect;
+        TemplateEffect = templateEffect;
         return new Closer(this);
     }
 
@@ -72,6 +77,7 @@ internal sealed class ContractWorkflowGate
             gate.EventKind = null;
             gate.Reason = null;
             gate.Effect = null;
+            gate.TemplateEffect = null;
         }
     }
 }
