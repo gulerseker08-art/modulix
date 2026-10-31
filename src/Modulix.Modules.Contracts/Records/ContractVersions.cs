@@ -21,11 +21,12 @@ internal static class ContractVersions
             c.Confidentiality, c.NetTotal, c.TaxTotal, c.GrossTotal, c.RecurringSummary,
             [.. parties.Select(p => new SnapshotParty(p.Id, p.Role, p.PartyId, p.PersonId, p.Position, p.Notes))],
             [.. lines.Select(l => new SnapshotLine(l.StableKey, l.Position, l.Kind, l.ProductCode, l.Name, l.Description, l.Quantity, l.UnitName, l.UnitPrice,
-                l.DiscountPercent, l.TaxRatePercent, l.BillingPeriod, l.Net, l.Tax, l.Gross))]);
+                l.DiscountPercent, l.TaxRatePercent, l.BillingPeriod, l.Net, l.Tax, l.Gross))],
+            c.HasNonStandardTerms, c.RiskLevel);
     }
 
-    /// <summary>Güncel sürüm numarası için dondurulmuş satır yoksa oluşturur; varsa durumunu <see cref="VersionStatus.Frozen"/> yapar.</summary>
-    public static async Task FreezeAsync(ContractsStoreContext context, Contract contract, string kind, string? reason, CancellationToken cancellationToken)
+    /// <summary>Güncel sürüm numarası için dondurulmuş satır yoksa oluşturur; varsa durumunu <see cref="VersionStatus.Frozen"/> yapar. Satırı döndürür.</summary>
+    public static async Task<ContractVersion> FreezeAsync(ContractsStoreContext context, Contract contract, string kind, string? reason, CancellationToken cancellationToken)
     {
         var existing = await context.Data.Set<ContractVersion>().SingleOrDefaultAsync(v => v.ContractId == contract.Id && v.VersionNo == contract.CurrentVersionNo, cancellationToken);
         if (existing is not null)
@@ -33,11 +34,11 @@ internal static class ContractVersions
             existing.Status = VersionStatus.Frozen;
             existing.Kind = kind;
             existing.Touch();
-            return;
+            return existing;
         }
 
         var json = ContractSnapshots.Serialize(await BuildSnapshotAsync(context, contract, cancellationToken));
-        context.Data.Set<ContractVersion>().Add(new ContractVersion
+        var version = new ContractVersion
         {
             ContractId = contract.Id,
             VersionNo = contract.CurrentVersionNo,
@@ -47,7 +48,23 @@ internal static class ContractVersions
             Sha256 = ContractSnapshots.Hash(json),
             Reason = reason is { Length: > Contract.ReasonMaxLength } ? reason[..Contract.ReasonMaxLength] : reason,
             CreatedBy = context.CurrentUserId,
-        });
+        };
+        context.Data.Set<ContractVersion>().Add(version);
+        return version;
+    }
+
+    /// <summary>
+    /// Onaya gönderim: sürümü dondurur ve yeni bir onay turu başlatır (tur numarası artar, plan ve hedef tarih yazılır). Önceki turun kararları
+    /// (geri çekilen onay) yeni turun adımlarına sayılmaz; kararlar tur numarasıyla ayrılır.
+    /// </summary>
+    public static async Task StartApprovalAsync(
+        ContractsStoreContext context, Contract contract, string? reason, ContractApprovalPlan plan, DateTimeOffset? dueAt, CancellationToken cancellationToken)
+    {
+        var version = await FreezeAsync(context, contract, VersionKinds.Approval, reason, cancellationToken);
+        version.ApprovalRound++;
+        version.ApprovalPlan = ContractApprovalPlans.Serialize(plan);
+        version.ApprovalDueAt = dueAt;
+        version.CreatedBy ??= context.CurrentUserId;
     }
 
     /// <summary>İptal edilen sözleşmenin teklif kalemlerini serbest bırakır: kalem yeniden bir sözleşmeye alınabilir (teklif izi sözleşmede kalır).</summary>
@@ -85,5 +102,22 @@ internal static class ContractVersions
         }
 
         contract.CurrentVersionNo++;
+    }
+
+    /// <summary>Bir onay kararı satırı ekler (eklenir, değişmez). <paramref name="round"/> sürümün o anki onay turudur.</summary>
+    public static void AddDecision(
+        ContractsStoreContext context, Contract contract, int round, int step, string decision, IReadOnlyCollection<Guid> onBehalfOf, string? reason)
+    {
+        context.Data.Set<ContractApprovalDecision>().Add(new ContractApprovalDecision
+        {
+            ContractId = contract.Id,
+            VersionNo = contract.CurrentVersionNo,
+            Round = round,
+            StepNo = step,
+            ActorId = context.CurrentUserId ?? Guid.Empty,
+            OnBehalfOf = string.Join(',', onBehalfOf),
+            Decision = decision,
+            Reason = reason is { Length: > Contract.ReasonMaxLength } ? reason[..Contract.ReasonMaxLength] : reason,
+        });
     }
 }

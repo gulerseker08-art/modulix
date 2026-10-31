@@ -15,6 +15,9 @@ public static class ContractsLookupDefinitions
     public const string ContractPrevious = "contracts.contract.previous";
     public const string PartyParty = "contracts.contract-party.party";
     public const string PartyPerson = "contracts.contract-party.person";
+    public const string RuleApprover = "contracts.approval-rule.approver";
+    public const string DelegationFrom = "contracts.approval-delegation.from";
+    public const string DelegationTo = "contracts.approval-delegation.to";
 
     private static readonly string[] PartyLabel = ["name"];
     private static readonly string[] PartySecondary = ["city", "taxNumber"];
@@ -60,5 +63,20 @@ public static class ContractsLookupDefinitions
         },
         Party(PartyParty, ContractsModule.Entities.ContractParty, "partyId", "Taraf"),
         Person(PartyPerson, ContractsModule.Entities.ContractParty, "personId", "Kişi"),
+        new(RuleApprover, ContractsModule.Entities.ContractApprovalRule, "approverId", "Onaylayan", LookupTargetKind.Member)
+        {
+            SearchDescription = "Üyenin görünen adı",
+            PageSize = 20,
+        },
+        new(DelegationFrom, ContractsModule.Entities.ContractApprovalDelegation, "fromUserId", "Vekâlet veren", LookupTargetKind.Member)
+        {
+            SearchDescription = "Üyenin görünen adı",
+            PageSize = 20,
+        },
+        new(DelegationTo, ContractsModule.Entities.ContractApprovalDelegation, "toUserId", "Vekil", LookupTargetKind.Member)
+        {
+            SearchDescription = "Üyenin görünen adı",
+            PageSize = 20,
+        },
     ];
 }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using Modulix.Core.Contracts.Approvals;
 
 namespace Modulix.Modules.Crm.Quotes;
 
@@ -99,54 +100,10 @@ public static class QuoteApprovalEvaluator
     /// </summary>
     public static IReadOnlyList<QuoteApprovalStep> Steps(IEnumerable<QuoteApprovalMatch> matches, IEnumerable<QuoteApprovalGiven> approvals)
     {
-        var groups = matches.GroupBy(m => m.Step).OrderBy(g => g.Key)
-            .Select(g => (Step: g.Key, Approvers: (IReadOnlyList<Guid>)[.. g.Where(m => m.ApproverId is not null).Select(m => m.ApproverId!.Value).Distinct()]))
-            .ToList();
-        if (groups.Count == 0)
-        {
-            groups.Add((1, []));
-        }
-
-        var result = new List<QuoteApprovalStep>();
-        var approvedBy = new List<HashSet<Guid>>();
-        foreach (var _ in groups)
-        {
-            approvedBy.Add([]);
-        }
-
-        var index = 0;
-        foreach (var approval in approvals)
-        {
-            if (index >= groups.Count)
-            {
-                break;
-            }
-
-            var (_, approvers) = groups[index];
-            if (approvers.Count == 0)
-            {
-                approvedBy[index].Add(approval.Actor);
-            }
-            else
-            {
-                foreach (var principal in approval.OnBehalfOf.Where(approvers.Contains))
-                {
-                    approvedBy[index].Add(principal);
-                }
-            }
-
-            if (IsComplete(approvers, approvedBy[index]))
-            {
-                index++;
-            }
-        }
-
-        for (var i = 0; i < groups.Count; i++)
-        {
-            result.Add(new QuoteApprovalStep(groups[i].Step, groups[i].Approvers, IsComplete(groups[i].Approvers, approvedBy[i]), [.. approvedBy[i]]));
-        }
-
-        return result;
+        var steps = ApprovalFlow.Steps(
+            matches.Select(m => new ApprovalStepSpec(m.Step, m.ApproverId)),
+            approvals.Select(a => new ApprovalGiven(a.Actor, a.OnBehalfOf)));
+        return [.. steps.Select(s => new QuoteApprovalStep(s.Step, s.Approvers, s.Completed, s.ApprovedBy))];
     }
 
     /// <summary>Şu anki (ilk tamamlanmamış) adım; hepsi tamamsa null.</summary>

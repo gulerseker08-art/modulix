@@ -40,7 +40,9 @@ public sealed record ContractSnapshot(
     decimal GrossTotal,
     string? RecurringSummary,
     IReadOnlyList<SnapshotParty> Parties,
-    IReadOnlyList<SnapshotLine> Lines)
+    IReadOnlyList<SnapshotLine> Lines,
+    bool HasNonStandardTerms = false,
+    string RiskLevel = "Low")
 {
     /// <summary>Hassas finansal alanlar maskelenmiş kopya (izni olmayan okuyucuya).</summary>
     public ContractSnapshot WithoutFinancials() => this with
@@ -60,7 +62,7 @@ public sealed record ContractSnapshot(
         ["startDate"] = StartDate?.ToString("yyyy-MM-dd"), ["endDate"] = EndDate?.ToString("yyyy-MM-dd"), ["isIndefinite"] = IsIndefinite ? "true" : "false",
         ["currency"] = Currency, ["priceIncludesTax"] = PriceIncludesTax ? "true" : "false", ["contractValue"] = ContractValue?.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture),
         ["paymentTerms"] = PaymentTerms, ["renewalMode"] = RenewalMode, ["renewalPeriodMonths"] = RenewalPeriodMonths?.ToString(), ["noticePeriodDays"] = NoticePeriodDays?.ToString(),
-        ["noticeDeadline"] = NoticeDeadline?.ToString("yyyy-MM-dd"), ["confidentiality"] = Confidentiality,
+        ["noticeDeadline"] = NoticeDeadline?.ToString("yyyy-MM-dd"), ["confidentiality"] = Confidentiality, ["hasNonStandardTerms"] = HasNonStandardTerms ? "true" : "false", ["riskLevel"] = RiskLevel,
         ["netTotal"] = NetTotal.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture), ["taxTotal"] = TaxTotal.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture),
         ["grossTotal"] = GrossTotal.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture),
     };

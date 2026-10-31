@@ -135,6 +135,28 @@ public static class ContractsEndpoints
             return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
+        // İç onay (dilim 5): sözleşmenin onay planı/ilerlemesi, onay iş listesi, kurallar ve vekâletler. Karar verme eylem uç noktalarıyla yapılır (approve, reject-approval, return-for-changes).
+        contracts.MapGet("/{id:guid}/approval", async (Guid id, IContractApprovals approvals, CancellationToken ct) =>
+        {
+            var result = await approvals.GetAsync(id, ct);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(ContractsModule.Permissions.ContractsRead);
+
+        group.MapGet("/approvals/inbox", async (bool? mine, IContractApprovals approvals, CancellationToken ct) =>
+        {
+            var result = await approvals.InboxAsync(mine ?? true, ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value!.Select(i => new ContractApprovalInboxItemDto(
+                    i.ContractId, i.Number, i.Title, i.Type, i.VersionNo, i.OwnerId, i.SubmittedBy, i.SubmittedAt, i.DueAt, i.IsOverdue, i.CurrentStep, i.StepCount,
+                    i.WaitingFor, i.CanDecide, i.ActingAsDelegate, i.CannotDecideReason, i.Rules)).ToList())
+                : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(ContractsModule.Permissions.ContractsApprove);
+
+        ResourceEndpoints.MapResource<ContractApprovalRuleDto, SaveContractApprovalRuleRequest>(group, Prefix, "approval-rules", ContractsModule.Entities.ContractApprovalRule,
+            ContractsModule.Permissions.ApprovalsManage, ContractsModule.Permissions.ApprovalsManage);
+        ResourceEndpoints.MapResource<ContractApprovalDelegationDto, SaveContractApprovalDelegationRequest>(group, Prefix, "approval-delegations", ContractsModule.Entities.ContractApprovalDelegation,
+            ContractsModule.Permissions.ApprovalsManage, ContractsModule.Permissions.ApprovalsManage);
+
         contracts.MapGet("/{id:guid}/versions", async (Guid id, IContractWorkflow workflow, CancellationToken ct) =>
         {
             var result = await workflow.VersionsAsync(id, ct);
@@ -167,6 +189,14 @@ public static class ContractsEndpoints
 
     private static IResult TemplateResult(Modulix.Core.Contracts.Records.RecordResult<Modulix.Core.Contracts.Records.RecordData> result) =>
         result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<ContractTemplateDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+
+    private static ContractApprovalDto ToDto(ContractApprovalView v) => new(
+        v.Status, v.VersionNo,
+        [.. v.Rules.Select(r => new ContractApprovalMatchDto(r.RuleId, r.RuleVersion, r.Name, r.Step, r.ApproverId, r.Reason))],
+        v.Note,
+        [.. v.Steps.Select(s => new ContractApprovalStepDto(s.Step, s.Approvers, s.Completed, s.ApprovedBy, s.IsCurrent))],
+        [.. v.Decisions.Select(d => new ContractApprovalDecisionDto(d.Id, d.VersionNo, d.StepNo, d.ActorId, d.OnBehalfOf, d.Decision, d.Reason, d.At))],
+        v.CurrentStep, v.CanDecide, v.ActingAsDelegate, v.CannotDecideReason, v.SubmittedBy, v.SubmittedAt, v.DueAt, v.IsOverdue);
 
     private static ContractDocumentDto ToDto(ContractDocumentInfo d) =>
         new(d.Id, d.ContractVersionNo, d.IsFinal, d.TemplateId, d.TemplateVersionNo, d.TemplateName, d.IsExample, d.FileName, d.SizeBytes, d.Sha256, d.CreatedBy, d.CreatedAt);
@@ -205,6 +235,7 @@ internal sealed class ContractPolicyProvider(IServiceProvider services) : IContr
             Text(await settings.GetValueAsync(ContractsModule.SettingKeys.ProviderName, cancellationToken)),
             Text(await settings.GetValueAsync(ContractsModule.SettingKeys.ProviderDetails, cancellationToken)),
             Text(await settings.GetValueAsync(ContractsModule.SettingKeys.FooterNote, cancellationToken)),
-            Text(await settings.GetValueAsync(Modulix.Core.Modules.CoreModule.SettingKeys.TimeZone, cancellationToken)) ?? "Europe/Istanbul");
+            Text(await settings.GetValueAsync(Modulix.Core.Modules.CoreModule.SettingKeys.TimeZone, cancellationToken)) ?? "Europe/Istanbul",
+            int.TryParse(await settings.GetValueAsync(ContractsModule.SettingKeys.ApprovalDueHours, cancellationToken), out var dueHours) ? Math.Clamp(dueHours, 0, 9999) : 72);
     }
 }

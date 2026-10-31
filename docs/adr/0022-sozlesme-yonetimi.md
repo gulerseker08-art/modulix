@@ -58,7 +58,7 @@ Yol haritasında (M1.5i, M1.6) sipariş/sözleşme köprüsü "hedef modül yok"
 3. Tekliften sözleşme: `IAcceptedQuoteSource` tüketimi, kalem sabitleme, mükerrer engeli; firma kartı ve fırsat sekmesi;
    `IActivityLinkTarget`.
 4. Şablonlar ve belge üretimi (sürüm, değişkenler, PDF, özet) — uygulandı.
-5. İç onay (genel değerlendirici, kurallar, adımlar, vekâlet, iş listesi).
+5. İç onay (genel değerlendirici, kurallar, adımlar, vekâlet, iş listesi) — uygulandı.
 6. İmza (imzacılar, manuel doğrulama, sağlayıcı arayüzü + simülasyon, webhook).
 7. Taahhütler (dönemsel gerçekleşme, ihlal → aktivite).
 8. Yenileme, fesih, ek protokol, zamanlanmış iş.
@@ -133,3 +133,21 @@ yok); teslim raporu. Ekranlar tarayıcıda denetlendi (aşağıdaki not), klavye
 | Örnek metin | `ContractTemplateSamples`: hukuki inceleme yapılmamış örnek; şablon ve belgede ÖRNEK olarak işaretlidir. |
 
 **Yapılmadı / sınırlar:** kurum logosu (tenant logo deposu yok), çok dilli şablon çevirisi (şablonda dil alanı var, arayüz çevirisi ayrı iş kalemi), şablon içe/dışa aktarma, WYSIWYG düzenleyici (düz metin düzenleyici ve canlı önizleme var), imza alanı yerleşimi sağlayıcıya bağlı değil (dilim 6). Antivirüs taraması gerekmez; dosyayı sunucu üretir. Ekran tarayıcıda denetlendi (şablon listesi, Belgeler sekmesi, önizleme ve eksik veri uyarısı); klavye/ekran okuyucu denemesi yapılmadı.
+
+## Uygulama durumu (beşinci dilim: iç onay)
+
+**Uygulandı ve testle doğrulandı** (birim `ContractApprovalTests` 20; entegrasyon `ContractApprovalFlowTests` 10 senaryo: iki adımlı plan, paralel onaylayıcılar ve iş listesi, vekâlet, geri gönderme ve yeni tur, ret, kural/vekâlet doğrulaması, bekleyen planın kural değişimine dayanıklılığı, gecikme, tenant izolasyonu, yetki ve dört göz):
+
+| Konu | Karar / davranış |
+|---|---|
+| Genel değerlendirici | Adım, paralel/sıralı ilerleme ve vekâlet hesabı CRM'den çıkarılıp `Core.Contracts.Approvals.ApprovalFlow` oldu (saf, modülden bağımsız). CRM teklif onayı bu hesaba devredildi (davranış aynı; CRM birim testleri değişmeden geçer). Kural eşleştirmesi modüle özgüdür (`ContractApprovalEvaluator`). |
+| Kurallar | `ContractApprovalRules`: tutar, kalem indirimi, süre (ay), standart dışı madde, en az risk düzeyi; tür ve para birimi daraltır; en az bir ölçüt zorunlu. Tutar eşiği sözleşme toplamına (yoksa elle girilen bedele) bakar. Tüm tenant'a uygulanır, yönetim izni ayrıdır (`contracts.approvals.manage`) ve denetim kaydına yazılır. |
+| Plan | Onaya gönderimde eşleşen kurallar (ad, sürüm, adım, onaylayıcı, tutarsız neden) `ContractVersions.ApprovalPlan`'a dondurulur; sürüm numarası ve `ApprovalRound` kararları turlara ayırır. Plan olmayan eski sürümler tek adsız adım gibi yürür. |
+| Karar | `ContractApprovalDecisions` değişmez satır: kim, adım, kimler adına, onay/ret/geri gönderme, gerekçe. Sürüm eşzamanlılığı (409) kısmi onayda da korunur (sözleşme satırı güncellenir). |
+| Dört göz | Gönderen kendi gönderdiğini onaylayamaz (ayarla açılabilir); aynı sürümde önceki adımda karar veren sonraki adımda karar veremez; adlı adımda payını vermiş kişi ikinci kez karar veremez. |
+| Vekâlet | `ContractApprovalDelegations`: süreli/süresiz, etkin/pasif; vekil onay iznine sahip olmalı; karar vekâleten işaretlenir. |
+| Gerekçe ve geri gönderme | Ret ve `return-for-changes` gerekçe ister. Geri gönderme taslağa döndürür, yeni revizyon açar. |
+| Hedef süre | `ApprovalDueAt` = gönderim + ayar saati; gecikme işaretlenir, kararı engellemez. |
+| Gösterge alanları | `HasNonStandardTerms`, `RiskLevel`: sözleşme formunda (metadata), anlık görüntüde ve karşılaştırmada. |
+
+**Yapılmadı / sınırlar:** gecikme için e-posta hatırlatması ve yöneticiye eskalasyon (zamanlanmış iş altyapısı dilim 8'de sözleşmeye bağlanacak; bu dilimde yalnızca hedef süre ve gecikme işareti var); onaylayıcı sözleşmeyi göremiyorsa (veri kapsamı) karar veremez; kural önizlemesi ("bu sözleşme hangi kurallara girer") yok, plan yalnızca gönderimde görünür; gerçek bir onay yöneticisi hiyerarşisi (yönetici zinciri) kullanılmıyor, onaylayıcı kuralda adlandırılır. Ekranlar tarayıcıda denetlendi (Onay sekmesi, iş listesi, kural ve vekâlet sayfası); klavye/ekran okuyucu denemesi yapılmadı.

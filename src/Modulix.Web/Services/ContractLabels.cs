@@ -32,6 +32,9 @@ public static class ContractLabels
     public static IReadOnlyList<(string Key, string Label)> Confidentialities { get; } =
         [("Internal", "Kurum içi"), ("Confidential", "Gizli"), ("Restricted", "Kısıtlı")];
 
+    public static IReadOnlyList<(string Key, string Label)> RiskLevels { get; } =
+        [("Low", "Düşük"), ("Medium", "Orta"), ("High", "Yüksek")];
+
     public static IReadOnlyList<(string Key, string Label)> LineKinds { get; } =
         [("Service", "Hizmet"), ("Product", "Ürün"), ("Text", "Açıklama satırı")];
 
@@ -92,6 +95,7 @@ public static class ContractActionLabels
         "withdraw-approval" => "Onayı geri çek",
         "approve" => "Onayla",
         "reject-approval" => "Onayı reddet",
+        "return-for-changes" => "Değişiklik için geri gönder",
         "cancel" => "Sözleşmeyi iptal et",
         "revise" => "Revizyon aç",
         _ => key,
@@ -111,6 +115,8 @@ public static class ContractActionLabels
         "ApprovalWithdrawn" => "Onay geri çekildi",
         "Approved" => "Onaylandı",
         "ApprovalRejected" => "Onay reddedildi",
+        "ApprovalStepApproved" => "Onay adımı onaylandı (sıradaki adım açıldı)",
+        "ApprovalReturned" => "Onaydan değişiklik talebiyle geri gönderildi; yeni revizyon taslağı açıldı",
         "ApprovalInvalidated" => "Taslağa döndü; önceki onay geçersiz kaldı",
         "Cancelled" => "İptal edildi",
         "Revised" => "Yeni revizyon açıldı",
@@ -127,7 +133,7 @@ public static class ContractActionLabels
         "title" => "Başlık", "type" => "Tür", "description" => "Açıklama", "partyId" => "Müşteri", "personId" => "İlgili kişi", "startDate" => "Başlangıç",
         "endDate" => "Bitiş", "isIndefinite" => "Belirsiz süreli", "currency" => "Para birimi", "priceIncludesTax" => "Vergi dahil", "contractValue" => "Sözleşme bedeli",
         "paymentTerms" => "Ödeme koşulları", "renewalMode" => "Yenileme yöntemi", "renewalPeriodMonths" => "Yenileme süresi (ay)", "noticePeriodDays" => "Bildirim süresi (gün)",
-        "noticeDeadline" => "Son bildirim tarihi", "confidentiality" => "Gizlilik", "netTotal" => "Net toplam", "taxTotal" => "Vergi", "grossTotal" => "Genel toplam",
+        "noticeDeadline" => "Son bildirim tarihi", "confidentiality" => "Gizlilik", "hasNonStandardTerms" => "Standart dışı madde", "riskLevel" => "Risk düzeyi", "netTotal" => "Net toplam", "taxTotal" => "Vergi", "grossTotal" => "Genel toplam",
         "kind" => "Tür", "productCode" => "Kod", "name" => "Ad", "quantity" => "Miktar", "unitName" => "Birim", "unitPrice" => "Birim fiyat", "discountPercent" => "İndirim %",
         "taxRatePercent" => "Vergi %", "billingPeriod" => "Dönem", "net" => "Net", "tax" => "Vergi", "gross" => "Toplam", "role" => "Rol", "notes" => "Not",
         _ => key,

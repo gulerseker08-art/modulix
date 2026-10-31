@@ -10,11 +10,12 @@ public static class ContractAction
     public const string WithdrawApproval = "withdraw-approval";
     public const string Approve = "approve";
     public const string RejectApproval = "reject-approval";
+    public const string ReturnForChanges = "return-for-changes";
     public const string Cancel = "cancel";
     public const string Revise = "revise";
 
     public static IReadOnlyList<string> All { get; } =
-        [SendToReview, MarkReady, ReopenDraft, SubmitForApproval, WithdrawApproval, Approve, RejectApproval, Cancel, Revise];
+        [SendToReview, MarkReady, ReopenDraft, SubmitForApproval, WithdrawApproval, Approve, RejectApproval, ReturnForChanges, Cancel, Revise];
 }
 
 /// <summary>Geçiş kararı için sözleşmenin ilgili durumu (veritabanı bilmez).</summary>
@@ -103,6 +104,7 @@ public static class ContractTransitions
 
             case ContractAction.Approve:
             case ContractAction.RejectApproval:
+            case ContractAction.ReturnForChanges:
                 return s.Approval == ApprovalStatus.Pending ? ContractRuleResult.Ok : ContractRuleResult.Deny("not-pending", "Onay bekleyen sürüm yok.");
 
             case ContractAction.Cancel:
@@ -139,7 +141,7 @@ public static class ContractTransitions
     }
 
     /// <summary>Eylem gerekçe ister mi? (Ret, iptal ve revizyon gerekçesiz yapılmaz.)</summary>
-    public static bool RequiresReason(string action) => action is ContractAction.RejectApproval or ContractAction.Cancel or ContractAction.Revise;
+    public static bool RequiresReason(string action) => action is ContractAction.RejectApproval or ContractAction.ReturnForChanges or ContractAction.Cancel or ContractAction.Revise;
 
     private static ContractRuleResult? MissingBasics(ContractState s)
     {

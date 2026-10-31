@@ -54,6 +54,8 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         Field.Integer<Contract>("noticePeriodDays", c => c.NoticePeriodDays, (c, v) => c.NoticePeriodDays = v, max: 3650),
         Field.Date<Contract>("noticeDeadline", c => c.NoticeDeadline, (c, v) => c.NoticeDeadline = v).AsSystem(),
         Field.Choice<Contract>("confidentiality", Confidentiality.All, c => c.Confidentiality, (c, v) => c.Confidentiality = v),
+        Field.Flag<Contract>("hasNonStandardTerms", c => c.HasNonStandardTerms, (c, v) => c.HasNonStandardTerms = v),
+        Field.Choice<Contract>("riskLevel", RiskLevel.All, c => c.RiskLevel, (c, v) => c.RiskLevel = v),
         Field.Text<Contract>("preparationStatus", Contract.StatusMaxLength, c => c.PreparationStatus, (c, v) => c.PreparationStatus = v!).AsSystem(),
         Field.Text<Contract>("approvalStatus", Contract.StatusMaxLength, c => c.ApprovalStatus, (c, v) => c.ApprovalStatus = v!).AsSystem(),
         Field.Text<Contract>("signatureStatus", Contract.StatusMaxLength, c => c.SignatureStatus, (c, v) => c.SignatureStatus = v!).AsSystem(),
@@ -207,6 +209,8 @@ public static class ContractEventKinds
     public const string Approved = "Approved";
     public const string ApprovalRejected = "ApprovalRejected";
     public const string ApprovalInvalidated = "ApprovalInvalidated";
+    public const string ApprovalStepApproved = "ApprovalStepApproved";
+    public const string ApprovalReturned = "ApprovalReturned";
     public const string Cancelled = "Cancelled";
     public const string Revised = "Revised";
     public const string CreatedFromQuote = "CreatedFromQuote";

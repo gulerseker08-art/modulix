@@ -1,0 +1,141 @@
+@* Sözleşme iç onay özeti (ADR-0022, dilim 5): eşleşen kurallar, adımlar, verilmiş kararlar ve geçerli kullanıcının durumu. Karar verme sözleşme sayfasındaki
+   eylem çubuğundan ya da onay iş listesinden yapılır; bu bileşen salt okunurdur. Kural eşikleri ve tutarlar burada gösterilmez (plan yalnızca kural adı ve nedeni taşır). *@
+@inject ApiClient Api
+@inject CrmLookups Lookups
+
+<section class="detail-section" aria-labelledby="approval-title">
+    <div class="section-header">
+        <h2 id="approval-title">İç onay</h2>
+        @if (approval is not null)
+        {
+            <span class="badge stage-@ContractLabels.ApprovalBadge(approval.Status)">@ContractLabels.Label(ContractLabels.Approvals, approval.Status)</span>
+        }
+    </div>
+
+    @if (error is not null)
+    {
+        <p class="text-muted" role="status">@error</p>
+    }
+    else if (approval is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (approval.Status == "NotRequired" && approval.Decisions.Count == 0)
+    {
+        <p class="text-muted">Bu sürüm henüz onaya gönderilmedi. Onaya gönderilirken eşleşen kurallar ve adımlar sürüme dondurulur.</p>
+    }
+    else
+    {
+        <dl class="detail-list">
+            <div><dt>Sürüm</dt><dd>V@(approval.VersionNo)</dd></div>
+            <div><dt>Gönderen</dt><dd>@Lookups.MemberName(approval.SubmittedBy) · @(approval.SubmittedAt is { } at ? CrmLabels.Time(at) : "—")</dd></div>
+            <div>
+                <dt>Hedef süre</dt>
+                <dd>
+                    @(approval.DueAt is { } due ? CrmLabels.Time(due) : "—")
+                    @if (approval.IsOverdue) { <span class="badge stage-lost">Gecikti</span> }
+                </dd>
+            </div>
+        </dl>
+
+        @if (approval.CanDecide)
+        {
+            <div class="alert alert-info" role="status">
+                Şu anki adımda karar verebilirsiniz@(approval.ActingAsDelegate ? " (vekâleten)" : string.Empty). Üstteki işlem çubuğundan onaylayın, reddedin ya da değişiklik isteyin.
+            </div>
+        }
+        else if (approval.Status == "Pending" && approval.CannotDecideReason is not null)
+        {
+            <p class="text-muted" role="status">Karar veremiyorsunuz: @approval.CannotDecideReason</p>
+        }
+
+        <h3>Eşleşen kurallar</h3>
+        @if (approval.Rules.Count == 0)
+        {
+            <p class="text-muted">@approval.Note</p>
+        }
+        else
+        {
+            <ul>
+                @foreach (var rule in approval.Rules)
+                {
+                    <li><strong>@rule.Name</strong> <small class="text-muted">sürüm @rule.RuleVersion@(approval.Steps.Count > 1 ? $" · adım {rule.Step}" : string.Empty)</small> — @rule.Reason
+                        @if (rule.ApproverId is not null) { <span class="text-muted"> · onaylayıcı: @Lookups.MemberName(rule.ApproverId)</span> }</li>
+                }
+            </ul>
+        }
+
+        <h3>Adımlar</h3>
+        <ol class="approval-steps">
+            @foreach (var step in approval.Steps)
+            {
+                <li aria-current="@(step.IsCurrent ? "step" : null)">
+                    <span class="badge stage-@(step.Completed ? "won" : step.IsCurrent ? "qualified" : "open")">@(step.Completed ? "Tamamlandı" : step.IsCurrent ? "Sırada" : "Bekliyor")</span>
+                    Adım @step.Step:
+                    @if (step.Approvers.Count == 0) { <span>onay izni olan herhangi biri</span> }
+                    else { <span>@string.Join(", ", step.Approvers.Select(a => Lookups.MemberName(a) + (step.ApprovedBy.Contains(a) ? " ✓" : string.Empty)))</span> }
+                </li>
+            }
+        </ol>
+
+        <h3>Kararlar</h3>
+        @if (approval.Decisions.Count == 0)
+        {
+            <p class="text-muted">Henüz karar verilmedi.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">Onay kararları</caption>
+                <thead><tr><th scope="col">Adım</th><th scope="col">Karar</th><th scope="col">Veren</th><th scope="col">Zaman</th><th scope="col">Gerekçe</th></tr></thead>
+                <tbody>
+                    @foreach (var d in approval.Decisions)
+                    {
+                        <tr>
+                            <td data-label="Adım">@d.StepNo</td>
+                            <td data-label="Karar"><span class="badge stage-@DecisionBadge(d.Decision)">@DecisionLabel(d.Decision)</span></td>
+                            <td data-label="Veren">
+                                @Lookups.MemberName(d.ActorId)
+                                @if (d.OnBehalfOf.Any(p => p != d.ActorId)) { <div class="small text-muted">vekâleten: @string.Join(", ", d.OnBehalfOf.Where(p => p != d.ActorId).Select(p => Lookups.MemberName(p)))</div> }
+                            </td>
+                            <td data-label="Zaman">@CrmLabels.Time(d.At)</td>
+                            <td data-label="Gerekçe">@(d.Reason ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+</section>
+
+@code {
+    private ContractApprovalDto? approval;
+    private string? error;
+    private string? loadedKey;
+
+    [Parameter, EditorRequired] public Guid ContractId { get; set; }
+
+    /// <summary>Sözleşme kaydının sürümü; eylemlerden sonra değişir ve paneli yeniler.</summary>
+    [Parameter] public long Version { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{ContractId}:{Version}";
+        if (key == loadedKey) { return; }
+        loadedKey = key;
+        await Lookups.LoadAsync();
+        var result = await Api.GetAsync<ContractApprovalDto>($"/api/contracts/contracts/{ContractId}/approval");
+        approval = result.Value;
+        error = result.IsSuccess ? null : result.Error;
+    }
+
+    private static string DecisionLabel(string decision) => decision switch
+    {
+        "Approved" => "Onayladı",
+        "Rejected" => "Reddetti",
+        "Returned" => "Geri gönderdi",
+        _ => decision,
+    };
+
+    private static string DecisionBadge(string decision) => decision switch { "Approved" => "won", "Rejected" => "lost", _ => "onhold" };
+}
