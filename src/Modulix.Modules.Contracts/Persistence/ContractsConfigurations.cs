@@ -130,12 +130,30 @@ internal sealed class ContractEventConfiguration : IEntityTypeConfiguration<Cont
     {
         ContractsTables.ConfigureCommon(builder, "ContractEvents");
         builder.Property(e => e.Kind).HasMaxLength(ContractEvent.KindMaxLength).IsRequired();
-        builder.Property(e => e.FromStatus).HasMaxLength(Contract.StatusMaxLength);
-        builder.Property(e => e.ToStatus).HasMaxLength(Contract.StatusMaxLength);
+        // Geçiş öncesi/sonrası özet: "hazırlık/onay/imza/yürürlük" dört durumu birlikte taşır.
+        builder.Property(e => e.FromStatus).HasMaxLength(ContractEvent.StatusSummaryMaxLength);
+        builder.Property(e => e.ToStatus).HasMaxLength(ContractEvent.StatusSummaryMaxLength);
         builder.Property(e => e.Reason).HasMaxLength(Contract.ReasonMaxLength);
         builder.HasIndex(e => new { e.TenantId, e.ContractId, e.CreatedAt });
 
         builder.HasOne<Contract>().WithMany().HasForeignKey(e => new { e.TenantId, e.ContractId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class ContractVersionConfiguration : IEntityTypeConfiguration<ContractVersion>
+{
+    public void Configure(EntityTypeBuilder<ContractVersion> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractVersions");
+        builder.Property(v => v.Kind).HasMaxLength(ContractVersion.KindMaxLength).IsRequired();
+        builder.Property(v => v.Status).HasMaxLength(Contract.StatusMaxLength).IsRequired();
+        builder.Property(v => v.Snapshot).IsRequired();
+        builder.Property(v => v.Sha256).HasMaxLength(ContractVersion.HashLength).IsUnicode(false).IsRequired();
+        builder.Property(v => v.Reason).HasMaxLength(Contract.ReasonMaxLength);
+        builder.HasIndex(v => new { v.TenantId, v.ContractId, v.VersionNo }).IsUnique().HasDatabaseName("UX_ContractVersions_Contract_VersionNo");
+
+        builder.HasOne<Contract>().WithMany().HasForeignKey(v => new { v.TenantId, v.ContractId })
             .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Cascade);
     }
 }

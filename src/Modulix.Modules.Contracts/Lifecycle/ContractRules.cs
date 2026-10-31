@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 
 namespace Modulix.Modules.Contracts.Lifecycle;
 
-// Saf kurallar (ADR-0021): veritabanı ve HTTP bilmez; birim testleriyle doğrulanır. Durum anahtarları API'de ve arayüzde aynen kullanılır.
+// Saf kurallar (ADR-0022): veritabanı ve HTTP bilmez; birim testleriyle doğrulanır. Durum anahtarları API'de ve arayüzde aynen kullanılır.
 
 /// <summary>Belge hazırlığı durumu.</summary>
 public static class PreparationStatus
@@ -224,4 +224,22 @@ public static class ContractRules
 
         return $"SZ-{createdAt:yyyyMMdd}-{new string(suffix)}";
     }
+}
+
+/// <summary>Sürümün niçin dondurulduğu.</summary>
+public static class VersionKinds
+{
+    public const string Approval = "Approval";
+    public const string Signature = "Signature";
+}
+
+/// <summary>Dondurulmuş sürümün durumu; onay/imza kararı sürüme yazılır, sonraki revizyon eskisini geçersiz kılar.</summary>
+public static class VersionStatus
+{
+    public const string Frozen = "Frozen";
+    public const string Approved = "Approved";
+    public const string Rejected = "Rejected";
+    public const string Withdrawn = "Withdrawn";
+    public const string Signed = "Signed";
+    public const string Superseded = "Superseded";
 }

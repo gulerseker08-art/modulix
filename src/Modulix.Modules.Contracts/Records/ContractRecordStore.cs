@@ -8,7 +8,7 @@ using Modulix.Modules.Contracts.Lifecycle;
 namespace Modulix.Modules.Contracts.Records;
 
 /// <summary>
-/// Sözleşme başlığı kayıt deposu (ADR-0021). Durum, sürüm ve toplam alanları sistem alanıdır: genel uçlardan yazılamaz, yalnızca iş
+/// Sözleşme başlığı kayıt deposu (ADR-0022). Durum, sürüm ve toplam alanları sistem alanıdır: genel uçlardan yazılamaz, yalnızca iş
 /// akışı kapısı açıkken yazılır. İçerik yalnızca taslakta ve imzaya gitmemişken düzenlenir (<see cref="ContractRules.CanEditContent"/>).
 /// Müşteri ve kişi ortak kayıttır; kişi seçildiyse müşteri tarafına bağlı olmalıdır. Son bildirim tarihi sunucuda hesaplanır.
 /// </summary>
@@ -94,6 +94,13 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
     protected override IQueryable<Contract> Search(IQueryable<Contract> source, string term) =>
         source.Where(c => c.Title.Contains(term) || c.Number.Contains(term) || (c.Description != null && c.Description.Contains(term)));
 
+    private string? before;
+
+    /// <summary>Tarihçe için geçiş öncesi durum özeti (hazırlık/onay/imza/yürürlük).</summary>
+    private static string StatusSummary(Contract c) => $"{c.PreparationStatus}/{c.ApprovalStatus}/{c.SignatureStatus}/{c.EffectiveStatus}";
+
+    protected override void OnUpdating(Contract entity) => before = StatusSummary(entity);
+
     protected override Task<JsonObject> PrepareNewAsync(Contract entity, JsonObject values, CancellationToken cancellationToken)
     {
         entity.Number = ContractRules.NewNumber(DateTimeOffset.UtcNow);
@@ -150,7 +157,11 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
 
         if (workflow && !isNew && Context.Gate.EventKind is { } kind)
         {
-            ContractHistory.Add(Context, entity, kind, Context.Gate.Reason);
+            ContractHistory.Add(Context, entity, kind, Context.Gate.Reason, before, StatusSummary(entity));
+            if (Context.Gate.Effect is { } effect)
+            {
+                await effect(Context, entity, cancellationToken);
+            }
         }
     }
 
@@ -172,6 +183,7 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         data.Set<ContractLine>().RemoveRange(await data.Set<ContractLine>().Where(l => l.ContractId == entity.Id).ToListAsync(cancellationToken));
         data.Set<ContractParty>().RemoveRange(await data.Set<ContractParty>().Where(p => p.ContractId == entity.Id).ToListAsync(cancellationToken));
         data.Set<ContractEvent>().RemoveRange(await data.Set<ContractEvent>().Where(e => e.ContractId == entity.Id).ToListAsync(cancellationToken));
+        data.Set<ContractVersion>().RemoveRange(await data.Set<ContractVersion>().Where(v => v.ContractId == entity.Id).ToListAsync(cancellationToken));
     }
 }
 
@@ -179,6 +191,17 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
 public static class ContractEventKinds
 {
     public const string Created = "Created";
+    public const string SentToReview = "SentToReview";
+    public const string MarkedReady = "MarkedReady";
+    public const string ReopenedDraft = "ReopenedDraft";
+    public const string SubmittedForApproval = "SubmittedForApproval";
+    public const string ApprovalWithdrawn = "ApprovalWithdrawn";
+    public const string Approved = "Approved";
+    public const string ApprovalRejected = "ApprovalRejected";
+    public const string ApprovalInvalidated = "ApprovalInvalidated";
+    public const string Cancelled = "Cancelled";
+    public const string Revised = "Revised";
+    public const string VersionFrozen = "VersionFrozen";
 }
 
 /// <summary>Tarihçe satırı yazımı; sözleşme güncellemesiyle aynı işlemde kaydedilir.</summary>

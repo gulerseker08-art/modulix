@@ -2,7 +2,7 @@ using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Modules.Contracts.Domain;
 
-// Sözleşme modülü entity'leri (ADR-0021). Alanlar kayıt depolarından (Records) doğrulanarak yazılır; uzunluk sınırları hem
+// Sözleşme modülü entity'leri (ADR-0022). Alanlar kayıt depolarından (Records) doğrulanarak yazılır; uzunluk sınırları hem
 // doğrulamada hem veritabanı kolonlarında aynı sabitlerden gelir. Müşteri ve kişiler ortak kayıttır (core.party / core.person).
 
 /// <summary>Tüm sözleşme kayıtlarının ortak alanları. TenantId kaydederken aktif tenant'tan atanır.</summary>
@@ -233,6 +233,7 @@ public sealed class ContractLine : ContractsEntity
 public sealed class ContractEvent : ContractsEntity
 {
     public const int KindMaxLength = 40;
+    public const int StatusSummaryMaxLength = 100;
 
     public Guid ContractId { get; internal set; }
 
@@ -245,4 +246,34 @@ public sealed class ContractEvent : ContractsEntity
     public string? ToStatus { get; internal set; }
 
     public string? Reason { get; internal set; }
+}
+
+/// <summary>
+/// Dondurulmuş sözleşme sürümü: onaya (ya da imzaya) giden içeriğin değişmez anlık görüntüsü ve SHA-256 özeti. Başlık ve kalemler
+/// sonradan değişse de bu satır aynı kalır; onay ve imza kararları bu özete bağlıdır. Sözleşme başına sürüm numarası tekildir.
+/// </summary>
+public sealed class ContractVersion : ContractsEntity
+{
+    public const int KindMaxLength = 20;
+    public const int HashLength = 64;
+
+    public Guid ContractId { get; internal set; }
+
+    public int VersionNo { get; internal set; }
+
+    /// <summary><see cref="Lifecycle.VersionKinds"/>: niçin donduruldu (Approval, Signature).</summary>
+    public string Kind { get; internal set; } = Lifecycle.VersionKinds.Approval;
+
+    /// <summary><see cref="Lifecycle.VersionStatus"/>.</summary>
+    public string Status { get; internal set; } = Lifecycle.VersionStatus.Frozen;
+
+    /// <summary>Anlık görüntü (JSON, <c>ContractSnapshot</c>).</summary>
+    public string Snapshot { get; internal set; } = string.Empty;
+
+    public string Sha256 { get; internal set; } = string.Empty;
+
+    /// <summary>Dondurma gerekçesi / değişiklik notu.</summary>
+    public string? Reason { get; internal set; }
+
+    public Guid? CreatedBy { get; internal set; }
 }
