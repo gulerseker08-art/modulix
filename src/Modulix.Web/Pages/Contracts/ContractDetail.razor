@@ -169,6 +169,18 @@
                                                 @foreach (var c in ContractLabels.Confidentialities) { <option value="@c.Key">@c.Label</option> }
                                             </select>
                                             break;
+                                        case "hasNonStandardTerms":
+                                            <div class="form-check">
+                                                <input id="c-nonstd" type="checkbox" class="form-check-input" @bind="form.HasNonStandardTerms" />
+                                                <label class="form-check-label" for="c-nonstd">@f.Label</label>
+                                            </div>
+                                            break;
+                                        case "riskLevel":
+                                            <label class="@f.LabelClass()" for="c-risk">@f.Label</label>
+                                            <select id="c-risk" class="form-select" @bind="form.RiskLevel">
+                                                @foreach (var r in ContractLabels.RiskLevels) { <option value="@r.Key">@r.Label</option> }
+                                            </select>
+                                            break;
                                         case "previousContractId":
                                             <label class="@f.LabelClass()" for="previousContractId">@f.Label</label>
                                             <LookupPicker Id="previousContractId" LookupKey="contracts.contract.previous" @bind-Value="form.PreviousContractId" Placeholder="—" Required="f.Required"
@@ -465,6 +477,13 @@
             </div>
         }
 
+        @if (contract is not null && tabs.Rendered(TabApproval))
+        {
+            <div role="tabpanel" id="tabpanel-@TabApproval" aria-labelledby="tab-@TabApproval" class="record-tabpanel" hidden="@tabs.Hidden(TabApproval)">
+                <ContractApprovalPanel ContractId="contract.Id" Version="contract.Version" />
+            </div>
+        }
+
         @if (contract is not null && tabs.Rendered(TabVersions))
         {
             <div role="tabpanel" id="tabpanel-@TabVersions" aria-labelledby="tab-@TabVersions" class="record-tabpanel" hidden="@tabs.Hidden(TabVersions)">
@@ -660,6 +679,7 @@
     private const string TabGeneral = "general";
     private const string TabParties = "parties";
     private const string TabLines = "lines";
+    private const string TabApproval = "approval";
     private const string TabVersions = "versions";
     private const string TabDocuments = "documents";
     private const string TabHistory = "history";
@@ -721,6 +741,7 @@
         new(TabGeneral, "Genel bilgiler"),
         new(TabParties, "Taraflar ve kişiler", parties.Count),
         new(TabLines, "Kapsam ve kalemler", lines.Count),
+        new(TabApproval, "Onay"),
         new(TabVersions, "Sürümler", versions.Count),
         new(TabDocuments, "Belgeler", documents.Count),
         new(TabHistory, "Tarihçe"),
@@ -797,7 +818,7 @@
             form.Title, form.PartyId ?? Guid.Empty, form.Type, Blank(form.Description), form.PersonId, form.OwnerId, form.PreviousContractId,
             form.StartDate, form.IsIndefinite ? null : form.EndDate, form.IsIndefinite, form.Currency, form.PriceIncludesTax,
             Session.Can(ContractsAccess.FinancialsRead) ? form.ContractValue : null, Blank(form.PaymentTerms), form.RenewalMode,
-            form.RenewalMode == "None" ? null : form.RenewalPeriodMonths, form.NoticePeriodDays, form.Confidentiality, contract?.Version,
+            form.RenewalMode == "None" ? null : form.RenewalPeriodMonths, form.NoticePeriodDays, form.Confidentiality, form.HasNonStandardTerms, form.RiskLevel, contract?.Version,
             CustomFieldText.ForSave(CustomFields, form.Custom));
         var result = contract is { } current
             ? await Api.PutAsync<ContractDto>($"/api/contracts/contracts/{current.Id}", request)
@@ -952,7 +973,7 @@
     private Task StartActionAsync(ContractActionDto action)
     {
         actionErrors = null;
-        if (action.RequiresReason || action.Action is "reopen-draft" or "withdraw-approval")
+        if (action.RequiresReason || action.Action is "reopen-draft" or "withdraw-approval" or "approve")
         {
             reasonAction = action.Action;
             reasonText = string.Empty;
@@ -1051,6 +1072,8 @@
         public int? RenewalPeriodMonths { get; set; }
         public int? NoticePeriodDays { get; set; }
         public string Confidentiality { get; set; } = "Internal";
+        public bool HasNonStandardTerms { get; set; }
+        public string RiskLevel { get; set; } = "Low";
         public string? Description { get; set; }
         public string? PaymentTerms { get; set; }
         public System.Text.Json.Nodes.JsonObject Custom { get; set; } = [];
@@ -1060,7 +1083,7 @@
             Title = c.Title, PartyId = c.PartyId, PersonId = c.PersonId, OwnerId = c.OwnerId, PreviousContractId = c.PreviousContractId, Type = c.Type,
             StartDate = c.StartDate, EndDate = c.EndDate, IsIndefinite = c.IsIndefinite, Currency = c.Currency, PriceIncludesTax = c.PriceIncludesTax,
             ContractValue = c.ContractValue, RenewalMode = c.RenewalMode, RenewalPeriodMonths = c.RenewalPeriodMonths, NoticePeriodDays = c.NoticePeriodDays,
-            Confidentiality = c.Confidentiality, Description = c.Description, PaymentTerms = c.PaymentTerms,
+            Confidentiality = c.Confidentiality, HasNonStandardTerms = c.HasNonStandardTerms, RiskLevel = c.RiskLevel, Description = c.Description, PaymentTerms = c.PaymentTerms,
             Custom = c.Custom?.DeepClone().AsObject() ?? [],
         };
     }

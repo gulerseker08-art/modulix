@@ -46,6 +46,7 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
         builder.Property(c => c.PaymentTerms).HasMaxLength(Contract.TextMaxLength);
         builder.Property(c => c.RenewalMode).HasMaxLength(Contract.StatusMaxLength).IsRequired();
         builder.Property(c => c.Confidentiality).HasMaxLength(Contract.StatusMaxLength).IsRequired();
+        builder.Property(c => c.RiskLevel).HasMaxLength(Contract.StatusMaxLength).HasDefaultValue(Lifecycle.RiskLevel.Low).IsRequired();
         builder.Property(c => c.PreparationStatus).HasMaxLength(Contract.StatusMaxLength).IsRequired();
         builder.Property(c => c.ApprovalStatus).HasMaxLength(Contract.StatusMaxLength).IsRequired();
         builder.Property(c => c.SignatureStatus).HasMaxLength(Contract.StatusMaxLength).IsRequired();
@@ -158,6 +159,7 @@ internal sealed class ContractVersionConfiguration : IEntityTypeConfiguration<Co
         builder.Property(v => v.Snapshot).IsRequired();
         builder.Property(v => v.Sha256).HasMaxLength(ContractVersion.HashLength).IsUnicode(false).IsRequired();
         builder.Property(v => v.Reason).HasMaxLength(Contract.ReasonMaxLength);
+        builder.Property(v => v.ApprovalPlan);
         builder.HasIndex(v => new { v.TenantId, v.ContractId, v.VersionNo }).IsUnique().HasDatabaseName("UX_ContractVersions_Contract_VersionNo");
 
         builder.HasOne<Contract>().WithMany().HasForeignKey(v => new { v.TenantId, v.ContractId })
@@ -218,5 +220,48 @@ internal sealed class ContractDocumentConfiguration : IEntityTypeConfiguration<C
         // Şablon silinemez (belgeler ona bağlı kalır); arşivlenir.
         builder.HasOne<ContractTemplate>().WithMany().HasForeignKey(d => new { d.TenantId, d.TemplateId })
             .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class ContractApprovalRuleConfiguration : IEntityTypeConfiguration<ContractApprovalRule>
+{
+    public void Configure(EntityTypeBuilder<ContractApprovalRule> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractApprovalRules");
+        builder.Property(r => r.Name).HasMaxLength(ContractApprovalRule.NameMaxLength).IsRequired();
+        builder.Property(r => r.Description).HasMaxLength(ContractApprovalRule.DescriptionMaxLength);
+        builder.Property(r => r.ContractType).HasMaxLength(ChoiceValueKeys.MaxLength);
+        builder.Property(r => r.Currency).HasMaxLength(Contract.CurrencyLength).IsFixedLength().IsUnicode(false);
+        builder.Property(r => r.MinGrossTotal).HasPrecision(18, 2);
+        builder.Property(r => r.MinDiscountPercent).HasPrecision(5, 2);
+        builder.Property(r => r.MinRiskLevel).HasMaxLength(Contract.StatusMaxLength);
+        builder.HasIndex(r => new { r.TenantId, r.IsActive, r.Step, r.Priority });
+        builder.ToTable(t => t.HasCheckConstraint("CK_ContractApprovalRules_Step", "[Step] BETWEEN 1 AND 9"));
+    }
+}
+
+internal sealed class ContractApprovalDelegationConfiguration : IEntityTypeConfiguration<ContractApprovalDelegation>
+{
+    public void Configure(EntityTypeBuilder<ContractApprovalDelegation> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractApprovalDelegations");
+        builder.Property(d => d.Note).HasMaxLength(ContractApprovalDelegation.NoteMaxLength);
+        builder.HasIndex(d => new { d.TenantId, d.FromUserId, d.IsActive });
+        builder.HasIndex(d => new { d.TenantId, d.ToUserId, d.IsActive });
+    }
+}
+
+internal sealed class ContractApprovalDecisionConfiguration : IEntityTypeConfiguration<ContractApprovalDecision>
+{
+    public void Configure(EntityTypeBuilder<ContractApprovalDecision> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractApprovalDecisions");
+        builder.Property(d => d.OnBehalfOf).HasMaxLength(ContractApprovalDecision.OnBehalfMaxLength).IsUnicode(false).IsRequired();
+        builder.Property(d => d.Decision).HasMaxLength(Contract.StatusMaxLength).IsRequired();
+        builder.Property(d => d.Reason).HasMaxLength(Contract.ReasonMaxLength);
+        builder.HasIndex(d => new { d.TenantId, d.ContractId, d.VersionNo, d.Round, d.CreatedAt });
+
+        builder.HasOne<Contract>().WithMany().HasForeignKey(d => new { d.TenantId, d.ContractId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Cascade);
     }
 }

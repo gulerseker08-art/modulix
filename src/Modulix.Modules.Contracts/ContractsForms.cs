@@ -41,6 +41,8 @@ public static class ContractsForms
             new("contractValue", "Sözleşme bedeli (isteğe bağlı)", "ticari", 4),
             new("description", "Açıklama", "aciklama", 12),
             new("paymentTerms", "Ödeme koşulları", "aciklama", 12),
+            new("hasNonStandardTerms", "Standart dışı madde var", "aciklama", 6),
+            new("riskLevel", "Risk düzeyi", "aciklama", 6),
         ]),
     ];
 }

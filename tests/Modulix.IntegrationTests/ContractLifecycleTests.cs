@@ -174,7 +174,7 @@ public class ContractLifecycleTests(ModulixApiFactory factory) : IClassFixture<M
 
     private static SaveContractRequest Save(ContractDto c) => new(
         c.Title, c.PartyId, c.Type, c.Description, c.PersonId, c.OwnerId, c.PreviousContractId, c.StartDate, c.EndDate, c.IsIndefinite, c.Currency, c.PriceIncludesTax,
-        c.ContractValue, c.PaymentTerms, c.RenewalMode, c.RenewalPeriodMonths, c.NoticePeriodDays, c.Confidentiality, c.Version);
+        c.ContractValue, c.PaymentTerms, c.RenewalMode, c.RenewalPeriodMonths, c.NoticePeriodDays, c.Confidentiality, c.HasNonStandardTerms, c.RiskLevel, c.Version);
 
     private async Task<(ModulixUser Admin, ModulixUser Approver, ModulixUser Reader, Guid PartyId)> SetUpAsync()
     {

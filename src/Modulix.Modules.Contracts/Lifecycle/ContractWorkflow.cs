@@ -22,7 +22,8 @@ public sealed record ContractPolicySettings(
     string? ProviderName = null,
     string? ProviderDetails = null,
     string? FooterNote = null,
-    string TimeZoneId = "Europe/Istanbul")
+    string TimeZoneId = "Europe/Istanbul",
+    int ApprovalDueHours = 72)
 {
     public static ContractPolicySettings Default { get; } = new(false);
 }
@@ -62,6 +63,8 @@ internal sealed class ContractWorkflow(
     ContractReader reader,
     ITenantContextAccessor tenant,
     ContractsStoreContext storeContext,
+    ContractApprovalEngine approvals,
+    TimeProvider time,
     IContractPolicyProvider? policy = null) : IContractWorkflow
 {
     private const string Key = ContractsModule.Entities.Contract;
@@ -75,6 +78,7 @@ internal sealed class ContractWorkflow(
         [ContractAction.WithdrawApproval] = ContractsModule.Permissions.ContractsWrite,
         [ContractAction.Approve] = ContractsModule.Permissions.ContractsApprove,
         [ContractAction.RejectApproval] = ContractsModule.Permissions.ContractsApprove,
+        [ContractAction.ReturnForChanges] = ContractsModule.Permissions.ContractsApprove,
         [ContractAction.Cancel] = ContractsModule.Permissions.ContractsWrite,
         [ContractAction.Revise] = ContractsModule.Permissions.ContractsWrite,
     };
@@ -106,9 +110,18 @@ internal sealed class ContractWorkflow(
         foreach (var action in ContractAction.All.Where(a => granted.Contains(PermissionOf[a])))
         {
             var rule = ContractTransitions.Can(action, state);
-            if (rule.Allowed && action is ContractAction.Approve or ContractAction.RejectApproval && await SelfApprovalBlockedAsync(id, cancellationToken))
+            if (rule.Allowed && IsDecision(action) && await SelfApprovalBlockedAsync(id, cancellationToken))
             {
                 rule = ContractRuleResult.Deny("self-approval", "Kendi onaya gönderdiğiniz sözleşmeyi onaylayamazsınız.");
+            }
+
+            if (rule.Allowed && IsDecision(action) && await reader.ContractAsync(id, cancellationToken) is { } stepContract)
+            {
+                var (allowed, why) = ContractApprovalEngine.CanDecide(await approvals.StateAsync(stepContract, cancellationToken));
+                if (!allowed)
+                {
+                    rule = ContractRuleResult.Deny("not-your-step", why ?? "Bu adımda karar veremezsiniz.");
+                }
             }
 
             list.Add(new ContractActionState(action, rule.Allowed, rule.Code, rule.Message, ContractTransitions.RequiresReason(action)));
@@ -148,13 +161,43 @@ internal sealed class ContractWorkflow(
             return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu işlem şu an yapılamaz.", [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
         }
 
-        if (action is ContractAction.Approve or ContractAction.RejectApproval && await SelfApprovalBlockedAsync(id, cancellationToken))
+        if (IsDecision(action) && await SelfApprovalBlockedAsync(id, cancellationToken))
         {
             return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Kendi onaya gönderdiğiniz sözleşmeyi onaylayamazsınız.",
                 [new RecordFieldError("approvalStatus", "Kendi onaya gönderdiğiniz sözleşmeyi onaylayamazsınız.")]);
         }
 
+        // Onay planı (gönderimde kurulur) ve karar yetkisi (adım, vekâlet, dört göz) sunucuda denetlenir; arayüz yalnızca aynı sonucu gösterir.
+        ContractApprovalState? decision = null;
+        ContractApprovalPlan? plan = null;
+        if (IsDecision(action) || action == ContractAction.SubmitForApproval)
+        {
+            var entity = await reader.ContractAsync(id, cancellationToken);
+            if (entity is null)
+            {
+                return RecordResult<RecordData>.Fail(RecordErrorCode.NotFound, "Sözleşme bulunamadı.");
+            }
+
+            if (IsDecision(action))
+            {
+                decision = await approvals.StateAsync(entity, cancellationToken);
+                var (allowed, why) = ContractApprovalEngine.CanDecide(decision);
+                if (!allowed)
+                {
+                    return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, why ?? "Bu adımda karar veremezsiniz.");
+                }
+            }
+            else
+            {
+                plan = await approvals.BuildPlanAsync(entity, cancellationToken);
+            }
+        }
+
         var approval = Text(contract, "approvalStatus") ?? ApprovalStatus.NotRequired;
+        var actorId = approvals.CurrentUserId ?? Guid.Empty;
+        var round = decision?.Version?.ApprovalRound ?? 0;
+        var dueHours = action == ContractAction.SubmitForApproval ? (policy is null ? ContractPolicySettings.Default : await policy.GetAsync(cancellationToken)).ApprovalDueHours : 0;
+        DateTimeOffset? DueAt() => dueHours > 0 ? time.GetUtcNow().AddHours(dueHours) : null;
         (JsonObject Values, string EventKind, Func<ContractsStoreContext, Contract, CancellationToken, Task>? Effect) step = action switch
         {
             ContractAction.SendToReview => (Set(("preparationStatus", PreparationStatus.InReview)), ContractEventKinds.SentToReview, null),
@@ -173,19 +216,46 @@ internal sealed class ContractWorkflow(
             ContractAction.SubmitForApproval => (
                 Set(("approvalStatus", ApprovalStatus.Pending), ("statusReason", text)),
                 ContractEventKinds.SubmittedForApproval,
-                Effect((ctx, c, ct) => ContractVersions.FreezeAsync(ctx, c, VersionKinds.Approval, text, ct))),
+                Effect((ctx, c, ct) => ContractVersions.StartApprovalAsync(ctx, c, text, plan!, DueAt(), ct))),
             ContractAction.WithdrawApproval => (
                 Set(("approvalStatus", ApprovalStatus.Withdrawn), ("statusReason", text)),
                 ContractEventKinds.ApprovalWithdrawn,
                 Effect((ctx, c, ct) => ContractVersions.SetStatusAsync(ctx, c, VersionStatus.Withdrawn, ct))),
+            // Onay: son adımsa sözleşme onaylanır; değilse yalnızca karar kaydedilir ve sıradaki adım açılır (sürüm eşzamanlılığı için sözleşme kaydı yine güncellenir).
+            ContractAction.Approve when !ContractApprovalEngine.CompletesAll(decision!, actorId) => (
+                Set(),
+                ContractEventKinds.ApprovalStepApproved,
+                Effect((ctx, c, ct) =>
+                {
+                    ContractVersions.AddDecision(ctx, c, round, decision!.Current!.Step, ApprovalDecisionKind.Approved, decision.Principals, text);
+                    c.Touch();
+                    return Task.CompletedTask;
+                })),
             ContractAction.Approve => (
                 Set(("approvalStatus", ApprovalStatus.Approved), ("statusReason", text)),
                 ContractEventKinds.Approved,
-                Effect((ctx, c, ct) => ContractVersions.SetStatusAsync(ctx, c, VersionStatus.Approved, ct))),
+                Effect(async (ctx, c, ct) =>
+                {
+                    ContractVersions.AddDecision(ctx, c, round, decision!.Current!.Step, ApprovalDecisionKind.Approved, decision.Principals, text);
+                    await ContractVersions.SetStatusAsync(ctx, c, VersionStatus.Approved, ct);
+                })),
             ContractAction.RejectApproval => (
                 Set(("approvalStatus", ApprovalStatus.Rejected), ("statusReason", text)),
                 ContractEventKinds.ApprovalRejected,
-                Effect((ctx, c, ct) => ContractVersions.SetStatusAsync(ctx, c, VersionStatus.Rejected, ct))),
+                Effect(async (ctx, c, ct) =>
+                {
+                    ContractVersions.AddDecision(ctx, c, round, decision!.Current!.Step, ApprovalDecisionKind.Rejected, decision.Principals, text);
+                    await ContractVersions.SetStatusAsync(ctx, c, VersionStatus.Rejected, ct);
+                })),
+            // Değişiklik talebiyle geri gönderme: onay turu sonlanır, sözleşme taslağa döner ve yeni revizyon açılır (dondurulan sürüm geçersiz kalır).
+            ContractAction.ReturnForChanges => (
+                Set(("preparationStatus", PreparationStatus.Draft), ("approvalStatus", ApprovalStatus.NotRequired), ("statusReason", text)),
+                ContractEventKinds.ApprovalReturned,
+                Effect(async (ctx, c, ct) =>
+                {
+                    ContractVersions.AddDecision(ctx, c, round, decision!.Current!.Step, ApprovalDecisionKind.Returned, decision.Principals, text);
+                    await ContractVersions.OpenNextVersionAsync(ctx, c, ct);
+                })),
             ContractAction.Cancel => (
                 Set(("effectiveStatus", EffectiveStatus.Cancelled), ("statusReason", text),
                     ("signatureStatus", Text(contract, "signatureStatus") == SignatureStatus.Pending ? SignatureStatus.Cancelled : Text(contract, "signatureStatus")),
@@ -199,7 +269,8 @@ internal sealed class ContractWorkflow(
             _ => throw new InvalidOperationException(action),
         };
 
-        using (gate.Open([permission], step.EventKind, text, step.Effect))
+        var eventReason = plan is null ? text : Truncate(text is null ? plan.Note : $"{text} â {plan.Note}", Contract.ReasonMaxLength);
+        using (gate.Open([permission], step.EventKind, eventReason, step.Effect))
         {
             return await pipeline.UpdateAsync(new RecordCommand(Key, id, step.Values, version) { Reason = $"contract.{step.EventKind}" }, cancellationToken);
         }
@@ -277,6 +348,10 @@ internal sealed class ContractWorkflow(
 
     private static ContractVersionView View(ContractVersion v, ContractSnapshot? snapshot) =>
         new(v.Id, v.VersionNo, v.Kind, v.Status, v.Sha256, v.Reason, v.CreatedBy, v.CreatedAt, snapshot);
+
+    private static bool IsDecision(string action) => action is ContractAction.Approve or ContractAction.RejectApproval or ContractAction.ReturnForChanges;
+
+    private static string? Truncate(string? value, int max) => value is { } v && v.Length > max ? v[..max] : value;
 
     private static ContractState StateOf(RecordData c) => new(
         Text(c, "preparationStatus") ?? PreparationStatus.Draft,

@@ -122,6 +122,12 @@ public sealed class Contract : ContractsEntity, IOwnedEntity
     /// <summary><see cref="Lifecycle.Confidentiality"/>.</summary>
     public string Confidentiality { get; internal set; } = Lifecycle.Confidentiality.Internal;
 
+    /// <summary>Standart dışı (olağan şablondan sapan) madde var mı? Elle işaretlenir; onay kuralları bu göstergeyi koşul olarak kullanabilir.</summary>
+    public bool HasNonStandardTerms { get; internal set; }
+
+    /// <summary><see cref="Lifecycle.RiskLevel"/>: elle girilen risk göstergesi; onay kuralları "en az bu düzey" koşuluyla kullanabilir.</summary>
+    public string RiskLevel { get; internal set; } = Lifecycle.RiskLevel.Low;
+
     /// <summary><see cref="Lifecycle.PreparationStatus"/>.</summary>
     public string PreparationStatus { get; internal set; } = Lifecycle.PreparationStatus.Draft;
 
@@ -157,6 +163,7 @@ public sealed class Contract : ContractsEntity, IOwnedEntity
     public DateTimeOffset? CalculatedAt { get; internal set; }
 
     public Guid? CreatedBy { get; internal set; }
+
 
     public Guid? UpdatedBy { get; internal set; }
 }
@@ -288,8 +295,21 @@ public sealed class ContractVersion : ContractsEntity
 
     public string Sha256 { get; internal set; } = string.Empty;
 
+
     /// <summary>Dondurma gerekçesi / değişiklik notu.</summary>
     public string? Reason { get; internal set; }
+
+    /// <summary>
+    /// Onaya gönderimde dondurulan onay planı (JSON, <c>ContractApprovalPlan</c>): hangi kurallar (sürümüyle) neden eşleşti, hangi adımlar ve kim onaylamalı.
+    /// Plan sürümle birlikte sabittir; kural sonradan değişse de bu sürümün onayı eski planla yürür. Onaya gitmemiş sürümde boştur.
+    /// </summary>
+    public string? ApprovalPlan { get; internal set; }
+
+    /// <summary>Onay turu: her onaya gönderimde artar. Kararlar tur numarasıyla saklanır; geri çekilip yeniden gönderilen sürümün eski kararları yeni turu etkilemez.</summary>
+    public int ApprovalRound { get; internal set; }
+
+    /// <summary>Onay için hedeflenen son tarih (onaya gönderim + ayardaki süre); geçmişse onay gecikmiştir. Yalnızca bilgi/eskalasyon içindir, onayı engellemez.</summary>
+    public DateTimeOffset? ApprovalDueAt { get; internal set; }
 
     public Guid? CreatedBy { get; internal set; }
 }
@@ -393,4 +413,107 @@ public sealed class ContractDocument : ContractsEntity
     public byte[] Content { get; internal set; } = [];
 
     public Guid? CreatedBy { get; internal set; }
+}
+
+/// <summary>
+/// Sözleşme iç onay kuralı (ADR-0022, dilim 5). Kuralın girilmiş koşulları birlikte sağlanırsa (VE) sözleşme o kuralın adımında onay gerektirir;
+/// kurallar arasında herhangi biri yeter (VEYA). En az bir koşul zorunludur. Adımlar sırayla, aynı adımdaki adlı onaylayanlar paralel çalışır.
+/// <see cref="ApproverId"/> boşsa <c>contracts.contracts.approve</c> izni olan herkes onaylayabilir. Kural sürümü (<c>Version</c>) onaya gönderim planına yazılır.
+/// </summary>
+public sealed class ContractApprovalRule : ContractsEntity
+{
+    public const int NameMaxLength = 150;
+    public const int DescriptionMaxLength = 500;
+    public const int TypeMaxLength = 40;
+
+    public string Name { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    /// <summary>Küçük sayı önce gösterilir; eşleşme sonucunu değiştirmez.</summary>
+    public int Priority { get; internal set; }
+
+    /// <summary>Onay adımı (1..9). Küçük adımlar önce tamamlanır; aynı adımdaki adlı onaylayanların hepsi onaylamalıdır.</summary>
+    public int Step { get; internal set; } = 1;
+
+    public bool IsActive { get; internal set; } = true;
+
+    /// <summary>Doluysa yalnızca bu sözleşme türünde (tür liste anahtarı) değerlendirilir; boşsa her tür. Tek başına koşul sayılmaz: tür yalnızca daraltır.</summary>
+    public string? ContractType { get; internal set; }
+
+    /// <summary>Boşsa her para birimi; doluysa tutar koşulu yalnızca bu para biriminde uygulanır.</summary>
+    public string? Currency { get; internal set; }
+
+    /// <summary>Sözleşme genel toplamı (kalem toplamı; yoksa elle girilen bedel) bunu aşarsa koşul sağlanır.</summary>
+    public decimal? MinGrossTotal { get; internal set; }
+
+    /// <summary>En yüksek kalem indirimi bunu aşarsa koşul sağlanır.</summary>
+    public decimal? MinDiscountPercent { get; internal set; }
+
+    /// <summary>Süre (ay) bunu aşarsa koşul sağlanır; belirsiz süreli sözleşme sonsuz sayılır ve koşulu sağlar.</summary>
+    public int? MinTermMonths { get; internal set; }
+
+    /// <summary>Doğruysa yalnızca standart dışı madde işaretli sözleşmede koşul sağlanır.</summary>
+    public bool RequiresNonStandardTerms { get; internal set; }
+
+    /// <summary>Doluysa sözleşmenin risk düzeyi en az bu olmalıdır (<see cref="Lifecycle.RiskLevel"/>).</summary>
+    public string? MinRiskLevel { get; internal set; }
+
+    /// <summary>Boşsa onay izni olan herkes; doluysa yalnızca bu kullanıcı (ya da vekili) onaylayabilir.</summary>
+    public Guid? ApproverId { get; internal set; }
+}
+
+/// <summary>
+/// Sözleşme onay vekâleti: <see cref="FromUserId"/> adına <see cref="ToUserId"/> onay verebilir. Vekil, kuralda adı geçen onaylayanın yerine geçer;
+/// onay iznine kendisi sahip olmalıdır (vekâlet izin vermez, yalnızca "adına" sayılır). Süreli ya da süresiz olabilir.
+/// </summary>
+public sealed class ContractApprovalDelegation : ContractsEntity
+{
+    public const int NoteMaxLength = 300;
+
+    public Guid FromUserId { get; internal set; }
+
+    public Guid ToUserId { get; internal set; }
+
+    public DateTimeOffset StartsAt { get; internal set; }
+
+    /// <summary>Boşsa süresiz.</summary>
+    public DateTimeOffset? EndsAt { get; internal set; }
+
+    public bool IsActive { get; internal set; } = true;
+
+    public string? Note { get; internal set; }
+
+    public bool CoversAt(DateTimeOffset at) => IsActive && StartsAt <= at && (EndsAt is null || EndsAt > at);
+}
+
+/// <summary>
+/// Bir sözleşme sürümünün onay kararı (onay, ret ya da değişiklik talebiyle geri gönderme). Eklenir, değişmez: kim, hangi adımda, kimler adına
+/// (vekâlet), ne zaman ve hangi gerekçeyle. Sürüm numarası kararın hangi dondurulmuş içeriğe verildiğini gösterir.
+/// </summary>
+public sealed class ContractApprovalDecision : ContractsEntity
+{
+    public const int OnBehalfMaxLength = 400;
+
+    public Guid ContractId { get; internal set; }
+
+    public int VersionNo { get; internal set; }
+
+    /// <summary>Sürümün onay turu (<see cref="ContractVersion.ApprovalRound"/>); yalnızca güncel turun kararları adımlara sayılır.</summary>
+    public int Round { get; internal set; }
+
+    public int StepNo { get; internal set; }
+
+    public Guid ActorId { get; internal set; }
+
+    /// <summary>Kararın adına sayıldığı kişiler (virgülle ayrılmış kimlikler; kendisi dahil). Vekâlet yoksa yalnızca kendisi.</summary>
+    public string OnBehalfOf { get; internal set; } = string.Empty;
+
+    /// <summary><see cref="Lifecycle.ApprovalDecisionKind"/>.</summary>
+    public string Decision { get; internal set; } = Lifecycle.ApprovalDecisionKind.Approved;
+
+    public string? Reason { get; internal set; }
+
+    public IReadOnlyList<Guid> OnBehalfIds() =>
+        [.. OnBehalfOf.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(s => Guid.TryParse(s, out var id) ? id : Guid.Empty).Where(id => id != Guid.Empty)];
 }

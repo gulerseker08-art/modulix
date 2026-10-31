@@ -1,0 +1,439 @@
+@page "/sozlesmeler/onay-kurallari"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Sözleşme onay kuralları · Modulix</PageTitle>
+
+<AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ApprovalsManage">
+    <div class="page-header">
+        <h1>Sözleşme onay kuralları</h1>
+        @if (form is null && delegationForm is null)
+        {
+            <div class="header-actions">
+                <button type="button" class="btn btn-primary" @onclick="NewRule">Yeni kural</button>
+                <button type="button" class="btn btn-outline-primary" @onclick="NewDelegation">Yeni vekâlet</button>
+            </div>
+        }
+    </div>
+
+    <p class="text-muted">
+        Bir kuralın girilen <strong>tüm koşulları birlikte</strong> sağlanırsa sözleşme iç onay ister; <strong>kurallardan biri</strong> yeterlidir. Tür ve para birimi yalnızca
+        daraltır; en az bir ölçüt (tutar, indirim, süre, standart dışı madde ya da risk) girilmelidir. Küçük adımlar önce tamamlanır; aynı adımdaki adlı onaylayıcıların hepsi
+        onaylamalıdır. Hiçbir kural eşleşmezse onay izni olan herhangi biri onaylar. Her onaya gönderimde eşleşen kuralların adı ve sürümü sözleşmeye dondurulur;
+        sonradan değişen kural bekleyen onayı etkilemez.
+    </p>
+
+    <Notice Text="@message" Failed="@failed" />
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveRuleAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni kural" : "Kuralı düzenle")</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="r-name">Ad *</label>
+                    <input id="r-name" class="form-control" maxlength="150" @bind="form.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-step">Onay adımı (1-9)</label>
+                    <input id="r-step" class="form-control" type="number" min="1" max="9" @bind="form.Step" />
+                    <FieldError Field="step" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-priority">Öncelik (küçük önce)</label>
+                    <input id="r-priority" class="form-control" type="number" min="0" @bind="form.Priority" />
+                    <FieldError Field="priority" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-type">Sözleşme türü (boş = hepsi)</label>
+                    <select id="r-type" class="form-select" @bind="form.ContractType">
+                        <option value="">Hepsi</option>
+                        @foreach (var type in Lookups.Choices(ContractsAccess.ContractTypeList, form.ContractType)) { <option value="@type.Key">@type.Label</option> }
+                    </select>
+                    <FieldError Field="contractType" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-gross">Toplam eşiği — aşılırsa</label>
+                    <input id="r-gross" class="form-control" type="number" step="0.01" min="0" @bind="form.MinGrossTotal" />
+                    <FieldError Field="minGrossTotal" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-currency">Para birimi (tutar için)</label>
+                    <input id="r-currency" class="form-control" maxlength="3" placeholder="Hepsi" @bind="form.Currency" />
+                    <FieldError Field="currency" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-discount">Kalem indirimi eşiği (%) — aşılırsa</label>
+                    <input id="r-discount" class="form-control" type="number" step="any" min="0" max="99.99" @bind="form.MinDiscountPercent" />
+                    <FieldError Field="minDiscountPercent" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="r-term">Süre eşiği (ay) — aşılırsa</label>
+                    <input id="r-term" class="form-control" type="number" min="0" max="1200" @bind="form.MinTermMonths" />
+                    <FieldError Field="minTermMonths" Errors="errors" />
+                    <div class="form-text">Belirsiz süreli sözleşme bu koşulu sağlar.</div>
+                </div>
+                <div>
+                    <label class="form-label" for="r-risk">Risk düzeyi en az</label>
+                    <select id="r-risk" class="form-select" @bind="form.MinRiskLevel">
+                        <option value="">Koşul yok</option>
+                        @foreach (var level in ContractLabels.RiskLevels) { <option value="@level.Key">@level.Label</option> }
+                    </select>
+                    <FieldError Field="minRiskLevel" Errors="errors" />
+                </div>
+                <div class="form-check">
+                    <input id="r-nonstd" class="form-check-input" type="checkbox" @bind="form.RequiresNonStandardTerms" />
+                    <label class="form-check-label" for="r-nonstd">Standart dışı madde işaretliyse</label>
+                </div>
+                <div>
+                    <label class="form-label" for="approverId">Onaylayıcı (isteğe bağlı)</label>
+                    <LookupPicker Id="approverId" LookupKey="contracts.approval-rule.approver" @bind-Value="form.ApproverId" Placeholder="Onay izni olan herkes"
+                                  Invalid="@(errors?.ContainsKey("approverId") == true)" />
+                    <FieldError Field="approverId" Errors="errors" />
+                </div>
+                <div class="form-check">
+                    <input id="r-active" class="form-check-input" type="checkbox" @bind="form.IsActive" />
+                    <label class="form-check-label" for="r-active">Kural etkin</label>
+                </div>
+                <div class="wide">
+                    <label class="form-label" for="r-description">Açıklama</label>
+                    <textarea id="r-description" class="form-control" rows="2" maxlength="500" @bind="form.Description"></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="CancelRule">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteRuleAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    @if (delegationForm is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveDelegationAsync" @onsubmit:preventDefault>
+            <h2>@(delegationForm.Id is null ? "Yeni vekâlet" : "Vekâleti düzenle")</h2>
+            <p class="text-muted">Vekil, vekâlet verenin yerine onay verebilir; onay iznine kendisi de sahip olmalıdır. Karar vekâleten işaretlenir ve geçmişte kalır.</p>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="fromUserId">Vekâlet veren *</label>
+                    <LookupPicker Id="fromUserId" LookupKey="contracts.approval-delegation.from" @bind-Value="delegationForm.FromUserId" Required="true"
+                                  Invalid="@(delegationErrors?.ContainsKey("fromUserId") == true)" />
+                    <FieldError Field="fromUserId" Errors="delegationErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="toUserId">Vekil *</label>
+                    <LookupPicker Id="toUserId" LookupKey="contracts.approval-delegation.to" @bind-Value="delegationForm.ToUserId" Required="true"
+                                  Invalid="@(delegationErrors?.ContainsKey("toUserId") == true)" />
+                    <FieldError Field="toUserId" Errors="delegationErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="d-start">Başlangıç</label>
+                    <input id="d-start" class="form-control" type="datetime-local" @bind="delegationForm.StartsAt" />
+                    <FieldError Field="startsAt" Errors="delegationErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="d-end">Bitiş (boş = süresiz)</label>
+                    <input id="d-end" class="form-control" type="datetime-local" @bind="delegationForm.EndsAt" />
+                    <FieldError Field="endsAt" Errors="delegationErrors" />
+                </div>
+                <div class="form-check">
+                    <input id="d-active" class="form-check-input" type="checkbox" @bind="delegationForm.IsActive" />
+                    <label class="form-check-label" for="d-active">Etkin</label>
+                </div>
+                <div class="wide">
+                    <label class="form-label" for="d-note">Not</label>
+                    <input id="d-note" class="form-control" maxlength="300" @bind="delegationForm.Note" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => delegationForm = null">Vazgeç</button>
+                @if (delegationForm.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteDelegationAsync">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    <section aria-labelledby="rules-title">
+        <h2 id="rules-title">Kurallar</h2>
+        @if (rules is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (rules.Count == 0)
+        {
+            <p class="text-muted">Kural yok; onaya gönderilen sözleşmeyi onay izni olan herhangi biri onaylar.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">Sözleşme onay kuralları</caption>
+                <thead><tr><th scope="col">Kural</th><th scope="col">Adım</th><th scope="col">Koşullar (hepsi)</th><th scope="col">Onaylayıcı</th><th scope="col">Durum</th><th scope="col"></th></tr></thead>
+                <tbody>
+                    @foreach (var rule in rules)
+                    {
+                        <tr>
+                            <td data-label="Kural" class="primary">@rule.Name <small class="text-muted">öncelik @rule.Priority · sürüm @rule.Version</small>
+                                @if (!string.IsNullOrWhiteSpace(rule.Description)) { <div class="small text-muted">@rule.Description</div> }</td>
+                            <td data-label="Adım">@rule.Step</td>
+                            <td data-label="Koşullar">@Conditions(rule)</td>
+                            <td data-label="Onaylayıcı">@(rule.ApproverId is null ? "Onay izni olan herkes" : Lookups.MemberName(rule.ApproverId))</td>
+                            <td data-label="Durum">@(rule.IsActive ? "Etkin" : "Pasif")</td>
+                            <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditRule(rule)">Düzenle</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section aria-labelledby="delegations-title">
+        <h2 id="delegations-title">Vekâletler</h2>
+        @if (delegations is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (delegations.Count == 0)
+        {
+            <p class="text-muted">Vekâlet yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">Sözleşme onay vekâletleri</caption>
+                <thead><tr><th scope="col">Vekâlet veren</th><th scope="col">Vekil</th><th scope="col">Süre</th><th scope="col">Durum</th><th scope="col"></th></tr></thead>
+                <tbody>
+                    @foreach (var item in delegations)
+                    {
+                        <tr>
+                            <td data-label="Vekâlet veren" class="primary">@Lookups.MemberName(item.FromUserId) @if (!string.IsNullOrWhiteSpace(item.Note)) { <div class="small text-muted">@item.Note</div> }</td>
+                            <td data-label="Vekil">@Lookups.MemberName(item.ToUserId)</td>
+                            <td data-label="Süre">@CrmLabels.Time(item.StartsAt) – @(item.EndsAt is { } end ? CrmLabels.Time(end) : "süresiz")</td>
+                            <td data-label="Durum">@DelegationState(item)</td>
+                            <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditDelegation(item)">Düzenle</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+</AuthGate>
+
+@code {
+    private const string RulesUrl = "/api/contracts/approval-rules";
+    private const string DelegationsUrl = "/api/contracts/approval-delegations";
+
+    private List<ContractApprovalRuleDto>? rules;
+    private List<ContractApprovalDelegationDto>? delegations;
+    private RuleForm? form;
+    private DelegationForm? delegationForm;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private IReadOnlyDictionary<string, string[]>? delegationErrors;
+    private string? message;
+    private bool failed;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(ContractsAccess.ApprovalsManage))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var (loadedRules, ruleError) = await Api.GetAllAsync<ContractApprovalRuleDto>(RulesUrl);
+        rules = loadedRules;
+        var (loadedDelegations, delegationError) = await Api.GetAllAsync<ContractApprovalDelegationDto>(DelegationsUrl);
+        delegations = loadedDelegations;
+        Notify(ruleError ?? delegationError, (ruleError ?? delegationError) is not null);
+    }
+
+    private string Conditions(ContractApprovalRuleDto rule)
+    {
+        var parts = new List<string>();
+        if (rule.MinGrossTotal is { } gross) { parts.Add($"toplam > {gross:N2} {rule.Currency ?? "(her para birimi)"}"); }
+        if (rule.MinDiscountPercent is { } percent) { parts.Add($"kalem indirimi > %{percent:0.##}"); }
+        if (rule.MinTermMonths is { } term) { parts.Add($"süre > {term} ay"); }
+        if (rule.RequiresNonStandardTerms) { parts.Add("standart dışı madde"); }
+        if (rule.MinRiskLevel is { Length: > 0 } risk) { parts.Add($"risk ≥ {ContractLabels.Label(ContractLabels.RiskLevels, risk)}"); }
+        if (rule.ContractType is { Length: > 0 } type) { parts.Add($"tür: {Lookups.Label(ContractsAccess.ContractTypeList, type)}"); }
+        return string.Join(" ve ", parts);
+    }
+
+    private static string DelegationState(ContractApprovalDelegationDto item)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return !item.IsActive ? "Pasif" : item.StartsAt > now ? "Başlamadı" : item.EndsAt is { } end && end <= now ? "Süresi doldu" : "Geçerli";
+    }
+
+    private void NewRule()
+    {
+        form = new RuleForm();
+        errors = null;
+        Notify(null, false);
+    }
+
+    private void EditRule(ContractApprovalRuleDto rule)
+    {
+        form = new RuleForm
+        {
+            Id = rule.Id, Version = rule.Version, Name = rule.Name, Description = rule.Description, Priority = rule.Priority, Step = rule.Step, IsActive = rule.IsActive,
+            ContractType = rule.ContractType ?? string.Empty, Currency = rule.Currency, MinGrossTotal = rule.MinGrossTotal, MinDiscountPercent = rule.MinDiscountPercent,
+            MinTermMonths = rule.MinTermMonths, RequiresNonStandardTerms = rule.RequiresNonStandardTerms, MinRiskLevel = rule.MinRiskLevel ?? string.Empty, ApproverId = rule.ApproverId,
+        };
+        errors = null;
+        Notify(null, false);
+    }
+
+    private void CancelRule()
+    {
+        form = null;
+        errors = null;
+    }
+
+    private async Task SaveRuleAsync()
+    {
+        if (busy || form is null) { return; }
+        busy = true;
+        var f = form;
+        var request = new SaveContractApprovalRuleRequest(
+            f.Name, Blank(f.Description), f.Priority, f.Step, f.IsActive, Blank(f.ContractType), Blank(f.Currency)?.ToUpperInvariant(), f.MinGrossTotal, f.MinDiscountPercent,
+            f.MinTermMonths, f.RequiresNonStandardTerms, Blank(f.MinRiskLevel), f.ApproverId, f.Version);
+        var result = f.Id is { } id
+            ? await Api.PutAsync<ContractApprovalRuleDto>($"{RulesUrl}/{id}", request)
+            : await Api.PostAsync<ContractApprovalRuleDto>(RulesUrl, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            form = null;
+            errors = null;
+            Notify("Kural kaydedildi.", false);
+            await LoadAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Sayfayı yenileyip tekrar deneyin." : result.Error, true);
+    }
+
+    private async Task DeleteRuleAsync()
+    {
+        if (busy || form is null) { return; }
+        busy = true;
+        var result = await Api.DeleteAsync($"{RulesUrl}/{form.Id}?version={form.Version}");
+        busy = false;
+        Notify(result.IsSuccess ? "Kural silindi." : result.Error, !result.IsSuccess);
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync();
+        }
+    }
+
+    private void NewDelegation()
+    {
+        delegationForm = new DelegationForm { StartsAt = DateTime.Now };
+        delegationErrors = null;
+        Notify(null, false);
+    }
+
+    private void EditDelegation(ContractApprovalDelegationDto item)
+    {
+        delegationForm = new DelegationForm
+        {
+            Id = item.Id, Version = item.Version, FromUserId = item.FromUserId, ToUserId = item.ToUserId, StartsAt = item.StartsAt.LocalDateTime,
+            EndsAt = item.EndsAt?.LocalDateTime, IsActive = item.IsActive, Note = item.Note,
+        };
+        delegationErrors = null;
+        Notify(null, false);
+    }
+
+    private async Task SaveDelegationAsync()
+    {
+        if (busy || delegationForm is null) { return; }
+        busy = true;
+        var d = delegationForm;
+        var request = new SaveContractApprovalDelegationRequest(
+            d.FromUserId ?? Guid.Empty, d.ToUserId ?? Guid.Empty, d.StartsAt is { } s ? new DateTimeOffset(s) : null, d.EndsAt is { } e ? new DateTimeOffset(e) : null,
+            d.IsActive, Blank(d.Note), d.Version);
+        var result = d.Id is { } id
+            ? await Api.PutAsync<ContractApprovalDelegationDto>($"{DelegationsUrl}/{id}", request)
+            : await Api.PostAsync<ContractApprovalDelegationDto>(DelegationsUrl, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            delegationForm = null;
+            delegationErrors = null;
+            Notify("Vekâlet kaydedildi.", false);
+            await LoadAsync();
+            return;
+        }
+
+        delegationErrors = result.FieldErrors;
+        Notify(result.Error, true);
+    }
+
+    private async Task DeleteDelegationAsync()
+    {
+        if (busy || delegationForm is null) { return; }
+        busy = true;
+        var result = await Api.DeleteAsync($"{DelegationsUrl}/{delegationForm.Id}?version={delegationForm.Version}");
+        busy = false;
+        Notify(result.IsSuccess ? "Vekâlet silindi." : result.Error, !result.IsSuccess);
+        if (result.IsSuccess)
+        {
+            delegationForm = null;
+            await LoadAsync();
+        }
+    }
+
+    private void Notify(string? text, bool isFailure)
+    {
+        message = text;
+        failed = isFailure;
+    }
+
+    private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    private sealed class RuleForm
+    {
+        public Guid? Id { get; init; }
+        public long? Version { get; init; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int Priority { get; set; }
+        public int Step { get; set; } = 1;
+        public bool IsActive { get; set; } = true;
+        public string? ContractType { get; set; } = string.Empty;
+        public string? Currency { get; set; }
+        public decimal? MinGrossTotal { get; set; }
+        public decimal? MinDiscountPercent { get; set; }
+        public int? MinTermMonths { get; set; }
+        public bool RequiresNonStandardTerms { get; set; }
+        public string? MinRiskLevel { get; set; } = string.Empty;
+        public Guid? ApproverId { get; set; }
+    }
+
+    private sealed class DelegationForm
+    {
+        public Guid? Id { get; init; }
+        public long? Version { get; init; }
+        public Guid? FromUserId { get; set; }
+        public Guid? ToUserId { get; set; }
+        public DateTime? StartsAt { get; set; }
+        public DateTime? EndsAt { get; set; }
+        public bool IsActive { get; set; } = true;
+        public string? Note { get; set; }
+    }
+}

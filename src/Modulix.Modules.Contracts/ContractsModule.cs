@@ -38,12 +38,16 @@ public sealed class ContractsModule : IModule
 
         /// <summary>Üretilmiş sözleşme belgesini indirir.</summary>
         public const string DocumentsDownload = "contracts.documents.download";
+
+        /// <summary>Onay kurallarını ve onay vekâletlerini tanımlar (yönetim işlemi; denetim kaydına yazılır). Onaylamaktan ayrıdır.</summary>
+        public const string ApprovalsManage = "contracts.approvals.manage";
     }
 
     /// <summary>Firma ayarları (Y6).</summary>
     public static class SettingKeys
     {
         public const string AllowSelfApproval = "contracts.approval.allow-self";
+        public const string ApprovalDueHours = "contracts.approval.due-hours";
         public const string ProviderName = "contracts.document.provider-name";
         public const string ProviderDetails = "contracts.document.provider-details";
         public const string FooterNote = "contracts.document.footer-note";
@@ -56,6 +60,8 @@ public sealed class ContractsModule : IModule
         public const string ContractParty = "contracts.contract-party";
         public const string ContractLine = "contracts.contract-line";
         public const string ContractTemplate = "contracts.contract-template";
+        public const string ContractApprovalRule = "contracts.contract-approval-rule";
+        public const string ContractApprovalDelegation = "contracts.contract-approval-delegation";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -78,6 +84,7 @@ public sealed class ContractsModule : IModule
         new(Permissions.TemplatesPublish, "Sözleşme şablonunu yayımlar, arşivler ve geri alır", "Sözleşme şablonları"),
         new(Permissions.DocumentsGenerate, "Yayımlanmış şablondan sözleşme belgesi (PDF) üretir", "Sözleşme belgeleri"),
         new(Permissions.DocumentsDownload, "Üretilmiş sözleşme belgesini indirir", "Sözleşme belgeleri"),
+        new(Permissions.ApprovalsManage, "Sözleşme onay kurallarını ve onay vekâletlerini tanımlar", "Sözleşme onayı"),
     ];
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
@@ -86,6 +93,13 @@ public sealed class ContractsModule : IModule
         {
             Description = "Evet seçilirse sözleşmeyi onaya gönderen kişi onaylama yetkisine sahipse kendi gönderdiğini onaylayabilir. Varsayılan hayırdır (hazırlayan ve onaylayan ayrılır).",
             Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
+        },
+        new(SettingKeys.ApprovalDueHours, "Sözleşme iç onay: hedef süre (saat)", "Sözleşmeler", SettingType.Text, "72")
+        {
+            Description = "Onaya gönderilen sözleşme için hedeflenen karar süresi. Süre aşılırsa onay gecikmiş görünür (onay iş listesinde ve sözleşmede). 0 kapalıdır.",
+            Pattern = @"^[0-9]{1,4}$",
+            PatternMessage = "0-9999 arası tam sayı girin.",
+            MaxLength = 4,
         },
         new(SettingKeys.ProviderName, "Sözleşme belgesi: hizmet veren ünvanı", "Sözleşmeler", SettingType.Text)
         {
@@ -137,6 +151,14 @@ public sealed class ContractsModule : IModule
             Scope = RecordScope.All,
         },
         new(
+            "contracts.approval-manager",
+            "Sözleşme onay yöneticisi",
+            "Sözleşme onay kurallarını ve vekâletlerini tanımlar; sözleşmeleri tutarlarıyla görüntüler.",
+            [Permissions.ContractsRead, Permissions.FinancialsRead, Permissions.ApprovalsManage])
+        {
+            Scope = RecordScope.All,
+        },
+        new(
             "contracts.viewer",
             "Sözleşme izleyici",
             "Sözleşmeleri tutarlar olmadan görüntüler.",
@@ -148,6 +170,22 @@ public sealed class ContractsModule : IModule
 
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
     [
+        new(Entities.ContractApprovalRule, "Sözleşme onay kuralı", Permissions.ApprovalsManage, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["description"] = "Açıklama", ["priority"] = "Öncelik", ["step"] = "Adım", ["isActive"] = "Etkin", ["contractType"] = "Sözleşme türü",
+            ["currency"] = "Para birimi", ["minGrossTotal"] = "Tutar eşiği", ["minDiscountPercent"] = "İndirim eşiği %", ["minTermMonths"] = "Süre eşiği (ay)",
+            ["requiresNonStandardTerms"] = "Standart dışı madde", ["minRiskLevel"] = "En düşük risk düzeyi", ["approverId"] = "Onaylayan",
+        }, "name")
+        {
+            UserFields = ["approverId"],
+        },
+        new(Entities.ContractApprovalDelegation, "Sözleşme onay vekâleti", Permissions.ApprovalsManage, new Dictionary<string, string>
+        {
+            ["fromUserId"] = "Vekâlet veren", ["toUserId"] = "Vekil", ["startsAt"] = "Başlangıç", ["endsAt"] = "Bitiş", ["isActive"] = "Etkin", ["note"] = "Not",
+        })
+        {
+            UserFields = ["fromUserId", "toUserId"],
+        },
         new(Entities.ContractTemplate, "Sözleşme şablonu", Permissions.ContractsRead, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["language"] = "Dil", ["contractType"] = "Sözleşme türü", ["usageScope"] = "Kullanım kapsamı", ["description"] = "Açıklama",
@@ -160,7 +198,7 @@ public sealed class ContractsModule : IModule
             ["endDate"] = "Bitiş", ["isIndefinite"] = "Belirsiz süreli", ["currency"] = "Para birimi", ["priceIncludesTax"] = "Fiyatlar vergi dahil",
             ["contractValue"] = "Sözleşme bedeli", ["paymentTerms"] = "Ödeme koşulları", ["renewalMode"] = "Yenileme yöntemi",
             ["renewalPeriodMonths"] = "Yenileme süresi (ay)", ["noticePeriodDays"] = "Bildirim süresi (gün)", ["noticeDeadline"] = "Son bildirim tarihi",
-            ["confidentiality"] = "Gizlilik", ["preparationStatus"] = "Hazırlık durumu", ["approvalStatus"] = "Onay durumu",
+            ["confidentiality"] = "Gizlilik", ["hasNonStandardTerms"] = "Standart dışı madde", ["riskLevel"] = "Risk düzeyi", ["preparationStatus"] = "Hazırlık durumu", ["approvalStatus"] = "Onay durumu",
             ["signatureStatus"] = "İmza durumu", ["effectiveStatus"] = "Yürürlük durumu", ["statusReason"] = "Gerekçe",
             ["currentVersionNo"] = "Güncel sürüm", ["effectiveVersionNo"] = "Yürürlükteki sürüm", ["netTotal"] = "Net toplam",
             ["taxTotal"] = "Vergi", ["grossTotal"] = "Genel toplam",
@@ -260,6 +298,10 @@ public sealed class ContractsModule : IModule
         services.AddScoped<IRecordStore, ContractTemplateRecordStore>();
         services.AddScoped<IContractTemplates, ContractTemplates>();
         services.AddScoped<IContractDocuments, ContractDocuments>();
+        services.AddScoped<IRecordStore, ContractApprovalRuleRecordStore>();
+        services.AddScoped<IRecordStore, ContractApprovalDelegationRecordStore>();
+        services.AddScoped<IContractApprovals, ContractApprovals>();
+        services.AddScoped<ContractApprovalEngine>();
         services.AddScoped<IActivityLinkTarget, ContractLinkTarget>();
     }
 }

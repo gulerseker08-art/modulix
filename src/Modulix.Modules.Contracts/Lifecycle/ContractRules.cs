@@ -75,6 +75,27 @@ public static class Confidentiality
     public static IReadOnlyList<string> All { get; } = [Internal, Confidential, Restricted];
 }
 
+/// <summary>Sözleşme risk düzeyi (elle girilen risk göstergesi); onay kuralları "en az bu düzey" koşuluyla kullanır.</summary>
+public static class RiskLevel
+{
+    public const string Low = "Low";
+    public const string Medium = "Medium";
+    public const string High = "High";
+
+    public static IReadOnlyList<string> All { get; } = [Low, Medium, High];
+
+    /// <summary>Sıra sayısı (0 düşük); bilinmeyen değer düşük sayılır.</summary>
+    public static int Rank(string? level) => level switch { Medium => 1, High => 2, _ => 0 };
+}
+
+/// <summary>Onay kararı türleri (<c>ContractApprovalDecisions</c>).</summary>
+public static class ApprovalDecisionKind
+{
+    public const string Approved = "Approved";
+    public const string Rejected = "Rejected";
+    public const string Returned = "Returned";
+}
+
 /// <summary>Taraf/ilgili kişi rolleri; adlar Shared'daki <c>ContractPartyRoles</c> ile aynıdır.</summary>
 public static class PartyRoles
 {

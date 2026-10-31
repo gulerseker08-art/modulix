@@ -26,6 +26,8 @@ public sealed record ContractDto(
     int? NoticePeriodDays,
     DateOnly? NoticeDeadline,
     string Confidentiality,
+    bool HasNonStandardTerms,
+    string RiskLevel,
     string PreparationStatus,
     string ApprovalStatus,
     string SignatureStatus,
@@ -66,6 +68,8 @@ public sealed record SaveContractRequest(
     int? RenewalPeriodMonths = null,
     int? NoticePeriodDays = null,
     string Confidentiality = "Internal",
+    bool HasNonStandardTerms = false,
+    string RiskLevel = "Low",
     long? Version = null,
     System.Text.Json.Nodes.JsonObject? Custom = null);
 
@@ -150,6 +154,7 @@ public static class ContractsAccess
     public const string TemplatesPublish = "contracts.templates.publish";
     public const string DocumentsGenerate = "contracts.documents.generate";
     public const string DocumentsDownload = "contracts.documents.download";
+    public const string ApprovalsManage = "contracts.approvals.manage";
 
     public const string ContractEntityKey = "contracts.contract";
 
@@ -174,7 +179,8 @@ public sealed record ContractSnapshotDto(
     string Number, int VersionNo, string Title, string Type, string? Description, Guid PartyId, Guid? PersonId, DateOnly? StartDate, DateOnly? EndDate,
     bool IsIndefinite, string Currency, bool PriceIncludesTax, decimal? ContractValue, string? PaymentTerms, string RenewalMode, int? RenewalPeriodMonths,
     int? NoticePeriodDays, DateOnly? NoticeDeadline, string Confidentiality, decimal NetTotal, decimal TaxTotal, decimal GrossTotal, string? RecurringSummary,
-    IReadOnlyList<ContractSnapshotPartyDto> Parties, IReadOnlyList<ContractSnapshotLineDto> Lines);
+    IReadOnlyList<ContractSnapshotPartyDto> Parties, IReadOnlyList<ContractSnapshotLineDto> Lines,
+    bool HasNonStandardTerms = false, string RiskLevel = "Low");
 
 public sealed record ContractVersionDto(Guid Id, int VersionNo, string Kind, string Status, string Sha256, string? Reason, Guid? CreatedBy, DateTimeOffset FrozenAt, ContractSnapshotDto? Snapshot);
 
