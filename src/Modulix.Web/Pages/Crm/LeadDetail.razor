@@ -70,7 +70,7 @@
             </div>
         }
 
-        <section class="detail-section">
+        <FormSection Title="Talep bilgileri" Icon="inbox">
             <dl class="detail-grid">
                 <div><dt>Talep sahibi</dt><dd>@(string.Join(' ', new[] { lead.FirstName, lead.LastName }.Where(n => !string.IsNullOrWhiteSpace(n))) is { Length: > 0 } name ? name : "—")</dd></div>
                 <div><dt>Firma adı</dt><dd>@(lead.CompanyName ?? "—")</dd></div>
@@ -104,10 +104,9 @@
                     <div class="span-all"><dt>Durum gerekçesi</dt><dd class="notes">@statusReason</dd></div>
                 }
             </dl>
-        </section>
+        </FormSection>
 
-        <section class="detail-section">
-            <div class="section-header"><h2>Kaynak ve sahiplik</h2></div>
+        <FormSection Title="Kaynak ve sahiplik" Icon="user-check">
             <dl class="detail-grid">
                 <div><dt>Kaynak</dt><dd>@(lead.Source is null ? "—" : Lookups.Label(CrmLeadLists.Source, lead.Source))@(lead.SourceDetail is { } sd ? $" · {sd}" : null)</dd></div>
                 <div><dt>İlk geliş</dt><dd>@CrmLabels.Time(lead.FirstReceivedAt)</dd></div>
@@ -146,7 +145,7 @@
                     }
                 }
             </dl>
-        </section>
+        </FormSection>
 
         <section class="detail-section lead-actions">
             <div class="section-header"><h2>İşlemler</h2></div>

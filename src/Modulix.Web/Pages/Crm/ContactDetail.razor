@@ -102,6 +102,7 @@
                 @if (tabs.Rendered(TabGeneral))
                 {
                     <div role="tabpanel" id="tabpanel-@TabGeneral" aria-labelledby="tab-@TabGeneral" class="record-tabpanel" hidden="@tabs.Hidden(TabGeneral)">
+                        <FormSection Title="Genel bilgiler" Icon="info">
                         <dl class="detail-grid">
                             @if (contact.Notes is { } notes)
                             {
@@ -116,13 +117,11 @@
                                 }
                             }
                         </dl>
+                        </FormSection>
 
-                        <section class="detail-section">
-                            <div class="section-header">
-                                <h2>İletişim bilgileri</h2>
-                            </div>
+                        <FormSection Title="İletişim bilgileri" Icon="phone">
                             <ContactPointsSection ContactId="Id" Title="Genel telefon ve e-posta" CanWrite="Session.Can(CrmAccess.ContactsWrite)" Changed="ReloadContactAsync" />
-                        </section>
+                        </FormSection>
                     </div>
                 }
 

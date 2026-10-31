@@ -131,8 +131,7 @@
         <div class="detail-layout">
             <div class="detail-main">
 
-            <section class="detail-section">
-                <div class="section-header"><h2>Özet</h2></div>
+            <FormSection Title="Temel bilgiler" Icon="target">
                 <dl class="detail-grid">
                     <div><dt>Firma</dt><dd><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></dd></div>
                     <div><dt>Ana kişi</dt><dd>@(opportunity.ContactId is null ? "—" : Lookups.ContactName(opportunity.ContactId))</dd></div>
@@ -208,7 +207,7 @@
                         <div class="span-all"><dt>Notlar</dt><dd class="notes">@notes</dd></div>
                     }
                 </dl>
-            </section>
+            </FormSection>
 
             <section class="detail-section opportunity-actions">
                 <div class="section-header"><h2>İşlemler</h2></div>
@@ -352,8 +351,7 @@
 
             @if (HasNeedAnalysis)
             {
-                <section class="detail-section">
-                    <div class="section-header"><h2>İhtiyaç analizi</h2></div>
+                <FormSection Title="Detaylar" Icon="clipboard-list" Description="İhtiyaç analizi">
                     <dl class="detail-grid">
                         @foreach (var (label, text) in NeedFields)
                         {
@@ -363,16 +361,16 @@
                             }
                         }
                     </dl>
-                </section>
+                </FormSection>
             }
 
             @if (Session.Can(CrmAccess.QuotesRead) && PrimaryQuote is { } lineQuote)
             {
-                <section class="detail-section" aria-labelledby="opp-lines">
-                    <div class="section-header">
-                        <h2 id="opp-lines">Ürün / hizmet kalemleri</h2>
+                <FormSection Title="Ürün / hizmet kalemleri" Icon="package">
+                    <Actions>
                         <a class="btn btn-outline-primary btn-sm" href="crm/teklifler/@lineQuote.Id">Teklifte düzenle</a>
-                    </div>
+                    </Actions>
+                    <ChildContent>
                     <p class="text-muted small">Kalemler esas tekliften (@lineQuote.QuoteNumber · V@(lineQuote.RevisionNo)) gelir; tutarlar fiyatlandırma motorunun hesabıdır. Ana toplama girmeyen seçenekler ve paket bileşenleri burada gösterilmez.</p>
                     @if (primaryLines is null)
                     {
@@ -409,17 +407,18 @@
                             </tbody>
                         </table>
                     }
-                </section>
+                    </ChildContent>
+                </FormSection>
             }
 
-            <section class="detail-section">
-                <div class="section-header">
-                    <h2>Kişiler</h2>
+            <FormSection Title="Kişiler" Icon="users">
+                <Actions>
                     @if (Session.Can(CrmAccess.OpportunitiesWrite) && !addingContact)
                     {
                         <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => addingContact = true">Kişi bağla</button>
                     }
-                </div>
+                </Actions>
+                <ChildContent>
                 @if (addingContact)
                 {
                     <div class="inline-form">
@@ -465,16 +464,17 @@
                         }
                     </ul>
                 }
-            </section>
+                </ChildContent>
+            </FormSection>
 
-            <section class="detail-section">
-                <div class="section-header">
-                    <h2>Rakipler</h2>
+            <FormSection Title="Rakipler" Icon="shield">
+                <Actions>
                     @if (Session.Can(CrmAccess.OpportunitiesWrite) && !addingCompetitor)
                     {
                         <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => addingCompetitor = true">Rakip ekle</button>
                     }
-                </div>
+                </Actions>
+                <ChildContent>
                 @if (addingCompetitor)
                 {
                     <div class="inline-form">
@@ -525,15 +525,17 @@
                         }
                     </ul>
                 }
-            </section>
+                </ChildContent>
+            </FormSection>
 
-            <section class="detail-section" aria-labelledby="opp-quotes">
-                <div class="section-header"><h2 id="opp-quotes">Teklifler</h2>
+            <FormSection Title="Teklifler" Icon="file-text">
+                <Actions>
                     @if (Session.Can(CrmAccess.QuotesWrite) && opportunity.Status == OpportunityStatus.Open)
                     {
                         <a class="btn btn-outline-primary btn-sm" href="crm/teklifler/yeni?opportunityId=@Id&companyId=@opportunity.CompanyId">Yeni teklif</a>
                     }
-                </div>
+                </Actions>
+                <ChildContent>
                 @if (!Session.Can(CrmAccess.QuotesRead))
                 {
                     <p class="text-muted">Teklifleri görme izniniz yok.</p>
@@ -581,10 +583,10 @@
                         </tbody>
                     </table>
                 }
-            </section>
+                </ChildContent>
+            </FormSection>
 
-            <section class="detail-section">
-                <div class="section-header"><h2>Aşama ve durum tarihçesi</h2></div>
+            <FormSection Title="Aşama ve durum tarihçesi" Icon="history">
                 @if (history is null)
                 {
                     <p class="text-muted">Yükleniyor…</p>
@@ -608,20 +610,20 @@
                         </tbody>
                     </table>
                 }
-            </section>
+            </FormSection>
 
             <RecordHistory EntityKey="@CrmEntityKeys.Opportunity" RecordId="Id" Version="opportunity.Version" />
             </div>
 
             <aside class="detail-side" aria-label="Fırsat yan paneli">
-                <section class="detail-section side-card" aria-labelledby="opp-activities">
-                    <div class="section-header">
-                        <h2 id="opp-activities">Aktivite zaman çizelgesi</h2>
+                <FormSection Title="Aktivite zaman çizelgesi" Icon="calendar" Class="side-card">
+                    <Actions>
                         @if (Session.Can(CrmAccess.ActivitiesWrite) && opportunity.Status is OpportunityStatus.Open or OpportunityStatus.OnHold)
                         {
                             <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => addingActivity = true"><span aria-hidden="true">+</span> Aktivite ekle</button>
                         }
-                    </div>
+                    </Actions>
+                    <ChildContent>
                     @if (activities is null)
                     {
                         <p class="text-muted">Yükleniyor…</p>
@@ -660,12 +662,12 @@
                     {
                         <p class="text-muted small">Kapanışta açık aktiviteler silinmez ya da otomatik kapatılmaz; açık kalırlar ve burada görünür.</p>
                     }
-                </section>
+                    </ChildContent>
+                </FormSection>
 
                 @if (ShowAmounts && Session.Can(CrmAccess.QuotesRead))
                 {
-                    <section class="detail-section side-card" aria-labelledby="opp-finance">
-                        <div class="section-header"><h2 id="opp-finance">Finansal özet</h2></div>
+                    <FormSection Title="Finansal özet" Icon="wallet" Class="side-card">
                         @if (PrimaryQuote is { } pq)
                         {
                             <p class="text-muted small">Esas teklif: <a href="crm/teklifler/@pq.Id">@pq.QuoteNumber · V@(pq.RevisionNo)</a></p>
@@ -684,7 +686,7 @@
                                 <div class="finance-total"><dt>Tahmini tutar</dt><dd>@(opportunity.Amount is { } manual ? CrmLabels.Amount(manual, opportunity.Currency) : "Bilinmiyor")</dd></div>
                             </dl>
                         }
-                    </section>
+                    </FormSection>
                 }
             </aside>
         </div>

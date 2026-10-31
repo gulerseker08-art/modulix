@@ -1,8 +1,28 @@
-@* Firma ekleme/düzenleme formu; Firmalar listesi ve firma detay sayfası kullanır. *@
+@* Firma ekleme/düzenleme formu; Firmalar listesi ve firma detay sayfası kullanır.
+   Düzen (referans "Firma kartı" ekranı): üstte başlık + İptal / Kaydet, solda yazdıkça güncellenen özet kartı, sağda ikon
+   başlıklı bölüm kartları (Temel bilgiler, Genel iletişim bilgileri, Notlar ve ek bilgiler). Alanlar ve kaydetme davranışı değişmedi. *@
 @inject ApiClient Api
 
-<form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-    <h2>@(Company is null ? "Yeni firma" : "Firmayı düzenle")</h2>
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Company is null ? "Yeni firma" : "Firma kartı")</h2>
+            @if (Company is not null)
+            {
+                <p>@Company.Name</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@busy">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
 
     @if (message is not null)
     {
@@ -14,113 +34,164 @@
         <p class="shared-note text-muted">Ad, vergi bilgileri, telefon, e-posta, web sitesi, şehir ve adres bu firmayı kullanan diğer modüllerde (ör. Lojistik) de görünür; burada yaptığınız değişiklik onlara da yansır. Telefon, e-posta, şehir ve adres alanları ana iletişim noktasını/adresi günceller; birden fazla kayıt için firma detayındaki "Adres ve iletişim" bölümünü kullanın.</p>
     }
 
-    <div class="form-grid">
-        <div>
-            <label class="form-label" for="name">Ad *</label>
-            <input id="name" class="form-control" maxlength="@CrmLimits.NameMaxLength" @bind="form.Name" />
-            <FieldError Field="name" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="status">Durum</label>
-            <select id="status" class="form-select" @bind="form.Status">
-                @foreach (var status in Lookups.Choices(CrmLists.CompanyStatus, source?.Status))
+    <div class="record-layout">
+        @* Şirket özeti: formdaki değerlerle canlı önizleme. *@
+        <aside class="record-summary" aria-label="Şirket özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true">@Initials</span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Name) ? "Firma adı" : form.Name)</strong>
+                    <span class="summary-sub">@Lookups.Label(CrmLists.CompanyStatus, form.Status)</span>
+                </div>
+                <h3 class="summary-heading">Şirket özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Tür</dt><dd>@(form.Kind == "Individual" ? "Gerçek kişi" : "Tüzel kişi")</dd></div>
+                    <div><dt>Sektör</dt><dd>@(string.IsNullOrWhiteSpace(form.Industry) ? "—" : form.Industry)</dd></div>
+                    <div><dt>Şehir</dt><dd>@(string.IsNullOrWhiteSpace(form.City) ? "—" : form.City)</dd></div>
+                    <div><dt>@(form.Kind == "Individual" ? "T.C. kimlik no" : "Vergi no")</dt><dd>@(string.IsNullOrWhiteSpace(form.TaxNumber) ? "—" : form.TaxNumber)</dd></div>
+                    <div><dt>Sorumlu</dt><dd>@(form.OwnerId is { } owner ? Lookups.MemberName(owner) : (Company is null ? "Ben" : "—"))</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <FormSection Title="Temel bilgiler" Icon="building">
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label required" for="name">Firma adı</label>
+                        <input id="name" class="form-control" maxlength="@CrmLimits.NameMaxLength" required aria-required="true" @bind="form.Name" />
+                        <FieldError Field="name" Errors="errors" />
+                    </div>
+                    <div class="span-3">
+                        <label class="form-label" for="kind">Tür</label>
+                        <select id="kind" class="form-select" @bind="form.Kind">
+                            <option value="Organization">Tüzel kişi (şirket)</option>
+                            <option value="Individual">Gerçek kişi (şahıs firması)</option>
+                        </select>
+                        <FieldError Field="kind" Errors="errors" />
+                    </div>
+                    <div class="span-3">
+                        <label class="form-label" for="status">Durum</label>
+                        <select id="status" class="form-select" @bind="form.Status">
+                            @foreach (var status in Lookups.Choices(CrmLists.CompanyStatus, source?.Status))
+                            {
+                                <option value="@status.Key">@status.Label</option>
+                            }
+                        </select>
+                        <FieldError Field="status" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="ownerId">Sorumlu</label>
+                        <LookupPicker Id="ownerId" LookupKey="crm.company.owner" @bind-Value="form.OwnerId" Placeholder="@(Company is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
+                        <FieldError Field="ownerId" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="industry">Sektör</label>
+                        <input id="industry" class="form-control" maxlength="@CrmLimits.IndustryMaxLength" @bind="form.Industry" />
+                        <FieldError Field="industry" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="source">Kaynak</label>
+                        <select id="source" class="form-select" @bind="form.Source">
+                            <option value="">—</option>
+                            @foreach (var value in Lookups.Choices(CrmLists.CompanySource, source?.Source))
+                            {
+                                <option value="@value.Key">@value.Label</option>
+                            }
+                        </select>
+                        <FieldError Field="source" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="taxOffice">Vergi dairesi</label>
+                        <input id="taxOffice" class="form-control" maxlength="@CrmLimits.TaxOfficeMaxLength" @bind="form.TaxOffice" />
+                        <FieldError Field="taxOffice" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="taxNumber">@(form.Kind == "Individual" ? "T.C. kimlik no" : "Vergi no")</label>
+                        <input id="taxNumber" class="form-control" maxlength="@CrmLimits.TaxNumberMaxLength" @bind="form.TaxNumber" />
+                        <FieldError Field="taxNumber" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="tags">Etiketler</label>
+                        <div class="input-icon">
+                            <AppIcon Name="tag" Size="16" />
+                            <input id="tags" class="form-control" maxlength="@CrmLimits.TagsMaxLength" placeholder="Virgülle ayırın: öncelikli, ihracat" @bind="form.Tags" />
+                        </div>
+                        <FieldError Field="tags" Errors="errors" />
+                    </div>
+                </div>
+            </FormSection>
+
+            <FormSection Title="Genel iletişim bilgileri" Icon="phone">
+                <div class="form-grid">
+                    <div class="span-12">
+                        <label class="form-label" for="address">Adres</label>
+                        <div class="input-icon">
+                            <AppIcon Name="map-pin" Size="16" />
+                            <input id="address" class="form-control" maxlength="@CrmLimits.AddressMaxLength" placeholder="Adres bilgisi girin…" @bind="form.Address" />
+                        </div>
+                        <FieldError Field="address" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="phone">Telefon</label>
+                        <div class="input-icon">
+                            <AppIcon Name="phone" Size="16" />
+                            <input id="phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
+                        </div>
+                        <FieldError Field="phone" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="email">E-posta</label>
+                        <div class="input-icon">
+                            <AppIcon Name="mail" Size="16" />
+                            <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" placeholder="E-posta adresi" @bind="form.Email" />
+                        </div>
+                        <FieldError Field="email" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="website">Web sitesi</label>
+                        <div class="input-icon">
+                            <AppIcon Name="globe" Size="16" />
+                            <input id="website" class="form-control" maxlength="@CrmLimits.TextMaxLength" placeholder="www.ornek.com" @bind="form.Website" />
+                        </div>
+                        <FieldError Field="website" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="city">Şehir</label>
+                        <input id="city" class="form-control" maxlength="@CrmLimits.CityMaxLength" @bind="form.City" />
+                        <FieldError Field="city" Errors="errors" />
+                    </div>
+                </div>
+            </FormSection>
+
+            <FormSection Title="Notlar ve ek bilgiler" Icon="message-square">
+                <div class="form-grid">
+                    <div class="span-12">
+                        <label class="form-label" for="notes">Notlar</label>
+                        <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
+                        <FieldError Field="notes" Errors="errors" />
+                    </div>
+                    <div class="span-12">
+                        <DuplicateSuggestions Resource="companies" Query="DuplicateQuery" ExcludeId="Company?.Id" Use="UseExisting" />
+                        @if (usePartyId is not null)
+                        {
+                            <p class="alert alert-info mt-2">Mevcut ortak firma kaydı kullanılacak: yeni taraf açılmaz, kaydettiğinizde bu firma için CRM kaydı oluşur. Boş bıraktığınız ortak alanlar kayıttaki değeri silmez.
+                                <button type="button" class="btn btn-link btn-sm" @onclick="() => usePartyId = null">Vazgeç</button></p>
+                        }
+                    </div>
+                    <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
+                </div>
+            </FormSection>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                @if (Company is not null)
                 {
-                    <option value="@status.Key">@status.Label</option>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
                 }
-            </select>
-            <FieldError Field="status" Errors="errors" />
+            </div>
         </div>
-        <div>
-            <label class="form-label" for="ownerId">Sorumlu</label>
-            <LookupPicker Id="ownerId" LookupKey="crm.company.owner" @bind-Value="form.OwnerId" Placeholder="@(Company is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
-            <FieldError Field="ownerId" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="industry">Sektör</label>
-            <input id="industry" class="form-control" maxlength="@CrmLimits.IndustryMaxLength" @bind="form.Industry" />
-            <FieldError Field="industry" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="source">Kaynak</label>
-            <select id="source" class="form-select" @bind="form.Source">
-                <option value="">—</option>
-                @foreach (var value in Lookups.Choices(CrmLists.CompanySource, source?.Source))
-                {
-                    <option value="@value.Key">@value.Label</option>
-                }
-            </select>
-            <FieldError Field="source" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="kind">Tür</label>
-            <select id="kind" class="form-select" @bind="form.Kind">
-                <option value="Organization">Tüzel kişi (şirket)</option>
-                <option value="Individual">Gerçek kişi (şahıs firması)</option>
-            </select>
-            <FieldError Field="kind" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="taxOffice">Vergi dairesi</label>
-            <input id="taxOffice" class="form-control" maxlength="@CrmLimits.TaxOfficeMaxLength" @bind="form.TaxOffice" />
-            <FieldError Field="taxOffice" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="taxNumber">@(form.Kind == "Individual" ? "T.C. kimlik no" : "Vergi no")</label>
-            <input id="taxNumber" class="form-control" maxlength="@CrmLimits.TaxNumberMaxLength" @bind="form.TaxNumber" />
-            <FieldError Field="taxNumber" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="phone">Telefon</label>
-            <input id="phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
-            <FieldError Field="phone" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="email">E-posta</label>
-            <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" @bind="form.Email" />
-            <FieldError Field="email" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="website">Web sitesi</label>
-            <input id="website" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="form.Website" />
-            <FieldError Field="website" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="city">Şehir</label>
-            <input id="city" class="form-control" maxlength="@CrmLimits.CityMaxLength" @bind="form.City" />
-            <FieldError Field="city" Errors="errors" />
-        </div>
-        <div class="span-all">
-            <label class="form-label" for="address">Adres</label>
-            <input id="address" class="form-control" maxlength="@CrmLimits.AddressMaxLength" @bind="form.Address" />
-            <FieldError Field="address" Errors="errors" />
-        </div>
-        <div class="span-all">
-            <label class="form-label" for="tags">Etiketler</label>
-            <input id="tags" class="form-control" maxlength="@CrmLimits.TagsMaxLength" placeholder="Virgülle ayırın: öncelikli, ihracat" @bind="form.Tags" />
-            <FieldError Field="tags" Errors="errors" />
-        </div>
-        <div class="span-all">
-            <label class="form-label" for="notes">Notlar</label>
-            <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
-            <FieldError Field="notes" Errors="errors" />
-        </div>
-        <div class="span-all">
-            <DuplicateSuggestions Resource="companies" Query="DuplicateQuery" ExcludeId="Company?.Id" Use="UseExisting" />
-            @if (usePartyId is not null)
-            {
-                <p class="alert alert-info mt-2">Mevcut ortak firma kaydı kullanılacak: yeni taraf açılmaz, kaydettiğinizde bu firma için CRM kaydı oluşur. Boş bıraktığınız ortak alanlar kayıttaki değeri silmez.
-                    <button type="button" class="btn btn-link btn-sm" @onclick="() => usePartyId = null">Vazgeç</button></p>
-            }
-        </div>
-        <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
-    </div>
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
-        @if (Company is not null)
-        {
-            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
-        }
     </div>
 </form>
 
@@ -148,6 +219,16 @@
 
     private CompanyDto? source;
     private bool initialized;
+
+    /// <summary>Özet kartındaki baş harfler (en çok iki kelime).</summary>
+    private string Initials
+    {
+        get
+        {
+            string[] words = (form.Name ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return words.Length == 0 ? "F" : string.Concat(words.Take(2).Select(w => char.ToUpper(w[0], System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))));
+        }
+    }
 
     /// <summary>Form yalnızca başka bir firma verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
     protected override void OnParametersSet()
