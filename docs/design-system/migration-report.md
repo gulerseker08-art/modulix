@@ -134,3 +134,20 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | Sekme davranışı | Var | İlk seçilişte yüklenir, sonra gizli kalır (kaydedilmemiş değişiklik kaybolmaz); sayı rozetleri |
 | Aktivite / fırsat ekleme | Var | Firma sayfasında sağdan açılan panelde |
 | Referanstaki "Finansal Durum & Cari" sekmesi | Yok | Kredi limiti, cari bakiye, e-fatura durumu gibi alanlar veri modelinde yok; gerekiyorsa özel alan (metadata) ya da ayrı bir finans modülü işi |
+
+## Gerçek tarayıcıda ekran testi (31.10.2026)
+
+GitHub Actions üzerinde gerçek ortamda çalıştırıldı: SQL Server + migration + örnek veri (`seed`), uygulama HTTPS'te, Chromium (Playwright) ile 1440px ve 390px. Betik ve geçici iş akışı `e2e/ekran-testi` dalındadır (main'e birleştirilmez); ekran görüntüleri ve ayrıntılı tablo o daldaki `ekran-testi-sonuc/` klasöründe.
+
+**Sonuç: 41/41 kontrol geçti** (giriş, kabuk, Aktiviteler, Fırsat, Firma, Kişi, koyu tema, mobil, Blazor hata çubuğu).
+
+Test sırasında bulunup bu dalda düzeltilenler:
+
+| Bulgu | Neden | Düzeltme |
+|---|---|---|
+| Aktivite detayında tür ham anahtar ("Meeting"), sorumlu "—"; aktivite durumu aileye göre değil genel adla | `CrmLookups` geçici (transient) kayıtlı; `ActivityActions` kendisi enjekte edince boş örnek alıyordu (tasarım fazlarından önce de vardı) | Sayfanın yüklediği örnek parametreyle verilir |
+| Lead raporunda kaynak, diskalifiye nedeni ve sorumlu adları ham anahtar | Aynı neden (`LeadReportPanel`) | Aynı düzeltme |
+| Aktiviteler süzgeç satırında her alan tam genişlikte, alt alta | Bootstrap `form-control` genişliği | `.filters` içindeki alanlar yan yana |
+| Telefonda haftalık çizelgede bugün ekran dışında | 7 sütun 390px'e sığmaz | Telefonda varsayılan görünüm Gün |
+
+Kalan gözlem: telefonda Fırsat sayfasının sağ paneli (aktivite zaman çizelgesi, finansal özet) en alta, değişiklik geçmişinin altına düşüyor; hata değil, sıralama iyileştirmesi olarak sonraki işe bırakıldı. `QuoteSharingPanel` ve `RelatedLeads` da `CrmLookups` enjekte ediyor ama kullanmıyor (zararsız).
