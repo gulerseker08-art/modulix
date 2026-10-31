@@ -226,11 +226,11 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         Assert.Equal(EventDeliveryStatus.Succeeded, Assert.Single(await DeliveriesAsync(company.Id, EventTestModule.Recorder)).Status);
         Assert.Equal(1, await EmailCountAsync(actor.TenantId));
 
-        // Dead-letter bir daha denenmez; loglarda kayıt değeri yok.
+        // Dead-letter bir daha denenmez; loglarda kayıt değeri yok (sayı değil ad aranır: GUID metinlerinde rastgele geçebilir).
         time.Advance(TimeSpan.FromDays(1));
         await DrainAsync();
         Assert.Equal(EventDispatcher.MaxAttempts, EventProbe.CallsOf(EventTestModule.Unordered, company.Id).Count);
-        Assert.DoesNotContain(logs.Messages, m => m.Contains("7391", StringComparison.Ordinal));
+        Assert.DoesNotContain(logs.Messages, m => m.Contains("Gizli Firma Adı", StringComparison.Ordinal));
         Assert.Contains(logs.Messages, m => m.Contains(company.Id.ToString(), StringComparison.Ordinal));
     }
 
