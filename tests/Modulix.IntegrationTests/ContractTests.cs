@@ -15,7 +15,7 @@ using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0021 ilk dilim: sözleşme başlığı, taraf ve kalem CRUD'u; sunucu toplamı ve son bildirim tarihi; tarih/ilişki doğrulamaları;
+/// ADR-0022 ilk dilim: sözleşme başlığı, taraf ve kalem CRUD'u; sunucu toplamı ve son bildirim tarihi; tarih/ilişki doğrulamaları;
 /// tenant izolasyonu; izin (yazma, finansal alan) ve veri kapsamı.
 /// </summary>
 public class ContractTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>

@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 
 namespace Modulix.Modules.Contracts.Lifecycle;
 
-// Saf kurallar (ADR-0021): veritabanı ve HTTP bilmez; birim testleriyle doğrulanır. Durum anahtarları API'de ve arayüzde aynen kullanılır.
+// Saf kurallar (ADR-0022): veritabanı ve HTTP bilmez; birim testleriyle doğrulanır. Durum anahtarları API'de ve arayüzde aynen kullanılır.
 
 /// <summary>Belge hazırlığı durumu.</summary>
 public static class PreparationStatus

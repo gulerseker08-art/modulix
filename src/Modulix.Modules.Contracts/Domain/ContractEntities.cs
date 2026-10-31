@@ -2,7 +2,7 @@ using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Modules.Contracts.Domain;
 
-// Sözleşme modülü entity'leri (ADR-0021). Alanlar kayıt depolarından (Records) doğrulanarak yazılır; uzunluk sınırları hem
+// Sözleşme modülü entity'leri (ADR-0022). Alanlar kayıt depolarından (Records) doğrulanarak yazılır; uzunluk sınırları hem
 // doğrulamada hem veritabanı kolonlarında aynı sabitlerden gelir. Müşteri ve kişiler ortak kayıttır (core.party / core.person).
 
 /// <summary>Tüm sözleşme kayıtlarının ortak alanları. TenantId kaydederken aktif tenant'tan atanır.</summary>

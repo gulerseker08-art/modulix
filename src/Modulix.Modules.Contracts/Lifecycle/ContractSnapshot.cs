@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace Modulix.Modules.Contracts.Lifecycle;
 
-// Dondurulmuş sürüm anlık görüntüsü (ADR-0021, dilim 2): onaya/imzaya giden içerik değişmez JSON olarak saklanır ve SHA-256 özeti
+// Dondurulmuş sürüm anlık görüntüsü (ADR-0022, dilim 2): onaya/imzaya giden içerik değişmez JSON olarak saklanır ve SHA-256 özeti
 // alınır. Onay ve imza bu özete bağlıdır; başlık ya da kalem sonradan değişse de sürüm aynı kalır. Karşılaştırma iki anlık görüntü
 // arasındaki alan, kalem ve taraf farklarını verir.
 

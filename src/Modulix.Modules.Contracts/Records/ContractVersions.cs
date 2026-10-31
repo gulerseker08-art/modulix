@@ -5,7 +5,7 @@ using Modulix.Modules.Contracts.Lifecycle;
 namespace Modulix.Modules.Contracts.Records;
 
 /// <summary>
-/// Sürüm dondurma ve sürüm durumu yazımı; iş akışı kapısının etkisi olarak sözleşme geçişiyle aynı işlemde çalışır (ADR-0021, dilim 2).
+/// Sürüm dondurma ve sürüm durumu yazımı; iş akışı kapısının etkisi olarak sözleşme geçişiyle aynı işlemde çalışır (ADR-0022, dilim 2).
 /// Anlık görüntü başlık, taraf ve kalemlerden kurulur; aynı sürüm numarası için zaten dondurulmuş içerik varsa yeniden dondurulmaz.
 /// </summary>
 internal static class ContractVersions

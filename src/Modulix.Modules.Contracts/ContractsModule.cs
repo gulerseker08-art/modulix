@@ -9,7 +9,7 @@ using Modulix.Modules.Contracts.Records;
 namespace Modulix.Modules.Contracts;
 
 /// <summary>
-/// Sözleşme yönetimi (EPIC 7, ADR-0021): şablon, sürüm, onay, imza, taahhüt ve yenileme. Sektörden bağımsızdır; müşteri ve kişiler
+/// Sözleşme yönetimi (EPIC 7, ADR-0022): şablon, sürüm, onay, imza, taahhüt ve yenileme. Sektörden bağımsızdır; müşteri ve kişiler
 /// ortak kayıttır (ADR-0006), CRM tablolarına bağlanmaz. Yalnızca <c>Modulix.Core.Contracts</c>'a başvurur.
 /// </summary>
 public sealed class ContractsModule : IModule
@@ -24,7 +24,7 @@ public sealed class ContractsModule : IModule
         /// <summary>Sözleşme bedeli, kalem fiyatları ve toplamlar (Y8b, hassas alan). Olmayan kişi sözleşmeyi görür, tutarları görmez ve yazamaz.</summary>
         public const string FinancialsRead = "contracts.financials.read";
 
-        /// <summary>İç onay bekleyen sözleşmeyi onaylar ya da reddeder (ADR-0021, dilim 2). Yazma izninden ayrıdır.</summary>
+        /// <summary>İç onay bekleyen sözleşmeyi onaylar ya da reddeder (ADR-0022, dilim 2). Yazma izninden ayrıdır.</summary>
         public const string ContractsApprove = "contracts.contracts.approve";
     }
 

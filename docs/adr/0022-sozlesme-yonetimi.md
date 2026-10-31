@@ -1,4 +1,4 @@
-# ADR-0021: Sözleşme yönetimi (EPIC 7) — analiz ve ilk dilim
+# ADR-0022: Sözleşme yönetimi (EPIC 7) — analiz ve ilk dilim
 
 Durum: Kısmen uygulandı (ilk dilim: modül iskeleti, veri modeli, kayıt depoları, temel ekranlar). Tarih: 2026-10-31.
 

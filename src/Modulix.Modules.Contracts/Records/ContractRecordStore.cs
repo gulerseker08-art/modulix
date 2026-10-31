@@ -8,7 +8,7 @@ using Modulix.Modules.Contracts.Lifecycle;
 namespace Modulix.Modules.Contracts.Records;
 
 /// <summary>
-/// Sözleşme başlığı kayıt deposu (ADR-0021). Durum, sürüm ve toplam alanları sistem alanıdır: genel uçlardan yazılamaz, yalnızca iş
+/// Sözleşme başlığı kayıt deposu (ADR-0022). Durum, sürüm ve toplam alanları sistem alanıdır: genel uçlardan yazılamaz, yalnızca iş
 /// akışı kapısı açıkken yazılır. İçerik yalnızca taslakta ve imzaya gitmemişken düzenlenir (<see cref="ContractRules.CanEditContent"/>).
 /// Müşteri ve kişi ortak kayıttır; kişi seçildiyse müşteri tarafına bağlı olmalıdır. Son bildirim tarihi sunucuda hesaplanır.
 /// </summary>

@@ -1,7 +1,7 @@
 namespace Modulix.Modules.Contracts.Lifecycle;
 
 /// <summary>
-/// Sözleşme süresi aritmetiği (ADR-0021, dilim 2). Tarihler tenant takviminde gündür (<see cref="DateOnly"/>); başlangıç ve bitiş günü
+/// Sözleşme süresi aritmetiği (ADR-0022, dilim 2). Tarihler tenant takviminde gündür (<see cref="DateOnly"/>); başlangıç ve bitiş günü
 /// sözleşmeye dahildir. "On iki ay" sabit 365 gün değildir: dönem, başlangıçtan N ay sonraki günün bir öncesinde biter. Başlangıcın gün
 /// numarası hedef ayda yoksa (31 → 30 günlük ay, 29 Şubat → artık olmayan yıl) hedef bir sonraki ayın ilk gününe kayar; bu sayede
 /// 1 Mart'ta başlayan on iki aylık dönem artık yılda 29 Şubat'ta, 29 Şubat 2024'te başlayan dönem 28 Şubat 2025'te biter.

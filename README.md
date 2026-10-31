@@ -502,7 +502,7 @@ Fırsat; numara (`OP-20261029-AB12CD`, tenant içinde benzersiz), durum (`Open`,
 
 **Henüz yok:** çoklu pipeline, teklif entegrasyonu, sipariş/sözleşme devri, tahmin anlık görüntüsü, zamanlanmış bildirimler, toplu işlemler (ayrıntı ADR-0017'de).
 
-## Sözleşme modülü ([ADR-0021](docs/adr/0021-sozlesme-yonetimi.md)) — ilk dilim
+## Sözleşme modülü ([ADR-0022](docs/adr/0022-sozlesme-yonetimi.md)) — ilk dilim
 
 Modül anahtarı `contracts`, şema `contracts`; sektörden bağımsızdır ve CRM tablolarına bağlanmaz. Müşteri ve ilgili kişi **ortak kayıttır** (`core.party`, `core.person`; ADR-0006), böylece CRM kapalıyken de sözleşme açılır. Tek veritabanında, RLS'li dört tablo: `Contracts`, `ContractParties`, `ContractLines`, `ContractEvents` (migration `ContractManagement`).
 
@@ -516,7 +516,7 @@ Uç noktalar (kayıt boru hattı; başka tenant'ın kaydı 404): `/api/contracts
 - **Ekranlar:** `Sözleşmeler` (`/sozlesmeler`: hızlı görünümler "Sözleşmelerim", "İmza bekleyen", "Bitişi yaklaşan (90 gün)", "Bildirim süresi yaklaşan (30 gün)"; yürürlük ve tür süzgeci; kritik tarih sütunu), sözleşme sayfası (`/sozlesmeler/yeni`, `/sozlesmeler/{id}`: genel bilgiler, taraflar ve kişiler, kapsam ve kalemler, tarihçe + işlem geçmişi sekmeleri; kaydedilmemiş değişiklik uyarısı; 409'da yenileme uyarısı).
 - **Durum geçişleri (dilim 2):** yalnızca eylem uç noktaları `POST /api/contracts/contracts/{id}/send-to-review | mark-ready | reopen-draft | submit-for-approval | withdraw-approval | approve | reject-approval | cancel | revise` (gövde `version` zorunlu, `reason` ret/iptal/revizyonda zorunlu; çakışmada 409); `GET .../actions` yetkili eylemleri ve yapılamayanların nedenini verir. Yayıma hazır için müşteri, başlangıç ve bitiş (ya da belirsiz süreli) gerekir; onay yalnızca yayıma hazır içerikte; onay beklerken taslağa dönülmez; imzalı/yürürlükteki içerik taslağa dönmez, `revise` yeni sürüm açar. Onaylama ayrı izindir (`contracts.contracts.approve`); onaya gönderen kendi gönderdiğini onaylayamaz (ayar `contracts.approval.allow-self`, varsayılan hayır).
 - **Sürümler:** onaya gönderimde içerik (başlık, taraflar, kalemler) `ContractVersions`'a JSON + SHA-256 ile dondurulur; onay/ret sürüme yazılır; onaylı/reddedilmiş içeriği düzenlemek için taslağa dönülünce eski sürüm `Superseded` olur ve sürüm numarası artar. `GET .../versions`, `.../versions/{no}` (finansal izni olmayana tutarlar maskeli), `.../versions/{no}/compare?with={no}` (`with=0` güncel taslak). **Süre aritmetiği** (`ContractPeriod`): on iki ay takvim ayıyla hesaplanır, ay sonu taşması bir sonraki ayın ilk gününe kayar (1 Mart + 12 ay → 29 Şubat artık yılda), bugün tenant saat dilimiyle bulunur.
-- **Henüz yok (sonraki dilimler):** imzaya gönderme ve yürürlüğe alma eylemleri, tekliften sözleşme oluşturma, şablon ve PDF, iç onay, imza, taahhüt, yenileme/fesih işi, ek protokol, dashboard, dışa aktarma, kayıtlı görünümler. Ayrıntı ve dilim planı ADR-0021'de.
+- **Henüz yok (sonraki dilimler):** imzaya gönderme ve yürürlüğe alma eylemleri, tekliften sözleşme oluşturma, şablon ve PDF, iç onay, imza, taahhüt, yenileme/fesih işi, ek protokol, dashboard, dışa aktarma, kayıtlı görünümler. Ayrıntı ve dilim planı ADR-0022'de.
 
 ## E-posta
 

@@ -28,7 +28,7 @@ public sealed record ContractState(
     bool HasParty = true);
 
 /// <summary>
-/// Durum geçişi ön koşulları (ADR-0021, dilim 2). Her eylem için tetikleyici kullanıcıdır; yetki iş akışı servisinde, ön koşul burada,
+/// Durum geçişi ön koşulları (ADR-0022, dilim 2). Her eylem için tetikleyici kullanıcıdır; yetki iş akışı servisinde, ön koşul burada,
 /// yan etkiler (sürüm dondurma, tarihçe) serviste tanımlıdır. Kurallar API seviyesinde uygulanır; arayüz yalnızca aynı sonucu gösterir.
 /// </summary>
 public static class ContractTransitions

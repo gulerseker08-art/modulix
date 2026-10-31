@@ -29,7 +29,7 @@ public interface IContractPolicyProvider
 }
 
 /// <summary>
-/// Sözleşme iş akışı (ADR-0021, dilim 2). Tek yazma yolu: iş akışı kapısı eylemin izniyle açılır ve kayıt boru hattı üzerinden güncelleme
+/// Sözleşme iş akışı (ADR-0022, dilim 2). Tek yazma yolu: iş akışı kapısı eylemin izniyle açılır ve kayıt boru hattı üzerinden güncelleme
 /// yapılır; kapsam, hassas alan, audit, olay ve sürüm denetimi (409) depoda uygulanır. Her eylem kaydın sürümünü ister. Ön koşullar
 /// <see cref="ContractTransitions"/> ile arayüzle ortaktır. Sürüm dondurma geçişle aynı işlemde yapılır (kapı etkisi).
 /// </summary>

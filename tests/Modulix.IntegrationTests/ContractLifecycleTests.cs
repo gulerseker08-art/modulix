@@ -15,7 +15,7 @@ using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0021 dilim 2: durum geçişleri, sürüm dondurma, onay ve karşılaştırma. Mutlu yol (inceleme → hazır → onay → onaylandı), doğrulama
+/// ADR-0022 dilim 2: durum geçişleri, sürüm dondurma, onay ve karşılaştırma. Mutlu yol (inceleme → hazır → onay → onaylandı), doğrulama
 /// (eksik tarih, gerekçe, eşzamanlılık), tenant izolasyonu (eylem ve sürüm uçları) ve yetki (onay izni, kendi onayı, finansal maske).
 /// </summary>
 public class ContractLifecycleTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>

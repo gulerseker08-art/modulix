@@ -11,7 +11,7 @@ using Modulix.Shared.Contracts;
 namespace Modulix.Api.Contracts;
 
 /// <summary>
-/// Sözleşme uç noktaları (/api/contracts/...; ADR-0021). Başlık, taraf ve kalem CRUD'u kayıt boru hattından geçer; durum, sürüm ve
+/// Sözleşme uç noktaları (/api/contracts/...; ADR-0022). Başlık, taraf ve kalem CRUD'u kayıt boru hattından geçer; durum, sürüm ve
 /// toplam alanları genel uçlardan yazılamaz. Durum geçişleri ayrı eylem uç noktalarıdır (<c>POST .../contracts/{id}/{eylem}</c>) ve tek
 /// kural kümesini (<see cref="IContractWorkflow"/>) kullanır. Eylem izinleri serviste, kayıt bulunduktan SONRA denetlenir: kapsam dışı kayıt
 /// 404, izinsiz eylem 403 alır. Eylemler kayıt sürümünü ister (eşzamanlı çakışmada yalnızca biri kazanır, diğeri 409 alır).

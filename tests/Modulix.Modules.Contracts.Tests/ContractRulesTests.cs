@@ -2,7 +2,7 @@ using Modulix.Modules.Contracts.Lifecycle;
 
 namespace Modulix.Modules.Contracts.Tests;
 
-/// <summary>ADR-0021 saf kurallar: tarih tutarlılığı, bildirim tarihi, içerik düzenleme ve silme kapıları, numara biçimi.</summary>
+/// <summary>ADR-0022 saf kurallar: tarih tutarlılığı, bildirim tarihi, içerik düzenleme ve silme kapıları, numara biçimi.</summary>
 public class ContractRulesTests
 {
     [Fact]

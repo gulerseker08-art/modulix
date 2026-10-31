@@ -2,7 +2,7 @@ using Modulix.Modules.Contracts.Lifecycle;
 
 namespace Modulix.Modules.Contracts.Tests;
 
-/// <summary>ADR-0021 dilim 2: dönem aritmetiği (ay sonu, artık yıl, tenant günü), tarih değerlendirmesi, geçiş ön koşulları, anlık görüntü özeti ve farkı.</summary>
+/// <summary>ADR-0022 dilim 2: dönem aritmetiği (ay sonu, artık yıl, tenant günü), tarih değerlendirmesi, geçiş ön koşulları, anlık görüntü özeti ve farkı.</summary>
 public class ContractLifecycleRulesTests
 {
     [Theory]
