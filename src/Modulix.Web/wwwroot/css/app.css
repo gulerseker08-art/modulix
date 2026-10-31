@@ -961,6 +961,26 @@ tr.done td.primary {
     margin-bottom: 0.75rem;
 }
 
+    /* Süzgeç satırındaki alanlar yan yana durur (Bootstrap'ın tam genişliği yerine); dar ekranda alt satıra kayar. */
+    .filters > .form-control,
+    .filters > .form-select {
+        flex: 1 1 11rem;
+        width: auto;
+        max-width: 18rem;
+    }
+
+    .filters > input[type="search"].form-control {
+        flex-basis: 14rem;
+        max-width: 22rem;
+    }
+
+@media (max-width: 575.98px) {
+    .filters > .form-control,
+    .filters > .form-select {
+        max-width: none;
+    }
+}
+
 .segmented {
     display: inline-flex;
     gap: 0.25rem;
