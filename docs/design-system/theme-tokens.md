@@ -4,31 +4,33 @@ Kaynak: `src/Modulix.Web/wwwroot/css/app.css` başındaki `:root, [data-theme="l
 
 ## Marka renkleri
 
+Modulix varsayılan paleti **lacivert / indigo / turkuaz / lila / krem**'dir (yol haritası K6 ve Ç15a.1). Logo işareti (`modulix-mark.svg`) aynı paleti taşır.
+
 | Token | Açık | Koyu | Kullanım |
 |---|---|---|---|
-| `--mx-brand-navy` | `#101D35` | — | Ana marka rengi, logo yazısı, aktif modül başlığı |
-| `--mx-brand-navy-light` | `#173B68` | — | Menü vurgusu, avatar |
-| `--mx-brand-primary` | `#087DB8` | `#3AA6DE` | Birincil buton, bağlantı, odak, aktif sekme |
-| `--mx-brand-primary-hover` | `#066A9C` | `#63BAE6` | Hover/active |
-| `--mx-brand-teal` | `#00C2C7` | `#2DD4D8` | Koyu zeminde marka vurgusu (aktif modül ikonu) |
-| `--mx-brand-teal-dark` | `#008F98` | `#2DC3C9` | Açık zeminde erişilebilir turkuaz (logo "x") |
+| `--mx-brand-navy` | `#111827` | — | Lacivert: logo yazısı, aktif modül başlığı |
+| `--mx-brand-navy-light` | `#1F2937` | — | Aktif modül başlığı gradyanı, avatar |
+| `--mx-brand-primary` | `#4F46E5` | `#818CF8` | İndigo: birincil buton, bağlantı, odak, aktif sekme |
+| `--mx-brand-primary-hover` | `#4338CA` | `#A5B4FC` | Hover/active |
+| `--mx-brand-teal` | `#10B981` | `#34D399` | Koyu zeminde marka vurgusu (aktif modül ikonu) |
+| `--mx-brand-teal-dark` | `#0F8F7F` | `#2DD4BF` | Açık zeminde erişilebilir turkuaz (logo "x", büyük metin 4.0:1) |
 
 ## Yüzey ve metin
 
 | Token | Açık | Koyu |
 |---|---|---|
-| `--mx-background` | `#F5F8FC` | `#0B1424` |
-| `--mx-surface` | `#FFFFFF` | `#111D33` |
-| `--mx-surface-muted` | `#EEF5FA` | `#17284A` |
-| `--mx-surface-hover` | `#F3F7FB` | `#15243F` |
-| `--mx-border` | `#DCE5F0` | `#233657` |
-| `--mx-border-strong` | `#B8C6D8` | `#36507A` |
-| `--mx-text-primary` | `#101D35` | `#E6EDF7` |
-| `--mx-text-secondary` | `#5F6E84`* | `#9AABC3` |
-| `--mx-text-label` | `#334155` | `#C3CFE0` |
-| `--mx-text-on-brand` | `#FFFFFF` | `#06121F` |
+| `--mx-background` | `#F4F6FB` (krem) | `#0B0F1F` |
+| `--mx-surface` | `#FFFFFF` | `#131730` |
+| `--mx-surface-muted` | `#EEF0FF` (lila) | `#1A1F3D` |
+| `--mx-surface-hover` | `#F1F3FB` | `#181D38` |
+| `--mx-border` | `#E8EBF3` | `#272D50` |
+| `--mx-border-strong` | `#C5CBE0` | `#3D4573` |
+| `--mx-text-primary` | `#111827` | `#E5E7F3` |
+| `--mx-text-secondary` | `#5F6B7E`* | `#9CA3C0` |
+| `--mx-text-label` | `#374151` | `#C5C9E0` |
+| `--mx-text-on-brand` | `#FFFFFF` | `#0B0F1F` |
 
-\* Referans değer `#64748B`, sayfa zemininde 4.47:1 kontrast verdiği için WCAG AA'yı (4.5:1) sağlayan en yakın ton `#5F6E84` seçildi.
+\* Eski değer `#6B7280`, krem zeminde 4.47:1 kontrast verdiği için WCAG AA'yı (4.5:1) sağlayan en yakın ton `#5F6B7E` seçildi (krem zeminde 5.0:1, lila zeminde 4.8:1).
 
 ## Durum renkleri (semantik, marka renklerinden ayrı)
 
@@ -39,7 +41,7 @@ Bu doygun renkler küçük metinde kullanılmaz. Rozet ve uyarılarda açık zem
 | Ton | Zemin / metin (açık) | Kontrast |
 |---|---|---|
 | `--mx-tone-neutral-*` | `#EEF2F7` / `#475569` | 6.7:1 |
-| `--mx-tone-brand-*` | `#E3F1F9` / `#075E8A` | 6.1:1 |
+| `--mx-tone-brand-*` | `#EEF0FF` / `#3730A3` | 8.8:1 |
 | `--mx-tone-info-*` | `#E0F2FE` / `#075985` | AA |
 | `--mx-tone-success-*` | `#D1FAE5` / `#065F46` | 6.8:1 |
 | `--mx-tone-warning-*` | `#FEF3C7` / `#92400E` | 6.4:1 |
@@ -53,7 +55,7 @@ Koyu temada her ton koyu zemin + açık metin olarak yeniden tanımlıdır (en d
 
 ## Tipografi
 
-Yazı tipi **Inter** (Google Fonts, `latin-ext` alt kümesi Türkçe karakterleri içerir; OFL lisanslı). Yüklenemezse Segoe UI / system-ui'ye düşer.
+Yazı tipi **Public Sans** (Google Fonts, `latin-ext` alt kümesi Türkçe karakterleri içerir; OFL lisanslı). Yüklenemezse Segoe UI / system-ui'ye düşer.
 
 | Token | Değer | Kullanım |
 |---|---|---|
@@ -76,7 +78,7 @@ Yazı tipi **Inter** (Google Fonts, `latin-ext` alt kümesi Türkçe karakterler
 
 ## Grafik serileri
 
-`--chart-c0` … `--chart-c5`: birincil mavi, turkuaz, amber, lacivert, kırmızı, gri. Koyu temada açık tonları tanımlıdır.
+`--chart-c0` … `--chart-c5`: indigo, turkuaz, amber, lacivert, kırmızı, gri. Koyu temada açık tonları tanımlıdır.
 
 ## Geriye uyumluluk
 

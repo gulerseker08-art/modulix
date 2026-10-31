@@ -67,6 +67,7 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 - Değişiklikler yalnızca `Modulix.Web` arayüz katmanındadır; API, iş kuralları, veritabanı, yetki ve tenant süzgeçleri değişmedi. Arayüz için otomatik bileşen testi (bUnit) altyapısı yoktur; kabuk davranışı statik önizlemeyle kontrol edildi, gerçek tarayıcıda elle denenmelidir.
 - **Görsel kontrol**: gerçek CSS dosyalarıyla statik önizleme Playwright/Chromium'da açık, koyu, daraltılmış menü ve 390px mobil olarak çekildi.
 - **Kontrast**: 21 renk çifti hesaplandı. Referanstaki `#64748B` sayfa zemininde 4.47:1 ve aktif menü metni 4.12:1 çıktı; ikisi düzeltildi, şimdi hepsi ≥ 4.5:1 (logo "x" büyük metin, 3.9:1).
+- **Palet düzeltmesi (31.10.2026)**: Faz 1'in referans tasarımdan aldığı lacivert/mavi palet, ürün kararı olan Modulix varsayılanıyla (lacivert / indigo / turkuaz / lila / krem; yol haritası K6, Ç15a.1) değiştirildi; yazı tipi Public Sans'a döndü. Yalnızca token değerleri ve `index.html` değişti; bileşenler ve düzenler aynı. Açık/koyu temada bütün metin çiftleri yeniden hesaplandı, hepsi AA (logo "x" büyük metin 4.0:1). Güncel değerler `theme-tokens.md`'de. Bu klasördeki `onizleme-*.png` görüntüleri önceki paletle alınmıştır; düzenler aynıdır, yalnızca renkler farklıdır.
 
 ## 5. Bilinçli olarak değiştirilmeyenler
 

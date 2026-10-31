@@ -5,7 +5,7 @@ Her yeni ya da değişen ekran için açık ve koyu temada, **1440px**, **1024px
 ## Kabuk
 - [ ] Logo "Modulix" (M büyük, `ü` yok, turkuaz x); daraltılmış menüde yalnızca işaret.
 - [ ] Sol menüde doğru öğe aktif; sayfa yenilenince ve doğrudan bağlantıyla açılınca da.
-- [ ] Aktif öğede sol vurgu çizgisi ve açık mavi zemin.
+- [ ] Aktif öğede sol vurgu çizgisi ve lila zemin, indigo metin.
 - [ ] Menüyü Daralt çalışıyor, tercih yenilemeden sonra korunuyor; ikonlarda `title` ipucu var.
 - [ ] Üst çubuk: tema düğmesi, avatar + ad + kuruluş, profil menüsü (Escape ve dışarı tıklama kapatır).
 - [ ] Tab ile ilk odak "İçeriğe geç"; odak halkası her etkileşimli öğede görünür.
