@@ -35,6 +35,7 @@ dotnet run --project src/Modulix.Api -- tenant-delete <slug> --confirm <slug>  #
 - Uç noktalar `.RequirePermission(...)` / `.RequireModule(...)` ile korunur. Yeni yönetim işlemleri denetim kaydına yazılmalı.
 - E-posta `IEmailQueue.Enqueue` ile kuyruğa yazılır; HTML'e giren kullanıcı girdisi `WebUtility.HtmlEncode` ile kodlanır.
 - Yeni sektör modülü için CRM'i örnek al (`src/Modulix.Modules.Crm`: `Domain`, `Persistence`, `Records`).
+- Kayıt formlarının düzeni metadata'dan gelir (ADR-0021): modül `IModule.Forms` ile varsayılan sekme/bölüm/alan yerleşimini tanımlar, firma Form tasarımı ekranından özelleştirir, editör `LayoutForm` ile çizer. Yeni formda alan yerleşimini Razor'a sabit yazma; tanıma alan ekle ve editörde o anahtar için girdiyi ver.
 
 ## Proje kuralları (ürün ve ekip kararları)
 

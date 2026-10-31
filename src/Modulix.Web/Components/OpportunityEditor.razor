@@ -1,8 +1,9 @@
 @* Fırsat ekleme/düzenleme formu; Fırsatlar sayfası, fırsat detayı ve firma detay sayfası (çekmecede) kullanır.
-   Düzen (referans fırsat ekranı): ikon başlıklı bölüm kartları — Temel bilgiler, Tutar ve zamanlama, Detaylar (ihtiyaç analizi),
-   Açıklama ve notlar. Alanlar ve kaydetme davranışı değişmedi; aşama yalnızca aşama eylemleriyle değişir. *@
+   Alanlar firmanın form düzenine (ADR-0021) göre bölüm kartlarına ve sekmelere yerleşir; her alanın girdisi burada tanımlıdır.
+   Tutar alanları izne bağlı, firma sabitse (firma detayı) çizilmez. Kaydetme davranışı değişmedi; aşama yalnızca aşama eylemleriyle değişir. *@
 @inject ApiClient Api
 @inject SessionState Session
+@inject FormLayouts Layouts
 
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
     <div class="form-toolbar">
@@ -15,7 +16,7 @@
         </div>
         <div class="form-toolbar-actions">
             <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@busy">
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -29,194 +30,184 @@
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
 
-    <FormSection Title="Temel bilgiler" Icon="target">
-        <div class="form-grid">
-            <div class="span-12">
-                <label class="form-label required" for="title">Fırsat adı</label>
-                <input id="title" class="form-control" maxlength="@CrmLimits.TextMaxLength" required aria-required="true" @bind="form.Title" />
-                <FieldError Field="title" Errors="errors" />
-            </div>
-            @if (FixedCompanyId is null)
+    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Fırsat formu bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
             {
-                <div class="span-6">
-                    <label class="form-label required" for="companyId">Müşteri (firma)</label>
+                case "title":
+                    <label class="@f.LabelClass()" for="title">@f.Label</label>
+                    <input id="title" class="form-control" maxlength="@CrmLimits.TextMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Title" />
+                    <FieldError Field="title" Errors="errors" />
+                    break;
+                case "companyId":
+                    <label class="@f.LabelClass()" for="companyId">@f.Label</label>
                     <LookupPicker Id="companyId" LookupKey="crm.opportunity.company" @bind-Value="form.CompanyId" Required="true" Invalid="@(errors?.ContainsKey("companyId") == true)" />
                     <FieldError Field="companyId" Errors="errors" />
-                </div>
-            }
-            <div class="span-6">
-                <label class="form-label" for="contactId">İlgili kişi</label>
-                <LookupPicker Id="contactId" LookupKey="crm.opportunity.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
-                <FieldError Field="contactId" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="stage">Aşama</label>
-                @if (Opportunity is null)
-                {
-                    <select id="stage" class="form-select" @bind="form.Stage">
-                        @foreach (var stage in Lookups.Choices(CrmLists.OpportunityStage).Where(s => s.Category == CrmLists.StageCategories.Open))
+                    break;
+                case "contactId":
+                    <label class="@f.LabelClass()" for="contactId">@f.Label</label>
+                    <LookupPicker Id="contactId" LookupKey="crm.opportunity.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
+                    <FieldError Field="contactId" Errors="errors" />
+                    break;
+                case "stage":
+                    <label class="@f.LabelClass()" for="stage">@f.Label</label>
+                    @if (Opportunity is null)
+                    {
+                        <select id="stage" class="form-select" @bind="form.Stage">
+                            @foreach (var stage in Lookups.Choices(CrmLists.OpportunityStage).Where(s => s.Category == CrmLists.StageCategories.Open))
+                            {
+                                <option value="@stage.Key">@stage.Label</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        // Aşama yalnızca aşama değiştirme / kapatma eylemleriyle değişir (panodaki taşıma ya da fırsat sayfası).
+                        <input id="stage" class="form-control" readonly value="@Lookups.Label(CrmLists.OpportunityStage, form.Stage)" />
+                    }
+                    <FieldError Field="stage" Errors="errors" />
+                    break;
+                case "priority":
+                    <label class="@f.LabelClass()" for="priority">@f.Label</label>
+                    <select id="priority" class="form-select" @bind="form.Priority">
+                        @foreach (var priority in LeadPriority.All)
                         {
-                            <option value="@stage.Key">@stage.Label</option>
+                            <option value="@priority">@LeadPriority.Label(priority)</option>
                         }
                     </select>
-                }
-                else
-                {
-                    // Aşama yalnızca aşama değiştirme / kapatma eylemleriyle değişir (panodaki taşıma ya da fırsat sayfası).
-                    <input id="stage" class="form-control" readonly value="@Lookups.Label(CrmLists.OpportunityStage, form.Stage)" />
-                }
-                <FieldError Field="stage" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="priority">Öncelik</label>
-                <select id="priority" class="form-select" @bind="form.Priority">
-                    @foreach (var priority in LeadPriority.All)
-                    {
-                        <option value="@priority">@LeadPriority.Label(priority)</option>
-                    }
-                </select>
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="type">Fırsat tipi</label>
-                <select id="type" class="form-select" @bind="form.Type">
-                    <option value="">—</option>
-                    @foreach (var type in Lookups.Choices(CrmLists.OpportunityType, form.Type))
-                    {
-                        <option value="@type.Key">@type.Label</option>
-                    }
-                </select>
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="source">Kaynak</label>
-                <select id="source" class="form-select" @bind="form.Source">
-                    <option value="">—</option>
-                    @foreach (var source in Lookups.Choices(CrmLeadLists.Source, form.Source))
-                    {
-                        <option value="@source.Key">@source.Label</option>
-                    }
-                </select>
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="ownerId">Satış sorumlusu</label>
-                <LookupPicker Id="ownerId" LookupKey="crm.opportunity.owner" @bind-Value="form.OwnerId" Placeholder="@(Opportunity is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
-                <FieldError Field="ownerId" Errors="errors" />
-            </div>
-        </div>
-    </FormSection>
-
-    <FormSection Title="Tutar ve zamanlama" Icon="coins">
-        <div class="form-grid">
-            @* Tutar ve olasılık hassas alandır (Y8b): izni olmayan görmez; boş gönderilir, sunucu kayıttaki değeri korur. *@
-            @if (Session.Can(CrmAccess.OpportunityAmountsRead))
-            {
-                <div class="span-4">
-                    <label class="form-label" for="amount">Tahmini tutar</label>
-                    <input id="amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.Amount" />
+                    break;
+                case "type":
+                    <label class="@f.LabelClass()" for="type">@f.Label</label>
+                    <select id="type" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Type">
+                        <option value="">—</option>
+                        @foreach (var type in Lookups.Choices(CrmLists.OpportunityType, form.Type))
+                        {
+                            <option value="@type.Key">@type.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="type" Errors="errors" />
+                    break;
+                case "source":
+                    <label class="@f.LabelClass()" for="source">@f.Label</label>
+                    <select id="source" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Source">
+                        <option value="">—</option>
+                        @foreach (var source in Lookups.Choices(CrmLeadLists.Source, form.Source))
+                        {
+                            <option value="@source.Key">@source.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="source" Errors="errors" />
+                    break;
+                case "ownerId":
+                    <label class="@f.LabelClass()" for="ownerId">@f.Label</label>
+                    <LookupPicker Id="ownerId" LookupKey="crm.opportunity.owner" @bind-Value="form.OwnerId" Required="f.Required" Placeholder="@(Opportunity is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
+                    <FieldError Field="ownerId" Errors="errors" />
+                    break;
+                case "amount":
+                    <label class="@f.LabelClass()" for="amount">@f.Label</label>
+                    <input id="amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Amount" />
                     <FieldError Field="amount" Errors="errors" />
-                </div>
-                <div class="span-4">
-                    <label class="form-label" for="probability">Olasılık (%)</label>
-                    <input id="probability" class="form-control" type="number" min="0" max="100" step="5" inputmode="numeric" @bind="form.Probability" />
+                    break;
+                case "probability":
+                    <label class="@f.LabelClass()" for="probability">@f.Label</label>
+                    <input id="probability" class="form-control" type="number" min="0" max="100" step="5" inputmode="numeric" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Probability" />
                     <FieldError Field="probability" Errors="errors" />
-                </div>
-            }
-            <div class="span-4">
-                <label class="form-label" for="currency">Para birimi</label>
-                <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
-                <FieldError Field="currency" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="expectedCloseDate">Tahmini kapanış tarihi</label>
-                <input id="expectedCloseDate" class="form-control" type="date" @bind="form.ExpectedCloseDate" />
-                <FieldError Field="expectedCloseDate" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="targetDecisionDate">Hedef karar tarihi</label>
-                <input id="targetDecisionDate" class="form-control" type="date" @bind="form.TargetDecisionDate" />
-                <FieldError Field="targetDecisionDate" Errors="errors" />
-            </div>
-            @if (Session.Can(CrmAccess.OpportunityAmountsRead))
-            {
-                <div class="span-4">
-                    <label class="form-label" for="customerBudget">Müşteri bütçesi</label>
-                    <input id="customerBudget" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.CustomerBudget" />
+                    break;
+                case "currency":
+                    <label class="@f.LabelClass()" for="currency">@f.Label</label>
+                    <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
+                    <FieldError Field="currency" Errors="errors" />
+                    break;
+                case "expectedCloseDate":
+                    <label class="@f.LabelClass()" for="expectedCloseDate">@f.Label</label>
+                    <input id="expectedCloseDate" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ExpectedCloseDate" />
+                    <FieldError Field="expectedCloseDate" Errors="errors" />
+                    break;
+                case "targetDecisionDate":
+                    <label class="@f.LabelClass()" for="targetDecisionDate">@f.Label</label>
+                    <input id="targetDecisionDate" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.TargetDecisionDate" />
+                    <FieldError Field="targetDecisionDate" Errors="errors" />
+                    break;
+                case "customerBudget":
+                    <label class="@f.LabelClass()" for="customerBudget">@f.Label</label>
+                    <input id="customerBudget" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.CustomerBudget" />
                     <FieldError Field="customerBudget" Errors="errors" />
-                </div>
+                    break;
+                case "budgetStatus":
+                    <label class="@f.LabelClass()" for="budgetStatus">@f.Label</label>
+                    <select id="budgetStatus" class="form-select" @bind="form.BudgetStatus">
+                        @foreach (var status in OpportunityBudgetStatus.All)
+                        {
+                            <option value="@status">@OpportunityBudgetStatus.Label(status)</option>
+                        }
+                    </select>
+                    break;
+                case "nextAction":
+                    <label class="@f.LabelClass()" for="nextAction">@f.Label</label>
+                    <input id="nextAction" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NextAction" />
+                    <FieldError Field="nextAction" Errors="errors" />
+                    break;
+                case "nextActionDate":
+                    <label class="@f.LabelClass()" for="nextActionDate">@f.Label</label>
+                    <input id="nextActionDate" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NextActionDate" />
+                    <FieldError Field="nextActionDate" Errors="errors" />
+                    break;
+                case "needDescription":
+                    <label class="@f.LabelClass()" for="needDescription">@f.Label</label>
+                    <textarea id="needDescription" class="form-control" rows="2" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NeedDescription"></textarea>
+                    <FieldError Field="needDescription" Errors="errors" />
+                    break;
+                case "currentProblem":
+                    <label class="@f.LabelClass()" for="currentProblem">@f.Label</label>
+                    <textarea id="currentProblem" class="form-control" rows="2" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.CurrentProblem"></textarea>
+                    <FieldError Field="currentProblem" Errors="errors" />
+                    break;
+                case "expectedBenefit":
+                    <label class="@f.LabelClass()" for="expectedBenefit">@f.Label</label>
+                    <textarea id="expectedBenefit" class="form-control" rows="2" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ExpectedBenefit"></textarea>
+                    <FieldError Field="expectedBenefit" Errors="errors" />
+                    break;
+                case "scope":
+                    <label class="@f.LabelClass()" for="scope">@f.Label</label>
+                    <textarea id="scope" class="form-control" rows="2" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Scope"></textarea>
+                    <FieldError Field="scope" Errors="errors" />
+                    break;
+                case "successCriteria":
+                    <label class="@f.LabelClass()" for="successCriteria">@f.Label</label>
+                    <textarea id="successCriteria" class="form-control" rows="2" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.SuccessCriteria"></textarea>
+                    <FieldError Field="successCriteria" Errors="errors" />
+                    break;
+                case "risks":
+                    <label class="@f.LabelClass()" for="risks">@f.Label</label>
+                    <textarea id="risks" class="form-control" rows="2" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Risks"></textarea>
+                    <FieldError Field="risks" Errors="errors" />
+                    break;
+                case "decisionProcess":
+                    <label class="@f.LabelClass()" for="decisionProcess">@f.Label</label>
+                    <textarea id="decisionProcess" class="form-control" rows="2" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.DecisionProcess"></textarea>
+                    <FieldError Field="decisionProcess" Errors="errors" />
+                    break;
+                case "description":
+                    <label class="@f.LabelClass()" for="description">@f.Label</label>
+                    <textarea id="description" class="form-control" rows="2" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                    break;
+                case "notes":
+                    <label class="@f.LabelClass()" for="notes">@f.Label</label>
+                    <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
+                    <FieldError Field="notes" Errors="errors" />
+                    break;
             }
-            <div class="span-4">
-                <label class="form-label" for="budgetStatus">Bütçe durumu</label>
-                <select id="budgetStatus" class="form-select" @bind="form.BudgetStatus">
-                    @foreach (var status in OpportunityBudgetStatus.All)
-                    {
-                        <option value="@status">@OpportunityBudgetStatus.Label(status)</option>
-                    }
-                </select>
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="nextAction">Sonraki aksiyon</label>
-                <input id="nextAction" class="form-control" maxlength="200" @bind="form.NextAction" />
-                <FieldError Field="nextAction" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="nextActionDate">Aksiyon tarihi</label>
-                <input id="nextActionDate" class="form-control" type="date" @bind="form.NextActionDate" />
-                <FieldError Field="nextActionDate" Errors="errors" />
-            </div>
-        </div>
-    </FormSection>
-
-    <FormSection Title="Detaylar" Icon="clipboard-list" Description="İhtiyaç analizi: müşterinin ihtiyacı, kapsam, ölçütler ve karar süreci.">
-        <div class="form-grid">
-            <div class="span-6">
-                <label class="form-label" for="needDescription">İhtiyaç</label>
-                <textarea id="needDescription" class="form-control" rows="2" maxlength="4000" @bind="form.NeedDescription"></textarea>
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="currentProblem">Mevcut sorun</label>
-                <textarea id="currentProblem" class="form-control" rows="2" maxlength="4000" @bind="form.CurrentProblem"></textarea>
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="expectedBenefit">Beklenen fayda</label>
-                <textarea id="expectedBenefit" class="form-control" rows="2" maxlength="4000" @bind="form.ExpectedBenefit"></textarea>
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="scope">Kapsam</label>
-                <textarea id="scope" class="form-control" rows="2" maxlength="4000" @bind="form.Scope"></textarea>
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="successCriteria">Başarı ölçütleri</label>
-                <textarea id="successCriteria" class="form-control" rows="2" maxlength="4000" @bind="form.SuccessCriteria"></textarea>
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="risks">Riskler ve engeller</label>
-                <textarea id="risks" class="form-control" rows="2" maxlength="4000" @bind="form.Risks"></textarea>
-            </div>
-            <div class="span-12">
-                <label class="form-label" for="decisionProcess">Karar süreci</label>
-                <textarea id="decisionProcess" class="form-control" rows="2" maxlength="4000" @bind="form.DecisionProcess"></textarea>
-            </div>
-        </div>
-    </FormSection>
-
-    <FormSection Title="Açıklama ve notlar" Icon="message-square">
-        <div class="form-grid">
-            <div class="span-12">
-                <label class="form-label" for="description">Açıklama</label>
-                <textarea id="description" class="form-control" rows="2" maxlength="4000" @bind="form.Description"></textarea>
-                <FieldError Field="description" Errors="errors" />
-            </div>
-            <div class="span-12">
-                <label class="form-label" for="notes">Notlar</label>
-                <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
-                <FieldError Field="notes" Errors="errors" />
-            </div>
-            <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
-        </div>
-    </FormSection>
+        </Field>
+    </LayoutForm>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
         <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
         @if (Opportunity is not null)
         {
@@ -226,6 +217,24 @@
 </form>
 
 @code {
+    private FormLayoutDto? layout;
+    private string? layoutError;
+
+    /// <summary>Firmanın form düzeni (ADR-0021): bölüm, sekme, sıra, genişlik, zorunluluk. Yüklenemezse form kaydedilemez.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(CrmEntityKeys.Opportunity);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    // Düzen alanı çizilsin mi: firma sabitse (firma detayı) seçilmez; tutar alanları hassastır (Y8b), izni olmayan görmez.
+    private bool Shows(FormFieldDto field) => field.Key switch
+    {
+        "companyId" => FixedCompanyId is null,
+        "amount" or "probability" or "customerBudget" => Session.Can(CrmAccess.OpportunityAmountsRead),
+        _ => true,
+    };
+
     private const string Url = "/api/crm/opportunities";
 
     private OpportunityForm form = new();

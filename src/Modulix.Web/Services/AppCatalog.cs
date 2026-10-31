@@ -81,6 +81,7 @@ public static class AppCatalog
         new("admin.custom-fields", Admin, "Özel alanlar", "square-pen", "yonetim/ozel-alanlar", 80, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
         new("admin.lists", Admin, "Listeler", "list", "yonetim/listeler", 90, Permission: CoreAccess.ManageCustomization),
         new("admin.sector-profile", Admin, "Sektör profili", "layers", "yonetim/sektor-profili", 100, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
+        new("admin.form-designer", Admin, "Form tasarımı", "clipboard-list", "yonetim/form-tasarimi", 85, Permission: CoreAccess.ManageCustomization),
 
         new(Platform, null, "Platform", "shield", null, 100, PlatformOnly: true),
         new("platform.home", Platform, "Genel bakış", "dashboard", "platform", 10, PlatformOnly: true, ExactMatch: true),

@@ -55,6 +55,32 @@ Kayıt formu kart çerçevesini kendisi taşımaz (`record-form sectioned`); ala
 
 Detay sayfalarında da aynı kart kullanılır: Fırsat (Temel bilgiler, Detaylar, Ürün / hizmet kalemleri, Kişiler, Rakipler, Teklifler, tarihçe, sağ panel kartları), Firma / Kişi genel sekmesi, Lead talep bilgileri.
 
+## Metadata'dan çizilen formlar (ADR-0021)
+
+Ekleme/düzenleme formları yerleşimi koddan değil **firmanın form düzeninden** alır. Editör her alanın girdisini `LayoutForm` bileşeninin `Field` şablonunda anahtara göre verir; sekmeler, bölüm kartları, sıra, genişlik, zorunluluk ve görünürlük `GET /api/form-layouts` ile gelen düzenden çizilir.
+
+```razor
+<LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors">
+    <Field Context="f">
+        @switch (f.Key)
+        {
+            case "name":
+                <label class="@f.LabelClass()" for="name">@f.Label</label>
+                <input id="name" class="form-control" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Name" />
+                <FieldError Field="name" Errors="errors" />
+                break;
+        }
+    </Field>
+</LayoutForm>
+```
+
+- Düzen `FormLayouts.ForAsync(kayıtTürü)` ile yüklenir; yüklenemezse form kaydetmeyi kapatır ve uyarı gösterir (varsayılan düzen istemcide yoktur).
+- Varsayılan yerleşim modülün tanımındadır (`CrmForms`). Yeni alan eklerken: tanıma alanı ekle (anahtar = kayıt alanının teknik adı), editörde `case` yaz. Yalnızca ekranda anlamı olan alanlar (`isAllDay`, `logAsDone`) tanımda **sabit**tir; zorunlu kılınamaz.
+- İzne/duruma bağlı alanlar (`FixedCompanyId`, tutar izni) `Shows` süzgeciyle atlanır; bütün alanları gizli bölüm çizilmez.
+- Özel alanlar aynı düzende yer alır (`custom.{anahtar}`), `CustomFieldInputs Only="…"` ile tek tek çizilir; zorunluluk düzenden artırılabilir.
+- Firmanın zorunlu kıldığı alan sunucuda da denetlenir; `FieldError` sunucu iletisini alanın altında gösterir.
+- Yönetim ekranı: `Pages/Admin/FormDesigner.razor` (`/yonetim/form-tasarimi`) — sekme/bölüm ekleme ve silme (içerik ilk sekmeye/bölüme taşınır), ok düğmeleriyle sıralama, "taşı" listeleri, genişlik, zorunlu, görünür, varsayılana dön.
+
 ## Alan durumları
 
 | Durum | Nasıl |

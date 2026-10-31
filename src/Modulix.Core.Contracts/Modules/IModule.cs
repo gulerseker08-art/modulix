@@ -89,6 +89,12 @@ public interface IModule
     /// </summary>
     IReadOnlyList<LookupDefinition> Lookups => [];
 
+    /// <summary>
+    /// Modülün form düzeni tanımları (ADR-0021): formların varsayılan sekme, bölüm ve alan yerleşimi. Tanım kodda sabittir;
+    /// firma yöneticisi üzerine kendi düzenini kurar (alan taşır, sekme açar, zorunluluk ekler). Anahtar modül anahtarıyla başlar.
+    /// </summary>
+    IReadOnlyList<FormDefinition> Forms => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {

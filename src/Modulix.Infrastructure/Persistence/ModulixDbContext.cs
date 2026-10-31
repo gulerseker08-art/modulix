@@ -81,6 +81,8 @@ public class ModulixDbContext(
 
     public DbSet<TenantLookupSetting> LookupSettings => Set<TenantLookupSetting>();
 
+    public DbSet<TenantFormLayout> FormLayouts => Set<TenantFormLayout>();
+
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
     /// <summary>Sorgu filtresinde kullanılır; EF her sorguda yeniden okur. Aktif tenant yoksa hiçbir satır dönmez.</summary>

@@ -50,7 +50,8 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Checkbox / Switch / RadioGroup | Stil | `form-check`, `form-check-input` |
 | UserPicker / TeamPicker | Kısmen | Kayıt sahibi/ekip seçimleri ilgili formlarda select olarak |
 | AddressField | Var | `AddressesSection.razor` |
-| Dinamik (özel) alanlar | Var | `CustomFieldInputs.razor` — aynı form sınıflarıyla çizilir |
+| Dinamik (özel) alanlar | Var | `CustomFieldInputs.razor` — aynı form sınıflarıyla çizilir; `Only` ile tek alan (form düzeni içinde) |
+| Metadata'dan form (LayoutForm) | Var | `Components/LayoutForm.razor` — `Layout` (`FormLayoutDto`), `Field` şablonu, `Shows`, özel alanlar; sekme / bölüm / alan düzeni firmanın form düzeninden (ADR-0021). Yönetim: `Pages/Admin/FormDesigner.razor` |
 | FieldError | Var | Alanın altında doğrulama iletisi |
 | FileUpload, RichTextEditor, MultiLookup | Yok | |
 

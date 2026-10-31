@@ -357,6 +357,42 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("ChoiceLists", "meta");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Customization.TenantFormLayout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("LayoutJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "EntityKey")
+                        .IsUnique();
+
+                    b.ToTable("FormLayouts", "meta");
+                });
+
             modelBuilder.Entity("Modulix.Core.Lookups.TenantLookupSetting", b =>
                 {
                     b.Property<Guid>("Id")

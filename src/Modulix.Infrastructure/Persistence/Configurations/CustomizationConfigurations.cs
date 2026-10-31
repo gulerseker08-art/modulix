@@ -46,6 +46,23 @@ internal sealed class TenantChoiceListConfiguration : IEntityTypeConfiguration<T
     }
 }
 
+internal sealed class TenantFormLayoutConfiguration : IEntityTypeConfiguration<TenantFormLayout>
+{
+    public void Configure(EntityTypeBuilder<TenantFormLayout> builder)
+    {
+        // Tenant verisi (ADR-0021): yalnızca firmanın özelleştirdiği formlar; Row-Level Security ile korunur.
+        builder.ToTable("FormLayouts", DatabaseSchemas.Meta);
+        builder.HasKey(l => l.Id);
+        builder.Property(l => l.Id).ValueGeneratedNever();
+        builder.Property(l => l.TenantId).IsRequired();
+        builder.Property(l => l.EntityKey).HasMaxLength(TenantFormLayout.EntityKeyMaxLength).IsRequired();
+        builder.Property(l => l.Version).IsRequired().IsConcurrencyToken();
+        builder.Property(l => l.UpdatedAt).IsRequired();
+        builder.HasIndex(l => new { l.TenantId, l.EntityKey }).IsUnique();
+        builder.HasAlternateKey(l => new { l.TenantId, l.Id });
+    }
+}
+
 internal sealed class TenantLookupSettingConfiguration : IEntityTypeConfiguration<TenantLookupSetting>
 {
     public void Configure(EntityTypeBuilder<TenantLookupSetting> builder)

@@ -62,6 +62,7 @@ public partial class EndpointProtectionTests(ModulixApiFactory factory) : IClass
         "GET /api/custom-fields/",   // özel alan tanımları (Y9a): formlar kurulur; değerler kayıtla ve kayıt izniyle gelir
         "GET /api/choice-lists/",    // seçim listeleri (Y9b): aynı gerekçe
         "GET /api/lookups/",         // lookup ayarları (ADR-0016): formlar davranışı öğrenir; veri değil ayar döner
+        "GET /api/form-layouts/",    // form düzenleri (ADR-0021): formlar yerleşimi öğrenir; veri değil düzen döner
     ];
 
     [Fact]

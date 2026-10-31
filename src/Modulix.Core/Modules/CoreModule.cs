@@ -72,6 +72,9 @@ public sealed class CoreModule : IModule
         /// <summary>Lookup ayarı (ADR-0016); kaydın kimliği firmanın ayar satırının kimliğidir.</summary>
         public const string LookupSetting = "core.lookup-setting";
 
+        /// <summary>Form düzeni (ADR-0021); kaydın kimliği firmanın düzen satırının kimliğidir.</summary>
+        public const string FormLayout = "core.form-layout";
+
         public const string Membership = "core.membership";
 
         /// <summary>İşletici şirket (ADR-0008): ad ve varsayılan olup olmadığı; kaydın kimliği şirketin kimliğidir.</summary>
@@ -199,6 +202,10 @@ public sealed class CoreModule : IModule
         {
             ["list"] = "Liste", ["values"] = "Değerler",
         }, "list"),
+        new(AuditedEntityKeys.FormLayout, "Form düzeni", null, new Dictionary<string, string>
+        {
+            ["form"] = "Form", ["tabs"] = "Sekmeler", ["sections"] = "Bölümler", ["required"] = "Zorunlu alanlar", ["hidden"] = "Gizli alanlar", ["source"] = "Düzen kaynağı",
+        }, "form"),
         new(AuditedEntityKeys.LookupSetting, "Lookup ayarı", null, new Dictionary<string, string>
         {
             ["lookup"] = "Alan", ["searchable"] = "Aranabilir", ["source"] = "Ayar kaynağı",

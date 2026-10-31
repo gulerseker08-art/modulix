@@ -197,6 +197,25 @@ Kullanıcı geri bildirimi: form ekranları referans görsellerdeki (Firma kart�
 
 ![Firma formu](onizleme-firma-formu.png)
 
+## Faz 7 — Form tasarımı: firmaya göre düzenlenebilir formlar (31.10.2026, ADR-0021)
+
+Kullanıcı isteği: her form için yöneticiye özel özelleştirme — alanların yeri, yeni sekme, zorunluluk gibi özellikler tenant yöneticisince belirlenebilmeli. Form düzeni artık metadata'dır: modül varsayılanı tanımlar (`IModule.Forms` / `CrmForms`), firma `Yönetim → Form tasarımı` ekranından özelleştirir (`meta.FormLayouts`, RLS), editörler `LayoutForm` ile çizer. Firmanın zorunlu kıldığı alan kayıt boru hattında sunucuda denetlenir.
+
+| Ekran | Durum | Not |
+|---|---|---|
+| Form tasarımı (yönetim) | Yeni | Form seçimi; sekme ekle/sil/sırala/adlandır; bölüm ekle/sil/sırala, ikon, sekmesini değiştir; alan: genişlik, zorunlu, görünür, bölüme taşı, sırala; sabit alanlar rozetli ve kilitli; Kaydet (sürümlü, 409/422 iletileri), Varsayılana dön |
+| Firma, Kişi, Fırsat, Lead, Aktivite formları | Değişti | Yerleşim düzenden; birden fazla sekme varsa `TabBar`; bölüm kartları, genişlik ve yıldız düzenden; alan girdileri editörde anahtara göre |
+| Özel alanlar | Değişti | Düzende `custom.{anahtar}` olarak taşınabilir; zorunluluk artırılabilir; `Ek bilgiler` varsayılan bölümü |
+| Sunucu | Yeni | `GET /api/form-layouts`, `GET/PUT/DELETE /api/customization/form-layouts/{kayıtTürü}`; boru hattında `RecordRequiredFields`; denetim kaydı `core.form-layout` |
+
+![Form tasarımı](onizleme-form-tasarimi.png)
+
+![Düzene göre çizilen firma formu (Finans sekmesi, zorunlu Sektör)](onizleme-form-duzeni.png)
+
+**Doğrulama:** Release derleme 0 hata; mimari 29/29; birim 214/214 (yeni `FormLayoutRulesTests`); entegrasyon `FormLayoutTests` 4/4 (mutlu yol + denetim kaydı, doğrulama hataları, tenant izolasyonu, yetki ve sunucuda zorunlu alan denetimi). Gerçek uygulamada: Sektör zorunlu kılındı, Finans sekmesi ve Finansal bilgiler bölümü açıldı, Vergi no oraya taşındı, kaydedildi; Yeni firma formu iki sekmeyle açıldı, sektörsüz kayıt sunucu iletisiyle ("Bu alan zorunludur.") reddedildi; Varsayılana dön çalıştı.
+
+**Yapılmayanlar:** alan ekleme (Özel alanlar ekranının işi), rol/şirket başına düzen, koşullu görünürlük, etiket değiştirme, sürükle-bırak, detay sayfalarının düzeni, teklif ve yönetim formları için tanım (altyapı hazır).
+
 ![Fırsat formu](onizleme-firsat-formu.png)
 
 **Doğrulama:** Release derleme 0 hata; mimari testler 29/29. Gerçek uygulamada (Chromium, 1440px ve 390px): Yeni firma, Yeni kişi, Yeni Lead formları, Fırsat düzenleme formu, Aktivite çekmecesi, Fırsat detayı kartları; telefonda yatay taşma yok, özet kartı gizlenir, alanlar tek kolon. Form gönderimi ve doğrulama kodu değişmediği için işlevsel akışlar önceki fazlardaki gibi; entegrasyon testleri CI'da.

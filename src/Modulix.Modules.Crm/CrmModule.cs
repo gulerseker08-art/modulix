@@ -335,6 +335,9 @@ public sealed class CrmModule : IModule
     /// <summary>Lookup alanları (ADR-0016); tanımlar <see cref="CrmLookupDefinitions"/>'tadır.</summary>
     IReadOnlyList<LookupDefinition> IModule.Lookups => CrmLookupDefinitions.All;
 
+    /// <summary>Form düzenleri (ADR-0021); varsayılan yerleşimler <see cref="CrmForms"/>'tadır, firma üzerine kendi düzenini kurar.</summary>
+    IReadOnlyList<FormDefinition> IModule.Forms => CrmForms.All;
+
     /// <summary>
     /// Seçim listeleri (Y9b). Hazır değerlerin anahtarları eski enum adlarıdır; kayıtlarda ve API'de bunlar durur.
     /// Firma adlarını, sırasını ve etkinliğini değiştirir; yeni değer eklerken kategorisini seçer.

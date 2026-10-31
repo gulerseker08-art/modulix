@@ -291,6 +291,15 @@ Formlardaki kayıt/üye seçimleri (firma, kişi, fırsat, sorumlu...) ortak `Lo
 - Kayıt sırasında firma/kişi görünürlüğü ve kişi↔firma ilişkisi (fırsat, Lead, aktivite, lokasyon) sunucuda yeniden doğrulanır; değişmeyen eski bağ yeniden denetlenmez.
 - Değişiklikler denetim kaydına `Lookup ayarı` olarak yazılır. Kayıt aramasında `ı/I` ve `i/İ` çiftleri veritabanı kolasyonu yüzünden eşleşmez (ayrıntı ADR-0016).
 
+### Form düzeni ([ADR-0021](docs/adr/0021-form-duzeni-ozellestirme.md))
+
+Firma yöneticisi her kayıt formunun düzenini kendine göre kurar: alanları taşır, yeni sekme ve bölüm açar, genişlik (çeyrek / üçte bir / yarım / üçte iki / tam satır), zorunluluk ve görünürlük belirler. Ekran Yönetim → Form tasarımı (`/yonetim/form-tasarimi`, `core.customization.manage`). Alanın kendisi (girdi tipi, doğrulama) koddadır; buradan yalnızca yerleşim ve zorunluluk değişir.
+
+- Tanım kodda sabittir (`IModule.Forms`, CRM için `CrmForms`: Firma, Kişi, Fırsat, Lead, Aktivite); firmanın düzeni `meta.FormLayouts` satırında JSON olarak durur. Satır yoksa tanım geçerlidir; "Varsayılana dön" satırı silmez, sürümü ilerletir.
+- Sabit alanlar (kaydın adı, aşama gibi) gizlenemez ve zorunluluğu değişmez; kodun zorunlu tuttuğu alan isteğe bağlı yapılamaz. Özel alanlar (Y9a) düzende `custom.{anahtar}` adıyla yer alır ve taşınabilir; yeni alan eklemek Özel alanlar ekranının işidir.
+- Firmanın zorunlu kıldığı alan **sunucuda** denetlenir (kayıt boru hattı): oluştururken dolu olmalı, güncellemede boşaltılamaz; eski kayıtlar zorunluluk konmadan önce açılmış olabilir, dokunulmadıkça reddedilmez.
+- `GET /api/form-layouts` (her üye; formlar buradan çizilir), `GET/PUT/DELETE /api/customization/form-layouts/{kayıtTürü}` (PUT gövdesinde düzenin tamamı + `version`; eski sürüm 409, geçersiz düzen 422 alan hatalarıyla, tanımsız form 404; DELETE `?version=` varsayılana döner). Değişiklikler denetim kaydına `Form düzeni` olarak yazılır.
+
 ### Sektör profilleri (Y9c)
 
 Profil, bir sektör için hazır başlangıç paketidir: modüller, özel alanlar ve liste değerleri. Dört profil kodda tanımlıdır (`Modulix.Api/Customization/SectorProfiles.cs`): Genel, Lojistik firması, Klinik, Üretici. Tanımlar açılışta modül kataloğuna göre doğrulanır; bilinmeyen modül, kayıt türü, liste veya kategori varsa uygulama açılmaz.

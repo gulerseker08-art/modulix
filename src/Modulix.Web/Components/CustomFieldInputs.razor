@@ -2,18 +2,22 @@
 @using System.Globalization
 @using System.Text.Json.Nodes
 
-@if (Fields.Count > 0)
+@if (Shown.Count > 0)
 {
-    <h3 class="span-all form-section">Ek bilgiler</h3>
-    @foreach (var field in Fields)
+    @if (Only is null)
+    {
+        <h3 class="span-all form-section">Ek bilgiler</h3>
+    }
+    @foreach (var field in Shown)
     {
         var id = $"custom-{field.Key}";
-        var wide = field.Type is CustomFieldType.MultilineText or CustomFieldType.MultiChoice;
+        var wide = Only is null && field.Type is CustomFieldType.MultilineText or CustomFieldType.MultiChoice;
+        var required = field.Required || RequiredOverride == true;
         <div class="@(wide ? "span-all" : null)">
             @if (field.Type == CustomFieldType.MultiChoice)
             {
                 <fieldset>
-                    <legend class="form-label">@field.Label@(field.Required ? " *" : null)</legend>
+                    <legend class="form-label @(required ? "required" : null)">@field.Label</legend>
                     <div class="check-list">
                         @foreach (var option in Selectable(field))
                         {
@@ -28,7 +32,7 @@
             }
             else
             {
-                <label class="form-label" for="@id">@field.Label@(field.Required ? " *" : null)</label>
+                <label class="form-label @(required ? "required" : null)" for="@id">@field.Label</label>
                 @switch (field.Type)
                 {
                     case CustomFieldType.MultilineText:
@@ -75,6 +79,14 @@
     [Parameter, EditorRequired] public JsonObject Values { get; set; } = [];
 
     [Parameter] public IReadOnlyDictionary<string, string[]>? Errors { get; set; }
+
+    /// <summary>Verilirse yalnızca bu anahtarlı alan çizilir (form düzeni alanı kendi yerine koyar); başlık ve genişlik sınıfı konmaz.</summary>
+    [Parameter] public string? Only { get; set; }
+
+    /// <summary>Form düzeninin eklediği zorunluluk (ADR-0021); tanımın zorunluluğunu kaldırmaz.</summary>
+    [Parameter] public bool? RequiredOverride { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> Shown => Only is null ? Fields : Fields.Where(f => f.Key == Only).ToList();
 
     // Pasif seçenek yeni değer olarak seçilemez; kayıtta zaten varsa listede kalır.
     private IEnumerable<CustomFieldOptionDto> Selectable(CustomFieldDto field)

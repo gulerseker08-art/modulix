@@ -86,6 +86,9 @@ public static class PersistenceSetup
         services.AddScoped<ILookupSettings>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ILookupSearch>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ISectorProfileService, SectorProfileService>();
+        services.AddScoped<FormLayoutService>();
+        services.AddScoped<IFormLayoutService>(sp => sp.GetRequiredService<FormLayoutService>());
+        services.AddScoped<IFormLayoutProvider>(sp => sp.GetRequiredService<FormLayoutService>());
         services.AddScoped<ICurrentAccess, CurrentAccess>();
 
         // Kullanıcı yönetimi (Y2); UserManager'ı host kaydeder (AddModulixAuth).
