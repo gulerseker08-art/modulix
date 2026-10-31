@@ -94,7 +94,7 @@ dotnet ef migrations add <Ad> --project src/Modulix.Infrastructure --startup-pro
 E-posta işleyicisi platform kuyruğunu işler. Olay işleyicisi her turda tek sorguyla işi olan tenant'ları bulur (outbox/teslim tabloları RLS dışıdır) ve yalnızca
 onların bağlamını kurup (oturum değeri → RLS) olayları işler; sağlık kontrolü ve platform olay ekranı da bütün tenant'ları
 tek sorguyla okur. Teklif süre dolumu işleyicisi CRM modülü açık tenant'larda tenant bağlamıyla döner (teklif tabloları
-RLS altındadır, çapraz tenant okunamaz). Teklif süre dolumu kilidi tenant başınadır (`sp_getapplock`, kaynak adı tenant kimliğini içerir). Outbox ve teslim tabloları RLS dışıdır; `ModulixDbContext` bu iki tabloya aktif tenant sorgu filtresi uygular, ham SQL de `TenantId` ile süzer.
+RLS altındadır, çapraz tenant okunamaz). Teklif süre dolumu kilidi tenant başınadır (`sp_getapplock`, kaynak adı tenant kimliğini içerir). Sözleşme zamanlanmış işleri (`ContractJobsWorker`; yenileme/fesih/yürürlük geçişi, hatırlatma ve eskalasyon, imza süre dolumu, taahhüt değerlendirmesi) sözleşme modülü açık her tenant'ı ayrı tenant bağlamı ve `contracts.scheduler` sistem kimliğiyle, tenant başına `sp_getapplock` kilidiyle çalıştırır; birden çok örnek aynı tenant'ı aynı anda işlemez. `ContractJobs:WorkerEnabled` (varsayılan `true`) ve `ContractJobs:PollIntervalSeconds` (varsayılan 900) ile yapılandırılır; testler işçiyi kapatır. Otomatik uzatma tenant ayarıyla açılana kadar (`contracts.renewal.allow-auto`) hiçbir sözleşme kendiliğinden uzatılmaz. Outbox ve teslim tabloları RLS dışıdır; `ModulixDbContext` bu iki tabloya aktif tenant sorgu filtresi uygular, ham SQL de `TenantId` ile süzer.
 
 ## Yedekleme, dışa aktarma ve silme
 

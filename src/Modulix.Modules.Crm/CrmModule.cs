@@ -878,6 +878,12 @@ public sealed class CrmModule : IModule
             [Entities.Quote],
             [Permissions.QuotesRead, Permissions.CompaniesRead, Permissions.OpportunitiesRead, Permissions.OpportunityAmountsRead, Permissions.OpportunitiesWrite, Permissions.OpportunitiesClose, Permissions.ActivitiesRead, Permissions.ActivitiesWrite]),
         // Zamanlanmış süre dolumu işinin sistem kimliği: olay işlemez, yalnızca izinlerini tanımlar.
+        // Diğer modüllerin zamanlanmış işleri (ör. sözleşme yenileme hatırlatması) için takip aktivitesi açan sistem kimliği: yalnızca aktivite izinleri.
+        EventSubscription.For<CrmFollowUpAnchor>(
+            "crm.follow-up",
+            [DomainEventTypes.RecordDeleted],
+            [Entities.Activity],
+            [Permissions.ActivitiesRead, Permissions.ActivitiesWrite]),
         EventSubscription.For<QuoteExpiryAnchor>(
             "crm.quote-expiry",
             [DomainEventTypes.RecordDeleted],
@@ -972,6 +978,9 @@ public sealed class CrmModule : IModule
         services.AddScoped<IActivityLinkTarget, OpportunityLinkTarget>();
         services.AddScoped<IActivityLinkTarget, LeadLinkTarget>();
         services.AddScoped<Modulix.Core.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>();
+        // Ana bilgisayarın (API) sistem kimliği köprüsü bu doğrudan uygulamayı kendi CRM sistem kimliği altında çağırır (aşağıdaki "crm.follow-up" aboneliği).
+        services.AddKeyedScoped<Modulix.Core.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>("direct");
+        services.AddScoped<CrmFollowUpAnchor>();
         services.AddScoped<IActivityLinkTarget, QuoteLinkTarget>();
         services.AddScoped<ActivityWorkflowGate>();
         services.AddScoped<IActivityWorkflow, ActivityWorkflow>();

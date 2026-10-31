@@ -50,6 +50,7 @@ builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
 
 builder.Services.AddModulixModules(ModulixModules.Create());
+builder.Services.AddScoped<Modulix.Core.Contracts.Activities.IFollowUpActivities, Modulix.Api.Contracts.HostFollowUpActivities>();
 
 // Sektör profilleri (Y9c): tanımlar açılışta modül kataloğuna göre doğrulanır.
 builder.Services.AddSingleton(sp => new SectorProfileCatalog(SectorProfiles.Create(), sp.GetRequiredService<ModuleCatalog>()));
@@ -77,6 +78,9 @@ builder.Services.AddHostedService<EventDispatchWorker>();
 builder.Services.Configure<Modulix.Api.Crm.QuoteExpiryOptions>(builder.Configuration.GetSection(Modulix.Api.Crm.QuoteExpiryOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Crm.QuoteExpiryRunner>();
 builder.Services.AddHostedService<Modulix.Api.Crm.QuoteExpiryWorker>();
+builder.Services.Configure<Modulix.Api.Contracts.ContractJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Contracts.ContractJobsOptions.SectionName));
+builder.Services.AddSingleton<Modulix.Api.Contracts.ContractJobsRunner>();
+builder.Services.AddHostedService<Modulix.Api.Contracts.ContractJobsWorker>();
 
 // Kullanıcı yönetimi: davet sınırı "Users" bölümünde; e-postadaki bağlantıların kökü App:PublicUrl (üretimde zorunlu).
 builder.Services.Configure<UserAdministrationOptions>(builder.Configuration.GetSection(UserAdministrationOptions.SectionName));

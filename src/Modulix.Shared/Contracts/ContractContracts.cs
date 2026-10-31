@@ -47,6 +47,9 @@ public sealed record ContractDto(
     int? SourceQuoteRevisionNo,
     string? SourceQuoteSha256,
     Guid? SourceOpportunityId,
+    Guid? EscalationUserId = null,
+    DateOnly? TerminationDate = null,
+    string? TerminationReason = null,
     System.Text.Json.Nodes.JsonObject? Custom = null);
 
 public sealed record SaveContractRequest(
@@ -71,7 +74,8 @@ public sealed record SaveContractRequest(
     bool HasNonStandardTerms = false,
     string RiskLevel = "Low",
     long? Version = null,
-    System.Text.Json.Nodes.JsonObject? Custom = null);
+    System.Text.Json.Nodes.JsonObject? Custom = null,
+    Guid? EscalationUserId = null);
 
 public sealed record ContractPartyDto(
     Guid Id,
@@ -160,6 +164,8 @@ public static class ContractsAccess
     public const string CommitmentsWrite = "contracts.commitments.write";
     public const string CommitmentsComplete = "contracts.commitments.complete";
     public const string CommitmentsWaive = "contracts.commitments.waive";
+    public const string RenewalsManage = "contracts.renewals.manage";
+    public const string ContractsTerminate = "contracts.contracts.terminate";
     public const string CommitmentCategoryList = "contracts.commitment-category";
 
     public const string ContractEntityKey = "contracts.contract";

@@ -163,6 +163,12 @@
                                             <LookupPicker Id="ownerId" LookupKey="contracts.contract.owner" @bind-Value="form.OwnerId" Required="f.Required" Placeholder="@(contract is null ? "Ben" : "—")" ReadOnly="@(!CanEditHeader)" />
                                             <FieldError Field="ownerId" Errors="errors" />
                                             break;
+                                        case "escalationUserId":
+                                            <label class="@f.LabelClass()" for="escalationUserId">@f.Label</label>
+                                            <LookupPicker Id="escalationUserId" LookupKey="contracts.contract.escalation" @bind-Value="form.EscalationUserId" Placeholder="—" ReadOnly="@(!CanEditHeader)" />
+                                            <small class="text-muted">Son bildirim tarihi geçip karar verilmezse bu kullanıcıya takip aktivitesi açılır.</small>
+                                            <FieldError Field="escalationUserId" Errors="errors" />
+                                            break;
                                         case "confidentiality":
                                             <label class="@f.LabelClass()" for="c-conf">@f.Label</label>
                                             <select id="c-conf" class="form-select" @bind="form.Confidentiality">
@@ -498,6 +504,13 @@
             </div>
         }
 
+        @if (contract is not null && tabs.Rendered(TabRenewal))
+        {
+            <div role="tabpanel" id="tabpanel-@TabRenewal" aria-labelledby="tab-@TabRenewal" class="record-tabpanel" hidden="@tabs.Hidden(TabRenewal)">
+                <ContractRenewalPanel Contract="contract" Changed="@(() => LoadAsync(contract.Id))" />
+            </div>
+        }
+
         @if (contract is not null && tabs.Rendered(TabVersions))
         {
             <div role="tabpanel" id="tabpanel-@TabVersions" aria-labelledby="tab-@TabVersions" class="record-tabpanel" hidden="@tabs.Hidden(TabVersions)">
@@ -696,6 +709,7 @@
     private const string TabApproval = "approval";
     private const string TabSignature = "signature";
     private const string TabCommitments = "commitments";
+    private const string TabRenewal = "renewal";
     private const string TabVersions = "versions";
     private const string TabDocuments = "documents";
     private const string TabHistory = "history";
@@ -760,6 +774,7 @@
         new(TabApproval, "Onay"),
         new(TabSignature, "İmza"),
         new(TabCommitments, "Taahhütler"),
+        new(TabRenewal, "Yenileme"),
         new(TabVersions, "Sürümler", versions.Count),
         new(TabDocuments, "Belgeler", documents.Count),
         new(TabHistory, "Tarihçe"),
@@ -837,7 +852,7 @@
             form.StartDate, form.IsIndefinite ? null : form.EndDate, form.IsIndefinite, form.Currency, form.PriceIncludesTax,
             Session.Can(ContractsAccess.FinancialsRead) ? form.ContractValue : null, Blank(form.PaymentTerms), form.RenewalMode,
             form.RenewalMode == "None" ? null : form.RenewalPeriodMonths, form.NoticePeriodDays, form.Confidentiality, form.HasNonStandardTerms, form.RiskLevel, contract?.Version,
-            CustomFieldText.ForSave(CustomFields, form.Custom));
+            CustomFieldText.ForSave(CustomFields, form.Custom), form.EscalationUserId);
         var result = contract is { } current
             ? await Api.PutAsync<ContractDto>($"/api/contracts/contracts/{current.Id}", request)
             : await Api.PostAsync<ContractDto>("/api/contracts/contracts", request);
@@ -1078,6 +1093,7 @@
         public Guid? PartyId { get; set; }
         public Guid? PersonId { get; set; }
         public Guid? OwnerId { get; set; }
+        public Guid? EscalationUserId { get; set; }
         public Guid? PreviousContractId { get; set; }
         public string Type { get; set; } = "Service";
         public DateOnly? StartDate { get; set; }
@@ -1098,7 +1114,7 @@
 
         public static ContractForm From(ContractDto c) => new()
         {
-            Title = c.Title, PartyId = c.PartyId, PersonId = c.PersonId, OwnerId = c.OwnerId, PreviousContractId = c.PreviousContractId, Type = c.Type,
+            Title = c.Title, PartyId = c.PartyId, PersonId = c.PersonId, OwnerId = c.OwnerId, EscalationUserId = c.EscalationUserId, PreviousContractId = c.PreviousContractId, Type = c.Type,
             StartDate = c.StartDate, EndDate = c.EndDate, IsIndefinite = c.IsIndefinite, Currency = c.Currency, PriceIncludesTax = c.PriceIncludesTax,
             ContractValue = c.ContractValue, RenewalMode = c.RenewalMode, RenewalPeriodMonths = c.RenewalPeriodMonths, NoticePeriodDays = c.NoticePeriodDays,
             Confidentiality = c.Confidentiality, HasNonStandardTerms = c.HasNonStandardTerms, RiskLevel = c.RiskLevel, Description = c.Description, PaymentTerms = c.PaymentTerms,

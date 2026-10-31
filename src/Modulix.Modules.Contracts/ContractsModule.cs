@@ -60,6 +60,12 @@ public sealed class ContractsModule : IModule
 
         /// <summary>Gerçekleşmeyi gerekçeyle muaf tutar (ihlal sayılmaz); ayrı yetkidir.</summary>
         public const string CommitmentsWaive = "contracts.commitments.waive";
+
+        /// <summary>Yenileme taslağı açar, yenilememe kararı verir ve yenileme takvimini yönetir; zamanlayıcı sistem kimliği de bunu taşır.</summary>
+        public const string RenewalsManage = "contracts.renewals.manage";
+
+        /// <summary>Yürürlükteki sözleşmeyi fesheder (ya da fesih tarihini planlar). Ayrı ve kritik bir yetkidir.</summary>
+        public const string ContractsTerminate = "contracts.contracts.terminate";
     }
 
     /// <summary>Firma ayarları (Y6).</summary>
@@ -69,6 +75,8 @@ public sealed class ContractsModule : IModule
         public const string ApprovalDueHours = "contracts.approval.due-hours";
         public const string SignatureProvider = "contracts.signature.provider";
         public const string SignatureValidityDays = "contracts.signature.validity-days";
+        public const string RenewalReminderDays = "contracts.renewal.reminder-days";
+        public const string AllowAutoRenewal = "contracts.renewal.allow-auto";
         public const string ProviderName = "contracts.document.provider-name";
         public const string ProviderDetails = "contracts.document.provider-details";
         public const string FooterNote = "contracts.document.footer-note";
@@ -114,6 +122,8 @@ public sealed class ContractsModule : IModule
         new(Permissions.CommitmentsWrite, "Sözleşme taahhüdü tanımlar, düzenler, iptal eder ve değerlendirme turunu çalıştırır", "Sözleşme taahhütleri"),
         new(Permissions.CommitmentsComplete, "Taahhüt gerçekleşmesini (dönem tamamlama, ölçüm, kanıt) kaydeder", "Sözleşme taahhütleri"),
         new(Permissions.CommitmentsWaive, "Taahhüt gerçekleşmesini gerekçeyle muaf tutar", "Sözleşme taahhütleri"),
+        new(Permissions.RenewalsManage, "Sözleşme yenileme taslağı açar, yenilememe kararı verir, yenileme takvimini yönetir", "Sözleşme yenileme ve fesih"),
+        new(Permissions.ContractsTerminate, "Yürürlükteki sözleşmeyi fesheder ya da fesih tarihini planlar", "Sözleşme yenileme ve fesih"),
     ];
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
@@ -141,6 +151,18 @@ public sealed class ContractsModule : IModule
             Pattern = @"^[0-9]{1,2}$",
             PatternMessage = "1-90 arası tam sayı girin.",
             MaxLength = 2,
+        },
+        new(SettingKeys.RenewalReminderDays, "Sözleşme yenileme: hatırlatma eşikleri (gün)", "Sözleşmeler", SettingType.Text, "90,60,30,7")
+        {
+            Description = "Son bildirim tarihine (yoksa bitişe) bu kadar gün kala sorumluya takip aktivitesi açılır. Virgülle ayrılmış günler (ör. 90,60,30,7).",
+            Pattern = @"^[0-9, ]{1,40}$",
+            PatternMessage = "Virgülle ayrılmış gün sayıları girin (ör. 90,60,30,7).",
+            MaxLength = 40,
+        },
+        new(SettingKeys.AllowAutoRenewal, "Sözleşme yenileme: otomatik uzatmaya izin ver", "Sözleşmeler", SettingType.Choice, "false")
+        {
+            Description = "Evet seçilirse, yenileme yöntemi otomatik olan imzalı sözleşmeler son bildirim tarihi geçince ve dönem bitiminde yenileme süresi kadar kendiliğinden uzatılır. Hayır (varsayılan) iken hiçbir sözleşme kendiliğinden uzatılmaz.",
+            Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
         },
         new(SettingKeys.ProviderName, "Sözleşme belgesi: hizmet veren ünvanı", "Sözleşmeler", SettingType.Text)
         {
@@ -208,6 +230,14 @@ public sealed class ContractsModule : IModule
             Scope = RecordScope.All,
         },
         new(
+            "contracts.renewal-manager",
+            "Sözleşme yenileme sorumlusu",
+            "Yenileme takvimini izler, yenileme taslağı açar, yenilememe kararı verir; fesih yetkisi içermez.",
+            [Permissions.ContractsRead, Permissions.ContractsWrite, Permissions.FinancialsRead, Permissions.RenewalsManage])
+        {
+            Scope = RecordScope.All,
+        },
+        new(
             "contracts.viewer",
             "Sözleşme izleyici",
             "Sözleşmeleri tutarlar olmadan görüntüler.",
@@ -258,14 +288,14 @@ public sealed class ContractsModule : IModule
             ["personId"] = "İlgili kişi", ["ownerId"] = "Sorumlu", ["previousContractId"] = "Önceki sözleşme", ["startDate"] = "Başlangıç",
             ["endDate"] = "Bitiş", ["isIndefinite"] = "Belirsiz süreli", ["currency"] = "Para birimi", ["priceIncludesTax"] = "Fiyatlar vergi dahil",
             ["contractValue"] = "Sözleşme bedeli", ["paymentTerms"] = "Ödeme koşulları", ["renewalMode"] = "Yenileme yöntemi",
-            ["renewalPeriodMonths"] = "Yenileme süresi (ay)", ["noticePeriodDays"] = "Bildirim süresi (gün)", ["noticeDeadline"] = "Son bildirim tarihi",
+            ["renewalPeriodMonths"] = "Yenileme süresi (ay)", ["noticePeriodDays"] = "Bildirim süresi (gün)", ["noticeDeadline"] = "Son bildirim tarihi", ["escalationUserId"] = "Yenileme eskalasyonu",
             ["confidentiality"] = "Gizlilik", ["hasNonStandardTerms"] = "Standart dışı madde", ["riskLevel"] = "Risk düzeyi", ["preparationStatus"] = "Hazırlık durumu", ["approvalStatus"] = "Onay durumu",
             ["signatureStatus"] = "İmza durumu", ["effectiveStatus"] = "Yürürlük durumu", ["statusReason"] = "Gerekçe",
             ["currentVersionNo"] = "Güncel sürüm", ["effectiveVersionNo"] = "Yürürlükteki sürüm", ["netTotal"] = "Net toplam",
             ["taxTotal"] = "Vergi", ["grossTotal"] = "Genel toplam",
         }, "title")
         {
-            UserFields = ["ownerId", "createdBy", "updatedBy"],
+            UserFields = ["ownerId", "escalationUserId", "createdBy", "updatedBy"],
             References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party, ["personId"] = SharedEntities.Person, ["previousContractId"] = Entities.Contract },
         },
         new(Entities.ContractParty, "Sözleşme tarafı", Permissions.ContractsRead, new Dictionary<string, string>
@@ -377,6 +407,12 @@ public sealed class ContractsModule : IModule
             [DomainEventTypes.RecordDeleted],
             [Entities.Contract],
             [Permissions.ContractsRead, Permissions.SignaturesProviderEvents]),
+        // Zamanlanmış işlerin sistem kimliği (yenileme hatırlatması, otomatik uzatma, yürürlük geçişi, imza ve taahhüt süreleri): olay işlemez, izinlerini tanımlar.
+        EventSubscription.For<ContractSchedulerAnchor>(
+            "contracts.scheduler",
+            [DomainEventTypes.RecordDeleted],
+            [Entities.Contract],
+            [Permissions.ContractsRead, Permissions.ContractsWrite, Permissions.RenewalsManage, Permissions.SignaturesManage, Permissions.CommitmentsWrite]),
     ];
 
     public void ConfigureServices(IServiceCollection services)
@@ -396,6 +432,9 @@ public sealed class ContractsModule : IModule
         services.AddScoped<IRecordStore, ContractApprovalDelegationRecordStore>();
         services.AddScoped<IRecordStore, ContractCommitmentRecordStore>();
         services.AddScoped<IContractCommitments, ContractCommitments>();
+        services.AddScoped<IContractRenewals, ContractRenewals>();
+        services.AddScoped<IContractScheduler, ContractScheduler>();
+        services.AddScoped<ContractSchedulerAnchor>();
         services.AddScoped<IContractApprovals, ContractApprovals>();
         services.AddScoped<ContractApprovalEngine>();
         services.AddSingleton<IContractSignatureProvider, SimulationSignatureProvider>();

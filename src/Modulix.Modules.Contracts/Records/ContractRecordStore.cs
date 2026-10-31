@@ -56,6 +56,9 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         Field.Choice<Contract>("confidentiality", Confidentiality.All, c => c.Confidentiality, (c, v) => c.Confidentiality = v),
         Field.Flag<Contract>("hasNonStandardTerms", c => c.HasNonStandardTerms, (c, v) => c.HasNonStandardTerms = v),
         Field.Choice<Contract>("riskLevel", RiskLevel.All, c => c.RiskLevel, (c, v) => c.RiskLevel = v),
+        Field.Owner<Contract>("escalationUserId", c => c.EscalationUserId, (c, v) => c.EscalationUserId = v),
+        Field.Date<Contract>("terminationDate", c => c.TerminationDate, (c, v) => c.TerminationDate = v).AsSystem(),
+        Field.Text<Contract>("terminationReason", Contract.ReasonMaxLength, c => c.TerminationReason, (c, v) => c.TerminationReason = v).AsSystem(),
         Field.Text<Contract>("preparationStatus", Contract.StatusMaxLength, c => c.PreparationStatus, (c, v) => c.PreparationStatus = v!).AsSystem(),
         Field.Text<Contract>("approvalStatus", Contract.StatusMaxLength, c => c.ApprovalStatus, (c, v) => c.ApprovalStatus = v!).AsSystem(),
         Field.Text<Contract>("signatureStatus", Contract.StatusMaxLength, c => c.SignatureStatus, (c, v) => c.SignatureStatus = v!).AsSystem(),
@@ -233,6 +236,15 @@ public static class ContractEventKinds
     public const string CommitmentCancelled = "CommitmentCancelled";
     public const string CommitmentEscalated = "CommitmentEscalated";
     public const string CommitmentEvaluated = "CommitmentEvaluated";
+    public const string Activated = "Activated";
+    public const string PeriodExpired = "PeriodExpired";
+    public const string AutoRenewed = "AutoRenewed";
+    public const string RenewalDraftCreated = "RenewalDraftCreated";
+    public const string RenewalDeclined = "RenewalDeclined";
+    public const string TerminationScheduled = "TerminationScheduled";
+    public const string Terminated = "Terminated";
+    public const string RenewalReminder = "RenewalReminder";
+    public const string SchedulerEvaluated = "SchedulerEvaluated";
     public const string Cancelled = "Cancelled";
     public const string Revised = "Revised";
     public const string CreatedFromQuote = "CreatedFromQuote";

@@ -118,6 +118,14 @@ public static class ContractActionLabels
         "ApprovalStepApproved" => "Onay adımı onaylandı (sıradaki adım açıldı)",
         "ApprovalReturned" => "Onaydan değişiklik talebiyle geri gönderildi; yeni revizyon taslağı açıldı",
         "ApprovalInvalidated" => "Taslağa döndü; önceki onay geçersiz kaldı",
+        "Activated" => "Başlangıç tarihi geldi; yürürlüğe girdi",
+        "PeriodExpired" => "Dönem sona erdi",
+        "AutoRenewed" => "Otomatik uzatıldı",
+        "RenewalDraftCreated" => "Yenileme taslağı açıldı",
+        "RenewalDeclined" => "Yenilememe kararı verildi",
+        "TerminationScheduled" => "Fesih planlandı",
+        "Terminated" => "Feshedildi",
+        "RenewalReminder" => "Yenileme hatırlatması işlendi",
         "Cancelled" => "İptal edildi",
         "Revised" => "Yeni revizyon açıldı",
         _ => kind,
@@ -239,4 +247,44 @@ public static class CommitmentLabels
         metric is null || target is null
             ? "—"
             : $"{metric}: {Label(Directions, direction).ToLowerInvariant()} {target.Value.ToString("0.######", Regional.Numbers)}{(string.IsNullOrEmpty(unit) ? string.Empty : " " + unit)}{(tolerance is > 0 ? $" (±{tolerance.Value.ToString("0.######", Regional.Numbers)})" : string.Empty)}";
+}
+
+/// <summary>Yenileme, fesih ve hatırlatma etiketleri (dilim 8); anahtarlar sunucudaki <c>RenewalOutcome</c>, <c>NonRenewalReason</c>, <c>ReminderKind</c> ve <c>ReminderStatus</c> ile aynıdır.</summary>
+public static class RenewalLabels
+{
+    public static IReadOnlyList<(string Key, string Label)> Outcomes { get; } =
+        [("DraftCreated", "Yenileme taslağı açıldı"), ("AutoExtended", "Otomatik uzatıldı"), ("NotRenewed", "Yenilenmeyecek")];
+
+    public static IReadOnlyList<(string Key, string Label)> Reasons { get; } =
+    [
+        ("Price", "Fiyat"), ("Competitor", "Rakibe geçti"), ("NoLongerNeeded", "Artık ihtiyaç yok"), ("ServiceQuality", "Hizmet kalitesi"), ("CustomerClosed", "Müşteri faaliyeti sonlandırdı"), ("Other", "Diğer"),
+    ];
+
+    public static IReadOnlyList<(string Key, string Label)> Sources { get; } = [("Scheduler", "Zamanlanmış iş"), ("User", "Kullanıcı")];
+
+    public static IReadOnlyList<(string Key, string Label)> ReminderKinds { get; } = [("Renewal", "Yenileme hatırlatması"), ("Escalation", "Eskalasyon"), ("Approval", "Onay hatırlatması")];
+
+    public static IReadOnlyList<(string Key, string Label)> ReminderStatuses { get; } =
+        [("Created", "Aktivite açıldı"), ("Skipped", "Atlandı"), ("Unavailable", "Aktivite modülü kapalı"), ("Failed", "Açılamadı (yeniden denenecek)")];
+
+    public static IReadOnlyList<(string Key, string Label)> Relations { get; } = [("Predecessor", "Önceki dönem"), ("Current", "Bu sözleşme"), ("Successor", "Yenileme")];
+
+    public static string Label(IReadOnlyList<(string Key, string Label)> list, string? key) => list.FirstOrDefault(x => x.Key == key).Label ?? key ?? "—";
+
+    public static string Badge(string? decision) => decision switch
+    {
+        "DraftCreated" or "AutoExtended" => "won",
+        "NotRenewed" => "lost",
+        null => "onhold",
+        _ => "open",
+    };
+
+    /// <summary>Son bildirim ya da bitişe kalan gün için kısa açıklama.</summary>
+    public static string Days(int? days) => days switch
+    {
+        null => "—",
+        0 => "bugün",
+        > 0 => $"{days} gün kaldı",
+        _ => $"{-days} gün geçti",
+    };
 }

@@ -45,3 +45,9 @@ internal sealed class CrmFollowUpActivities(IRecordPipeline pipeline) : IFollowU
         return new FollowUpResult(created.Value.Id, null);
     }
 }
+
+/// <summary>"crm.follow-up" kimliğinin izin çapası (başka modüllerin zamanlanmış işleri adına aktivite açar); olay işlemez.</summary>
+internal sealed class CrmFollowUpAnchor : Modulix.Core.Contracts.Events.IEventSubscriber
+{
+    public Task HandleAsync(Modulix.Core.Contracts.Events.EventEnvelope envelope, CancellationToken cancellationToken) => Task.CompletedTask;
+}
