@@ -7,26 +7,26 @@
 [data-theme="light"] {
     color-scheme: light;
 
-    /* Marka */
-    --mx-brand-navy: #101D35;
-    --mx-brand-navy-light: #173B68;
-    --mx-brand-primary: #087DB8;
-    --mx-brand-primary-hover: #066A9C;
-    --mx-brand-primary-rgb: 8, 125, 184;
-    --mx-brand-teal: #00C2C7;
-    --mx-brand-teal-dark: #008F98;
+    /* Marka: Modulix varsayılanı lacivert / indigo / turkuaz / lila / krem (yol haritası K6, Ç15a.1) */
+    --mx-brand-navy: #111827;
+    --mx-brand-navy-light: #1F2937;
+    --mx-brand-primary: #4F46E5;
+    --mx-brand-primary-hover: #4338CA;
+    --mx-brand-primary-rgb: 79, 70, 229;
+    --mx-brand-teal: #10B981;
+    --mx-brand-teal-dark: #0F8F7F;
 
-    /* Yüzeyler ve metin */
-    --mx-background: #F5F8FC;
+    /* Yüzeyler ve metin: krem zemin, lila vurgu */
+    --mx-background: #F4F6FB;
     --mx-surface: #FFFFFF;
-    --mx-surface-muted: #EEF5FA;
-    --mx-surface-hover: #F3F7FB;
-    --mx-border: #DCE5F0;
-    --mx-border-strong: #B8C6D8;
-    --mx-text-primary: #101D35;
-    /* Referans #64748B, sayfa zemininde (#F5F8FC) 4.47:1 kaldığı için AA (4.5:1) sağlayan en yakın ton kullanılır. */
-    --mx-text-secondary: #5F6E84;
-    --mx-text-label: #334155;
+    --mx-surface-muted: #EEF0FF;
+    --mx-surface-hover: #F1F3FB;
+    --mx-border: #E8EBF3;
+    --mx-border-strong: #C5CBE0;
+    --mx-text-primary: #111827;
+    /* Eski #6B7280 krem zeminde 4.47:1 kaldığı için AA (4.5:1) sağlayan en yakın ton kullanılır. */
+    --mx-text-secondary: #5F6B7E;
+    --mx-text-label: #374151;
     --mx-text-on-brand: #FFFFFF;
 
     /* Durum (semantik) — marka renklerinden ayrı */
@@ -39,8 +39,8 @@
     /* Rozet tonları: açık zemin + AA kontrastlı koyu metin */
     --mx-tone-neutral-bg: #EEF2F7;
     --mx-tone-neutral-fg: #475569;
-    --mx-tone-brand-bg: #E3F1F9;
-    --mx-tone-brand-fg: #075E8A;
+    --mx-tone-brand-bg: #EEF0FF;
+    --mx-tone-brand-fg: #3730A3;
     --mx-tone-info-bg: #E0F2FE;
     --mx-tone-info-fg: #075985;
     --mx-tone-success-bg: #D1FAE5;
@@ -55,15 +55,15 @@
     --mx-tone-teal-fg: #0F5F63;
 
     /* Grafik serileri */
-    --chart-c0: #087DB8;
-    --chart-c1: #00A9AE;
+    --chart-c0: #4F46E5;
+    --chart-c1: #10B981;
     --chart-c2: #F59E0B;
-    --chart-c3: #173B68;
+    --chart-c3: #1F2937;
     --chart-c4: #EF4444;
     --chart-c5: #94A3B8;
 
     /* Tipografi */
-    --mx-font: 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --mx-font: 'Public Sans', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
     --mx-fs-page-title: 1.75rem;     /* 28px / 700 */
     --mx-fs-section-title: 1.125rem; /* 18px / 600 */
     --mx-fs-card-title: 1rem;        /* 16px / 600 */
@@ -92,9 +92,9 @@
     --mx-radius-badge: 6px;
 
     /* Gölgeler: hafif; glow ve ağır gölge yok */
-    --mx-shadow-card: 0 1px 2px rgba(16, 29, 53, 0.04), 0 1px 3px rgba(16, 29, 53, 0.03);
-    --mx-shadow-raised: 0 4px 16px rgba(16, 29, 53, 0.08);
-    --mx-shadow-popover: 0 12px 32px rgba(16, 29, 53, 0.16);
+    --mx-shadow-card: 0 1px 2px rgba(17, 24, 39, 0.04), 0 1px 3px rgba(17, 24, 39, 0.03);
+    --mx-shadow-raised: 0 4px 16px rgba(17, 24, 39, 0.08);
+    --mx-shadow-popover: 0 12px 32px rgba(17, 24, 39, 0.16);
     --mx-focus-ring: 0 0 0 3px rgba(var(--mx-brand-primary-rgb), 0.28);
 
     /* Kabuk ölçüleri */
@@ -133,7 +133,7 @@
     --bs-link-color: var(--mx-brand-primary);
     --bs-link-color-rgb: var(--mx-brand-primary-rgb);
     --bs-link-hover-color: var(--mx-brand-primary-hover);
-    --bs-link-hover-color-rgb: 6, 106, 156;
+    --bs-link-hover-color-rgb: 67, 56, 202;
     --bs-border-radius: var(--mx-radius-input);
     --bs-border-radius-sm: 6px;
     --bs-border-radius-lg: var(--mx-radius-card);
@@ -148,28 +148,28 @@
 [data-theme="dark"] {
     color-scheme: dark;
 
-    --mx-brand-primary: #3AA6DE;
-    --mx-brand-primary-hover: #63BAE6;
-    --mx-brand-primary-rgb: 58, 166, 222;
-    --mx-brand-teal: #2DD4D8;
-    --mx-brand-teal-dark: #2DC3C9;
+    --mx-brand-primary: #818CF8;
+    --mx-brand-primary-hover: #A5B4FC;
+    --mx-brand-primary-rgb: 129, 140, 248;
+    --mx-brand-teal: #34D399;
+    --mx-brand-teal-dark: #2DD4BF;
 
-    --mx-background: #0B1424;
-    --mx-surface: #111D33;
-    --mx-surface-muted: #17284A;
-    --mx-surface-hover: #15243F;
-    --mx-border: #233657;
-    --mx-border-strong: #36507A;
-    --mx-text-primary: #E6EDF7;
-    --mx-text-secondary: #9AABC3;
-    --mx-text-label: #C3CFE0;
-    --mx-text-on-brand: #06121F;
+    --mx-background: #0B0F1F;
+    --mx-surface: #131730;
+    --mx-surface-muted: #1A1F3D;
+    --mx-surface-hover: #181D38;
+    --mx-border: #272D50;
+    --mx-border-strong: #3D4573;
+    --mx-text-primary: #E5E7F3;
+    --mx-text-secondary: #9CA3C0;
+    --mx-text-label: #C5C9E0;
+    --mx-text-on-brand: #0B0F1F;
     --mx-danger-text: #F87171;
 
-    --mx-tone-neutral-bg: #1E2B44;
-    --mx-tone-neutral-fg: #C3CFE0;
-    --mx-tone-brand-bg: #12324D;
-    --mx-tone-brand-fg: #8FD0F2;
+    --mx-tone-neutral-bg: #1E2240;
+    --mx-tone-neutral-fg: #C5C9E0;
+    --mx-tone-brand-bg: #27265E;
+    --mx-tone-brand-fg: #C7D2FE;
     --mx-tone-info-bg: #0C3247;
     --mx-tone-info-fg: #7DD3FC;
     --mx-tone-success-bg: #0B3B2E;
@@ -183,10 +183,10 @@
     --mx-tone-teal-bg: #0C3537;
     --mx-tone-teal-fg: #7FE3E6;
 
-    --chart-c0: #3AA6DE;
-    --chart-c1: #2DD4D8;
+    --chart-c0: #818CF8;
+    --chart-c1: #34D399;
     --chart-c2: #FBBF24;
-    --chart-c3: #8EA9D6;
+    --chart-c3: #A5B4FC;
     --chart-c4: #F87171;
     --chart-c5: #64748B;
 
@@ -204,7 +204,7 @@
     --bs-link-color: var(--mx-brand-primary);
     --bs-link-color-rgb: var(--mx-brand-primary-rgb);
     --bs-link-hover-color: var(--mx-brand-primary-hover);
-    --bs-link-hover-color-rgb: 99, 186, 230;
+    --bs-link-hover-color-rgb: 165, 180, 252;
 }
 
 html, body {
@@ -3100,7 +3100,7 @@ section[aria-labelledby] > h2 {
     position: fixed;
     inset: 0;
     z-index: 1060;
-    background: rgba(16, 29, 53, 0.35);
+    background: rgba(17, 24, 39, 0.35);
 }
 
 .drawer {
