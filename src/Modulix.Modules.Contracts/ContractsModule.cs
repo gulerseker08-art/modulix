@@ -23,6 +23,15 @@ public sealed class ContractsModule : IModule
 
         /// <summary>Sözleşme bedeli, kalem fiyatları ve toplamlar (Y8b, hassas alan). Olmayan kişi sözleşmeyi görür, tutarları görmez ve yazamaz.</summary>
         public const string FinancialsRead = "contracts.financials.read";
+
+        /// <summary>İç onay bekleyen sözleşmeyi onaylar ya da reddeder (ADR-0021, dilim 2). Yazma izninden ayrıdır.</summary>
+        public const string ContractsApprove = "contracts.contracts.approve";
+    }
+
+    /// <summary>Firma ayarları (Y6).</summary>
+    public static class SettingKeys
+    {
+        public const string AllowSelfApproval = "contracts.approval.allow-self";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -48,6 +57,16 @@ public sealed class ContractsModule : IModule
         new(Permissions.ContractsRead, "Sözleşmeleri, taraflarını ve kalemlerini görüntüler", "Sözleşmeler"),
         new(Permissions.ContractsWrite, "Sözleşme taslağı açar, taraf ve kalem ekler, düzenler, taslağı siler", "Sözleşmeler"),
         new(Permissions.FinancialsRead, "Sözleşme bedelini, kalem fiyatlarını ve toplamları görür ve düzenler", "Sözleşme tutarları"),
+        new(Permissions.ContractsApprove, "İç onay bekleyen sözleşmeyi onaylar ya da gerekçeyle reddeder", "Sözleşmeler"),
+    ];
+
+    IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
+    [
+        new(SettingKeys.AllowSelfApproval, "Sözleşme iç onay: kendi gönderdiğini onaylama", "Sözleşmeler", SettingType.Choice, "false")
+        {
+            Description = "Evet seçilirse sözleşmeyi onaya gönderen kişi onaylama yetkisine sahipse kendi gönderdiğini onaylayabilir. Varsayılan hayırdır (hazırlayan ve onaylayan ayrılır).",
+            Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
+        },
     ];
 
     /// <summary>Devre dışı bırakılan kişinin yürürlükte olmayan ve yürürlükteki sözleşmeleri devredilir (ADR-0004).</summary>
@@ -65,6 +84,14 @@ public sealed class ContractsModule : IModule
             [Permissions.ContractsRead, Permissions.ContractsWrite, Permissions.FinancialsRead])
         {
             Scope = RecordScope.Own,
+        },
+        new(
+            "contracts.approver",
+            "Sözleşme onaylayıcı",
+            "Sözleşmeleri tutarlarıyla görüntüler, iç onayı verir ya da reddeder.",
+            [Permissions.ContractsRead, Permissions.FinancialsRead, Permissions.ContractsApprove])
+        {
+            Scope = RecordScope.All,
         },
         new(
             "contracts.viewer",

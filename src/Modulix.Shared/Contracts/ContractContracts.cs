@@ -138,6 +138,37 @@ public static class ContractsAccess
     public const string ContractsRead = "contracts.contracts.read";
     public const string ContractsWrite = "contracts.contracts.write";
     public const string FinancialsRead = "contracts.financials.read";
+    public const string ContractsApprove = "contracts.contracts.approve";
 
     public const string ContractTypeList = "contracts.contract-type";
 }
+
+// ---- Dilim 2: durum geçişleri ve sürümler
+
+/// <summary>Eylem isteği: kaydın sürümü zorunlu (eşzamanlı çakışmada 409); gerekçe bazı eylemlerde zorunludur.</summary>
+public sealed record ContractTransitionRequest(long Version, string? Reason = null);
+
+public sealed record ContractActionDto(string Action, bool Allowed, string? Code, string? Message, bool RequiresReason);
+
+public sealed record ContractSnapshotLineDto(
+    Guid StableKey, int Position, string Kind, string? ProductCode, string Name, string? Description, decimal Quantity, string? UnitName,
+    decimal UnitPrice, decimal DiscountPercent, decimal TaxRatePercent, string? BillingPeriod, decimal Net, decimal Tax, decimal Gross);
+
+public sealed record ContractSnapshotPartyDto(Guid Id, string Role, Guid? PartyId, Guid? PersonId, int Position, string? Notes);
+
+/// <summary>Dondurulmuş içerik; finansal alanlar izni olmayan okuyucuya sıfır/boş gelir.</summary>
+public sealed record ContractSnapshotDto(
+    string Number, int VersionNo, string Title, string Type, string? Description, Guid PartyId, Guid? PersonId, DateOnly? StartDate, DateOnly? EndDate,
+    bool IsIndefinite, string Currency, bool PriceIncludesTax, decimal? ContractValue, string? PaymentTerms, string RenewalMode, int? RenewalPeriodMonths,
+    int? NoticePeriodDays, DateOnly? NoticeDeadline, string Confidentiality, decimal NetTotal, decimal TaxTotal, decimal GrossTotal, string? RecurringSummary,
+    IReadOnlyList<ContractSnapshotPartyDto> Parties, IReadOnlyList<ContractSnapshotLineDto> Lines);
+
+public sealed record ContractVersionDto(Guid Id, int VersionNo, string Kind, string Status, string Sha256, string? Reason, Guid? CreatedBy, DateTimeOffset FrozenAt, ContractSnapshotDto? Snapshot);
+
+public sealed record FieldChangeDto(string Field, string? Before, string? After);
+
+public sealed record LineChangeDto(Guid StableKey, string Change, string Name, IReadOnlyList<FieldChangeDto> Fields);
+
+public sealed record PartyChangeDto(Guid Id, string Change, string Role, IReadOnlyList<FieldChangeDto> Fields);
+
+public sealed record ContractCompareDto(IReadOnlyList<FieldChangeDto> Header, IReadOnlyList<LineChangeDto> Lines, IReadOnlyList<PartyChangeDto> Parties);
