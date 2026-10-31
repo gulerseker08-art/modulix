@@ -1,0 +1,277 @@
+@implements IDisposable
+@inject SessionState Session
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+@* Genel arama (AppHeader): yazdıkça firma, kişi, fırsat, lead ve tekliflerde arar (docs/design-system/component-catalog.md).
+   Ayrı bir genel arama uç noktası yoktur; yalnızca kullanıcının izni olan kayıt türlerinin mevcut liste uç noktaları
+   çağrılır. Tenant, yetki ve kayıt kapsamı süzgeçleri o uç noktalarda, sunucuda uygulanır. *@
+<div class="global-search" @onkeydown="OnKeyDown">
+    <label class="visually-hidden" for="global-search-input">Arama yapın</label>
+    <span class="global-search-icon"><AppIcon Name="search" Size="18" /></span>
+    <input id="global-search-input" type="search" class="global-search-input" autocomplete="off" spellcheck="false"
+           placeholder="Arama yapın..." role="combobox" aria-autocomplete="list"
+           aria-expanded="@(open ? "true" : "false")" aria-controls="global-search-results"
+           aria-activedescendant="@(open && active >= 0 ? OptionId(active) : null)"
+           value="@query" @oninput="OnInputAsync" @onfocus="OnFocus" />
+
+    @if (open)
+    {
+        <div class="global-search-backdrop" @onclick="Close"></div>
+        <div id="global-search-results" class="global-search-panel" role="listbox" aria-label="Arama sonuçları">
+            @if (busy)
+            {
+                <p class="global-search-state" role="status">
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Aranıyor…
+                </p>
+            }
+            else if (groups.Count == 0)
+            {
+                <p class="global-search-state" role="status">“@query” için sonuç bulunamadı.</p>
+            }
+            else
+            {
+                int index = 0;
+                @foreach (SearchGroup group in groups)
+                {
+                    <div class="global-search-group">
+                        <div class="global-search-group-title">
+                            <AppIcon Name="@group.Icon" Size="16" />
+                            @group.Label
+                            <span class="global-search-count">@group.TotalCount.ToString("N0", Regional.Numbers)</span>
+                        </div>
+                        @foreach (SearchItem item in group.Items)
+                        {
+                            int i = index++;
+                            <a id="@OptionId(i)" role="option" aria-selected="@(i == active ? "true" : "false")"
+                               class="global-search-item @(i == active ? "is-active" : null)" href="@item.Href"
+                               @onclick="Close" @onmouseenter="() => active = i">
+                                <span class="global-search-primary">@item.Title</span>
+                                @if (item.Detail is not null)
+                                {
+                                    <span class="global-search-secondary">@item.Detail</span>
+                                }
+                            </a>
+                        }
+                        @if (group.TotalCount > group.Items.Count)
+                        {
+                            <a class="global-search-more" href="@group.ListRoute" @onclick="Close">Tümünü @group.Label listesinde ara →</a>
+                        }
+                    </div>
+                }
+            }
+
+            @if (failed.Count > 0)
+            {
+                <p class="global-search-state" role="alert">@string.Join(", ", failed) aranamadı; daha sonra yeniden deneyin.</p>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Her kayıt türünden en çok kaç sonuç gösterilir.</summary>
+    private const int Limit = 5;
+
+    private sealed record SearchItem(string Title, string? Detail, string Href);
+
+    private sealed record SearchGroup(string Label, string Icon, string ListRoute, IReadOnlyList<SearchItem> Items, int TotalCount);
+
+    private string query = "";
+    private bool open;
+    private bool busy;
+    private int active = -1;
+    private IReadOnlyList<SearchGroup> groups = [];
+    private readonly List<string> failed = [];
+    private CancellationTokenSource? pending;
+
+    private IEnumerable<SearchItem> Flat => groups.SelectMany(g => g.Items);
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        Session.Changed += OnSessionChanged;
+    }
+
+    private static string OptionId(int index) => $"global-search-option-{index}";
+
+    private async Task OnInputAsync(ChangeEventArgs e)
+    {
+        query = e.Value?.ToString() ?? "";
+        pending?.Cancel();
+        string text = query.Trim();
+        if (text.Length < 2)
+        {
+            open = false;
+            busy = false;
+            groups = [];
+            failed.Clear();
+            active = -1;
+            return;
+        }
+
+        CancellationTokenSource cts = new();
+        pending = cts;
+        open = true;
+        busy = true;
+        active = -1;
+
+        // Debounce: kullanıcı yazmayı bırakınca sorgu gider; araya yeni tuş girince önceki sorgu iptal olur.
+        try
+        {
+            await Task.Delay(300, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        await SearchAsync(text, cts.Token);
+    }
+
+    private void OnFocus()
+    {
+        if (groups.Count > 0 || (busy && query.Trim().Length >= 2))
+        {
+            open = true;
+        }
+    }
+
+    private async Task SearchAsync(string text, CancellationToken token)
+    {
+        List<Task<SearchGroup?>> tasks = [];
+        List<string> failures = [];
+        bool crm = Session.IsModuleEnabled(CrmAccess.ModuleKey);
+
+        if (crm && Session.Can(CrmAccess.CompaniesRead))
+        {
+            tasks.Add(FetchAsync<CompanyDto>("Firmalar", "building", "crm/firmalar", "/api/crm/companies", text, failures,
+                c => new SearchItem(c.Name, Join(c.Industry, c.City), $"crm/firmalar/{c.Id}")));
+        }
+
+        if (crm && Session.Can(CrmAccess.ContactsRead))
+        {
+            tasks.Add(FetchAsync<ContactDto>("Kişiler", "user", "crm/kisiler", "/api/crm/contacts", text, failures,
+                c => new SearchItem($"{c.FirstName} {c.LastName}".Trim(), Join(c.Title, c.Email), $"crm/kisiler/{c.Id}")));
+        }
+
+        if (crm && Session.Can(CrmAccess.OpportunitiesRead))
+        {
+            tasks.Add(FetchAsync<OpportunityDto>("Fırsatlar", "target", "crm/firsatlar", "/api/crm/opportunities", text, failures,
+                o => new SearchItem(o.Title, o.Amount is { } amount ? $"{amount.ToString("N2", Regional.Numbers)} {o.Currency}" : null, $"crm/firsatlar/{o.Id}")));
+        }
+
+        if (crm && Session.Can(CrmAccess.LeadsRead))
+        {
+            tasks.Add(FetchAsync<LeadDto>("Lead'ler", "inbox", "crm/leadler", "/api/crm/leads", text, failures,
+                l => new SearchItem(l.Subject, Join(l.LeadNumber, l.CompanyName ?? $"{l.FirstName} {l.LastName}".Trim()), $"crm/leadler/{l.Id}")));
+        }
+
+        if (crm && Session.Can(CrmAccess.QuotesRead))
+        {
+            tasks.Add(FetchAsync<QuoteDto>("Teklifler", "file-text", "crm/teklifler", "/api/crm/quotes", text, failures,
+                q => new SearchItem(q.Title, Join(q.QuoteNumber, $"V{q.RevisionNo}"), $"crm/teklifler/{q.Id}")));
+        }
+
+        SearchGroup?[] results = await Task.WhenAll(tasks);
+        if (token.IsCancellationRequested)
+        {
+            return;
+        }
+
+        groups = results.Where(g => g is not null).Select(g => g!).ToList();
+        failed.Clear();
+        failed.AddRange(failures);
+        busy = false;
+        active = groups.Count > 0 ? 0 : -1;
+    }
+
+    private async Task<SearchGroup?> FetchAsync<T>(string label, string icon, string listRoute, string url, string text,
+        List<string> failures, Func<T, SearchItem> map)
+    {
+        ApiResult<CrmPage<T>> result = await Api.GetAsync<CrmPage<T>>(
+            $"{url}?page=1&pageSize={Limit}&search={Uri.EscapeDataString(text)}");
+        if (!result.IsSuccess || result.Value is null)
+        {
+            lock (failures)
+            {
+                failures.Add(label);
+            }
+
+            return null;
+        }
+
+        List<SearchItem> items = result.Value.Items.Take(Limit).Select(map).ToList();
+        return items.Count == 0 ? null : new SearchGroup(label, icon, listRoute, items, result.Value.TotalCount);
+    }
+
+    private static string? Join(string? first, string? second)
+    {
+        string[] parts = new[] { first, second }.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!).ToArray();
+        return parts.Length == 0 ? null : string.Join(" · ", parts);
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (!open)
+        {
+            return;
+        }
+
+        int count = Flat.Count();
+        switch (e.Key)
+        {
+            case "Escape":
+                Close();
+                break;
+            case "ArrowDown" when count > 0:
+                active = active < 0 ? 0 : Math.Min(active + 1, count - 1);
+                break;
+            case "ArrowUp" when count > 0:
+                active = active <= 0 ? 0 : active - 1;
+                break;
+            case "Enter" when active >= 0 && active < count:
+                string href = Flat.ElementAt(active).Href;
+                Close();
+                Navigation.NavigateTo(href);
+                break;
+        }
+    }
+
+    private void Close()
+    {
+        open = false;
+        active = -1;
+    }
+
+    // Sayfa değişince (sonuca gidildi ya da menüden geçildi) kutu temizlenir; Escape ise yazılanı korur.
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (open || query.Length > 0)
+        {
+            query = "";
+            groups = [];
+            failed.Clear();
+            Close();
+            StateHasChanged();
+        }
+    }
+
+    // Tenant ya da şirket değişince önceki bağlamın sonuçları kalmaz.
+    private void OnSessionChanged()
+    {
+        pending?.Cancel();
+        query = "";
+        groups = [];
+        failed.Clear();
+        Close();
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        pending?.Cancel();
+        Navigation.LocationChanged -= OnLocationChanged;
+        Session.Changed -= OnSessionChanged;
+    }
+}

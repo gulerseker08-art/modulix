@@ -22,6 +22,11 @@
                     <img class="tenant-logo" src="@logo.Url" alt="@Session.ActiveTenantName" />
                 }
 
+                @* Genel arama: yetki ve tenant sınırları sunucudaki liste uç noktalarından gelir (GlobalSearch). *@
+                <div class="header-search">
+                    <GlobalSearch />
+                </div>
+
                 <div class="header-tools">
                     @* İşletici şirket seçici (ADR-0008): yalnızca birden fazla şirkete erişim varsa görünür. *@
                     @if (Session.HasMultipleCompanies)

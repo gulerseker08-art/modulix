@@ -152,3 +152,26 @@ Test sırasında bulunup bu dalda düzeltilenler:
 | Telefonda haftalık çizelgede bugün ekran dışında | 7 sütun 390px'e sığmaz | Telefonda varsayılan görünüm Gün |
 
 Kalan gözlem: telefonda Fırsat sayfasının sağ paneli (aktivite zaman çizelgesi, finansal özet) en alta, değişiklik geçmişinin altına düşüyor; hata değil, sıralama iyileştirmesi olarak sonraki işe bırakıldı. `QuoteSharingPanel` ve `RelatedLeads` da `CrmLookups` enjekte ediyor ama kullanmıyor (zararsız).
+
+
+## Faz 5 — Palet, logo ve genel arama (31.10.2026)
+
+Dal: `gseker/modulix-design-system-0f1c04`. Kullanıcı kararı: tasarım sistemi **referans CRM ekranlarının lacivert / mavi / turkuaz paletine** göre uygulanır; aynı gün erken saatte yapılan indigo / lila / krem dönüşü (PR #79) geri alındı ve yol haritasındaki K6 / Ç15a.1 maddeleri bu karara göre düzeltildi (bir daha "ürün varsayılanı" gerekçesiyle geri dönülmesin diye).
+
+| Özellik | Durum | Not |
+|---|---|---|
+| Renk tokenları | Değişti | Şablondaki 15 token birebir (`brand-navy #101D35`, `brand-navy-light #173B68`, `brand-primary #087DB8`, `brand-teal #00C2C7`, `brand-teal-dark #008F98`, `background #F5F8FC`, `surface-muted #EEF5FA`, `border #DCE5F0`, durum renkleri). Yalnızca `text-secondary` için şablondaki `#64748B` yerine `#5D6B81` kullanıldı (sayfa zemininde 4.47:1 → 5.1:1). Marka ve turkuaz ton çiftleri, grafik serileri ve gölgeler yeni palete göre; koyu tema aynı adlarla koyu lacivert zemin üzerine yeniden türetildi |
+| Tipografi | Değişti | Inter (Google Fonts, 400–800); önceki Public Sans kaldırıldı |
+| Logo | Değişti | `modulix-mark.svg` referans logoya göre yeniden çizildi: iki çapraz, eğik uçlu şeritten oluşan "X" (sol yarı lacivert, sağ üst turkuaz, sağ alt mavi; "/" şeridi üstte); koyu tema için `modulix-mark-dark.svg` eklendi ve `BrandLogo` temaya göre birini gösterir; `favicon.png` (64px) ve `icon-192.png` aynı geometriden üretildi; `theme-color` `#101D35`. Logo metni `BrandLogo` bileşeninde "Moduli" + turkuaz "x", slogan MODÜLER İŞİN GÜCÜ (değişmedi) |
+| Genel arama | Yeni | `Components/GlobalSearch.razor` üst çubuğun ortasında ("Arama yapın..."). 2+ karakterde 300ms gecikmeyle firma, kişi, fırsat, lead ve teklif liste uç noktalarını yalnızca izin olan türler için paralel çağırır (`pageSize=5`); sonuçlar gruplu panelde, klavye ile gezilir, Enter kaydı açar. Yeni uç nokta yok: tenant, yetki ve kapsam süzgeçleri sunucudaki liste uç noktalarındadır |
+| Bildirim ve yardım ikonları | Yok | Bildirim altyapısı ve yardım içeriği yok; sahte ikon eklenmedi |
+
+Bileşenler, düzenler ve davranışlar (faz 2–4) değişmedi; yeni palet token katmanından bütün ekranlara yansır.
+
+![Genel arama](onizleme-genel-arama.png)
+
+![Daraltılmış menü](onizleme-menu-daraltilmis.png)
+
+**Doğrulama (yerel, gerçek uygulama):** Release derleme 0 hata; mimari testler 29/29. Uygulama yerel SQL Server ve `seed` verisiyle çalıştırıldı, Chromium'da (1440px ve 390px) kontrol edildi: giriş, ana sayfa, Aktiviteler (hafta/gün), Fırsat detayı (huni, gösterge şeridi, sağ panel), Firma detayı (özet kartı, sekmeler), koyu tema, daraltılmış menü (yalnızca işaret), telefonda yatay taşma yok (`scrollWidth == innerWidth`), yazı tipi Inter ve `--mx-brand-primary #087DB8` tarayıcıda doğrulandı. Genel arama: "an" → Firmalar (2) + Fırsatlar (1) gruplu sonuç, Enter ile ilk sonuç (Anka Gıda A.Ş.) açıldı, sonuçsuz sorguda "sonuç bulunamadı", telefonda panel tam genişlikte. Bu klasördeki `onizleme-*.png` görüntüleri bu çalıştırmadan alınmıştır (tarayıcı paneli çözünürlüğünde; `onizleme-aktivite-cekmece.png` önceki paletten kalmadır, düzen aynıdır). Entegrasyon testleri bu oturumda çalıştırılmadı; yalnızca `Modulix.Web` ve belgeler değişti, API ve veritabanı aynı — CI sonucu PR'da.
+
+**Kalanlar:** Üst çubukta bildirim ve yardım ikonları (altyapı yok). Şablondaki "Takip Et", tekrarlayan aktivite, hatırlatıcı sekmesi, DataGrid kolon yönetimi ve kayıtlı görünüm, merkezi toast, modal, bUnit/axe testleri önceki fazlardaki gibi açık iş kalemleridir.
