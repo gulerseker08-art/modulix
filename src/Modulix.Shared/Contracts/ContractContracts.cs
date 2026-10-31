@@ -39,7 +39,8 @@ public sealed record ContractDto(
     string? RecurringSummary,
     DateTimeOffset? CalculatedAt,
     Guid? CreatedBy,
-    Guid? UpdatedBy);
+    Guid? UpdatedBy,
+    System.Text.Json.Nodes.JsonObject? Custom = null);
 
 public sealed record SaveContractRequest(
     string Title,
@@ -60,7 +61,8 @@ public sealed record SaveContractRequest(
     int? RenewalPeriodMonths = null,
     int? NoticePeriodDays = null,
     string Confidentiality = "Internal",
-    long? Version = null);
+    long? Version = null,
+    System.Text.Json.Nodes.JsonObject? Custom = null);
 
 public sealed record ContractPartyDto(
     Guid Id,
@@ -139,6 +141,8 @@ public static class ContractsAccess
     public const string ContractsWrite = "contracts.contracts.write";
     public const string FinancialsRead = "contracts.financials.read";
     public const string ContractsApprove = "contracts.contracts.approve";
+
+    public const string ContractEntityKey = "contracts.contract";
 
     public const string ContractTypeList = "contracts.contract-type";
 }

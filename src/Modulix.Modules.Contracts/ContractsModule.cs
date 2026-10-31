@@ -153,6 +153,9 @@ public sealed class ContractsModule : IModule
 
     IReadOnlyList<LookupDefinition> IModule.Lookups => ContractsLookupDefinitions.All;
 
+    /// <summary>Sözleşme formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021 form düzeni).</summary>
+    IReadOnlyList<FormDefinition> IModule.Forms => ContractsForms.All;
+
     /// <summary>Sözleşme türü (Y9b): hazır değerler örnektir; firma kendi türlerini ekler. Kod türe bakmaz (sektör koşulu yok).</summary>
     IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
     [

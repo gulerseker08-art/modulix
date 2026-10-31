@@ -5,6 +5,7 @@
 @inject CrmLookups Lookups
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
+@inject FormLayouts Layouts
 
 <PageTitle>@(contract?.Title ?? "Yeni sözleşme") · Modulix</PageTitle>
 
@@ -119,117 +120,124 @@
                                 </ul>
                             </div>
                         }
-                        <div class="form-grid" @oninput="() => dirty = true">
-                            <div class="span-all">
-                                <label class="form-label" for="c-title">Başlık *</label>
-                                <input id="c-title" class="form-control" maxlength="200" @bind="form.Title" aria-invalid="@(errors?.ContainsKey("title") == true)" />
-                                <FieldError Field="title" Errors="errors" />
-                            </div>
-                            <div>
-                                <label class="form-label" for="partyId">Müşteri *</label>
-                                <LookupPicker Id="partyId" LookupKey="contracts.contract.party" @bind-Value="form.PartyId" Required="true"
-                                              Invalid="@(errors?.ContainsKey("partyId") == true)" ReadOnly="@(!CanEditHeader)" />
-                                <FieldError Field="partyId" Errors="errors" />
-                            </div>
-                            <div>
-                                <label class="form-label" for="personId">İlgili kişi</label>
-                                <LookupPicker Id="personId" LookupKey="contracts.contract.person" @bind-Value="form.PersonId" ParentId="form.PartyId" Placeholder="—"
-                                              Invalid="@(errors?.ContainsKey("personId") == true)" ReadOnly="@(!CanEditHeader)" />
-                                <FieldError Field="personId" Errors="errors" />
-                            </div>
-                            <div>
-                                <label class="form-label" for="c-type">Tür *</label>
-                                <select id="c-type" class="form-select" @bind="form.Type">
-                                    @foreach (var t in Lookups.Choices(ContractsAccess.ContractTypeList, contract?.Type))
+                        <div @oninput="() => dirty = true" @onchange="() => dirty = true">
+                            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" Shows="ShowsField" TabsLabel="Sözleşme formu bölümleri">
+                                <Field Context="f">
+                                    @switch (f.Key)
                                     {
-                                        <option value="@t.Key">@t.Label</option>
+                                        case "title":
+                                            <label class="@f.LabelClass()" for="c-title">@f.Label</label>
+                                            <input id="c-title" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Title" aria-invalid="@(errors?.ContainsKey("title") == true)" />
+                                            <FieldError Field="title" Errors="errors" />
+                                            break;
+                                        case "partyId":
+                                            <label class="@f.LabelClass()" for="partyId">@f.Label</label>
+                                            <LookupPicker Id="partyId" LookupKey="contracts.contract.party" @bind-Value="form.PartyId" Required="f.Required"
+                                                          Invalid="@(errors?.ContainsKey("partyId") == true)" ReadOnly="@(!CanEditHeader)" />
+                                            <FieldError Field="partyId" Errors="errors" />
+                                            break;
+                                        case "personId":
+                                            <label class="@f.LabelClass()" for="personId">@f.Label</label>
+                                            <LookupPicker Id="personId" LookupKey="contracts.contract.person" @bind-Value="form.PersonId" ParentId="form.PartyId" Placeholder="—" Required="f.Required"
+                                                          Invalid="@(errors?.ContainsKey("personId") == true)" ReadOnly="@(!CanEditHeader)" />
+                                            <FieldError Field="personId" Errors="errors" />
+                                            break;
+                                        case "type":
+                                            <label class="@f.LabelClass()" for="c-type">@f.Label</label>
+                                            <select id="c-type" class="form-select" @bind="form.Type">
+                                                @foreach (var t in Lookups.Choices(ContractsAccess.ContractTypeList, contract?.Type))
+                                                {
+                                                    <option value="@t.Key">@t.Label</option>
+                                                }
+                                            </select>
+                                            <FieldError Field="type" Errors="errors" />
+                                            break;
+                                        case "ownerId":
+                                            <label class="@f.LabelClass()" for="ownerId">@f.Label</label>
+                                            <LookupPicker Id="ownerId" LookupKey="contracts.contract.owner" @bind-Value="form.OwnerId" Required="f.Required" Placeholder="@(contract is null ? "Ben" : "—")" ReadOnly="@(!CanEditHeader)" />
+                                            <FieldError Field="ownerId" Errors="errors" />
+                                            break;
+                                        case "confidentiality":
+                                            <label class="@f.LabelClass()" for="c-conf">@f.Label</label>
+                                            <select id="c-conf" class="form-select" @bind="form.Confidentiality">
+                                                @foreach (var c in ContractLabels.Confidentialities) { <option value="@c.Key">@c.Label</option> }
+                                            </select>
+                                            break;
+                                        case "previousContractId":
+                                            <label class="@f.LabelClass()" for="previousContractId">@f.Label</label>
+                                            <LookupPicker Id="previousContractId" LookupKey="contracts.contract.previous" @bind-Value="form.PreviousContractId" Placeholder="—" Required="f.Required"
+                                                          Invalid="@(errors?.ContainsKey("previousContractId") == true)" ReadOnly="@(!CanEditHeader)" />
+                                            <FieldError Field="previousContractId" Errors="errors" />
+                                            break;
+                                        case "startDate":
+                                            <label class="@f.LabelClass()" for="c-start">@f.Label</label>
+                                            <input id="c-start" type="date" class="form-control" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.StartDate" />
+                                            <FieldError Field="startDate" Errors="errors" />
+                                            break;
+                                        case "endDate":
+                                            <label class="@f.LabelClass()" for="c-end">@f.Label</label>
+                                            <input id="c-end" type="date" class="form-control" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EndDate" disabled="@form.IsIndefinite" />
+                                            <FieldError Field="endDate" Errors="errors" />
+                                            break;
+                                        case "isIndefinite":
+                                            <div class="form-check">
+                                                <input id="c-indef" type="checkbox" class="form-check-input" @bind="form.IsIndefinite" />
+                                                <label class="form-check-label" for="c-indef">@f.Label</label>
+                                            </div>
+                                            break;
+                                        case "renewalMode":
+                                            <label class="@f.LabelClass()" for="c-renewal">@f.Label</label>
+                                            <select id="c-renewal" class="form-select" @bind="form.RenewalMode">
+                                                @foreach (var m in ContractLabels.RenewalModes) { <option value="@m.Key">@m.Label</option> }
+                                            </select>
+                                            <FieldError Field="renewalMode" Errors="errors" />
+                                            break;
+                                        case "renewalPeriodMonths":
+                                            <label class="@f.LabelClass()" for="c-renewal-months">@f.Label</label>
+                                            <input id="c-renewal-months" type="number" min="1" max="120" class="form-control" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.RenewalPeriodMonths" disabled="@(form.RenewalMode == "None")" />
+                                            <FieldError Field="renewalPeriodMonths" Errors="errors" />
+                                            break;
+                                        case "noticePeriodDays":
+                                            <label class="@f.LabelClass()" for="c-notice">@f.Label</label>
+                                            <input id="c-notice" type="number" min="0" max="3650" class="form-control" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NoticePeriodDays" />
+                                            <small class="text-muted">Son bildirim tarihi = bitiş − bildirim süresi; sunucu hesaplar.</small>
+                                            <FieldError Field="noticePeriodDays" Errors="errors" />
+                                            break;
+                                        case "currency":
+                                            <label class="@f.LabelClass()" for="c-currency">@f.Label</label>
+                                            <input id="c-currency" class="form-control" maxlength="3" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Currency" />
+                                            <FieldError Field="currency" Errors="errors" />
+                                            break;
+                                        case "priceIncludesTax":
+                                            <label class="@f.LabelClass()" for="c-tax">@f.Label</label>
+                                            <select id="c-tax" class="form-select" @bind="form.PriceIncludesTax">
+                                                <option value="False">Fiyatlar vergi hariç</option>
+                                                <option value="True">Fiyatlar vergi dahil</option>
+                                            </select>
+                                            break;
+                                        case "contractValue":
+                                            <label class="@f.LabelClass()" for="c-value">@f.Label</label>
+                                            <input id="c-value" type="number" step="0.01" min="0" class="form-control" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ContractValue" />
+                                            <small class="text-muted">Kalem toplamından bağımsız üst limit ya da toplam bedel.</small>
+                                            <FieldError Field="contractValue" Errors="errors" />
+                                            break;
+                                        case "description":
+                                            <label class="@f.LabelClass()" for="c-desc">@f.Label</label>
+                                            <textarea id="c-desc" class="form-control" rows="3" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                                            break;
+                                        case "paymentTerms":
+                                            <label class="@f.LabelClass()" for="c-payment">@f.Label</label>
+                                            <textarea id="c-payment" class="form-control" rows="3" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PaymentTerms"></textarea>
+                                            break;
                                     }
-                                </select>
-                                <FieldError Field="type" Errors="errors" />
-                            </div>
-                            <div>
-                                <label class="form-label" for="ownerId">Sorumlu</label>
-                                <LookupPicker Id="ownerId" LookupKey="contracts.contract.owner" @bind-Value="form.OwnerId" Placeholder="@(contract is null ? "Ben" : "—")" ReadOnly="@(!CanEditHeader)" />
-                            </div>
-                            <div>
-                                <label class="form-label" for="c-start">Başlangıç tarihi</label>
-                                <input id="c-start" type="date" class="form-control" @bind="form.StartDate" />
-                                <FieldError Field="startDate" Errors="errors" />
-                            </div>
-                            <div>
-                                <label class="form-label" for="c-end">Bitiş tarihi</label>
-                                <input id="c-end" type="date" class="form-control" @bind="form.EndDate" disabled="@form.IsIndefinite" />
-                                <FieldError Field="endDate" Errors="errors" />
-                            </div>
-                            <div class="form-check">
-                                <input id="c-indef" type="checkbox" class="form-check-input" @bind="form.IsIndefinite" />
-                                <label class="form-check-label" for="c-indef">Belirsiz süreli sözleşme</label>
-                            </div>
-                            <div>
-                                <label class="form-label" for="c-renewal">Yenileme yöntemi</label>
-                                <select id="c-renewal" class="form-select" @bind="form.RenewalMode">
-                                    @foreach (var m in ContractLabels.RenewalModes) { <option value="@m.Key">@m.Label</option> }
-                                </select>
-                                <FieldError Field="renewalMode" Errors="errors" />
-                            </div>
-                            <div>
-                                <label class="form-label" for="c-renewal-months">Yenileme süresi (ay)</label>
-                                <input id="c-renewal-months" type="number" min="1" max="120" class="form-control" @bind="form.RenewalPeriodMonths" disabled="@(form.RenewalMode == "None")" />
-                                <FieldError Field="renewalPeriodMonths" Errors="errors" />
-                            </div>
-                            <div>
-                                <label class="form-label" for="c-notice">Bildirim süresi (gün)</label>
-                                <input id="c-notice" type="number" min="0" max="3650" class="form-control" @bind="form.NoticePeriodDays" />
-                                <small class="text-muted">Son bildirim tarihi = bitiş − bildirim süresi; sunucu hesaplar.</small>
-                                <FieldError Field="noticePeriodDays" Errors="errors" />
-                            </div>
-                            <div>
-                                <label class="form-label" for="c-currency">Para birimi *</label>
-                                <input id="c-currency" class="form-control" maxlength="3" @bind="form.Currency" />
-                                <FieldError Field="currency" Errors="errors" />
-                            </div>
-                            <div>
-                                <label class="form-label" for="c-tax">Fiyatlandırma biçimi</label>
-                                <select id="c-tax" class="form-select" @bind="form.PriceIncludesTax">
-                                    <option value="False">Fiyatlar vergi hariç</option>
-                                    <option value="True">Fiyatlar vergi dahil</option>
-                                </select>
-                            </div>
-                            @if (Session.Can(ContractsAccess.FinancialsRead))
-                            {
-                                <div>
-                                    <label class="form-label" for="c-value">Sözleşme bedeli (isteğe bağlı)</label>
-                                    <input id="c-value" type="number" step="0.01" min="0" class="form-control" @bind="form.ContractValue" />
-                                    <small class="text-muted">Kalem toplamından bağımsız üst limit ya da toplam bedel.</small>
-                                    <FieldError Field="contractValue" Errors="errors" />
-                                </div>
-                            }
-                            <div>
-                                <label class="form-label" for="c-conf">Gizlilik</label>
-                                <select id="c-conf" class="form-select" @bind="form.Confidentiality">
-                                    @foreach (var c in ContractLabels.Confidentialities) { <option value="@c.Key">@c.Label</option> }
-                                </select>
-                            </div>
-                            <div>
-                                <label class="form-label" for="previousContractId">Önceki sözleşme</label>
-                                <LookupPicker Id="previousContractId" LookupKey="contracts.contract.previous" @bind-Value="form.PreviousContractId" Placeholder="—"
-                                              Invalid="@(errors?.ContainsKey("previousContractId") == true)" ReadOnly="@(!CanEditHeader)" />
-                                <FieldError Field="previousContractId" Errors="errors" />
-                            </div>
-                            <div class="span-all">
-                                <label class="form-label" for="c-desc">Açıklama</label>
-                                <textarea id="c-desc" class="form-control" rows="3" maxlength="4000" @bind="form.Description"></textarea>
-                            </div>
-                            <div class="span-all">
-                                <label class="form-label" for="c-payment">Ödeme koşulları</label>
-                                <textarea id="c-payment" class="form-control" rows="3" maxlength="4000" @bind="form.PaymentTerms"></textarea>
-                            </div>
+                                </Field>
+                            </LayoutForm>
                         </div>
                     </fieldset>
                     @if (CanEditHeader)
                     {
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">@(contract is null ? "Taslağı oluştur" : "Kaydet")</button>
+                            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@(contract is null ? "Taslağı oluştur" : "Kaydet")</button>
                             @if (dirty) { <span class="text-muted" role="status">Kaydedilmemiş değişiklikler var.</span> }
                         </div>
                     }
@@ -605,6 +613,7 @@
     private IReadOnlyDictionary<string, string[]>? actionErrors;
     private readonly Dictionary<Guid, string> partyNames = [];
     private readonly Dictionary<Guid, string> personNames = [];
+    private FormLayoutDto? layout;
     private PartyForm? partyForm;
     private LineForm? lineForm;
     private IReadOnlyDictionary<string, string[]>? errors;
@@ -616,6 +625,11 @@
     private bool busy;
     private bool dirty;
     private bool childDirty;
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(ContractsAccess.ContractEntityKey)];
+
+    /// <summary>Düzende çizilecek alan süzgeci: sözleşme bedeli yalnızca finansal izni olana (sunucu yine de denetler).</summary>
+    private bool ShowsField(FormFieldDto field) => field.Key != "contractValue" || Session.Can(ContractsAccess.FinancialsRead);
 
     private bool CanWrite => Session.Can(ContractsAccess.ContractsWrite);
 
@@ -641,6 +655,7 @@
         await Session.EnsureLoadedAsync();
         if (!Session.Can(ContractsAccess.ContractsRead)) { return; }
         await Lookups.LoadAsync();
+        layout ??= await Layouts.ForAsync(ContractsAccess.ContractEntityKey);
         if (Id is { } id)
         {
             await LoadAsync(id);
@@ -702,7 +717,8 @@
             form.Title, form.PartyId ?? Guid.Empty, form.Type, Blank(form.Description), form.PersonId, form.OwnerId, form.PreviousContractId,
             form.StartDate, form.IsIndefinite ? null : form.EndDate, form.IsIndefinite, form.Currency, form.PriceIncludesTax,
             Session.Can(ContractsAccess.FinancialsRead) ? form.ContractValue : null, Blank(form.PaymentTerms), form.RenewalMode,
-            form.RenewalMode == "None" ? null : form.RenewalPeriodMonths, form.NoticePeriodDays, form.Confidentiality, contract?.Version);
+            form.RenewalMode == "None" ? null : form.RenewalPeriodMonths, form.NoticePeriodDays, form.Confidentiality, contract?.Version,
+            CustomFieldText.ForSave(CustomFields, form.Custom));
         var result = contract is { } current
             ? await Api.PutAsync<ContractDto>($"/api/contracts/contracts/{current.Id}", request)
             : await Api.PostAsync<ContractDto>("/api/contracts/contracts", request);
@@ -923,6 +939,7 @@
         public string Confidentiality { get; set; } = "Internal";
         public string? Description { get; set; }
         public string? PaymentTerms { get; set; }
+        public System.Text.Json.Nodes.JsonObject Custom { get; set; } = [];
 
         public static ContractForm From(ContractDto c) => new()
         {
@@ -930,6 +947,7 @@
             StartDate = c.StartDate, EndDate = c.EndDate, IsIndefinite = c.IsIndefinite, Currency = c.Currency, PriceIncludesTax = c.PriceIncludesTax,
             ContractValue = c.ContractValue, RenewalMode = c.RenewalMode, RenewalPeriodMonths = c.RenewalPeriodMonths, NoticePeriodDays = c.NoticePeriodDays,
             Confidentiality = c.Confidentiality, Description = c.Description, PaymentTerms = c.PaymentTerms,
+            Custom = c.Custom?.DeepClone().AsObject() ?? [],
         };
     }
 
