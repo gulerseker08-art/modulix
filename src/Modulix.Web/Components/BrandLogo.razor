@@ -2,7 +2,9 @@
    İşaret, onaylı img/modulix-mark.svg dosyasıdır; yazı "Modulix" (M büyük, son x turkuaz vurgulu), slogan isteğe bağlı.
    Logo metni başka yerde elle yazılmaz; bu bileşen kullanılır. *@
 <span class="brand-logo @(ShowTagline ? null : "no-tagline")">
-    <img class="brand-mark" src="img/modulix-mark.svg" alt="" width="@Size" height="@Size" />
+    @* Açık ve koyu tema için iki işaret dosyası; hangisinin görüneceğini CSS (data-theme) seçer. *@
+    <img class="brand-mark brand-mark-light" src="img/modulix-mark.svg" alt="" width="@Size" height="@Size" />
+    <img class="brand-mark brand-mark-dark" src="img/modulix-mark-dark.svg" alt="" width="@Size" height="@Size" />
     <span class="brand-text">
         <span class="brand-name">Moduli<span class="brand-x">x</span></span>
         @if (ShowTagline)

@@ -7,14 +7,14 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Bileşen | Durum | Nerede / nasıl |
 |---|---|---|
 | AppShell | Var | `Layout/MainLayout.razor`: sol menü + üst çubuk + `main#main-content`; "İçeriğe geç" bağlantısı |
-| AppHeader | Var | MainLayout üst çubuğu: tenant logosu, şirket seçici, tema düğmesi, profil menüsü |
+| AppHeader | Var | MainLayout üst çubuğu: tenant logosu, ortada genel arama, şirket seçici, tema düğmesi, profil menüsü (avatar, ad, kuruluş) |
 | Sidebar | Var | `Layout/NavMenu.razor`: aktif modülün sayfaları (AppCatalog + izin süzgeci), aktif öğede vurgu çizgisi, Menüyü Daralt |
 | ModuleSwitcher | Var | `Components/AppLauncher.razor` (logoya tıklanınca "Tüm Uygulamalar" paneli) |
 | BrandLogo | Var | `Components/BrandLogo.razor` — `Size`, `ShowTagline` |
 | ThemeToggle | Var | `Components/ThemeToggle.razor` |
 | PageHeader | Var | `Components/PageHeader.razor` — `Title`, `Icon`, `Subtitle`, aksiyonlar `ChildContent` |
 | Breadcrumb | Stil | `<ol class="breadcrumb-trail">`; bugün detay sayfaları `back-link` kullanır |
-| Global arama | Yok | Sunucuda tenant/yetki sınırlı genel arama uç noktası yok |
+| Global arama | Var | `Components/GlobalSearch.razor`: üst çubukta "Arama yapın..." kutusu; 2+ karakterde 300ms gecikmeyle firma, kişi, fırsat, lead ve teklif liste uç noktalarını (`?search=&pageSize=5`) yalnızca izin olan türler için paralel çağırır; sonuçlar gruplu açılır panelde (ok tuşları, Enter, Escape, dışarı tıklama). Ayrı genel arama uç noktası yoktur; tenant, yetki ve kapsam süzgeçleri sunucudaki liste uç noktalarındadır |
 | NotificationCenter | Yok | Bildirim altyapısı yok |
 
 ## Temel

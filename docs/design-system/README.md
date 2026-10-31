@@ -30,7 +30,7 @@ Modulix'in bütün modülleri tek bir ürün ailesi gibi görünmelidir. Bu klas
 
 ## Marka
 
-- Logo: `Components/BrandLogo.razor`. İşaret onaylı `wwwroot/img/modulix-mark.svg` dosyasıdır (yeni logo üretilmedi). Yazı "Moduli" + turkuaz "x"; slogan **MODÜLER İŞİN GÜCÜ** (`ShowTagline="false"` ile gizlenir; daraltılmış menüde ve çok dar ekranda kendiliğinden gizlenir).
+- Logo: `Components/BrandLogo.razor`. İşaret `wwwroot/img/modulix-mark.svg` dosyasıdır (referans logo): iki çapraz, uçları eğik kesilmiş şeritten oluşan "X"; sol yarı lacivert, "/" şeridi sağ üstte turkuaza, "\\" şeridi sağ altta maviye geçer. Koyu temada `modulix-mark-dark.svg` (lacivert yarısı açık çelik mavi) görünür; `favicon.png` ve `icon-192.png` aynı geometriden üretilir. Yazı "Moduli" + turkuaz "x" (Inter 800); slogan **MODÜLER İŞİN GÜCÜ** (`ShowTagline="false"` ile gizlenir; daraltılmış menüde ve çok dar ekranda kendiliğinden gizlenir).
 - Favicon `favicon.png` ve `img/modulix-mark.svg`; `index.html` `theme-color` değeri `--mx-brand-navy` ile aynıdır.
 
 ## Tema

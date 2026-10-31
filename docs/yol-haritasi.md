@@ -33,7 +33,7 @@ Antrepo için genel bir gümrük anahtarı	Ülke/rejim/tesis/alan yetkileriyle a
 - K3 — ADR: Veri sahipliği, tenant izolasyonu, modüller arası sözleşme ve işlem tutarlılığı kararları gerekçesi ve alternatifleriyle kaydedilir.
 - K4 — Teslim sırası: Core → CRM pilotu → lojistik pilotu → depo/antrepo ve İK temel → finansal/uyum genişlemesi önerilir. Bu sıra ürün kullanım bağımlılığı değildir; lojistik CRM satın alınmadan çalışır.
 - K5 — Bağımsız modüller: Bir modül başka modülün tablolarına yazmaz, ORM varlığını kullanmaz, kapalı modülün ekranını zorunlu kılmaz. Sözleşme, olay veya açık sorgu servisi kullanılır. API uçları da domain kurallarını atlamaz.
-- K6 — Tema: Modülix varsayılan renkleri korunur; bütün renkler ve görsel durumlar semantik tema değişkenlerinden gelir.
+- K6 — Tema: Modulix varsayılan renkleri (lacivert / mavi / turkuaz, docs/design-system/theme-tokens.md) korunur; bütün renkler ve görsel durumlar semantik tema değişkenlerinden gelir.
 - K7 — Hesaplamalar: Core teknik hesap araçlarını sağlar; sektör ve yasal hesap kuralları sahip modülde sürümlenir. Resmî bildirim ve dış sistem aktarımı hesap sorumluluğundan ayrılır.
 - K8 — e-belge: Teknik sağlayıcı katmanı ortak; belgeyi doğuran iş kuralı ilgili modüldedir. e-İrsaliye lojistik pilot ihtiyacı varsa D2'dedir, her sektöre zorunlu değildir.
 - K9 — Depo: Genel depo yetenekleri ortak depo modülündedir. Gümrüklü antrepo bunun seçilebilir ülke/rejim uyum uzantısıdır; hukuken izin verilen alan düzeni ayrıca doğrulanır.
@@ -225,7 +225,7 @@ Bağımlılık: Ç0, Ç13, Ç23.
 - Ç14.6 İşletim: Sağlık ekranı, nöbet/iletişim planı, kapasite ve sürüm notları. Kabul: Arıza runbook'u uygulamayı yazmayan bir operatörce takip edilebilir.
 Ç15 — Tasarım sistemi, tema, erişilebilirlik ve dil [GENİŞLETME / D1–D4]
 Bağımlılık: Y6, Y9; ekranlar Ç9, belge Ç8 ile bağlanır.
-- Ç15a.1 Semantik tema (D1): --mx-primary, --mx-surface, --mx-success, --mx-danger vb.; lacivert/indigo/turkuaz/lila/krem varsayılanı. Kabul: Elle gömülü durum ve marka rengi kalmaz; hata yalnızca renkle anlatılmaz.
+- Ç15a.1 Semantik tema (D1): --mx-primary, --mx-surface, --mx-success, --mx-danger vb.; lacivert / mavi / turkuaz varsayılanı (docs/design-system/theme-tokens.md; 31.10.2026 kararıyla indigo/lila/krem denemesi geri alındı). Kabul: Elle gömülü durum ve marka rengi kalmaz; hata yalnızca renkle anlatılmaz.
 - Ç15a.2 Bileşenler: Form, tablo, modal, boş/yükleniyor/hata, toast, menü ve modül kartları. Kabul: Klavye odağı ve etiketler çalışır; temel akışlarda WCAG AA hedefi doğrulanır.
 - Ç15b Firma teması (D2): Hazır tema, özel ana/vurgu renkleri, açık/koyu/sistem, logo ve güvenli önizleme. Kabul: Kontrastı yetersiz renk reddedilir; CSS/HTML enjeksiyonu kabul edilmez.
 - Ç15c Dil (D1 temel, D4 İngilizce): Metin anahtarları baştan kullanılır; çoğul, çeviri, tarih/sayı/para ve dil fallback'i. Kabul: Domain kodu Türkçe etiketlere bağlı değildir; dil değişimi kaydedilmiş teknik değerleri değiştirmez.

@@ -33,6 +33,14 @@
     margin-right: auto;
 }
 
+/* Genel arama üst çubuğun ortasında, kalan genişliği alır. */
+.header-search {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+}
+
 .header-tools {
     display: flex;
     align-items: center;
@@ -155,6 +163,11 @@
     /* İsim kısalır, menü ekrandan taşmaz. */
     .profile-button {
         max-width: 12rem;
+    }
+
+    /* Telefonda arama kutusuna yer kalsın diye ad gizlenir; avatar ve profil menüsü kalır. */
+    .session-info {
+        display: none;
     }
 
     .session-tenant {

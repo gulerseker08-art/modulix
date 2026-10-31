@@ -4,33 +4,35 @@ Kaynak: `src/Modulix.Web/wwwroot/css/app.css` başındaki `:root, [data-theme="l
 
 ## Marka renkleri
 
-Modulix varsayılan paleti **lacivert / indigo / turkuaz / lila / krem**'dir (yol haritası K6 ve Ç15a.1). Logo işareti (`modulix-mark.svg`) aynı paleti taşır.
+Modulix paleti **lacivert / mavi / turkuaz** üzerine kuruludur (referans CRM tasarımı, 31.10.2026 kararı; önceki indigo/lila/krem denemesi geri alındı). Logo işareti (`modulix-mark.svg`) aynı paleti taşır: iki çapraz şeritten oluşan "X", sol yarı lacivert, sağ üst turkuaz, sağ alt mavi; koyu tema için `modulix-mark-dark.svg`.
 
 | Token | Açık | Koyu | Kullanım |
 |---|---|---|---|
-| `--mx-brand-navy` | `#111827` | — | Lacivert: logo yazısı, aktif modül başlığı |
-| `--mx-brand-navy-light` | `#1F2937` | — | Aktif modül başlığı gradyanı, avatar |
-| `--mx-brand-primary` | `#4F46E5` | `#818CF8` | İndigo: birincil buton, bağlantı, odak, aktif sekme |
-| `--mx-brand-primary-hover` | `#4338CA` | `#A5B4FC` | Hover/active |
-| `--mx-brand-teal` | `#10B981` | `#34D399` | Koyu zeminde marka vurgusu (aktif modül ikonu) |
-| `--mx-brand-teal-dark` | `#0F8F7F` | `#2DD4BF` | Açık zeminde erişilebilir turkuaz (logo "x", büyük metin 4.0:1) |
+| `--mx-brand-navy` | `#101D35` | — | Ana marka rengi: logo yazısı, aktif modül başlığı, ana metin |
+| `--mx-brand-navy-light` | `#173B68` | — | Aktif modül başlığı gradyanı, avatar, logo işaretinin sol çizgisi |
+| `--mx-brand-primary` | `#087DB8` | `#3BAEE6` | Ana etkileşim rengi: birincil buton, bağlantı, odak, aktif sekme, aktif menü çizgisi |
+| `--mx-brand-primary-hover` | `#066A9C` | `#6CC6F2` | Hover/active |
+| `--mx-brand-teal` | `#00C2C7` | `#2DD4D8` | Marka vurgusu: koyu zeminde (aktif modül ikonu), logo işaretinin sağ çizgisi |
+| `--mx-brand-teal-dark` | `#008F98` | `#5EEAEE` | Açık zeminde erişilebilir turkuaz (logo "x", büyük metin 3.9:1) |
+
+Birincil renk beyaz metinle 4.53:1 verir; 14px düğme metni için AA sınırındadır, bu yüzden düğme metni 600 ağırlıktadır ve daha açık bir mavi birincil olarak kullanılmaz.
 
 ## Yüzey ve metin
 
 | Token | Açık | Koyu |
 |---|---|---|
-| `--mx-background` | `#F4F6FB` (krem) | `#0B0F1F` |
-| `--mx-surface` | `#FFFFFF` | `#131730` |
-| `--mx-surface-muted` | `#EEF0FF` (lila) | `#1A1F3D` |
-| `--mx-surface-hover` | `#F1F3FB` | `#181D38` |
-| `--mx-border` | `#E8EBF3` | `#272D50` |
-| `--mx-border-strong` | `#C5CBE0` | `#3D4573` |
-| `--mx-text-primary` | `#111827` | `#E5E7F3` |
-| `--mx-text-secondary` | `#5F6B7E`* | `#9CA3C0` |
-| `--mx-text-label` | `#374151` | `#C5C9E0` |
-| `--mx-text-on-brand` | `#FFFFFF` | `#0B0F1F` |
+| `--mx-background` | `#F5F8FC` | `#0B1322` |
+| `--mx-surface` | `#FFFFFF` | `#121D33` |
+| `--mx-surface-muted` | `#EEF5FA` (seçili menü, hafif vurgu) | `#192842` |
+| `--mx-surface-hover` | `#F3F7FB` | `#16233B` |
+| `--mx-border` | `#DCE5F0` | `#243654` |
+| `--mx-border-strong` | `#B9C8DA` | `#3A5078` |
+| `--mx-text-primary` | `#101D35` | `#E6EDF7` |
+| `--mx-text-secondary` | `#5D6B81`* | `#9FB0C8` |
+| `--mx-text-label` | `#2B3A55` | `#C9D4E5` |
+| `--mx-text-on-brand` | `#FFFFFF` | `#07111F` |
 
-\* Eski değer `#6B7280`, krem zeminde 4.47:1 kontrast verdiği için WCAG AA'yı (4.5:1) sağlayan en yakın ton `#5F6B7E` seçildi (krem zeminde 5.0:1, lila zeminde 4.8:1).
+\* Referanstaki `#64748B` sayfa zemininde 4.47:1, seçili menü zemininde 4.32:1 kontrast verdiği için WCAG AA'yı (4.5:1) sağlayan en yakın ton `#5D6B81` seçildi (sayfa zemininde 5.1:1, seçili menü zemininde 4.9:1).
 
 ## Durum renkleri (semantik, marka renklerinden ayrı)
 
@@ -41,21 +43,21 @@ Bu doygun renkler küçük metinde kullanılmaz. Rozet ve uyarılarda açık zem
 | Ton | Zemin / metin (açık) | Kontrast |
 |---|---|---|
 | `--mx-tone-neutral-*` | `#EEF2F7` / `#475569` | 6.7:1 |
-| `--mx-tone-brand-*` | `#EEF0FF` / `#3730A3` | 8.8:1 |
+| `--mx-tone-brand-*` | `#E6F2FA` / `#0B5C87` | 6.4:1 |
 | `--mx-tone-info-*` | `#E0F2FE` / `#075985` | AA |
 | `--mx-tone-success-*` | `#D1FAE5` / `#065F46` | 6.8:1 |
 | `--mx-tone-warning-*` | `#FEF3C7` / `#92400E` | 6.4:1 |
 | `--mx-tone-danger-*` | `#FEE2E2` / `#991B1B` | 6.8:1 |
 | `--mx-tone-violet-*` | `#EDE9FE` / `#5B21B6` | 7.6:1 |
-| `--mx-tone-teal-*` | `#DDF6F6` / `#0F5F63` | 6.6:1 |
+| `--mx-tone-teal-*` | `#DDF6F7` / `#0B6368` | 6.2:1 |
 
 Aktivite aileleri bu tonlara bağlıdır (`fam-*` sınıfları `--fam-bg` / `--fam-fg` verir): görev → teal, arama → violet, toplantı → info, ziyaret → warning, e-posta → success, meşgul (özel) → neutral.
 
-Koyu temada her ton koyu zemin + açık metin olarak yeniden tanımlıdır (en düşük 8:1 civarı).
+Koyu temada her ton koyu zemin + açık metin olarak yeniden tanımlıdır (en düşük 8:1 civarı; marka tonu `#0E3652` / `#9EDCFF` 8.5:1).
 
 ## Tipografi
 
-Yazı tipi **Public Sans** (Google Fonts, `latin-ext` alt kümesi Türkçe karakterleri içerir; OFL lisanslı). Yüklenemezse Segoe UI / system-ui'ye düşer.
+Yazı tipi **Inter** (Google Fonts, `latin-ext` alt kümesi Türkçe karakterleri içerir; OFL lisanslı; `index.html` yalnızca 400–800 ağırlıklarını yükler). Yüklenemezse Segoe UI / system-ui'ye düşer.
 
 | Token | Değer | Kullanım |
 |---|---|---|
@@ -72,14 +74,14 @@ Yazı tipi **Public Sans** (Google Fonts, `latin-ext` alt kümesi Türkçe karak
 
 - Boşluk (4px tabanlı): `--mx-space-1` 4px · `-2` 8px · `-3` 12px · `-4` 16px · `-5` 20px · `-6` 24px · `-8` 32px.
 - Köşe: input 8px, button 9px, card 12px, drawer 14px, modal 14px, badge 6px (`--mx-radius-*`).
-- Gölge: `--mx-shadow-card` (kart), `--mx-shadow-raised` (hover), `--mx-shadow-popover` (açılır menü/panel). Glow ve ağır gölge yok.
+- Gölge: `--mx-shadow-card` (kart), `--mx-shadow-raised` (hover), `--mx-shadow-popover` (açılır menü/panel). Lacivert tabanlı, hafif; glow ve ağır gölge yok.
 - Odak: `--mx-focus-ring` (3px, birincil rengin %28'i).
 - Kabuk: `--mx-header-height` 64px, `--mx-sidebar-width` 248px, `--mx-sidebar-collapsed-width` 72px, `--mx-control-height` 40px (dokunmatik ekranda 44px).
 
 ## Grafik serileri
 
-`--chart-c0` … `--chart-c5`: indigo, turkuaz, amber, lacivert, kırmızı, gri. Koyu temada açık tonları tanımlıdır.
+`--chart-c0` … `--chart-c5`: mavi, turkuaz, amber, lacivert, kırmızı, gri. Koyu temada açık tonları tanımlıdır.
 
 ## Geriye uyumluluk
 
-Eski adlar (`--mx-indigo`, `--mx-lilac`, `--mx-cream`, `--mx-ink`, `--mx-muted`, `--mx-teal`, `--mx-radius`, `--mx-shadow`…) yeni tokenlara takma addır; mevcut CSS çalışmaya devam eder. Yeni kodda kullanılmaz, dokunulan kurallarda yeni adlara geçilir.
+Eski adlar (`--mx-indigo`, `--mx-lilac`, `--mx-cream`, `--mx-ink`, `--mx-muted`, `--mx-teal`, `--mx-radius`, `--mx-shadow`…) yeni tokenlara takma addır; mevcut CSS çalışmaya devam eder. Adları eski paletten kalmadır (`--mx-indigo` artık birincil maviyi, `--mx-lilac` seçili menü zeminini verir). Yeni kodda kullanılmaz, dokunulan kurallarda yeni adlara geçilir.

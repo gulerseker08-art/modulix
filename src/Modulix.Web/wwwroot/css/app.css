@@ -7,26 +7,26 @@
 [data-theme="light"] {
     color-scheme: light;
 
-    /* Marka: Modulix varsayılanı lacivert / indigo / turkuaz / lila / krem (yol haritası K6, Ç15a.1) */
-    --mx-brand-navy: #111827;
-    --mx-brand-navy-light: #1F2937;
-    --mx-brand-primary: #4F46E5;
-    --mx-brand-primary-hover: #4338CA;
-    --mx-brand-primary-rgb: 79, 70, 229;
-    --mx-brand-teal: #10B981;
-    --mx-brand-teal-dark: #0F8F7F;
+    /* Marka: Modulix paleti lacivert / mavi / turkuaz (referans CRM tasarımı; docs/design-system/theme-tokens.md) */
+    --mx-brand-navy: #101D35;
+    --mx-brand-navy-light: #173B68;
+    --mx-brand-primary: #087DB8;
+    --mx-brand-primary-hover: #066A9C;
+    --mx-brand-primary-rgb: 8, 125, 184;
+    --mx-brand-teal: #00C2C7;
+    --mx-brand-teal-dark: #008F98;
 
-    /* Yüzeyler ve metin: krem zemin, lila vurgu */
-    --mx-background: #F4F6FB;
+    /* Yüzeyler ve metin: açık mavi-gri zemin, beyaz kart */
+    --mx-background: #F5F8FC;
     --mx-surface: #FFFFFF;
-    --mx-surface-muted: #EEF0FF;
-    --mx-surface-hover: #F1F3FB;
-    --mx-border: #E8EBF3;
-    --mx-border-strong: #C5CBE0;
-    --mx-text-primary: #111827;
-    /* Eski #6B7280 krem zeminde 4.47:1 kaldığı için AA (4.5:1) sağlayan en yakın ton kullanılır. */
-    --mx-text-secondary: #5F6B7E;
-    --mx-text-label: #374151;
+    --mx-surface-muted: #EEF5FA;
+    --mx-surface-hover: #F3F7FB;
+    --mx-border: #DCE5F0;
+    --mx-border-strong: #B9C8DA;
+    --mx-text-primary: #101D35;
+    /* Referanstaki #64748B sayfa zemininde 4.47:1 kaldığı için AA (4.5:1) sağlayan en yakın ton kullanılır. */
+    --mx-text-secondary: #5D6B81;
+    --mx-text-label: #2B3A55;
     --mx-text-on-brand: #FFFFFF;
 
     /* Durum (semantik) — marka renklerinden ayrı */
@@ -39,8 +39,8 @@
     /* Rozet tonları: açık zemin + AA kontrastlı koyu metin */
     --mx-tone-neutral-bg: #EEF2F7;
     --mx-tone-neutral-fg: #475569;
-    --mx-tone-brand-bg: #EEF0FF;
-    --mx-tone-brand-fg: #3730A3;
+    --mx-tone-brand-bg: #E6F2FA;
+    --mx-tone-brand-fg: #0B5C87;
     --mx-tone-info-bg: #E0F2FE;
     --mx-tone-info-fg: #075985;
     --mx-tone-success-bg: #D1FAE5;
@@ -51,19 +51,19 @@
     --mx-tone-danger-fg: #991B1B;
     --mx-tone-violet-bg: #EDE9FE;
     --mx-tone-violet-fg: #5B21B6;
-    --mx-tone-teal-bg: #DDF6F6;
-    --mx-tone-teal-fg: #0F5F63;
+    --mx-tone-teal-bg: #DDF6F7;
+    --mx-tone-teal-fg: #0B6368;
 
     /* Grafik serileri */
-    --chart-c0: #4F46E5;
-    --chart-c1: #10B981;
+    --chart-c0: #087DB8;
+    --chart-c1: #00C2C7;
     --chart-c2: #F59E0B;
-    --chart-c3: #1F2937;
+    --chart-c3: #173B68;
     --chart-c4: #EF4444;
     --chart-c5: #94A3B8;
 
-    /* Tipografi */
-    --mx-font: 'Public Sans', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    /* Tipografi: Inter (Google Fonts, latin-ext alt kümesi Türkçe karakterleri içerir) */
+    --mx-font: 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
     --mx-fs-page-title: 1.75rem;     /* 28px / 700 */
     --mx-fs-section-title: 1.125rem; /* 18px / 600 */
     --mx-fs-card-title: 1rem;        /* 16px / 600 */
@@ -92,9 +92,9 @@
     --mx-radius-badge: 6px;
 
     /* Gölgeler: hafif; glow ve ağır gölge yok */
-    --mx-shadow-card: 0 1px 2px rgba(17, 24, 39, 0.04), 0 1px 3px rgba(17, 24, 39, 0.03);
-    --mx-shadow-raised: 0 4px 16px rgba(17, 24, 39, 0.08);
-    --mx-shadow-popover: 0 12px 32px rgba(17, 24, 39, 0.16);
+    --mx-shadow-card: 0 1px 2px rgba(16, 29, 53, 0.04), 0 1px 3px rgba(16, 29, 53, 0.03);
+    --mx-shadow-raised: 0 4px 16px rgba(16, 29, 53, 0.08);
+    --mx-shadow-popover: 0 12px 32px rgba(16, 29, 53, 0.16);
     --mx-focus-ring: 0 0 0 3px rgba(var(--mx-brand-primary-rgb), 0.28);
 
     /* Kabuk ölçüleri */
@@ -133,7 +133,7 @@
     --bs-link-color: var(--mx-brand-primary);
     --bs-link-color-rgb: var(--mx-brand-primary-rgb);
     --bs-link-hover-color: var(--mx-brand-primary-hover);
-    --bs-link-hover-color-rgb: 67, 56, 202;
+    --bs-link-hover-color-rgb: 6, 106, 156;
     --bs-border-radius: var(--mx-radius-input);
     --bs-border-radius-sm: 6px;
     --bs-border-radius-lg: var(--mx-radius-card);
@@ -148,28 +148,29 @@
 [data-theme="dark"] {
     color-scheme: dark;
 
-    --mx-brand-primary: #818CF8;
-    --mx-brand-primary-hover: #A5B4FC;
-    --mx-brand-primary-rgb: 129, 140, 248;
-    --mx-brand-teal: #34D399;
-    --mx-brand-teal-dark: #2DD4BF;
+    /* Koyu lacivert zemin, biraz daha açık kart; turkuaz vurgu kontrollü (glow yok). */
+    --mx-brand-primary: #3BAEE6;
+    --mx-brand-primary-hover: #6CC6F2;
+    --mx-brand-primary-rgb: 59, 174, 230;
+    --mx-brand-teal: #2DD4D8;
+    --mx-brand-teal-dark: #5EEAEE;
 
-    --mx-background: #0B0F1F;
-    --mx-surface: #131730;
-    --mx-surface-muted: #1A1F3D;
-    --mx-surface-hover: #181D38;
-    --mx-border: #272D50;
-    --mx-border-strong: #3D4573;
-    --mx-text-primary: #E5E7F3;
-    --mx-text-secondary: #9CA3C0;
-    --mx-text-label: #C5C9E0;
-    --mx-text-on-brand: #0B0F1F;
+    --mx-background: #0B1322;
+    --mx-surface: #121D33;
+    --mx-surface-muted: #192842;
+    --mx-surface-hover: #16233B;
+    --mx-border: #243654;
+    --mx-border-strong: #3A5078;
+    --mx-text-primary: #E6EDF7;
+    --mx-text-secondary: #9FB0C8;
+    --mx-text-label: #C9D4E5;
+    --mx-text-on-brand: #07111F;
     --mx-danger-text: #F87171;
 
-    --mx-tone-neutral-bg: #1E2240;
-    --mx-tone-neutral-fg: #C5C9E0;
-    --mx-tone-brand-bg: #27265E;
-    --mx-tone-brand-fg: #C7D2FE;
+    --mx-tone-neutral-bg: #1C2A42;
+    --mx-tone-neutral-fg: #C9D4E5;
+    --mx-tone-brand-bg: #0E3652;
+    --mx-tone-brand-fg: #9EDCFF;
     --mx-tone-info-bg: #0C3247;
     --mx-tone-info-fg: #7DD3FC;
     --mx-tone-success-bg: #0B3B2E;
@@ -180,13 +181,13 @@
     --mx-tone-danger-fg: #FCA5A5;
     --mx-tone-violet-bg: #2B1D52;
     --mx-tone-violet-fg: #C4B5FD;
-    --mx-tone-teal-bg: #0C3537;
+    --mx-tone-teal-bg: #0B3A3F;
     --mx-tone-teal-fg: #7FE3E6;
 
-    --chart-c0: #818CF8;
-    --chart-c1: #34D399;
+    --chart-c0: #3BAEE6;
+    --chart-c1: #2DD4D8;
     --chart-c2: #FBBF24;
-    --chart-c3: #A5B4FC;
+    --chart-c3: #93C5FD;
     --chart-c4: #F87171;
     --chart-c5: #64748B;
 
@@ -204,7 +205,7 @@
     --bs-link-color: var(--mx-brand-primary);
     --bs-link-color-rgb: var(--mx-brand-primary-rgb);
     --bs-link-hover-color: var(--mx-brand-primary-hover);
-    --bs-link-hover-color-rgb: 165, 180, 252;
+    --bs-link-hover-color-rgb: 108, 198, 242;
 }
 
 html, body {
@@ -1777,6 +1778,19 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 
     .brand-logo .brand-mark {
         flex: none;
+    }
+
+    /* Koyu temada lacivert yarısı açık tonlu ikinci işaret dosyası görünür. */
+    .brand-logo .brand-mark-dark {
+        display: none;
+    }
+
+    [data-theme="dark"] .brand-logo .brand-mark-light {
+        display: none;
+    }
+
+    [data-theme="dark"] .brand-logo .brand-mark-dark {
+        display: inline;
     }
 
 .brand-text {
@@ -3813,5 +3827,148 @@ button.pipeline-label {
 
     .summary-card {
         padding: var(--mx-space-4);
+    }
+}
+
+/* ---- Genel arama (AppHeader) ---- */
+/* Üst çubuğun ortasındaki arama kutusu; sonuçlar açılır panelde kayıt türüne göre gruplanır (GlobalSearch.razor). */
+.global-search {
+    position: relative;
+    width: 100%;
+    max-width: 36rem;
+}
+
+.global-search-icon {
+    position: absolute;
+    left: 0.875rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: grid;
+    color: var(--mx-text-secondary);
+    pointer-events: none;
+}
+
+.global-search-input {
+    width: 100%;
+    height: var(--mx-control-height);
+    padding: 0 var(--mx-space-3) 0 2.625rem;
+    border: 1px solid var(--mx-border);
+    border-radius: 999px;
+    background: var(--mx-background);
+    color: var(--mx-text-primary);
+    font-size: var(--mx-fs-body);
+}
+
+    .global-search-input::placeholder {
+        color: var(--mx-text-secondary);
+    }
+
+    .global-search-input:hover {
+        border-color: var(--mx-border-strong);
+    }
+
+    .global-search-input:focus {
+        outline: none;
+        background: var(--mx-surface);
+        border-color: var(--mx-brand-primary);
+        box-shadow: var(--mx-focus-ring);
+    }
+
+/* Panelin dışına tıklanınca kapanır. */
+.global-search-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+}
+
+.global-search-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + var(--mx-space-2));
+    z-index: 1050;
+    max-height: min(70vh, 32rem);
+    overflow-y: auto;
+    padding: var(--mx-space-2);
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    box-shadow: var(--mx-shadow-popover);
+}
+
+.global-search-state {
+    margin: 0;
+    padding: var(--mx-space-3);
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-body);
+}
+
+.global-search-group + .global-search-group {
+    margin-top: var(--mx-space-2);
+    padding-top: var(--mx-space-2);
+    border-top: 1px solid var(--mx-border);
+}
+
+.global-search-group-title {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+    padding: var(--mx-space-1) var(--mx-space-3);
+    font-size: var(--mx-fs-helper);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--mx-text-secondary);
+}
+
+.global-search-count {
+    margin-left: auto;
+    font-weight: 500;
+}
+
+.global-search-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border-radius: var(--mx-radius-input);
+    color: var(--mx-text-primary);
+    text-decoration: none;
+}
+
+    .global-search-item:hover,
+    .global-search-item.is-active {
+        background: var(--mx-surface-muted);
+        color: var(--mx-text-primary);
+    }
+
+    .global-search-item .global-search-primary {
+        font-size: var(--mx-fs-body);
+        font-weight: 600;
+    }
+
+    .global-search-item .global-search-secondary {
+        font-size: var(--mx-fs-helper);
+        color: var(--mx-text-secondary);
+    }
+
+.global-search-more {
+    display: block;
+    padding: var(--mx-space-1) var(--mx-space-3);
+    font-size: var(--mx-fs-helper);
+    font-weight: 600;
+}
+
+@media (max-width: 640.98px) {
+    .global-search-input {
+        padding-left: 2.25rem;
+    }
+
+    /* Telefonda panel ekran genişliğini kullanır (üstte menü çubuğu + üst çubuk vardır). */
+    .global-search-panel {
+        position: fixed;
+        left: var(--mx-space-3);
+        right: var(--mx-space-3);
+        top: calc(var(--mx-header-height) * 2 + var(--mx-space-2));
     }
 }
