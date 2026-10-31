@@ -52,7 +52,7 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | DataGrid | Kısmen | `app.css` (`record-table`) | Önizleme; telefonda kart listesi | Kolon görünürlüğü/yeniden boyutlandırma, kayıtlı görünüm, dışa aktarma, ortak bileşen |
 | Firma/Kişi | Kısmen | `Pages/Crm/Companies.razor`, `Contacts.razor` (PageHeader) | CI derleme ✓ | Firma detayında 12 kolonlu ana içerik + sağ panel düzeni |
 | Aktiviteler | Tamam (faz 2) | `Pages/Crm/Activities.razor`, `Components/ActivityCalendar.razor`, `Components/TodayActivities.razor`, `Components/Drawer.razor`, `Services/ActivityLabels.cs` | CI çalışma 41128200581 ✓ (derleme + 817 test); statik önizleme | Saat çizelgesinde blok sürükleyerek saat değiştirme ve yeniden boyutlandırma yok (gün değiştirme var); detay çekmecesinde ayrı sekmeler yok |
-| Fırsatlar | Kısmen | `Pages/Crm/Opportunities.razor` (PageHeader) | CI derleme ✓ | Chevron satış hunisi, KPI şeridi, sağ zaman çizelgesi + finansal özet |
+| Fırsatlar | Tamam (faz 3) | `Pages/Crm/OpportunityDetail.razor`, `Components/SalesPipeline.razor` | CI (bkz. Faz 3); statik önizleme | Fırsat listesi/pano ekranı yalnızca token/tema düzeyinde |
 | Teklifler | Token/tema | — | — | Detay düzeni |
 | Diğer CRM | Token/tema | Bütün `PageTitle` metinleri | — | — |
 | Yönetim | Token/tema | — | — | Ekrana özel düzen |
@@ -101,3 +101,20 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | Tekrarlayan aktivite, hatırlatıcı sekmesi | Yok | Altyapıda yok |
 
 ![Düzenleme çekmecesi](onizleme-aktivite-cekmece.png)
+
+
+## Faz 3 — Fırsat detayı
+
+![Fırsat detayı](onizleme-firsat.png)
+
+| Özellik | Durum | Not |
+|---|---|---|
+| Başlık | Var | İkon, ad, firma · kişi · sorumlu, durum/aşama rozetleri, uyarılar; Düzenle ve Yeni teklif |
+| Satış hunisi (chevron) | Var | `SalesPipeline`: aşamalar tenant'ın aşama listesinden gelir (sıra/kategori yönetici ayarı, kod içinde sabit aşama yok). Geçilen aşamalar onaylı, güncel aşama dolu, kazanıldı/kaybedildi kendi tonunda. Aşamaya tıklamak **işlem panelini açar** (Aşama değiştir / Kazanıldı / Kaybedildi) ve ilk alana odaklanır; aşama kuralları ve doğrulamalar mevcut işlemle sunucuda çalışır. Telefonda yalnızca güncel aşama adıyla görünür |
+| Gösterge şeridi | Var | Tahmini tutar, Olasılık, Tahmini kapanış, Beklenen gelir (mevcut ağırlıklı tutar hesabı), Aşama süresi. Tutar göstergeleri alan yetkisine (`crm.opportunities.amounts.read`) bağlıdır |
+| İki kolonlu düzen | Var | ≥1200px ana içerik + yapışkan sağ panel; dar ekranda alt alta |
+| Ürün / hizmet kalemleri | Var (salt okunur) | Fırsatın kendi kalemi yoktur; **esas teklifin** kalemleri fiyatlandırma motorunun hesaplarıyla gösterilir, düzenleme teklif ekranındadır ("Teklifte düzenle"). Esas teklif yoksa bölüm görünmez |
+| Aktivite zaman çizelgesi | Var | Aile ikon ve rengiyle dikey çizelge; "Aktivite ekle" sağdan açılan panelde |
+| Finansal özet | Var | Esas teklifin liste fiyatı, indirim, net, vergi, genel toplam (para birimi teklifinki); esas teklif yoksa elle girilen tahmini tutar |
+| Karar vericiler / rakipler | Korundu | Mevcut kişi rolleri ve rakip bölümleri aynen; ilişkisel lookup (`LookupPicker`) kullanılıyor |
+| Takip et | Yok | Altyapıda takip/abonelik yok |
