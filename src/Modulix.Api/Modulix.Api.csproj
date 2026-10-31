@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Modulix.Infrastructure\Modulix.Infrastructure.csproj" />
     <ProjectReference Include="..\Modulix.Modules.Crm\Modulix.Modules.Crm.csproj" />
     <ProjectReference Include="..\Modulix.Modules.Logistics\Modulix.Modules.Logistics.csproj" />
+    <ProjectReference Include="..\Modulix.Modules.Contracts\Modulix.Modules.Contracts.csproj" />
     <ProjectReference Include="..\Modulix.AI\Modulix.AI.csproj" />
     <ProjectReference Include="..\Modulix.Shared\Modulix.Shared.csproj" />
     <ProjectReference Include="..\Modulix.Web\Modulix.Web.csproj" />

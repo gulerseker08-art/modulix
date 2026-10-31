@@ -1,0 +1,248 @@
+using Modulix.Core.Contracts.Tenancy;
+
+namespace Modulix.Modules.Contracts.Domain;
+
+// Sözleşme modülü entity'leri (ADR-0021). Alanlar kayıt depolarından (Records) doğrulanarak yazılır; uzunluk sınırları hem
+// doğrulamada hem veritabanı kolonlarında aynı sabitlerden gelir. Müşteri ve kişiler ortak kayıttır (core.party / core.person).
+
+/// <summary>Tüm sözleşme kayıtlarının ortak alanları. TenantId kaydederken aktif tenant'tan atanır.</summary>
+public abstract class ContractsEntity : ITenantEntity, ICompanyShared
+{
+    protected ContractsEntity()
+    {
+        Id = Guid.CreateVersion7();
+        CreatedAt = DateTimeOffset.UtcNow;
+        UpdatedAt = CreatedAt;
+        Version = 1;
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid TenantId { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public DateTimeOffset UpdatedAt { get; private set; }
+
+    /// <summary>Her değişiklikte artar; eşzamanlı güncellemeleri yakalamak için kullanılır (409).</summary>
+    public long Version { get; private set; }
+
+    /// <summary>Firmanın tanımladığı özel alanların değerleri (Y9a), JSON nesnesi; boşsa null.</summary>
+    public string? CustomFields { get; internal set; }
+
+    internal void Touch()
+    {
+        UpdatedAt = DateTimeOffset.UtcNow;
+        Version++;
+    }
+}
+
+/// <summary>Bir kullanıcıya atanabilen kayıt. Sorumlu, aktif tenant'ın etkin üyesi olmalıdır.</summary>
+public interface IOwnedEntity
+{
+    Guid? OwnerId { get; }
+}
+
+/// <summary>
+/// Sözleşme ana kaydı. Başlık güncel taslağı taşır; onaya/imzaya giden içerik sürüm tablosunda dondurulur (ikinci dilim).
+/// Hazırlık, onay, imza ve yürürlük durumları ayrı alanlardır ve yalnızca iş akışı eylemleriyle yazılır.
+/// </summary>
+public sealed class Contract : ContractsEntity, IOwnedEntity
+{
+    public const int NumberMaxLength = 30;
+    public const int TitleMaxLength = 200;
+    public const int TextMaxLength = 4000;
+    public const int StatusMaxLength = 20;
+    public const int ReasonMaxLength = 500;
+    public const int CurrencyLength = 3;
+    public const int SummaryMaxLength = 2000;
+
+    /// <summary>Tenant içinde benzersiz numara (SZ-20261031-AB12CD).</summary>
+    public string Number { get; internal set; } = string.Empty;
+
+    public string Title { get; internal set; } = string.Empty;
+
+    /// <summary>Sözleşme türü (Y9b listesi <c>contracts.contract-type</c>).</summary>
+    public string Type { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    /// <summary>Müşteri: ortak taraf kaydı (core.party, ADR-0006).</summary>
+    public Guid PartyId { get; internal set; }
+
+    /// <summary>Müşteri tarafındaki ana ilgili kişi (core.person); seçildiyse müşteri tarafına bağlı olmalıdır.</summary>
+    public Guid? PersonId { get; internal set; }
+
+    public Guid? OwnerId { get; internal set; }
+
+    /// <summary>Yenilenen/değiştirilen önceki sözleşme (aynı tenant).</summary>
+    public Guid? PreviousContractId { get; internal set; }
+
+    public DateOnly? StartDate { get; internal set; }
+
+    /// <summary>Belirsiz süreli sözleşmede boştur.</summary>
+    public DateOnly? EndDate { get; internal set; }
+
+    public bool IsIndefinite { get; internal set; }
+
+    public string Currency { get; internal set; } = "TRY";
+
+    public bool PriceIncludesTax { get; internal set; }
+
+    /// <summary>Elle girilen toplam sözleşme bedeli (kalem toplamından bağımsız, ör. çerçeve sözleşme üst limiti). Hassas alan.</summary>
+    public decimal? ContractValue { get; internal set; }
+
+    public string? PaymentTerms { get; internal set; }
+
+    /// <summary><see cref="Lifecycle.RenewalMode"/>.</summary>
+    public string RenewalMode { get; internal set; } = Lifecycle.RenewalMode.None;
+
+    /// <summary>Yenileme süresi (ay); yenilemesiz sözleşmede boş.</summary>
+    public int? RenewalPeriodMonths { get; internal set; }
+
+    /// <summary>Yenilememe/fesih bildirimi için bitişten önce gereken gün sayısı.</summary>
+    public int? NoticePeriodDays { get; internal set; }
+
+    /// <summary>Son bildirim tarihi: bitiş − bildirim süresi. Sunucu hesaplar; istemci yazamaz.</summary>
+    public DateOnly? NoticeDeadline { get; internal set; }
+
+    /// <summary><see cref="Lifecycle.Confidentiality"/>.</summary>
+    public string Confidentiality { get; internal set; } = Lifecycle.Confidentiality.Internal;
+
+    /// <summary><see cref="Lifecycle.PreparationStatus"/>.</summary>
+    public string PreparationStatus { get; internal set; } = Lifecycle.PreparationStatus.Draft;
+
+    /// <summary><see cref="Lifecycle.ApprovalStatus"/>.</summary>
+    public string ApprovalStatus { get; internal set; } = Lifecycle.ApprovalStatus.NotRequired;
+
+    /// <summary><see cref="Lifecycle.SignatureStatus"/>.</summary>
+    public string SignatureStatus { get; internal set; } = Lifecycle.SignatureStatus.NotSent;
+
+    /// <summary><see cref="Lifecycle.EffectiveStatus"/>.</summary>
+    public string EffectiveStatus { get; internal set; } = Lifecycle.EffectiveStatus.NotInForce;
+
+    /// <summary>Son geçişin gerekçesi (ret, iptal, fesih...).</summary>
+    public string? StatusReason { get; internal set; }
+
+    /// <summary>Güncel taslak sürüm numarası (1'den başlar; her revizyonda artar).</summary>
+    public int CurrentVersionNo { get; internal set; } = 1;
+
+    /// <summary>Yürürlükteki (imzalanmış) sürüm; henüz yoksa boş.</summary>
+    public int? EffectiveVersionNo { get; internal set; }
+
+    // ---- Sunucu hesabı (QuoteCalculator); istemci yazamaz. Tek seferlik kalemlerin toplamı; dönemsel kalemler özet JSON'dadır.
+
+    public decimal NetTotal { get; internal set; }
+
+    public decimal TaxTotal { get; internal set; }
+
+    public decimal GrossTotal { get; internal set; }
+
+    /// <summary>Dönemsel kalemlerin dönem başına özeti (JSON); sözleşme süresiyle çarpılmış genel toplam üretilmez.</summary>
+    public string? RecurringSummary { get; internal set; }
+
+    public DateTimeOffset? CalculatedAt { get; internal set; }
+
+    public Guid? CreatedBy { get; internal set; }
+
+    public Guid? UpdatedBy { get; internal set; }
+}
+
+/// <summary>
+/// Sözleşmenin tarafı ya da ilgili kişisi (müşteri dışındaki taraflar, imzacı, fatura/teknik yetkili...). Taraf ortak kayıttır;
+/// kişi tek başına da (örneğin müşteri yetkilisi) eklenebilir.
+/// </summary>
+public sealed class ContractParty : ContractsEntity
+{
+    public const int RoleMaxLength = 30;
+    public const int NotesMaxLength = 1000;
+
+    public Guid ContractId { get; internal set; }
+
+    /// <summary><see cref="Lifecycle.PartyRoles"/>.</summary>
+    public string Role { get; internal set; } = Lifecycle.PartyRoles.Other;
+
+    public Guid? PartyId { get; internal set; }
+
+    public Guid? PersonId { get; internal set; }
+
+    public int Position { get; internal set; }
+
+    public string? Notes { get; internal set; }
+}
+
+/// <summary>
+/// Sözleşme kalemi: ürün/hizmet bilgisi kopya olarak saklanır (katalog ya da teklif sonradan değişse de kalem aynı kalır).
+/// Tutarlar sunucuda hesaplanır.
+/// </summary>
+public sealed class ContractLine : ContractsEntity
+{
+    public const int NameMaxLength = 200;
+    public const int CodeMaxLength = 50;
+    public const int TextMaxLength = 2000;
+    public const int KindMaxLength = 20;
+    public const int UnitMaxLength = 50;
+    public const int PeriodMaxLength = 20;
+
+    public Guid ContractId { get; internal set; }
+
+    /// <summary>Revizyonlar ve teklif kalemi arasında izleme için kararlı anahtar.</summary>
+    public Guid StableKey { get; internal set; }
+
+    public int Position { get; internal set; }
+
+    /// <summary><see cref="Lifecycle.LineKinds"/>.</summary>
+    public string Kind { get; internal set; } = Lifecycle.LineKinds.Service;
+
+    public string? ProductCode { get; internal set; }
+
+    public string Name { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    public decimal Quantity { get; internal set; } = 1m;
+
+    public string? UnitName { get; internal set; }
+
+    public decimal UnitPrice { get; internal set; }
+
+    public decimal DiscountPercent { get; internal set; }
+
+    public decimal TaxRatePercent { get; internal set; }
+
+    /// <summary>Boşsa tek seferlik; doluysa dönem (<see cref="Lifecycle.BillingPeriods"/>).</summary>
+    public string? BillingPeriod { get; internal set; }
+
+    /// <summary>Kaynak teklif kaleminin kararlı anahtarı (tekliften oluşturulduysa).</summary>
+    public Guid? SourceQuoteLineKey { get; internal set; }
+
+    // ---- Sunucu hesabı
+
+    public decimal ListAmount { get; internal set; }
+
+    public decimal LineDiscount { get; internal set; }
+
+    public decimal Net { get; internal set; }
+
+    public decimal Tax { get; internal set; }
+
+    public decimal Gross { get; internal set; }
+}
+
+/// <summary>Sözleşme tarihçesi: her geçiş ve işaret (kim, ne zaman, hangi durumdan hangisine, gerekçe). Eklenir, değişmez.</summary>
+public sealed class ContractEvent : ContractsEntity
+{
+    public const int KindMaxLength = 40;
+
+    public Guid ContractId { get; internal set; }
+
+    public string Kind { get; internal set; } = string.Empty;
+
+    public Guid? ActorId { get; internal set; }
+
+    public string? FromStatus { get; internal set; }
+
+    public string? ToStatus { get; internal set; }
+
+    public string? Reason { get; internal set; }
+}

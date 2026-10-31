@@ -1,4 +1,5 @@
 using Modulix.Shared.Access;
+using Modulix.Shared.Contracts;
 using Modulix.Shared.Crm;
 
 namespace Modulix.Web.Services;
@@ -47,6 +48,7 @@ public sealed record AppDefinition(
 public static class AppCatalog
 {
     public const string Crm = "crm";
+    public const string Contracts = "contracts";
     public const string Admin = "admin";
     public const string Platform = "platform";
 
@@ -69,6 +71,9 @@ public static class AppCatalog
         new("crm.quote-rules", Crm, "Teklif kuralları", "shield", "crm/teklif-kurallari", 34, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage),
         new("crm.quote-delegations", Crm, "Onay vekâletleri", "users", "crm/onay-vekaletleri", 34, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage),
         new("crm.activities", Crm, "Aktiviteler", "activity", "crm/aktiviteler", 40, CrmAccess.ModuleKey, CrmAccess.ActivitiesRead, Tone: AppTone.Teal),
+
+        new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal),
+        new("contracts.list", Contracts, "Sözleşmeler", "file-text", "sozlesmeler", 10, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
 
         new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal),
         new("admin.home", Admin, "Genel bakış", "dashboard", "yonetim", 10, AnyPermission: CoreAccess.AdministrationPermissions, ExactMatch: true),

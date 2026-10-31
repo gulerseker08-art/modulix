@@ -1,0 +1,177 @@
+@page "/sozlesmeler"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Sözleşmeler · Modulix</PageTitle>
+
+<AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
+    <div class="page-header">
+        <h1>Sözleşmeler</h1>
+        <div class="header-actions">
+            @if (Session.Can(ContractsAccess.ContractsWrite))
+            {
+                <a class="btn btn-primary" href="sozlesmeler/yeni">Yeni sözleşme</a>
+            }
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="filters" role="group" aria-label="Hızlı görünümler">
+        <button type="button" class="chip @(view == "mine" ? "active" : null)" aria-pressed="@(view == "mine" ? "true" : "false")" @onclick='() => ToggleViewAsync("mine")'>Sözleşmelerim</button>
+        <button type="button" class="chip @(view == "signature" ? "active" : null)" aria-pressed="@(view == "signature" ? "true" : "false")" @onclick='() => ToggleViewAsync("signature")'>İmza bekleyen</button>
+        <button type="button" class="chip @(view == "ending" ? "active" : null)" aria-pressed="@(view == "ending" ? "true" : "false")" @onclick='() => ToggleViewAsync("ending")'>Bitişi yaklaşan (90 gün)</button>
+        <button type="button" class="chip @(view == "notice" ? "active" : null)" aria-pressed="@(view == "notice" ? "true" : "false")" @onclick='() => ToggleViewAsync("notice")'>Bildirim süresi yaklaşan (30 gün)</button>
+        <label class="visually-hidden" for="effective-filter">Yürürlük durumu</label>
+        <select id="effective-filter" class="form-select form-select-sm filter-select" @bind="effective" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm yürürlük durumları</option>
+            @foreach (var s in ContractLabels.Effectives)
+            {
+                <option value="@s.Key">@s.Label</option>
+            }
+        </select>
+        <label class="visually-hidden" for="type-filter">Tür</label>
+        <select id="type-filter" class="form-select form-select-sm filter-select" @bind="type" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm türler</option>
+            @foreach (var t in Lookups.Choices(ContractsAccess.ContractTypeList))
+            {
+                <option value="@t.Key">@t.Label</option>
+            }
+        </select>
+    </div>
+
+    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <label class="visually-hidden" for="contract-search">Sözleşme ara</label>
+        <input id="contract-search" class="form-control" type="search" placeholder="Başlık veya sözleşme no ara" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted">Bu süzgece uyan sözleşme yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Sözleşme listesi</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Sözleşme</th><th scope="col">Müşteri</th><th scope="col">Tür</th><th scope="col">Durumlar</th>
+                    <th scope="col">Başlangıç / Bitiş</th><th scope="col">Kritik tarih</th><th scope="col" class="text-end">Toplam</th><th scope="col">Sorumlu</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in page.Items)
+                {
+                    <tr>
+                        <td data-label="Sözleşme" class="primary">
+                            <a href="sozlesmeler/@c.Id">@c.Title</a>
+                            <small class="text-muted">@c.Number · V@(c.CurrentVersionNo)</small>
+                        </td>
+                        <td data-label="Müşteri">@PartyName(c.PartyId)</td>
+                        <td data-label="Tür">@Lookups.Label(ContractsAccess.ContractTypeList, c.Type)</td>
+                        <td data-label="Durumlar">
+                            <span class="badge stage-@ContractLabels.EffectiveBadge(c.EffectiveStatus)">@ContractLabels.Label(ContractLabels.Effectives, c.EffectiveStatus)</span>
+                            @if (c.ApprovalStatus != "NotRequired") { <span class="badge stage-@ContractLabels.ApprovalBadge(c.ApprovalStatus)">@ContractLabels.Label(ContractLabels.Approvals, c.ApprovalStatus)</span> }
+                            @if (c.SignatureStatus != "NotSent") { <span class="badge stage-@ContractLabels.SignatureBadge(c.SignatureStatus)">@ContractLabels.Label(ContractLabels.Signatures, c.SignatureStatus)</span> }
+                        </td>
+                        <td data-label="Başlangıç / Bitiş">@ContractLabels.Date(c.StartDate) – @(c.IsIndefinite ? "Belirsiz süreli" : ContractLabels.Date(c.EndDate))</td>
+                        <td data-label="Kritik tarih">@Critical(c)</td>
+                        <td data-label="Toplam" class="text-end">@ContractLabels.Money(c.GrossTotal, c.Currency)</td>
+                        <td data-label="Sorumlu">@Lookups.MemberName(c.OwnerId)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private PagedResult<ContractDto>? page;
+    private string? message;
+    private string? effective;
+    private string? type;
+    private string? view;
+    private string search = string.Empty;
+    private readonly Dictionary<Guid, string> partyNames = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(ContractsAccess.ContractsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"/api/contracts/contracts?page={pageNumber}";
+        if (!string.IsNullOrWhiteSpace(search)) { url += $"&search={Uri.EscapeDataString(search.Trim())}"; }
+        if (!string.IsNullOrEmpty(effective)) { url += $"&effectiveStatus={effective}"; }
+        if (!string.IsNullOrEmpty(type)) { url += $"&type={Uri.EscapeDataString(type)}"; }
+        var today = DateOnly.FromDateTime(Regional.Now.DateTime);
+        url += view switch
+        {
+            "mine" => "&ownerId=me",
+            "signature" => "&signatureStatus=Pending",
+            // Yürürlükteki ya da başlangıcı bekleyen sözleşmelerde bitiş önümüzdeki 90 gün içinde.
+            "ending" => $"&endFrom={today:yyyy-MM-dd}&endTo={today.AddDays(90):yyyy-MM-dd}",
+            "notice" => $"&noticeFrom={today:yyyy-MM-dd}&noticeTo={today.AddDays(30):yyyy-MM-dd}",
+            _ => string.Empty,
+        };
+
+        var result = await Api.GetAsync<PagedResult<ContractDto>>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            await ResolvePartiesAsync(page.Items.Select(c => c.PartyId));
+        }
+    }
+
+    /// <summary>Müşteri adları ortak lookup üzerinden çözülür: yalnızca kullanıcının görebildiği kayıtlar ad döner.</summary>
+    private async Task ResolvePartiesAsync(IEnumerable<Guid> ids)
+    {
+        var missing = ids.Distinct().Where(id => !partyNames.ContainsKey(id)).ToList();
+        if (missing.Count == 0) { return; }
+        var resolved = await Api.PostAsync<LookupResolveDto>("/api/lookups/contracts.contract.party/resolve", new ResolveLookupRequest(missing));
+        foreach (var item in resolved.Value?.Items ?? [])
+        {
+            partyNames[item.Id] = item.Label ?? "—";
+        }
+    }
+
+    private string PartyName(Guid id) => partyNames.TryGetValue(id, out var name) ? name : "—";
+
+    private Task ToggleViewAsync(string key)
+    {
+        view = view == key ? null : key;
+        return LoadAsync(1);
+    }
+
+    private static string Critical(ContractDto c)
+    {
+        if (c.NoticeDeadline is { } notice && ContractLabels.DaysUntil(notice) is { } nd && nd >= 0)
+        {
+            return $"Son bildirim: {ContractLabels.Date(notice)} ({nd} gün)";
+        }
+
+        if (!c.IsIndefinite && c.EndDate is { } end && ContractLabels.DaysUntil(end) is { } ed)
+        {
+            return ed < 0 ? $"Bitti: {ContractLabels.Date(end)}" : $"Bitiş: {ContractLabels.Date(end)} ({ed} gün)";
+        }
+
+        return "—";
+    }
+}
