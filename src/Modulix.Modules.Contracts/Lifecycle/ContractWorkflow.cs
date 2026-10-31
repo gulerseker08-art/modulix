@@ -186,7 +186,7 @@ internal sealed class ContractWorkflow(
                     ("signatureStatus", Text(contract, "signatureStatus") == SignatureStatus.Pending ? SignatureStatus.Cancelled : Text(contract, "signatureStatus")),
                     ("approvalStatus", approval == ApprovalStatus.Pending ? ApprovalStatus.Withdrawn : approval)),
                 ContractEventKinds.Cancelled,
-                null),
+                Effect((ctx, c, ct) => ContractVersions.ReleaseQuoteLinesAsync(ctx, c, ct))),
             ContractAction.Revise => (
                 Set(("preparationStatus", PreparationStatus.Draft), ("approvalStatus", ApprovalStatus.NotRequired), ("signatureStatus", SignatureStatus.NotSent), ("statusReason", text)),
                 ContractEventKinds.Revised,

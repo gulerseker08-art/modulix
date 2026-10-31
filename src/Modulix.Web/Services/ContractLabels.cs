@@ -102,6 +102,7 @@ public static class ContractActionLabels
     public static string History(string kind) => kind switch
     {
         "Created" => "Oluşturuldu",
+        "CreatedFromQuote" => "Kabul edilmiş tekliften oluşturuldu",
         "SentToReview" => "İncelemeye gönderildi",
         "MarkedReady" => "Yayıma hazır işaretlendi",
         "ReopenedDraft" => "Taslağa döndü",

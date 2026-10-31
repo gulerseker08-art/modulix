@@ -39,7 +39,13 @@ public sealed record ContractDto(
     string? RecurringSummary,
     DateTimeOffset? CalculatedAt,
     Guid? CreatedBy,
-    Guid? UpdatedBy);
+    Guid? UpdatedBy,
+    Guid? SourceQuoteId,
+    string? SourceQuoteNumber,
+    int? SourceQuoteRevisionNo,
+    string? SourceQuoteSha256,
+    Guid? SourceOpportunityId,
+    System.Text.Json.Nodes.JsonObject? Custom = null);
 
 public sealed record SaveContractRequest(
     string Title,
@@ -60,7 +66,8 @@ public sealed record SaveContractRequest(
     int? RenewalPeriodMonths = null,
     int? NoticePeriodDays = null,
     string Confidentiality = "Internal",
-    long? Version = null);
+    long? Version = null,
+    System.Text.Json.Nodes.JsonObject? Custom = null);
 
 public sealed record ContractPartyDto(
     Guid Id,
@@ -140,6 +147,8 @@ public static class ContractsAccess
     public const string FinancialsRead = "contracts.financials.read";
     public const string ContractsApprove = "contracts.contracts.approve";
 
+    public const string ContractEntityKey = "contracts.contract";
+
     public const string ContractTypeList = "contracts.contract-type";
 }
 
@@ -172,3 +181,25 @@ public sealed record LineChangeDto(Guid StableKey, string Change, string Name, I
 public sealed record PartyChangeDto(Guid Id, string Change, string Role, IReadOnlyList<FieldChangeDto> Fields);
 
 public sealed record ContractCompareDto(IReadOnlyList<FieldChangeDto> Header, IReadOnlyList<LineChangeDto> Lines, IReadOnlyList<PartyChangeDto> Parties);
+
+// ---- Dilim 3: kabul edilmiş tekliften sözleşme
+
+/// <param name="TermMonths">Süre (ay); verilirse başlangıç tarihi zorunlu, bitiş takvim ayıyla sunucuda hesaplanır.</param>
+/// <param name="LineKeys">Sözleşmeye alınacak teklif kalemleri (kararlı anahtar); boşsa tümü (kısmi kapsam için alt küme).</param>
+public sealed record CreateContractFromQuoteRequest(
+    string? Type = null,
+    DateOnly? StartDate = null,
+    int? TermMonths = null,
+    string? RenewalMode = null,
+    int? RenewalPeriodMonths = null,
+    int? NoticePeriodDays = null,
+    IReadOnlyList<Guid>? LineKeys = null,
+    Guid? OwnerId = null);
+
+public sealed record QuoteSourceLineDto(
+    Guid StableKey, int Position, string Name, decimal Quantity, string? Unit, decimal Net, decimal Gross, string? RecurringPeriod,
+    bool Taken, Guid? ContractId, string? ContractNumber);
+
+public sealed record QuoteSourceDto(
+    Guid QuoteId, string QuoteNumber, int RevisionNo, string Title, string Currency, decimal NetTotal, decimal GrossTotal, DateTimeOffset AcceptedAt,
+    string? AcceptedBy, string? DocumentSha256, bool CustomerLinked, IReadOnlyList<QuoteSourceLineDto> Lines);

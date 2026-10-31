@@ -62,6 +62,24 @@ public static class ContractsEndpoints
             }).RequirePermission(ContractsModule.Permissions.ContractsRead);
         }
 
+        // Kabul edilmiş tekliften sözleşme (dilim 3): önizleme (kalemler ve sözleşmede olanlar) ve oluşturma. İzinler serviste denetlenir (yazma + finansal).
+        var fromQuote = group.MapGroup("/from-quote");
+        fromQuote.MapGet("/{quoteId:guid}", async (Guid quoteId, IContractFromQuote service, CancellationToken ct) =>
+        {
+            var result = await service.PreviewAsync(quoteId, ct);
+            return result.IsSuccess
+                ? Results.Ok(JsonSerializer.Deserialize<QuoteSourceDto>(JsonSerializer.Serialize(result.Value, Json), Json))
+                : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(ContractsModule.Permissions.ContractsRead);
+        fromQuote.MapPost("/{quoteId:guid}", async (Guid quoteId, CreateContractFromQuoteRequest r, IContractFromQuote service, CancellationToken ct) =>
+        {
+            var result = await service.CreateAsync(quoteId,
+                new ContractFromQuoteOptions(r.Type, r.StartDate, r.TermMonths, r.RenewalMode, r.RenewalPeriodMonths, r.NoticePeriodDays, r.LineKeys, r.OwnerId), ct);
+            return result.IsSuccess
+                ? Results.Created($"{Prefix}/contracts/{result.Value!.Id}", ResourceEndpoints.ToDto<ContractDto>(result.Value))
+                : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(ContractsModule.Permissions.ContractsRead);
+
         contracts.MapGet("/{id:guid}/versions", async (Guid id, IContractWorkflow workflow, CancellationToken ct) =>
         {
             var result = await workflow.VersionsAsync(id, ct);

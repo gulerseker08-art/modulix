@@ -97,6 +97,21 @@ tenant izolasyonu, yetki/maske; `EndpointProtectionTests` yeni uçlarla geçer):
 | Tarihçe | `ContractEvents.FromStatus/ToStatus` dört durumun özetini taşır ("hazırlık/onay/imza/yürürlük", 100 karakter). |
 | Ekran | Detayda eylem çubuğu (gerekçe formu, yapılamayan işlemler ve nedenleri), "Sürümler" sekmesi (liste, özet, güncel taslakla / önceki sürümle karşılaştırma tabloları), tarihçe etiketleri. |
 
+## Uygulama durumu (üçüncü dilim: kabul edilmiş tekliften sözleşme, form metadata'sı, ilişkili kayıtlar)
+
+**Uygulandı ve testle doğrulandı** (entegrasyon `ContractFromQuoteTests` 5, `ContractFormTests` 3):
+
+| Konu | Karar / davranış |
+|---|---|
+| Devir sözleşmesi | `AcceptedQuote` (Core.Contracts) `PartyId`/`PersonId` taşır (CRM firması/kişisinin ortak kaydı); sözleşme modülü yalnızca bu arayüze bağlıdır (isteğe bağlı bağımlılık: CRM yoksa "kaynak kullanılamıyor"). |
+| İlişki | Teklif ile sözleşme bire bir değil: kalem alt kümesiyle bir tekliften birden çok sözleşme; aynı kalem aynı anda tek sözleşmede (`ContractLines.SourceQuoteId` + `SourceQuoteLineKey` filtreli benzersiz indeks; iptalde `SourceQuoteId` boşaltılır). Mükerrer istek 409 ve atomik: kalem reddedilirse sözleşme de yazılmaz (`RunAtomicAsync`). |
+| Tutar | Satır fiyatı teklifin indirim sonrası net birim fiyatı, vergi satır başına; sözleşme vergi hariç. Örnek: 2 × 1.000 + %20 → 2.400; aylık 500 dönemsel özette. Teklif sonradan değişse de sözleşme aynı kalır (kopya). |
+| Süre | `termMonths` + `startDate` → bitiş `ContractPeriod.TermEnd` (1 Kasım 2026 + 12 ay → 31 Ekim 2027). |
+| İz | Sözleşmede kaynak teklif kimliği/numarası/revizyonu/belge özeti ve fırsat kimliği; tarihçe `CreatedFromQuote`. CRM bu bağı tablo olarak görmez: arayüz sözleşme API'sini `partyId`/`sourceOpportunityId` süzgeciyle okur. |
+| Form | `IModule.Forms` ile `ContractsForms`; `ContractDetail` `LayoutForm` ile çizer (CLAUDE.md form düzeni kuralı); firma zorunluluğu sunucuda denetlenir. `ContractDto`/`SaveContractRequest` özel alan taşır. |
+| Aktivite | `ContractLinkTarget` (`IActivityLinkTarget`): görünürlük okuma izni + veri kapsamı; başlık yalnızca ad ve numara. |
+| Ekran | `/sozlesmeler/tekliften/{id}` (önizleme, kalem seçimi, süre/yenileme), teklif sayfasında "Sözleşme oluştur", firma kartı ve fırsat sayfasında `RelatedContracts`. |
+
 **Yapılmadı (sonraki dilimler):** imza ve yürürlüğe alma eylemleri (dilim 6; `ContractDates` hazır), geriye dönük tarih girişinin yetki/gerekçeyle
 denetimi (imza/yürürlük adımında uygulanacak), onay kuralları/adımlar/vekâlet (dilim 5; bu dilimde tek adımlı onay), tekliften sözleşme (`AcceptedQuote`'a ortak kayıt
 kimlikleri), firma/fırsat sekmesi, `IActivityLinkTarget`; şablon/PDF; iç onay; imza; taahhüt; yenileme/fesih/ek protokol ve zamanlanmış iş;

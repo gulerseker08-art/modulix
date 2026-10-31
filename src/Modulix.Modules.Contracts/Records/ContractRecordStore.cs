@@ -37,6 +37,11 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         Field.Shared<Contract, Person>("personId", "Kişi bulunamadı.", c => c.PersonId, (c, v) => c.PersonId = v),
         Field.Owner<Contract>(OwnerField, c => c.OwnerId, (c, v) => c.OwnerId = v),
         Field.Reference<Contract, Contract>("previousContractId", "Önceki sözleşme bulunamadı.", c => c.PreviousContractId, (c, v) => c.PreviousContractId = v),
+        Field.Id<Contract>("sourceQuoteId", c => c.SourceQuoteId, (c, v) => c.SourceQuoteId = v).AsSystem(),
+        Field.Text<Contract>("sourceQuoteNumber", Contract.NumberMaxLength, c => c.SourceQuoteNumber, (c, v) => c.SourceQuoteNumber = v).AsSystem(),
+        Field.Integer<Contract>("sourceQuoteRevisionNo", c => c.SourceQuoteRevisionNo, (c, v) => c.SourceQuoteRevisionNo = v).AsSystem(),
+        Field.Text<Contract>("sourceQuoteSha256", ContractVersion.HashLength, c => c.SourceQuoteSha256, (c, v) => c.SourceQuoteSha256 = v).AsSystem(),
+        Field.Id<Contract>("sourceOpportunityId", c => c.SourceOpportunityId, (c, v) => c.SourceOpportunityId = v).AsSystem(),
         Field.Date<Contract>("startDate", c => c.StartDate, (c, v) => c.StartDate = v),
         Field.Date<Contract>("endDate", c => c.EndDate, (c, v) => c.EndDate = v),
         Field.Flag<Contract>("isIndefinite", c => c.IsIndefinite, (c, v) => c.IsIndefinite = v),
@@ -70,6 +75,8 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         ["partyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PartyId == id) : null,
         ["personId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PersonId == id) : null,
         ["previousContractId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PreviousContractId == id) : null,
+        ["sourceQuoteId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.SourceQuoteId == id) : null,
+        ["sourceOpportunityId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.SourceOpportunityId == id) : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
         ["number"] = (q, v, _) => v.Trim() is { Length: > 0 } number ? q.Where(c => c.Number == number) : null,
         ["type"] = (q, v, _) => v.Trim() is { Length: > 0 } type ? q.Where(c => c.Type == type) : null,
@@ -167,7 +174,8 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
 
     protected override Task CreatedAsync(Contract entity, CancellationToken cancellationToken)
     {
-        ContractHistory.Add(Context, entity, ContractEventKinds.Created, null);
+        // Kapı açıkken oluşturma (ör. tekliften) kendi tarihçe türünü ve gerekçesini taşır.
+        ContractHistory.Add(Context, entity, Context.Gate.EventKind ?? ContractEventKinds.Created, Context.Gate.Reason);
         return Task.CompletedTask;
     }
 
@@ -201,6 +209,7 @@ public static class ContractEventKinds
     public const string ApprovalInvalidated = "ApprovalInvalidated";
     public const string Cancelled = "Cancelled";
     public const string Revised = "Revised";
+    public const string CreatedFromQuote = "CreatedFromQuote";
     public const string VersionFrozen = "VersionFrozen";
 }
 

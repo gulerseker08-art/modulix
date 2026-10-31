@@ -78,6 +78,19 @@ public sealed class Contract : ContractsEntity, IOwnedEntity
     /// <summary>Yenilenen/değiştirilen önceki sözleşme (aynı tenant).</summary>
     public Guid? PreviousContractId { get; internal set; }
 
+    /// <summary>Kaynak teklif (kabul edilmiş revizyon); CRM tablosuna bağ yoktur, kimlik ve numara anlık görüntüdür. Sunucu yazar.</summary>
+    public Guid? SourceQuoteId { get; internal set; }
+
+    public string? SourceQuoteNumber { get; internal set; }
+
+    public int? SourceQuoteRevisionNo { get; internal set; }
+
+    /// <summary>Müşterinin kabul ettiği teklif belgesinin SHA-256 özeti (teklif sürümü sabitlenmiştir).</summary>
+    public string? SourceQuoteSha256 { get; internal set; }
+
+    /// <summary>Kaynak teklifin fırsatı (fırsat ekranından sözleşme sürecini izlemek için).</summary>
+    public Guid? SourceOpportunityId { get; internal set; }
+
     public DateOnly? StartDate { get; internal set; }
 
     /// <summary>Belirsiz süreli sözleşmede boştur.</summary>
@@ -215,6 +228,9 @@ public sealed class ContractLine : ContractsEntity
 
     /// <summary>Kaynak teklif kaleminin kararlı anahtarı (tekliften oluşturulduysa).</summary>
     public Guid? SourceQuoteLineKey { get; internal set; }
+
+    /// <summary>Kalemin geldiği teklif. Sözleşme iptal edilince boşaltılır (kalem yeniden sözleşmeye alınabilir); aynı teklif kalemi ikinci kez kullanılamaz.</summary>
+    public Guid? SourceQuoteId { get; internal set; }
 
     // ---- Sunucu hesabı
 

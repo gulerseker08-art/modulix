@@ -478,6 +478,10 @@ internal sealed class AcceptedQuoteSource(IRecordPipeline pipeline, QuoteReader 
         return new AcceptedQuote(
             quote.Id, quote.QuoteNumber, quote.RevisionNo, quote.Title, quote.CompanyId, quote.ContactId, quote.OpportunityId, quote.Currency, quote.PriceIncludesTax,
             quote.NetTotal, quote.TaxTotal, quote.GrossTotal, quote.DecidedAt ?? quote.UpdatedAt, decision?.SignerName, decision?.DocumentSha256 ?? document?.Sha256,
-            quote.PaymentTerms, quote.DeliveryTerms, quote.CommercialTerms, lines);
+            quote.PaymentTerms, quote.DeliveryTerms, quote.CommercialTerms, lines)
+        {
+            PartyId = await reader.PartyOfCompanyAsync(quote.CompanyId, cancellationToken),
+            PersonId = quote.ContactId is { } contactId ? await reader.PersonOfContactAsync(contactId, cancellationToken) : null,
+        };
     }
 }

@@ -1,0 +1,83 @@
+@* İlişkili sözleşmeler (ADR-0022, dilim 3): firma kartında müşterinin, fırsat ekranında kaynak fırsatın sözleşmeleri. Sözleşme modülü bu tenant için
+   kapalıysa ya da kullanıcının okuma izni yoksa bileşen hiçbir şey çizmez ve istek yapmaz; liste sunucuda izin ve veri kapsamıyla süzülür. *@
+@inject ApiClient Api
+@inject SessionState Session
+
+@if (Available)
+{
+    <section class="detail-section" aria-labelledby="related-contracts-title">
+        <div class="section-header">
+            <h2 id="related-contracts-title">@Title</h2>
+        </div>
+        @if (error is not null)
+        {
+            <p class="text-muted" role="status">@error</p>
+        }
+        else if (items is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (items.Count == 0)
+        {
+            <p class="text-muted">İlişkili sözleşme yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">@Title</caption>
+                <thead>
+                    <tr><th scope="col">Sözleşme</th><th scope="col">Durum</th><th scope="col">Başlangıç / Bitiş</th><th scope="col">Son bildirim</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in items)
+                    {
+                        <tr>
+                            <td data-label="Sözleşme" class="primary"><a href="sozlesmeler/@c.Id">@c.Title</a> <small class="text-muted">@c.Number</small></td>
+                            <td data-label="Durum">
+                                <span class="badge stage-@ContractLabels.EffectiveBadge(c.EffectiveStatus)">@ContractLabels.Label(ContractLabels.Effectives, c.EffectiveStatus)</span>
+                                @if (c.SignatureStatus != "NotSent") { <span class="badge stage-@ContractLabels.SignatureBadge(c.SignatureStatus)">@ContractLabels.Label(ContractLabels.Signatures, c.SignatureStatus)</span> }
+                            </td>
+                            <td data-label="Başlangıç / Bitiş">@ContractLabels.Date(c.StartDate) – @(c.IsIndefinite ? "Belirsiz süreli" : ContractLabels.Date(c.EndDate))</td>
+                            <td data-label="Son bildirim">@ContractLabels.Date(c.NoticeDeadline)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlyList<ContractDto>? items;
+    private string? error;
+    private string? loadedFor;
+
+    [Parameter] public string Title { get; set; } = "Sözleşmeler";
+
+    /// <summary>Ortak müşteri (taraf) kaydı; firma kartında firmanın <c>PartyId</c> değeri.</summary>
+    [Parameter] public Guid? PartyId { get; set; }
+
+    /// <summary>Kaynak fırsat: fırsattan açılan tekliflerden doğan sözleşmeler.</summary>
+    [Parameter] public Guid? SourceOpportunityId { get; set; }
+
+    private bool Available => Session.IsModuleEnabled(ContractsAccess.ModuleKey) && Session.Can(ContractsAccess.ContractsRead) && (PartyId is not null || SourceOpportunityId is not null);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Available)
+        {
+            return;
+        }
+
+        var query = PartyId is { } party ? $"partyId={party}" : $"sourceOpportunityId={SourceOpportunityId}";
+        if (loadedFor == query)
+        {
+            return;
+        }
+
+        loadedFor = query;
+        var result = await Api.GetAsync<PagedResult<ContractDto>>($"/api/contracts/contracts?{query}&pageSize=20");
+        items = result.Value?.Items;
+        error = result.IsSuccess ? null : result.Error;
+    }
+}

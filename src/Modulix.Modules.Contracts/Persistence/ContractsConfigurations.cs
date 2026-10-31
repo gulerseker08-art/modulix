@@ -59,6 +59,10 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
         builder.HasIndex(c => new { c.TenantId, c.Number }).IsUnique().HasDatabaseName("UX_Contracts_Number");
         builder.HasIndex(c => new { c.TenantId, c.PartyId });
         builder.HasIndex(c => new { c.TenantId, c.OwnerId, c.EffectiveStatus });
+        builder.Property(c => c.SourceQuoteNumber).HasMaxLength(Contract.NumberMaxLength);
+        builder.Property(c => c.SourceQuoteSha256).HasMaxLength(ContractVersion.HashLength).IsUnicode(false);
+        builder.HasIndex(c => new { c.TenantId, c.SourceQuoteId });
+        builder.HasIndex(c => new { c.TenantId, c.SourceOpportunityId });
         // Tarih ve durum sorguları (bitişi yaklaşan, bildirim süresi yaklaşan, imza bekleyen).
         builder.HasIndex(c => new { c.TenantId, c.EffectiveStatus, c.EndDate });
         builder.HasIndex(c => new { c.TenantId, c.NoticeDeadline });
@@ -118,6 +122,9 @@ internal sealed class ContractLineConfiguration : IEntityTypeConfiguration<Contr
         builder.Property(l => l.Gross).HasPrecision(18, 2);
         builder.HasIndex(l => new { l.TenantId, l.ContractId, l.Position });
         builder.HasIndex(l => new { l.TenantId, l.ContractId, l.StableKey }).IsUnique().HasDatabaseName("UX_ContractLines_StableKey");
+        // Teklif kalemi aynı anda ikinci bir sözleşmeye giremez (mükerrer devir; yarışta veritabanı ikincisini reddeder). İptalde SourceQuoteId boşaltılır.
+        builder.HasIndex(l => new { l.TenantId, l.SourceQuoteId, l.SourceQuoteLineKey }).IsUnique().HasDatabaseName("UX_ContractLines_SourceQuoteLine")
+            .HasFilter("[SourceQuoteId] IS NOT NULL AND [SourceQuoteLineKey] IS NOT NULL");
 
         builder.HasOne<Contract>().WithMany().HasForeignKey(l => new { l.TenantId, l.ContractId })
             .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Cascade);

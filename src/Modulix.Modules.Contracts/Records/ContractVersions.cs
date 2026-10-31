@@ -50,6 +50,16 @@ internal static class ContractVersions
         });
     }
 
+    /// <summary>İptal edilen sözleşmenin teklif kalemlerini serbest bırakır: kalem yeniden bir sözleşmeye alınabilir (teklif izi sözleşmede kalır).</summary>
+    public static async Task ReleaseQuoteLinesAsync(ContractsStoreContext context, Contract contract, CancellationToken cancellationToken)
+    {
+        foreach (var line in await context.Data.Set<ContractLine>().Where(l => l.ContractId == contract.Id && l.SourceQuoteId != null).ToListAsync(cancellationToken))
+        {
+            line.SourceQuoteId = null;
+            line.Touch();
+        }
+    }
+
     /// <summary>Güncel sürümün durumunu yazar (onaylandı, reddedildi, geri çekildi, geçersiz kılındı).</summary>
     public static async Task SetStatusAsync(ContractsStoreContext context, Contract contract, string status, CancellationToken cancellationToken)
     {
