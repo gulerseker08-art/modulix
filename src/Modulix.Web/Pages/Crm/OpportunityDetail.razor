@@ -131,6 +131,12 @@
         <div class="detail-layout">
             <div class="detail-main">
 
+            <TabBar Tabs="OpportunityTabs" State="tabs" Label="Fırsat bölümleri" Changed="_ => { }" />
+
+            @if (tabs.Rendered(TabGeneral))
+            {
+            <div role="tabpanel" id="tabpanel-@TabGeneral" aria-labelledby="tab-@TabGeneral" class="record-tabpanel" hidden="@tabs.Hidden(TabGeneral)">
+
             <FormSection Title="Temel bilgiler" Icon="target">
                 <dl class="detail-grid">
                     <div><dt>Firma</dt><dd><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></dd></div>
@@ -411,6 +417,12 @@
                 </FormSection>
             }
 
+            </div>
+            }
+
+            @if (tabs.Rendered(TabContacts))
+            {
+            <div role="tabpanel" id="tabpanel-@TabContacts" aria-labelledby="tab-@TabContacts" class="record-tabpanel" hidden="@tabs.Hidden(TabContacts)">
             <FormSection Title="Kişiler" Icon="users">
                 <Actions>
                     @if (Session.Can(CrmAccess.OpportunitiesWrite) && !addingContact)
@@ -467,6 +479,12 @@
                 </ChildContent>
             </FormSection>
 
+            </div>
+            }
+
+            @if (tabs.Rendered(TabCompetitors))
+            {
+            <div role="tabpanel" id="tabpanel-@TabCompetitors" aria-labelledby="tab-@TabCompetitors" class="record-tabpanel" hidden="@tabs.Hidden(TabCompetitors)">
             <FormSection Title="Rakipler" Icon="shield">
                 <Actions>
                     @if (Session.Can(CrmAccess.OpportunitiesWrite) && !addingCompetitor)
@@ -528,6 +546,12 @@
                 </ChildContent>
             </FormSection>
 
+            </div>
+            }
+
+            @if (tabs.Rendered(TabQuotes))
+            {
+            <div role="tabpanel" id="tabpanel-@TabQuotes" aria-labelledby="tab-@TabQuotes" class="record-tabpanel" hidden="@tabs.Hidden(TabQuotes)">
             <FormSection Title="Teklifler" Icon="file-text">
                 <Actions>
                     @if (Session.Can(CrmAccess.QuotesWrite) && opportunity.Status == OpportunityStatus.Open)
@@ -586,6 +610,12 @@
                 </ChildContent>
             </FormSection>
 
+            </div>
+            }
+
+            @if (tabs.Rendered(TabHistory))
+            {
+            <div role="tabpanel" id="tabpanel-@TabHistory" aria-labelledby="tab-@TabHistory" class="record-tabpanel" hidden="@tabs.Hidden(TabHistory)">
             <FormSection Title="Aşama ve durum tarihçesi" Icon="history">
                 @if (history is null)
                 {
@@ -613,6 +643,8 @@
             </FormSection>
 
             <RecordHistory EntityKey="@CrmEntityKeys.Opportunity" RecordId="Id" Version="opportunity.Version" />
+            </div>
+            }
             </div>
 
             <aside class="detail-side" aria-label="Fırsat yan paneli">
@@ -709,6 +741,30 @@
     private string? quoteNotice;
     private bool quoteNoticeFailed;
     private IReadOnlyList<OpportunityHistoryDto>? history;
+
+    // Sekmeler (docs/design-system/form-standards.md → Sekmeler): Genel bilgiler, Kişiler, Rakipler, Teklifler, Geçmiş.
+    private const string TabGeneral = "genel";
+    private const string TabContacts = "kisiler";
+    private const string TabCompetitors = "rakipler";
+    private const string TabQuotes = "teklifler";
+    private const string TabHistory = "gecmis";
+    private readonly TabState tabs = new(TabGeneral);
+
+    /// <summary>Teklif izni yoksa Teklifler sekmesi hiç eklenmez (sunucu yine denetler); sayılar yüklenen listelerden gelir.</summary>
+    private IReadOnlyList<TabItem> OpportunityTabs
+    {
+        get
+        {
+            List<TabItem> list = [new(TabGeneral, "Genel bilgiler"), new(TabContacts, "Kişiler", contacts?.Count), new(TabCompetitors, "Rakipler", competitors?.Count)];
+            if (Session.Can(CrmAccess.QuotesRead))
+            {
+                list.Add(new(TabQuotes, "Teklifler", quotes?.Count));
+            }
+
+            list.Add(new(TabHistory, "Geçmiş"));
+            return list;
+        }
+    }
     private IReadOnlyDictionary<string, string[]>? actionErrors;
     private string? message;
     private string? notice;

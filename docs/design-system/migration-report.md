@@ -193,7 +193,7 @@ Kullanıcı geri bildirimi: form ekranları referans görsellerdeki (Firma kart�
 | Fırsat detayı | Değişti | Özet → **Temel bilgiler** kartı; İhtiyaç analizi → **Detaylar**; Ürün / hizmet kalemleri, Kişiler, Rakipler, Teklifler, Aşama ve durum tarihçesi ve sağ paneldeki Aktivite zaman çizelgesi / Finansal özet kartları `FormSection` ile (aksiyon düğmeleri başlıkta) |
 | Firma / Kişi detayı | Değişti | Genel sekmesinde Genel bilgiler ve Adres ve iletişim / İletişim bilgileri kartları |
 | Lead detayı | Değişti | Talep bilgileri ve Kaynak ve sahiplik kartları |
-| Sekmeli fırsat detayı, Takip Et, Kazanma nedenleri / Kaybetme riskleri onay kutuları | Yok | Fırsat detayı kartlı ama tek sayfa (sekme yok); referanstaki onay kutusu alanları veri modelinde yok |
+| Fırsat detayı sekmeleri | Var | `TabBar` + `TabState` ile **Genel bilgiler** (temel bilgiler, işlemler, detaylar, kalemler) · **Kişiler** · **Rakipler** · **Teklifler** (teklif izni yoksa sekme hiç eklenmez) · **Geçmiş** (aşama tarihçesi + değişiklik geçmişi); sayı rozetleri yüklenen listelerden. Sağ panel (aktivite zaman çizelgesi, finansal özet) her sekmede görünür || Takip Et, Kazanma nedenleri / Kaybetme riskleri onay kutuları, Notlar / Dokümanlar / Analiz sekmeleri | Yok | Referanstaki bu alanlar ve içerikler veri modelinde / altyapıda yok |
 
 ![Firma formu](onizleme-firma-formu.png)
 
