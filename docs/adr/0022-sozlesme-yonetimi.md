@@ -59,8 +59,8 @@ Yol haritasında (M1.5i, M1.6) sipariş/sözleşme köprüsü "hedef modül yok"
    `IActivityLinkTarget`.
 4. Şablonlar ve belge üretimi (sürüm, değişkenler, PDF, özet) — uygulandı.
 5. İç onay (genel değerlendirici, kurallar, adımlar, vekâlet, iş listesi) — uygulandı.
-6. İmza (imzacılar, manuel doğrulama, sağlayıcı arayüzü + simülasyon, webhook).
-7. Taahhütler (dönemsel gerçekleşme, ihlal → aktivite).
+6. İmza (imzacılar, manuel doğrulama, sağlayıcı arayüzü + simülasyon, webhook) — uygulandı.
+7. Taahhütler (dönemsel gerçekleşme, ihlal → aktivite) — uygulandı.
 8. Yenileme, fesih, ek protokol, zamanlanmış iş.
 9. Ekran tamamlama (sihirbaz, dashboard, takvim, görünümler, dışa aktarma, ayarlar, erişilebilirlik).
 10. Dokümantasyon ve teslim raporu.
@@ -151,3 +151,34 @@ yok); teslim raporu. Ekranlar tarayıcıda denetlendi (aşağıdaki not), klavye
 | Gösterge alanları | `HasNonStandardTerms`, `RiskLevel`: sözleşme formunda (metadata), anlık görüntüde ve karşılaştırmada. |
 
 **Yapılmadı / sınırlar:** gecikme için e-posta hatırlatması ve yöneticiye eskalasyon (zamanlanmış iş altyapısı dilim 8'de sözleşmeye bağlanacak; bu dilimde yalnızca hedef süre ve gecikme işareti var); onaylayıcı sözleşmeyi göremiyorsa (veri kapsamı) karar veremez; kural önizlemesi ("bu sözleşme hangi kurallara girer") yok, plan yalnızca gönderimde görünür; gerçek bir onay yöneticisi hiyerarşisi (yönetici zinciri) kullanılmıyor, onaylayıcı kuralda adlandırılır. Ekranlar tarayıcıda denetlendi (Onay sekmesi, iş listesi, kural ve vekâlet sayfası); klavye/ekran okuyucu denemesi yapılmadı.
+
+## Uygulama durumu (altıncı dilim: imza)
+
+**Uygulandı ve testle doğrulandı** (birim `ContractSignatureTests` 13; entegrasyon `ContractSignatureFlowTests` 7 senaryo: sıralı manuel imza ve yürürlüğe geçiş, başlatma doğrulamaları, imzalı webhook ile paralel simülasyon (idempotency, sıra, tekrar koruması), ret/hatırlatma/iptal/süre dolumu, tenant izolasyonu, yetki ayrımı, sözleşme iptali ve taslağa dönüş):
+
+| Konu | Karar / davranış |
+|---|---|
+| Model | `ContractSignatureRequests` (belge + SHA-256, yöntem, kip, durum, son tarih, son olay numarası), `ContractSignatories`, `ContractSignatureEvents` (değişmez günlük; sağlayıcı olay kimliği istek içinde tekil), `ContractSignatureFiles` (manuel kanıt). Hepsi RLS'li. |
+| Durumlar | İstek: Pending, PartiallySigned, Completed, Rejected, Expired, Cancelled. İmzacı: Waiting, Sent, Viewed, Signed, Declined, Expired, Cancelled. Sözleşmenin imza durumu istekten türetilir ve kapı etkisiyle sözleşme güncellemesiyle aynı işlemde yazılır (sürüm denetimi: eşzamanlı iki imzadan biri 409). Saf kurallar `SignatureFlow`. |
+| Yöntemler | Manuel (tarama + doğrulayan) ve sağlayıcı ayrıdır; güvence düzeyi (`ManualScan`, `SimulatedElectronic`, `ProviderElectronic`, `ProviderQualified`) imzacıya yazılır ve eşit gösterilmez. Simülasyon hiçbir zaman gerçek ya da nitelikli sayılmaz. |
+| Webhook | HMAC-SHA256 + zaman damgası (5 dk) + sabit süreli karşılaştırma; gizli anahtar yapılandırmada; tenant referanstan; sistem kimliği (`contracts.signature-webhook`, `EventSubscription` ile izinleri bildirilir); idempotent ve sıra denetimli; hız ve boyut sınırı. |
+| Güvenlik | Doğrulayan imzalayan olamaz; başlatma/doğrulama/indirme ayrı izin; dosya imzası denetimi, indirme başlıkları; imza yalnızca örnek olmayan, kesin, güncel sürüm belgesine; imzalı sürüm düzenlenemez, yeniden revizyon gerekir. |
+| Yürürlük | Zorunlu imzacıların hepsi imzalayınca sürüm `Signed`, `EffectiveVersionNo` yazılır, `EffectiveStatus = ContractDates.StatusOn(bugün, başlangıç, bitiş, belirsiz)`. |
+
+**Yapılmadı / sınırlar:** gerçek bir imza sağlayıcısı entegrasyonu (yalnızca arayüz ve simülasyon; gerçek sağlayıcı için sözleşme, erişim ve hukuki değerlendirme gerekir); Modulix tarafından barındırılan müşteri imza sayfası/bağlantısı (kapsam dışı, gerekçe README'de); müşteriye e-posta ya da bildirim (hatırlatma yalnızca kaydedilir; dış gönderim yasak); süresi dolan isteklerin otomatik sonlandırılması (servis `ExpireAsync` ve okuyucu `OverdueSignatureContractsAsync` hazır, zamanlanmış iş dilim 8); antivirüs taraması; imzacı kimlik doğrulaması ve yetki kanıtı (Modulix doğrulamaz). Ekranlar tarayıcıda denetlendi (İmza sekmesi, istek başlatma, simülasyonla imza, yürürlük durumu); klavye/ekran okuyucu denemesi yapılmadı.
+
+## Uygulama durumu (yedinci dilim: taahhütler)
+
+**Uygulandı ve testle doğrulandı** (birim `ContractCommitmentTests` 26; entegrasyon `ContractCommitmentTests` 7 senaryo: tek seferlik ve dönemsel takip ile kilit, ölçüm ve ihlal + takip aktivitesi, tolerans/eskalasyon/idempotent değerlendirme, CRM kapalıyken ve açık uçlu ufuk, doğrulama/bağımlılık/muafiyet/iptal, tenant izolasyonu, yetki ayrımı):
+
+| Konu | Karar / davranış |
+|---|---|
+| Model | `ContractCommitments` (tanım; toplu kök), `ContractCommitmentOccurrences` (her dönem ayrı satır; (taahhüt, sıra) benzersiz), `ContractCommitmentFiles` (kanıt). Hepsi RLS'li. Gerçekleşme değişiklikleri taahhüt güncellemesiyle aynı işlemde (kapı etkisi `CommitmentEffect`), sürüm denetimli. |
+| Takvim | Saf `CommitmentSchedule`: tekrar kuralından son tarihler, ay sonu kırpma ilk son tarihe bağlı (kaymaz), 120 satır üst sınırı, bitişsizde 12 aylık kayan ufuk. Tenant gününe göre "bugün". |
+| Ölçüm | Saf `CommitmentMeasure`: en az / en çok / tam, tolerans dahil. Hedef tutmazsa ya da tolerans sonrası tamamlanırsa ihlal. |
+| İhlal | `CommitmentTracker`: gecikmiş (son tarih geçti), ihlal (son tarih + tolerans günü geçti), eskalasyon (ihlal + gün, tamamlanmamış, bir kez), tamamlanabilirlik (üzerine yazma yok), bağımlılık engeli. |
+| Takip aktivitesi | `IFollowUpActivities` (Core.Contracts) bağlantı sözleşmesi; CRM uygular (aktivite + kayıt bağı, kayıt boru hattından). CRM yoksa/kapalıysa "kullanılamıyor", açılamazsa "başarısız" ve yeniden denenir. Aktivite sorumluya, eskalasyonda eskalasyon kullanıcısına açılır. |
+| Sonuç | Ceza ve finansal sonuç **uygulanmaz** (sözleşme kuralı ve yetkili onayı olmadan yapılmaz); yalnızca atıf notu vardır. |
+| Entegrasyon | Firma kartında aktif taahhütler ve yaklaşan tarihler; aktivite takvimine ihlal/eskalasyon aktiviteleri; sözleşme tarihçesine olaylar. |
+
+**Yapılmadı / sınırlar:** ekip sorumlusu (yalnızca kullanıcı; ekip alanı yok); aktivite dışında bildirim (e-posta) ve ihlalin yöneticiye otomatik zincirlenmesi (yönetici hiyerarşisi yok, eskalasyon kullanıcısı taahhütte adlandırılır); değerlendirmeyi kendiliğinden çalıştıran zamanlanmış iş (servis hazır, çalıştırıcı dilim 8; o zamana kadar tur kullanıcı tarafından tetiklenir); bağımlılık tek bir taahhüde; taahhüt şablonları ve toplu dışa aktarma; kişi kartında taahhüt görünümü (yalnızca firma kartı). Ekranlar tarayıcıda denetlendi (Taahhütler sekmesi, iş listesi, değerlendirme ve CRM takip aktivitesi); klavye/ekran okuyucu denemesi yapılmadı.

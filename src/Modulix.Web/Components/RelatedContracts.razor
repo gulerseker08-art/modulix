@@ -45,10 +45,35 @@
             </table>
         }
     </section>
+
+    @if (PartyId is not null && upcoming is { Count: > 0 })
+    {
+        <section class="detail-section" aria-labelledby="related-commitments-title">
+            <div class="section-header">
+                <h2 id="related-commitments-title">Aktif taahhütler ve yaklaşan tarihler</h2>
+            </div>
+            <table class="table record-table">
+                <caption class="visually-hidden">Yaklaşan ve geciken taahhütler</caption>
+                <thead><tr><th scope="col">Taahhüt</th><th scope="col">Sözleşme</th><th scope="col">Son tarih</th><th scope="col">Durum</th></tr></thead>
+                <tbody>
+                    @foreach (var o in upcoming)
+                    {
+                        <tr>
+                            <td data-label="Taahhüt" class="primary">@o.CommitmentTitle</td>
+                            <td data-label="Sözleşme"><a href="sozlesmeler/@o.ContractId">@o.ContractTitle</a> <small class="text-muted">@o.ContractNumber</small></td>
+                            <td data-label="Son tarih">@ContractLabels.Date(o.DueDate)@if (o.IsOverdue) { <div class="small text-danger">@o.DaysOverdue gün gecikti</div> }</td>
+                            <td data-label="Durum"><span class="badge stage-@CommitmentLabels.Badge(o.Status, o.IsOverdue)">@CommitmentLabels.Label(CommitmentLabels.OccurrenceStatuses, o.Status)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
 }
 
 @code {
     private IReadOnlyList<ContractDto>? items;
+    private IReadOnlyList<CommitmentOccurrenceDto>? upcoming;
     private string? error;
     private string? loadedFor;
 
@@ -79,5 +104,13 @@
         var result = await Api.GetAsync<PagedResult<ContractDto>>($"/api/contracts/contracts?{query}&pageSize=20");
         items = result.Value?.Items;
         error = result.IsSuccess ? null : result.Error;
+
+        // Müşterinin açık taahhütleri: gecikenler ve önümüzdeki 60 gün (en yakın beş).
+        if (PartyId is { } partyId)
+        {
+            var until = DateOnly.FromDateTime(DateTime.Today.AddDays(60)).ToString("yyyy-MM-dd");
+            var commitments = await Api.GetAsync<List<CommitmentOccurrenceDto>>($"/api/contracts/commitments/occurrences?partyId={partyId}&status=Open&dueTo={until}");
+            upcoming = commitments.Value?.Take(5).ToList();
+        }
     }
 }

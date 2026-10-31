@@ -23,7 +23,9 @@ public sealed record ContractPolicySettings(
     string? ProviderDetails = null,
     string? FooterNote = null,
     string TimeZoneId = "Europe/Istanbul",
-    int ApprovalDueHours = 72)
+    int ApprovalDueHours = 72,
+    string? SignatureProvider = null,
+    int SignatureValidityDays = 14)
 {
     public static ContractPolicySettings Default { get; } = new(false);
 }
@@ -203,7 +205,7 @@ internal sealed class ContractWorkflow(
             ContractAction.SendToReview => (Set(("preparationStatus", PreparationStatus.InReview)), ContractEventKinds.SentToReview, null),
             ContractAction.MarkReady => (Set(("preparationStatus", PreparationStatus.ReadyToPublish)), ContractEventKinds.MarkedReady, null),
             ContractAction.ReopenDraft => (
-                Set(("preparationStatus", PreparationStatus.Draft), ("approvalStatus", ApprovalStatus.NotRequired), ("statusReason", text)),
+                Set(("preparationStatus", PreparationStatus.Draft), ("approvalStatus", ApprovalStatus.NotRequired), ("signatureStatus", SignatureStatus.NotSent), ("statusReason", text)),
                 approval is ApprovalStatus.Approved or ApprovalStatus.Rejected or ApprovalStatus.Withdrawn ? ContractEventKinds.ApprovalInvalidated : ContractEventKinds.ReopenedDraft,
                 Effect(async (ctx, c, ct) =>
                 {
@@ -261,7 +263,11 @@ internal sealed class ContractWorkflow(
                     ("signatureStatus", Text(contract, "signatureStatus") == SignatureStatus.Pending ? SignatureStatus.Cancelled : Text(contract, "signatureStatus")),
                     ("approvalStatus", approval == ApprovalStatus.Pending ? ApprovalStatus.Withdrawn : approval)),
                 ContractEventKinds.Cancelled,
-                Effect((ctx, c, ct) => ContractVersions.ReleaseQuoteLinesAsync(ctx, c, ct))),
+                Effect(async (ctx, c, ct) =>
+                {
+                    await ContractSignatureWriter.CancelOpenAsync(ctx, c, text ?? "Sözleşme iptal edildi.", ct);
+                    await ContractVersions.ReleaseQuoteLinesAsync(ctx, c, ct);
+                })),
             ContractAction.Revise => (
                 Set(("preparationStatus", PreparationStatus.Draft), ("approvalStatus", ApprovalStatus.NotRequired), ("signatureStatus", SignatureStatus.NotSent), ("statusReason", text)),
                 ContractEventKinds.Revised,

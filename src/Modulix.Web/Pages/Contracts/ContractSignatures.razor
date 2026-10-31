@@ -1,0 +1,103 @@
+@page "/sozlesmeler/imzalar"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Sözleşme imzaları · Modulix</PageTitle>
+
+<AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
+    <div class="page-header">
+        <h1>Sözleşme imzaları</h1>
+    </div>
+    <p class="text-muted">
+        İmza sürecindeki sözleşmeler. İmza isteği başlatmak, manuel imzayı doğrulamak ve süreci yönetmek için sözleşmeyi açın (İmza sekmesi). Simülasyon sağlayıcısıyla alınan imzaların hukuki değeri yoktur.
+    </p>
+
+    <Notice Text="@notice" Failed="true" />
+
+    <div class="filters">
+        <label class="form-label" for="sig-filter">Durum</label>
+        <select id="sig-filter" class="form-select" value="@status" @onchange="FilterAsync">
+            @foreach (var s in statuses) { <option value="@s.Key">@s.Label</option> }
+        </select>
+    </div>
+
+    @if (items is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (items.Count == 0)
+    {
+        <p class="text-muted">Bu durumda sözleşme yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">İmza durumuna göre sözleşmeler</caption>
+            <thead><tr><th scope="col">Sözleşme</th><th scope="col">Müşteri</th><th scope="col">İmza</th><th scope="col">Yürürlük</th><th scope="col">Başlangıç / Bitiş</th></tr></thead>
+            <tbody>
+                @foreach (var c in items)
+                {
+                    <tr>
+                        <td data-label="Sözleşme" class="primary"><a href="sozlesmeler/@c.Id">@c.Title</a> <small class="text-muted">@c.Number · V@(c.CurrentVersionNo)</small></td>
+                        <td data-label="Müşteri">@PartyName(c.PartyId)</td>
+                        <td data-label="İmza"><span class="badge stage-@ContractLabels.SignatureBadge(c.SignatureStatus)">@ContractLabels.Label(ContractLabels.Signatures, c.SignatureStatus)</span></td>
+                        <td data-label="Yürürlük"><span class="badge stage-@ContractLabels.EffectiveBadge(c.EffectiveStatus)">@ContractLabels.Label(ContractLabels.Effectives, c.EffectiveStatus)</span></td>
+                        <td data-label="Başlangıç / Bitiş">@ContractLabels.Date(c.StartDate) – @(c.IsIndefinite ? "Belirsiz süreli" : ContractLabels.Date(c.EndDate))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private readonly IReadOnlyList<(string Key, string Label)> statuses =
+    [
+        ("Pending", "İmza bekliyor"), ("PartiallySigned", "Kısmen imzalandı"), ("Completed", "İmzalandı"), ("Rejected", "İmza reddedildi"), ("Expired", "İmza süresi doldu"), ("Cancelled", "İmza iptal edildi"),
+    ];
+
+    private readonly Dictionary<Guid, string> partyNames = [];
+    private List<ContractDto>? items;
+    private string status = "Pending";
+    private string? notice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(ContractsAccess.ContractsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task FilterAsync(ChangeEventArgs e)
+    {
+        status = e.Value?.ToString() ?? "Pending";
+        items = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var (loaded, error) = await Api.GetAllAsync<ContractDto>($"/api/contracts/contracts?signatureStatus={status}");
+        items = loaded;
+        notice = error;
+        await ResolvePartiesAsync((loaded ?? []).Select(c => c.PartyId));
+    }
+
+    /// <summary>Müşteri adları ortak lookup üzerinden çözülür: yalnızca kullanıcının görebildiği kayıtlar ad döner.</summary>
+    private async Task ResolvePartiesAsync(IEnumerable<Guid> ids)
+    {
+        var missing = ids.Distinct().Where(id => !partyNames.ContainsKey(id)).ToList();
+        if (missing.Count == 0) { return; }
+        var resolved = await Api.PostAsync<LookupResolveDto>("/api/lookups/contracts.contract.party/resolve", new ResolveLookupRequest(missing));
+        foreach (var item in resolved.Value?.Items ?? [])
+        {
+            partyNames[item.Id] = item.Label ?? "—";
+        }
+    }
+
+    private string PartyName(Guid id) => partyNames.TryGetValue(id, out var name) ? name : "—";
+}

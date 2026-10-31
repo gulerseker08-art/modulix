@@ -155,6 +155,12 @@ public static class ContractsAccess
     public const string DocumentsGenerate = "contracts.documents.generate";
     public const string DocumentsDownload = "contracts.documents.download";
     public const string ApprovalsManage = "contracts.approvals.manage";
+    public const string SignaturesManage = "contracts.signatures.manage";
+    public const string SignaturesVerify = "contracts.signatures.verify";
+    public const string CommitmentsWrite = "contracts.commitments.write";
+    public const string CommitmentsComplete = "contracts.commitments.complete";
+    public const string CommitmentsWaive = "contracts.commitments.waive";
+    public const string CommitmentCategoryList = "contracts.commitment-category";
 
     public const string ContractEntityKey = "contracts.contract";
 

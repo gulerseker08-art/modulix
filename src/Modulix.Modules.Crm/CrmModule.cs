@@ -971,6 +971,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<IActivityLinkTarget, ContactLinkTarget>();
         services.AddScoped<IActivityLinkTarget, OpportunityLinkTarget>();
         services.AddScoped<IActivityLinkTarget, LeadLinkTarget>();
+        services.AddScoped<Modulix.Core.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>();
         services.AddScoped<IActivityLinkTarget, QuoteLinkTarget>();
         services.AddScoped<ActivityWorkflowGate>();
         services.AddScoped<IActivityWorkflow, ActivityWorkflow>();

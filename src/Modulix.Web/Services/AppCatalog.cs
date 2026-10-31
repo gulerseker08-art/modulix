@@ -76,6 +76,8 @@ public static class AppCatalog
         new("contracts.list", Contracts, "Sözleşmeler", "file-text", "sozlesmeler", 10, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
         new("contracts.templates", Contracts, "Şablonlar", "layers", "sozlesmeler/sablonlar", 20, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
         new("contracts.approvals", Contracts, "Onaylar", "check-circle", "sozlesmeler/onaylar", 30, ContractsAccess.ModuleKey, ContractsAccess.ContractsApprove, Tone: AppTone.Teal),
+        new("contracts.signatures", Contracts, "İmzalar", "check-circle", "sozlesmeler/imzalar", 35, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
+        new("contracts.commitments", Contracts, "Taahhütler", "clipboard-list", "sozlesmeler/taahhutler", 36, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Tone: AppTone.Teal),
         new("contracts.approval-rules", Contracts, "Onay kuralları", "shield", "sozlesmeler/onay-kurallari", 40, ContractsAccess.ModuleKey, ContractsAccess.ApprovalsManage),
 
         new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal),

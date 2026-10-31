@@ -1527,6 +1527,295 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractCommitment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("ConsequenceNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("DependsOnCommitmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Direction")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("EscalateAfterDays")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("EscalationUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("GraceDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("MetricName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Obligor")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Recurrence")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateOnly?>("RecurrenceEndDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("ResponsibleUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal?>("TargetValue")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal?>("Tolerance")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "DependsOnCommitmentId");
+
+                    b.HasIndex("TenantId", "ContractId", "Status");
+
+                    b.HasIndex("TenantId", "ResponsibleUserId", "Status");
+
+                    b.ToTable("ContractCommitments", "contracts", t =>
+                        {
+                            t.HasCheckConstraint("CK_ContractCommitments_Grace", "[GraceDays] BETWEEN 0 AND 365 AND [EscalateAfterDays] BETWEEN 0 AND 365");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractCommitmentFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<Guid>("OccurrenceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "OccurrenceId");
+
+                    b.ToTable("ContractCommitmentFiles", "contracts");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractCommitmentOccurrence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("ActualValue")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<string>("BreachReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("BreachedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CommitmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CompletedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("CompletedOn")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("EscalatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("EscalationActivityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("EvidenceFileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("FollowUpActivityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FollowUpStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool?>("MetTarget")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("RecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("WaiveReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("WaivedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "CommitmentId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContractCommitmentOccurrences_Sequence");
+
+                    b.HasIndex("TenantId", "Status", "DueDate");
+
+                    b.HasIndex("TenantId", "ContractId", "Status", "DueDate");
+
+                    b.ToTable("ContractCommitmentOccurrences", "contracts");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractDocument", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1835,6 +2124,343 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "PersonId");
 
                     b.ToTable("ContractParties", "contracts");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSignatory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Assurance")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Capacity")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DeclineReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<Guid?>("EvidenceFileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("LastReminderAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReminderCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("SignedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("VerifiedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("VerifiedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ContractId");
+
+                    b.HasIndex("TenantId", "RequestId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContractSignatories_RequestPosition");
+
+                    b.HasIndex("TenantId", "UserId", "Status");
+
+                    b.ToTable("ContractSignatories", "contracts");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSignatureEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ProviderEventId")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("SignatoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "RequestId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "RequestId", "ProviderEventId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContractSignatureEvents_ProviderEvent")
+                        .HasFilter("[ProviderEventId] IS NOT NULL");
+
+                    b.ToTable("ContractSignatureEvents", "contracts");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSignatureFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<Guid>("SignatoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ContractId");
+
+                    b.HasIndex("TenantId", "SignatoryId");
+
+                    b.ToTable("ContractSignatureFiles", "contracts");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSignatureRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CloseReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DocumentSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("LastEventSequence")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("ProviderReference")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("VersionNo")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ProviderReference")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContractSignatureRequests_ProviderReference")
+                        .HasFilter("[ProviderReference] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ContractId", "VersionNo")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContractSignatureRequests_OpenPerVersion")
+                        .HasFilter("[Status] IN (N'Pending', N'PartiallySigned')");
+
+                    b.HasIndex("TenantId", "Status", "ExpiresAt");
+
+                    b.HasIndex("TenantId", "ContractId", "VersionNo", "CreatedAt");
+
+                    b.ToTable("ContractSignatureRequests", "contracts");
                 });
 
             modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractTemplate", b =>
@@ -5142,6 +5768,32 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractCommitment", b =>
+                {
+                    b.HasOne("Modulix.Modules.Contracts.Domain.Contract", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ContractId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Contracts.Domain.ContractCommitment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DependsOnCommitmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractCommitmentOccurrence", b =>
+                {
+                    b.HasOne("Modulix.Modules.Contracts.Domain.ContractCommitment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CommitmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractDocument", b =>
                 {
                     b.HasOne("Modulix.Modules.Contracts.Domain.Contract", null)
@@ -5199,6 +5851,36 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId", "PersonId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSignatory", b =>
+                {
+                    b.HasOne("Modulix.Modules.Contracts.Domain.ContractSignatureRequest", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RequestId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSignatureEvent", b =>
+                {
+                    b.HasOne("Modulix.Modules.Contracts.Domain.ContractSignatureRequest", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RequestId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSignatureRequest", b =>
+                {
+                    b.HasOne("Modulix.Modules.Contracts.Domain.Contract", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ContractId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractTemplateVersion", b =>

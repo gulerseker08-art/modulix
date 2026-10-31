@@ -157,6 +157,9 @@ public static class ContractsEndpoints
         ResourceEndpoints.MapResource<ContractApprovalDelegationDto, SaveContractApprovalDelegationRequest>(group, Prefix, "approval-delegations", ContractsModule.Entities.ContractApprovalDelegation,
             ContractsModule.Permissions.ApprovalsManage, ContractsModule.Permissions.ApprovalsManage);
 
+        ContractSignatureEndpoints.MapInternal(contracts);
+        ContractCommitmentEndpoints.MapInternal(group, Prefix);
+
         contracts.MapGet("/{id:guid}/versions", async (Guid id, IContractWorkflow workflow, CancellationToken ct) =>
         {
             var result = await workflow.VersionsAsync(id, ct);
@@ -236,6 +239,8 @@ internal sealed class ContractPolicyProvider(IServiceProvider services) : IContr
             Text(await settings.GetValueAsync(ContractsModule.SettingKeys.ProviderDetails, cancellationToken)),
             Text(await settings.GetValueAsync(ContractsModule.SettingKeys.FooterNote, cancellationToken)),
             Text(await settings.GetValueAsync(Modulix.Core.Modules.CoreModule.SettingKeys.TimeZone, cancellationToken)) ?? "Europe/Istanbul",
-            int.TryParse(await settings.GetValueAsync(ContractsModule.SettingKeys.ApprovalDueHours, cancellationToken), out var dueHours) ? Math.Clamp(dueHours, 0, 9999) : 72);
+            int.TryParse(await settings.GetValueAsync(ContractsModule.SettingKeys.ApprovalDueHours, cancellationToken), out var dueHours) ? Math.Clamp(dueHours, 0, 9999) : 72,
+            Text(await settings.GetValueAsync(ContractsModule.SettingKeys.SignatureProvider, cancellationToken)) is { } provider && provider != "none" ? provider : null,
+            int.TryParse(await settings.GetValueAsync(ContractsModule.SettingKeys.SignatureValidityDays, cancellationToken), out var validity) ? Math.Clamp(validity, 1, 90) : 14);
     }
 }
