@@ -24,7 +24,7 @@ Modulix'in bütün modülleri tek bir ürün ailesi gibi görünmelidir. Bu klas
 2. **Kendi kabuğunu yapma.** Her oturumlu sayfa `MainLayout` içinde çalışır. Yeni modül yalnızca `AppCatalog`'a kayıt ekler; sol menü ve uygulama paneli kendiliğinden oluşur.
 3. **Sayfa başlığı için `PageHeader` kullan.** `<PageHeader Title="…" Icon="…" Subtitle="…">aksiyonlar</PageHeader>`. Birincil aksiyon sağda ve en sonda.
 4. **Logo metnini elle yazma.** Logo yalnızca `BrandLogo` bileşeninden gelir. Ürün adı her yerde **Modulix** yazılır (M büyük, diğerleri küçük, `ü` yok).
-5. **Formlar ortak sınıfları kullanır**: `record-form`, `form-grid`, `form-label`, `form-control`/`form-select`, `FieldError`, `form-actions`. Ayrıntı: `form-standards.md`.
+5. **Formlar bölüm kartlarıyla kurulur**: `record-form sectioned` + `form-toolbar` (İptal / Kaydet), `FormSection` kartları (ikon + başlık), 12 kolonlu `form-grid` (`span-3/4/6/8/12`), `form-label`, `form-control`/`form-select`, `input-icon`, `FieldError`, `form-actions`. Ayrıntı: `form-standards.md`.
 6. **Liste ekranları `record-table`** kullanır; telefonda kart listesine dönüşmesi için hücrelere `data-label` verilir.
 7. **Erişilebilirlik**: her ikon düğmesinde erişilebilir ad (`aria-label`, `title` ya da `visually-hidden` metin); durum yalnızca renkle anlatılmaz (metin, ikon ya da çizgi eşlik eder).
 

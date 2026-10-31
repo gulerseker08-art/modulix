@@ -1,8 +1,28 @@
-@* Kişi ekleme/düzenleme formu; Kişiler listesi ve kişi detay sayfası kullanır. *@
+@* Kişi ekleme/düzenleme formu; Kişiler listesi ve kişi detay sayfası kullanır.
+   Düzen (referans kayıt kartı): üstte başlık + İptal / Kaydet, solda yazdıkça güncellenen özet kartı, sağda ikon başlıklı
+   bölüm kartları (Kişi bilgileri, İletişim, Notlar ve ek bilgiler). Alanlar ve kaydetme davranışı değişmedi. *@
 @inject ApiClient Api
 
-<form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-    <h2>@(Contact is null ? "Yeni kişi" : "Kişiyi düzenle")</h2>
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Contact is null ? "Yeni kişi" : "Kişi kartı")</h2>
+            @if (Contact is not null)
+            {
+                <p>@Contact.FirstName @Contact.LastName</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@busy">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
 
     @if (message is not null)
     {
@@ -14,61 +34,104 @@
         <p class="shared-note text-muted">Ad, soyad, telefon ve e-posta bu kişiyi kullanan diğer modüllerde de görünür; burada yaptığınız değişiklik onlara da yansır. Unvan, departman ve rol firma ilişkisine özgüdür ve kişi detayındaki ilişkilerden düzenlenir.</p>
     }
 
-    <div class="form-grid">
-        <div>
-            <label class="form-label" for="firstName">Ad *</label>
-            <input id="firstName" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.FirstName" />
-            <FieldError Field="firstName" Errors="errors" />
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Kişi özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true">@Initials</span>
+                    <strong class="summary-name">@FullName</strong>
+                    @if (!string.IsNullOrWhiteSpace(form.Title))
+                    {
+                        <span class="summary-sub">@form.Title</span>
+                    }
+                </div>
+                <h3 class="summary-heading">Kişi özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Firma</dt><dd>@(form.CompanyId is { } company ? Lookups.CompanyName(company) : "—")</dd></div>
+                    <div><dt>Sorumlu</dt><dd>@(form.OwnerId is { } owner ? Lookups.MemberName(owner) : (form.Id is null ? "Ben" : "—"))</dd></div>
+                    <div><dt>E-posta</dt><dd>@(string.IsNullOrWhiteSpace(form.Email) ? "—" : form.Email)</dd></div>
+                    <div><dt>Telefon</dt><dd>@(string.IsNullOrWhiteSpace(form.Phone) ? "—" : form.Phone)</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <FormSection Title="Kişi bilgileri" Icon="user">
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label required" for="firstName">Ad</label>
+                        <input id="firstName" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" required aria-required="true" @bind="form.FirstName" />
+                        <FieldError Field="firstName" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label required" for="lastName">Soyad</label>
+                        <input id="lastName" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" required aria-required="true" @bind="form.LastName" />
+                        <FieldError Field="lastName" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="title">Unvan</label>
+                        <input id="title" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.Title" />
+                        <FieldError Field="title" Errors="errors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="companyId">Firma</label>
+                        <LookupPicker Id="companyId" LookupKey="crm.contact.company" @bind-Value="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("companyId") == true)" />
+                        <FieldError Field="companyId" Errors="errors" />
+                        <small class="text-muted">Birden fazla firma için kişiyi kaydedip firma ilişkilerini kişi detayından yönetin.</small>
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="ownerId">Sorumlu</label>
+                        <LookupPicker Id="ownerId" LookupKey="crm.contact.owner" @bind-Value="form.OwnerId" Placeholder="@(form.Id is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
+                        <FieldError Field="ownerId" Errors="errors" />
+                        <small class="text-muted">Firmaya bağlı kişi firmanın erişim kapsamına göre görünür; sorumlu yalnızca firmasız kişide kapsamı belirler.</small>
+                    </div>
+                </div>
+            </FormSection>
+
+            <FormSection Title="İletişim" Icon="phone">
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label" for="email">E-posta (ana)</label>
+                        <div class="input-icon">
+                            <AppIcon Name="mail" Size="16" />
+                            <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" placeholder="E-posta adresi" @bind="form.Email" />
+                        </div>
+                        <FieldError Field="email" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="phone">Telefon (ana)</label>
+                        <div class="input-icon">
+                            <AppIcon Name="phone" Size="16" />
+                            <input id="phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
+                        </div>
+                        <FieldError Field="phone" Errors="errors" />
+                    </div>
+                </div>
+            </FormSection>
+
+            <FormSection Title="Notlar ve ek bilgiler" Icon="message-square">
+                <div class="form-grid">
+                    <div class="span-12">
+                        <label class="form-label" for="notes">Notlar</label>
+                        <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
+                        <FieldError Field="notes" Errors="errors" />
+                    </div>
+                    <div class="span-12">
+                        <DuplicateSuggestions Resource="contacts" Query="DuplicateQuery" ExcludeId="Contact?.Id" />
+                    </div>
+                    <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
+                </div>
+            </FormSection>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
         </div>
-        <div>
-            <label class="form-label" for="lastName">Soyad *</label>
-            <input id="lastName" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.LastName" />
-            <FieldError Field="lastName" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="companyId">Firma</label>
-            <LookupPicker Id="companyId" LookupKey="crm.contact.company" @bind-Value="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("companyId") == true)" />
-            <FieldError Field="companyId" Errors="errors" />
-            <small class="text-muted">Birden fazla firma için kişiyi kaydedip firma ilişkilerini kişi detayından yönetin.</small>
-        </div>
-        <div>
-            <label class="form-label" for="ownerId">Sorumlu</label>
-            <LookupPicker Id="ownerId" LookupKey="crm.contact.owner" @bind-Value="form.OwnerId" Placeholder="@(form.Id is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
-            <FieldError Field="ownerId" Errors="errors" />
-            <small class="text-muted">Firmaya bağlı kişi firmanın erişim kapsamına göre görünür; sorumlu yalnızca firmasız kişide kapsamı belirler.</small>
-        </div>
-        <div>
-            <label class="form-label" for="title">Unvan</label>
-            <input id="title" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.Title" />
-            <FieldError Field="title" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="email">E-posta (ana)</label>
-            <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" @bind="form.Email" />
-            <FieldError Field="email" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="phone">Telefon (ana)</label>
-            <input id="phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
-            <FieldError Field="phone" Errors="errors" />
-        </div>
-        <div class="span-all">
-            <label class="form-label" for="notes">Notlar</label>
-            <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
-            <FieldError Field="notes" Errors="errors" />
-        </div>
-        <div class="span-all">
-            <DuplicateSuggestions Resource="contacts" Query="DuplicateQuery" ExcludeId="Contact?.Id" />
-        </div>
-        <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
-    </div>
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
-        @if (form.Id is not null)
-        {
-            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
-        }
     </div>
 </form>
 
@@ -81,6 +144,18 @@
     private bool busy;
     private ContactDto? source;
     private bool initialized;
+
+    /// <summary>Özet kartı: ad soyad ve baş harfler formdaki değerlerden gelir.</summary>
+    private string FullName => string.Join(" ", new[] { form.FirstName, form.LastName }.Where(p => !string.IsNullOrWhiteSpace(p))) is { Length: > 0 } name ? name : "Ad Soyad";
+
+    private string Initials
+    {
+        get
+        {
+            string[] words = new[] { form.FirstName, form.LastName }.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!).ToArray();
+            return words.Length == 0 ? "K" : string.Concat(words.Take(2).Select(w => char.ToUpper(w[0], System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))));
+        }
+    }
 
     /// <summary>Düzenlenecek kişi; null ise yeni kişi.</summary>
     [Parameter] public ContactDto? Contact { get; set; }

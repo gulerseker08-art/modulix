@@ -175,3 +175,28 @@ Bileşenler, düzenler ve davranışlar (faz 2–4) değişmedi; yeni palet toke
 **Doğrulama (yerel, gerçek uygulama):** Release derleme 0 hata; mimari testler 29/29. Uygulama yerel SQL Server ve `seed` verisiyle çalıştırıldı, Chromium'da (1440px ve 390px) kontrol edildi: giriş, ana sayfa, Aktiviteler (hafta/gün), Fırsat detayı (huni, gösterge şeridi, sağ panel), Firma detayı (özet kartı, sekmeler), koyu tema, daraltılmış menü (yalnızca işaret), telefonda yatay taşma yok (`scrollWidth == innerWidth`), yazı tipi Inter ve `--mx-brand-primary #087DB8` tarayıcıda doğrulandı. Genel arama: "an" → Firmalar (2) + Fırsatlar (1) gruplu sonuç, Enter ile ilk sonuç (Anka Gıda A.Ş.) açıldı, sonuçsuz sorguda "sonuç bulunamadı", telefonda panel tam genişlikte. Bu klasördeki `onizleme-*.png` görüntüleri bu çalıştırmadan alınmıştır (tarayıcı paneli çözünürlüğünde; `onizleme-aktivite-cekmece.png` önceki paletten kalmadır, düzen aynıdır). Entegrasyon testleri bu oturumda çalıştırılmadı; yalnızca `Modulix.Web` ve belgeler değişti, API ve veritabanı aynı — CI sonucu PR'da.
 
 **Kalanlar:** Üst çubukta bildirim ve yardım ikonları (altyapı yok). Şablondaki "Takip Et", tekrarlayan aktivite, hatırlatıcı sekmesi, DataGrid kolon yönetimi ve kayıtlı görünüm, merkezi toast, modal, bUnit/axe testleri önceki fazlardaki gibi açık iş kalemleridir.
+
+
+## Faz 6 — Form düzeni: bölüm kartları (31.10.2026)
+
+Kullanıcı geri bildirimi: form ekranları referans görsellerdeki (Firma kartı, Fırsat) kartlı düzenle eşleşmiyordu — editörler tek bir kartta alt alta alan listesiydi. Bu fazda ortak `FormSection` bileşeni ve 12 kolonlu `form-grid` kuruldu; bütün CRM editörleri ve detay bölümleri buna geçirildi. Alanlar, doğrulama, kaydetme ve yetki davranışı değişmedi (yalnızca işaretleme ve CSS).
+
+| Ekran | Durum | Not |
+|---|---|---|
+| `FormSection` bileşeni | Yeni | İkon kutusu + başlık + açıklama + sağda aksiyon; gövdede `form-grid` ya da `detail-grid`. Çekmecede çerçevesiz, çizgiyle ayrılır |
+| `form-grid` | Değişti | 12 kolon; `span-3/4/6/8/12` genişlikleri. Eski kullanım (sınıfsız alan, `span-all`) aynı görünümü korur: 768px üstünde 2, 1200px üstünde 3 kolon |
+| Firma formu (`CompanyEditor`) | Değişti | Üstte "Firma kartı" + İptal / Kaydet; solda canlı **Şirket özeti** (baş harfler, ad, durum, tür, sektör, şehir, vergi no, sorumlu); kartlar: Temel bilgiler, Genel iletişim bilgileri (ikonlu adres / telefon / e-posta / web alanları), Notlar ve ek bilgiler. Referanstaki Finans (kredi limiti, cari bakiye, e-fatura) ve Ticari unvan / çalışan sayısı / yıllık gelir alanları veri modelinde yok; şema yalnızca tasarım için değiştirilmedi (özel alan olarak tanımlanabilir) |
+| Kişi formu (`ContactEditor`) | Değişti | Kişi kartı + özet (baş harfler, ad soyad, unvan, firma, sorumlu, iletişim); kartlar: Kişi bilgileri, İletişim, Notlar ve ek bilgiler |
+| Fırsat formu (`OpportunityEditor`) | Değişti | Kartlar: Temel bilgiler (fırsat adı, müşteri, ilgili kişi, aşama, öncelik, fırsat tipi, kaynak, satış sorumlusu), Tutar ve zamanlama, Detaylar (ihtiyaç analizi — önceden kapalı `details` idi, artık açık kart), Açıklama ve notlar. Çekmecede (firma detayından) aynı bileşen |
+| Lead formu (`LeadEditor`) | Değişti | Kartlar: Talep, Talep sahibi, Eşleştirme ve sahiplik, Bütçe ve zamanlama, İhtiyaç ve açıklama; eşleşme uyarısı ve "Yine de kaydet" korunur |
+| Aktivite formu (`ActivityEditor`) | Değişti | Kartlar: Aktivite, Zaman, İlişkili kayıtlar, Yer ve ayrıntılar; çekmecede çizgiyle ayrılmış bölümler |
+| Fırsat detayı | Değişti | Özet → **Temel bilgiler** kartı; İhtiyaç analizi → **Detaylar**; Ürün / hizmet kalemleri, Kişiler, Rakipler, Teklifler, Aşama ve durum tarihçesi ve sağ paneldeki Aktivite zaman çizelgesi / Finansal özet kartları `FormSection` ile (aksiyon düğmeleri başlıkta) |
+| Firma / Kişi detayı | Değişti | Genel sekmesinde Genel bilgiler ve Adres ve iletişim / İletişim bilgileri kartları |
+| Lead detayı | Değişti | Talep bilgileri ve Kaynak ve sahiplik kartları |
+| Fırsat detayı sekmeleri | Var | `TabBar` + `TabState` ile **Genel bilgiler** (temel bilgiler, işlemler, detaylar, kalemler) · **Kişiler** · **Rakipler** · **Teklifler** (teklif izni yoksa sekme hiç eklenmez) · **Geçmiş** (aşama tarihçesi + değişiklik geçmişi); sayı rozetleri yüklenen listelerden. Sağ panel (aktivite zaman çizelgesi, finansal özet) her sekmede görünür || Takip Et, Kazanma nedenleri / Kaybetme riskleri onay kutuları, Notlar / Dokümanlar / Analiz sekmeleri | Yok | Referanstaki bu alanlar ve içerikler veri modelinde / altyapıda yok |
+
+![Firma formu](onizleme-firma-formu.png)
+
+![Fırsat formu](onizleme-firsat-formu.png)
+
+**Doğrulama:** Release derleme 0 hata; mimari testler 29/29. Gerçek uygulamada (Chromium, 1440px ve 390px): Yeni firma, Yeni kişi, Yeni Lead formları, Fırsat düzenleme formu, Aktivite çekmecesi, Fırsat detayı kartları; telefonda yatay taşma yok, özet kartı gizlenir, alanlar tek kolon. Form gönderimi ve doğrulama kodu değişmediği için işlevsel akışlar önceki fazlardaki gibi; entegrasyon testleri CI'da.

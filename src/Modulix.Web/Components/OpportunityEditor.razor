@@ -1,174 +1,223 @@
-@* Fırsat ekleme/düzenleme formu; Fırsatlar sayfası ve firma detay sayfası kullanır. *@
+@* Fırsat ekleme/düzenleme formu; Fırsatlar sayfası, fırsat detayı ve firma detay sayfası (çekmecede) kullanır.
+   Düzen (referans fırsat ekranı): ikon başlıklı bölüm kartları — Temel bilgiler, Tutar ve zamanlama, Detaylar (ihtiyaç analizi),
+   Açıklama ve notlar. Alanlar ve kaydetme davranışı değişmedi; aşama yalnızca aşama eylemleriyle değişir. *@
 @inject ApiClient Api
 @inject SessionState Session
 
-<form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-    <h2>@(Opportunity is null ? "Yeni fırsat" : "Fırsatı düzenle")</h2>
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Opportunity is null ? "Yeni fırsat" : "Fırsat kartı")</h2>
+            @if (Opportunity is not null)
+            {
+                <p>@Opportunity.Title</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@busy">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
 
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <div class="form-grid">
-        <div class="span-all">
-            <label class="form-label" for="title">Başlık *</label>
-            <input id="title" class="form-control" maxlength="@CrmLimits.TextMaxLength" @bind="form.Title" />
-            <FieldError Field="title" Errors="errors" />
-        </div>
-        @if (FixedCompanyId is null)
-        {
-            <div>
-                <label class="form-label" for="companyId">Firma *</label>
-                <LookupPicker Id="companyId" LookupKey="crm.opportunity.company" @bind-Value="form.CompanyId" Required="true" Invalid="@(errors?.ContainsKey("companyId") == true)" />
-                <FieldError Field="companyId" Errors="errors" />
+    <FormSection Title="Temel bilgiler" Icon="target">
+        <div class="form-grid">
+            <div class="span-12">
+                <label class="form-label required" for="title">Fırsat adı</label>
+                <input id="title" class="form-control" maxlength="@CrmLimits.TextMaxLength" required aria-required="true" @bind="form.Title" />
+                <FieldError Field="title" Errors="errors" />
             </div>
-        }
-        <div>
-            <label class="form-label" for="contactId">Kişi</label>
-            <LookupPicker Id="contactId" LookupKey="crm.opportunity.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
-            <FieldError Field="contactId" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="stage">Aşama</label>
-            @if (Opportunity is null)
+            @if (FixedCompanyId is null)
             {
-                <select id="stage" class="form-select" @bind="form.Stage">
-                    @foreach (var stage in Lookups.Choices(CrmLists.OpportunityStage).Where(s => s.Category == CrmLists.StageCategories.Open))
+                <div class="span-6">
+                    <label class="form-label required" for="companyId">Müşteri (firma)</label>
+                    <LookupPicker Id="companyId" LookupKey="crm.opportunity.company" @bind-Value="form.CompanyId" Required="true" Invalid="@(errors?.ContainsKey("companyId") == true)" />
+                    <FieldError Field="companyId" Errors="errors" />
+                </div>
+            }
+            <div class="span-6">
+                <label class="form-label" for="contactId">İlgili kişi</label>
+                <LookupPicker Id="contactId" LookupKey="crm.opportunity.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
+                <FieldError Field="contactId" Errors="errors" />
+            </div>
+            <div class="span-4">
+                <label class="form-label" for="stage">Aşama</label>
+                @if (Opportunity is null)
+                {
+                    <select id="stage" class="form-select" @bind="form.Stage">
+                        @foreach (var stage in Lookups.Choices(CrmLists.OpportunityStage).Where(s => s.Category == CrmLists.StageCategories.Open))
+                        {
+                            <option value="@stage.Key">@stage.Label</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    // Aşama yalnızca aşama değiştirme / kapatma eylemleriyle değişir (panodaki taşıma ya da fırsat sayfası).
+                    <input id="stage" class="form-control" readonly value="@Lookups.Label(CrmLists.OpportunityStage, form.Stage)" />
+                }
+                <FieldError Field="stage" Errors="errors" />
+            </div>
+            <div class="span-4">
+                <label class="form-label" for="priority">Öncelik</label>
+                <select id="priority" class="form-select" @bind="form.Priority">
+                    @foreach (var priority in LeadPriority.All)
                     {
-                        <option value="@stage.Key">@stage.Label</option>
+                        <option value="@priority">@LeadPriority.Label(priority)</option>
                     }
                 </select>
-            }
-            else
+            </div>
+            <div class="span-4">
+                <label class="form-label" for="type">Fırsat tipi</label>
+                <select id="type" class="form-select" @bind="form.Type">
+                    <option value="">—</option>
+                    @foreach (var type in Lookups.Choices(CrmLists.OpportunityType, form.Type))
+                    {
+                        <option value="@type.Key">@type.Label</option>
+                    }
+                </select>
+            </div>
+            <div class="span-6">
+                <label class="form-label" for="source">Kaynak</label>
+                <select id="source" class="form-select" @bind="form.Source">
+                    <option value="">—</option>
+                    @foreach (var source in Lookups.Choices(CrmLeadLists.Source, form.Source))
+                    {
+                        <option value="@source.Key">@source.Label</option>
+                    }
+                </select>
+            </div>
+            <div class="span-6">
+                <label class="form-label" for="ownerId">Satış sorumlusu</label>
+                <LookupPicker Id="ownerId" LookupKey="crm.opportunity.owner" @bind-Value="form.OwnerId" Placeholder="@(Opportunity is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
+                <FieldError Field="ownerId" Errors="errors" />
+            </div>
+        </div>
+    </FormSection>
+
+    <FormSection Title="Tutar ve zamanlama" Icon="coins">
+        <div class="form-grid">
+            @* Tutar ve olasılık hassas alandır (Y8b): izni olmayan görmez; boş gönderilir, sunucu kayıttaki değeri korur. *@
+            @if (Session.Can(CrmAccess.OpportunityAmountsRead))
             {
-                // Aşama yalnızca aşama değiştirme / kapatma eylemleriyle değişir (panodaki taşıma ya da fırsat sayfası).
-                <input id="stage" class="form-control" readonly value="@Lookups.Label(CrmLists.OpportunityStage, form.Stage)" />
+                <div class="span-4">
+                    <label class="form-label" for="amount">Tahmini tutar</label>
+                    <input id="amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.Amount" />
+                    <FieldError Field="amount" Errors="errors" />
+                </div>
+                <div class="span-4">
+                    <label class="form-label" for="probability">Olasılık (%)</label>
+                    <input id="probability" class="form-control" type="number" min="0" max="100" step="5" inputmode="numeric" @bind="form.Probability" />
+                    <FieldError Field="probability" Errors="errors" />
+                </div>
             }
-            <FieldError Field="stage" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="priority">Öncelik</label>
-            <select id="priority" class="form-select" @bind="form.Priority">
-                @foreach (var priority in LeadPriority.All)
-                {
-                    <option value="@priority">@LeadPriority.Label(priority)</option>
-                }
-            </select>
-        </div>
-        <div>
-            <label class="form-label" for="type">Tür</label>
-            <select id="type" class="form-select" @bind="form.Type">
-                <option value="">—</option>
-                @foreach (var type in Lookups.Choices(CrmLists.OpportunityType, form.Type))
-                {
-                    <option value="@type.Key">@type.Label</option>
-                }
-            </select>
-        </div>
-        <div>
-            <label class="form-label" for="source">Edinim kaynağı</label>
-            <select id="source" class="form-select" @bind="form.Source">
-                <option value="">—</option>
-                @foreach (var source in Lookups.Choices(CrmLeadLists.Source, form.Source))
-                {
-                    <option value="@source.Key">@source.Label</option>
-                }
-            </select>
-        </div>
-        @* Tutar ve olasılık hassas alandır (Y8b): izni olmayan görmez; boş gönderilir, sunucu kayıttaki değeri korur. *@
-        @if (Session.Can(CrmAccess.OpportunityAmountsRead))
-        {
-            <div>
-                <label class="form-label" for="probability">Olasılık (%)</label>
-                <input id="probability" class="form-control" type="number" min="0" max="100" step="5" inputmode="numeric" @bind="form.Probability" />
-                <FieldError Field="probability" Errors="errors" />
+            <div class="span-4">
+                <label class="form-label" for="currency">Para birimi</label>
+                <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
+                <FieldError Field="currency" Errors="errors" />
             </div>
-            <div>
-                <label class="form-label" for="amount">Tutar</label>
-                <input id="amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.Amount" />
-                <FieldError Field="amount" Errors="errors" />
+            <div class="span-4">
+                <label class="form-label" for="expectedCloseDate">Tahmini kapanış tarihi</label>
+                <input id="expectedCloseDate" class="form-control" type="date" @bind="form.ExpectedCloseDate" />
+                <FieldError Field="expectedCloseDate" Errors="errors" />
             </div>
-        }
-        <div>
-            <label class="form-label" for="currency">Para birimi</label>
-            <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
-            <FieldError Field="currency" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="expectedCloseDate">Beklenen kapanış</label>
-            <input id="expectedCloseDate" class="form-control" type="date" @bind="form.ExpectedCloseDate" />
-            <FieldError Field="expectedCloseDate" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="ownerId">Sorumlu</label>
-            <LookupPicker Id="ownerId" LookupKey="crm.opportunity.owner" @bind-Value="form.OwnerId" Placeholder="@(Opportunity is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
-            <FieldError Field="ownerId" Errors="errors" />
-        </div>
-        <div class="span-all">
-            <label class="form-label" for="description">Açıklama</label>
-            <textarea id="description" class="form-control" rows="2" maxlength="4000" @bind="form.Description"></textarea>
-            <FieldError Field="description" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="nextAction">Sonraki aksiyon</label>
-            <input id="nextAction" class="form-control" maxlength="200" @bind="form.NextAction" />
-            <FieldError Field="nextAction" Errors="errors" />
-        </div>
-        <div>
-            <label class="form-label" for="nextActionDate">Aksiyon tarihi</label>
-            <input id="nextActionDate" class="form-control" type="date" @bind="form.NextActionDate" />
-            <FieldError Field="nextActionDate" Errors="errors" />
-        </div>
-        @if (Session.Can(CrmAccess.OpportunityAmountsRead))
-        {
-            <div>
-                <label class="form-label" for="customerBudget">Müşteri bütçesi</label>
-                <input id="customerBudget" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.CustomerBudget" />
-                <FieldError Field="customerBudget" Errors="errors" />
+            <div class="span-4">
+                <label class="form-label" for="targetDecisionDate">Hedef karar tarihi</label>
+                <input id="targetDecisionDate" class="form-control" type="date" @bind="form.TargetDecisionDate" />
+                <FieldError Field="targetDecisionDate" Errors="errors" />
             </div>
-        }
-        <div>
-            <label class="form-label" for="budgetStatus">Bütçe durumu</label>
-            <select id="budgetStatus" class="form-select" @bind="form.BudgetStatus">
-                @foreach (var status in OpportunityBudgetStatus.All)
-                {
-                    <option value="@status">@OpportunityBudgetStatus.Label(status)</option>
-                }
-            </select>
+            @if (Session.Can(CrmAccess.OpportunityAmountsRead))
+            {
+                <div class="span-4">
+                    <label class="form-label" for="customerBudget">Müşteri bütçesi</label>
+                    <input id="customerBudget" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.CustomerBudget" />
+                    <FieldError Field="customerBudget" Errors="errors" />
+                </div>
+            }
+            <div class="span-4">
+                <label class="form-label" for="budgetStatus">Bütçe durumu</label>
+                <select id="budgetStatus" class="form-select" @bind="form.BudgetStatus">
+                    @foreach (var status in OpportunityBudgetStatus.All)
+                    {
+                        <option value="@status">@OpportunityBudgetStatus.Label(status)</option>
+                    }
+                </select>
+            </div>
+            <div class="span-4">
+                <label class="form-label" for="nextAction">Sonraki aksiyon</label>
+                <input id="nextAction" class="form-control" maxlength="200" @bind="form.NextAction" />
+                <FieldError Field="nextAction" Errors="errors" />
+            </div>
+            <div class="span-4">
+                <label class="form-label" for="nextActionDate">Aksiyon tarihi</label>
+                <input id="nextActionDate" class="form-control" type="date" @bind="form.NextActionDate" />
+                <FieldError Field="nextActionDate" Errors="errors" />
+            </div>
         </div>
-        <div>
-            <label class="form-label" for="targetDecisionDate">Hedef karar tarihi</label>
-            <input id="targetDecisionDate" class="form-control" type="date" @bind="form.TargetDecisionDate" />
-            <FieldError Field="targetDecisionDate" Errors="errors" />
+    </FormSection>
+
+    <FormSection Title="Detaylar" Icon="clipboard-list" Description="İhtiyaç analizi: müşterinin ihtiyacı, kapsam, ölçütler ve karar süreci.">
+        <div class="form-grid">
+            <div class="span-6">
+                <label class="form-label" for="needDescription">İhtiyaç</label>
+                <textarea id="needDescription" class="form-control" rows="2" maxlength="4000" @bind="form.NeedDescription"></textarea>
+            </div>
+            <div class="span-6">
+                <label class="form-label" for="currentProblem">Mevcut sorun</label>
+                <textarea id="currentProblem" class="form-control" rows="2" maxlength="4000" @bind="form.CurrentProblem"></textarea>
+            </div>
+            <div class="span-6">
+                <label class="form-label" for="expectedBenefit">Beklenen fayda</label>
+                <textarea id="expectedBenefit" class="form-control" rows="2" maxlength="4000" @bind="form.ExpectedBenefit"></textarea>
+            </div>
+            <div class="span-6">
+                <label class="form-label" for="scope">Kapsam</label>
+                <textarea id="scope" class="form-control" rows="2" maxlength="4000" @bind="form.Scope"></textarea>
+            </div>
+            <div class="span-6">
+                <label class="form-label" for="successCriteria">Başarı ölçütleri</label>
+                <textarea id="successCriteria" class="form-control" rows="2" maxlength="4000" @bind="form.SuccessCriteria"></textarea>
+            </div>
+            <div class="span-6">
+                <label class="form-label" for="risks">Riskler ve engeller</label>
+                <textarea id="risks" class="form-control" rows="2" maxlength="4000" @bind="form.Risks"></textarea>
+            </div>
+            <div class="span-12">
+                <label class="form-label" for="decisionProcess">Karar süreci</label>
+                <textarea id="decisionProcess" class="form-control" rows="2" maxlength="4000" @bind="form.DecisionProcess"></textarea>
+            </div>
         </div>
-        <details class="span-all">
-            <summary>İhtiyaç analizi</summary>
-            <label class="form-label" for="needDescription">İhtiyaç</label>
-            <textarea id="needDescription" class="form-control" rows="2" maxlength="4000" @bind="form.NeedDescription"></textarea>
-            <label class="form-label" for="currentProblem">Mevcut sorun</label>
-            <textarea id="currentProblem" class="form-control" rows="2" maxlength="4000" @bind="form.CurrentProblem"></textarea>
-            <label class="form-label" for="expectedBenefit">Beklenen fayda</label>
-            <textarea id="expectedBenefit" class="form-control" rows="2" maxlength="4000" @bind="form.ExpectedBenefit"></textarea>
-            <label class="form-label" for="scope">Kapsam</label>
-            <textarea id="scope" class="form-control" rows="2" maxlength="4000" @bind="form.Scope"></textarea>
-            <label class="form-label" for="successCriteria">Başarı ölçütleri</label>
-            <textarea id="successCriteria" class="form-control" rows="2" maxlength="4000" @bind="form.SuccessCriteria"></textarea>
-            <label class="form-label" for="risks">Riskler ve engeller</label>
-            <textarea id="risks" class="form-control" rows="2" maxlength="4000" @bind="form.Risks"></textarea>
-            <label class="form-label" for="decisionProcess">Karar süreci</label>
-            <textarea id="decisionProcess" class="form-control" rows="2" maxlength="4000" @bind="form.DecisionProcess"></textarea>
-        </details>
-        <div class="span-all">
-            <label class="form-label" for="notes">Notlar</label>
-            <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
-            <FieldError Field="notes" Errors="errors" />
+    </FormSection>
+
+    <FormSection Title="Açıklama ve notlar" Icon="message-square">
+        <div class="form-grid">
+            <div class="span-12">
+                <label class="form-label" for="description">Açıklama</label>
+                <textarea id="description" class="form-control" rows="2" maxlength="4000" @bind="form.Description"></textarea>
+                <FieldError Field="description" Errors="errors" />
+            </div>
+            <div class="span-12">
+                <label class="form-label" for="notes">Notlar</label>
+                <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
+                <FieldError Field="notes" Errors="errors" />
+            </div>
+            <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
         </div>
-        <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
-    </div>
+    </FormSection>
+
     <div class="form-actions">
         <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
         @if (Opportunity is not null)
         {
             <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>

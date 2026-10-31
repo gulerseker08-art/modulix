@@ -24,7 +24,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Button | Stil | `btn btn-primary` (birincil), `btn-outline-secondary` (ikincil/İptal), `btn-outline-danger` (yıkıcı), `btn-sm` |
 | IconButton | Stil | `<button class="icon-button" aria-label="…">` + `AppIcon` |
 | Badge / StatusBadge | Stil + Var | `badge` + `stage-*`, `status-*`, `user-*` tonları; `TenantStateBadge`, `UserStatusBadge` |
-| Card / SectionCard | Stil | `record-form`, `detail-section`, `detail-grid`, `chart-card`, `tile` |
+| Card / SectionCard | Var | `Components/FormSection.razor` — ikon başlıklı bölüm kartı (`Title`, `Icon`, `Description`, `Actions`, `Class`); form ve detay bölümleri bununla kurulur. Eski stiller: `record-form`, `detail-section`, `detail-grid`, `chart-card`, `tile` |
 | Kayıt düzeni + özet kartı | Stil | `record-layout` (solda `record-summary` > `summary-card`: `summary-identity`, `summary-facts`, `summary-numbers`, `summary-contact`; sağda `record-main`) — Firma ve Kişi detayı |
 | Detay düzeni + sağ panel | Stil | `detail-layout` (`detail-main` + yapışkan `detail-side` > `side-card`) — Fırsat detayı |
 | SummaryCard / KPIStatCard | Stil | `summary` + `summary-item`, `stat-grid` + `stat-card` (+ `stat-icon`); tıklanabilir KPI: `kpi-grid` + `button.stat-card.kpi-card.tone-*` |

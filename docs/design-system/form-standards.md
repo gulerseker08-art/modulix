@@ -2,29 +2,58 @@
 
 Elle yazılmış formlar ile metadata'dan (özel alanlar, `CustomFieldInputs`) oluşan alanlar aynı sınıfları kullanır; bu sayede tasarım kalitesi farklılaşmaz.
 
-## Düzen
+## Düzen: bölüm kartları (referans "Firma kartı" / "Fırsat" ekranları)
+
+Kayıt formu kart çerçevesini kendisi taşımaz (`record-form sectioned`); alanlar ikon başlıklı **bölüm kartlarına** (`FormSection`) bölünür. Üstte başlık ve İptal / Kaydet araç çubuğu, geniş ekranda solda yazdıkça güncellenen özet kartı bulunur.
 
 ```razor
-<form class="record-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
-    <h2>Temel bilgiler</h2>
-    <div class="form-grid">
-        <div>
-            <label class="form-label required" for="name">Firma resmi unvanı</label>
-            <input id="name" class="form-control" @bind="form.Name" aria-describedby="name-error" />
-            <FieldError Field="name" Errors="errors" />
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div><h2>Firma kartı</h2><p>ABC Lojistik A.Ş.</p></div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@saving">Kaydet</button>
         </div>
-        <div class="span-all">…geniş alan…</div>
     </div>
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@saving">Kaydet</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">İptal</button>
+
+    <div class="record-layout">
+        <aside class="record-summary"><div class="summary-card">…canlı özet…</div></aside>
+        <div class="record-main">
+            <FormSection Title="Temel bilgiler" Icon="building">
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label required" for="name">Firma adı</label>
+                        <input id="name" class="form-control" required aria-required="true" @bind="form.Name" />
+                        <FieldError Field="name" Errors="errors" />
+                    </div>
+                    <div class="span-3">…Tür…</div>
+                    <div class="span-3">…Durum…</div>
+                </div>
+            </FormSection>
+
+            <FormSection Title="Genel iletişim bilgileri" Icon="phone">
+                <div class="form-grid">
+                    <div class="span-4">
+                        <label class="form-label" for="phone">Telefon</label>
+                        <div class="input-icon"><AppIcon Name="phone" Size="16" /><input id="phone" class="form-control" type="tel" @bind="form.Phone" /></div>
+                    </div>
+                </div>
+            </FormSection>
+
+            <div class="form-actions">…Kaydet / İptal / Sil…</div>
+        </div>
     </div>
 </form>
 ```
 
-- `form-grid`: telefonda 1, 768px üstünde 2, 1200px üstünde 3 kolon. Tüm satırı kaplayan alan `span-all`.
-- İlgili alanlar mantıksal kartlara bölünür (`record-form` ya da `detail-section` başına bir başlık). Kartlar arası 16–24px, kart içi 24px.
-- Detay sayfasında ana içerik solda, özet/ilgili kayıtlar sağda; dar ekranda alt alta.
+- **`FormSection`** (`Components/FormSection.razor`): `Title`, `Icon` (AppIcon), isteğe bağlı `Description`, sağda `Actions`, ek sınıf için `Class` (ör. sağ panelde `side-card`). Gövde genellikle `form-grid` ya da salt okunur `detail-grid` taşır; kart içindeki `detail-grid` kendi çerçevesini tekrarlamaz. Aksiyon verilince içerik `<ChildContent>` içine yazılır.
+- **`form-grid`** 12 kolonludur: alan genişliği `span-3`, `span-4`, `span-6`, `span-8`, `span-12` (= `span-all`) ile verilir. Sınıfsız alan 768px üstünde yarım, 1200px üstünde üçte bir satır alır; telefonda her alan tek kolondur. Çekmecede (`Drawer`) en çok iki kolona böler.
+- **`input-icon`**: telefon, e-posta, web sitesi, adres gibi alanlarda input'un solunda ikon (`AppIcon`, 16px).
+- **Özet kartı**: `record-summary > summary-card` (`summary-identity` avatar + ad + durum, `summary-heading`, `summary-facts`); formdaki değerlerden canlı doldurulur, 992px altında gizlenir.
+- Çekmecede araç çubuğu gizlenir (çekmecenin kendi başlığı vardır), kartlar çerçevesiz ve çizgiyle ayrılır; Kaydet / İptal alta yapışıktır.
+- Kartlar arası 16px, kart içi 20–24px; ikon kutusu 36px, marka tonunda.
+
+Detay sayfalarında da aynı kart kullanılır: Fırsat (Temel bilgiler, Detaylar, Ürün / hizmet kalemleri, Kişiler, Rakipler, Teklifler, tarihçe, sağ panel kartları), Firma / Kişi genel sekmesi, Lead talep bilgileri.
 
 ## Alan durumları
 
@@ -44,7 +73,7 @@ Durum yalnızca renkle anlatılmaz: hata iletisi metin olarak görünür, zorunl
 
 ## Kaydetme davranışı
 
-- Aksiyon sırası: **Kaydet** (birincil), gerekiyorsa **Kaydet ve Kapat / Kaydet ve Yeni**, **İptal**; yıkıcı işlem (**Sil**) en sonda `btn-outline-danger`.
+- Aksiyon sırası: **Kaydet** (birincil), gerekiyorsa **Kaydet ve Kapat / Kaydet ve Yeni**, **İptal**; yıkıcı işlem (**Sil**) en sonda `btn-outline-danger`. Üst araç çubuğunda İptal solda, Kaydet sağda ve en sonda.
 - Kaydetme sürerken düğme `disabled` olur (çift kayıt önlenir) ve spinner gösterilir.
 - Sunucu doğrulama hataları alan anahtarıyla `FieldError`'a, genel hata `Notice`'e yazılır.
 - Kaydedilmemiş değişiklik uyarısı ve merkezi toast bugün **yok**; eklenecek iş kalemi olarak `migration-report.md`'de.
@@ -55,7 +84,7 @@ Durum yalnızca renkle anlatılmaz: hata iletisi metin olarak görünür, zorunl
 
 ## Sekmeler
 
-Kayıt sayfalarında bölümler `TabBar` + `TabState` ile sekmelere ayrılır (Firma, Kişi). Kurallar:
+Kayıt sayfalarında bölümler `TabBar` + `TabState` ile sekmelere ayrılır (Firma, Kişi, Fırsat). Kurallar:
 
 - Sekme listesi yetkiye göre kurulur; görme izni olmayan bölümün sekmesi hiç eklenmez (sunucu yine denetler).
 - Sekme ilk seçildiğinde çizilir ve verisini o an yükler; başka sekmeye geçince DOM'da gizli kalır. Böylece açık bir düzenleme formu sekme değiştirince kaybolmaz.

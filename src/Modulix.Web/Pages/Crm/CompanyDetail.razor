@@ -135,6 +135,7 @@
                 {
                     <div role="tabpanel" id="tabpanel-@TabGeneral" aria-labelledby="tab-@TabGeneral" class="record-tabpanel" hidden="@tabs.Hidden(TabGeneral)">
                         @* Boş alanlar gösterilmez; telefonda kart kısa kalır. Kimlik ve iletişim özet kartındadır. *@
+                        <FormSection Title="Genel bilgiler" Icon="info">
                         <dl class="detail-grid">
                             @if (company.Source is { } source)
                             {
@@ -160,15 +161,13 @@
                                 }
                             }
                         </dl>
+                        </FormSection>
 
                         @* Adresler ve iletişim (ADR-0012): ana kayıtlar yukarıdaki telefon/e-posta/adres alanlarının kaynağıdır. *@
-                        <section class="detail-section">
-                            <div class="section-header">
-                                <h2>Adres ve iletişim</h2>
-                            </div>
+                        <FormSection Title="Adres ve iletişim" Icon="map-pin">
                             <AddressesSection CompanyId="Id" Title="Adresler" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />
                             <ContactPointsSection CompanyId="Id" Title="Telefon ve e-posta" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />
-                        </section>
+                        </FormSection>
 
                         <LocationsSection CompanyId="Id" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Lookups="Lookups" />
                     </div>
