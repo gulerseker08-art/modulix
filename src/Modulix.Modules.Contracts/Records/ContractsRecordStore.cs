@@ -174,6 +174,7 @@ internal abstract class ContractsRecordStore<TEntity>(ContractsStoreContext cont
 
         EnsureVersion(entity, expectedVersion);
         var before = ToData(entity).Values;
+        OnUpdating(entity);
         await ApplyAsync(entity, values, isNew: false, cancellationToken);
         if (!JsonNode.DeepEquals(before, ToData(entity).Values))
         {
@@ -195,6 +196,11 @@ internal abstract class ContractsRecordStore<TEntity>(ContractsStoreContext cont
         await BeforeDeleteAsync(entity, cancellationToken);
         Data.Set<TEntity>().Remove(entity);
         return true;
+    }
+
+    /// <summary>Güncellemede alanlar yazılmadan hemen önce (ör. tarihçe için önceki durumu saklamak).</summary>
+    protected virtual void OnUpdating(TEntity entity)
+    {
     }
 
     /// <summary>Varsayılanlar atandıktan sonra, kayıt eklenmeden hemen önce (ör. tarihçe satırı, toplam hesabı).</summary>

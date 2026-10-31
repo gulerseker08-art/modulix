@@ -79,3 +79,57 @@ public static class ContractLabels
     public static int? DaysUntil(DateOnly? date) =>
         date is { } d ? d.DayNumber - DateOnly.FromDateTime(Regional.Now.DateTime).DayNumber : null;
 }
+
+/// <summary>Eylem ve tarihçe etiketleri (dilim 2); anahtarlar sunucudaki <c>ContractAction</c> / <c>ContractEventKinds</c> ile aynıdır.</summary>
+public static class ContractActionLabels
+{
+    public static string Action(string key) => key switch
+    {
+        "send-to-review" => "İncelemeye gönder",
+        "mark-ready" => "Yayıma hazır işaretle",
+        "reopen-draft" => "Taslağa dön",
+        "submit-for-approval" => "Onaya gönder",
+        "withdraw-approval" => "Onayı geri çek",
+        "approve" => "Onayla",
+        "reject-approval" => "Onayı reddet",
+        "cancel" => "Sözleşmeyi iptal et",
+        "revise" => "Revizyon aç",
+        _ => key,
+    };
+
+    public static bool IsPrimary(string key) => key is "submit-for-approval" or "approve" or "mark-ready";
+
+    public static string History(string kind) => kind switch
+    {
+        "Created" => "Oluşturuldu",
+        "SentToReview" => "İncelemeye gönderildi",
+        "MarkedReady" => "Yayıma hazır işaretlendi",
+        "ReopenedDraft" => "Taslağa döndü",
+        "SubmittedForApproval" => "Onaya gönderildi (sürüm donduruldu)",
+        "ApprovalWithdrawn" => "Onay geri çekildi",
+        "Approved" => "Onaylandı",
+        "ApprovalRejected" => "Onay reddedildi",
+        "ApprovalInvalidated" => "Taslağa döndü; önceki onay geçersiz kaldı",
+        "Cancelled" => "İptal edildi",
+        "Revised" => "Yeni revizyon açıldı",
+        _ => kind,
+    };
+
+    public static IReadOnlyList<(string Key, string Label)> VersionStatuses { get; } =
+    [
+        ("Frozen", "Donduruldu"), ("Approved", "Onaylandı"), ("Rejected", "Reddedildi"), ("Withdrawn", "Geri çekildi"), ("Signed", "İmzalandı"), ("Superseded", "Geçersiz (yeni revizyon)"),
+    ];
+
+    public static string Field(string key) => key switch
+    {
+        "title" => "Başlık", "type" => "Tür", "description" => "Açıklama", "partyId" => "Müşteri", "personId" => "İlgili kişi", "startDate" => "Başlangıç",
+        "endDate" => "Bitiş", "isIndefinite" => "Belirsiz süreli", "currency" => "Para birimi", "priceIncludesTax" => "Vergi dahil", "contractValue" => "Sözleşme bedeli",
+        "paymentTerms" => "Ödeme koşulları", "renewalMode" => "Yenileme yöntemi", "renewalPeriodMonths" => "Yenileme süresi (ay)", "noticePeriodDays" => "Bildirim süresi (gün)",
+        "noticeDeadline" => "Son bildirim tarihi", "confidentiality" => "Gizlilik", "netTotal" => "Net toplam", "taxTotal" => "Vergi", "grossTotal" => "Genel toplam",
+        "kind" => "Tür", "productCode" => "Kod", "name" => "Ad", "quantity" => "Miktar", "unitName" => "Birim", "unitPrice" => "Birim fiyat", "discountPercent" => "İndirim %",
+        "taxRatePercent" => "Vergi %", "billingPeriod" => "Dönem", "net" => "Net", "tax" => "Vergi", "gross" => "Toplam", "role" => "Rol", "notes" => "Not",
+        _ => key,
+    };
+
+    public static string Change(string key) => key switch { "Added" => "Eklendi", "Removed" => "Kaldırıldı", "Changed" => "Değişti", _ => key };
+}

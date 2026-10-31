@@ -63,6 +63,41 @@
                 </div>
             }
 
+            <section aria-labelledby="actions-title" class="contract-actions">
+                <h2 id="actions-title" class="visually-hidden">İşlemler</h2>
+                @if (reasonAction is not null)
+                {
+                    <form class="record-form" novalidate @onsubmit="ConfirmReasonAsync" @onsubmit:preventDefault>
+                        <label class="form-label" for="reason">@ContractActionLabels.Action(reasonAction) için gerekçe @(actions.FirstOrDefault(a => a.Action == reasonAction)?.RequiresReason == true ? "*" : "(isteğe bağlı)")</label>
+                        <textarea id="reason" class="form-control" rows="2" maxlength="500" @bind="reasonText"></textarea>
+                        <FieldError Field="reason" Errors="actionErrors" />
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" disabled="@busy">Onayla</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => reasonAction = null">Vazgeç</button>
+                        </div>
+                    </form>
+                }
+                <div class="header-actions" role="group" aria-label="Sözleşme işlemleri">
+                    @foreach (var action in actions.Where(a => a.Allowed))
+                    {
+                        <button type="button" class="btn @(ContractActionLabels.IsPrimary(action.Action) ? "btn-primary" : "btn-outline-secondary")" disabled="@busy"
+                                @onclick="() => StartActionAsync(action)">@ContractActionLabels.Action(action.Action)</button>
+                    }
+                </div>
+                @if (actions.Any(a => !a.Allowed))
+                {
+                    <details class="small text-muted">
+                        <summary>Şu an yapılamayan işlemler (@actions.Count(a => !a.Allowed))</summary>
+                        <ul class="action-reasons">
+                            @foreach (var action in actions.Where(a => !a.Allowed))
+                            {
+                                <li><strong>@ContractActionLabels.Action(action.Action):</strong> @action.Message</li>
+                            }
+                        </ul>
+                    </details>
+                }
+            </section>
+
             <TabBar Tabs="Tabs" State="tabs" Label="Sözleşme bölümleri" Changed="_ => { }" />
         }
 
@@ -416,6 +451,103 @@
             </div>
         }
 
+        @if (contract is not null && tabs.Rendered(TabVersions))
+        {
+            <div role="tabpanel" id="tabpanel-@TabVersions" aria-labelledby="tab-@TabVersions" class="record-tabpanel" hidden="@tabs.Hidden(TabVersions)">
+                <section aria-labelledby="versions-title">
+                    <h2 id="versions-title">Sürümler</h2>
+                    <p class="text-muted">Onaya gönderilen içerik dondurulur ve SHA-256 özetiyle saklanır; güncel taslak V@(contract.CurrentVersionNo)@(contract.EffectiveVersionNo is { } ev2 ? $", yürürlükteki sürüm V{ev2}" : "").</p>
+                    @if (versions.Count == 0)
+                    {
+                        <p class="text-muted">Henüz dondurulmuş sürüm yok; ilk sürüm onaya gönderildiğinde oluşur.</p>
+                    }
+                    else
+                    {
+                        <table class="table record-table">
+                            <caption class="visually-hidden">Sözleşme sürümleri</caption>
+                            <thead><tr><th scope="col">Sürüm</th><th scope="col">Durum</th><th scope="col">Dondurulma</th><th scope="col">Özet (SHA-256)</th><th scope="col">Gerekçe</th><th scope="col"><span class="visually-hidden">İşlemler</span></th></tr></thead>
+                            <tbody>
+                                @foreach (var v in versions)
+                                {
+                                    <tr>
+                                        <td data-label="Sürüm">V@(v.VersionNo) <small class="text-muted">@(v.Kind == "Approval" ? "onay" : "imza")</small></td>
+                                        <td data-label="Durum">@ContractLabels.Label(ContractActionLabels.VersionStatuses, v.Status)</td>
+                                        <td data-label="Dondurulma">@CrmLabels.Time(v.FrozenAt) · @Lookups.MemberName(v.CreatedBy)</td>
+                                        <td data-label="Özet"><code title="@v.Sha256">@v.Sha256[..12]…</code></td>
+                                        <td data-label="Gerekçe">@v.Reason</td>
+                                        <td data-label="İşlemler">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => CompareAsync(v.VersionNo, 0)">Güncel taslakla karşılaştır</button>
+                                            @if (versions.FirstOrDefault(o => o.VersionNo < v.VersionNo) is { } previous)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => CompareAsync(previous.VersionNo, v.VersionNo)">V@(previous.VersionNo) ile karşılaştır</button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    @if (compare is not null)
+                    {
+                        <section aria-labelledby="compare-title" class="compare">
+                            <h3 id="compare-title">Karşılaştırma: V@(compareFrom) → @(compareTo == 0 ? "güncel taslak" : $"V{compareTo}")</h3>
+                            @if (compare.Header.Count == 0 && compare.Lines.Count == 0 && compare.Parties.Count == 0)
+                            {
+                                <p class="text-muted">İki sürüm arasında fark yok.</p>
+                            }
+                            @if (compare.Header.Count > 0)
+                            {
+                                <table class="table record-table">
+                                    <caption>Alan farkları</caption>
+                                    <thead><tr><th scope="col">Alan</th><th scope="col">Önce</th><th scope="col">Sonra</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var f in compare.Header)
+                                        {
+                                            <tr><td data-label="Alan">@ContractActionLabels.Field(f.Field)</td><td data-label="Önce">@(f.Before ?? "—")</td><td data-label="Sonra">@(f.After ?? "—")</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                            @if (compare.Lines.Count > 0)
+                            {
+                                <table class="table record-table">
+                                    <caption>Kalem farkları</caption>
+                                    <thead><tr><th scope="col">Kalem</th><th scope="col">Değişiklik</th><th scope="col">Ayrıntı</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var l in compare.Lines)
+                                        {
+                                            <tr>
+                                                <td data-label="Kalem">@l.Name</td>
+                                                <td data-label="Değişiklik">@ContractActionLabels.Change(l.Change)</td>
+                                                <td data-label="Ayrıntı">@string.Join("; ", l.Fields.Where(f => l.Change != "Changed" ? f.After is not null || f.Before is not null : true).Select(f => $"{ContractActionLabels.Field(f.Field)}: {f.Before ?? "—"} → {f.After ?? "—"}"))</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                            @if (compare.Parties.Count > 0)
+                            {
+                                <table class="table record-table">
+                                    <caption>Taraf farkları</caption>
+                                    <thead><tr><th scope="col">Rol</th><th scope="col">Değişiklik</th><th scope="col">Ayrıntı</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var p in compare.Parties)
+                                        {
+                                            <tr>
+                                                <td data-label="Rol">@ContractLabels.Label(ContractLabels.PartyRoles, p.Role)</td>
+                                                <td data-label="Değişiklik">@ContractActionLabels.Change(p.Change)</td>
+                                                <td data-label="Ayrıntı">@string.Join("; ", p.Fields.Select(f => $"{ContractActionLabels.Field(f.Field)}: {f.Before ?? "—"} → {f.After ?? "—"}"))</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        </section>
+                    }
+                </section>
+            </div>
+        }
+
         @if (contract is not null && tabs.Rendered(TabHistory))
         {
             <div role="tabpanel" id="tabpanel-@TabHistory" aria-labelledby="tab-@TabHistory" class="record-tabpanel" hidden="@tabs.Hidden(TabHistory)">
@@ -431,7 +563,7 @@
                             @foreach (var h in history)
                             {
                                 <li>
-                                    <strong>@HistoryLabel(h.Kind)</strong> · @CrmLabels.Time(h.At) · @Lookups.MemberName(h.ActorId)
+                                    <strong>@ContractActionLabels.History(h.Kind)</strong> · @CrmLabels.Time(h.At) · @Lookups.MemberName(h.ActorId)
                                     @if (h.FromStatus is not null || h.ToStatus is not null) { <span> (@h.FromStatus → @h.ToStatus)</span> }
                                     @if (!string.IsNullOrWhiteSpace(h.Reason)) { <div class="text-muted">@h.Reason</div> }
                                 </li>
@@ -452,6 +584,7 @@
     private const string TabGeneral = "general";
     private const string TabParties = "parties";
     private const string TabLines = "lines";
+    private const string TabVersions = "versions";
     private const string TabHistory = "history";
 
     [Parameter] public Guid? Id { get; set; }
@@ -462,6 +595,14 @@
     private List<ContractPartyDto> parties = [];
     private List<ContractLineDto> lines = [];
     private List<ContractHistoryDto> history = [];
+    private List<ContractActionDto> actions = [];
+    private List<ContractVersionDto> versions = [];
+    private ContractCompareDto? compare;
+    private int compareFrom;
+    private int compareTo;
+    private string? reasonAction;
+    private string reasonText = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? actionErrors;
     private readonly Dictionary<Guid, string> partyNames = [];
     private readonly Dictionary<Guid, string> personNames = [];
     private PartyForm? partyForm;
@@ -491,6 +632,7 @@
         new(TabGeneral, "Genel bilgiler"),
         new(TabParties, "Taraflar ve kişiler", parties.Count),
         new(TabLines, "Kapsam ve kalemler", lines.Count),
+        new(TabVersions, "Sürümler", versions.Count),
         new(TabHistory, "Tarihçe"),
     ];
 
@@ -524,6 +666,9 @@
         parties = (await Api.GetAsync<PagedResult<ContractPartyDto>>($"/api/contracts/contract-parties?contractId={id}&pageSize=200")).Value?.Items.ToList() ?? [];
         lines = (await Api.GetAsync<PagedResult<ContractLineDto>>($"/api/contracts/contract-lines?contractId={id}&pageSize=200")).Value?.Items.ToList() ?? [];
         history = (await Api.GetAsync<List<ContractHistoryDto>>($"/api/contracts/contracts/{id}/history")).Value ?? [];
+        actions = (await Api.GetAsync<List<ContractActionDto>>($"/api/contracts/contracts/{id}/actions")).Value ?? [];
+        versions = (await Api.GetAsync<List<ContractVersionDto>>($"/api/contracts/contracts/{id}/versions")).Value ?? [];
+        compare = null;
         await ResolveAsync("contracts.contract-party.party", partyNames, parties.Select(p => p.PartyId));
         await ResolveAsync("contracts.contract-party.person", personNames, parties.Select(p => p.PersonId));
     }
@@ -707,11 +852,52 @@
         }
     }
 
-    private static string HistoryLabel(string kind) => kind switch
+    /// <summary>Gerekçe isteyen eylemde önce gerekçe formu açılır; diğerleri doğrudan çalışır.</summary>
+    private Task StartActionAsync(ContractActionDto action)
     {
-        "Created" => "Oluşturuldu",
-        _ => kind,
-    };
+        actionErrors = null;
+        if (action.RequiresReason || action.Action is "reopen-draft" or "withdraw-approval")
+        {
+            reasonAction = action.Action;
+            reasonText = string.Empty;
+            return Task.CompletedTask;
+        }
+
+        return RunActionAsync(action.Action, null);
+    }
+
+    private Task ConfirmReasonAsync() => reasonAction is { } action ? RunActionAsync(action, Blank(reasonText)) : Task.CompletedTask;
+
+    private async Task RunActionAsync(string action, string? reason)
+    {
+        if (contract is null || busy) { return; }
+        if ((dirty || childDirty) && !await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş değişiklikler var; işlem bunları dikkate almaz. Devam edilsin mi?")) { return; }
+        busy = true;
+        var result = await Api.PostAsync<ContractDto>($"/api/contracts/contracts/{contract.Id}/{action}", new ContractTransitionRequest(contract.Version, reason));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            actionErrors = result.FieldErrors;
+            Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Sayfayı yenileyip tekrar deneyin." : result.Error, failed: true);
+            if (result.Status == System.Net.HttpStatusCode.Conflict) { await LoadAsync(contract.Id); }
+            return;
+        }
+
+        reasonAction = null;
+        dirty = false;
+        Notify($"{ContractActionLabels.Action(action)}: tamamlandı.");
+        await LoadAsync(contract.Id);
+    }
+
+    private async Task CompareAsync(int from, int to)
+    {
+        if (contract is null) { return; }
+        var result = await Api.GetAsync<ContractCompareDto>($"/api/contracts/contracts/{contract.Id}/versions/{from}/compare?with={to}");
+        compare = result.Value;
+        compareFrom = from;
+        compareTo = to;
+        if (!result.IsSuccess) { Notify(result.Error, failed: true); }
+    }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
