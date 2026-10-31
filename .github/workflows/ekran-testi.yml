@@ -1,0 +1,85 @@
+# GEÇİCİ: tasarım sistemi ekranlarının gerçek tarayıcıda testi (yalnızca e2e/ekran-testi dalında çalışır; main'e birleştirilmez).
+name: Ekran testi
+
+on:
+  push:
+    branches: [e2e/ekran-testi]
+
+permissions:
+  contents: write
+
+jobs:
+  screens:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      ASPNETCORE_ENVIRONMENT: Development
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.100'
+
+      - name: Gecici veritabani sifreleri
+        run: |
+          sa="Mx!$(openssl rand -hex 12)"
+          app="Mx!$(openssl rand -hex 12)"
+          migrator="Mx!$(openssl rand -hex 12)"
+          for secret in "$sa" "$app" "$migrator"; do echo "::add-mask::$secret"; done
+          printf 'MSSQL_PORT=14333\nMSSQL_SA_PASSWORD=%s\nMODULIX_APP_PASSWORD=%s\nMODULIX_MIGRATOR_PASSWORD=%s\n' \
+            "$sa" "$app" "$migrator" > .env
+          {
+            echo "ConnectionStrings__Modulix=Server=localhost,14333;Database=Modulix;User Id=modulix_app;Password=$app;TrustServerCertificate=True"
+            echo "ConnectionStrings__ModulixMigrations=Server=localhost,14333;Database=Modulix;User Id=modulix_migrator;Password=$migrator;TrustServerCertificate=True"
+          } >> "$GITHUB_ENV"
+
+      - name: SQL Server ve Mailpit
+        run: docker compose up -d --wait sqlserver mailpit
+
+      - name: Veritabani
+        run: docker compose run --rm db-init
+
+      - name: Derle
+        run: dotnet build src/Modulix.Api
+
+      - name: Migration ve ornek veri
+        run: |
+          dotnet run --project src/Modulix.Api --no-build -- migrate
+          dotnet run --project src/Modulix.Api --no-build -- seed
+
+      - name: Uygulamayi baslat (HTTPS)
+        run: |
+          dotnet dev-certs https
+          nohup dotnet run --project src/Modulix.Api --no-build --launch-profile https > app.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -ksf https://localhost:7026/health > /dev/null; then echo "hazir"; exit 0; fi
+            sleep 3
+          done
+          echo "uygulama acilmadi"; tail -n 80 app.log; exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Playwright
+        run: |
+          npm init -y > /dev/null
+          npm install playwright@1.56.1 > /dev/null
+          npx playwright install --with-deps chromium > /dev/null
+
+      - name: Ekran testi
+        run: BASE_URL=https://localhost:7026 OUT=ekran-testi-sonuc node tests/ui-screens/screens.mjs
+
+      - name: Sonuclari dala yaz
+        if: always()
+        run: |
+          mkdir -p ekran-testi-sonuc
+          tail -n 200 app.log > ekran-testi-sonuc/app-log-son.txt || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ekran-testi-sonuc
+          git commit -m "Ekran testi sonuçları [skip ci]" || exit 0
+          git push
