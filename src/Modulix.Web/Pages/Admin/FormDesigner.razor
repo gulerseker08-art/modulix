@@ -1,0 +1,543 @@
+@page "/yonetim/form-tasarimi"
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<PageTitle>Form tasarımı · Modulix</PageTitle>
+
+@* Form tasarımı (ADR-0021): firma yöneticisi her formun sekmelerini, bölümlerini ve alanlarını düzenler — alan taşır, yeni sekme ve
+   bölüm açar, genişlik, zorunluluk ve görünürlük belirler. Alanların kendisi (girdi tipi, doğrulama) koddadır; buradan yalnızca
+   yerleşim ve zorunluluk değişir. Kodun zorunlu tuttuğu ve sabit alanlar değiştirilemez; zorunluluk sunucuda da denetlenir. *@
+<AuthGate Permission="@CoreAccess.ManageCustomization">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <PageHeader Title="Form tasarımı" Icon="clipboard-list" Subtitle="Formların sekmelerini, bölümlerini ve alanlarını firmanıza göre düzenleyin.">
+        @if (current is not null)
+        {
+            @if (current.Customized)
+            {
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ResetAsync">Varsayılana dön</button>
+            }
+            <button type="button" class="btn btn-primary" disabled="@(busy || !dirty)" @onclick="SaveAsync">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        }
+    </PageHeader>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+    @if (fieldErrors is { Count: > 0 })
+    {
+        <ul class="alert alert-danger" role="alert">
+            @foreach (var (_, texts) in fieldErrors)
+            {
+                @foreach (var text in texts)
+                {
+                    <li>@text</li>
+                }
+            }
+        </ul>
+    }
+
+    @if (layouts is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else
+    {
+        <div class="designer-toolbar">
+            <div>
+                <label class="form-label" for="designer-form">Form</label>
+                <select id="designer-form" class="form-select" value="@current?.EntityKey" @onchange="OnFormChanged">
+                    @foreach (var item in layouts)
+                    {
+                        <option value="@item.EntityKey">@item.EntityName@(item.Customized ? " · firma düzeni" : null)</option>
+                    }
+                </select>
+            </div>
+            <div class="designer-toolbar-actions">
+                <button type="button" class="btn btn-outline-primary" disabled="@(tabs.Count >= 8)" @onclick="AddTab"><span aria-hidden="true">+</span> Yeni sekme</button>
+            </div>
+        </div>
+
+        @if (current is not null)
+        {
+            <p class="text-muted small">
+                Sürükleme yerine ok düğmeleri ve "taşı" listeleri kullanılır; böylece klavyeyle de çalışır. Sabit alanlar (<AppIcon Name="shield" Size="14" />) gizlenemez ve
+                zorunluluğu değişmez; kodun zorunlu tuttuğu alan isteğe bağlı yapılamaz. Özel alanlar "Özel alanlar" ekranında tanımlanır, burada yalnızca yerleşir.
+                Zorunlu kıldığınız alanlar kaydederken sunucuda da denetlenir.
+            </p>
+
+            @for (var ti = 0; ti < tabs.Count; ti++)
+            {
+                var tab = tabs[ti];
+                var tabIndex = ti;
+                <section class="section-card designer-tab" aria-label="@tab.Label sekmesi">
+                    <div class="designer-tab-head">
+                        <span class="section-card-icon" aria-hidden="true"><AppIcon Name="layers" Size="18" /></span>
+                        <div class="designer-name">
+                            <label class="visually-hidden" for="tab-label-@tab.Key">Sekme adı</label>
+                            <input id="tab-label-@tab.Key" class="form-control" maxlength="60" value="@tab.Label" @onchange="e => Rename(tab, e.Value as string)" />
+                            <small class="text-muted">Sekme</small>
+                        </div>
+                        <div class="designer-actions">
+                            <button type="button" class="icon-button" title="Yukarı taşı" aria-label="@tab.Label sekmesini yukarı taşı" disabled="@(tabIndex == 0)" @onclick="() => MoveTab(tabIndex, -1)">↑</button>
+                            <button type="button" class="icon-button" title="Aşağı taşı" aria-label="@tab.Label sekmesini aşağı taşı" disabled="@(tabIndex == tabs.Count - 1)" @onclick="() => MoveTab(tabIndex, 1)">↓</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => AddSection(tab)"><span aria-hidden="true">+</span> Bölüm ekle</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(tabs.Count == 1)" @onclick="() => RemoveTab(tab)">Sekmeyi sil</button>
+                        </div>
+                    </div>
+
+                    @foreach (var section in sections.Where(s => s.Tab == tab.Key).ToList())
+                    {
+                        var sectionIndex = sections.IndexOf(section);
+                        var inTab = sections.Where(s => s.Tab == tab.Key).ToList();
+                        var fieldsHere = fields.Where(f => f.Section == section.Key).ToList();
+                        <div class="designer-section">
+                            <div class="designer-section-head">
+                                <span class="section-card-icon" aria-hidden="true"><AppIcon Name="@(section.Icon ?? "square-pen")" Size="16" /></span>
+                                <div class="designer-name">
+                                    <label class="visually-hidden" for="section-label-@section.Key">Bölüm adı</label>
+                                    <input id="section-label-@section.Key" class="form-control form-control-sm" maxlength="60" value="@section.Label" @onchange="e => Rename(section, e.Value as string)" />
+                                </div>
+                                <label class="visually-hidden" for="section-icon-@section.Key">Bölüm ikonu</label>
+                                <select id="section-icon-@section.Key" class="form-select form-select-sm designer-icon" value="@(section.Icon ?? "")" @onchange="e => SetIcon(section, e.Value as string)">
+                                    <option value="">İkon yok</option>
+                                    @foreach (var icon in Icons)
+                                    {
+                                        <option value="@icon">@icon</option>
+                                    }
+                                </select>
+                                @if (tabs.Count > 1)
+                                {
+                                    <label class="visually-hidden" for="section-tab-@section.Key">Bölümün sekmesi</label>
+                                    <select id="section-tab-@section.Key" class="form-select form-select-sm designer-move" value="@section.Tab" @onchange="e => MoveSectionToTab(section, e.Value as string)">
+                                        @foreach (var t in tabs)
+                                        {
+                                            <option value="@t.Key">@t.Label</option>
+                                        }
+                                    </select>
+                                }
+                                <div class="designer-actions">
+                                    <button type="button" class="icon-button" title="Yukarı taşı" aria-label="@section.Label bölümünü yukarı taşı" disabled="@(inTab.IndexOf(section) == 0)" @onclick="() => MoveSection(section, -1)">↑</button>
+                                    <button type="button" class="icon-button" title="Aşağı taşı" aria-label="@section.Label bölümünü aşağı taşı" disabled="@(inTab.IndexOf(section) == inTab.Count - 1)" @onclick="() => MoveSection(section, 1)">↓</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(sections.Count == 1)" @onclick="() => RemoveSection(section)">Bölümü sil</button>
+                                </div>
+                            </div>
+
+                            @if (fieldsHere.Count == 0)
+                            {
+                                <p class="text-muted small designer-empty">Bu bölümde alan yok; başka bölümdeki bir alanı "Bölüm" listesinden buraya taşıyın.</p>
+                            }
+                            else
+                            {
+                                <table class="table record-table designer-fields">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Alan</th>
+                                            <th scope="col">Genişlik</th>
+                                            <th scope="col">Zorunlu</th>
+                                            <th scope="col">Görünür</th>
+                                            <th scope="col">Bölüm</th>
+                                            <th scope="col" class="actions">Sıra</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var field in fieldsHere)
+                                        {
+                                            var position = fieldsHere.IndexOf(field);
+                                            <tr class="@(field.Visible ? null : "designer-hidden")">
+                                                <td data-label="Alan">
+                                                    <strong>@field.Label</strong>
+                                                    @if (field.Fixed)
+                                                    {
+                                                        <span class="badge category ms-2" title="Sabit alan: gizlenemez, zorunluluğu değişmez"><AppIcon Name="shield" Size="12" /> Sabit</span>
+                                                    }
+                                                    @if (field.IsCustom)
+                                                    {
+                                                        <span class="badge ms-2">Özel alan</span>
+                                                    }
+                                                    @if (field.DefaultRequired && !field.Fixed)
+                                                    {
+                                                        <span class="badge ms-2" title="Kodun zorunlu tuttuğu alan">Zorunlu (tanım)</span>
+                                                    }
+                                                </td>
+                                                <td data-label="Genişlik">
+                                                    <label class="visually-hidden" for="span-@field.Key">@field.Label genişliği</label>
+                                                    <select id="span-@field.Key" class="form-select form-select-sm" value="@field.Span" @onchange="e => SetSpan(field, e.Value as string)">
+                                                        @foreach (var span in FormSpanLabels.All)
+                                                        {
+                                                            <option value="@span">@FormSpanLabels.Of(span)</option>
+                                                        }
+                                                    </select>
+                                                </td>
+                                                <td data-label="Zorunlu">
+                                                    <input type="checkbox" class="form-check-input" aria-label="@field.Label zorunlu" checked="@field.Required"
+                                                           disabled="@(field.Fixed || field.DefaultRequired)" @onchange="e => SetRequired(field, (bool)e.Value!)" />
+                                                </td>
+                                                <td data-label="Görünür">
+                                                    <input type="checkbox" class="form-check-input" aria-label="@field.Label görünür" checked="@field.Visible"
+                                                           disabled="@field.Fixed" @onchange="e => SetVisible(field, (bool)e.Value!)" />
+                                                </td>
+                                                <td data-label="Bölüm">
+                                                    <label class="visually-hidden" for="section-of-@field.Key">@field.Label bölümü</label>
+                                                    <select id="section-of-@field.Key" class="form-select form-select-sm designer-move" value="@field.Section" @onchange="e => MoveFieldToSection(field, e.Value as string)">
+                                                        @foreach (var s in sections)
+                                                        {
+                                                            <option value="@s.Key">@TabLabel(s.Tab)@s.Label</option>
+                                                        }
+                                                    </select>
+                                                </td>
+                                                <td class="actions" data-label="Sıra">
+                                                    <button type="button" class="icon-button" title="Yukarı taşı" aria-label="@field.Label alanını yukarı taşı" disabled="@(position == 0)" @onclick="() => MoveField(field, -1)">↑</button>
+                                                    <button type="button" class="icon-button" title="Aşağı taşı" aria-label="@field.Label alanını aşağı taşı" disabled="@(position == fieldsHere.Count - 1)" @onclick="() => MoveField(field, 1)">↓</button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        </div>
+                    }
+                </section>
+            }
+        }
+    }
+</AuthGate>
+
+@code {
+    private static readonly string[] Icons =
+    [
+        "building", "user", "users", "user-check", "phone", "mail", "map-pin", "globe", "target", "coins", "wallet", "clipboard-list",
+        "message-square", "calendar", "clock", "activity", "inbox", "square-pen", "info", "briefcase", "tag", "file-text", "package", "shield", "layers", "list",
+    ];
+
+    private sealed class DraftTab
+    {
+        public required string Key { get; init; }
+
+        public string Label { get; set; } = "";
+    }
+
+    private sealed class DraftSection
+    {
+        public required string Key { get; init; }
+
+        public string Label { get; set; } = "";
+
+        public string? Icon { get; set; }
+
+        public string Tab { get; set; } = "";
+    }
+
+    private sealed class DraftField
+    {
+        public required string Key { get; init; }
+
+        public required string Label { get; init; }
+
+        public string Section { get; set; } = "";
+
+        public int Span { get; set; }
+
+        public bool Required { get; set; }
+
+        public bool Visible { get; set; }
+
+        public bool Fixed { get; init; }
+
+        public bool IsCustom { get; init; }
+
+        public bool DefaultRequired { get; init; }
+    }
+
+    private List<FormLayoutDto>? layouts;
+    private FormLayoutDto? current;
+    private List<DraftTab> tabs = [];
+    private List<DraftSection> sections = [];
+    private List<DraftField> fields = [];
+    private bool dirty;
+    private bool busy;
+    private string? message;
+    private string? notice;
+    private IReadOnlyDictionary<string, string[]>? fieldErrors;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync(null);
+
+    private async Task LoadAsync(string? entityKey)
+    {
+        var result = await Api.GetAsync<List<FormLayoutDto>>("/api/form-layouts");
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        layouts = result.Value ?? [];
+        Select(layouts.FirstOrDefault(l => l.EntityKey == (entityKey ?? current?.EntityKey)) ?? layouts.FirstOrDefault());
+    }
+
+    private void Select(FormLayoutDto? layout)
+    {
+        current = layout;
+        tabs = layout is null ? [] : [.. layout.Tabs.Select(t => new DraftTab { Key = t.Key, Label = t.Label })];
+        sections = layout is null ? [] : [.. layout.Sections.Select(s => new DraftSection { Key = s.Key, Label = s.Label, Icon = s.Icon, Tab = s.Tab })];
+        fields = layout is null ? [] : [.. layout.Fields.Select(f => new DraftField
+        {
+            Key = f.Key, Label = f.Label, Section = f.Section, Span = f.Span, Required = f.Required, Visible = f.Visible,
+            Fixed = f.Fixed, IsCustom = f.IsCustom, DefaultRequired = f.DefaultRequired,
+        })];
+        dirty = false;
+        fieldErrors = null;
+    }
+
+    private void OnFormChanged(ChangeEventArgs e)
+    {
+        notice = null;
+        message = null;
+        Select(layouts?.FirstOrDefault(l => l.EntityKey == e.Value?.ToString()));
+    }
+
+    private string TabLabel(string tabKey) => tabs.Count > 1 ? $"{tabs.FirstOrDefault(t => t.Key == tabKey)?.Label} › " : string.Empty;
+
+    private void Touch()
+    {
+        dirty = true;
+        notice = null;
+    }
+
+    private string UniqueKey(string label, IEnumerable<string> existing, string fallback)
+    {
+        var slug = Slug.Suggest(label);
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            slug = fallback;
+        }
+
+        var taken = existing.ToHashSet(StringComparer.Ordinal);
+        var key = slug;
+        for (var i = 2; taken.Contains(key); i++)
+        {
+            key = $"{slug}-{i}";
+        }
+
+        return key;
+    }
+
+    private void AddTab()
+    {
+        var label = $"Yeni sekme {tabs.Count + 1}";
+        tabs.Add(new DraftTab { Key = UniqueKey(label, tabs.Select(t => t.Key), "sekme"), Label = label });
+        Touch();
+    }
+
+    private void Rename(DraftTab tab, string? label)
+    {
+        tab.Label = (label ?? "").Trim();
+        Touch();
+    }
+
+    private void MoveTab(int index, int delta)
+    {
+        var target = index + delta;
+        if (target < 0 || target >= tabs.Count)
+        {
+            return;
+        }
+
+        (tabs[index], tabs[target]) = (tabs[target], tabs[index]);
+        Touch();
+    }
+
+    // Silinen sekmenin bölümleri ilk sekmeye taşınır; alan kaybolmaz.
+    private void RemoveTab(DraftTab tab)
+    {
+        if (tabs.Count == 1)
+        {
+            return;
+        }
+
+        tabs.Remove(tab);
+        foreach (var section in sections.Where(s => s.Tab == tab.Key))
+        {
+            section.Tab = tabs[0].Key;
+        }
+
+        Touch();
+    }
+
+    private void AddSection(DraftTab tab)
+    {
+        var label = "Yeni bölüm";
+        sections.Add(new DraftSection { Key = UniqueKey(label, sections.Select(s => s.Key), "bolum"), Label = label, Tab = tab.Key });
+        Touch();
+    }
+
+    private void Rename(DraftSection section, string? label)
+    {
+        section.Label = (label ?? "").Trim();
+        Touch();
+    }
+
+    private void SetIcon(DraftSection section, string? icon)
+    {
+        section.Icon = string.IsNullOrEmpty(icon) ? null : icon;
+        Touch();
+    }
+
+    private void MoveSectionToTab(DraftSection section, string? tabKey)
+    {
+        if (tabKey is not null && tabs.Any(t => t.Key == tabKey))
+        {
+            section.Tab = tabKey;
+            Touch();
+        }
+    }
+
+    // Aynı sekme içindeki komşusuyla yer değiştirir.
+    private void MoveSection(DraftSection section, int delta)
+    {
+        var inTab = sections.Where(s => s.Tab == section.Tab).ToList();
+        var position = inTab.IndexOf(section);
+        var target = position + delta;
+        if (target < 0 || target >= inTab.Count)
+        {
+            return;
+        }
+
+        var a = sections.IndexOf(section);
+        var b = sections.IndexOf(inTab[target]);
+        (sections[a], sections[b]) = (sections[b], sections[a]);
+        Touch();
+    }
+
+    // Silinen bölümün alanları ilk bölüme taşınır; alan kaybolmaz.
+    private void RemoveSection(DraftSection section)
+    {
+        if (sections.Count == 1)
+        {
+            return;
+        }
+
+        sections.Remove(section);
+        foreach (var field in fields.Where(f => f.Section == section.Key))
+        {
+            field.Section = sections[0].Key;
+        }
+
+        Touch();
+    }
+
+    private void SetSpan(DraftField field, string? value)
+    {
+        if (int.TryParse(value, out var span) && FormSpanLabels.All.Contains(span))
+        {
+            field.Span = span;
+            Touch();
+        }
+    }
+
+    private void SetRequired(DraftField field, bool required)
+    {
+        field.Required = field.DefaultRequired || required;
+        Touch();
+    }
+
+    private void SetVisible(DraftField field, bool visible)
+    {
+        field.Visible = field.Fixed || visible;
+        Touch();
+    }
+
+    private void MoveFieldToSection(DraftField field, string? sectionKey)
+    {
+        if (sectionKey is not null && sections.Any(s => s.Key == sectionKey))
+        {
+            field.Section = sectionKey;
+            // Taşınan alan hedef bölümün sonuna gider.
+            fields.Remove(field);
+            fields.Add(field);
+            Touch();
+        }
+    }
+
+    private void MoveField(DraftField field, int delta)
+    {
+        var inSection = fields.Where(f => f.Section == field.Section).ToList();
+        var position = inSection.IndexOf(field);
+        var target = position + delta;
+        if (target < 0 || target >= inSection.Count)
+        {
+            return;
+        }
+
+        var a = fields.IndexOf(field);
+        var b = fields.IndexOf(inSection[target]);
+        (fields[a], fields[b]) = (fields[b], fields[a]);
+        Touch();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (current is null)
+        {
+            return;
+        }
+
+        busy = true;
+        message = null;
+        notice = null;
+        fieldErrors = null;
+        var request = new SaveFormLayoutRequest(
+            [.. tabs.Select(t => new FormTabDto(t.Key, t.Label))],
+            [.. sections.Select(s => new FormSectionDto(s.Key, s.Label, s.Icon, s.Tab))],
+            [.. fields.Select(f => new SaveFormFieldRequest(f.Key, f.Section, f.Span, f.Required, f.Visible))],
+            current.Version);
+        var result = await Api.PutAsync<FormLayoutDto>($"/api/customization/form-layouts/{current.EntityKey}", request);
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            fieldErrors = result.FieldErrors;
+            return;
+        }
+
+        Layouts.Invalidate();
+        await LoadAsync(current.EntityKey);
+        notice = "Form düzeni kaydedildi; formlar yeni düzenle açılır.";
+    }
+
+    private async Task ResetAsync()
+    {
+        if (current is null)
+        {
+            return;
+        }
+
+        busy = true;
+        message = null;
+        notice = null;
+        var result = await Api.DeleteAsync($"/api/customization/form-layouts/{current.EntityKey}?version={current.Version}");
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        Layouts.Invalidate();
+        await LoadAsync(current.EntityKey);
+        notice = "Varsayılan düzene dönüldü.";
+    }
+}

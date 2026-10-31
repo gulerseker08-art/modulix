@@ -30,7 +30,8 @@ public sealed class RecordPipeline(
     IUnitOfWork unitOfWork,
     EventHandlingScope? handling = null,
     ISharedReferenceMerger? references = null,
-    RecordCommandContext? commandContext = null) : IRecordPipeline
+    RecordCommandContext? commandContext = null,
+    IFormLayoutProvider? formLayouts = null) : IRecordPipeline
 {
     public async Task<RecordResult<RecordData>> GetAsync(RecordRef record, CancellationToken cancellationToken)
     {
@@ -130,6 +131,9 @@ public sealed class RecordPipeline(
             (values, errors) = RecordCustomFields.Prepare(custom, RecordOperation.Create, values, before: null);
         }
 
+        // Firmanın form düzeniyle zorunlu kıldığı alanlar (ADR-0021); kodun zorunluları depoda doğrulanır.
+        errors.AddRange(RecordRequiredFields.Check(await ExtraRequiredAsync(tenant!, store, cancellationToken), RecordOperation.Create, values));
+
         // Şirket kapsamı (ADR-0008): şirket kapsamlı kayıt oluşturulurken CompanyId verilmemişse aktif şirkete düşer; verilen
         // veya düşen değer erişilebilir olmalıdır. Değeri store doğrulamadan önce yerine koyarız.
         if (store.CompanyField is { } companyField && EnsureWritableCompany(values, companyField) is { } companyError)
@@ -198,6 +202,8 @@ public sealed class RecordPipeline(
         {
             (values, errors) = RecordCustomFields.Prepare(custom, RecordOperation.Update, values, before.Values);
         }
+
+        errors.AddRange(RecordRequiredFields.Check(await ExtraRequiredAsync(tenant!, store, cancellationToken), RecordOperation.Update, values));
 
         // Şirket kapsamlı kaydın şirketi güncellemeyle değiştirilemez (ADR-0008): taşıma ayrı bir komuttur.
         if (store.CompanyField is { } companyField && ChangesCompany(before.Values, values, companyField))
@@ -472,6 +478,11 @@ public sealed class RecordPipeline(
     }
 
     // Özel alanı olan türde etkin alan tanımları; diğerlerinde boş (veritabanına gidilmez).
+    private static readonly IReadOnlySet<string> NoRequired = new HashSet<string>();
+
+    private async Task<IReadOnlySet<string>> ExtraRequiredAsync(TenantContext tenant, IRecordStore store, CancellationToken cancellationToken) =>
+        formLayouts is null ? NoRequired : await formLayouts.GetRequiredFieldsAsync(tenant, store.EntityKey, cancellationToken);
+
     private async Task<IReadOnlyList<Customization.CustomFieldInfo>> CustomFieldsAsync(
         TenantContext tenant, IRecordStore store, CancellationToken cancellationToken) =>
         store.SupportsCustomFields ? await customFields.GetFieldsAsync(tenant, store.EntityKey, cancellationToken) : [];

@@ -50,6 +50,23 @@ public sealed class NoCustomFields : ICustomFieldProvider
         Task.FromResult<IReadOnlyList<Customization.CustomFieldInfo>>([]);
 }
 
+/// <summary>
+/// Form düzeni (ADR-0021): firmanın düzeniyle zorunlu kıldığı alanlar (kodun zaten zorunlu tuttukları hariç). Boru hattı
+/// oluştururken bunların dolu olmasını, güncellemede boşaltılmamasını ister. İstek boyunca saklanabilir.
+/// </summary>
+public interface IFormLayoutProvider
+{
+    Task<IReadOnlySet<string>> GetRequiredFieldsAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken);
+}
+
+public sealed class NoFormLayouts : IFormLayoutProvider
+{
+    private static readonly IReadOnlySet<string> None = new HashSet<string>();
+
+    public Task<IReadOnlySet<string>> GetRequiredFieldsAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken) =>
+        Task.FromResult(None);
+}
+
 public sealed class AllFieldsVisible : IFieldAccessService
 {
     private static readonly IReadOnlySet<string> None = new HashSet<string>();

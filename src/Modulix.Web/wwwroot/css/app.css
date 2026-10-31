@@ -4177,3 +4177,99 @@ button.pipeline-label {
     .input-icon > .form-control {
         padding-left: 2.375rem;
     }
+
+
+/* ---- Form tasarımı (ADR-0021): sekme kartları, bölüm blokları ve alan tablosu ---- */
+.form-extras {
+    margin-bottom: var(--mx-space-4);
+}
+
+    .form-extras:empty {
+        display: none;
+    }
+
+.designer-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--mx-space-3);
+    margin-bottom: var(--mx-space-4);
+}
+
+    .designer-toolbar .form-select {
+        min-width: 16rem;
+    }
+
+.designer-tab-head,
+.designer-section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-3);
+}
+
+.designer-tab-head {
+    margin-bottom: var(--mx-space-4);
+}
+
+.designer-name {
+    flex: 1;
+    min-width: 12rem;
+}
+
+    .designer-name small {
+        display: block;
+        margin-top: 2px;
+    }
+
+.designer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-1);
+    margin-left: auto;
+}
+
+.designer-section {
+    margin-top: var(--mx-space-3);
+    padding: var(--mx-space-3) var(--mx-space-4);
+    border: 1px dashed var(--mx-border-strong);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-background);
+}
+
+    .designer-section .section-card-icon {
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 8px;
+    }
+
+.designer-icon,
+.designer-move {
+    width: auto;
+    min-width: 9rem;
+}
+
+.designer-empty {
+    margin: var(--mx-space-3) 0 0;
+}
+
+.designer-fields {
+    margin: var(--mx-space-3) 0 0;
+}
+
+    .designer-fields td .form-select {
+        min-width: 7rem;
+    }
+
+    .designer-fields tr.designer-hidden strong {
+        color: var(--mx-text-secondary);
+        text-decoration: line-through;
+    }
+
+    .designer-fields .icon-button {
+        width: 2rem;
+        height: 2rem;
+        font-size: 1rem;
+    }

@@ -1,0 +1,96 @@
+@* Metadata'dan çizilen form gövdesi (ADR-0021): firmanın form düzenindeki sekmeler, bölüm kartları ve alanlar sırayla çizilir.
+   Her alan için editör kendi girdisini verir (Field şablonu, anahtara göre); özel alanlar CustomFieldInputs ile aynı yerde çizilir.
+   Gizli alan ve bütün alanları gizli bölüm çizilmez; birden fazla sekme varsa TabBar kullanılır (bütün sekmeler DOM'da kalır,
+   kaydedilmemiş girdi kaybolmaz). *@
+@if (Layout is null)
+{
+    <p class="text-muted" role="status">Form düzeni yükleniyor…</p>
+}
+else
+{
+    var multi = Layout.Tabs.Count > 1;
+    if (multi && tabs is not null)
+    {
+        <TabBar Tabs="TabItems" State="tabs" Label="@TabsLabel" Changed="_ => { }" />
+    }
+
+    @foreach (var tab in Layout.Tabs)
+    {
+        var key = TabKey(tab.Key);
+        <div role="@(multi ? "tabpanel" : null)" id="@(multi ? $"tabpanel-{key}" : null)" aria-labelledby="@(multi ? $"tab-{key}" : null)"
+             class="@(multi ? "record-tabpanel" : null)" hidden="@(multi && tabs is not null && tabs.Hidden(key))">
+            @foreach (var section in Layout.Sections.Where(s => s.Tab == tab.Key))
+            {
+                var fields = Layout.Fields.Where(f => f.Section == section.Key && f.Visible && Shows(f)).ToList();
+                if (fields.Count == 0)
+                {
+                    continue;
+                }
+
+                <FormSection Title="@section.Label" Icon="@section.Icon">
+                    <div class="form-grid">
+                        @foreach (var field in fields)
+                        {
+                            <div class="span-@field.Span">
+                                @if (field.IsCustom)
+                                {
+                                    var custom = CustomFields.FirstOrDefault(c => "custom." + c.Key == field.Key);
+                                    if (custom is not null)
+                                    {
+                                        <CustomFieldInputs Fields="CustomFields" Values="CustomValues" Errors="Errors" Only="@custom.Key" RequiredOverride="field.Required" />
+                                    }
+                                }
+                                else
+                                {
+                                    @Field(field)
+                                }
+                            </div>
+                        }
+                    </div>
+                </FormSection>
+            }
+        </div>
+    }
+}
+
+@code {
+    private TabState? tabs;
+    private string? tabsFor;
+
+    /// <summary>Formun etkin düzeni; null iken yükleniyor iletisi çizilir.</summary>
+    [Parameter, EditorRequired] public FormLayoutDto? Layout { get; set; }
+
+    /// <summary>Yerleşik alanın girdisi: etiket, kontrol ve FieldError. Sarmalayıcı div (span) buradan gelir.</summary>
+    [Parameter, EditorRequired] public RenderFragment<FormFieldDto> Field { get; set; } = default!;
+
+    /// <summary>Alan bu formda çizilsin mi (ör. izin olmayan tutar alanı, sabit firma). Varsayılan: hepsi.</summary>
+    [Parameter] public Func<FormFieldDto, bool> Shows { get; set; } = _ => true;
+
+    [Parameter] public IReadOnlyList<CustomFieldDto> CustomFields { get; set; } = [];
+
+    [Parameter] public System.Text.Json.Nodes.JsonObject CustomValues { get; set; } = [];
+
+    [Parameter] public IReadOnlyDictionary<string, string[]>? Errors { get; set; }
+
+    [Parameter] public string TabsLabel { get; set; } = "Form bölümleri";
+
+    // Sekme anahtarları "form-" önekiyle: aynı sayfadaki kayıt sekmeleriyle (tabpanel-genel) çakışmaz.
+    private static string TabKey(string key) => "form-" + key;
+
+    private IReadOnlyList<TabItem> TabItems => Layout is null ? [] : [.. Layout.Tabs.Select(t => new TabItem(TabKey(t.Key), t.Label))];
+
+    protected override void OnParametersSet()
+    {
+        if (Layout is null || Layout.Tabs.Count == 0)
+        {
+            return;
+        }
+
+        var first = TabKey(Layout.Tabs[0].Key);
+        if (tabs is null || tabsFor != Layout.EntityKey || Layout.Tabs.All(t => TabKey(t.Key) != tabs.Active))
+        {
+            tabs = new TabState(first);
+            tabsFor = Layout.EntityKey;
+        }
+    }
+}

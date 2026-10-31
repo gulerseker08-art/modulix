@@ -1,8 +1,9 @@
 @* Lead ekleme/düzenleme formu. Durum, sorumlu ve dönüşüm alanları burada değişmez: ilgili eylemler Lead detayındadır.
    Yeni Lead kaydedilmeden önce olası eşleşmeler gösterilir; aynı e-posta tek başına engel değildir, kullanıcı yine de kaydedebilir.
-   Düzen: ikon başlıklı bölüm kartları (Talep, Talep sahibi, Eşleştirme ve sahiplik, Bütçe ve zamanlama, İhtiyaç ve açıklama). *@
+   Alanlar firmanın form düzenine (ADR-0021) göre bölüm kartlarına ve sekmelere yerleşir; her alanın girdisi burada tanımlıdır. *@
 @inject ApiClient Api
 @inject SessionState Session
+@inject FormLayouts Layouts
 
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
     <div class="form-toolbar">
@@ -15,7 +16,7 @@
         </div>
         <div class="form-toolbar-actions">
             <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@busy">
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -29,171 +30,157 @@
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
 
-    <FormSection Title="Talep" Icon="inbox">
-        <div class="form-grid">
-            <div class="span-12">
-                <label class="form-label required" for="lead-subject">Konu</label>
-                <input id="lead-subject" class="form-control" maxlength="200" required aria-required="true" @bind="form.Subject" />
-                <FieldError Field="subject" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="lead-priority">Öncelik</label>
-                <select id="lead-priority" class="form-select" @bind="form.Priority">
-                    @foreach (var priority in LeadPriority.All)
-                    {
-                        <option value="@priority">@LeadPriority.Label(priority)</option>
-                    }
-                </select>
-                <FieldError Field="priority" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="lead-source">Kaynak</label>
-                <select id="lead-source" class="form-select" @bind="form.Source">
-                    <option value="">—</option>
-                    @foreach (var source in Lookups.Choices(CrmLeadLists.Source, form.Source))
-                    {
-                        <option value="@source.Key">@source.Label</option>
-                    }
-                </select>
-                <FieldError Field="source" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="lead-source-detail">Kaynak ayrıntısı</label>
-                <input id="lead-source-detail" class="form-control" maxlength="200" @bind="form.SourceDetail" />
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="lead-product">İlgilenilen ürün/hizmet</label>
-                <input id="lead-product" class="form-control" maxlength="200" @bind="form.ProductInterest" />
-                <FieldError Field="productInterest" Errors="errors" />
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="lead-industry">Sektör</label>
-                <input id="lead-industry" class="form-control" maxlength="100" @bind="form.Industry" />
-            </div>
-        </div>
-    </FormSection>
-
-    <FormSection Title="Talep sahibi" Icon="user">
-        <div class="form-grid">
-            <div class="span-4">
-                <label class="form-label" for="lead-first">Ad</label>
-                <input id="lead-first" class="form-control" maxlength="100" @bind="form.FirstName" />
-                <FieldError Field="firstName" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="lead-last">Soyad</label>
-                <input id="lead-last" class="form-control" maxlength="100" @bind="form.LastName" />
-                <FieldError Field="lastName" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="lead-title">Unvan</label>
-                <input id="lead-title" class="form-control" maxlength="100" @bind="form.JobTitle" />
-                <FieldError Field="jobTitle" Errors="errors" />
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="lead-company">Firma adı</label>
-                <div class="input-icon">
-                    <AppIcon Name="building" Size="16" />
-                    <input id="lead-company" class="form-control" maxlength="200" @bind="form.CompanyName" />
-                </div>
-                <FieldError Field="companyName" Errors="errors" />
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="lead-email">E-posta</label>
-                <div class="input-icon">
-                    <AppIcon Name="mail" Size="16" />
-                    <input id="lead-email" class="form-control" type="email" maxlength="254" @bind="form.Email" />
-                </div>
-                <FieldError Field="email" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="lead-phone">Telefon</label>
-                <div class="input-icon">
-                    <AppIcon Name="phone" Size="16" />
-                    <input id="lead-phone" class="form-control" type="tel" maxlength="40" @bind="form.Phone" />
-                </div>
-                <FieldError Field="phone" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="lead-website">Web sitesi</label>
-                <div class="input-icon">
-                    <AppIcon Name="globe" Size="16" />
-                    <input id="lead-website" class="form-control" maxlength="300" @bind="form.Website" />
-                </div>
-                <FieldError Field="website" Errors="errors" />
-            </div>
-            <div class="span-3">
-                <label class="form-label" for="lead-city">Şehir</label>
-                <input id="lead-city" class="form-control" maxlength="100" @bind="form.City" />
-                <FieldError Field="city" Errors="errors" />
-            </div>
-            <div class="span-3">
-                <label class="form-label" for="lead-country">Ülke (2 harf)</label>
-                <input id="lead-country" class="form-control" maxlength="2" placeholder="TR" @bind="form.Country" />
-                <FieldError Field="country" Errors="errors" />
-            </div>
-        </div>
-    </FormSection>
-
-    <FormSection Title="Eşleştirme ve sahiplik" Icon="user-check" Description="Mevcut bir müşteri ya da kişiyle ilişkiliyse burada bağlanır.">
-        <div class="form-grid">
-            @if (Lead is null && Session.Can(CrmAccess.LeadsAssign))
+    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Lead formu bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
             {
-                <div class="span-4">
-                    <label class="form-label" for="lead-owner">Sorumlu</label>
+                case "subject":
+                    <label class="@f.LabelClass()" for="lead-subject">@f.Label</label>
+                    <input id="lead-subject" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Subject" />
+                    <FieldError Field="subject" Errors="errors" />
+                    break;
+                case "priority":
+                    <label class="@f.LabelClass()" for="lead-priority">@f.Label</label>
+                    <select id="lead-priority" class="form-select" @bind="form.Priority">
+                        @foreach (var priority in LeadPriority.All)
+                        {
+                            <option value="@priority">@LeadPriority.Label(priority)</option>
+                        }
+                    </select>
+                    <FieldError Field="priority" Errors="errors" />
+                    break;
+                case "source":
+                    <label class="@f.LabelClass()" for="lead-source">@f.Label</label>
+                    <select id="lead-source" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Source">
+                        <option value="">—</option>
+                        @foreach (var source in Lookups.Choices(CrmLeadLists.Source, form.Source))
+                        {
+                            <option value="@source.Key">@source.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="source" Errors="errors" />
+                    break;
+                case "sourceDetail":
+                    <label class="@f.LabelClass()" for="lead-source-detail">@f.Label</label>
+                    <input id="lead-source-detail" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.SourceDetail" />
+                    <FieldError Field="sourceDetail" Errors="errors" />
+                    break;
+                case "productInterest":
+                    <label class="@f.LabelClass()" for="lead-product">@f.Label</label>
+                    <input id="lead-product" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ProductInterest" />
+                    <FieldError Field="productInterest" Errors="errors" />
+                    break;
+                case "industry":
+                    <label class="@f.LabelClass()" for="lead-industry">@f.Label</label>
+                    <input id="lead-industry" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Industry" />
+                    <FieldError Field="industry" Errors="errors" />
+                    break;
+                case "firstName":
+                    <label class="@f.LabelClass()" for="lead-first">@f.Label</label>
+                    <input id="lead-first" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.FirstName" />
+                    <FieldError Field="firstName" Errors="errors" />
+                    break;
+                case "lastName":
+                    <label class="@f.LabelClass()" for="lead-last">@f.Label</label>
+                    <input id="lead-last" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.LastName" />
+                    <FieldError Field="lastName" Errors="errors" />
+                    break;
+                case "jobTitle":
+                    <label class="@f.LabelClass()" for="lead-title">@f.Label</label>
+                    <input id="lead-title" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.JobTitle" />
+                    <FieldError Field="jobTitle" Errors="errors" />
+                    break;
+                case "companyName":
+                    <label class="@f.LabelClass()" for="lead-company">@f.Label</label>
+                    <div class="input-icon">
+                        <AppIcon Name="building" Size="16" />
+                        <input id="lead-company" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.CompanyName" />
+                    </div>
+                    <FieldError Field="companyName" Errors="errors" />
+                    break;
+                case "email":
+                    <label class="@f.LabelClass()" for="lead-email">@f.Label</label>
+                    <div class="input-icon">
+                        <AppIcon Name="mail" Size="16" />
+                        <input id="lead-email" class="form-control" type="email" maxlength="254" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Email" />
+                    </div>
+                    <FieldError Field="email" Errors="errors" />
+                    break;
+                case "phone":
+                    <label class="@f.LabelClass()" for="lead-phone">@f.Label</label>
+                    <div class="input-icon">
+                        <AppIcon Name="phone" Size="16" />
+                        <input id="lead-phone" class="form-control" type="tel" maxlength="40" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Phone" />
+                    </div>
+                    <FieldError Field="phone" Errors="errors" />
+                    break;
+                case "website":
+                    <label class="@f.LabelClass()" for="lead-website">@f.Label</label>
+                    <div class="input-icon">
+                        <AppIcon Name="globe" Size="16" />
+                        <input id="lead-website" class="form-control" maxlength="300" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Website" />
+                    </div>
+                    <FieldError Field="website" Errors="errors" />
+                    break;
+                case "city":
+                    <label class="@f.LabelClass()" for="lead-city">@f.Label</label>
+                    <input id="lead-city" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.City" />
+                    <FieldError Field="city" Errors="errors" />
+                    break;
+                case "country":
+                    <label class="@f.LabelClass()" for="lead-country">@f.Label</label>
+                    <input id="lead-country" class="form-control" maxlength="2" placeholder="TR" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Country" />
+                    <FieldError Field="country" Errors="errors" />
+                    break;
+                case "ownerId":
+                    <label class="@f.LabelClass()" for="lead-owner">@f.Label</label>
                     <LookupPicker Id="lead-owner" LookupKey="crm.lead.owner" @bind-Value="form.OwnerId" Placeholder="Ben" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
                     <FieldError Field="ownerId" Errors="errors" />
-                </div>
+                    break;
+                case "companyId":
+                    <label class="@f.LabelClass()" for="lead-existing-company">@f.Label</label>
+                    <LookupPicker Id="lead-existing-company" LookupKey="crm.lead.company" @bind-Value="form.CompanyId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("companyId") == true)" />
+                    <FieldError Field="companyId" Errors="errors" />
+                    break;
+                case "contactId":
+                    <label class="@f.LabelClass()" for="lead-existing-contact">@f.Label</label>
+                    <LookupPicker Id="lead-existing-contact" LookupKey="crm.lead.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
+                    <FieldError Field="contactId" Errors="errors" />
+                    break;
+                case "estimatedBudget":
+                    <label class="@f.LabelClass()" for="lead-budget">@f.Label</label>
+                    <input id="lead-budget" class="form-control" type="number" step="0.01" min="0" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EstimatedBudget" />
+                    <small class="text-muted">Bilinmiyorsa boş bırakın.</small>
+                    <FieldError Field="estimatedBudget" Errors="errors" />
+                    break;
+                case "currency":
+                    <label class="@f.LabelClass()" for="lead-currency">@f.Label</label>
+                    <input id="lead-currency" class="form-control" maxlength="3" @bind="form.Currency" />
+                    <FieldError Field="currency" Errors="errors" />
+                    break;
+                case "targetPurchaseDate":
+                    <label class="@f.LabelClass()" for="lead-target">@f.Label</label>
+                    <input id="lead-target" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.TargetPurchaseDate" />
+                    <FieldError Field="targetPurchaseDate" Errors="errors" />
+                    break;
+                case "needDescription":
+                    <label class="@f.LabelClass()" for="lead-need">@f.Label</label>
+                    <textarea id="lead-need" class="form-control" rows="2" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NeedDescription"></textarea>
+                    <FieldError Field="needDescription" Errors="errors" />
+                    break;
+                case "description":
+                    <label class="@f.LabelClass()" for="lead-description">@f.Label</label>
+                    <textarea id="lead-description" class="form-control" rows="3" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                    break;
             }
-            <div class="span-4">
-                <label class="form-label" for="lead-existing-company">Mevcut müşteri firması</label>
-                <LookupPicker Id="lead-existing-company" LookupKey="crm.lead.company" @bind-Value="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("companyId") == true)" />
-                <FieldError Field="companyId" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="lead-existing-contact">Mevcut kişi</label>
-                <LookupPicker Id="lead-existing-contact" LookupKey="crm.lead.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
-                <FieldError Field="contactId" Errors="errors" />
-            </div>
-        </div>
-    </FormSection>
-
-    <FormSection Title="Bütçe ve zamanlama" Icon="coins">
-        <div class="form-grid">
-            <div class="span-4">
-                <label class="form-label" for="lead-budget">Tahmini bütçe (bilinmiyorsa boş)</label>
-                <input id="lead-budget" class="form-control" type="number" step="0.01" min="0" @bind="form.EstimatedBudget" />
-                <FieldError Field="estimatedBudget" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="lead-currency">Para birimi</label>
-                <input id="lead-currency" class="form-control" maxlength="3" @bind="form.Currency" />
-                <FieldError Field="currency" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="lead-target">Hedef satın alma tarihi</label>
-                <input id="lead-target" class="form-control" type="date" @bind="form.TargetPurchaseDate" />
-                <FieldError Field="targetPurchaseDate" Errors="errors" />
-            </div>
-        </div>
-    </FormSection>
-
-    <FormSection Title="İhtiyaç ve açıklama" Icon="message-square">
-        <div class="form-grid">
-            <div class="span-12">
-                <label class="form-label" for="lead-need">İhtiyaç</label>
-                <textarea id="lead-need" class="form-control" rows="2" maxlength="4000" @bind="form.NeedDescription"></textarea>
-                <FieldError Field="needDescription" Errors="errors" />
-            </div>
-            <div class="span-12">
-                <label class="form-label" for="lead-description">Açıklama / talep metni</label>
-                <textarea id="lead-description" class="form-control" rows="3" maxlength="4000" @bind="form.Description"></textarea>
-                <FieldError Field="description" Errors="errors" />
-            </div>
-            <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
-        </div>
-    </FormSection>
+        </Field>
+    </LayoutForm>
 
     @if (matches is { Count: > 0 })
     {
@@ -212,7 +199,7 @@
     }
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@busy">@(matches is { Count: > 0 } ? "Yine de kaydet" : "Kaydet")</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@(matches is { Count: > 0 } ? "Yine de kaydet" : "Kaydet")</button>
         <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
         @if (Lead is not null && Session.Can(CrmAccess.LeadsDelete) && Lead.Status != LeadStatus.Converted)
         {
@@ -222,6 +209,19 @@
 </form>
 
 @code {
+    private FormLayoutDto? layout;
+    private string? layoutError;
+
+    /// <summary>Firmanın form düzeni (ADR-0021): bölüm, sekme, sıra, genişlik, zorunluluk. Yüklenemezse form kaydedilemez.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(CrmEntityKeys.Lead);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    // Sorumlu yalnızca yeni Lead açarken ve atama izniyle seçilir; sonrası Lead detayındaki atama eylemidir.
+    private bool Shows(FormFieldDto field) => field.Key != "ownerId" || (Lead is null && Session.Can(CrmAccess.LeadsAssign));
+
     private const string Url = "/api/crm/leads";
 
     private LeadForm form = new();

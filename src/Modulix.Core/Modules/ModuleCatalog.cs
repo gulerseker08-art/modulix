@@ -113,6 +113,8 @@ public sealed partial class ModuleCatalog
                 }
             }
 
+            RegisterForms(module);
+
             foreach (var access in module.SharedRecordAccess)
             {
                 if (!SharedEntities.All.Contains(access.EntityKey)

@@ -1,9 +1,10 @@
 @* Aktivite ekleme/düzenleme formu; Aktiviteler sayfası, firma ve Lead detay sayfaları (çekmecede) kullanır. Durum, tamamlanma ve
    sorumlu değişikliği buradan yapılmaz: bunlar ayrı eylemlerdir (ActivityActions). Yeni kayıtta "geçmişte tamamlandı" işaretlenirse
    geçmiş tarihli bir etkileşim kaydı açılır. Saatler firmanın saat dilimindedir; tüm gün etkinliği yalnızca takvim günüdür.
-   Düzen: bölüm kartları — Aktivite, Zaman, İlişkili kayıtlar, Yer ve ayrıntılar (çekmecede çizgiyle ayrılır). *@
+   Alanlar firmanın form düzenine (ADR-0021) göre bölümlere yerleşir; çekmecede bölümler çizgiyle ayrılır. *@
 @inject ApiClient Api
 @inject SessionState Session
+@inject FormLayouts Layouts
 
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
     <div class="form-toolbar">
@@ -12,7 +13,7 @@
         </div>
         <div class="form-toolbar-actions">
             <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
         </div>
     </div>
 
@@ -20,183 +21,178 @@
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
 
-    <FormSection Title="Aktivite" Icon="activity">
-        <div class="form-grid">
-            <div class="span-12">
-                <label class="form-label required" for="subject">Konu</label>
-                <input id="subject" class="form-control" maxlength="@CrmLimits.TextMaxLength" required aria-required="true" @bind="form.Subject" />
-                <FieldError Field="subject" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="type">Aktivite türü</label>
-                <select id="type" class="form-select" @bind="form.Type">
-                    @foreach (var type in Lookups.Choices(CrmLists.ActivityType, source?.Type))
-                    {
-                        <option value="@type.Key">@type.Label</option>
-                    }
-                </select>
-                <FieldError Field="type" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="priority">Öncelik</label>
-                <select id="priority" class="form-select" @bind="form.Priority">
-                    @foreach (var priority in new[] { ActivityPriority.Low, ActivityPriority.Normal, ActivityPriority.High, ActivityPriority.Urgent })
-                    {
-                        <option value="@priority">@ActivityLabels.Priority(priority)</option>
-                    }
-                </select>
-                <FieldError Field="priority" Errors="errors" />
-            </div>
-            <div class="span-4">
-                <label class="form-label" for="dueAt">Son tarih</label>
-                <input id="dueAt" class="form-control" type="datetime-local" @bind="form.DueAt" />
-                <FieldError Field="dueAt" Errors="errors" />
-            </div>
-        </div>
-    </FormSection>
-
-    <FormSection Title="Zaman" Icon="calendar">
-        <div class="form-grid">
-            <div class="form-check-row span-12">
-                <input id="allday" class="form-check-input" type="checkbox" @bind="form.IsAllDay" />
-                <label class="form-check-label" for="allday">Tüm gün</label>
-            </div>
-            @if (form.IsAllDay)
+    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Aktivite formu bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
             {
-                <div class="span-6">
-                    <label class="form-label" for="startDate">Başlangıç günü</label>
-                    <input id="startDate" class="form-control" type="date" @bind="form.StartDate" />
-                    <FieldError Field="startDate" Errors="errors" />
-                </div>
-                <div class="span-6">
-                    <label class="form-label" for="endDate">Bitiş günü</label>
-                    <input id="endDate" class="form-control" type="date" @bind="form.EndDate" />
-                    <FieldError Field="endDate" Errors="errors" />
-                </div>
-            }
-            else
-            {
-                <div class="span-6">
-                    <label class="form-label" for="startAt">Başlangıç (zaman bloğu)</label>
-                    <input id="startAt" class="form-control" type="datetime-local" @bind="form.StartAt" />
-                    <FieldError Field="startAt" Errors="errors" />
-                </div>
-                <div class="span-6">
-                    <label class="form-label" for="endAt">Bitiş</label>
-                    <input id="endAt" class="form-control" type="datetime-local" @bind="form.EndAt" />
-                    <FieldError Field="endAt" Errors="errors" />
-                </div>
-            }
-            <FieldError Field="timeZone" Errors="errors" />
-            <div class="span-4">
-                <label class="form-label" for="estimate">Tahmini süre (dk)</label>
-                <input id="estimate" class="form-control" type="number" min="1" @bind="form.EstimatedMinutes" />
-                <FieldError Field="estimatedMinutes" Errors="errors" />
-            </div>
-        </div>
-    </FormSection>
-
-    <FormSection Title="İlişkili kayıtlar" Icon="users">
-        <div class="form-grid">
-            <div class="span-6">
-                <label class="form-label" for="ownerId">Atanan kullanıcı</label>
-                @if (Activity is null)
-                {
-                    <LookupPicker Id="ownerId" LookupKey="crm.activity.owner" @bind-Value="form.OwnerId" Placeholder="Ben" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
-                }
-                else
-                {
-                    <input id="ownerId" class="form-control" value="@Lookups.MemberName(Activity.OwnerId)" disabled />
-                    <small class="text-muted">Sorumlu "Yeniden ata" eylemiyle değişir.</small>
-                }
-                <FieldError Field="ownerId" Errors="errors" />
-            </div>
-            @if (FixedCompanyId is null)
-            {
-                <div class="span-6">
-                    <label class="form-label" for="companyId">İlgili firma</label>
-                    <LookupPicker Id="companyId" LookupKey="crm.activity.company" @bind-Value="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("companyId") == true)" />
-                    <FieldError Field="companyId" Errors="errors" />
-                </div>
-            }
-            <div class="span-6">
-                <label class="form-label" for="contactId">İlgili kişi</label>
-                <LookupPicker Id="contactId" LookupKey="crm.activity.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
-                <FieldError Field="contactId" Errors="errors" />
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="opportunityId">Fırsat</label>
-                <LookupPicker Id="opportunityId" LookupKey="crm.activity.opportunity" @bind-Value="form.OpportunityId" ParentId="form.CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("opportunityId") == true)" />
-                <FieldError Field="opportunityId" Errors="errors" />
-            </div>
-        </div>
-    </FormSection>
-
-    <FormSection Title="Yer ve ayrıntılar" Icon="map-pin">
-        <div class="form-grid">
-            <div class="span-6">
-                <label class="form-label" for="location">Konum</label>
-                <div class="input-icon">
-                    <AppIcon Name="map-pin" Size="16" />
-                    <input id="location" class="form-control" maxlength="300" @bind="form.Location" />
-                </div>
-                <FieldError Field="location" Errors="errors" />
-            </div>
-            <div class="span-6">
-                <label class="form-label" for="online">Toplantı bağlantısı</label>
-                <div class="input-icon">
-                    <AppIcon Name="globe" Size="16" />
-                    <input id="online" class="form-control" maxlength="500" @bind="form.OnlineMeetingUrl" />
-                </div>
-                <FieldError Field="onlineMeetingUrl" Errors="errors" />
-            </div>
-            <div class="form-check-row span-12">
-                <input id="private" class="form-check-input" type="checkbox" @bind="form.IsPrivate" />
-                <label class="form-check-label" for="private">Özel (diğerleri yalnızca meşgul görür)</label>
-            </div>
-            @if (Activity is null && Session.Can(CrmAccess.ActivitiesWrite))
-            {
-                <div class="form-check-row span-12">
-                    <input id="completed" class="form-check-input" type="checkbox" @bind="form.LogAsDone" />
-                    <label class="form-check-label" for="completed">Geçmişte gerçekleşti (tamamlanmış etkileşim olarak kaydet)</label>
-                </div>
-                @if (form.LogAsDone)
-                {
-                    <div class="span-6">
-                        <label class="form-label" for="doneAt">Gerçekleşme zamanı</label>
-                        <input id="doneAt" class="form-control" type="datetime-local" @bind="form.DoneAt" />
-                        <FieldError Field="completedAt" Errors="errors" />
+                case "subject":
+                    <label class="@f.LabelClass()" for="subject">@f.Label</label>
+                    <input id="subject" class="form-control" maxlength="@CrmLimits.TextMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Subject" />
+                    <FieldError Field="subject" Errors="errors" />
+                    break;
+                case "type":
+                    <label class="@f.LabelClass()" for="type">@f.Label</label>
+                    <select id="type" class="form-select" @bind="form.Type">
+                        @foreach (var type in Lookups.Choices(CrmLists.ActivityType, source?.Type))
+                        {
+                            <option value="@type.Key">@type.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="type" Errors="errors" />
+                    break;
+                case "priority":
+                    <label class="@f.LabelClass()" for="priority">@f.Label</label>
+                    <select id="priority" class="form-select" @bind="form.Priority">
+                        @foreach (var priority in new[] { ActivityPriority.Low, ActivityPriority.Normal, ActivityPriority.High, ActivityPriority.Urgent })
+                        {
+                            <option value="@priority">@ActivityLabels.Priority(priority)</option>
+                        }
+                    </select>
+                    <FieldError Field="priority" Errors="errors" />
+                    break;
+                case "dueAt":
+                    <label class="@f.LabelClass()" for="dueAt">@f.Label</label>
+                    <input id="dueAt" class="form-control" type="datetime-local" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.DueAt" />
+                    <FieldError Field="dueAt" Errors="errors" />
+                    break;
+                case "isAllDay":
+                    <div class="form-check-row">
+                        <input id="allday" class="form-check-input" type="checkbox" @bind="form.IsAllDay" />
+                        <label class="form-check-label" for="allday">@f.Label</label>
                     </div>
-                    @if (form.Type is ActivityType.Call or ActivityType.Meeting or ActivityType.Visit)
+                    break;
+                case "startAt":
+                    @if (form.IsAllDay)
                     {
-                        <div class="span-6">
-                            <label class="form-label" for="outcome">Sonuç</label>
-                            <select id="outcome" class="form-select" @bind="form.Outcome">
-                                <option value="@ActivityOutcome.Reached">@ActivityOutcome.Label(ActivityOutcome.Reached)</option>
-                                <option value="@ActivityOutcome.NoAnswer">@ActivityOutcome.Label(ActivityOutcome.NoAnswer)</option>
-                            </select>
-                            <small class="text-muted">İlk temas yalnızca gerçekleşen temastan (ulaşılan arama, yapılan toplantı) sayılır.</small>
-                            <FieldError Field="outcome" Errors="errors" />
+                        <label class="@f.LabelClass()" for="startDate">Başlangıç günü</label>
+                        <input id="startDate" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.StartDate" />
+                        <FieldError Field="startDate" Errors="errors" />
+                    }
+                    else
+                    {
+                        <label class="@f.LabelClass()" for="startAt">Başlangıç (zaman bloğu)</label>
+                        <input id="startAt" class="form-control" type="datetime-local" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.StartAt" />
+                        <FieldError Field="startAt" Errors="errors" />
+                    }
+                    <FieldError Field="timeZone" Errors="errors" />
+                    break;
+                case "endAt":
+                    @if (form.IsAllDay)
+                    {
+                        <label class="@f.LabelClass()" for="endDate">Bitiş günü</label>
+                        <input id="endDate" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EndDate" />
+                        <FieldError Field="endDate" Errors="errors" />
+                    }
+                    else
+                    {
+                        <label class="@f.LabelClass()" for="endAt">Bitiş</label>
+                        <input id="endAt" class="form-control" type="datetime-local" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EndAt" />
+                        <FieldError Field="endAt" Errors="errors" />
+                    }
+                    break;
+                case "estimatedMinutes":
+                    <label class="@f.LabelClass()" for="estimate">@f.Label</label>
+                    <input id="estimate" class="form-control" type="number" min="1" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EstimatedMinutes" />
+                    <FieldError Field="estimatedMinutes" Errors="errors" />
+                    break;
+                case "ownerId":
+                    <label class="@f.LabelClass()" for="ownerId">@f.Label</label>
+                    @if (Activity is null)
+                    {
+                        <LookupPicker Id="ownerId" LookupKey="crm.activity.owner" @bind-Value="form.OwnerId" Placeholder="Ben" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
+                    }
+                    else
+                    {
+                        <input id="ownerId" class="form-control" value="@Lookups.MemberName(Activity.OwnerId)" disabled />
+                        <small class="text-muted">Sorumlu "Yeniden ata" eylemiyle değişir.</small>
+                    }
+                    <FieldError Field="ownerId" Errors="errors" />
+                    break;
+                case "companyId":
+                    <label class="@f.LabelClass()" for="companyId">@f.Label</label>
+                    <LookupPicker Id="companyId" LookupKey="crm.activity.company" @bind-Value="form.CompanyId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("companyId") == true)" />
+                    <FieldError Field="companyId" Errors="errors" />
+                    break;
+                case "contactId":
+                    <label class="@f.LabelClass()" for="contactId">@f.Label</label>
+                    <LookupPicker Id="contactId" LookupKey="crm.activity.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
+                    <FieldError Field="contactId" Errors="errors" />
+                    break;
+                case "opportunityId":
+                    <label class="@f.LabelClass()" for="opportunityId">@f.Label</label>
+                    <LookupPicker Id="opportunityId" LookupKey="crm.activity.opportunity" @bind-Value="form.OpportunityId" ParentId="form.CompanyId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("opportunityId") == true)" />
+                    <FieldError Field="opportunityId" Errors="errors" />
+                    break;
+                case "location":
+                    <label class="@f.LabelClass()" for="location">@f.Label</label>
+                    <div class="input-icon">
+                        <AppIcon Name="map-pin" Size="16" />
+                        <input id="location" class="form-control" maxlength="300" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Location" />
+                    </div>
+                    <FieldError Field="location" Errors="errors" />
+                    break;
+                case "onlineMeetingUrl":
+                    <label class="@f.LabelClass()" for="online">@f.Label</label>
+                    <div class="input-icon">
+                        <AppIcon Name="globe" Size="16" />
+                        <input id="online" class="form-control" maxlength="500" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.OnlineMeetingUrl" />
+                    </div>
+                    <FieldError Field="onlineMeetingUrl" Errors="errors" />
+                    break;
+                case "isPrivate":
+                    <div class="form-check-row">
+                        <input id="private" class="form-check-input" type="checkbox" @bind="form.IsPrivate" />
+                        <label class="form-check-label" for="private">Özel (diğerleri yalnızca meşgul görür)</label>
+                    </div>
+                    break;
+                case "logAsDone":
+                    <div class="form-check-row">
+                        <input id="completed" class="form-check-input" type="checkbox" @bind="form.LogAsDone" />
+                        <label class="form-check-label" for="completed">Geçmişte gerçekleşti (tamamlanmış etkileşim olarak kaydet)</label>
+                    </div>
+                    @if (form.LogAsDone)
+                    {
+                        <div class="form-grid mt-2">
+                            <div class="span-6">
+                                <label class="form-label" for="doneAt">Gerçekleşme zamanı</label>
+                                <input id="doneAt" class="form-control" type="datetime-local" @bind="form.DoneAt" />
+                                <FieldError Field="completedAt" Errors="errors" />
+                            </div>
+                            @if (form.Type is ActivityType.Call or ActivityType.Meeting or ActivityType.Visit)
+                            {
+                                <div class="span-6">
+                                    <label class="form-label" for="outcome">Sonuç</label>
+                                    <select id="outcome" class="form-select" @bind="form.Outcome">
+                                        <option value="@ActivityOutcome.Reached">@ActivityOutcome.Label(ActivityOutcome.Reached)</option>
+                                        <option value="@ActivityOutcome.NoAnswer">@ActivityOutcome.Label(ActivityOutcome.NoAnswer)</option>
+                                    </select>
+                                    <small class="text-muted">İlk temas yalnızca gerçekleşen temastan (ulaşılan arama, yapılan toplantı) sayılır.</small>
+                                    <FieldError Field="outcome" Errors="errors" />
+                                </div>
+                            }
+                            else if (form.Type == ActivityType.Email)
+                            {
+                                <input type="hidden" value="@ActivityOutcome.Sent" />
+                            }
                         </div>
                     }
-                    else if (form.Type == ActivityType.Email)
-                    {
-                        <input type="hidden" value="@ActivityOutcome.Sent" />
-                    }
-                }
+                    break;
+                case "notes":
+                    <label class="@f.LabelClass()" for="notes">@f.Label</label>
+                    <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
+                    <FieldError Field="notes" Errors="errors" />
+                    break;
             }
-            <div class="span-12">
-                <label class="form-label" for="notes">Açıklama</label>
-                <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
-                <FieldError Field="notes" Errors="errors" />
-            </div>
-            <CustomFieldInputs Fields="CustomFields" Values="form.Custom" Errors="errors" />
-        </div>
-    </FormSection>
+        </Field>
+    </LayoutForm>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
         <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
         @if (Activity is not null)
         {
@@ -206,6 +202,24 @@
 </form>
 
 @code {
+    private FormLayoutDto? layout;
+    private string? layoutError;
+
+    /// <summary>Firmanın form düzeni (ADR-0021): bölüm, sekme, sıra, genişlik, zorunluluk. Yüklenemezse form kaydedilemez.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(CrmEntityKeys.Activity);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    // Firma sabitse (firma detayı) seçilmez; geçmişe kayıt yalnızca yeni aktivitede ve yazma izniyle.
+    private bool Shows(FormFieldDto field) => field.Key switch
+    {
+        "companyId" => FixedCompanyId is null,
+        "logAsDone" => Activity is null && Session.Can(CrmAccess.ActivitiesWrite),
+        _ => true,
+    };
+
     private const string Url = "/api/crm/activities";
 
     private ActivityForm form = new();

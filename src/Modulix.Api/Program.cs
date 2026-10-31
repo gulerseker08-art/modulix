@@ -154,6 +154,7 @@ app.MapTeamEndpoints();
 app.MapCustomFieldEndpoints();
 app.MapChoiceListEndpoints();
 app.MapLookupEndpoints();
+app.MapFormLayoutEndpoints();
 app.MapSectorProfileEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
