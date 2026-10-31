@@ -50,7 +50,7 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | Navigation | Tamam | `Layout/NavMenu.razor(.css)`, `Components/AppLauncher.razor`, `Components/AppIcon.razor`, `Components/BrandLogo.razor` | Statik önizleme (açık, koyu, daraltılmış) | Menü bugün yalnızca aktif modülün sayfalarını gösterir (mevcut davranış korundu) |
 | Form Components | Kısmen | `app.css` (form durumları, `required`, `aria-invalid`) | Önizlemede default/invalid/read-only/disabled | Ayrı Razor bileşenleri (TextField vb.), FileUpload, RichText, kaydedilmemiş değişiklik uyarısı, Kaydet ve Kapat/Yeni |
 | DataGrid | Kısmen | `app.css` (`record-table`) | Önizleme; telefonda kart listesi | Kolon görünürlüğü/yeniden boyutlandırma, kayıtlı görünüm, dışa aktarma, ortak bileşen |
-| Firma/Kişi | Tamam (faz 4) | `Pages/Crm/CompanyDetail.razor`, `ContactDetail.razor`, `Components/TabBar.razor`, `TabState.cs` | CI (bkz. Faz 4); statik önizleme | Liste ekranları PageHeader + token düzeyinde; düzenleme formu (CompanyEditor/ContactEditor) tam sayfa olarak kaldı |
+| Firma/Kişi | Tamam (faz 4) | `Pages/Crm/CompanyDetail.razor`, `ContactDetail.razor`, `Components/TabBar.razor`, `TabState.cs` | CI çalışma 41158356211 ✓ (derleme + 817 test); statik önizleme | Liste ekranları PageHeader + token düzeyinde; düzenleme formu (CompanyEditor/ContactEditor) tam sayfa olarak kaldı |
 | Aktiviteler | Tamam (faz 2) | `Pages/Crm/Activities.razor`, `Components/ActivityCalendar.razor`, `Components/TodayActivities.razor`, `Components/Drawer.razor`, `Services/ActivityLabels.cs` | CI çalışma 41128200581 ✓ (derleme + 817 test); statik önizleme | Saat çizelgesinde blok sürükleyerek saat değiştirme ve yeniden boyutlandırma yok (gün değiştirme var); detay çekmecesinde ayrı sekmeler yok |
 | Fırsatlar | Tamam (faz 3) | `Pages/Crm/OpportunityDetail.razor`, `Components/SalesPipeline.razor` | CI çalışma 41156483217 ✓ (derleme + 817 test, yeniden çalıştırmada); statik önizleme | Fırsat listesi/pano ekranı yalnızca token/tema düzeyinde |
 | Teklifler | Token/tema | — | — | Detay düzeni |
@@ -119,7 +119,7 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | Karar vericiler / rakipler | Korundu | Mevcut kişi rolleri ve rakip bölümleri aynen; ilişkisel lookup (`LookupPicker`) kullanılıyor |
 | Takip et | Yok | Altyapıda takip/abonelik yok |
 
-**CI notu (faz 3):** İlk çalıştırmada `PlatformAdministrationTests.Failed_opening_creates_nothing_and_sends_no_email` son adımda 201 yerine 500 döndü. Bu faz yalnızca `Modulix.Web`, README ve belgeleri değiştirdi; aynı test önceki iki çalışmada geçmişti ve yalnızca başarısız iş yeniden çalıştırılınca bütün testler geçti. Test kararsızdır (flaky); ayrı bir iş kalemi olarak incelenmelidir (aynı kısa adla ikinci tenant açılışı sırasında sunucu hatası).
+**CI notu (faz 3):** İlk çalıştırmada `PlatformAdministrationTests.Failed_opening_creates_nothing_and_sends_no_email` son adımda 201 yerine 500 döndü. Bu faz yalnızca `Modulix.Web`, README ve belgeleri değiştirdi; aynı test önceki iki çalışmada geçmişti ve yalnızca başarısız iş yeniden çalıştırılınca bütün testler geçti. Test kararsızdır (flaky); ayrı bir iş kalemi olarak incelenmelidir (aynı kısa adla ikinci tenant açılışı sırasında sunucu hatası). PR #77 çalışmasında da `EventTests.Concurrent_dispatchers_complete_each_delivery_once` bir kez SQL Server deadlock'u ile kırıldı, yeniden çalıştırmada geçti.
 
 
 ## Faz 4 — Firma ve kişi detayı
