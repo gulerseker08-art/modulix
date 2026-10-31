@@ -103,11 +103,11 @@ await check('Hazırlık', 'Bu hafta için örnek aktiviteler API ile eklenir', a
     ids.opportunity = opps.items?.find(o => o.title?.startsWith('Depo'))?.id ?? opps.items?.[0]?.id;
     ids.contact = contacts.items?.[0]?.id;
     const samples = [
-        { subject: 'Ekip toplantısı', type: 'Meeting', startAt: istanbulIso(0, 9), endAt: istanbulIso(0, 10) },
-        { subject: 'Saha ziyareti', type: 'Meeting', startAt: istanbulIso(0, 9, 30), endAt: istanbulIso(0, 10, 30), companyId: ids.company },
-        { subject: 'Bütçe teyidi', type: 'Call', startAt: istanbulIso(0, 14, 30), endAt: istanbulIso(0, 15, 15), companyId: ids.company, opportunityId: ids.opportunity },
+        { subject: 'Ekip toplantısı', type: 'Meeting', startAt: istanbulIso(0, 9), endAt: istanbulIso(0, 10), timeZone: 'Europe/Istanbul' },
+        { subject: 'Saha ziyareti', type: 'Meeting', startAt: istanbulIso(0, 9, 30), endAt: istanbulIso(0, 10, 30), timeZone: 'Europe/Istanbul', companyId: ids.company },
+        { subject: 'Bütçe teyidi', type: 'Call', startAt: istanbulIso(0, 14, 30), endAt: istanbulIso(0, 15, 15), timeZone: 'Europe/Istanbul', companyId: ids.company, opportunityId: ids.opportunity },
         { subject: 'Teklif revizyonu', type: 'Task', dueAt: istanbulIso(0, 17), companyId: ids.company, opportunityId: ids.opportunity },
-        { subject: 'Ürün demosu', type: 'Meeting', startAt: istanbulIso(1, 11), endAt: istanbulIso(1, 12), companyId: ids.company },
+        { subject: 'Ürün demosu', type: 'Meeting', startAt: istanbulIso(1, 11), endAt: istanbulIso(1, 12), timeZone: 'Europe/Istanbul', companyId: ids.company },
     ];
     const statuses = [];
     const errors = [];
