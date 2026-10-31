@@ -29,6 +29,12 @@
                 {
                     <p class="text-muted mb-0">
                         @contract.Number · Sürüm V@(contract.CurrentVersionNo)@(contract.EffectiveVersionNo is { } ev ? $" · Yürürlükte V{ev}" : "")
+                        @if (contract.SourceQuoteNumber is not null)
+                        {
+                            <text> · Kaynak teklif: </text>
+                            @if (contract.SourceQuoteId is { } sourceQuote && Session.Can(CrmAccess.QuotesRead)) { <a href="crm/teklifler/@sourceQuote">@contract.SourceQuoteNumber V@(contract.SourceQuoteRevisionNo)</a> }
+                            else { <text>@contract.SourceQuoteNumber V@(contract.SourceQuoteRevisionNo)</text> }
+                        }
                         <span class="badge stage-@ContractLabels.EffectiveBadge(contract.EffectiveStatus)">@ContractLabels.Label(ContractLabels.Effectives, contract.EffectiveStatus)</span>
                         <span class="badge stage-open">@ContractLabels.Label(ContractLabels.Preparations, contract.PreparationStatus)</span>
                         <span class="badge stage-@ContractLabels.ApprovalBadge(contract.ApprovalStatus)">@ContractLabels.Label(ContractLabels.Approvals, contract.ApprovalStatus)</span>

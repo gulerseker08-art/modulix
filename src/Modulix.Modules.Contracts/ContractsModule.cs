@@ -208,5 +208,7 @@ public sealed class ContractsModule : IModule
         services.AddScoped<IRecordStore, ContractPartyRecordStore>();
         services.AddScoped<IRecordStore, ContractLineRecordStore>();
         services.AddScoped<IContractWorkflow, ContractWorkflow>();
+        services.AddScoped<IContractFromQuote, ContractFromQuote>();
+        services.AddScoped<IActivityLinkTarget, ContractLinkTarget>();
     }
 }

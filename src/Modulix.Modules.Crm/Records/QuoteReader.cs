@@ -38,6 +38,14 @@ internal sealed class QuoteReader(IModuleData data)
             .Select(r => new QuoteApprovalRuleInfo(r.Id, r.Version, r.Name, r.Priority, r.Currency, r.MinDiscountPercent, r.MinGrossTotal, r.ApproverId, r.Step))
             .ToListAsync(cancellationToken);
 
+    /// <summary>Firmanın ortak taraf kaydı (devir sözleşmesi için); firma yoksa null.</summary>
+    public async Task<Guid?> PartyOfCompanyAsync(Guid companyId, CancellationToken cancellationToken) =>
+        await data.Set<Company>().AsNoTracking().Where(c => c.Id == companyId).Select(c => (Guid?)c.PartyId).SingleOrDefaultAsync(cancellationToken);
+
+    /// <summary>Kişinin ortak kişi kaydı (devir sözleşmesi için); kişi yoksa null.</summary>
+    public async Task<Guid?> PersonOfContactAsync(Guid contactId, CancellationToken cancellationToken) =>
+        await data.Set<Contact>().AsNoTracking().Where(c => c.Id == contactId).Select(c => (Guid?)c.PersonId).SingleOrDefaultAsync(cancellationToken);
+
     public Task<Quote?> QuoteAsync(Guid quoteId, CancellationToken cancellationToken) =>
         data.Set<Quote>().AsNoTracking().SingleOrDefaultAsync(q => q.Id == quoteId, cancellationToken);
 

@@ -121,6 +121,7 @@ internal sealed class ContractLineRecordStore(ContractsStoreContext context) : C
         Field.Rate<ContractLine>("taxRatePercent", l => l.TaxRatePercent, (l, v) => l.TaxRatePercent = v ?? 0m),
         Field.OptionalChoice<ContractLine>("billingPeriod", BillingPeriods.All, l => l.BillingPeriod, (l, v) => l.BillingPeriod = v),
         Field.Id<ContractLine>("sourceQuoteLineKey", l => l.SourceQuoteLineKey, (l, v) => l.SourceQuoteLineKey = v).AsSystem(),
+        Field.Id<ContractLine>("sourceQuoteId", l => l.SourceQuoteId, (l, v) => l.SourceQuoteId = v).AsSystem(),
         Field.Money<ContractLine>("listAmount", l => l.ListAmount, (l, v) => l.ListAmount = v ?? 0m).AsSystem(),
         Field.Money<ContractLine>("lineDiscount", l => l.LineDiscount, (l, v) => l.LineDiscount = v ?? 0m).AsSystem(),
         Field.Money<ContractLine>("net", l => l.Net, (l, v) => l.Net = v ?? 0m).AsSystem(),
@@ -132,6 +133,7 @@ internal sealed class ContractLineRecordStore(ContractsStoreContext context) : C
     {
         ["contractId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.ContractId == id) : null,
         ["kind"] = (q, v, _) => LineKinds.All.Contains(v) ? q.Where(l => l.Kind == v) : null,
+        ["sourceQuoteId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.SourceQuoteId == id) : null,
     };
 
     protected override IOrderedQueryable<ContractLine> Order(IQueryable<ContractLine> source) => source.OrderBy(l => l.Position).ThenBy(l => l.CreatedAt);
@@ -192,6 +194,11 @@ internal sealed class ContractReader(Core.Contracts.Persistence.IModuleData data
 {
     public async Task<List<ContractEvent>> HistoryAsync(Guid contractId, CancellationToken cancellationToken) =>
         await data.Set<ContractEvent>().AsNoTracking().Where(e => e.ContractId == contractId).OrderBy(e => e.CreatedAt).ThenBy(e => e.Id).ToListAsync(cancellationToken);
+
+    /// <summary>Teklifin sözleşmelerde kullanılan kalemleri: kalem anahtarı → sözleşme. Aynı kalem ikinci kez kullanılamaz (benzersiz indeks).</summary>
+    public async Task<Dictionary<Guid, Guid>> UsedQuoteLinesAsync(Guid quoteId, CancellationToken cancellationToken) =>
+        await data.Set<ContractLine>().AsNoTracking().Where(l => l.SourceQuoteId == quoteId && l.SourceQuoteLineKey != null)
+            .Select(l => new { Key = l.SourceQuoteLineKey!.Value, l.ContractId }).ToDictionaryAsync(x => x.Key, x => x.ContractId, cancellationToken);
 
     public Task<Contract?> ContractAsync(Guid contractId, CancellationToken cancellationToken) =>
         data.Set<Contract>().AsNoTracking().SingleOrDefaultAsync(c => c.Id == contractId, cancellationToken);

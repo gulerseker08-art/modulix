@@ -1240,6 +1240,24 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<Guid?>("SourceOpportunityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SourceQuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceQuoteNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int?>("SourceQuoteRevisionNo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceQuoteSha256")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
                     b.Property<DateOnly?>("StartDate")
                         .HasColumnType("date");
 
@@ -1289,6 +1307,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "PreviousContractId");
 
                     b.HasIndex("TenantId", "SignatureStatus");
+
+                    b.HasIndex("TenantId", "SourceOpportunityId");
+
+                    b.HasIndex("TenantId", "SourceQuoteId");
 
                     b.HasIndex("TenantId", "EffectiveStatus", "EndDate");
 
@@ -1418,6 +1440,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 6)
                         .HasColumnType("decimal(18,6)");
 
+                    b.Property<Guid?>("SourceQuoteId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("SourceQuoteLineKey")
                         .HasColumnType("uniqueidentifier");
 
@@ -1459,6 +1484,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "ContractId", "StableKey")
                         .IsUnique()
                         .HasDatabaseName("UX_ContractLines_StableKey");
+
+                    b.HasIndex("TenantId", "SourceQuoteId", "SourceQuoteLineKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContractLines_SourceQuoteLine")
+                        .HasFilter("[SourceQuoteId] IS NOT NULL AND [SourceQuoteLineKey] IS NOT NULL");
 
                     b.ToTable("ContractLines", "contracts");
                 });

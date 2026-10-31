@@ -422,6 +422,15 @@
                 <QuoteSharingPanel Quote="quote" OnChanged="() => LoadAsync(quote.Id)" />
             }
 
+            @if (quote.Status == "Accepted" && Session.IsModuleEnabled(ContractsAccess.ModuleKey) && Session.Can(ContractsAccess.ContractsWrite) && Session.Can(ContractsAccess.FinancialsRead))
+            {
+                <section aria-labelledby="quote-contract-title">
+                    <h2 id="quote-contract-title">Sözleşme</h2>
+                    <p class="text-muted">Kabul edilen bu teklif revizyonundan sözleşme taslağı oluşturabilirsiniz; fiyatlar teklifin kabul anındaki halidir ve teklif sonradan değişse de sözleşmeyi etkilemez.</p>
+                    <a class="btn btn-primary" href="sozlesmeler/tekliften/@quote.Id">Sözleşme oluştur</a>
+                </section>
+            }
+
             @if (family.Count > 1)
             {
                 <section aria-labelledby="rev-title">

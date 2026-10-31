@@ -42,7 +42,17 @@ public sealed record AcceptedQuote(
     string? PaymentTerms,
     string? DeliveryTerms,
     string? CommercialTerms,
-    IReadOnlyList<AcceptedQuoteLine> Lines);
+    IReadOnlyList<AcceptedQuoteLine> Lines)
+{
+    /// <summary>
+    /// Müşterinin ortak taraf kaydı (core.party, ADR-0006). Teklif CRM firmasına bağlıdır; sözleşme gibi CRM'den bağımsız modüller ortak kaydı kullanır.
+    /// Boşsa (eski veri) devralan modül müşteriyi başka yoldan seçtirmelidir.
+    /// </summary>
+    public Guid? PartyId { get; init; }
+
+    /// <summary>Teklifin kişisinin ortak kişi kaydı (core.person); kişi yoksa boş.</summary>
+    public Guid? PersonId { get; init; }
+}
 
 /// <summary>
 /// Kabul edilmiş teklifi sonraki modüllere verir. Görünürlük çağıranın izin ve veri kapsamıyla belirlenir; teklif bulunamazsa, kapsam dışıysa
