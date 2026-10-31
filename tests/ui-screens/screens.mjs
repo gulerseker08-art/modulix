@@ -12,16 +12,24 @@ const results = [];
 const consoleErrors = [];
 let shotNo = 0;
 
-function record(area, name, ok, detail = '') {
-    results.push({ area, name, ok: !!ok, detail: String(detail ?? '') });
-    console.log(`${ok ? 'GEÇTİ ' : 'KALDI '} [${area}] ${name}${detail ? ' — ' + detail : ''}`);
+function record(area, name, ok, detail = '', skipped = false) {
+    results.push({ area, name, ok: !!ok, skipped, detail: String(detail ?? '') });
+    console.log(`${skipped ? 'ATLANDI' : ok ? 'GEÇTİ ' : 'KALDI '} [${area}] ${name}${detail ? ' — ' + detail : ''}`);
 }
+
+// Kontrol sonucu: true / açıklama metni = geçti; fail('…') = kaldı; skip('…') = veri yok, değerlendirilemedi.
+const fail = detail => ({ fail: detail });
+const skip = detail => ({ skip: detail });
 
 async function check(area, name, fn) {
     try {
         const r = await fn();
         if (r === false) {
             record(area, name, false);
+        } else if (r && typeof r === 'object' && 'fail' in r) {
+            record(area, name, false, r.fail);
+        } else if (r && typeof r === 'object' && 'skip' in r) {
+            record(area, name, true, r.skip, true);
         } else {
             record(area, name, true, typeof r === 'string' ? r : '');
         }
@@ -102,12 +110,15 @@ await check('Hazırlık', 'Bu hafta için örnek aktiviteler API ile eklenir', a
         { subject: 'Ürün demosu', type: 'Meeting', startAt: istanbulIso(1, 11), endAt: istanbulIso(1, 12), companyId: ids.company },
     ];
     const statuses = [];
+    const errors = [];
     for (const s of samples) {
         const r = await page.request.post(`${BASE}/api/crm/activities`, { data: s });
         statuses.push(r.status());
+        if (r.status() >= 400) errors.push(`${s.subject}: ${(await r.text()).slice(0, 200)}`);
     }
     const ok = statuses.filter(x => x >= 200 && x < 300).length;
-    return ok > 0 ? `${ok}/${samples.length} oluşturuldu (durumlar: ${statuses.join(',')}); firma=${!!ids.company} fırsat=${!!ids.opportunity} kişi=${!!ids.contact}` : false;
+    const detail = `${ok}/${samples.length} oluşturuldu (durumlar: ${statuses.join(',')})${errors.length ? ' · hatalar: ' + errors.join(' ;; ') : ''}`;
+    return ok === samples.length ? detail : fail(detail);
 });
 
 // ---------------------------------------------------------------- Kabuk
@@ -166,12 +177,12 @@ await check('Kabuk', 'Menüyü Daralt: menü ikonlara iner ve yenilemede korunur
     await shot(page, 'menu-daraltilmis');
     await page.click('.nav-collapse-button');
     await page.waitForFunction(() => !document.documentElement.classList.contains('sidebar-collapsed'));
-    return kept && after < before ? `genişlik ${Math.round(before)}px → ${Math.round(after)}px` : false;
+    return kept && after < before ? `genişlik ${Math.round(before)}px → ${Math.round(after)}px` : fail(`korundu=${kept}, ${before}→${after}`);
 });
 
 await check('Kabuk', 'Sol menüde aktif öğe vurgulu (Firmalar)', async () => {
     const active = await page.$eval('.nav-item a.active', el => el.textContent.trim());
-    return active.includes('Firmalar') ? `aktif: ${active}` : `aktif: ${active}`;
+    return active.includes('Firmalar') ? `aktif: ${active}` : fail(`aktif: ${active}`);
 });
 
 await check('Kabuk', 'Firmalar listesi PageHeader ile açılır', async () => {
@@ -186,7 +197,7 @@ await check('Aktiviteler', 'Varsayılan görünüm haftalık saat çizelgesi', a
     await gotoApp(page, 'crm/aktiviteler', '.kpi-grid');
     await page.waitForSelector('.cal-time', { timeout: 30000 });
     const active = await page.$eval('.segmented .chip.active', el => el.textContent.trim());
-    return active === 'Hafta' ? true : `seçili görünüm: ${active}`;
+    return active === 'Hafta' ? true : fail(`seçili görünüm: ${active}`);
 });
 
 await check('Aktiviteler', 'Özet kartları sayı gösterir', async () => {
@@ -201,22 +212,25 @@ await check('Aktiviteler', 'Saat çizelgesinde aktivite blokları ve bugün pane
     const today = await page.$$eval('.today-item', els => els.length);
     const now = await page.$$eval('.cal-now', els => els.length);
     await shot(page, 'aktiviteler-hafta');
-    return events > 0 && today > 0 ? `${events} saatli blok, ${allDay} tüm gün/son tarihli, bugün panelinde ${today}, şimdi çizgisi ${now}` : `bloklar=${events}, bugün=${today}`;
+    const d = `${events} saatli blok, ${allDay} tüm gün/son tarihli, bugün panelinde ${today}, şimdi çizgisi ${now}`;
+    return events > 0 && today > 0 ? d : fail(d);
 });
 
 await check('Aktiviteler', 'Çakışan aktiviteler yan yana (genişlik paylaşımı)', async () => {
     const widths = await page.$$eval('.cal-time-col.today .cal-event', els => els.map(e => e.style.width));
-    return widths.some(w => w && !w.startsWith('100')) ? `bugünün blok genişlikleri: ${widths.join(', ')}` : `genişlikler: ${widths.join(', ')}`;
+    if (widths.length < 2) return skip(`bugün yalnızca ${widths.length} saatli blok var; çakışma denenemedi`);
+    return widths.some(w => w && !w.startsWith('100')) ? `bugünün blok genişlikleri: ${widths.join(', ')}` : fail(`genişlikler: ${widths.join(', ')}`);
 });
 
 await check('Aktiviteler', 'Bloğa tıklayınca detay çekmecesi açılır, Escape ile kapanır', async () => {
+    if (!(await page.$('.cal-event .cal-entry'))) return fail('takvimde tıklanacak saatli blok yok');
     await page.click('.cal-event .cal-entry');
     await page.waitForSelector('.drawer .activity-panel', { timeout: 10000 });
     const focused = await page.evaluate(() => document.activeElement?.classList.contains('drawer'));
     await shot(page, 'aktivite-detay-cekmece');
     await page.keyboard.press('Escape');
     await page.waitForSelector('.drawer', { state: 'detached', timeout: 5000 });
-    return focused ? 'açılınca odak çekmecede' : 'açıldı (odak çekmecede değil)';
+    return focused ? 'açılınca odak çekmecede' : fail('açıldı ama odak çekmeceye geçmedi');
 });
 
 await check('Aktiviteler', 'Bugün panelinden detay açılır, arka plana tıklayınca kapanır', async () => {
@@ -237,7 +251,7 @@ await check('Aktiviteler', 'Yeni aktivite çekmecede açılır; Kaydet/Vazgeç g
     await shot(page, 'yeni-aktivite-cekmece');
     await page.click('.drawer .form-actions .btn-outline-secondary');
     await page.waitForSelector('.drawer', { state: 'detached', timeout: 5000 });
-    return visible ? 'aksiyonlar ekranda görünür' : 'aksiyonlar ekran dışında';
+    return visible ? 'aksiyonlar ekranda görünür' : fail('Kaydet/Vazgeç ekran dışında');
 });
 
 await check('Aktiviteler', 'Ay, Gün, Ajanda ve Liste görünümleri çizilir', async () => {
@@ -257,7 +271,7 @@ await check('Aktiviteler', '"Geciken" kartı liste görünümünü gecikenler s�
     await page.waitForTimeout(1200);
     const quick = await page.$eval('.filters[aria-label="Hızlı filtre"] .chip.active', el => el.textContent.trim());
     const mode = await page.$eval('.segmented .chip.active', el => el.textContent.trim());
-    return mode === 'Liste' && quick === 'Gecikenler' ? true : `görünüm=${mode}, süzgeç=${quick}`;
+    return mode === 'Liste' && quick === 'Gecikenler' ? true : fail(`görünüm=${mode}, süzgeç=${quick}`);
 });
 
 // ---------------------------------------------------------------- Fırsat detayı
@@ -273,19 +287,20 @@ if (ids.opportunity) {
 
     await check('Fırsat', 'Hunide başka bir açık aşamaya tıklayınca işlem paneli açılır ve aşama önseçilir', async () => {
         const target = await page.$('.pipeline-step.is-todo.cat-open button.pipeline-label');
-        if (!target) return 'tıklanabilir açık aşama yok (fırsat son açık aşamada olabilir)';
+        if (!target) return skip('tıklanabilir açık aşama yok (fırsat son açık aşamada olabilir)');
         const name = (await target.textContent()).trim();
         await target.click();
         await page.waitForSelector('#o-stage', { timeout: 5000 });
         const selected = await page.$eval('#o-stage', el => el.options[el.selectedIndex].text);
         const focused = await page.evaluate(() => document.activeElement?.id);
         await shot(page, 'firsat-asama-paneli');
-        return `tıklanan: ${name}; seçili: ${selected}; odak: ${focused}`;
+        const d = `tıklanan: ${name}; seçili: ${selected}; odak: ${focused}`;
+        return name.includes(selected) && focused === 'o-stage' ? d : fail(d);
     });
 
     await check('Fırsat', 'Huni "Kazanıldı" aşaması kazanma panelini açar', async () => {
         const won = await page.$('.pipeline-step.cat-won button.pipeline-label');
-        if (!won) return 'kazanıldı aşaması tıklanamıyor';
+        if (!won) return fail('kazanıldı aşaması tıklanamıyor');
         await won.click();
         await page.waitForSelector('#w-date', { timeout: 5000 });
         return true;
@@ -317,17 +332,18 @@ if (ids.company) {
         if (!linkBtn) return false;
         await linkBtn.click();
         await page.waitForTimeout(800);
-        const input = await page.$('#tabpanel-iliskiler input[type=text]:not([readonly]), #tabpanel-iliskiler input:not([type]):not([readonly])');
-        const marker = 'Yarım kalan not';
-        if (input) await input.fill(marker);
+        // Unvan düz metin alanıdır (kişi arama kutusu seçim yapılmadan odaktan çıkınca bilerek temizlenir).
+        const input = await page.waitForSelector('#link-title', { timeout: 5000 });
+        const marker = 'Yarım kalan unvan';
+        await input.fill(marker);
+        await page.click('#tabpanel-iliskiler .section-header h2');
         await shot(page, 'firma-iliskiler-form');
         await page.click('.record-tab:has-text("Genel bilgiler")');
         await page.waitForSelector('#tabpanel-genel:not([hidden])');
         await page.click('.record-tab:has-text("Kişiler ve ilişkiler")');
         await page.waitForSelector('#tabpanel-iliskiler:not([hidden])');
-        const still = input ? await input.inputValue() : null;
-        const formThere = await page.$$eval('#tabpanel-iliskiler form, #tabpanel-iliskiler .record-form, #tabpanel-iliskiler .inline-form', els => els.length);
-        return input ? (still === marker ? `form ve yazılan değer korundu (${formThere} form)` : `değer kayboldu: "${still}"`) : `form açık kaldı (${formThere} form; metin alanı bulunamadı)`;
+        const still = await page.$eval('#link-title', el => el.value).catch(() => null);
+        return still === marker ? 'form açık kaldı, yazılan unvan korundu' : fail(`form/değer kayboldu: "${still}"`);
     });
 
     await check('Firma', 'Fırsatlar, Aktiviteler ve Geçmiş sekmeleri açılır', async () => {
@@ -393,7 +409,7 @@ for (const [name, route, sel] of mobileRoutes) {
         await gotoApp(m, route, sel);
         const o = await overflowX(m);
         await shot(m, `mobil-${name}`, true);
-        return o <= 0 ? true : `${o}px yatay taşma`;
+        return o <= 0 ? true : fail(`${o}px yatay taşma`);
     });
 }
 await check('Mobil', 'Menü düğmesi sol menüyü açar', async () => {
@@ -410,7 +426,7 @@ if (ids.opportunity) {
         await m.waitForSelector('.drawer', { timeout: 10000 });
         const w = await m.$eval('.drawer', el => Math.round(el.getBoundingClientRect().width));
         await shot(m, 'mobil-cekmece');
-        return w >= 389 ? `genişlik ${w}px` : `genişlik ${w}px (tam ekran değil)`;
+        return w >= 389 ? `genişlik ${w}px` : fail(`genişlik ${w}px (tam ekran değil)`);
     });
 }
 
@@ -420,15 +436,16 @@ await check('Genel', 'Blazor hata çubuğu hiç görünmedi', async () => !(awai
 await browser.close();
 
 const failed = results.filter(r => !r.ok);
+const skipped = results.filter(r => r.skipped);
 fs.writeFileSync(path.join(OUT, 'sonuc.json'), JSON.stringify({ base: BASE, results, consoleErrors }, null, 2));
 const md = [
     `# Ekran testi sonucu`,
     ``,
-    `${results.length - failed.length}/${results.length} kontrol geçti.`,
+    `${results.length - failed.length - skipped.length}/${results.length} kontrol geçti, ${failed.length} kaldı, ${skipped.length} atlandı.`,
     ``,
     `| Alan | Kontrol | Sonuç | Ayrıntı |`,
     `|---|---|---|---|`,
-    ...results.map(r => `| ${r.area} | ${r.name} | ${r.ok ? 'Geçti' : '**Kaldı**'} | ${r.detail.replace(/\|/g, '/')} |`),
+    ...results.map(r => `| ${r.area} | ${r.name} | ${r.skipped ? 'Atlandı' : r.ok ? 'Geçti' : '**Kaldı**'} | ${r.detail.replace(/\|/g, '/')} |`),
     ``,
     `## Tarayıcı konsol hataları (${consoleErrors.length})`,
     ...consoleErrors.slice(0, 40).map(e => `- ${e.replace(/\n/g, ' ')}`),
