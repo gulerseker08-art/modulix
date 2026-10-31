@@ -55,4 +55,10 @@ Durum yalnızca renkle anlatılmaz: hata iletisi metin olarak görünür, zorunl
 
 ## Sekmeler
 
-Detay sayfalarında bölüm geçişi `filters` + `chip` (`aria-pressed`) ya da açılıp kapanan `sub-section` ile yapılır. Aktif öğe dolu birincil renkle gösterilir; yetkisi olmayan bölüm hiç çizilmez (`Session.Can(...)`).
+Kayıt sayfalarında bölümler `TabBar` + `TabState` ile sekmelere ayrılır (Firma, Kişi). Kurallar:
+
+- Sekme listesi yetkiye göre kurulur; görme izni olmayan bölümün sekmesi hiç eklenmez (sunucu yine denetler).
+- Sekme ilk seçildiğinde çizilir ve verisini o an yükler; başka sekmeye geçince DOM'da gizli kalır. Böylece açık bir düzenleme formu sekme değiştirince kaybolmaz.
+- Etkin sekme birincil renk alt çizgi ve koyu metinle gösterilir; sayı rozeti sunucudaki toplamdır.
+- Telefonda sekme çubuğu yatay kayar.
+- Durum geçişleri gibi sayfa içi küçük seçimler için `filters` + `chip` (`aria-pressed`) kullanılmaya devam eder.

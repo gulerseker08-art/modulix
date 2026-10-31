@@ -25,8 +25,11 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | IconButton | Stil | `<button class="icon-button" aria-label="…">` + `AppIcon` |
 | Badge / StatusBadge | Stil + Var | `badge` + `stage-*`, `status-*`, `user-*` tonları; `TenantStateBadge`, `UserStatusBadge` |
 | Card / SectionCard | Stil | `record-form`, `detail-section`, `detail-grid`, `chart-card`, `tile` |
+| Kayıt düzeni + özet kartı | Stil | `record-layout` (solda `record-summary` > `summary-card`: `summary-identity`, `summary-facts`, `summary-numbers`, `summary-contact`; sağda `record-main`) — Firma ve Kişi detayı |
+| Detay düzeni + sağ panel | Stil | `detail-layout` (`detail-main` + yapışkan `detail-side` > `side-card`) — Fırsat detayı |
 | SummaryCard / KPIStatCard | Stil | `summary` + `summary-item`, `stat-grid` + `stat-card` (+ `stat-icon`); tıklanabilir KPI: `kpi-grid` + `button.stat-card.kpi-card.tone-*` |
-| Tabs / segmented | Stil | `filters` + `chip` (`aria-pressed`), `segmented` |
+| Tabs (kayıt sekmeleri) | Var | `Components/TabBar.razor` + `TabState` (`TabItem(Key, Label, Count)`): sekme ilk seçilişte çizilir, sonra gizli kalır (kaydedilmemiş form kaybolmaz); paneller `role="tabpanel"`, `hidden` |
+| Segmented / chip | Stil | `filters` + `chip` (`aria-pressed`), `segmented` |
 | Accordion | Stil | `sub-section` + `section-toggle` |
 | Notice / Toast | Var | `Components/Notice.razor` (sayfa içi, `role="status"`/`alert`). Merkezi toast kuyruğu yok |
 | ConfirmationDialog | Stil | `confirm` satır içi onay deseni |

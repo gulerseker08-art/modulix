@@ -50,7 +50,7 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | Navigation | Tamam | `Layout/NavMenu.razor(.css)`, `Components/AppLauncher.razor`, `Components/AppIcon.razor`, `Components/BrandLogo.razor` | Statik önizleme (açık, koyu, daraltılmış) | Menü bugün yalnızca aktif modülün sayfalarını gösterir (mevcut davranış korundu) |
 | Form Components | Kısmen | `app.css` (form durumları, `required`, `aria-invalid`) | Önizlemede default/invalid/read-only/disabled | Ayrı Razor bileşenleri (TextField vb.), FileUpload, RichText, kaydedilmemiş değişiklik uyarısı, Kaydet ve Kapat/Yeni |
 | DataGrid | Kısmen | `app.css` (`record-table`) | Önizleme; telefonda kart listesi | Kolon görünürlüğü/yeniden boyutlandırma, kayıtlı görünüm, dışa aktarma, ortak bileşen |
-| Firma/Kişi | Kısmen | `Pages/Crm/Companies.razor`, `Contacts.razor` (PageHeader) | CI derleme ✓ | Firma detayında 12 kolonlu ana içerik + sağ panel düzeni |
+| Firma/Kişi | Tamam (faz 4) | `Pages/Crm/CompanyDetail.razor`, `ContactDetail.razor`, `Components/TabBar.razor`, `TabState.cs` | CI (bkz. Faz 4); statik önizleme | Liste ekranları PageHeader + token düzeyinde; düzenleme formu (CompanyEditor/ContactEditor) tam sayfa olarak kaldı |
 | Aktiviteler | Tamam (faz 2) | `Pages/Crm/Activities.razor`, `Components/ActivityCalendar.razor`, `Components/TodayActivities.razor`, `Components/Drawer.razor`, `Services/ActivityLabels.cs` | CI çalışma 41128200581 ✓ (derleme + 817 test); statik önizleme | Saat çizelgesinde blok sürükleyerek saat değiştirme ve yeniden boyutlandırma yok (gün değiştirme var); detay çekmecesinde ayrı sekmeler yok |
 | Fırsatlar | Tamam (faz 3) | `Pages/Crm/OpportunityDetail.razor`, `Components/SalesPipeline.razor` | CI çalışma 41156483217 ✓ (derleme + 817 test, yeniden çalıştırmada); statik önizleme | Fırsat listesi/pano ekranı yalnızca token/tema düzeyinde |
 | Teklifler | Token/tema | — | — | Detay düzeni |
@@ -120,3 +120,17 @@ Bu faz, Modulix tasarım sistemini **merkezi katmanlardan** (token, tema, kabuk,
 | Takip et | Yok | Altyapıda takip/abonelik yok |
 
 **CI notu (faz 3):** İlk çalıştırmada `PlatformAdministrationTests.Failed_opening_creates_nothing_and_sends_no_email` son adımda 201 yerine 500 döndü. Bu faz yalnızca `Modulix.Web`, README ve belgeleri değiştirdi; aynı test önceki iki çalışmada geçmişti ve yalnızca başarısız iş yeniden çalıştırılınca bütün testler geçti. Test kararsızdır (flaky); ayrı bir iş kalemi olarak incelenmelidir (aynı kısa adla ikinci tenant açılışı sırasında sunucu hatası).
+
+
+## Faz 4 — Firma ve kişi detayı
+
+![Firma detayı](onizleme-firma.png)
+
+| Özellik | Durum | Not |
+|---|---|---|
+| Başlık | Var | İkon, ad, sektör · şehir (kişide unvan · birincil firma), durum ve etiket rozetleri; Birleştir + Düzenle |
+| Özet kartı (solda, yapışkan) | Var | Avatar (baş harfler), sorumlu, sektör, vergi no, şehir; firma için satış özeti (açık/kazanılan fırsat sayısı ve toplamları, açık/geciken aktivite — sunucudaki özet uç noktası); hızlı iletişim (telefon, e-posta, web). Telefonda kimlik bloğu gizlenir (başlıkta zaten var) |
+| Sekmeler | Var | Firma: Genel bilgiler (kaynak, adres, notlar, özel alanlar, adres ve iletişim, lokasyonlar) · Kişiler ve ilişkiler · Fırsatlar ve leadler · Aktiviteler · Geçmiş. Kişi: Genel bilgiler · Firma ilişkileri · Aktiviteler · Fırsatlar ve leadler · Geçmiş. Yetkisiz bölüm sekme olarak görünmez |
+| Sekme davranışı | Var | İlk seçilişte yüklenir, sonra gizli kalır (kaydedilmemiş değişiklik kaybolmaz); sayı rozetleri |
+| Aktivite / fırsat ekleme | Var | Firma sayfasında sağdan açılan panelde |
+| Referanstaki "Finansal Durum & Cari" sekmesi | Yok | Kredi limiti, cari bakiye, e-fatura durumu gibi alanlar veri modelinde yok; gerekiyorsa özel alan (metadata) ya da ayrı bir finans modülü işi |
