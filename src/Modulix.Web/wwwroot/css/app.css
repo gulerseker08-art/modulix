@@ -4273,3 +4273,55 @@ button.pipeline-label {
         height: 2rem;
         font-size: 1rem;
     }
+
+/* Sözleşme belgesi önizlemesi (ADR-0022, dilim 4): kağıt benzeri, metin olarak basılır. */
+.doc-preview {
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #d7dee6);
+    border-radius: 0.5rem;
+    padding: 1.25rem 1.5rem;
+    max-width: 56rem;
+}
+
+    .doc-preview h3 {
+        font-size: 1.25rem;
+        margin: 0.5rem 0;
+    }
+
+    .doc-preview h4 {
+        font-size: 1rem;
+        margin: 1rem 0 0.25rem;
+    }
+
+    .doc-preview .doc-paragraph {
+        white-space: pre-wrap;
+    }
+
+    .doc-preview .doc-total {
+        text-align: right;
+        font-weight: 600;
+    }
+
+    .doc-preview .doc-signatures {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        gap: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    .doc-preview .doc-signature-line {
+        border-bottom: 1px solid currentColor;
+        height: 3rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .doc-preview .doc-page-break {
+        border-top: 2px dashed var(--border, #d7dee6);
+        margin: 1rem 0;
+    }
+
+.template-body {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.875rem;
+    min-height: 22rem;
+}

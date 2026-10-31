@@ -190,7 +190,7 @@ internal sealed class ContractLineRecordStore(ContractsStoreContext context) : C
 }
 
 /// <summary>Sözleşme tarihçesinin salt okunur erişimi. Çağıran, sözleşmenin görünürlüğünü kayıt boru hattında kendisi doğrulamış olmalıdır.</summary>
-internal sealed class ContractReader(Core.Contracts.Persistence.IModuleData data)
+internal sealed partial class ContractReader(Core.Contracts.Persistence.IModuleData data)
 {
     public async Task<List<ContractEvent>> HistoryAsync(Guid contractId, CancellationToken cancellationToken) =>
         await data.Set<ContractEvent>().AsNoTracking().Where(e => e.ContractId == contractId).OrderBy(e => e.CreatedAt).ThenBy(e => e.Id).ToListAsync(cancellationToken);

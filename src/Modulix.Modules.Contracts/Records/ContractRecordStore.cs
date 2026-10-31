@@ -184,7 +184,7 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         var rule = ContractRules.CanDelete(entity.SignatureStatus, entity.EffectiveStatus);
         if (!rule.Allowed)
         {
-            throw new RecordValidationException([new RecordFieldError("id", rule.Message!)]);
+            throw new RecordConflictException(rule.Message!);
         }
 
         var data = Context.Data;
@@ -210,6 +210,7 @@ public static class ContractEventKinds
     public const string Cancelled = "Cancelled";
     public const string Revised = "Revised";
     public const string CreatedFromQuote = "CreatedFromQuote";
+    public const string DocumentGenerated = "DocumentGenerated";
     public const string VersionFrozen = "VersionFrozen";
 }
 

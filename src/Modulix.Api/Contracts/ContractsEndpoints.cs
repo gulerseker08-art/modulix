@@ -80,6 +80,61 @@ public static class ContractsEndpoints
                 : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
+        // Belgeler (dilim 4): liste, önizleme, üretim ve indirme. İzinler serviste denetlenir (sözleşme görünürlüğü önce: kapsam dışı 404).
+        contracts.MapGet("/{id:guid}/documents", async (Guid id, IContractDocuments documents, CancellationToken ct) =>
+        {
+            var result = await documents.ListAsync(id, ct);
+            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(ContractsModule.Permissions.ContractsRead);
+        contracts.MapPost("/{id:guid}/documents/preview", async (Guid id, PreviewContractDocumentRequest r, IContractDocuments documents, CancellationToken ct) =>
+        {
+            var result = await documents.PreviewAsync(id, r.TemplateId, r.UseDraft, ct);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(ContractsModule.Permissions.ContractsRead);
+        contracts.MapPost("/{id:guid}/documents", async (Guid id, GenerateContractDocumentRequest r, IContractDocuments documents, CancellationToken ct) =>
+        {
+            var result = await documents.GenerateAsync(id, r.TemplateId, ct);
+            return result.IsSuccess ? Results.Created($"{Prefix}/contracts/{id}/documents/{result.Value!.Id}", ToDto(result.Value)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(ContractsModule.Permissions.ContractsRead);
+        contracts.MapGet("/{id:guid}/documents/{documentId:guid}/file", async (Guid id, Guid documentId, IContractDocuments documents, HttpContext http, CancellationToken ct) =>
+        {
+            var result = await documents.GetFileAsync(id, documentId, ct);
+            if (!result.IsSuccess)
+            {
+                return RecordEndpoints.ToProblem(result.Error!);
+            }
+
+            http.Response.Headers.CacheControl = "no-store";
+            http.Response.Headers.XContentTypeOptions = "nosniff";
+            return Results.File(result.Value!.Content, "application/pdf", result.Value.Info.FileName);
+        }).RequirePermission(ContractsModule.Permissions.ContractsRead);
+
+        // Şablonlar (dilim 4): CRUD kayıt boru hattından (düzenleme izni), yaşam döngüsü eylemleri ayrı izinle (yayımlama).
+        ResourceEndpoints.MapResource<ContractTemplateDto, SaveContractTemplateRequest>(group, Prefix, "templates", ContractsModule.Entities.ContractTemplate,
+            ContractsModule.Permissions.ContractsRead, ContractsModule.Permissions.TemplatesEdit);
+        var templates = group.MapGroup("/templates");
+        templates.MapGet("/variables", () => Results.Ok(ContractTemplateVariables.All.Select(v => new TemplateVariableDto(v.Key, v.Label, v.Group, v.Financial, v.IsBlock)).ToList()))
+            .RequirePermission(ContractsModule.Permissions.ContractsRead);
+        templates.MapGet("/sample", () => Results.Ok(new TemplateSampleDto(ContractTemplateSamples.ServiceName, ContractTemplateSamples.ServiceBody.Replace("\r\n", "\n"), ContractTemplateSamples.Notice)))
+            .RequirePermission(ContractsModule.Permissions.ContractsRead);
+        templates.MapPost("/{id:guid}/publish", async (Guid id, TemplateActionRequest r, IContractTemplates service, CancellationToken ct) =>
+            TemplateResult(await service.PublishAsync(id, r.Version, r.Reason, ct))).RequirePermission(ContractsModule.Permissions.ContractsRead);
+        templates.MapPost("/{id:guid}/archive", async (Guid id, TemplateActionRequest r, IContractTemplates service, CancellationToken ct) =>
+            TemplateResult(await service.ArchiveAsync(id, r.Version, r.Reason ?? string.Empty, ct))).RequirePermission(ContractsModule.Permissions.ContractsRead);
+        templates.MapPost("/{id:guid}/restore", async (Guid id, TemplateActionRequest r, IContractTemplates service, CancellationToken ct) =>
+            TemplateResult(await service.RestoreAsync(id, r.Version, ct))).RequirePermission(ContractsModule.Permissions.ContractsRead);
+        templates.MapGet("/{id:guid}/versions", async (Guid id, IContractTemplates service, CancellationToken ct) =>
+        {
+            var result = await service.VersionsAsync(id, ct);
+            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(ContractsModule.Permissions.ContractsRead);
+        templates.MapGet("/{id:guid}/versions/{versionNo}", async (Guid id, string versionNo, IContractTemplates service, CancellationToken ct) =>
+        {
+            if (!int.TryParse(versionNo, out var no)) { return Results.NotFound(); }
+            var result = await service.VersionAsync(id, no, ct);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(ContractsModule.Permissions.ContractsRead);
+
         contracts.MapGet("/{id:guid}/versions", async (Guid id, IContractWorkflow workflow, CancellationToken ct) =>
         {
             var result = await workflow.VersionsAsync(id, ct);
@@ -110,6 +165,28 @@ public static class ContractsEndpoints
         return app;
     }
 
+    private static IResult TemplateResult(Modulix.Core.Contracts.Records.RecordResult<Modulix.Core.Contracts.Records.RecordData> result) =>
+        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<ContractTemplateDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+
+    private static ContractDocumentDto ToDto(ContractDocumentInfo d) =>
+        new(d.Id, d.ContractVersionNo, d.IsFinal, d.TemplateId, d.TemplateVersionNo, d.TemplateName, d.IsExample, d.FileName, d.SizeBytes, d.Sha256, d.CreatedBy, d.CreatedAt);
+
+    private static ContractTemplateVersionDto ToDto(ContractTemplateVersionView v) =>
+        new(v.Id, v.VersionNo, v.Name, v.Sha256, v.IsExample, v.Notes, v.PublishedBy, v.PublishedAt, v.Body);
+
+    private static ContractPreviewDto ToDto(ContractPreview p) =>
+        new(p.TemplateName, p.TemplateVersionNo, p.IsExample, p.IsDraftTemplate, p.IsFinal, [.. p.Blocks.Select(ToDto)], p.Missing);
+
+    private static RenderedBlockDto ToDto(DocBlock block) => block switch
+    {
+        HeadingBlock h => new("Heading", h.Level, h.Text, null, null, null, null),
+        ParagraphBlock p => new("Paragraph", 0, p.Text, null, null, null, null),
+        TableBlock t => new("Table", 0, null, t.Header, t.Rows, t.Totals, null),
+        PartyListBlock l => new("PartyList", 0, null, null, null, l.Items, null),
+        SignatureBlock s => new("Signature", 0, null, null, null, null, [.. s.Slots.Select(x => new SignatureSlotDto(x.Title, x.Name))]),
+        _ => new("PageBreak", 0, null, null, null, null, null),
+    };
+
     /// <summary>Anlık görüntü aynı alan adlarıyla taşınır (JSON üzerinden tipli DTO'ya).</summary>
     private static ContractVersionDto ToDto(ContractVersionView v) =>
         new(v.Id, v.VersionNo, v.Kind, v.Status, v.Sha256, v.Reason, v.CreatedBy, v.FrozenAt,
@@ -122,7 +199,12 @@ internal sealed class ContractPolicyProvider(IServiceProvider services) : IContr
     public async Task<ContractPolicySettings> GetAsync(CancellationToken cancellationToken)
     {
         var settings = services.GetRequiredService<ITenantSettings>();
+        static string? Text(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         return new ContractPolicySettings(
-            string.Equals(await settings.GetValueAsync(ContractsModule.SettingKeys.AllowSelfApproval, cancellationToken), "true", StringComparison.OrdinalIgnoreCase));
+            string.Equals(await settings.GetValueAsync(ContractsModule.SettingKeys.AllowSelfApproval, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
+            Text(await settings.GetValueAsync(ContractsModule.SettingKeys.ProviderName, cancellationToken)),
+            Text(await settings.GetValueAsync(ContractsModule.SettingKeys.ProviderDetails, cancellationToken)),
+            Text(await settings.GetValueAsync(ContractsModule.SettingKeys.FooterNote, cancellationToken)),
+            Text(await settings.GetValueAsync(Modulix.Core.Modules.CoreModule.SettingKeys.TimeZone, cancellationToken)) ?? "Europe/Istanbul");
     }
 }

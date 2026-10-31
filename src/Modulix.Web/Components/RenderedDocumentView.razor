@@ -1,0 +1,81 @@
+@* Render edilmiş sözleşme belgesi önizlemesi (ADR-0022, dilim 4): şablon + sözleşme verisinden sunucunun kurduğu bloklar. İçerik metin olarak basılır
+   (Blazor kodlar); şablon ya da veri içindeki HTML yorumlanmaz. Eksik veri varsa belge üretilemez ve eksikler listelenir. *@
+
+@if (Preview is not null)
+{
+    @if (Preview.IsExample)
+    {
+        <div class="alert alert-danger" role="status"><strong>ÖRNEK METİN</strong> — hukuki inceleme yapılmamıştır; kurumunuzun onaylı metniyle değiştirin.</div>
+    }
+    @if (Preview.IsDraftTemplate)
+    {
+        <div class="alert alert-warning" role="status">Bu önizleme şablonun <strong>yayımlanmamış çalışma kopyasıdır</strong>; belge yalnızca yayımlanmış sürümden üretilir.</div>
+    }
+    else if (!Preview.IsFinal)
+    {
+        <div class="alert alert-info" role="status">Sözleşme sürümü henüz dondurulmadı: üretilecek belge <strong>taslak kopya</strong> olarak işaretlenir.</div>
+    }
+    @if (Preview.Missing.Count > 0)
+    {
+        <div class="alert alert-danger" role="alert">
+            <strong>Belge üretilemez; eksik bilgiler:</strong>
+            <ul class="mb-0">
+                @foreach (var item in Preview.Missing) { <li>@item</li> }
+            </ul>
+        </div>
+    }
+
+    <article class="doc-preview" aria-label="Belge önizlemesi: @Preview.TemplateName (şablon V@(Preview.TemplateVersionNo))">
+        @foreach (var block in Preview.Blocks)
+        {
+            switch (block.Kind)
+            {
+                case "Heading" when block.Level == 1:
+                    <h3>@block.Text</h3>
+                    break;
+                case "Heading":
+                    <h4>@block.Text</h4>
+                    break;
+                case "Paragraph":
+                    <p class="doc-paragraph">@block.Text</p>
+                    break;
+                case "Table":
+                    <div class="table-scroll">
+                        <table class="table record-table doc-table">
+                            <caption class="visually-hidden">Kalem tablosu</caption>
+                            <thead><tr>@foreach (var h in block.Header ?? []) { <th scope="col">@h</th> }</tr></thead>
+                            <tbody>
+                                @foreach (var row in block.Rows ?? [])
+                                {
+                                    <tr>@foreach (var cell in row) { <td class="doc-paragraph">@cell</td> }</tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @foreach (var total in block.Items ?? [])
+                    {
+                        <div class="doc-total">@total</div>
+                    }
+                    break;
+                case "PartyList":
+                    <ul>@foreach (var item in block.Items ?? []) { <li>@item</li> }</ul>
+                    break;
+                case "Signature":
+                    <div class="doc-signatures">
+                        @foreach (var slot in block.Slots ?? [])
+                        {
+                            <div><strong>@slot.Title</strong><div class="doc-signature-line"></div><span>@slot.Name</span></div>
+                        }
+                    </div>
+                    break;
+                case "PageBreak":
+                    <hr class="doc-page-break" aria-label="Sayfa sonu" />
+                    break;
+            }
+        }
+    </article>
+}
+
+@code {
+    [Parameter] public ContractPreviewDto? Preview { get; set; }
+}

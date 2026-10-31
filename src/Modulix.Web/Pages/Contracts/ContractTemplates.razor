@@ -1,0 +1,440 @@
+@page "/sozlesmeler/sablonlar"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+@inject IJSRuntime Js
+
+<PageTitle>Sözleşme şablonları · Modulix</PageTitle>
+
+<NavigationLock ConfirmExternalNavigation="@dirty" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
+
+<AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
+    <div class="page-header">
+        <div>
+            <h1>Sözleşme şablonları</h1>
+            <p class="text-muted mb-0">Şablon düz metindir: yalnızca kontrollü <code>{{değişken}}</code>'ler değiştirilir; kod ve HTML çalışmaz. Belgeler yalnızca yayımlanmış sürümden üretilir.</p>
+        </div>
+        <div class="header-actions">
+            <a class="btn btn-outline-secondary" href="sozlesmeler">Sözleşmeler</a>
+            @if (CanEdit)
+            {
+                <button type="button" class="btn btn-outline-primary" @onclick="NewFromSampleAsync">Örnek metinden başla</button>
+                <button type="button" class="btn btn-primary" @onclick="NewTemplate">Yeni şablon</button>
+            }
+        </div>
+    </div>
+
+    <Notice Text="@notice" Failed="@noticeFailed" />
+
+    <div class="filters" role="group" aria-label="Şablon süzgeçleri">
+        <label class="visually-hidden" for="t-status">Durum</label>
+        <select id="t-status" class="form-select form-select-sm filter-select" @bind="statusFilter" @bind:after="LoadAsync">
+            <option value="">Tüm durumlar</option>
+            @foreach (var s in TemplateLabels.Statuses) { <option value="@s.Key">@s.Label</option> }
+        </select>
+    </div>
+
+    @if (templates is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (templates.Count == 0)
+    {
+        <p class="text-muted">Henüz şablon yok. @(CanEdit ? "\"Örnek metinden başla\" ile bir örnek açabilirsiniz." : "")</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Sözleşme şablonları</caption>
+            <thead><tr><th scope="col">Şablon</th><th scope="col">Dil</th><th scope="col">Tür</th><th scope="col">Durum</th><th scope="col">Yayımlanan sürüm</th><th scope="col"><span class="visually-hidden">İşlemler</span></th></tr></thead>
+            <tbody>
+                @foreach (var t in templates)
+                {
+                    <tr class="@(selected?.Id == t.Id ? "selected" : null)">
+                        <td data-label="Şablon" class="primary">
+                            @t.Name
+                            @if (t.IsExample) { <span class="badge stage-lost" title="Hukuki inceleme yapılmamış örnek metin">Örnek</span> }
+                            @if (!string.IsNullOrWhiteSpace(t.UsageScope)) { <small class="text-muted">@t.UsageScope</small> }
+                        </td>
+                        <td data-label="Dil">@t.Language.ToUpperInvariant()</td>
+                        <td data-label="Tür">@(t.ContractType is null ? "Her tür" : Lookups.Label(ContractsAccess.ContractTypeList, t.ContractType))</td>
+                        <td data-label="Durum"><span class="badge stage-@TemplateLabels.StatusBadge(t.Status)">@TemplateLabels.Label(TemplateLabels.Statuses, t.Status)</span></td>
+                        <td data-label="Yayımlanan sürüm">@(t.PublishedVersionNo is { } n ? $"V{n}" : "—")</td>
+                        <td data-label="İşlemler"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => SelectAsync(t)">@(CanEdit ? "Aç / düzenle" : "Görüntüle")</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (form is not null)
+    {
+        <section aria-labelledby="template-editor-title" class="template-editor">
+            <h2 id="template-editor-title">@(selected is null ? "Yeni şablon" : selected.Name)</h2>
+            @if (selected is not null)
+            {
+                <p class="text-muted">
+                    <span class="badge stage-@TemplateLabels.StatusBadge(selected.Status)">@TemplateLabels.Label(TemplateLabels.Statuses, selected.Status)</span>
+                    @if (selected.PublishedVersionNo is { } pv) { <text> Yayımlanan sürüm V@(pv).</text> }
+                    @if (HasUnpublishedChanges) { <strong> Yayımlanmamış değişiklik var.</strong> }
+                </p>
+            }
+            @if (selected?.Status == "Archived")
+            {
+                <div class="alert alert-info" role="status">Arşivlenmiş şablon salt okunurdur; düzenlemek ya da kullanmak için geri alın.</div>
+            }
+
+            <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <fieldset disabled="@(!CanEditSelected || busy)">
+                    <legend class="visually-hidden">Şablon bilgileri</legend>
+                    @if (errors is { Count: > 0 })
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            <strong>Kaydetmeden önce şunları düzeltin:</strong>
+                            <ul class="mb-0">@foreach (var (_, messages) in errors) { foreach (var text in messages) { <li>@text</li> } }</ul>
+                        </div>
+                    }
+                    <div class="form-grid" @oninput="() => dirty = true" @onchange="() => dirty = true">
+                        <div class="span-6">
+                            <label class="form-label required" for="t-name">Ad</label>
+                            <input id="t-name" class="form-control" maxlength="150" aria-required="true" @bind="form.Name" />
+                            <FieldError Field="name" Errors="errors" />
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="t-lang">Dil</label>
+                            <select id="t-lang" class="form-select" @bind="form.Language">
+                                <option value="tr">Türkçe</option>
+                                <option value="en">İngilizce</option>
+                            </select>
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="t-type">Sözleşme türü</label>
+                            <select id="t-type" class="form-select" @bind="form.ContractType">
+                                <option value="">Her tür</option>
+                                @foreach (var t in Lookups.Choices(ContractsAccess.ContractTypeList, form.ContractType)) { <option value="@t.Key">@t.Label</option> }
+                            </select>
+                            <FieldError Field="contractType" Errors="errors" />
+                        </div>
+                        <div class="span-6">
+                            <label class="form-label" for="t-scope">Kullanım kapsamı</label>
+                            <input id="t-scope" class="form-control" maxlength="100" @bind="form.UsageScope" />
+                        </div>
+                        <div class="span-6">
+                            <label class="form-label" for="t-desc">Açıklama</label>
+                            <input id="t-desc" class="form-control" maxlength="2000" @bind="form.Description" />
+                        </div>
+                        <div class="span-12 form-check">
+                            <input id="t-example" type="checkbox" class="form-check-input" @bind="form.IsExample" />
+                            <label class="form-check-label" for="t-example">Örnek metin (hukuki inceleme yapılmamış; üretilen her belgede açıkça işaretlenir)</label>
+                        </div>
+                        <div class="span-12">
+                            <label class="form-label required" for="t-body">Şablon metni</label>
+                            <textarea id="t-body" class="form-control template-body" maxlength="20000" aria-required="true" aria-describedby="t-body-help" @bind="form.Body" @bind:event="oninput"></textarea>
+                            <small id="t-body-help" class="text-muted">
+                                Satır başında <code>#</code> / <code>##</code> başlık yapar; boş satır paragraf ayırır; blok değişkenleri (<code>{{kalem_tablosu}}</code>, <code>{{taraflar_listesi}}</code>, <code>{{imza_alani}}</code>, <code>{{sayfa_sonu}}</code>) satırda tek başına yazılır.
+                            </small>
+                            <FieldError Field="body" Errors="errors" />
+                        </div>
+                    </div>
+                </fieldset>
+
+                <details class="variable-catalog">
+                    <summary>Değişken kataloğu (@variables.Count)</summary>
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Kullanılabilir şablon değişkenleri</caption>
+                        <thead><tr><th scope="col">Değişken</th><th scope="col">Anlamı</th><th scope="col">Grup</th><th scope="col"><span class="visually-hidden">Ekle</span></th></tr></thead>
+                        <tbody>
+                            @foreach (var v in variables)
+                            {
+                                <tr>
+                                    <td data-label="Değişken"><code>@("{{" + v.Key + "}}")</code></td>
+                                    <td data-label="Anlamı">@v.Label @if (v.Financial) { <span class="badge stage-onhold" title="Tutar içerir; belge üretmek için finansal alan izni gerekir">Tutar</span> }</td>
+                                    <td data-label="Grup">@v.Group</td>
+                                    <td data-label="Ekle">
+                                        @if (CanEditSelected)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Insert(v)">Metne ekle</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </details>
+
+                <div class="form-actions">
+                    @if (CanEditSelected)
+                    {
+                        <button type="submit" class="btn btn-primary" disabled="@busy">@(selected is null ? "Taslağı oluştur" : "Kaydet")</button>
+                    }
+                    @if (selected is not null && CanPublish && selected.Status != "Archived")
+                    {
+                        <button type="button" class="btn btn-outline-primary" disabled="@(busy || dirty)" title="@(dirty ? "Önce kaydedin" : null)" @onclick='() => StartAsync("publish")'>Yayımla</button>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick='() => StartAsync("archive")'>Arşivle</button>
+                    }
+                    @if (selected is { Status: "Archived" } && CanPublish)
+                    {
+                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick='() => StartAsync("restore")'>Geri al</button>
+                    }
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Close">Kapat</button>
+                    @if (dirty) { <span class="text-muted" role="status">Kaydedilmemiş değişiklikler var.</span> }
+                </div>
+            </form>
+
+            @if (action is not null)
+            {
+                <form class="record-form" novalidate @onsubmit="ConfirmActionAsync" @onsubmit:preventDefault>
+                    <label class="form-label" for="t-reason">@(action == "publish" ? "Sürüm notu (isteğe bağlı)" : "Arşivleme gerekçesi *")</label>
+                    @if (action != "restore")
+                    {
+                        <textarea id="t-reason" class="form-control" rows="2" maxlength="500" @bind="reasonText"></textarea>
+                    }
+                    <FieldError Field="reason" Errors="errors" />
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" disabled="@busy">@TemplateLabels.Action(action)</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="() => action = null">Vazgeç</button>
+                    </div>
+                </form>
+            }
+
+            @if (selected is not null)
+            {
+                <section aria-labelledby="preview-title">
+                    <h3 id="preview-title">Önizleme</h3>
+                    <p class="text-muted">Bir sözleşme seçerek şablonun çalışma kopyasını o sözleşmenin verisiyle görün (belge üretilmez).</p>
+                    <div class="form-grid">
+                        <div class="span-6">
+                            <label class="form-label" for="previewContract">Sözleşme</label>
+                            <LookupPicker Id="previewContract" LookupKey="contracts.contract.previous" @bind-Value="previewContractId" Placeholder="Sözleşme seçin…" />
+                        </div>
+                        <div class="span-6 align-self-end">
+                            <button type="button" class="btn btn-outline-secondary" disabled="@(previewContractId is null || busy)" @onclick="PreviewAsync">Önizle</button>
+                        </div>
+                    </div>
+                    <RenderedDocumentView Preview="preview" />
+                </section>
+
+                <section aria-labelledby="versions-title">
+                    <h3 id="versions-title">Yayımlanan sürümler</h3>
+                    @if (versions.Count == 0)
+                    {
+                        <p class="text-muted">Henüz yayımlanmış sürüm yok.</p>
+                    }
+                    else
+                    {
+                        <table class="table record-table">
+                            <caption class="visually-hidden">Şablon sürümleri</caption>
+                            <thead><tr><th scope="col">Sürüm</th><th scope="col">Yayımlanma</th><th scope="col">Özet (SHA-256)</th><th scope="col">Not</th></tr></thead>
+                            <tbody>
+                                @foreach (var v in versions)
+                                {
+                                    <tr>
+                                        <td data-label="Sürüm">V@(v.VersionNo)@(v.IsExample ? " (örnek)" : "")</td>
+                                        <td data-label="Yayımlanma">@CrmLabels.Time(v.PublishedAt) · @Lookups.MemberName(v.PublishedBy)</td>
+                                        <td data-label="Özet"><code title="@v.Sha256">@v.Sha256[..12]…</code></td>
+                                        <td data-label="Not">@v.Notes</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </section>
+            }
+        </section>
+    }
+</AuthGate>
+
+@code {
+    private PagedResult<ContractTemplateDto>? page;
+    private IReadOnlyList<ContractTemplateDto>? templates => page?.Items;
+    private ContractTemplateDto? selected;
+    private TemplateForm? form;
+    private List<ContractTemplateVersionDto> versions = [];
+    private IReadOnlyList<TemplateVariableDto> variables = [];
+    private ContractPreviewDto? preview;
+    private Guid? previewContractId;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? notice;
+    private bool noticeFailed;
+    private string? statusFilter;
+    private string? action;
+    private string reasonText = string.Empty;
+    private bool busy;
+    private bool dirty;
+
+    private bool CanEdit => Session.Can(ContractsAccess.TemplatesEdit);
+
+    private bool CanPublish => Session.Can(ContractsAccess.TemplatesPublish);
+
+    private bool CanEditSelected => CanEdit && selected?.Status != "Archived";
+
+    private bool HasUnpublishedChanges =>
+        selected is { PublishedVersionNo: not null } && versions.FirstOrDefault() is { } latest && latest.Sha256 != selected.BodySha256;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(ContractsAccess.ContractsRead)) { return; }
+        await Lookups.LoadAsync();
+        variables = (await Api.GetAsync<List<TemplateVariableDto>>("/api/contracts/templates/variables")).Value ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var url = "/api/contracts/templates?pageSize=100";
+        if (!string.IsNullOrEmpty(statusFilter)) { url += $"&status={statusFilter}"; }
+        var result = await Api.GetAsync<PagedResult<ContractTemplateDto>>(url);
+        page = result.Value;
+        if (!result.IsSuccess) { Notify(result.Error, true); }
+    }
+
+    private async Task ConfirmLeaveAsync(LocationChangingContext context)
+    {
+        if (dirty && !await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş değişiklikler var. Sayfadan ayrılmak istiyor musunuz?"))
+        {
+            context.PreventNavigation();
+        }
+    }
+
+    private void NewTemplate()
+    {
+        selected = null;
+        form = new TemplateForm { Language = "tr" };
+        versions = [];
+        preview = null;
+        errors = null;
+        action = null;
+        dirty = false;
+    }
+
+    private async Task NewFromSampleAsync()
+    {
+        var sample = await Api.GetAsync<TemplateSampleDto>("/api/contracts/templates/sample");
+        if (!sample.IsSuccess) { Notify(sample.Error, true); return; }
+        NewTemplate();
+        form = new TemplateForm { Name = sample.Value!.Name, Body = sample.Value.Body, IsExample = true, Language = "tr" };
+        dirty = true;
+        Notify(sample.Value.Notice);
+    }
+
+    private async Task SelectAsync(ContractTemplateDto template)
+    {
+        if (dirty && !await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş değişiklikler var. Başka şablonu açmak istiyor musunuz?")) { return; }
+        await OpenAsync(template);
+    }
+
+    private async Task OpenAsync(ContractTemplateDto template)
+    {
+        selected = template;
+        form = TemplateForm.From(template);
+        preview = null;
+        errors = null;
+        action = null;
+        dirty = false;
+        versions = (await Api.GetAsync<List<ContractTemplateVersionDto>>($"/api/contracts/templates/{template.Id}/versions")).Value ?? [];
+    }
+
+    private void Close()
+    {
+        selected = null;
+        form = null;
+        preview = null;
+        dirty = false;
+    }
+
+    private void Insert(TemplateVariableDto variable)
+    {
+        if (form is null) { return; }
+        var token = "{{" + variable.Key + "}}";
+        // Blok değişkenleri satırda tek başına durmalıdır.
+        form.Body = variable.IsBlock ? $"{form.Body.TrimEnd()}\n\n{token}\n" : $"{form.Body}{token}";
+        dirty = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (form is null || busy) { return; }
+        busy = true;
+        var request = new SaveContractTemplateRequest(form.Name, form.Body, form.Language, string.IsNullOrEmpty(form.ContractType) ? null : form.ContractType,
+            Blank(form.UsageScope), Blank(form.Description), form.IsExample, selected?.Version);
+        var result = selected is { } current
+            ? await Api.PutAsync<ContractTemplateDto>($"/api/contracts/templates/{current.Id}", request)
+            : await Api.PostAsync<ContractTemplateDto>("/api/contracts/templates", request);
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Şablonu yeniden açıp tekrar deneyin." : result.Error, true);
+            return;
+        }
+
+        errors = null;
+        dirty = false;
+        Notify("Şablon kaydedildi.");
+        await LoadAsync();
+        await OpenAsync(result.Value!);
+    }
+
+    private Task StartAsync(string kind)
+    {
+        action = kind;
+        reasonText = string.Empty;
+        errors = null;
+        return kind == "restore" ? ConfirmActionAsync() : Task.CompletedTask;
+    }
+
+    private async Task ConfirmActionAsync()
+    {
+        if (selected is null || action is null || busy) { return; }
+        busy = true;
+        var result = await Api.PostAsync<ContractTemplateDto>($"/api/contracts/templates/{selected.Id}/{action}", new TemplateActionRequest(selected.Version, Blank(reasonText)));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            Notify(result.Error, true);
+            return;
+        }
+
+        var label = TemplateLabels.Action(action);
+        action = null;
+        Notify($"{label}: tamamlandı.");
+        await LoadAsync();
+        await OpenAsync(result.Value!);
+    }
+
+    private async Task PreviewAsync()
+    {
+        if (selected is null || previewContractId is not { } contractId) { return; }
+        busy = true;
+        var result = await Api.PostAsync<ContractPreviewDto>($"/api/contracts/contracts/{contractId}/documents/preview", new PreviewContractDocumentRequest(selected.Id, UseDraft: CanEdit));
+        busy = false;
+        preview = result.Value;
+        if (!result.IsSuccess) { Notify(result.Error, true); }
+    }
+
+    private void Notify(string? text, bool failed = false)
+    {
+        notice = text;
+        noticeFailed = failed;
+    }
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class TemplateForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Body { get; set; } = string.Empty;
+        public string Language { get; set; } = "tr";
+        public string? ContractType { get; set; }
+        public string? UsageScope { get; set; }
+        public string? Description { get; set; }
+        public bool IsExample { get; set; }
+
+        public static TemplateForm From(ContractTemplateDto t) => new()
+        {
+            Name = t.Name, Body = t.Body, Language = t.Language, ContractType = t.ContractType, UsageScope = t.UsageScope, Description = t.Description, IsExample = t.IsExample,
+        };
+    }
+}

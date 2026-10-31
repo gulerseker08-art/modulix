@@ -164,3 +164,59 @@ internal sealed class ContractVersionConfiguration : IEntityTypeConfiguration<Co
             .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal sealed class ContractTemplateConfiguration : IEntityTypeConfiguration<ContractTemplate>
+{
+    public void Configure(EntityTypeBuilder<ContractTemplate> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractTemplates");
+        builder.Property(t => t.Name).HasMaxLength(ContractTemplate.NameMaxLength).IsRequired();
+        builder.Property(t => t.Language).HasMaxLength(2).IsFixedLength().IsUnicode(false).IsRequired();
+        builder.Property(t => t.ContractType).HasMaxLength(ChoiceValueKeys.MaxLength);
+        builder.Property(t => t.UsageScope).HasMaxLength(ContractTemplate.ScopeMaxLength);
+        builder.Property(t => t.Description).HasMaxLength(ContractTemplate.DescriptionMaxLength);
+        builder.Property(t => t.Body).IsRequired();
+        builder.Property(t => t.BodySha256).HasMaxLength(ContractVersion.HashLength).IsUnicode(false).IsRequired();
+        builder.Property(t => t.Status).HasMaxLength(Contract.StatusMaxLength).IsRequired();
+        builder.HasIndex(t => new { t.TenantId, t.Name, t.Language }).IsUnique().HasDatabaseName("UX_ContractTemplates_NameLanguage");
+        builder.HasIndex(t => new { t.TenantId, t.Status });
+    }
+}
+
+internal sealed class ContractTemplateVersionConfiguration : IEntityTypeConfiguration<ContractTemplateVersion>
+{
+    public void Configure(EntityTypeBuilder<ContractTemplateVersion> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractTemplateVersions");
+        builder.Property(v => v.Name).HasMaxLength(ContractTemplate.NameMaxLength).IsRequired();
+        builder.Property(v => v.Body).IsRequired();
+        builder.Property(v => v.Sha256).HasMaxLength(ContractVersion.HashLength).IsUnicode(false).IsRequired();
+        builder.Property(v => v.Notes).HasMaxLength(Contract.ReasonMaxLength);
+        builder.HasIndex(v => new { v.TenantId, v.TemplateId, v.VersionNo }).IsUnique().HasDatabaseName("UX_ContractTemplateVersions_TemplateVersion");
+
+        builder.HasOne<ContractTemplate>().WithMany().HasForeignKey(v => new { v.TenantId, v.TemplateId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class ContractDocumentConfiguration : IEntityTypeConfiguration<ContractDocument>
+{
+    public void Configure(EntityTypeBuilder<ContractDocument> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractDocuments");
+        builder.Property(d => d.TemplateName).HasMaxLength(ContractTemplate.NameMaxLength).IsRequired();
+        builder.Property(d => d.FileName).HasMaxLength(ContractDocument.FileNameMaxLength).IsRequired();
+        builder.Property(d => d.ContentType).HasMaxLength(100).IsUnicode(false).IsRequired();
+        builder.Property(d => d.Sha256).HasMaxLength(ContractVersion.HashLength).IsUnicode(false).IsRequired();
+        builder.Property(d => d.Snapshot).IsRequired();
+        builder.Property(d => d.Content).IsRequired();
+        builder.HasIndex(d => new { d.TenantId, d.ContractId, d.CreatedAt });
+        builder.HasIndex(d => new { d.TenantId, d.TemplateId });
+
+        builder.HasOne<Contract>().WithMany().HasForeignKey(d => new { d.TenantId, d.ContractId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Cascade);
+        // Şablon silinemez (belgeler ona bağlı kalır); arşivlenir.
+        builder.HasOne<ContractTemplate>().WithMany().HasForeignKey(d => new { d.TenantId, d.TemplateId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}

@@ -17,7 +17,12 @@ public sealed record ContractActionState(string Action, bool Allowed, string? Co
 public sealed record ContractVersionView(Guid Id, int VersionNo, string Kind, string Status, string Sha256, string? Reason, Guid? CreatedBy, DateTimeOffset FrozenAt, ContractSnapshot? Snapshot);
 
 /// <summary>Tenant ayarlarından gelen sözleşme politikası; sağlayıcı yoksa varsayılan.</summary>
-public sealed record ContractPolicySettings(bool AllowSelfApproval)
+public sealed record ContractPolicySettings(
+    bool AllowSelfApproval,
+    string? ProviderName = null,
+    string? ProviderDetails = null,
+    string? FooterNote = null,
+    string TimeZoneId = "Europe/Istanbul")
 {
     public static ContractPolicySettings Default { get; } = new(false);
 }

@@ -146,6 +146,10 @@ public static class ContractsAccess
     public const string ContractsWrite = "contracts.contracts.write";
     public const string FinancialsRead = "contracts.financials.read";
     public const string ContractsApprove = "contracts.contracts.approve";
+    public const string TemplatesEdit = "contracts.templates.edit";
+    public const string TemplatesPublish = "contracts.templates.publish";
+    public const string DocumentsGenerate = "contracts.documents.generate";
+    public const string DocumentsDownload = "contracts.documents.download";
 
     public const string ContractEntityKey = "contracts.contract";
 
@@ -203,3 +207,60 @@ public sealed record QuoteSourceLineDto(
 public sealed record QuoteSourceDto(
     Guid QuoteId, string QuoteNumber, int RevisionNo, string Title, string Currency, decimal NetTotal, decimal GrossTotal, DateTimeOffset AcceptedAt,
     string? AcceptedBy, string? DocumentSha256, bool CustomerLinked, IReadOnlyList<QuoteSourceLineDto> Lines);
+
+// ---- Dilim 4: şablonlar ve belgeler
+
+public sealed record ContractTemplateDto(
+    Guid Id,
+    long Version,
+    string Name,
+    string Language,
+    string? ContractType,
+    string? UsageScope,
+    string? Description,
+    string Body,
+    string BodySha256,
+    bool IsExample,
+    string Status,
+    int? PublishedVersionNo,
+    Guid? CreatedBy,
+    Guid? UpdatedBy);
+
+public sealed record SaveContractTemplateRequest(
+    string Name,
+    string Body,
+    string Language = "tr",
+    string? ContractType = null,
+    string? UsageScope = null,
+    string? Description = null,
+    bool IsExample = false,
+    long? Version = null);
+
+/// <summary>Şablon eylemi: kaydın sürümü zorunlu (409); gerekçe arşivlemede zorunlu, yayımlamada not olarak saklanır.</summary>
+public sealed record TemplateActionRequest(long Version, string? Reason = null);
+
+public sealed record ContractTemplateVersionDto(Guid Id, int VersionNo, string Name, string Sha256, bool IsExample, string? Notes, Guid? PublishedBy, DateTimeOffset PublishedAt, string? Body);
+
+public sealed record TemplateVariableDto(string Key, string Label, string Group, bool Financial, bool IsBlock);
+
+/// <summary>Örnek şablon metni; hukuki inceleme yapılmamıştır, kurum kendi onaylı metnini kullanmalıdır.</summary>
+public sealed record TemplateSampleDto(string Name, string Body, string Notice);
+
+public sealed record ContractDocumentDto(
+    Guid Id, int ContractVersionNo, bool IsFinal, Guid TemplateId, int TemplateVersionNo, string TemplateName, bool IsExample, string FileName, int SizeBytes,
+    string Sha256, Guid? CreatedBy, DateTimeOffset CreatedAt);
+
+public sealed record GenerateContractDocumentRequest(Guid TemplateId);
+
+/// <param name="UseDraft">Yayımlanmamış çalışma kopyasıyla önizle (şablon düzenleme izni ister).</param>
+public sealed record PreviewContractDocumentRequest(Guid TemplateId, bool UseDraft = false);
+
+public sealed record SignatureSlotDto(string Title, string Name);
+
+/// <summary>Render edilmiş blok: <c>Kind</c> = Heading | Paragraph | Table | PartyList | Signature | PageBreak.</summary>
+public sealed record RenderedBlockDto(
+    string Kind, int Level, string? Text, IReadOnlyList<string>? Header, IReadOnlyList<IReadOnlyList<string>>? Rows, IReadOnlyList<string>? Items,
+    IReadOnlyList<SignatureSlotDto>? Slots);
+
+public sealed record ContractPreviewDto(
+    string TemplateName, int TemplateVersionNo, bool IsExample, bool IsDraftTemplate, bool IsFinal, IReadOnlyList<RenderedBlockDto> Blocks, IReadOnlyList<string> Missing);

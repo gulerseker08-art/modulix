@@ -26,12 +26,27 @@ public sealed class ContractsModule : IModule
 
         /// <summary>İç onay bekleyen sözleşmeyi onaylar ya da reddeder (ADR-0022, dilim 2). Yazma izninden ayrıdır.</summary>
         public const string ContractsApprove = "contracts.contracts.approve";
+
+        /// <summary>Şablon metnini oluşturur ve düzenler (taslak çalışma kopyası). Yayımlamadan ayrıdır.</summary>
+        public const string TemplatesEdit = "contracts.templates.edit";
+
+        /// <summary>Şablonu yayımlar, arşivler ve geri alır; yayımlanan sürümden belge üretilir. Düzenlemeden ayrıdır.</summary>
+        public const string TemplatesPublish = "contracts.templates.publish";
+
+        /// <summary>Yayımlanmış şablondan sözleşme belgesi (PDF) üretir.</summary>
+        public const string DocumentsGenerate = "contracts.documents.generate";
+
+        /// <summary>Üretilmiş sözleşme belgesini indirir.</summary>
+        public const string DocumentsDownload = "contracts.documents.download";
     }
 
     /// <summary>Firma ayarları (Y6).</summary>
     public static class SettingKeys
     {
         public const string AllowSelfApproval = "contracts.approval.allow-self";
+        public const string ProviderName = "contracts.document.provider-name";
+        public const string ProviderDetails = "contracts.document.provider-details";
+        public const string FooterNote = "contracts.document.footer-note";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -40,6 +55,7 @@ public sealed class ContractsModule : IModule
         public const string Contract = "contracts.contract";
         public const string ContractParty = "contracts.contract-party";
         public const string ContractLine = "contracts.contract-line";
+        public const string ContractTemplate = "contracts.contract-template";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -58,6 +74,10 @@ public sealed class ContractsModule : IModule
         new(Permissions.ContractsWrite, "Sözleşme taslağı açar, taraf ve kalem ekler, düzenler, taslağı siler", "Sözleşmeler"),
         new(Permissions.FinancialsRead, "Sözleşme bedelini, kalem fiyatlarını ve toplamları görür ve düzenler", "Sözleşme tutarları"),
         new(Permissions.ContractsApprove, "İç onay bekleyen sözleşmeyi onaylar ya da gerekçeyle reddeder", "Sözleşmeler"),
+        new(Permissions.TemplatesEdit, "Sözleşme şablonu oluşturur ve taslak metnini düzenler", "Sözleşme şablonları"),
+        new(Permissions.TemplatesPublish, "Sözleşme şablonunu yayımlar, arşivler ve geri alır", "Sözleşme şablonları"),
+        new(Permissions.DocumentsGenerate, "Yayımlanmış şablondan sözleşme belgesi (PDF) üretir", "Sözleşme belgeleri"),
+        new(Permissions.DocumentsDownload, "Üretilmiş sözleşme belgesini indirir", "Sözleşme belgeleri"),
     ];
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
@@ -66,6 +86,21 @@ public sealed class ContractsModule : IModule
         {
             Description = "Evet seçilirse sözleşmeyi onaya gönderen kişi onaylama yetkisine sahipse kendi gönderdiğini onaylayabilir. Varsayılan hayırdır (hazırlayan ve onaylayan ayrılır).",
             Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
+        },
+        new(SettingKeys.ProviderName, "Sözleşme belgesi: hizmet veren ünvanı", "Sözleşmeler", SettingType.Text)
+        {
+            Description = "Belge başlığında ve imza alanında görünür; şablonda {{hizmet_veren.unvan}} değişkeniyle kullanılır.",
+            MaxLength = 200,
+        },
+        new(SettingKeys.ProviderDetails, "Sözleşme belgesi: hizmet veren iletişim bilgileri", "Sözleşmeler", SettingType.MultilineText)
+        {
+            Description = "Belge başlığının altında küçük yazıyla görünür (adres, vergi no, telefon).",
+            MaxLength = 500,
+        },
+        new(SettingKeys.FooterNote, "Sözleşme belgesi: alt bilgi notu", "Sözleşmeler", SettingType.Text)
+        {
+            Description = "Her sayfanın altında görünür (ör. gizlilik notu).",
+            MaxLength = 200,
         },
     ];
 
@@ -81,7 +116,7 @@ public sealed class ContractsModule : IModule
             "contracts.manager",
             "Sözleşme sorumlusu",
             "Sözleşmeleri, taraflarını, kalemlerini ve tutarlarını görüntüler ve düzenler.",
-            [Permissions.ContractsRead, Permissions.ContractsWrite, Permissions.FinancialsRead])
+            [Permissions.ContractsRead, Permissions.ContractsWrite, Permissions.FinancialsRead, Permissions.DocumentsGenerate, Permissions.DocumentsDownload])
         {
             Scope = RecordScope.Own,
         },
@@ -90,6 +125,14 @@ public sealed class ContractsModule : IModule
             "Sözleşme onaylayıcı",
             "Sözleşmeleri tutarlarıyla görüntüler, iç onayı verir ya da reddeder.",
             [Permissions.ContractsRead, Permissions.FinancialsRead, Permissions.ContractsApprove])
+        {
+            Scope = RecordScope.All,
+        },
+        new(
+            "contracts.template-manager",
+            "Sözleşme şablon yöneticisi",
+            "Sözleşme şablonlarını oluşturur, düzenler, yayımlar ve arşivler.",
+            [Permissions.ContractsRead, Permissions.TemplatesEdit, Permissions.TemplatesPublish])
         {
             Scope = RecordScope.All,
         },
@@ -105,6 +148,11 @@ public sealed class ContractsModule : IModule
 
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
     [
+        new(Entities.ContractTemplate, "Sözleşme şablonu", Permissions.ContractsRead, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["language"] = "Dil", ["contractType"] = "Sözleşme türü", ["usageScope"] = "Kullanım kapsamı", ["description"] = "Açıklama",
+            ["bodySha256"] = "Metin özeti", ["isExample"] = "Örnek metin", ["status"] = "Durum", ["publishedVersionNo"] = "Yayımlanan sürüm",
+        }, "name"),
         new(Entities.Contract, "Sözleşme", Permissions.ContractsRead, new Dictionary<string, string>
         {
             ["number"] = "Numara", ["title"] = "Başlık", ["type"] = "Tür", ["description"] = "Açıklama", ["partyId"] = "Müşteri",
@@ -209,6 +257,9 @@ public sealed class ContractsModule : IModule
         services.AddScoped<IRecordStore, ContractLineRecordStore>();
         services.AddScoped<IContractWorkflow, ContractWorkflow>();
         services.AddScoped<IContractFromQuote, ContractFromQuote>();
+        services.AddScoped<IRecordStore, ContractTemplateRecordStore>();
+        services.AddScoped<IContractTemplates, ContractTemplates>();
+        services.AddScoped<IContractDocuments, ContractDocuments>();
         services.AddScoped<IActivityLinkTarget, ContractLinkTarget>();
     }
 }

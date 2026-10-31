@@ -293,3 +293,104 @@ public sealed class ContractVersion : ContractsEntity
 
     public Guid? CreatedBy { get; internal set; }
 }
+
+/// <summary>
+/// Sözleşme şablonu (ADR-0022, dilim 4). <see cref="Body"/> çalışma kopyasıdır (taslak düzenleme); yayımlama değişmez bir
+/// <see cref="ContractTemplateVersion"/> üretir ve belgeler yalnızca yayımlanmış sürümle üretilir. Düzenleme ve yayımlama ayrı izinlerdir.
+/// Örnek metinler <see cref="IsExample"/> ile açıkça işaretlenir; hukuki metin kurumun sorumluluğundadır.
+/// </summary>
+public sealed class ContractTemplate : ContractsEntity
+{
+    public const int NameMaxLength = 150;
+    public const int ScopeMaxLength = 100;
+    public const int DescriptionMaxLength = 2000;
+    public const int BodyMaxLength = Lifecycle.ContractTemplateEngine.BodyMaxLength;
+
+    public string Name { get; internal set; } = string.Empty;
+
+    /// <summary><see cref="Lifecycle.TemplateLanguages"/>.</summary>
+    public string Language { get; internal set; } = "tr";
+
+    /// <summary>Boşsa her sözleşme türünde kullanılır; doluysa yalnızca o türde (sözleşme türü liste anahtarı).</summary>
+    public string? ContractType { get; internal set; }
+
+    /// <summary>Kullanım kapsamı (serbest metin, ör. "Hizmet sözleşmeleri").</summary>
+    public string? UsageScope { get; internal set; }
+
+    public string? Description { get; internal set; }
+
+    public string Body { get; internal set; } = string.Empty;
+
+    /// <summary>Çalışma kopyasının özeti; son yayımlanan sürümün özetinden farklıysa "yayımlanmamış değişiklik" vardır.</summary>
+    public string BodySha256 { get; internal set; } = string.Empty;
+
+    public bool IsExample { get; internal set; }
+
+    /// <summary><see cref="Lifecycle.TemplateStatus"/>.</summary>
+    public string Status { get; internal set; } = Lifecycle.TemplateStatus.Draft;
+
+    /// <summary>Son yayımlanan sürüm numarası; hiç yayımlanmadıysa boş.</summary>
+    public int? PublishedVersionNo { get; internal set; }
+
+    public Guid? CreatedBy { get; internal set; }
+
+    public Guid? UpdatedBy { get; internal set; }
+}
+
+/// <summary>Yayımlanmış şablon sürümü: metnin değişmez kopyası. Şablon sonradan değişse de bu satır ve ondan üretilen belgeler aynı kalır.</summary>
+public sealed class ContractTemplateVersion : ContractsEntity
+{
+    public Guid TemplateId { get; internal set; }
+
+    public int VersionNo { get; internal set; }
+
+    public string Name { get; internal set; } = string.Empty;
+
+    public string Body { get; internal set; } = string.Empty;
+
+    public string Sha256 { get; internal set; } = string.Empty;
+
+    public bool IsExample { get; internal set; }
+
+    public string? Notes { get; internal set; }
+
+    public Guid? PublishedBy { get; internal set; }
+}
+
+/// <summary>
+/// Üretilen sözleşme belgesi (PDF). Hangi sözleşme sürümü, şablon sürümü ve veri anlık görüntüsüyle üretildiği, dosyanın SHA-256 özeti ve kimliği
+/// saklanır; satır değişmez. <see cref="IsFinal"/>: sözleşme sürümü dondurulmuşsa (onaya/imzaya gitmiş) belge kesin içeriktir; aksi halde taslak kopyadır.
+/// </summary>
+public sealed class ContractDocument : ContractsEntity
+{
+    public const int FileNameMaxLength = 160;
+
+    public Guid ContractId { get; internal set; }
+
+    public int ContractVersionNo { get; internal set; }
+
+    public bool IsFinal { get; internal set; }
+
+    public Guid TemplateId { get; internal set; }
+
+    public int TemplateVersionNo { get; internal set; }
+
+    public string TemplateName { get; internal set; } = string.Empty;
+
+    public bool IsExample { get; internal set; }
+
+    public string FileName { get; internal set; } = string.Empty;
+
+    public string ContentType { get; internal set; } = "application/pdf";
+
+    public int SizeBytes { get; internal set; }
+
+    public string Sha256 { get; internal set; } = string.Empty;
+
+    /// <summary>Belgenin üretildiği veri (JSON: değişken değerleri, kalemler, taraflar); müşteri kartı ya da sözleşme sonradan değişse de belge verisi sabittir.</summary>
+    public string Snapshot { get; internal set; } = string.Empty;
+
+    public byte[] Content { get; internal set; } = [];
+
+    public Guid? CreatedBy { get; internal set; }
+}
