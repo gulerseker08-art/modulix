@@ -192,4 +192,24 @@ internal sealed class ContractReader(Core.Contracts.Persistence.IModuleData data
 {
     public async Task<List<ContractEvent>> HistoryAsync(Guid contractId, CancellationToken cancellationToken) =>
         await data.Set<ContractEvent>().AsNoTracking().Where(e => e.ContractId == contractId).OrderBy(e => e.CreatedAt).ThenBy(e => e.Id).ToListAsync(cancellationToken);
+
+    public Task<Contract?> ContractAsync(Guid contractId, CancellationToken cancellationToken) =>
+        data.Set<Contract>().AsNoTracking().SingleOrDefaultAsync(c => c.Id == contractId, cancellationToken);
+
+    public async Task<List<ContractLine>> LinesAsync(Guid contractId, CancellationToken cancellationToken) =>
+        await data.Set<ContractLine>().AsNoTracking().Where(l => l.ContractId == contractId).OrderBy(l => l.Position).ThenBy(l => l.CreatedAt).ToListAsync(cancellationToken);
+
+    public async Task<List<ContractParty>> PartiesAsync(Guid contractId, CancellationToken cancellationToken) =>
+        await data.Set<ContractParty>().AsNoTracking().Where(p => p.ContractId == contractId).OrderBy(p => p.Position).ThenBy(p => p.CreatedAt).ToListAsync(cancellationToken);
+
+    public async Task<List<ContractVersion>> VersionsAsync(Guid contractId, CancellationToken cancellationToken) =>
+        await data.Set<ContractVersion>().AsNoTracking().Where(v => v.ContractId == contractId).OrderByDescending(v => v.VersionNo).ToListAsync(cancellationToken);
+
+    public Task<ContractVersion?> VersionAsync(Guid contractId, int versionNo, CancellationToken cancellationToken) =>
+        data.Set<ContractVersion>().AsNoTracking().SingleOrDefaultAsync(v => v.ContractId == contractId && v.VersionNo == versionNo, cancellationToken);
+
+    /// <summary>Sözleşmeyi en son onaya gönderen kullanıcı (kendi gönderdiğini onaylama denetimi için).</summary>
+    public async Task<Guid?> LastSubmitterAsync(Guid contractId, CancellationToken cancellationToken) =>
+        await data.Set<ContractEvent>().AsNoTracking().Where(e => e.ContractId == contractId && e.Kind == ContractEventKinds.SubmittedForApproval)
+            .OrderByDescending(e => e.CreatedAt).Select(e => e.ActorId).FirstOrDefaultAsync(cancellationToken);
 }

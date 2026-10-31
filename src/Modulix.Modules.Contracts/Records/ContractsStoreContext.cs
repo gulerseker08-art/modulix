@@ -48,11 +48,19 @@ internal sealed class ContractWorkflowGate
 
     public string? Reason { get; private set; }
 
-    public IDisposable Open(IReadOnlyList<string> permissions, string eventKind, string? reason = null)
+    /// <summary>
+    /// Geçişle aynı işlemde çalışan ek yazma (sürüm dondurma, sürüm durumu). Sözleşmenin sürüm denetimine ve audit'ine bağlı yazılır;
+    /// eşzamanlı çakışmada hiçbiri yazılmaz.
+    /// </summary>
+    public Func<ContractsStoreContext, Domain.Contract, CancellationToken, Task>? Effect { get; private set; }
+
+    public IDisposable Open(
+        IReadOnlyList<string> permissions, string eventKind, string? reason = null, Func<ContractsStoreContext, Domain.Contract, CancellationToken, Task>? effect = null)
     {
         Permissions = permissions;
         EventKind = eventKind;
         Reason = reason;
+        Effect = effect;
         return new Closer(this);
     }
 
@@ -63,6 +71,7 @@ internal sealed class ContractWorkflowGate
             gate.Permissions = null;
             gate.EventKind = null;
             gate.Reason = null;
+            gate.Effect = null;
         }
     }
 }

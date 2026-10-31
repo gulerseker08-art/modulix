@@ -82,7 +82,23 @@ yetki/kapsam; `TableInventoryTests`, `EndpointProtectionTests`, `ModulesAndRoles
 | Ekranlar | `/sozlesmeler` (hızlı görünümler, süzgeçler, kritik tarih, lookup ile çözülen müşteri adı), `/sozlesmeler/yeni|{id}` (sekmeler: genel, taraflar, kalemler, tarihçe + işlem geçmişi; salt okunur uyarısı; kaydedilmemiş değişiklik kilidi; 409 uyarısı). Uygulama menüsünde "Sözleşmeler". |
 | Çekirdek düzeltmesi | `RecordPipeline.OwnerOutOfScope` sorumlu alanı olmayan alt kayıt türünde `ArgumentNullException` (500) üretiyordu; genel alan adıyla 422 döner. `ResourceEndpoints` (tipli CRUD eşleyici) CRM'den bağımsız hale getirildi; CRM kendi kopyasını korur. |
 
-**Yapılmadı (sonraki dilimler):** durum geçişi eylemleri ve `ContractVersions` dondurma; tekliften sözleşme (`AcceptedQuote`'a ortak kayıt
+## Uygulama durumu (ikinci dilim: durum geçişleri, sürüm dondurma, karşılaştırma)
+
+**Uygulandı ve testle doğrulandı** (birim `ContractLifecycleRulesTests` 16; entegrasyon `ContractLifecycleTests` 4: mutlu yol, doğrulama,
+tenant izolasyonu, yetki/maske; `EndpointProtectionTests` yeni uçlarla geçer):
+
+| Konu | Karar / davranış |
+|---|---|
+| Dönem aritmetiği | `ContractPeriod`: N aylık dönem takvim ayıyla hesaplanır (365 gün değil); gün taşarsa hedef bir sonraki ayın ilk gününe kayar, bitiş = hedef − 1 gün. Örnekler testte: 1 Kas 2026 + 12 ay → 31 Eki 2027; 1 Mar 2027 + 12 → 29 Şub 2028; 29 Şub 2024 + 12 → 28 Şub 2025; 31 Oca + 1 → 28 Şub. Başlangıç ve bitiş günü dahildir; sonraki dönem bitişin ertesi günü başlar. "Bugün" tenant saat dilimiyle hesaplanır (`core.regional.time-zone`). |
+| Tarih değerlendirmesi | `ContractDates.StatusOn/Evaluate` (saf): imzalı sözleşme başlangıç gelmeden aktif olmaz (`AwaitingStart`), bitiş günü dahil aktiftir, ertesi gün `Expired`; belirsiz süreli dolmaz; askıdaki/feshedilen/iptal edilen değerlendirilmez; süresi dolan geri aktifleşmez. İmza tamamlanması (dilim 6) ve zamanlanmış iş (dilim 8) bunu kullanır. |
+| Eylemler | `POST /api/contracts/contracts/{id}/{eylem}` (gövde: `version`, `reason`), `GET .../actions` (yetkili eylemler ve yapılamayanların nedeni). Eylemler: `send-to-review`, `mark-ready`, `reopen-draft`, `submit-for-approval`, `withdraw-approval`, `approve`, `reject-approval`, `cancel`, `revise`. Ön koşullar `ContractTransitions` (saf; arayüzle ortak): yayıma hazır için müşteri + başlangıç + (bitiş ya da belirsiz süreli) zorunlu; onay yalnızca yayıma hazır içerikte; onay beklerken taslağa dönülmez (önce geri çek); imzaya gitmiş/imzalı içerik taslağa dönmez, revizyon açılır; iptal yalnızca yürürlüğe girmemiş ve imzalanmamış sözleşmede; kapanmış sözleşmede işlem yok. Ret, iptal ve revizyon gerekçe ister. Her eylem kayıt sürümü ister (409). |
+| Sürümler | `contracts.ContractVersions` (migration `ContractVersions`, RLS): onaya gönderimde güncel taslak başlık + taraflar + kalemler JSON anlık görüntüsü ve SHA-256 özetiyle dondurulur; aynı sürüm numarası yeniden dondurulmaz. Onay/ret/geri çekme sürüm durumuna da yazılır. Onaylı/reddedilmiş içeriği düzenlemek için taslağa dönülünce eski sürüm `Superseded`, `CurrentVersionNo` artar, onay geçersiz kalır (`ApprovalInvalidated`); imzalı sürüm `Signed` kalır, `EffectiveVersionNo` değişmez. `GET .../versions`, `.../versions/{no}` (finansal izni olmayana tutarlar maskeli), `.../versions/{no}/compare?with={no|0}` (0 = güncel taslak; alan, kalem (kararlı anahtar) ve taraf farkları; finansal alanlar izinsiz okuyucuya gösterilmez). |
+| Yetki | Yeni izin `contracts.contracts.approve` (yazmadan ayrı); hazır rol "Sözleşme onaylayıcı". Ayar `contracts.approval.allow-self` (varsayılan hayır): onaya gönderen kendi gönderdiğini onaylayamaz (`IContractPolicyProvider`, host tenant ayarından okur). |
+| Tarihçe | `ContractEvents.FromStatus/ToStatus` dört durumun özetini taşır ("hazırlık/onay/imza/yürürlük", 100 karakter). |
+| Ekran | Detayda eylem çubuğu (gerekçe formu, yapılamayan işlemler ve nedenleri), "Sürümler" sekmesi (liste, özet, güncel taslakla / önceki sürümle karşılaştırma tabloları), tarihçe etiketleri. |
+
+**Yapılmadı (sonraki dilimler):** imza ve yürürlüğe alma eylemleri (dilim 6; `ContractDates` hazır), geriye dönük tarih girişinin yetki/gerekçeyle
+denetimi (imza/yürürlük adımında uygulanacak), onay kuralları/adımlar/vekâlet (dilim 5; bu dilimde tek adımlı onay), tekliften sözleşme (`AcceptedQuote`'a ortak kayıt
 kimlikleri), firma/fırsat sekmesi, `IActivityLinkTarget`; şablon/PDF; iç onay; imza; taahhüt; yenileme/fesih/ek protokol ve zamanlanmış iş;
 dashboard, kayıtlı görünümler, dışa aktarma; CRM kapalı tenant'ta arayüzden yeni müşteri açma (API var, sözleşme formunda hızlı oluşturma
 yok); teslim raporu. Ekranlar tarayıcıda denetlendi (aşağıdaki not), klavye/ekran okuyucu denemesi yapılmadı.
