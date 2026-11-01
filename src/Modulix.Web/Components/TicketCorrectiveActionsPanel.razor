@@ -1,0 +1,172 @@
+@* Şikâyetin düzeltici aksiyonları (ADR-0024, dilim 6). Yalnızca şikâyet türündeki talepte çizilir. Kurallar sunucudadır: sorumlu etkin üye, son tarih geçmiş olamaz, tamamlama/iptal/yeniden açma not ister.
+   Gecikme: açık ve son tarihi geçmiş (Türkiye günü). Yazma support.complaints.manage izniyle. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+@if (IsComplaint && Session.Can(SupportAccess.TicketsRead))
+{
+    <section aria-labelledby="ca-title">
+        <h2 id="ca-title">Düzeltici aksiyonlar</h2>
+        <Notice Text="@message" Failed="@failed" />
+        @if (actions is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (actions.Count == 0)
+        {
+            <p class="text-muted">Düzeltici aksiyon yok.</p>
+        }
+        else
+        {
+            <ul class="task-list">
+                @foreach (var a in actions)
+                {
+                    <li>
+                        <span class="badge stage-@Badge(a)">@Text(a)</span>
+                        <strong class="@(a.Status != "Open" ? "text-decoration-line-through" : null)">@a.Title</strong>
+                        <small class="text-muted"> · @Lookups.MemberName(a.OwnerId) · son tarih @a.DueDate.ToString("dd.MM.yyyy")@(a.IsOverdue ? $" ({a.DaysOverdue} gün gecikti)" : null)</small>
+                        @if (!string.IsNullOrWhiteSpace(a.Note)) { <div class="small">Not: @a.Note</div> }
+                        @if (CanManage)
+                        {
+                            <div class="mt-1">
+                                @if (a.Status == "Open")
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => Begin(a, "Done")'>Tamamla</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => Begin(a, "Cancelled")'>İptal et</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => Begin(a, "Open")'>Yeniden aç</button>
+                                }
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (pending is not null)
+        {
+            <form class="record-form" novalidate @onsubmit="ApplyAsync" @onsubmit:preventDefault>
+                <fieldset disabled="@busy">
+                    <legend class="h6">@(pendingStatus == "Done" ? "Sonuç notu" : pendingStatus == "Cancelled" ? "İptal gerekçesi" : "Yeniden açma gerekçesi") — @pending.Title</legend>
+                    <label class="form-label visually-hidden" for="ca-note">Not</label>
+                    <textarea id="ca-note" class="form-control" rows="2" maxlength="1000" @bind="note" aria-invalid="@(Has("note") ? "true" : null)"></textarea>
+                    <FieldError Field="note" Errors="errors" />
+                </fieldset>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-outline-secondary" disabled="@busy">Kaydet</button>
+                    <button type="button" class="btn btn-link" @onclick="() => pending = null">Vazgeç</button>
+                </div>
+            </form>
+        }
+
+        @if (CanManage)
+        {
+            <form class="record-form" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault>
+                <fieldset disabled="@busy">
+                    <legend class="h6">Aksiyon ekle</legend>
+                    <div class="form-grid">
+                        <div class="span-6">
+                            <label class="form-label" for="ca-new-title">Başlık</label>
+                            <input id="ca-new-title" class="form-control" maxlength="200" @bind="title" aria-invalid="@(Has("title") ? "true" : null)" />
+                            <FieldError Field="title" Errors="errors" />
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="ca-new-owner">Sorumlu</label>
+                            <LookupPicker Id="ca-new-owner" LookupKey="support.ticket.owner" @bind-Value="owner" Placeholder="Seçin" />
+                            <FieldError Field="ownerId" Errors="errors" />
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="ca-new-due">Son tarih</label>
+                            <input id="ca-new-due" type="date" class="form-control" @bind="due" aria-invalid="@(Has("dueDate") ? "true" : null)" />
+                            <FieldError Field="dueDate" Errors="errors" />
+                        </div>
+                    </div>
+                </fieldset>
+                <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Ekle</button></div>
+            </form>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public TicketDto Ticket { get; set; } = default!;
+
+    private List<CorrectiveActionDto>? actions;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private string title = string.Empty;
+    private Guid? owner;
+    private DateOnly? due = DateOnly.FromDateTime(DateTime.Today.AddDays(7));
+    private CorrectiveActionDto? pending;
+    private string pendingStatus = string.Empty;
+    private string note = string.Empty;
+    private Guid loadedFor;
+
+    private bool IsComplaint => Lookups.CategoryOf(SupportLabels.TicketTypeList, Ticket.TypeKey) == SupportLabels.ComplaintCategory;
+
+    private bool CanManage => Session.Can(SupportAccess.ComplaintsManage) && Ticket.Status is not ("Cancelled" or "Merged");
+
+    private bool Has(string field) => errors?.ContainsKey(field) == true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Ticket.Id) { return; }
+        await Lookups.LoadAsync();
+        if (!IsComplaint) { return; }
+        loadedFor = Ticket.Id;
+        actions = (await Api.GetAsync<List<CorrectiveActionDto>>($"/api/support/tickets/{Ticket.Id}/corrective-actions")).Value ?? [];
+    }
+
+    private void Begin(CorrectiveActionDto action, string status)
+    {
+        pending = action;
+        pendingStatus = status;
+        note = string.Empty;
+        errors = null;
+    }
+
+    private async Task AddAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<List<CorrectiveActionDto>>($"/api/support/tickets/{Ticket.Id}/corrective-actions", new AddCorrectiveActionRequest(title, owner, due));
+        busy = false;
+        failed = !result.IsSuccess;
+        message = result.IsSuccess ? "Aksiyon eklendi." : result.Error;
+        errors = result.FieldErrors;
+        if (result.IsSuccess)
+        {
+            actions = result.Value;
+            title = string.Empty;
+        }
+    }
+
+    private async Task ApplyAsync()
+    {
+        if (busy || pending is null) { return; }
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<List<CorrectiveActionDto>>($"/api/support/tickets/{Ticket.Id}/corrective-actions/{pending.Id}/status", new SetCorrectiveActionStatusRequest(pendingStatus, note));
+        busy = false;
+        failed = !result.IsSuccess;
+        message = result.IsSuccess ? "Aksiyon güncellendi." : result.Error;
+        errors = result.FieldErrors;
+        if (result.IsSuccess)
+        {
+            actions = result.Value;
+            pending = null;
+        }
+    }
+
+    private static string Text(CorrectiveActionDto a) => a.Status switch { "Done" => "Tamamlandı", "Cancelled" => "İptal", _ => a.IsOverdue ? "Gecikmiş" : "Açık" };
+
+    private static string Badge(CorrectiveActionDto a) => a.Status switch { "Done" => "won", "Cancelled" => "cancelled", _ => a.IsOverdue ? "lost" : "open" };
+}
