@@ -48,3 +48,22 @@ internal sealed class SatisfactionSurveyConfiguration : IEntityTypeConfiguration
             .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class TicketLinkConfiguration : IEntityTypeConfiguration<TicketLink>
+{
+    public void Configure(EntityTypeBuilder<TicketLink> builder)
+    {
+        SupportTables.ConfigureCommon(builder, "TicketLinks");
+        builder.Property(l => l.EntityKey).HasMaxLength(TicketLink.EntityKeyMaxLength).IsRequired();
+        builder.Property(l => l.Label).HasMaxLength(TicketLink.LabelMaxLength).IsRequired();
+
+        builder.HasIndex(l => new { l.TenantId, l.TicketId, l.EntityKey, l.RecordId }).IsUnique().HasDatabaseName("UX_TicketLinks_Record");
+        // Karşı modülün sayfalarındaki "ilişkili talepler" listesi için ters arama.
+        builder.HasIndex(l => new { l.TenantId, l.EntityKey, l.RecordId });
+        builder.ToTable(t => t.HasCheckConstraint("CK_TicketLinks_Kind", "[EntityKey] IN ('contracts.contract','orders.order','orders.delivery')"));
+
+        // RecordId başka modülün kaydıdır: yabancı anahtar yoktur (bağlanırken boru hattıyla doğrulanır).
+        builder.HasOne<SupportTicket>().WithMany().HasForeignKey(l => new { l.TenantId, l.TicketId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}

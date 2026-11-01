@@ -94,7 +94,7 @@ internal static class SlaEngine
 
             case TicketStatus.Reopened when beforeStatus != TicketStatus.Reopened:
                 // Yeniden açma yeni bir çözüm döngüsü başlatır; önceki döngü örnekleri olduğu gibi saklanır. İlk yanıt yeniden ölçülmez.
-                if (await SelectAsync(context, ticket.TypeKey, ticket.CategoryId, ticket.Priority, ticket.PartyId, cancellationToken) is { } selection
+                if (await SelectAsync(context, ticket.TypeKey, ticket.CategoryId, ticket.Priority, ticket.PartyId, cancellationToken, await ContractIdsAsync(context, ticket.Id, null, null, cancellationToken)) is { } selection
                     && Start(context, ticket, selection, SlaMetric.Resolution, ticket.ReopenCount + 1, now) is { } cycle)
                 {
                     created.Add(cycle);
@@ -124,10 +124,43 @@ internal static class SlaEngine
         return $"Önce: {(before.Length == 0 ? "açık SLA yok" : before)} — Sonra: {(open.Count == 0 ? "açık SLA yok" : string.Join("; ", open.Select(Describe)))}";
     }
 
+    /// <summary>
+    /// Talebe sözleşme bağlandı ya da bağlantısı kaldırıldı: açık örneklerin politikası güncel bağlı sözleşmelerle yeniden seçilir (değişen politika ya da hedef varsa yeniden anlık görüntülenir;
+    /// ihlal edilmiş örnek değişmez). Yeni/kaldırılan bağ henüz kaydedilmediğinden kimlik ayrıca verilir.
+    /// </summary>
+    public static async Task OnLinksChangedAsync(SupportStoreContext context, SupportTicket ticket, Guid? added, Guid? removed, CancellationToken cancellationToken)
+    {
+        var open = (await OpenAsync(context, ticket.Id, cancellationToken)).Where(IsOpen).ToList();
+        if (open.Count == 0)
+        {
+            return;
+        }
+
+        await ReselectAsync(context, ticket, open, cancellationToken, contractIds: await ContractIdsAsync(context, ticket.Id, added, removed, cancellationToken));
+        Sync(ticket, open);
+    }
+
+    /// <summary>Talebe bağlı sözleşme kimlikleri; henüz kaydedilmemiş ekleme/çıkarma ayrıca verilir.</summary>
+    internal static async Task<IReadOnlyList<Guid>> ContractIdsAsync(SupportStoreContext context, Guid ticketId, Guid? added, Guid? removed, CancellationToken cancellationToken)
+    {
+        var ids = await context.Data.Set<TicketLink>().AsNoTracking().Where(l => l.TicketId == ticketId && l.EntityKey == TicketLinkKinds.Contract).Select(l => l.RecordId).ToListAsync(cancellationToken);
+        if (added is { } add && !ids.Contains(add))
+        {
+            ids.Add(add);
+        }
+
+        if (removed is { } remove)
+        {
+            ids.Remove(remove);
+        }
+
+        return ids;
+    }
+
     // ---- Politika seçimi
 
     public static async Task<SlaSelection?> SelectAsync(
-        SupportStoreContext context, string typeKey, Guid? categoryId, string priority, Guid? partyId, CancellationToken cancellationToken)
+        SupportStoreContext context, string typeKey, Guid? categoryId, string priority, Guid? partyId, CancellationToken cancellationToken, IReadOnlyList<Guid>? contractIds = null)
     {
         var policies = await context.Data.Set<SlaPolicy>().AsNoTracking().Where(p => p.IsActive).ToListAsync(cancellationToken);
         if (policies.Count == 0)
@@ -146,8 +179,8 @@ internal static class SlaEngine
         }
 
         var chosen = SlaPolicySelector.Select(
-            policies.Select(p => new SlaPolicyCandidate(p.Id, p.Name, p.Precedence, p.IsDefault, p.IsActive, p.TypeKey, p.CategoryId, p.Priority, p.PartyId)),
-            new SlaTicketFacts(typeKey, chain, priority, partyId));
+            policies.Select(p => new SlaPolicyCandidate(p.Id, p.Name, p.Precedence, p.IsDefault, p.IsActive, p.TypeKey, p.CategoryId, p.Priority, p.PartyId, p.ContractId)),
+            new SlaTicketFacts(typeKey, chain, priority, partyId, contractIds));
         if (chosen is null)
         {
             return null;
@@ -329,9 +362,9 @@ internal static class SlaEngine
     /// Öncelik değişimi ya da yeniden hesaplama: güncel özelliklerle politika yeniden seçilir. Harcanan iş süresi korunur, hedef anı kalan süreden yeniden hesaplanır
     /// (deterministik). İhlal edilmiş örnek değiştirilmez (öncelik düşürerek ihlal silinemez); eşleşen politika yoksa ya da politikada o ölçüt için hedef yoksa mevcut hedef korunur.
     /// </summary>
-    private static async Task ReselectAsync(SupportStoreContext context, SupportTicket ticket, IReadOnlyList<SlaInstance> open, CancellationToken cancellationToken, bool force = false)
+    private static async Task ReselectAsync(SupportStoreContext context, SupportTicket ticket, IReadOnlyList<SlaInstance> open, CancellationToken cancellationToken, bool force = false, IReadOnlyList<Guid>? contractIds = null)
     {
-        if (await SelectAsync(context, ticket.TypeKey, ticket.CategoryId, ticket.Priority, ticket.PartyId, cancellationToken) is not { } selection)
+        if (await SelectAsync(context, ticket.TypeKey, ticket.CategoryId, ticket.Priority, ticket.PartyId, cancellationToken, contractIds ?? await ContractIdsAsync(context, ticket.Id, null, null, cancellationToken)) is not { } selection)
         {
             return;
         }

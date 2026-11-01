@@ -301,7 +301,7 @@ public sealed class SupportModule : IModule
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["isActive"] = "Etkin", ["isDefault"] = "Varsayılan", ["precedence"] = "Öncelik sırası", ["typeKey"] = "Tür",
             ["categoryId"] = "Kategori", ["priority"] = "Öncelik", ["partyId"] = "Müşteri", ["firstResponseMinutes"] = "İlk yanıt hedefi (dk)", ["resolutionMinutes"] = "Çözüm hedefi (dk)",
-            ["calendarId"] = "Takvim", ["pauseOnWaitingCustomer"] = "Müşteri beklemesinde durdur", ["pauseOnWaitingInternal"] = "İç ekip beklemesinde durdur",
+            ["contractId"] = "Sözleşme", ["calendarId"] = "Takvim", ["pauseOnWaitingCustomer"] = "Müşteri beklemesinde durdur", ["pauseOnWaitingInternal"] = "İç ekip beklemesinde durdur",
             ["escalationRules"] = "Eskalasyon kuralları", ["revision"] = "Sürüm",
         }, "name")
         {
@@ -411,6 +411,7 @@ public sealed class SupportModule : IModule
         services.AddScoped<ITicketMerge, TicketMerge>();
         services.AddScoped<ITicketTasks, TicketTasks>();
         services.AddScoped<ITicketAttachments, TicketAttachments>();
+        services.AddScoped<ITicketLinks, TicketLinks>();
         services.AddScoped<ITicketInbound, TicketInbound>();
         services.AddScoped<SurveyIssuer>();
         services.AddScoped<ITicketSurveys, TicketSurveys>();

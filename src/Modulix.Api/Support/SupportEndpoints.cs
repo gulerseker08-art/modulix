@@ -47,7 +47,7 @@ public static class SupportEndpoints
         // SLA: önizleme yönetim izniyle; talep SLA'sı talep okuma iznine ve veri kapsamına bağlıdır (kapsam dışı talep 404); yeniden hesaplama ayrı izin ve gerekçe ister.
         group.MapPost("/sla/preview", async (SlaPreviewRequest r, ITicketSla sla, CancellationToken ct) =>
         {
-            var result = await sla.PreviewAsync(new SlaPreviewInput(r.TypeKey, r.CategoryId, r.Priority, r.PartyId, r.StartAt), ct);
+            var result = await sla.PreviewAsync(new SlaPreviewInput(r.TypeKey, r.CategoryId, r.Priority, r.PartyId, r.StartAt, r.ContractId), ct);
             return result.IsSuccess ? Results.Ok(Map<SlaPreviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.SlaManage);
 

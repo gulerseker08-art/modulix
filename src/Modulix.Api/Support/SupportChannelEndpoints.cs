@@ -122,6 +122,23 @@ internal static class SupportChannelEndpoints
             return Results.File(result.Value!.Content, result.Value.Info.ContentType, result.Value.Info.FileName);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
+        // İlişkili kayıtlar (sözleşme, sipariş, teslimat): bağlama çağıranın yetkisiyle doğrulanır; talep düzenleme izni gerekir.
+        tickets.MapGet("/{id:guid}/links", async (Guid id, ITicketLinks links, CancellationToken ct) =>
+        {
+            var result = await links.ListAsync(id, ct);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketLinkDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+        tickets.MapPost("/{id:guid}/links", async (Guid id, AddTicketLinkRequest r, ITicketLinks links, CancellationToken ct) =>
+        {
+            var result = await links.AddAsync(id, r.EntityKey, r.RecordId, ct);
+            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/links", Map<List<TicketLinkDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+        tickets.MapDelete("/{id:guid}/links/{linkId:guid}", async (Guid id, Guid linkId, ITicketLinks links, CancellationToken ct) =>
+        {
+            var result = await links.RemoveAsync(id, linkId, ct);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketLinkDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+
         // Memnuniyet anketleri (personel görünümü; belirteç dönmez).
         tickets.MapGet("/{id:guid}/surveys", async (Guid id, ITicketSurveys surveys, CancellationToken ct) =>
         {

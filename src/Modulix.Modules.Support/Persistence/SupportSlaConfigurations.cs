@@ -44,6 +44,7 @@ internal sealed class SlaPolicyConfiguration : IEntityTypeConfiguration<SlaPolic
             .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<SlaCalendar>().WithMany().HasForeignKey(p => new { p.TenantId, p.CalendarId })
             .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+        // ContractId başka modülün kaydıdır: yabancı anahtar yok, kayıt kaydedilirken boru hattıyla doğrulanır.
         builder.HasOne<Party>().WithMany().HasForeignKey(p => new { p.TenantId, p.PartyId })
             .HasPrincipalKey(p => new { p.TenantId, p.Id }).OnDelete(DeleteBehavior.Restrict);
     }

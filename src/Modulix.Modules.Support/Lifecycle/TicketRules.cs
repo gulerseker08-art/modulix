@@ -137,6 +137,8 @@ public static class TicketEventKinds
     public const string InternalNote = "InternalNote";
     public const string AttachmentAdded = "AttachmentAdded";
     public const string InternalAttachmentAdded = "InternalAttachmentAdded";
+    public const string LinkAdded = "LinkAdded";
+    public const string LinkRemoved = "LinkRemoved";
     public const string InboundReceived = "InboundReceived";
     public const string SurveyAnswered = "SurveyAnswered";
     public const string LowSatisfaction = "LowSatisfaction";
