@@ -54,6 +54,44 @@ internal sealed class OrderReader(IModuleData data)
             .Where(h => h.Status == "Sent" && h.SentAt != null && h.SentAt <= cutoff && h.EscalatedRound < h.Round)
             .OrderBy(h => h.SentAt).Take(take).ToListAsync(cancellationToken);
 
+    public Task<OperationJob?> JobAsync(Guid id, CancellationToken cancellationToken) =>
+        data.Set<OperationJob>().AsNoTracking().SingleOrDefaultAsync(j => j.Id == id, cancellationToken);
+
+    public async Task<List<OperationJobTask>> JobTasksAsync(Guid jobId, CancellationToken cancellationToken) =>
+        await data.Set<OperationJobTask>().AsNoTracking().Where(t => t.JobId == jobId).OrderBy(t => t.Position).ThenBy(t => t.CreatedAt).ToListAsync(cancellationToken);
+
+    public async Task<List<OperationJobLine>> JobLinksAsync(Guid jobId, CancellationToken cancellationToken) =>
+        await data.Set<OperationJobLine>().AsNoTracking().Where(l => l.JobId == jobId).ToListAsync(cancellationToken);
+
+    public async Task<List<OperationJobEvent>> JobEventsAsync(Guid jobId, CancellationToken cancellationToken) =>
+        await data.Set<OperationJobEvent>().AsNoTracking().Where(e => e.JobId == jobId).OrderBy(e => e.CreatedAt).ThenBy(e => e.Id).ToListAsync(cancellationToken);
+
+    /// <summary>Siparişin bütün bağımlılık kenarları (döngü denetimi için).</summary>
+    public async Task<List<OperationJobDependency>> JobEdgesAsync(Guid orderId, CancellationToken cancellationToken) =>
+        await data.Set<OperationJobDependency>().AsNoTracking().Where(d => d.OrderId == orderId).ToListAsync(cancellationToken);
+
+    /// <summary>Siparişin işleri (izlenir: sipariş iptalinde açık işler aynı kaydetmede iptal edilir).</summary>
+    public async Task<List<OperationJob>> JobsOfOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
+        await data.Set<OperationJob>().Where(j => j.OrderId == orderId).OrderBy(j => j.CreatedAt).ToListAsync(cancellationToken);
+
+    /// <summary>Açık (tamamlanmamış, iptal edilmemiş) işlerdeki sipariş kalemleri: bir kalem aynı anda yalnızca bir açık işte bulunur.</summary>
+    public async Task<HashSet<Guid>> LinesInOpenJobsAsync(Guid orderId, CancellationToken cancellationToken) =>
+        [.. await (from l in data.Set<OperationJobLine>().AsNoTracking()
+                   join j in data.Set<OperationJob>().AsNoTracking() on l.JobId equals j.Id
+                   where j.OrderId == orderId && j.Status != "Completed" && j.Status != "Cancelled"
+                   select l.OrderLineId).ToListAsync(cancellationToken)];
+
+    /// <summary>Atama beklerken belirlenen süreden uzun kalmış, takibi üretilmemiş işler (zamanlayıcı).</summary>
+    public async Task<List<OperationJob>> UnassignedJobsSinceAsync(DateTimeOffset cutoff, int take, CancellationToken cancellationToken) =>
+        await data.Set<OperationJob>().AsNoTracking()
+            .Where(j => j.Status == "AwaitingAssignment" && j.UnassignedAlertAt == null && j.CreatedAt <= cutoff).OrderBy(j => j.CreatedAt).Take(take).ToListAsync(cancellationToken);
+
+    /// <summary>Planlanan bitişi geçmiş, takibi üretilmemiş açık işler (zamanlayıcı).</summary>
+    public async Task<List<OperationJob>> OverdueJobsAsync(DateOnly today, int take, CancellationToken cancellationToken) =>
+        await data.Set<OperationJob>().AsNoTracking()
+            .Where(j => j.Status != "Completed" && j.Status != "Cancelled" && j.PlannedEndDate != null && j.PlannedEndDate < today && j.OverdueAlertAt == null)
+            .OrderBy(j => j.PlannedEndDate).Take(take).ToListAsync(cancellationToken);
+
     public Task<SalesOrder?> OrderAsync(Guid orderId, CancellationToken cancellationToken) =>
         data.Set<SalesOrder>().AsNoTracking().SingleOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 }

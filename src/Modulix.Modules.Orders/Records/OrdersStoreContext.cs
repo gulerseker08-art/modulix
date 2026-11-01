@@ -54,10 +54,15 @@ internal sealed class OrderWorkflowGate
     /// <summary>Devir geçişiyle (gönderme, bilgi isteme, kabul) aynı işlemde çalışan ek yazma (tarihçe satırı, sipariş devir durumu aynası). Devir kaydının sürüm denetimine bağlıdır.</summary>
     public Func<OrdersStoreContext, Domain.OrderHandover, CancellationToken, Task>? HandoverEffect { get; private set; }
 
+    /// <summary>İş oluşturma ya da güncellemesiyle aynı işlemde çalışan ek yazma (görevler, kalem bağları, bağımlılıklar, geçmiş satırı). İş kaydının sürüm denetimine bağlıdır.</summary>
+    public Func<OrdersStoreContext, Domain.OperationJob, CancellationToken, Task>? JobEffect { get; private set; }
+
     public IDisposable Open(
         IReadOnlyList<string> permissions, string eventKind, string? reason = null, Func<OrdersStoreContext, Domain.SalesOrder, CancellationToken, Task>? effect = null,
-        Func<OrdersStoreContext, Domain.OrderHandover, CancellationToken, Task>? handoverEffect = null)
+        Func<OrdersStoreContext, Domain.OrderHandover, CancellationToken, Task>? handoverEffect = null,
+        Func<OrdersStoreContext, Domain.OperationJob, CancellationToken, Task>? jobEffect = null)
     {
+        JobEffect = jobEffect;
         Permissions = permissions;
         EventKind = eventKind;
         Reason = reason;
@@ -75,6 +80,7 @@ internal sealed class OrderWorkflowGate
             gate.Reason = null;
             gate.Effect = null;
             gate.HandoverEffect = null;
+            gate.JobEffect = null;
         }
     }
 }
