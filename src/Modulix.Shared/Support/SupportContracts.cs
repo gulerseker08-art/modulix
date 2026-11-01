@@ -131,6 +131,8 @@ public static class SupportAccess
     public const string InternalRead = "support.internal.read";
     public const string SettingsManage = "support.settings.manage";
     public const string TicketsMerge = "support.tickets.merge";
+    public const string TicketsExport = "support.tickets.export";
+    public const string InboundIngest = "support.inbound.ingest";
     public const string SlaManage = "support.sla.manage";
     public const string SlaRecalculate = "support.sla.recalculate";
 

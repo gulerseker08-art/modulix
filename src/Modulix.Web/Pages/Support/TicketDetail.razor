@@ -44,6 +44,10 @@
 
         <TicketMergePanel Ticket="ticket" />
 
+        <TicketAttachmentsPanel Ticket="ticket" Messages="messages" />
+
+        <TicketSurveyPanel Ticket="ticket" />
+
         <div class="detail-columns">
             <div>
                 <section aria-labelledby="messages-title">
@@ -64,6 +68,7 @@
                                 <li class="@(m.Visibility == "Internal" ? "timeline-internal" : null)">
                                     <strong>@Describe(m)</strong>
                                     <span class="text-muted small"> · @CrmLabels.Time(m.CreatedAt) · @(m.AuthorId is null ? "Sistem" : Lookups.MemberName(m.AuthorId))</span>
+                                    @if (m.Channel is { } channel) { <span class="badge stage-open">@SupportLabels.Label(SupportLabels.Channels, channel)</span> }
                                     @if (m.SourceTicketId is { } source) { <span class="badge stage-open">Birleştirilen talepten</span> <a class="small" href="destek/talepler/@source">kaynak talep</a> }
                                     <div class="message-body">@m.Body</div>
                                     @if (SupportLabels.Delivery(m.DeliveryStatus) is { Length: > 0 } delivery) { <small class="text-muted">@delivery</small> }

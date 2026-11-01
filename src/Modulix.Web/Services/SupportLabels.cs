@@ -100,6 +100,10 @@ public static class SupportLabels
         "TaskReopened" => "Alt iş yeniden açıldı",
         "CustomerConfirmed" => "Müşteri çözümü onayladı",
         "AutoClosed" => "Zaman aşımıyla otomatik kapatıldı",
+        "AttachmentAdded" => "Ek eklendi",
+        "InternalAttachmentAdded" => "İç nota ek eklendi",
+        "SurveyAnswered" => "Memnuniyet anketi yanıtlandı",
+        "LowSatisfaction" => "Düşük memnuniyet puanı alındı (takip gerekir)",
         _ => kind,
     };
 

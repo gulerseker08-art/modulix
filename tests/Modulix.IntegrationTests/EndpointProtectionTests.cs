@@ -33,6 +33,10 @@ public partial class EndpointProtectionTests(ModulixApiFactory factory) : IClass
         "POST /api/public/quotes/{tenant}/view",
         "POST /api/public/quotes/{tenant}/pdf",
         "POST /api/public/quotes/{tenant}/decision",
+        // Destek memnuniyet anketi (ADR-0024 dilim 4): oturumsuzdur; kimlik doğrulama süreli, tek kullanımlık bağlantı belirtecine sahip olmaktır (gövdede, özeti saklanır),
+        // tenant URL'den çözülür, hız sınırı ve tek tip 404 uygulanır.
+        "POST /api/public/support-survey/{tenant}/view",
+        "POST /api/public/support-survey/{tenant}/answer",
         // İmza sağlayıcısı webhook'u (ADR-0022 dilim 6): oturumsuzdur; kimlik doğrulama HMAC imzası ve zaman damgasıdır, gizli anahtar yapılandırmadan gelir
         // (yoksa uç nokta kapalı: 404), tenant sağlayıcı referansından çözülür, hız ve boyut sınırı uygulanır.
         "POST /api/public/contracts/signature/{provider}/events",
