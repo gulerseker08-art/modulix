@@ -431,6 +431,15 @@
                 </section>
             }
 
+            @if (quote.Status == "Accepted" && Session.IsModuleEnabled(OrdersAccess.ModuleKey) && Session.Can(OrdersAccess.OrdersCreate) && Session.Can(OrdersAccess.FinancialsRead))
+            {
+                <section aria-labelledby="quote-order-title">
+                    <h2 id="quote-order-title">Sipariş</h2>
+                    <p class="text-muted">Müşterinin kabul ettiği bu teklif revizyonundan sipariş oluşturabilirsiniz; fiyatlar ve koşullar kabul anındaki halidir. Bir teklif kalemi, kabul edilen miktarın üzerinde siparişe alınamaz.</p>
+                    <a class="btn btn-primary" href="siparisler/tekliften/@quote.Id">Sipariş oluştur</a>
+                </section>
+            }
+
             @if (family.Count > 1)
             {
                 <section aria-labelledby="rev-title">

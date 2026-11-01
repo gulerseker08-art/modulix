@@ -26,7 +26,9 @@ using Modulix.Infrastructure.Users;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Logistics;
 using Modulix.Modules.Contracts;
+using Modulix.Modules.Orders;
 using Modulix.Api.Contracts;
+using Modulix.Api.Orders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -168,6 +170,7 @@ app.MapSectorProfileEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapContractsEndpoints();
+app.MapOrdersEndpoints();
 app.MapLeadIntakeEndpoints();
 app.MapQuotePublicEndpoints();
 app.MapContractSignatureWebhook();
@@ -197,5 +200,5 @@ public partial class Program;
 /// </summary>
 internal static class ModulixModules
 {
-    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule()];
+    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule()];
 }

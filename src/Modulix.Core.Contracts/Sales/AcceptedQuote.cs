@@ -17,7 +17,23 @@ public sealed record AcceptedQuoteLine(
     decimal Net,
     decimal Tax,
     decimal Gross,
-    string? RecurringPeriod);
+    string? RecurringPeriod)
+{
+    /// <summary>Kalem türü (Product, Service, Package, Free). Sipariş ürün teslimatı ile hizmet başlangıcını ayrı izler.</summary>
+    public string Kind { get; init; } = "Product";
+
+    /// <summary>Paket bileşeniyse paket ana kaleminin kararlı anahtarı.</summary>
+    public Guid? ParentStableKey { get; init; }
+
+    public string? GroupName { get; init; }
+
+    /// <summary>Katalog ürün kimliği (kopya; sonradan katalog değişse de sipariş değişmez). Yabancı anahtar değildir.</summary>
+    public Guid? ProductId { get; init; }
+
+    public decimal ListAmount { get; init; }
+
+    public decimal LineDiscount { get; init; }
+}
 
 /// <summary>
 /// Kabul edilmiş teklif sürümünün değişmez görünümü. Yalnızca ana toplama giren kalemler (opsiyonel ve alternatifler seçilmişse dahil) bulunur;
@@ -52,6 +68,34 @@ public sealed record AcceptedQuote(
 
     /// <summary>Teklifin kişisinin ortak kişi kaydı (core.person); kişi yoksa boş.</summary>
     public Guid? PersonId { get; init; }
+
+    /// <summary>Kabul yöntemi: <c>Portal</c> (müşteri kendi sayfasından, belge özetine bağlı) ya da <c>Manual</c> (satış kullanıcısı kaydetti; belge kanıtı yoktur).</summary>
+    public string AcceptanceMethod { get; init; } = "Manual";
+
+    /// <summary>Kabulü kaydeden iç kullanıcı (yalnızca manuel kabulde); portal kabulünde boştur.</summary>
+    public Guid? AcceptedByUserId { get; init; }
+
+    /// <summary>Müşterinin kabul ifadesi/gerekçesi (portal ifadesi ya da manuel kabul notu).</summary>
+    public string? AcceptanceNote { get; init; }
+
+    /// <summary>Teklifin geçerlilik bitişi. Geçerlilik kabul anında denetlenmiştir; dönüşüm bu tarihe bakmaz, yalnızca kayıt için taşınır.</summary>
+    public DateTimeOffset? ValidUntil { get; init; }
+
+    public Guid? OwnerId { get; init; }
+
+    /// <summary>Sunulduğu anda sabitlenen müşteri ünvanı.</summary>
+    public string? CustomerName { get; init; }
+
+    /// <summary>Firma kartındaki fatura/teslimat adresinin metin kopyası; adres yoksa boş.</summary>
+    public string? BillingAddress { get; init; }
+
+    public string? DeliveryAddress { get; init; }
+
+    public string? ReportingCurrency { get; init; }
+
+    public decimal? ExchangeRate { get; init; }
+
+    public DateOnly? ExchangeRateDate { get; init; }
 }
 
 /// <summary>
