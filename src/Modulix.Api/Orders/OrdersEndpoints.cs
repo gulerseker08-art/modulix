@@ -41,6 +41,11 @@ public static class OrdersEndpoints
         ResourceEndpoints.MapResource<OperationTaskDto, SaveOperationTaskRequest>(group, Prefix, "operation-tasks", OrdersModule.Entities.JobTask,
             OrdersModule.Permissions.OrdersRead, OrdersModule.Permissions.JobsManage, OrdersModule.Permissions.JobsManage, OrdersModule.Permissions.JobsManage);
 
+        ResourceEndpoints.MapResource<DeliveryDto, SaveDeliveryRequest>(group, Prefix, "deliveries", OrdersModule.Entities.Delivery,
+            OrdersModule.Permissions.OrdersRead, OrdersModule.Permissions.FulfillmentRecord, OrdersModule.Permissions.FulfillmentRecord);
+        ResourceEndpoints.MapResource<ServiceStartDto, SaveServiceStartRequest>(group, Prefix, "service-starts", OrdersModule.Entities.ServiceStart,
+            OrdersModule.Permissions.OrdersRead, OrdersModule.Permissions.FulfillmentRecord, OrdersModule.Permissions.FulfillmentRecord);
+
         var orders = group.MapGroup("/orders");
         orders.MapGet("/{id:guid}/history", async (Guid id, IOrderQueries queries, CancellationToken ct) =>
         {
@@ -182,6 +187,81 @@ public static class OrdersEndpoints
             var result = await service.RemoveDependencyAsync(id, dependsOnJobId, ct);
             return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+
+        // Teslimat ve hizmet başlangıcı (dilim 5): ürün kalemleri çoklu/kısmi teslimatla, hizmet kalemleri başlangıç kaydıyla ayrı izlenir.
+        orders.MapGet("/{id:guid}/fulfillment", async (Guid id, IOrderFulfillment service, CancellationToken ct) =>
+        {
+            var result = await service.GetAsync(id, ct);
+            return result.IsSuccess ? Results.Ok(Map<FulfillmentDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+        orders.MapPost("/{id:guid}/deliveries", async (Guid id, PlanDeliveryRequest r, IOrderFulfillment service, CancellationToken ct) =>
+        {
+            var result = await service.PlanDeliveryAsync(id, new PlanDeliveryInput(r.PlannedDate, r.Lines?.Select(l => new QuantityRequest(l.LineId, l.Quantity)).ToList(), r.JobId, r.Notes), ct);
+            return result.IsSuccess ? Results.Created($"{Prefix}/deliveries/{result.Value!.Id}", Map<DeliveryViewDto>(result.Value)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+        orders.MapPost("/{id:guid}/service-starts", async (Guid id, PlanServiceRequest r, IOrderFulfillment service, CancellationToken ct) =>
+        {
+            var result = await service.PlanServiceAsync(id, r.OrderLineId, r.PlannedStartDate, ct);
+            return result.IsSuccess ? Results.Created($"{Prefix}/orders/{id}/fulfillment", Map<ServiceLineDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+
+        var deliveries = group.MapGroup("/deliveries");
+        foreach (var action in DeliveryAction.All)
+        {
+            deliveries.MapPost($"/{{id:guid}}/{action}", async (Guid id, DeliveryActionRequest r, IOrderFulfillment service, CancellationToken ct) =>
+            {
+                var input = new DeliveryActionInput(r.Reason, r.ReceiverName, r.ReceiverNote, r.ActualDate, r.Lines?.Select(l => new QuantityRequest(l.LineId, l.Quantity)).ToList(), r.PlannedDate);
+                var result = await service.RunDeliveryAsync(id, action, r.Version, input, ct);
+                return result.IsSuccess ? Results.Ok(Map<DeliveryViewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+        }
+
+        // Teslim kanıtı: ham gövde (pdf/png/jpeg, en çok 2 MB). Dosya içeriği günlüğe yazılmaz; indirme yetki ve veri kapsamından geçer.
+        deliveries.MapPut("/{id:guid}/evidence", async (Guid id, string? fileName, string? description, HttpRequest request, IOrderFulfillment service, CancellationToken ct) =>
+        {
+            if (request.ContentLength is > OrderFulfillmentAccess.MaxEvidenceBytes)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "Dosya çok büyük.", detail: $"En fazla {OrderFulfillmentAccess.MaxEvidenceBytes / (1024 * 1024)} MB.");
+            }
+
+            using var buffer = new MemoryStream();
+            var chunk = new byte[16 * 1024];
+            int read;
+            while ((read = await request.Body.ReadAsync(chunk, ct)) > 0)
+            {
+                if (buffer.Length + read > OrderFulfillmentAccess.MaxEvidenceBytes)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "Dosya çok büyük.", detail: $"En fazla {OrderFulfillmentAccess.MaxEvidenceBytes / (1024 * 1024)} MB.");
+                }
+
+                buffer.Write(chunk, 0, read);
+            }
+
+            var result = await service.AddEvidenceAsync(id, fileName, request.ContentType, buffer.ToArray(), description, ct);
+            return result.IsSuccess ? Results.Ok(Map<DeliveryViewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(OrdersModule.Permissions.OrdersRead).DisableAntiforgery();
+        deliveries.MapGet("/{id:guid}/evidence/{evidenceId:guid}", async (Guid id, Guid evidenceId, HttpContext http, IOrderFulfillment service, CancellationToken ct) =>
+        {
+            var result = await service.GetEvidenceAsync(id, evidenceId, ct);
+            if (!result.IsSuccess)
+            {
+                return RecordEndpoints.ToProblem(result.Error!);
+            }
+
+            http.Response.Headers.CacheControl = "no-store";
+            http.Response.Headers["X-Content-Type-Options"] = "nosniff";
+            return Results.File(result.Value!.Content, result.Value.ContentType, result.Value.FileName);
+        }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+
+        var serviceStarts = group.MapGroup("/service-starts");
+        foreach (var action in ServiceAction.All)
+        {
+            serviceStarts.MapPost($"/{{id:guid}}/{action}", async (Guid id, ServiceActionRequest r, IOrderFulfillment service, CancellationToken ct) =>
+            {
+                var result = await service.RunServiceAsync(id, action, r.Version, new ServiceActionInput(r.ConfirmedBy, r.Note), ct);
+                return result.IsSuccess ? Results.Ok(Map<ServiceLineDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+        }
 
         return app;
     }

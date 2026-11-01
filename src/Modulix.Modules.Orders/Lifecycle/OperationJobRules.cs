@@ -142,6 +142,9 @@ public static class OperationTemplates
         "Başlangıç müşteriye bildirildi",
     ];
 
+    /// <summary>Hizmet başlangıcından önce tamamlanmış olması gereken şablon görevleri (başlık eşleşmesiyle).</summary>
+    public static readonly IReadOnlySet<string> ServicePrerequisites = new HashSet<string>(Service.Take(3));
+
     public static IReadOnlyList<string> For(string kind) => kind switch
     {
         JobKind.Delivery => Delivery,

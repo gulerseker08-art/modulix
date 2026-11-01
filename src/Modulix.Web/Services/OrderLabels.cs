@@ -157,6 +157,17 @@ public static class OrderLabels
         "ChangeApplied" => "Değişiklik talebi onaylandı ve uygulandı",
         "ChangeRejected" => "Değişiklik talebi reddedildi",
         "ChangeWithdrawn" => "Değişiklik talebi geri çekildi",
+        "DeliveryPlanned" => "Teslimat planlandı",
+        "Delivered" => "Teslimat kaydedildi",
+        "DeliveryFailed" => "Teslimat başarısız",
+        "DeliveryRescheduled" => "Teslimat yeniden planlandı",
+        "DeliveryCancelled" => "Teslimat iptal edildi",
+        "EvidenceAdded" => "Teslim kanıtı eklendi",
+        "ServicePlanned" => "Hizmet başlangıcı planlandı",
+        "ServiceStarted" => "Hizmet başladı",
+        "ServiceConfirmed" => "Müşteri başlangıcı onayladı",
+        "ServiceCompleted" => "Hizmet tamamlandı",
+        "FulfillmentChanged" => "Gerçekleşme durumu değişti",
         _ => kind,
     };
 

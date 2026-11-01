@@ -23,3 +23,15 @@ internal sealed class ModuleModelCacheKeyFactory : IModelCacheKeyFactory
             ? (context.GetType(), modulix.ModelKey, designTime)
             : (context.GetType(), designTime);
 }
+
+/// <summary><c>sp_getapplock</c> ile işlem kapsamlı kilit (<see cref="ITransactionLock"/>); 15 saniyede alınamazsa hata verir.</summary>
+internal sealed class SqlTransactionLock(ModulixDbContext db) : ITransactionLock
+{
+    public async Task AcquireAsync(string resource, CancellationToken cancellationToken)
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            "DECLARE @r int; EXEC @r = sys.sp_getapplock @Resource = {0}, @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 15000; IF @r < 0 THROW 51000, 'Kaynak kilidi alinamadi.', 1;",
+            [resource], cancellationToken);
+        db.ChangeTracker.Clear();
+    }
+}

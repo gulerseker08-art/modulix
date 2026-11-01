@@ -56,6 +56,9 @@ public sealed class OrdersModule : IModule
 
         /// <summary>Operasyon işini elle açar, başlatır, tamamlar, iptal eder; görev ve bağımlılıkları yönetir.</summary>
         public const string JobsManage = "orders.jobs.manage";
+
+        /// <summary>Teslimat planlar, teslim/başarısız/iptal/yeniden planlama kaydeder, teslim kanıtı ekler; hizmet başlangıcını planlar, başlatır, onaylar, tamamlar.</summary>
+        public const string FulfillmentRecord = "orders.fulfillment.record";
     }
 
     /// <summary>Firma ayarları.</summary>
@@ -79,6 +82,8 @@ public sealed class OrdersModule : IModule
         public const string HandoverItem = "orders.handover-item";
         public const string Job = "orders.operation-job";
         public const string JobTask = "orders.operation-task";
+        public const string Delivery = "orders.delivery";
+        public const string ServiceStart = "orders.service-start";
     }
 
     public string Key => ModuleKey;
@@ -100,6 +105,7 @@ public sealed class OrdersModule : IModule
         new(Permissions.HandoversAccept, "Satış devrini operasyon adına kabul eder ya da gerekçeyle bilgi ister", "Satış devri"),
         new(Permissions.JobsAssign, "Operasyon işine sorumlu kullanıcı ve ekip atar", "Operasyon işleri"),
         new(Permissions.JobsManage, "Operasyon işini elle açar, başlatır, tamamlar, iptal eder; görev ve bağımlılıkları yönetir", "Operasyon işleri"),
+        new(Permissions.FulfillmentRecord, "Teslimat planlar ve kaydeder (kısmi teslim, başarısız teslim, yeniden planlama, teslim kanıtı); hizmet başlangıcını kaydeder", "Teslimat ve hizmet başlangıcı"),
     ];
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
@@ -162,7 +168,7 @@ public sealed class OrdersModule : IModule
             "orders.operations",
             "Operasyon sorumlusu (sipariş)",
             "Siparişleri tutarlar olmadan görüntüler; satış devirlerini kabul eder ya da gerekçeyle bilgi ister; operasyon işlerini atar ve yürütür.",
-            [Permissions.OrdersRead, Permissions.HandoversAccept, Permissions.JobsAssign, Permissions.JobsManage])
+            [Permissions.OrdersRead, Permissions.HandoversAccept, Permissions.JobsAssign, Permissions.JobsManage, Permissions.FulfillmentRecord])
         {
             Scope = RecordScope.All,
         },
@@ -259,6 +265,26 @@ public sealed class OrdersModule : IModule
             UserFields = ["doneBy"],
             References = new Dictionary<string, string> { ["jobId"] = Entities.Job },
         },
+        new(Entities.Delivery, "Teslimat", Permissions.OrdersRead, new Dictionary<string, string>
+        {
+            ["orderId"] = "Sipariş", ["jobId"] = "Operasyon işi", ["number"] = "Numara", ["status"] = "Durum", ["plannedDate"] = "Planlanan tarih", ["actualDate"] = "Gerçekleşen tarih",
+            ["receiverName"] = "Teslim alan", ["receiverNote"] = "Teslim notu", ["failureReason"] = "Gerekçe", ["rescheduledFromId"] = "Yeniden planlanan teslimat",
+            ["rescheduleReason"] = "Yeniden planlama gerekçesi", ["notes"] = "Not", ["deliveredAt"] = "Teslim zamanı",
+        }, "number")
+        {
+            UserFields = ["deliveredBy", "createdBy"],
+            References = new Dictionary<string, string> { ["orderId"] = Entities.Order },
+        },
+        new(Entities.ServiceStart, "Hizmet başlangıcı", Permissions.OrdersRead, new Dictionary<string, string>
+        {
+            ["orderId"] = "Sipariş", ["orderLineId"] = "Sipariş kalemi", ["status"] = "Durum", ["plannedStartDate"] = "Planlanan başlangıç", ["actualStartAt"] = "Gerçekleşen başlangıç",
+            ["customerConfirmedAt"] = "Müşteri onayı zamanı", ["customerConfirmedBy"] = "Onaylayan", ["confirmationNote"] = "Onay notu", ["delayReason"] = "Gecikme gerekçesi",
+            ["completedAt"] = "Tamamlanma zamanı",
+        })
+        {
+            UserFields = ["startedBy", "completedBy", "createdBy"],
+            References = new Dictionary<string, string> { ["orderId"] = Entities.Order },
+        },
         new(Entities.OrderLine, "Sipariş kalemi", Permissions.OrdersRead, new Dictionary<string, string>
         {
             ["orderId"] = "Sipariş", ["position"] = "Sıra", ["kind"] = "Tür", ["productCode"] = "Kod", ["name"] = "Ad", ["description"] = "Açıklama",
@@ -328,6 +354,9 @@ public sealed class OrdersModule : IModule
         services.AddScoped<OperationJobs>();
         services.AddScoped<IOperationJobs>(sp => sp.GetRequiredService<OperationJobs>());
         services.AddScoped<IOperationJobGenerator>(sp => sp.GetRequiredService<OperationJobs>());
+        services.AddScoped<IRecordStore, OrderDeliveryRecordStore>();
+        services.AddScoped<IRecordStore, OrderServiceStartRecordStore>();
+        services.AddScoped<IOrderFulfillment, OrderFulfillment>();
         services.AddScoped<IOrderScheduler, OrderScheduler>();
         services.AddScoped<OrdersSchedulerAnchor>();
         services.AddScoped<IOrderWorkflow, OrderWorkflow>();

@@ -6192,6 +6192,223 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("ActualDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeliveredBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("JobId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("PlannedDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ReceiverName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ReceiverNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RescheduleReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("RescheduledFromId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Deliveries_Number");
+
+                    b.HasIndex("TenantId", "OrderId");
+
+                    b.HasIndex("TenantId", "Status", "PlannedDate");
+
+                    b.ToTable("Deliveries", "orders", t =>
+                        {
+                            t.HasCheckConstraint("CK_Deliveries_Status", "[Status] IN ('Planned','Delivered','Failed','Cancelled')");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderDeliveryEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UploadedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "DeliveryId");
+
+                    b.ToTable("DeliveryEvidence", "orders", t =>
+                        {
+                            t.HasCheckConstraint("CK_DeliveryEvidence_Size", "[SizeBytes] > 0 AND [SizeBytes] <= 2097152");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderDeliveryLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("DeliveredQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrderLineId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("PlannedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "OrderLineId");
+
+                    b.HasIndex("TenantId", "DeliveryId", "OrderLineId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DeliveryLines_Line");
+
+                    b.HasIndex("TenantId", "OrderId", "OrderLineId");
+
+                    b.ToTable("DeliveryLines", "orders", t =>
+                        {
+                            t.HasCheckConstraint("CK_DeliveryLines_Quantity", "[PlannedQuantity] > 0 AND [DeliveredQuantity] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderHandover", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6461,6 +6678,89 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "HandoverId", "Position");
 
                     b.ToTable("HandoverItems", "orders");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderServiceStart", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ActualStartAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CompletedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ConfirmationNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("CustomerConfirmedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomerConfirmedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("DelayReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrderLineId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("PlannedStartDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("StartedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "OrderId");
+
+                    b.HasIndex("TenantId", "OrderLineId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ServiceStarts_Line");
+
+                    b.HasIndex("TenantId", "Status", "PlannedStartDate");
+
+                    b.ToTable("ServiceStarts", "orders", t =>
+                        {
+                            t.HasCheckConstraint("CK_ServiceStarts_Status", "[Status] IN ('Planned','Started','Completed')");
+                        });
                 });
 
             modelBuilder.Entity("Modulix.Modules.Orders.Domain.QuoteLineConsumption", b =>
@@ -7819,6 +8119,43 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderDelivery", b =>
+                {
+                    b.HasOne("Modulix.Modules.Orders.Domain.SalesOrder", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OrderId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderDeliveryEvidence", b =>
+                {
+                    b.HasOne("Modulix.Modules.Orders.Domain.OrderDelivery", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DeliveryId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderDeliveryLine", b =>
+                {
+                    b.HasOne("Modulix.Modules.Orders.Domain.OrderDelivery", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DeliveryId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Orders.Domain.SalesOrderLine", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OrderLineId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderHandover", b =>
                 {
                     b.HasOne("Modulix.Modules.Orders.Domain.SalesOrder", null)
@@ -7844,6 +8181,23 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Modules.Orders.Domain.OrderHandover", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "HandoverId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderServiceStart", b =>
+                {
+                    b.HasOne("Modulix.Modules.Orders.Domain.SalesOrder", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OrderId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Orders.Domain.SalesOrderLine", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OrderLineId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

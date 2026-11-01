@@ -1,0 +1,574 @@
+@page "/siparisler/{Id:guid}/teslimat"
+@using Microsoft.AspNetCore.Components.Forms
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Teslimat ve hizmet başlangıcı · Modulix</PageTitle>
+
+<AuthGate Module="@OrdersAccess.ModuleKey" Permission="@OrdersAccess.OrdersRead">
+    @if (notFound)
+    {
+        <div class="alert alert-warning" role="alert">Sipariş bulunamadı ya da erişim yetkiniz yok. <a href="siparisler">Siparişlere dön</a></div>
+    }
+    else if (view is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <h1>Teslimat ve hizmet başlangıcı</h1>
+                <p class="mb-0">
+                    <span class="text-muted"><a href="siparisler/@view.OrderId">Sipariş @view.OrderNumber</a></span>
+                    <span class="badge stage-@OrderLabels.FulfillmentBadge(view.Status)">@OrderLabels.Label(OrderLabels.Fulfillments, view.Status)</span>
+                    @if (!string.IsNullOrEmpty(view.ContractNumber)) { <span class="text-muted">· Sözleşme @view.ContractNumber</span> }
+                </p>
+            </div>
+            <div class="header-actions"><a class="btn btn-outline-secondary" href="siparisler/@view.OrderId">Sipariş</a></div>
+        </div>
+
+        <Notice Text="@notice" Failed="@failed" />
+
+        <p class="text-muted">
+            Ürün kalemleri çoklu ve kısmi teslimatla, hizmet kalemleri başlangıç kaydıyla ayrı izlenir. Hizmetin başlaması tamamlanması sayılmaz;
+            sipariş ancak tüm ürünler teslim edilip tüm hizmetler tamamlanınca "Tamamlandı" olur.
+        </p>
+
+        @if (view.Products.Count > 0)
+        {
+            <section aria-labelledby="products-title">
+                <h2 id="products-title">Ürün kalemleri</h2>
+                <table class="table record-table">
+                    <caption class="visually-hidden">Ürün kalemlerinin teslimat durumu</caption>
+                    <thead>
+                        <tr><th scope="col">Kalem</th><th scope="col" class="text-end">Sipariş</th><th scope="col" class="text-end">Etkin</th><th scope="col" class="text-end">Teslim edilen</th><th scope="col" class="text-end">Kalan</th><th scope="col" class="text-end">Planlı</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in view.Products)
+                        {
+                            <tr>
+                                <td data-label="Kalem" class="primary">@p.Name</td>
+                                <td data-label="Sipariş" class="text-end">@OrderLabels.Quantity(p.Ordered, p.Unit)</td>
+                                <td data-label="Etkin" class="text-end">@OrderLabels.Quantity(p.Effective, p.Unit)</td>
+                                <td data-label="Teslim edilen" class="text-end">@OrderLabels.Quantity(p.Delivered, p.Unit)</td>
+                                <td data-label="Kalan" class="text-end">@OrderLabels.Quantity(p.Remaining, p.Unit)</td>
+                                <td data-label="Planlı" class="text-end">@OrderLabels.Quantity(p.PlannedOpen, p.Unit)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </section>
+
+            <section aria-labelledby="deliveries-title">
+                <h2 id="deliveries-title">Teslimatlar</h2>
+                @if (CanRecord && view.Products.Any(p => p.Remaining - p.PlannedOpen > 0m))
+                {
+                    @if (!planning)
+                    {
+                        <button type="button" class="btn btn-primary" disabled="@busy" @onclick="StartPlan">Teslimat planla</button>
+                    }
+                    else
+                    {
+                        <form class="record-form" novalidate @onsubmit="PlanAsync" @onsubmit:preventDefault>
+                            <fieldset disabled="@busy">
+                                <legend>Yeni teslimat</legend>
+                                <div class="form-grid">
+                                    <div class="span-4"><label class="form-label" for="plan-date">Planlanan teslim tarihi</label><input id="plan-date" type="date" class="form-control" @bind="planDate" /></div>
+                                    <div class="span-8"><label class="form-label" for="plan-notes">Not</label><input id="plan-notes" class="form-control" maxlength="2000" @bind="planNotes" /></div>
+                                    @foreach (var p in view.Products.Where(p => p.Remaining - p.PlannedOpen > 0m))
+                                    {
+                                        <div class="span-4">
+                                            <label class="form-label" for="plan-q-@p.LineId">@p.Name (planlanabilir @OrderLabels.Quantity(p.Remaining - p.PlannedOpen, p.Unit))</label>
+                                            <input id="plan-q-@p.LineId" type="number" min="0" step="any" class="form-control" @bind="quantities[p.LineId]" />
+                                        </div>
+                                    }
+                                </div>
+                            </fieldset>
+                            @if (formError is not null) { <div class="invalid-feedback d-block" role="alert">@formError</div> }
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary" disabled="@busy">Planla</button>
+                                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => planning = false">Vazgeç</button>
+                            </div>
+                        </form>
+                    }
+                }
+
+                @if (view.Deliveries.Count == 0)
+                {
+                    <p class="text-muted mt-2">Henüz planlanmış teslimat yok.</p>
+                }
+
+                @foreach (var d in view.Deliveries)
+                {
+                    <article class="mb-4 pb-3 border-bottom" aria-labelledby="del-@d.Id">
+                        <h3 id="del-@d.Id">
+                            @d.Number
+                            <span class="badge stage-@DeliveryBadge(d.Status)">@DeliveryLabel(d.Status)</span>
+                            @if (d.IsOverdue) { <span class="badge stage-lost">Gecikti</span> }
+                        </h3>
+                        <dl class="detail-list">
+                            <dt>Planlanan</dt><dd>@OrderLabels.Date(d.PlannedDate)</dd>
+                            @if (d.ActualDate is not null) { <dt>Gerçekleşen</dt><dd>@OrderLabels.Date(d.ActualDate)</dd> }
+                            @if (!string.IsNullOrEmpty(d.ReceiverName)) { <dt>Teslim alan</dt><dd>@d.ReceiverName@(string.IsNullOrEmpty(d.ReceiverNote) ? null : " · " + d.ReceiverNote)</dd> }
+                            @if (!string.IsNullOrEmpty(d.FailureReason)) { <dt>@(d.Status == "Cancelled" ? "İptal gerekçesi" : "Başarısızlık gerekçesi")</dt><dd>@d.FailureReason</dd> }
+                            @if (d.RescheduledFromId is not null) { <dt>Yeniden planlama</dt><dd>@d.RescheduleReason</dd> }
+                            @if (!string.IsNullOrEmpty(d.Notes)) { <dt>Not</dt><dd>@d.Notes</dd> }
+                        </dl>
+                        <ul>
+                            @foreach (var l in d.Lines)
+                            {
+                                <li>@l.Name: planlanan @OrderLabels.Quantity(l.Planned, l.Unit)@(d.Status == "Delivered" ? $" · teslim edilen {OrderLabels.Quantity(l.Delivered, l.Unit)}" : null)</li>
+                            }
+                        </ul>
+
+                        <h4 class="h6">Teslim kanıtı</h4>
+                        @if (d.Evidence.Count == 0) { <p class="text-muted small">Kanıt eklenmedi.</p> }
+                        else
+                        {
+                            <ul class="small">
+                                @foreach (var e in d.Evidence)
+                                {
+                                    <li>
+                                        <a href="api/orders/deliveries/@d.Id/evidence/@e.Id" download="@e.FileName">@e.FileName</a>
+                                        <span class="text-muted"> · @(e.SizeBytes / 1024) KB · @CrmLabels.Time(e.At)@(string.IsNullOrEmpty(e.Description) ? null : " · " + e.Description)</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        @if (CanRecord && d.Status != "Cancelled")
+                        {
+                            <div class="mb-2">
+                                <label class="form-label" for="ev-@d.Id">Kanıt ekle (PDF, PNG ya da JPEG, en çok 2 MB)</label>
+                                <InputFile id="@("ev-" + d.Id)" class="form-control" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" disabled="@busy"
+                                           OnChange="e => UploadAsync(d, e)" />
+                            </div>
+                        }
+
+                        @if (CanRecord && d.Actions.Count > 0)
+                        {
+                            <div class="header-actions" role="group" aria-label="@(d.Number + " işlemleri")">
+                                @foreach (var a in d.Actions.Where(a => a.Allowed))
+                                {
+                                    <button type="button" class="btn @(a.Action == "deliver" ? "btn-primary" : a.Action == "cancel" ? "btn-outline-danger" : "btn-outline-secondary")"
+                                            disabled="@busy" @onclick="() => ChooseDelivery(d, a.Action)">@DeliveryAction(a.Action)</button>
+                                }
+                            </div>
+                            @if (activeDelivery == d.Id && activeAction is { } act)
+                            {
+                                <form class="record-form" novalidate @onsubmit="RunDeliveryAsync" @onsubmit:preventDefault>
+                                    <fieldset disabled="@busy">
+                                        <legend>@DeliveryAction(act)</legend>
+                                        <div class="form-grid">
+                                            @if (act == "deliver")
+                                            {
+                                                <div class="span-6"><label class="form-label" for="f-receiver">Teslim alan kişi (zorunlu)</label><input id="f-receiver" class="form-control" maxlength="300" @bind="receiver" /></div>
+                                                <div class="span-6"><label class="form-label" for="f-actual">Gerçekleşen tarih</label><input id="f-actual" type="date" class="form-control" @bind="actualDate" /></div>
+                                                <div class="span-12"><label class="form-label" for="f-rnote">Teslim notu</label><input id="f-rnote" class="form-control" maxlength="2000" @bind="receiverNote" /></div>
+                                                @foreach (var l in d.Lines)
+                                                {
+                                                    <div class="span-4">
+                                                        <label class="form-label" for="f-q-@l.OrderLineId">@l.Name: teslim edilen (planlanan @OrderLabels.Quantity(l.Planned, l.Unit))</label>
+                                                        <input id="f-q-@l.OrderLineId" type="number" min="0" step="any" class="form-control" @bind="quantities[l.OrderLineId]" />
+                                                    </div>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <div class="span-12"><label class="form-label" for="f-reason">Gerekçe (zorunlu)</label><textarea id="f-reason" class="form-control" rows="2" maxlength="500" @bind="reason"></textarea></div>
+                                                @if (act == "reschedule")
+                                                {
+                                                    <div class="span-4"><label class="form-label" for="f-new-date">Yeni teslim tarihi (zorunlu)</label><input id="f-new-date" type="date" class="form-control" @bind="rescheduleDate" /></div>
+                                                }
+                                            }
+                                        </div>
+                                    </fieldset>
+                                    @if (formError is not null) { <div class="invalid-feedback d-block" role="alert">@formError</div> }
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelForm">Vazgeç</button>
+                                    </div>
+                                </form>
+                            }
+                        }
+                    </article>
+                }
+            </section>
+        }
+
+        @if (view.Services.Count > 0)
+        {
+            <section aria-labelledby="services-title">
+                <h2 id="services-title">Hizmet kalemleri</h2>
+                @foreach (var s in view.Services)
+                {
+                    <article class="mb-4 pb-3 border-bottom" aria-labelledby="svc-@s.LineId">
+                        <h3 id="svc-@s.LineId">
+                            @s.Name
+                            <span class="badge stage-@ServiceBadge(s.Start?.Status)">@ServiceLabel(s.Start?.Status)</span>
+                            @if (s.IsOverdue) { <span class="badge stage-lost">Başlangıç gecikti</span> }
+                        </h3>
+                        <dl class="detail-list">
+                            <dt>Miktar</dt><dd>@OrderLabels.Quantity(s.Quantity, null)@(string.IsNullOrEmpty(s.RecurringPeriod) ? null : " · " + s.RecurringPeriod)</dd>
+                            @if (s.Start is { } st)
+                            {
+                                <dt>Planlanan başlangıç</dt><dd>@OrderLabels.Date(st.PlannedStartDate)</dd>
+                                @if (st.ActualStartAt is { } started) { <dt>Gerçekleşen başlangıç</dt><dd>@CrmLabels.Time(started)</dd> }
+                                @if (st.CustomerConfirmedAt is { } confirmedAt) { <dt>Müşteri onayı</dt><dd>@st.CustomerConfirmedBy · @CrmLabels.Time(confirmedAt)@(string.IsNullOrEmpty(st.ConfirmationNote) ? null : " · " + st.ConfirmationNote)</dd> }
+                                @if (st.CompletedAt is { } completedAt) { <dt>Tamamlanma</dt><dd>@CrmLabels.Time(completedAt)</dd> }
+                                @if (!string.IsNullOrEmpty(st.DelayReason)) { <dt>Gecikme gerekçesi</dt><dd>@st.DelayReason</dd> }
+                            }
+                        </dl>
+                        @if (s.OngoingObligation)
+                        {
+                            <p class="small text-muted">Süreli hizmet: başladı ancak tamamlanmadı; devam eden yükümlülük açık kalır.</p>
+                        }
+                        @if (s.Blockers.Count > 0)
+                        {
+                            <div class="alert alert-warning" role="status">
+                                <strong>Başlangıç şu nedenlerle kaydedilemez:</strong>
+                                <ul class="mb-0">@foreach (var b in s.Blockers) { <li>@b</li> }</ul>
+                            </div>
+                        }
+
+                        @if (CanRecord)
+                        {
+                            @if (s.Start is null)
+                            {
+                                <div class="search">
+                                    <label class="visually-hidden" for="svc-date-@s.LineId">Planlanan başlangıç</label>
+                                    <input id="svc-date-@s.LineId" type="date" class="form-control" @bind="servicePlanDates[s.LineId]" />
+                                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => PlanServiceAsync(s)">Başlangıcı planla</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="header-actions" role="group" aria-label="@(s.Name + " işlemleri")">
+                                    @foreach (var a in s.Actions)
+                                    {
+                                        <button type="button" class="btn @(a.Action == "start" ? "btn-primary" : "btn-outline-secondary")" disabled="@(!a.Allowed || busy)"
+                                                aria-describedby="@(a.Allowed ? null : $"why-{s.LineId}-{a.Action}")" @onclick="() => ChooseService(s, a.Action)">@ServiceAction(a.Action)</button>
+                                    }
+                                </div>
+                                <ul class="small text-muted mt-2">
+                                    @foreach (var a in s.Actions.Where(a => !a.Allowed))
+                                    {
+                                        <li id="why-@s.LineId-@a.Action"><strong>@ServiceAction(a.Action):</strong> @a.Message</li>
+                                    }
+                                </ul>
+                                @if (activeService == s.LineId && activeServiceAction == "confirm")
+                                {
+                                    <form class="record-form" novalidate @onsubmit="RunServiceAsync" @onsubmit:preventDefault>
+                                        <fieldset disabled="@busy">
+                                            <legend>Müşteri başlangıç onayı</legend>
+                                            <div class="form-grid">
+                                                <div class="span-6"><label class="form-label" for="c-by">Onaylayan kişi (zorunlu)</label><input id="c-by" class="form-control" maxlength="300" @bind="confirmedBy" /></div>
+                                                <div class="span-6"><label class="form-label" for="c-note">Not</label><input id="c-note" class="form-control" maxlength="500" @bind="confirmNote" /></div>
+                                            </div>
+                                        </fieldset>
+                                        @if (formError is not null) { <div class="invalid-feedback d-block" role="alert">@formError</div> }
+                                        <div class="form-actions">
+                                            <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelForm">Vazgeç</button>
+                                        </div>
+                                    </form>
+                                }
+                                @if (s.Start.Status == "Planned" && s.IsOverdue)
+                                {
+                                    <form class="search" novalidate @onsubmit="() => SaveDelayAsync(s)" @onsubmit:preventDefault>
+                                        <label class="visually-hidden" for="delay-@s.LineId">Gecikme gerekçesi</label>
+                                        <input id="delay-@s.LineId" class="form-control" maxlength="500" placeholder="Başlangıç gecikme gerekçesi" @bind="delayReasons[s.LineId]" />
+                                        <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(delayReasons.GetValueOrDefault(s.LineId)))">Gerekçeyi kaydet</button>
+                                    </form>
+                                }
+                            }
+                        }
+                    </article>
+                }
+            </section>
+        }
+
+        @if (view.Products.Count == 0 && view.Services.Count == 0)
+        {
+            <p class="text-muted">Bu siparişte izlenecek etkin kalem yok.</p>
+        }
+    }
+</AuthGate>
+
+@code {
+    private const long MaxEvidenceBytes = OrderFulfillmentAccess.MaxEvidenceBytes;
+
+    [Parameter] public Guid Id { get; set; }
+
+    private FulfillmentDto? view;
+    private string? notice;
+    private bool failed;
+    private bool notFound;
+    private bool busy;
+    private bool planning;
+    private DateOnly? planDate;
+    private string planNotes = string.Empty;
+    private readonly Dictionary<Guid, decimal> quantities = [];
+    private readonly Dictionary<Guid, DateOnly?> servicePlanDates = [];
+    private readonly Dictionary<Guid, string> delayReasons = [];
+    private string? formError;
+    private Guid? activeDelivery;
+    private string? activeAction;
+    private string reason = string.Empty;
+    private string receiver = string.Empty;
+    private string receiverNote = string.Empty;
+    private DateOnly? actualDate;
+    private DateOnly? rescheduleDate;
+    private Guid? activeService;
+    private string? activeServiceAction;
+    private string confirmedBy = string.Empty;
+    private string confirmNote = string.Empty;
+
+    private bool CanRecord => Session.Can(OrderFulfillmentAccess.FulfillmentRecord);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(OrdersAccess.OrdersRead)) { return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<FulfillmentDto>($"/api/orders/orders/{Id}/fulfillment");
+        if (!result.IsSuccess)
+        {
+            notFound = true;
+            return;
+        }
+
+        view = result.Value;
+        foreach (var s in view!.Services)
+        {
+            servicePlanDates.TryAdd(s.LineId, null);
+            delayReasons.TryAdd(s.LineId, s.Start?.DelayReason ?? string.Empty);
+        }
+    }
+
+    private void Report(bool ok, string success, string? error)
+    {
+        failed = !ok;
+        notice = ok ? success : error;
+    }
+
+    // ---- Teslimat planı
+
+    private void StartPlan()
+    {
+        planDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+        planNotes = string.Empty;
+        formError = null;
+        quantities.Clear();
+        foreach (var p in view!.Products) { quantities[p.LineId] = Math.Max(0m, p.Remaining - p.PlannedOpen); }
+        planning = true;
+    }
+
+    private async Task PlanAsync()
+    {
+        if (busy || view is null) { return; }
+        if (planDate is null) { formError = "Planlanan teslim tarihi zorunludur."; return; }
+        var lines = view.Products.Where(p => quantities.GetValueOrDefault(p.LineId) > 0m).Select(p => new QuantityDto(p.LineId, quantities[p.LineId])).ToList();
+        if (lines.Count == 0) { formError = "En az bir kalem için sıfırdan büyük miktar girin."; return; }
+
+        busy = true;
+        var result = await Api.PostAsync<DeliveryViewDto>($"/api/orders/orders/{Id}/deliveries", new PlanDeliveryRequest(planDate.Value, lines, null, string.IsNullOrWhiteSpace(planNotes) ? null : planNotes.Trim()));
+        busy = false;
+        Report(result.IsSuccess, "Teslimat planlandı.", result.Error);
+        formError = result.IsSuccess ? null : result.Error;
+        if (result.IsSuccess) { planning = false; await LoadAsync(); }
+    }
+
+    // ---- Teslimat eylemleri
+
+    private void ChooseDelivery(DeliveryViewDto d, string action)
+    {
+        if (activeDelivery == d.Id && activeAction == action) { CancelForm(); return; }
+        activeDelivery = d.Id;
+        activeAction = action;
+        formError = null;
+        reason = string.Empty;
+        receiver = string.Empty;
+        receiverNote = string.Empty;
+        actualDate = DateOnly.FromDateTime(DateTime.Today);
+        rescheduleDate = null;
+        quantities.Clear();
+        foreach (var l in d.Lines) { quantities[l.OrderLineId] = l.Planned; }
+    }
+
+    private void CancelForm()
+    {
+        activeDelivery = null;
+        activeAction = null;
+        activeService = null;
+        activeServiceAction = null;
+        formError = null;
+    }
+
+    private async Task RunDeliveryAsync()
+    {
+        if (busy || view is null || activeDelivery is not { } id || activeAction is not { } action) { return; }
+        var delivery = view.Deliveries.First(d => d.Id == id);
+        DeliveryActionRequest request;
+        if (action == "deliver")
+        {
+            if (string.IsNullOrWhiteSpace(receiver)) { formError = "Teslim alan kişi zorunludur."; return; }
+            var lines = delivery.Lines.Select(l => new QuantityDto(l.OrderLineId, quantities.GetValueOrDefault(l.OrderLineId))).ToList();
+            request = new DeliveryActionRequest(delivery.Version, null, receiver.Trim(), string.IsNullOrWhiteSpace(receiverNote) ? null : receiverNote.Trim(), actualDate, lines);
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(reason)) { formError = "Gerekçe zorunludur."; return; }
+            if (action == "reschedule" && rescheduleDate is null) { formError = "Yeni teslim tarihi zorunludur."; return; }
+            request = new DeliveryActionRequest(delivery.Version, reason.Trim(), PlannedDate: rescheduleDate);
+        }
+
+        busy = true;
+        var result = await Api.PostAsync<DeliveryViewDto>($"/api/orders/deliveries/{id}/{action}", request);
+        busy = false;
+        Report(result.IsSuccess, $"{DeliveryAction(action)}: kaydedildi.", result.Error);
+        formError = result.IsSuccess ? null : result.Error;
+        if (result.IsSuccess) { CancelForm(); await LoadAsync(); }
+    }
+
+    private async Task UploadAsync(DeliveryViewDto d, InputFileChangeEventArgs e)
+    {
+        if (busy || e.File is not { } file) { return; }
+        if (file.Size > MaxEvidenceBytes) { Report(false, string.Empty, "Dosya en fazla 2 MB olabilir."); return; }
+        if (!OrderFulfillmentAccess.AllowedEvidenceTypes.Contains(file.ContentType)) { Report(false, string.Empty, "Yalnızca PDF, PNG ve JPEG dosyaları yüklenebilir."); return; }
+
+        busy = true;
+        try
+        {
+            using var stream = file.OpenReadStream(MaxEvidenceBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            var url = $"/api/orders/deliveries/{d.Id}/evidence?fileName={Uri.EscapeDataString(file.Name)}";
+            var result = await Api.PutBytesAsync<DeliveryViewDto>(url, buffer.ToArray(), file.ContentType);
+            Report(result.IsSuccess, "Teslim kanıtı eklendi.", result.Error);
+        }
+        catch (IOException)
+        {
+            Report(false, string.Empty, "Dosya okunamadı ya da çok büyük.");
+        }
+        finally
+        {
+            busy = false;
+        }
+
+        await LoadAsync();
+    }
+
+    // ---- Hizmet başlangıcı
+
+    private async Task PlanServiceAsync(ServiceLineDto s)
+    {
+        if (busy) { return; }
+        busy = true;
+        var result = await Api.PostAsync<ServiceLineDto>($"/api/orders/orders/{Id}/service-starts", new PlanServiceRequest(s.LineId, servicePlanDates.GetValueOrDefault(s.LineId)));
+        busy = false;
+        Report(result.IsSuccess, "Hizmet başlangıcı planlandı.", result.Error);
+        await LoadAsync();
+    }
+
+    private async Task ChooseService(ServiceLineDto s, string action)
+    {
+        formError = null;
+        confirmedBy = string.Empty;
+        confirmNote = string.Empty;
+        if (action == "confirm")
+        {
+            activeService = activeService == s.LineId && activeServiceAction == "confirm" ? null : s.LineId;
+            activeServiceAction = activeService is null ? null : "confirm";
+            return;
+        }
+
+        activeService = s.LineId;
+        activeServiceAction = action;
+        await RunServiceAsync();
+    }
+
+    private async Task RunServiceAsync()
+    {
+        if (busy || view is null || activeService is not { } lineId || activeServiceAction is not { } action) { return; }
+        var service = view.Services.First(x => x.LineId == lineId);
+        if (service.Start is null) { return; }
+        if (action == "confirm" && string.IsNullOrWhiteSpace(confirmedBy)) { formError = "Onaylayan kişi zorunludur."; return; }
+
+        busy = true;
+        var request = new ServiceActionRequest(service.Start.Version, string.IsNullOrWhiteSpace(confirmedBy) ? null : confirmedBy.Trim(), string.IsNullOrWhiteSpace(confirmNote) ? null : confirmNote.Trim());
+        var result = await Api.PostAsync<ServiceLineDto>($"/api/orders/service-starts/{service.Start.Id}/{action}", request);
+        busy = false;
+        Report(result.IsSuccess, $"{ServiceAction(action)}: kaydedildi.", result.Error);
+        formError = result.IsSuccess ? null : result.Error;
+        if (result.IsSuccess) { CancelForm(); }
+        await LoadAsync();
+    }
+
+    private async Task SaveDelayAsync(ServiceLineDto s)
+    {
+        if (busy || s.Start is null) { return; }
+        busy = true;
+        var result = await Api.PutAsync<ServiceStartDto>($"/api/orders/service-starts/{s.Start.Id}",
+            new SaveServiceStartRequest(s.Start.Version, s.Start.PlannedStartDate, delayReasons.GetValueOrDefault(s.LineId)?.Trim()));
+        busy = false;
+        Report(result.IsSuccess, "Gecikme gerekçesi kaydedildi.", result.Error);
+        await LoadAsync();
+    }
+
+    // ---- Etiketler
+
+    private static string DeliveryLabel(string status) => status switch
+    {
+        "Planned" => "Planlandı",
+        "Delivered" => "Teslim edildi",
+        "Failed" => "Başarısız",
+        "Cancelled" => "İptal edildi",
+        _ => status,
+    };
+
+    private static string DeliveryBadge(string status) => status switch
+    {
+        "Delivered" => "won",
+        "Planned" => "onhold",
+        "Failed" => "lost",
+        _ => "cancelled",
+    };
+
+    private static string DeliveryAction(string action) => action switch
+    {
+        "deliver" => "Teslim edildi olarak kaydet",
+        "fail" => "Başarısız işaretle",
+        "cancel" => "Teslimatı iptal et",
+        "reschedule" => "Yeniden planla",
+        _ => action,
+    };
+
+    private static string ServiceLabel(string? status) => status switch
+    {
+        null => "Başlangıç planlanmadı",
+        "Planned" => "Başlangıç planlandı",
+        "Started" => "Başladı",
+        "Completed" => "Tamamlandı",
+        _ => status,
+    };
+
+    private static string ServiceBadge(string? status) => status switch
+    {
+        "Completed" => "won",
+        "Started" or "Planned" => "onhold",
+        _ => "open",
+    };
+
+    private static string ServiceAction(string action) => action switch
+    {
+        "start" => "Hizmeti başlat",
+        "confirm" => "Müşteri onayını kaydet",
+        "complete" => "Hizmeti tamamla",
+        _ => action,
+    };
+}

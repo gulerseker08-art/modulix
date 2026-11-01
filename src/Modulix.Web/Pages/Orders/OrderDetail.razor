@@ -220,6 +220,15 @@
             <a class="btn btn-outline-primary" href="siparisler/@order.Id/devir">@(order.HandoverStatus == "NotStarted" ? "Devri hazırla" : "Devir ekranını aç")</a>
         </section>
 
+        <section aria-labelledby="fulfillment-title">
+            <h2 id="fulfillment-title">Teslimat ve hizmet başlangıcı</h2>
+            <p>
+                <span class="badge stage-@OrderLabels.FulfillmentBadge(order.FulfillmentStatus)">@OrderLabels.Label(OrderLabels.Fulfillments, order.FulfillmentStatus)</span>
+                <span class="text-muted"> Ürün kalemleri kısmi teslimatla, hizmet kalemleri başlangıç kaydıyla ayrı izlenir; teslim kanıtı ve müşteri onayı kaydedilir.</span>
+            </p>
+            <a class="btn btn-outline-primary" href="siparisler/@order.Id/teslimat">Teslimat ekranını aç</a>
+        </section>
+
         <OrderJobsPanel Order="order" Lines="lines ?? []" />
 
         <OrderChangeRequestsPanel Order="order" Lines="lines ?? []" Changed="LoadAsync" />

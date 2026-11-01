@@ -167,6 +167,14 @@ internal sealed class OrderWorkflow(
             job.Touch();
         }
 
+        // Planlı teslimatlar iptal edilir; teslim edilmiş kayıtlar korunur.
+        foreach (var delivery in await reader.PlannedDeliveriesTrackedAsync(order.Id, cancellationToken))
+        {
+            delivery.Status = DeliveryStatus.Cancelled;
+            delivery.FailureReason = "Sipariş iptal edildi.";
+            delivery.Touch();
+        }
+
         if (await reader.PendingChangeRequestAsync(order.Id, cancellationToken) is { } pending)
         {
             pending.Status = ChangeRequestStatus.Withdrawn;
