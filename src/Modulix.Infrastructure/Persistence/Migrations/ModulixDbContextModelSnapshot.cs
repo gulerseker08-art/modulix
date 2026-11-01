@@ -7661,6 +7661,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ContractId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -8223,6 +8226,62 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "TicketId", "CreatedAt");
 
                     b.ToTable("TicketEvents", "support");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EntityKey")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("RecordId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "EntityKey", "RecordId");
+
+                    b.HasIndex("TenantId", "TicketId", "EntityKey", "RecordId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TicketLinks_Record");
+
+                    b.ToTable("TicketLinks", "support", t =>
+                        {
+                            t.HasCheckConstraint("CK_TicketLinks_Kind", "[EntityKey] IN ('contracts.contract','orders.order','orders.delivery')");
+                        });
                 });
 
             modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketMessage", b =>
@@ -9598,6 +9657,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketEvent", b =>
+                {
+                    b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TicketId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketLink", b =>
                 {
                     b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
                         .WithMany()

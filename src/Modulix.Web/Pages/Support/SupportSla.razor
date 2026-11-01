@@ -178,6 +178,17 @@
                             <label class="form-label" for="pol-party">Müşteri</label>
                             <LookupPicker Id="pol-party" LookupKey="support.sla-policy.party" @bind-Value="pol.PartyId" Placeholder="Tümü" />
                         </div>
+                        @if (contracts is not null)
+                        {
+                            <div class="span-3">
+                                <label class="form-label" for="pol-contract">Sözleşme</label>
+                                <select id="pol-contract" class="form-select" @bind="pol.ContractKey">
+                                    <option value="">Tümü</option>
+                                    @foreach (var c in contracts.Where(c => pol.PartyId is null || c.PartyId == pol.PartyId)) { <option value="@c.Id">@c.Number · @c.Title</option> }
+                                </select>
+                                <div class="form-text">Yalnızca bu sözleşmeye bağlı taleplere uygulanır (talebe sözleşme bağlanınca politika yeniden seçilir).</div>
+                            </div>
+                        }
                     }
                     <div class="span-3">
                         <label class="form-label" for="pol-fr">İlk yanıt hedefi (dk)</label>
@@ -326,6 +337,7 @@
 
     private List<SlaCalendarDto>? calendars;
     private List<SlaPolicyDto>? policies;
+    private List<ContractDto>? contracts;
     private string? message;
     private bool failed;
     private bool busy;
@@ -350,6 +362,10 @@
     {
         calendars = (await Api.GetAsync<PagedResult<SlaCalendarDto>>("/api/support/sla-calendars?pageSize=200")).Value?.Items.ToList() ?? [];
         policies = (await Api.GetAsync<PagedResult<SlaPolicyDto>>("/api/support/sla-policies?pageSize=200")).Value?.Items.ToList() ?? [];
+        // Sözleşme kısıtı yalnızca sözleşme modülü açık ve okuma izni olan yöneticide sunulur (liste sunucuda yetkiyle süzülür).
+        contracts = Session.IsModuleEnabled(ContractsAccess.ModuleKey) && Session.Can(ContractsAccess.ContractsRead)
+            ? (await Api.GetAsync<PagedResult<ContractDto>>("/api/contracts/contracts?pageSize=100")).Value?.Items.ToList()
+            : null;
     }
 
     // ---- Takvim
@@ -434,7 +450,7 @@
         {
             Id = p.Id, Version = p.Version, Name = p.Name, Description = p.Description, IsActive = p.IsActive, IsDefault = p.IsDefault, Precedence = p.Precedence, TypeKey = p.TypeKey ?? string.Empty,
             CategoryId = p.CategoryId, Priority = p.Priority ?? string.Empty, PartyId = p.PartyId, FirstResponseMinutes = p.FirstResponseMinutes, ResolutionMinutes = p.ResolutionMinutes,
-            CalendarId = p.CalendarId, PauseOnWaitingCustomer = p.PauseOnWaitingCustomer, PauseOnWaitingInternal = p.PauseOnWaitingInternal,
+            CalendarId = p.CalendarId, PauseOnWaitingCustomer = p.PauseOnWaitingCustomer, PauseOnWaitingInternal = p.PauseOnWaitingInternal, ContractKey = p.ContractId?.ToString() ?? string.Empty,
         };
         if (!string.IsNullOrWhiteSpace(p.EscalationRules))
         {
@@ -453,7 +469,8 @@
         var request = new SaveSlaPolicyRequest(
             pol.Id is null ? 0 : pol.Version, pol.Name, string.IsNullOrWhiteSpace(pol.Description) ? null : pol.Description.Trim(), pol.IsActive, pol.IsDefault, pol.Precedence,
             pol.IsDefault || pol.TypeKey.Length == 0 ? null : pol.TypeKey, pol.IsDefault ? null : pol.CategoryId, pol.IsDefault || pol.Priority.Length == 0 ? null : pol.Priority, pol.IsDefault ? null : pol.PartyId,
-            pol.FirstResponseMinutes, pol.ResolutionMinutes, pol.CalendarId, pol.PauseOnWaitingCustomer, pol.PauseOnWaitingInternal, rules);
+            pol.FirstResponseMinutes, pol.ResolutionMinutes, pol.CalendarId, pol.PauseOnWaitingCustomer, pol.PauseOnWaitingInternal, rules,
+            pol.IsDefault || !Guid.TryParse(pol.ContractKey, out var contractId) ? null : contractId);
         if (await RunAsync(() => pol.Id is null ? Api.PostAsync<SlaPolicyDto>("/api/support/sla-policies", request) : Api.PutAsync<SlaPolicyDto>($"/api/support/sla-policies/{pol.Id}", request),
                 "Politika kaydedildi.", e => polErrors = e))
         {
@@ -468,6 +485,7 @@
         if (p.Priority is not null) { parts.Add("öncelik: " + SupportLabels.Label(SupportLabels.Priorities, p.Priority)); }
         if (p.CategoryId is not null) { parts.Add("kategori"); }
         if (p.PartyId is not null) { parts.Add("müşteri"); }
+        if (p.ContractId is not null) { parts.Add("sözleşme"); }
         return parts.Count == 0 ? (p.IsDefault ? "yedek (kısıtsız)" : "kısıtsız") : string.Join(", ", parts);
     }
 
@@ -542,6 +560,7 @@
         public Guid? CategoryId { get; set; }
         public string Priority { get; set; } = string.Empty;
         public Guid? PartyId { get; set; }
+        public string ContractKey { get; set; } = string.Empty;
         public int? FirstResponseMinutes { get; set; } = 60;
         public int? ResolutionMinutes { get; set; } = 480;
         public Guid? CalendarId { get; set; }

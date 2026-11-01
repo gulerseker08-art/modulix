@@ -61,6 +61,9 @@ public sealed class SlaPolicy : SupportEntity
 
     public Guid? PartyId { get; internal set; }
 
+    /// <summary>Yalnızca bu sözleşmeye bağlı taleplere uygulanır (sözleşmenin destek kapsamı). Başka modülün kaydı olduğundan yabancı anahtar yoktur; kaydedilirken çağıranın yetkisiyle doğrulanır.</summary>
+    public Guid? ContractId { get; internal set; }
+
     /// <summary>İlk insan yanıtı hedefi (dakika); boşsa bu ölçüt izlenmez.</summary>
     public int? FirstResponseMinutes { get; internal set; }
 

@@ -91,6 +91,7 @@ internal sealed class SlaPolicyRecordStore(SupportStoreContext context) : Suppor
         Field.Reference<SlaPolicy, TicketCategory>("categoryId", "Kategori bulunamadı.", p => p.CategoryId, (p, v) => p.CategoryId = v),
         Field.OptionalChoice<SlaPolicy>("priority", TicketPriority.All, p => p.Priority, (p, v) => p.Priority = v),
         Field.Shared<SlaPolicy, Party>("partyId", "Müşteri bulunamadı.", p => p.PartyId, (p, v) => p.PartyId = v),
+        Field.Id<SlaPolicy>("contractId", p => p.ContractId, (p, v) => p.ContractId = v),
         Field.Integer<SlaPolicy>("firstResponseMinutes", p => p.FirstResponseMinutes, (p, v) => p.FirstResponseMinutes = v, max: SlaPolicy.MaxMinutes),
         Field.Integer<SlaPolicy>("resolutionMinutes", p => p.ResolutionMinutes, (p, v) => p.ResolutionMinutes = v, max: SlaPolicy.MaxMinutes),
         Field.Reference<SlaPolicy, SlaCalendar>("calendarId", "Takvim bulunamadı.", p => p.CalendarId, (p, v) => p.CalendarId = v),
@@ -114,7 +115,7 @@ internal sealed class SlaPolicyRecordStore(SupportStoreContext context) : Suppor
     private string? fingerprint;
 
     private static string Fingerprint(SlaPolicy p) =>
-        string.Join('|', p.Name, p.IsActive, p.IsDefault, p.Precedence, p.TypeKey, p.CategoryId, p.Priority, p.PartyId, p.FirstResponseMinutes, p.ResolutionMinutes, p.CalendarId,
+        string.Join('|', p.Name, p.IsActive, p.IsDefault, p.Precedence, p.TypeKey, p.CategoryId, p.Priority, p.PartyId, p.ContractId, p.FirstResponseMinutes, p.ResolutionMinutes, p.CalendarId,
             p.PauseOnWaitingCustomer, p.PauseOnWaitingInternal, p.EscalationRules);
 
     protected override void OnUpdating(SlaPolicy entity) => fingerprint = Fingerprint(entity);
@@ -139,7 +140,7 @@ internal sealed class SlaPolicyRecordStore(SupportStoreContext context) : Suppor
 
         if (entity.IsDefault)
         {
-            if (entity.TypeKey is not null || entity.CategoryId is not null || entity.Priority is not null || entity.PartyId is not null)
+            if (entity.TypeKey is not null || entity.CategoryId is not null || entity.Priority is not null || entity.PartyId is not null || entity.ContractId is not null)
             {
                 errors.Add(new RecordFieldError("isDefault", "Varsayılan (yedek) politikada eşleşme kısıtı olamaz."));
             }
@@ -147,6 +148,20 @@ internal sealed class SlaPolicyRecordStore(SupportStoreContext context) : Suppor
             if (await Context.Data.Set<SlaPolicy>().AsNoTracking().AnyAsync(p => p.IsDefault && p.Id != entity.Id, cancellationToken))
             {
                 errors.Add(new RecordFieldError("isDefault", "Başka bir politika varsayılan; önce onun varsayılan işaretini kaldırın."));
+            }
+        }
+
+        // Sözleşme kısıtı: sözleşme çağıranın yetkisiyle okunabilmeli (başka modülün kaydı; bulunamıyor, yetki yok ya da modül kapalıysa aynı yanıt) ve müşteri kısıtıyla çelişmemeli.
+        if (entity.ContractId is { } contractId && (isNew || values.ContainsKey("contractId") || values.ContainsKey("partyId")))
+        {
+            var contract = await Context.ReadRecordAsync(TicketLinkKinds.Contract, contractId, cancellationToken);
+            if (contract is null)
+            {
+                errors.Add(new RecordFieldError("contractId", "Sözleşme bulunamadı, erişim yetkiniz yok ya da sözleşme modülü kapalı."));
+            }
+            else if (entity.PartyId is { } policyParty && contract.Values["partyId"]?.ToString() != policyParty.ToString())
+            {
+                errors.Add(new RecordFieldError("contractId", "Sözleşme, politikadaki müşteriye ait değil."));
             }
         }
 

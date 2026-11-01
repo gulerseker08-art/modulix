@@ -97,10 +97,11 @@ public static class EscalationRuleParser
 
 /// <summary>Politika seçiminde adaylar (yalnızca seçime gereken alanlar).</summary>
 public sealed record SlaPolicyCandidate(
-    Guid Id, string Name, int Precedence, bool IsDefault, bool IsActive, string? TypeKey, Guid? CategoryId, string? Priority, Guid? PartyId);
+    Guid Id, string Name, int Precedence, bool IsDefault, bool IsActive, string? TypeKey, Guid? CategoryId, string? Priority, Guid? PartyId, Guid? ContractId = null);
 
 /// <summary>Talebin politika seçimine giren özellikleri. <see cref="CategoryChain"/>: önce talebin kategorisi, sonra üst kategorisi.</summary>
-public sealed record SlaTicketFacts(string TypeKey, IReadOnlyList<Guid> CategoryChain, string Priority, Guid? PartyId);
+/// <param name="ContractIds">Talebe bağlı sözleşmeler (bağlı sözleşmeye göre politika seçimi için); yoksa boş.</param>
+public sealed record SlaTicketFacts(string TypeKey, IReadOnlyList<Guid> CategoryChain, string Priority, Guid? PartyId, IReadOnlyList<Guid>? ContractIds = null);
 
 /// <summary>
 /// Politika seçimi (kesin sıra). Yalnızca etkin ve kısıtlarının hepsi talebe uyan politikalar aday olur. Aday sırası: (1) tanımlı kısıt sayısı çok olan (daha özel),
@@ -118,11 +119,12 @@ public static class SlaPolicySelector
     }
 
     public static int Score(SlaPolicyCandidate c) =>
-        (c.TypeKey is null ? 0 : 1) + (c.CategoryId is null ? 0 : 1) + (c.Priority is null ? 0 : 1) + (c.PartyId is null ? 0 : 1);
+        (c.TypeKey is null ? 0 : 1) + (c.CategoryId is null ? 0 : 1) + (c.Priority is null ? 0 : 1) + (c.PartyId is null ? 0 : 1) + (c.ContractId is null ? 0 : 1);
 
     private static bool Matches(SlaPolicyCandidate c, SlaTicketFacts f) =>
         (c.TypeKey is null || string.Equals(c.TypeKey, f.TypeKey, StringComparison.OrdinalIgnoreCase))
         && (c.CategoryId is null || f.CategoryChain.Contains(c.CategoryId.Value))
         && (c.Priority is null || c.Priority == f.Priority)
-        && (c.PartyId is null || c.PartyId == f.PartyId);
+        && (c.PartyId is null || c.PartyId == f.PartyId)
+        && (c.ContractId is null || (f.ContractIds?.Contains(c.ContractId.Value) ?? false));
 }

@@ -677,6 +677,7 @@
         @if (contract is not null && tabs.Rendered(TabHistory))
         {
             <div role="tabpanel" id="tabpanel-@TabHistory" aria-labelledby="tab-@TabHistory" class="record-tabpanel" hidden="@tabs.Hidden(TabHistory)">
+                <RelatedTickets Title="İlişkili destek talepleri" LinkedEntityKey="contracts.contract" LinkedRecordId="contract.Id" />
                 <section aria-labelledby="timeline-title">
                     <h2 id="timeline-title">Sözleşme tarihçesi</h2>
                     @if (history.Count == 0)

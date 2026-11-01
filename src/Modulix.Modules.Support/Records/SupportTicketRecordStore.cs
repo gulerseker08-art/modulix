@@ -77,6 +77,10 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         ["categoryId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.CategoryId == id) : null,
         ["queueId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.QueueId == id) : null,
         ["parentTicketId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.ParentTicketId == id) : null,
+        // Bağlı kayıt: "anahtar:kimlik" (ör. contracts.contract:{guid}); karşı modülün sayfalarındaki "ilişkili talepler" listesi için.
+        ["linked"] = (q, v, _) => v.LastIndexOf(':') is > 0 and var colon && FilterValue.Id(v[(colon + 1)..]) is { } linkedId && v[..colon] is var linkedKey
+            ? q.Where(t => context.Data.Set<TicketLink>().Any(l => l.TicketId == t.Id && l.EntityKey == linkedKey && l.RecordId == linkedId))
+            : null,
         ["mergedIntoId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.MergedIntoId == id) : null,
         // Başvuran e-postası/telefonu (tanımsız başvuran için mükerrer denetimi); tam eşleşme.
         ["reporterEmail"] = (q, v, _) => v.Trim() is { Length: > 0 } email ? q.Where(t => t.ReporterEmail == email) : null,

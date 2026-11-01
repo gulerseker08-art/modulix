@@ -158,13 +158,13 @@ public sealed record SaveSlaCalendarRequest(
 public sealed record SlaPolicyDto(
     Guid Id, long Version, string Name, string? Description, bool IsActive, bool IsDefault, int Precedence, string? TypeKey, Guid? CategoryId, string? Priority, Guid? PartyId,
     int? FirstResponseMinutes, int? ResolutionMinutes, Guid? CalendarId, bool PauseOnWaitingCustomer, bool PauseOnWaitingInternal, string? EscalationRules, int Revision,
-    Guid? CreatedBy, Guid? UpdatedBy);
+    Guid? CreatedBy, Guid? UpdatedBy, Guid? ContractId = null);
 
 /// <param name="EscalationRules">JSON: <c>[{"id":"warn","metric":"Resolution","percent":75,"action":"NotifyOwner","userId":null,"queueId":null}]</c>.</param>
 public sealed record SaveSlaPolicyRequest(
     long Version = 0, string? Name = null, string? Description = null, bool IsActive = true, bool IsDefault = false, int Precedence = 100, string? TypeKey = null,
     Guid? CategoryId = null, string? Priority = null, Guid? PartyId = null, int? FirstResponseMinutes = null, int? ResolutionMinutes = null, Guid? CalendarId = null,
-    bool PauseOnWaitingCustomer = true, bool PauseOnWaitingInternal = false, string? EscalationRules = null);
+    bool PauseOnWaitingCustomer = true, bool PauseOnWaitingInternal = false, string? EscalationRules = null, Guid? ContractId = null);
 
 public sealed record SlaPauseDto(DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string Reason);
 
@@ -178,7 +178,13 @@ public sealed record SlaInstanceDto(
 
 public sealed record SlaRecalculateRequest(long Version, string? Reason = null);
 
-public sealed record SlaPreviewRequest(string TypeKey, string Priority, Guid? CategoryId = null, Guid? PartyId = null, DateTimeOffset? StartAt = null);
+public sealed record SlaPreviewRequest(string TypeKey, string Priority, Guid? CategoryId = null, Guid? PartyId = null, DateTimeOffset? StartAt = null, Guid? ContractId = null);
+
+// ---- Dilim 5: entegrasyonlar (ADR-0024)
+
+public sealed record TicketLinkDto(Guid Id, string EntityKey, Guid RecordId, string Label, Guid? CreatedBy, DateTimeOffset CreatedAt);
+
+public sealed record AddTicketLinkRequest(string EntityKey, Guid RecordId);
 
 public sealed record SlaPreviewMetricDto(string Metric, int TargetMinutes, DateTimeOffset DueAt, DateTimeOffset? WarningAt);
 

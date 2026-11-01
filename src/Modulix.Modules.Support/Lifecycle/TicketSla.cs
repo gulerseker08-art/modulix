@@ -23,7 +23,7 @@ public sealed record SlaInstanceView(
     DateTimeOffset? DueAt, DateTimeOffset? WarningAt, int WorkedMinutes, int RemainingMinutes, DateTimeOffset? CompletedAt, DateTimeOffset? BreachedAt,
     string? CalendarName, bool AlwaysOpen, DateTimeOffset ComputedAt, IReadOnlyList<SlaPauseView> Pauses, IReadOnlyList<SlaEscalationView> Escalations);
 
-public sealed record SlaPreviewInput(string TypeKey, Guid? CategoryId, string Priority, Guid? PartyId, DateTimeOffset? StartAt);
+public sealed record SlaPreviewInput(string TypeKey, Guid? CategoryId, string Priority, Guid? PartyId, DateTimeOffset? StartAt, Guid? ContractId = null);
 
 public sealed record SlaPreviewMetric(string Metric, int TargetMinutes, DateTimeOffset DueAt, DateTimeOffset? WarningAt);
 
@@ -130,7 +130,7 @@ internal sealed class TicketSla(
             return RecordResult<SlaPreviewResult>.Fail(RecordErrorCode.ValidationFailed, "Önizleme girdileri geçersiz.", errors);
         }
 
-        var selection = await SlaEngine.SelectAsync(storeContext, input.TypeKey!, input.CategoryId, input.Priority!, input.PartyId, cancellationToken);
+        var selection = await SlaEngine.SelectAsync(storeContext, input.TypeKey!, input.CategoryId, input.Priority!, input.PartyId, cancellationToken, input.ContractId is { } previewContract ? [previewContract] : null);
         if (selection is null)
         {
             return RecordResult<SlaPreviewResult>.Ok(new SlaPreviewResult(false, null, null, 0, null, false, false, false, [], []));

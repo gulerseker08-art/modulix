@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Persistence;
@@ -10,8 +11,18 @@ namespace Modulix.Modules.Support.Records;
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler: veri, tenant üyeleri, seçim listeleri, isteği yapan kullanıcı ve iş akışı kapısı.</summary>
 internal sealed class SupportStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
-    ICurrentAccess permissions, TicketWorkflowGate gate, TimeProvider time, IRecordCommandContext? command = null)
+    ICurrentAccess permissions, TicketWorkflowGate gate, TimeProvider time, IServiceProvider services, IRecordCommandContext? command = null)
 {
+    /// <summary>
+    /// Başka bir modülün kaydını kayıt boru hattından <b>çağıranın yetkisi ve veri kapsamıyla</b> okur (destek karşı modülün tablosunu görmez). Kayıt yoksa, okunamıyorsa, modül kapalıysa ya da
+    /// yetki yoksa aynı sonuç (null) döner. Boru hattı yazma sırasında geç çözülür (depolar boru hattına bağlı olduğundan döngüsel bağımlılık oluşmaz).
+    /// </summary>
+    public async Task<RecordData?> ReadRecordAsync(string entityKey, Guid id, CancellationToken cancellationToken)
+    {
+        var result = await services.GetRequiredService<IRecordPipeline>().GetAsync(new RecordRef(entityKey, id), cancellationToken);
+        return result.IsSuccess ? result.Value : null;
+    }
+
     public IModuleData Data => data;
 
     public ITenantMembers Members => members;
