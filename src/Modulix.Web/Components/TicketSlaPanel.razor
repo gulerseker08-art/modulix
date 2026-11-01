@@ -1,0 +1,148 @@
+@* Talep SLA durumu: tüm hesap sunucudadır (otorite); bu bileşen yalnızca sunucunun hesapladığı örnekleri ve süreleri gösterir. Sayaç yazısı gösterim amaçlıdır. *@
+@implements IDisposable
+@inject ApiClient Api
+@inject SessionState Session
+
+<section aria-labelledby="sla-title">
+    <h2 id="sla-title">SLA</h2>
+    <Notice Text="@message" Failed="@failed" />
+    @if (instances is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (instances.Count == 0)
+    {
+        <p class="text-muted">Bu talebe uyan SLA politikası yok: <strong>hedefsiz</strong>. Hedef atanması için eşleşen bir politika (ya da varsayılan politika) tanımlanmalıdır.</p>
+    }
+    else
+    {
+        <p class="small text-muted">Süreler sunucuda iş takvimine göre hesaplanır; sayaç yazısı gösterim amaçlıdır ve @(Refresh) sn'de bir yenilenir. Saatler tarayıcınızın saat dilimindedir.</p>
+        @foreach (var cycle in instances.GroupBy(i => i.Cycle).OrderByDescending(g => g.Key))
+        {
+            <h3 class="h6">Döngü @cycle.Key@(cycle.Key == instances.Max(i => i.Cycle) ? " (güncel)" : " (geçmiş)")</h3>
+            <div class="sla-cards">
+                @foreach (var i in cycle.OrderBy(i => i.Metric))
+                {
+                    <article class="sla-card" aria-label="@SlaLabels.Label(SlaLabels.Metrics, i.Metric) SLA">
+                        <header>
+                            <strong>@SlaLabels.Label(SlaLabels.Metrics, i.Metric)</strong>
+                            <span class="badge stage-@SlaLabels.StateBadge(i.State)">@SlaLabels.Label(SlaLabels.States, i.State)</span>
+                        </header>
+                        <dl class="detail-list">
+                            <dt>Politika</dt><dd>@i.PolicyName (sürüm @i.PolicyRevision)@(i.AlwaysOpen ? " · 7/24" : i.CalendarName is { } cal ? " · " + cal : null)</dd>
+                            <dt>Hedef</dt><dd>@SlaLabels.Duration(i.TargetMinutes) iş süresi</dd>
+                            <dt>Harcanan / kalan</dt><dd>@SlaLabels.Duration(i.WorkedMinutes) / @SlaLabels.Duration(i.RemainingMinutes)</dd>
+                            @if (i.Status == "Running" && i.DueAt is { } due)
+                            {
+                                <dt>Hedef anı</dt><dd>@CrmLabels.Time(due) · <span aria-live="off">@SlaLabels.Remaining(due, DateTimeOffset.UtcNow)</span></dd>
+                            }
+                            else if (i.Status == "Paused")
+                            {
+                                <dt>Hedef anı</dt><dd>Duraklatıldı; sayaç sürdürülünce yeniden hesaplanır.</dd>
+                            }
+                            @if (i.BreachedAt is { } breached) { <dt>İhlal anı</dt><dd>@CrmLabels.Time(breached) <small class="text-muted">(gerçek hedef anı)</small></dd> }
+                            @if (i.CompletedAt is { } completed) { <dt>Tamamlanma</dt><dd>@CrmLabels.Time(completed)</dd> }
+                        </dl>
+                        @if (i.Pauses.Count > 0)
+                        {
+                            <details>
+                                <summary>Duraklatma aralıkları (@i.Pauses.Count)</summary>
+                                <ul class="small">
+                                    @foreach (var p in i.Pauses)
+                                    {
+                                        <li>@CrmLabels.Time(p.StartedAt) → @(p.EndedAt is { } end ? CrmLabels.Time(end) : "devam ediyor") · @SupportLabels.Label(SupportLabels.Statuses, p.Reason)</li>
+                                    }
+                                </ul>
+                            </details>
+                        }
+                        @if (i.Escalations.Count > 0)
+                        {
+                            <details>
+                                <summary>Eskalasyon eylemleri (@i.Escalations.Count)</summary>
+                                <ul class="small">
+                                    @foreach (var e in i.Escalations)
+                                    {
+                                        <li>%@e.Percent · @SlaLabels.Label(SlaLabels.Actions, e.Action) · @CrmLabels.Time(e.ExecutedAt) · @e.Outcome</li>
+                                    }
+                                </ul>
+                            </details>
+                        }
+                    </article>
+                }
+            </div>
+        }
+
+        @if (Session.Can(SupportAccess.SlaRecalculate) && instances.Any(i => i.Status is "Running" or "Paused"))
+        {
+            <details>
+                <summary>SLA'yı yeniden hesapla (yetkili işlem)</summary>
+                <form class="record-form" novalidate @onsubmit="RecalculateAsync" @onsubmit:preventDefault>
+                    <p class="small text-muted">Açık örnekler güncel politika ve takvimle yeniden anlık görüntülenir; harcanan süre korunur, ihlal edilmiş örnek değişmez. Önce/sonra özeti tarihçeye yazılır.</p>
+                    <label class="form-label" for="sla-reason">Gerekçe (zorunlu)</label>
+                    <textarea id="sla-reason" class="form-control" rows="2" maxlength="500" @bind="reason" aria-invalid="@(reasonError is not null ? "true" : null)"></textarea>
+                    @if (reasonError is not null) { <div class="invalid-feedback d-block" role="alert">@reasonError</div> }
+                    <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Yeniden hesapla</button></div>
+                </form>
+            </details>
+        }
+    }
+</section>
+
+@code {
+    private const int Refresh = 30;
+
+    [Parameter, EditorRequired] public TicketDto Ticket { get; set; } = default!;
+
+    /// <summary>Yeniden hesaplamadan sonra güncel talep.</summary>
+    [Parameter] public EventCallback<TicketDto> Changed { get; set; }
+
+    private List<SlaInstanceDto>? instances;
+    private Guid loadedFor;
+    private long loadedVersion;
+    private string reason = string.Empty;
+    private string? reasonError;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private Timer? timer;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Ticket.Id && loadedVersion == Ticket.Version)
+        {
+            return;
+        }
+
+        loadedFor = Ticket.Id;
+        loadedVersion = Ticket.Version;
+        await LoadAsync();
+        timer ??= new Timer(async _ => await InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); }), null, TimeSpan.FromSeconds(Refresh), TimeSpan.FromSeconds(Refresh));
+    }
+
+    private async Task LoadAsync() =>
+        instances = (await Api.GetAsync<List<SlaInstanceDto>>($"/api/support/tickets/{Ticket.Id}/sla")).Value ?? [];
+
+    private async Task RecalculateAsync()
+    {
+        if (busy) { return; }
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            reasonError = "Gerekçe zorunludur.";
+            return;
+        }
+
+        busy = true;
+        reasonError = null;
+        var result = await Api.PostAsync<TicketDto>($"/api/support/tickets/{Ticket.Id}/sla/recalculate", new SlaRecalculateRequest(Ticket.Version, reason.Trim()));
+        busy = false;
+        failed = !result.IsSuccess;
+        message = result.IsSuccess ? "SLA yeniden hesaplandı." : result.Error;
+        if (result.IsSuccess)
+        {
+            reason = string.Empty;
+            await Changed.InvokeAsync(result.Value!);
+        }
+    }
+
+    public void Dispose() => timer?.Dispose();
+}

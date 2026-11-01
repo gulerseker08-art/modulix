@@ -13,7 +13,7 @@ public sealed record TicketHistoryItem(
 /// Çalışma alanı sayıları. Her sayı kayıt boru hattının listesinden gelir; bu yüzden kullanıcının izni ve veri kapsamı dışındaki talepler
 /// sayıya girmez ve sayı, listede aynı süzgeçle açılan sonuçla birebir aynıdır.
 /// </summary>
-public sealed record TicketSummaryCounts(int Mine, int Unassigned, int AwaitingFirstResponse, int WaitingCustomer, int Reopened, int Resolved, int Open);
+public sealed record TicketSummaryCounts(int Mine, int Unassigned, int AwaitingFirstResponse, int WaitingCustomer, int Reopened, int Resolved, int Open, int SlaAtRisk = 0, int SlaBreached = 0);
 
 /// <summary>Talep okuma sorguları. Görünürlük (izin ve veri kapsamı) kayıt boru hattında doğrulanır; görünmeyen talep "bulunamadı" alır.</summary>
 public interface ITicketQueries
@@ -63,8 +63,10 @@ internal sealed class TicketSummaryService(IRecordPipeline pipeline) : ITicketSu
         var reopened = await CountAsync(cancellationToken, ("status", TicketStatus.Reopened));
         var resolved = await CountAsync(cancellationToken, ("status", TicketStatus.Resolved));
         var open = await CountAsync(cancellationToken, ("open", "true"));
+        var atRisk = await CountAsync(cancellationToken, ("slaAtRisk", "true"), ("open", "true"));
+        var breached = await CountAsync(cancellationToken, ("slaBreached", "true"), ("open", "true"));
         return RecordResult<TicketSummaryCounts>.Ok(new TicketSummaryCounts(
-            mine.Count, unassigned.Count, awaiting.Count, waiting.Count, reopened.Count, resolved.Count, open.Count));
+            mine.Count, unassigned.Count, awaiting.Count, waiting.Count, reopened.Count, resolved.Count, open.Count, atRisk.Count, breached.Count));
     }
 
     private async Task<(int Count, RecordError? Error)> CountAsync(CancellationToken cancellationToken, params (string Name, string Value)[] filters)

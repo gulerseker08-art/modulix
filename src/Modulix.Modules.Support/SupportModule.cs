@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
@@ -59,6 +60,12 @@ public sealed class SupportModule : IModule
 
         /// <summary>Kuyrukları ve kategorileri yönetir.</summary>
         public const string SettingsManage = "support.settings.manage";
+
+        /// <summary>SLA politikalarını ve iş takvimlerini yönetir; örnek talep üzerinde politika önizlemesi yapar.</summary>
+        public const string SlaManage = "support.sla.manage";
+
+        /// <summary>Talebin açık SLA örneklerini gerekçeyle güncel politika ve takvimle yeniden hesaplar.</summary>
+        public const string SlaRecalculate = "support.sla.recalculate";
     }
 
     /// <summary>Firma ayarları.</summary>
@@ -74,6 +81,8 @@ public sealed class SupportModule : IModule
         public const string Ticket = "support.ticket";
         public const string Queue = "support.queue";
         public const string Category = "support.category";
+        public const string SlaCalendar = "support.sla-calendar";
+        public const string SlaPolicy = "support.sla-policy";
     }
 
     /// <summary>Seçim listeleri (Y9b): firma adlarını, sırasını ve etkinliğini değiştirir.</summary>
@@ -112,6 +121,8 @@ public sealed class SupportModule : IModule
         new(Permissions.NotesWrite, "İç not yazar (müşteriye gitmez)", "Destek mesajları"),
         new(Permissions.InternalRead, "İç notları okur", "Destek mesajları"),
         new(Permissions.SettingsManage, "Destek kuyruklarını ve kategorilerini yönetir", "Destek yönetimi"),
+        new(Permissions.SlaManage, "SLA politikalarını ve iş takvimlerini yönetir; politika önizlemesi yapar", "Destek yönetimi"),
+        new(Permissions.SlaRecalculate, "Talebin açık SLA örneklerini gerekçeyle yeniden hesaplar", "Destek talepleri"),
     ];
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
@@ -156,7 +167,7 @@ public sealed class SupportModule : IModule
             [
                 Permissions.TicketsRead, Permissions.TicketsCreate, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsTake,
                 Permissions.TicketsResolve, Permissions.TicketsClose, Permissions.TicketsReopen, Permissions.TicketsCancel, Permissions.PriorityOverride,
-                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead,
+                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SlaRecalculate,
             ])
         {
             Scope = RecordScope.Team,
@@ -168,7 +179,7 @@ public sealed class SupportModule : IModule
             [
                 Permissions.TicketsRead, Permissions.TicketsCreate, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsTake,
                 Permissions.TicketsResolve, Permissions.TicketsClose, Permissions.TicketsReopen, Permissions.TicketsCancel, Permissions.PriorityOverride,
-                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SettingsManage,
+                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SettingsManage, Permissions.SlaManage, Permissions.SlaRecalculate,
             ])
         {
             Scope = RecordScope.All,
@@ -194,6 +205,7 @@ public sealed class SupportModule : IModule
             ["parentTicketId"] = "İlişkili talep", ["eventDate"] = "Olay tarihi", ["expectedOutcome"] = "Beklenen sonuç", ["resolutionCode"] = "Çözüm kodu",
             ["resolutionNote"] = "Çözüm açıklaması", ["resolvedAt"] = "Çözüm zamanı", ["rootCause"] = "Kök neden", ["correctiveAction"] = "Düzeltici aksiyon",
             ["closedAt"] = "Kapanış zamanı", ["reopenCount"] = "Yeniden açılma sayısı", ["firstResponseAt"] = "İlk yanıt zamanı",
+            ["firstResponseDueAt"] = "İlk yanıt hedefi", ["resolutionDueAt"] = "Çözüm hedefi",
         }, "subject")
         {
             UserFields = ["ownerId", "resolvedBy", "createdBy", "updatedBy"],
@@ -217,6 +229,24 @@ public sealed class SupportModule : IModule
         {
             UserFields = ["createdBy", "updatedBy"],
             References = new Dictionary<string, string> { ["parentId"] = Entities.Category, ["defaultQueueId"] = Entities.Queue },
+        },
+        new(Entities.SlaCalendar, "SLA takvimi", Permissions.SlaManage, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["timeZoneId"] = "Saat dilimi", ["isAlwaysOpen"] = "7/24", ["weeklyHours"] = "Çalışma saatleri", ["holidays"] = "Tatiller", ["isActive"] = "Etkin",
+        }, "name")
+        {
+            UserFields = ["createdBy", "updatedBy"],
+        },
+        new(Entities.SlaPolicy, "SLA politikası", Permissions.SlaManage, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["description"] = "Açıklama", ["isActive"] = "Etkin", ["isDefault"] = "Varsayılan", ["precedence"] = "Öncelik sırası", ["typeKey"] = "Tür",
+            ["categoryId"] = "Kategori", ["priority"] = "Öncelik", ["partyId"] = "Müşteri", ["firstResponseMinutes"] = "İlk yanıt hedefi (dk)", ["resolutionMinutes"] = "Çözüm hedefi (dk)",
+            ["calendarId"] = "Takvim", ["pauseOnWaitingCustomer"] = "Müşteri beklemesinde durdur", ["pauseOnWaitingInternal"] = "İç ekip beklemesinde durdur",
+            ["escalationRules"] = "Eskalasyon kuralları", ["revision"] = "Sürüm",
+        }, "name")
+        {
+            UserFields = ["createdBy", "updatedBy"],
+            References = new Dictionary<string, string> { ["categoryId"] = Entities.Category, ["partyId"] = SharedEntities.Party, ["calendarId"] = Entities.SlaCalendar },
         },
     ];
 
@@ -279,6 +309,18 @@ public sealed class SupportModule : IModule
         new(SharedEntities.Person, Entities.Ticket, "personId", "destek talebi"),
     ];
 
+    /// <summary>
+    /// Sistem kimliği (oturumsuz çağıran): SLA zamanlanmış işi (ihlal işareti, eskalasyon) bu kimlikle, kendi tenant kapsamında ve yalnızca bildirilen izinlerle çalışır.
+    /// </summary>
+    IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
+    [
+        EventSubscription.For<SupportSchedulerAnchor>(
+            "support.scheduler",
+            [DomainEventTypes.RecordDeleted],
+            [Entities.Ticket],
+            [Permissions.TicketsRead, Permissions.TicketsWrite, Permissions.TicketsAssign]),
+    ];
+
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<SupportStoreContext>();
@@ -291,6 +333,11 @@ public sealed class SupportModule : IModule
         services.AddScoped<ITicketMessages, TicketMessages>();
         services.AddScoped<ITicketQueries, TicketQueries>();
         services.AddScoped<ITicketSummary, TicketSummaryService>();
+        services.AddScoped<IRecordStore, SlaCalendarRecordStore>();
+        services.AddScoped<IRecordStore, SlaPolicyRecordStore>();
+        services.AddScoped<ITicketSla, TicketSla>();
+        services.AddScoped<ISlaScheduler, SlaScheduler>();
+        services.AddScoped<SupportSchedulerAnchor>();
         services.AddScoped<IActivityLinkTarget, TicketLinkTarget>();
     }
 }

@@ -38,6 +38,8 @@
 
         <TicketActionsPanel Ticket="ticket" Changed="OnChangedAsync" />
 
+        <TicketSlaPanel Ticket="ticket" Changed="OnChangedAsync" />
+
         <div class="detail-columns">
             <div>
                 <section aria-labelledby="messages-title">
@@ -110,7 +112,7 @@
                             @foreach (var h in history)
                             {
                                 <li>
-                                    <strong>@SupportLabels.History(h.Kind)</strong>
+                                    <strong>@HistoryText(h.Kind)</strong>
                                     <span class="text-muted small"> · @CrmLabels.Time(h.At) · @(h.ActorId is null ? "Sistem" : Lookups.MemberName(h.ActorId))</span>
                                     @if (h.FromStatus != h.ToStatus && h.ToStatus is not null) { <div class="small">@SupportLabels.Label(SupportLabels.Statuses, h.FromStatus) → @SupportLabels.Label(SupportLabels.Statuses, h.ToStatus)</div> }
                                     @if (h.FromOwnerId != h.ToOwnerId) { <div class="small">Sorumlu: @(h.FromOwnerId is null ? "—" : Lookups.MemberName(h.FromOwnerId)) → @(h.ToOwnerId is null ? "Atanmamış" : Lookups.MemberName(h.ToOwnerId))</div> }
@@ -228,6 +230,8 @@
         messages = (await Api.GetAsync<List<TicketMessageDto>>($"/api/support/tickets/{Id}/messages")).Value ?? [];
         history = (await Api.GetAsync<List<TicketHistoryDto>>($"/api/support/tickets/{Id}/history")).Value ?? [];
     }
+
+    private static string HistoryText(string kind) => SlaLabels.HistoryKind(kind) is var sla && sla != kind ? sla : SupportLabels.History(kind);
 
     private static string Describe(TicketMessageDto m) => m.Direction switch
     {

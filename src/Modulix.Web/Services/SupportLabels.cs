@@ -23,7 +23,7 @@ public static class SupportLabels
 
     public static IReadOnlyList<(string Key, string Label)> Sorts { get; } =
     [
-        ("-createdAt", "En yeni"), ("createdAt", "En eski"), ("priority", "Öncelik (yüksek önce)"), ("-lastActivity", "Son hareket"),
+        ("-createdAt", "En yeni"), ("createdAt", "En eski"), ("priority", "Öncelik (yüksek önce)"), ("-lastActivity", "Son hareket"), ("resolutionDue", "Çözüm hedefi (yakın)"), ("firstResponseDue", "İlk yanıt hedefi (yakın)"),
         ("number", "Numara (artan)"), ("-number", "Numara (azalan)"), ("subject", "Konu (A-Z)"),
     ];
 
