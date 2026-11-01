@@ -87,6 +87,7 @@ public static class OrderEventKinds
     public const string ChangeApplied = "ChangeApplied";
     public const string ChangeRejected = "ChangeRejected";
     public const string ChangeWithdrawn = "ChangeWithdrawn";
+    public const string HandoverChanged = "HandoverChanged";
 }
 
 public readonly record struct OrderRuleResult(bool Allowed, string? Code = null, string? Message = null)

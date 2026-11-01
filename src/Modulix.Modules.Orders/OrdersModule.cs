@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
@@ -40,12 +41,23 @@ public sealed class OrdersModule : IModule
 
         /// <summary>Kalan yükümlülük varken siparişi gerekçeyle zorla kapatır. Kapatma yetkisinden ayrıdır.</summary>
         public const string OrdersForceClose = "orders.orders.force-close";
+
+        /// <summary>Satış devri kaydını hazırlar ve düzenler (kontrol listesi dahil). Göndermekten ve kabul etmekten ayrıdır.</summary>
+        public const string HandoversWrite = "orders.handovers.write";
+
+        /// <summary>Hazır satış devrini operasyona gönderir ya da bilgi isteği sonrası yeniden gönderir.</summary>
+        public const string HandoversSend = "orders.handovers.send";
+
+        /// <summary>Operasyon adına devri kabul eder ya da gerekçeyle bilgi ister; sorumlu operasyon kullanıcısını atar.</summary>
+        public const string HandoversAccept = "orders.handovers.accept";
     }
 
     /// <summary>Firma ayarları.</summary>
     public static class SettingKeys
     {
         public const string AllowSelfApproval = "orders.approval.allow-self";
+        public const string HandoverAcceptDueDays = "orders.handover.accept-due-days";
+        public const string HandoverWaitHours = "orders.handover.wait-hours";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -54,6 +66,8 @@ public sealed class OrdersModule : IModule
         public const string Order = "orders.order";
         public const string OrderLine = "orders.order-line";
         public const string ChangeRequest = "orders.change-request";
+        public const string Handover = "orders.handover";
+        public const string HandoverItem = "orders.handover-item";
     }
 
     public string Key => ModuleKey;
@@ -70,10 +84,27 @@ public sealed class OrdersModule : IModule
         new(Permissions.OrdersCancel, "Siparişi gerekçeyle iptal eder (teslim edilen kayıtlar korunur)", "Siparişler"),
         new(Permissions.OrdersClose, "Gerçekleşmesi tamamlanmış siparişi kapatır", "Siparişler"),
         new(Permissions.OrdersForceClose, "Kalan yükümlülük varken siparişi gerekçeyle zorla kapatır", "Siparişler"),
+        new(Permissions.HandoversWrite, "Satış devri kaydını ve kontrol listesini hazırlar ve düzenler", "Satış devri"),
+        new(Permissions.HandoversSend, "Hazır satış devrini operasyona gönderir ya da yeniden gönderir", "Satış devri"),
+        new(Permissions.HandoversAccept, "Satış devrini operasyon adına kabul eder ya da gerekçeyle bilgi ister", "Satış devri"),
     ];
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
     [
+        new(SettingKeys.HandoverAcceptDueDays, "Satış devri: kabul için hedef süre (gün)", "Siparişler", SettingType.Text, "2")
+        {
+            Description = "Operasyona gönderilen devir için açılan takip aktivitesinin son tarihi (gönderimden itibaren gün). 1-30 arası.",
+            Pattern = @"^[0-9]{1,2}$",
+            PatternMessage = "1-30 arası tam sayı girin.",
+            MaxLength = 2,
+        },
+        new(SettingKeys.HandoverWaitHours, "Satış devri: kabul bekleme uyarı süresi (saat)", "Siparişler", SettingType.Text, "48")
+        {
+            Description = "Operasyona gönderilen devir bu süreden uzun kabul edilmezse satış sorumlusuna bir kez takip aktivitesi açılır. 0 kapalıdır.",
+            Pattern = @"^[0-9]{1,4}$",
+            PatternMessage = "0-9999 arası tam sayı girin.",
+            MaxLength = 4,
+        },
         new(SettingKeys.AllowSelfApproval, "Sipariş onayı: kendi gönderdiğini onaylama", "Siparişler", SettingType.Choice, "false")
         {
             Description = "Evet seçilirse siparişi onaya gönderen kişi onaylama yetkisine sahipse kendi gönderdiğini onaylayabilir (aynı kural değişiklik talebi için de geçerlidir). Varsayılan hayırdır (hazırlayan ve onaylayan ayrılır).",
@@ -93,9 +124,17 @@ public sealed class OrdersModule : IModule
             "orders.sales",
             "Sipariş sorumlusu (satış)",
             "Kabul edilmiş tekliften sipariş oluşturur, siparişleri tutarlarıyla görüntüler ve taslağı düzenler.",
-            [Permissions.OrdersRead, Permissions.OrdersCreate, Permissions.OrdersWrite, Permissions.FinancialsRead])
+            [Permissions.OrdersRead, Permissions.OrdersCreate, Permissions.OrdersWrite, Permissions.FinancialsRead, Permissions.HandoversWrite, Permissions.HandoversSend])
         {
             Scope = RecordScope.Own,
+        },
+        new(
+            "orders.operations",
+            "Operasyon sorumlusu (sipariş)",
+            "Siparişleri tutarlar olmadan görüntüler; satış devirlerini kabul eder ya da gerekçeyle bilgi ister.",
+            [Permissions.OrdersRead, Permissions.HandoversAccept])
+        {
+            Scope = RecordScope.All,
         },
         new(
             "orders.approver",
@@ -149,6 +188,28 @@ public sealed class OrdersModule : IModule
             UserFields = ["requestedBy", "decidedBy"],
             References = new Dictionary<string, string> { ["orderId"] = Entities.Order },
         },
+        new(Entities.Handover, "Satış devri", Permissions.OrdersRead, new Dictionary<string, string>
+        {
+            ["orderId"] = "Sipariş", ["status"] = "Durum", ["round"] = "Gönderim turu", ["scope"] = "Satılan kapsam", ["outOfScope"] = "Kapsam dışı işler",
+            ["deliverables"] = "Teslim edilecek çıktılar", ["commitments"] = "Müşteri taahhütleri", ["location"] = "Lokasyon", ["contactName"] = "İlgili kişi",
+            ["contactPhone"] = "Telefon", ["contactEmail"] = "E-posta", ["targetStartDate"] = "Hedef başlangıç", ["targetEndDate"] = "Hedef bitiş", ["priority"] = "Öncelik",
+            ["requiredDocuments"] = "Gerekli belgeler", ["customerPrerequisites"] = "Müşteri ön koşulları", ["paymentConditions"] = "Ödeme/sözleşme koşulları",
+            ["risks"] = "Riskler", ["specialRequests"] = "Özel talepler", ["dependencies"] = "Bağımlılıklar", ["responsibleUserId"] = "Sorumlu operasyon kullanıcısı",
+            ["responsibleTeam"] = "Sorumlu operasyon ekibi", ["completionCriteria"] = "Tamamlanma kriterleri", ["acceptanceCriteria"] = "Müşteri kabul kriterleri",
+            ["infoRequest"] = "Bilgi isteği", ["sentAt"] = "Gönderim zamanı", ["acceptedAt"] = "Kabul zamanı",
+        })
+        {
+            UserFields = ["responsibleUserId", "sentBy", "acceptedBy", "createdBy"],
+            References = new Dictionary<string, string> { ["orderId"] = Entities.Order },
+        },
+        new(Entities.HandoverItem, "Devir kontrol listesi maddesi", Permissions.OrdersRead, new Dictionary<string, string>
+        {
+            ["handoverId"] = "Devir", ["position"] = "Sıra", ["text"] = "Madde", ["isRequired"] = "Zorunlu", ["isDone"] = "Tamamlandı", ["doneAt"] = "Tamamlanma zamanı", ["note"] = "Not",
+        })
+        {
+            UserFields = ["doneBy"],
+            References = new Dictionary<string, string> { ["handoverId"] = Entities.Handover },
+        },
         new(Entities.OrderLine, "Sipariş kalemi", Permissions.OrdersRead, new Dictionary<string, string>
         {
             ["orderId"] = "Sipariş", ["position"] = "Sıra", ["kind"] = "Tür", ["productCode"] = "Kod", ["name"] = "Ad", ["description"] = "Açıklama",
@@ -189,6 +250,19 @@ public sealed class OrdersModule : IModule
         new(SharedEntities.Person, Entities.Order, "personId", "sipariş"),
     ];
 
+    /// <summary>
+    /// Sistem kimlikleri (oturumsuz çağıranlar): zamanlanmış işler (devir kabul bekleme takibi) bu kimlikle, kendi tenant kapsamında ve yalnızca bildirilen
+    /// izinlerle çalışır. Olay işlemez; izinlerini tanımlar.
+    /// </summary>
+    IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
+    [
+        EventSubscription.For<OrdersSchedulerAnchor>(
+            "orders.scheduler",
+            [DomainEventTypes.RecordDeleted],
+            [Entities.Order],
+            [Permissions.OrdersRead, Permissions.HandoversWrite]),
+    ];
+
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<OrdersStoreContext>();
@@ -197,6 +271,11 @@ public sealed class OrdersModule : IModule
         services.AddScoped<IRecordStore, OrderRecordStore>();
         services.AddScoped<IRecordStore, OrderLineRecordStore>();
         services.AddScoped<IRecordStore, OrderChangeRequestRecordStore>();
+        services.AddScoped<IRecordStore, OrderHandoverRecordStore>();
+        services.AddScoped<IRecordStore, OrderHandoverItemRecordStore>();
+        services.AddScoped<IOrderHandovers, OrderHandovers>();
+        services.AddScoped<IOrderScheduler, OrderScheduler>();
+        services.AddScoped<OrdersSchedulerAnchor>();
         services.AddScoped<IOrderWorkflow, OrderWorkflow>();
         services.AddScoped<IOrderChangeRequests, OrderChangeRequests>();
         services.AddScoped<IOrderFromQuote, OrderFromQuote>();

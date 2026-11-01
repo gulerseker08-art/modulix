@@ -211,6 +211,15 @@
             }
         </section>
 
+        <section aria-labelledby="handover-title">
+            <h2 id="handover-title">Satış devri</h2>
+            <p>
+                <span class="badge stage-@OrderLabels.HandoverBadge(order.HandoverStatus)">@OrderLabels.Label(OrderLabels.Handovers, order.HandoverStatus)</span>
+                <span class="text-muted"> Satıştan operasyona yapılandırılmış devir: kapsam, çıktılar, taahhütler, kontrol listesi ve kabul kriterleri.</span>
+            </p>
+            <a class="btn btn-outline-primary" href="siparisler/@order.Id/devir">@(order.HandoverStatus == "NotStarted" ? "Devri hazırla" : "Devir ekranını aç")</a>
+        </section>
+
         <OrderChangeRequestsPanel Order="order" Lines="lines ?? []" Changed="LoadAsync" />
 
         <section aria-labelledby="history-title">
