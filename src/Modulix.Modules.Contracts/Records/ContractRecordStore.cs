@@ -87,7 +87,10 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         ["type"] = (q, v, _) => v.Trim() is { Length: > 0 } type ? q.Where(c => c.Type == type) : null,
         ["preparationStatus"] = (q, v, _) => PreparationStatus.All.Contains(v) ? q.Where(c => c.PreparationStatus == v) : null,
         ["approvalStatus"] = (q, v, _) => ApprovalStatus.All.Contains(v) ? q.Where(c => c.ApprovalStatus == v) : null,
-        ["signatureStatus"] = (q, v, _) => SignatureStatus.All.Contains(v) ? q.Where(c => c.SignatureStatus == v) : null,
+        // Virgülle ayrılmış birden çok durum kabul edilir (ör. imza bekleyen = Pending,PartiallySigned).
+        ["signatureStatus"] = (q, v, _) => v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) is { Length: > 0 } statuses && statuses.All(SignatureStatus.All.Contains)
+            ? q.Where(c => statuses.Contains(c.SignatureStatus))
+            : null,
         ["effectiveStatus"] = (q, v, _) => EffectiveStatus.All.Contains(v) ? q.Where(c => c.EffectiveStatus == v) : null,
         ["renewalMode"] = (q, v, _) => RenewalMode.All.Contains(v) ? q.Where(c => c.RenewalMode == v) : null,
         ["confidentiality"] = (q, v, _) => Confidentiality.All.Contains(v) ? q.Where(c => c.Confidentiality == v) : null,
@@ -99,9 +102,31 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         ["endTo"] = (q, v, _) => FilterValue.Date(v) is { } d ? q.Where(c => c.EndDate <= d) : null,
         ["noticeFrom"] = (q, v, _) => FilterValue.Date(v) is { } d ? q.Where(c => c.NoticeDeadline >= d) : null,
         ["noticeTo"] = (q, v, _) => FilterValue.Date(v) is { } d ? q.Where(c => c.NoticeDeadline <= d) : null,
+        // Açık ihlali (tamamlanmamış, muaf tutulmamış) olan taahhüdü bulunan sözleşmeler. Süzgeç yalnızca kullanıcının zaten görebildiği sözleşmeleri daraltır.
+        ["commitmentOverdue"] = (q, v, ctx) => FilterValue.Bool(v) is { } flag
+            ? q.Where(c => ctx.Data.Set<ContractCommitmentOccurrence>().Any(o => o.ContractId == c.Id && o.Status == OccurrenceStatus.Breached) == flag)
+            : null,
     };
 
     protected override IOrderedQueryable<Contract> Order(IQueryable<Contract> source) => source.OrderByDescending(c => c.CreatedAt);
+
+    protected override IReadOnlyCollection<string>? SortKeys => ContractSort.All;
+
+    protected override IOrderedQueryable<Contract> Order(IQueryable<Contract> source, string? sort) => sort switch
+    {
+        "title" => source.OrderBy(c => c.Title),
+        "-title" => source.OrderByDescending(c => c.Title),
+        "number" => source.OrderBy(c => c.Number),
+        "-number" => source.OrderByDescending(c => c.Number),
+        "startDate" => source.OrderBy(c => c.StartDate),
+        "-startDate" => source.OrderByDescending(c => c.StartDate),
+        "endDate" => source.OrderBy(c => c.EndDate == null).ThenBy(c => c.EndDate),
+        "-endDate" => source.OrderBy(c => c.EndDate == null).ThenByDescending(c => c.EndDate),
+        "noticeDeadline" => source.OrderBy(c => c.NoticeDeadline == null).ThenBy(c => c.NoticeDeadline),
+        "-noticeDeadline" => source.OrderBy(c => c.NoticeDeadline == null).ThenByDescending(c => c.NoticeDeadline),
+        "createdAt" => source.OrderBy(c => c.CreatedAt),
+        _ => Order(source),
+    };
 
     protected override IQueryable<Contract> Search(IQueryable<Contract> source, string term) =>
         source.Where(c => c.Title.Contains(term) || c.Number.Contains(term) || (c.Description != null && c.Description.Contains(term)));

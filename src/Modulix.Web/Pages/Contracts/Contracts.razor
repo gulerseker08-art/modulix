@@ -9,9 +9,14 @@
     <div class="page-header">
         <h1>Sözleşmeler</h1>
         <div class="header-actions">
+            <a class="btn btn-outline-secondary" href="sozlesmeler/ozet">Pano</a>
+            @if (Session.Can(ContractsAccess.ContractsExport))
+            {
+                <a class="btn btn-outline-secondary" href="@ExportUrl()" download="sozlesmeler.csv">CSV indir</a>
+            }
             @if (Session.Can(ContractsAccess.ContractsWrite))
             {
-                <a class="btn btn-primary" href="sozlesmeler/yeni">Yeni sözleşme</a>
+                <a class="btn btn-primary" href="sozlesmeler/sihirbaz">Yeni sözleşme</a>
             }
         </div>
     </div>
@@ -20,12 +25,13 @@
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
+    <Notice Text="@notice" Failed="@noticeFailed" />
 
     <div class="filters" role="group" aria-label="Hızlı görünümler">
-        <button type="button" class="chip @(view == "mine" ? "active" : null)" aria-pressed="@(view == "mine" ? "true" : "false")" @onclick='() => ToggleViewAsync("mine")'>Sözleşmelerim</button>
-        <button type="button" class="chip @(view == "signature" ? "active" : null)" aria-pressed="@(view == "signature" ? "true" : "false")" @onclick='() => ToggleViewAsync("signature")'>İmza bekleyen</button>
-        <button type="button" class="chip @(view == "ending" ? "active" : null)" aria-pressed="@(view == "ending" ? "true" : "false")" @onclick='() => ToggleViewAsync("ending")'>Bitişi yaklaşan (90 gün)</button>
-        <button type="button" class="chip @(view == "notice" ? "active" : null)" aria-pressed="@(view == "notice" ? "true" : "false")" @onclick='() => ToggleViewAsync("notice")'>Bildirim süresi yaklaşan (30 gün)</button>
+        @foreach (var (key, label) in ViewLabels.Presets)
+        {
+            <button type="button" class="chip @(view == key ? "active" : null)" aria-pressed="@(view == key ? "true" : "false")" @onclick="() => ToggleViewAsync(key)">@label</button>
+        }
         <label class="visually-hidden" for="effective-filter">Yürürlük durumu</label>
         <select id="effective-filter" class="form-select form-select-sm filter-select" @bind="effective" @bind:after="() => LoadAsync(1)">
             <option value="">Tüm yürürlük durumları</option>
@@ -42,7 +48,58 @@
                 <option value="@t.Key">@t.Label</option>
             }
         </select>
+        <label class="visually-hidden" for="sort-select">Sıralama</label>
+        <select id="sort-select" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
+            @foreach (var (key, label) in ViewLabels.Sorts)
+            {
+                <option value="@key">Sıralama: @label</option>
+            }
+        </select>
     </div>
+
+    @if (approval is not null || preparation is not null)
+    {
+        <div class="filters" role="group" aria-label="Uygulanan ek süzgeçler">
+            @if (approval is not null)
+            {
+                <button type="button" class="chip active" @onclick="() => ClearExtraAsync(true)" aria-label="Süzgeci kaldır: Onay durumu @ContractLabels.Label(ContractLabels.Approvals, approval)">Onay: @ContractLabels.Label(ContractLabels.Approvals, approval) ×</button>
+            }
+            @if (preparation is not null)
+            {
+                <button type="button" class="chip active" @onclick="() => ClearExtraAsync(false)" aria-label="Süzgeci kaldır: Hazırlık durumu @ContractLabels.Label(ContractLabels.Preparations, preparation)">Hazırlık: @ContractLabels.Label(ContractLabels.Preparations, preparation) ×</button>
+            }
+        </div>
+    }
+
+    <section class="saved-views" aria-labelledby="views-title">
+        <h2 id="views-title" class="visually-hidden">Kaydedilmiş görünümler</h2>
+        <div class="filters">
+            <label class="visually-hidden" for="saved-view">Kaydedilmiş görünüm</label>
+            <select id="saved-view" class="form-select form-select-sm filter-select" value="@selectedViewId" @onchange="ApplyViewAsync">
+                <option value="">Kaydedilmiş görünüm seç…</option>
+                @foreach (var v in views)
+                {
+                    <option value="@v.Id">@v.Name</option>
+                }
+            </select>
+            @if (SelectedView is not null)
+            {
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="UpdateViewAsync">Görünümü güncelle</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="DeleteViewAsync">Görünümü sil</button>
+            }
+            <button type="button" class="btn btn-sm btn-outline-secondary" aria-expanded="@(saving ? "true" : "false")" aria-controls="save-view-form" @onclick="() => saving = !saving">Görünümü kaydet</button>
+        </div>
+        @if (saving)
+        {
+            <form id="save-view-form" class="search" novalidate @onsubmit="SaveViewAsync" @onsubmit:preventDefault>
+                <label class="visually-hidden" for="view-name">Görünüm adı</label>
+                <input id="view-name" class="form-control" maxlength="100" placeholder="Görünüm adı (ör. Bu çeyrek biten hizmet sözleşmeleri)" @bind="viewName" aria-invalid="@(viewErrors is not null)" aria-describedby="@(viewErrors is null ? null : "view-name-error")" />
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                @if (viewErrors is not null) { <div id="view-name-error" class="invalid-feedback d-block" role="alert">@viewErrors</div> }
+            </form>
+            <p class="small text-muted">Görünüm yalnızca sizin listenizi hatırlar; başkalarına gösterilmez ve yetkinizi genişletmez.</p>
+        }
+    </section>
 
     <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
         <label class="visually-hidden" for="contract-search">Sözleşme ara</label>
@@ -56,10 +113,11 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Bu süzgece uyan sözleşme yok.</p>
+        <p class="text-muted" role="status">Bu süzgece uyan sözleşme yok.</p>
     }
     else
     {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) sözleşme listelendi.</p>
         <table class="table record-table">
             <caption class="visually-hidden">Sözleşme listesi</caption>
             <thead>
@@ -96,42 +154,91 @@
 </AuthGate>
 
 @code {
+    private const string DefaultSort = "-createdAt";
+
     private PagedResult<ContractDto>? page;
     private string? message;
+    private string? notice;
+    private bool noticeFailed;
     private string? effective;
     private string? type;
     private string? view;
+    private string? approval;
+    private string? preparation;
+    private string sort = DefaultSort;
     private string search = string.Empty;
     private readonly Dictionary<Guid, string> partyNames = [];
+
+    private List<ContractSavedViewDto> views = [];
+    private string? selectedViewId;
+    private bool saving;
+    private bool busy;
+    private string viewName = string.Empty;
+    private string? viewErrors;
+
+    // Panodaki sayaçlardan gelen bağlantılar: hızlı görünüm ya da tek durum süzgeci.
+    [SupplyParameterFromQuery(Name = "gorunum")] public string? QueryView { get; set; }
+
+    [SupplyParameterFromQuery(Name = "onay")] public string? QueryApproval { get; set; }
+
+    [SupplyParameterFromQuery(Name = "hazirlik")] public string? QueryPreparation { get; set; }
+
+    [SupplyParameterFromQuery(Name = "yururluk")] public string? QueryEffective { get; set; }
+
+    private ContractSavedViewDto? SelectedView => views.FirstOrDefault(v => v.Id.ToString() == selectedViewId);
 
     protected override async Task OnInitializedAsync()
     {
         await Session.EnsureLoadedAsync();
         if (Session.Can(ContractsAccess.ContractsRead))
         {
+            if (ViewLabels.Presets.Any(p => p.Key == QueryView)) { view = QueryView; }
+            if (ContractLabels.Approvals.Any(a => a.Key == QueryApproval)) { approval = QueryApproval; }
+            if (ContractLabels.Preparations.Any(p => p.Key == QueryPreparation)) { preparation = QueryPreparation; }
+            if (ContractLabels.Effectives.Any(e => e.Key == QueryEffective)) { effective = QueryEffective; }
             await Lookups.LoadAsync();
+            await LoadViewsAsync();
             await LoadAsync(1);
         }
     }
 
+    /// <summary>Liste süzgeçleri: hızlı görünüm göreli tarihleri bugüne göre açar; seçili alanlar hızlı görünümün varsayılanını ezer.</summary>
+    private Dictionary<string, string> Filters()
+    {
+        var today = DateOnly.FromDateTime(Regional.Now.DateTime);
+        var filters = new Dictionary<string, string>();
+        switch (view)
+        {
+            case "mine": filters["ownerId"] = "me"; break;
+            case "signature": filters["signatureStatus"] = "Pending,PartiallySigned"; break;
+            // Yürürlükteki sözleşmelerde bitiş önümüzdeki 90 gün içinde; bildirim süresi 30 gün içinde.
+            case "ending": filters["effectiveStatus"] = "Active"; filters["endFrom"] = $"{today:yyyy-MM-dd}"; filters["endTo"] = $"{today.AddDays(90):yyyy-MM-dd}"; break;
+            case "notice": filters["effectiveStatus"] = "Active"; filters["noticeFrom"] = $"{today:yyyy-MM-dd}"; filters["noticeTo"] = $"{today.AddDays(30):yyyy-MM-dd}"; break;
+            case "overdue": filters["commitmentOverdue"] = "true"; break;
+        }
+
+        if (!string.IsNullOrEmpty(effective)) { filters["effectiveStatus"] = effective; }
+        if (!string.IsNullOrEmpty(type)) { filters["type"] = type; }
+        if (!string.IsNullOrEmpty(approval)) { filters["approvalStatus"] = approval; }
+        if (!string.IsNullOrEmpty(preparation)) { filters["preparationStatus"] = preparation; }
+        if (sort != DefaultSort) { filters["sort"] = sort; }
+        return filters;
+    }
+
+    private string Query(int? pageNumber)
+    {
+        var parts = new List<string>();
+        if (pageNumber is { } n) { parts.Add($"page={n}"); }
+        if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
+        parts.AddRange(Filters().Select(f => $"{f.Key}={Uri.EscapeDataString(f.Value)}"));
+        return string.Join('&', parts);
+    }
+
+    private string ExportUrl() => $"api/contracts/contracts/export?{Query(null)}";
+
     private async Task LoadAsync(int pageNumber)
     {
-        var url = $"/api/contracts/contracts?page={pageNumber}";
-        if (!string.IsNullOrWhiteSpace(search)) { url += $"&search={Uri.EscapeDataString(search.Trim())}"; }
-        if (!string.IsNullOrEmpty(effective)) { url += $"&effectiveStatus={effective}"; }
-        if (!string.IsNullOrEmpty(type)) { url += $"&type={Uri.EscapeDataString(type)}"; }
-        var today = DateOnly.FromDateTime(Regional.Now.DateTime);
-        url += view switch
-        {
-            "mine" => "&ownerId=me",
-            "signature" => "&signatureStatus=Pending",
-            // Yürürlükteki ya da başlangıcı bekleyen sözleşmelerde bitiş önümüzdeki 90 gün içinde.
-            "ending" => $"&endFrom={today:yyyy-MM-dd}&endTo={today.AddDays(90):yyyy-MM-dd}",
-            "notice" => $"&noticeFrom={today:yyyy-MM-dd}&noticeTo={today.AddDays(30):yyyy-MM-dd}",
-            _ => string.Empty,
-        };
-
-        var result = await Api.GetAsync<PagedResult<ContractDto>>(url);
+        var result = await Api.GetAsync<PagedResult<ContractDto>>($"/api/contracts/contracts?{Query(pageNumber)}");
         page = result.Value;
         message = result.Error;
         if (page is not null)
@@ -158,6 +265,127 @@
     {
         view = view == key ? null : key;
         return LoadAsync(1);
+    }
+
+    private Task ClearExtraAsync(bool approvalFilter)
+    {
+        if (approvalFilter) { approval = null; } else { preparation = null; }
+        return LoadAsync(1);
+    }
+
+    // ---- kaydedilmiş görünümler
+
+    private async Task LoadViewsAsync()
+    {
+        var result = await Api.GetAsync<PagedResult<ContractSavedViewDto>>("/api/contracts/saved-views?pageSize=50");
+        views = [.. result.Value?.Items ?? []];
+    }
+
+    /// <summary>Geçerli süzgeçleri görünüm metnine çevirir: göreli tarihli hızlı görünüm tarih yerine anahtarıyla saklanır.</summary>
+    private string ViewText()
+    {
+        var parts = new List<string>();
+        void Add(string key, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value)) { parts.Add($"{key}={Uri.EscapeDataString(value.Trim())}"); }
+        }
+
+        Add("preset", view);
+        Add("effectiveStatus", effective);
+        Add("preparationStatus", preparation);
+        Add("approvalStatus", approval);
+        Add("type", type);
+        Add("search", search);
+        if (sort != DefaultSort) { Add("sort", sort); }
+        return string.Join('&', parts);
+    }
+
+    private async Task ApplyViewAsync(ChangeEventArgs e)
+    {
+        selectedViewId = e.Value?.ToString();
+        notice = null;
+        view = effective = type = approval = preparation = null;
+        search = string.Empty;
+        sort = DefaultSort;
+        if (SelectedView is { } selected)
+        {
+            foreach (var part in (selected.Filters ?? string.Empty).Split('&', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var pair = part.Split('=', 2);
+                var value = pair.Length == 2 ? Uri.UnescapeDataString(pair[1]) : string.Empty;
+                switch (Uri.UnescapeDataString(pair[0]))
+                {
+                    case "preset": view = value; break;
+                    case "effectiveStatus": effective = value; break;
+                    case "preparationStatus": preparation = value; break;
+                    case "approvalStatus": approval = value; break;
+                    case "type": type = value; break;
+                    case "search": search = value; break;
+                    case "sort": sort = ViewLabels.Sorts.Any(s => s.Key == value) ? value : DefaultSort; break;
+                }
+            }
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SaveViewAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        viewErrors = null;
+        var result = await Api.PostAsync<ContractSavedViewDto>("/api/contracts/saved-views", new SaveContractSavedViewRequest(viewName.Trim(), ViewText()));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            viewErrors = result.FieldErrors.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error ?? "Görünüm kaydedilemedi.";
+            return;
+        }
+
+        saving = false;
+        viewName = string.Empty;
+        await LoadViewsAsync();
+        selectedViewId = result.Value!.Id.ToString();
+        Notify("Görünüm kaydedildi.", false);
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (busy || SelectedView is not { } selected) { return; }
+        busy = true;
+        var result = await Api.PutAsync<ContractSavedViewDto>($"/api/contracts/saved-views/{selected.Id}", new SaveContractSavedViewRequest(selected.Name, ViewText(), selected.Version));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Notify(result.FieldErrors.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error, true);
+            return;
+        }
+
+        await LoadViewsAsync();
+        Notify($"“{selected.Name}” görünümü güncellendi.", false);
+    }
+
+    private async Task DeleteViewAsync()
+    {
+        if (busy || SelectedView is not { } selected) { return; }
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/contracts/saved-views/{selected.Id}?version={selected.Version}");
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Notify(result.Error, true);
+            return;
+        }
+
+        selectedViewId = null;
+        await LoadViewsAsync();
+        Notify($"“{selected.Name}” görünümü silindi.", false);
+    }
+
+    private void Notify(string? text, bool failed)
+    {
+        notice = text;
+        noticeFailed = failed;
     }
 
     private static string Critical(ContractDto c)

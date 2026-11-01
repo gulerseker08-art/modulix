@@ -1,0 +1,135 @@
+@page "/sozlesmeler/ozet"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Sözleşme panosu · Modulix</PageTitle>
+
+<AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
+    <div class="page-header">
+        <h1>Sözleşme panosu</h1>
+        <div class="header-actions">
+            <a class="btn btn-outline-secondary" href="sozlesmeler">Sözleşme listesi</a>
+            <a class="btn btn-outline-secondary" href="sozlesmeler/yenileme">Yenileme takvimi</a>
+        </div>
+    </div>
+    <p class="text-muted">
+        Yalnızca görebildiğiniz sözleşmeler sayılır; her kutu tıklanınca aynı süzgeçle listeyi açar. Tutarlar para birimine göre ayrı gösterilir, kur ile toplanmaz.
+    </p>
+
+    <Notice Text="@error" Failed="true" />
+
+    @if (data is null && error is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (data is not null)
+    {
+        <section aria-labelledby="counts-title">
+            <h2 id="counts-title" class="visually-hidden">Sayaçlar</h2>
+            <div class="stat-grid">
+                @foreach (var (key, label) in ViewLabels.Counters)
+                {
+                    var count = data.Counts.FirstOrDefault(c => c.Key == key)?.Count ?? 0;
+                    <a class="stat-card" href="@ViewLabels.CounterLink(key)" aria-label="@label: @count">
+                        <span>@label</span>
+                        <strong>@count.ToString("N0", Regional.Numbers)</strong>
+                    </a>
+                }
+            </div>
+        </section>
+
+        <div class="chart-grid">
+            <section class="chart-card" aria-labelledby="type-title">
+                <h2 id="type-title">Yürürlükteki sözleşmeler · türe göre</h2>
+                @if (data.ByType.Count == 0)
+                {
+                    <p class="text-muted">Yürürlükte sözleşme yok.</p>
+                }
+                else
+                {
+                    <BarChart Slices="TypeSlices" Title="Yürürlükteki sözleşmelerin türe göre dağılımı" />
+                }
+                @if (data.Truncated)
+                {
+                    <p class="small text-muted">Dağılım yürürlükteki ilk 2000 sözleşmeye dayanır.</p>
+                }
+            </section>
+
+            <section class="chart-card" aria-labelledby="money-title">
+                <h2 id="money-title">Yürürlükteki sözleşme tutarı · para birimine göre</h2>
+                @if (data.Money is null)
+                {
+                    <p class="text-muted">Tutarları görmek için “Sözleşme tutarları” izni gerekir.</p>
+                }
+                else if (data.Money.Count == 0)
+                {
+                    <p class="text-muted">Yürürlükte sözleşme yok.</p>
+                }
+                else
+                {
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Para birimine göre tek seferlik sözleşme toplamları</caption>
+                        <thead><tr><th scope="col">Para birimi</th><th scope="col" class="text-end">Sözleşme</th><th scope="col" class="text-end">Net</th><th scope="col" class="text-end">Genel toplam</th></tr></thead>
+                        <tbody>
+                            @foreach (var m in data.Money)
+                            {
+                                <tr>
+                                    <td data-label="Para birimi" class="primary">@m.Currency</td>
+                                    <td data-label="Sözleşme" class="text-end">@m.Count</td>
+                                    <td data-label="Net" class="text-end">@ContractLabels.Money(m.NetTotal, m.Currency)</td>
+                                    <td data-label="Genel toplam" class="text-end">@ContractLabels.Money(m.GrossTotal, m.Currency)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <p class="small text-muted">Yalnızca tek seferlik toplamlar; dönemsel kalemler sözleşme detayında özetlenir.</p>
+                }
+            </section>
+        </div>
+
+        <section aria-labelledby="upcoming-title">
+            <h2 id="upcoming-title">Yaklaşan kritik tarihler (90 gün)</h2>
+            @if (data.Upcoming.Count == 0)
+            {
+                <p class="text-muted">Önümüzdeki 90 günde son bildirim ya da bitiş tarihi gelen yürürlükteki sözleşme yok.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Yaklaşan kritik tarihler</caption>
+                    <thead><tr><th scope="col">Sözleşme</th><th scope="col">Tarih</th><th scope="col">Kalan</th></tr></thead>
+                    <tbody>
+                        @foreach (var d in data.Upcoming)
+                        {
+                            <tr>
+                                <td data-label="Sözleşme" class="primary"><a href="sozlesmeler/@d.ContractId">@d.Title</a> <small class="text-muted">@d.Number</small></td>
+                                <td data-label="Tarih">@(d.Kind == "notice" ? "Son bildirim" : "Bitiş"): @ContractLabels.Date(d.Date)</td>
+                                <td data-label="Kalan">@RenewalLabels.Days(d.DaysLeft)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <p class="small"><a href="sozlesmeler/yenileme">Yenileme takvimini aç</a></p>
+            }
+        </section>
+    }
+</AuthGate>
+
+@code {
+    private ContractDashboardDto? data;
+    private string? error;
+
+    private IReadOnlyList<ChartSlice> TypeSlices =>
+        [.. (data?.ByType ?? []).Select(t => new ChartSlice(t.Key == "—" ? "Türsüz" : Lookups.Label(ContractsAccess.ContractTypeList, t.Key), t.Count))];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(ContractsAccess.ContractsRead)) { return; }
+        await Lookups.LoadAsync();
+        var result = await Api.GetAsync<ContractDashboardDto>("/api/contracts/dashboard");
+        data = result.Value;
+        error = result.IsSuccess ? null : result.Error;
+    }
+}

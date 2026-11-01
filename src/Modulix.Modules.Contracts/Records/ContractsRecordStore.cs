@@ -111,7 +111,8 @@ internal abstract class ContractsRecordStore<TEntity>(ContractsStoreContext cont
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
-        var source = ApplyFilters(Restrict(Data.Set<TEntity>().AsNoTracking()), query.Filters);
+        var (filters, sort) = SplitSort(query.Filters);
+        var source = ApplyFilters(Restrict(Data.Set<TEntity>().AsNoTracking()), filters);
         if (query.Owners is { } owners && UsesScope)
         {
             source = ScopeToOwners(source, owners);
@@ -129,7 +130,7 @@ internal abstract class ContractsRecordStore<TEntity>(ContractsStoreContext cont
         }
 
         var total = await source.CountAsync(cancellationToken);
-        var items = await Order(source).ThenBy(e => e.Id).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToListAsync(cancellationToken);
+        var items = await Order(source, sort).ThenBy(e => e.Id).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToListAsync(cancellationToken);
         return new RecordPage([.. items.Select(ToData)], query.Page, query.PageSize, total);
     }
 
@@ -223,6 +224,27 @@ internal abstract class ContractsRecordStore<TEntity>(ContractsStoreContext cont
 
     /// <summary>Liste sırası. Eşit kayıtlar kimliğe göre sıralanır; sayfalar kararlı kalır.</summary>
     protected abstract IOrderedQueryable<TEntity> Order(IQueryable<TEntity> source);
+
+    /// <summary>Liste süzgeçleriyle gelen <c>sort</c> anahtarını kabul eden depolar anahtar listesini verir; diğerleri için "sort" bilinmeyen süzgeçtir.</summary>
+    protected virtual IReadOnlyCollection<string>? SortKeys => null;
+
+    /// <summary>İstenen sıralama (yalnızca <see cref="SortKeys"/> içindeki anahtarlar gelir); varsayılan sıra için null.</summary>
+    protected virtual IOrderedQueryable<TEntity> Order(IQueryable<TEntity> source, string? sort) => Order(source);
+
+    private (IReadOnlyDictionary<string, string>? Filters, string? Sort) SplitSort(IReadOnlyDictionary<string, string>? filters)
+    {
+        if (filters is null || SortKeys is not { } keys || !filters.TryGetValue("sort", out var sort))
+        {
+            return (filters, null);
+        }
+
+        if (!keys.Contains(sort, StringComparer.Ordinal))
+        {
+            throw new RecordValidationException([new RecordFieldError("sort", "Geçersiz sıralama.")]);
+        }
+
+        return (filters.Where(f => f.Key != "sort").ToDictionary(f => f.Key, f => f.Value), sort);
+    }
 
     protected abstract IQueryable<TEntity> Search(IQueryable<TEntity> source, string term);
 

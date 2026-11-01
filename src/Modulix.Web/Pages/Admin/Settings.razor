@@ -29,7 +29,12 @@
     }
     else
     {
-        <section class="record-form settings-group">
+        @if (Group is not null)
+        {
+            <p class="text-muted">Yalnızca “@Group” ayarları gösteriliyor. <a href="yonetim/ayarlar">Tüm ayarlar</a></p>
+        }
+
+        <section class="record-form settings-group" hidden="@(Group is not null)">
             <h2>Logo</h2>
             @if (logoMessage is not null)
             {
@@ -59,7 +64,7 @@
             }
         </section>
 
-        @foreach (var group in settings.GroupBy(s => s.Group))
+        @foreach (var group in settings.Where(s => Group is null || s.Group == Group).GroupBy(s => s.Group))
         {
             <form class="record-form settings-group" novalidate @onsubmit="() => SaveAsync(group.Key)" @onsubmit:preventDefault>
                 <h2>@group.Key</h2>
@@ -123,6 +128,9 @@
 </AuthGate>
 
 @code {
+    // Modül sayfalarından gelen bağlantı (ör. Sözleşmeler): yalnızca o grubu gösterir.
+    [SupplyParameterFromQuery(Name = "grup")] public string? Group { get; set; }
+
     private IReadOnlyList<SettingDto>? settings;
     private readonly Dictionary<string, string> values = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> notices = [];

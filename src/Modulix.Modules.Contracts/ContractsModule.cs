@@ -66,6 +66,9 @@ public sealed class ContractsModule : IModule
 
         /// <summary>Yürürlükteki sözleşmeyi fesheder (ya da fesih tarihini planlar). Ayrı ve kritik bir yetkidir.</summary>
         public const string ContractsTerminate = "contracts.contracts.terminate";
+
+        /// <summary>Sözleşme listesini CSV olarak dışa aktarır (ADR-0022, dilim 9). Görüntülemeden ayrıdır; tutar sütunları ayrıca <see cref="FinancialsRead"/> ister, çıkış denetim kaydına yazılır.</summary>
+        public const string ContractsExport = "contracts.contracts.export";
     }
 
     /// <summary>Firma ayarları (Y6).</summary>
@@ -91,6 +94,7 @@ public sealed class ContractsModule : IModule
         public const string ContractTemplate = "contracts.contract-template";
         public const string ContractApprovalRule = "contracts.contract-approval-rule";
         public const string ContractApprovalDelegation = "contracts.contract-approval-delegation";
+        public const string ContractSavedView = "contracts.contract-saved-view";
         public const string ContractCommitment = "contracts.contract-commitment";
     }
 
@@ -124,6 +128,7 @@ public sealed class ContractsModule : IModule
         new(Permissions.CommitmentsWaive, "Taahhüt gerçekleşmesini gerekçeyle muaf tutar", "Sözleşme taahhütleri"),
         new(Permissions.RenewalsManage, "Sözleşme yenileme taslağı açar, yenilememe kararı verir, yenileme takvimini yönetir", "Sözleşme yenileme ve fesih"),
         new(Permissions.ContractsTerminate, "Yürürlükteki sözleşmeyi fesheder ya da fesih tarihini planlar", "Sözleşme yenileme ve fesih"),
+        new(Permissions.ContractsExport, "Sözleşme listesini CSV olarak dışa aktarır (tutar sütunları için ayrıca tutar izni gerekir)", "Sözleşmeler"),
     ];
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
@@ -193,7 +198,7 @@ public sealed class ContractsModule : IModule
             "contracts.manager",
             "Sözleşme sorumlusu",
             "Sözleşmeleri, taraflarını, kalemlerini ve tutarlarını görüntüler ve düzenler.",
-            [Permissions.ContractsRead, Permissions.ContractsWrite, Permissions.FinancialsRead, Permissions.DocumentsGenerate, Permissions.DocumentsDownload, Permissions.CommitmentsWrite, Permissions.CommitmentsComplete])
+            [Permissions.ContractsRead, Permissions.ContractsWrite, Permissions.FinancialsRead, Permissions.ContractsExport, Permissions.DocumentsGenerate, Permissions.DocumentsDownload, Permissions.CommitmentsWrite, Permissions.CommitmentsComplete])
         {
             Scope = RecordScope.Own,
         },
@@ -431,8 +436,10 @@ public sealed class ContractsModule : IModule
         services.AddScoped<IRecordStore, ContractApprovalRuleRecordStore>();
         services.AddScoped<IRecordStore, ContractApprovalDelegationRecordStore>();
         services.AddScoped<IRecordStore, ContractCommitmentRecordStore>();
+        services.AddScoped<IRecordStore, ContractSavedViewStore>();
         services.AddScoped<IContractCommitments, ContractCommitments>();
         services.AddScoped<IContractRenewals, ContractRenewals>();
+        services.AddScoped<IContractDashboard, ContractDashboard>();
         services.AddScoped<IContractScheduler, ContractScheduler>();
         services.AddScoped<ContractSchedulerAnchor>();
         services.AddScoped<IContractApprovals, ContractApprovals>();

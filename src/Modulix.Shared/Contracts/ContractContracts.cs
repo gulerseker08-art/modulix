@@ -166,6 +166,7 @@ public static class ContractsAccess
     public const string CommitmentsWaive = "contracts.commitments.waive";
     public const string RenewalsManage = "contracts.renewals.manage";
     public const string ContractsTerminate = "contracts.contracts.terminate";
+    public const string ContractsExport = "contracts.contracts.export";
     public const string CommitmentCategoryList = "contracts.commitment-category";
 
     public const string ContractEntityKey = "contracts.contract";
