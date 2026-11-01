@@ -41,7 +41,7 @@ internal sealed class TicketQueries(IRecordPipeline pipeline, SupportReader read
         var events = await reader.EventsAsync(ticketId, cancellationToken);
         return RecordResult<IReadOnlyList<TicketHistoryItem>>.Ok(
         [
-            .. events.Where(e => includeInternal || e.Kind != TicketEventKinds.InternalNote)
+            .. events.Where(e => includeInternal || !TicketEventKinds.IsInternalOnly(e.Kind))
                 .Select(e => new TicketHistoryItem(e.Id, e.Kind, e.CreatedAt, e.ActorId, e.FromStatus, e.ToStatus, e.FromOwnerId, e.ToOwnerId, e.FromQueueId, e.ToQueueId, e.Reason)),
         ]);
     }

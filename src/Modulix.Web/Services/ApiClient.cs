@@ -29,6 +29,14 @@ public sealed class ApiClient(HttpClient http)
         return http.PutAsync(url, content);
     });
 
+    /// <summary>Gövdesi dosyanın kendisi olan POST (ör. talep eki).</summary>
+    public Task<ApiResult<T>> PostBytesAsync<T>(string url, byte[] body, string contentType) => SendAsync<T>(() =>
+    {
+        var content = new ByteArrayContent(body);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        return http.PostAsync(url, content);
+    });
+
     public Task<ApiResult<bool>> DeleteAsync(string url) => SendAsync<bool>(() => http.DeleteAsync(url));
 
     private static async Task<ApiResult<T>> SendAsync<T>(Func<Task<HttpResponseMessage>> send)

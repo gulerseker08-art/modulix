@@ -133,7 +133,16 @@ internal sealed class TicketMessageConfiguration : IEntityTypeConfiguration<Tick
         builder.Property(m => m.Body).HasMaxLength(TicketMessage.BodyMaxLength).IsRequired();
         builder.Property(m => m.DeliveryStatus).HasMaxLength(SupportTicket.StatusMaxLength).IsRequired();
 
+        builder.Property(m => m.Channel).HasMaxLength(SupportTicket.StatusMaxLength);
+        builder.Property(m => m.ExternalMessageId).HasMaxLength(Lifecycle.InboundRules.MaxMessageIdLength);
+        builder.Property(m => m.InReplyTo).HasMaxLength(Lifecycle.InboundRules.MaxMessageIdLength);
+        builder.Property(m => m.SenderAddress).HasMaxLength(SupportTicket.EmailMaxLength);
+
         builder.HasIndex(m => new { m.TenantId, m.TicketId, m.CreatedAt });
+        // Tekrar koruması: aynı kanalın aynı mesaj kimliği bir tenant'ta yalnızca bir kez yazılır (yarışta da).
+        builder.HasIndex(m => new { m.TenantId, m.Channel, m.ExternalMessageId }).IsUnique()
+            .HasFilter("[ExternalMessageId] IS NOT NULL").HasDatabaseName("UX_Messages_External");
+        builder.HasIndex(m => new { m.TenantId, m.SenderAddress, m.CreatedAt }).HasFilter("[SenderAddress] IS NOT NULL");
         builder.HasOne<SupportTicket>().WithMany().HasForeignKey(m => new { m.TenantId, m.SourceTicketId })
             .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
 

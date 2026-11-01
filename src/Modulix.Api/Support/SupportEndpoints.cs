@@ -140,6 +140,8 @@ public static class SupportEndpoints
                 : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
+        SupportChannelEndpoints.MapInternal(group, tickets);
+
         // Eylemler: izinler serviste denetlenir; sunucu geçiş tablosunu uygular, desteklenmeyen geçiş 409 alır.
         tickets.MapGet("/{id:guid}/actions", async (Guid id, ITicketWorkflow workflow, CancellationToken ct) =>
         {
@@ -172,6 +174,8 @@ internal sealed class SupportPolicyProvider(IServiceProvider services) : ISuppor
         return new TicketPolicySettings(
             int.TryParse(await settings.GetValueAsync(SupportModule.SettingKeys.ReopenWindowDays, cancellationToken), out var days) ? Math.Clamp(days, 1, 90) : 7,
             !string.Equals(await settings.GetValueAsync(SupportModule.SettingKeys.RequireRootCause, cancellationToken), "false", StringComparison.OrdinalIgnoreCase),
-            int.TryParse(await settings.GetValueAsync(SupportModule.SettingKeys.AutoCloseDays, cancellationToken), out var autoClose) ? Math.Clamp(autoClose, 0, 999) : 0);
+            int.TryParse(await settings.GetValueAsync(SupportModule.SettingKeys.AutoCloseDays, cancellationToken), out var autoClose) ? Math.Clamp(autoClose, 0, 999) : 0,
+            string.Equals(await settings.GetValueAsync(SupportModule.SettingKeys.SurveyEnabled, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
+            int.TryParse(await settings.GetValueAsync(SupportModule.SettingKeys.SurveyValidDays, cancellationToken), out var surveyDays) ? Math.Clamp(surveyDays, 1, 90) : SurveyRules.DefaultValidDays);
     }
 }

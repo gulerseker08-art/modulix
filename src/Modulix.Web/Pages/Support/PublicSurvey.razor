@@ -1,0 +1,115 @@
+@page "/anket/{Tenant}"
+@layout PublicLayout
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Memnuniyet anketi · Modulix</PageTitle>
+
+@* Oturumsuz memnuniyet anketi (ADR-0024 dilim 4). Belirteç adresin # parçasındadır (#t=...): sunucuya, günlüklere ve Referer başlığına gitmez; API çağrılarında gövdede taşınır.
+   Anket tek kullanımlık ve süreli; talebin konusu ve numarası dışında bir şey gösterilmez. *@
+
+@if (loading)
+{
+    <p class="text-muted" role="status">Anket yükleniyor…</p>
+}
+else if (invalid)
+{
+    <div class="alert alert-warning" role="alert">
+        <h1 class="h5">Bağlantı geçersiz</h1>
+        <p class="mb-0">Bu anket bağlantısı geçersiz ya da kaldırılmış. Lütfen size ulaşan ekiple iletişime geçin.</p>
+    </div>
+}
+else if (view is not null)
+{
+    <article class="public-quote" aria-labelledby="survey-heading">
+        <h1 id="survey-heading" class="h4">Deneyiminizi puanlayın</h1>
+        <p class="text-muted"><strong>@view.TicketNumber</strong> · @view.Subject</p>
+
+        @if (view.State == "answered")
+        {
+            <div class="alert alert-success" role="status">
+                <strong>Teşekkür ederiz.</strong> Yanıtınız kaydedildi@(view.Rating is { } r ? $" (puan: {r}/5)" : null). Bu anket yeniden yanıtlanamaz.
+            </div>
+        }
+        else if (!view.CanAnswer)
+        {
+            <div class="alert alert-warning" role="status">@(view.Message ?? "Bu anket artık yanıtlanamıyor.")</div>
+        }
+        else
+        {
+            <Notice Text="@problem" Failed="true" />
+            <form novalidate @onsubmit="AnswerAsync" @onsubmit:preventDefault>
+                <fieldset disabled="@busy">
+                    <legend class="form-label">Talebinizin çözümünden ne kadar memnun kaldınız?</legend>
+                    <div role="radiogroup" aria-label="Puan (1: hiç memnun değilim, 5: çok memnunum)">
+                        @for (var value = 1; value <= 5; value++)
+                        {
+                            var current = value;
+                            <div class="form-check form-check-inline">
+                                <input id="rate-@current" class="form-check-input" type="radio" name="rating" checked="@(rating == current)" @onchange="() => rating = current" />
+                                <label class="form-check-label" for="rate-@current">@current @Hint(current)</label>
+                            </div>
+                        }
+                    </div>
+                    @if (ratingMissing) { <div class="invalid-feedback d-block" role="alert">Lütfen bir puan seçin.</div> }
+                    <label class="form-label mt-3" for="survey-comment">Eklemek istediğiniz bir şey var mı? (isteğe bağlı)</label>
+                    <textarea id="survey-comment" class="form-control" rows="3" maxlength="1000" @bind="comment"></textarea>
+                </fieldset>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Gönder</button></div>
+            </form>
+            <p class="small text-muted mt-2">Bu bağlantı size özeldir ve @CrmLabels.Time(view.ExpiresAt) tarihine kadar geçerlidir.</p>
+        }
+    </article>
+}
+
+@code {
+    [Parameter] public string Tenant { get; set; } = string.Empty;
+
+    private PublicSurveyView? view;
+    private string token = string.Empty;
+    private int rating;
+    private string comment = string.Empty;
+    private string? problem;
+    private bool loading = true;
+    private bool invalid;
+    private bool busy;
+    private bool ratingMissing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        token = Modulix.Web.Pages.Crm.PublicQuote.TokenFromFragment(Navigation.Uri);
+        if (token.Length == 0)
+        {
+            loading = false;
+            invalid = true;
+            return;
+        }
+
+        var result = await Api.PostAsync<PublicSurveyView>($"/api/public/support-survey/{Uri.EscapeDataString(Tenant)}/view", new PublicSurveyTokenRequest(token));
+        loading = false;
+        view = result.Value;
+        invalid = view is null;
+    }
+
+    private async Task AnswerAsync()
+    {
+        if (busy) { return; }
+        ratingMissing = rating == 0;
+        if (ratingMissing) { return; }
+        busy = true;
+        problem = null;
+        var result = await Api.PostAsync<PublicSurveyView>(
+            $"/api/public/support-survey/{Uri.EscapeDataString(Tenant)}/answer",
+            new PublicSurveyAnswerRequest(token, rating, string.IsNullOrWhiteSpace(comment) ? null : comment.Trim()));
+        busy = false;
+        if (result.Value is { } updated)
+        {
+            view = updated;
+            return;
+        }
+
+        problem = result.Error ?? "Yanıtınız kaydedilemedi.";
+    }
+
+    private static string Hint(int value) => value switch { 1 => "(hiç memnun değilim)", 5 => "(çok memnunum)", _ => string.Empty };
+}

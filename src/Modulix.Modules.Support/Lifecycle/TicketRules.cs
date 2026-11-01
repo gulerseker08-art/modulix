@@ -135,6 +135,14 @@ public static class TicketEventKinds
     public const string PublicReply = "PublicReply";
     public const string CustomerMessage = "CustomerMessage";
     public const string InternalNote = "InternalNote";
+    public const string AttachmentAdded = "AttachmentAdded";
+    public const string InternalAttachmentAdded = "InternalAttachmentAdded";
+    public const string InboundReceived = "InboundReceived";
+    public const string SurveyAnswered = "SurveyAnswered";
+    public const string LowSatisfaction = "LowSatisfaction";
+
+    /// <summary>İç not iznine bağlı olaylar: iç not izni olmayana tarihçede görünmez.</summary>
+    public static bool IsInternalOnly(string kind) => kind is InternalNote or InternalAttachmentAdded;
 }
 
 /// <summary>İş akışı eylemleri; adlar API yoludur (<c>POST /api/support/tickets/{id}/{eylem}</c>).</summary>
@@ -159,7 +167,8 @@ public static class TicketAction
 }
 
 /// <summary>Tenant ayarlarından gelen talep politikası; sağlayıcı yoksa varsayılan.</summary>
-public sealed record TicketPolicySettings(int ReopenWindowDays = 7, bool RequireRootCauseForComplaint = true, int AutoCloseDays = 0)
+public sealed record TicketPolicySettings(
+    int ReopenWindowDays = 7, bool RequireRootCauseForComplaint = true, int AutoCloseDays = 0, bool SurveyEnabled = false, int SurveyValidDays = SurveyRules.DefaultValidDays)
 {
     public static TicketPolicySettings Default { get; } = new();
 }

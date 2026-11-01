@@ -49,6 +49,7 @@ internal sealed class TicketWorkflow(
     ICurrentAccess access,
     SupportStoreContext storeContext,
     IChoiceLists choiceLists,
+    SurveyIssuer surveys,
     ISupportPolicyProvider? policy = null) : ITicketWorkflow
 {
     private const string Key = SupportModule.Entities.Ticket;
@@ -285,7 +286,11 @@ internal sealed class TicketWorkflow(
         var kind = EventOf[action];
 
         // Geçiş ve yan etkileri tek kaydetmede yazılır; sürüm çakışmasında hiçbiri yazılmaz.
-        using (gate.Open([permission], kind, reason))
+        // Çözümde ayar açıksa memnuniyet anketi aynı işlemde açılır ve e-postası kuyruğa yazılır.
+        Func<SupportStoreContext, SupportTicket, CancellationToken, Task>? effect = action == TicketAction.Resolve
+            ? (ctx, ticket, ct) => surveys.IssueAsync(ctx, ticket, settings, ct)
+            : null;
+        using (gate.Open([permission], kind, reason, effect))
         {
             return await pipeline.UpdateAsync(new RecordCommand(Key, id, values, input.Version) { Reason = $"support.{kind}" }, cancellationToken);
         }

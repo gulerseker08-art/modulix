@@ -61,8 +61,14 @@ public sealed class SupportModule : IModule
         /// <summary>Kuyrukları ve kategorileri yönetir.</summary>
         public const string SettingsManage = "support.settings.manage";
 
-        /// <summary>SLA politikalarını ve iş takvimlerini yönetir; örnek talep üzerinde politika önizlemesi yapar.</summary>
+        /// <summary>Mükerrer talebi başka bir talebe birleştirir (geri alınamaz).</summary>
         public const string TicketsMerge = "support.tickets.merge";
+
+        /// <summary>Görebildiği talepleri CSV olarak dışa aktarır (iç not ve mesaj gövdesi içermez).</summary>
+        public const string TicketsExport = "support.tickets.export";
+
+        /// <summary>Gelen kanal adaptörü olarak mesaj girer (talep açar, talebe mesaj ekler). Entegrasyon kullanıcısına verilir; oluşturma ve yanıt izinleri de gerekir.</summary>
+        public const string InboundIngest = "support.inbound.ingest";
 
         /// <summary>SLA politikalarını ve iş takvimlerini yönetir; örnek talep üzerinde politika önizlemesi yapar.</summary>
         public const string SlaManage = "support.sla.manage";
@@ -77,6 +83,8 @@ public sealed class SupportModule : IModule
         public const string ReopenWindowDays = "support.reopen.window-days";
         public const string RequireRootCause = "support.complaint.require-root-cause";
         public const string AutoCloseDays = "support.auto-close-days";
+        public const string SurveyEnabled = "support.survey.enabled";
+        public const string SurveyValidDays = "support.survey.valid-days";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -128,6 +136,8 @@ public sealed class SupportModule : IModule
         new(Permissions.InternalRead, "İç notları okur", "Destek mesajları"),
         new(Permissions.SettingsManage, "Destek kuyruklarını ve kategorilerini yönetir", "Destek yönetimi"),
         new(Permissions.TicketsMerge, "Mükerrer talebi başka bir talebe birleştirir (geri alınamaz)", "Destek talepleri"),
+        new(Permissions.TicketsExport, "Görebildiği talepleri CSV olarak dışa aktarır", "Destek talepleri"),
+        new(Permissions.InboundIngest, "Gelen kanal adaptörü olarak mesaj girer (talep açar, talebe mesaj ekler)", "Destek yönetimi"),
         new(Permissions.SlaManage, "SLA politikalarını ve iş takvimlerini yönetir; politika önizlemesi yapar", "Destek yönetimi"),
         new(Permissions.SlaRecalculate, "Talebin açık SLA örneklerini gerekçeyle yeniden hesaplar", "Destek talepleri"),
     ];
@@ -147,6 +157,18 @@ public sealed class SupportModule : IModule
             Pattern = @"^[0-9]{1,3}$",
             PatternMessage = "0-999 arası tam sayı girin.",
             MaxLength = 3,
+        },
+        new(SettingKeys.SurveyEnabled, "Destek: çözümde memnuniyet anketi gönder", "Destek", SettingType.Choice, "false")
+        {
+            Description = "Evet seçilirse talep çözüldüğünde, başvuranın e-postası varsa süreli ve tek kullanımlık anket bağlantısı e-posta kuyruğuna yazılır. Varsayılan hayırdır.",
+            Options = [new SettingOption("true", "Evet"), new SettingOption("false", "Hayır")],
+        },
+        new(SettingKeys.SurveyValidDays, "Destek: anket bağlantısının geçerlilik süresi (gün)", "Destek", SettingType.Text, "14")
+        {
+            Description = "Anket bağlantısı bu süre sonunda geçersiz olur. 1-90 arası.",
+            Pattern = @"^[0-9]{1,2}$",
+            PatternMessage = "1-90 arası tam sayı girin.",
+            MaxLength = 2,
         },
         new(SettingKeys.RequireRootCause, "Destek: şikâyet çözümünde kök neden zorunlu", "Destek", SettingType.Choice, "true")
         {
@@ -181,7 +203,7 @@ public sealed class SupportModule : IModule
             [
                 Permissions.TicketsRead, Permissions.TicketsCreate, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsTake,
                 Permissions.TicketsResolve, Permissions.TicketsClose, Permissions.TicketsReopen, Permissions.TicketsCancel, Permissions.PriorityOverride,
-                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SlaRecalculate, Permissions.TicketsMerge,
+                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SlaRecalculate, Permissions.TicketsMerge, Permissions.TicketsExport,
             ])
         {
             Scope = RecordScope.Team,
@@ -193,8 +215,16 @@ public sealed class SupportModule : IModule
             [
                 Permissions.TicketsRead, Permissions.TicketsCreate, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsTake,
                 Permissions.TicketsResolve, Permissions.TicketsClose, Permissions.TicketsReopen, Permissions.TicketsCancel, Permissions.PriorityOverride,
-                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SettingsManage, Permissions.SlaManage, Permissions.SlaRecalculate, Permissions.TicketsMerge,
+                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SettingsManage, Permissions.SlaManage, Permissions.SlaRecalculate, Permissions.TicketsMerge, Permissions.TicketsExport,
             ])
+        {
+            Scope = RecordScope.All,
+        },
+        new(
+            "support.integration",
+            "Destek kanal entegrasyonu",
+            "Gelen kanal adaptörü (e-posta, web formu) için servis kullanıcısı: talep açar ve talebe mesaj ekler; başka bir şey yapamaz. Kapsam tümü olmalıdır.",
+            [Permissions.TicketsRead, Permissions.TicketsCreate, Permissions.MessagesReply, Permissions.InboundIngest])
         {
             Scope = RecordScope.All,
         },
@@ -344,6 +374,12 @@ public sealed class SupportModule : IModule
     /// </summary>
     IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
     [
+        // Herkese açık memnuniyet anketi sistem adına çalışır; yalnızca talebi okur ve tarihçe/son hareket yazar.
+        EventSubscription.For<SupportSurveyAnchor>(
+            "support.survey",
+            [DomainEventTypes.RecordDeleted],
+            [Entities.Ticket],
+            [Permissions.TicketsRead, Permissions.TicketsWrite]),
         EventSubscription.For<SupportSchedulerAnchor>(
             "support.scheduler",
             [DomainEventTypes.RecordDeleted],
@@ -374,6 +410,13 @@ public sealed class SupportModule : IModule
         services.AddScoped<ITicketDuplicates, TicketDuplicates>();
         services.AddScoped<ITicketMerge, TicketMerge>();
         services.AddScoped<ITicketTasks, TicketTasks>();
+        services.AddScoped<ITicketAttachments, TicketAttachments>();
+        services.AddScoped<ITicketInbound, TicketInbound>();
+        services.AddScoped<SurveyIssuer>();
+        services.AddScoped<ITicketSurveys, TicketSurveys>();
+        services.AddScoped<ISurveyPortal, SurveyPortal>();
+        services.AddScoped<ITicketBulk, TicketBulk>();
+        services.AddScoped<SupportSurveyAnchor>();
         services.AddScoped<SupportSchedulerAnchor>();
         services.AddScoped<IActivityLinkTarget, TicketLinkTarget>();
     }

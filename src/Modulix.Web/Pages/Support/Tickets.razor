@@ -11,12 +11,16 @@
             <h1>Destek çalışma alanı</h1>
             <p class="text-muted mb-0">Benim taleplerim, atanmamış talepler ve bekleyenler. Sayılar yetkiniz ve veri kapsamınızla sınırlıdır ve altındaki listeyle aynı süzgeci kullanır.</p>
         </div>
-        @if (Session.Can(SupportAccess.TicketsCreate))
-        {
-            <div class="header-actions">
+        <div class="header-actions">
+            @if (Session.Can(SupportAccess.TicketsExport))
+            {
+                <a class="btn btn-outline-secondary" href="api/support/tickets/export?@Query(1)" download="talepler.csv">CSV dışa aktar</a>
+            }
+            @if (Session.Can(SupportAccess.TicketsCreate))
+            {
                 <a class="btn btn-primary" href="destek/talepler/yeni">Yeni talep</a>
-            </div>
-        }
+            }
+        </div>
     </div>
 
     @if (message is not null)
@@ -83,10 +87,57 @@
     else if (page is not null)
     {
         <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) talep listelendi.</p>
+        @if (CanBulk)
+        {
+            <section class="bulk-bar" aria-label="Toplu işlem">
+                <p class="small text-muted mb-1">
+                    Seçilen taleplerin her biri kendi eyleminin izin, veri kapsamı ve kuralıyla işlenir; işlem atomik değildir, her talebin sonucu ayrı gösterilir. En çok 50 talep.
+                </p>
+                <div class="filters">
+                    <span role="status" aria-live="polite">@selected.Count talep seçili</span>
+                    <label class="visually-hidden" for="bulk-action">Toplu işlem</label>
+                    <select id="bulk-action" class="form-select form-select-sm filter-select" @bind="bulkAction">
+                        <option value="">İşlem seçin</option>
+                        @if (Session.Can(SupportAccess.TicketsAssign)) { <option value="assign">Sorumlu ata</option> }
+                        @if (Session.Can(SupportAccess.TicketsClose)) { <option value="close">Kapat (çözülmüş olmalı)</option> }
+                        @if (Session.Can(SupportAccess.TicketsCancel)) { <option value="cancel">İptal et</option> }
+                    </select>
+                    @if (bulkAction == "assign")
+                    {
+                        <LookupPicker Id="bulk-owner" LookupKey="support.ticket.owner" @bind-Value="bulkOwner" Placeholder="Sorumlu seçin" />
+                    }
+                    @if (bulkAction == "cancel")
+                    {
+                        <label class="visually-hidden" for="bulk-reason">Gerekçe</label>
+                        <input id="bulk-reason" class="form-control form-control-sm" maxlength="500" placeholder="Gerekçe (zorunlu)" @bind="bulkReason" />
+                    }
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(bulkBusy || selected.Count == 0 || string.IsNullOrEmpty(bulkAction))" @onclick="RunBulkAsync">Uygula</button>
+                </div>
+                @if (bulkResults is not null)
+                {
+                    <div class="alert @(bulkResults.All(r => r.Succeeded) ? "alert-success" : "alert-warning")" role="status">
+                        @bulkResults.Count(r => r.Succeeded) / @bulkResults.Count talep işlendi.
+                        @if (bulkResults.Any(r => !r.Succeeded))
+                        {
+                            <ul class="mb-0">
+                                @foreach (var r in bulkResults.Where(r => !r.Succeeded))
+                                {
+                                    <li>@(r.Number ?? "Talep bulunamadı"): @r.Message</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
+            </section>
+        }
         <table class="table record-table">
             <caption class="visually-hidden">Destek talebi listesi</caption>
             <thead>
                 <tr>
+                    @if (CanBulk)
+                    {
+                        <th scope="col"><span class="visually-hidden">Seç</span></th>
+                    }
                     <th scope="col">Talep</th><th scope="col">Müşteri</th><th scope="col">Tür</th><th scope="col">Öncelik</th><th scope="col">Durum</th>
                     <th scope="col">Sorumlu</th><th scope="col">Yaş</th><th scope="col">SLA hedefleri</th><th scope="col">Son hareket</th>
                 </tr>
@@ -95,6 +146,12 @@
                 @foreach (var t in page.Items)
                 {
                     <tr>
+                        @if (CanBulk)
+                        {
+                            <td data-label="Seç">
+                                <input type="checkbox" class="form-check-input" aria-label="@(t.Number + " numaralı talebi seç")" checked="@selected.Contains(t.Id)" @onchange="e => Toggle(t.Id, (bool)e.Value!)" />
+                            </td>
+                        }
                         <td data-label="Talep" class="primary">
                             <a href="destek/talepler/@t.Id">@t.Subject</a>
                             <small class="text-muted">@t.Number</small>
@@ -139,6 +196,38 @@
     private string? typeKey;
     private string sort = DefaultSort;
     private string search = string.Empty;
+    private readonly HashSet<Guid> selected = [];
+    private string bulkAction = string.Empty;
+    private Guid? bulkOwner;
+    private string bulkReason = string.Empty;
+    private bool bulkBusy;
+    private List<BulkTicketResultDto>? bulkResults;
+
+    private bool CanBulk => Session.Can(SupportAccess.TicketsAssign) || Session.Can(SupportAccess.TicketsClose) || Session.Can(SupportAccess.TicketsCancel);
+
+    private void Toggle(Guid id, bool on)
+    {
+        if (on && selected.Count < 50) { selected.Add(id); } else { selected.Remove(id); }
+    }
+
+    private async Task RunBulkAsync()
+    {
+        if (bulkBusy || selected.Count == 0 || string.IsNullOrEmpty(bulkAction)) { return; }
+        bulkBusy = true;
+        var result = await Api.PostAsync<List<BulkTicketResultDto>>("/api/support/tickets/bulk",
+            new BulkTicketsRequest(bulkAction, [.. selected], string.IsNullOrWhiteSpace(bulkReason) ? null : bulkReason.Trim(), bulkOwner));
+        bulkBusy = false;
+        if (result.IsSuccess)
+        {
+            bulkResults = result.Value;
+            selected.Clear();
+            await LoadAsync(page?.Page ?? 1);
+        }
+        else
+        {
+            bulkResults = [new BulkTicketResultDto(Guid.Empty, null, false, null, result.Error)];
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

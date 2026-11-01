@@ -1,0 +1,53 @@
+@* Memnuniyet anketi sonucu (salt okunur). Anket, ayar açıkken talep çözülünce oluşur; bağlantı e-posta kuyruğuna yazılır — "Gönderildi" müşteriye ulaştı demek değildir. *@
+@inject ApiClient Api
+
+@if (surveys is { Count: > 0 })
+{
+    <section aria-labelledby="survey-title">
+        <h2 id="survey-title">Memnuniyet anketi</h2>
+        <ul class="task-list">
+            @foreach (var s in surveys)
+            {
+                <li>
+                    <span class="badge stage-@Badge(s)">@StateText(s)</span>
+                    <strong>Döngü @s.Cycle</strong>
+                    @if (s.Rating is { } rating)
+                    {
+                        <span> · Puan: @rating / 5</span>
+                        @if (rating <= 2) { <span class="badge stage-lost">Düşük puan — takip edin</span> }
+                    }
+                    @if (!string.IsNullOrWhiteSpace(s.Comment)) { <div class="small">“@s.Comment”</div> }
+                    <small class="text-muted">
+                        @(s.AnsweredAt is { } at ? "Yanıt: " + CrmLabels.Time(at) : s.State == "NotSent" ? "E-posta kuyruğa yazılmadı (genel adres ayarlı değil)" : "Son geçerlilik: " + CrmLabels.Time(s.ExpiresAt))
+                    </small>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public TicketDto Ticket { get; set; } = default!;
+
+    private List<SurveyDto>? surveys;
+    private Guid loadedFor;
+    private string? loadedStatus;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Ticket.Id && loadedStatus == Ticket.Status) { return; }
+        loadedFor = Ticket.Id;
+        loadedStatus = Ticket.Status;
+        surveys = (await Api.GetAsync<List<SurveyDto>>($"/api/support/tickets/{Ticket.Id}/surveys")).Value;
+    }
+
+    private static string StateText(SurveyDto s) => s.State switch
+    {
+        "Answered" => "Yanıtlandı",
+        "Expired" => "Süresi doldu",
+        "NotSent" => "Gönderilmedi",
+        _ => "E-posta kuyruğa alındı",
+    };
+
+    private static string Badge(SurveyDto s) => s.State switch { "Answered" => "won", "Expired" or "NotSent" => "cancelled", _ => "open" };
+}

@@ -104,7 +104,7 @@ public sealed record TicketActionDto(string Action, bool Allowed, string? Code, 
 public sealed record AddTicketMessageRequest(string Kind, string? Body);
 
 public sealed record TicketMessageDto(
-    Guid Id, string Visibility, string Direction, string Body, Guid? AuthorId, string DeliveryStatus, bool IsAutomatic, DateTimeOffset CreatedAt, Guid? SourceTicketId = null);
+    Guid Id, string Visibility, string Direction, string Body, Guid? AuthorId, string DeliveryStatus, bool IsAutomatic, DateTimeOffset CreatedAt, Guid? SourceTicketId = null, string? Channel = null);
 
 public sealed record TicketHistoryDto(
     Guid Id, string Kind, DateTimeOffset At, Guid? ActorId, string? FromStatus, string? ToStatus, Guid? FromOwnerId, Guid? ToOwnerId,
@@ -131,6 +131,8 @@ public static class SupportAccess
     public const string InternalRead = "support.internal.read";
     public const string SettingsManage = "support.settings.manage";
     public const string TicketsMerge = "support.tickets.merge";
+    public const string TicketsExport = "support.tickets.export";
+    public const string InboundIngest = "support.inbound.ingest";
     public const string SlaManage = "support.sla.manage";
     public const string SlaRecalculate = "support.sla.recalculate";
 
@@ -213,3 +215,38 @@ public sealed record MergeTicketRequest(Guid TargetId, long Version, string? Rea
 public sealed record TicketTaskDto(Guid Id, string Title, Guid? AssigneeId, bool IsBlocking, bool IsDone, DateTimeOffset? DoneAt, Guid? DoneBy, Guid? CreatedBy, DateTimeOffset CreatedAt);
 
 public sealed record AddTicketTaskRequest(string? Title, Guid? AssigneeId = null, bool IsBlocking = false);
+
+// ---- Dilim 4: kanal, ek, memnuniyet, toplu işlem (ADR-0024)
+
+public sealed record AttachmentDto(
+    Guid Id, Guid MessageId, string FileName, string ContentType, int SizeBytes, string Sha256, string ScanStatus, bool IsInternal, Guid? CreatedBy, DateTimeOffset CreatedAt);
+
+/// <summary>Kanal adaptörünün normalize ettiği gelen mesaj. <c>ExternalMessageId</c> tekrar korumasının anahtarıdır.</summary>
+public sealed record InboundMessageRequest(
+    string Channel,
+    string ExternalMessageId,
+    string? InReplyTo = null,
+    IReadOnlyList<string>? References = null,
+    string? FromAddress = null,
+    string? FromName = null,
+    string? Subject = null,
+    string? Body = null,
+    string? AutoSubmitted = null,
+    string? Precedence = null,
+    bool SuppressAutoResponse = false,
+    bool NullReturnPath = false);
+
+public sealed record InboundResultDto(string Outcome, Guid? TicketId, Guid? MessageId, string? TicketNumber);
+
+public sealed record SurveyDto(
+    Guid Id, int Cycle, string State, DateTimeOffset? QueuedAt, DateTimeOffset ExpiresAt, DateTimeOffset? AnsweredAt, int? Rating, string? Comment, DateTimeOffset CreatedAt);
+
+public sealed record PublicSurveyTokenRequest(string Token);
+
+public sealed record PublicSurveyAnswerRequest(string Token, int Rating, string? Comment = null);
+
+public sealed record PublicSurveyView(string State, bool CanAnswer, string? Message, string TicketNumber, string Subject, DateTimeOffset ExpiresAt, int? Rating);
+
+public sealed record BulkTicketsRequest(string Action, IReadOnlyList<Guid> Ids, string? Reason = null, Guid? OwnerId = null, Guid? QueueId = null);
+
+public sealed record BulkTicketResultDto(Guid Id, string? Number, bool Succeeded, string? Code, string? Message);
