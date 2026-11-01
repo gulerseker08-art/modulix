@@ -60,9 +60,54 @@ public static class OrderLabels
         _ => "open",
     };
 
+    public static IReadOnlyList<(string Key, string Label)> ChangeStatuses { get; } =
+        [("Pending", "Karar bekliyor"), ("Approved", "Onaylandı ve uygulandı"), ("Rejected", "Reddedildi"), ("Withdrawn", "Geri çekildi")];
+
+    public static string ChangeBadge(string status) => status switch
+    {
+        "Approved" => "won",
+        "Pending" => "onhold",
+        "Rejected" => "lost",
+        _ => "cancelled",
+    };
+
+    public static IReadOnlyList<(string Key, string Label)> HeaderFields { get; } =
+    [
+        ("deliveryAddress", "Teslimat adresi"), ("location", "Lokasyon"), ("plannedStartDate", "Planlanan başlangıç"), ("plannedDeliveryDate", "Planlanan teslim"),
+        ("paymentTerms", "Ödeme koşulları"), ("deliveryTerms", "Teslimat koşulları"), ("commercialTerms", "Ticari koşullar"),
+        ("commitments", "Müşteriye verilen taahhütler"), ("operationsNotes", "Operasyon notları"),
+    ];
+
+    public static string Action(string key) => key switch
+    {
+        "submit-for-approval" => "Onaya gönder",
+        "withdraw-approval" => "Onayı geri çek",
+        "approve" => "Onayla",
+        "return-to-draft" => "Taslağa geri gönder",
+        "cancel" => "Siparişi iptal et",
+        "close" => "Siparişi kapat",
+        "force-close" => "Zorla kapat",
+        _ => key,
+    };
+
+    public static bool IsPrimary(string key) => key is "submit-for-approval" or "approve" or "close";
+
+    public static bool IsDanger(string key) => key is "cancel" or "force-close";
+
     public static string History(string kind) => kind switch
     {
         "CreatedFromQuote" => "Kabul edilmiş tekliften oluşturuldu",
+        "SubmittedForApproval" => "Onaya gönderildi",
+        "ApprovalWithdrawn" => "Onay geri çekildi",
+        "Approved" => "Onaylandı",
+        "ReturnedToDraft" => "Onaydan taslağa geri gönderildi",
+        "Cancelled" => "İptal edildi",
+        "Closed" => "Kapatıldı",
+        "ForceClosed" => "Kalan yükümlülükle zorla kapatıldı",
+        "ChangeRequested" => "Değişiklik talebi açıldı",
+        "ChangeApplied" => "Değişiklik talebi onaylandı ve uygulandı",
+        "ChangeRejected" => "Değişiklik talebi reddedildi",
+        "ChangeWithdrawn" => "Değişiklik talebi geri çekildi",
         _ => kind,
     };
 

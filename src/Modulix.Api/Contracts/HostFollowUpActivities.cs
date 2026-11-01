@@ -16,7 +16,7 @@ namespace Modulix.Api.Contracts;
 /// </summary>
 internal sealed class HostFollowUpActivities(IServiceProvider services, EventHandlingScope handling, ITenantContextAccessor tenant, ITenantScopeFactory scopes, TimeProvider time) : IFollowUpActivities
 {
-    private static readonly HashSet<string> ElevatedSystemIdentities = new(StringComparer.Ordinal) { "contracts.scheduler" };
+    private static readonly HashSet<string> ElevatedSystemIdentities = new(StringComparer.Ordinal) { "contracts.scheduler", "orders.scheduler" };
 
     public async Task<FollowUpResult> CreateAsync(FollowUpRequest request, CancellationToken cancellationToken)
     {

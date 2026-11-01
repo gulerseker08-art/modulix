@@ -76,6 +76,18 @@ public static class LineKinds
 public static class OrderEventKinds
 {
     public const string CreatedFromQuote = "CreatedFromQuote";
+    public const string SubmittedForApproval = "SubmittedForApproval";
+    public const string ApprovalWithdrawn = "ApprovalWithdrawn";
+    public const string Approved = "Approved";
+    public const string ReturnedToDraft = "ReturnedToDraft";
+    public const string Cancelled = "Cancelled";
+    public const string Closed = "Closed";
+    public const string ForceClosed = "ForceClosed";
+    public const string ChangeRequested = "ChangeRequested";
+    public const string ChangeApplied = "ChangeApplied";
+    public const string ChangeRejected = "ChangeRejected";
+    public const string ChangeWithdrawn = "ChangeWithdrawn";
+    public const string HandoverChanged = "HandoverChanged";
 }
 
 public readonly record struct OrderRuleResult(bool Allowed, string? Code = null, string? Message = null)

@@ -1,0 +1,130 @@
+@* Sipariş durum işlemleri: kural sunucuda uygulanır; bu bileşen yalnızca sunucunun eylem listesini (izin, ön koşul, gerekçe) gösterir. *@
+@inject ApiClient Api
+
+<section aria-labelledby="order-actions-title">
+    <h2 id="order-actions-title">Durum işlemleri</h2>
+    <Notice Text="@message" Failed="@failed" />
+    @if (actions is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (actions.Count == 0)
+    {
+        <p class="text-muted">Bu sipariş için yapabileceğiniz durum işlemi yok.</p>
+    }
+    else
+    {
+        <div class="header-actions" role="group" aria-label="Sipariş durum işlemleri">
+            @foreach (var action in actions)
+            {
+                <button type="button" class="btn @(OrderLabels.IsDanger(action.Action) ? "btn-outline-danger" : OrderLabels.IsPrimary(action.Action) ? "btn-primary" : "btn-outline-secondary")"
+                        disabled="@(!action.Allowed || busy)" aria-pressed="@(selected == action.Action ? "true" : "false")" aria-describedby="@(action.Allowed ? null : $"why-{action.Action}")"
+                        @onclick="() => Choose(action)">@OrderLabels.Action(action.Action)</button>
+            }
+        </div>
+        <ul class="small text-muted mt-2">
+            @foreach (var blocked in actions.Where(a => !a.Allowed))
+            {
+                <li id="why-@blocked.Action"><strong>@OrderLabels.Action(blocked.Action):</strong> @blocked.Message</li>
+            }
+        </ul>
+
+        @if (selectedAction is { RequiresReason: true })
+        {
+            <form class="record-form" novalidate @onsubmit="RunAsync" @onsubmit:preventDefault>
+                <label class="form-label" for="action-reason">Gerekçe (zorunlu) — @OrderLabels.Action(selectedAction.Action)</label>
+                <textarea id="action-reason" class="form-control" rows="2" maxlength="500" @bind="reason" aria-invalid="@(reasonError is not null ? "true" : null)"></textarea>
+                @if (reasonError is not null) { <div class="invalid-feedback d-block" role="alert">@reasonError</div> }
+                @if (selectedAction.Action is "cancel")
+                {
+                    <p class="small text-muted mt-1">İptal siparişin teslim edilmemiş kısmını sonlandırır; teslim edilen kayıtlar korunur. İptal bir iade ya da fatura işlemi değildir.</p>
+                }
+                <div class="form-actions">
+                    <button type="submit" class="btn @(OrderLabels.IsDanger(selectedAction.Action) ? "btn-danger" : "btn-primary")" disabled="@busy">Onayla: @OrderLabels.Action(selectedAction.Action)</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">Vazgeç</button>
+                </div>
+            </form>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public OrderDto Order { get; set; } = default!;
+
+    /// <summary>Eylem uygulandıktan sonra güncel sipariş (üst ekran kendini yeniler).</summary>
+    [Parameter] public EventCallback<OrderDto> Changed { get; set; }
+
+    private List<OrderActionDto>? actions;
+    private string? selected;
+    private string reason = string.Empty;
+    private string? reasonError;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private Guid loadedFor;
+    private long loadedVersion;
+
+    private OrderActionDto? selectedAction => actions?.FirstOrDefault(a => a.Action == selected);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Order.Id && loadedVersion == Order.Version)
+        {
+            return;
+        }
+
+        loadedFor = Order.Id;
+        loadedVersion = Order.Version;
+        var result = await Api.GetAsync<List<OrderActionDto>>($"/api/orders/orders/{Order.Id}/actions");
+        actions = result.Value ?? [];
+    }
+
+    private async Task Choose(OrderActionDto action)
+    {
+        message = null;
+        reasonError = null;
+        reason = string.Empty;
+        if (action.RequiresReason)
+        {
+            selected = selected == action.Action ? null : action.Action;
+            return;
+        }
+
+        selected = action.Action;
+        await RunAsync();
+    }
+
+    private void Cancel()
+    {
+        selected = null;
+        reasonError = null;
+    }
+
+    private async Task RunAsync()
+    {
+        if (busy || selectedAction is not { } action) { return; }
+        if (action.RequiresReason && string.IsNullOrWhiteSpace(reason))
+        {
+            reasonError = "Gerekçe zorunludur.";
+            return;
+        }
+
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<OrderDto>($"/api/orders/orders/{Order.Id}/{action.Action}", new OrderTransitionRequest(Order.Version, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            failed = true;
+            message = result.Error;
+            selected = null;
+            return;
+        }
+
+        failed = false;
+        message = $"{OrderLabels.Action(action.Action)}: işlem tamamlandı.";
+        selected = null;
+        reason = string.Empty;
+        await Changed.InvokeAsync(result.Value!);
+    }
+}

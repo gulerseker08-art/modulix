@@ -96,6 +96,7 @@ public sealed record OrderLineDto(
     Guid SourceQuoteId,
     Guid SourceQuoteLineKey,
     decimal DeliveredQuantity,
+    decimal CancelledQuantity,
     bool IsCancelled,
     DateOnly? PlannedDate);
 
@@ -140,6 +141,37 @@ public static class OrdersAccess
     public const string OrdersCreate = "orders.orders.create";
     public const string OrdersWrite = "orders.orders.write";
     public const string FinancialsRead = "orders.financials.read";
+    public const string OrdersApprove = "orders.orders.approve";
+    public const string OrdersCancel = "orders.orders.cancel";
+    public const string OrdersClose = "orders.orders.close";
+    public const string OrdersForceClose = "orders.orders.force-close";
 
     public const string OrderEntityKey = "orders.order";
 }
+
+// ---- Dilim 2: durum geçişleri ve değişiklik talebi
+
+/// <summary>Eylem isteği: kaydın sürümü zorunlu (eşzamanlı çakışmada 409); gerekçe bazı eylemlerde zorunludur.</summary>
+public sealed record OrderTransitionRequest(long Version, string? Reason = null);
+
+public sealed record OrderActionDto(string Action, bool Allowed, string? Code, string? Message, bool RequiresReason);
+
+/// <summary>Kalem değişikliği: yeni etkin miktar (yalnızca azaltma; 0 kalemi iptal eder) ve/veya planlanan tarih.</summary>
+public sealed record OrderLineChangeDto(Guid LineId, decimal? Quantity = null, DateOnly? PlannedDate = null);
+
+/// <param name="Header">Başlık alanı → yeni değer (boş değer alanı temizler). İzin verilenler: deliveryAddress, location, plannedStartDate, plannedDeliveryDate, paymentTerms, deliveryTerms, commercialTerms, commitments, operationsNotes.</param>
+public sealed record OrderChangeSetDto(IReadOnlyDictionary<string, string?> Header, IReadOnlyList<OrderLineChangeDto> Lines);
+
+public sealed record OrderChangeRequestInputDto(string? Reason, IReadOnlyDictionary<string, string?>? Header = null, IReadOnlyList<OrderLineChangeDto>? Lines = null);
+
+public sealed record OrderChangePreviewDto(
+    OrderChangeSetDto Changes, IReadOnlyList<string> Operations, IReadOnlyList<string> Deliveries, IReadOnlyList<string> Contracts, decimal? NetDelta, decimal? TaxDelta);
+
+public sealed record OrderChangeRequestDto(
+    Guid Id, long Version, Guid OrderId, int Sequence, string Status, string Reason, OrderChangeSetDto Changes, IReadOnlyList<string> Operations,
+    IReadOnlyList<string> Deliveries, IReadOnlyList<string> Contracts, decimal? NetDelta, decimal? TaxDelta, Guid? RequestedBy, Guid? DecidedBy,
+    DateTimeOffset? DecidedAt, string? DecisionNote, DateTimeOffset CreatedAt);
+
+public sealed record DecideOrderChangeRequest(long Version, string? Note = null);
+
+public sealed record WithdrawOrderChangeRequest(long Version);

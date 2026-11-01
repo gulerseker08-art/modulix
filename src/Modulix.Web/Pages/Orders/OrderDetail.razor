@@ -33,6 +33,8 @@
 
         <Notice Text="@notice" Failed="@noticeFailed" />
 
+        <OrderActionsPanel Order="order" Changed="OnActionAsync" />
+
         <section aria-labelledby="summary-title">
             <h2 id="summary-title">Özet</h2>
             <dl class="detail-list">
@@ -111,6 +113,7 @@
                                 <td data-label="Miktar" class="text-end">
                                     @OrderLabels.Quantity(line.Quantity, line.UnitName)
                                     @if (line.AcceptedQuantity != line.Quantity) { <small class="text-muted d-block">Teklifte @OrderLabels.Quantity(line.AcceptedQuantity, line.UnitName)</small> }
+                                    @if (line.CancelledQuantity > 0) { <small class="text-muted d-block">İptal/azaltılan @OrderLabels.Quantity(line.CancelledQuantity, line.UnitName) · etkin @OrderLabels.Quantity(line.Quantity - line.CancelledQuantity, line.UnitName)</small> }
                                 </td>
                                 <td data-label="Birim fiyat" class="text-end">@OrderLabels.Money(line.UnitPrice, order.Currency)</td>
                                 <td data-label="Net" class="text-end">@OrderLabels.Money(line.Net, order.Currency)</td>
@@ -208,6 +211,17 @@
             }
         </section>
 
+        <section aria-labelledby="handover-title">
+            <h2 id="handover-title">Satış devri</h2>
+            <p>
+                <span class="badge stage-@OrderLabels.HandoverBadge(order.HandoverStatus)">@OrderLabels.Label(OrderLabels.Handovers, order.HandoverStatus)</span>
+                <span class="text-muted"> Satıştan operasyona yapılandırılmış devir: kapsam, çıktılar, taahhütler, kontrol listesi ve kabul kriterleri.</span>
+            </p>
+            <a class="btn btn-outline-primary" href="siparisler/@order.Id/devir">@(order.HandoverStatus == "NotStarted" ? "Devri hazırla" : "Devir ekranını aç")</a>
+        </section>
+
+        <OrderChangeRequestsPanel Order="order" Lines="lines ?? []" Changed="LoadAsync" />
+
         <section aria-labelledby="history-title">
             <h2 id="history-title">İşlem geçmişi</h2>
             @if (history is null)
@@ -292,6 +306,14 @@
         lines = lineResult.Value?.Items.ToList() ?? [];
         var historyResult = await Api.GetAsync<List<OrderHistoryDto>>($"/api/orders/orders/{Id}/history");
         history = historyResult.Value ?? [];
+    }
+
+    /// <summary>Durum eylemi uygulandı: sipariş, kalemler ve geçmiş yeniden yüklenir.</summary>
+    private async Task OnActionAsync(OrderDto updated)
+    {
+        order = updated;
+        editing = false;
+        await LoadAsync();
     }
 
     private void StartEdit()
