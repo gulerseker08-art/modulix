@@ -1,6 +1,6 @@
 # ADR-0022: Sözleşme yönetimi (EPIC 7) — analiz ve ilk dilim
 
-Durum: Kısmen uygulandı (ilk dilim: modül iskeleti, veri modeli, kayıt depoları, temel ekranlar). Tarih: 2026-10-31.
+Durum: Büyük ölçüde uygulandı (dilim 1–10; engelli ve kısmen kalan işler için bkz. [teslim raporu](../sozlesme-yonetimi-teslim-raporu.md)). Tarih: 2026-10-31 (son güncelleme 2026-11-01).
 
 ## Mevcut durum (analiz anında, kodla kanıtlı)
 
@@ -63,7 +63,7 @@ Yol haritasında (M1.5i, M1.6) sipariş/sözleşme köprüsü "hedef modül yok"
 7. Taahhütler (dönemsel gerçekleşme, ihlal → aktivite) — uygulandı.
 8. Yenileme, fesih, zamanlanmış iş (ek protokol `revise` ile) — uygulandı.
 9. Ekran tamamlama (sihirbaz, pano, kayıtlı görünümler, sıralama, dışa aktarma, ayarlar bağlantısı, erişilebilirlik) — uygulandı (toplu işlem ve ay ızgarası takvimi hariç; bkz. dokuzuncu dilim).
-10. Dokümantasyon ve teslim raporu.
+10. Dokümantasyon ve teslim raporu — uygulandı ([docs/sozlesme-yonetimi-teslim-raporu.md](../sozlesme-yonetimi-teslim-raporu.md)).
 
 ## Uygulama durumu (birinci dilim: iskelet)
 
