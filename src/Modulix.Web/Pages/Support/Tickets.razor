@@ -88,7 +88,7 @@
             <thead>
                 <tr>
                     <th scope="col">Talep</th><th scope="col">Müşteri</th><th scope="col">Tür</th><th scope="col">Öncelik</th><th scope="col">Durum</th>
-                    <th scope="col">Sorumlu</th><th scope="col">Yaş</th><th scope="col">Son hareket</th>
+                    <th scope="col">Sorumlu</th><th scope="col">Yaş</th><th scope="col">SLA hedefleri</th><th scope="col">Son hareket</th>
                 </tr>
             </thead>
             <tbody>
@@ -105,6 +105,7 @@
                         <td data-label="Durum"><span class="badge stage-@SupportLabels.StatusBadge(t.Status)">@SupportLabels.Label(SupportLabels.Statuses, t.Status)</span></td>
                         <td data-label="Sorumlu">@(t.OwnerId is null ? "Atanmamış" : Lookups.MemberName(t.OwnerId))</td>
                         <td data-label="Yaş">@Age(t.CreatedAt)</td>
+                        <td data-label="SLA hedefleri">@SlaText(t)</td>
                         <td data-label="Son hareket">@CrmLabels.Time(t.LastActivityAt)</td>
                     </tr>
                 }
@@ -121,7 +122,7 @@
     private static readonly (string Key, string Label)[] Presets =
     [
         ("mine", "Benim taleplerim"), ("unassigned", "Atanmamış"), ("awaiting", "Yanıt bekleyen"), ("waiting", "Müşteri bekleyen"),
-        ("reopened", "Yeniden açılan"), ("resolved", "Çözüldü (teyit bekliyor)"), ("open", "Tüm açık talepler"),
+        ("reopened", "Yeniden açılan"), ("resolved", "Çözüldü (teyit bekliyor)"), ("slarisk", "SLA riski"), ("slabreach", "SLA ihlali"), ("open", "Tüm açık talepler"),
     ];
 
     /// <summary>Pano / başka ekranlardan gelen bağlantılar: <c>?gorunum=unassigned</c>, <c>?musteri={id}</c>.</summary>
@@ -158,6 +159,8 @@
         "waiting" => summary.WaitingCustomer,
         "reopened" => summary.Reopened,
         "resolved" => summary.Resolved,
+        "slarisk" => summary.SlaAtRisk,
+        "slabreach" => summary.SlaBreached,
         "open" => summary.Open,
         _ => null,
     };
@@ -180,6 +183,8 @@
             case "waiting": parts.Add("status=WaitingCustomer"); break;
             case "reopened": parts.Add("status=Reopened"); break;
             case "resolved": parts.Add("status=Resolved"); break;
+            case "slarisk": parts.Add("slaAtRisk=true"); parts.Add("open=true"); break;
+            case "slabreach": parts.Add("slaBreached=true"); parts.Add("open=true"); break;
             case "open": parts.Add("open=true"); break;
         }
 
@@ -199,6 +204,12 @@
         message = result.IsSuccess ? null : result.Error;
         summary = (await Api.GetAsync<TicketSummaryDto>("/api/support/summary")).Value;
     }
+
+    /// <summary>Listedeki hedef anı kopyası (otorite SLA örneğidir): çalışan sayaç yoksa tire.</summary>
+    private static string SlaText(TicketDto t) =>
+        t.FirstResponseDueAt is null && t.ResolutionDueAt is null
+            ? "—"
+            : string.Join(" · ", new[] { t.FirstResponseDueAt is { } f ? "İlk yanıt " + CrmLabels.Time(f) : null, t.ResolutionDueAt is { } r ? "Çözüm " + CrmLabels.Time(r) : null }.Where(x => x is not null));
 
     private static string Age(DateTimeOffset createdAt)
     {

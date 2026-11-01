@@ -26,12 +26,6 @@ public interface ISlaScheduler
     Task<SlaSchedulerRun> RunAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>"support.scheduler" kimliğinin izin çapası (zamanlanmış işin izinlerini tanımlar); olay işlemez.</summary>
-internal sealed class SupportSchedulerAnchor : IEventSubscriber
-{
-    public Task HandleAsync(EventEnvelope envelope, CancellationToken cancellationToken) => Task.CompletedTask;
-}
-
 internal sealed class SlaScheduler(
     IModuleData data,
     IRecordPipeline pipeline,

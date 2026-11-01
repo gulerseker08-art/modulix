@@ -107,7 +107,7 @@ Desteklenmeyen geçiş **409**, eksik gerekçe/alan **422**, yetkisiz eylem **40
 
 ### 4.3 Öncelik, yönlendirme, atama
 
-- Öncelik = etki × aciliyet matrisi (dilim 1: sabit varsayılan, dilim 2: yönetilebilir). Elle değişiklik ayrı izin + gerekçe ister, `PriorityOverridden` ile işaretlenir ve sonraki etki/aciliyet düzenlemesiyle sessizce ezilmez.
+- Öncelik = etki × aciliyet matrisi (dilim 1-2: sabit varsayılan; yönetilebilir matris dilim 3). Elle değişiklik ayrı izin + gerekçe ister, `PriorityOverridden` ile işaretlenir ve sonraki etki/aciliyet düzenlemesiyle sessizce ezilmez.
 - Yönlendirme (dilim 1): açık kuyruk (yetkiyle) → kategori varsayılan kuyruğu → üst kategori kuyruğu → tenant varsayılan kuyruğu → kuyruksuz (atanmamış). Sıra sabit olduğundan sonuç **belirlidir**; pasif kuyruk atlanır. Öncelik sıralı kural motoru (kanal, müşteri segmenti, hizmet) dilim 2.
 - Kuyruk ile sahiplik ayrı alanlardır; atanmamış talepler çalışma alanında "Atanmamış" olarak görünür ve veri kapsamı ne olursa olsun kuyrukta herkese görünür (üzerine alınabilsin diye).
 - Eşzamanlı üzerine alma: ikinci istek sürüm çakışması (409) ya da talep artık başkasının olduğu için kapsam dışı (404) alır; hiçbir durumda ikinci sahip yazılmaz.
@@ -154,13 +154,26 @@ Rol şablonları: `support.agent` (kapsam Ekip), `support.lead` (Ekip), `support
 
 Renk tek gösterge değildir (durum/öncelik metinli rozet), düğmeler klavye erişimlidir, hata mesajları `role="alert"`/`aria-describedby` ile okunur. Dilim 2+ ekranları (SLA/eskalasyon yönetimi, şikâyet inceleme, memnuniyet, raporlar, kuyruk/atama toplu işlemleri, müşteri portalı) henüz yoktur.
 
-### 4.8 SLA tasarım kararları (dilim 2; **henüz uygulanmadı**)
+### 4.8 SLA tasarım kararları (dilim 2; uygulandı)
 
 - İlk yanıt ve çözüm hedefi ayrı izlenir; sonraki müşteri mesajına yanıt ayrı sayaç.
 - Politika seçimi: sözleşme/hizmet kapsamı (varsa) → müşteri + tür + kategori + öncelik → tenant varsayılanı; eşitlikte en özel (en çok eşleşen alan) ve sonra en yeni sürüm; kapsam dışı kayıt "hedefsiz" gösterilir.
 - Zaman UTC saklanır; süre, ilgili takvime (çalışma saatleri, hafta sonu, tatil, yarım gün, zaman dilimi, DST) göre hesaplanır. Örnek: Pzt–Cum 09:00–18:00, hedef 2 iş saati, Cuma 17:00 açılış → Pazartesi 10:00 (Pazartesi tatilse Salı 10:00).
 - Müşteri beklemesi SLA'yı durdurur, iç ekip beklemesi varsayılan olarak durdurmaz (politikayla değişir). Her SLA örneği politika/takvim sürüm anlık görüntüsü, başlangıç, hedef, harcanan iş süresi, durdurma aralıkları, gerçekleşme ve ihlal tutar; açık kayıtlar politika değişikliğinden etkilenmez (yetkili, gerekçeli, audit'li yeniden hesaplama).
-- İhlal, işin çalıştığı ana değil gerçek hedef/gerçekleşme zamanına göre değerlendirilir. İş tekrarı/paralelliği tekil eylem anahtarıyla korunur: `(TenantId, TicketId, SlaCycle, Threshold/Action)`; kesinti sonrası kaçırılan ihlal doğru hedef zamanıyla işlenir; tenant başına `sp_getapplock` (sipariş/sözleşme işçisi kalıbı). Öncelik düşürme/bekletme/yeniden açma geçmiş ihlali silmez; her döngü ayrı saklanır.
+- İhlal, işin çalıştığı ana değil gerçek hedef/gerçekleşme zamanına göre değerlendirilir. İş tekrarı/paralelliği tekil eylem anahtarıyla korunur: `(TenantId, SlaInstanceId, RuleId)`; örnek zaten `(TenantId, TicketId, Cycle, Metric)` ile tekildir; kesinti sonrası kaçırılan ihlal doğru hedef zamanıyla işlenir; tenant başına `sp_getapplock` (sipariş/sözleşme işçisi kalıbı). Öncelik düşürme/bekletme/yeniden açma geçmiş ihlali silmez; her döngü ayrı saklanır.
+
+**Uygulanan tasarım (dilim 2):**
+
+- **Takvim** (`support.sla-calendar`): saat dilimi (IANA), haftalık çalışma pencereleri (gün başına birden çok pencere), tatiller (tam gün kapalı ya da yarım gün penceresi), 7/24 seçeneği. Hesap saf sınıflardadır (`WorkCalendar`, `SlaClock`): `AddWorkingTime` / `WorkingTimeBetween`. Pencere sonunda biten süre o anda biter (ertesi güne taşmaz); yaz/kış saatinde geçersiz yerel saat bir saat ileri, belirsiz yerel saat ilk (yaz saati) karşılığıyla çözülür; pencereler gerçek geçen süreyle ölçülür.
+- **Politika** (`support.sla-policy`): kısıtlar (tür, kategori — üst kategori de uyar —, öncelik, müşteri), ilk yanıt ve çözüm hedefi (dakika; biri yeterli), takvim, bekleme kuralları (müşteri beklemesi varsayılan durdurur, iç ekip beklemesi durdurmaz), eskalasyon kuralları, öncelik sırası. Seçim sırası `SlaPolicySelector`: yalnızca etkin ve **tüm** kısıtları uyan politikalar aday; (1) çok kısıtlı olan, (2) küçük `precedence`, (3) ad (harf duyarsız), (4) kimlik. Kısıtsız "varsayılan" politika yalnızca özel politika yoksa. Uyan yoksa talep **hedefsiz**dir. Sözleşme/hizmet kapsamı sinyali yoktur (sözleşme bağlantısı dilim 5).
+- **Anlık görüntü ve sürüm:** her SLA örneği politika + takvim anlık görüntüsünü (JSON) ve politika sürümünü taşır; politika ya da takvim düzenlemesi açık örnekleri **değiştirmez**. Yetkili `POST /api/support/tickets/{id}/sla/recalculate` (`support.sla.recalculate`, gerekçe zorunlu) açık örnekleri güncel politika/takvimle yeniden anlık görüntüler; önce/sonra özeti tarihçeye (`SlaRecalculated`) ve denetim kaydına (talep hedef alanları) düşer.
+- **Sayaç:** `WorkedSeconds` (duraklatma öncesi birikmiş iş süresi) ve `RunningSince`; hedef anı = çalışmaya başlanan andan kalan iş süresi kadar sonrası. Duraklatma/sürdürme aralıkları `SlaPauses`'ta saklanır. Bekleme durumuna girince/çıkınca sayaç **aynı işlemde** eşitlenir (`SlaEngine`).
+- **Tamamlama:** ilk insan yanıtı (dilim 1 kuralı) ilk yanıt örneğini, çözüm çözüm örneğini tamamlar (çözümle açık ilk yanıt örneği de kapanır); iptal örnekleri iptal eder. Hedef anı geçtikten sonra tamamlanan örnek **ihlal** olarak, gerçek hedef anıyla işaretlenir.
+- **Yeniden açma:** yeni bir çözüm **döngüsü** başlatır (güncel politika ve öncelikle); önceki döngü ve ihlali olduğu gibi kalır. İlk yanıt yeniden ölçülmez.
+- **Öncelik değişimi:** ihlal edilmemiş örnekte politika yeniden seçilir; harcanan iş süresi korunur, hedef kalan süreden yeniden hesaplanır (deterministik). İhlal edilmiş örnek hiçbir zaman değiştirilmez/silinmez. Eşleşen politika yoksa mevcut hedef korunur.
+- **Zamanlayıcı** (`SupportJobsRunner`, `support.scheduler` sistem kimliği, tenant başına `sp_getapplock`; `SupportJobs:WorkerEnabled`, `PollIntervalSeconds` varsayılan 300): (1) hedef anı geçmiş çalışan örneği gerçek hedef anıyla ihlal işaretler ve tarihçeye `SlaBreached` yazar; (2) her örneğin eskalasyon kurallarını eşik anına göre değerlendirir ve tekil anahtarla bir kez uygular. Eylemler ayrıdır: `NotifyOwner` (sahibine e-posta), `NotifyUser` (adlı kullanıcıya, ör. ekip lideri, e-posta), `Reassign` (kuyruk ve/veya kullanıcı; tarihçeye `SlaEscalated`). E-posta yalnızca talep numarası ve konusunu içerir (iç not ve açıklama gitmez). Geçici hata (sürüm çakışması) satırı yazmaz ve sonraki turda yeniden denenir; geçersiz yapılandırma satırı "uygulanamadı" sonucuyla yazar (döngü olmaz).
+- **Göstergeler:** `GET /api/support/summary` `slaAtRisk` (çalışan, ihlal olmamış, ilk uyarı eşiği geçmiş) ve `slaBreached` (açık örnek hedef anını aşmış) sayar; liste `slaAtRisk=true|slaBreached=true` süzgeçleri ve `sort=resolutionDue|firstResponseDue` ile aynı kaynaktan gelir. Taleplerde `firstResponseDueAt`/`resolutionDueAt` listeler için örnekten kopyalanır (otorite örnektir).
+- **Arayüz:** talep detayında SLA paneli (durum, hedef, harcanan/kalan, duraklatma aralıkları, eskalasyon eylemleri, yetkiliye yeniden hesaplama); `/destek/sla` yönetim ekranı (takvim, politika, eskalasyon kuralları, örnek talep için önizleme). Sayaç yazısı **gösterim amaçlıdır**, 30 sn'de bir sunucudan yenilenir.
 
 ## 5. Migration ve geri dönüş yaklaşımı
 
@@ -172,15 +185,21 @@ Renk tek gösterge değildir (durum/öncelik metinli rozet), düğmeler klavye e
 ## 6. Dilimler
 
 1. **Dilim 1 — Çekirdek (uygulandı):** analiz, ADR, modül, talep/kuyruk/kategori/mesaj/tarihçe, durum makinesi, atama/devir, iç not ayrımı, çözüm, yeniden açma penceresi, öncelik matrisi, yönlendirme, tekrar koruması, çalışma alanı/liste/yeni/detay/ayar ekranları, testler.
-2. **Dilim 2 — SLA ve eskalasyon:** destek takvimi, politika sürümü, SLA örneği/döngü, durdurma aralıkları, uyarı/ihlal işçisi (tekil eylem), eskalasyon eylemleri, yönetilebilir öncelik matrisi ve öncelik sıralı yönlendirme kuralları, yönetim ekranları.
-3. **Dilim 3 — Çözüm derinliği ve şikâyet:** mükerrer birleştirme, alt görev/engelleyici iş, zaman aşımıyla kapanma ve müşteri teyidi, şikâyet inceleme (tekrarlayan neden, düzeltici aksiyon), kategoriye bağlı alan kuralları, mükerrer uyarısı.
+2. **Dilim 2 — SLA ve eskalasyon (uygulandı):** destek iş takvimi, sürümlü politika ve anlık görüntü, politika seçimi (kesin sıra), SLA örneği/döngü, duraklatma, ihlal ve eskalasyon işçisi (tekil eylem), yeniden hesaplama, önizleme, yönetim ekranı ve talep SLA paneli. **Dilim 3'e kaydırıldı:** yönetilebilir öncelik matrisi ve öncelik sıralı yönlendirme kuralları (dilim 2'de yalnızca SLA ve eskalasyon kapsandı).
+3. **Dilim 3 — Çözüm derinliği, yönlendirme ve şikâyet:** yönetilebilir öncelik matrisi, öncelik sıralı yönlendirme kuralları (kanal, müşteri segmenti, hizmet), mükerrer birleştirme, alt görev/engelleyici iş, zaman aşımıyla kapanma ve müşteri teyidi, şikâyet inceleme (tekrarlayan neden, düzeltici aksiyon), kategoriye bağlı alan kuralları, mükerrer uyarısı.
 4. **Dilim 4 — Kanallar, ek, memnuniyet:** gelen kanal adaptör arayüzü (Message-Id/In-Reply-To, otomatik yanıt döngüsü koruması, mesaj tekrar koruması), dosya ekleri (genel depo kararı), memnuniyet anketi (süreli belirteç, tekrar yanıt önleme, düşük puan takibi), dışa aktarma, toplu atama/kapatma.
 5. **Dilim 5 — Entegrasyonlar:** CRM firma kartı (talep aç, geçmiş talepler), sözleşme destek kapsamı/SLA seçimi, sipariş/teslimat/lojistik ilişkili kayıt (güvenli referans), finans iade/tazmin bağlantısı, domain event adları, modül kapatma salt okunur gösterim, mevcut portal varsa koşullu müşteri erişimi.
 6. **Dilim 6 — Raporlar:** hacim, backlog yaşı, ilk yanıt/çözüm süresi (takvim ve iş süresi; ortalama/medyan/yüzdelik), SLA uyumu (pay/payda), yeniden açılma, CSAT (yanıt oranı, örneklem), drill-down.
 
 ## 7. Sınırlamalar (baştan bilinen)
 
-- İş takvimi altyapısı yoktur (dilim 2'de destek modülünde kurulur).
+- İş takvimi destek modülündedir (Core'da genel takvim yoktur); ikinci bir modül gerektirirse Core'a taşınır.
+- Takvim arayüzü gün başına tek pencere düzenler (API ve hesap birden çok pencereyi destekler). Tatil listesi elle girilir; resmî tatil takvimi içe aktarılmaz.
+- Açık SLA örnekleri anlık görüntüyle yaşar: politika/takvim/tatil düzenlemesi onları etkilemez, yalnızca yetkili yeniden hesaplama günceller. Talebin türü, kategorisi ya da müşterisi değişince politika yeniden seçilmez (yalnızca öncelik değişiminde ve yeniden hesaplamada).
+- "Sonraki müşteri mesajına yanıt" ayrı sayacı ve sözleşme/hizmet kapsamına göre politika seçimi uygulanmadı (sözleşme bağlantısı dilim 5).
+- Zamanlayıcı bir turda en çok 200 ihlal ve 400 çalışan örnek işler (kalanı sonraki turda).
+- `Reassign` yalnızca kural kuyruk ve/veya kullanıcı verir; yalnızca kuyruk verilirse sorumlu korunur. Eskalasyonda ek olarak aktivite açılmaz (yalnızca e-posta ve tarihçe).
+- Eskalasyon e-postası kuyruğa alınır; iç kullanıcıya gider, teslim durumu e-posta kuyruğundan izlenir.
 - Genel dosya deposu, gelen e-posta kanalı, müşteri portalı, dosya tarama, uygulama içi bildirim merkezi yoktur.
 - Aktivite altyapısı CRM modülüne aittir: görev/görüşmeyi talebe bağlamak için CRM açık olmalıdır; destek tek başına çalışır, yalnızca aktivite bağlantısı CRM ister.
 - `PriorityOverridden` bir kez işaretlenince sonraki etki/aciliyet düzenlemesi öncelik hesabını yenilemez (bilinçli: elle karar korunur).
@@ -220,12 +239,12 @@ Renk tek gösterge değildir (durum/öncelik metinli rozet), düğmeler klavye e
 | 4 | Yetkisiz kullanıcı başka kullanıcının kaydına, iç nota erişemez | `Unauthorized_users_cannot_see_other_agents_tickets_or_run_actions_they_lack_permission_for`, `Internal_notes_never_reach_users_without_the_internal_permission_and_replies_stay_separate`. Export/dosya: dilim 4; **ekip/iş birimi kapsamı** yalnızca "kendi" ve "tümü" ile denendi | Kısmen |
 | 4b | Başka tenant'ın kimliğiyle okuma/yazma/ilişkilendirme sızıntı/değişiklik yaratmaz | `Another_tenant_cannot_read_change_or_link_tickets_customers_categories_or_queues` (talep, müşteri, kategori, kuyruk, kullanıcı, ilişkili talep; toplu işlem yok) | Geçti |
 | 5 | Etki/aciliyet önceliği belirler; manuel gerekçe kaydı; yönlendirme deterministik | `Priority_follows_impact_and_urgency_and_a_manual_change_needs_permission_and_a_reason`, `Routing_uses_the_category_queue_then_the_parent_category_then_the_default_queue_deterministically`, `Impact_and_urgency_decide_the_priority` (birim). Yönlendirme **çakışması** (kural motoru) dilim 2 | Kısmen |
-| 6 | Mesai takvimi hedefi (Cuma 17:00 → Pazartesi 10:00) | — | **Yapılmadı** (dilim 2) |
-| 7 | Pause/resume yalnızca izinli sayaçları etkiler; DST | Bekleme durumları test edildi (`The_state_machine_is_enforced...`); **SLA sayaçları yok** | **Yapılmadı** (dilim 2) |
+| 6 | Mesai takvimi hedefi (Cuma 17:00 → Pazartesi 10:00; Pazartesi tatilse Salı 10:00) | `Friday_afternoon_two_working_hours_ends_on_monday_morning`, `A_holiday_on_monday_pushes_the_target_to_tuesday`, `A_half_day_holiday_only_counts_its_own_window`, `Starting_outside_working_hours...` (birim, sabit saat); `Preview_shows_the_selected_policy_and_calendar_based_targets_for_a_sample_ticket` (API) | Geçti |
+| 7 | Pause/resume yalnızca izinli sayaçları etkiler; iç ekip beklemesi varsayılan durdurmaz; DST | `Waiting_for_the_customer_pauses_the_clock_internal_waiting_does_not_by_default_and_the_policy_can_change_that`, `Pausing_and_resuming_moves_the_target_by_the_paused_time_only`, `Daylight_saving_gap_and_overlap_use_real_elapsed_time` | Geçti |
 | 8 | Otomatik alındı/iç not ilk yanıt sayılmaz; başarısız dış gönderim sayılmaz | `First_response_counts_only_accepted_human_replies_to_the_customer` (birim), `Internal_notes_never_reach...` (iç not ve `Failed` e-posta ilk yanıtı doldurmaz). Otomatik alındı mesajı **henüz üretilmiyor** | Kısmen |
-| 9 | SLA job tekrarında eylem çoğalmaz | — | **Yapılmadı** (dilim 2) |
+| 9 | SLA job tekrarında/paralel çalışmada eylem çoğalmaz; kesinti sonrası ihlal doğru hedef zamanıyla işlenir | `The_scheduler_marks_breaches_at_the_real_target_time_and_applies_each_escalation_exactly_once` (tekrar ve 3 paralel çalıştırma; kayıt, e-posta ve tarihçe sayıları sabit; ihlal anı = gerçek hedef anı) | Geçti |
 | 10 | Çözüm alanları eksikken çözme, yetkisiz geçiş, eşzamanlı üzerine alma engellenir | `The_state_machine_is_enforced_on_the_server_and_generic_updates_cannot_bypass_it`, `Complaints_need_a_root_cause...`, `Concurrent_takes_and_stale_versions_end_in_a_single_owner_and_clear_conflicts` | Geçti |
-| 11 | Yeniden açılan talebin önceki çözümü korunur; yeni döngü | `Complaints_need_a_root_cause_and_reopening_keeps_the_previous_resolution_inside_the_window`, `A_customer_message_on_a_resolved_ticket_reopens_it...`. SLA döngüsü dilim 2 | Kısmen |
+| 11 | Yeniden açılan talebin önceki çözümü ve SLA ihlali korunur; yeni döngü | `Complaints_need_a_root_cause_and_reopening_keeps_the_previous_resolution_inside_the_window`, `A_breach_survives_priority_changes_and_reopening_starts_a_new_cycle_while_keeping_the_old_one` | Geçti |
 | 12 | Birleştirme veri kaybetmez | — | **Yapılmadı** (dilim 3) |
 | 13 | Aynı oluşturma isteği/harici mesaj tekrarında duplicate oluşmaz | `Repeating_a_creation_request_with_the_same_client_key_does_not_create_a_second_ticket` (ardışık ve eşzamanlı). Harici mesaj anahtarı dilim 4 | Kısmen |
 | 14 | Memnuniyet tekrar/süre/sıfır puan | — | **Yapılmadı** (dilim 4) |
@@ -239,6 +258,14 @@ Renk tek gösterge değildir (durum/öncelik metinli rozet), düğmeler klavye e
 
 Tam entegrasyon paketi (`dotnet test tests/Modulix.IntegrationTests -c Release`, SQL Server + Mailpit) **488/488 geçti** (19 dk 15 sn; mevcut 472 test + destek 16). Ayrıca `dotnet build Modulix.slnx -c Release` hatasız, mimari 41, çekirdek 214 ve destek birim 59 test geçti.
 
+### Dilim 2 — SLA ve eskalasyon (1 Kasım 2026): uygulandı ve doğrulandı
+
+**Kod:** `Sla/WorkCalendar.cs` (takvim, SLA saati), `Sla/SlaPolicyRules.cs` (politika seçimi, eskalasyon kuralı), `Sla/SlaEngine.cs` (yaşam döngüsü), `Lifecycle/TicketSla.cs` (okuma, önizleme, yeniden hesaplama), `Lifecycle/SlaScheduler.cs` (ihlal, eskalasyon), `Records/SupportSlaRecordStores.cs` (takvim ve politika), API `SupportEndpoints`/`SupportJobsWorker`, migration `SupportSla` (5 tablo, RLS dahil; `Tickets`'a iki sütun), ekranlar `/destek/sla` ve talep SLA paneli, liste SLA görünümleri.
+
+**Testler:** destek birim 73 (14 yeni: takvim, tatil, yarım gün, bölünmüş gün, 7/24, DST boşluk/çakışma, duraklatma matematiği, eşik anları, takvim ve kural doğrulaması, politika seçimi ve sıra bağımsızlığı); entegrasyon `SupportSlaTests` 11 yeni test (yönetim ve doğrulama, seçim ve anlık görüntü, önizleme, deterministik seçim, duraklatma, tamamlama ve gerçek-hedef-anı ihlali, zamanlayıcı ve tekil eskalasyon, ihlalin öncelik değişiminden etkilenmemesi ve yeniden açma döngüsü, yeniden hesaplama, görünürlük ve tenant izolasyonu, gösterge/liste tutarlılığı). Hedef anları saat beklenmeden veritabanında geriye alınarak sınanır; hesap sabit saatle birim testlerdedir. Tarayıcıda (yerel demo) takvim/politika listesi, önizleme, talep SLA paneli ve duraklatma denendi; bu sırada **bir arayüz hatası bulundu ve düzeltildi** (haftalık özet "Pazartesi"yi "Paz" olarak kısaltıp Pazar ile karıştırıyordu).
+
+**Tam paket:** `dotnet test tests/Modulix.IntegrationTests -c Release` **499/499 geçti** (22 dk 56 sn; dilim 1 sonrası 488 + 11 yeni SLA testi). Ardından zamanlayıcı `Records` klasörüne ve izin çapası ayrı dosyaya taşındı (mimari testler `IModuleData` yalnızca `Records` içinde ve abone sınıfı gövdesinde yasak servis olmaması kurallarını denetler; ikisi de ilk sürümde ihlal edilmişti ve mimari testlerce yakalandı); taşımadan sonra `dotnet build Modulix.slnx -c Release` hatasız, mimari 41, çekirdek 214, destek birim 73 ve destek/SLA/envanter/olay entegrasyon testleri (53) yeniden geçti.
+
 ## 10. Kalan işler (epic tamamlanmış sayılmaz)
 
-Dilim 2–6 (bölüm 6); ayrıca: otomatik alındı mesajı, kanban (isteğe bağlı), ekip/iş birimi kapsamı testi, dışa aktarma, toplu atama/kapatma, birleştirme, kayıtlı görünümler, mesaj düzenleme/geri alma politikası, KVKK saklama politikası, kanal adaptörleri, portal. Hiçbiri yapılmış ya da çalışıyormuş gibi sunulmaz.
+Dilim 3–6 (bölüm 6); ayrıca: otomatik alındı mesajı, "sonraki müşteri mesajına yanıt" SLA sayacı, kanban (isteğe bağlı), ekip/iş birimi kapsamı testi, dışa aktarma, toplu atama/kapatma, birleştirme, kayıtlı görünümler, mesaj düzenleme/geri alma politikası, KVKK saklama politikası, kanal adaptörleri, portal. Hiçbiri yapılmış ya da çalışıyormuş gibi sunulmaz.
