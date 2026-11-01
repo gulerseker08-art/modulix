@@ -10,7 +10,9 @@ namespace Modulix.Modules.Orders.Lifecycle;
 public sealed record OrderActionState(string Action, bool Allowed, string? Code, string? Message, bool RequiresReason);
 
 /// <summary>Tenant ayarlarından gelen sipariş politikası; sağlayıcı yoksa varsayılan.</summary>
-public sealed record OrderPolicySettings(bool AllowSelfApproval, int HandoverAcceptDueDays = 2, int HandoverWaitHours = 48)
+public sealed record OrderPolicySettings(
+    bool AllowSelfApproval, int HandoverAcceptDueDays = 2, int HandoverWaitHours = 48, string JobStrategy = Lifecycle.JobStrategy.PerKind,
+    bool JobServiceAfterDelivery = false, int JobUnassignedHours = 24)
 {
     public static OrderPolicySettings Default { get; } = new(false);
 }
@@ -154,6 +156,23 @@ internal sealed class OrderWorkflow(
             line.IsCancelled = reduction.NewCancelled >= line.Quantity;
             line.Touch();
             Release(ledger, line.SourceQuoteLineKey, reduction);
+        }
+
+        // Açık operasyon işleri iptal edilir (tamamlanmış işler ve gerçekleşen kayıtlar korunur).
+        foreach (var job in (await reader.JobsOfOrderAsync(order.Id, cancellationToken)).Where(j => JobStatus.IsOpen(j.Status)))
+        {
+            JobHistory.Add(context, job, JobEventKinds.Cancelled, job.Status, JobStatus.Cancelled, "Sipariş iptal edildi.");
+            job.Status = JobStatus.Cancelled;
+            job.CancelReason = "Sipariş iptal edildi.";
+            job.Touch();
+        }
+
+        // Planlı teslimatlar iptal edilir; teslim edilmiş kayıtlar korunur.
+        foreach (var delivery in await reader.PlannedDeliveriesTrackedAsync(order.Id, cancellationToken))
+        {
+            delivery.Status = DeliveryStatus.Cancelled;
+            delivery.FailureReason = "Sipariş iptal edildi.";
+            delivery.Touch();
         }
 
         if (await reader.PendingChangeRequestAsync(order.Id, cancellationToken) is { } pending)

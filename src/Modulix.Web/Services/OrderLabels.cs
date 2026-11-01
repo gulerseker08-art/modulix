@@ -33,6 +33,55 @@ public static class OrderLabels
         ("deliveryDate", "Teslim tarihi (yakın)"), ("-deliveryDate", "Teslim tarihi (uzak)"), ("title", "Başlık (A-Z)"),
     ];
 
+    public static IReadOnlyList<(string Key, string Label)> JobStatuses { get; } =
+    [
+        ("AwaitingAssignment", "Atama bekliyor"), ("Planned", "Planlandı"), ("InProgress", "Devam ediyor"), ("Completed", "Tamamlandı"), ("Cancelled", "İptal edildi"),
+    ];
+
+    public static IReadOnlyList<(string Key, string Label)> JobKinds { get; } =
+        [("Delivery", "Teslimat"), ("Service", "Hizmet başlangıcı"), ("Mixed", "Karma"), ("Other", "Diğer")];
+
+    public static IReadOnlyList<(string Key, string Label)> Priorities { get; } =
+        [("Low", "Düşük"), ("Normal", "Normal"), ("High", "Yüksek"), ("Urgent", "Acil")];
+
+    public static IReadOnlyList<(string Key, string Label)> JobSorts { get; } =
+    [
+        ("-createdAt", "En yeni"), ("plannedEnd", "Planlanan bitiş (yakın)"), ("-plannedEnd", "Planlanan bitiş (uzak)"), ("number", "Numara (artan)"), ("title", "Başlık (A-Z)"),
+    ];
+
+    public static string JobBadge(string status) => status switch
+    {
+        "Completed" => "won",
+        "InProgress" => "onhold",
+        "AwaitingAssignment" => "lost",
+        "Cancelled" => "cancelled",
+        _ => "open",
+    };
+
+    public static string JobAction(string key) => key switch
+    {
+        "assign" => "Ata",
+        "start" => "Başlat",
+        "complete" => "Tamamla",
+        "cancel" => "İptal et",
+        _ => key,
+    };
+
+    public static string JobHistory(string kind) => kind switch
+    {
+        "Generated" => "Devir kabulünden üretildi",
+        "CreatedManually" => "Elle açıldı",
+        "Assigned" => "Atama yapıldı",
+        "Started" => "Başlatıldı",
+        "Completed" => "Tamamlandı",
+        "Cancelled" => "İptal edildi",
+        "DependencyAdded" => "Bağımlılık eklendi",
+        "DependencyRemoved" => "Bağımlılık kaldırıldı",
+        "UnassignedAlert" => "Atama bekleme takibi açıldı",
+        "OverdueAlert" => "Gecikme takibi açıldı",
+        _ => kind,
+    };
+
     public static string Label(IReadOnlyList<(string Key, string Label)> list, string? key) =>
         list.FirstOrDefault(x => x.Key == key).Label ?? key ?? "—";
 
@@ -108,6 +157,17 @@ public static class OrderLabels
         "ChangeApplied" => "Değişiklik talebi onaylandı ve uygulandı",
         "ChangeRejected" => "Değişiklik talebi reddedildi",
         "ChangeWithdrawn" => "Değişiklik talebi geri çekildi",
+        "DeliveryPlanned" => "Teslimat planlandı",
+        "Delivered" => "Teslimat kaydedildi",
+        "DeliveryFailed" => "Teslimat başarısız",
+        "DeliveryRescheduled" => "Teslimat yeniden planlandı",
+        "DeliveryCancelled" => "Teslimat iptal edildi",
+        "EvidenceAdded" => "Teslim kanıtı eklendi",
+        "ServicePlanned" => "Hizmet başlangıcı planlandı",
+        "ServiceStarted" => "Hizmet başladı",
+        "ServiceConfirmed" => "Müşteri başlangıcı onayladı",
+        "ServiceCompleted" => "Hizmet tamamlandı",
+        "FulfillmentChanged" => "Gerçekleşme durumu değişti",
         _ => kind,
     };
 

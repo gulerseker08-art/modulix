@@ -50,6 +50,15 @@ public sealed class OrdersModule : IModule
 
         /// <summary>Operasyon adına devri kabul eder ya da gerekçeyle bilgi ister; sorumlu operasyon kullanıcısını atar.</summary>
         public const string HandoversAccept = "orders.handovers.accept";
+
+        /// <summary>Operasyon işine sorumlu kullanıcı ve ekip atar. İşi yönetmekten ayrıdır.</summary>
+        public const string JobsAssign = "orders.jobs.assign";
+
+        /// <summary>Operasyon işini elle açar, başlatır, tamamlar, iptal eder; görev ve bağımlılıkları yönetir.</summary>
+        public const string JobsManage = "orders.jobs.manage";
+
+        /// <summary>Teslimat planlar, teslim/başarısız/iptal/yeniden planlama kaydeder, teslim kanıtı ekler; hizmet başlangıcını planlar, başlatır, onaylar, tamamlar.</summary>
+        public const string FulfillmentRecord = "orders.fulfillment.record";
     }
 
     /// <summary>Firma ayarları.</summary>
@@ -58,6 +67,9 @@ public sealed class OrdersModule : IModule
         public const string AllowSelfApproval = "orders.approval.allow-self";
         public const string HandoverAcceptDueDays = "orders.handover.accept-due-days";
         public const string HandoverWaitHours = "orders.handover.wait-hours";
+        public const string JobStrategy = "orders.jobs.strategy";
+        public const string JobServiceAfterDelivery = "orders.jobs.service-after-delivery";
+        public const string JobUnassignedHours = "orders.jobs.unassigned-hours";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -68,6 +80,10 @@ public sealed class OrdersModule : IModule
         public const string ChangeRequest = "orders.change-request";
         public const string Handover = "orders.handover";
         public const string HandoverItem = "orders.handover-item";
+        public const string Job = "orders.operation-job";
+        public const string JobTask = "orders.operation-task";
+        public const string Delivery = "orders.delivery";
+        public const string ServiceStart = "orders.service-start";
     }
 
     public string Key => ModuleKey;
@@ -87,10 +103,30 @@ public sealed class OrdersModule : IModule
         new(Permissions.HandoversWrite, "Satış devri kaydını ve kontrol listesini hazırlar ve düzenler", "Satış devri"),
         new(Permissions.HandoversSend, "Hazır satış devrini operasyona gönderir ya da yeniden gönderir", "Satış devri"),
         new(Permissions.HandoversAccept, "Satış devrini operasyon adına kabul eder ya da gerekçeyle bilgi ister", "Satış devri"),
+        new(Permissions.JobsAssign, "Operasyon işine sorumlu kullanıcı ve ekip atar", "Operasyon işleri"),
+        new(Permissions.JobsManage, "Operasyon işini elle açar, başlatır, tamamlar, iptal eder; görev ve bağımlılıkları yönetir", "Operasyon işleri"),
+        new(Permissions.FulfillmentRecord, "Teslimat planlar ve kaydeder (kısmi teslim, başarısız teslim, yeniden planlama, teslim kanıtı); hizmet başlangıcını kaydeder", "Teslimat ve hizmet başlangıcı"),
     ];
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
     [
+        new(SettingKeys.JobStrategy, "Operasyon işi: oluşturma stratejisi", "Siparişler", SettingType.Choice, "PerKind")
+        {
+            Description = "Devir kabul edilince işlerin nasıl açılacağı. Türe göre: ürün kalemleri tek 'Teslimat', hizmet/paket kalemleri tek 'Hizmet başlangıcı' işi olur. Tek iş: bütün kalemler tek işte. Kalem başına: her kalem ayrı iş.",
+            Options = [new SettingOption("PerKind", "Türe göre (teslimat ve hizmet ayrı)"), new SettingOption("Single", "Tek iş"), new SettingOption("PerLine", "Kalem başına")],
+        },
+        new(SettingKeys.JobServiceAfterDelivery, "Operasyon işi: hizmet işi teslimat işinden sonra başlasın", "Siparişler", SettingType.Choice, "false")
+        {
+            Description = "Evet seçilirse (türe göre stratejide) hizmet başlangıcı işi teslimat işi tamamlanmadan başlatılamaz; bağımlılık sunucuda uygulanır.",
+            Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
+        },
+        new(SettingKeys.JobUnassignedHours, "Operasyon işi: atama bekleme uyarı süresi (saat)", "Siparişler", SettingType.Text, "24")
+        {
+            Description = "Atama bekleyen iş bu süreden uzun atanmazsa devri kabul eden kullanıcıya bir kez takip aktivitesi açılır. 0 kapalıdır.",
+            Pattern = @"^[0-9]{1,4}$",
+            PatternMessage = "0-9999 arası tam sayı girin.",
+            MaxLength = 4,
+        },
         new(SettingKeys.HandoverAcceptDueDays, "Satış devri: kabul için hedef süre (gün)", "Siparişler", SettingType.Text, "2")
         {
             Description = "Operasyona gönderilen devir için açılan takip aktivitesinin son tarihi (gönderimden itibaren gün). 1-30 arası.",
@@ -131,8 +167,8 @@ public sealed class OrdersModule : IModule
         new(
             "orders.operations",
             "Operasyon sorumlusu (sipariş)",
-            "Siparişleri tutarlar olmadan görüntüler; satış devirlerini kabul eder ya da gerekçeyle bilgi ister.",
-            [Permissions.OrdersRead, Permissions.HandoversAccept])
+            "Siparişleri tutarlar olmadan görüntüler; satış devirlerini kabul eder ya da gerekçeyle bilgi ister; operasyon işlerini atar ve yürütür.",
+            [Permissions.OrdersRead, Permissions.HandoversAccept, Permissions.JobsAssign, Permissions.JobsManage, Permissions.FulfillmentRecord])
         {
             Scope = RecordScope.All,
         },
@@ -210,6 +246,45 @@ public sealed class OrdersModule : IModule
             UserFields = ["doneBy"],
             References = new Dictionary<string, string> { ["handoverId"] = Entities.Handover },
         },
+        new(Entities.Job, "Operasyon işi", Permissions.OrdersRead, new Dictionary<string, string>
+        {
+            ["orderId"] = "Sipariş", ["number"] = "Numara", ["title"] = "Başlık", ["kind"] = "Tür", ["groupKey"] = "Üretim grubu", ["status"] = "Durum", ["priority"] = "Öncelik",
+            ["responsibleUserId"] = "Sorumlu", ["teamName"] = "Ekip", ["plannedStartDate"] = "Planlanan başlangıç", ["plannedEndDate"] = "Planlanan bitiş",
+            ["actualStartAt"] = "Gerçekleşen başlangıç", ["actualEndAt"] = "Gerçekleşen bitiş", ["location"] = "Lokasyon", ["notes"] = "Not", ["cancelReason"] = "İptal gerekçesi",
+            ["source"] = "Kaynak",
+        }, "title")
+        {
+            UserFields = ["responsibleUserId", "createdBy"],
+            References = new Dictionary<string, string> { ["orderId"] = Entities.Order },
+        },
+        new(Entities.JobTask, "Operasyon işi görevi", Permissions.OrdersRead, new Dictionary<string, string>
+        {
+            ["jobId"] = "İş", ["position"] = "Sıra", ["title"] = "Görev", ["isRequired"] = "Zorunlu", ["isDone"] = "Tamamlandı", ["doneAt"] = "Tamamlanma zamanı", ["note"] = "Not",
+        }, "title")
+        {
+            UserFields = ["doneBy"],
+            References = new Dictionary<string, string> { ["jobId"] = Entities.Job },
+        },
+        new(Entities.Delivery, "Teslimat", Permissions.OrdersRead, new Dictionary<string, string>
+        {
+            ["orderId"] = "Sipariş", ["jobId"] = "Operasyon işi", ["number"] = "Numara", ["status"] = "Durum", ["plannedDate"] = "Planlanan tarih", ["actualDate"] = "Gerçekleşen tarih",
+            ["receiverName"] = "Teslim alan", ["receiverNote"] = "Teslim notu", ["failureReason"] = "Gerekçe", ["rescheduledFromId"] = "Yeniden planlanan teslimat",
+            ["rescheduleReason"] = "Yeniden planlama gerekçesi", ["notes"] = "Not", ["deliveredAt"] = "Teslim zamanı",
+        }, "number")
+        {
+            UserFields = ["deliveredBy", "createdBy"],
+            References = new Dictionary<string, string> { ["orderId"] = Entities.Order },
+        },
+        new(Entities.ServiceStart, "Hizmet başlangıcı", Permissions.OrdersRead, new Dictionary<string, string>
+        {
+            ["orderId"] = "Sipariş", ["orderLineId"] = "Sipariş kalemi", ["status"] = "Durum", ["plannedStartDate"] = "Planlanan başlangıç", ["actualStartAt"] = "Gerçekleşen başlangıç",
+            ["customerConfirmedAt"] = "Müşteri onayı zamanı", ["customerConfirmedBy"] = "Onaylayan", ["confirmationNote"] = "Onay notu", ["delayReason"] = "Gecikme gerekçesi",
+            ["completedAt"] = "Tamamlanma zamanı",
+        })
+        {
+            UserFields = ["startedBy", "completedBy", "createdBy"],
+            References = new Dictionary<string, string> { ["orderId"] = Entities.Order },
+        },
         new(Entities.OrderLine, "Sipariş kalemi", Permissions.OrdersRead, new Dictionary<string, string>
         {
             ["orderId"] = "Sipariş", ["position"] = "Sıra", ["kind"] = "Tür", ["productCode"] = "Kod", ["name"] = "Ad", ["description"] = "Açıklama",
@@ -260,7 +335,7 @@ public sealed class OrdersModule : IModule
             "orders.scheduler",
             [DomainEventTypes.RecordDeleted],
             [Entities.Order],
-            [Permissions.OrdersRead, Permissions.HandoversWrite]),
+            [Permissions.OrdersRead, Permissions.HandoversWrite, Permissions.JobsManage]),
     ];
 
     public void ConfigureServices(IServiceCollection services)
@@ -274,6 +349,14 @@ public sealed class OrdersModule : IModule
         services.AddScoped<IRecordStore, OrderHandoverRecordStore>();
         services.AddScoped<IRecordStore, OrderHandoverItemRecordStore>();
         services.AddScoped<IOrderHandovers, OrderHandovers>();
+        services.AddScoped<IRecordStore, OperationJobRecordStore>();
+        services.AddScoped<IRecordStore, OperationJobTaskRecordStore>();
+        services.AddScoped<OperationJobs>();
+        services.AddScoped<IOperationJobs>(sp => sp.GetRequiredService<OperationJobs>());
+        services.AddScoped<IOperationJobGenerator>(sp => sp.GetRequiredService<OperationJobs>());
+        services.AddScoped<IRecordStore, OrderDeliveryRecordStore>();
+        services.AddScoped<IRecordStore, OrderServiceStartRecordStore>();
+        services.AddScoped<IOrderFulfillment, OrderFulfillment>();
         services.AddScoped<IOrderScheduler, OrderScheduler>();
         services.AddScoped<OrdersSchedulerAnchor>();
         services.AddScoped<IOrderWorkflow, OrderWorkflow>();

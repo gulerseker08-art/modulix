@@ -121,9 +121,9 @@ public sealed class OrderJobsWorker(IServiceScopeFactory scopes, OrderJobsRunner
                     try
                     {
                         var (run, _) = await runner.RunTenantAsync(tenantId, stoppingToken);
-                        if (run is { HandoverEscalations: > 0 } r)
+                        if (run is { } r && r.HandoverEscalations + r.UnassignedJobAlerts + r.OverdueJobAlerts > 0)
                         {
-                            logger.LogInformation("Tenant {TenantId} sipariş işleri: {Escalations} devir kabul gecikmesi takibi.", tenantId, r.HandoverEscalations);
+                            logger.LogInformation("Tenant {TenantId} sipariş işleri: {Escalations} devir kabul gecikmesi, {Unassigned} atama bekleyen iş, {Overdue} geciken iş takibi.", tenantId, r.HandoverEscalations, r.UnassignedJobAlerts, r.OverdueJobAlerts);
                         }
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

@@ -1,0 +1,159 @@
+@* Siparişin operasyon işleri: işler devir kabulünde ayarlı stratejiye göre üretilir; burada izlenir, gerekirse elle iş açılır. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<section aria-labelledby="order-jobs-title">
+    <h2 id="order-jobs-title">Operasyon işleri</h2>
+    <Notice Text="@message" Failed="@failed" />
+    @if (jobs is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else
+    {
+        @if (jobs.Count == 0)
+        {
+            <p class="text-muted">
+                @(Order.HandoverStatus == "Accepted"
+                    ? "Bu siparişin devri kabul edilmiş ancak açık operasyon işi yok."
+                    : "Operasyon işleri, satış devri operasyon tarafından kabul edilince otomatik açılır.")
+            </p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">Siparişin operasyon işleri</caption>
+                <thead><tr><th scope="col">İş</th><th scope="col">Tür</th><th scope="col">Durum</th><th scope="col">Sorumlu / ekip</th><th scope="col">Planlanan</th></tr></thead>
+                <tbody>
+                    @foreach (var j in jobs)
+                    {
+                        <tr>
+                            <td data-label="İş" class="primary"><a href="siparisler/isler/@j.Id">@j.Title</a><small class="text-muted">@j.Number</small></td>
+                            <td data-label="Tür">@OrderLabels.Label(OrderLabels.JobKinds, j.Kind)</td>
+                            <td data-label="Durum"><span class="badge stage-@OrderLabels.JobBadge(j.Status)">@OrderLabels.Label(OrderLabels.JobStatuses, j.Status)</span></td>
+                            <td data-label="Sorumlu / ekip">
+                                @(Lookups.MemberName(j.ResponsibleUserId) is { Length: > 0 } who ? who : (string.IsNullOrEmpty(j.TeamName) ? "Atanmadı" : null))
+                                @if (!string.IsNullOrEmpty(j.TeamName)) { <small class="text-muted d-block">@j.TeamName</small> }
+                            </td>
+                            <td data-label="Planlanan">@OrderLabels.Date(j.PlannedStartDate) – @OrderLabels.Date(j.PlannedEndDate)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (CanCreate)
+        {
+            @if (!creating)
+            {
+                <button type="button" class="btn btn-outline-primary" @onclick="StartCreate">Elle iş aç</button>
+            }
+            else
+            {
+                <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+                    <fieldset disabled="@busy">
+                        <legend class="visually-hidden">Yeni operasyon işi</legend>
+                        <p class="text-muted">Seçtiğiniz sipariş kalemleri yeni bir işe bağlanır. Bir kalem aynı anda yalnızca bir açık işte bulunur. Sorumlu ya da ekip girmezseniz iş "Atama bekliyor" durumunda açılır.</p>
+                        <div class="form-grid">
+                            <div class="span-12"><label class="form-label" for="mj-title">İş başlığı</label><input id="mj-title" class="form-control" maxlength="200" @bind="title" /></div>
+                            <div class="span-12">
+                                <fieldset>
+                                    <legend class="form-label">Bağlanacak kalemler</legend>
+                                    @foreach (var line in Lines.Where(l => !l.IsCancelled))
+                                    {
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="mj-line-@line.Id" checked="@selected.Contains(line.Id)" @onchange="e => Toggle(line.Id, (bool)e.Value!)" />
+                                            <label class="form-check-label" for="mj-line-@line.Id">@line.Name</label>
+                                        </div>
+                                    }
+                                    <FieldError Field="lineIds" Errors="errors" />
+                                </fieldset>
+                            </div>
+                            <div class="span-6"><label class="form-label" for="mj-user">Sorumlu kullanıcı</label><LookupPicker Id="mj-user" LookupKey="orders.operation-job.responsible" @bind-Value="responsible" Placeholder="Atama bekliyor" /></div>
+                            <div class="span-6"><label class="form-label" for="mj-team">Ekip</label><input id="mj-team" class="form-control" maxlength="300" @bind="team" /></div>
+                            <div class="span-6"><label class="form-label" for="mj-start">Planlanan başlangıç</label><input id="mj-start" type="date" class="form-control" @bind="start" /></div>
+                            <div class="span-6"><label class="form-label" for="mj-end">Planlanan bitiş</label><input id="mj-end" type="date" class="form-control" @bind="end" /></div>
+                        </div>
+                    </fieldset>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" disabled="@(busy || selected.Count == 0)">İşi aç</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => creating = false">Vazgeç</button>
+                    </div>
+                </form>
+            }
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public OrderDto Order { get; set; } = default!;
+
+    [Parameter, EditorRequired] public IReadOnlyList<OrderLineDto> Lines { get; set; } = [];
+
+    private List<OperationJobDto>? jobs;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private readonly HashSet<Guid> selected = [];
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private bool creating;
+    private string title = string.Empty;
+    private Guid? responsible;
+    private string team = string.Empty;
+    private DateOnly? start;
+    private DateOnly? end;
+    private Guid loadedFor;
+    private long loadedVersion;
+
+    private bool CanCreate => Order.Status == "Approved" && Order.HandoverStatus == "Accepted" && Session.Can(OperationJobAccess.JobsManage);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Order.Id && loadedVersion == Order.Version) { return; }
+        loadedFor = Order.Id;
+        loadedVersion = Order.Version;
+        await Lookups.LoadAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<PagedResult<OperationJobDto>>($"/api/orders/operation-jobs?orderId={Order.Id}&pageSize=100&sort=createdAt");
+        jobs = result.Value?.Items.ToList() ?? [];
+    }
+
+    private void StartCreate()
+    {
+        creating = true;
+        errors = null;
+        selected.Clear();
+        title = string.Empty;
+        responsible = null;
+        team = string.Empty;
+        start = null;
+        end = null;
+    }
+
+    private void Toggle(Guid id, bool on)
+    {
+        if (on) { selected.Add(id); } else { selected.Remove(id); }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (busy || selected.Count == 0) { return; }
+        busy = true;
+        message = null;
+        errors = null;
+        var request = new CreateOperationJobRequest([.. selected], string.IsNullOrWhiteSpace(title) ? null : title.Trim(), null, responsible,
+            string.IsNullOrWhiteSpace(team) ? null : team.Trim(), start, end);
+        var result = await Api.PostAsync<OperationJobDetailDto>($"/api/orders/orders/{Order.Id}/jobs", request);
+        busy = false;
+        failed = !result.IsSuccess;
+        errors = result.FieldErrors;
+        message = result.IsSuccess ? "Operasyon işi açıldı." : result.Error;
+        if (result.IsSuccess) { creating = false; }
+        await LoadAsync();
+    }
+}
