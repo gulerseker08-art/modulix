@@ -5771,6 +5771,93 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderChangeRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Changes")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DecidedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Impact")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<decimal>("NetDelta")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("RequestedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("TaxDelta")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ChangeRequests_OnePending")
+                        .HasFilter("[Status] = 'Pending'");
+
+                    b.HasIndex("TenantId", "OrderId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ChangeRequests_Sequence");
+
+                    b.ToTable("ChangeRequests", "orders", t =>
+                        {
+                            t.HasCheckConstraint("CK_ChangeRequests_Status", "[Status] IN ('Pending','Approved','Rejected','Withdrawn')");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Orders.Domain.QuoteLineConsumption", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6123,6 +6210,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<decimal>("CancelledQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -6243,7 +6334,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.ToTable("OrderLines", "orders", t =>
                         {
-                            t.HasCheckConstraint("CK_OrderLines_Quantity", "[Quantity] > 0 AND [DeliveredQuantity] >= 0 AND [DeliveredQuantity] <= [Quantity]");
+                            t.HasCheckConstraint("CK_OrderLines_Quantity", "[Quantity] > 0 AND [DeliveredQuantity] >= 0 AND [CancelledQuantity] >= 0 AND [DeliveredQuantity] + [CancelledQuantity] <= [Quantity]");
                         });
                 });
 
@@ -7046,6 +7137,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Modules.Crm.Domain.Quote", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "QuoteId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Orders.Domain.OrderChangeRequest", b =>
+                {
+                    b.HasOne("Modulix.Modules.Orders.Domain.SalesOrder", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OrderId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

@@ -1,0 +1,304 @@
+@* Onaylanmış siparişin değişiklik talepleri: ticari alanlar yerinde değişmez; talep açılır, etkisi gösterilir, yetkili kişi karar verince sunucu uygular. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<section aria-labelledby="change-title">
+    <h2 id="change-title">Değişiklik talepleri</h2>
+    <Notice Text="@message" Failed="@failed" />
+
+    @if (requests is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else
+    {
+        @if (CanCreate)
+        {
+            @if (!creating)
+            {
+                <button type="button" class="btn btn-outline-primary mb-2" @onclick="StartCreate">Değişiklik talebi aç</button>
+            }
+            else
+            {
+                <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+                    <fieldset disabled="@busy">
+                        <legend class="visually-hidden">Yeni değişiklik talebi</legend>
+                        <p class="text-muted">Onaylanmış siparişin fiyat ve müşteri bilgisi değişmez. Yalnızca planlama, adres, koşul ve notlar ile kalem miktarının azaltılması talep edilebilir; miktar artırılamaz, teslim edilen miktarın altına inilemez.</p>
+                        <div class="form-grid">
+                            <div class="span-12">
+                                <label class="form-label" for="cr-reason">Gerekçe (zorunlu)</label>
+                                <textarea id="cr-reason" class="form-control" rows="2" maxlength="500" @bind="reason"></textarea>
+                                <FieldError Field="reason" Errors="errors" />
+                            </div>
+                            @foreach (var (key, label) in OrderLabels.HeaderFields)
+                            {
+                                <div class="@(key is "plannedStartDate" or "plannedDeliveryDate" or "location" ? "span-6" : "span-12")">
+                                    <label class="form-label" for="cr-@key">@label</label>
+                                    @if (key is "plannedStartDate" or "plannedDeliveryDate")
+                                    {
+                                        <input id="cr-@key" type="date" class="form-control" value="@header[key]" @onchange="e => header[key] = e.Value?.ToString() ?? string.Empty" />
+                                    }
+                                    else
+                                    {
+                                        <textarea id="cr-@key" class="form-control" rows="@(key == "location" ? 1 : 2)" maxlength="4000" @onchange="e => header[key] = e.Value?.ToString() ?? string.Empty">@header[key]</textarea>
+                                    }
+                                    <FieldError Field="@key" Errors="errors" />
+                                </div>
+                            }
+                        </div>
+                        <h3 class="h6 mt-3">Kalem miktarı (yalnızca azaltma; 0 kalemi iptal eder)</h3>
+                        <table class="table record-table">
+                            <caption class="visually-hidden">Kalem miktar değişikliği</caption>
+                            <thead><tr><th scope="col">Kalem</th><th scope="col" class="text-end">Etkin miktar</th><th scope="col" class="text-end">Teslim edilen</th><th scope="col" class="text-end">Yeni miktar</th></tr></thead>
+                            <tbody>
+                                @foreach (var line in Lines.Where(l => !l.IsCancelled))
+                                {
+                                    <tr>
+                                        <td data-label="Kalem" class="primary"><label for="cr-q-@line.Id">@line.Name</label></td>
+                                        <td data-label="Etkin miktar" class="text-end">@OrderLabels.Quantity(line.Quantity - line.CancelledQuantity, line.UnitName)</td>
+                                        <td data-label="Teslim edilen" class="text-end">@OrderLabels.Quantity(line.DeliveredQuantity, line.UnitName)</td>
+                                        <td data-label="Yeni miktar" class="text-end">
+                                            <input id="cr-q-@line.Id" type="number" min="@line.DeliveredQuantity.ToString(System.Globalization.CultureInfo.InvariantCulture)" max="@((line.Quantity - line.CancelledQuantity).ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                                   step="any" class="form-control form-control-sm text-end" placeholder="değişmez" value="@quantities.GetValueOrDefault(line.Id)" @onchange="e => quantities[line.Id] = e.Value?.ToString() ?? string.Empty" />
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <FieldError Field="lines" Errors="errors" />
+                        <FieldError Field="changes" Errors="errors" />
+                        <FieldError Field="status" Errors="errors" />
+
+                        @if (preview is not null)
+                        {
+                            <div class="alert alert-info" role="status" aria-live="polite">
+                                <strong>Etki özeti</strong>
+                                <ImpactLists Operations="preview.Operations" Deliveries="preview.Deliveries" Contracts="preview.Contracts" NetDelta="preview.NetDelta" TaxDelta="preview.TaxDelta" Currency="@Order.Currency" />
+                            </div>
+                        }
+                    </fieldset>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="PreviewAsync">Etkiyi göster</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy">Talebi aç</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => creating = false">Vazgeç</button>
+                    </div>
+                </form>
+            }
+        }
+        else if (Order.Status != "Approved" && Session.Can(OrdersAccess.OrdersWrite))
+        {
+            <p class="text-muted">Değişiklik talebi yalnızca onaylanmış sipariş için açılır; taslak sipariş doğrudan düzenlenir.</p>
+        }
+
+        @if (requests.Count == 0)
+        {
+            <p class="text-muted">Bu siparişte değişiklik talebi yok.</p>
+        }
+        else
+        {
+            <ol class="history-list">
+                @foreach (var r in requests)
+                {
+                    <li>
+                        <strong>Talep #@r.Sequence</strong>
+                        <span class="badge stage-@OrderLabels.ChangeBadge(r.Status)">@OrderLabels.Label(OrderLabels.ChangeStatuses, r.Status)</span>
+                        <span class="text-muted"> · @CrmLabels.Time(r.CreatedAt) · @(Lookups.MemberName(r.RequestedBy) is { Length: > 0 } who ? who : "—")</span>
+                        <div>@r.Reason</div>
+                        <ImpactLists Operations="r.Operations" Deliveries="r.Deliveries" Contracts="r.Contracts" NetDelta="r.NetDelta" TaxDelta="r.TaxDelta" Currency="@Order.Currency" />
+                        @if (r.DecidedAt is { } decidedAt)
+                        {
+                            <div class="text-muted small">Karar: @CrmLabels.Time(decidedAt) · @(Lookups.MemberName(r.DecidedBy) is { Length: > 0 } decider ? decider : "sistem")@(string.IsNullOrEmpty(r.DecisionNote) ? null : " · " + r.DecisionNote)</div>
+                        }
+                        @if (r.Status == "Pending")
+                        {
+                            <div class="header-actions mt-1">
+                                @if (Session.Can(OrdersAccess.OrdersApprove))
+                                {
+                                    <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick="() => DecideAsync(r, true)">Onayla ve uygula</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="() => StartReject(r)">Reddet</button>
+                                }
+                                @if (Session.Can(OrdersAccess.OrdersWrite))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => WithdrawAsync(r)">Geri çek</button>
+                                }
+                            </div>
+                            @if (rejecting == r.Id)
+                            {
+                                <form class="record-form" novalidate @onsubmit="() => DecideAsync(r, false)" @onsubmit:preventDefault>
+                                    <label class="form-label" for="reject-note-@r.Id">Ret gerekçesi (zorunlu)</label>
+                                    <input id="reject-note-@r.Id" class="form-control" maxlength="500" @bind="rejectNote" />
+                                    <div class="form-actions"><button type="submit" class="btn btn-danger btn-sm" disabled="@busy">Reddet</button></div>
+                                </form>
+                            }
+                        }
+                    </li>
+                }
+            </ol>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public OrderDto Order { get; set; } = default!;
+
+    [Parameter, EditorRequired] public IReadOnlyList<OrderLineDto> Lines { get; set; } = [];
+
+    /// <summary>Talep uygulandığında ya da sipariş değiştiğinde üst ekranın yenilenmesi için.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private List<OrderChangeRequestDto>? requests;
+    private OrderChangePreviewDto? preview;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private bool creating;
+    private string reason = string.Empty;
+    private string rejectNote = string.Empty;
+    private Guid? rejecting;
+    private Guid loadedFor;
+    private long loadedVersion;
+    private readonly Dictionary<string, string> header = OrderLabels.HeaderFields.ToDictionary(f => f.Key, _ => string.Empty);
+    private readonly Dictionary<Guid, string> quantities = [];
+
+    private bool CanCreate => Order.Status == "Approved" && Session.Can(OrdersAccess.OrdersWrite) && requests is not null && !requests.Any(r => r.Status == "Pending");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Order.Id && loadedVersion == Order.Version)
+        {
+            return;
+        }
+
+        loadedFor = Order.Id;
+        loadedVersion = Order.Version;
+        await Lookups.LoadAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<OrderChangeRequestDto>>($"/api/orders/orders/{Order.Id}/change-requests");
+        requests = result.Value ?? [];
+    }
+
+    private void StartCreate()
+    {
+        creating = true;
+        preview = null;
+        errors = null;
+        reason = string.Empty;
+        // Başlangıç değerleri siparişin mevcut hali; yalnızca değişen alanlar sunucuda etkili sayılır.
+        header["deliveryAddress"] = Order.DeliveryAddress ?? string.Empty;
+        header["location"] = Order.Location ?? string.Empty;
+        header["plannedStartDate"] = Order.PlannedStartDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+        header["plannedDeliveryDate"] = Order.PlannedDeliveryDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+        header["paymentTerms"] = Order.PaymentTerms ?? string.Empty;
+        header["deliveryTerms"] = Order.DeliveryTerms ?? string.Empty;
+        header["commercialTerms"] = Order.CommercialTerms ?? string.Empty;
+        header["commitments"] = Order.Commitments ?? string.Empty;
+        header["operationsNotes"] = Order.OperationsNotes ?? string.Empty;
+        quantities.Clear();
+    }
+
+    private OrderChangeRequestInputDto Input()
+    {
+        var lines = new List<OrderLineChangeDto>();
+        foreach (var (id, text) in quantities)
+        {
+            if (decimal.TryParse(text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var quantity))
+            {
+                lines.Add(new OrderLineChangeDto(id, quantity));
+            }
+        }
+
+        return new OrderChangeRequestInputDto(reason, new Dictionary<string, string?>(header.Select(h => new KeyValuePair<string, string?>(h.Key, h.Value))), lines);
+    }
+
+    private async Task PreviewAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<OrderChangePreviewDto>($"/api/orders/orders/{Order.Id}/change-requests/preview", Input());
+        busy = false;
+        preview = result.Value;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            failed = true;
+            message = result.Error;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<OrderChangeRequestDto>($"/api/orders/orders/{Order.Id}/change-requests", Input());
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            failed = true;
+            message = result.Error;
+            return;
+        }
+
+        failed = false;
+        message = "Değişiklik talebi açıldı; onaylanana kadar sipariş değişmez.";
+        creating = false;
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private void StartReject(OrderChangeRequestDto request)
+    {
+        rejecting = rejecting == request.Id ? null : request.Id;
+        rejectNote = string.Empty;
+    }
+
+    private async Task DecideAsync(OrderChangeRequestDto request, bool approve)
+    {
+        if (busy) { return; }
+        if (!approve && string.IsNullOrWhiteSpace(rejectNote))
+        {
+            failed = true;
+            message = "Reddetmek için gerekçe zorunludur.";
+            return;
+        }
+
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<OrderChangeRequestDto>($"/api/orders/change-requests/{request.Id}/{(approve ? "approve" : "reject")}",
+            new DecideOrderChangeRequest(request.Version, approve ? null : rejectNote.Trim()));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            failed = true;
+            message = result.Error;
+            return;
+        }
+
+        failed = false;
+        message = approve ? "Talep onaylandı ve sipariş güncellendi." : "Talep reddedildi.";
+        rejecting = null;
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private async Task WithdrawAsync(OrderChangeRequestDto request)
+    {
+        if (busy) { return; }
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<OrderChangeRequestDto>($"/api/orders/change-requests/{request.Id}/withdraw", new WithdrawOrderChangeRequest(request.Version));
+        busy = false;
+        failed = !result.IsSuccess;
+        message = result.IsSuccess ? "Talep geri çekildi." : result.Error;
+        await LoadAsync();
+    }
+}

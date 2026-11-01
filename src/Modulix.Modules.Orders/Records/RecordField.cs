@@ -92,6 +92,22 @@ internal static class Field
             e => get(e) is { } value ? JsonValue.Create(value) : null,
             (e, v) => set(e, (decimal?)v));
 
+    /// <summary>İşaretli tutar (fark): negatif olabilir, en fazla iki ondalık.</summary>
+    public static RecordField<T> SignedMoney<T>(string name, Func<T, decimal?> get, Action<T, decimal?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var amount))
+                {
+                    return ParsedValue.Fail("Sayı olmalıdır.");
+                }
+
+                return Math.Abs(amount) > 9_999_999_999_999_999.99m || decimal.Round(amount, 2) != amount
+                    ? ParsedValue.Fail("En fazla iki ondalıklı bir tutar girin.")
+                    : ParsedValue.Of(amount);
+            },
+            e => get(e) is { } value ? JsonValue.Create(value) : null,
+            (e, v) => set(e, (decimal?)v));
+
     /// <summary>Yüzde oranı: 0–100 arası, en çok 4 ondalık.</summary>
     public static RecordField<T> Rate<T>(string name, Func<T, decimal?> get, Action<T, decimal?> set) =>
         new(name, required: false, nullable: true, node =>

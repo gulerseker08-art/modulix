@@ -61,6 +61,7 @@ builder.Services.AddModulixRecords();
 builder.Services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyProvider, Modulix.Api.Crm.OpportunityPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modulix.Api.Crm.QuotePolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Contracts.Lifecycle.IContractPolicyProvider, Modulix.Api.Contracts.ContractPolicyProvider>();
+builder.Services.AddScoped<Modulix.Modules.Orders.Lifecycle.IOrderPolicyProvider, Modulix.Api.Orders.OrderPolicyProvider>();
 builder.Services.AddSingleton<Modulix.Modules.Contracts.Lifecycle.IContractPdfRenderer, Modulix.Api.Contracts.ContractPdfRenderer>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDocumentService>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDelivery>();

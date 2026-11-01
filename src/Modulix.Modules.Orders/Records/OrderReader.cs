@@ -17,6 +17,28 @@ internal sealed class OrderReader(IModuleData data)
     public async Task<List<QuoteLineConsumption>> ConsumptionsAsync(Guid quoteId, CancellationToken cancellationToken) =>
         await data.Set<QuoteLineConsumption>().Where(c => c.QuoteId == quoteId).ToListAsync(cancellationToken);
 
+    /// <summary>Siparişin kalemleri (izlenir: aynı istekte güncellenip sürüm denetimiyle kaydedilebilir).</summary>
+    public async Task<List<SalesOrderLine>> LinesAsync(Guid orderId, CancellationToken cancellationToken) =>
+        await data.Set<SalesOrderLine>().Where(l => l.OrderId == orderId).OrderBy(l => l.Position).ToListAsync(cancellationToken);
+
+    public Task<int> ActiveLineCountAsync(Guid orderId, CancellationToken cancellationToken) =>
+        data.Set<SalesOrderLine>().AsNoTracking().CountAsync(l => l.OrderId == orderId && !l.IsCancelled, cancellationToken);
+
+    public async Task<List<OrderChangeRequest>> ChangeRequestsAsync(Guid orderId, CancellationToken cancellationToken) =>
+        await data.Set<OrderChangeRequest>().AsNoTracking().Where(c => c.OrderId == orderId).OrderByDescending(c => c.Sequence).ToListAsync(cancellationToken);
+
+    public Task<OrderChangeRequest?> ChangeRequestAsync(Guid id, CancellationToken cancellationToken) =>
+        data.Set<OrderChangeRequest>().AsNoTracking().SingleOrDefaultAsync(c => c.Id == id, cancellationToken);
+
+    /// <summary>Siparişin bekleyen değişiklik talebi (izlenir; sipariş iptalinde geri çekilir).</summary>
+    public Task<OrderChangeRequest?> PendingChangeRequestAsync(Guid orderId, CancellationToken cancellationToken) =>
+        data.Set<OrderChangeRequest>().SingleOrDefaultAsync(c => c.OrderId == orderId && c.Status == "Pending", cancellationToken);
+
+    /// <summary>Son kaydedilen tarihçe satırının sahibi (ör. onaya gönderen); yoksa null.</summary>
+    public async Task<Guid?> LastActorAsync(Guid orderId, string kind, CancellationToken cancellationToken) =>
+        await data.Set<SalesOrderEvent>().AsNoTracking().Where(e => e.OrderId == orderId && e.Kind == kind)
+            .OrderByDescending(e => e.CreatedAt).Select(e => e.ActorId).FirstOrDefaultAsync(cancellationToken);
+
     public Task<SalesOrder?> OrderAsync(Guid orderId, CancellationToken cancellationToken) =>
         data.Set<SalesOrder>().AsNoTracking().SingleOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 }
