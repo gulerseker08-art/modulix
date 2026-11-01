@@ -10,7 +10,7 @@ namespace Modulix.Modules.Support.Records;
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler: veri, tenant üyeleri, seçim listeleri, isteği yapan kullanıcı ve iş akışı kapısı.</summary>
 internal sealed class SupportStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
-    ICurrentAccess permissions, TicketWorkflowGate gate, IRecordCommandContext? command = null)
+    ICurrentAccess permissions, TicketWorkflowGate gate, TimeProvider time, IRecordCommandContext? command = null)
 {
     public IModuleData Data => data;
 
@@ -26,6 +26,9 @@ internal sealed class SupportStoreContext(
 
     /// <summary>İş akışı kapısı: durum, sorumlu ve çözüm gibi sistem alanları yalnızca kapı açıkken yazılır.</summary>
     public TicketWorkflowGate Gate => gate;
+
+    /// <summary>Saat kaynağı (testte sabitlenebilir).</summary>
+    public TimeProvider Time => time;
 
     /// <summary>Çalışan yazma komutunun nedeni (yalnızca güvenilir iç çağıranlar verir, ör. kayıt devri).</summary>
     public string? CommandReason => command?.Reason;

@@ -196,6 +196,12 @@ public sealed class SupportTicket : SupportEntity, IOwnedEntity
     /// <summary>İlk insan yanıtının kabul edildiği an (otomatik mesaj ve iç not sayılmaz). SLA ölçümünün (dilim 2) girdisidir.</summary>
     public DateTimeOffset? FirstResponseAt { get; internal set; }
 
+    /// <summary>Çalışan ilk yanıt SLA sayacının hedef anı (SLA örneğinden kopya; liste için). Duraklatılmış, tamamlanmış ya da hedefsiz ise boştur.</summary>
+    public DateTimeOffset? FirstResponseDueAt { get; internal set; }
+
+    /// <summary>Çalışan çözüm SLA sayacının hedef anı (SLA örneğinden kopya; liste için).</summary>
+    public DateTimeOffset? ResolutionDueAt { get; internal set; }
+
     public DateTimeOffset LastActivityAt { get; internal set; } = DateTimeOffset.UtcNow;
 
     public Guid? CreatedBy { get; internal set; }

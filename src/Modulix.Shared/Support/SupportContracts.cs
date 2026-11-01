@@ -40,6 +40,8 @@ public sealed record TicketDto(
     DateTimeOffset? ClosedAt,
     int ReopenCount,
     DateTimeOffset? FirstResponseAt,
+    DateTimeOffset? FirstResponseDueAt,
+    DateTimeOffset? ResolutionDueAt,
     DateTimeOffset LastActivityAt,
     DateTimeOffset CreatedAt,
     Guid? CreatedBy,
@@ -107,7 +109,7 @@ public sealed record TicketHistoryDto(
     Guid Id, string Kind, DateTimeOffset At, Guid? ActorId, string? FromStatus, string? ToStatus, Guid? FromOwnerId, Guid? ToOwnerId,
     Guid? FromQueueId, Guid? ToQueueId, string? Reason);
 
-public sealed record TicketSummaryDto(int Mine, int Unassigned, int AwaitingFirstResponse, int WaitingCustomer, int Reopened, int Resolved, int Open);
+public sealed record TicketSummaryDto(int Mine, int Unassigned, int AwaitingFirstResponse, int WaitingCustomer, int Reopened, int Resolved, int Open, int SlaAtRisk = 0, int SlaBreached = 0);
 
 /// <summary>Arayüzün izin ve modül anahtarları (sunucudaki <c>SupportModule</c> ile aynıdır).</summary>
 public static class SupportAccess
@@ -127,8 +129,55 @@ public static class SupportAccess
     public const string NotesWrite = "support.notes.write";
     public const string InternalRead = "support.internal.read";
     public const string SettingsManage = "support.settings.manage";
+    public const string SlaManage = "support.sla.manage";
+    public const string SlaRecalculate = "support.sla.recalculate";
 
     public const string TicketEntityKey = "support.ticket";
     public const string QueueEntityKey = "support.queue";
     public const string CategoryEntityKey = "support.category";
+    public const string SlaCalendarEntityKey = "support.sla-calendar";
+    public const string SlaPolicyEntityKey = "support.sla-policy";
 }
+
+// ---- Dilim 2: SLA, iş takvimi ve eskalasyon (ADR-0024). Hesap backend'dedir; arayüz sayacı yalnızca gösterimdir.
+
+public sealed record SlaCalendarDto(
+    Guid Id, long Version, string Name, string TimeZoneId, bool IsAlwaysOpen, string? WeeklyHours, string? Holidays, bool IsActive, Guid? CreatedBy, Guid? UpdatedBy);
+
+/// <param name="WeeklyHours">JSON: <c>[{"day":1,"start":"09:00","end":"18:00"}]</c> (0=Pazar … 6=Cumartesi).</param>
+/// <param name="Holidays">JSON: <c>[{"date":"2026-10-29","name":"…","start":null,"end":null}]</c>; start/end verilirse yarım gün.</param>
+public sealed record SaveSlaCalendarRequest(
+    long Version = 0, string? Name = null, string? TimeZoneId = "Europe/Istanbul", bool IsAlwaysOpen = false, string? WeeklyHours = null, string? Holidays = null, bool IsActive = true);
+
+public sealed record SlaPolicyDto(
+    Guid Id, long Version, string Name, string? Description, bool IsActive, bool IsDefault, int Precedence, string? TypeKey, Guid? CategoryId, string? Priority, Guid? PartyId,
+    int? FirstResponseMinutes, int? ResolutionMinutes, Guid? CalendarId, bool PauseOnWaitingCustomer, bool PauseOnWaitingInternal, string? EscalationRules, int Revision,
+    Guid? CreatedBy, Guid? UpdatedBy);
+
+/// <param name="EscalationRules">JSON: <c>[{"id":"warn","metric":"Resolution","percent":75,"action":"NotifyOwner","userId":null,"queueId":null}]</c>.</param>
+public sealed record SaveSlaPolicyRequest(
+    long Version = 0, string? Name = null, string? Description = null, bool IsActive = true, bool IsDefault = false, int Precedence = 100, string? TypeKey = null,
+    Guid? CategoryId = null, string? Priority = null, Guid? PartyId = null, int? FirstResponseMinutes = null, int? ResolutionMinutes = null, Guid? CalendarId = null,
+    bool PauseOnWaitingCustomer = true, bool PauseOnWaitingInternal = false, string? EscalationRules = null);
+
+public sealed record SlaPauseDto(DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string Reason);
+
+public sealed record SlaEscalationDto(string RuleId, int Percent, string Action, DateTimeOffset ThresholdAt, DateTimeOffset ExecutedAt, string? Outcome);
+
+/// <param name="State">Running | Paused | Breached | Met | Missed | Cancelled.</param>
+public sealed record SlaInstanceDto(
+    Guid Id, int Cycle, string Metric, string Status, string State, string PolicyName, int PolicyRevision, DateTimeOffset StartedAt, int TargetMinutes, DateTimeOffset? DueAt,
+    DateTimeOffset? WarningAt, int WorkedMinutes, int RemainingMinutes, DateTimeOffset? CompletedAt, DateTimeOffset? BreachedAt, string? CalendarName, bool AlwaysOpen,
+    DateTimeOffset ComputedAt, IReadOnlyList<SlaPauseDto> Pauses, IReadOnlyList<SlaEscalationDto> Escalations);
+
+public sealed record SlaRecalculateRequest(long Version, string? Reason = null);
+
+public sealed record SlaPreviewRequest(string TypeKey, string Priority, Guid? CategoryId = null, Guid? PartyId = null, DateTimeOffset? StartAt = null);
+
+public sealed record SlaPreviewMetricDto(string Metric, int TargetMinutes, DateTimeOffset DueAt, DateTimeOffset? WarningAt);
+
+public sealed record SlaRuleDto(string Id, string Metric, int Percent, string Action, Guid? UserId, Guid? QueueId);
+
+public sealed record SlaPreviewDto(
+    bool Matched, Guid? PolicyId, string? PolicyName, int PolicyRevision, string? CalendarName, bool AlwaysOpen, bool PauseOnWaitingCustomer, bool PauseOnWaitingInternal,
+    IReadOnlyList<SlaPreviewMetricDto> Metrics, IReadOnlyList<SlaRuleDto> Rules);
