@@ -18,6 +18,18 @@
     </div>
 
     <Notice Text="@message" Failed="true" />
+    @if (duplicates is { Count: > 0 })
+    {
+        <div class="alert alert-warning" role="status">
+            <strong>Olası mükerrer talep:</strong> aynı başvuranın benzer açık talepleri var. Yine de kaydedebilirsiniz; mükerrerse mevcut talepte devam etmeniz önerilir.
+            <ul class="mb-0">
+                @foreach (var d in duplicates)
+                {
+                    <li><a href="destek/talepler/@d.Id">@d.Number</a> · @d.Subject <small class="text-muted">(@SupportLabels.Label(SupportLabels.Statuses, d.Status) · @d.Reason · benzerlik %@((int)Math.Round(d.Score * 100)))</small></li>
+                }
+            </ul>
+        </div>
+    }
 
     <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
         <fieldset disabled="@busy">
@@ -25,7 +37,7 @@
             <div class="form-grid">
                 <div class="span-12">
                     <label class="form-label" for="f-subject">Konu (zorunlu)</label>
-                    <input id="f-subject" class="form-control" maxlength="200" @bind="form.Subject" aria-invalid="@(Has("subject") ? "true" : null)" aria-describedby="@(Has("subject") ? "e-subject" : null)" />
+                    <input id="f-subject" class="form-control" maxlength="200" @bind="form.Subject" @bind:after="CheckDuplicatesAsync" aria-invalid="@(Has("subject") ? "true" : null)" aria-describedby="@(Has("subject") ? "e-subject" : null)" />
                     <FieldError Field="subject" Errors="errors" />
                 </div>
                 <div class="span-6">
@@ -156,18 +168,29 @@
         await Session.EnsureLoadedAsync();
         if (!Session.Can(SupportAccess.TicketsCreate)) { return; }
         await Lookups.LoadAsync();
+        matrix = (await Api.GetAsync<List<PriorityCellDto>>("/api/support/priority-matrix")).Value ?? [];
         form.TypeKey = Lookups.DefaultOf(SupportLabels.TicketTypeList) ?? "Support";
         form.PartyId = InitialParty;
         form.ParentTicketId = InitialParent;
     }
 
-    private string Priority() => (form.Impact, form.Urgency) switch
+    private List<PriorityCellDto> matrix = [];
+    private List<TicketDuplicateDto>? duplicates;
+
+    /// <summary>Tenant matrisinden (sunucu) hesaplanan öncelik; yalnızca gösterim, otorite sunucudur.</summary>
+    private string Priority() => matrix.FirstOrDefault(c => c.Impact == form.Impact && c.Urgency == form.Urgency)?.Priority ?? "Normal";
+
+    private async Task CheckDuplicatesAsync()
     {
-        ("High", "High") => "Critical",
-        ("High", "Medium") or ("Medium", "High") => "High",
-        ("High", "Low") or ("Medium", "Medium") or ("Low", "High") => "Normal",
-        _ => "Low",
-    };
+        duplicates = null;
+        if (string.IsNullOrWhiteSpace(form.Subject) || (form.PartyId is null && string.IsNullOrWhiteSpace(form.ReporterEmail) && string.IsNullOrWhiteSpace(form.ReporterPhone))) { return; }
+        var query = new List<string> { $"subject={Uri.EscapeDataString(form.Subject)}" };
+        if (form.PartyId is { } party) { query.Add($"partyId={party}"); }
+        if (!string.IsNullOrWhiteSpace(form.ReporterEmail)) { query.Add($"reporterEmail={Uri.EscapeDataString(form.ReporterEmail.Trim())}"); }
+        if (!string.IsNullOrWhiteSpace(form.ReporterPhone)) { query.Add($"reporterPhone={Uri.EscapeDataString(form.ReporterPhone.Trim())}"); }
+        if (form.CategoryId is { } category) { query.Add($"categoryId={category}"); }
+        duplicates = (await Api.GetAsync<List<TicketDuplicateDto>>($"/api/support/tickets/duplicates?{string.Join('&', query)}")).Value;
+    }
 
     private async Task SaveAsync()
     {

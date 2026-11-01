@@ -91,7 +91,7 @@
         {
             <table class="table record-table">
                 <caption class="visually-hidden">Talep kategorileri</caption>
-                <thead><tr><th scope="col">Kategori</th><th scope="col">Üst kategori</th><th scope="col">Varsayılan kuyruk</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+                <thead><tr><th scope="col">Kategori</th><th scope="col">Üst kategori</th><th scope="col">Varsayılan kuyruk</th><th scope="col">Zorunlu alanlar</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
                 <tbody>
                     @foreach (var c in categories.Where(c => c.ParentId is null).SelectMany(root => new[] { root }.Concat(categories.Where(c => c.ParentId == root.Id))).Concat(categories.Where(c => c.ParentId is { } p && categories.All(r => r.Id != p))))
                     {
@@ -99,6 +99,7 @@
                             <td data-label="Kategori" class="primary">@(c.ParentId is null ? null : "↳ ")@c.Name</td>
                             <td data-label="Üst kategori">@(c.ParentId is { } parentId ? categories.FirstOrDefault(p => p.Id == parentId)?.Name ?? "—" : "—")</td>
                             <td data-label="Varsayılan kuyruk">@(c.DefaultQueueId is { } queueId ? queues?.FirstOrDefault(q => q.Id == queueId)?.Name ?? "—" : "—")</td>
+                            <td data-label="Zorunlu alanlar">@RequiredText(c.RequiredFields)</td>
                             <td data-label="Durum"><span class="badge stage-@(c.IsActive ? "won" : "cancelled")">@(c.IsActive ? "Etkin" : "Pasif")</span></td>
                             <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleCategoryAsync(c)" disabled="@busy">@(c.IsActive ? "Pasife al" : "Etkinleştir")</button></td>
                         </tr>
@@ -126,6 +127,17 @@
                         <LookupPicker Id="c-queue" LookupKey="support.category.queue" @bind-Value="categoryQueue" Placeholder="Üst kategori / varsayılan kuyruk" />
                         <FieldError Field="defaultQueueId" Errors="categoryErrors" />
                     </div>
+                    <div class="span-12">
+                        <span class="form-label d-block">Bu kategoride zorunlu alanlar (üst kategorinin alanları da geçerlidir)</span>
+                        @foreach (var (key, label) in RequiredOptions)
+                        {
+                            <div class="form-check form-check-inline">
+                                <input id="req-@key" class="form-check-input" type="checkbox" checked="@categoryRequired.Contains(key)" @onchange="e => ToggleRequired(key, (bool)e.Value!)" />
+                                <label class="form-check-label" for="req-@key">@label</label>
+                            </div>
+                        }
+                        <FieldError Field="requiredFields" Errors="categoryErrors" />
+                    </div>
                 </div>
             </fieldset>
             <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Kategori ekle</button></div>
@@ -147,6 +159,15 @@
     private Guid? categoryParent;
     private Guid? categoryQueue;
     private IReadOnlyDictionary<string, string[]>? categoryErrors;
+    private readonly HashSet<string> categoryRequired = [];
+
+    private static readonly (string Key, string Label)[] RequiredOptions =
+        [("description", "Açıklama"), ("personId", "İlgili kişi"), ("reporterEmail", "Başvuran e-postası"), ("reporterPhone", "Başvuran telefonu"), ("eventDate", "Olay tarihi"), ("expectedOutcome", "Beklenen sonuç")];
+
+    private void ToggleRequired(string key, bool on) { if (on) { categoryRequired.Add(key); } else { categoryRequired.Remove(key); } }
+
+    private static string RequiredText(string? csv) =>
+        string.IsNullOrWhiteSpace(csv) ? "—" : string.Join(", ", csv.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(k => RequiredOptions.FirstOrDefault(o => o.Key == k).Label ?? k));
 
     protected override async Task OnInitializedAsync()
     {
@@ -203,16 +224,17 @@
     private async Task AddCategoryAsync()
     {
         categoryErrors = null;
-        if (await RunAsync(() => Api.PostAsync<CategoryDto>("/api/support/categories", new SaveCategoryRequest(Name: categoryName, ParentId: categoryParent, DefaultQueueId: categoryQueue, IsActive: true)),
+        if (await RunAsync(() => Api.PostAsync<CategoryDto>("/api/support/categories", new SaveCategoryRequest(Name: categoryName, ParentId: categoryParent, DefaultQueueId: categoryQueue, IsActive: true, RequiredFields: categoryRequired.Count == 0 ? null : string.Join(',', categoryRequired))),
                 "Kategori eklendi.", e => categoryErrors = e))
         {
             categoryName = string.Empty;
             categoryParent = null;
             categoryQueue = null;
+            categoryRequired.Clear();
         }
     }
 
     private Task ToggleCategoryAsync(CategoryDto c) =>
-        RunAsync(() => Api.PutAsync<CategoryDto>($"/api/support/categories/{c.Id}", new SaveCategoryRequest(c.Version, c.Name, c.ParentId, c.DefaultQueueId, !c.IsActive, c.Position)),
+        RunAsync(() => Api.PutAsync<CategoryDto>($"/api/support/categories/{c.Id}", new SaveCategoryRequest(c.Version, c.Name, c.ParentId, c.DefaultQueueId, !c.IsActive, c.Position, c.RequiredFields)),
             c.IsActive ? "Kategori pasife alındı." : "Kategori etkinleştirildi.");
 }

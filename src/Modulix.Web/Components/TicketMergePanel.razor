@@ -1,0 +1,86 @@
+@* Mükerrer talebi başka bir talebe birleştirir. Kural sunucudadır: aynı müşteri, açık hedef, ayrı yetki ve gerekçe; kaynak talep son duruma geçer, veri korunur. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+@if (CanMerge)
+{
+    <section aria-labelledby="merge-title">
+        <h2 id="merge-title">Mükerrer talep</h2>
+        <details>
+            <summary>Bu talebi başka bir talebe birleştir</summary>
+            <p class="small text-muted">
+                Bu talep <strong>Birleştirildi</strong> durumuna geçer; geçmişi, mesajları ve dış anahtarı korunur, mesajları özgün zamanlarıyla hedef talebe kopyalanır. Farklı müşterilerin talepleri birleştirilemez.
+                Bu işlem geri alınamaz.
+            </p>
+            <Notice Text="@message" Failed="true" />
+            @if (candidates is { Count: > 0 })
+            {
+                <fieldset>
+                    <legend class="h6">Olası mükerrerler</legend>
+                    @foreach (var c in candidates)
+                    {
+                        <div class="form-check">
+                            <input id="cand-@c.Id" class="form-check-input" type="radio" name="merge-target" checked="@(targetId == c.Id)" @onchange="() => targetId = c.Id" />
+                            <label class="form-check-label" for="cand-@c.Id"><a href="destek/talepler/@c.Id">@c.Number</a> · @c.Subject <small class="text-muted">(@SupportLabels.Label(SupportLabels.Statuses, c.Status) · benzerlik %@((int)Math.Round(c.Score * 100)) · @c.Reason)</small></label>
+                        </div>
+                    }
+                </fieldset>
+            }
+            <label class="form-label" for="merge-target">Ya da hedef talebi arayın</label>
+            <LookupPicker Id="merge-target" LookupKey="support.ticket.parent" @bind-Value="targetId" Placeholder="Talep ara…" />
+            <FieldError Field="targetId" Errors="errors" />
+            <label class="form-label mt-2" for="merge-reason">Gerekçe (zorunlu)</label>
+            <textarea id="merge-reason" class="form-control" rows="2" maxlength="500" @bind="reason" aria-invalid="@(Has("reason") ? "true" : null)"></textarea>
+            <FieldError Field="reason" Errors="errors" />
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-danger" disabled="@(busy || targetId is null)" @onclick="MergeAsync">Birleştir</button>
+            </div>
+        </details>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public TicketDto Ticket { get; set; } = default!;
+
+    private bool CanMerge => Session.Can(SupportAccess.TicketsMerge) && Ticket.Status is not ("Closed" or "Cancelled" or "Merged" or "Resolved");
+
+    private List<TicketDuplicateDto>? candidates;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private Guid? targetId;
+    private string reason = string.Empty;
+    private Guid loadedFor;
+
+    private bool Has(string field) => errors?.ContainsKey(field) == true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!CanMerge || loadedFor == Ticket.Id) { return; }
+        loadedFor = Ticket.Id;
+        var query = new List<string> { $"excludeId={Ticket.Id}", $"subject={Uri.EscapeDataString(Ticket.Subject)}" };
+        if (Ticket.PartyId is { } party) { query.Add($"partyId={party}"); }
+        if (!string.IsNullOrWhiteSpace(Ticket.ReporterEmail)) { query.Add($"reporterEmail={Uri.EscapeDataString(Ticket.ReporterEmail)}"); }
+        if (!string.IsNullOrWhiteSpace(Ticket.ReporterPhone)) { query.Add($"reporterPhone={Uri.EscapeDataString(Ticket.ReporterPhone)}"); }
+        candidates = (await Api.GetAsync<List<TicketDuplicateDto>>($"/api/support/tickets/duplicates?{string.Join('&', query)}")).Value ?? [];
+    }
+
+    private async Task MergeAsync()
+    {
+        if (busy || targetId is null) { return; }
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<TicketDto>($"/api/support/tickets/{Ticket.Id}/merge", new MergeTicketRequest(targetId.Value, Ticket.Version, reason));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo($"destek/talepler/{targetId}");
+            return;
+        }
+
+        message = result.Error;
+        errors = result.FieldErrors;
+    }
+}

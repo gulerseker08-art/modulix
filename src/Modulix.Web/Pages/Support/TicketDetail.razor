@@ -40,6 +40,10 @@
 
         <TicketSlaPanel Ticket="ticket" Changed="OnChangedAsync" />
 
+        <TicketTasksPanel Ticket="ticket" Changed="ReloadAsync" />
+
+        <TicketMergePanel Ticket="ticket" />
+
         <div class="detail-columns">
             <div>
                 <section aria-labelledby="messages-title">
@@ -60,6 +64,7 @@
                                 <li class="@(m.Visibility == "Internal" ? "timeline-internal" : null)">
                                     <strong>@Describe(m)</strong>
                                     <span class="text-muted small"> · @CrmLabels.Time(m.CreatedAt) · @(m.AuthorId is null ? "Sistem" : Lookups.MemberName(m.AuthorId))</span>
+                                    @if (m.SourceTicketId is { } source) { <span class="badge stage-open">Birleştirilen talepten</span> <a class="small" href="destek/talepler/@source">kaynak talep</a> }
                                     <div class="message-body">@m.Body</div>
                                     @if (SupportLabels.Delivery(m.DeliveryStatus) is { Length: > 0 } delivery) { <small class="text-muted">@delivery</small> }
                                 </li>
@@ -145,6 +150,7 @@
                     @if (ticket.PriorityReason is { Length: > 0 }) { <dt>Öncelik gerekçesi</dt><dd>@ticket.PriorityReason</dd> }
                     @if (ticket.StatusReason is { Length: > 0 }) { <dt>Durum gerekçesi</dt><dd>@ticket.StatusReason</dd> }
                     @if (ticket.ParentTicketId is { } parent) { <dt>İlişkili talep</dt><dd><a href="destek/talepler/@parent">Önceki talep</a></dd> }
+                    @if (ticket.MergedIntoId is { } mergedInto) { <dt>Birleştirildi</dt><dd><a href="destek/talepler/@mergedInto">Hedef talep</a></dd> }
                     @if (ticket.EventDate is { } eventDate) { <dt>Olay tarihi</dt><dd>@SupportLabels.Date(eventDate)</dd> }
                     @if (ticket.ExpectedOutcome is { Length: > 0 }) { <dt>Beklenen sonuç</dt><dd>@ticket.ExpectedOutcome</dd> }
                     @if (ticket.Description is { Length: > 0 }) { <dt>Açıklama</dt><dd class="message-body">@ticket.Description</dd> }
@@ -201,7 +207,9 @@
     private bool CanWrite => ticket is not null && !TicketStatusFinal && (Session.Can(SupportAccess.MessagesReply) || Session.Can(SupportAccess.NotesWrite));
 
     private IEnumerable<(string Key, string Label)> KindsAllowed => SupportLabels.MessageKinds.Where(k =>
-        k.Key == "note" ? Session.Can(SupportAccess.NotesWrite) : Session.Can(SupportAccess.MessagesReply));
+        k.Key == "note" ? Session.Can(SupportAccess.NotesWrite)
+        : k.Key == "customer-confirmation" ? Session.Can(SupportAccess.MessagesReply) && ticket?.Status == "Resolved"
+        : Session.Can(SupportAccess.MessagesReply));
 
     private bool Has(string field) => sendErrors?.ContainsKey(field) == true;
 
