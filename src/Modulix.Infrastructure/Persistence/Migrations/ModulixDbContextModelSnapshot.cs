@@ -7301,6 +7301,80 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.SatisfactionSurvey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("AnsweredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Cycle")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("QueuedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int?>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RecipientEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Surveys_Token");
+
+                    b.HasIndex("TenantId", "AnsweredAt", "Rating");
+
+                    b.HasIndex("TenantId", "TicketId", "Cycle")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Surveys_Cycle");
+
+                    b.ToTable("Surveys", "support", t =>
+                        {
+                            t.HasCheckConstraint("CK_Surveys_Answer", "([AnsweredAt] IS NULL AND [Rating] IS NULL) OR ([AnsweredAt] IS NOT NULL AND [Rating] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Surveys_Rating", "[Rating] IS NULL OR ([Rating] BETWEEN 1 AND 5)");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Support.Domain.SlaCalendar", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7951,6 +8025,81 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ScanStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "MessageId");
+
+                    b.HasIndex("TenantId", "TicketId");
+
+                    b.HasIndex("TenantId", "MessageId", "Sha256")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Attachments_Content");
+
+                    b.ToTable("Attachments", "support", t =>
+                        {
+                            t.HasCheckConstraint("CK_Attachments_Size", "[SizeBytes] > 0 AND [SizeBytes] <= 5242880");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8089,6 +8238,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(8000)
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Channel")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -8105,8 +8258,20 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("ExternalMessageId")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("InReplyTo")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
                     b.Property<bool>("IsAutomatic")
                         .HasColumnType("bit");
+
+                    b.Property<string>("SenderAddress")
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
 
                     b.Property<Guid?>("SourceTicketId")
                         .HasColumnType("uniqueidentifier");
@@ -8131,9 +8296,15 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("TenantId", "Id");
-
                     b.HasIndex("TenantId", "SourceTicketId");
+
+                    b.HasIndex("TenantId", "Channel", "ExternalMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Messages_External")
+                        .HasFilter("[ExternalMessageId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "SenderAddress", "CreatedAt")
+                        .HasFilter("[SenderAddress] IS NOT NULL");
 
                     b.HasIndex("TenantId", "TicketId", "CreatedAt");
 
@@ -9287,6 +9458,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.SatisfactionSurvey", b =>
+                {
+                    b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TicketId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Modules.Support.Domain.SlaEscalation", b =>
                 {
                     b.HasOne("Modulix.Modules.Support.Domain.SlaInstance", null)
@@ -9382,6 +9563,23 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId", "QueueId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketAttachment", b =>
+                {
+                    b.HasOne("Modulix.Modules.Support.Domain.TicketMessage", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "MessageId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TicketId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketCategory", b =>

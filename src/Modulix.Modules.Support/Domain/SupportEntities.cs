@@ -244,6 +244,17 @@ public sealed class TicketMessage : SupportEntity
 
     /// <summary>Otomatik alındı mesajı gibi sistem mesajı: ilk insan yanıtı sayılmaz.</summary>
     public bool IsAutomatic { get; internal set; }
+
+    /// <summary>Gelen kanaldan geldiyse kanal (<c>Email</c>, <c>Web</c>...); elle girilen mesajda boş.</summary>
+    public string? Channel { get; internal set; }
+
+    /// <summary>Kanalın verdiği mesaj kimliği (e-postada Message-Id). Aynı kanal ve kimlikle ikinci mesaj yazılmaz (tekrar koruması).</summary>
+    public string? ExternalMessageId { get; internal set; }
+
+    public string? InReplyTo { get; internal set; }
+
+    /// <summary>Gönderen adres (küçük harf); gönderen başına sel koruması bunu sayar.</summary>
+    public string? SenderAddress { get; internal set; }
 }
 
 /// <summary>Talep tarihçesi: durum, atama, kuyruk, öncelik, mesaj ve çözüm olayları. Gövde içermez (iç not içeriği tarihçeye sızmaz).</summary>

@@ -27,11 +27,14 @@ public static class MessageKind
     public static readonly IReadOnlyList<string> All = [Reply, CustomerMessage, Note, CustomerConfirmation];
 }
 
-public sealed record AddMessageInput(string Kind, string? Body);
+/// <summary>Gelen kanaldan gelen mesajın kanal bilgisi (tekrar koruması ve konu eşleştirmesi için saklanır).</summary>
+public sealed record InboundInfo(string Channel, string ExternalMessageId, string? InReplyTo, string? SenderAddress);
+
+public sealed record AddMessageInput(string Kind, string? Body, InboundInfo? Inbound = null);
 
 /// <summary>Mesaj (API görünümü). İç not yalnızca iç not okuma izni olana verilir.</summary>
 public sealed record TicketMessageItem(
-    Guid Id, string Visibility, string Direction, string Body, Guid? AuthorId, string DeliveryStatus, bool IsAutomatic, DateTimeOffset CreatedAt, Guid? SourceTicketId = null);
+    Guid Id, string Visibility, string Direction, string Body, Guid? AuthorId, string DeliveryStatus, bool IsAutomatic, DateTimeOffset CreatedAt, Guid? SourceTicketId = null, string? Channel = null);
 
 /// <summary>
 /// Talep mesajları (ADR-0024). Müşteriye görünen yanıt ile iç not kesin ayrıdır: ayrım veritabanında da bir kısıtla korunur ve iç not yalnızca
@@ -165,6 +168,10 @@ internal sealed class TicketMessages(
                 AuthorId = context.CurrentUserId,
                 DeliveryStatus = delivery,
                 IsAutomatic = false,
+                Channel = input.Inbound?.Channel,
+                ExternalMessageId = input.Inbound?.ExternalMessageId,
+                InReplyTo = input.Inbound?.InReplyTo,
+                SenderAddress = input.Inbound?.SenderAddress?.ToLowerInvariant(),
             };
             context.Data.Set<TicketMessage>().Add(created);
 
@@ -217,7 +224,7 @@ internal sealed class TicketMessages(
     }
 
     private static TicketMessageItem ToItem(TicketMessage m) =>
-        new(m.Id, m.Visibility, m.Direction, m.Body, m.AuthorId, m.DeliveryStatus, m.IsAutomatic, m.CreatedAt, m.SourceTicketId);
+        new(m.Id, m.Visibility, m.Direction, m.Body, m.AuthorId, m.DeliveryStatus, m.IsAutomatic, m.CreatedAt, m.SourceTicketId, m.Channel);
 
     private static RecordResult<TicketMessageItem> Invalid(string field, string message) =>
         RecordResult<TicketMessageItem>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);

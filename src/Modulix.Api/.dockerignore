@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/.vs/
+.git/
+**/node_modules/
+**/TestResults/
+**/.env
+**/.env.*
+**/secrets.json
+**/*.pfx
+**/*.p12
