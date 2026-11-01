@@ -98,6 +98,8 @@ internal sealed class SalesOrderLineConfiguration : IEntityTypeConfiguration<Sal
         builder.Property(l => l.Quantity).HasPrecision(18, 4);
         builder.Property(l => l.AcceptedQuantity).HasPrecision(18, 4);
         builder.Property(l => l.DeliveredQuantity).HasPrecision(18, 4);
+        builder.Property(l => l.CancelledQuantity).HasPrecision(18, 4);
+        builder.Ignore(l => l.EffectiveQuantity);
         builder.Property(l => l.UnitName).HasMaxLength(SalesOrderLine.UnitMaxLength);
         builder.Property(l => l.UnitPrice).HasPrecision(18, 6);
         builder.Property(l => l.ListAmount).HasPrecision(18, 2);
@@ -113,7 +115,7 @@ internal sealed class SalesOrderLineConfiguration : IEntityTypeConfiguration<Sal
         // Aynı siparişte aynı teklif kalemi bir kez bulunur; sipariş sınırları arasındaki toplam miktarı tüketim defteri denetler.
         builder.HasIndex(l => new { l.TenantId, l.OrderId, l.SourceQuoteLineKey }).IsUnique().HasDatabaseName("UX_OrderLines_SourceLine");
         builder.HasIndex(l => new { l.TenantId, l.SourceQuoteId, l.SourceQuoteLineKey });
-        builder.ToTable(t => t.HasCheckConstraint("CK_OrderLines_Quantity", "[Quantity] > 0 AND [DeliveredQuantity] >= 0 AND [DeliveredQuantity] <= [Quantity]"));
+        builder.ToTable(t => t.HasCheckConstraint("CK_OrderLines_Quantity", "[Quantity] > 0 AND [DeliveredQuantity] >= 0 AND [CancelledQuantity] >= 0 AND [DeliveredQuantity] + [CancelledQuantity] <= [Quantity]"));
 
         builder.HasOne<SalesOrder>().WithMany().HasForeignKey(l => new { l.TenantId, l.OrderId })
             .HasPrincipalKey(o => new { o.TenantId, o.Id }).OnDelete(DeleteBehavior.Restrict);
@@ -154,5 +156,27 @@ internal sealed class QuoteLineConsumptionConfiguration : IEntityTypeConfigurati
         // Fazla dönüşüm veritabanında da engellenir (uygulama kontrolüne ek güvence).
         builder.ToTable(t => t.HasCheckConstraint(
             "CK_QuoteLineConsumptions_Limit", "[ConvertedQuantity] >= 0 AND [ConvertedQuantity] <= [AcceptedQuantity]"));
+    }
+}
+
+internal sealed class OrderChangeRequestConfiguration : IEntityTypeConfiguration<OrderChangeRequest>
+{
+    public void Configure(EntityTypeBuilder<OrderChangeRequest> builder)
+    {
+        OrdersTables.ConfigureCommon(builder, "ChangeRequests");
+        builder.Property(c => c.Status).HasMaxLength(SalesOrder.StatusMaxLength).IsRequired();
+        builder.Property(c => c.Reason).HasMaxLength(SalesOrder.ReasonMaxLength).IsRequired();
+        builder.Property(c => c.Changes).HasMaxLength(OrderChangeRequest.JsonMaxLength).IsRequired();
+        builder.Property(c => c.Impact).HasMaxLength(OrderChangeRequest.JsonMaxLength).IsRequired();
+        builder.Property(c => c.DecisionNote).HasMaxLength(SalesOrder.ReasonMaxLength);
+        builder.Property(c => c.NetDelta).HasPrecision(18, 2);
+        builder.Property(c => c.TaxDelta).HasPrecision(18, 2);
+        builder.HasIndex(c => new { c.TenantId, c.OrderId, c.Sequence }).IsUnique().HasDatabaseName("UX_ChangeRequests_Sequence");
+        // Sipariş başına en fazla bir bekleyen talep (eşzamanlı ikinci talep benzersiz anahtara çarpar).
+        builder.HasIndex(c => new { c.TenantId, c.OrderId }).IsUnique().HasFilter("[Status] = 'Pending'").HasDatabaseName("UX_ChangeRequests_OnePending");
+        builder.ToTable(t => t.HasCheckConstraint("CK_ChangeRequests_Status", "[Status] IN ('Pending','Approved','Rejected','Withdrawn')"));
+
+        builder.HasOne<SalesOrder>().WithMany().HasForeignKey(c => new { c.TenantId, c.OrderId })
+            .HasPrincipalKey(o => new { o.TenantId, o.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }

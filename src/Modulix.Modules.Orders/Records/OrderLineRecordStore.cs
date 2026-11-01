@@ -48,6 +48,7 @@ internal sealed class OrderLineRecordStore(OrdersStoreContext context) : OrdersR
         Field.Id<SalesOrderLine>("sourceQuoteId", l => l.SourceQuoteId == Guid.Empty ? null : l.SourceQuoteId, (l, v) => l.SourceQuoteId = v ?? Guid.Empty).AsSystem(),
         Field.Id<SalesOrderLine>("sourceQuoteLineKey", l => l.SourceQuoteLineKey == Guid.Empty ? null : l.SourceQuoteLineKey, (l, v) => l.SourceQuoteLineKey = v ?? Guid.Empty).AsSystem(),
         Field.Quantity<SalesOrderLine>("deliveredQuantity", l => l.DeliveredQuantity, (l, v) => l.DeliveredQuantity = v ?? 0m).AsSystem(),
+        Field.Quantity<SalesOrderLine>("cancelledQuantity", l => l.CancelledQuantity, (l, v) => l.CancelledQuantity = v ?? 0m).AsSystem(),
         Field.Flag<SalesOrderLine>("isCancelled", l => l.IsCancelled, (l, v) => l.IsCancelled = v).AsSystem(),
         Field.Date<SalesOrderLine>("plannedDate", l => l.PlannedDate, (l, v) => l.PlannedDate = v),
     ];

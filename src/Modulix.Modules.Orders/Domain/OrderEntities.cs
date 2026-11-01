@@ -237,8 +237,16 @@ public sealed class SalesOrderLine : OrdersEntity
     /// <summary>Teslim edilen miktar (ürün kalemi); gerçekleşme kayıtlarından sunucu yazar.</summary>
     public decimal DeliveredQuantity { get; internal set; }
 
-    /// <summary>İptal edilen (teslim edilmemiş) kalem; gerçekleşen kayıtlar silinmez.</summary>
+    /// <summary>
+    /// İptal ya da değişiklik talebiyle azaltılan miktar. Etkin miktar <c>Quantity - CancelledQuantity</c>'dir; kalemin kopyalanmış tutarları
+    /// değişmez, etkin tutar orantılı hesaplanır. Teslim edilen miktar hiçbir zaman azaltılamaz (<c>Delivered + Cancelled &lt;= Quantity</c>).
+    /// </summary>
+    public decimal CancelledQuantity { get; internal set; }
+
+    /// <summary>Tamamı iptal edilmiş (teslim edilen yok) kalem; kayıt silinmez.</summary>
     public bool IsCancelled { get; internal set; }
+
+    public decimal EffectiveQuantity => Quantity - CancelledQuantity;
 
     public DateOnly? PlannedDate { get; internal set; }
 }
@@ -283,4 +291,42 @@ public sealed class QuoteLineConsumption : OrdersEntity
     public decimal ConvertedTax { get; internal set; }
 
     public decimal RemainingQuantity => AcceptedQuantity - ConvertedQuantity;
+}
+
+/// <summary>
+/// Onaylanmış siparişin gerekçeli değişiklik talebi. Talep, önerilen değişiklikleri (<see cref="Changes"/>) ve talep anındaki etki özetini
+/// (<see cref="Impact"/>) taşır; onaylanana kadar sipariş değişmez. Sipariş başına aynı anda en fazla bir bekleyen talep vardır.
+/// </summary>
+public sealed class OrderChangeRequest : OrdersEntity
+{
+    public const int JsonMaxLength = 4000;
+
+    public Guid OrderId { get; internal set; }
+
+    /// <summary>Sipariş içinde 1'den artan sıra.</summary>
+    public int Sequence { get; internal set; }
+
+    /// <summary><see cref="Lifecycle.ChangeRequestStatus"/>.</summary>
+    public string Status { get; internal set; } = Lifecycle.ChangeRequestStatus.Pending;
+
+    public string Reason { get; internal set; } = string.Empty;
+
+    /// <summary>Önerilen değişiklikler (JSON: başlık alanları ve kalem değişiklikleri).</summary>
+    public string Changes { get; internal set; } = "{}";
+
+    /// <summary>Operasyon, teslimat ve sözleşme üzerindeki etki özeti (JSON; tutar içermez).</summary>
+    public string Impact { get; internal set; } = "{}";
+
+    /// <summary>Talebin tutara etkisi (negatif: azalır). Hassas alan.</summary>
+    public decimal NetDelta { get; internal set; }
+
+    public decimal TaxDelta { get; internal set; }
+
+    public Guid? RequestedBy { get; internal set; }
+
+    public Guid? DecidedBy { get; internal set; }
+
+    public DateTimeOffset? DecidedAt { get; internal set; }
+
+    public string? DecisionNote { get; internal set; }
 }

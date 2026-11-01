@@ -28,6 +28,24 @@ public sealed class OrdersModule : IModule
 
         /// <summary>Sipariş tutarlarını, kalem fiyatlarını ve toplamları görür. Olmayan kişi siparişi görür, tutarları görmez ve tekliften sipariş oluşturamaz.</summary>
         public const string FinancialsRead = "orders.financials.read";
+
+        /// <summary>Onay bekleyen siparişi onaylar ya da gerekçeyle taslağa geri gönderir; onaylanmış siparişin değişiklik talebine karar verir. Yazma izninden ayrıdır.</summary>
+        public const string OrdersApprove = "orders.orders.approve";
+
+        /// <summary>Siparişi iptal eder (teslim edilen miktar ve kayıtları korunur). Ayrı ve kritik bir yetkidir.</summary>
+        public const string OrdersCancel = "orders.orders.cancel";
+
+        /// <summary>Gerçekleşmesi tamamlanmış siparişi kapatır.</summary>
+        public const string OrdersClose = "orders.orders.close";
+
+        /// <summary>Kalan yükümlülük varken siparişi gerekçeyle zorla kapatır. Kapatma yetkisinden ayrıdır.</summary>
+        public const string OrdersForceClose = "orders.orders.force-close";
+    }
+
+    /// <summary>Firma ayarları.</summary>
+    public static class SettingKeys
+    {
+        public const string AllowSelfApproval = "orders.approval.allow-self";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -35,6 +53,7 @@ public sealed class OrdersModule : IModule
     {
         public const string Order = "orders.order";
         public const string OrderLine = "orders.order-line";
+        public const string ChangeRequest = "orders.change-request";
     }
 
     public string Key => ModuleKey;
@@ -47,6 +66,19 @@ public sealed class OrdersModule : IModule
         new(Permissions.OrdersCreate, "Kabul edilmiş tekliften sipariş oluşturur", "Siparişler"),
         new(Permissions.OrdersWrite, "Taslak siparişin ticari alanlarını ve planlama bilgilerini düzenler", "Siparişler"),
         new(Permissions.FinancialsRead, "Sipariş tutarlarını, kalem fiyatlarını ve toplamları görür", "Sipariş tutarları"),
+        new(Permissions.OrdersApprove, "Onay bekleyen siparişi onaylar ya da gerekçeyle geri gönderir; değişiklik talebine karar verir", "Siparişler"),
+        new(Permissions.OrdersCancel, "Siparişi gerekçeyle iptal eder (teslim edilen kayıtlar korunur)", "Siparişler"),
+        new(Permissions.OrdersClose, "Gerçekleşmesi tamamlanmış siparişi kapatır", "Siparişler"),
+        new(Permissions.OrdersForceClose, "Kalan yükümlülük varken siparişi gerekçeyle zorla kapatır", "Siparişler"),
+    ];
+
+    IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
+    [
+        new(SettingKeys.AllowSelfApproval, "Sipariş onayı: kendi gönderdiğini onaylama", "Siparişler", SettingType.Choice, "false")
+        {
+            Description = "Evet seçilirse siparişi onaya gönderen kişi onaylama yetkisine sahipse kendi gönderdiğini onaylayabilir (aynı kural değişiklik talebi için de geçerlidir). Varsayılan hayırdır (hazırlayan ve onaylayan ayrılır).",
+            Options = [new SettingOption("false", "Hayır"), new SettingOption("true", "Evet")],
+        },
     ];
 
     /// <summary>Devre dışı bırakılan kişinin siparişleri devredilir (ADR-0004).</summary>
@@ -64,6 +96,22 @@ public sealed class OrdersModule : IModule
             [Permissions.OrdersRead, Permissions.OrdersCreate, Permissions.OrdersWrite, Permissions.FinancialsRead])
         {
             Scope = RecordScope.Own,
+        },
+        new(
+            "orders.approver",
+            "Sipariş onaylayıcı",
+            "Siparişleri tutarlarıyla görüntüler; onaylar, geri gönderir, iptal eder ve değişiklik taleplerine karar verir.",
+            [Permissions.OrdersRead, Permissions.FinancialsRead, Permissions.OrdersApprove, Permissions.OrdersCancel])
+        {
+            Scope = RecordScope.All,
+        },
+        new(
+            "orders.closer",
+            "Sipariş kapatma sorumlusu",
+            "Tamamlanan siparişleri kapatır; kalan yükümlülük varken zorla kapatma yetkisi içermez.",
+            [Permissions.OrdersRead, Permissions.OrdersClose])
+        {
+            Scope = RecordScope.All,
         },
         new(
             "orders.viewer",
@@ -92,11 +140,20 @@ public sealed class OrdersModule : IModule
             UserFields = ["ownerId", "acceptedByUserId", "createdBy", "updatedBy"],
             References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party, ["personId"] = SharedEntities.Person },
         },
+        new(Entities.ChangeRequest, "Sipariş değişiklik talebi", Permissions.OrdersRead, new Dictionary<string, string>
+        {
+            ["orderId"] = "Sipariş", ["sequence"] = "Sıra", ["status"] = "Durum", ["reason"] = "Gerekçe", ["changes"] = "Önerilen değişiklikler", ["impact"] = "Etki özeti",
+            ["netDelta"] = "Net tutar farkı", ["taxDelta"] = "Vergi farkı", ["decidedAt"] = "Karar zamanı", ["decisionNote"] = "Karar notu",
+        })
+        {
+            UserFields = ["requestedBy", "decidedBy"],
+            References = new Dictionary<string, string> { ["orderId"] = Entities.Order },
+        },
         new(Entities.OrderLine, "Sipariş kalemi", Permissions.OrdersRead, new Dictionary<string, string>
         {
             ["orderId"] = "Sipariş", ["position"] = "Sıra", ["kind"] = "Tür", ["productCode"] = "Kod", ["name"] = "Ad", ["description"] = "Açıklama",
             ["quantity"] = "Miktar", ["acceptedQuantity"] = "Kabul edilen miktar", ["unitName"] = "Birim", ["unitPrice"] = "Birim fiyat",
-            ["taxRatePercent"] = "Vergi %", ["net"] = "Net", ["tax"] = "Vergi", ["gross"] = "Toplam", ["deliveredQuantity"] = "Teslim edilen",
+            ["taxRatePercent"] = "Vergi %", ["net"] = "Net", ["tax"] = "Vergi", ["gross"] = "Toplam", ["deliveredQuantity"] = "Teslim edilen", ["cancelledQuantity"] = "İptal edilen miktar",
             ["plannedDate"] = "Planlanan tarih",
         }, "name")
         {
@@ -108,6 +165,7 @@ public sealed class OrdersModule : IModule
     IReadOnlyList<SensitiveFields> IModule.SensitiveFields { get; } =
     [
         new(Entities.Order, Permissions.FinancialsRead, ["netTotal", "taxTotal", "grossTotal"]),
+        new(Entities.ChangeRequest, Permissions.FinancialsRead, ["netDelta", "taxDelta"]),
         new(Entities.OrderLine, Permissions.FinancialsRead, ["unitPrice", "listAmount", "lineDiscount", "net", "tax", "gross"]),
     ];
 
@@ -138,6 +196,9 @@ public sealed class OrdersModule : IModule
         services.AddScoped<OrderReader>();
         services.AddScoped<IRecordStore, OrderRecordStore>();
         services.AddScoped<IRecordStore, OrderLineRecordStore>();
+        services.AddScoped<IRecordStore, OrderChangeRequestRecordStore>();
+        services.AddScoped<IOrderWorkflow, OrderWorkflow>();
+        services.AddScoped<IOrderChangeRequests, OrderChangeRequests>();
         services.AddScoped<IOrderFromQuote, OrderFromQuote>();
         services.AddScoped<IOrderQueries, OrderQueries>();
         services.AddScoped<IActivityLinkTarget, OrderLinkTarget>();

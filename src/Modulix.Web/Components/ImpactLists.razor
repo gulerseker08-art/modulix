@@ -1,0 +1,28 @@
+@* Değişikliğin operasyon, teslimat, sözleşme ve tutar etkisi. Tutar farkı yalnızca tutar görme izni olana gelir (aksi halde null). *@
+<ul class="small mb-1">
+    @foreach (var item in Operations) { <li><strong>Operasyon:</strong> @item</li> }
+    @foreach (var item in Deliveries) { <li><strong>Teslimat:</strong> @item</li> }
+    @foreach (var item in Contracts) { <li><strong>Sözleşme:</strong> @item</li> }
+    @if (NetDelta is { } net && TaxDelta is { } tax && (net != 0 || tax != 0))
+    {
+        <li><strong>Tutar:</strong> net @OrderLabels.Money(net, Currency), vergi @OrderLabels.Money(tax, Currency) (sipariş tutarındaki fark; iade ya da fatura değildir).</li>
+    }
+    @if (Operations.Count + Deliveries.Count + Contracts.Count == 0 && (NetDelta ?? 0m) == 0m)
+    {
+        <li class="text-muted">Operasyon, teslimat, sözleşme ya da tutar üzerinde etki yok.</li>
+    }
+</ul>
+
+@code {
+    [Parameter] public IReadOnlyList<string> Operations { get; set; } = [];
+
+    [Parameter] public IReadOnlyList<string> Deliveries { get; set; } = [];
+
+    [Parameter] public IReadOnlyList<string> Contracts { get; set; } = [];
+
+    [Parameter] public decimal? NetDelta { get; set; }
+
+    [Parameter] public decimal? TaxDelta { get; set; }
+
+    [Parameter] public string Currency { get; set; } = "TRY";
+}
