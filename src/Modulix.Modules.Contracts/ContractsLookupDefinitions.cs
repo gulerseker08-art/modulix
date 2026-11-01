@@ -13,6 +13,7 @@ public static class ContractsLookupDefinitions
     public const string ContractPerson = "contracts.contract.person";
     public const string ContractOwner = "contracts.contract.owner";
     public const string ContractPrevious = "contracts.contract.previous";
+    public const string ContractEscalation = "contracts.contract.escalation";
     public const string PartyParty = "contracts.contract-party.party";
     public const string PartyPerson = "contracts.contract-party.person";
     public const string RuleApprover = "contracts.approval-rule.approver";
@@ -52,6 +53,11 @@ public static class ContractsLookupDefinitions
         Party(ContractParty, ContractsModule.Entities.Contract, "partyId", "Müşteri"),
         Person(ContractPerson, ContractsModule.Entities.Contract, "personId", "İlgili kişi"),
         new(ContractOwner, ContractsModule.Entities.Contract, "ownerId", "Sorumlu", LookupTargetKind.Member)
+        {
+            SearchDescription = "Üyenin görünen adı",
+            PageSize = 20,
+        },
+        new(ContractEscalation, ContractsModule.Entities.Contract, "escalationUserId", "Yenileme eskalasyonu", LookupTargetKind.Member)
         {
             SearchDescription = "Üyenin görünen adı",
             PageSize = 20,

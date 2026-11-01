@@ -860,3 +860,9 @@ internal sealed class ContractSystemAnchor : Modulix.Core.Contracts.Events.IEven
 {
     public Task HandleAsync(Modulix.Core.Contracts.Events.EventEnvelope envelope, CancellationToken cancellationToken) => Task.CompletedTask;
 }
+
+/// <summary>"contracts.scheduler" sistem kimliğinin izin çapası (zamanlanmış işler sistem adına çalışır); olay işlemez.</summary>
+internal sealed class ContractSchedulerAnchor : Modulix.Core.Contracts.Events.IEventSubscriber
+{
+    public Task HandleAsync(Modulix.Core.Contracts.Events.EventEnvelope envelope, CancellationToken cancellationToken) => Task.CompletedTask;
+}

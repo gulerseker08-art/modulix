@@ -1,0 +1,382 @@
+@* Sözleşme dönemi, yenileme ve fesih (ADR-0022, dilim 8): bildirim tarihleri, otomatik uzatma durumu, yenileme taslağı, yenilememe kararı, fesih, hatırlatma geçmişi ve yenileme zinciri.
+   Bir dönem için tek karar vardır. Otomatik uzatma yalnızca sözleşme "otomatik" yenilemeliyse ve firma ayarı açıksa çalışır; fiyat/ceza gibi finansal sonuç otomatik uygulanmaz.
+   Hatırlatmalar sorumluya takip aktivitesi olarak açılır; müşteriye bildirim gitmez. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+@inject NavigationManager Navigation
+
+<section class="detail-section" aria-labelledby="renewal-title">
+    <div class="section-header">
+        <h2 id="renewal-title">Dönem, yenileme ve fesih</h2>
+    </div>
+
+    <Notice Text="@notice" Failed="@noticeFailed" />
+
+    @if (loading)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (overview is null)
+    {
+        <p class="text-muted">Yenileme bilgisi yüklenemedi.</p>
+    }
+    else
+    {
+        <dl class="detail-list">
+            <div><dt>Yürürlük durumu</dt><dd>@ContractLabels.Label(ContractLabels.Effectives, overview.EffectiveStatus)</dd></div>
+            <div><dt>Dönem bitişi</dt><dd>@(overview.IsIndefinite ? "Belirsiz süreli" : ContractLabels.Date(overview.EndDate))@if (!overview.IsIndefinite && overview.DaysToEnd is { } toEnd) { <small class="text-muted"> · @RenewalLabels.Days(toEnd)</small> }</dd></div>
+            <div>
+                <dt>Son bildirim tarihi</dt>
+                <dd>
+                    @ContractLabels.Date(overview.NoticeDeadline)
+                    @if (overview.DaysToNotice is { } toNotice) { <small class="@(toNotice < 0 && overview.CurrentDecision is null ? "text-danger" : "text-muted")"> · @RenewalLabels.Days(toNotice)</small> }
+                    @if (overview.NoticePeriodDays is { } noticeDays) { <small class="text-muted"> (bitişten @noticeDays gün önce)</small> }
+                </dd>
+            </div>
+            <div><dt>Yenileme yöntemi</dt><dd>@ContractLabels.Label(ContractLabels.RenewalModes, overview.RenewalMode)@(overview.RenewalPeriodMonths is { } months ? $" · {months} ay" : string.Empty)</dd></div>
+            <div>
+                <dt>Otomatik uzatma</dt>
+                <dd>@(overview.AutoRenewalBlockedReason is null ? "Koşullar sağlanınca zamanlanmış iş uzatır." : overview.AutoRenewalBlockedReason)</dd>
+            </div>
+            <div><dt>Hatırlatma eşikleri</dt><dd>@string.Join(", ", overview.Thresholds.Select(t => t + " gün"))</dd></div>
+            @if (overview.TerminationDate is { } terminationDate)
+            {
+                <div><dt>Fesih</dt><dd>@ContractLabels.Date(terminationDate) · @overview.TerminationReason</dd></div>
+            }
+            @if (overview.CurrentDecision is { } current)
+            {
+                <div>
+                    <dt>Bu dönem için karar</dt>
+                    <dd>
+                        <span class="badge stage-@RenewalLabels.Badge(current.Outcome)">@RenewalLabels.Label(RenewalLabels.Outcomes, current.Outcome)</span>
+                        @if (current.Reason is not null) { <span> · @RenewalLabels.Label(RenewalLabels.Reasons, current.Reason)</span> }
+                        @if (current.ResultContractId is { } resultId) { <span> · <a href="sozlesmeler/@resultId">taslağı aç</a></span> }
+                    </dd>
+                </div>
+            }
+        </dl>
+
+        @if (overview.EffectiveStatus == "Active" && (CanManage || CanTerminate))
+        {
+            <div class="header-actions">
+                @if (CanManage && overview.CurrentDecision is null && !overview.IsIndefinite)
+                {
+                    <button type="button" class="btn btn-primary btn-sm" disabled="@busy" @onclick='() => Open("draft")'>Yenileme taslağı oluştur</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => Open("decline")'>Yenilememe kararı ver</button>
+                }
+                @if (CanTerminate && overview.TerminationDate is null)
+                {
+                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick='() => Open("terminate")'>Feshet</button>
+                }
+            </div>
+        }
+
+        @if (errors is { Count: > 0 })
+        {
+            <div class="alert alert-danger" role="alert"><ul class="mb-0">@foreach (var (_, messages) in errors) { foreach (var message in messages) { <li>@message</li> } }</ul></div>
+        }
+
+        @if (action == "draft")
+        {
+            <form class="record-form" novalidate @onsubmit="DraftAsync" @onsubmit:preventDefault>
+                <h3>Yenileme taslağı</h3>
+                <p class="small text-muted">
+                    Bu sözleşmenin kopyası taslak olarak açılır (kalemler, taraflar ve koşullar kopyalanır; önceki sözleşme bağı kurulur). Fiyat ya da koşul değişikliğini taslakta yapın;
+                    taslak normal onay ve imza sürecinden geçer. Aynı dönem için ikinci taslak açılmaz.
+                </p>
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="rn-start">Yeni dönem başlangıcı (boş = bitişin ertesi günü)</label>
+                        <input id="rn-start" class="form-control" type="date" @bind="draftStart" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="rn-months">Süre (ay; boş = yenileme süresi)</label>
+                        <input id="rn-months" class="form-control" type="number" min="1" max="120" @bind="draftMonths" />
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@busy">Taslağı oluştur</button>
+                    <button type="button" class="btn btn-link" @onclick="Close">Vazgeç</button>
+                </div>
+            </form>
+        }
+
+        @if (action == "decline")
+        {
+            <form class="record-form" novalidate @onsubmit="DeclineAsync" @onsubmit:preventDefault>
+                <h3>Yenilememe kararı</h3>
+                <p class="small text-muted">Karar bu dönem için verilir: otomatik uzatma ve yenileme hatırlatmaları durur. Sözleşme dönem bitince süresi dolar.</p>
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="dc-reason">Neden *</label>
+                        <select id="dc-reason" class="form-select" @bind="declineReason">
+                            <option value="">Seçin…</option>
+                            @foreach (var r in RenewalLabels.Reasons) { <option value="@r.Key">@r.Label</option> }
+                        </select>
+                    </div>
+                    <div class="wide">
+                        <label class="form-label" for="dc-note">Not</label>
+                        <input id="dc-note" class="form-control" maxlength="1000" @bind="declineNote" />
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-danger" disabled="@busy">Kararı kaydet</button>
+                    <button type="button" class="btn btn-link" @onclick="Close">Vazgeç</button>
+                </div>
+            </form>
+        }
+
+        @if (action == "terminate")
+        {
+            <form class="record-form" novalidate @onsubmit="TerminateAsync" @onsubmit:preventDefault>
+                <h3>Sözleşmeyi feshet</h3>
+                <p class="small text-muted">
+                    Bugün ya da geçmiş bir tarih seçilirse fesih hemen etkili olur; gelecek tarih seçilirse planlanır ve tarih gelince zamanlanmış iş uygular. Etkin taahhütler kapatılır.
+                    Fesih tazminat ya da ceza hesaplamaz; bunlar ayrıca takip edilir.
+                </p>
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="tm-date">Fesih tarihi *</label>
+                        <input id="tm-date" class="form-control" type="date" @bind="terminateDate" />
+                    </div>
+                    <div class="wide">
+                        <label class="form-label" for="tm-reason">Gerekçe *</label>
+                        <input id="tm-reason" class="form-control" maxlength="500" @bind="terminateReason" />
+                    </div>
+                    @if (needsShortNoticeConfirmation)
+                    {
+                        <div class="wide form-check">
+                            <input id="tm-short" class="form-check-input" type="checkbox" @bind="confirmShortNotice" />
+                            <label class="form-check-label" for="tm-short">Seçilen tarih sözleşmedeki bildirim süresinden kısa; yine de feshetmek istiyorum.</label>
+                        </div>
+                    }
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-danger" disabled="@busy">Feshet</button>
+                    <button type="button" class="btn btn-link" @onclick="Close">Vazgeç</button>
+                </div>
+            </form>
+        }
+
+        <h3>Karar geçmişi</h3>
+        @if (overview.History.Count == 0)
+        {
+            <p class="text-muted">Bu sözleşmede henüz yenileme kararı yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">Yenileme kararları</caption>
+                <thead><tr><th scope="col">Dönem bitişi</th><th scope="col">Karar</th><th scope="col">Yeni bitiş / taslak</th><th scope="col">Kaynak</th><th scope="col">Tarih</th></tr></thead>
+                <tbody>
+                    @foreach (var d in overview.History)
+                    {
+                        <tr>
+                            <td data-label="Dönem bitişi" class="primary">@ContractLabels.Date(d.PeriodEnd)</td>
+                            <td data-label="Karar">
+                                <span class="badge stage-@RenewalLabels.Badge(d.Outcome)">@RenewalLabels.Label(RenewalLabels.Outcomes, d.Outcome)</span>
+                                @if (d.Reason is not null) { <div class="small">@RenewalLabels.Label(RenewalLabels.Reasons, d.Reason)</div> }
+                                @if (d.Note is not null) { <div class="small text-muted">@d.Note</div> }
+                            </td>
+                            <td data-label="Yeni bitiş / taslak">
+                                @if (d.NewEndDate is { } newEnd) { <span>@ContractLabels.Date(newEnd)</span> }
+                                @if (d.ResultContractId is { } resultId) { <a href="sozlesmeler/@resultId">taslağı aç</a> }
+                                @if (d.NewEndDate is null && d.ResultContractId is null) { <span class="text-muted">—</span> }
+                            </td>
+                            <td data-label="Kaynak">@RenewalLabels.Label(RenewalLabels.Sources, d.Source)@(d.DecidedBy is { } by ? " · " + Lookups.MemberName(by) : string.Empty)</td>
+                            <td data-label="Tarih">@d.At.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <h3>Hatırlatmalar</h3>
+        @if (overview.Reminders.Count == 0)
+        {
+            <p class="text-muted">Henüz hatırlatma üretilmedi. Zamanlanmış iş, son bildirim tarihine eşik günleri kala sorumluya takip aktivitesi açar.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">Yenileme hatırlatmaları</caption>
+                <thead><tr><th scope="col">Dönem</th><th scope="col">Tür</th><th scope="col">Eşik</th><th scope="col">Durum</th><th scope="col">Tarih</th></tr></thead>
+                <tbody>
+                    @foreach (var r in overview.Reminders.OrderByDescending(x => x.PeriodKey).ThenByDescending(x => x.At))
+                    {
+                        <tr>
+                            <td data-label="Dönem" class="primary">@ContractLabels.Date(r.PeriodKey)</td>
+                            <td data-label="Tür">@RenewalLabels.Label(RenewalLabels.ReminderKinds, r.Kind)</td>
+                            <td data-label="Eşik">@(r.ThresholdDays > 0 ? r.ThresholdDays + " gün" : "—")</td>
+                            <td data-label="Durum">
+                                @RenewalLabels.Label(RenewalLabels.ReminderStatuses, r.Status)
+                                @if (r.Note is not null) { <div class="small text-muted">@r.Note</div> }
+                            </td>
+                            <td data-label="Tarih">@r.At.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (chain.Count > 1)
+        {
+            <h3>Yenileme zinciri</h3>
+            <ol class="chain-list">
+                @foreach (var item in chain)
+                {
+                    <li>
+                        <span class="badge stage-@(item.Relation == "Current" ? "open" : "onhold")">@RenewalLabels.Label(RenewalLabels.Relations, item.Relation)</span>
+                        @if (item.Relation == "Current") { <strong>@item.Title</strong> } else { <a href="sozlesmeler/@item.Id">@item.Title</a> }
+                        <small class="text-muted">@item.Number · @ContractLabels.Date(item.StartDate) – @ContractLabels.Date(item.EndDate) · @ContractLabels.Label(ContractLabels.Effectives, item.EffectiveStatus)</small>
+                    </li>
+                }
+            </ol>
+        }
+    }
+</section>
+
+@code {
+    private RenewalOverviewDto? overview;
+    private List<ChainItemDto> chain = [];
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? notice;
+    private bool noticeFailed;
+    private bool busy;
+    private bool loading = true;
+    private string? loadedFor;
+    private string? action;
+    private DateTime? draftStart;
+    private int? draftMonths;
+    private string declineReason = string.Empty;
+    private string? declineNote;
+    private DateTime? terminateDate;
+    private string terminateReason = string.Empty;
+    private bool confirmShortNotice;
+    private bool needsShortNoticeConfirmation;
+
+    [Parameter, EditorRequired] public ContractDto Contract { get; set; } = null!;
+
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private bool CanManage => Session.Can(ContractsAccess.RenewalsManage) && Session.Can(ContractsAccess.ContractsWrite);
+
+    private bool CanTerminate => Session.Can(ContractsAccess.ContractsTerminate);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{Contract.Id}:{Contract.Version}";
+        if (key == loadedFor) { return; }
+        if (loadedFor?.StartsWith($"{Contract.Id}:", StringComparison.Ordinal) != true)
+        {
+            // Başka sözleşmeye geçildi: açık form ve iletiler taşınmaz.
+            action = null;
+            errors = null;
+            notice = null;
+            declineReason = string.Empty;
+            declineNote = null;
+            terminateReason = string.Empty;
+        }
+
+        loadedFor = key;
+        await Lookups.LoadAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        var result = await Api.GetAsync<RenewalOverviewDto>($"/api/contracts/contracts/{Contract.Id}/renewal");
+        overview = result.Value;
+        chain = (await Api.GetAsync<List<ChainItemDto>>($"/api/contracts/contracts/{Contract.Id}/chain")).Value ?? [];
+        loading = false;
+        if (!result.IsSuccess) { Notify(result.Error, true); }
+    }
+
+    private void Open(string name)
+    {
+        action = name;
+        errors = null;
+        notice = null;
+        needsShortNoticeConfirmation = false;
+        confirmShortNotice = false;
+        terminateDate ??= DateTime.Today;
+    }
+
+    private void Close()
+    {
+        action = null;
+        errors = null;
+    }
+
+    private async Task DraftAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        var result = await Api.PostAsync<RenewalDraftResultDto>(
+            $"/api/contracts/contracts/{Contract.Id}/renewal/draft",
+            new RenewalDraftRequest(draftStart is { } start ? DateOnly.FromDateTime(start) : null, draftMonths));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            Notify(result.Error, true);
+            return;
+        }
+
+        Navigation.NavigateTo($"sozlesmeler/{result.Value!.ContractId}");
+    }
+
+    private async Task DeclineAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        var result = await Api.PostAsync<RenewalOverviewDto>($"/api/contracts/contracts/{Contract.Id}/renewal/decline", new DeclineRenewalRequest(declineReason, Blank(declineNote)));
+        busy = false;
+        await AfterAsync(result, "Yenilememe kararı kaydedildi.");
+    }
+
+    private async Task TerminateAsync()
+    {
+        if (busy) { return; }
+        busy = true;
+        var result = await Api.PostAsync<RenewalOverviewDto>(
+            $"/api/contracts/contracts/{Contract.Id}/terminate",
+            new TerminateContractRequest(DateOnly.FromDateTime(terminateDate ?? DateTime.Today), terminateReason, confirmShortNotice));
+        busy = false;
+        if (!result.IsSuccess && result.Status == System.Net.HttpStatusCode.Conflict && result.Error?.Contains("bildirim süresinin", StringComparison.Ordinal) == true)
+        {
+            needsShortNoticeConfirmation = true;
+        }
+
+        await AfterAsync(result, terminateDate is { } d && DateOnly.FromDateTime(d) > DateOnly.FromDateTime(DateTime.Today) ? "Fesih planlandı." : "Sözleşme feshedildi.");
+    }
+
+    private async Task AfterAsync(ApiResult<RenewalOverviewDto> result, string success)
+    {
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            Notify(result.Error, true);
+            return;
+        }
+
+        action = null;
+        errors = null;
+        declineReason = string.Empty;
+        declineNote = null;
+        terminateReason = string.Empty;
+        Notify(success, false);
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private void Notify(string? text, bool failed)
+    {
+        notice = text;
+        noticeFailed = failed;
+    }
+
+    private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+}

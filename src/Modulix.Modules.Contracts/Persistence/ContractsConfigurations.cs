@@ -56,6 +56,8 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
         builder.Property(c => c.TaxTotal).HasPrecision(18, 2);
         builder.Property(c => c.GrossTotal).HasPrecision(18, 2);
         builder.Property(c => c.RecurringSummary).HasMaxLength(Contract.SummaryMaxLength);
+        builder.Property(c => c.TerminationDate).HasColumnType("date");
+        builder.Property(c => c.TerminationReason).HasMaxLength(Contract.ReasonMaxLength);
 
         builder.HasIndex(c => new { c.TenantId, c.Number }).IsUnique().HasDatabaseName("UX_Contracts_Number");
         builder.HasIndex(c => new { c.TenantId, c.PartyId });
@@ -344,6 +346,43 @@ internal sealed class ContractSignatureFileConfiguration : IEntityTypeConfigurat
         builder.Property(f => f.Content).IsRequired();
         builder.HasIndex(f => new { f.TenantId, f.ContractId });
         builder.HasIndex(f => new { f.TenantId, f.SignatoryId });
+    }
+}
+
+internal sealed class ContractRenewalConfiguration : IEntityTypeConfiguration<ContractRenewal>
+{
+    public void Configure(EntityTypeBuilder<ContractRenewal> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractRenewals");
+        builder.Property(r => r.PeriodEnd).HasColumnType("date");
+        builder.Property(r => r.NewEndDate).HasColumnType("date");
+        builder.Property(r => r.Outcome).HasMaxLength(Contract.StatusMaxLength).IsRequired();
+        builder.Property(r => r.Reason).HasMaxLength(Contract.StatusMaxLength);
+        builder.Property(r => r.Note).HasMaxLength(ContractRenewal.NoteMaxLength);
+        builder.Property(r => r.Source).HasMaxLength(20).IsRequired();
+        // Bir sözleşme dönemi için tek karar: mükerrer taslak, çift uzatma ve çelişen karar benzersiz indeksle engellenir (eşzamanlı işçiler dahil).
+        builder.HasIndex(r => new { r.TenantId, r.ContractId, r.PeriodEnd }).IsUnique().HasDatabaseName("UX_ContractRenewals_ContractPeriod");
+        builder.HasIndex(r => new { r.TenantId, r.ResultContractId });
+
+        builder.HasOne<Contract>().WithMany().HasForeignKey(r => new { r.TenantId, r.ContractId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class ContractReminderConfiguration : IEntityTypeConfiguration<ContractReminder>
+{
+    public void Configure(EntityTypeBuilder<ContractReminder> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractReminders");
+        builder.Property(r => r.PeriodKey).HasColumnType("date");
+        builder.Property(r => r.Kind).HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Status).HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Note).HasMaxLength(Contract.ReasonMaxLength);
+        // Aynı sözleşme, dönem, tür ve eşik için ikinci hatırlatma üretilemez.
+        builder.HasIndex(r => new { r.TenantId, r.ContractId, r.PeriodKey, r.Kind, r.ThresholdDays }).IsUnique().HasDatabaseName("UX_ContractReminders_Key");
+
+        builder.HasOne<Contract>().WithMany().HasForeignKey(r => new { r.TenantId, r.ContractId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

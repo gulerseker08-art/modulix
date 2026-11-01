@@ -25,7 +25,9 @@ public sealed record ContractPolicySettings(
     string TimeZoneId = "Europe/Istanbul",
     int ApprovalDueHours = 72,
     string? SignatureProvider = null,
-    int SignatureValidityDays = 14)
+    int SignatureValidityDays = 14,
+    string? RenewalReminderDays = null,
+    bool AllowAutoRenewal = false)
 {
     public static ContractPolicySettings Default { get; } = new(false);
 }

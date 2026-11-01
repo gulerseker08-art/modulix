@@ -159,6 +159,7 @@ public static class ContractsEndpoints
 
         ContractSignatureEndpoints.MapInternal(contracts);
         ContractCommitmentEndpoints.MapInternal(group, Prefix);
+        ContractRenewalEndpoints.MapInternal(group);
 
         contracts.MapGet("/{id:guid}/versions", async (Guid id, IContractWorkflow workflow, CancellationToken ct) =>
         {
@@ -241,6 +242,8 @@ internal sealed class ContractPolicyProvider(IServiceProvider services) : IContr
             Text(await settings.GetValueAsync(Modulix.Core.Modules.CoreModule.SettingKeys.TimeZone, cancellationToken)) ?? "Europe/Istanbul",
             int.TryParse(await settings.GetValueAsync(ContractsModule.SettingKeys.ApprovalDueHours, cancellationToken), out var dueHours) ? Math.Clamp(dueHours, 0, 9999) : 72,
             Text(await settings.GetValueAsync(ContractsModule.SettingKeys.SignatureProvider, cancellationToken)) is { } provider && provider != "none" ? provider : null,
-            int.TryParse(await settings.GetValueAsync(ContractsModule.SettingKeys.SignatureValidityDays, cancellationToken), out var validity) ? Math.Clamp(validity, 1, 90) : 14);
+            int.TryParse(await settings.GetValueAsync(ContractsModule.SettingKeys.SignatureValidityDays, cancellationToken), out var validity) ? Math.Clamp(validity, 1, 90) : 14,
+            Text(await settings.GetValueAsync(ContractsModule.SettingKeys.RenewalReminderDays, cancellationToken)),
+            string.Equals(await settings.GetValueAsync(ContractsModule.SettingKeys.AllowAutoRenewal, cancellationToken), "true", StringComparison.OrdinalIgnoreCase));
     }
 }

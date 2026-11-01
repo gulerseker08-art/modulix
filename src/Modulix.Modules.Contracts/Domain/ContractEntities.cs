@@ -128,6 +128,14 @@ public sealed class Contract : ContractsEntity, IOwnedEntity
     /// <summary><see cref="Lifecycle.RiskLevel"/>: elle girilen risk göstergesi; onay kuralları "en az bu düzey" koşuluyla kullanabilir.</summary>
     public string RiskLevel { get; internal set; } = Lifecycle.RiskLevel.Low;
 
+    /// <summary>Yenileme/bildirim süresi geçince eskalasyon aktivitesinin açılacağı kullanıcı (sorumlunun yöneticisi gibi); boşsa eskalasyon yalnızca kaydedilir.</summary>
+    public Guid? EscalationUserId { get; internal set; }
+
+    /// <summary>Fesih tarihi (planlanmış ya da gerçekleşmiş); sistem alanı. Gelecekteyse zamanlanmış iş o gün sözleşmeyi feshedilmiş yapar.</summary>
+    public DateOnly? TerminationDate { get; internal set; }
+
+    public string? TerminationReason { get; internal set; }
+
     /// <summary><see cref="Lifecycle.PreparationStatus"/>.</summary>
     public string PreparationStatus { get; internal set; } = Lifecycle.PreparationStatus.Draft;
 

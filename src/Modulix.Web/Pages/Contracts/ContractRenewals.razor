@@ -1,0 +1,146 @@
+@page "/sozlesmeler/yenileme"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Sözleşme yenileme takvimi · Modulix</PageTitle>
+
+<AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
+    <div class="page-header">
+        <h1>Sözleşme yenileme takvimi</h1>
+        @if (Session.Can(ContractsAccess.RenewalsManage))
+        {
+            <div class="header-actions">
+                <button type="button" class="btn btn-outline-secondary" disabled="@running" @onclick="RunAsync">Zamanlanmış işleri şimdi çalıştır</button>
+            </div>
+        }
+    </div>
+    <p class="text-muted">
+        Görebildiğiniz yürürlükteki sözleşmelerin son bildirim tarihine ve bitişine göre sıralı listesi. Karar vermek (yenileme taslağı, yenilememe, fesih) için sözleşmeyi açın (Yenileme sekmesi).
+        Zamanlanmış iş her gün sorumluya takip aktivitesi açar; müşteriye bildirim gitmez ve fiyat ya da ceza otomatik uygulanmaz.
+    </p>
+
+    <Notice Text="@notice" Failed="@noticeFailed" />
+
+    <div class="filters">
+        <div>
+            <label class="form-label" for="rn-days">Ufuk</label>
+            <select id="rn-days" class="form-select" value="@days" @onchange="HorizonAsync">
+                <option value="30">30 gün</option>
+                <option value="90">90 gün</option>
+                <option value="180">180 gün</option>
+                <option value="365">1 yıl</option>
+            </select>
+        </div>
+        <div class="form-check">
+            <input id="rn-undecided" class="form-check-input" type="checkbox" checked="@onlyUndecided" @onchange="Toggle" />
+            <label class="form-check-label" for="rn-undecided">Yalnızca kararı olmayanlar</label>
+        </div>
+    </div>
+
+    @if (items is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (Visible.Count == 0)
+    {
+        <p class="text-muted">Bu ufukta yenileme gerektiren sözleşme yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Yenileme takvimi</caption>
+            <thead><tr><th scope="col">Sözleşme</th><th scope="col">Son bildirim</th><th scope="col">Bitiş</th><th scope="col">Yöntem</th><th scope="col">Karar</th><th scope="col">Sorumlu</th></tr></thead>
+            <tbody>
+                @foreach (var i in Visible)
+                {
+                    <tr>
+                        <td data-label="Sözleşme" class="primary"><a href="sozlesmeler/@i.ContractId">@i.Title</a> <small class="text-muted">@i.Number</small></td>
+                        <td data-label="Son bildirim">
+                            @ContractLabels.Date(i.NoticeDeadline)
+                            @if (i.DaysToNotice is { } n) { <div class="small @(n < 0 && i.Decision is null ? "text-danger" : "text-muted")">@RenewalLabels.Days(n)</div> }
+                        </td>
+                        <td data-label="Bitiş">@ContractLabels.Date(i.EndDate)@if (i.DaysToEnd is { } e) { <div class="small text-muted">@RenewalLabels.Days(e)</div> }</td>
+                        <td data-label="Yöntem">@ContractLabels.Label(ContractLabels.RenewalModes, i.RenewalMode)</td>
+                        <td data-label="Karar">
+                            @if (i.TerminationDate is { } termination) { <div class="small text-danger">Fesih: @ContractLabels.Date(termination)</div> }
+                            @if (i.Decision is { } decision)
+                            {
+                                <span class="badge stage-@RenewalLabels.Badge(decision)">@RenewalLabels.Label(RenewalLabels.Outcomes, decision)</span>
+                                @if (i.ResultContractId is { } resultId) { <div class="small"><a href="sozlesmeler/@resultId">taslağı aç</a></div> }
+                            }
+                            else
+                            {
+                                <span class="text-muted">Karar bekliyor</span>
+                            }
+                            @if (i.LastReminder is not null) { <div class="small text-muted">Son hatırlatma: @i.LastReminder</div> }
+                        </td>
+                        <td data-label="Sorumlu">@(i.OwnerId is null ? "—" : Lookups.MemberName(i.OwnerId))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private List<RenewalCalendarItemDto>? items;
+    private int days = 90;
+    private bool onlyUndecided;
+    private bool running;
+    private string? notice;
+    private bool noticeFailed;
+
+    private List<RenewalCalendarItemDto> Visible => (items ?? []).Where(i => !onlyUndecided || i.Decision is null).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(ContractsAccess.ContractsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task HorizonAsync(ChangeEventArgs e)
+    {
+        days = int.TryParse(e.Value?.ToString(), out var parsed) ? parsed : 90;
+        items = null;
+        await LoadAsync();
+    }
+
+    private void Toggle(ChangeEventArgs e) => onlyUndecided = e.Value is true;
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<RenewalCalendarItemDto>>($"/api/contracts/renewals/calendar?days={days}");
+        items = result.Value ?? [];
+        if (!result.IsSuccess) { Notify(result.Error, true); }
+    }
+
+    private async Task RunAsync()
+    {
+        if (running) { return; }
+        running = true;
+        var result = await Api.PostAsync<SchedulerRunDto>("/api/contracts/scheduler/run", new { });
+        running = false;
+        if (!result.IsSuccess)
+        {
+            Notify(result.Error, true);
+            return;
+        }
+
+        var r = result.Value!;
+        Notify(
+            $"Tur tamamlandı: {r.AutoRenewed} otomatik uzatma, {r.RemindersCreated} hatırlatma, {r.EscalationsCreated} eskalasyon, {r.Terminated} fesih, {r.PeriodsExpired} süresi dolan, {r.Activated} yürürlüğe giren.", false);
+        items = null;
+        await LoadAsync();
+    }
+
+    private void Notify(string? text, bool failed)
+    {
+        notice = text;
+        noticeFailed = failed;
+    }
+}

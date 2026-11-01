@@ -43,6 +43,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             // Olay işleyicisi de çalışmaz; olay testleri işleyiciyi kendisi çağırır (EventTests).
             .UseSetting("Events:WorkerEnabled", "false")
             .UseSetting("QuoteExpiry:WorkerEnabled", "false")
+            .UseSetting("ContractJobs:WorkerEnabled", "false")
 
             // Sözleşme imza simülasyonunun webhook gizli anahtarı (yalnızca testlerde; gerçek ortamda ortam değişkeniyle verilir).
             .UseSetting("ContractSignature:Simulation:WebhookSecret", ModulixApiFactory.SignatureWebhookSecret);

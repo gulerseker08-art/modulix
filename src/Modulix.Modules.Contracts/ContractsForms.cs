@@ -36,6 +36,7 @@ public static class ContractsForms
             new("renewalMode", "Yenileme yöntemi", "sure", 4),
             new("renewalPeriodMonths", "Yenileme süresi (ay)", "sure", 4),
             new("noticePeriodDays", "Bildirim süresi (gün)", "sure", 4),
+            new("escalationUserId", "Yenileme eskalasyonu", "sure", 4),
             new("currency", "Para birimi", "ticari", 4, Required: true, Fixed: true),
             new("priceIncludesTax", "Fiyatlandırma biçimi", "ticari", 4),
             new("contractValue", "Sözleşme bedeli (isteğe bağlı)", "ticari", 4),
