@@ -89,6 +89,7 @@ internal sealed class TicketCategoryRecordStore(SupportStoreContext context) : S
         Field.Reference<TicketCategory, SupportQueue>("defaultQueueId", "Kuyruk bulunamadı.", c => c.DefaultQueueId, (c, v) => c.DefaultQueueId = v),
         Field.Flag<TicketCategory>("isActive", c => c.IsActive, (c, v) => c.IsActive = v),
         Field.Integer<TicketCategory>("position", c => c.Position, (c, v) => c.Position = v ?? 0, max: 9999),
+        Field.Text<TicketCategory>("requiredFields", 200, c => c.RequiredFields, (c, v) => c.RequiredFields = v),
         Field.Id<TicketCategory>("createdBy", c => c.CreatedBy, (c, v) => c.CreatedBy = v).AsSystem(),
         Field.Id<TicketCategory>("updatedBy", c => c.UpdatedBy, (c, v) => c.UpdatedBy = v).AsSystem(),
     ];
@@ -107,6 +108,7 @@ internal sealed class TicketCategoryRecordStore(SupportStoreContext context) : S
     protected override async Task AppliedAsync(TicketCategory entity, System.Text.Json.Nodes.JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
         var errors = new List<RecordFieldError>();
+        errors.AddRange(Modulix.Modules.Support.Lifecycle.CategoryFieldRules.Validate(entity.RequiredFields).Select(e => new RecordFieldError(e.Field, e.Message)));
         if (entity.ParentId is { } parentId)
         {
             if (parentId == entity.Id)

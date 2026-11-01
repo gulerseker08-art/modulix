@@ -21,14 +21,17 @@ public static class MessageKind
     /// <summary>İç not: müşteriye hiçbir yoldan gitmez.</summary>
     public const string Note = "note";
 
-    public static readonly IReadOnlyList<string> All = [Reply, CustomerMessage, Note];
+    /// <summary>Müşterinin çözümü onayladığının kaydı: çözülmüş talebi hemen kapatır (zaman aşımı beklenmez).</summary>
+    public const string CustomerConfirmation = "customer-confirmation";
+
+    public static readonly IReadOnlyList<string> All = [Reply, CustomerMessage, Note, CustomerConfirmation];
 }
 
 public sealed record AddMessageInput(string Kind, string? Body);
 
 /// <summary>Mesaj (API görünümü). İç not yalnızca iç not okuma izni olana verilir.</summary>
 public sealed record TicketMessageItem(
-    Guid Id, string Visibility, string Direction, string Body, Guid? AuthorId, string DeliveryStatus, bool IsAutomatic, DateTimeOffset CreatedAt);
+    Guid Id, string Visibility, string Direction, string Body, Guid? AuthorId, string DeliveryStatus, bool IsAutomatic, DateTimeOffset CreatedAt, Guid? SourceTicketId = null);
 
 /// <summary>
 /// Talep mesajları (ADR-0024). Müşteriye görünen yanıt ile iç not kesin ayrıdır: ayrım veritabanında da bir kısıtla korunur ve iç not yalnızca
@@ -75,6 +78,7 @@ internal sealed class TicketMessages(
         {
             MessageKind.Reply => (MessageVisibility.Public, MessageDirection.Outbound, SupportModule.Permissions.MessagesReply, TicketEventKinds.PublicReply),
             MessageKind.CustomerMessage => (MessageVisibility.Public, MessageDirection.Inbound, SupportModule.Permissions.MessagesReply, TicketEventKinds.CustomerMessage),
+            MessageKind.CustomerConfirmation => (MessageVisibility.Public, MessageDirection.Inbound, SupportModule.Permissions.MessagesReply, TicketEventKinds.CustomerConfirmed),
             _ => (MessageVisibility.Internal, MessageDirection.Note, SupportModule.Permissions.NotesWrite, TicketEventKinds.InternalNote),
         };
 
@@ -127,6 +131,18 @@ internal sealed class TicketMessages(
             }
         }
 
+        if (input.Kind == MessageKind.CustomerConfirmation)
+        {
+            if (status != TicketStatus.Resolved)
+            {
+                return RecordResult<TicketMessageItem>.Fail(RecordErrorCode.Conflict, "Müşteri teyidi yalnızca çözülmüş talepte kaydedilir.", [new RecordFieldError("status", "Talep çözülmüş değil.")]);
+            }
+
+            // Teyit çözülmüş talebi kapatır; çözüm kaydı ve geçmiş korunur.
+            values["status"] = TicketStatus.Closed;
+            values["closedAt"] = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+        }
+
         TicketMessage? created = null;
         Func<SupportStoreContext, SupportTicket, CancellationToken, Task> effect = async (context, ticket, ct) =>
         {
@@ -135,7 +151,7 @@ internal sealed class TicketMessages(
             {
                 delivery = await DeliverAsync(ticket, body, ct);
             }
-            else if (input.Kind == MessageKind.CustomerMessage)
+            else if (input.Kind is MessageKind.CustomerMessage or MessageKind.CustomerConfirmation)
             {
                 delivery = DeliveryStatus.Recorded;
             }
@@ -201,7 +217,7 @@ internal sealed class TicketMessages(
     }
 
     private static TicketMessageItem ToItem(TicketMessage m) =>
-        new(m.Id, m.Visibility, m.Direction, m.Body, m.AuthorId, m.DeliveryStatus, m.IsAutomatic, m.CreatedAt);
+        new(m.Id, m.Visibility, m.Direction, m.Body, m.AuthorId, m.DeliveryStatus, m.IsAutomatic, m.CreatedAt, m.SourceTicketId);
 
     private static RecordResult<TicketMessageItem> Invalid(string field, string message) =>
         RecordResult<TicketMessageItem>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);

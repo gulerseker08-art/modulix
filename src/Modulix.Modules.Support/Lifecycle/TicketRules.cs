@@ -21,11 +21,14 @@ public static class TicketStatus
     public const string Reopened = "Reopened";
     public const string Cancelled = "Cancelled";
 
+    /// <summary>Başka bir talebe birleştirilmiş (son durum). Kapatma, iptal ve yeniden açmadan ayrı bir eylemin sonucudur; geçmiş korunur.</summary>
+    public const string Merged = "Merged";
+
     public static readonly IReadOnlyList<string> All =
-        [New, Triage, Assigned, InProgress, WaitingCustomer, WaitingInternal, Resolved, Closed, Reopened, Cancelled];
+        [New, Triage, Assigned, InProgress, WaitingCustomer, WaitingInternal, Resolved, Closed, Reopened, Cancelled, Merged];
 
     /// <summary>Son durumlar: talep üzerinde yeni iş yapılmaz (kapalı talep yalnızca pencere içinde yeniden açılır).</summary>
-    public static bool IsFinal(string status) => status is Closed or Cancelled;
+    public static bool IsFinal(string status) => status is Closed or Cancelled or Merged;
 
     /// <summary>Çalışılan (çözülmemiş, kapanmamış) durumlar: müşteri yanıtı, atama ve devir bu durumlarda yapılır.</summary>
     public static bool IsWorking(string status) => status is New or Triage or Assigned or InProgress or WaitingCustomer or WaitingInternal or Reopened;
@@ -117,6 +120,14 @@ public static class TicketEventKinds
     public const string Cancelled = "Cancelled";
     public const string PriorityChanged = "PriorityChanged";
     public const string CustomerLinked = "CustomerLinked";
+    public const string RoutedByRule = "RoutedByRule";
+    public const string MergedInto = "MergedInto";
+    public const string MergeReceived = "MergeReceived";
+    public const string TaskAdded = "TaskAdded";
+    public const string TaskCompleted = "TaskCompleted";
+    public const string TaskReopened = "TaskReopened";
+    public const string CustomerConfirmed = "CustomerConfirmed";
+    public const string AutoClosed = "AutoClosed";
     public const string SlaBreached = "SlaBreached";
     public const string SlaEscalated = "SlaEscalated";
     public const string SlaRecalculationRequested = "SlaRecalculationRequested";
@@ -148,7 +159,7 @@ public static class TicketAction
 }
 
 /// <summary>Tenant ayarlarından gelen talep politikası; sağlayıcı yoksa varsayılan.</summary>
-public sealed record TicketPolicySettings(int ReopenWindowDays = 7, bool RequireRootCauseForComplaint = true)
+public sealed record TicketPolicySettings(int ReopenWindowDays = 7, bool RequireRootCauseForComplaint = true, int AutoCloseDays = 0)
 {
     public static TicketPolicySettings Default { get; } = new();
 }

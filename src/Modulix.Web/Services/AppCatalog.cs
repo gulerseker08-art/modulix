@@ -96,6 +96,7 @@ public static class AppCatalog
         new("support.tickets", Support, "Talepler", "inbox", "destek/talepler", 10, SupportAccess.ModuleKey, SupportAccess.TicketsRead, ExactMatch: true),
         new("support.new", Support, "Yeni talep", "clipboard-list", "destek/talepler/yeni", 20, SupportAccess.ModuleKey, SupportAccess.TicketsCreate, ExactMatch: true),
         new("support.settings", Support, "Kuyruklar ve kategoriler", "wrench", "destek/ayarlar", 90, SupportAccess.ModuleKey, SupportAccess.SettingsManage),
+        new("support.routing", Support, "Öncelik ve yönlendirme", "list", "destek/yonlendirme", 89, SupportAccess.ModuleKey, SupportAccess.SettingsManage),
         new("support.sla", Support, "SLA ve eskalasyon", "shield", "destek/sla", 91, SupportAccess.ModuleKey, SupportAccess.SlaManage),
 
         new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal),

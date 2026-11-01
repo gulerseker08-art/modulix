@@ -13,7 +13,7 @@ using Modulix.Modules.Support.Sla;
 namespace Modulix.Modules.Support.Lifecycle;
 
 /// <summary>Tur özeti: yeni işaretlenen ihlal sayısı ve uygulanan eskalasyon eylemi sayısı.</summary>
-public sealed record SlaSchedulerRun(int Breaches, int Escalations);
+public sealed record SlaSchedulerRun(int Breaches, int Escalations, int AutoClosed = 0);
 
 /// <summary>
 /// SLA zamanlanmış işi (ADR-0024 dilim 2). Host, işi tenant başına bir kez çalıştırır (tenant başına oturum kilidi); aynı turun tekrar ya da paralel çalışması da güvenlidir:
@@ -32,7 +32,8 @@ internal sealed class SlaScheduler(
     TicketWorkflowGate gate,
     TimeProvider time,
     IEmailQueue emailQueue,
-    INotificationRecipients? recipients = null) : ISlaScheduler
+    INotificationRecipients? recipients = null,
+    ISupportPolicyProvider? policy = null) : ISlaScheduler
 {
     private const int BatchSize = 200;
 
@@ -41,7 +42,43 @@ internal sealed class SlaScheduler(
         var now = time.GetUtcNow();
         var breaches = await MarkBreachesAsync(now, cancellationToken);
         var escalations = await EscalateAsync(now, cancellationToken);
-        return new SlaSchedulerRun(breaches, escalations);
+        var closed = await AutoCloseAsync(now, cancellationToken);
+        return new SlaSchedulerRun(breaches, escalations, closed);
+    }
+
+    /// <summary>
+    /// Zaman aşımıyla kapanma: <c>support.auto-close-days</c> (0 kapalı) kadar süredir çözüldü durumunda olan talep, müşteri itirazı (mesaj ⇒ yeniden açılır) gelmediyse kapatılır. Çözüm kaydı
+    /// ve geçmiş korunur; tarihçeye <c>AutoClosed</c> yazılır. Kapanmış talep bir sonraki turda aday olmaz (tekrar çalıştırma güvenlidir).
+    /// </summary>
+    private async Task<int> AutoCloseAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var days = policy is null ? 0 : (await policy.GetAsync(cancellationToken)).AutoCloseDays;
+        if (days <= 0)
+        {
+            return 0;
+        }
+
+        var cutoff = now.AddDays(-days);
+        var due = await data.Set<SupportTicket>().AsNoTracking().Where(t => t.Status == TicketStatus.Resolved && t.ResolvedAt != null && t.ResolvedAt <= cutoff)
+            .OrderBy(t => t.ResolvedAt).Take(BatchSize).Select(t => new { t.Id, t.Version }).ToListAsync(cancellationToken);
+        var closed = 0;
+        foreach (var ticket in due)
+        {
+            var values = new JsonObject
+            {
+                ["status"] = TicketStatus.Closed,
+                ["closedAt"] = now.ToString("O", CultureInfo.InvariantCulture),
+                ["lastActivityAt"] = now.ToString("O", CultureInfo.InvariantCulture),
+            };
+            using var _ = gate.Open([SupportModule.Permissions.TicketsClose], TicketEventKinds.AutoClosed, Truncate($"Müşteri itirazı gelmeden {days} gün geçti; otomatik kapatıldı."));
+            var result = await pipeline.UpdateAsync(new RecordCommand(SupportModule.Entities.Ticket, ticket.Id, values, ticket.Version) { Reason = "support.AutoClosed" }, cancellationToken);
+            if (result.IsSuccess)
+            {
+                closed++;
+            }
+        }
+
+        return closed;
     }
 
     /// <summary>Hedef anı geçmiş çalışan örnekleri gerçek hedef anıyla ihlal olarak işaretler (bir kez).</summary>

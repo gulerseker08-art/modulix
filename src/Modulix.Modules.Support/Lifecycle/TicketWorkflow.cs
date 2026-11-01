@@ -97,10 +97,16 @@ internal sealed class TicketWorkflow(
 
         var granted = await access.GetPermissionsAsync(cancellationToken);
         var state = StateOf(record.Value!, await PolicyAsync(cancellationToken));
+        var blockers = await OpenBlockersAsync(id, cancellationToken);
         var list = new List<TicketActionState>();
         foreach (var action in TicketAction.All.Where(a => granted.Contains(PermissionOf[a])))
         {
             var rule = Evaluate(action, state, record.Value!);
+            if (rule.Allowed && action == TicketAction.Resolve && blockers > 0)
+            {
+                rule = BlockedByTasks(blockers);
+            }
+
             list.Add(new TicketActionState(action, rule.Allowed, rule.Code, rule.Message, TicketTransitions.RequiresReason(action)));
         }
 
@@ -139,6 +145,13 @@ internal sealed class TicketWorkflow(
         if (!rule.Allowed)
         {
             return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu işlem şu an yapılamaz.", [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
+        }
+
+        // Engelleyici açık alt iş varken talep çözülemez (sunucuda uygulanır).
+        if (action == TicketAction.Resolve && await OpenBlockersAsync(id, cancellationToken) is > 0 and var blockers)
+        {
+            var blocked = BlockedByTasks(blockers);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, blocked.Message!, [new RecordFieldError(blocked.Code!, blocked.Message!)]);
         }
 
         var values = new JsonObject { ["lastActivityAt"] = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture) };
@@ -302,6 +315,12 @@ internal sealed class TicketWorkflow(
 
         return rule;
     }
+
+    private Task<int> OpenBlockersAsync(Guid ticketId, CancellationToken cancellationToken) =>
+        storeContext.Data.Set<TicketTask>().AsNoTracking().CountAsync(t => t.TicketId == ticketId && t.IsBlocking && !t.IsDone, cancellationToken);
+
+    private static TicketRuleResult BlockedByTasks(int count) =>
+        TicketRuleResult.Deny("blocking-tasks", $"{count} engelleyici alt iş açık; talebi çözmeden önce bunları tamamlayın.");
 
     private async Task<TicketPolicySettings> PolicyAsync(CancellationToken cancellationToken) =>
         policy is null ? TicketPolicySettings.Default : await policy.GetAsync(cancellationToken);
