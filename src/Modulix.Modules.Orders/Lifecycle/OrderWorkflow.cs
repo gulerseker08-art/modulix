@@ -10,7 +10,7 @@ namespace Modulix.Modules.Orders.Lifecycle;
 public sealed record OrderActionState(string Action, bool Allowed, string? Code, string? Message, bool RequiresReason);
 
 /// <summary>Tenant ayarlarından gelen sipariş politikası; sağlayıcı yoksa varsayılan.</summary>
-public sealed record OrderPolicySettings(bool AllowSelfApproval)
+public sealed record OrderPolicySettings(bool AllowSelfApproval, int HandoverAcceptDueDays = 2, int HandoverWaitHours = 48)
 {
     public static OrderPolicySettings Default { get; } = new(false);
 }

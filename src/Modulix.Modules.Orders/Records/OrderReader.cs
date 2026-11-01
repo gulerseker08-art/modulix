@@ -39,6 +39,21 @@ internal sealed class OrderReader(IModuleData data)
         await data.Set<SalesOrderEvent>().AsNoTracking().Where(e => e.OrderId == orderId && e.Kind == kind)
             .OrderByDescending(e => e.CreatedAt).Select(e => e.ActorId).FirstOrDefaultAsync(cancellationToken);
 
+    public Task<OrderHandover?> HandoverAsync(Guid id, CancellationToken cancellationToken) =>
+        data.Set<OrderHandover>().AsNoTracking().SingleOrDefaultAsync(h => h.Id == id, cancellationToken);
+
+    public async Task<List<OrderHandoverItem>> HandoverItemsAsync(Guid handoverId, CancellationToken cancellationToken) =>
+        await data.Set<OrderHandoverItem>().AsNoTracking().Where(i => i.HandoverId == handoverId).OrderBy(i => i.Position).ThenBy(i => i.CreatedAt).ToListAsync(cancellationToken);
+
+    public async Task<List<OrderHandoverEvent>> HandoverEventsAsync(Guid handoverId, CancellationToken cancellationToken) =>
+        await data.Set<OrderHandoverEvent>().AsNoTracking().Where(e => e.HandoverId == handoverId).OrderBy(e => e.CreatedAt).ThenBy(e => e.Id).ToListAsync(cancellationToken);
+
+    /// <summary>Kabulü belirlenen süreden uzun bekleyen, o tur için gecikme takibi üretilmemiş devirler (zamanlayıcı).</summary>
+    public async Task<List<OrderHandover>> HandoversWaitingSinceAsync(DateTimeOffset cutoff, int take, CancellationToken cancellationToken) =>
+        await data.Set<OrderHandover>().AsNoTracking()
+            .Where(h => h.Status == "Sent" && h.SentAt != null && h.SentAt <= cutoff && h.EscalatedRound < h.Round)
+            .OrderBy(h => h.SentAt).Take(take).ToListAsync(cancellationToken);
+
     public Task<SalesOrder?> OrderAsync(Guid orderId, CancellationToken cancellationToken) =>
         data.Set<SalesOrder>().AsNoTracking().SingleOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 }

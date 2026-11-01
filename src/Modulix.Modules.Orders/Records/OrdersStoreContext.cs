@@ -51,13 +51,18 @@ internal sealed class OrderWorkflowGate
     /// <summary>Geçişle aynı işlemde çalışan ek yazma (ör. tüketim defteri, devir kaydı). Siparişin sürüm denetimine ve audit'ine bağlı yazılır.</summary>
     public Func<OrdersStoreContext, Domain.SalesOrder, CancellationToken, Task>? Effect { get; private set; }
 
+    /// <summary>Devir geçişiyle (gönderme, bilgi isteme, kabul) aynı işlemde çalışan ek yazma (tarihçe satırı, sipariş devir durumu aynası). Devir kaydının sürüm denetimine bağlıdır.</summary>
+    public Func<OrdersStoreContext, Domain.OrderHandover, CancellationToken, Task>? HandoverEffect { get; private set; }
+
     public IDisposable Open(
-        IReadOnlyList<string> permissions, string eventKind, string? reason = null, Func<OrdersStoreContext, Domain.SalesOrder, CancellationToken, Task>? effect = null)
+        IReadOnlyList<string> permissions, string eventKind, string? reason = null, Func<OrdersStoreContext, Domain.SalesOrder, CancellationToken, Task>? effect = null,
+        Func<OrdersStoreContext, Domain.OrderHandover, CancellationToken, Task>? handoverEffect = null)
     {
         Permissions = permissions;
         EventKind = eventKind;
         Reason = reason;
         Effect = effect;
+        HandoverEffect = handoverEffect;
         return new Closer(this);
     }
 
@@ -69,6 +74,7 @@ internal sealed class OrderWorkflowGate
             gate.EventKind = null;
             gate.Reason = null;
             gate.Effect = null;
+            gate.HandoverEffect = null;
         }
     }
 }

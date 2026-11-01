@@ -1,0 +1,423 @@
+@page "/siparisler/{OrderId:guid}/devir"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Satış devri · Modulix</PageTitle>
+
+<AuthGate Module="@OrdersAccess.ModuleKey" Permission="@OrdersAccess.OrdersRead">
+    <div class="page-header">
+        <div>
+            <h1>Satış devri@(order is null ? null : " · " + order.Number)</h1>
+            <p class="text-muted mb-0">Satış sorumlusu devir kaydını hazırlar; sistem zorunlu bilgi ve kontrol listesini denetler; operasyon kabul eder ya da gerekçeyle bilgi ister. Gönderilen devir karara bağlanana kadar değişmez.</p>
+        </div>
+        <div class="header-actions">
+            <a class="btn btn-outline-secondary" href="siparisler/@OrderId">Siparişe dön</a>
+        </div>
+    </div>
+
+    <Notice Text="@notice" Failed="@failed" />
+
+    @if (notFoundOrder)
+    {
+        <div class="alert alert-warning" role="alert">Sipariş bulunamadı ya da erişim yetkiniz yok. <a href="siparisler">Siparişlere dön</a></div>
+    }
+    else if (loading)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (detail is null)
+    {
+        <p class="text-muted">Bu sipariş için henüz devir kaydı yok.</p>
+        @if (Session.Can(OrderHandoverAccess.HandoversWrite))
+        {
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="CreateAsync">Devir kaydı hazırla</button>
+        }
+        else
+        {
+            <p class="text-muted">Devir kaydı hazırlamak için '@OrderHandoverAccess.HandoversWrite' izni gerekir.</p>
+        }
+    }
+    else
+    {
+        var h = detail.Handover;
+        <p>
+            <span class="badge stage-@OrderLabels.HandoverBadge(h.Status)">@OrderLabels.Label(OrderLabels.Handovers, h.Status)</span>
+            @if (h.Round > 0) { <span class="text-muted"> · Gönderim turu @h.Round</span> }
+            @if (h.SentAt is { } sentAt) { <span class="text-muted"> · Gönderen @Lookups.MemberName(h.SentBy), @CrmLabels.Time(sentAt)</span> }
+            @if (h.AcceptedAt is { } acceptedAt) { <span class="text-muted"> · Kabul eden @Lookups.MemberName(h.AcceptedBy), @CrmLabels.Time(acceptedAt)</span> }
+        </p>
+
+        @if (h.Status == "InfoRequested" && !string.IsNullOrEmpty(h.InfoRequest))
+        {
+            <div class="alert alert-warning" role="status"><strong>Operasyon bilgi istedi:</strong> @h.InfoRequest</div>
+        }
+
+        @if (Editable)
+        {
+            <section aria-labelledby="missing-title">
+                <h2 id="missing-title" class="h6">Gönderim için eksikler</h2>
+                @if (detail.Missing.Count == 0)
+                {
+                    <p class="text-success" role="status">Zorunlu bilgi ve kontrol listesi tamam; devir gönderilebilir.</p>
+                }
+                else
+                {
+                    <ul class="alert alert-warning" role="status" aria-live="polite">
+                        @foreach (var missing in detail.Missing) { <li>@missing</li> }
+                    </ul>
+                }
+            </section>
+        }
+
+        <section aria-labelledby="actions-title">
+            <h2 id="actions-title">İşlemler</h2>
+            @if (detail.Actions.Count == 0)
+            {
+                <p class="text-muted">Bu devir için yapabileceğiniz işlem yok.</p>
+            }
+            else
+            {
+                <div class="header-actions" role="group" aria-label="Devir işlemleri">
+                    @foreach (var action in detail.Actions)
+                    {
+                        <button type="button" class="btn @(action.Action == "send" || action.Action == "accept" ? "btn-primary" : "btn-outline-secondary")"
+                                disabled="@(!action.Allowed || busy)" aria-describedby="@(action.Allowed ? null : $"why-{action.Action}")" @onclick="() => Choose(action)">@ActionLabel(action, h.Status)</button>
+                    }
+                </div>
+                <ul class="small text-muted mt-2">
+                    @foreach (var blocked in detail.Actions.Where(a => !a.Allowed))
+                    {
+                        <li id="why-@blocked.Action"><strong>@ActionLabel(blocked, h.Status):</strong> @blocked.Message</li>
+                    }
+                </ul>
+                @if (selected is { } chosen)
+                {
+                    <form class="record-form" novalidate @onsubmit="RunAsync" @onsubmit:preventDefault>
+                        @if (chosen.RequiresNote || chosen.Action == "accept")
+                        {
+                            <label class="form-label" for="action-note">@NoteLabel(chosen)</label>
+                            <textarea id="action-note" class="form-control" rows="2" maxlength="4000" @bind="note" aria-invalid="@(noteError is not null ? "true" : null)"></textarea>
+                            @if (noteError is not null) { <div class="invalid-feedback d-block" role="alert">@noteError</div> }
+                        }
+                        @if (chosen.Action == "accept")
+                        {
+                            <label class="form-label mt-2" for="accept-responsible">Sorumlu operasyon kullanıcısı (isteğe bağlı)</label>
+                            <LookupPicker Id="accept-responsible" LookupKey="orders.handover.responsible" @bind-Value="responsible" Placeholder="@(h.ResponsibleUserId is null ? "—" : Lookups.MemberName(h.ResponsibleUserId))" />
+                        }
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" disabled="@busy">Onayla: @ActionLabel(chosen, h.Status)</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => selected = null">Vazgeç</button>
+                        </div>
+                    </form>
+                }
+            }
+        </section>
+
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@(!Editable || busy)">
+                <legend class="visually-hidden">Devir bilgileri</legend>
+                @if (!Editable)
+                {
+                    <p class="text-muted">@(h.Status == "Accepted" ? "Kabul edilen devir değişmez; sonraki değişiklikler için siparişte değişiklik talebi açın." : "Gönderilen devir karara bağlanana kadar değişmez.")</p>
+                }
+                <h2>Kapsam ve çıktılar</h2>
+                <div class="form-grid">
+                    <div class="span-12"><label class="form-label" for="f-scope">Satılan kapsam (zorunlu)</label><textarea id="f-scope" class="form-control" rows="2" maxlength="4000" @bind="form.Scope"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-out">Kapsam dışı işler</label><textarea id="f-out" class="form-control" rows="2" maxlength="4000" @bind="form.OutOfScope"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-deliverables">Teslim edilecek çıktılar (zorunlu)</label><textarea id="f-deliverables" class="form-control" rows="2" maxlength="4000" @bind="form.Deliverables"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-commitments">Müşteriye verilen taahhütler</label><textarea id="f-commitments" class="form-control" rows="2" maxlength="4000" @bind="form.Commitments"></textarea></div>
+                </div>
+                <h2>Lokasyon ve iletişim</h2>
+                <div class="form-grid">
+                    <div class="span-12"><label class="form-label" for="f-location">Lokasyon (zorunlu)</label><input id="f-location" class="form-control" maxlength="1000" @bind="form.Location" /></div>
+                    <div class="span-4"><label class="form-label" for="f-contact">Müşteri tarafı ilgili kişi (zorunlu)</label><input id="f-contact" class="form-control" maxlength="300" @bind="form.ContactName" /></div>
+                    <div class="span-4"><label class="form-label" for="f-phone">Telefon</label><input id="f-phone" class="form-control" maxlength="300" @bind="form.ContactPhone" /></div>
+                    <div class="span-4"><label class="form-label" for="f-email">E-posta</label><input id="f-email" type="email" class="form-control" maxlength="254" @bind="form.ContactEmail" /><FieldError Field="contactEmail" Errors="errors" /></div>
+                    <div class="span-12"><small class="text-muted">İlgili kişi için telefon ya da e-postadan en az biri zorunludur.</small></div>
+                </div>
+                <h2>Tarih, öncelik ve sorumluluk</h2>
+                <div class="form-grid">
+                    <div class="span-4"><label class="form-label" for="f-start">Hedef başlangıç (zorunlu)</label><input id="f-start" type="date" class="form-control" @bind="form.TargetStartDate" /></div>
+                    <div class="span-4"><label class="form-label" for="f-end">Hedef bitiş</label><input id="f-end" type="date" class="form-control" @bind="form.TargetEndDate" /><FieldError Field="targetEndDate" Errors="errors" /></div>
+                    <div class="span-4">
+                        <label class="form-label" for="f-priority">Öncelik</label>
+                        <select id="f-priority" class="form-select" @bind="form.Priority">
+                            @foreach (var p in Priorities) { <option value="@p.Key">@p.Label</option> }
+                        </select>
+                    </div>
+                    <div class="span-6"><label class="form-label" for="f-resp">Sorumlu operasyon kullanıcısı</label><LookupPicker Id="f-resp" LookupKey="orders.handover.responsible" @bind-Value="form.ResponsibleUserId" Placeholder="—" ReadOnly="@(!Editable)" /></div>
+                    <div class="span-6"><label class="form-label" for="f-team">Sorumlu operasyon ekibi</label><input id="f-team" class="form-control" maxlength="300" @bind="form.ResponsibleTeam" /></div>
+                    <div class="span-12"><small class="text-muted">Sorumlu kullanıcı ya da ekipten en az biri zorunludur.</small></div>
+                </div>
+                <h2>Belgeler, koşullar ve riskler</h2>
+                <div class="form-grid">
+                    <div class="span-12"><label class="form-label" for="f-docs">Gerekli belgeler</label><textarea id="f-docs" class="form-control" rows="2" maxlength="4000" @bind="form.RequiredDocuments"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-pre">Müşteri ön koşulları</label><textarea id="f-pre" class="form-control" rows="2" maxlength="4000" @bind="form.CustomerPrerequisites"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-pay">Ödeme ve sözleşme onayı koşulları (varsa)</label><textarea id="f-pay" class="form-control" rows="2" maxlength="4000" @bind="form.PaymentConditions"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-risks">Riskler</label><textarea id="f-risks" class="form-control" rows="2" maxlength="4000" @bind="form.Risks"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-special">Özel talepler</label><textarea id="f-special" class="form-control" rows="2" maxlength="4000" @bind="form.SpecialRequests"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-deps">Bağımlılıklar</label><textarea id="f-deps" class="form-control" rows="2" maxlength="4000" @bind="form.Dependencies"></textarea></div>
+                </div>
+                <h2>Kabul kriterleri</h2>
+                <div class="form-grid">
+                    <div class="span-12"><label class="form-label" for="f-complete">Tamamlanma kriterleri (zorunlu)</label><textarea id="f-complete" class="form-control" rows="2" maxlength="4000" @bind="form.CompletionCriteria"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-accept">Müşteri kabul kriterleri (zorunlu)</label><textarea id="f-accept" class="form-control" rows="2" maxlength="4000" @bind="form.AcceptanceCriteria"></textarea></div>
+                </div>
+            </fieldset>
+            @if (Editable)
+            {
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Devir bilgilerini kaydet</button></div>
+            }
+        </form>
+
+        <section aria-labelledby="checklist-title">
+            <h2 id="checklist-title">Kontrol listesi</h2>
+            <ul class="list-unstyled">
+                @foreach (var item in detail.Items)
+                {
+                    <li class="form-check">
+                        <input class="form-check-input" type="checkbox" id="item-@item.Id" checked="@item.IsDone" disabled="@(!Editable || busy)" @onchange="e => ToggleAsync(item, (bool)e.Value!)" />
+                        <label class="form-check-label" for="item-@item.Id">@item.Text@(item.IsRequired ? null : " (isteğe bağlı)")</label>
+                        @if (item.IsDone && item.DoneAt is { } doneAt) { <small class="text-muted"> · @Lookups.MemberName(item.DoneBy), @CrmLabels.Time(doneAt)</small> }
+                        @if (Editable && !item.IsDefault)
+                        {
+                            <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteItemAsync(item)">Sil</button>
+                        }
+                    </li>
+                }
+            </ul>
+            @if (Editable)
+            {
+                <form class="search" novalidate @onsubmit="AddItemAsync" @onsubmit:preventDefault>
+                    <label class="visually-hidden" for="new-item">Yeni kontrol listesi maddesi</label>
+                    <input id="new-item" class="form-control" maxlength="300" placeholder="Kendi maddenizi ekleyin (zorunlu sayılır)" @bind="newItem" />
+                    <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(newItem))">Madde ekle</button>
+                </form>
+            }
+        </section>
+
+        <section aria-labelledby="handover-history-title">
+            <h2 id="handover-history-title">Devir geçmişi</h2>
+            <ol class="history-list">
+                @foreach (var e in detail.History)
+                {
+                    <li>
+                        <strong>@HistoryLabel(e.Kind)</strong>@(e.Round > 0 ? $" (tur {e.Round})" : null)
+                        <span class="text-muted"> · @CrmLabels.Time(e.At) · @(Lookups.MemberName(e.ActorId) is { Length: > 0 } actor ? actor : "sistem")</span>
+                        @if (!string.IsNullOrEmpty(e.Note)) { <div>@e.Note</div> }
+                    </li>
+                }
+            </ol>
+        </section>
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid OrderId { get; set; }
+
+    private static readonly (string Key, string Label)[] Priorities = [("Low", "Düşük"), ("Normal", "Normal"), ("High", "Yüksek"), ("Urgent", "Acil")];
+
+    private OrderDto? order;
+    private HandoverDetailDto? detail;
+    private HandoverActionDto? selected;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? notice;
+    private bool failed;
+    private bool loading = true;
+    private bool notFoundOrder;
+    private bool busy;
+    private string note = string.Empty;
+    private string? noteError;
+    private string newItem = string.Empty;
+    private Guid? responsible;
+    private Form form = new();
+
+    private bool Editable => detail is not null && Session.Can(OrderHandoverAccess.HandoversWrite) && detail.Handover.Status is "Preparing" or "Ready" or "InfoRequested";
+
+    private sealed class Form
+    {
+        public string? Scope { get; set; }
+        public string? OutOfScope { get; set; }
+        public string? Deliverables { get; set; }
+        public string? Commitments { get; set; }
+        public string? Location { get; set; }
+        public string? ContactName { get; set; }
+        public string? ContactPhone { get; set; }
+        public string? ContactEmail { get; set; }
+        public DateOnly? TargetStartDate { get; set; }
+        public DateOnly? TargetEndDate { get; set; }
+        public string Priority { get; set; } = "Normal";
+        public string? RequiredDocuments { get; set; }
+        public string? CustomerPrerequisites { get; set; }
+        public string? PaymentConditions { get; set; }
+        public string? Risks { get; set; }
+        public string? SpecialRequests { get; set; }
+        public string? Dependencies { get; set; }
+        public Guid? ResponsibleUserId { get; set; }
+        public string? ResponsibleTeam { get; set; }
+        public string? CompletionCriteria { get; set; }
+        public string? AcceptanceCriteria { get; set; }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(OrdersAccess.OrdersRead))
+        {
+            return;
+        }
+
+        await Lookups.LoadAsync();
+        var orderResult = await Api.GetAsync<OrderDto>($"/api/orders/orders/{OrderId}");
+        if (!orderResult.IsSuccess)
+        {
+            notFoundOrder = true;
+            loading = false;
+            return;
+        }
+
+        order = orderResult.Value;
+        await LoadAsync();
+        loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<HandoverDetailDto>($"/api/orders/orders/{OrderId}/handover");
+        detail = result.IsSuccess ? result.Value : null;
+        if (detail is not null)
+        {
+            var h = detail.Handover;
+            form = new Form
+            {
+                Scope = h.Scope, OutOfScope = h.OutOfScope, Deliverables = h.Deliverables, Commitments = h.Commitments, Location = h.Location, ContactName = h.ContactName,
+                ContactPhone = h.ContactPhone, ContactEmail = h.ContactEmail, TargetStartDate = h.TargetStartDate, TargetEndDate = h.TargetEndDate, Priority = h.Priority,
+                RequiredDocuments = h.RequiredDocuments, CustomerPrerequisites = h.CustomerPrerequisites, PaymentConditions = h.PaymentConditions, Risks = h.Risks,
+                SpecialRequests = h.SpecialRequests, Dependencies = h.Dependencies, ResponsibleUserId = h.ResponsibleUserId, ResponsibleTeam = h.ResponsibleTeam,
+                CompletionCriteria = h.CompletionCriteria, AcceptanceCriteria = h.AcceptanceCriteria,
+            };
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<HandoverDetailDto>($"/api/orders/orders/{OrderId}/handover", new { });
+        busy = false;
+        failed = !result.IsSuccess;
+        notice = result.IsSuccess ? "Devir kaydı hazırlandı; varsayılan kontrol listesi eklendi." : result.Error;
+        await LoadAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy || detail is null) { return; }
+        busy = true;
+        errors = null;
+        var f = form;
+        var request = new SaveHandoverRequest(
+            detail.Handover.Version, f.Scope, f.OutOfScope, f.Deliverables, f.Commitments, f.Location, f.ContactName, f.ContactPhone, f.ContactEmail, f.TargetStartDate, f.TargetEndDate,
+            f.Priority, f.RequiredDocuments, f.CustomerPrerequisites, f.PaymentConditions, f.Risks, f.SpecialRequests, f.Dependencies, f.ResponsibleUserId, f.ResponsibleTeam,
+            f.CompletionCriteria, f.AcceptanceCriteria);
+        var result = await Api.PutAsync<HandoverDto>($"/api/orders/handovers/{detail.Handover.Id}", request);
+        busy = false;
+        failed = !result.IsSuccess;
+        errors = result.FieldErrors;
+        notice = result.IsSuccess ? "Devir bilgileri kaydedildi." : result.Error;
+        await LoadAsync();
+    }
+
+    private async Task ToggleAsync(HandoverItemDto item, bool done)
+    {
+        if (busy || detail is null) { return; }
+        busy = true;
+        var result = await Api.PutAsync<HandoverItemDto>($"/api/orders/handover-items/{item.Id}", new SaveHandoverItemRequest(detail.Handover.Id, item.Text, done, item.Note, item.Version));
+        busy = false;
+        failed = !result.IsSuccess;
+        notice = result.IsSuccess ? null : result.Error;
+        await LoadAsync();
+    }
+
+    private async Task AddItemAsync()
+    {
+        if (busy || detail is null || string.IsNullOrWhiteSpace(newItem)) { return; }
+        busy = true;
+        var result = await Api.PostAsync<HandoverItemDto>("/api/orders/handover-items", new SaveHandoverItemRequest(detail.Handover.Id, newItem.Trim()));
+        busy = false;
+        failed = !result.IsSuccess;
+        notice = result.IsSuccess ? "Madde eklendi." : result.Error;
+        if (result.IsSuccess) { newItem = string.Empty; }
+        await LoadAsync();
+    }
+
+    private async Task DeleteItemAsync(HandoverItemDto item)
+    {
+        if (busy) { return; }
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/orders/handover-items/{item.Id}?version={item.Version}");
+        busy = false;
+        failed = !result.IsSuccess;
+        notice = result.IsSuccess ? "Madde silindi." : result.Error;
+        await LoadAsync();
+    }
+
+    private async Task Choose(HandoverActionDto action)
+    {
+        note = string.Empty;
+        noteError = null;
+        responsible = null;
+        selected = selected?.Action == action.Action ? null : action;
+        if (selected is { RequiresNote: false } && action.Action == "send")
+        {
+            await RunAsync();
+        }
+    }
+
+    private async Task RunAsync()
+    {
+        if (busy || detail is null || selected is not { } action) { return; }
+        if (action.RequiresNote && string.IsNullOrWhiteSpace(note))
+        {
+            noteError = action.Action == "request-info" ? "Bilgi istemek için gerekçe zorunludur." : "Yeniden göndermek için neyin tamamlandığını yazın.";
+            return;
+        }
+
+        busy = true;
+        var result = await Api.PostAsync<HandoverDetailDto>($"/api/orders/handovers/{detail.Handover.Id}/{action.Action}",
+            new HandoverActionRequest(detail.Handover.Version, string.IsNullOrWhiteSpace(note) ? null : note.Trim(), responsible));
+        busy = false;
+        failed = !result.IsSuccess;
+        notice = result.IsSuccess ? $"{ActionLabel(action, detail.Handover.Status)}: işlem tamamlandı." : result.Error;
+        selected = null;
+        var refreshed = await Api.GetAsync<OrderDto>($"/api/orders/orders/{OrderId}");
+        order = refreshed.Value ?? order;
+        await LoadAsync();
+    }
+
+    private static string ActionLabel(HandoverActionDto action, string status) => action.Action switch
+    {
+        "send" => status == "InfoRequested" ? "Yeniden gönder" : "Operasyona gönder",
+        "request-info" => "Bilgi iste",
+        "accept" => "Devri kabul et",
+        _ => action.Action,
+    };
+
+    private static string NoteLabel(HandoverActionDto action) => action.Action switch
+    {
+        "request-info" => "Bilgi isteği gerekçesi (zorunlu)",
+        "send" => "Neyin tamamlandığı (zorunlu)",
+        _ => "Kabul notu (isteğe bağlı)",
+    };
+
+    private static string HistoryLabel(string kind) => kind switch
+    {
+        "Created" => "Devir kaydı hazırlandı",
+        "Sent" => "Operasyona gönderildi",
+        "Resubmitted" => "Bilgi sonrası yeniden gönderildi",
+        "InfoRequested" => "Operasyon bilgi istedi",
+        "Accepted" => "Operasyon kabul etti",
+        "WaitingEscalated" => "Kabul gecikmesi takibi açıldı",
+        _ => kind,
+    };
+}
