@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Platform;
@@ -118,6 +119,13 @@ public class SupportIntegrationTests(ModulixApiFactory factory) : IClassFixture<
         Assert.Equal(("contracts.contract", contract.Id), (link.EntityKey, link.RecordId));
         Assert.Equal($"{contract.Number} · {contract.Title}", link.Label);
         Assert.Contains(await HistoryAsync(lead, ticket.Id), h => h.Kind == "LinkAdded" && h.Reason!.Contains(contract.Number));
+
+        // Alan olayı adı: diğer modüller ve abonelikler "support.<TarihçeOlayı>" nedenini görür (RecordUpdated olayının nedeni).
+        using (var scope = factory.OpenScope(s.Tenant.Id))
+        {
+            var reasons = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().OutboxMessages.AsNoTracking().Where(o => o.RecordId == ticket.Id).Select(o => o.Reason).ToListAsync();
+            Assert.Contains("support.LinkAdded", reasons);
+        }
 
         // Karşı modülün sayfasındaki "ilişkili talepler" için ters arama.
         var found = (await lead.GetFromJsonAsync<PagedResult<TicketDto>>($"/api/support/tickets?linked=contracts.contract:{contract.Id}"))!;

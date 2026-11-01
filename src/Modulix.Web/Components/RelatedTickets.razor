@@ -1,0 +1,92 @@
+@* İlişkili destek talepleri (ADR-0024, dilim 5): firma kartında müşterinin, sözleşme/sipariş sayfasında o kayda bağlı talepler. Destek modülü bu tenant için kapalıysa ya da kullanıcının okuma izni
+   yoksa bileşen hiçbir şey çizmez ve istek yapmaz; liste sunucuda izin ve veri kapsamıyla süzülür. Başka modülün sayfası destek tablolarına bağlanmaz, destek API'sini çağırır. *@
+@inject ApiClient Api
+@inject SessionState Session
+
+@if (Available)
+{
+    <section class="detail-section" aria-labelledby="related-tickets-@IdSuffix">
+        <div class="section-header">
+            <h2 id="related-tickets-@IdSuffix">@Title</h2>
+            @if (PartyId is { } party && Session.Can(SupportAccess.TicketsCreate))
+            {
+                <a class="btn btn-sm btn-outline-secondary" href="destek/talepler/yeni?musteri=@party">Talep aç</a>
+            }
+        </div>
+        @if (error is not null)
+        {
+            <p class="text-muted" role="status">@error</p>
+        }
+        else if (listing is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (listing.Items.Count == 0)
+        {
+            <p class="text-muted">İlişkili destek talebi yok.</p>
+        }
+        else
+        {
+            <p class="small text-muted">@open açık talep · toplam @listing.TotalCount@(listing.TotalCount > listing.Items.Count ? " (son " + listing.Items.Count + " gösteriliyor)" : null)</p>
+            <table class="table record-table">
+                <caption class="visually-hidden">@Title</caption>
+                <thead><tr><th scope="col">Talep</th><th scope="col">Öncelik</th><th scope="col">Durum</th><th scope="col">Sorumlu</th><th scope="col">Son hareket</th></tr></thead>
+                <tbody>
+                    @foreach (var t in listing.Items)
+                    {
+                        <tr>
+                            <td data-label="Talep" class="primary"><a href="destek/talepler/@t.Id">@t.Subject</a> <small class="text-muted">@t.Number</small></td>
+                            <td data-label="Öncelik"><span class="badge stage-@SupportLabels.PriorityBadge(t.Priority)">@SupportLabels.Label(SupportLabels.Priorities, t.Priority)</span></td>
+                            <td data-label="Durum"><span class="badge stage-@SupportLabels.StatusBadge(t.Status)">@SupportLabels.Label(SupportLabels.Statuses, t.Status)</span></td>
+                            <td data-label="Sorumlu">@(t.OwnerId is null ? "Atanmamış" : Lookups.MemberName(t.OwnerId))</td>
+                            <td data-label="Son hareket">@CrmLabels.Time(t.LastActivityAt)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <a class="small" href="@AllHref">Tüm destek talepleri</a>
+        }
+    </section>
+}
+
+@code {
+    [Inject] private CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public string Title { get; set; } = "Destek talepleri";
+
+    /// <summary>Ortak müşteri (taraf) kaydı; firma kartında firmanın <c>PartyId</c> değeri.</summary>
+    [Parameter] public Guid? PartyId { get; set; }
+
+    /// <summary>Bağlı kayıt türü ve kimliği (ör. <c>contracts.contract</c>, sözleşme kimliği); verilirse bu kayda bağlı talepler listelenir.</summary>
+    [Parameter] public string? LinkedEntityKey { get; set; }
+
+    [Parameter] public Guid? LinkedRecordId { get; set; }
+
+    private PagedResult<TicketDto>? listing;
+    private string? error;
+    private string? loadedFor;
+    private int open;
+
+    private bool Available => Session.IsModuleEnabled(SupportAccess.ModuleKey) && Session.Can(SupportAccess.TicketsRead) && Filter is not null;
+
+    private string? Filter => PartyId is { } party ? $"partyId={party}" : LinkedRecordId is { } id && LinkedEntityKey is { } key ? $"linked={Uri.EscapeDataString(key)}:{id}" : null;
+
+    private string IdSuffix => (LinkedRecordId ?? PartyId)?.ToString("N") ?? "x";
+
+    private string AllHref => PartyId is { } party ? $"destek/talepler?musteri={party}" : "destek/talepler";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Available || loadedFor == Filter)
+        {
+            return;
+        }
+
+        loadedFor = Filter;
+        await Lookups.LoadAsync();
+        var result = await Api.GetAsync<PagedResult<TicketDto>>($"/api/support/tickets?{Filter}&pageSize=10&sort=-lastActivity");
+        listing = result.Value;
+        error = result.IsSuccess ? null : result.Error;
+        open = listing?.Items.Count(t => t.Status is not ("Closed" or "Cancelled" or "Merged" or "Resolved")) ?? 0;
+    }
+}
