@@ -20,6 +20,10 @@ public static class SupportLookupDefinitions
     public const string PolicyCalendar = "support.sla-policy.calendar";
     public const string PolicyCategory = "support.sla-policy.category";
     public const string PolicyParty = "support.sla-policy.party";
+    public const string RuleCategory = "support.routing-rule.category";
+    public const string RuleQueue = "support.routing-rule.queue";
+    public const string RuleParty = "support.routing-rule.party";
+    public const string RuleOwner = "support.routing-rule.owner";
 
     private static readonly string[] PartyLabel = ["name"];
     private static readonly string[] PartySecondary = ["city", "taxNumber"];
@@ -93,6 +97,27 @@ public static class SupportLookupDefinitions
             LabelFields = PartyLabel,
             SecondaryFields = PartySecondary,
             SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir",
+        },
+        new(RuleCategory, SupportModule.Entities.RoutingRule, "categoryId", "Kategori", LookupTargetKind.Record, SupportModule.Entities.Category)
+        {
+            LabelFields = NameLabel,
+            SearchDescription = "Kategori adı",
+        },
+        new(RuleQueue, SupportModule.Entities.RoutingRule, "queueId", "Kuyruk", LookupTargetKind.Record, SupportModule.Entities.Queue)
+        {
+            LabelFields = NameLabel,
+            SearchDescription = "Kuyruk adı",
+        },
+        new(RuleParty, SupportModule.Entities.RoutingRule, "partyId", "Müşteri", LookupTargetKind.Record, SharedEntities.Party)
+        {
+            LabelFields = PartyLabel,
+            SecondaryFields = PartySecondary,
+            SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir",
+        },
+        new(RuleOwner, SupportModule.Entities.RoutingRule, "ownerId", "Sorumlu", LookupTargetKind.Member)
+        {
+            SearchDescription = "Üyenin görünen adı",
+            PageSize = 20,
         },
     ];
 }

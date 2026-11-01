@@ -121,9 +121,9 @@ public sealed class SupportJobsWorker(IServiceScopeFactory scopes, SupportJobsRu
                     try
                     {
                         var (run, _) = await runner.RunTenantAsync(tenantId, stoppingToken);
-                        if (run is { } r && r.Breaches + r.Escalations > 0)
+                        if (run is { } r && r.Breaches + r.Escalations + r.AutoClosed > 0)
                         {
-                            logger.LogInformation("Tenant {TenantId} SLA işleri: {Breaches} ihlal işaretlendi, {Escalations} eskalasyon eylemi uygulandı.", tenantId, r.Breaches, r.Escalations);
+                            logger.LogInformation("Tenant {TenantId} SLA işleri: {Breaches} ihlal işaretlendi, {Escalations} eskalasyon eylemi uygulandı, {AutoClosed} talep otomatik kapatıldı.", tenantId, r.Breaches, r.Escalations, r.AutoClosed);
                         }
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

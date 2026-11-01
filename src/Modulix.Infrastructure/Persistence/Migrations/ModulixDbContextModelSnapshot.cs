@@ -7241,6 +7241,66 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.PriorityMatrixEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Impact")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Urgency")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "Impact", "Urgency")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PriorityMatrix_Cell");
+
+                    b.ToTable("PriorityMatrix", "support", t =>
+                        {
+                            t.HasCheckConstraint("CK_PriorityMatrix_Impact", "[Impact] IN ('Low','Medium','High')");
+
+                            t.HasCheckConstraint("CK_PriorityMatrix_Priority", "[Priority] IN ('Low','Normal','High','Critical')");
+
+                            t.HasCheckConstraint("CK_PriorityMatrix_Urgency", "[Urgency] IN ('Low','Medium','High')");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Support.Domain.SlaCalendar", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7740,6 +7800,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("LastActivityAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("MergedIntoId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Number")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -7854,6 +7917,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("UX_Tickets_ClientKey")
                         .HasFilter("[ClientKey] IS NOT NULL");
 
+                    b.HasIndex("TenantId", "MergedIntoId");
+
                     b.HasIndex("TenantId", "Number")
                         .IsUnique()
                         .HasDatabaseName("UX_Tickets_Number");
@@ -7880,7 +7945,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_Tickets_Priority", "[Priority] IN ('Low','Normal','High','Critical')");
 
-                            t.HasCheckConstraint("CK_Tickets_Status", "[Status] IN ('New','Triage','Assigned','InProgress','WaitingCustomer','WaitingInternal','Resolved','Closed','Reopened','Cancelled')");
+                            t.HasCheckConstraint("CK_Tickets_Status", "[Status] IN ('New','Triage','Assigned','InProgress','WaitingCustomer','WaitingInternal','Resolved','Closed','Reopened','Cancelled','Merged')");
 
                             t.HasCheckConstraint("CK_Tickets_Urgency", "[Urgency] IN ('Low','Medium','High')");
                         });
@@ -7916,6 +7981,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Position")
                         .HasColumnType("int");
+
+                    b.Property<string>("RequiredFields")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
@@ -8039,6 +8108,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsAutomatic")
                         .HasColumnType("bit");
 
+                    b.Property<Guid?>("SourceTicketId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -8061,6 +8133,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasAlternateKey("TenantId", "Id");
 
+                    b.HasIndex("TenantId", "SourceTicketId");
+
                     b.HasIndex("TenantId", "TicketId", "CreatedAt");
 
                     b.ToTable("Messages", "support", t =>
@@ -8069,6 +8143,150 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_Messages_Visibility", "([Visibility] = 'Internal' AND [Direction] = 'Note') OR ([Visibility] = 'Public' AND [Direction] IN ('Outbound','Inbound'))");
                         });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketRoutingRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Channel")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PartyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Priority")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("QueueId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TypeKey")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "CategoryId");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_RoutingRules_Name");
+
+                    b.HasIndex("TenantId", "PartyId");
+
+                    b.HasIndex("TenantId", "QueueId");
+
+                    b.HasIndex("TenantId", "IsActive", "Order");
+
+                    b.ToTable("RoutingRules", "support", t =>
+                        {
+                            t.HasCheckConstraint("CK_RoutingRules_Action", "[QueueId] IS NOT NULL OR [OwnerId] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_RoutingRules_Channel", "[Channel] IS NULL OR [Channel] IN ('User','Phone','Email','Web','Portal','Api')");
+
+                            t.HasCheckConstraint("CK_RoutingRules_Priority", "[Priority] IS NULL OR [Priority] IN ('Low','Normal','High','Critical')");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AssigneeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DoneAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DoneBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsBlocking")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDone")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "TicketId", "IsDone");
+
+                    b.ToTable("TicketTasks", "support");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
@@ -9137,6 +9355,12 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
                         .WithMany()
+                        .HasForeignKey("TenantId", "MergedIntoId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
+                        .WithMany()
                         .HasForeignKey("TenantId", "ParentTicketId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -9186,6 +9410,43 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketMessage", b =>
+                {
+                    b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SourceTicketId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TicketId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketRoutingRule", b =>
+                {
+                    b.HasOne("Modulix.Modules.Support.Domain.TicketCategory", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CategoryId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Core.Contracts.SharedRecords.Party", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PartyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Support.Domain.SupportQueue", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "QueueId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.TicketTask", b =>
                 {
                     b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
                         .WithMany()

@@ -62,6 +62,9 @@ public sealed class SupportModule : IModule
         public const string SettingsManage = "support.settings.manage";
 
         /// <summary>SLA politikalarını ve iş takvimlerini yönetir; örnek talep üzerinde politika önizlemesi yapar.</summary>
+        public const string TicketsMerge = "support.tickets.merge";
+
+        /// <summary>SLA politikalarını ve iş takvimlerini yönetir; örnek talep üzerinde politika önizlemesi yapar.</summary>
         public const string SlaManage = "support.sla.manage";
 
         /// <summary>Talebin açık SLA örneklerini gerekçeyle güncel politika ve takvimle yeniden hesaplar.</summary>
@@ -73,6 +76,7 @@ public sealed class SupportModule : IModule
     {
         public const string ReopenWindowDays = "support.reopen.window-days";
         public const string RequireRootCause = "support.complaint.require-root-cause";
+        public const string AutoCloseDays = "support.auto-close-days";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -83,6 +87,8 @@ public sealed class SupportModule : IModule
         public const string Category = "support.category";
         public const string SlaCalendar = "support.sla-calendar";
         public const string SlaPolicy = "support.sla-policy";
+        public const string PriorityMatrix = "support.priority-matrix";
+        public const string RoutingRule = "support.routing-rule";
     }
 
     /// <summary>Seçim listeleri (Y9b): firma adlarını, sırasını ve etkinliğini değiştirir.</summary>
@@ -121,6 +127,7 @@ public sealed class SupportModule : IModule
         new(Permissions.NotesWrite, "İç not yazar (müşteriye gitmez)", "Destek mesajları"),
         new(Permissions.InternalRead, "İç notları okur", "Destek mesajları"),
         new(Permissions.SettingsManage, "Destek kuyruklarını ve kategorilerini yönetir", "Destek yönetimi"),
+        new(Permissions.TicketsMerge, "Mükerrer talebi başka bir talebe birleştirir (geri alınamaz)", "Destek talepleri"),
         new(Permissions.SlaManage, "SLA politikalarını ve iş takvimlerini yönetir; politika önizlemesi yapar", "Destek yönetimi"),
         new(Permissions.SlaRecalculate, "Talebin açık SLA örneklerini gerekçeyle yeniden hesaplar", "Destek talepleri"),
     ];
@@ -133,6 +140,13 @@ public sealed class SupportModule : IModule
             Pattern = @"^[0-9]{1,2}$",
             PatternMessage = "1-90 arası tam sayı girin.",
             MaxLength = 2,
+        },
+        new(SettingKeys.AutoCloseDays, "Destek: çözülen talebi otomatik kapatma süresi (gün)", "Destek", SettingType.Text, "0")
+        {
+            Description = "Çözüldü durumunda müşteri itirazı gelmeden bu kadar gün geçerse talep otomatik kapanır (zamanlanmış iş). 0 kapalıdır (varsayılan). Müşteri mesajı talebi yeniden açar; müşteri teyidi hemen kapatır.",
+            Pattern = @"^[0-9]{1,3}$",
+            PatternMessage = "0-999 arası tam sayı girin.",
+            MaxLength = 3,
         },
         new(SettingKeys.RequireRootCause, "Destek: şikâyet çözümünde kök neden zorunlu", "Destek", SettingType.Choice, "true")
         {
@@ -167,7 +181,7 @@ public sealed class SupportModule : IModule
             [
                 Permissions.TicketsRead, Permissions.TicketsCreate, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsTake,
                 Permissions.TicketsResolve, Permissions.TicketsClose, Permissions.TicketsReopen, Permissions.TicketsCancel, Permissions.PriorityOverride,
-                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SlaRecalculate,
+                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SlaRecalculate, Permissions.TicketsMerge,
             ])
         {
             Scope = RecordScope.Team,
@@ -179,7 +193,7 @@ public sealed class SupportModule : IModule
             [
                 Permissions.TicketsRead, Permissions.TicketsCreate, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsTake,
                 Permissions.TicketsResolve, Permissions.TicketsClose, Permissions.TicketsReopen, Permissions.TicketsCancel, Permissions.PriorityOverride,
-                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SettingsManage, Permissions.SlaManage, Permissions.SlaRecalculate,
+                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SettingsManage, Permissions.SlaManage, Permissions.SlaRecalculate, Permissions.TicketsMerge,
             ])
         {
             Scope = RecordScope.All,
@@ -204,7 +218,7 @@ public sealed class SupportModule : IModule
             ["priorityReason"] = "Öncelik gerekçesi", ["status"] = "Durum", ["statusReason"] = "Durum gerekçesi", ["queueId"] = "Kuyruk", ["ownerId"] = "Sorumlu",
             ["parentTicketId"] = "İlişkili talep", ["eventDate"] = "Olay tarihi", ["expectedOutcome"] = "Beklenen sonuç", ["resolutionCode"] = "Çözüm kodu",
             ["resolutionNote"] = "Çözüm açıklaması", ["resolvedAt"] = "Çözüm zamanı", ["rootCause"] = "Kök neden", ["correctiveAction"] = "Düzeltici aksiyon",
-            ["closedAt"] = "Kapanış zamanı", ["reopenCount"] = "Yeniden açılma sayısı", ["firstResponseAt"] = "İlk yanıt zamanı",
+            ["mergedIntoId"] = "Birleştirildiği talep", ["closedAt"] = "Kapanış zamanı", ["reopenCount"] = "Yeniden açılma sayısı", ["firstResponseAt"] = "İlk yanıt zamanı",
             ["firstResponseDueAt"] = "İlk yanıt hedefi", ["resolutionDueAt"] = "Çözüm hedefi",
         }, "subject")
         {
@@ -224,11 +238,27 @@ public sealed class SupportModule : IModule
         },
         new(Entities.Category, "Talep kategorisi", Permissions.SettingsManage, new Dictionary<string, string>
         {
-            ["name"] = "Ad", ["parentId"] = "Üst kategori", ["defaultQueueId"] = "Varsayılan kuyruk", ["isActive"] = "Etkin", ["position"] = "Sıra",
+            ["name"] = "Ad", ["parentId"] = "Üst kategori", ["defaultQueueId"] = "Varsayılan kuyruk", ["isActive"] = "Etkin", ["position"] = "Sıra", ["requiredFields"] = "Zorunlu alanlar",
         }, "name")
         {
             UserFields = ["createdBy", "updatedBy"],
             References = new Dictionary<string, string> { ["parentId"] = Entities.Category, ["defaultQueueId"] = Entities.Queue },
+        },
+        new(Entities.PriorityMatrix, "Öncelik matrisi hücresi", Permissions.SettingsManage, new Dictionary<string, string>
+        {
+            ["impact"] = "Etki", ["urgency"] = "Aciliyet", ["priority"] = "Öncelik",
+        })
+        {
+            UserFields = ["createdBy", "updatedBy"],
+        },
+        new(Entities.RoutingRule, "Yönlendirme kuralı", Permissions.SettingsManage, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["order"] = "Sıra", ["isActive"] = "Etkin", ["channel"] = "Kanal", ["typeKey"] = "Tür", ["categoryId"] = "Kategori", ["priority"] = "Öncelik",
+            ["partyId"] = "Müşteri", ["queueId"] = "Kuyruk", ["ownerId"] = "Sorumlu",
+        }, "name")
+        {
+            UserFields = ["ownerId", "createdBy", "updatedBy"],
+            References = new Dictionary<string, string> { ["categoryId"] = Entities.Category, ["partyId"] = SharedEntities.Party, ["queueId"] = Entities.Queue },
         },
         new(Entities.SlaCalendar, "SLA takvimi", Permissions.SlaManage, new Dictionary<string, string>
         {
@@ -318,7 +348,7 @@ public sealed class SupportModule : IModule
             "support.scheduler",
             [DomainEventTypes.RecordDeleted],
             [Entities.Ticket],
-            [Permissions.TicketsRead, Permissions.TicketsWrite, Permissions.TicketsAssign]),
+            [Permissions.TicketsRead, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsClose]),
     ];
 
     public void ConfigureServices(IServiceCollection services)
@@ -337,6 +367,13 @@ public sealed class SupportModule : IModule
         services.AddScoped<IRecordStore, SlaPolicyRecordStore>();
         services.AddScoped<ITicketSla, TicketSla>();
         services.AddScoped<ISlaScheduler, SlaScheduler>();
+        services.AddScoped<IRecordStore, PriorityMatrixRecordStore>();
+        services.AddScoped<IRecordStore, TicketRoutingRuleRecordStore>();
+        services.AddScoped<IPriorityMatrixService, PriorityMatrixService>();
+        services.AddScoped<ITicketRoutingPreview, TicketRoutingPreview>();
+        services.AddScoped<ITicketDuplicates, TicketDuplicates>();
+        services.AddScoped<ITicketMerge, TicketMerge>();
+        services.AddScoped<ITicketTasks, TicketTasks>();
         services.AddScoped<SupportSchedulerAnchor>();
         services.AddScoped<IActivityLinkTarget, TicketLinkTarget>();
     }

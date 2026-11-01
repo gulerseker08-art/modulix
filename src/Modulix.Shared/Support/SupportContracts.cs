@@ -28,6 +28,7 @@ public sealed record TicketDto(
     Guid? QueueId,
     Guid? OwnerId,
     Guid? ParentTicketId,
+    Guid? MergedIntoId,
     string? ClientKey,
     DateOnly? EventDate,
     string? ExpectedOutcome,
@@ -80,10 +81,10 @@ public sealed record QueueDto(Guid Id, long Version, string Name, string? Descri
 public sealed record SaveQueueRequest(long Version = 0, string? Name = null, string? Description = null, bool IsDefault = false, bool IsActive = true);
 
 public sealed record CategoryDto(
-    Guid Id, long Version, string Name, Guid? ParentId, Guid? DefaultQueueId, bool IsActive, int Position, Guid? CreatedBy, Guid? UpdatedBy);
+    Guid Id, long Version, string Name, Guid? ParentId, Guid? DefaultQueueId, bool IsActive, int Position, string? RequiredFields, Guid? CreatedBy, Guid? UpdatedBy);
 
 public sealed record SaveCategoryRequest(
-    long Version = 0, string? Name = null, Guid? ParentId = null, Guid? DefaultQueueId = null, bool IsActive = true, int Position = 0);
+    long Version = 0, string? Name = null, Guid? ParentId = null, Guid? DefaultQueueId = null, bool IsActive = true, int Position = 0, string? RequiredFields = null);
 
 /// <summary>Eylem isteği: kaydın sürümü zorunlu (eşzamanlı çakışmada 409); gerekçe ve diğer alanlar eylemin türüne göre zorunludur.</summary>
 public sealed record TicketActionRequest(
@@ -103,7 +104,7 @@ public sealed record TicketActionDto(string Action, bool Allowed, string? Code, 
 public sealed record AddTicketMessageRequest(string Kind, string? Body);
 
 public sealed record TicketMessageDto(
-    Guid Id, string Visibility, string Direction, string Body, Guid? AuthorId, string DeliveryStatus, bool IsAutomatic, DateTimeOffset CreatedAt);
+    Guid Id, string Visibility, string Direction, string Body, Guid? AuthorId, string DeliveryStatus, bool IsAutomatic, DateTimeOffset CreatedAt, Guid? SourceTicketId = null);
 
 public sealed record TicketHistoryDto(
     Guid Id, string Kind, DateTimeOffset At, Guid? ActorId, string? FromStatus, string? ToStatus, Guid? FromOwnerId, Guid? ToOwnerId,
@@ -129,6 +130,7 @@ public static class SupportAccess
     public const string NotesWrite = "support.notes.write";
     public const string InternalRead = "support.internal.read";
     public const string SettingsManage = "support.settings.manage";
+    public const string TicketsMerge = "support.tickets.merge";
     public const string SlaManage = "support.sla.manage";
     public const string SlaRecalculate = "support.sla.recalculate";
 
@@ -137,6 +139,8 @@ public static class SupportAccess
     public const string CategoryEntityKey = "support.category";
     public const string SlaCalendarEntityKey = "support.sla-calendar";
     public const string SlaPolicyEntityKey = "support.sla-policy";
+    public const string PriorityMatrixEntityKey = "support.priority-matrix";
+    public const string RoutingRuleEntityKey = "support.routing-rule";
 }
 
 // ---- Dilim 2: SLA, iş takvimi ve eskalasyon (ADR-0024). Hesap backend'dedir; arayüz sayacı yalnızca gösterimdir.
@@ -181,3 +185,31 @@ public sealed record SlaRuleDto(string Id, string Metric, int Percent, string Ac
 public sealed record SlaPreviewDto(
     bool Matched, Guid? PolicyId, string? PolicyName, int PolicyRevision, string? CalendarName, bool AlwaysOpen, bool PauseOnWaitingCustomer, bool PauseOnWaitingInternal,
     IReadOnlyList<SlaPreviewMetricDto> Metrics, IReadOnlyList<SlaRuleDto> Rules);
+
+// ---- Dilim 3: yönetilebilir öncelik matrisi, yönlendirme kuralları, kategori alan kuralları, mükerrer, birleştirme ve alt işler (ADR-0024)
+
+public sealed record PriorityCellDto(string Impact, string Urgency, string Priority);
+
+/// <summary>Matris hücreleri (eksik hücre yerleşik değerle tamamlanır). Matris yalnızca sonradan açılan ya da etki/aciliyeti düzenlenen talepleri etkiler.</summary>
+public sealed record SavePriorityMatrixRequest(IReadOnlyList<PriorityCellDto> Cells);
+
+public sealed record RoutingRuleDto(
+    Guid Id, long Version, string Name, int Order, bool IsActive, string? Channel, string? TypeKey, Guid? CategoryId, string? Priority, Guid? PartyId, Guid? QueueId, Guid? OwnerId,
+    Guid? CreatedBy, Guid? UpdatedBy);
+
+public sealed record SaveRoutingRuleRequest(
+    long Version = 0, string? Name = null, int Order = 100, bool IsActive = true, string? Channel = null, string? TypeKey = null, Guid? CategoryId = null, string? Priority = null,
+    Guid? PartyId = null, Guid? QueueId = null, Guid? OwnerId = null);
+
+public sealed record RoutingPreviewRequest(string Channel, string TypeKey, string Priority, Guid? CategoryId = null, Guid? PartyId = null);
+
+public sealed record RoutingPreviewDto(bool RuleMatched, Guid? RuleId, string? RuleName, int? RuleOrder, Guid? QueueId, Guid? OwnerId, string Source);
+
+public sealed record TicketDuplicateDto(Guid Id, string Number, string Subject, string Status, DateTimeOffset CreatedAt, double Score, string Reason);
+
+/// <param name="TargetId">Talebin birleştirileceği hedef talep. Kaynak talep (yoldaki) son durum <c>Merged</c> olur.</param>
+public sealed record MergeTicketRequest(Guid TargetId, long Version, string? Reason = null);
+
+public sealed record TicketTaskDto(Guid Id, string Title, Guid? AssigneeId, bool IsBlocking, bool IsDone, DateTimeOffset? DoneAt, Guid? DoneBy, Guid? CreatedBy, DateTimeOffset CreatedAt);
+
+public sealed record AddTicketTaskRequest(string? Title, Guid? AssigneeId = null, bool IsBlocking = false);

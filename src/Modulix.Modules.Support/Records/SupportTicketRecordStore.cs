@@ -51,6 +51,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         Field.Owner<SupportTicket>(OwnerField, t => t.OwnerId, (t, v) => t.OwnerId = v).AsSystem(),
         Field.Reference<SupportTicket, SupportTicket>("parentTicketId", "İlişkili talep bulunamadı.", t => t.ParentTicketId, (t, v) => t.ParentTicketId = v, createOnly: true),
         Field.Text<SupportTicket>("clientKey", SupportTicket.ClientKeyMaxLength, t => t.ClientKey, (t, v) => t.ClientKey = v).AsSystem(),
+        Field.Id<SupportTicket>("mergedIntoId", t => t.MergedIntoId, (t, v) => t.MergedIntoId = v).AsSystem(),
         Field.Date<SupportTicket>("eventDate", t => t.EventDate, (t, v) => t.EventDate = v),
         Field.Text<SupportTicket>("expectedOutcome", SupportTicket.TextMaxLength, t => t.ExpectedOutcome, (t, v) => t.ExpectedOutcome = v),
         Field.ListChoice<SupportTicket>("resolutionCode", SupportModule.Lists.ResolutionCode, t => t.ResolutionCode, (t, v) => t.ResolutionCode = v, required: false).AsSystem(),
@@ -76,6 +77,10 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         ["categoryId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.CategoryId == id) : null,
         ["queueId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.QueueId == id) : null,
         ["parentTicketId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.ParentTicketId == id) : null,
+        ["mergedIntoId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.MergedIntoId == id) : null,
+        // Başvuran e-postası/telefonu (tanımsız başvuran için mükerrer denetimi); tam eşleşme.
+        ["reporterEmail"] = (q, v, _) => v.Trim() is { Length: > 0 } email ? q.Where(t => t.ReporterEmail == email) : null,
+        ["reporterPhone"] = (q, v, _) => v.Trim() is { Length: > 0 } phone ? q.Where(t => t.ReporterPhone == phone) : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(t => t.OwnerId == owner) : null,
         ["number"] = (q, v, _) => v.Trim() is { Length: > 0 } number ? q.Where(t => t.Number == number) : null,
         // Virgülle ayrılmış birden çok durum kabul edilir (ör. status=New,Triage).
@@ -85,7 +90,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         ["typeKey"] = (q, v, _) => ChoiceValueKeyFilter(v) is { } key ? q.Where(t => t.TypeKey == key) : null,
         // Açık talepler: iptal edilmemiş ve kapanmamış (çözüldü, müşteri teyidini beklerken açık sayılır).
         ["open"] = (q, v, _) => FilterValue.Bool(v) is { } flag
-            ? q.Where(t => (t.Status != TicketStatus.Closed && t.Status != TicketStatus.Cancelled) == flag)
+            ? q.Where(t => (t.Status != TicketStatus.Closed && t.Status != TicketStatus.Cancelled && t.Status != TicketStatus.Merged) == flag)
             : null,
         // Atanmamış: çalışılan durumda ve sorumlusuz (kuyrukta bekleyen).
         ["unassigned"] = (q, v, _) => FilterValue.Bool(v) is { } flag
@@ -106,7 +111,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         // Yanıtsız: çalışılan durumda ve henüz ilk insan yanıtı verilmemiş.
         ["awaitingFirstResponse"] = (q, v, _) => FilterValue.Bool(v) is { } flag
             ? q.Where(t => (t.FirstResponseAt == null
-                && t.Status != TicketStatus.Closed && t.Status != TicketStatus.Cancelled && t.Status != TicketStatus.Resolved) == flag)
+                && t.Status != TicketStatus.Closed && t.Status != TicketStatus.Cancelled && t.Status != TicketStatus.Merged && t.Status != TicketStatus.Resolved) == flag)
             : null,
     };
 
@@ -256,7 +261,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         var errors = new List<RecordFieldError>();
         var workflow = Context.Gate.IsOpen;
 
-        if (!isNew && !workflow && !IsTransfer && entity.Status is TicketStatus.Resolved or TicketStatus.Closed or TicketStatus.Cancelled)
+        if (!isNew && !workflow && !IsTransfer && entity.Status is TicketStatus.Resolved or TicketStatus.Closed or TicketStatus.Cancelled or TicketStatus.Merged)
         {
             errors.Add(new RecordFieldError("subject", "Çözülmüş, kapanmış ya da iptal edilmiş talep düzenlenemez; gerekirse önce yeniden açın."));
         }
@@ -298,7 +303,17 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         // Öncelik etki × aciliyetten hesaplanır; yetkili ve gerekçeli elle değiştirilmişse (PriorityOverridden) hesap onu ezmez.
         if (!entity.PriorityOverridden && !(workflow && values.ContainsKey("priority")))
         {
-            entity.Priority = PriorityMatrix.Compute(entity.Impact, entity.Urgency);
+            entity.Priority = await PriorityMatrices.ComputeAsync(Context, entity.Impact, entity.Urgency, cancellationToken);
+        }
+
+        // Kategoriye (ve üst kategoriye) bağlı zorunlu alanlar: yalnızca kullanıcı düzenlemesinde ve oluşturmada; iş akışı eylemleri alan kuralına takılmaz.
+        if (!workflow && !IsTransfer)
+        {
+            var missing = await MissingRequiredFieldsAsync(entity, cancellationToken);
+            if (missing.Count > 0)
+            {
+                throw new RecordValidationException([.. missing.Select(f => new RecordFieldError(f, "Bu kategori için bu alan zorunludur."))]);
+            }
         }
 
         entity.UpdatedBy = Context.CurrentUserId;
@@ -328,13 +343,72 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
 
     protected override async Task CreatedAsync(SupportTicket entity, CancellationToken cancellationToken)
     {
-        // Yönlendirme: açıkça kuyruk verilmediyse kategorinin (yoksa üst kategorinin) varsayılan kuyruğu, o da yoksa tenant varsayılan kuyruğu.
+        entity.LastActivityAt = DateTimeOffset.UtcNow;
+        entity.Priority = await PriorityMatrices.ComputeAsync(Context, entity.Impact, entity.Urgency, cancellationToken);
+
+        // Yönlendirme sırası: (1) yetkiyle verilmiş açık kuyruk/sorumlu, (2) öncelik sıralı yönlendirme kuralı (ilk eşleşme; yalnızca açılışta bir kez), (3) kategori ve üst kategori
+        // varsayılan kuyruğu, (4) tenant varsayılan kuyruğu, (5) kuyruksuz (atanmamış).
+        TicketRoutingRule? rule = null;
+        if (entity.QueueId is null && entity.OwnerId is null)
+        {
+            rule = await TicketRouting.MatchRuleAsync(Context, entity, cancellationToken);
+            if (rule is not null)
+            {
+                if (rule.QueueId is { } ruleQueue && await Context.Data.Set<SupportQueue>().AsNoTracking().AnyAsync(q => q.Id == ruleQueue && q.IsActive, cancellationToken))
+                {
+                    entity.QueueId = ruleQueue;
+                }
+
+                // Pasif ya da üyeliği kapanmış sorumlu atanmaz; kural kuyruk eylemiyle sürer.
+                if (rule.OwnerId is { } ruleOwner && await Context.Members.IsActiveMemberAsync(ruleOwner, cancellationToken))
+                {
+                    entity.OwnerId = ruleOwner;
+                }
+            }
+        }
+
         entity.QueueId ??= await TicketRouting.ResolveQueueAsync(Context.Data, entity.CategoryId, cancellationToken);
         entity.Status = entity.OwnerId is null ? TicketStatus.New : TicketStatus.Assigned;
-        entity.LastActivityAt = DateTimeOffset.UtcNow;
-        entity.Priority = PriorityMatrix.Compute(entity.Impact, entity.Urgency);
         TicketHistory.Add(Context, entity, TicketEventKinds.Created, null, null, null, null);
+        if (rule is not null)
+        {
+            TicketHistory.Add(Context, entity, TicketEventKinds.RoutedByRule, $"Yönlendirme kuralı: {rule.Name}", null, null, null);
+        }
+
         await SlaEngine.OnCreatedAsync(Context, entity, cancellationToken);
+    }
+
+    /// <summary>Talebin kategorisinin (ve üst kategorisinin) zorunlu alanlarından boş olanlar.</summary>
+    private async Task<IReadOnlyList<string>> MissingRequiredFieldsAsync(SupportTicket ticket, CancellationToken cancellationToken)
+    {
+        if (ticket.CategoryId is not { } categoryId)
+        {
+            return [];
+        }
+
+        var chain = await Context.Data.Set<TicketCategory>().AsNoTracking().Where(c => c.Id == categoryId)
+            .Select(c => new { c.RequiredFields, Parent = c.ParentId }).FirstOrDefaultAsync(cancellationToken);
+        if (chain is null)
+        {
+            return [];
+        }
+
+        var required = CategoryFieldRules.Parse(chain.RequiredFields).ToList();
+        if (chain.Parent is { } parentId)
+        {
+            required.AddRange(CategoryFieldRules.Parse(await Context.Data.Set<TicketCategory>().AsNoTracking().Where(c => c.Id == parentId).Select(c => c.RequiredFields).FirstOrDefaultAsync(cancellationToken)));
+        }
+
+        return CategoryFieldRules.Missing(required, field => field switch
+        {
+            "description" => !string.IsNullOrWhiteSpace(ticket.Description),
+            "personId" => ticket.PersonId is not null,
+            "reporterEmail" => !string.IsNullOrWhiteSpace(ticket.ReporterEmail),
+            "reporterPhone" => !string.IsNullOrWhiteSpace(ticket.ReporterPhone),
+            "eventDate" => ticket.EventDate is not null,
+            "expectedOutcome" => !string.IsNullOrWhiteSpace(ticket.ExpectedOutcome),
+            _ => true,
+        });
     }
 
     protected override Task BeforeDeleteAsync(SupportTicket entity, CancellationToken cancellationToken) =>
@@ -373,6 +447,37 @@ internal static class TicketHistory
 /// </summary>
 internal static class TicketRouting
 {
+    /// <summary>Talebe uyan ilk yönlendirme kuralı (<see cref="RoutingRuleSelector"/>); yoksa null.</summary>
+    public static async Task<TicketRoutingRule?> MatchRuleAsync(SupportStoreContext context, SupportTicket ticket, CancellationToken cancellationToken)
+    {
+        var rules = await context.Data.Set<TicketRoutingRule>().AsNoTracking().Where(r => r.IsActive).ToListAsync(cancellationToken);
+        if (rules.Count == 0)
+        {
+            return null;
+        }
+
+        var chain = await CategoryChainAsync(context.Data, ticket.CategoryId, cancellationToken);
+        var selected = RoutingRuleSelector.Select(
+            rules.Select(r => new RoutingRule(r.Id, r.Name, r.Order, r.IsActive, r.Channel, r.TypeKey, r.CategoryId, r.Priority, r.PartyId, r.QueueId, r.OwnerId)),
+            new RoutingFacts(ticket.Channel, ticket.TypeKey, chain, ticket.Priority, ticket.PartyId));
+        return selected is null ? null : rules.First(r => r.Id == selected.Id);
+    }
+
+    public static async Task<IReadOnlyList<Guid>> CategoryChainAsync(Modulix.Core.Contracts.Persistence.IModuleData data, Guid? categoryId, CancellationToken cancellationToken)
+    {
+        var chain = new List<Guid>();
+        if (categoryId is { } id)
+        {
+            chain.Add(id);
+            if (await data.Set<TicketCategory>().AsNoTracking().Where(c => c.Id == id).Select(c => c.ParentId).FirstOrDefaultAsync(cancellationToken) is { } parent)
+            {
+                chain.Add(parent);
+            }
+        }
+
+        return chain;
+    }
+
     public static async Task<Guid?> ResolveQueueAsync(Modulix.Core.Contracts.Persistence.IModuleData data, Guid? categoryId, CancellationToken cancellationToken)
     {
         if (categoryId is { } id)

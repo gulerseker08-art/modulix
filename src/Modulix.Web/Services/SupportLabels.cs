@@ -10,7 +10,7 @@ public static class SupportLabels
     public static IReadOnlyList<(string Key, string Label)> Statuses { get; } =
     [
         ("New", "Yeni"), ("Triage", "Sınıflandırmada"), ("Assigned", "Atandı"), ("InProgress", "İşlemde"), ("WaitingCustomer", "Müşteriden bilgi bekleniyor"),
-        ("WaitingInternal", "İç ekip bekleniyor"), ("Resolved", "Çözüldü"), ("Closed", "Kapandı"), ("Reopened", "Yeniden açıldı"), ("Cancelled", "İptal edildi"),
+        ("WaitingInternal", "İç ekip bekleniyor"), ("Resolved", "Çözüldü"), ("Closed", "Kapandı"), ("Reopened", "Yeniden açıldı"), ("Cancelled", "İptal edildi"), ("Merged", "Birleştirildi"),
     ];
 
     public static IReadOnlyList<(string Key, string Label)> Priorities { get; } =
@@ -28,7 +28,7 @@ public static class SupportLabels
     ];
 
     public static IReadOnlyList<(string Key, string Label)> MessageKinds { get; } =
-        [("reply", "Müşteriye yanıt"), ("note", "İç not (müşteriye gitmez)"), ("customer-message", "Müşteriden gelen mesajı kaydet")];
+        [("reply", "Müşteriye yanıt"), ("note", "İç not (müşteriye gitmez)"), ("customer-message", "Müşteriden gelen mesajı kaydet"), ("customer-confirmation", "Müşteri çözümü onayladı (talebi kapatır)")];
 
     public static string Label(IReadOnlyList<(string Key, string Label)> list, string? key) => list.FirstOrDefault(x => x.Key == key).Label ?? key ?? "—";
 
@@ -36,7 +36,7 @@ public static class SupportLabels
     {
         "Resolved" => "won",
         "Closed" => "lost",
-        "Cancelled" => "cancelled",
+        "Cancelled" or "Merged" => "cancelled",
         "WaitingCustomer" or "WaitingInternal" or "InProgress" => "onhold",
         "Reopened" => "lost",
         _ => "open",
@@ -92,6 +92,14 @@ public static class SupportLabels
         "PublicReply" => "Müşteriye yanıt yazıldı",
         "CustomerMessage" => "Müşteri mesajı kaydedildi",
         "InternalNote" => "İç not eklendi",
+        "RoutedByRule" => "Yönlendirme kuralıyla yönlendirildi",
+        "MergedInto" => "Başka talebe birleştirildi",
+        "MergeReceived" => "Birleştirilen talep alındı",
+        "TaskAdded" => "Alt iş eklendi",
+        "TaskCompleted" => "Alt iş tamamlandı",
+        "TaskReopened" => "Alt iş yeniden açıldı",
+        "CustomerConfirmed" => "Müşteri çözümü onayladı",
+        "AutoClosed" => "Zaman aşımıyla otomatik kapatıldı",
         _ => kind,
     };
 

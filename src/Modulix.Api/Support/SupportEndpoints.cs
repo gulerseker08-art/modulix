@@ -51,7 +51,65 @@ public static class SupportEndpoints
             return result.IsSuccess ? Results.Ok(Map<SlaPreviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.SlaManage);
 
+        ResourceEndpoints.MapResource<RoutingRuleDto, SaveRoutingRuleRequest>(group, Prefix, "routing-rules", SupportModule.Entities.RoutingRule,
+            SupportModule.Permissions.SettingsManage, SupportModule.Permissions.SettingsManage);
+
+        // Öncelik matrisi: okuma talep okuma iziniyle (talep ekranı hesaplanan önceliği gösterir), toplu kayıt yönetim iziniyle. Matris yalnızca sonradan açılan/düzenlenen talepleri etkiler.
+        group.MapGet("/priority-matrix", async (IPriorityMatrixService matrix, CancellationToken ct) =>
+        {
+            var result = await matrix.GetAsync(ct);
+            return result.IsSuccess ? Results.Ok(Map<List<PriorityCellDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+        group.MapPut("/priority-matrix", async (SavePriorityMatrixRequest r, IPriorityMatrixService matrix, CancellationToken ct) =>
+        {
+            var result = await matrix.SaveAsync([.. r.Cells.Select(c => new PriorityCell(c.Impact, c.Urgency, c.Priority))], ct);
+            return result.IsSuccess ? Results.Ok(Map<List<PriorityCellDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.SettingsManage);
+
+        // Yönlendirme denemesi: hangi kural eşleşir, hangi kuyruk/sorumlu çıkar? Hiçbir şey yazmaz.
+        group.MapPost("/routing/preview", async (RoutingPreviewRequest r, ITicketRoutingPreview preview, CancellationToken ct) =>
+        {
+            var result = await preview.PreviewAsync(new RoutingPreviewInput(r.Channel, r.TypeKey, r.CategoryId, r.Priority, r.PartyId), ct);
+            return result.IsSuccess ? Results.Ok(Map<RoutingPreviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.SettingsManage);
+
         var tickets = group.MapGroup("/tickets");
+
+        // Olası mükerrer uyarısı: yalnızca çağıranın görebildiği açık talepler aday olur; uyarıdır, kayıt açılmasını engellemez.
+        tickets.MapGet("/duplicates", async (Guid? partyId, string? reporterEmail, string? reporterPhone, string? subject, Guid? categoryId, Guid? excludeId, ITicketDuplicates duplicates, CancellationToken ct) =>
+        {
+            var result = await duplicates.FindAsync(new DuplicateProbe(partyId, reporterEmail, reporterPhone, subject, categoryId, excludeId), ct);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketDuplicateDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+
+        // Birleştirme: ayrı yetki ve gerekçe; kaynak son duruma geçer, geçmiş ve mesajlar korunur.
+        tickets.MapPost("/{id:guid}/merge", async (Guid id, MergeTicketRequest r, ITicketMerge merge, CancellationToken ct) =>
+        {
+            var result = await merge.MergeAsync(id, r.TargetId, r.Version, r.Reason, ct);
+            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<TicketDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+
+        // Alt işler: engelleyici açık alt iş varken talep çözülemez. Yazma talep düzenleme iznine bağlıdır (serviste, talep bulunduktan SONRA).
+        tickets.MapGet("/{id:guid}/tasks", async (Guid id, ITicketTasks tasks, CancellationToken ct) =>
+        {
+            var result = await tasks.ListAsync(id, ct);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketTaskDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+        tickets.MapPost("/{id:guid}/tasks", async (Guid id, AddTicketTaskRequest r, ITicketTasks tasks, CancellationToken ct) =>
+        {
+            var result = await tasks.AddAsync(id, r.Title, r.AssigneeId, r.IsBlocking, ct);
+            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/tasks", Map<List<TicketTaskDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+        tickets.MapPost("/{id:guid}/tasks/{taskId:guid}/complete", async (Guid id, Guid taskId, ITicketTasks tasks, CancellationToken ct) =>
+        {
+            var result = await tasks.SetDoneAsync(id, taskId, true, ct);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketTaskDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+        tickets.MapPost("/{id:guid}/tasks/{taskId:guid}/reopen", async (Guid id, Guid taskId, ITicketTasks tasks, CancellationToken ct) =>
+        {
+            var result = await tasks.SetDoneAsync(id, taskId, false, ct);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketTaskDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapGet("/{id:guid}/sla", async (Guid id, ITicketSla sla, CancellationToken ct) =>
         {
             var result = await sla.GetAsync(id, ct);
@@ -113,6 +171,7 @@ internal sealed class SupportPolicyProvider(IServiceProvider services) : ISuppor
         var settings = services.GetRequiredService<Modulix.Core.Settings.ITenantSettings>();
         return new TicketPolicySettings(
             int.TryParse(await settings.GetValueAsync(SupportModule.SettingKeys.ReopenWindowDays, cancellationToken), out var days) ? Math.Clamp(days, 1, 90) : 7,
-            !string.Equals(await settings.GetValueAsync(SupportModule.SettingKeys.RequireRootCause, cancellationToken), "false", StringComparison.OrdinalIgnoreCase));
+            !string.Equals(await settings.GetValueAsync(SupportModule.SettingKeys.RequireRootCause, cancellationToken), "false", StringComparison.OrdinalIgnoreCase),
+            int.TryParse(await settings.GetValueAsync(SupportModule.SettingKeys.AutoCloseDays, cancellationToken), out var autoClose) ? Math.Clamp(autoClose, 0, 999) : 0);
     }
 }

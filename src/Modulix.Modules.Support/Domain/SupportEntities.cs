@@ -20,7 +20,8 @@ public abstract class SupportEntity : ITenantEntity, ICompanyShared
 
     public Guid TenantId { get; private set; }
 
-    public DateTimeOffset CreatedAt { get; private set; }
+    /// <summary>Oluşturma anı. Birleştirmede taşınan mesajın özgün zamanını korumak için modül içinden ayarlanabilir.</summary>
+    public DateTimeOffset CreatedAt { get; internal set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -83,6 +84,9 @@ public sealed class TicketCategory : SupportEntity
     public bool IsActive { get; internal set; } = true;
 
     public int Position { get; internal set; }
+
+    /// <summary>Bu kategoriye açılan talepte zorunlu alanlar (virgülle; <see cref="Lifecycle.CategoryFieldRules.Allowed"/>). Üst kategorinin zorunlu alanları da geçerlidir.</summary>
+    public string? RequiredFields { get; internal set; }
 
     public Guid? CreatedBy { get; internal set; }
 
@@ -166,6 +170,9 @@ public sealed class SupportTicket : SupportEntity, IOwnedEntity
     /// <summary>Önceki/ilişkili talep (yeniden açma penceresi dışındaki yanıt ya da takip talebi).</summary>
     public Guid? ParentTicketId { get; internal set; }
 
+    /// <summary>Birleştirilmişse hedef talep (durum <c>Merged</c>); kaynağın geçmişi, mesajları ve dış anahtarı kaynakta kalır.</summary>
+    public Guid? MergedIntoId { get; internal set; }
+
     /// <summary>İstemcinin verdiği tekrar-koruma anahtarı: aynı anahtarla gelen ikinci oluşturma mükerrer kayıt üretmez.</summary>
     public string? ClientKey { get; internal set; }
 
@@ -228,6 +235,9 @@ public sealed class TicketMessage : SupportEntity
     public string Body { get; internal set; } = string.Empty;
 
     public Guid? AuthorId { get; internal set; }
+
+    /// <summary>Başka bir talepten birleştirme ile kopyalandıysa kaynak talep (özgün zamanı korunur); yoksa boş.</summary>
+    public Guid? SourceTicketId { get; internal set; }
 
     /// <summary><see cref="Lifecycle.DeliveryStatus"/>.</summary>
     public string DeliveryStatus { get; internal set; } = Lifecycle.DeliveryStatus.NotRequired;

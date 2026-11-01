@@ -75,9 +75,10 @@ internal static class SlaEngine
         switch (ticket.Status)
         {
             case TicketStatus.Cancelled:
+            case TicketStatus.Merged:
                 foreach (var instance in open.Where(IsOpen))
                 {
-                    Cancel(instance, "Talep iptal edildi.", now, pauses);
+                    Cancel(instance, ticket.Status == TicketStatus.Merged ? "Talep başka bir talebe birleştirildi." : "Talep iptal edildi.", now, pauses);
                 }
 
                 break;

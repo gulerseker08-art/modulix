@@ -27,6 +27,14 @@ internal sealed class SupportStoreContext(
     /// <summary>İş akışı kapısı: durum, sorumlu ve çözüm gibi sistem alanları yalnızca kapı açıkken yazılır.</summary>
     public TicketWorkflowGate Gate => gate;
 
+    private IReadOnlyDictionary<(string Impact, string Urgency), string>? matrix;
+
+    /// <summary>Tenant öncelik matrisi hücreleri (istek boyunca önbellekli); hücre tanımlı değilse yerleşik matris kullanılır.</summary>
+    public async Task<IReadOnlyDictionary<(string Impact, string Urgency), string>> MatrixAsync(CancellationToken cancellationToken) =>
+        matrix ??= (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+            Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking(data.Set<Domain.PriorityMatrixEntry>()), cancellationToken))
+            .ToDictionary(e => (e.Impact, e.Urgency), e => e.Priority);
+
     /// <summary>Saat kaynağı (testte sabitlenebilir).</summary>
     public TimeProvider Time => time;
 

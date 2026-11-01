@@ -49,6 +49,8 @@ internal sealed class TicketCategoryConfiguration : IEntityTypeConfiguration<Tic
         SupportTables.ConfigureCommon(builder, "Categories");
         builder.Property(c => c.Name).HasMaxLength(TicketCategory.NameMaxLength).IsRequired();
 
+        builder.Property(c => c.RequiredFields).HasMaxLength(200);
+
         builder.HasIndex(c => new { c.TenantId, c.ParentId, c.Name }).IsUnique().HasDatabaseName("UX_Categories_Name");
 
         builder.HasOne<TicketCategory>().WithMany().HasForeignKey(c => new { c.TenantId, c.ParentId })
@@ -96,7 +98,7 @@ internal sealed class SupportTicketConfiguration : IEntityTypeConfiguration<Supp
         builder.HasIndex(t => new { t.TenantId, t.CategoryId });
 
         builder.ToTable(t => t.HasCheckConstraint("CK_Tickets_Status",
-            "[Status] IN ('New','Triage','Assigned','InProgress','WaitingCustomer','WaitingInternal','Resolved','Closed','Reopened','Cancelled')"));
+            "[Status] IN ('New','Triage','Assigned','InProgress','WaitingCustomer','WaitingInternal','Resolved','Closed','Reopened','Cancelled','Merged')"));
         builder.ToTable(t => t.HasCheckConstraint("CK_Tickets_Channel", "[Channel] IN ('User','Phone','Email','Web','Portal','Api')"));
         builder.ToTable(t => t.HasCheckConstraint("CK_Tickets_Impact", "[Impact] IN ('Low','Medium','High')"));
         builder.ToTable(t => t.HasCheckConstraint("CK_Tickets_Urgency", "[Urgency] IN ('Low','Medium','High')"));
@@ -115,6 +117,9 @@ internal sealed class SupportTicketConfiguration : IEntityTypeConfiguration<Supp
             .HasPrincipalKey(q => new { q.TenantId, q.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<SupportTicket>().WithMany().HasForeignKey(t => new { t.TenantId, t.ParentTicketId })
             .HasPrincipalKey(p => new { p.TenantId, p.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<SupportTicket>().WithMany().HasForeignKey(t => new { t.TenantId, t.MergedIntoId })
+            .HasPrincipalKey(p => new { p.TenantId, p.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(t => new { t.TenantId, t.MergedIntoId });
     }
 }
 
@@ -129,6 +134,8 @@ internal sealed class TicketMessageConfiguration : IEntityTypeConfiguration<Tick
         builder.Property(m => m.DeliveryStatus).HasMaxLength(SupportTicket.StatusMaxLength).IsRequired();
 
         builder.HasIndex(m => new { m.TenantId, m.TicketId, m.CreatedAt });
+        builder.HasOne<SupportTicket>().WithMany().HasForeignKey(m => new { m.TenantId, m.SourceTicketId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
 
         // İç not müşteriye görünen kanala giremez: iç görünürlük yalnızca not yönüyle, dış görünürlük yalnızca giden/gelen yönle birlikte olur.
         builder.ToTable(t => t.HasCheckConstraint("CK_Messages_Visibility",
