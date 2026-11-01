@@ -4392,3 +4392,27 @@ button.pipeline-label {
         grid-template-columns: minmax(0, 1fr);
     }
 }
+
+/* Destek modülü (ADR-0024): talep detayı iki sütun, mesaj gövdesi ve iç not vurgusu */
+.detail-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.message-body {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.timeline-internal {
+    border-left: 3px dashed var(--mx-brand-teal-dark);
+    padding-left: .5rem;
+}
+
+@media (max-width: 900px) {
+    .detail-columns {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

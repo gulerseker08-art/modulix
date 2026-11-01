@@ -1,0 +1,218 @@
+@page "/destek/ayarlar"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Destek ayarları · Modulix</PageTitle>
+
+<AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.SettingsManage">
+    <div class="page-header">
+        <div>
+            <h1>Kuyruklar ve kategoriler</h1>
+            <p class="text-muted mb-0">Talepler kategorinin varsayılan kuyruğuna, yoksa üst kategorinin kuyruğuna, o da yoksa varsayılan kuyruğa düşer. Kuyruk yoksa talep atanmamış kalır. Kullanılan kuyruk ve kategori silinmez, pasife alınır.</p>
+        </div>
+        <div class="header-actions">
+            <a class="btn btn-outline-secondary" href="yonetim/ayarlar?grup=Destek">Politika ayarları</a>
+        </div>
+    </div>
+
+    <Notice Text="@message" Failed="@failed" />
+
+    <section aria-labelledby="queues-title">
+        <h2 id="queues-title">Kuyruklar</h2>
+        @if (queues is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (queues.Count == 0)
+        {
+            <p class="text-muted">Henüz kuyruk yok. Talepler kuyruksuz (atanmamış) açılır. Bir kuyruğu varsayılan yapmanız önerilir.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">Destek kuyrukları</caption>
+                <thead><tr><th scope="col">Kuyruk</th><th scope="col">Açıklama</th><th scope="col">Varsayılan</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+                <tbody>
+                    @foreach (var q in queues)
+                    {
+                        <tr>
+                            <td data-label="Kuyruk" class="primary">@q.Name</td>
+                            <td data-label="Açıklama">@(q.Description ?? "—")</td>
+                            <td data-label="Varsayılan">@(q.IsDefault ? "Evet" : "—")</td>
+                            <td data-label="Durum"><span class="badge stage-@(q.IsActive ? "won" : "cancelled")">@(q.IsActive ? "Etkin" : "Pasif")</span></td>
+                            <td data-label="İşlem">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleQueueAsync(q)" disabled="@(busy || q.IsDefault)">@(q.IsActive ? "Pasife al" : "Etkinleştir")</button>
+                                @if (!q.IsDefault && q.IsActive)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => MakeDefaultAsync(q)" disabled="@busy">Varsayılan yap</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <form class="record-form" novalidate @onsubmit="AddQueueAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <legend class="h6">Yeni kuyruk</legend>
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label" for="q-name">Ad</label>
+                        <input id="q-name" class="form-control" maxlength="100" @bind="queueName" />
+                        <FieldError Field="name" Errors="queueErrors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="q-desc">Açıklama</label>
+                        <input id="q-desc" class="form-control" maxlength="500" @bind="queueDescription" />
+                    </div>
+                    <div class="span-12 form-check">
+                        <input id="q-default" class="form-check-input" type="checkbox" @bind="queueDefault" />
+                        <label class="form-check-label" for="q-default">Varsayılan kuyruk (eşleşme olmayan talepler buraya düşer)</label>
+                        <FieldError Field="isDefault" Errors="queueErrors" />
+                    </div>
+                </div>
+            </fieldset>
+            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Kuyruk ekle</button></div>
+        </form>
+    </section>
+
+    <section aria-labelledby="categories-title">
+        <h2 id="categories-title">Kategoriler</h2>
+        @if (categories is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (categories.Count == 0)
+        {
+            <p class="text-muted">Henüz kategori yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">Talep kategorileri</caption>
+                <thead><tr><th scope="col">Kategori</th><th scope="col">Üst kategori</th><th scope="col">Varsayılan kuyruk</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+                <tbody>
+                    @foreach (var c in categories.Where(c => c.ParentId is null).SelectMany(root => new[] { root }.Concat(categories.Where(c => c.ParentId == root.Id))).Concat(categories.Where(c => c.ParentId is { } p && categories.All(r => r.Id != p))))
+                    {
+                        <tr>
+                            <td data-label="Kategori" class="primary">@(c.ParentId is null ? null : "↳ ")@c.Name</td>
+                            <td data-label="Üst kategori">@(c.ParentId is { } parentId ? categories.FirstOrDefault(p => p.Id == parentId)?.Name ?? "—" : "—")</td>
+                            <td data-label="Varsayılan kuyruk">@(c.DefaultQueueId is { } queueId ? queues?.FirstOrDefault(q => q.Id == queueId)?.Name ?? "—" : "—")</td>
+                            <td data-label="Durum"><span class="badge stage-@(c.IsActive ? "won" : "cancelled")">@(c.IsActive ? "Etkin" : "Pasif")</span></td>
+                            <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleCategoryAsync(c)" disabled="@busy">@(c.IsActive ? "Pasife al" : "Etkinleştir")</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <form class="record-form" novalidate @onsubmit="AddCategoryAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <legend class="h6">Yeni kategori</legend>
+                <div class="form-grid">
+                    <div class="span-4">
+                        <label class="form-label" for="c-name">Ad</label>
+                        <input id="c-name" class="form-control" maxlength="100" @bind="categoryName" />
+                        <FieldError Field="name" Errors="categoryErrors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="c-parent">Üst kategori (alt kategori için)</label>
+                        <LookupPicker Id="c-parent" LookupKey="support.category.parent" @bind-Value="categoryParent" Placeholder="Ana kategori" />
+                        <FieldError Field="parentId" Errors="categoryErrors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="c-queue">Varsayılan kuyruk</label>
+                        <LookupPicker Id="c-queue" LookupKey="support.category.queue" @bind-Value="categoryQueue" Placeholder="Üst kategori / varsayılan kuyruk" />
+                        <FieldError Field="defaultQueueId" Errors="categoryErrors" />
+                    </div>
+                </div>
+            </fieldset>
+            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Kategori ekle</button></div>
+        </form>
+    </section>
+</AuthGate>
+
+@code {
+    private List<QueueDto>? queues;
+    private List<CategoryDto>? categories;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private string queueName = string.Empty;
+    private string? queueDescription;
+    private bool queueDefault;
+    private IReadOnlyDictionary<string, string[]>? queueErrors;
+    private string categoryName = string.Empty;
+    private Guid? categoryParent;
+    private Guid? categoryQueue;
+    private IReadOnlyDictionary<string, string[]>? categoryErrors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(SupportAccess.SettingsManage)) { await ReloadAsync(); }
+    }
+
+    private async Task ReloadAsync()
+    {
+        queues = (await Api.GetAsync<PagedResult<QueueDto>>("/api/support/queues?pageSize=200")).Value?.Items.ToList() ?? [];
+        categories = (await Api.GetAsync<PagedResult<CategoryDto>>("/api/support/categories?pageSize=200")).Value?.Items.ToList() ?? [];
+    }
+
+    private async Task<bool> RunAsync<T>(Func<Task<ApiResult<T>>> call, string done, Action<IReadOnlyDictionary<string, string[]>>? errors = null)
+    {
+        busy = true;
+        message = null;
+        var result = await call();
+        busy = false;
+        failed = !result.IsSuccess;
+        message = result.IsSuccess ? done : result.Error;
+        if (!result.IsSuccess) { errors?.Invoke(result.FieldErrors); return false; }
+        await ReloadAsync();
+        return true;
+    }
+
+    private async Task AddQueueAsync()
+    {
+        queueErrors = null;
+        if (await RunAsync(() => Api.PostAsync<QueueDto>("/api/support/queues", new SaveQueueRequest(Name: queueName, Description: string.IsNullOrWhiteSpace(queueDescription) ? null : queueDescription.Trim(), IsDefault: queueDefault, IsActive: true)),
+                "Kuyruk eklendi.", e => queueErrors = e))
+        {
+            queueName = string.Empty;
+            queueDescription = null;
+            queueDefault = false;
+        }
+    }
+
+    private Task ToggleQueueAsync(QueueDto q) =>
+        RunAsync(() => Api.PutAsync<QueueDto>($"/api/support/queues/{q.Id}", new SaveQueueRequest(q.Version, q.Name, q.Description, q.IsDefault, !q.IsActive)), q.IsActive ? "Kuyruk pasife alındı." : "Kuyruk etkinleştirildi.");
+
+    private async Task MakeDefaultAsync(QueueDto q)
+    {
+        // Tek varsayılan kuyruk kuralı: önce mevcut varsayılanın işareti kaldırılır.
+        if (queues?.FirstOrDefault(x => x.IsDefault) is { } current)
+        {
+            var cleared = await Api.PutAsync<QueueDto>($"/api/support/queues/{current.Id}", new SaveQueueRequest(current.Version, current.Name, current.Description, false, current.IsActive));
+            if (!cleared.IsSuccess) { failed = true; message = cleared.Error; return; }
+        }
+
+        await RunAsync(() => Api.PutAsync<QueueDto>($"/api/support/queues/{q.Id}", new SaveQueueRequest(q.Version, q.Name, q.Description, true, q.IsActive)), "Varsayılan kuyruk güncellendi.");
+    }
+
+    private async Task AddCategoryAsync()
+    {
+        categoryErrors = null;
+        if (await RunAsync(() => Api.PostAsync<CategoryDto>("/api/support/categories", new SaveCategoryRequest(Name: categoryName, ParentId: categoryParent, DefaultQueueId: categoryQueue, IsActive: true)),
+                "Kategori eklendi.", e => categoryErrors = e))
+        {
+            categoryName = string.Empty;
+            categoryParent = null;
+            categoryQueue = null;
+        }
+    }
+
+    private Task ToggleCategoryAsync(CategoryDto c) =>
+        RunAsync(() => Api.PutAsync<CategoryDto>($"/api/support/categories/{c.Id}", new SaveCategoryRequest(c.Version, c.Name, c.ParentId, c.DefaultQueueId, !c.IsActive, c.Position)),
+            c.IsActive ? "Kategori pasife alındı." : "Kategori etkinleştirildi.");
+}

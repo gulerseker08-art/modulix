@@ -31,7 +31,7 @@ docker compose run --rm db-init
 Windows'ta tek adım: `powershell -ExecutionPolicy Bypass -File scripts\db-up.ps1` — ayrıca migration'ları uygular ve
 örnek tenant'ları (acme, beta) oluşturur.
 
-Yeni bir modül şeması eklenince (ör. `contracts`, ADR-0022; `orders`, ADR-0023) şema ve uygulama rolünün veri yetkisi iki yerde tanımlanır:
+Yeni bir modül şeması eklenince (ör. `contracts`, ADR-0022; `orders`, ADR-0023; `support`, ADR-0024) şema ve uygulama rolünün veri yetkisi iki yerde tanımlanır:
 `docker/sqlserver/init.sql` (yeni ortam) ve modülün ilk migration'ındaki idempotent `GRANT` (mevcut veritabanı). Yalnızca
 `init.sql` güncellenirse mevcut veritabanında uygulama kullanıcısı yeni tablolara yazamaz (INSERT permission denied).
 

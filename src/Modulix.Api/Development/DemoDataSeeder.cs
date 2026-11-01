@@ -59,6 +59,7 @@ public static class DemoDataSeeder
         await entitlements.SetEnabledAsync(acme.Id, "logistics", enabled: true, cancellationToken);
         await entitlements.SetEnabledAsync(acme.Id, "contracts", enabled: true, cancellationToken);
         await entitlements.SetEnabledAsync(acme.Id, "orders", enabled: true, cancellationToken);
+        await entitlements.SetEnabledAsync(acme.Id, "support", enabled: true, cancellationToken);
         await entitlements.SetEnabledAsync(beta.Id, "logistics", enabled: true, cancellationToken);
 
         await EnsureAdministratorsAsync(services, acme, cancellationToken);

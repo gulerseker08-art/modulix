@@ -29,6 +29,8 @@ using Modulix.Modules.Contracts;
 using Modulix.Modules.Orders;
 using Modulix.Api.Contracts;
 using Modulix.Api.Orders;
+using Modulix.Api.Support;
+using Modulix.Modules.Support;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +64,7 @@ builder.Services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyP
 builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modulix.Api.Crm.QuotePolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Contracts.Lifecycle.IContractPolicyProvider, Modulix.Api.Contracts.ContractPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Orders.Lifecycle.IOrderPolicyProvider, Modulix.Api.Orders.OrderPolicyProvider>();
+builder.Services.AddScoped<Modulix.Modules.Support.Lifecycle.ISupportPolicyProvider, Modulix.Api.Support.SupportPolicyProvider>();
 builder.Services.AddSingleton<Modulix.Modules.Contracts.Lifecycle.IContractPdfRenderer, Modulix.Api.Contracts.ContractPdfRenderer>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDocumentService>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDelivery>();
@@ -175,6 +178,7 @@ app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapContractsEndpoints();
 app.MapOrdersEndpoints();
+app.MapSupportEndpoints();
 app.MapLeadIntakeEndpoints();
 app.MapQuotePublicEndpoints();
 app.MapContractSignatureWebhook();
@@ -204,5 +208,5 @@ public partial class Program;
 /// </summary>
 internal static class ModulixModules
 {
-    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule()];
+    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule()];
 }

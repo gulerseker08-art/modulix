@@ -1,0 +1,207 @@
+@* Talep durum işlemleri: kural sunucuda uygulanır; bu bileşen yalnızca sunucunun eylem listesini (izin, ön koşul, gerekçe) gösterir ve eylemin girdilerini toplar. *@
+@inject ApiClient Api
+@inject CrmLookups Lookups
+
+<section aria-labelledby="ticket-actions-title">
+    <h2 id="ticket-actions-title">İşlemler</h2>
+    <Notice Text="@message" Failed="@failed" />
+    @if (actions is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (actions.Count == 0)
+    {
+        <p class="text-muted">Bu talep için yapabileceğiniz işlem yok.</p>
+    }
+    else
+    {
+        <div class="header-actions" role="group" aria-label="Talep işlemleri">
+            @foreach (var action in actions)
+            {
+                <button type="button" class="btn @(SupportLabels.IsDanger(action.Action) ? "btn-outline-danger" : SupportLabels.IsPrimary(action.Action) ? "btn-primary" : "btn-outline-secondary")"
+                        disabled="@(!action.Allowed || busy)" aria-pressed="@(selected == action.Action ? "true" : "false")" aria-describedby="@(action.Allowed ? null : $"why-{action.Action}")"
+                        @onclick="() => Choose(action)">@SupportLabels.Action(action.Action)</button>
+            }
+        </div>
+        <ul class="small text-muted mt-2">
+            @foreach (var blocked in actions.Where(a => !a.Allowed))
+            {
+                <li id="why-@blocked.Action"><strong>@SupportLabels.Action(blocked.Action):</strong> @blocked.Message</li>
+            }
+        </ul>
+
+        @if (selectedAction is { } current && NeedsInput(current))
+        {
+            <form class="record-form" novalidate @onsubmit="RunAsync" @onsubmit:preventDefault>
+                <h3 class="h6">@SupportLabels.Action(current.Action)</h3>
+                @switch (current.Action)
+                {
+                    case "assign":
+                        <label class="form-label" for="act-owner">Sorumlu</label>
+                        <LookupPicker Id="act-owner" LookupKey="support.ticket.owner" @bind-Value="ownerId" Placeholder="Sorumlu seçin…" />
+                        <label class="form-label mt-2" for="act-queue">Kuyruk (isteğe bağlı)</label>
+                        <LookupPicker Id="act-queue" LookupKey="support.ticket.queue" @bind-Value="queueId" Placeholder="Kuyruk seçin…" />
+                        <FieldError Field="ownerId" Errors="fieldErrors" />
+                        break;
+                    case "transfer":
+                        <label class="form-label" for="act-queue">Devredilecek kuyruk</label>
+                        <LookupPicker Id="act-queue" LookupKey="support.ticket.queue" @bind-Value="queueId" Required="true" Placeholder="Kuyruk seçin…" />
+                        <FieldError Field="queueId" Errors="fieldErrors" />
+                        <label class="form-label mt-2" for="act-owner">Yeni sorumlu (isteğe bağlı)</label>
+                        <LookupPicker Id="act-owner" LookupKey="support.ticket.owner" @bind-Value="ownerId" Placeholder="Boş bırakılırsa sorumlu sıfırlanır" />
+                        break;
+                    case "resolve":
+                        <label class="form-label" for="act-code">Çözüm kodu (zorunlu)</label>
+                        <select id="act-code" class="form-select" @bind="resolutionCode">
+                            <option value="">Seçin…</option>
+                            @foreach (var c in Lookups.Choices(SupportLabels.ResolutionCodeList)) { <option value="@c.Key">@c.Label</option> }
+                        </select>
+                        <FieldError Field="resolutionCode" Errors="fieldErrors" />
+                        <label class="form-label mt-2" for="act-note">Çözüm açıklaması (zorunlu)</label>
+                        <textarea id="act-note" class="form-control" rows="3" maxlength="4000" @bind="resolutionNote"></textarea>
+                        <FieldError Field="resolutionNote" Errors="fieldErrors" />
+                        @if (IsComplaint)
+                        {
+                            <label class="form-label mt-2" for="act-root">Kök neden (şikâyet için zorunlu)</label>
+                            <textarea id="act-root" class="form-control" rows="2" maxlength="4000" @bind="rootCause"></textarea>
+                            <FieldError Field="rootCause" Errors="fieldErrors" />
+                            <label class="form-label mt-2" for="act-corrective">Düzeltici aksiyon (şikâyet için zorunlu)</label>
+                            <textarea id="act-corrective" class="form-control" rows="2" maxlength="4000" @bind="correctiveAction"></textarea>
+                            <FieldError Field="correctiveAction" Errors="fieldErrors" />
+                        }
+                        break;
+                    case "set-priority":
+                        <label class="form-label" for="act-priority">Yeni öncelik</label>
+                        <select id="act-priority" class="form-select" @bind="priority">
+                            <option value="">Seçin…</option>
+                            @foreach (var (key, label) in SupportLabels.Priorities) { <option value="@key">@label</option> }
+                        </select>
+                        <FieldError Field="priority" Errors="fieldErrors" />
+                        <p class="small text-muted mt-1">Elle değiştirilen öncelik sonraki etki/aciliyet düzenlemeleriyle otomatik değişmez.</p>
+                        break;
+                }
+                @if (current.RequiresReason)
+                {
+                    <label class="form-label mt-2" for="act-reason">Gerekçe (zorunlu)</label>
+                    <textarea id="act-reason" class="form-control" rows="2" maxlength="500" @bind="reason" aria-invalid="@(reasonError is not null ? "true" : null)"></textarea>
+                    @if (reasonError is not null) { <div class="invalid-feedback d-block" role="alert">@reasonError</div> }
+                }
+                <div class="form-actions">
+                    <button type="submit" class="btn @(SupportLabels.IsDanger(current.Action) ? "btn-danger" : "btn-primary")" disabled="@busy">Onayla: @SupportLabels.Action(current.Action)</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">Vazgeç</button>
+                </div>
+            </form>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public TicketDto Ticket { get; set; } = default!;
+
+    /// <summary>Eylem uygulandıktan sonra güncel talep (üst ekran kendini yeniler).</summary>
+    [Parameter] public EventCallback<TicketDto> Changed { get; set; }
+
+    private List<TicketActionDto>? actions;
+    private string? selected;
+    private string reason = string.Empty;
+    private string? reasonError;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private bool lookupsLoaded;
+    private Guid loadedFor;
+    private long loadedVersion;
+    private Guid? ownerId;
+    private Guid? queueId;
+    private string resolutionCode = string.Empty;
+    private string resolutionNote = string.Empty;
+    private string rootCause = string.Empty;
+    private string correctiveAction = string.Empty;
+    private string priority = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? fieldErrors;
+
+    private TicketActionDto? selectedAction => actions?.FirstOrDefault(a => a.Action == selected);
+
+    private bool IsComplaint => Lookups.CategoryOf(SupportLabels.TicketTypeList, Ticket.TypeKey) == SupportLabels.ComplaintCategory;
+
+    private static bool NeedsInput(TicketActionDto action) => action.RequiresReason || action.Action is "assign" or "transfer" or "resolve" or "set-priority";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!lookupsLoaded)
+        {
+            lookupsLoaded = true;
+            await Lookups.LoadAsync();
+        }
+
+        if (loadedFor == Ticket.Id && loadedVersion == Ticket.Version)
+        {
+            return;
+        }
+
+        loadedFor = Ticket.Id;
+        loadedVersion = Ticket.Version;
+        var result = await Api.GetAsync<List<TicketActionDto>>($"/api/support/tickets/{Ticket.Id}/actions");
+        actions = result.Value ?? [];
+    }
+
+    private async Task Choose(TicketActionDto action)
+    {
+        message = null;
+        reasonError = null;
+        fieldErrors = null;
+        reason = string.Empty;
+        ownerId = null;
+        queueId = null;
+        resolutionCode = resolutionNote = rootCause = correctiveAction = priority = string.Empty;
+        if (NeedsInput(action))
+        {
+            selected = selected == action.Action ? null : action.Action;
+            return;
+        }
+
+        selected = action.Action;
+        await RunAsync();
+    }
+
+    private void Cancel()
+    {
+        selected = null;
+        reasonError = null;
+        fieldErrors = null;
+    }
+
+    private async Task RunAsync()
+    {
+        if (busy || selectedAction is not { } action) { return; }
+        if (action.RequiresReason && string.IsNullOrWhiteSpace(reason))
+        {
+            reasonError = "Gerekçe zorunludur.";
+            return;
+        }
+
+        busy = true;
+        message = null;
+        fieldErrors = null;
+        var body = new TicketActionRequest(
+            Ticket.Version, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(), ownerId, queueId, Blank(resolutionCode), Blank(resolutionNote),
+            Blank(rootCause), Blank(correctiveAction), Blank(priority));
+        var result = await Api.PostAsync<TicketDto>($"/api/support/tickets/{Ticket.Id}/{action.Action}", body);
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            failed = true;
+            message = result.Error;
+            fieldErrors = result.FieldErrors;
+            return;
+        }
+
+        failed = false;
+        message = $"{SupportLabels.Action(action.Action)}: işlem tamamlandı.";
+        selected = null;
+        reason = string.Empty;
+        await Changed.InvokeAsync(result.Value!);
+    }
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

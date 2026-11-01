@@ -93,6 +93,9 @@ jobs:
       - name: Siparis birim testleri
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Modules.Orders.Tests/Modulix.Modules.Orders.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/orders-tests.log"
 
+      - name: Destek birim testleri
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Modules.Support.Tests/Modulix.Modules.Support.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/support-tests.log"
+
       - name: Entegrasyon testleri
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/integration-tests.log"
 
