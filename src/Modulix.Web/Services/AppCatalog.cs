@@ -73,12 +73,14 @@ public static class AppCatalog
         new("crm.activities", Crm, "Aktiviteler", "activity", "crm/aktiviteler", 40, CrmAccess.ModuleKey, CrmAccess.ActivitiesRead, Tone: AppTone.Teal),
 
         new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal),
+        new("contracts.dashboard", Contracts, "Pano", "dashboard", "sozlesmeler/ozet", 5, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, ExactMatch: true),
         new("contracts.list", Contracts, "Sözleşmeler", "file-text", "sozlesmeler", 10, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
         new("contracts.templates", Contracts, "Şablonlar", "layers", "sozlesmeler/sablonlar", 20, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
         new("contracts.approvals", Contracts, "Onaylar", "check-circle", "sozlesmeler/onaylar", 30, ContractsAccess.ModuleKey, ContractsAccess.ContractsApprove, Tone: AppTone.Teal),
         new("contracts.signatures", Contracts, "İmzalar", "check-circle", "sozlesmeler/imzalar", 35, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
         new("contracts.commitments", Contracts, "Taahhütler", "clipboard-list", "sozlesmeler/taahhutler", 36, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Tone: AppTone.Teal),
         new("contracts.renewals", Contracts, "Yenilemeler", "calendar", "sozlesmeler/yenileme", 37, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
+        new("contracts.settings", Contracts, "Sözleşme ayarları", "wrench", "yonetim/ayarlar?grup=S%C3%B6zle%C5%9Fmeler", 90, ContractsAccess.ModuleKey, CoreAccess.ManageSettings),
         new("contracts.approval-rules", Contracts, "Onay kuralları", "shield", "sozlesmeler/onay-kurallari", 40, ContractsAccess.ModuleKey, ContractsAccess.ApprovalsManage),
 
         new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal),

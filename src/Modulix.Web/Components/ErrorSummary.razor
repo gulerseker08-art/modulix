@@ -1,0 +1,17 @@
+@* Kaydetmeden önce düzeltilecek alanların özeti; ekran okuyucuya uyarı olarak duyurulur. *@
+@if (Errors is { Count: > 0 })
+{
+    <div class="alert alert-danger" role="alert">
+        <strong>Kaydetmeden önce şunları düzeltin:</strong>
+        <ul class="mb-0">
+            @foreach (var (_, messages) in Errors)
+            {
+                foreach (var text in messages) { <li>@text</li> }
+            }
+        </ul>
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyDictionary<string, string[]>? Errors { get; set; }
+}

@@ -253,6 +253,17 @@ internal sealed class ContractApprovalDelegationConfiguration : IEntityTypeConfi
     }
 }
 
+internal sealed class ContractSavedViewConfiguration : IEntityTypeConfiguration<ContractSavedView>
+{
+    public void Configure(EntityTypeBuilder<ContractSavedView> builder)
+    {
+        ContractsTables.ConfigureCommon(builder, "ContractSavedViews");
+        builder.Property(v => v.Name).HasMaxLength(Lifecycle.ContractViewRules.NameMaxLength).IsRequired();
+        builder.Property(v => v.Filters).HasMaxLength(Lifecycle.ContractViewRules.FiltersMaxLength).IsRequired();
+        builder.HasIndex(v => new { v.TenantId, v.OwnerUserId, v.Name }).IsUnique();
+    }
+}
+
 internal sealed class ContractApprovalDecisionConfiguration : IEntityTypeConfiguration<ContractApprovalDecision>
 {
     public void Configure(EntityTypeBuilder<ContractApprovalDecision> builder)

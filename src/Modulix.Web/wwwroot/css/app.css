@@ -4325,3 +4325,70 @@ button.pipeline-label {
     font-size: 0.875rem;
     min-height: 22rem;
 }
+
+/* Sözleşme sihirbazı (ADR-0022, dilim 9): adım göstergesi, alt bölümler ve özet listesi. */
+.wizard-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mx-space-2);
+    list-style: none;
+    margin: 0 0 var(--mx-space-5);
+    padding: 0;
+}
+
+    .wizard-steps li {
+        padding: var(--mx-space-2) var(--mx-space-3);
+        border: 1px solid var(--mx-border);
+        border-radius: var(--mx-radius-card);
+        background: var(--mx-surface, transparent);
+        font-size: 0.875rem;
+    }
+
+    .wizard-steps li .btn-link {
+        padding: 0;
+        font-size: inherit;
+    }
+
+    .wizard-steps li.current {
+        border-color: var(--mx-primary, currentColor);
+        font-weight: 600;
+    }
+
+    .wizard-steps li.done {
+        color: var(--mx-text-muted, inherit);
+    }
+
+.wizard-sub {
+    margin-top: var(--mx-space-4);
+    padding-top: var(--mx-space-4);
+    border-top: 1px solid var(--mx-border);
+}
+
+.summary-list {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--mx-space-2) var(--mx-space-4);
+    margin: 0 0 var(--mx-space-4);
+}
+
+    .summary-list dt {
+        font-weight: 600;
+    }
+
+    .summary-list dd {
+        margin: 0;
+    }
+
+.saved-views .filters {
+    align-items: center;
+}
+
+@media (max-width: 640px) {
+    .wizard-steps li {
+        flex: 1 1 100%;
+    }
+
+    .summary-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

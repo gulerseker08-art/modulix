@@ -288,3 +288,37 @@ public static class RenewalLabels
         _ => $"{-days} gün geçti",
     };
 }
+
+/// <summary>Liste görünümü (dilim 9): hızlı görünümler, sıralama seçenekleri ve pano etiketleri; anahtarlar sunucudaki <c>ContractViewRules</c>, <c>ContractSort</c> ve <c>ContractDashboardService</c> ile aynıdır.</summary>
+public static class ViewLabels
+{
+    public static IReadOnlyList<(string Key, string Label)> Presets { get; } =
+    [
+        ("mine", "Sözleşmelerim"), ("signature", "İmza bekleyen"), ("ending", "Bitişi yaklaşan (90 gün)"), ("notice", "Bildirim süresi yaklaşan (30 gün)"), ("overdue", "Taahhüdü geciken"),
+    ];
+
+    public static IReadOnlyList<(string Key, string Label)> Sorts { get; } =
+    [
+        ("-createdAt", "En yeni önce"), ("createdAt", "En eski önce"), ("title", "Başlık A→Z"), ("-title", "Başlık Z→A"), ("number", "Numara (artan)"), ("-number", "Numara (azalan)"),
+        ("endDate", "Bitiş: yakın önce"), ("-endDate", "Bitiş: uzak önce"), ("noticeDeadline", "Son bildirim: yakın önce"), ("startDate", "Başlangıç: eski önce"), ("-startDate", "Başlangıç: yeni önce"),
+    ];
+
+    public static IReadOnlyList<(string Key, string Label)> Counters { get; } =
+    [
+        ("total", "Tüm sözleşmeler"), ("drafts", "Hazırlıkta (taslak)"), ("approval", "Onay bekleyen"), ("signature", "İmza bekleyen"), ("active", "Yürürlükte"),
+        ("awaitingStart", "Başlangıcı bekleyen"), ("ending", "Bitişi yaklaşan (90 gün)"), ("notice", "Bildirim süresi yaklaşan (30 gün)"), ("overdue", "Taahhüdü geciken"),
+    ];
+
+    /// <summary>Panodaki sayaç tıklanınca açılan liste adresi (hızlı görünüm ya da süzgeç).</summary>
+    public static string CounterLink(string key) => key switch
+    {
+        "signature" or "ending" or "notice" or "overdue" => $"sozlesmeler?gorunum={key}",
+        "approval" => "sozlesmeler?onay=Pending",
+        "drafts" => "sozlesmeler?hazirlik=Draft",
+        "active" => "sozlesmeler?yururluk=Active",
+        "awaitingStart" => "sozlesmeler?yururluk=AwaitingStart",
+        _ => "sozlesmeler",
+    };
+
+    public static string Label(IReadOnlyList<(string Key, string Label)> list, string? key) => list.FirstOrDefault(x => x.Key == key).Label ?? key ?? "—";
+}

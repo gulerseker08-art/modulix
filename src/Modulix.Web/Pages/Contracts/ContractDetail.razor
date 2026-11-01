@@ -46,6 +46,10 @@
                 <a class="btn btn-outline-secondary" href="sozlesmeler">Listeye dön</a>
                 @if (contract is not null && CanWrite)
                 {
+                    @if (Editable && contract.PreparationStatus == "Draft")
+                    {
+                        <a class="btn btn-outline-secondary" href="sozlesmeler/sihirbaz?id=@contract.Id">Sihirbazla düzenle</a>
+                    }
                     <button type="button" class="btn btn-outline-danger" @onclick="DeleteAsync" disabled="@busy">Taslağı sil</button>
                 }
             </div>
