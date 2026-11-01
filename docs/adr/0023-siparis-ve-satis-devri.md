@@ -118,6 +118,65 @@ Dilim 4 doğrulaması: 9 yeni birim testi (üretim planı ve stratejiler, şablo
 
 Dilim 5 doğrulaması: 37 yeni birim testi (planlama ve teslim miktar kuralları, gerçekleşme hesabı, geçiş tabloları, başlangıç ön koşulları, kanıt dosyası kuralları), 8 yeni entegrasyon testi (kısmi teslimat ve kalan miktar, fazla teslimatın engellenmesi, eşzamanlı teslim, başarısız teslimat ve gerekçeli yeniden planlama, kanıt türü/boyut/içerik sınırları ve indirme yetkisi, hizmet başlangıcı ön koşulları ve başlangıç-tamamlanma ayrımı ve normal kapatma, bağımlı iş engeli, sipariş iptalinde teslimatlar, tenant izolasyonu ve yetki); tarayıcıda plan ve kısmi teslim akışı denendi. Not: ürün kalemi testlerde kalem türü veritabanında ayarlanarak denendi. Teslimat için lojistik talep taslağı, stok düşümü, fatura/tahsilat ve onboarding/destek bağlantısı **yoktur**; sözleşme numarası yalnızca bilgi olarak gösterilir.
 
-**Henüz yapılmadı (sonraki dilimler):** özet göstergeler ve birleşik sipariş izleme (dilim 6). İstisnai dönüşüm bu epic'te desteklenmez.
+**Dilim 6 — Özet göstergeler ve birleşik izleme (1 Kasım 2026): uygulandı ve doğrulandı.** `GET /api/orders/summary` yalnızca **sayı** döndürür (tutar toplanmaz, gelir ya da tahsilat sayılmaz): devir bekleyen (onaylı, devri kabul edilmemiş), onay bekleyen, kısmen gerçekleşen, geciken sipariş; atanmamış ve geciken iş; açık, geciken teslimat; geciken hizmet başlangıcı; ilk gönderimden kabule ortalama devir kabul süresi (son kabul edilen en çok 200 devir, örnek sayısıyla). Her sayı kayıt boru hattının listesinden gelir; bu yüzden kullanıcının izni ve veri kapsamı dışındaki kayıtlar sayıya girmez ve gösterge listeyle aynı süzgeci kullanır. Ekran: `/siparisler/ozet` (kutular ilgili filtrelenmiş listeyi açar: `?gorunum=handover|partial|overdue`, `?durum=PendingApproval`, operasyon işlerinde `?gorunum=unassigned|overdue`; geciken teslimat ve hizmet başlangıçları ilk 10 kayıtla listelenir), menüde "Pano". Birleşik izleme: sipariş detayında teslimat/hizmet özeti (teslim edilen/etkin adet, açık ve geciken teslimat, hizmet durumu sayıları) ve siparişe bağlı aktiviteler; firma kartında ve fırsat ekranında ilişkili siparişler (`RelatedOrders`; durum, devir, gerçekleşme ve tutar, her biri kendi para biriminde).
+
+Dilim 6 doğrulaması: 3 yeni birim testi (ortalama hesabı), 3 yeni entegrasyon testi (sayıların doğruluğu ve listeyle aynı süzgeç, ortalama devir kabul süresi, tutar alanı yokluğu, izin / veri kapsamı / tenant sınırı, müşteri ve fırsat üzerinden siparişlere erişim, siparişe bağlı devir aktiviteleri); tarayıcıda pano ve süzgeç bağlantıları denendi.
+
+## 5. EPIC 8 kapanış durumu
+
+**Epic bütünüyle tamamlanmış sayılmaz.** Süreç omurgası (tekliften sipariş → yaşam döngüsü → satış devri → operasyon işi → teslimat/hizmet başlangıcı → izleme) uygulanmış ve doğrulanmıştır; aşağıdaki maddeler yapılmamış ya da kısmendir ve gerçek engel olarak kayıtlıdır.
+
+### Kabul senaryoları (15) ve kanıtları
+
+| # | Senaryo | Doğrulama |
+| --- | --- | --- |
+| 1 | Doğru kalem ve tutarlarla sipariş | `Accepted_quote_becomes_an_order_with_the_right_lines_totals_acceptance_and_trace` |
+| 2 | Uygun olmayan teklif reddi | `Drafts_rejected_cancelled_and_unknown_quotes_cannot_become_orders`, `Order_can_be_created_after_the_quote_validity_because_acceptance_was_already_checked` |
+| 3 | Çift tıklama, tekrar, eşzamanlı istek | `Repeated_and_concurrent_requests_produce_a_single_order` |
+| 4 | Kısmi dönüşümde kabul edilen miktar aşılmaz | `Partial_conversion_tracks_remaining_quantity_and_never_exceeds_the_accepted_quantity` |
+| 5 | Snapshot değişmez | `Later_customer_changes_do_not_change_the_order_snapshot_and_commercial_fields_stay_editable_only_in_draft` |
+| 6 | Eksik bilgiyle devir gönderilemez | `Incomplete_or_unapproved_handover_cannot_be_sent_and_only_senders_can_send` |
+| 7 | Bilgi iste / yeniden gönder | `Handover_flows_send_info_request_resubmit_and_accept_with_history_locks_and_follow_ups` |
+| 8 | Kabul işleri yalnızca bir kez üretir | `Accepting_a_handover_creates_the_delivery_and_service_jobs_once_with_lines_tasks_and_planning_from_the_handover`, `Job_creation_follows_the_configured_strategy_and_a_dependency_blocks_the_service_job_until_delivery_is_complete` |
+| 9 | Kısmi teslimat, kalan miktar, fazla teslimat engeli | `Partial_deliveries_track_remaining_quantity_and_block_over_delivery`, `Concurrent_deliveries_cannot_deliver_more_than_the_ordered_quantity` |
+| 10 | Eksik ön koşulla hizmet başlangıcı kaydedilemez | `Service_start_is_blocked_until_prerequisites_are_done_and_starting_is_not_completing`, `Service_start_waits_for_the_dependent_delivery_job_when_services_follow_delivery` |
+| 11 | Başlangıç tamamlanma sayılmaz | `Service_start_is_blocked_until_prerequisites_are_done_and_starting_is_not_completing` |
+| 12 | İptal/değişiklik gerçekleşmiş kayıtları silmez | `Approved_order_can_be_cancelled_and_cancellation_withdraws_a_pending_change_request`, `Cancelling_the_order_cancels_planned_deliveries_but_keeps_delivered_records`, `Cancelling_the_order_cancels_open_jobs_and_keeps_completed_ones` |
+| 13 | Yetkisiz kullanıcı işlem yapamaz, tutarları göremez | `Other_tenants_and_unauthorized_users_cannot_create_read_or_see_amounts`, `..._cannot_decide_see_amounts_or_reach_change_requests`, `Fulfillment_requires_an_accepted_handover_the_record_permission_and_tenant_scope`, `Summary_is_limited_by_permission_data_scope_and_tenant` |
+| 14 | Tenantlar arası erişim yok | yukarıdaki yetki testleri (kayıt, kanıt dosyası, iş) ve `Delivery_evidence_is_limited_by_type_content_and_size_and_download_follows_permissions_and_tenant`. **Kısmen:** zamanlayıcının tenant'lar arası izolasyonu ayrıca bir senaryoyla sınanmadı; her çalıştırma tek tenant bağlamında ve kendi kilidiyle koşar |
+| 15 | Arka plan hatasından sonra yeniden deneme mükerrer kayıt üretmez | `A_handover_waiting_too_long_gets_one_follow_up_per_round_and_the_job_can_be_repeated_safely`, `Unassigned_and_overdue_jobs_get_one_follow_up_each_and_the_scheduler_can_be_repeated_safely`. İş üretimi kabulle aynı işlemde yapıldığından ayrı yeniden deneme altyapısı yoktur: hata halinde kabul geri alınır ve yeniden denemek mükerrer iş üretmez (benzersiz filtreli indeks) |
+
+### Modüller arası entegrasyonların son durumu
+
+| İlişki | Durum |
+| --- | --- |
+| Firma/kişi → siparişler | Var: firma kartında ve fırsat ekranında ilişkili siparişler. Sipariş detayından firma kartına doğrudan bağlantı yok (sipariş taraf kimliği taşır, firma kimliği değil) |
+| Fırsat → teklif → sipariş | Var |
+| Ürün/hizmet/fiyat → sipariş kalemi ve snapshot | Var (kalemler kopyalanır; teklifteki ürün kimliği saklanır) |
+| Sözleşme | Kısmen: sözleşme numarası/kimliği referanstır, doğrulanmaz; kapsam ve başlangıç koşulları siparişe taşınmaz |
+| Aktivite | Var: devir takibi, eksik bilgi, kabul/atama/iş gecikmesi; sipariş detayında listelenir |
+| Onboarding | **Yok**: modül yok; mükerrer görev üretilmemesi için sahiplik kararı: sipariş sonrası operasyon görevleri bu epic'in sahipliğindedir, onboarding sonraki epic'tir |
+| Destek | **Yok** |
+| Raporlama | Kısmen: özet sayılar ve filtreli listeler; dışa aktarma ve tutar raporu yok |
+| Finans, stok, muhasebe, lojistik talebi | **Yok** ve varmış gibi gösterilmez; sipariş tutarı tahsilat ya da gelir değildir |
+
+### Kalan işler ve bilinen sınırlamalar
+
+- İstisnai (geçerliliği dolmuş teklifin) dönüşümü ve özel yetkisi desteklenmez.
+- Siparişe ekip ve business unit aktarımı yoktur (satış sorumlusu ve firma kapsamı vardır); operasyon ekibi serbest metindir (ekip lookup'ı yok).
+- Operasyon işine belge eklenmez; genel dosya deposu (Ç4) olmadığından yalnızca teslim kanıtı küçük bir tabloda tutulur.
+- Kur dönüşümü yoktur; farklı para birimleri ayrı gösterilir, toplanmaz.
+- Arayüz metinleri yalnızca Türkçedir (TR/EN altyapısı ayrı iş kalemidir).
+- Başlangıç ön koşulları hizmet şablonunun ilk üç görevinden okunur; müşteri başlangıç onayı serbest metin kişidir.
+- Katalogdan ürün satırı üretimi testlerde kalem türü veritabanında ayarlanarak simüle edildi.
+- Sipariş detayından firma kartına bağlantı, dışa aktarma ve zamanlayıcı tenant izolasyon senaryosu eksiktir.
+
+### Kullanıcının deneyebileceği kısa uçtan uca senaryo
+
+1. CRM'de teklifi sunun ve kabulü kaydedin; teklif ekranında "Sipariş oluştur" ile (`/siparisler/tekliften/{id}`) siparişi oluşturun.
+2. Siparişi onaya gönderin; başka bir kullanıcı onaylasın.
+3. `/siparisler/{id}/devir` ekranında devri hazırlayıp gönderin; operasyon kullanıcısı kabul etsin: iş kuyruğunda (`/siparisler/isler`) Teslimat ve Hizmet işleri oluşur.
+4. `/siparisler/{id}/teslimat` ekranında teslimatı planlayıp kısmi teslim edin, kanıt ekleyin; hizmet için ön koşul görevlerini tamamlayıp başlangıcı kaydedin, müşteri onayını girin, hizmeti tamamlayın.
+5. `/siparisler/ozet` panosundan sayıları ve sipariş detayından tüm süreci izleyin; tüm kalemler gerçekleşince siparişi kapatın.
 
 **Bilinen sınırlamalar (dilim 1):** manuel teklif kabulünde belge kanıtı yoktur (yalnızca not ve kullanıcı); sözleşme bağlantısı doğrulanmayan kimlik+numara referansıdır; PUT tam durum gönderir (platform kuralı), gönderilmeyen düzenlenebilir alan temizlenir.

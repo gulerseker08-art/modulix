@@ -94,3 +94,11 @@ public sealed record DeliveryActionRequest(
 public sealed record PlanServiceRequest(Guid OrderLineId, DateOnly? PlannedStartDate = null);
 
 public sealed record ServiceActionRequest(long Version, string? ConfirmedBy = null, string? Note = null);
+
+/// <summary>
+/// Sipariş ve operasyon özet göstergeleri (yalnızca sayılar; tutar toplanmaz). Sayılar kullanıcının izni ve veri kapsamıyla sınırlıdır.
+/// <paramref name="AverageHandoverAcceptanceHours"/>: ilk gönderimden kabule ortalama saat (son kabul edilen en çok 200 devir; örnek yoksa boş).
+/// </summary>
+public sealed record OrderSummaryDto(
+    int HandoverPending, int PendingApproval, int PartiallyFulfilled, int OverdueOrders, int UnassignedJobs, int OverdueJobs, int OverdueDeliveries,
+    int OverdueServiceStarts, int OpenDeliveries, double? AverageHandoverAcceptanceHours, int HandoverAcceptanceSample);

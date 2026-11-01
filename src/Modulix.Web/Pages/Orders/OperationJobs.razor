@@ -104,6 +104,9 @@
         ("mine", "Benim işlerim"), ("unassigned", "Atanmamış"), ("planned", "Planlanan"), ("progress", "Devam eden"), ("overdue", "Geciken"),
     ];
 
+    /// <summary>Özet panosundan gelen bağlantılar: <c>?gorunum=unassigned</c>, <c>?gorunum=overdue</c>.</summary>
+    [SupplyParameterFromQuery(Name = "gorunum")] public string? InitialView { get; set; }
+
     private PagedResult<OperationJobDto>? page;
     private string? message;
     private string? view;
@@ -118,6 +121,7 @@
         if (Session.Can(OrdersAccess.OrdersRead))
         {
             await Lookups.LoadAsync();
+            if (InitialView is not null && Presets.Any(p => p.Key == InitialView)) { view = InitialView; }
             await LoadAsync(1);
         }
     }

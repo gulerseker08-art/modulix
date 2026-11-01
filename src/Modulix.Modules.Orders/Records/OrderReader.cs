@@ -48,6 +48,11 @@ internal sealed class OrderReader(IModuleData data)
     public async Task<List<OrderHandoverItem>> HandoverItemsAsync(Guid handoverId, CancellationToken cancellationToken) =>
         await data.Set<OrderHandoverItem>().AsNoTracking().Where(i => i.HandoverId == handoverId).OrderBy(i => i.Position).ThenBy(i => i.CreatedAt).ToListAsync(cancellationToken);
 
+    /// <summary>Verilen devirlerin ilk gönderim zamanı (ilk Sent olayı); gönderilmemiş devir yoktur.</summary>
+    public async Task<Dictionary<Guid, DateTimeOffset>> FirstSentAtAsync(IReadOnlyList<Guid> handoverIds, CancellationToken cancellationToken) =>
+        await data.Set<OrderHandoverEvent>().AsNoTracking().Where(e => e.Kind == "Sent" && handoverIds.Contains(e.HandoverId))
+            .GroupBy(e => e.HandoverId).Select(g => new { g.Key, At = g.Min(e => e.CreatedAt) }).ToDictionaryAsync(x => x.Key, x => x.At, cancellationToken);
+
     public async Task<List<OrderHandoverEvent>> HandoverEventsAsync(Guid handoverId, CancellationToken cancellationToken) =>
         await data.Set<OrderHandoverEvent>().AsNoTracking().Where(e => e.HandoverId == handoverId).OrderBy(e => e.CreatedAt).ThenBy(e => e.Id).ToListAsync(cancellationToken);
 

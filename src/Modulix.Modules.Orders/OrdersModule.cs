@@ -363,6 +363,7 @@ public sealed class OrdersModule : IModule
         services.AddScoped<IOrderChangeRequests, OrderChangeRequests>();
         services.AddScoped<IOrderFromQuote, OrderFromQuote>();
         services.AddScoped<IOrderQueries, OrderQueries>();
+        services.AddScoped<IOrderSummary, OrderSummary>();
         services.AddScoped<IActivityLinkTarget, OrderLinkTarget>();
     }
 }

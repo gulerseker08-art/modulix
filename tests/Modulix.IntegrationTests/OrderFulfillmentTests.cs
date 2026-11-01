@@ -23,7 +23,7 @@ namespace Modulix.IntegrationTests;
 /// gerekçeli yeniden planlama, teslim kanıtı yükleme/indirme sınırları ve yetkisi, hizmet başlangıcı ön koşulları (görev, bağımlı iş), başlangıcın tamamlanma
 /// sayılmaması, karma siparişin ayrı izlenmesi, normal kapatma, sipariş iptali, tenant izolasyonu ve yetki.
 /// </summary>
-public class OrderFulfillmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
+public partial class OrderFulfillmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
     private static readonly byte[] Pdf = [.. "%PDF-1.4 teslim tutanagi"u8.ToArray()];
 
@@ -507,7 +507,7 @@ public class OrderFulfillmentTests(ModulixApiFactory factory) : IClassFixture<Mo
     }
 
     private sealed record Setup(
-        Tenant Tenant, ModulixUser Admin, ModulixUser Sales, ModulixUser Approver, ModulixUser Ops, ModulixUser Closer, ModulixUser Reader, Guid CompanyId);
+        Tenant Tenant, ModulixUser Admin, ModulixUser Sales, ModulixUser Approver, ModulixUser Ops, ModulixUser Closer, ModulixUser Reader, ModulixUser Own, ModulixUser NoAccess, Guid CompanyId);
 
     private async Task<Setup> SetUpAsync()
     {
@@ -520,6 +520,8 @@ public class OrderFulfillmentTests(ModulixApiFactory factory) : IClassFixture<Mo
         var ops = await factory.CreateUserAsync(tenant);
         var closer = await factory.CreateUserAsync(tenant);
         var reader = await factory.CreateUserAsync(tenant);
+        var own = await factory.CreateUserAsync(tenant);
+        var noAccess = await factory.CreateUserAsync(tenant);
         using (var scope = factory.OpenScope(tenant.Id))
         {
             var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
@@ -534,11 +536,12 @@ public class OrderFulfillmentTests(ModulixApiFactory factory) : IClassFixture<Mo
         await factory.CreateRoleAsync(tenant.Id, [OrdersRead, HandoversAccept, JobsAssign, JobsManage, FulfillmentRecord, .. activityWork], Scope.All, ops);
         await factory.CreateRoleAsync(tenant.Id, [OrdersRead, OrdersClose], Scope.All, closer);
         await factory.CreateRoleAsync(tenant.Id, [OrdersRead], Scope.All, reader);
+        await factory.CreateRoleAsync(tenant.Id, [OrdersRead], Scope.Own, own);
         using var client = await LoginAsync(admin);
         var company = await client.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Anka Ltd."));
         Assert.Equal(HttpStatusCode.Created, company.StatusCode);
         var companyId = (await company.Content.ReadFromJsonAsync<CompanyDto>())!.Id;
-        return new Setup(tenant, admin, sales, approver, ops, closer, reader, companyId);
+        return new Setup(tenant, admin, sales, approver, ops, closer, reader, own, noAccess, companyId);
     }
 
     private async Task<HttpClient> LoginAsync(ModulixUser user)

@@ -1,0 +1,83 @@
+@* İlişkili siparişler (ADR-0023, dilim 6): firma kartında müşterinin, fırsat ekranında kaynak fırsatın siparişleri. Sipariş modülü bu tenant için kapalıysa ya da
+   kullanıcının okuma izni yoksa bileşen hiçbir şey çizmez ve istek yapmaz; liste sunucuda izin ve veri kapsamıyla süzülür. Tutarlar yalnızca izni olana gösterilir ve
+   her sipariş kendi para biriminde yazılır (toplanmaz). *@
+@inject ApiClient Api
+@inject SessionState Session
+
+@if (Available)
+{
+    <section class="detail-section" aria-labelledby="related-orders-title">
+        <div class="section-header">
+            <h2 id="related-orders-title">@Title</h2>
+        </div>
+        @if (error is not null)
+        {
+            <p class="text-muted" role="status">@error</p>
+        }
+        else if (items is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (items.Count == 0)
+        {
+            <p class="text-muted">İlişkili sipariş yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">@Title</caption>
+                <thead>
+                    <tr><th scope="col">Sipariş</th><th scope="col">Durum</th><th scope="col">Devir</th><th scope="col">Gerçekleşme</th><th scope="col" class="text-end">Tutar</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var o in items)
+                    {
+                        <tr>
+                            <td data-label="Sipariş" class="primary"><a href="siparisler/@o.Id">@o.Title</a> <small class="text-muted">@o.Number</small></td>
+                            <td data-label="Durum"><span class="badge stage-@OrderLabels.StatusBadge(o.Status)">@OrderLabels.Label(OrderLabels.Statuses, o.Status)</span></td>
+                            <td data-label="Devir"><span class="badge stage-@OrderLabels.HandoverBadge(o.HandoverStatus)">@OrderLabels.Label(OrderLabels.Handovers, o.HandoverStatus)</span></td>
+                            <td data-label="Gerçekleşme"><span class="badge stage-@OrderLabels.FulfillmentBadge(o.FulfillmentStatus)">@OrderLabels.Label(OrderLabels.Fulfillments, o.FulfillmentStatus)</span></td>
+                            <td data-label="Tutar" class="text-end">@OrderLabels.Money(o.GrossTotal, o.Currency)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="small text-muted">Sipariş tutarıdır; tahsilat, fatura ya da gelir değildir. Para birimleri toplanmaz.</p>
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlyList<OrderDto>? items;
+    private string? error;
+    private string? loadedFor;
+
+    [Parameter] public string Title { get; set; } = "Siparişler";
+
+    /// <summary>Ortak müşteri (taraf) kaydı; firma kartında firmanın <c>PartyId</c> değeri.</summary>
+    [Parameter] public Guid? PartyId { get; set; }
+
+    /// <summary>Kaynak fırsat: fırsattan açılan tekliflerden doğan siparişler.</summary>
+    [Parameter] public Guid? SourceOpportunityId { get; set; }
+
+    private bool Available => Session.IsModuleEnabled(OrdersAccess.ModuleKey) && Session.Can(OrdersAccess.OrdersRead) && (PartyId is not null || SourceOpportunityId is not null);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Available)
+        {
+            return;
+        }
+
+        var query = PartyId is { } party ? $"partyId={party}" : $"sourceOpportunityId={SourceOpportunityId}";
+        if (loadedFor == query)
+        {
+            return;
+        }
+
+        loadedFor = query;
+        var result = await Api.GetAsync<PagedResult<OrderDto>>($"/api/orders/orders?{query}&pageSize=20");
+        items = result.Value?.Items;
+        error = result.IsSuccess ? null : result.Error;
+    }
+}

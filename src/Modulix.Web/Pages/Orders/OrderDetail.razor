@@ -226,12 +226,50 @@
                 <span class="badge stage-@OrderLabels.FulfillmentBadge(order.FulfillmentStatus)">@OrderLabels.Label(OrderLabels.Fulfillments, order.FulfillmentStatus)</span>
                 <span class="text-muted"> Ürün kalemleri kısmi teslimatla, hizmet kalemleri başlangıç kaydıyla ayrı izlenir; teslim kanıtı ve müşteri onayı kaydedilir.</span>
             </p>
+            @if (fulfillment is not null)
+            {
+                <ul class="small">
+                    @if (fulfillment.Products.Count > 0)
+                    {
+                        <li>Ürün: @OrderLabels.Quantity(fulfillment.Products.Sum(p => p.Delivered), null) / @OrderLabels.Quantity(fulfillment.Products.Sum(p => p.Effective), null) adet teslim edildi · açık teslimat @fulfillment.Deliveries.Count(d => d.Status == "Planned")@(fulfillment.Deliveries.Any(d => d.IsOverdue) ? " (gecikmiş var)" : null)</li>
+                    }
+                    @if (fulfillment.Services.Count > 0)
+                    {
+                        <li>Hizmet: @fulfillment.Services.Count(s => s.Start?.Status == "Completed") tamamlandı · @fulfillment.Services.Count(s => s.Start?.Status == "Started") devam ediyor · @fulfillment.Services.Count(s => s.Start is null or { Status: "Planned" }) başlamadı</li>
+                    }
+                </ul>
+            }
             <a class="btn btn-outline-primary" href="siparisler/@order.Id/teslimat">Teslimat ekranını aç</a>
         </section>
 
         <OrderJobsPanel Order="order" Lines="lines ?? []" />
 
         <OrderChangeRequestsPanel Order="order" Lines="lines ?? []" Changed="LoadAsync" />
+
+        @if (Session.IsModuleEnabled(CrmAccess.ModuleKey) && Session.Can(CrmAccess.ActivitiesRead))
+        {
+            <section aria-labelledby="activities-title">
+                <h2 id="activities-title">Aktiviteler</h2>
+                @if (activities is null)
+                {
+                    <p class="text-muted" role="status">Yükleniyor…</p>
+                }
+                else if (activities.Count == 0)
+                {
+                    <p class="text-muted">Bu siparişe bağlı aktivite yok. Devir takibi, eksik bilgi ve gecikme görevleri burada görünür.</p>
+                }
+                else
+                {
+                    <ul>
+                        @foreach (var a in activities)
+                        {
+                            <li><strong>@a.Subject</strong> <span class="text-muted">· @(a.Status == "Completed" ? "tamamlandı" : a.DueAt is { } due ? "son tarih " + CrmLabels.Time(due) : "açık")@(a.OwnerId is null ? null : " · " + Lookups.MemberName(a.OwnerId))</span></li>
+                        }
+                    </ul>
+                    <a href="crm/aktiviteler">Aktivite listesi</a>
+                }
+            </section>
+        }
 
         <section aria-labelledby="history-title">
             <h2 id="history-title">İşlem geçmişi</h2>
@@ -265,6 +303,8 @@
 
     private OrderDto? order;
     private List<OrderLineDto>? lines;
+    private FulfillmentDto? fulfillment;
+    private List<ActivityDto>? activities;
     private List<OrderHistoryDto>? history;
     private IReadOnlyDictionary<string, string[]>? errors;
     private string? notice;
@@ -317,6 +357,11 @@
         lines = lineResult.Value?.Items.ToList() ?? [];
         var historyResult = await Api.GetAsync<List<OrderHistoryDto>>($"/api/orders/orders/{Id}/history");
         history = historyResult.Value ?? [];
+        fulfillment = (await Api.GetAsync<FulfillmentDto>($"/api/orders/orders/{Id}/fulfillment")).Value;
+        if (Session.IsModuleEnabled(CrmAccess.ModuleKey) && Session.Can(CrmAccess.ActivitiesRead))
+        {
+            activities = (await Api.GetAsync<CrmPage<ActivityDto>>($"/api/crm/activities?related=orders.order:{Id}&pageSize=10")).Value?.Items.ToList() ?? [];
+        }
     }
 
     /// <summary>Durum eylemi uygulandı: sipariş, kalemler ve geçmiş yeniden yüklenir.</summary>

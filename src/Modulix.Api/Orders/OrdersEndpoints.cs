@@ -46,6 +46,12 @@ public static class OrdersEndpoints
         ResourceEndpoints.MapResource<ServiceStartDto, SaveServiceStartRequest>(group, Prefix, "service-starts", OrdersModule.Entities.ServiceStart,
             OrdersModule.Permissions.OrdersRead, OrdersModule.Permissions.FulfillmentRecord, OrdersModule.Permissions.FulfillmentRecord);
 
+        group.MapGet("/summary", async (IOrderSummary service, CancellationToken ct) =>
+        {
+            var result = await service.GetAsync(ct);
+            return result.IsSuccess ? Results.Ok(Map<OrderSummaryDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+
         var orders = group.MapGroup("/orders");
         orders.MapGet("/{id:guid}/history", async (Guid id, IOrderQueries queries, CancellationToken ct) =>
         {
