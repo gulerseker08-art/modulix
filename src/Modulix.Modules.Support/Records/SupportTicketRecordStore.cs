@@ -4,6 +4,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Support.Domain;
 using Modulix.Modules.Support.Lifecycle;
+using Modulix.Modules.Support.Sla;
 
 namespace Modulix.Modules.Support.Records;
 
@@ -61,6 +62,8 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         Field.Time<SupportTicket>("closedAt", t => t.ClosedAt, (t, v) => t.ClosedAt = v).AsSystem(),
         Field.Integer<SupportTicket>("reopenCount", t => t.ReopenCount, (t, v) => t.ReopenCount = v ?? 0).AsSystem(),
         Field.Time<SupportTicket>("firstResponseAt", t => t.FirstResponseAt, (t, v) => t.FirstResponseAt = v).AsSystem(),
+        Field.Time<SupportTicket>("firstResponseDueAt", t => t.FirstResponseDueAt, (t, v) => t.FirstResponseDueAt = v).AsSystem(),
+        Field.Time<SupportTicket>("resolutionDueAt", t => t.ResolutionDueAt, (t, v) => t.ResolutionDueAt = v).AsSystem(),
         Field.Time<SupportTicket>("lastActivityAt", t => t.LastActivityAt, (t, v) => t.LastActivityAt = v ?? DateTimeOffset.UtcNow).AsSystem(),
         Field.Id<SupportTicket>("createdBy", t => t.CreatedBy, (t, v) => t.CreatedBy = v).AsSystem(),
         Field.Id<SupportTicket>("updatedBy", t => t.UpdatedBy, (t, v) => t.UpdatedBy = v).AsSystem(),
@@ -90,6 +93,16 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
                 && (t.Status == TicketStatus.New || t.Status == TicketStatus.Triage || t.Status == TicketStatus.Assigned || t.Status == TicketStatus.InProgress
                     || t.Status == TicketStatus.WaitingCustomer || t.Status == TicketStatus.WaitingInternal || t.Status == TicketStatus.Reopened)) == flag)
             : null,
+        // SLA ihlali: açık (çalışan/duraklatılmış) SLA örneği hedef anını aşmış (işaretlenmiş ya da hedef anı geçmiş). Gösterge ve liste bu süzgeci paylaşır.
+        ["slaBreached"] = (q, v, ctx) => FilterValue.Bool(v) is { } flag
+            ? q.Where(t => ctx.Data.Set<SlaInstance>().Any(i => i.TicketId == t.Id && (i.Status == SlaStatus.Running || i.Status == SlaStatus.Paused)
+                && (i.BreachedAt != null || (i.Status == SlaStatus.Running && i.DueAt != null && i.DueAt <= DateTimeOffset.UtcNow))) == flag)
+            : null,
+        // SLA riski: çalışan, henüz ihlal olmamış örneğin ilk uyarı eşiği geçmiş.
+        ["slaAtRisk"] = (q, v, ctx) => FilterValue.Bool(v) is { } flag
+            ? q.Where(t => ctx.Data.Set<SlaInstance>().Any(i => i.TicketId == t.Id && i.Status == SlaStatus.Running && i.BreachedAt == null
+                && (i.DueAt == null || i.DueAt > DateTimeOffset.UtcNow) && i.WarningAt != null && i.WarningAt <= DateTimeOffset.UtcNow) == flag)
+            : null,
         // Yanıtsız: çalışılan durumda ve henüz ilk insan yanıtı verilmemiş.
         ["awaitingFirstResponse"] = (q, v, _) => FilterValue.Bool(v) is { } flag
             ? q.Where(t => (t.FirstResponseAt == null
@@ -116,6 +129,8 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         "priority" => source.OrderBy(t => t.Priority == TicketPriority.Critical ? 0 : t.Priority == TicketPriority.High ? 1 : t.Priority == TicketPriority.Normal ? 2 : 3).ThenBy(t => t.CreatedAt),
         "createdAt" => source.OrderBy(t => t.CreatedAt),
         "-lastActivity" => source.OrderByDescending(t => t.LastActivityAt),
+        "resolutionDue" => source.OrderBy(t => t.ResolutionDueAt == null).ThenBy(t => t.ResolutionDueAt),
+        "firstResponseDue" => source.OrderBy(t => t.FirstResponseDueAt == null).ThenBy(t => t.FirstResponseDueAt),
         _ => Order(source),
     };
 
@@ -146,6 +161,8 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
     private Guid? beforeParty;
     private Guid? beforePerson;
     private Guid? beforeCategory;
+    private string? beforePriority;
+    private DateTimeOffset? beforeFirstResponse;
 
     protected override void OnUpdating(SupportTicket entity)
     {
@@ -155,6 +172,8 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         beforeParty = entity.PartyId;
         beforePerson = entity.PersonId;
         beforeCategory = entity.CategoryId;
+        beforePriority = entity.Priority;
+        beforeFirstResponse = entity.FirstResponseAt;
     }
 
     protected override async Task<JsonObject> PrepareNewAsync(SupportTicket entity, JsonObject values, CancellationToken cancellationToken)
@@ -298,6 +317,12 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
                 // Tanımsız başvuranı ortak firmaya/kişiye bağlamak (ya da değiştirmek) tarihçeye düşer.
                 TicketHistory.Add(Context, entity, TicketEventKinds.CustomerLinked, null, beforeStatus, beforeOwner, beforeQueue);
             }
+
+            // SLA örnekleri talebin durumu, önceliği ve ilk yanıtıyla aynı işlemde eşitlenir.
+            if (entity.Status != beforeStatus || entity.Priority != beforePriority || entity.FirstResponseAt != beforeFirstResponse)
+            {
+                await SlaEngine.OnUpdatedAsync(Context, entity, beforeStatus, beforePriority, beforeFirstResponse, cancellationToken);
+            }
         }
     }
 
@@ -309,6 +334,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         entity.LastActivityAt = DateTimeOffset.UtcNow;
         entity.Priority = PriorityMatrix.Compute(entity.Impact, entity.Urgency);
         TicketHistory.Add(Context, entity, TicketEventKinds.Created, null, null, null, null);
+        await SlaEngine.OnCreatedAsync(Context, entity, cancellationToken);
     }
 
     protected override Task BeforeDeleteAsync(SupportTicket entity, CancellationToken cancellationToken) =>
@@ -318,7 +344,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
 /// <summary>Liste sıralama anahtarları.</summary>
 public static class TicketSort
 {
-    public static readonly IReadOnlyList<string> All = ["number", "-number", "subject", "priority", "createdAt", "-lastActivity"];
+    public static readonly IReadOnlyList<string> All = ["number", "-number", "subject", "priority", "createdAt", "-lastActivity", "resolutionDue", "firstResponseDue"];
 }
 
 /// <summary>Tarihçe satırı yazımı; talep güncellemesiyle aynı işlemde kaydedilir. Mesaj gövdesi tarihçeye girmez.</summary>

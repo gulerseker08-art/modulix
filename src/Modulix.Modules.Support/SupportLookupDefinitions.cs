@@ -17,6 +17,9 @@ public static class SupportLookupDefinitions
     public const string TicketParent = "support.ticket.parent";
     public const string CategoryParent = "support.category.parent";
     public const string CategoryQueue = "support.category.queue";
+    public const string PolicyCalendar = "support.sla-policy.calendar";
+    public const string PolicyCategory = "support.sla-policy.category";
+    public const string PolicyParty = "support.sla-policy.party";
 
     private static readonly string[] PartyLabel = ["name"];
     private static readonly string[] PartySecondary = ["city", "taxNumber"];
@@ -74,6 +77,22 @@ public static class SupportLookupDefinitions
         {
             LabelFields = NameLabel,
             SearchDescription = "Kuyruk adı",
+        },
+        new(PolicyCalendar, SupportModule.Entities.SlaPolicy, "calendarId", "Takvim", LookupTargetKind.Record, SupportModule.Entities.SlaCalendar)
+        {
+            LabelFields = NameLabel,
+            SearchDescription = "Takvim adı",
+        },
+        new(PolicyCategory, SupportModule.Entities.SlaPolicy, "categoryId", "Kategori", LookupTargetKind.Record, SupportModule.Entities.Category)
+        {
+            LabelFields = NameLabel,
+            SearchDescription = "Kategori adı",
+        },
+        new(PolicyParty, SupportModule.Entities.SlaPolicy, "partyId", "Müşteri", LookupTargetKind.Record, SharedEntities.Party)
+        {
+            LabelFields = PartyLabel,
+            SecondaryFields = PartySecondary,
+            SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir",
         },
     ];
 }

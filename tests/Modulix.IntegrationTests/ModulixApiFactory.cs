@@ -45,6 +45,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             .UseSetting("QuoteExpiry:WorkerEnabled", "false")
             .UseSetting("ContractJobs:WorkerEnabled", "false")
             .UseSetting("OrderJobs:WorkerEnabled", "false")
+            .UseSetting("SupportJobs:WorkerEnabled", "false")
 
             // Sözleşme imza simülasyonunun webhook gizli anahtarı (yalnızca testlerde; gerçek ortamda ortam değişkeniyle verilir).
             .UseSetting("ContractSignature:Simulation:WebhookSecret", ModulixApiFactory.SignatureWebhookSecret);

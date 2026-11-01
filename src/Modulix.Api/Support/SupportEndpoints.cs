@@ -39,7 +39,29 @@ public static class SupportEndpoints
             return result.IsSuccess ? Results.Ok(Map<TicketSummaryDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
+        ResourceEndpoints.MapResource<SlaCalendarDto, SaveSlaCalendarRequest>(group, Prefix, "sla-calendars", SupportModule.Entities.SlaCalendar,
+            SupportModule.Permissions.SlaManage, SupportModule.Permissions.SlaManage);
+        ResourceEndpoints.MapResource<SlaPolicyDto, SaveSlaPolicyRequest>(group, Prefix, "sla-policies", SupportModule.Entities.SlaPolicy,
+            SupportModule.Permissions.SlaManage, SupportModule.Permissions.SlaManage);
+
+        // SLA: önizleme yönetim izniyle; talep SLA'sı talep okuma iznine ve veri kapsamına bağlıdır (kapsam dışı talep 404); yeniden hesaplama ayrı izin ve gerekçe ister.
+        group.MapPost("/sla/preview", async (SlaPreviewRequest r, ITicketSla sla, CancellationToken ct) =>
+        {
+            var result = await sla.PreviewAsync(new SlaPreviewInput(r.TypeKey, r.CategoryId, r.Priority, r.PartyId, r.StartAt), ct);
+            return result.IsSuccess ? Results.Ok(Map<SlaPreviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.SlaManage);
+
         var tickets = group.MapGroup("/tickets");
+        tickets.MapGet("/{id:guid}/sla", async (Guid id, ITicketSla sla, CancellationToken ct) =>
+        {
+            var result = await sla.GetAsync(id, ct);
+            return result.IsSuccess ? Results.Ok(Map<List<SlaInstanceDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+        tickets.MapPost("/{id:guid}/sla/recalculate", async (Guid id, SlaRecalculateRequest r, ITicketSla sla, CancellationToken ct) =>
+        {
+            var result = await sla.RecalculateAsync(id, r.Version, r.Reason, ct);
+            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<TicketDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapGet("/{id:guid}/history", async (Guid id, ITicketQueries queries, CancellationToken ct) =>
         {
             var result = await queries.HistoryAsync(id, ct);

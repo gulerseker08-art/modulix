@@ -1,0 +1,561 @@
+@page "/destek/sla"
+@using System.Globalization
+@using System.Text.Json
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>SLA yönetimi · Modulix</PageTitle>
+
+<AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.SlaManage">
+    <div class="page-header">
+        <div>
+            <h1>SLA ve eskalasyon</h1>
+            <p class="text-muted mb-0">Politika seçimi: yalnızca etkin ve kısıtlarının hepsi talebe uyan politikalar aday olur; önce daha çok kısıtı olan, sonra öncelik sayısı küçük olan, sonra ad sırası kazanır. Hiçbiri uymazsa varsayılan politika kullanılır; o da yoksa talep hedefsiz kalır. Politika değişikliği açık taleplerin hedeflerini <strong>değiştirmez</strong> (anlık görüntü); gerekirse talep sayfasından yetkili yeniden hesaplama yapılır.</p>
+        </div>
+        <div class="header-actions"><a class="btn btn-outline-secondary" href="destek/ayarlar">Kuyruklar ve kategoriler</a></div>
+    </div>
+
+    <Notice Text="@message" Failed="@failed" />
+
+    <section aria-labelledby="cal-title">
+        <h2 id="cal-title">İş takvimleri</h2>
+        @if (calendars is null) { <p class="text-muted" role="status">Yükleniyor…</p> }
+        else if (calendars.Count == 0) { <p class="text-muted">Takvim yok: politikalar takvimsiz 7/24 hesaplanır.</p> }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">İş takvimleri</caption>
+                <thead><tr><th scope="col">Takvim</th><th scope="col">Saat dilimi</th><th scope="col">Çalışma saatleri</th><th scope="col">Tatil</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+                <tbody>
+                    @foreach (var c in calendars)
+                    {
+                        <tr>
+                            <td data-label="Takvim" class="primary">@c.Name</td>
+                            <td data-label="Saat dilimi">@(c.IsAlwaysOpen ? "7/24" : c.TimeZoneId)</td>
+                            <td data-label="Çalışma saatleri">@WeeklySummary(c)</td>
+                            <td data-label="Tatil">@HolidayCount(c)</td>
+                            <td data-label="Durum"><span class="badge stage-@(c.IsActive ? "won" : "cancelled")">@(c.IsActive ? "Etkin" : "Pasif")</span></td>
+                            <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => EditCalendar(c)" disabled="@busy">Düzenle</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <form class="record-form" novalidate @onsubmit="SaveCalendarAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <legend class="h6">@(cal.Id is null ? "Yeni takvim" : "Takvimi düzenle")</legend>
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label" for="cal-name">Ad</label>
+                        <input id="cal-name" class="form-control" maxlength="100" @bind="cal.Name" />
+                        <FieldError Field="name" Errors="calErrors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="cal-zone">Saat dilimi</label>
+                        <input id="cal-zone" class="form-control" list="zones" maxlength="64" @bind="cal.TimeZoneId" />
+                        <datalist id="zones"><option value="Europe/Istanbul"></option><option value="UTC"></option><option value="Europe/Berlin"></option><option value="Europe/London"></option></datalist>
+                        <FieldError Field="timeZoneId" Errors="calErrors" />
+                    </div>
+                    <div class="span-12 form-check">
+                        <input id="cal-always" class="form-check-input" type="checkbox" @bind="cal.AlwaysOpen" />
+                        <label class="form-check-label" for="cal-always">7/24 (çalışma saati ve tatil uygulanmaz)</label>
+                    </div>
+                    @if (!cal.AlwaysOpen)
+                    {
+                        <div class="span-12">
+                            <span class="form-label d-block">Çalışma saatleri (yerel saat; gün başına tek pencere)</span>
+                            @foreach (var (day, label) in SlaLabels.Days)
+                            {
+                                var row = cal.Days[day];
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                    <div class="form-check" style="min-width:9rem">
+                                        <input id="day-@day" class="form-check-input" type="checkbox" @bind="row.Enabled" />
+                                        <label class="form-check-label" for="day-@day">@label</label>
+                                    </div>
+                                    <label class="visually-hidden" for="day-start-@day">@label başlangıç</label>
+                                    <input id="day-start-@day" type="time" class="form-control form-control-sm" style="max-width:8rem" @bind="row.Start" disabled="@(!row.Enabled)" />
+                                    <span aria-hidden="true">–</span>
+                                    <label class="visually-hidden" for="day-end-@day">@label bitiş</label>
+                                    <input id="day-end-@day" type="time" class="form-control form-control-sm" style="max-width:8rem" @bind="row.End" disabled="@(!row.Enabled)" />
+                                </div>
+                            }
+                            <FieldError Field="weeklyHours" Errors="calErrors" />
+                        </div>
+                        <div class="span-12">
+                            <label class="form-label" for="cal-holidays">Tatiller (satır başına bir tane)</label>
+                            <textarea id="cal-holidays" class="form-control" rows="4" @bind="cal.HolidaysText" placeholder="2026-10-29; Cumhuriyet Bayramı&#10;2026-10-28; Arife; 09:00-13:00"></textarea>
+                            <small class="text-muted">Biçim: <code>yyyy-MM-dd; ad</code> (tam gün kapalı) ya da <code>yyyy-MM-dd; ad; SS:dd-SS:dd</code> (yalnızca o pencere açık, yarım gün).</small>
+                            <FieldError Field="holidays" Errors="calErrors" />
+                        </div>
+                    }
+                    <div class="span-12 form-check">
+                        <input id="cal-active" class="form-check-input" type="checkbox" @bind="cal.IsActive" />
+                        <label class="form-check-label" for="cal-active">Etkin</label>
+                    </div>
+                </div>
+            </fieldset>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">@(cal.Id is null ? "Takvim ekle" : "Kaydet")</button>
+                @if (cal.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewCalendar">Vazgeç</button> }
+            </div>
+        </form>
+    </section>
+
+    <section aria-labelledby="pol-title">
+        <h2 id="pol-title">SLA politikaları</h2>
+        @if (policies is null) { <p class="text-muted" role="status">Yükleniyor…</p> }
+        else if (policies.Count == 0) { <p class="text-muted">Politika yok: talepler hedefsiz açılır.</p> }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">SLA politikaları</caption>
+                <thead><tr><th scope="col">Politika</th><th scope="col">Kısıtlar</th><th scope="col">Hedefler</th><th scope="col">Takvim</th><th scope="col">Sıra</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+                <tbody>
+                    @foreach (var p in policies)
+                    {
+                        <tr>
+                            <td data-label="Politika" class="primary">@p.Name <small class="text-muted">sürüm @p.Revision@(p.IsDefault ? " · varsayılan" : null)</small></td>
+                            <td data-label="Kısıtlar">@Constraints(p)</td>
+                            <td data-label="Hedefler">@Targets(p)</td>
+                            <td data-label="Takvim">@(p.CalendarId is { } id ? calendars?.FirstOrDefault(c => c.Id == id)?.Name ?? "—" : "7/24")</td>
+                            <td data-label="Sıra">@p.Precedence</td>
+                            <td data-label="Durum"><span class="badge stage-@(p.IsActive ? "won" : "cancelled")">@(p.IsActive ? "Etkin" : "Pasif")</span></td>
+                            <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => EditPolicy(p)" disabled="@busy">Düzenle</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <form class="record-form" novalidate @onsubmit="SavePolicyAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <legend class="h6">@(pol.Id is null ? "Yeni politika" : "Politikayı düzenle (kaydedilince sürüm artar; açık talepler etkilenmez)")</legend>
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label" for="pol-name">Ad</label>
+                        <input id="pol-name" class="form-control" maxlength="100" @bind="pol.Name" />
+                        <FieldError Field="name" Errors="polErrors" />
+                    </div>
+                    <div class="span-3">
+                        <label class="form-label" for="pol-prec">Öncelik sırası (küçük kazanır)</label>
+                        <input id="pol-prec" type="number" min="0" max="1000" class="form-control" @bind="pol.Precedence" />
+                        <FieldError Field="precedence" Errors="polErrors" />
+                    </div>
+                    <div class="span-3 form-check align-self-end">
+                        <input id="pol-active" class="form-check-input" type="checkbox" @bind="pol.IsActive" />
+                        <label class="form-check-label" for="pol-active">Etkin</label>
+                    </div>
+                    <div class="span-12"><label class="form-label" for="pol-desc">Açıklama</label><input id="pol-desc" class="form-control" maxlength="500" @bind="pol.Description" /></div>
+
+                    <div class="span-12 form-check">
+                        <input id="pol-default" class="form-check-input" type="checkbox" @bind="pol.IsDefault" />
+                        <label class="form-check-label" for="pol-default">Varsayılan (yedek) politika: kısıtsız olmalı; hiçbir özel politika uymazsa kullanılır</label>
+                        <FieldError Field="isDefault" Errors="polErrors" />
+                    </div>
+                    @if (!pol.IsDefault)
+                    {
+                        <div class="span-3">
+                            <label class="form-label" for="pol-type">Tür</label>
+                            <select id="pol-type" class="form-select" @bind="pol.TypeKey">
+                                <option value="">Tümü</option>
+                                @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList)) { <option value="@t.Key">@t.Label</option> }
+                            </select>
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="pol-priority">Öncelik</label>
+                            <select id="pol-priority" class="form-select" @bind="pol.Priority">
+                                <option value="">Tümü</option>
+                                @foreach (var (key, label) in SupportLabels.Priorities) { <option value="@key">@label</option> }
+                            </select>
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="pol-category">Kategori</label>
+                            <LookupPicker Id="pol-category" LookupKey="support.sla-policy.category" @bind-Value="pol.CategoryId" Placeholder="Tümü" />
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="pol-party">Müşteri</label>
+                            <LookupPicker Id="pol-party" LookupKey="support.sla-policy.party" @bind-Value="pol.PartyId" Placeholder="Tümü" />
+                        </div>
+                    }
+                    <div class="span-3">
+                        <label class="form-label" for="pol-fr">İlk yanıt hedefi (dk)</label>
+                        <input id="pol-fr" type="number" min="1" max="525600" class="form-control" @bind="pol.FirstResponseMinutes" />
+                        <FieldError Field="firstResponseMinutes" Errors="polErrors" />
+                    </div>
+                    <div class="span-3">
+                        <label class="form-label" for="pol-res">Çözüm hedefi (dk)</label>
+                        <input id="pol-res" type="number" min="1" max="525600" class="form-control" @bind="pol.ResolutionMinutes" />
+                        <FieldError Field="resolutionMinutes" Errors="polErrors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="pol-cal">Takvim</label>
+                        <LookupPicker Id="pol-cal" LookupKey="support.sla-policy.calendar" @bind-Value="pol.CalendarId" Placeholder="Takvimsiz (7/24)" />
+                        <FieldError Field="calendarId" Errors="polErrors" />
+                    </div>
+                    <div class="span-6 form-check">
+                        <input id="pol-pc" class="form-check-input" type="checkbox" @bind="pol.PauseOnWaitingCustomer" />
+                        <label class="form-check-label" for="pol-pc">Müşteriden bilgi beklenirken sayacı durdur</label>
+                    </div>
+                    <div class="span-6 form-check">
+                        <input id="pol-pi" class="form-check-input" type="checkbox" @bind="pol.PauseOnWaitingInternal" />
+                        <label class="form-check-label" for="pol-pi">İç ekip beklenirken de sayacı durdur (varsayılan hayır)</label>
+                    </div>
+
+                    <div class="span-12">
+                        <span class="form-label d-block">Eskalasyon kuralları <small class="text-muted">(hedefin yüzdesine ulaşılınca; 100 = hedef/ihlal, 100 üstü ihlal sonrası; her kural talep başına bir kez uygulanır)</small></span>
+                        @for (var i = 0; i < pol.Rules.Count; i++)
+                        {
+                            var rule = pol.Rules[i];
+                            var index = i;
+                            <div class="border rounded p-2 mb-2">
+                                <div class="d-flex flex-wrap gap-2 align-items-end">
+                                    <div>
+                                        <label class="form-label small" for="r-id-@index">Kimlik</label>
+                                        <input id="r-id-@index" class="form-control form-control-sm" style="max-width:8rem" maxlength="20" @bind="rule.Id" />
+                                    </div>
+                                    <div>
+                                        <label class="form-label small" for="r-metric-@index">Ölçüt</label>
+                                        <select id="r-metric-@index" class="form-select form-select-sm" @bind="rule.Metric">
+                                            @foreach (var (key, label) in SlaLabels.Metrics) { <option value="@key">@label</option> }
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label small" for="r-pct-@index">Yüzde</label>
+                                        <input id="r-pct-@index" type="number" min="1" max="500" class="form-control form-control-sm" style="max-width:6rem" @bind="rule.Percent" />
+                                    </div>
+                                    <div>
+                                        <label class="form-label small" for="r-action-@index">Eylem</label>
+                                        <select id="r-action-@index" class="form-select form-select-sm" @bind="rule.Action">
+                                            @foreach (var (key, label) in SlaLabels.Actions) { <option value="@key">@label</option> }
+                                        </select>
+                                    </div>
+                                    @if (rule.Action is "NotifyUser" or "Reassign")
+                                    {
+                                        <div>
+                                            <label class="form-label small" for="r-user-@index">Kullanıcı</label>
+                                            <LookupPicker Id="@($"r-user-{index}")" LookupKey="support.ticket.owner" @bind-Value="rule.UserId" Placeholder="Kullanıcı seçin…" />
+                                        </div>
+                                    }
+                                    @if (rule.Action == "Reassign")
+                                    {
+                                        <div>
+                                            <label class="form-label small" for="r-queue-@index">Kuyruk</label>
+                                            <LookupPicker Id="@($"r-queue-{index}")" LookupKey="support.ticket.queue" @bind-Value="rule.QueueId" Placeholder="Kuyruk seçin…" />
+                                        </div>
+                                    }
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => pol.Rules.RemoveAt(index)">Kuralı kaldır</button>
+                                </div>
+                            </div>
+                        }
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddRule">Kural ekle</button>
+                        <FieldError Field="escalationRules" Errors="polErrors" />
+                    </div>
+                </div>
+            </fieldset>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">@(pol.Id is null ? "Politika ekle" : "Kaydet")</button>
+                @if (pol.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewPolicy">Vazgeç</button> }
+            </div>
+        </form>
+    </section>
+
+    <section aria-labelledby="prev-title">
+        <h2 id="prev-title">Örnek talep için önizleme</h2>
+        <p class="small text-muted">Hangi politika seçilir ve hedefler ne zaman olur? Hiçbir şey yazılmaz.</p>
+        <form class="record-form" novalidate @onsubmit="PreviewAsync" @onsubmit:preventDefault>
+            <div class="form-grid">
+                <div class="span-3">
+                    <label class="form-label" for="pv-type">Tür</label>
+                    <select id="pv-type" class="form-select" @bind="pv.TypeKey">
+                        @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList)) { <option value="@t.Key">@t.Label</option> }
+                    </select>
+                </div>
+                <div class="span-3">
+                    <label class="form-label" for="pv-priority">Öncelik</label>
+                    <select id="pv-priority" class="form-select" @bind="pv.Priority">
+                        @foreach (var (key, label) in SupportLabels.Priorities) { <option value="@key">@label</option> }
+                    </select>
+                </div>
+                <div class="span-3">
+                    <label class="form-label" for="pv-category">Kategori</label>
+                    <LookupPicker Id="pv-category" LookupKey="support.sla-policy.category" @bind-Value="pv.CategoryId" Placeholder="Kategorisiz" />
+                </div>
+                <div class="span-3">
+                    <label class="form-label" for="pv-party">Müşteri</label>
+                    <LookupPicker Id="pv-party" LookupKey="support.sla-policy.party" @bind-Value="pv.PartyId" Placeholder="Müşterisiz" />
+                </div>
+                <div class="span-4">
+                    <label class="form-label" for="pv-start">Açılış anı (boşsa şimdi)</label>
+                    <input id="pv-start" type="datetime-local" class="form-control" @bind="pv.StartAt" />
+                </div>
+            </div>
+            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Önizle</button></div>
+            <FieldError Field="typeKey" Errors="pvErrors" />
+        </form>
+        @if (preview is not null)
+        {
+            @if (!preview.Matched)
+            {
+                <div class="alert alert-warning" role="status">Hiçbir politika uymuyor: bu talep <strong>hedefsiz</strong> açılır.</div>
+            }
+            else
+            {
+                <div class="alert alert-info" role="status">
+                    Seçilen politika: <strong>@preview.PolicyName</strong> (sürüm @preview.PolicyRevision) · @(preview.AlwaysOpen ? "7/24" : preview.CalendarName) ·
+                    müşteri beklemesi @(preview.PauseOnWaitingCustomer ? "durdurur" : "durdurmaz"), iç ekip beklemesi @(preview.PauseOnWaitingInternal ? "durdurur" : "durdurmaz")
+                    <ul class="mb-0">
+                        @foreach (var m in preview.Metrics)
+                        {
+                            <li>@SlaLabels.Label(SlaLabels.Metrics, m.Metric): hedef @SlaLabels.Duration(m.TargetMinutes) iş süresi → <strong>@CrmLabels.Time(m.DueAt)</strong>@(m.WarningAt is { } w ? $" (ilk uyarı {CrmLabels.Time(w)})" : null)</li>
+                        }
+                        @foreach (var r in preview.Rules)
+                        {
+                            <li>Eskalasyon «@r.Id»: @SlaLabels.Label(SlaLabels.Metrics, r.Metric) %@r.Percent → @SlaLabels.Label(SlaLabels.Actions, r.Action)</li>
+                        }
+                    </ul>
+                </div>
+            }
+        }
+    </section>
+</AuthGate>
+
+@code {
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    private List<SlaCalendarDto>? calendars;
+    private List<SlaPolicyDto>? policies;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private CalForm cal = CalForm.New();
+    private PolForm pol = new();
+    private PreviewForm pv = new();
+    private SlaPreviewDto? preview;
+    private IReadOnlyDictionary<string, string[]>? calErrors;
+    private IReadOnlyDictionary<string, string[]>? polErrors;
+    private IReadOnlyDictionary<string, string[]>? pvErrors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(SupportAccess.SlaManage)) { return; }
+        await Lookups.LoadAsync();
+        pv.TypeKey = Lookups.DefaultOf(SupportLabels.TicketTypeList) ?? "Support";
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        calendars = (await Api.GetAsync<PagedResult<SlaCalendarDto>>("/api/support/sla-calendars?pageSize=200")).Value?.Items.ToList() ?? [];
+        policies = (await Api.GetAsync<PagedResult<SlaPolicyDto>>("/api/support/sla-policies?pageSize=200")).Value?.Items.ToList() ?? [];
+    }
+
+    // ---- Takvim
+
+    private void NewCalendar() { cal = CalForm.New(); calErrors = null; }
+
+    private void EditCalendar(SlaCalendarDto c)
+    {
+        cal = CalForm.New();
+        cal.Id = c.Id; cal.Version = c.Version; cal.Name = c.Name; cal.TimeZoneId = c.TimeZoneId; cal.AlwaysOpen = c.IsAlwaysOpen; cal.IsActive = c.IsActive;
+        foreach (var day in cal.Days.Values) { day.Enabled = false; }
+        foreach (var w in ParseWeekly(c.WeeklyHours))
+        {
+            if (cal.Days.TryGetValue(w.Day, out var row)) { row.Enabled = true; row.Start = TimeOnly.ParseExact(w.Start, "HH:mm", CultureInfo.InvariantCulture); row.End = TimeOnly.ParseExact(w.End, "HH:mm", CultureInfo.InvariantCulture); }
+        }
+
+        cal.HolidaysText = string.Join('\n', ParseHolidays(c.Holidays).Select(h => h.Window is { } win ? $"{h.Date}; {h.Name}; {win}" : $"{h.Date}; {h.Name}"));
+        calErrors = null;
+    }
+
+    private async Task SaveCalendarAsync()
+    {
+        calErrors = null;
+        var holidays = new List<object>();
+        foreach (var line in cal.HolidaysText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parts = line.Split(';', StringSplitOptions.TrimEntries);
+            string? start = null, end = null;
+            if (parts.Length > 2 && parts[2].Split('-', StringSplitOptions.TrimEntries) is { Length: 2 } window) { start = window[0]; end = window[1]; }
+            holidays.Add(new { date = parts[0], name = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : null, start, end });
+        }
+
+        var weekly = cal.Days.Where(d => d.Value.Enabled).Select(d => new { day = d.Key, start = d.Value.Start.ToString("HH:mm", CultureInfo.InvariantCulture), end = d.Value.End.ToString("HH:mm", CultureInfo.InvariantCulture) });
+        var request = new SaveSlaCalendarRequest(
+            cal.Id is null ? 0 : cal.Version, cal.Name, cal.TimeZoneId, cal.AlwaysOpen, cal.AlwaysOpen ? null : JsonSerializer.Serialize(weekly, Json),
+            cal.AlwaysOpen || holidays.Count == 0 ? null : JsonSerializer.Serialize(holidays, Json), cal.IsActive);
+        if (await RunAsync(() => cal.Id is null ? Api.PostAsync<SlaCalendarDto>("/api/support/sla-calendars", request) : Api.PutAsync<SlaCalendarDto>($"/api/support/sla-calendars/{cal.Id}", request),
+                "Takvim kaydedildi.", e => calErrors = e))
+        {
+            NewCalendar();
+        }
+    }
+
+    private static IEnumerable<(int Day, string Start, string End)> ParseWeekly(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) { yield break; }
+        using var doc = JsonDocument.Parse(json);
+        foreach (var e in doc.RootElement.EnumerateArray())
+        {
+            yield return (e.GetProperty("day").GetInt32(), e.GetProperty("start").GetString() ?? "09:00", e.GetProperty("end").GetString() ?? "18:00");
+        }
+    }
+
+    private static IEnumerable<(string Date, string Name, string? Window)> ParseHolidays(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) { yield break; }
+        using var doc = JsonDocument.Parse(json);
+        foreach (var e in doc.RootElement.EnumerateArray())
+        {
+            var start = e.TryGetProperty("start", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() : null;
+            var end = e.TryGetProperty("end", out var en) && en.ValueKind == JsonValueKind.String ? en.GetString() : null;
+            yield return (e.GetProperty("date").GetString() ?? string.Empty, e.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString()! : string.Empty, start is not null && end is not null ? $"{start}-{end}" : null);
+        }
+    }
+
+    private static string WeeklySummary(SlaCalendarDto c)
+    {
+        if (c.IsAlwaysOpen) { return "7/24"; }
+        var groups = ParseWeekly(c.WeeklyHours).GroupBy(w => (w.Start, w.End)).Select(g => $"{string.Join(", ", g.Select(w => SlaLabels.ShortDay(w.Day)))} {g.Key.Start}-{g.Key.End}");
+        return string.Join("; ", groups);
+    }
+
+    private static string HolidayCount(SlaCalendarDto c) => c.IsAlwaysOpen ? "—" : $"{ParseHolidays(c.Holidays).Count()} gün";
+
+    // ---- Politika
+
+    private void NewPolicy() { pol = new PolForm(); polErrors = null; }
+
+    private void EditPolicy(SlaPolicyDto p)
+    {
+        pol = new PolForm
+        {
+            Id = p.Id, Version = p.Version, Name = p.Name, Description = p.Description, IsActive = p.IsActive, IsDefault = p.IsDefault, Precedence = p.Precedence, TypeKey = p.TypeKey ?? string.Empty,
+            CategoryId = p.CategoryId, Priority = p.Priority ?? string.Empty, PartyId = p.PartyId, FirstResponseMinutes = p.FirstResponseMinutes, ResolutionMinutes = p.ResolutionMinutes,
+            CalendarId = p.CalendarId, PauseOnWaitingCustomer = p.PauseOnWaitingCustomer, PauseOnWaitingInternal = p.PauseOnWaitingInternal,
+        };
+        if (!string.IsNullOrWhiteSpace(p.EscalationRules))
+        {
+            pol.Rules = JsonSerializer.Deserialize<List<RuleRow>>(p.EscalationRules, Json) ?? [];
+        }
+
+        polErrors = null;
+    }
+
+    private void AddRule() => pol.Rules.Add(new RuleRow { Id = $"k{pol.Rules.Count + 1}", Metric = "Resolution", Percent = 75, Action = "NotifyOwner" });
+
+    private async Task SavePolicyAsync()
+    {
+        polErrors = null;
+        var rules = pol.Rules.Count == 0 ? null : JsonSerializer.Serialize(pol.Rules.Select(r => new { id = r.Id, metric = r.Metric, percent = r.Percent, action = r.Action, userId = r.Action is "NotifyUser" or "Reassign" ? r.UserId : null, queueId = r.Action == "Reassign" ? r.QueueId : null }), Json);
+        var request = new SaveSlaPolicyRequest(
+            pol.Id is null ? 0 : pol.Version, pol.Name, string.IsNullOrWhiteSpace(pol.Description) ? null : pol.Description.Trim(), pol.IsActive, pol.IsDefault, pol.Precedence,
+            pol.IsDefault || pol.TypeKey.Length == 0 ? null : pol.TypeKey, pol.IsDefault ? null : pol.CategoryId, pol.IsDefault || pol.Priority.Length == 0 ? null : pol.Priority, pol.IsDefault ? null : pol.PartyId,
+            pol.FirstResponseMinutes, pol.ResolutionMinutes, pol.CalendarId, pol.PauseOnWaitingCustomer, pol.PauseOnWaitingInternal, rules);
+        if (await RunAsync(() => pol.Id is null ? Api.PostAsync<SlaPolicyDto>("/api/support/sla-policies", request) : Api.PutAsync<SlaPolicyDto>($"/api/support/sla-policies/{pol.Id}", request),
+                "Politika kaydedildi.", e => polErrors = e))
+        {
+            NewPolicy();
+        }
+    }
+
+    private static string Constraints(SlaPolicyDto p)
+    {
+        var parts = new List<string>();
+        if (p.TypeKey is not null) { parts.Add("tür: " + p.TypeKey); }
+        if (p.Priority is not null) { parts.Add("öncelik: " + SupportLabels.Label(SupportLabels.Priorities, p.Priority)); }
+        if (p.CategoryId is not null) { parts.Add("kategori"); }
+        if (p.PartyId is not null) { parts.Add("müşteri"); }
+        return parts.Count == 0 ? (p.IsDefault ? "yedek (kısıtsız)" : "kısıtsız") : string.Join(", ", parts);
+    }
+
+    private static string Targets(SlaPolicyDto p) =>
+        string.Join(" · ", new[] { p.FirstResponseMinutes is { } f ? "ilk yanıt " + SlaLabels.Duration(f) : null, p.ResolutionMinutes is { } r ? "çözüm " + SlaLabels.Duration(r) : null }.Where(x => x is not null));
+
+    // ---- Önizleme
+
+    private async Task PreviewAsync()
+    {
+        pvErrors = null;
+        preview = null;
+        busy = true;
+        var request = new SlaPreviewRequest(pv.TypeKey, pv.Priority, pv.CategoryId, pv.PartyId, pv.StartAt is { } at ? new DateTimeOffset(at) : null);
+        var result = await Api.PostAsync<SlaPreviewDto>("/api/support/sla/preview", request);
+        busy = false;
+        failed = !result.IsSuccess;
+        message = result.IsSuccess ? null : result.Error;
+        pvErrors = result.FieldErrors;
+        preview = result.Value;
+    }
+
+    private async Task<bool> RunAsync<T>(Func<Task<ApiResult<T>>> call, string done, Action<IReadOnlyDictionary<string, string[]>>? errors = null)
+    {
+        busy = true;
+        message = null;
+        var result = await call();
+        busy = false;
+        failed = !result.IsSuccess;
+        message = result.IsSuccess ? done : result.Error;
+        if (!result.IsSuccess) { errors?.Invoke(result.FieldErrors); return false; }
+        await ReloadAsync();
+        return true;
+    }
+
+    private sealed class DayRow { public bool Enabled { get; set; } public TimeOnly Start { get; set; } = new(9, 0); public TimeOnly End { get; set; } = new(18, 0); }
+
+    private sealed class CalForm
+    {
+        public Guid? Id { get; set; }
+        public long Version { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string TimeZoneId { get; set; } = "Europe/Istanbul";
+        public bool AlwaysOpen { get; set; }
+        public bool IsActive { get; set; } = true;
+        public string HolidaysText { get; set; } = string.Empty;
+        public Dictionary<int, DayRow> Days { get; } = Enumerable.Range(0, 7).ToDictionary(d => d, d => new DayRow { Enabled = d is >= 1 and <= 5 });
+
+        public static CalForm New() => new();
+    }
+
+    private sealed class RuleRow
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Metric { get; set; } = "Resolution";
+        public int Percent { get; set; } = 75;
+        public string Action { get; set; } = "NotifyOwner";
+        public Guid? UserId { get; set; }
+        public Guid? QueueId { get; set; }
+    }
+
+    private sealed class PolForm
+    {
+        public Guid? Id { get; set; }
+        public long Version { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsActive { get; set; } = true;
+        public bool IsDefault { get; set; }
+        public int Precedence { get; set; } = 100;
+        public string TypeKey { get; set; } = string.Empty;
+        public Guid? CategoryId { get; set; }
+        public string Priority { get; set; } = string.Empty;
+        public Guid? PartyId { get; set; }
+        public int? FirstResponseMinutes { get; set; } = 60;
+        public int? ResolutionMinutes { get; set; } = 480;
+        public Guid? CalendarId { get; set; }
+        public bool PauseOnWaitingCustomer { get; set; } = true;
+        public bool PauseOnWaitingInternal { get; set; }
+        public List<RuleRow> Rules { get; set; } = [];
+    }
+
+    private sealed class PreviewForm
+    {
+        public string TypeKey { get; set; } = "Support";
+        public string Priority { get; set; } = "Normal";
+        public Guid? CategoryId { get; set; }
+        public Guid? PartyId { get; set; }
+        public DateTime? StartAt { get; set; }
+    }
+}

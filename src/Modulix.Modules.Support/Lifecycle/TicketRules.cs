@@ -117,6 +117,10 @@ public static class TicketEventKinds
     public const string Cancelled = "Cancelled";
     public const string PriorityChanged = "PriorityChanged";
     public const string CustomerLinked = "CustomerLinked";
+    public const string SlaBreached = "SlaBreached";
+    public const string SlaEscalated = "SlaEscalated";
+    public const string SlaRecalculationRequested = "SlaRecalculationRequested";
+    public const string SlaRecalculated = "SlaRecalculated";
     public const string PublicReply = "PublicReply";
     public const string CustomerMessage = "CustomerMessage";
     public const string InternalNote = "InternalNote";

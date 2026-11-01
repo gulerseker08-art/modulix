@@ -4416,3 +4416,26 @@ button.pipeline-label {
         grid-template-columns: minmax(0, 1fr);
     }
 }
+
+/* SLA kartları (ADR-0024 dilim 2) */
+.sla-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.sla-card {
+    border: 1px solid var(--mx-border);
+    border-radius: .5rem;
+    padding: .75rem 1rem;
+    background: var(--mx-surface);
+}
+
+    .sla-card header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: .5rem;
+        margin-bottom: .5rem;
+    }
