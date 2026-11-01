@@ -1,0 +1,279 @@
+@page "/destek/talepler/{Id:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>@(ticket is null ? "Talep" : ticket.Number) · Modulix</PageTitle>
+
+<AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.TicketsRead">
+    @if (notFound)
+    {
+        <div class="alert alert-warning" role="alert">Talep bulunamadı ya da erişim yetkiniz yok. <a href="destek/talepler">Taleplere dön</a></div>
+    }
+    else if (ticket is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <h1>@ticket.Subject</h1>
+                <p class="mb-0">
+                    <span class="text-muted">@ticket.Number</span>
+                    <span class="badge stage-@SupportLabels.StatusBadge(ticket.Status)">@SupportLabels.Label(SupportLabels.Statuses, ticket.Status)</span>
+                    <span class="badge stage-@SupportLabels.PriorityBadge(ticket.Priority)">Öncelik: @SupportLabels.Label(SupportLabels.Priorities, ticket.Priority)@(ticket.PriorityOverridden ? " (elle)" : null)</span>
+                    <span class="text-muted">· @Lookups.Label(SupportLabels.TicketTypeList, ticket.TypeKey)</span>
+                </p>
+                <p class="small text-muted mb-0">Sorumlu: <strong>@(ticket.OwnerId is null ? "Atanmamış" : Lookups.MemberName(ticket.OwnerId))</strong> · Açılış: @CrmLabels.Time(ticket.CreatedAt) · İlk yanıt: @(ticket.FirstResponseAt is { } first ? CrmLabels.Time(first) : "henüz yok")</p>
+            </div>
+            <div class="header-actions">
+                <a class="btn btn-outline-secondary" href="destek/talepler">Taleplere dön</a>
+                @if (Session.Can(SupportAccess.TicketsCreate))
+                {
+                    <a class="btn btn-outline-secondary" href="@RelatedHref">İlişkili talep aç</a>
+                }
+            </div>
+        </div>
+
+        <TicketActionsPanel Ticket="ticket" Changed="OnChangedAsync" />
+
+        <div class="detail-columns">
+            <div>
+                <section aria-labelledby="messages-title">
+                    <h2 id="messages-title">Yazışma</h2>
+                    @if (messages is null)
+                    {
+                        <p class="text-muted" role="status">Yükleniyor…</p>
+                    }
+                    else if (messages.Count == 0)
+                    {
+                        <p class="text-muted">Henüz mesaj yok.</p>
+                    }
+                    else
+                    {
+                        <ol class="timeline">
+                            @foreach (var m in messages)
+                            {
+                                <li class="@(m.Visibility == "Internal" ? "timeline-internal" : null)">
+                                    <strong>@Describe(m)</strong>
+                                    <span class="text-muted small"> · @CrmLabels.Time(m.CreatedAt) · @(m.AuthorId is null ? "Sistem" : Lookups.MemberName(m.AuthorId))</span>
+                                    <div class="message-body">@m.Body</div>
+                                    @if (SupportLabels.Delivery(m.DeliveryStatus) is { Length: > 0 } delivery) { <small class="text-muted">@delivery</small> }
+                                </li>
+                            }
+                        </ol>
+                    }
+
+                    @if (CanWrite)
+                    {
+                        <form class="record-form" novalidate @onsubmit="SendAsync" @onsubmit:preventDefault>
+                            <fieldset disabled="@sending">
+                                <legend class="h6">Yeni mesaj</legend>
+                                <div role="radiogroup" aria-label="Mesaj türü" class="filters">
+                                    @foreach (var (key, label) in KindsAllowed)
+                                    {
+                                        <label class="chip @(kind == key ? "active" : null)">
+                                            <input type="radio" class="visually-hidden" name="msg-kind" value="@key" checked="@(kind == key)" @onchange="() => kind = key" />@label
+                                        </label>
+                                    }
+                                </div>
+                                @if (kind == "note")
+                                {
+                                    <p class="small text-muted mb-1">İç not müşteriye hiçbir yoldan gönderilmez ve müşteri çıktılarına girmez.</p>
+                                }
+                                else if (kind == "reply")
+                                {
+                                    <p class="small text-muted mb-1">Yanıt müşteriye görünür; müşterinin e-postası varsa e-posta kuyruğuna alınır (müşteriye ulaştığı doğrulanmaz).</p>
+                                }
+                                <label class="form-label visually-hidden" for="msg-body">Mesaj metni</label>
+                                <textarea id="msg-body" class="form-control" rows="3" maxlength="8000" @bind="body" aria-invalid="@(Has("body") ? "true" : null)"></textarea>
+                                <FieldError Field="body" Errors="sendErrors" />
+                            </fieldset>
+                            <Notice Text="@sendMessage" Failed="true" />
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary" disabled="@sending">Gönder</button>
+                            </div>
+                        </form>
+                    }
+                </section>
+
+                <section aria-labelledby="history-title">
+                    <h2 id="history-title">Tarihçe</h2>
+                    @if (history is null)
+                    {
+                        <p class="text-muted" role="status">Yükleniyor…</p>
+                    }
+                    else
+                    {
+                        <ol class="history-list">
+                            @foreach (var h in history)
+                            {
+                                <li>
+                                    <strong>@SupportLabels.History(h.Kind)</strong>
+                                    <span class="text-muted small"> · @CrmLabels.Time(h.At) · @(h.ActorId is null ? "Sistem" : Lookups.MemberName(h.ActorId))</span>
+                                    @if (h.FromStatus != h.ToStatus && h.ToStatus is not null) { <div class="small">@SupportLabels.Label(SupportLabels.Statuses, h.FromStatus) → @SupportLabels.Label(SupportLabels.Statuses, h.ToStatus)</div> }
+                                    @if (h.FromOwnerId != h.ToOwnerId) { <div class="small">Sorumlu: @(h.FromOwnerId is null ? "—" : Lookups.MemberName(h.FromOwnerId)) → @(h.ToOwnerId is null ? "Atanmamış" : Lookups.MemberName(h.ToOwnerId))</div> }
+                                    @if (!string.IsNullOrEmpty(h.Reason)) { <div class="small">Gerekçe: @h.Reason</div> }
+                                </li>
+                            }
+                        </ol>
+                    }
+                </section>
+            </div>
+
+            <aside aria-labelledby="info-title">
+                <h2 id="info-title">Talep bilgileri</h2>
+                <dl class="detail-list">
+                    <dt>Müşteri</dt>
+                    <dd>
+                        @if (ticket.PartyId is { } party)
+                        {
+                            @(ticket.CustomerName ?? "—")
+                        }
+                        else
+                        {
+                            <span>@(ticket.ReporterName ?? "—") <span class="badge stage-open">Müşteri tanımsız</span></span>
+                        }
+                    </dd>
+                    @if (ticket.ReporterEmail is { Length: > 0 }) { <dt>Başvuran e-postası</dt><dd>@ticket.ReporterEmail</dd> }
+                    @if (ticket.ReporterPhone is { Length: > 0 }) { <dt>Başvuran telefonu</dt><dd>@ticket.ReporterPhone</dd> }
+                    <dt>Kanal</dt><dd>@SupportLabels.Label(SupportLabels.Channels, ticket.Channel)</dd>
+                    <dt>Etki / aciliyet</dt><dd>@SupportLabels.Label(SupportLabels.Levels, ticket.Impact) / @SupportLabels.Label(SupportLabels.Levels, ticket.Urgency)</dd>
+                    @if (ticket.PriorityReason is { Length: > 0 }) { <dt>Öncelik gerekçesi</dt><dd>@ticket.PriorityReason</dd> }
+                    @if (ticket.StatusReason is { Length: > 0 }) { <dt>Durum gerekçesi</dt><dd>@ticket.StatusReason</dd> }
+                    @if (ticket.ParentTicketId is { } parent) { <dt>İlişkili talep</dt><dd><a href="destek/talepler/@parent">Önceki talep</a></dd> }
+                    @if (ticket.EventDate is { } eventDate) { <dt>Olay tarihi</dt><dd>@SupportLabels.Date(eventDate)</dd> }
+                    @if (ticket.ExpectedOutcome is { Length: > 0 }) { <dt>Beklenen sonuç</dt><dd>@ticket.ExpectedOutcome</dd> }
+                    @if (ticket.Description is { Length: > 0 }) { <dt>Açıklama</dt><dd class="message-body">@ticket.Description</dd> }
+                </dl>
+
+                @if (ticket.ResolutionCode is not null)
+                {
+                    <h3 class="h6">Çözüm</h3>
+                    <dl class="detail-list">
+                        <dt>Kod</dt><dd>@Lookups.Label(SupportLabels.ResolutionCodeList, ticket.ResolutionCode)</dd>
+                        <dt>Açıklama</dt><dd class="message-body">@ticket.ResolutionNote</dd>
+                        @if (ticket.RootCause is { Length: > 0 }) { <dt>Kök neden</dt><dd>@ticket.RootCause</dd> }
+                        @if (ticket.CorrectiveAction is { Length: > 0 }) { <dt>Düzeltici aksiyon</dt><dd>@ticket.CorrectiveAction</dd> }
+                        <dt>Çözen / zaman</dt><dd>@Lookups.MemberName(ticket.ResolvedBy) · @(ticket.ResolvedAt is { } at ? CrmLabels.Time(at) : "—")</dd>
+                        @if (ticket.ReopenCount > 0) { <dt>Yeniden açılma</dt><dd>@ticket.ReopenCount kez; önceki çözüm kayıtları denetim kaydında</dd> }
+                    </dl>
+                }
+
+                @if (Session.Can(SupportAccess.TicketsWrite) && ticket.PartyId is null && !TicketStatusFinal)
+                {
+                    <h3 class="h6">Müşteriye bağla</h3>
+                    <p class="small text-muted">Başvuran mevcut bir müşteriyse seçerek talebi o kayda bağlayın; yeni müşteri kaydı açılmaz.</p>
+                    <label class="form-label" for="link-party">Müşteri</label>
+                    <LookupPicker Id="link-party" LookupKey="support.ticket.party" @bind-Value="linkPartyId" Placeholder="Müşteri ara…" />
+                    <FieldError Field="partyId" Errors="linkErrors" />
+                    <Notice Text="@linkMessage" Failed="true" />
+                    <div class="form-actions"><button type="button" class="btn btn-outline-secondary" disabled="@(linkPartyId is null || sending)" @onclick="LinkAsync">Bağla</button></div>
+                }
+            </aside>
+        </div>
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private TicketDto? ticket;
+    private List<TicketMessageDto>? messages;
+    private List<TicketHistoryDto>? history;
+    private bool notFound;
+    private string kind = "reply";
+    private string body = string.Empty;
+    private bool sending;
+    private string? sendMessage;
+    private IReadOnlyDictionary<string, string[]>? sendErrors;
+    private Guid? linkPartyId;
+    private string? linkMessage;
+    private IReadOnlyDictionary<string, string[]>? linkErrors;
+
+    private string RelatedHref => ticket is null ? "destek/talepler/yeni" : ticket.PartyId is { } party ? $"destek/talepler/yeni?iliskili={ticket.Id}&musteri={party}" : $"destek/talepler/yeni?iliskili={ticket.Id}";
+
+    private bool TicketStatusFinal => ticket is { Status: "Closed" or "Cancelled" };
+
+    private bool CanWrite => ticket is not null && !TicketStatusFinal && (Session.Can(SupportAccess.MessagesReply) || Session.Can(SupportAccess.NotesWrite));
+
+    private IEnumerable<(string Key, string Label)> KindsAllowed => SupportLabels.MessageKinds.Where(k =>
+        k.Key == "note" ? Session.Can(SupportAccess.NotesWrite) : Session.Can(SupportAccess.MessagesReply));
+
+    private bool Has(string field) => sendErrors?.ContainsKey(field) == true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(SupportAccess.TicketsRead)) { return; }
+        await Lookups.LoadAsync();
+        await ReloadAsync();
+        kind = KindsAllowed.FirstOrDefault().Key ?? "reply";
+    }
+
+    private async Task ReloadAsync()
+    {
+        var result = await Api.GetAsync<TicketDto>($"/api/support/tickets/{Id}");
+        notFound = !result.IsSuccess;
+        ticket = result.Value;
+        if (ticket is null) { return; }
+        messages = (await Api.GetAsync<List<TicketMessageDto>>($"/api/support/tickets/{Id}/messages")).Value ?? [];
+        history = (await Api.GetAsync<List<TicketHistoryDto>>($"/api/support/tickets/{Id}/history")).Value ?? [];
+    }
+
+    private async Task OnChangedAsync(TicketDto updated)
+    {
+        ticket = updated;
+        messages = (await Api.GetAsync<List<TicketMessageDto>>($"/api/support/tickets/{Id}/messages")).Value ?? [];
+        history = (await Api.GetAsync<List<TicketHistoryDto>>($"/api/support/tickets/{Id}/history")).Value ?? [];
+    }
+
+    private static string Describe(TicketMessageDto m) => m.Direction switch
+    {
+        "Outbound" => "Müşteriye yanıt",
+        "Inbound" => "Müşteriden gelen mesaj",
+        _ => "İç not (müşteriye gitmez)",
+    };
+
+    private async Task SendAsync()
+    {
+        if (sending) { return; }
+        sending = true;
+        sendMessage = null;
+        sendErrors = null;
+        var result = await Api.PostAsync<TicketMessageDto>($"/api/support/tickets/{Id}/messages", new AddTicketMessageRequest(kind, body));
+        sending = false;
+        if (!result.IsSuccess)
+        {
+            sendMessage = result.Error;
+            sendErrors = result.FieldErrors;
+            return;
+        }
+
+        body = string.Empty;
+        await ReloadAsync();
+    }
+
+    private async Task LinkAsync()
+    {
+        if (ticket is null || linkPartyId is null || sending) { return; }
+        sending = true;
+        linkMessage = null;
+        linkErrors = null;
+        var request = new SaveTicketRequest(
+            ticket.Version, ticket.Subject, ticket.Description, ticket.TypeKey, ticket.Channel, linkPartyId, ticket.PersonId, ticket.ReporterName, ticket.ReporterEmail, ticket.ReporterPhone,
+            ticket.CategoryId, ticket.Impact, ticket.Urgency, EventDate: ticket.EventDate, ExpectedOutcome: ticket.ExpectedOutcome);
+        var result = await Api.PutAsync<TicketDto>($"/api/support/tickets/{Id}", request);
+        sending = false;
+        if (!result.IsSuccess)
+        {
+            linkMessage = result.Error;
+            linkErrors = result.FieldErrors;
+            return;
+        }
+
+        linkPartyId = null;
+        await ReloadAsync();
+    }
+}
