@@ -12,6 +12,7 @@ public static class OrdersLookupDefinitions
     public const string OrderPerson = "orders.order.person";
     public const string OrderOwner = "orders.order.owner";
     public const string HandoverResponsible = "orders.handover.responsible";
+    public const string JobResponsible = "orders.operation-job.responsible";
 
     private static readonly string[] PersonLabel = ["firstName", "lastName"];
     private static readonly string[] PersonSecondary = ["title", "email"];
@@ -28,6 +29,11 @@ public static class OrdersLookupDefinitions
             DependsOnHint = "Müşteri sipariş oluşturulurken tekliften gelir; kişiler o müşteriyle sınırlanır.",
         },
         new(HandoverResponsible, OrdersModule.Entities.Handover, "responsibleUserId", "Sorumlu operasyon kullanıcısı", LookupTargetKind.Member)
+        {
+            SearchDescription = "Üyenin görünen adı",
+            PageSize = 20,
+        },
+        new(JobResponsible, OrdersModule.Entities.Job, "responsibleUserId", "Sorumlu", LookupTargetKind.Member)
         {
             SearchDescription = "Üyenin görünen adı",
             PageSize = 20,

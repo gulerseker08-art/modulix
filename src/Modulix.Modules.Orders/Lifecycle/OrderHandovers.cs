@@ -47,6 +47,7 @@ internal sealed class OrderHandovers(
     OrderReader reader,
     OrdersStoreContext storeContext,
     TimeProvider time,
+    IOperationJobGenerator jobs,
     IOrderPolicyProvider? policy = null,
     IFollowUpActivities? followUps = null) : IOrderHandovers
 {
@@ -182,9 +183,22 @@ internal sealed class OrderHandovers(
                 await HandoverSync.MirrorAsync(ctx, h, token);
             });
             var updated = await pipeline.UpdateAsync(new RecordCommand(OrdersModule.Entities.Handover, handoverId, values, version) { Reason = $"handover.{kind}" }, ct);
-            return updated.IsSuccess
-                ? RecordResult<OrderHandoverView>.Ok(await ViewAsync(updated.Value!, ct))
-                : RecordResult<OrderHandoverView>.Fail(updated.Error!.Code, updated.Error.Message, updated.Error.FieldErrors);
+            if (!updated.IsSuccess)
+            {
+                return RecordResult<OrderHandoverView>.Fail(updated.Error!.Code, updated.Error.Message, updated.Error.FieldErrors);
+            }
+
+            // Kabul edilen devir için operasyon işleri aynı işlemde üretilir (bir kez; hata halinde kabul de geri alınır ve yeniden denenebilir).
+            if (action == HandoverAction.Accept)
+            {
+                var generated = await jobs.GenerateAsync(handoverId, permission, ct);
+                if (!generated.IsSuccess)
+                {
+                    return RecordResult<OrderHandoverView>.Fail(generated.Error!.Code, generated.Error.Message, generated.Error.FieldErrors);
+                }
+            }
+
+            return RecordResult<OrderHandoverView>.Ok(await ViewAsync(updated.Value!, ct));
         }, cancellationToken);
         if (!result.IsSuccess)
         {

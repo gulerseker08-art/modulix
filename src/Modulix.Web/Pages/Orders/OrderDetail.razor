@@ -220,6 +220,8 @@
             <a class="btn btn-outline-primary" href="siparisler/@order.Id/devir">@(order.HandoverStatus == "NotStarted" ? "Devri hazırla" : "Devir ekranını aç")</a>
         </section>
 
+        <OrderJobsPanel Order="order" Lines="lines ?? []" />
+
         <OrderChangeRequestsPanel Order="order" Lines="lines ?? []" Changed="LoadAsync" />
 
         <section aria-labelledby="history-title">

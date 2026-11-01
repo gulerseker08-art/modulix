@@ -52,7 +52,7 @@ internal abstract class OrdersRecordStore<TEntity>(OrdersStoreContext context) :
 
     /// <summary>Kapı açıkken güncelleme eylemin izniyle yapılır (ör. onaylayan yazma iznine sahip olmak zorunda değildir).</summary>
     public IReadOnlyList<string>? AnyPermissionFor(RecordOperation operation) =>
-        operation == RecordOperation.Update && context.Gate.Permissions is { } permissions ? permissions : null;
+        operation is RecordOperation.Update or RecordOperation.Create && context.Gate.Permissions is { } permissions ? permissions : null;
 
     string? IRecordStore.OwnerField => IsOwned ? OwnerField : null;
 

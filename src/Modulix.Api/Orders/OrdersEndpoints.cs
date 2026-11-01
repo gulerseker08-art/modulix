@@ -36,6 +36,11 @@ public static class OrdersEndpoints
         ResourceEndpoints.MapResource<HandoverItemDto, SaveHandoverItemRequest>(group, Prefix, "handover-items", OrdersModule.Entities.HandoverItem,
             OrdersModule.Permissions.OrdersRead, OrdersModule.Permissions.HandoversWrite, OrdersModule.Permissions.HandoversWrite, OrdersModule.Permissions.HandoversWrite);
 
+        ResourceEndpoints.MapResource<OperationJobDto, SaveOperationJobRequest>(group, Prefix, "operation-jobs", OrdersModule.Entities.Job,
+            OrdersModule.Permissions.OrdersRead, OrdersModule.Permissions.JobsManage, OrdersModule.Permissions.JobsManage);
+        ResourceEndpoints.MapResource<OperationTaskDto, SaveOperationTaskRequest>(group, Prefix, "operation-tasks", OrdersModule.Entities.JobTask,
+            OrdersModule.Permissions.OrdersRead, OrdersModule.Permissions.JobsManage, OrdersModule.Permissions.JobsManage, OrdersModule.Permissions.JobsManage);
+
         var orders = group.MapGroup("/orders");
         orders.MapGet("/{id:guid}/history", async (Guid id, IOrderQueries queries, CancellationToken ct) =>
         {
@@ -145,8 +150,51 @@ public static class OrdersEndpoints
             }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         }
 
+        // Operasyon işi (dilim 4): devir kabulünde otomatik üretilir; elle iş açma, atama, başlatma, tamamlama, iptal ve bağımlılık uç noktaları.
+        orders.MapPost("/{id:guid}/jobs", async (Guid id, CreateOperationJobRequest r, IOperationJobs service, CancellationToken ct) =>
+        {
+            var result = await service.CreateManualAsync(id, new ManualJobInput(r.Title, r.LineIds, r.Priority, r.ResponsibleUserId, r.TeamName, r.PlannedStartDate, r.PlannedEndDate, r.Location, r.Notes), ct);
+            return result.IsSuccess ? Results.Created($"{Prefix}/operation-jobs/{result.Value!.Job.Id}", ToJobDetail(result.Value)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+
+        var jobs = group.MapGroup("/operation-jobs");
+        jobs.MapGet("/{id:guid}/detail", async (Guid id, IOperationJobs service, CancellationToken ct) =>
+        {
+            var result = await service.GetAsync(id, ct);
+            return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+        foreach (var action in JobAction.All)
+        {
+            jobs.MapPost($"/{{id:guid}}/{action}", async (Guid id, OperationJobActionRequest r, IOperationJobs service, CancellationToken ct) =>
+            {
+                var result = await service.RunAsync(id, action, r.Version, new JobActionInput(r.Reason, r.ResponsibleUserId, r.TeamName), ct);
+                return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+        }
+
+        jobs.MapPost("/{id:guid}/dependencies", async (Guid id, AddJobDependencyRequest r, IOperationJobs service, CancellationToken ct) =>
+        {
+            var result = await service.AddDependencyAsync(id, r.DependsOnJobId, ct);
+            return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+        jobs.MapDelete("/{id:guid}/dependencies/{dependsOnJobId:guid}", async (Guid id, Guid dependsOnJobId, IOperationJobs service, CancellationToken ct) =>
+        {
+            var result = await service.RemoveDependencyAsync(id, dependsOnJobId, ct);
+            return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(OrdersModule.Permissions.OrdersRead);
+
         return app;
     }
+
+    private static OperationJobDetailDto ToJobDetail(OperationJobView view) => new(
+        ResourceEndpoints.ToDto<OperationJobDto>(view.Job), view.OrderNumber,
+        [.. view.Lines.Select(l => new OperationJobLineDto(l.OrderLineId, l.Name, l.Kind, l.Quantity, l.Unit))],
+        [.. view.Tasks.Select(t => new OperationTaskDto(t.Id, t.Version, t.Position, t.Title, t.IsRequired, t.IsDone, t.DoneBy, t.DoneAt, t.Note, t.IsDefault))],
+        [.. view.DependsOn.Select(d => new OperationJobLinkDto(d.JobId, d.Number, d.Title, d.Status))],
+        [.. view.Dependents.Select(d => new OperationJobLinkDto(d.JobId, d.Number, d.Title, d.Status))],
+        [.. view.Actions.Select(a => new OperationJobActionDto(a.Action, a.Allowed, a.Code, a.Message, a.RequiresReason))],
+        [.. view.History.Select(h => new OperationJobEventDto(h.Id, h.Kind, h.At, h.ActorId, h.FromStatus, h.ToStatus, h.Note))],
+        view.ProgressPercent);
 
     private static HandoverDetailDto ToDetail(OrderHandoverView view) => new(
         ResourceEndpoints.ToDto<HandoverDto>(view.Handover),
@@ -171,6 +219,9 @@ internal sealed class OrderPolicyProvider(IServiceProvider services) : IOrderPol
         return new OrderPolicySettings(
             string.Equals(await settings.GetValueAsync(OrdersModule.SettingKeys.AllowSelfApproval, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
             int.TryParse(await settings.GetValueAsync(OrdersModule.SettingKeys.HandoverAcceptDueDays, cancellationToken), out var dueDays) ? Math.Clamp(dueDays, 1, 30) : 2,
-            int.TryParse(await settings.GetValueAsync(OrdersModule.SettingKeys.HandoverWaitHours, cancellationToken), out var waitHours) ? Math.Clamp(waitHours, 0, 9999) : 48);
+            int.TryParse(await settings.GetValueAsync(OrdersModule.SettingKeys.HandoverWaitHours, cancellationToken), out var waitHours) ? Math.Clamp(waitHours, 0, 9999) : 48,
+            await settings.GetValueAsync(OrdersModule.SettingKeys.JobStrategy, cancellationToken) is { } strategy && JobStrategy.All.Contains(strategy) ? strategy : JobStrategy.PerKind,
+            string.Equals(await settings.GetValueAsync(OrdersModule.SettingKeys.JobServiceAfterDelivery, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
+            int.TryParse(await settings.GetValueAsync(OrdersModule.SettingKeys.JobUnassignedHours, cancellationToken), out var unassignedHours) ? Math.Clamp(unassignedHours, 0, 9999) : 24);
     }
 }
