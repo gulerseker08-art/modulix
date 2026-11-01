@@ -20,6 +20,7 @@ public class ProjectReferenceRulesTests
         ["Modulix.Modules.Crm"] = [CoreContracts],
         ["Modulix.Modules.Logistics"] = [CoreContracts],
         ["Modulix.Modules.Contracts"] = [CoreContracts],
+        ["Modulix.Modules.Orders"] = [CoreContracts],
         ["Modulix.AI"] = [CoreContracts],
         ["Modulix.Web"] = ["Modulix.Shared"],
 
@@ -32,6 +33,7 @@ public class ProjectReferenceRulesTests
             "Modulix.Modules.Crm",
             "Modulix.Modules.Logistics",
             "Modulix.Modules.Contracts",
+            "Modulix.Modules.Orders",
             "Modulix.AI",
             "Modulix.Shared",
             "Modulix.Web",

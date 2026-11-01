@@ -88,6 +88,31 @@ internal sealed class QuoteReader(IModuleData data)
             .ToListAsync(cancellationToken);
     }
 
+    /// <summary>Teklifi kabul eden son olay (manuel kabul ya da müşteri kabulü); yoksa null.</summary>
+    public Task<QuoteEvent?> AcceptEventAsync(Guid quoteId, CancellationToken cancellationToken) =>
+        data.Set<QuoteEvent>().AsNoTracking().Where(e => e.QuoteId == quoteId && (e.Kind == "Accepted" || e.Kind == "CustomerAccepted"))
+            .OrderByDescending(e => e.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+
+    /// <summary>
+    /// Firmanın etkin adresinin tek satır metin kopyası. Verilen türler sırayla denenir; ilk türde birincil adres önceliklidir. Adres yoksa null.
+    /// Sipariş bu metni kopya olarak saklar; firma kartı sonradan değişse de sipariş değişmez.
+    /// </summary>
+    public async Task<string?> AddressTextAsync(Guid companyId, IReadOnlyList<string> types, CancellationToken cancellationToken)
+    {
+        var addresses = await data.Set<Address>().AsNoTracking().Where(a => a.CompanyId == companyId && a.IsActive).ToListAsync(cancellationToken);
+        foreach (var type in types)
+        {
+            var found = addresses.Where(a => a.Type == type).OrderByDescending(a => a.IsPrimary).ThenBy(a => a.CreatedAt).FirstOrDefault();
+            if (found is not null)
+            {
+                return string.Join(", ", new[] { found.Line1, found.Line2, found.District, found.City, found.PostalCode, found.Country }
+                    .Where(p => !string.IsNullOrWhiteSpace(p)));
+            }
+        }
+
+        return null;
+    }
+
     public Task<bool> HasEventAsync(Guid quoteId, string kind, CancellationToken cancellationToken) =>
         data.Set<QuoteEvent>().AsNoTracking().AnyAsync(e => e.QuoteId == quoteId && e.Kind == kind, cancellationToken);
 

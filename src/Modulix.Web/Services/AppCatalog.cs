@@ -1,6 +1,7 @@
 using Modulix.Shared.Access;
 using Modulix.Shared.Contracts;
 using Modulix.Shared.Crm;
+using Modulix.Shared.Orders;
 
 namespace Modulix.Web.Services;
 
@@ -49,6 +50,7 @@ public static class AppCatalog
 {
     public const string Crm = "crm";
     public const string Contracts = "contracts";
+    public const string Orders = "orders";
     public const string Admin = "admin";
     public const string Platform = "platform";
 
@@ -82,6 +84,9 @@ public static class AppCatalog
         new("contracts.renewals", Contracts, "Yenilemeler", "calendar", "sozlesmeler/yenileme", 37, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
         new("contracts.settings", Contracts, "Sözleşme ayarları", "wrench", "yonetim/ayarlar?grup=S%C3%B6zle%C5%9Fmeler", 90, ContractsAccess.ModuleKey, CoreAccess.ManageSettings),
         new("contracts.approval-rules", Contracts, "Onay kuralları", "shield", "sozlesmeler/onay-kurallari", 40, ContractsAccess.ModuleKey, ContractsAccess.ApprovalsManage),
+
+        new(Orders, null, "Siparişler", "package", null, 25, ModuleKey: OrdersAccess.ModuleKey),
+        new("orders.list", Orders, "Siparişler", "package", "siparisler", 10, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead),
 
         new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal),
         new("admin.home", Admin, "Genel bakış", "dashboard", "yonetim", 10, AnyPermission: CoreAccess.AdministrationPermissions, ExactMatch: true),

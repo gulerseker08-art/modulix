@@ -1,0 +1,261 @@
+@page "/siparisler/tekliften/{QuoteId:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>Tekliften sipariş · Modulix</PageTitle>
+
+<AuthGate Module="@OrdersAccess.ModuleKey" Permission="@OrdersAccess.OrdersCreate">
+    <div class="page-header">
+        <div>
+            <h1>Tekliften sipariş oluştur</h1>
+            <p class="text-muted mb-0">Müşterinin kabul ettiği teklif revizyonu siparişe dönüşür. Fiyatlar ve koşullar teklifin kabul anındaki halidir; teklif, katalog ya da müşteri kartı sonradan değişse de sipariş değişmez.</p>
+        </div>
+        <div class="header-actions">
+            <a class="btn btn-outline-secondary" href="crm/teklifler/@QuoteId">Teklife dön</a>
+        </div>
+    </div>
+
+    @if (!Session.Can(OrdersAccess.FinancialsRead))
+    {
+        <div class="alert alert-warning" role="alert">Fiyatlar siparişe sunucu tarafından yazıldığı için bu işlem tutar görme izni (<code>@OrdersAccess.FinancialsRead</code>) ister.</div>
+    }
+    else if (notFound)
+    {
+        <div class="alert alert-warning" role="alert">Kabul edilmiş teklif bulunamadı ya da erişim yetkiniz yok. <a href="crm/teklifler">Tekliflere dön</a></div>
+    }
+    else if (preview is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else
+    {
+        <Notice Text="@message" Failed="true" />
+
+        @foreach (var blocker in preview.Blockers)
+        {
+            <div class="alert alert-danger" role="alert">@blocker</div>
+        }
+
+        @if (preview.ExistingOrders.Count > 0)
+        {
+            <div class="alert alert-info" role="status">
+                Bu tekliften oluşturulmuş sipariş@(preview.ExistingOrders.Count > 1 ? "ler" : ""):
+                @foreach (var existing in preview.ExistingOrders)
+                {
+                    <a class="ms-2" href="siparisler/@existing.Id">@existing.Number</a>
+                }
+            </div>
+        }
+
+        @if (preview.Warnings.Count > 0)
+        {
+            <section aria-labelledby="warn-title">
+                <h2 id="warn-title" class="h6">Eksik veya dikkat edilecek bilgiler</h2>
+                <ul class="alert alert-warning">
+                    @foreach (var warning in preview.Warnings) { <li>@warning</li> }
+                </ul>
+            </section>
+        }
+
+        <section aria-labelledby="quote-summary-title">
+            <h2 id="quote-summary-title">Kabul edilen teklif</h2>
+            <dl class="detail-list">
+                <dt>Teklif</dt><dd><strong>@preview.Title</strong> · @preview.QuoteNumber · Revizyon V@(preview.RevisionNo)</dd>
+                <dt>Müşteri</dt><dd>@(preview.CustomerName ?? "—")</dd>
+                <dt>Kabul</dt>
+                <dd>
+                    @OrderLabels.Label(OrderLabels.AcceptanceMethods, preview.AcceptanceMethod)@(preview.AcceptedBy is { Length: > 0 } by ? " · " + by : string.Empty) · @CrmLabels.Time(preview.AcceptedAt)
+                    @if (preview.DocumentSha256 is { Length: > 12 } sha) { <small class="text-muted"> · Belge özeti <code title="@sha">@sha[..12]…</code></small> }
+                </dd>
+                <dt>Teklif geçerliliği</dt><dd>@(preview.ValidUntil is { } until ? CrmLabels.Time(until) : "—") <small class="text-muted">Geçerlilik kabul anında denetlenmiştir; dönüşümde yeniden denetlenmez.</small></dd>
+                <dt>Tutar</dt><dd>Net @OrderLabels.Money(preview.NetTotal, preview.Currency) · Genel @OrderLabels.Money(preview.GrossTotal, preview.Currency)</dd>
+                <dt>Ödeme koşulları</dt><dd>@(preview.PaymentTerms ?? "—")</dd>
+                <dt>Teslimat koşulları</dt><dd>@(preview.DeliveryTerms ?? "—")</dd>
+            </dl>
+        </section>
+
+        <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@(busy || preview.Blockers.Count > 0)">
+                <legend class="visually-hidden">Siparişe alınacak kalemler ve planlama</legend>
+                <h2>Kapsam</h2>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="partial" checked="@partial" @onchange="e => SetPartial((bool)e.Value!)" />
+                    <label class="form-check-label" for="partial">Kısmi dönüşüm: yalnızca seçtiğim kalemleri ve miktarları siparişe al (varsayılan teklifin tamamıdır).</label>
+                </div>
+                <table class="table record-table">
+                    <caption class="visually-hidden">Teklif kalemleri</caption>
+                    <thead><tr>
+                        <th scope="col">Kalem</th><th scope="col">Tür</th><th scope="col" class="text-end">Kabul edilen</th><th scope="col" class="text-end">Önceden alınan</th>
+                        <th scope="col" class="text-end">Kalan</th><th scope="col" class="text-end">Bu siparişe</th><th scope="col" class="text-end">Net</th>
+                    </tr></thead>
+                    <tbody>
+                        @foreach (var line in preview.Lines)
+                        {
+                            <tr>
+                                <td data-label="Kalem" class="primary"><label for="qty-@line.StableKey">@line.Name</label></td>
+                                <td data-label="Tür">@OrderLabels.Label(OrderLabels.LineKinds, line.Kind)</td>
+                                <td data-label="Kabul edilen" class="text-end">@OrderLabels.Quantity(line.AcceptedQuantity, line.Unit)</td>
+                                <td data-label="Önceden alınan" class="text-end">@OrderLabels.Quantity(line.ConvertedQuantity, line.Unit)</td>
+                                <td data-label="Kalan" class="text-end">@OrderLabels.Quantity(line.RemainingQuantity, line.Unit)</td>
+                                <td data-label="Bu siparişe" class="text-end">
+                                    @if (partial)
+                                    {
+                                        <input id="qty-@line.StableKey" type="number" min="0" max="@line.RemainingQuantity.ToString(System.Globalization.CultureInfo.InvariantCulture)" step="any" class="form-control form-control-sm text-end"
+                                               disabled="@(line.RemainingQuantity <= 0)" value="@QuantityOf(line.StableKey)" @onchange="e => SetQuantity(line.StableKey, e.Value?.ToString())" />
+                                    }
+                                    else
+                                    {
+                                        <span id="qty-@line.StableKey">@OrderLabels.Quantity(line.RemainingQuantity, line.Unit)</span>
+                                    }
+                                </td>
+                                <td data-label="Net" class="text-end">@OrderLabels.Money(line.Net, preview.Currency)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <FieldError Field="lines" Errors="errors" />
+
+                <h2>Planlama</h2>
+                <div class="form-grid">
+                    <div class="span-12">
+                        <label class="form-label" for="f-title">Sipariş başlığı</label>
+                        <input id="f-title" class="form-control" maxlength="200" placeholder="@preview.Title" @bind="title" />
+                        <FieldError Field="title" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="f-start">Planlanan başlangıç</label>
+                        <input id="f-start" type="date" class="form-control" @bind="startDate" />
+                        <FieldError Field="plannedStartDate" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="f-delivery">Planlanan teslim</label>
+                        <input id="f-delivery" type="date" class="form-control" @bind="deliveryDate" />
+                        <FieldError Field="plannedDeliveryDate" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="f-owner">Satış sorumlusu</label>
+                        <LookupPicker Id="f-owner" LookupKey="orders.order.owner" @bind-Value="ownerId" Placeholder="Teklifin sorumlusu / ben" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="f-location">Lokasyon</label>
+                        <input id="f-location" class="form-control" maxlength="1000" @bind="location" />
+                        <FieldError Field="location" Errors="errors" />
+                    </div>
+                    <div class="span-12">
+                        <label class="form-label" for="f-address">Teslimat adresi</label>
+                        <textarea id="f-address" class="form-control" rows="2" maxlength="1000" placeholder="@(preview.DeliveryAddress ?? "Müşteri kartında adres yok")" @bind="deliveryAddress"></textarea>
+                        <small class="text-muted">Boş bırakılırsa müşteri kartındaki adres kopyalanır; sonradan kart değişse de sipariş değişmez.</small>
+                        <FieldError Field="deliveryAddress" Errors="errors" />
+                    </div>
+                    <div class="span-12">
+                        <label class="form-label" for="f-commitments">Müşteriye verilen taahhütler</label>
+                        <textarea id="f-commitments" class="form-control" rows="2" maxlength="4000" @bind="commitments"></textarea>
+                    </div>
+                    <div class="span-12">
+                        <label class="form-label" for="f-notes">Operasyon notları</label>
+                        <textarea id="f-notes" class="form-control" rows="2" maxlength="4000" @bind="operationsNotes"></textarea>
+                    </div>
+                </div>
+            </fieldset>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || preview.Blockers.Count > 0 || (partial && quantities.Count(q => q.Value > 0) == 0))">Siparişi oluştur</button>
+            </div>
+        </form>
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid QuoteId { get; set; }
+
+    private OrderSourceDto? preview;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool notFound;
+    private bool busy;
+    private bool partial;
+    private readonly Dictionary<Guid, decimal> quantities = [];
+    private string title = string.Empty;
+    private DateOnly? startDate;
+    private DateOnly? deliveryDate;
+    private Guid? ownerId;
+    private string location = string.Empty;
+    private string deliveryAddress = string.Empty;
+    private string commitments = string.Empty;
+    private string operationsNotes = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(OrdersAccess.OrdersCreate) || !Session.Can(OrdersAccess.FinancialsRead))
+        {
+            return;
+        }
+
+        var result = await Api.GetAsync<OrderSourceDto>($"/api/orders/from-quote/{QuoteId}");
+        if (!result.IsSuccess)
+        {
+            notFound = true;
+            return;
+        }
+
+        preview = result.Value;
+        quantities.Clear();
+    }
+
+    private void SetPartial(bool on)
+    {
+        partial = on;
+        quantities.Clear();
+        if (on && preview is not null)
+        {
+            // Başlangıçta her kalemin kalan miktarı önerilir; kullanıcı azaltır ya da sıfırlar.
+            foreach (var line in preview.Lines.Where(l => l.RemainingQuantity > 0)) { quantities[line.StableKey] = line.RemainingQuantity; }
+        }
+    }
+
+    private string QuantityOf(Guid key) =>
+        quantities.TryGetValue(key, out var value) ? value.ToString("G29", System.Globalization.CultureInfo.InvariantCulture) : "0";
+
+    private void SetQuantity(Guid key, string? text)
+    {
+        quantities[key] = decimal.TryParse(text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var value) && value > 0 ? value : 0m;
+    }
+
+    private async Task CreateAsync()
+    {
+        if (busy || preview is null) { return; }
+        busy = true;
+        message = null;
+        errors = null;
+        var lines = partial ? quantities.Where(q => q.Value > 0).Select(q => new OrderLineQuantityRequest(q.Key, q.Value)).ToList() : null;
+        var request = new CreateOrderFromQuoteRequest(
+            partial ? "Partial" : "Full", lines, string.IsNullOrWhiteSpace(title) ? null : title.Trim(), ownerId,
+            string.IsNullOrWhiteSpace(deliveryAddress) ? null : deliveryAddress.Trim(), string.IsNullOrWhiteSpace(location) ? null : location.Trim(),
+            startDate, deliveryDate, string.IsNullOrWhiteSpace(commitments) ? null : commitments.Trim(), string.IsNullOrWhiteSpace(operationsNotes) ? null : operationsNotes.Trim());
+        var result = await Api.PostAsync<OrderDto>($"/api/orders/from-quote/{QuoteId}", request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo($"siparisler/{result.Value!.Id}");
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+
+        // Çakışma (çift tıklama, başkası oluşturdu): güncel durumu yükle; mevcut sipariş bağlantısı görünür.
+        if (result.Status == System.Net.HttpStatusCode.Conflict)
+        {
+            var again = await Api.GetAsync<OrderSourceDto>($"/api/orders/from-quote/{QuoteId}");
+            if (again.IsSuccess)
+            {
+                preview = again.Value;
+                if (preview!.ExistingOrders.Count > 0 && preview.FullyConverted && !partial)
+                {
+                    Navigation.NavigateTo($"siparisler/{preview.ExistingOrders[0].Id}");
+                }
+            }
+        }
+    }
+}

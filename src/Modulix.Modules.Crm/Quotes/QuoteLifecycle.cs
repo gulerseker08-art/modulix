@@ -473,8 +473,13 @@ internal sealed class AcceptedQuoteSource(IRecordPipeline pipeline, QuoteReader 
         var document = (await reader.DocumentsAsync(quoteId, cancellationToken)).FirstOrDefault();
         var lines = (await reader.LinesAsync(quoteId, cancellationToken)).Where(l => l.Included)
             .Select(l => new AcceptedQuoteLine(
-                l.StableKey, l.Position, l.ProductCode, l.Name, l.Description, l.Quantity, l.UnitName, l.UnitPrice, l.TaxRatePercent, l.Net, l.Tax, l.Gross, l.RecurringPeriod))
+                l.StableKey, l.Position, l.ProductCode, l.Name, l.Description, l.Quantity, l.UnitName, l.UnitPrice, l.TaxRatePercent, l.Net, l.Tax, l.Gross, l.RecurringPeriod)
+            {
+                Kind = l.Kind, ParentStableKey = l.ParentStableKey, GroupName = l.GroupName, ProductId = l.ProductId, ListAmount = l.ListAmount, LineDiscount = l.LineDiscount + l.DocumentDiscountShare,
+            })
             .ToList();
+        var accepted = await reader.AcceptEventAsync(quoteId, cancellationToken);
+        var portal = decision is not null;
         return new AcceptedQuote(
             quote.Id, quote.QuoteNumber, quote.RevisionNo, quote.Title, quote.CompanyId, quote.ContactId, quote.OpportunityId, quote.Currency, quote.PriceIncludesTax,
             quote.NetTotal, quote.TaxTotal, quote.GrossTotal, quote.DecidedAt ?? quote.UpdatedAt, decision?.SignerName, decision?.DocumentSha256 ?? document?.Sha256,
@@ -482,6 +487,17 @@ internal sealed class AcceptedQuoteSource(IRecordPipeline pipeline, QuoteReader 
         {
             PartyId = await reader.PartyOfCompanyAsync(quote.CompanyId, cancellationToken),
             PersonId = quote.ContactId is { } contactId ? await reader.PersonOfContactAsync(contactId, cancellationToken) : null,
+            AcceptanceMethod = portal ? "Portal" : "Manual",
+            AcceptedByUserId = portal ? null : accepted?.ActorId,
+            AcceptanceNote = portal ? decision!.TermsStatement : quote.StatusReason,
+            ValidUntil = quote.ValidUntil,
+            OwnerId = quote.OwnerId,
+            CustomerName = quote.CustomerNameSnapshot,
+            BillingAddress = await reader.AddressTextAsync(quote.CompanyId, ["Billing", "Registered", "Office", "Other"], cancellationToken),
+            DeliveryAddress = await reader.AddressTextAsync(quote.CompanyId, ["Shipping", "Office", "Billing", "Registered", "Other"], cancellationToken),
+            ReportingCurrency = quote.ReportingCurrency,
+            ExchangeRate = quote.ExchangeRate,
+            ExchangeRateDate = quote.ExchangeRateDate,
         };
     }
 }

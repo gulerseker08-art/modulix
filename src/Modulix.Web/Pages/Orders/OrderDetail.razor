@@ -1,0 +1,335 @@
+@page "/siparisler/{Id:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>@(order?.Number ?? "Sipariş") · Modulix</PageTitle>
+
+<AuthGate Module="@OrdersAccess.ModuleKey" Permission="@OrdersAccess.OrdersRead">
+    @if (notFound)
+    {
+        <div class="alert alert-warning" role="alert">Sipariş bulunamadı ya da erişim yetkiniz yok. <a href="siparisler">Siparişlere dön</a></div>
+    }
+    else if (order is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <h1>@order.Title</h1>
+                <p class="mb-0">
+                    <span class="text-muted">@order.Number</span>
+                    <span class="badge stage-@OrderLabels.StatusBadge(order.Status)">@OrderLabels.Label(OrderLabels.Statuses, order.Status)</span>
+                    <span class="badge stage-@OrderLabels.HandoverBadge(order.HandoverStatus)">@OrderLabels.Label(OrderLabels.Handovers, order.HandoverStatus)</span>
+                    <span class="badge stage-@OrderLabels.FulfillmentBadge(order.FulfillmentStatus)">@OrderLabels.Label(OrderLabels.Fulfillments, order.FulfillmentStatus)</span>
+                </p>
+            </div>
+            <div class="header-actions">
+                <a class="btn btn-outline-secondary" href="siparisler">Siparişler</a>
+            </div>
+        </div>
+
+        <Notice Text="@notice" Failed="@noticeFailed" />
+
+        <section aria-labelledby="summary-title">
+            <h2 id="summary-title">Özet</h2>
+            <dl class="detail-list">
+                <dt>Müşteri</dt><dd>@(order.CustomerName ?? "—")</dd>
+                <dt>Satış sorumlusu</dt><dd>@(Lookups.MemberName(order.OwnerId) is { Length: > 0 } owner ? owner : "—")</dd>
+                <dt>Tutar</dt>
+                <dd>
+                    Net @OrderLabels.Money(order.NetTotal, order.Currency) · Vergi @OrderLabels.Money(order.TaxTotal, order.Currency) · Genel @OrderLabels.Money(order.GrossTotal, order.Currency)
+                    <small class="text-muted">Sipariş tutarıdır; tahsilat, fatura ya da gelir değildir.</small>
+                </dd>
+                <dt>Planlanan başlangıç / teslim</dt><dd>@OrderLabels.Date(order.PlannedStartDate) – @OrderLabels.Date(order.PlannedDeliveryDate)</dd>
+                <dt>Lokasyon</dt><dd>@(order.Location ?? "—")</dd>
+                <dt>Teslimat adresi</dt><dd>@(order.DeliveryAddress ?? "—")</dd>
+                <dt>Fatura adresi</dt><dd>@(order.BillingAddress ?? "—")</dd>
+                <dt>Dönüşüm</dt><dd>@(order.ConversionMode == "Full" ? "Teklifin tamamı" : "Kısmi dönüşüm")</dd>
+            </dl>
+        </section>
+
+        <section aria-labelledby="source-title">
+            <h2 id="source-title">Kaynak teklif ve müşteri kabulü</h2>
+            <dl class="detail-list">
+                <dt>Teklif</dt><dd><a href="crm/teklifler/@order.SourceQuoteId">@order.SourceQuoteNumber · V@(order.SourceQuoteRevisionNo)</a></dd>
+                @if (order.SourceOpportunityId is { } opportunity)
+                {
+                    <dt>Fırsat</dt><dd><a href="crm/firsatlar/@opportunity">Fırsatı aç</a></dd>
+                }
+                <dt>Sözleşme</dt><dd>@(order.ContractNumber ?? "Bağlı sözleşme yok")</dd>
+                <dt>Müşteri kabulü</dt>
+                <dd>
+                    @OrderLabels.Label(OrderLabels.AcceptanceMethods, order.AcceptanceMethod) · @CrmLabels.Time(order.AcceptedAt)
+                    @if (!string.IsNullOrEmpty(order.AcceptedByName)) { <span> · @order.AcceptedByName</span> }
+                    else if (order.AcceptedByUserId is { } user) { <span> · kaydeden: @Lookups.MemberName(user)</span> }
+                </dd>
+                @if (order.AcceptanceMethod == "Manual")
+                {
+                    <dt>Kanıt</dt><dd class="text-muted">Kabul satış kullanıcısı tarafından elle kaydedildi; müşterinin imzalı belge kanıtı bu kayıtta yoktur.</dd>
+                }
+                @if (order.SourceQuoteSha256 is { Length: > 12 } sha)
+                {
+                    <dt>Belge özeti</dt><dd><code title="@sha">@sha[..12]…</code></dd>
+                }
+                <dt>Teklif geçerliliği</dt><dd>@(order.QuoteValidUntil is { } until ? CrmLabels.Time(until) : "—") <small class="text-muted">Kabul anında denetlendi.</small></dd>
+                @if (!string.IsNullOrEmpty(order.AcceptanceNote)) { <dt>Kabul notu</dt><dd>@order.AcceptanceNote</dd> }
+            </dl>
+        </section>
+
+        <section aria-labelledby="lines-title">
+            <h2 id="lines-title">Kalemler</h2>
+            @if (lines is null)
+            {
+                <p class="text-muted" role="status">Yükleniyor…</p>
+            }
+            else if (lines.Count == 0)
+            {
+                <p class="text-muted">Bu siparişte kalem yok.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Sipariş kalemleri</caption>
+                    <thead><tr>
+                        <th scope="col">Kalem</th><th scope="col">Tür</th><th scope="col" class="text-end">Miktar</th><th scope="col" class="text-end">Birim fiyat</th>
+                        <th scope="col" class="text-end">Net</th><th scope="col" class="text-end">Vergi</th><th scope="col" class="text-end">Toplam</th>
+                        <th scope="col" class="text-end">Teslim edilen</th>
+                    </tr></thead>
+                    <tbody>
+                        @foreach (var line in lines)
+                        {
+                            <tr>
+                                <td data-label="Kalem" class="primary">
+                                    @line.Name
+                                    @if (line.ProductCode is not null) { <small class="text-muted">@line.ProductCode</small> }
+                                    @if (line.IsCancelled) { <span class="badge stage-cancelled">İptal</span> }
+                                </td>
+                                <td data-label="Tür">@OrderLabels.Label(OrderLabels.LineKinds, line.Kind)</td>
+                                <td data-label="Miktar" class="text-end">
+                                    @OrderLabels.Quantity(line.Quantity, line.UnitName)
+                                    @if (line.AcceptedQuantity != line.Quantity) { <small class="text-muted d-block">Teklifte @OrderLabels.Quantity(line.AcceptedQuantity, line.UnitName)</small> }
+                                </td>
+                                <td data-label="Birim fiyat" class="text-end">@OrderLabels.Money(line.UnitPrice, order.Currency)</td>
+                                <td data-label="Net" class="text-end">@OrderLabels.Money(line.Net, order.Currency)</td>
+                                <td data-label="Vergi" class="text-end">@OrderLabels.Money(line.Tax, order.Currency)</td>
+                                <td data-label="Toplam" class="text-end">@OrderLabels.Money(line.Gross, order.Currency)</td>
+                                <td data-label="Teslim edilen" class="text-end">@(line.Kind == "Product" ? OrderLabels.Quantity(line.DeliveredQuantity, line.UnitName) : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section aria-labelledby="terms-title">
+            <h2 id="terms-title">Ticari koşullar ve notlar</h2>
+            @if (!editing)
+            {
+                <dl class="detail-list">
+                    <dt>Ödeme koşulları</dt><dd>@(order.PaymentTerms ?? "—")</dd>
+                    <dt>Teslimat koşulları</dt><dd>@(order.DeliveryTerms ?? "—")</dd>
+                    <dt>Ticari koşullar</dt><dd>@(order.CommercialTerms ?? "—")</dd>
+                    <dt>Müşteriye verilen taahhütler</dt><dd>@(order.Commitments ?? "—")</dd>
+                    <dt>Operasyon notları</dt><dd>@(order.OperationsNotes ?? "—")</dd>
+                </dl>
+                @if (CanEdit)
+                {
+                    <button type="button" class="btn btn-outline-primary" @onclick="StartEdit">Planlama ve koşulları düzenle</button>
+                }
+                else if (Session.Can(OrdersAccess.OrdersWrite) && order.Status != "Draft")
+                {
+                    <p class="text-muted">Taslak dışındaki siparişin ticari alanları yerinde değiştirilemez.</p>
+                }
+            }
+            else
+            {
+                <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                    <fieldset disabled="@busy">
+                        <legend class="visually-hidden">Taslak sipariş düzenleme</legend>
+                        <div class="form-grid">
+                            <div class="span-12">
+                                <label class="form-label" for="e-title">Başlık</label>
+                                <input id="e-title" class="form-control" maxlength="200" @bind="form.Title" />
+                                <FieldError Field="title" Errors="errors" />
+                            </div>
+                            <div class="span-6">
+                                <label class="form-label" for="e-start">Planlanan başlangıç</label>
+                                <input id="e-start" type="date" class="form-control" @bind="form.PlannedStartDate" />
+                                <FieldError Field="plannedStartDate" Errors="errors" />
+                            </div>
+                            <div class="span-6">
+                                <label class="form-label" for="e-delivery">Planlanan teslim</label>
+                                <input id="e-delivery" type="date" class="form-control" @bind="form.PlannedDeliveryDate" />
+                                <FieldError Field="plannedDeliveryDate" Errors="errors" />
+                            </div>
+                            <div class="span-6">
+                                <label class="form-label" for="e-owner">Satış sorumlusu</label>
+                                <LookupPicker Id="e-owner" LookupKey="orders.order.owner" @bind-Value="form.OwnerId" Placeholder="—" />
+                                <FieldError Field="ownerId" Errors="errors" />
+                            </div>
+                            <div class="span-6">
+                                <label class="form-label" for="e-location">Lokasyon</label>
+                                <input id="e-location" class="form-control" maxlength="1000" @bind="form.Location" />
+                            </div>
+                            <div class="span-12">
+                                <label class="form-label" for="e-address">Teslimat adresi</label>
+                                <textarea id="e-address" class="form-control" rows="2" maxlength="1000" @bind="form.DeliveryAddress"></textarea>
+                            </div>
+                            <div class="span-12">
+                                <label class="form-label" for="e-payment">Ödeme koşulları</label>
+                                <textarea id="e-payment" class="form-control" rows="2" maxlength="4000" @bind="form.PaymentTerms"></textarea>
+                            </div>
+                            <div class="span-12">
+                                <label class="form-label" for="e-delivery-terms">Teslimat koşulları</label>
+                                <textarea id="e-delivery-terms" class="form-control" rows="2" maxlength="4000" @bind="form.DeliveryTerms"></textarea>
+                            </div>
+                            <div class="span-12">
+                                <label class="form-label" for="e-commercial">Ticari koşullar</label>
+                                <textarea id="e-commercial" class="form-control" rows="2" maxlength="4000" @bind="form.CommercialTerms"></textarea>
+                            </div>
+                            <div class="span-12">
+                                <label class="form-label" for="e-commitments">Müşteriye verilen taahhütler</label>
+                                <textarea id="e-commitments" class="form-control" rows="2" maxlength="4000" @bind="form.Commitments"></textarea>
+                            </div>
+                            <div class="span-12">
+                                <label class="form-label" for="e-notes">Operasyon notları</label>
+                                <textarea id="e-notes" class="form-control" rows="2" maxlength="4000" @bind="form.OperationsNotes"></textarea>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">Vazgeç</button>
+                    </div>
+                </form>
+            }
+        </section>
+
+        <section aria-labelledby="history-title">
+            <h2 id="history-title">İşlem geçmişi</h2>
+            @if (history is null)
+            {
+                <p class="text-muted" role="status">Yükleniyor…</p>
+            }
+            else if (history.Count == 0)
+            {
+                <p class="text-muted">Kayıt yok.</p>
+            }
+            else
+            {
+                <ol class="history-list">
+                    @foreach (var item in history)
+                    {
+                        <li>
+                            <strong>@OrderLabels.History(item.Kind)</strong>
+                            <span class="text-muted"> · @CrmLabels.Time(item.At) · @(Lookups.MemberName(item.ActorId) is { Length: > 0 } actor ? actor : "sistem")</span>
+                            @if (!string.IsNullOrEmpty(item.Reason)) { <div>@item.Reason</div> }
+                        </li>
+                    }
+                </ol>
+            }
+        </section>
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private OrderDto? order;
+    private List<OrderLineDto>? lines;
+    private List<OrderHistoryDto>? history;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? notice;
+    private bool noticeFailed;
+    private bool notFound;
+    private bool busy;
+    private bool editing;
+    private EditForm form = new();
+
+    private bool CanEdit => order is { Status: "Draft" } && Session.Can(OrdersAccess.OrdersWrite);
+
+    private sealed class EditForm
+    {
+        public string Title { get; set; } = string.Empty;
+        public DateOnly? PlannedStartDate { get; set; }
+        public DateOnly? PlannedDeliveryDate { get; set; }
+        public Guid? OwnerId { get; set; }
+        public string? Location { get; set; }
+        public string? DeliveryAddress { get; set; }
+        public string? PaymentTerms { get; set; }
+        public string? DeliveryTerms { get; set; }
+        public string? CommercialTerms { get; set; }
+        public string? Commitments { get; set; }
+        public string? OperationsNotes { get; set; }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(OrdersAccess.OrdersRead))
+        {
+            return;
+        }
+
+        await Lookups.LoadAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<OrderDto>($"/api/orders/orders/{Id}");
+        if (!result.IsSuccess)
+        {
+            notFound = true;
+            return;
+        }
+
+        order = result.Value;
+        var lineResult = await Api.GetAsync<PagedResult<OrderLineDto>>($"/api/orders/order-lines?orderId={Id}&pageSize=200");
+        lines = lineResult.Value?.Items.ToList() ?? [];
+        var historyResult = await Api.GetAsync<List<OrderHistoryDto>>($"/api/orders/orders/{Id}/history");
+        history = historyResult.Value ?? [];
+    }
+
+    private void StartEdit()
+    {
+        if (order is null) { return; }
+        form = new EditForm
+        {
+            Title = order.Title, PlannedStartDate = order.PlannedStartDate, PlannedDeliveryDate = order.PlannedDeliveryDate, OwnerId = order.OwnerId,
+            Location = order.Location, DeliveryAddress = order.DeliveryAddress, PaymentTerms = order.PaymentTerms, DeliveryTerms = order.DeliveryTerms,
+            CommercialTerms = order.CommercialTerms, Commitments = order.Commitments, OperationsNotes = order.OperationsNotes,
+        };
+        errors = null;
+        editing = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy || order is null) { return; }
+        busy = true;
+        notice = null;
+        var request = new SaveOrderRequest(
+            order.Version, form.Title, OwnerId: form.OwnerId, DeliveryAddress: form.DeliveryAddress, Location: form.Location, PlannedStartDate: form.PlannedStartDate,
+            PlannedDeliveryDate: form.PlannedDeliveryDate, PaymentTerms: form.PaymentTerms, DeliveryTerms: form.DeliveryTerms, CommercialTerms: form.CommercialTerms,
+            Commitments: form.Commitments, OperationsNotes: form.OperationsNotes, PersonId: order.PersonId, ContractId: order.ContractId, ContractNumber: order.ContractNumber);
+        var result = await Api.PutAsync<OrderDto>($"/api/orders/orders/{Id}", request);
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            notice = result.Error;
+            noticeFailed = true;
+            return;
+        }
+
+        order = result.Value;
+        editing = false;
+        noticeFailed = false;
+        notice = "Sipariş kaydedildi.";
+        await LoadAsync();
+    }
+}
