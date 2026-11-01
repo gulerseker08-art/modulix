@@ -77,6 +77,19 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         ["categoryId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.CategoryId == id) : null,
         ["queueId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.QueueId == id) : null,
         ["parentTicketId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.ParentTicketId == id) : null,
+        // Rapor kırılımı (dilim 6): açılış tarihi aralığı (Türkiye günü, uçlar dahil), yaş (gün), yeniden açılma, düşük memnuniyet, kimlik listesi.
+        ["createdFrom"] = (q, v, _) => FilterValue.Date(v) is { } d && ReportPeriod.StartOf(d) is var from ? q.Where(t => t.CreatedAt >= from) : null,
+        ["createdTo"] = (q, v, _) => FilterValue.Date(v) is { } d && ReportPeriod.EndExclusive(d) is var until ? q.Where(t => t.CreatedAt < until) : null,
+        ["minAgeDays"] = (q, v, _) => int.TryParse(v, out var days) && days >= 0 && DateTimeOffset.UtcNow.AddDays(-days) is var edge ? q.Where(t => t.CreatedAt <= edge) : null,
+        ["maxAgeDays"] = (q, v, _) => int.TryParse(v, out var days) && days > 0 && DateTimeOffset.UtcNow.AddDays(-days) is var edge ? q.Where(t => t.CreatedAt > edge) : null,
+        ["reopened"] = (q, v, _) => FilterValue.Bool(v) is { } flag ? q.Where(t => (t.ReopenCount > 0) == flag) : null,
+        ["lowSatisfaction"] = (q, v, ctx) => FilterValue.Bool(v) is { } flag
+            ? q.Where(t => ctx.Data.Set<SatisfactionSurvey>().Any(s => s.TicketId == t.Id && s.Rating != null && s.Rating <= SurveyRules.LowRatingThreshold) == flag)
+            : null,
+        ["ids"] = (q, v, _) => v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) is { Length: > 0 and <= 50 } parts
+            && parts.Select(FilterValue.Id).ToList() is var ids && ids.All(i => i is not null) && ids.Select(i => i!.Value).ToList() is var list
+            ? q.Where(t => list.Contains(t.Id))
+            : null,
         // Bağlı kayıt: "anahtar:kimlik" (ör. contracts.contract:{guid}); karşı modülün sayfalarındaki "ilişkili talepler" listesi için.
         ["linked"] = (q, v, _) => v.LastIndexOf(':') is > 0 and var colon && FilterValue.Id(v[(colon + 1)..]) is { } linkedId && v[..colon] is var linkedKey
             ? q.Where(t => context.Data.Set<TicketLink>().Any(l => l.TicketId == t.Id && l.EntityKey == linkedKey && l.RecordId == linkedId))
