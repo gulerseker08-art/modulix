@@ -119,7 +119,16 @@ public static class CoreAccess
     /// <summary>İşletici şirketler ve kullanıcıların şirket görevleri (ADR-0008).</summary>
     public const string ManageCompanies = "core.companies.manage";
 
+    /// <summary>İletişim tercihlerini, izin geçmişini ve engelleri görüntüler (ADR-0025).</summary>
+    public const string ReadCommunication = "core.communication.read";
+
+    /// <summary>Kanıtla izin/ret kaydeder (ADR-0025).</summary>
+    public const string ManageCommunication = "core.communication.manage";
+
+    /// <summary>İletişim noktasını engeller ve engeli gerekçeyle kaldırır (ADR-0025).</summary>
+    public const string SuppressCommunication = "core.communication.suppress";
+
     /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
-        [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies];
+        [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication];
 }
