@@ -1,6 +1,6 @@
 # ADR-0026 — Birim hiyerarşisi, birim bazlı rol ataması ve kayıt görünürlüğü (bayi yönetiminin erişim katmanı)
 
-Durum: **taslak, onay bekliyor** (2 Kasım 2026). Yalnızca kodla ve testle doğrulananlar "yapıldı" yazılır; bu belge henüz hiçbir şeyi uygulamaz.
+Durum: **kabul edildi** (2 Kasım 2026). Uygulama dilimlerle ilerler; her dilimin durumu bölüm 10'dadır. Yalnızca kodla ve testle doğrulananlar "yapıldı" yazılır; bu belge tek başına hiçbir şeyi uygulamaz.
 
 ## 1. Bağlam ve amaç
 
@@ -125,7 +125,7 @@ Bayinin **ticari** katmanı ayrı kararda ele alınır (ADR-0027 adayı). Bu bel
 
 | Dilim | İçerik | Durum |
 |---|---|---|
-| 0 | Bu ADR'nin onayı | Bekliyor |
+| 0 | Bu ADR'nin onayı | Kabul edildi (2 Kasım 2026) |
 | 1 | `BusinessUnit` ağacı, üyelik, kök backfill, birim ekranı, kullanıcı kartında birim ve listede filtre (kapsam henüz değişmez) | Yapılmadı |
 | 2 | Rolün birime atanması, `AssignLevel`, kapsamların birleşimi, `Unit`/`UnitAndBelow` kapsamları, kullanıcı kartında etkin kapsam ve rol kaynağı | Yapılmadı |
 | 3 | Kapsam dışı ortak kayıt seçeneği, mükerrer/benzersizlik sızıntı denetimi, arama/lookup/rapor/dışa aktarma doğrulaması | Yapılmadı |
@@ -135,10 +135,14 @@ Bayinin **ticari** katmanı ayrı kararda ele alınır (ADR-0027 adayı). Bu bel
 
 | Karar | Öneri | Durum |
 |---|---|---|
-| Sahip bazlı görünürlük (kayıt bazlı değil) | Sahip bazlı | **Onaylandı** |
-| Birimden gelen rol alt birimlere inmesin (açık seçenekle) | Varsayılan kapalı | Öneri, onay bekliyor |
-| Kullanıcı tek birime bağlı | Tek birim | Öneri, onay bekliyor |
-| Kullanıcı bazında birim rolünü kapatma yok | Yok | Öneri, onay bekliyor |
-| Bayi rollerinde kapsam dışı ortak kayıt gizli | Gizle | Öneri, onay bekliyor |
-| Kullanıcı için birim zorunlu | Zorunlu (varsayılan kök) | Öneri, onay bekliyor |
-| Birim tablolarının sınıfı `ICompanyShared` | Ortak | Öneri, onay bekliyor |
+Tümü 2 Kasım 2026'da ADR'nin kabulüyle onaylanmıştır.
+
+| Karar | Seçim | Durum |
+|---|---|---|
+| Sahip bazlı görünürlük (kayıt bazlı değil) | Sahip bazlı | Kabul edildi |
+| Birimden gelen rol alt birimlere inmesin (açık seçenekle) | Varsayılan kapalı | Kabul edildi |
+| Kullanıcı tek birime bağlı | Tek birim | Kabul edildi |
+| Kullanıcı bazında birim rolünü kapatma yok | Yok | Kabul edildi |
+| Bayi rollerinde kapsam dışı ortak kayıt gizli | Gizle | Kabul edildi |
+| Kullanıcı için birim zorunlu | Zorunlu (varsayılan kök) | Kabul edildi |
+| Birim tablolarının sınıfı `ICompanyShared` | Ortak | Kabul edildi |
