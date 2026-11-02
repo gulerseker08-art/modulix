@@ -82,7 +82,8 @@
                     <legend class="form-label">Kayıt kapsamı</legend>
                     <p class="text-muted small">
                         İzinler hangi tür kayıtları, kapsam hangi kayıtları göreceğini belirler. Sorumlusu olan kayıtlara (firma,
-                        fırsat, aktivite) uygulanır. Kişinin birden fazla rolü varsa en geniş kapsam geçerlidir.
+                        fırsat, aktivite) uygulanır. Kişinin birden fazla rolü varsa her rolün gördüğü kayıtlar birleşir. Departman
+                        kapsamları kişinin <a href="yonetim/departmanlar">departmanına</a> göre belirlenir.
                     </p>
                     @foreach (var option in ScopeOptions)
                     {
@@ -100,6 +101,30 @@
                         <small class="text-muted">Kendi kapsamınızdan geniş bir kapsam veremezsiniz.</small>
                     }
                     <FieldError Field="scope" Errors="errors" />
+                </fieldset>
+
+                @* Atanabilir düzey (ADR-0026 K6): bayi gibi departmanlara toplu rol vermek için rol açıkça departmana atanabilir yapılır. *@
+                <fieldset class="scope-choice">
+                    <legend class="form-label">Atanabilir düzey</legend>
+                    <p class="text-muted small">
+                        Rol kullanıcıya doğrudan, bir departmana (departmandaki herkese) ya da ikisine de atanabilir. Departmana atanan
+                        rol, o departmandaki her kullanıcıya izinlerini ve kayıt kapsamını verir.
+                    </p>
+                    @foreach (var option in AssignLevelOptions)
+                    {
+                        var id = $"level-{option}";
+                        <div class="form-check">
+                            <input id="@id" class="form-check-input" type="radio" name="assign-level" checked="@(assignLevel == option)"
+                                   disabled="@(role is { UnitCount: > 0 } && option == RoleAssignLevel.User)"
+                                   @onchange="() => assignLevel = option" />
+                            <label class="form-check-label" for="@id"><strong>@RoleAssignLevelLabels.Of(option)</strong></label>
+                        </div>
+                    }
+                    @if (role is { UnitCount: > 0 })
+                    {
+                        <small class="text-muted">Rol @role.UnitCount departmana atanmış; "yalnızca kullanıcıya" yapmak için önce departman atamalarını kaldırın.</small>
+                    }
+                    <FieldError Field="assignLevel" Errors="errors" />
                 </fieldset>
 
                 @if (skippedFromTemplate > 0)
@@ -194,6 +219,7 @@
     private HashSet<string> selected = [];
     private string name = string.Empty;
     private RecordScope scope = RecordScope.All;
+    private RoleAssignLevel assignLevel = RoleAssignLevel.User;
     private Guid? moveTo;
     private bool loaded;
     private bool deleting;
@@ -240,6 +266,7 @@
             name = role?.Name ?? string.Empty;
             selected = role?.Permissions.ToHashSet() ?? [];
             scope = role?.Scope ?? RecordScope.All;
+            assignLevel = role?.AssignLevel ?? RoleAssignLevel.User;
         }
         else
         {
@@ -248,6 +275,7 @@
             name = source is null ? string.Empty : $"{source.Name} (kopya)";
             selected = source?.Permissions.ToHashSet() ?? [];
             scope = source?.Scope ?? (Session.IsAdministrator ? RecordScope.All : Session.Scope);
+            assignLevel = source?.AssignLevel ?? RoleAssignLevel.User;
             templateKey = null;
             skippedFromTemplate = 0;
             templates = source is null ? (await Api.GetAsync<List<RoleTemplateDto>>("/api/roles/templates")).Value ?? [] : [];
@@ -283,11 +311,16 @@
 
     private bool CanGrant(string permission) => Session.IsAdministrator || Session.Can(permission);
 
-    private static readonly RecordScope[] ScopeOptions = [RecordScope.All, RecordScope.Team, RecordScope.Own];
+    private static readonly RecordScope[] ScopeOptions =
+        [RecordScope.All, RecordScope.UnitAndBelow, RecordScope.Unit, RecordScope.Team, RecordScope.Own];
 
-    // Sunucu da denetler: yönetici olmayan kişi kendi kapsamından geniş kapsam veremez, geniş kapsamlı rolü daraltamaz.
+    private static readonly RoleAssignLevel[] AssignLevelOptions = [RoleAssignLevel.User, RoleAssignLevel.Unit, RoleAssignLevel.Both];
+
+    // Sunucu da denetler: yönetici olmayan kişi kendi kapsamının kapsamadığı kapsamı veremez, kapsamadığı kapsamlı rolü daraltamaz.
+    // Ekip ile departman birbirini kapsamaz; ekranda kişinin en geniş kapsamı bilinir, kesin karar sunucudadır.
     private bool CanGrantScope(RecordScope option) =>
-        Session.IsAdministrator || (option >= Session.Scope && (role is null || role.Scope >= Session.Scope));
+        Session.IsAdministrator
+        || (RecordScopeRules.Covers(Session.Scope, option) && (role is null || RecordScopeRules.Covers(Session.Scope, role.Scope)));
 
     // Yönetici rolüne yalnızca yönetici taşıyabilir (sunucu da denetler).
     private IEnumerable<RoleDto> MoveTargets() =>
@@ -297,7 +330,7 @@
     {
         busy = true;
         notice = null;
-        var request = new SaveRoleRequest(name, selected.Order(StringComparer.Ordinal).ToList(), scope);
+        var request = new SaveRoleRequest(name, selected.Order(StringComparer.Ordinal).ToList(), scope, assignLevel);
         var result = IsNew
             ? await Api.PostAsync<RoleDto>("/api/roles", request)
             : await Api.PutAsync<RoleDto>($"/api/roles/{RoleId}", request);
@@ -318,7 +351,13 @@
             return;
         }
 
-        role = role! with { Name = result.Value!.Name, Permissions = result.Value.Permissions, Scope = result.Value.Scope };
+        role = role! with
+        {
+            Name = result.Value!.Name,
+            Permissions = result.Value.Permissions,
+            Scope = result.Value.Scope,
+            AssignLevel = result.Value.AssignLevel,
+        };
         selected = role.Permissions.ToHashSet();
         message = null;
         errors = null;

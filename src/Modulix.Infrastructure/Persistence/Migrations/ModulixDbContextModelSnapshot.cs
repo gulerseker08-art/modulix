@@ -115,6 +115,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("AssignLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -730,6 +735,33 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("BusinessUnitMembers", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Organization.BusinessUnitRole", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("InheritToChildren")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RoleId");
+
+                    b.HasIndex("TenantId", "BusinessUnitId", "RoleId")
+                        .IsUnique();
+
+                    b.ToTable("BusinessUnitRoles", "core");
                 });
 
             modelBuilder.Entity("Modulix.Core.Organization.Company", b =>
@@ -8942,6 +8974,23 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId", "MembershipId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Organization.BusinessUnitRole", b =>
+                {
+                    b.HasOne("Modulix.Core.Organization.BusinessUnit", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "BusinessUnitId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Core.Authorization.Role", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RoleId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

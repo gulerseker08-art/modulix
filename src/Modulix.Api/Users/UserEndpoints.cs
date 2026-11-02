@@ -104,9 +104,12 @@ public static class UserEndpoints
             return Results.Ok(new UserAccessDto(
                 result.IsAdministrator,
                 await AccessEndpoints.AssignablePermissionsAsync(catalog, access, ct),
-                result.Permissions.Select(p => new PermissionGrantDto(p.Key, p.GrantedBy.Select(r => new UserRoleDto(r.Id, r.Name, r.IsSystem)).ToList())).ToList(),
+                result.Permissions.Select(p => new PermissionGrantDto(p.Key, p.GrantedBy.Select(r => new UserRoleDto(r.Id, r.Name, r.IsSystem, r.ViaBusinessUnit)).ToList())).ToList(),
                 (Shared.Access.RecordScope)result.Scope,
-                result.Teams));
+                result.Teams,
+                result.BusinessUnit,
+                result.Scopes.Select(s => (Shared.Access.RecordScope)s).ToList(),
+                result.Roles.Select(r => new UserRoleSourceDto(r.Id, r.Name, r.IsSystem, (Shared.Access.RecordScope)r.Scope, r.ViaBusinessUnit)).ToList()));
         }
         catch (Exception ex) when (ToProblem(ex) is { } problem)
         {

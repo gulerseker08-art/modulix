@@ -129,7 +129,7 @@ Bayinin **ticari** katmanı ayrı kararda ele alınır (ADR-0027 adayı). Bu bel
 |---|---|---|
 | 0 | Bu ADR'nin onayı | Kabul edildi (2 Kasım 2026) |
 | 1 | `BusinessUnit` ağacı, üyelik, kök backfill, departman ekranı, kullanıcı kartında departman ve listede filtre (kapsam henüz değişmez) | **Yapıldı** (birim ve entegrasyon testleriyle doğrulandı: `BusinessUnitTests`; kullanıcı yönetimi, tenant izolasyonu, tablo envanteri, dışa aktarma ve denetim sınıfları geçti; tam paket CI'da). Rol ataması ve kapsam hesabı bu dilimde yok |
-| 2 | Rolün departmana atanması, `AssignLevel`, kapsamların birleşimi, `Unit`/`UnitAndBelow` kapsamları, kullanıcı kartında etkin kapsam ve rol kaynağı | Yapılmadı |
+| 2 | Rolün departmana atanması, `AssignLevel`, kapsamların birleşimi, `Unit`/`UnitAndBelow` kapsamları, kullanıcı kartında etkin kapsam ve rol kaynağı | **Yapıldı** (birim ve entegrasyon testleriyle doğrulandı: `RecordScopeRulesTests`, `BusinessUnitRoleTests` ve kapsam/rol/kullanıcı/tenant/denetim regresyon sınıfları; tam paket CI'da). Sınırlama: kapsam dışı ortak firma/kişi hâlâ asgari kimlikle görünür, bayi izolasyonu dilim 3'te tamamlanır |
 | 3 | Kapsam dışı ortak kayıt seçeneği, mükerrer/benzersizlik sızıntı denetimi, arama/lookup/rapor/dışa aktarma doğrulaması | Yapılmadı |
 | 4 | Departman değişikliği akışı (onay, etkilenen kayıt sayısı, devir bağlantısı), pasif üyelik kuralları | Yapılmadı |
 

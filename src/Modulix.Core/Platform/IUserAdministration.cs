@@ -1,7 +1,14 @@
 namespace Modulix.Core.Platform;
 
 /// <summary>Kullanıcı listesindeki veya detayındaki rol.</summary>
-public sealed record UserRole(Guid Id, string Name, bool IsSystem);
+public sealed record UserRole(Guid Id, string Name, bool IsSystem)
+{
+    /// <summary>Doluysa rol kullanıcıya doğrudan değil, bu departman üzerinden gelir (ADR-0026).</summary>
+    public string? ViaBusinessUnit { get; init; }
+}
+
+/// <summary>Kullanıcının etkin rolü, kayıt kapsamı ve kaynağı (doğrudan ya da departman).</summary>
+public sealed record UserRoleSource(Guid Id, string Name, bool IsSystem, Contracts.Authorization.RecordScope Scope, string? ViaBusinessUnit);
 
 /// <summary>Aktif tenant'ın bir üyesi; kimlik <see cref="MembershipId"/>'dir (aynı kişi başka tenant'ta başka üyeliktir).</summary>
 public sealed record TenantUser(
@@ -82,6 +89,15 @@ public sealed record UserAccess(bool IsAdministrator, IReadOnlyList<PermissionGr
 
     /// <summary>Kişinin ekipleri (ada göre); "ekibinin kayıtları" bunların üyelerini kapsar.</summary>
     public IReadOnlyList<string> Teams { get; init; } = [];
+
+    /// <summary>Kişinin departmanı (ADR-0026).</summary>
+    public string? BusinessUnit { get; init; }
+
+    /// <summary>Kayıt kapsamları: kayıt sahibi kümeleri bunların birleşimidir; <see cref="Scope"/> yalnızca gösterim için en geniş olanıdır.</summary>
+    public IReadOnlyList<Contracts.Authorization.RecordScope> Scopes { get; init; } = [];
+
+    /// <summary>Etkin roller ve kaynakları: doğrudan atananlar ile departmandan gelenler.</summary>
+    public IReadOnlyList<UserRoleSource> Roles { get; init; } = [];
 }
 
 public sealed class UserAdministrationException(UserAdministrationError error, string message) : Exception(message)

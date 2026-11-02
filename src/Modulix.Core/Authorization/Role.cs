@@ -58,6 +58,13 @@ public sealed class Role : ITenantEntity, ICompanyShared
     /// <summary>Kayıt kapsamı (Y8): rolün izinleri hangi kayıtlarda geçerli. Sistem rolünde her zaman tüm kayıtlar.</summary>
     public RecordScope Scope { get; private set; } = RecordScope.All;
 
+    /// <summary>Rolün kullanıcıya, departmana ya da ikisine atanabilmesi (ADR-0026). Varsayılan yalnızca kullanıcıdır.</summary>
+    public RoleAssignLevel AssignLevel { get; private set; } = RoleAssignLevel.User;
+
+    public bool AssignableToUnit => AssignLevel is RoleAssignLevel.Unit or RoleAssignLevel.Both;
+
+    public bool AssignableToUser => AssignLevel is RoleAssignLevel.User or RoleAssignLevel.Both;
+
     /// <summary>
     /// Aynı adlı eski bir rolü sistem rolüne çevirir (sistem rolü öncesi oluşturulmuş "Yönetici" rolleri için).
     /// İzin listesi boşaltılır; sistem rolü izinlerini katalogdan alır.
@@ -67,6 +74,19 @@ public sealed class Role : ITenantEntity, ICompanyShared
         IsSystem = true;
         Permissions = [];
         Scope = RecordScope.All;
+        AssignLevel = RoleAssignLevel.User;
+    }
+
+    /// <summary>Sistem rolü her zaman yalnızca kullanıcıya atanır (son yönetici koruması doğrudan atamaya bakar).</summary>
+    public void SetAssignLevel(RoleAssignLevel level)
+    {
+        EnsureEditable();
+        if (!Enum.IsDefined(level))
+        {
+            throw new ArgumentException("Geçersiz atanabilir düzey.", nameof(level));
+        }
+
+        AssignLevel = level;
     }
 
     public void SetScope(RecordScope scope)

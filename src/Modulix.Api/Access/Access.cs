@@ -206,7 +206,8 @@ public static class AccessEndpoints
         try
         {
             var role = await roles.CreateAsync(
-                request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId, ToScope(request.Scope) ?? Core.Contracts.Authorization.RecordScope.All);
+                request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId, ToScope(request.Scope) ?? Core.Contracts.Authorization.RecordScope.All,
+                ToLevel(request.AssignLevel));
             return Results.Created($"/api/roles/{role.Id}", ToDto(role));
         }
         catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
@@ -220,7 +221,8 @@ public static class AccessEndpoints
     {
         try
         {
-            var role = await roles.UpdateAsync(roleId, request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId, ToScope(request.Scope));
+            var role = await roles.UpdateAsync(
+                roleId, request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId, ToScope(request.Scope), ToLevel(request.AssignLevel));
             return role is null ? RoleNotFound() : Results.Ok(ToDto(role));
         }
         catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
@@ -258,7 +260,12 @@ public static class AccessEndpoints
         UserEndpoints.Run(() => users.SetRolesAsync(membershipId, request.RoleIds ?? [], ct));
 
     private static RoleDto ToDto(RoleSummary role) =>
-        new(role.Id, role.Name, role.Permissions, role.IsSystem, role.MemberCount, (Shared.Access.RecordScope)role.Scope);
+        new(role.Id, role.Name, role.Permissions, role.IsSystem, role.MemberCount, (Shared.Access.RecordScope)role.Scope,
+            (Shared.Access.RoleAssignLevel)role.AssignLevel, role.UnitCount);
+
+    // Tanımsız değer Role.SetAssignLevel'da alan hatası olur.
+    private static Core.Contracts.Authorization.RoleAssignLevel? ToLevel(Shared.Access.RoleAssignLevel? level) =>
+        level is { } value ? (Core.Contracts.Authorization.RoleAssignLevel)value : null;
 
     // Tanımsız değer Role.SetScope'ta alan hatası olur.
     private static Core.Contracts.Authorization.RecordScope? ToScope(Shared.Access.RecordScope? scope) =>

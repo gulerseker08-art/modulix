@@ -99,6 +99,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
                         command.CommandText =
                             "EXEC sys.sp_set_session_context @key = N'TenantId', @value = @t;" +
                             "DELETE FROM [core].[TeamMembers] WHERE [TenantId] = @t;" +
+                            "DELETE FROM [core].[BusinessUnitRoles] WHERE [TenantId] = @t;" +
                             "DELETE FROM [core].[BusinessUnitMembers] WHERE [TenantId] = @t;" +
                             "DELETE FROM [core].[BusinessUnits] WHERE [TenantId] = @t;" +
                             "DELETE FROM [core].[MembershipRoles] WHERE [TenantId] = @t;" +

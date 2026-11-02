@@ -29,14 +29,67 @@ internal sealed class MembershipDataScope(
             return hit.Owners;
         }
 
-        var owners = await permissions.GetScopeAsync(tenant.MembershipId, cancellationToken) switch
-        {
-            RecordScope.All => null,
-            RecordScope.Team => await TeamOwnersAsync(db, tenant.MembershipId, tenant.UserId, cancellationToken),
-            _ => new HashSet<Guid> { tenant.UserId },
-        };
+        var owners = await OwnersAsync(tenant, cancellationToken);
         cached = (tenant.MembershipId, owners);
         return owners;
+    }
+
+    /// <summary>
+    /// Kişinin etkin rollerinin (doğrudan ve departmandan gelen) her kapsamı bir sahip kümesi üretir; sonuç kümelerin
+    /// birleşimidir (ADR-0026 K5). Herhangi biri "tümü" ise süzgeç yoktur (<c>null</c>). Her kapsam kişinin kendi kayıtlarını
+    /// kapsar. "Departman ve altı" kök departmanda tüm firmadır ve "tümü"ne indirgenir (sahipsiz kayıtlar dahil).
+    /// </summary>
+    private async Task<IReadOnlySet<Guid>?> OwnersAsync(TenantContext tenant, CancellationToken cancellationToken)
+    {
+        var scopes = await permissions.GetScopesAsync(tenant.MembershipId, cancellationToken);
+        if (scopes.Contains(RecordScope.All))
+        {
+            return null;
+        }
+
+        var owners = new HashSet<Guid> { tenant.UserId };
+        foreach (var scope in scopes.Distinct())
+        {
+            switch (scope)
+            {
+                case RecordScope.Team:
+                    owners.UnionWith(await TeamOwnersAsync(db, tenant.MembershipId, tenant.UserId, cancellationToken));
+                    break;
+                case RecordScope.Unit or RecordScope.UnitAndBelow:
+                    var unit = await permissions.GetUnitAsync(tenant.MembershipId, cancellationToken);
+                    if (unit is null)
+                    {
+                        break;
+                    }
+
+                    var includeBelow = scope == RecordScope.UnitAndBelow;
+                    if (includeBelow && unit.Path.Count(c => c == '/') == 2)
+                    {
+                        return null;
+                    }
+
+                    owners.UnionWith(await UnitOwnersAsync(unit, includeBelow, cancellationToken));
+                    break;
+            }
+        }
+
+        return owners;
+    }
+
+    /// <summary>
+    /// Departmandaki (ve istenirse alt departmanlardaki) bütün üyeliklerin kullanıcı kimlikleri; pasif ve devre dışı
+    /// üyelikler dahildir, böylece ayrılan çalışanın kayıtları departmanda kalır (ADR-0026 K7).
+    /// </summary>
+    private async Task<IReadOnlyList<Guid>> UnitOwnersAsync(MembershipUnit unit, bool includeBelow, CancellationToken cancellationToken)
+    {
+        var unitIds = includeBelow ? await permissions.GetUnitTreeIdsAsync(unit.Path, cancellationToken) : [unit.Id];
+        return await (
+            from member in db.BusinessUnitMembers.AsNoTracking()
+            join membership in db.Memberships.AsNoTracking() on member.MembershipId equals membership.Id
+            where unitIds.Contains(member.BusinessUnitId) && membership.TenantId == member.TenantId
+            select membership.UserId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
     }
 
     /// <summary>
