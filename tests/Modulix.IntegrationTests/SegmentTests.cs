@@ -27,6 +27,19 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
 
     private static readonly string[] AllMarketing = [SegmentsRead, SegmentsWrite, SegmentsPublish, RecipientsRead];
 
+    // ---- Arayüz sözleşmesi ----
+
+    [Fact]
+    public void Shared_access_keys_match_the_marketing_module()
+    {
+        // Arayüz menüsü ve ekranlar bu anahtarlara bakar; modüldeki bir değişiklik arayüzü sessizce bozmasın.
+        Assert.Equal(MarketingModule.ModuleKey, MarketingAccess.ModuleKey);
+        var modulePermissions = ((Modulix.Core.Contracts.Modules.IModule)new MarketingModule()).Permissions.Select(p => p.Key).Order().ToList();
+        Assert.Equal(
+            modulePermissions,
+            typeof(MarketingAccess).GetFields().Where(f => f.Name != nameof(MarketingAccess.ModuleKey)).Select(f => (string)f.GetValue(null)!).Order());
+    }
+
     // ---- Mutlu yol ----
 
     [Fact]

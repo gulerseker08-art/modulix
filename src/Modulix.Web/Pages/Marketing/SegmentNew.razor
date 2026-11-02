@@ -1,0 +1,101 @@
+@page "/pazarlama/segmentler/yeni"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>Yeni segment · Modulix</PageTitle>
+
+<AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.SegmentsWrite">
+    <div class="page-header">
+        <div>
+            <h1>Yeni segment</h1>
+            <p class="text-muted mb-0">Hedef türü ve tür oluşturulduktan sonra değiştirilemez. Dinamik segmentin koşullarını sonraki adımda tanımlar ve yayımlarsınız; statik segmentte üyeleri kendiniz seçersiniz.</p>
+        </div>
+        <div class="header-actions"><a class="btn btn-outline-secondary" href="pazarlama/segmentler">Listeye dön</a></div>
+    </div>
+
+    <Notice Text="@message" Failed="true" />
+    <ErrorSummary Errors="@errors" />
+
+    <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <fieldset disabled="@busy">
+            <div class="form-grid">
+                <div class="span-6">
+                    <label class="form-label" for="s-name">Ad</label>
+                    <input id="s-name" class="form-control" maxlength="150" @bind="name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div class="span-6">
+                    <label class="form-label" for="s-code">Kod</label>
+                    <input id="s-code" class="form-control" maxlength="40" placeholder="tekstil-marmara" aria-describedby="s-code-help" @bind="code" />
+                    <small id="s-code-help" class="text-muted">Küçük harf, rakam ve tire; sonradan değişmez.</small>
+                    <FieldError Field="code" Errors="errors" />
+                </div>
+                <div class="span-6">
+                    <label class="form-label" for="s-target">Hedef türü</label>
+                    <select id="s-target" class="form-select" @bind="target">
+                        @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
+                    </select>
+                    <FieldError Field="target" Errors="errors" />
+                </div>
+                <div class="span-6">
+                    <label class="form-label" for="s-kind">Tür</label>
+                    <select id="s-kind" class="form-select" @bind="kind">
+                        @foreach (var k in MarketingLabels.Kinds) { <option value="@k.Key">@k.Label</option> }
+                    </select>
+                    <FieldError Field="kind" Errors="errors" />
+                </div>
+                <div class="span-12">
+                    <label class="form-label" for="s-purpose">Amaç</label>
+                    <input id="s-purpose" class="form-control" maxlength="200" placeholder="Ör. antrepo hizmeti tanıtımı" @bind="purpose" />
+                    <FieldError Field="purpose" Errors="errors" />
+                </div>
+                <div class="span-12">
+                    <label class="form-label" for="s-desc">Açıklama</label>
+                    <textarea id="s-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                </div>
+            </div>
+        </fieldset>
+        <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Oluştur</button></div>
+    </form>
+</AuthGate>
+
+@code {
+    private string name = string.Empty;
+    private string code = string.Empty;
+    private string target = "Company";
+    private string kind = "Dynamic";
+    private string purpose = string.Empty;
+    private string description = string.Empty;
+    private bool busy;
+    private string? message;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override Task OnInitializedAsync() => Session.EnsureLoadedAsync();
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<SegmentDto>("/api/marketing/segments", new SaveSegmentRequest(
+            Code: code.Trim(),
+            Name: name.Trim(),
+            Description: Blank(description),
+            Target: target,
+            Kind: kind,
+            Purpose: Blank(purpose)));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo($"pazarlama/segmentler/{result.Value!.Id}");
+            return;
+        }
+
+        message = result.FieldErrors.Count == 0 ? result.Error : null;
+        errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
+    }
+
+    private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

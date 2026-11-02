@@ -99,7 +99,8 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 | 0 — Analiz ve ADR | Yapıldı (bu belge) |
 | 1 — Çekirdek iletişim tercihi ve engel (arka uç, API, denetim, RLS, 9 entegrasyon + 43 birim testi) | Yapıldı; ekran yok (dilim 3'te segment ekranlarıyla) |
 | 2 — Pazarlama modülü, segment motoru (arka uç) | Yapıldı; ayrıntı aşağıda |
-| 3–8 | Planlı |
+| 3 — Segment ekranları (liste, detay, koşul düzenleyici, önizleme, üyeler, sürümler) | Yapıldı; ayrıntı aşağıda |
+| 4–8 | Planlı |
 
 ### Dilim 2 — uygulama notları (sapmalar ve sınırlar)
 
@@ -109,3 +110,9 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 - **Bilerek yok**: CRM'de bulunmayan alanlar (firma büyüklüğü, bölge, ürün sahipliği), son aktivite alanı, sözleşme bitişi (`Contracts` kaynağı dilim 2b), segmentin başka segmente başvurusu, zamanlanmış otomatik yenileme (sistem yetki bağlamı kararı bekliyor), statik segmente toplu içe aktarma/CSV, üye dışa aktarma, lead satırlarında ad (yalnızca kimlik), ekranlar (dilim 3).
 - **Davranış notları**: metin karşılaştırmaları veritabanı harmanına (büyük/küçük harf duyarsız) uyar; "X olmayan" (`ne`) boş değeri de kapsar; yayımlanmış segment silinmez, arşivlenir; hedef türü, tür ve kod değişmez; yayımlanmış sürüm değişmez ve silinmez; dahil/hariç istisna aynı hedef için tekildir (hariç, dahilin önüne geçer).
 - **Test**: 36 birim (koşul ağacı), 10 birim (CRM ifade ağacı: NULL, harf, gün sınırları), 9 entegrasyon (AND/OR/NULL/ilişki, sürüm değişmezliği, statik/istisna, doğrulama, yaşam döngüsü, tenant izolasyonu, alan yetkisi/kapalı modül, veri kapsamı, eylem izinleri). Performans ölçümü (100.000 sentetik kişi) yapılmadı; dilim 8.
+
+### Dilim 3 — uygulama notları (ekranlar)
+
+- **Yapılan**: menüde "Pazarlama → Segmentler" (modül ve `marketing.segments.read` izniyle); `/pazarlama/segmentler` (liste: durum, hedef, tür, benim segmentlerim, arama, sayfalama, son hesaplama ve hata), `/pazarlama/segmentler/yeni`, `/pazarlama/segmentler/{id}` (Genel, Koşullar, Üyeler, Sürümler sekmeleri; yayımla, yenile, arşivle/geri al, kopyala). Koşul düzenleyici (`SegmentConditionEditor`) iç içe VE/VEYA gruplarını kurar, alan listesi yalnızca çağıranın kullanabildiklerini gösterir, kullanılamayanları nedeniyle listeler; önizleme sayıyı ve ilk satırları gösterir, hata sunucu mesajıyla özetlenir. `MarketingAccess` (Shared) sabitleri modül izinleriyle testle eşitlenir. Demo seed'i `acme` için pazarlama hakkını açar.
+- **Doğrulama**: tarayıcıda (yerel önizleme) oluştur → koşul kur → önizle → taslağı kaydet → yayımla → hariç tut → sürümler akışı ve hata yolu DOM üzerinden denendi; ekran görüntüsü alınamadı (pano gizliydi), bu yüzden görsel düzen, duyarlı görünüm ve koyu tema **elle gözden geçirilmedi**.
+- **Bilerek yok**: üye dışa aktarma, statik segmente toplu içe aktarma, istisna listesinde hedef adı (yalnızca kimliğin son 8 karakteri; ad için ortak kayıt çözümleme servisi gerekir), Contracts/aktivite alanları, firma/kişi kartında segment sekmesi, iletişim tercihi ekranı (tercih/engel API'si hazır, ekranı yok).
