@@ -248,6 +248,16 @@ Roller "hangi tür kaydı", kayıt kapsamı "hangi kayıtları" belirler. Kapsam
 - `GET /api/tenant/members?assignable=true`: kişinin sorumlu atayabileceği üyeler. `GET /api/tenant/access` ve kullanıcının "Erişim" görünümü kapsamı (ve ekipleri) gösterir.
 - Yönetici olmayan rol yöneticisi kendi kapsamından geniş kapsam veremez (403).
 
+### Departman ağacı ([ADR-0026](docs/adr/0026-departman-hiyerarsisi-ve-departman-bazli-gorunurluk.md), dilim 1)
+
+Merkez kök departmandır; bayiler ve diğer yapılar altında yer alır. Her tenant'ın tek kök departmanı vardır ve her üyelik tam bir departmandadır. **Departman ekip değildir:** ekip çok üyeli bir çalışma grubudur (bir kişi birden çok ekipte olabilir), departman ağaçtaki tek konumdur.
+
+- **Departmanlar** (Yönetim → Departmanlar, `core.users.manage`): `GET/POST /api/business-units`, `GET/PUT /api/business-units/{id}`, `PUT /api/business-units/{id}/active` (kapat/aç). Kullanıcı kartındaki departman: `GET/PUT /api/users/{üyelik}/business-unit`. Kullanıcı listesi `?businessUnitId=` ile departmana göre süzülür; davet `businessUnitId` alabilir (verilmezse kök departman).
+- Kurallar: kök kapatılamaz; ağaç kök dahil en fazla dört seviyedir; aynı üst departmanda aynı ad kullanılamaz (409); üyesi ya da etkin alt departmanı olan departman kapatılamaz (409); kapalı departmana kullanıcı atanamaz (400). Departman silinmez. Tür (Merkez/Bayi/Diğer) yalnızca açıklayıcıdır.
+- Değişiklikler denetim kaydına "Departman" olarak, kullanıcının departman değişimi "Kullanıcı" kaydı olarak yazılır. Tablolar (`core.BusinessUnits`, `core.BusinessUnitMembers`) tenant verisidir: RLS ve EF filtresiyle korunur, tenant başına tek kök veritabanı kısıtıdır.
+- Migration `BusinessUnits` mevcut tenant'lara kök departmanı (tenant adıyla) ve tüm üyeliklere kök departmanı geri doldurur; yeniden çalıştırılabilir.
+- **Henüz yok** (sonraki dilimler, ADR-0026 bölüm 10): rolün departmana atanması, "Departman" ve "Departman ve altı" kayıt kapsamları, kapsam dışı ortak kayıt ayarı, departman değişiminde etkilenen kayıt uyarısı. Bu dilimde departman **kayıt görünürlüğünü ve yetkiyi değiştirmez**; yalnızca örgüt yapısını ve kullanıcı konumunu tutar.
+
 ### Hassas alanlar (Y8b)
 
 Bazı alanlar kaydı görebilen herkese açık değildir. Modül hassas alanlarını ve onları açan izni `IModule.SensitiveFields` ile tanımlar; CRM'de fırsatın **tutarı** ve **olasılığı** `crm.opportunity-amounts.read` ("Fırsat tutarları" satırı) ister. Para birimi hassas değildir. Bu izin "Satış temsilcisi" ve "Salt okur" şablonlarında vardır; migration bugün fırsatları gören her role izni ekler, kimse görünürlük kaybetmez.

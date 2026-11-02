@@ -25,6 +25,20 @@
             <input id="inviteName" class="form-control" maxlength="200" @bind="displayName" />
             <FieldError Field="displayName" Errors="errors" />
         </div>
+        @if (Units.Count > 0)
+        {
+            <div>
+                <label class="form-label" for="inviteUnit">Departman</label>
+                <select id="inviteUnit" class="form-select" @bind="businessUnitId">
+                    <option value="">Varsayılan (kök departman)</option>
+                    @foreach (var unit in Units.Where(u => u.IsActive))
+                    {
+                        <option value="@unit.Id">@unit.PathNames</option>
+                    }
+                </select>
+                <FieldError Field="businessUnitId" Errors="errors" />
+            </div>
+        }
         <fieldset class="span-all">
             <legend class="form-label">Roller</legend>
             <RolePicker Roles="Roles" Selected="selected" CanGrantAdministrator="CanGrantAdministrator" />
@@ -43,6 +57,9 @@
 
     [Parameter] public bool CanGrantAdministrator { get; set; }
 
+    /// <summary>Seçilebilir departmanlar (ADR-0026); boşsa seçim gösterilmez ve davet kök departmana bağlanır.</summary>
+    [Parameter] public IReadOnlyList<BusinessUnitDto> Units { get; set; } = [];
+
     [Parameter] public EventCallback<InviteUserResponse> Invited { get; set; }
 
     [Parameter] public EventCallback Cancelled { get; set; }
@@ -50,6 +67,7 @@
     private readonly HashSet<Guid> selected = [];
     private string email = string.Empty;
     private string displayName = string.Empty;
+    private Guid? businessUnitId;
     private string? message;
     private IReadOnlyDictionary<string, string[]>? errors;
     private bool busy;
@@ -57,7 +75,7 @@
     private async Task InviteAsync()
     {
         busy = true;
-        var result = await Api.PostAsync<InviteUserResponse>("/api/users/invitations", new InviteUserRequest(email, displayName, selected.ToList()));
+        var result = await Api.PostAsync<InviteUserResponse>("/api/users/invitations", new InviteUserRequest(email, displayName, selected.ToList(), businessUnitId));
         busy = false;
 
         if (!result.IsSuccess)

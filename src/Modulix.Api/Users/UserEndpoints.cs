@@ -45,10 +45,14 @@ public static class UserEndpoints
     }
 
     private static async Task<IResult> ListAsync(
-        string? search, UserStatus? status, Guid? roleId, bool? twoFactor, int? page, int? pageSize, IUserAdministration admin, CancellationToken ct)
+        string? search, UserStatus? status, Guid? roleId, bool? twoFactor, Guid? businessUnitId, int? page, int? pageSize, IUserAdministration admin, CancellationToken ct)
     {
         var result = await admin.ListAsync(
-            new UserQuery(search, (MembershipStatus?)status, roleId, page ?? 1, pageSize ?? 25) { TwoFactorEnabled = twoFactor }, ct);
+            new UserQuery(search, (MembershipStatus?)status, roleId, page ?? 1, pageSize ?? 25)
+            {
+                TwoFactorEnabled = twoFactor,
+                BusinessUnitId = businessUnitId,
+            }, ct);
         return Results.Ok(new UserPageResponse(result.Items.Select(ToDto).ToList(), result.Page, result.PageSize, result.TotalCount));
     }
 
@@ -128,7 +132,10 @@ public static class UserEndpoints
         try
         {
             var result = await admin.InviteAsync(
-                new UserInvitation(request.Email, request.DisplayName, request.RoleIds ?? [], PublicUrl.Resolve(http)), ct);
+                new UserInvitation(request.Email, request.DisplayName, request.RoleIds ?? [], PublicUrl.Resolve(http))
+                {
+                    BusinessUnitId = request.BusinessUnitId,
+                }, ct);
             return Results.Created($"/api/users/{result.User.MembershipId}", new InviteUserResponse(ToDto(result.User), result.ExistingAccount));
         }
         catch (Exception ex) when (ToProblem(ex) is { } problem)
@@ -164,6 +171,7 @@ public static class UserEndpoints
         UserAdministrationException ex => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message),
         RoleConflictException ex => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message),
         CompanyConflictException ex => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message),
+        BusinessUnitConflictException ex => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message),
         ArgumentException ex => Results.ValidationProblem(
             new Dictionary<string, string[]> { [ex.ParamName ?? string.Empty] = [FieldMessage(ex)] },
             title: "Lütfen işaretli alanları düzeltin.",
@@ -183,7 +191,8 @@ public static class UserEndpoints
         user.LastSignInAt,
         user.IsLockedOut,
         user.IsCurrentUser,
-        user.TwoFactorEnabled);
+        user.TwoFactorEnabled,
+        user.BusinessUnitName);
 
     // ArgumentException.Message sonuna " (Parameter 'x')" ekler; kullanıcıya yalnızca asıl mesaj gösterilir.
     private static string FieldMessage(ArgumentException ex) =>
