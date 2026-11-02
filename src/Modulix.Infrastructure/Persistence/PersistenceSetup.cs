@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Audit;
 using Modulix.Core.Authorization;
+using Modulix.Core.Communication;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Communication;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
@@ -18,6 +20,7 @@ using Modulix.Core.Settings;
 using Modulix.Core.Teams;
 using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Authorization;
+using Modulix.Infrastructure.Communication;
 using Modulix.Infrastructure.Customization;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Lookups;
@@ -75,6 +78,11 @@ public static class PersistenceSetup
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<MembershipPermissions>();
         services.AddScoped<ITeamService, TeamService>();
+
+        // Ortak iletişim tercihi (ADR-0025): modüller okuma sözleşmesini, API yönetimi kullanır.
+        services.AddScoped<CommunicationService>();
+        services.AddScoped<ICommunicationPreferences>(sp => sp.GetRequiredService<CommunicationService>());
+        services.AddScoped<ICommunicationAdministration>(sp => sp.GetRequiredService<CommunicationService>());
         services.AddScoped<ICompanyAdministration, CompanyAdministration>();
         services.AddScoped<IBranchAdministration, BranchAdministration>();
         services.AddScoped<CustomFieldService>();

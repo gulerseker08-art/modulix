@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
+using Modulix.Core.Communication;
 using Modulix.Core.Customization;
 using Modulix.Core.Lookups;
 using Modulix.Core.Teams;
@@ -68,6 +69,13 @@ public class ModulixDbContext(
     public DbSet<Team> Teams => Set<Team>();
 
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+
+    // Ortak iletişim tercihi (ADR-0025).
+    public DbSet<CommunicationPreference> CommunicationPreferences => Set<CommunicationPreference>();
+
+    public DbSet<ConsentEvent> ConsentEvents => Set<ConsentEvent>();
+
+    public DbSet<CommunicationSuppression> CommunicationSuppressions => Set<CommunicationSuppression>();
 
     public DbSet<Company> Companies => Set<Company>();
 
