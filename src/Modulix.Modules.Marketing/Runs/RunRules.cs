@@ -58,6 +58,13 @@ public static class RunTransitions
 /// <summary>İçerik kuralları (saf): zorunlu alanlar ve güvenli bağlantılar.</summary>
 public static partial class ContentRules
 {
+    /// <summary>
+    /// Gönderim anında iletinin sonuna eklenen çıkış bağlantısı. İçerik sürümü değişmez; alt bilgi her iletiye ayrı eklenir (bağlantı kişiye özeldir).
+    /// Her kanalda aynı düz metin; bağlantı yalnızca sistemin ürettiği https adresidir, kullanıcı girdisi değildir.
+    /// </summary>
+    public static string WithUnsubscribeFooter(string body, string pageUrl) =>
+        $"{body.TrimEnd()}\n\n--\nBu iletileri almak istemiyorsanız abonelikten çıkabilirsiniz: {pageUrl}";
+
     /// <summary>İçerikteki bağlantılar yalnızca http/https olabilir; betik ve veri şemaları ve şemasız "www" olmayan başka şemalar reddedilir.</summary>
     public static IReadOnlyList<(string Field, string Message)> Validate(CommunicationChannel channel, string? subject, string? body)
     {

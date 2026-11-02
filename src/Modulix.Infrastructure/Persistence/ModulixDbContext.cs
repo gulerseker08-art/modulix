@@ -79,6 +79,8 @@ public class ModulixDbContext(
 
     public DbSet<FrequencyWindow> FrequencyWindows => Set<FrequencyWindow>();
 
+    public DbSet<CommunicationLinkToken> CommunicationLinkTokens => Set<CommunicationLinkToken>();
+
     public DbSet<Company> Companies => Set<Company>();
 
     public DbSet<Branch> Branches => Set<Branch>();

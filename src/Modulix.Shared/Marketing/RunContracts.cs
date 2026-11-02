@@ -35,7 +35,8 @@ public sealed record SaveCampaignRunRequest(
 public sealed record RunActionRequest(long? Version = null, string? Reason = null);
 
 public sealed record RunSummaryDto(
-    string Status, int Total, IReadOnlyDictionary<string, int> Statuses, IReadOnlyDictionary<string, int> Codes, bool ProviderConfigured, string Provider);
+    string Status, int Total, IReadOnlyDictionary<string, int> Statuses, IReadOnlyDictionary<string, int> Codes, bool ProviderConfigured, string Provider,
+    bool UnsubscribeLinkAvailable);
 
 public sealed record ProcessResultDto(int Processed, int Accepted, int Failed, int Skipped, int Unknown, int Requeued, int Remaining, bool Completed);
 

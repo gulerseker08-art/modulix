@@ -25,7 +25,10 @@ public enum ProviderOutcome
 }
 
 /// <param name="IdempotencyKey">Aynı gönderim için aynı anahtar: sağlayıcı destekliyorsa çift gönderimi engeller.</param>
-public sealed record MessageRequest(string IdempotencyKey, CommunicationChannel Channel, string Address, string? Subject, string Body);
+/// <param name="Unsubscribe">Pazarlama iletisine eklenen abonelikten çıkma bağlantıları. Gerçek bir e-posta sağlayıcısı <c>OneClickUrl</c> ile <c>List-Unsubscribe</c> ve
+/// <c>List-Unsubscribe-Post</c> başlıklarını (RFC 8058) yazmakla yükümlüdür; <c>Body</c> metninde sayfa bağlantısı zaten vardır.</param>
+public sealed record MessageRequest(
+    string IdempotencyKey, CommunicationChannel Channel, string Address, string? Subject, string Body, UnsubscribeLink? Unsubscribe = null);
 
 public sealed record ProviderResult(ProviderOutcome Outcome, string? ProviderMessageId = null, string? ErrorCode = null);
 

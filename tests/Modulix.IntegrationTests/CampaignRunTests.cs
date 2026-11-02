@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
+using Modulix.Core.Contracts.Marketing;
 using Modulix.Core.Modules;
 using Modulix.Infrastructure.Identity;
 using Modulix.Modules.Crm;
@@ -21,8 +23,48 @@ namespace Modulix.IntegrationTests;
 /// ADR-0025 dilim 5: içerik sürümü, onay (görev ayrılığı), başlatma, işleme, gönderim öncesi yeniden denetim, sıklık sınırı ve belirsiz sonuç. Dört test türü: mutlu yol,
 /// hata/doğrulama, tenant izolasyonu, yetki. Test sağlayıcısı iletiyi hiçbir yere göndermez; bu testlerde gerçek ileti gitmez.
 /// </summary>
-public class CampaignRunTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
+public class CampaignRunTests : IClassFixture<ModulixApiFactory>, IAsyncLifetime
 {
+    private static readonly System.Collections.Concurrent.ConcurrentBag<MessageRequest> Sent = [];
+
+    private readonly ModulixApiFactory factory;
+    private readonly WebApplicationFactory<Program> host;
+
+    public CampaignRunTests(ModulixApiFactory factory)
+    {
+        this.factory = factory;
+
+        // Abonelikten çıkma bağlantısı genel adresle kurulur (adres yoksa pazarlama gönderimi başlamaz); bu testlerde adres ayarlıdır. Test sağlayıcısı
+        // sarmalanır: aynı sonuçları verir, ek olarak sağlayıcıya giden istekleri kaydeder (hiçbir yere ileti gitmez).
+        host = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("App:PublicUrl", "https://app.modulix.test");
+            builder.ConfigureServices(services =>
+            {
+                var fake = services.Single(d => d.ServiceType == typeof(IMessageProvider));
+                services.Remove(fake);
+                services.AddScoped<IMessageProvider>(sp => new RecordingProvider((IMessageProvider)ActivatorUtilities.CreateInstance(sp, fake.ImplementationType!), Sent));
+            });
+        });
+    }
+
+    private sealed class RecordingProvider(IMessageProvider inner, System.Collections.Concurrent.ConcurrentBag<MessageRequest> sent) : IMessageProvider
+    {
+        public string Key => inner.Key;
+
+        public bool Supports(CommunicationChannel channel) => inner.Supports(channel);
+
+        public Task<ProviderResult> SendAsync(MessageRequest request, CancellationToken cancellationToken)
+        {
+            sent.Add(request);
+            return inner.SendAsync(request, cancellationToken);
+        }
+    }
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync() => await host.DisposeAsync();
+
     private static readonly string[] CrmPermissions =
     [
         CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite, CrmModule.Permissions.ContactsRead, CrmModule.Permissions.ContactsWrite,
@@ -398,7 +440,7 @@ public class CampaignRunTests(ModulixApiFactory factory) : IClassFixture<Modulix
         Assert.Equal(HttpStatusCode.Forbidden, (await noRecipients.GetAsync($"/api/marketing/campaign-runs/{run.Id}/deliveries")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await sender.GetAsync($"/api/marketing/campaign-runs/{run.Id}/deliveries")).StatusCode);
 
-        using var anonymous = factory.CreateBrowserClient();
+        using var anonymous = host.CreateClient(Browser());
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsync($"/api/marketing/campaign-runs/{run.Id}/process", null)).StatusCode);
 
         // Modül kapanınca işleme ve eylemler 403; veriler silinmez.
@@ -421,6 +463,75 @@ public class CampaignRunTests(ModulixApiFactory factory) : IClassFixture<Modulix
             modulePermissions,
             typeof(MarketingAccess).GetFields().Where(f => f.Name != nameof(MarketingAccess.ModuleKey)).Select(f => (string)f.GetValue(null)!).Order());
         await Task.CompletedTask;
+    }
+
+    // ---- Abonelikten çıkma bağlantısı (dilim 6) ----
+
+    [Fact]
+    public async Task Every_message_carries_its_own_working_unsubscribe_link_and_the_next_run_honours_the_unsubscribe()
+    {
+        var w = await WorldAsync();
+        await SetSettingAsync(w.Preparer, MarketingModule.SettingKeys.Provider, "fake");
+        var run = await PreparedRunAsync(w);
+        await ApproveAsync(w, run);
+        await ActAsync(w.Approver, run.Id, "start");
+        await ProcessAllAsync(w.Approver, run.Id);
+
+        // Sağlayıcıya giden her ileti, kişiye özel bir bağlantı ve tek tıkla çıkış adresi taşır; içerik metni olduğu gibi kalır, alt bilgi sona eklenir.
+        var key = w.Tenant.Id.ToString("N");
+        var mine = Sent.Where(r => r.Unsubscribe?.PageUrl.Contains(key, StringComparison.Ordinal) == true).ToList();
+        Assert.True(mine.Count >= 5, mine.Count.ToString());
+        Assert.All(mine, r =>
+        {
+            Assert.StartsWith(Body, r.Body, StringComparison.Ordinal);
+            Assert.EndsWith(r.Unsubscribe!.PageUrl, r.Body, StringComparison.Ordinal);
+            Assert.Contains("/api/public/communication/", r.Unsubscribe.OneClickUrl, StringComparison.Ordinal);
+        });
+        Assert.Equal(mine.Count, mine.Select(r => r.Unsubscribe!.PageUrl).Distinct().Count());
+
+        // Alıcı bağlantıdaki sayfa uç noktasıyla çıkar.
+        var message = mine.First(r => r.Address == "ok1@a.test");
+        var token = message.Unsubscribe!.PageUrl[(message.Unsubscribe.PageUrl.IndexOf("#t=", StringComparison.Ordinal) + 3)..];
+        using var anonymous = host.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), HandleCookies = false, AllowAutoRedirect = false });
+        Assert.Equal(HttpStatusCode.OK, (await anonymous.PostAsJsonAsync($"/api/public/communication/{key}/unsubscribe", new PublicCommunicationTokenRequest(token))).StatusCode);
+        var preferences = (await w.Preparer.GetFromJsonAsync<PreferencePageDto>("/api/communication/preferences?address=ok1@a.test"))!;
+        Assert.Equal(("Denied", "unsubscribe"), (Assert.Single(preferences.Items).Status, preferences.Items[0].Source));
+
+        // Sonraki çalıştırma çıkışı gönderimden hemen önce görür: bu alıcıya ileti gitmez.
+        var before = Sent.Count(r => r.Address == "ok1@a.test" && r.Unsubscribe!.PageUrl.Contains(key, StringComparison.Ordinal));
+        var second = await PreparedRunAsync(w);
+        await ApproveAsync(w, second);
+        await ActAsync(w.Approver, second.Id, "start");
+        await ProcessAllAsync(w.Approver, second.Id);
+        Assert.Equal(1, (await SummaryAsync(w.Approver, second.Id)).Codes["Skipped:denied"]);
+        Assert.Equal(before, Sent.Count(r => r.Address == "ok1@a.test" && r.Unsubscribe!.PageUrl.Contains(key, StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task A_run_cannot_start_without_the_public_address_because_no_marketing_message_goes_out_without_an_unsubscribe_link()
+    {
+        var w = await WorldAsync();
+        await SetSettingAsync(w.Preparer, MarketingModule.SettingKeys.Provider, "fake");
+        var run = await PreparedRunAsync(w);
+        await ApproveAsync(w, run);
+
+        // Genel adresi (App:PublicUrl) olmayan bir ana bilgisayardan aynı tenant'a bağlanan onaylayıcı.
+        var user = await factory.CreateUserAsync(w.Tenant);
+        await factory.CreateRoleAsync(w.Tenant.Id, Approver, RecordScope.All, user);
+        var noUrl = factory.CreateBrowserClient();
+        Assert.Equal(HttpStatusCode.OK, (await noUrl.PostAsJsonAsync("/api/auth/login", new LoginRequest(user.Email!, ModulixApiFactory.Password))).StatusCode);
+
+        var summary = await SummaryAsync(noUrl, run.Id);
+        Assert.False(summary.UnsubscribeLinkAvailable);
+        Assert.True((await SummaryAsync(w.Approver, run.Id)).UnsubscribeLinkAvailable);
+
+        var blocked = await noUrl.PostAsJsonAsync($"/api/marketing/campaign-runs/{run.Id}/start", new RunActionRequest());
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+        Assert.Contains("App:PublicUrl", await blocked.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Equal(0, (await SummaryAsync(w.Approver, run.Id)).Total);
+
+        // Adres ayarlı ana bilgisayardan başlatılabilir.
+        Assert.Equal("Running", (await ActAsync(w.Approver, run.Id, "start")).Status);
     }
 
     // ---- Yardımcılar ----
@@ -578,9 +689,11 @@ public class CampaignRunTests(ModulixApiFactory factory) : IClassFixture<Modulix
         return await LoginAsync(user);
     }
 
+    private static WebApplicationFactoryClientOptions Browser() => new() { BaseAddress = new Uri("https://localhost"), HandleCookies = true, AllowAutoRedirect = false };
+
     private async Task<HttpClient> LoginAsync(ModulixUser user)
     {
-        var client = factory.CreateBrowserClient();
+        var client = host.CreateClient(Browser());
         var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(user.Email!, ModulixApiFactory.Password));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return client;
