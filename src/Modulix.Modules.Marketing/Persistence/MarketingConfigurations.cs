@@ -87,6 +87,9 @@ internal sealed class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
         builder.Property(c => c.UtmSource).HasMaxLength(Campaign.UtmMaxLength);
         builder.Property(c => c.UtmMedium).HasMaxLength(Campaign.UtmMaxLength);
         builder.Property(c => c.UtmCampaign).HasMaxLength(Campaign.UtmMaxLength);
+        builder.Property(c => c.Budget).HasPrecision(18, 2);
+        builder.Property(c => c.ActualCost).HasPrecision(18, 2);
+        builder.Property(c => c.CostCurrency).HasMaxLength(3).IsRequired();
         builder.Property(c => c.Status).HasMaxLength(20).IsRequired();
 
         builder.HasIndex(c => new { c.TenantId, c.Code }).IsUnique().HasDatabaseName("UX_Campaigns_Code");

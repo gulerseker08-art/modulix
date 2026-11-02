@@ -42,6 +42,8 @@ internal sealed class CampaignResponseRecordStore(MarketingStoreContext context)
         ["campaignId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(x => x.CampaignId == id) : null,
         ["runId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(x => x.RunId == id) : null,
         ["deliveryId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(x => x.DeliveryId == id) : null,
+        // Hedef (firma/kişi/lead) ya da o hedefteki kişi için yanıtlar; müşteri kartındaki pazarlama geçmişi kullanır.
+        ["targetId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(x => x.TargetId == id || x.PersonId == id) : null,
         ["status"] = (q, v, _) => ResponseStatuses.All.Contains(v) ? q.Where(x => x.Status == v) : null,
         ["kind"] = (q, v, _) => ResponseKinds.All.Contains(v) ? q.Where(x => x.Kind == v) : null,
         ["ownerId"] = (q, v, c) => FilterValue.User(v, c) is { } id ? q.Where(x => x.OwnerId == id) : null,
