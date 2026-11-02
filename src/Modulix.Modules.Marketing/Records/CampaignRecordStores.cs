@@ -7,6 +7,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Marketing.Audiences;
 using Modulix.Modules.Marketing.Domain;
+using Modulix.Modules.Marketing.Responses;
 
 namespace Modulix.Modules.Marketing.Records;
 
@@ -41,6 +42,9 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
         Field.Integer<Campaign>("maxPerTarget", c => c.MaxPerTarget, (c, v) => c.MaxPerTarget = v, max: 1000),
         Field.Date<Campaign>("startsOn", c => c.StartsOn, (c, v) => c.StartsOn = v),
         Field.Date<Campaign>("endsOn", c => c.EndsOn, (c, v) => c.EndsOn = v),
+        Field.Text<Campaign>("utmSource", Campaign.UtmMaxLength, c => c.UtmSource, (c, v) => c.UtmSource = v),
+        Field.Text<Campaign>("utmMedium", Campaign.UtmMaxLength, c => c.UtmMedium, (c, v) => c.UtmMedium = v),
+        Field.Text<Campaign>("utmCampaign", Campaign.UtmMaxLength, c => c.UtmCampaign, (c, v) => c.UtmCampaign = v),
         Field.Owner<Campaign>("ownerId", c => c.OwnerId, (c, v) => c.OwnerId = v),
         Field.Choice<Campaign>("status", CampaignStatuses.All, c => c.Status, (c, v) => c.Status = v).AsSystem(),
         Field.Id<Campaign>("createdBy", c => c.CreatedBy, (c, v) => c.CreatedBy = v).AsSystem(),
@@ -99,6 +103,11 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
             errors.Add(new RecordFieldError("endsOn", "Bitiş tarihi başlangıçtan önce olamaz."));
         }
 
+        // Kaynak/UTM değerleri küçük harfe çevrilir ve lead'e olduğu gibi geçtiği için güvenli karakterlerle sınırlıdır (bağlantı parametresi gibi kullanılabilir).
+        entity.UtmSource = NormalizeUtm("utmSource", entity.UtmSource, errors);
+        entity.UtmMedium = NormalizeUtm("utmMedium", entity.UtmMedium, errors);
+        entity.UtmCampaign = NormalizeUtm("utmCampaign", entity.UtmCampaign, errors);
+
         if (errors.Count > 0)
         {
             throw new RecordValidationException(errors);
@@ -124,10 +133,22 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
     protected override async Task BeforeDeleteAsync(Campaign entity, CancellationToken cancellationToken)
     {
         if (await Context.Data.Set<CampaignAudienceEntry>().AnyAsync(e => e.CampaignId == entity.Id, cancellationToken)
-            || await Context.Data.Set<AudienceSnapshot>().AnyAsync(s => s.CampaignId == entity.Id, cancellationToken))
+            || await Context.Data.Set<AudienceSnapshot>().AnyAsync(s => s.CampaignId == entity.Id, cancellationToken)
+            || await Context.Data.Set<CampaignResponse>().AnyAsync(r => r.CampaignId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Hedef kitlesi ya da dondurulmuş kitlesi olan kampanya silinemez; arşivleyin.");
+            throw new RecordConflictException("Hedef kitlesi, dondurulmuş kitlesi ya da yanıtı olan kampanya silinemez; arşivleyin.");
         }
+    }
+
+    private static string? NormalizeUtm(string field, string? value, List<RecordFieldError> errors)
+    {
+        var text = UtmRules.Normalize(value, out var valid);
+        if (!valid)
+        {
+            errors.Add(new RecordFieldError(field, "Kaynak/UTM değeri harf, rakam, nokta, alt çizgi, tire ya da ~ içerebilir (en fazla 80 karakter, boşluk yok)."));
+        }
+
+        return text;
     }
 
     [GeneratedRegex("^[a-z0-9][a-z0-9-]{1,39}$")]

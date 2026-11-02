@@ -25,6 +25,7 @@ internal static class CampaignEndpoints
             MarketingModule.Permissions.CampaignsRead, MarketingModule.Permissions.CampaignsAudience);
 
         RunEndpoints.MapRunEndpoints(group);
+        ResponseEndpoints.MapResponseEndpoints(group);
 
         var campaigns = group.MapGroup("/campaigns");
         campaigns.MapPost("/{id:guid}/audience/preview", async (Guid id, ICampaignAudience audience, CancellationToken ct) =>

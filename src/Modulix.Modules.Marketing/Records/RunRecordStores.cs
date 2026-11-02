@@ -238,6 +238,9 @@ internal sealed class DeliveryJournal(MarketingStoreContext context)
     public async Task<List<CampaignDelivery>> TrackedByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) =>
         await context.Data.Set<CampaignDelivery>().Where(d => ids.Contains(d.Id)).OrderBy(d => d.CreatedAt).ThenBy(d => d.Id).ToListAsync(cancellationToken);
 
+    public Task<CampaignDelivery?> FindAsync(Guid id, CancellationToken cancellationToken) =>
+        context.Data.Set<CampaignDelivery>().AsNoTracking().SingleOrDefaultAsync(d => d.Id == id, cancellationToken);
+
     public async Task<List<CampaignDelivery>> StaleSendingAsync(Guid runId, DateTimeOffset olderThan, CancellationToken cancellationToken) =>
         await For(runId).Where(d => d.Status == DeliveryStatuses.Sending && d.UpdatedAt < olderThan).ToListAsync(cancellationToken);
 

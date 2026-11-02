@@ -34,7 +34,7 @@
         </div>
 
         <Notice Text="@message" Failed="@failed" />
-        <div class="alert alert-info" role="note">Bu sürümde içerik, onay ve gönderim yoktur; hiçbir ileti gönderilmez. Hedef kitle gönderimden önce izin ve engel kontrolüyle yeniden değerlendirilecektir; segmentte olmak izin vermez.</div>
+        <div class="alert alert-info" role="note">Gerçek gönderim kapalıdır: sağlayıcı ayarlanmadıkça ileti gitmez, test sağlayıcısı iletiyi hiçbir yere göndermez. Her gönderimden önce izin ve engel yeniden denetlenir; segmentte olmak izin vermez.</div>
 
         <TabBar Tabs="Tabs" State="tabState" Label="Kampanya bölümleri" Changed="OnTabChangedAsync" />
 
@@ -88,6 +88,22 @@
                             <input id="g-end" class="form-control" type="date" @bind="endsOn" />
                             <FieldError Field="endsOn" Errors="generalErrors" />
                         </div>
+                        <div class="span-4">
+                            <label class="form-label" for="g-utm-source">UTM kaynak</label>
+                            <input id="g-utm-source" class="form-control" maxlength="80" placeholder="varsayılan: kampanya" @bind="utmSource" />
+                            <FieldError Field="utmSource" Errors="generalErrors" />
+                        </div>
+                        <div class="span-4">
+                            <label class="form-label" for="g-utm-medium">UTM ortam</label>
+                            <input id="g-utm-medium" class="form-control" maxlength="80" placeholder="varsayılan: kanal" @bind="utmMedium" />
+                            <FieldError Field="utmMedium" Errors="generalErrors" />
+                        </div>
+                        <div class="span-4">
+                            <label class="form-label" for="g-utm-campaign">UTM kampanya</label>
+                            <input id="g-utm-campaign" class="form-control" maxlength="80" placeholder="varsayılan: kampanya kodu" @bind="utmCampaign" />
+                            <FieldError Field="utmCampaign" Errors="generalErrors" />
+                        </div>
+                        <p class="span-12 small text-muted mb-0">Kaynak/UTM değerleri küçük harfe çevrilir; yanıttan açılan lead'e yazılır.</p>
                         <div class="span-12">
                             <label class="form-label" for="g-desc">Açıklama</label>
                             <textarea id="g-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
@@ -236,6 +252,13 @@
             </div>
         }
 
+        @if (tabState.Rendered("yanitlar"))
+        {
+            <div id="tabpanel-yanitlar" role="tabpanel" aria-labelledby="tab-yanitlar" hidden="@tabState.Hidden("yanitlar")">
+                <CampaignResponsesPanel Campaign="campaign" />
+            </div>
+        }
+
         @if (tabState.Rendered("dondurulmus"))
         {
             <div id="tabpanel-dondurulmus" role="tabpanel" aria-labelledby="tab-dondurulmus" hidden="@tabState.Hidden("dondurulmus")">
@@ -327,6 +350,9 @@
     private string name = string.Empty;
     private string purpose = string.Empty;
     private string description = string.Empty;
+    private string utmSource = string.Empty;
+    private string utmMedium = string.Empty;
+    private string utmCampaign = string.Empty;
     private string rule = "PrimaryContact";
     private string role = string.Empty;
     private int? maxPerTarget;
@@ -361,7 +387,11 @@
 
     private bool CanEntries => CanWrite && !IsArchived;
 
-    private IReadOnlyList<TabItem> Tabs => [new("genel", "Genel"), new("kitle", "Hedef kitle"), new("dondurulmus", "Dondurulmuş kitleler"), new("calistirmalar", "İçerik ve çalıştırmalar")];
+    private IReadOnlyList<TabItem> Tabs =>
+    [
+        new("genel", "Genel"), new("kitle", "Hedef kitle"), new("dondurulmus", "Dondurulmuş kitleler"), new("calistirmalar", "İçerik ve çalıştırmalar"),
+        .. (Session.Can(MarketingAccess.ResponsesRead) ? new[] { new TabItem("yanitlar", "Yanıtlar") } : []),
+    ];
 
     protected override async Task OnInitializedAsync()
     {
@@ -378,6 +408,9 @@
         name = value.Name;
         purpose = value.Purpose ?? string.Empty;
         description = value.Description ?? string.Empty;
+        utmSource = value.UtmSource ?? string.Empty;
+        utmMedium = value.UtmMedium ?? string.Empty;
+        utmCampaign = value.UtmCampaign ?? string.Empty;
         rule = value.RecipientRule;
         role = value.RecipientRole ?? string.Empty;
         maxPerTarget = value.MaxPerTarget;
@@ -415,7 +448,8 @@
         var result = await Api.PutAsync<CampaignDto>($"/api/marketing/campaigns/{Id}", new SaveCampaignRequest(
             campaign!.Version, campaign.Code, name.Trim(), Blank(description), Blank(purpose), campaign.Target, campaign.Channel,
             campaign.Target == "Company" ? rule : campaign.RecipientRule, campaign.Target == "Company" && rule == "Role" ? Blank(role) : null,
-            maxPerTarget, startsOn is { } s ? DateOnly.FromDateTime(s) : null, endsOn is { } e ? DateOnly.FromDateTime(e) : null, campaign.OwnerId));
+            maxPerTarget, startsOn is { } s ? DateOnly.FromDateTime(s) : null, endsOn is { } e ? DateOnly.FromDateTime(e) : null, campaign.OwnerId,
+            Blank(utmSource), Blank(utmMedium), Blank(utmCampaign)));
         busy = false;
         if (result.IsSuccess) { Apply(result.Value!); preview = null; Report("Kampanya kaydedildi.", false); }
         else { generalErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }

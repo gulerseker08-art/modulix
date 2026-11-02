@@ -34,6 +34,7 @@ public sealed class Campaign : MarketingEntity, IOwnedEntity
     public const int DescriptionMaxLength = 1000;
     public const int PurposeMaxLength = 200;
     public const int RoleMaxLength = 100;
+    public const int UtmMaxLength = 80;
 
     public string Code { get; internal set; } = string.Empty;
 
@@ -61,6 +62,13 @@ public sealed class Campaign : MarketingEntity, IOwnedEntity
     public DateOnly? StartsOn { get; internal set; }
 
     public DateOnly? EndsOn { get; internal set; }
+
+    /// <summary>Kaynak/UTM (ADR-0025, dilim 7): yanıttan açılan lead'e geçer. Boşsa varsayılan: kaynak "kampanya", ortam kanal, kampanya kodu.</summary>
+    public string? UtmSource { get; internal set; }
+
+    public string? UtmMedium { get; internal set; }
+
+    public string? UtmCampaign { get; internal set; }
 
     public Guid? OwnerId { get; internal set; }
 

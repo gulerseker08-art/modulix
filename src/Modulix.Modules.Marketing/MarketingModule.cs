@@ -6,6 +6,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Marketing.Audiences;
 using Modulix.Modules.Marketing.Records;
+using Modulix.Modules.Marketing.Responses;
 using Modulix.Modules.Marketing.Runs;
 using Modulix.Modules.Marketing.Segments;
 
@@ -48,6 +49,12 @@ public sealed class MarketingModule : IModule
 
         /// <summary>Onaylı çalıştırmayı başlatır, işler, duraklatır, sürdürür ve iptal eder.</summary>
         public const string CampaignsSend = "marketing.campaigns.send";
+
+        /// <summary>Kampanya yanıtlarını ve kaynak/UTM bilgisini görüntüler. Kapsam yanıtın sorumlusuna göredir.</summary>
+        public const string ResponsesRead = "marketing.responses.read";
+
+        /// <summary>Yanıt kaydeder; yanıtı üstlenir, kapatır, yanıttan lead ve aktivite açar, "iletişim istemiyorum" yanıtının çıkışını uygular. Lead ve aktivite için ayrıca ilgili CRM izni gerekir.</summary>
+        public const string ResponsesWrite = "marketing.responses.write";
     }
 
     public static class SettingKeys
@@ -67,6 +74,13 @@ public sealed class MarketingModule : IModule
         public const string AudienceSnapshot = "marketing.audience-snapshot";
         public const string CampaignContent = "marketing.campaign-content";
         public const string CampaignRun = "marketing.campaign-run";
+        public const string CampaignResponse = "marketing.campaign-response";
+    }
+
+    /// <summary>Başka modüllerin kayıt anahtarları (yalnızca kayıt boru hattıyla okunur; modül başvurusu yok).</summary>
+    public static class ExternalEntities
+    {
+        public const string Lead = "crm.lead";
     }
 
     public string Key => ModuleKey;
@@ -84,6 +98,8 @@ public sealed class MarketingModule : IModule
         new(Permissions.CampaignsAudience, "Hedef kitleyi dondurur; kampanyayı arşivler ve geri alır", "Kampanyalar"),
         new(Permissions.CampaignsApprove, "Çalıştırmayı onaylar ya da reddeder (hazırlayan kendi çalıştırmasını onaylayamaz)", "Kampanyalar"),
         new(Permissions.CampaignsSend, "Onaylı çalıştırmayı başlatır, işler, duraklatır, sürdürür ve iptal eder", "Kampanyalar"),
+        new(Permissions.ResponsesRead, "Kampanya yanıtlarını görüntüler", "Yanıtlar"),
+        new(Permissions.ResponsesWrite, "Yanıt kaydeder, üstlenir, kapatır; yanıttan lead ve aktivite açar; çıkış yanıtını uygular", "Yanıtlar"),
     ];
 
     /// <summary>Devre dışı bırakılan kişinin segmentleri devredilir (ADR-0004).</summary>
@@ -98,7 +114,7 @@ public sealed class MarketingModule : IModule
             "marketing.specialist",
             "Pazarlama uzmanı",
             "Segmentleri görüntüler, oluşturur ve düzenler; alıcıları görür. Yayımlayamaz. Kendi ve ekibinin segmentlerini görür.",
-            [Permissions.SegmentsRead, Permissions.SegmentsWrite, Permissions.RecipientsRead, Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsAudience])
+            [Permissions.SegmentsRead, Permissions.SegmentsWrite, Permissions.RecipientsRead, Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsAudience, Permissions.ResponsesRead, Permissions.ResponsesWrite])
         {
             Scope = RecordScope.Team,
         },
@@ -106,7 +122,7 @@ public sealed class MarketingModule : IModule
             "marketing.manager",
             "Pazarlama yöneticisi",
             "Bütün segmentleri yönetir, yayımlar ve arşivler.",
-            [Permissions.SegmentsRead, Permissions.SegmentsWrite, Permissions.SegmentsPublish, Permissions.RecipientsRead, Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsAudience, Permissions.CampaignsApprove, Permissions.CampaignsSend])
+            [Permissions.SegmentsRead, Permissions.SegmentsWrite, Permissions.SegmentsPublish, Permissions.RecipientsRead, Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsAudience, Permissions.CampaignsApprove, Permissions.CampaignsSend, Permissions.ResponsesRead, Permissions.ResponsesWrite])
         {
             Scope = RecordScope.All,
         },
@@ -114,7 +130,7 @@ public sealed class MarketingModule : IModule
             "marketing.viewer",
             "Pazarlama izleyici",
             "Segmentleri ve sayılarını görüntüler; alıcı listesini görmez.",
-            [Permissions.SegmentsRead, Permissions.CampaignsRead])
+            [Permissions.SegmentsRead, Permissions.CampaignsRead, Permissions.ResponsesRead])
         {
             Scope = RecordScope.All,
         },
@@ -161,7 +177,7 @@ public sealed class MarketingModule : IModule
         {
             ["code"] = "Kod", ["name"] = "Ad", ["description"] = "Açıklama", ["purpose"] = "Amaç", ["target"] = "Hedef türü", ["channel"] = "Kanal",
             ["recipientRule"] = "Kişi seçme kuralı", ["recipientRole"] = "Aranan rol", ["maxPerTarget"] = "Hedef başına alıcı sınırı",
-            ["startsOn"] = "Başlangıç", ["endsOn"] = "Bitiş", ["ownerId"] = "Sorumlu", ["status"] = "Durum",
+            ["startsOn"] = "Başlangıç", ["endsOn"] = "Bitiş", ["utmSource"] = "UTM kaynak", ["utmMedium"] = "UTM ortam", ["utmCampaign"] = "UTM kampanya", ["ownerId"] = "Sorumlu", ["status"] = "Durum",
         }, "name")
         {
             UserFields = ["ownerId", "createdBy", "updatedBy"],
@@ -226,6 +242,25 @@ public sealed class MarketingModule : IModule
                 },
             },
         },
+        new(Entities.CampaignResponse, "Kampanya yanıtı", Permissions.ResponsesRead, new Dictionary<string, string>
+        {
+            ["campaignId"] = "Kampanya", ["runId"] = "Çalıştırma", ["deliveryId"] = "İleti", ["targetId"] = "Hedef", ["personId"] = "Kişi", ["kind"] = "Tür", ["note"] = "Not",
+            ["receivedAt"] = "Alındığı zaman", ["status"] = "Durum", ["ownerId"] = "Sorumlu", ["leadId"] = "Lead", ["activityId"] = "Aktivite",
+            ["optOutAppliedAt"] = "Çıkış uygulama zamanı", ["closedReason"] = "Kapanış gerekçesi",
+        })
+        {
+            UserFields = ["ownerId", "createdBy", "updatedBy"],
+            References = new Dictionary<string, string> { ["campaignId"] = Entities.Campaign },
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["kind"] = new Dictionary<string, string>
+                {
+                    ["Interested"] = "İlgilendi", ["Question"] = "Soru", ["MeetingRequest"] = "Görüşme talebi", ["NotInterested"] = "İlgilenmiyor", ["OptOut"] = "İletişim istemiyor",
+                    ["Complaint"] = "Şikâyet", ["Other"] = "Diğer",
+                },
+                ["status"] = new Dictionary<string, string> { ["New"] = "Yeni", ["InProgress"] = "İşlemde", ["Converted"] = "Lead'e dönüştü", ["Closed"] = "Kapalı" },
+            },
+        },
     ];
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
@@ -283,6 +318,8 @@ public sealed class MarketingModule : IModule
         services.AddScoped<IRecordStore, CampaignRunRecordStore>();
         services.AddScoped<DeliveryJournal>();
         services.AddScoped<ICampaignRuns, CampaignRuns>();
+        services.AddScoped<IRecordStore, CampaignResponseRecordStore>();
+        services.AddScoped<ICampaignResponses, CampaignResponses>();
         services.AddScoped<IMessageProvider, FakeMessageProvider>();
     }
 }

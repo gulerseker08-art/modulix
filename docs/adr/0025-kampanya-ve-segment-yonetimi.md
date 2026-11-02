@@ -77,8 +77,8 @@ CRM'in sunduğu alanlar (yalnızca olanlar): firma — ad, şehir, sektör (serb
 - **Dilim 4**: kampanya, hedef kitle (dahil/hariç), alıcı çözümleme (kişi seçme kuralı), anlık görüntü, sayı ayrımı ve elenme nedenleri.
 - **Dilim 5**: içerik sürümü, onay, planlama, çalıştırma/teslim (idempotency anahtarı), sahte sağlayıcı, sıklık rezervasyonu, duraklat/iptal, abonelikten çıkma uç noktası.
 - **Dilim 7** (taslakta 6; abonelikten çıkma dilim 6'ya alındı): yanıt çalışma alanı, kaynak/UTM, yanıttan aktivite/lead/fırsat.
-- **Dilim 7**: maliyet, attribution (ilk/son dokunuş), raporlar, müşteri kartı sekmeleri.
-- **Dilim 8**: kabul/regresyon, performans ölçümü (100.000 sentetik kişi), işletim notu.
+- **Dilim 8** (taslakta 7): maliyet, attribution (ilk/son dokunuş), raporlar, müşteri kartı sekmeleri.
+- **Dilim 9** (taslakta 8): kabul/regresyon, performans ölçümü (100.000 sentetik kişi), işletim notu.
 
 ## 7. Veri, silme ve gizlilik
 
@@ -103,7 +103,8 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 | 4 — Kampanya, hedef kitle, alıcı çözümleme, uygunluk, anlık görüntü (arka uç ve ekranlar) | Yapıldı; ayrıntı aşağıda |
 | 5 — İçerik, onay, çalıştırma, gönderim çekirdeği (test sağlayıcısı) | Yapıldı; abonelikten çıkma, otomatik işçi, gerçek sağlayıcı yok (aşağıda) |
 | 6 — Abonelikten çıkma ve tercih merkezi (oturumsuz sayfa, tek tıkla çıkış, gönderimde zorunlu bağlantı) | Yapıldı; ayrıntı aşağıda |
-| 7–9 | Planlı: yanıt çalışma alanı ve kaynak/UTM (7), maliyet, atıf ve raporlar (8), kabul/regresyon ve performans (9) |
+| 7 — Yanıt çalışma alanı, kampanya kaynak/UTM, yanıttan lead ve aktivite, çıkış yanıtı | Yapıldı; ayrıntı aşağıda (webhook ile otomatik yanıt toplama yok) |
+| 8–9 | Planlı: maliyet, atıf ve raporlar (8), kabul/regresyon ve performans (9) |
 
 ### Dilim 2 — uygulama notları (sapmalar ve sınırlar)
 
@@ -152,3 +153,14 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 - **Gönderimle bütünleşme**: `SendBlock` sağlayıcının yanında bağlantı üretilebilirliğini de denetler; `App:PublicUrl` ayarsızsa başlatma ve işleme 409 verir, hiçbir teslimat satırı açılmaz (özette `unsubscribeLinkAvailable=false`, ekranda uyarı). Gönderim anında (izin, engel ve sıklık denetiminden sonra) bağlantı üretilir; metne `ContentRules.WithUnsubscribeFooter` ile alt bilgi eklenir (içerik sürümü değişmez). Üretilemezse satır `Failed: unsubscribe-link-unavailable` olur ve sıklık hakkı geri verilir. Bir sonraki çalıştırma çıkışı gönderimden hemen önce görür.
 - **Bilerek yok / açık**: tercih merkezinde konu/liste bazlı tercih (yalnızca "pazarlama" amacı vardır), kanal bazlı (SMS/WhatsApp) çıkış sayfası dili, çıkış sonrası geri bildirim (neden sorusu), yönetim ekranında tercih listesi (API var, ekran yok), belirteç satırı temizliği ve gönderim başına satır yerine yeniden kullanım (hacim ölçümü dilim 9'da), `List-Unsubscribe` başlıklarını yazan gerçek sağlayıcı, İYS/KVKK metinleri için hukuki karar.
 - **Test**: 19 birim (belirteç, karma, biçim, ömür, geri alma kuralı, alt bilgi), 10 entegrasyon (8 portal: çıkış/tekrar/geri alma ve olay sayıları, tek tıkla çıkış ve GET'in işlem yapmaması, geçersiz/yabancı belirteç, firma kaydı ve engel, süresi dolmuş bağlantı, üretici doğrulaması ve yalnızca karma, tenant izolasyonu, yalnızca POST/gövde sınırı/yönetim uçlarının açılmaması; 2 kampanya: her iletide kişiye özel çalışan bağlantı ve sonraki çalıştırmanın çıkışı görmesi, genel adres yokken başlatmanın bloklanması).
+
+### Dilim 7 — uygulama notları (yanıt çalışma alanı, kaynak/UTM)
+
+- **Yapılan**: `CampaignResponse` (`marketing.CampaignResponses`, RLS, kayıt boru hattı), yanıt servisi (`ICampaignResponses`: kaydet ve eylemler), kampanya kaynak/UTM alanları, kampanya detayında "Yanıtlar" sekmesi, yanıttan lead ve takip aktivitesi, "iletişim istemiyorum" yanıtının çıkışının uygulanması. İzinler `marketing.responses.read|write` (yeni).
+- **Yanıt gönderilmiş bir iletiye bağlanır**: kayıt `deliveryId` ister; ileti çağıranın görebildiği bir çalıştırma ve kampanya üzerinden okunur (erişemediği ileti "bulunamadı") ve sağlayıcıya verilmiş olmalıdır (kabul edildi ya da sonucu belirsiz). Kampanya, çalıştırma, hedef ve kişi kimlikleri iletiden kopyalanır, istemci veremez; yanıtta adres yoktur. Yanıt kaydı ve durum değişikliği yalnızca yanıt uçlarındandır (genel PUT/DELETE yok); bütün alanlar sistem alanıdır (kapı açıkken yazılır). Sorumlu kaydı açan kullanıcıdır; görünürlük sorumluya bağlı veri kapsamındandır. Yanıtı olan kampanya silinemez.
+- **Durum makinesi** (`ResponseTransitions`, saf): Yeni → İşlemde (üstlen) → Lead'e dönüştü; kapat ve yeniden aç gerekçe ister. Yalnızca ilgi, soru ve görüşme talebi lead'e dönüşür; ret, çıkış ve şikâyet dönüşmez. Aktivite ve lead yanıt başına bir kez açılır; aynı yanıt için eşzamanlı eylemler işlem kilidiyle sıralanır ve dış etki ile durum değişikliği tek işlemdedir (4 eşzamanlı dönüşümde tam bir lead).
+- **Sözleşmeler** (Core.Contracts): `ICampaignLeads` (lead açar; CRM uygular: lead çağıranın kimliği ve yetkisiyle kayıt boru hattından açılır, yetki yoksa `Forbidden`, modül kapalıysa `Unavailable`), `IOptOutRecorder` (çekirdek: pazarlama iznini reddeder, kaynak "abonelikten çıkma", zaten reddedilmişse yazmaz). Aktivite için mevcut `IFollowUpActivities` kullanılır (lead varsa lead'e bağlı). Marketing CRM alanlarını bilmez; kişi/firma adı, adres ve kanal bilgisi gönderim anında çözülüp sözleşmeyle verilir. Lead hedefli kampanyada yeni lead açılmaz, yanıt mevcut lead'e bağlanır.
+- **Kaynak/UTM**: kampanyada `utmSource|utmMedium|utmCampaign` (isteğe bağlı; küçük harfe çevrilir, harf/rakam/`.`/`_`/`~`/`-`, en çok 80 karakter). Boş bırakılan alan lead'e varsayılanla geçer: kaynak `kampanya`, ortam kanal (ör. `email`), kampanya kampanya kodu; ayrıca lead kaynak ayrıntısı `Kampanya: <ad>`. Lead'in "kaynak" seçim listesi firmaya özgü olduğundan seçilmez (UTM ve ayrıntı yazılır). Atıf (ilk/son dokunuş) ve raporlar dilim 8'dedir; bu dilim yalnızca kaynağı lead'e taşır.
+- **Çıkış yanıtı**: "iletişim istemiyorum" yanıtı kaydedilince kendiliğinden uygulanmaz; yanıtta "Çıkışı uygula" eylemi adresi gönderilen iletinin iletişim noktasından çözer ve pazarlama iznini reddeder (adres çözülemiyorsa uygulanmış gibi gösterilmez, elle kaydedilir). Yanıtı yeniden açmak çıkışı geri almaz. Eylem yalnızca `marketing.responses.write` ister (iletişimi azaltmak güvenli kabul edildi; denetim kaydı yazılır).
+- **Bilerek yok / açık**: sağlayıcıdan otomatik yanıt toplama (webhook, gelen kutusu eşleme), yanıtın otomatik sınıflandırılması, aktivite için tarih/atanan seçimi (yarın, yanıt sorumlusu), yanıttan fırsat açma (lead'in mevcut CRM dönüşümüyle yapılır), yanıt sayıları ve raporlar (dilim 8), yanıtın müşteri kartında görünmesi (dilim 8), yanıtlar için SLA, toplu eylem.
+- **Test**: 42 birim (durum makinesi, UTM kuralları, ad ayrıştırma), 9 entegrasyon (lead ve aktivite akışı ve kaynak, özel UTM, çıkış yanıtı ve sonraki çalıştırma, doğrulama ve gönderilmemiş ileti, durum makinesi ve geçersiz UTM, eşzamanlı dönüşüm, tenant izolasyonu, izinler ve CRM izni, dar veri kapsamı).
