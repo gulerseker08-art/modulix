@@ -229,6 +229,13 @@
             </div>
         }
 
+        @if (tabState.Rendered("calistirmalar"))
+        {
+            <div id="tabpanel-calistirmalar" role="tabpanel" aria-labelledby="tab-calistirmalar" hidden="@tabState.Hidden("calistirmalar")">
+                <CampaignRunsPanel Campaign="campaign" />
+            </div>
+        }
+
         @if (tabState.Rendered("dondurulmus"))
         {
             <div id="tabpanel-dondurulmus" role="tabpanel" aria-labelledby="tab-dondurulmus" hidden="@tabState.Hidden("dondurulmus")">
@@ -354,7 +361,7 @@
 
     private bool CanEntries => CanWrite && !IsArchived;
 
-    private IReadOnlyList<TabItem> Tabs => [new("genel", "Genel"), new("kitle", "Hedef kitle"), new("dondurulmus", "Dondurulmuş kitleler")];
+    private IReadOnlyList<TabItem> Tabs => [new("genel", "Genel"), new("kitle", "Hedef kitle"), new("dondurulmus", "Dondurulmuş kitleler"), new("calistirmalar", "İçerik ve çalıştırmalar")];
 
     protected override async Task OnInitializedAsync()
     {

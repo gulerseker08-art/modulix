@@ -68,6 +68,7 @@ builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modu
 builder.Services.AddScoped<Modulix.Modules.Contracts.Lifecycle.IContractPolicyProvider, Modulix.Api.Contracts.ContractPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Orders.Lifecycle.IOrderPolicyProvider, Modulix.Api.Orders.OrderPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Support.Lifecycle.ISupportPolicyProvider, Modulix.Api.Support.SupportPolicyProvider>();
+builder.Services.AddScoped<Modulix.Modules.Marketing.Runs.IMarketingPolicyProvider, Modulix.Api.Marketing.MarketingPolicyProvider>();
 builder.Services.Configure<Modulix.Api.Support.SupportJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Support.SupportJobsOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Support.SupportJobsRunner>();
 builder.Services.AddHostedService<Modulix.Api.Support.SupportJobsWorker>();

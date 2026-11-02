@@ -88,4 +88,6 @@ public static class MarketingAccess
     public const string CampaignsRead = "marketing.campaigns.read";
     public const string CampaignsWrite = "marketing.campaigns.write";
     public const string CampaignsAudience = "marketing.campaigns.audience";
+    public const string CampaignsApprove = "marketing.campaigns.approve";
+    public const string CampaignsSend = "marketing.campaigns.send";
 }
