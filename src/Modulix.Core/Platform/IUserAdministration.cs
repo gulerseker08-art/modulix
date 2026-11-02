@@ -19,6 +19,9 @@ public sealed record TenantUser(
 {
     public bool IsAdministrator => Roles.Any(r => r.IsSystem);
 
+    /// <summary>Kullanıcının departmanı (ADR-0026); her üyelik bir departmandadır.</summary>
+    public string? BusinessUnitName { get; init; }
+
     /// <summary>İki adımlı doğrulama açık mı (Y7b); hesaba aittir, firmaya değil.</summary>
     public bool TwoFactorEnabled { get; init; }
 }
@@ -28,6 +31,9 @@ public sealed record UserQuery(string? Search, MembershipStatus? Status, Guid? R
 {
     /// <summary>İki adımlı doğrulaması açık (true) ya da kapalı (false) olanlar (Y7b).</summary>
     public bool? TwoFactorEnabled { get; init; }
+
+    /// <summary>Yalnızca bu departmandaki kullanıcılar (ADR-0026).</summary>
+    public Guid? BusinessUnitId { get; init; }
 }
 
 public sealed record UserPage(IReadOnlyList<TenantUser> Items, int Page, int PageSize, int TotalCount);
@@ -35,7 +41,11 @@ public sealed record UserPage(IReadOnlyList<TenantUser> Items, int Page, int Pag
 /// <summary>
 /// Davet. <see cref="PublicUrl"/>: e-postadaki bağlantıların kökü (ör. https://app.modulix.com.tr); API ayardan okur.
 /// </summary>
-public sealed record UserInvitation(string Email, string DisplayName, IReadOnlyCollection<Guid> RoleIds, string PublicUrl);
+public sealed record UserInvitation(string Email, string DisplayName, IReadOnlyCollection<Guid> RoleIds, string PublicUrl)
+{
+    /// <summary>Kullanıcının departmanı; verilmezse kök departman (ADR-0026 K4).</summary>
+    public Guid? BusinessUnitId { get; init; }
+}
 
 /// <summary><see cref="ExistingAccount"/>: e-posta platformda zaten kayıtlıydı; üyelik hemen etkin oldu, bilgi e-postası gitti.</summary>
 public sealed record InvitationResult(TenantUser User, bool ExistingAccount);

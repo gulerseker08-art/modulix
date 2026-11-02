@@ -27,7 +27,7 @@
 
     @if (inviting)
     {
-        <InviteUserForm Roles="roles" CanGrantAdministrator="Session.IsAdministrator" Invited="InvitedAsync" Cancelled="() => inviting = false" />
+        <InviteUserForm Roles="roles" Units="units" CanGrantAdministrator="Session.IsAdministrator" Invited="InvitedAsync" Cancelled="() => inviting = false" />
     }
 
     <div class="filters" role="group" aria-label="Durum">
@@ -45,6 +45,13 @@
             @foreach (var role in roles)
             {
                 <option value="@role.Id">@role.Name</option>
+            }
+        </select>
+        <select class="form-select" aria-label="Departman" @bind="businessUnitId" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm departmanlar</option>
+            @foreach (var unit in units)
+            {
+                <option value="@unit.Id">@unit.PathNames</option>
             }
         </select>
         <select class="form-select" aria-label="İki adımlı doğrulama" @bind="twoFactor" @bind:after="() => LoadAsync(1)">
@@ -70,7 +77,7 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ad</th><th>E-posta</th><th>Roller</th><th>Durum</th><th>İki adımlı</th><th>Son giriş</th></tr>
+                <tr><th>Ad</th><th>E-posta</th><th>Departman</th><th>Roller</th><th>Durum</th><th>İki adımlı</th><th>Son giriş</th></tr>
             </thead>
             <tbody>
                 @foreach (var user in page.Items)
@@ -84,6 +91,7 @@
                             }
                         </td>
                         <td data-label="E-posta">@user.Email</td>
+                        <td data-label="Departman">@(user.BusinessUnitName ?? "—")</td>
                         <td data-label="Roller">@RoleNames(user)</td>
                         <td data-label="Durum"><UserStatusBadge User="user" /></td>
                         <td data-label="İki adımlı">@(user.TwoFactorEnabled ? "Açık" : "Kapalı")</td>
@@ -102,6 +110,8 @@
     private string? search;
     private UserStatus? status;
     private Guid? roleId;
+    private Guid? businessUnitId;
+    private IReadOnlyList<BusinessUnitDto> units = [];
     private bool? twoFactor;
     private bool inviting;
     private string? message;
@@ -113,6 +123,7 @@
         if (Session.Can(CoreAccess.ManageUsers))
         {
             roles = (await Api.GetAsync<List<RoleDto>>("/api/roles")).Value ?? [];
+            units = (await Api.GetAsync<List<BusinessUnitDto>>("/api/business-units")).Value ?? [];
             await LoadAsync(1);
         }
     }
@@ -134,6 +145,11 @@
         if (roleId is { } r)
         {
             url += $"&roleId={r}";
+        }
+
+        if (businessUnitId is { } u)
+        {
+            url += $"&businessUnitId={u}";
         }
 
         if (twoFactor is { } t)

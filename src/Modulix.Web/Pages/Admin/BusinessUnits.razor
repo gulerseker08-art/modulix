@@ -1,0 +1,158 @@
+@page "/yonetim/departmanlar"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>Departmanlar · Modulix</PageTitle>
+
+@* Departman ağacı (ADR-0026). Merkez kök departmandır; bayiler ve diğer yapılar altında yer alır. *@
+<AuthGate Permission="@CoreAccess.ManageUsers">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Departmanlar</h1>
+    </div>
+
+    <p class="text-muted">
+        Her kullanıcı tam bir departmandadır. Merkez, ağacın kökündedir; bayiler ve diğer yapılar onun altında yer alır.
+        Departman ağacı kullanıcıların örgütsel konumunu gösterir; kayıt görünürlüğü ve rol atamaları sonraki adımlarda
+        departmana bağlanacaktır.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (units is not null)
+    {
+        <form class="record-form settings-group" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+            <h2>Yeni departman</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="unit-parent">Üst departman *</label>
+                    <select id="unit-parent" class="form-select" @bind="parentId">
+                        @foreach (var unit in units.Where(u => u.IsActive && u.Depth < MaxParentDepth))
+                        {
+                            <option value="@unit.Id">@unit.PathNames</option>
+                        }
+                    </select>
+                    <FieldError Field="parent" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="unit-name">Departman adı *</label>
+                    <input id="unit-name" class="form-control" maxlength="200" placeholder="ör. Marmara Bayi" @bind="name" @bind:event="oninput" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="unit-code">Kod</label>
+                    <input id="unit-code" class="form-control" maxlength="50" @bind="code" />
+                    <FieldError Field="code" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="unit-kind">Tür *</label>
+                    <select id="unit-kind" class="form-select" @bind="kind">
+                        @foreach (var option in ChildKinds)
+                        {
+                            <option value="@option.Key">@option.Value</option>
+                        }
+                    </select>
+                    <FieldError Field="kind" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name) || parentId == Guid.Empty)">Departman ekle</button>
+            </div>
+        </form>
+
+        <table class="table record-table">
+            <thead>
+                <tr><th>Departman</th><th>Tür</th><th>Kod</th><th>Kullanıcı</th><th>Durum</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var unit in Ordered())
+                {
+                    <tr>
+                        <td data-label="Departman" class="primary">
+                            <span style="padding-inline-start: @(unit.Depth * 1.25)rem">
+                                <a href="yonetim/departmanlar/@unit.Id">@unit.Name</a>
+                            </span>
+                        </td>
+                        <td data-label="Tür">@BusinessUnitKindLabels.Of(unit.Kind)</td>
+                        <td data-label="Kod">@(unit.Code ?? "—")</td>
+                        <td data-label="Kullanıcı">@unit.MemberCount</td>
+                        <td data-label="Durum">@(unit.IsActive ? "Etkin" : "Kapalı")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else if (message is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+</AuthGate>
+
+@code {
+    // Kök dahil dört seviye (0..3): üst departman olabilecek en derin seviye 2'dir.
+    private const int MaxParentDepth = 3;
+
+    private static readonly IReadOnlyDictionary<string, string> ChildKinds = new Dictionary<string, string>
+    {
+        [BusinessUnitKindLabels.Dealer] = BusinessUnitKindLabels.Of(BusinessUnitKindLabels.Dealer),
+        [BusinessUnitKindLabels.Other] = BusinessUnitKindLabels.Of(BusinessUnitKindLabels.Other),
+    };
+
+    private IReadOnlyList<BusinessUnitDto>? units;
+    private Guid parentId;
+    private string name = string.Empty;
+    private string? code;
+    private string kind = BusinessUnitKindLabels.Dealer;
+    private string? message;
+    private bool busy;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ManageUsers))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<BusinessUnitDto>>("/api/business-units");
+        units = result.Value;
+        message = result.Error;
+        if (units is not null && (parentId == Guid.Empty || units.All(u => u.Id != parentId)))
+        {
+            parentId = units.FirstOrDefault(u => u.ParentId is null)?.Id ?? Guid.Empty;
+        }
+    }
+
+    /// <summary>Ağaç sırası: her departman üst departmanının hemen altında, kardeşler ada göre.</summary>
+    private IEnumerable<BusinessUnitDto> Ordered()
+    {
+        var byParent = units!.ToLookup(u => u.ParentId);
+        IEnumerable<BusinessUnitDto> Walk(Guid? parent) =>
+            byParent[parent].OrderBy(u => u.Name, StringComparer.CurrentCulture).SelectMany(u => new[] { u }.Concat(Walk(u.Id)));
+        return Walk(null);
+    }
+
+    private async Task CreateAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<BusinessUnitDetailDto>("/api/business-units", new CreateBusinessUnitRequest(parentId, name, code, kind));
+        busy = false;
+        errors = result.FieldErrors;
+        if (result.Value is { } created)
+        {
+            Navigation.NavigateTo($"yonetim/departmanlar/{created.Unit.Id}");
+            return;
+        }
+
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+    }
+}

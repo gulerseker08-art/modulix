@@ -28,14 +28,15 @@ public sealed record UserDto(
     DateTimeOffset? LastSignInAt,
     bool IsLockedOut,
     bool IsCurrentUser,
-    bool TwoFactorEnabled = false)
+    bool TwoFactorEnabled = false,
+    string? BusinessUnitName = null)
 {
     public bool IsAdministrator => Roles.Any(r => r.IsSystem);
 }
 
 public sealed record UserPageResponse(IReadOnlyList<UserDto> Items, int Page, int PageSize, int TotalCount);
 
-public sealed record InviteUserRequest(string Email, string DisplayName, IReadOnlyList<Guid>? RoleIds);
+public sealed record InviteUserRequest(string Email, string DisplayName, IReadOnlyList<Guid>? RoleIds, Guid? BusinessUnitId = null);
 
 /// <summary><see cref="ExistingAccount"/>: kişinin hesabı vardı; üyelik hemen etkin oldu ve bilgi e-postası gitti.</summary>
 public sealed record InviteUserResponse(UserDto User, bool ExistingAccount);

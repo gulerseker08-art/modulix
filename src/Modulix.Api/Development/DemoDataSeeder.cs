@@ -140,17 +140,21 @@ public static class DemoDataSeeder
 
         var admin = await roles.EnsureSystemRoleAsync(ct);
         await DefaultCompany.EnsureAsync(tenantDb, tenant.Name, ct);
+        var root = await DefaultBusinessUnit.EnsureRootAsync(tenantDb, tenant.Name, ct);
         await tenantDb.SaveChangesAsync(ct);
 
         var membershipIds = await platform.Memberships.Where(m => m.TenantId == tenant.Id).Select(m => m.Id).ToListAsync(ct);
         foreach (var membershipId in membershipIds)
         {
+            await DefaultBusinessUnit.EnsureMemberAsync(tenantDb, membershipId, root, ct);
             var assigned = await roles.GetMembershipRolesAsync(membershipId, ct) ?? [];
             if (assigned.All(r => r.Id != admin.Id))
             {
                 await roles.SetMembershipRolesAsync(membershipId, [.. assigned.Select(r => r.Id), admin.Id], ct);
             }
         }
+
+        await tenantDb.SaveChangesAsync(ct);
     }
 
     private static async Task<Tenant> EnsureTenantAsync(ModulixDbContext db, string name, string slug, CancellationToken ct)
