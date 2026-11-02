@@ -330,6 +330,16 @@ Firma (taraf) ve kişi çekirdekte tek kayıttır ([ADR-0006](docs/adr/0006-orta
 - **Mükerrer önerisi ve birleştirme** ([ADR-0013](docs/adr/0013-mukerrer-onerisi-ve-guvenli-birlestirme.md)): vergi numarası kesin, ad/e-posta/telefon olası eşleşmedir; öneri hiçbir şeyi birleştirmez. Birleştirme ayrı izin ister (`crm.companies.merge`, `crm.contacts.merge`; hazır hiçbir role verilmez), önizleme + sürüm denetimiyle tek işlemde çalışır, kaynak kaldırılır ve eski kimlik hedefe izlenir (`merged/{oldId}`). Ortak kayda başka modüllerin başvuruları `IReferenceMover` ile taşınır; taşıyamayan depo birleştirmeyi engeller.
 - Henüz yok: kullanıcının (üyeliğin) kişiye bağlanması, birleştirmenin geri alınması ve birleştirme için arka plan toplu aracı.
 
+### İletişim tercihi ve engel ([ADR-0025](docs/adr/0025-kampanya-ve-segment-yonetimi.md), dilim 1)
+
+Pazarlama izninin tek sahibi çekirdektir; kampanya, destek gibi modüller yalnızca okur (`ICommunicationPreferences`, `Modulix.Core.Contracts`). Tercih kişiye değil **iletişim noktasına** (kanal + normalize adres + amaç) bağlıdır; CRM kapalıyken de çalışır. Firma/e-posta kaydı izin değildir: kayıt yoksa durum `Unknown` ve pazarlama gönderilmez.
+
+- Kanallar `Email`, `Phone`, `Sms`, `WhatsApp`; amaçlar `Marketing`, `Transactional`, `Service` (işlem/hizmet bildirimi izin gerektirmez ama pazarlama iznini aşmak için seçilemez). E-posta küçük harfe çevrilir (yerel kısımda nokta/`+etiket` birleştirilmez); telefon uluslararası rakam biçimine indirilir, `+`/`00` yoksa 10-11 haneli numaralar Türkiye (`90`) sayılır.
+- `PUT /api/communication/preferences` (`core.communication.manage`): izin ya da ret. İzin için kanıt referansı ya da gerekçe zorunludur; **reddedilmiş izin içe aktarma, sağlayıcı veya sistemle yeniden açılamaz**, yalnızca `manual`/`form`/`preference-center` kaynağı ve kanıtla açılır. Her değişiklik değişmez olay satırı bırakır (`GET /preferences/{id}/events`); aynı kayıt tekrarlanırsa olay üretmez.
+- Engel (`POST /api/communication/suppressions`, `core.communication.suppress`): `HardBounce` ve `InvalidAddress` bütün amaçları, `Complaint`/`OptOut`/`Manual` pazarlamayı durdurur ve izni ezer. Kaldırma gerekçe ister (`POST …/{id}/lift`), satır silinmez. Aynı kanal+adres+nedenle aktif engel varsa yenisi açılmaz.
+- `POST /api/communication/check` ve `GET /preferences`, `GET /suppressions` `core.communication.read` ister. Denetim kaydı adresi maskeli yazar (`a***@example.com`).
+- Kod: `Modulix.Core/Communication` (varlıklar, `CommunicationRules`), `Modulix.Infrastructure/Communication/CommunicationService.cs`, uç noktalar `Modulix.Api/Communication`. **Henüz yok:** tercih merkezi/abonelikten çıkma bağlantısı, soft bounce sayacı, İYS entegrasyonu, ekran (sonraki dilimler; bkz. ADR-0025 bölüm 6 ve 8).
+
 ## CRM modülü
 
 İlk sektör modülü ve diğerlerinin şablonu. Firma, kişi, fırsat ve aktivite; tablolar `crm` şemasında, Row-Level Security ile korunur.

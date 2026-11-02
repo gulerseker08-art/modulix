@@ -29,6 +29,15 @@ public sealed class CoreModule : IModule
 
         /// <summary>İşletici şirketleri ve kullanıcıların şirket görevlerini yönetir (ADR-0008).</summary>
         public const string ManageCompanies = "core.companies.manage";
+
+        /// <summary>İletişim tercihlerini, izin geçmişini ve engelleri okur (ADR-0025).</summary>
+        public const string ReadCommunication = "core.communication.read";
+
+        /// <summary>Kanıtla izin/ret kaydeder (ADR-0025). Engel koymak ve kaldırmak ayrı izindir.</summary>
+        public const string ManageCommunication = "core.communication.manage";
+
+        /// <summary>İletişim noktasını engeller ve engeli gerekçeyle kaldırır (ADR-0025).</summary>
+        public const string SuppressCommunication = "core.communication.suppress";
     }
 
     public string Key => ModuleKey;
@@ -43,6 +52,9 @@ public sealed class CoreModule : IModule
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
         new(Permissions.ManageCompanies, "İşletici şirketleri ve kullanıcıların şirket görevlerini yönetir", "Şirketler"),
+        new(Permissions.ReadCommunication, "İletişim tercihlerini, izin geçmişini ve engelleri görüntüler", "İletişim tercihleri"),
+        new(Permissions.ManageCommunication, "İletişim izni ve ret kaydeder (kanıtla)", "İletişim tercihleri"),
+        new(Permissions.SuppressCommunication, "İletişim noktasını engeller ve engeli gerekçeyle kaldırır", "İletişim tercihleri"),
     ];
 
     /// <summary>Çekirdeğin olay abonelikleri (ADR-0007).</summary>
@@ -86,6 +98,12 @@ public sealed class CoreModule : IModule
         public const string TenantSetting = "core.tenant-setting";
         public const string Audit = "core.audit";
 
+        /// <summary>İletişim tercihi (ADR-0025); kaydın kimliği tercih satırının kimliğidir. Adres maskeli yazılır.</summary>
+        public const string CommunicationPreference = "core.communication-preference";
+
+        /// <summary>İletişim engeli (ADR-0025); kaydın kimliği engel satırının kimliğidir. Adres maskeli yazılır.</summary>
+        public const string CommunicationSuppression = "core.communication-suppression";
+
         /// <summary>Oturum olayları (giriş, hatalı şifre, kilitlenme, şifre sıfırlama, davet kabulü); kayıt kişinin hesabıdır.</summary>
         public const string Account = "core.account";
 
@@ -117,6 +135,9 @@ public sealed class CoreModule : IModule
         public const string Yes = "true";
         public const string No = "false";
     }
+
+    /// <summary>İletişim tercihi denetim değerlerini (maskeli adres, kanıt) yalnızca bu izni olan denetim okuru görür.</summary>
+    private const string ReadCommunicationKey = Permissions.ReadCommunication;
 
     private const string ProfileGroup = "Firma profili";
     private const string RegionalGroup = "Bölgesel ayarlar";
@@ -183,6 +204,35 @@ public sealed class CoreModule : IModule
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["members"] = "Üyeler",
         }, "name"),
+        new(AuditedEntityKeys.CommunicationPreference, "İletişim tercihi", ReadCommunicationKey, new Dictionary<string, string>
+        {
+            ["channel"] = "Kanal", ["purpose"] = "Amaç", ["address"] = "Adres (maskeli)", ["status"] = "Durum", ["source"] = "Kaynak",
+            ["evidenceRef"] = "Kanıt", ["reason"] = "Gerekçe",
+        }, "address")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string> { ["Unknown"] = "Bilinmiyor", ["Granted"] = "İzin var", ["Denied"] = "Reddedildi" },
+                ["channel"] = new Dictionary<string, string> { ["Email"] = "E-posta", ["Phone"] = "Telefon", ["Sms"] = "SMS", ["WhatsApp"] = "WhatsApp" },
+                ["purpose"] = new Dictionary<string, string> { ["Marketing"] = "Pazarlama", ["Transactional"] = "İşlem", ["Service"] = "Hizmet" },
+            },
+        },
+        new(AuditedEntityKeys.CommunicationSuppression, "İletişim engeli", ReadCommunicationKey, new Dictionary<string, string>
+        {
+            ["channel"] = "Kanal", ["address"] = "Adres (maskeli)", ["reason"] = "Neden", ["source"] = "Kaynak", ["note"] = "Not",
+            ["endsAt"] = "Bitiş", ["liftReason"] = "Kaldırma gerekçesi", ["lifted"] = "Kaldırıldı",
+        }, "address")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["reason"] = new Dictionary<string, string>
+                {
+                    ["HardBounce"] = "Kalıcı teslim hatası", ["Complaint"] = "Şikâyet", ["InvalidAddress"] = "Geçersiz adres",
+                    ["OptOut"] = "İletişim istemiyor", ["Manual"] = "Elle engel",
+                },
+                ["channel"] = new Dictionary<string, string> { ["Email"] = "E-posta", ["Phone"] = "Telefon", ["Sms"] = "SMS", ["WhatsApp"] = "WhatsApp" },
+            },
+        },
         new(AuditedEntityKeys.CustomField, "Özel alan", null, new Dictionary<string, string>
         {
             ["entity"] = "Kayıt türü", ["label"] = "Ad", ["key"] = "Anahtar", ["type"] = "Tip", ["required"] = "Zorunlu",
