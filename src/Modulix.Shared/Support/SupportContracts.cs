@@ -133,6 +133,8 @@ public static class SupportAccess
     public const string TicketsMerge = "support.tickets.merge";
     public const string TicketsExport = "support.tickets.export";
     public const string InboundIngest = "support.inbound.ingest";
+    public const string ReportsRead = "support.reports.read";
+    public const string ComplaintsManage = "support.complaints.manage";
     public const string SlaManage = "support.sla.manage";
     public const string SlaRecalculate = "support.sla.recalculate";
 
@@ -256,3 +258,53 @@ public sealed record PublicSurveyView(string State, bool CanAnswer, string? Mess
 public sealed record BulkTicketsRequest(string Action, IReadOnlyList<Guid> Ids, string? Reason = null, Guid? OwnerId = null, Guid? QueueId = null);
 
 public sealed record BulkTicketResultDto(Guid Id, string? Number, bool Succeeded, string? Code, string? Message);
+
+// ---- Dilim 6: raporlar ve şikâyet inceleme (ADR-0024)
+
+public sealed record CorrectiveActionDto(
+    Guid Id, string Title, Guid OwnerId, DateOnly DueDate, string Status, bool IsOverdue, int DaysOverdue, string? Note, DateTimeOffset? ClosedAt, Guid? ClosedBy, Guid? CreatedBy, DateTimeOffset CreatedAt);
+
+public sealed record AddCorrectiveActionRequest(string? Title, Guid? OwnerId, DateOnly? DueDate);
+
+public sealed record SetCorrectiveActionStatusRequest(string? Status, string? Note);
+
+public sealed record ReportMetaDto(DateOnly From, DateOnly To, string Granularity, int TicketCount, bool Truncated, string TimeZone, DateTimeOffset GeneratedAt);
+
+/// <param name="DrillDown">Aynı sayıyı veren talep listesi süzgeci (sorgu dizesi); <c>/api/support/tickets?</c> ve çalışma alanı sayfasıyla kullanılır.</param>
+public sealed record ReportCountDto(string Key, int Count, string DrillDown);
+
+public sealed record ReportSeriesPointDto(DateOnly Bucket, int Created);
+
+public sealed record ReportVolumeDto(
+    int Total, IReadOnlyList<ReportSeriesPointDto> Series, IReadOnlyList<ReportCountDto> ByStatus, IReadOnlyList<ReportCountDto> ByType, IReadOnlyList<ReportCountDto> ByChannel,
+    IReadOnlyList<ReportCountDto> ByPriority, string DrillDown);
+
+public sealed record ReportBacklogBucketDto(string Key, string Label, int Count, string DrillDown);
+
+public sealed record ReportBacklogDto(int Open, int Unassigned, double? OldestDays, IReadOnlyList<ReportBacklogBucketDto> Buckets);
+
+public sealed record ReportDurationDto(int Count, double? Mean, double? Median, double? P90, double? P95, double? Min, double? Max);
+
+public sealed record ReportTimesDto(
+    ReportDurationDto FirstResponseCalendar, ReportDurationDto FirstResponseBusiness, ReportDurationDto ResolutionCalendar, ReportDurationDto ResolutionBusiness, int NotYetResponded, int NotYetResolved);
+
+public sealed record ReportSlaCountsDto(int Met, int Missed, int Breached, int InProgress, int Cancelled, int Decided, double? CompliancePercent);
+
+public sealed record ReportSlaDto(string Metric, ReportSlaCountsDto Counts, double? CompliancePercent, string DrillDown);
+
+public sealed record ReportReopenDto(int Resolved, int Reopened, double? RatePercent, int TotalReopens, string DrillDown);
+
+public sealed record ReportCsatDto(
+    int Sent, int NotSent, int Answered, double? ResponseRatePercent, double? AverageRating, IReadOnlyList<ReportCountDto> Distribution, int Low, bool SmallSample, string DrillDown);
+
+public sealed record ReportOverviewDto(
+    ReportMetaDto Meta, ReportVolumeDto Volume, ReportBacklogDto Backlog, ReportTimesDto Times, IReadOnlyList<ReportSlaDto> Sla, ReportReopenDto Reopen, ReportCsatDto Csat);
+
+public sealed record RecurringCauseDto(string Cause, int Count, DateTimeOffset FirstAt, DateTimeOffset LastAt, IReadOnlyList<ReportCountDto> Categories, IReadOnlyList<Guid> TicketIds, string DrillDown);
+
+public sealed record OverdueActionDto(Guid Id, Guid TicketId, string TicketNumber, string Title, Guid OwnerId, DateOnly DueDate, int DaysOverdue);
+
+public sealed record ActionSummaryDto(int Open, int Overdue, int Done, int Cancelled, int DueInPeriod, int DoneOnTime, int DoneLate, int OverdueInPeriod, double? OnTimePercent);
+
+public sealed record ComplaintReviewDto(
+    ReportMetaDto Meta, int Complaints, int WithRootCause, int MinOccurrences, IReadOnlyList<RecurringCauseDto> Recurring, ActionSummaryDto Actions, IReadOnlyList<OverdueActionDto> OverdueActions);

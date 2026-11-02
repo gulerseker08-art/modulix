@@ -23,6 +23,11 @@
         </div>
     </div>
 
+    @if (!string.IsNullOrWhiteSpace(RawFilter))
+    {
+        <div class="alert alert-info" role="status">Rapor süzgeci uygulandı. <a href="destek/talepler">Süzgeci temizle</a> · <a href="destek/raporlar">Rapora dön</a></div>
+    }
+
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
@@ -187,6 +192,9 @@
 
     [SupplyParameterFromQuery(Name = "musteri")] public Guid? PartyId { get; set; }
 
+    /// <summary>Rapor kırılımı: rapordaki sayıyla aynı sonucu veren süzgeç sorgu dizesi (ör. createdFrom=2026-10-01&status=New); sunucu bilinmeyen süzgeci reddeder.</summary>
+    [SupplyParameterFromQuery(Name = "filtre")] public string? RawFilter { get; set; }
+
     private PagedResult<TicketDto>? page;
     private TicketSummaryDto? summary;
     private string? message;
@@ -282,6 +290,7 @@
         if (!string.IsNullOrEmpty(priority)) { parts.Add($"priority={Uri.EscapeDataString(priority)}"); }
         if (!string.IsNullOrEmpty(typeKey)) { parts.Add($"typeKey={Uri.EscapeDataString(typeKey)}"); }
         if (PartyId is { } party) { parts.Add($"partyId={party}"); }
+        if (!string.IsNullOrWhiteSpace(RawFilter)) { parts.Add(RawFilter.Trim().TrimStart('&')); }
         if (sort != DefaultSort) { parts.Add($"sort={Uri.EscapeDataString(sort)}"); }
         return string.Join('&', parts);
     }

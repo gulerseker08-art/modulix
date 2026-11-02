@@ -154,6 +154,36 @@ internal static class SupportChannelEndpoints
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         tickets.MapGet("/export", ExportAsync).RequirePermission(SupportModule.Permissions.TicketsExport);
+
+        // Düzeltici aksiyonlar (şikâyet inceleme): okuma talep okuma iziniyle, yazma support.complaints.manage ile (serviste, talep bulunduktan SONRA).
+        tickets.MapGet("/{id:guid}/corrective-actions", async (Guid id, ICorrectiveActions actions, CancellationToken ct) =>
+        {
+            var result = await actions.ListAsync(id, ct);
+            return result.IsSuccess ? Results.Ok(Map<List<CorrectiveActionDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+        tickets.MapPost("/{id:guid}/corrective-actions", async (Guid id, AddCorrectiveActionRequest r, ICorrectiveActions actions, CancellationToken ct) =>
+        {
+            var result = await actions.AddAsync(id, r.Title, r.OwnerId, r.DueDate, ct);
+            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/corrective-actions", Map<List<CorrectiveActionDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+        tickets.MapPost("/{id:guid}/corrective-actions/{actionId:guid}/status", async (Guid id, Guid actionId, SetCorrectiveActionStatusRequest r, ICorrectiveActions actions, CancellationToken ct) =>
+        {
+            var result = await actions.SetStatusAsync(id, actionId, r.Status, r.Note, ct);
+            return result.IsSuccess ? Results.Ok(Map<List<CorrectiveActionDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.TicketsRead);
+
+        // Raporlar: veri çağıranın izin ve veri kapsamıyla kayıt boru hattından okunur (liste ekranını aşmaz); her sayı bir kırılım süzgeci taşır.
+        var reports = group.MapGroup("/reports");
+        reports.MapGet("/overview", async (DateOnly? from, DateOnly? to, string? granularity, string? typeKey, Guid? queueId, Guid? categoryId, string? priority, Guid? partyId, ISupportReports service, CancellationToken ct) =>
+        {
+            var result = await service.OverviewAsync(new ReportQuery(from, to, granularity, typeKey, queueId, categoryId, priority, partyId), ct);
+            return result.IsSuccess ? Results.Ok(Map<ReportOverviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.ReportsRead);
+        reports.MapGet("/complaints", async (DateOnly? from, DateOnly? to, int? minOccurrences, string? typeKey, Guid? queueId, Guid? categoryId, string? priority, Guid? partyId, ISupportReports service, CancellationToken ct) =>
+        {
+            var result = await service.ComplaintsAsync(new ReportQuery(from, to, null, typeKey, queueId, categoryId, priority, partyId), minOccurrences, ct);
+            return result.IsSuccess ? Results.Ok(Map<ComplaintReviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(SupportModule.Permissions.ReportsRead);
     }
 
     private const string Prefix = "/api/support";

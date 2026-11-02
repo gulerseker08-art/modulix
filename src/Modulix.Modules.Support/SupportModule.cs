@@ -67,6 +67,12 @@ public sealed class SupportModule : IModule
         /// <summary>Görebildiği talepleri CSV olarak dışa aktarır (iç not ve mesaj gövdesi içermez).</summary>
         public const string TicketsExport = "support.tickets.export";
 
+        /// <summary>Destek raporlarını (hacim, birikim, süre, SLA uyumu, yeniden açılma, memnuniyet, şikâyet inceleme) okur. Veriler yine çağıranın veri kapsamıyla sınırlıdır.</summary>
+        public const string ReportsRead = "support.reports.read";
+
+        /// <summary>Şikâyetlerin düzeltici aksiyonlarını açar, tamamlar, iptal eder ve yeniden açar.</summary>
+        public const string ComplaintsManage = "support.complaints.manage";
+
         /// <summary>Gelen kanal adaptörü olarak mesaj girer (talep açar, talebe mesaj ekler). Entegrasyon kullanıcısına verilir; oluşturma ve yanıt izinleri de gerekir.</summary>
         public const string InboundIngest = "support.inbound.ingest";
 
@@ -138,6 +144,8 @@ public sealed class SupportModule : IModule
         new(Permissions.TicketsMerge, "Mükerrer talebi başka bir talebe birleştirir (geri alınamaz)", "Destek talepleri"),
         new(Permissions.TicketsExport, "Görebildiği talepleri CSV olarak dışa aktarır", "Destek talepleri"),
         new(Permissions.InboundIngest, "Gelen kanal adaptörü olarak mesaj girer (talep açar, talebe mesaj ekler)", "Destek yönetimi"),
+        new(Permissions.ReportsRead, "Destek raporlarını ve şikâyet incelemesini görüntüler (veri kapsamıyla sınırlı)", "Destek raporları"),
+        new(Permissions.ComplaintsManage, "Şikâyetlerin düzeltici aksiyonlarını açar, tamamlar, iptal eder", "Destek talepleri"),
         new(Permissions.SlaManage, "SLA politikalarını ve iş takvimlerini yönetir; politika önizlemesi yapar", "Destek yönetimi"),
         new(Permissions.SlaRecalculate, "Talebin açık SLA örneklerini gerekçeyle yeniden hesaplar", "Destek talepleri"),
     ];
@@ -203,7 +211,7 @@ public sealed class SupportModule : IModule
             [
                 Permissions.TicketsRead, Permissions.TicketsCreate, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsTake,
                 Permissions.TicketsResolve, Permissions.TicketsClose, Permissions.TicketsReopen, Permissions.TicketsCancel, Permissions.PriorityOverride,
-                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SlaRecalculate, Permissions.TicketsMerge, Permissions.TicketsExport,
+                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SlaRecalculate, Permissions.TicketsMerge, Permissions.TicketsExport, Permissions.ReportsRead, Permissions.ComplaintsManage,
             ])
         {
             Scope = RecordScope.Team,
@@ -215,7 +223,7 @@ public sealed class SupportModule : IModule
             [
                 Permissions.TicketsRead, Permissions.TicketsCreate, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsTake,
                 Permissions.TicketsResolve, Permissions.TicketsClose, Permissions.TicketsReopen, Permissions.TicketsCancel, Permissions.PriorityOverride,
-                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SettingsManage, Permissions.SlaManage, Permissions.SlaRecalculate, Permissions.TicketsMerge, Permissions.TicketsExport,
+                Permissions.MessagesReply, Permissions.NotesWrite, Permissions.InternalRead, Permissions.SettingsManage, Permissions.SlaManage, Permissions.SlaRecalculate, Permissions.TicketsMerge, Permissions.TicketsExport, Permissions.ReportsRead, Permissions.ComplaintsManage,
             ])
         {
             Scope = RecordScope.All,
@@ -412,6 +420,8 @@ public sealed class SupportModule : IModule
         services.AddScoped<ITicketTasks, TicketTasks>();
         services.AddScoped<ITicketAttachments, TicketAttachments>();
         services.AddScoped<ITicketLinks, TicketLinks>();
+        services.AddScoped<ICorrectiveActions, CorrectiveActions>();
+        services.AddScoped<ISupportReports, SupportReports>();
         services.AddScoped<ITicketInbound, TicketInbound>();
         services.AddScoped<SurveyIssuer>();
         services.AddScoped<ITicketSurveys, TicketSurveys>();

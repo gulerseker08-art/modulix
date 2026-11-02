@@ -7241,6 +7241,75 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.CorrectiveAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ClosedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "TicketId");
+
+                    b.HasIndex("TenantId", "Status", "DueDate");
+
+                    b.ToTable("CorrectiveActions", "support", t =>
+                        {
+                            t.HasCheckConstraint("CK_CorrectiveActions_Closure", "([Status] = 'Open' AND [ClosedAt] IS NULL) OR ([Status] <> 'Open' AND [ClosedAt] IS NOT NULL AND [Note] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_CorrectiveActions_Status", "[Status] IN ('Open','Done','Cancelled')");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Support.Domain.PriorityMatrixEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9512,6 +9581,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Modules.Orders.Domain.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "OrderId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Support.Domain.CorrectiveAction", b =>
+                {
+                    b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TicketId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

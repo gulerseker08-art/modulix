@@ -1,0 +1,133 @@
+@page "/destek/sikayetler"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Şikâyet inceleme · Modulix</PageTitle>
+
+<AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.ReportsRead">
+    <div class="page-header">
+        <div>
+            <h1>Şikâyet inceleme</h1>
+            <p class="text-muted mb-0">
+                Tekrarlayan kök nedenler ve düzeltici aksiyon takibi. Veriler yetkiniz ve veri kapsamınızla sınırlıdır. Kök nedenler yazıldığı metne göre gruplanır
+                (büyük/küçük harf ve boşluk farkı gözetilmez; anlamsal eşleştirme yoktur).
+            </p>
+        </div>
+        <div class="header-actions"><a class="btn btn-outline-secondary" href="destek/raporlar">Destek raporları</a></div>
+    </div>
+
+    <form class="filters" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="Süzgeçler">
+        <label class="visually-hidden" for="cp-from">Başlangıç</label>
+        <input id="cp-from" type="date" class="form-control form-control-sm filter-select" @bind="from" />
+        <label class="visually-hidden" for="cp-to">Bitiş</label>
+        <input id="cp-to" type="date" class="form-control form-control-sm filter-select" @bind="to" />
+        <label class="visually-hidden" for="cp-min">Tekrar eşiği</label>
+        <input id="cp-min" type="number" min="2" max="100" class="form-control form-control-sm filter-select" @bind="minOccurrences" />
+        <button type="submit" class="btn btn-sm btn-outline-secondary" disabled="@busy">Getir</button>
+    </form>
+
+    <Notice Text="@error" Failed="true" />
+
+    @if (review is null && error is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (review is not null)
+    {
+        <p class="small text-muted" role="status">
+            @review.Meta.From.ToString("dd.MM.yyyy") – @review.Meta.To.ToString("dd.MM.yyyy") · dönemde açılan <strong>@review.Complaints</strong> şikâyet, kök nedeni yazılmış <strong>@review.WithRootCause</strong>
+        </p>
+        @if (review.Meta.Truncated)
+        {
+            <div class="alert alert-warning" role="alert">Talep sayısı rapor üst sınırını aştı; sayılar eksiktir. Dönemi daraltın.</div>
+        }
+
+        <section aria-labelledby="cp-recurring"><h2 id="cp-recurring">Tekrarlayan nedenler (en az @review.MinOccurrences kez)</h2>
+            @if (review.Recurring.Count == 0)
+            {
+                <p class="text-muted">Bu dönemde eşiği aşan tekrarlayan neden yok.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Tekrarlayan kök nedenler</caption>
+                    <thead><tr><th scope="col">Kök neden</th><th scope="col">Tekrar</th><th scope="col">İlk / son</th><th scope="col">Kategoriler</th></tr></thead>
+                    <tbody>
+                        @foreach (var r in review.Recurring)
+                        {
+                            <tr>
+                                <td data-label="Kök neden" class="primary">@r.Cause</td>
+                                <td data-label="Tekrar"><a href="@ReportLabels.Drill(r.DrillDown)">@r.Count şikâyet</a></td>
+                                <td data-label="İlk / son">@CrmLabels.Time(r.FirstAt) / @CrmLabels.Time(r.LastAt)</td>
+                                <td data-label="Kategoriler">@string.Join(", ", r.Categories.Select(c => $"{c.Key} ({c.Count})"))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                @if (review.Recurring.Any(r => r.Count > r.TicketIds.Count)) { <p class="small text-muted">Bağlantılar en çok 50 talebi açar.</p> }
+            }
+        </section>
+
+        <section aria-labelledby="cp-actions"><h2 id="cp-actions">Düzeltici aksiyonlar</h2>
+            <p>
+                Açık: <strong>@review.Actions.Open</strong> · gecikmiş: <strong>@review.Actions.Overdue</strong> · tamamlanan: @review.Actions.Done · iptal: @review.Actions.Cancelled
+            </p>
+            <p class="small text-muted">
+                Zamanında tamamlanma (vadesi bu dönemde olanlar): <strong>@ReportLabels.Percent(review.Actions.OnTimePercent)</strong>
+                — pay: zamanında tamamlanan @review.Actions.DoneOnTime; payda: zamanında @review.Actions.DoneOnTime + geç @review.Actions.DoneLate + gecikmiş açık @review.Actions.OverdueInPeriod.
+            </p>
+            @if (review.OverdueActions.Count == 0)
+            {
+                <p class="text-muted">Gecikmiş aksiyon yok.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Gecikmiş düzeltici aksiyonlar</caption>
+                    <thead><tr><th scope="col">Aksiyon</th><th scope="col">Talep</th><th scope="col">Sorumlu</th><th scope="col">Son tarih</th><th scope="col">Gecikme</th></tr></thead>
+                    <tbody>
+                        @foreach (var a in review.OverdueActions)
+                        {
+                            <tr>
+                                <td data-label="Aksiyon" class="primary">@a.Title</td>
+                                <td data-label="Talep"><a href="destek/talepler/@a.TicketId">@a.TicketNumber</a></td>
+                                <td data-label="Sorumlu">@Lookups.MemberName(a.OwnerId)</td>
+                                <td data-label="Son tarih">@a.DueDate.ToString("dd.MM.yyyy")</td>
+                                <td data-label="Gecikme">@a.DaysOverdue gün</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+    }
+</AuthGate>
+
+@code {
+    private ComplaintReviewDto? review;
+    private string? error;
+    private bool busy;
+    private DateOnly from = DateOnly.FromDateTime(DateTime.Today.AddDays(-89));
+    private DateOnly to = DateOnly.FromDateTime(DateTime.Today);
+    private int minOccurrences = 2;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(SupportAccess.ReportsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        busy = true;
+        var result = await Api.GetAsync<ComplaintReviewDto>($"/api/support/reports/complaints?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&minOccurrences={minOccurrences}");
+        busy = false;
+        error = result.IsSuccess ? null : result.Error;
+        if (result.IsSuccess) { review = result.Value; }
+    }
+}

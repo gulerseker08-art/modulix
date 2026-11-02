@@ -98,6 +98,8 @@ public static class AppCatalog
         new("support.settings", Support, "Kuyruklar ve kategoriler", "wrench", "destek/ayarlar", 90, SupportAccess.ModuleKey, SupportAccess.SettingsManage),
         new("support.routing", Support, "Öncelik ve yönlendirme", "list", "destek/yonlendirme", 89, SupportAccess.ModuleKey, SupportAccess.SettingsManage),
         new("support.sla", Support, "SLA ve eskalasyon", "shield", "destek/sla", 91, SupportAccess.ModuleKey, SupportAccess.SlaManage),
+        new("support.reports", Support, "Raporlar", "list", "destek/raporlar", 92, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
+        new("support.complaints", Support, "Şikâyet inceleme", "shield", "destek/sikayetler", 93, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
 
         new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal),
         new("admin.home", Admin, "Genel bakış", "dashboard", "yonetim", 10, AnyPermission: CoreAccess.AdministrationPermissions, ExactMatch: true),
