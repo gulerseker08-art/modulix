@@ -25,6 +25,14 @@ public sealed class SegmentConditionException(IReadOnlyList<ConditionError> erro
     public IReadOnlyList<ConditionError> Errors { get; } = errors;
 }
 
+/// <summary>Sonuç, istenen sınırdan büyük (ör. anlık görüntüye sığmaz).</summary>
+public sealed class SegmentTooLargeException(int count, int limit) : Exception($"Sonuç {count:N0} hedef; en fazla {limit:N0} kabul edilir. Segmenti daraltın.")
+{
+    public int Count { get; } = count;
+
+    public int Limit { get; } = limit;
+}
+
 /// <summary>Hesaplama süre sınırını aştı.</summary>
 public sealed class SegmentTimeoutException(TimeSpan limit) : Exception($"Hesaplama {limit.TotalSeconds:0} saniyelik sınırı aştı.");
 
@@ -38,4 +46,7 @@ public interface ISegmentEngine
 
     /// <summary>Geçersiz koşulda <see cref="SegmentConditionException"/>, süre aşımında <see cref="SegmentTimeoutException"/>.</summary>
     Task<SegmentEvaluation> EvaluateAsync(SegmentEvaluationRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Hedef kimliklerinin tamamı (sıralı). <paramref name="limit"/> aşılırsa <see cref="SegmentTooLargeException"/>; diğer hatalar <see cref="EvaluateAsync"/> gibidir.</summary>
+    Task<IReadOnlyList<Guid>> ResolveIdsAsync(SegmentEvaluationRequest request, int limit, CancellationToken cancellationToken);
 }

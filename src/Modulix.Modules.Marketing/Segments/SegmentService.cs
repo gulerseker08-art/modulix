@@ -28,6 +28,12 @@ public interface ISegmentService
 
     Task<RecordResult<RecordData>> RestoreAsync(Guid segmentId, long? expectedVersion, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Etkin segmentin güncel üyelerinin kimlikleri (hedef kitle için); segment etkin değilse ya da hedef türü uyuşmuyorsa hata. Çağıranın veri kapsamı
+    /// ve alan yetkisi uygulanır. Sonuç <paramref name="limit"/>'ten büyükse "çok büyük" hatası.
+    /// </summary>
+    Task<RecordResult<IReadOnlyList<Guid>>> MemberIdsAsync(Guid segmentId, SegmentTarget expectedTarget, int limit, CancellationToken cancellationToken);
+
     /// <summary>Yeni taslak segment açar: tür, hedef, amaç ve koşul kopyalanır; üyeler ve sürüm geçmişi kopyalanmaz.</summary>
     Task<RecordResult<RecordData>> CopyAsync(Guid segmentId, string code, string name, CancellationToken cancellationToken);
 }
@@ -177,6 +183,51 @@ internal sealed class SegmentService(
         }
 
         return await WriteStateAsync(segmentId, null, null, null, evaluation.Value!, null, cancellationToken);
+    }
+
+    public async Task<RecordResult<IReadOnlyList<Guid>>> MemberIdsAsync(Guid segmentId, SegmentTarget expectedTarget, int limit, CancellationToken cancellationToken)
+    {
+        var loaded = await LoadAsync(segmentId, cancellationToken);
+        if (!loaded.IsSuccess)
+        {
+            return RecordResult<IReadOnlyList<Guid>>.Fail(loaded.Error!.Code, loaded.Error.Message, loaded.Error.FieldErrors);
+        }
+
+        var segment = SegmentState.From(loaded.Value!);
+        if (segment.Status != SegmentStatuses.Active)
+        {
+            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, "Segment etkin değil; yalnızca yayımlanmış (etkin) segment hedef kitlede kullanılır.");
+        }
+
+        if (segment.Target != expectedTarget)
+        {
+            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, "Segmentin hedef türü kampanyanınkiyle aynı değil.");
+        }
+
+        var condition = await PublishedConditionAsync(segment, cancellationToken);
+        if (condition.Error is { } error)
+        {
+            return RecordResult<IReadOnlyList<Guid>>.Fail(error.Code, error.Message, error.FieldErrors);
+        }
+
+        try
+        {
+            return RecordResult<IReadOnlyList<Guid>>.Ok(
+                await engine.ResolveIdsAsync(new SegmentEvaluationRequest(segment.Target, condition.Value, segmentId, true, 1, 1, false), limit, cancellationToken));
+        }
+        catch (SegmentConditionException ex)
+        {
+            return RecordResult<IReadOnlyList<Guid>>.Fail(
+                RecordErrorCode.ValidationFailed, "Koşul geçersiz.", [.. ex.Errors.Select(e => new RecordFieldError("condition", e.Message))]);
+        }
+        catch (SegmentTimeoutException ex)
+        {
+            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, ex.Message);
+        }
+        catch (SegmentTooLargeException ex)
+        {
+            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, ex.Message);
+        }
     }
 
     public Task<RecordResult<RecordData>> ArchiveAsync(Guid segmentId, long? expectedVersion, CancellationToken cancellationToken) =>

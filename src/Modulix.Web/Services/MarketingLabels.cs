@@ -42,6 +42,41 @@ public static class MarketingLabels
         _ => (1, 1),
     };
 
+    public static readonly (string Key, string Label)[] Channels = [("Email", "E-posta"), ("Phone", "Telefon"), ("Sms", "SMS"), ("WhatsApp", "WhatsApp")];
+
+    public static readonly (string Key, string Label)[] CampaignStatuses = [("Draft", "Taslak"), ("Archived", "Arşiv")];
+
+    public static readonly (string Key, string Label)[] RecipientRules =
+    [
+        ("PrimaryContact", "Birincil irtibat kişisi"), ("DecisionMaker", "Karar verici kişiler"), ("Role", "Belirli role sahip kişiler"),
+        ("AllContacts", "Firmanın tüm aktif kişileri"), ("CompanyPoints", "Firmanın kendi iletişim noktaları"),
+    ];
+
+    private static readonly Dictionary<string, string> Reasons = new()
+    {
+        ["granted"] = "İzinli",
+        ["denied"] = "Pazarlama iletişimi reddedilmiş",
+        ["unknown"] = "İzin bilinmiyor (gönderilmez)",
+        ["invalid-address"] = "Geçersiz adres",
+        ["shared-address"] = "Paylaşılan adres (izin kişiye değil adrese bağlı; otomatik gönderilmez)",
+        ["duplicate-address"] = "Aynı adres kitlede zaten var",
+        ["duplicate-person"] = "Aynı kişi başka kayıt üzerinden zaten seçildi",
+        ["per-target-limit"] = "Hedef başına alıcı sınırı aşıldı",
+        ["no-matching-contact"] = "Kurala uyan kişi yok (ör. birincil irtibat tanımlı değil)",
+        ["no-contact-point"] = "Seçilen kanalda etkin iletişim noktası yok",
+        ["target-not-found"] = "Hedef kayıt bulunamadı ya da erişiminiz yok",
+        ["suppressed:hard-bounce"] = "Engelli: kalıcı teslim hatası",
+        ["suppressed:invalid-address"] = "Engelli: geçersiz adres",
+        ["suppressed:complaint"] = "Engelli: alıcı şikayet etti",
+        ["suppressed:opt-out"] = "Engelli: iletişim istemiyor",
+        ["suppressed:manual"] = "Engelli: elle engellenmiş",
+    };
+
+    /// <summary>Hedef kitle neden kodunun Türkçe açıklaması; bilinmeyen kod olduğu gibi gösterilir.</summary>
+    public static string Reason(string code) => Reasons.GetValueOrDefault(code, code);
+
+    public static string RecipientStatus(string status) => status switch { "Eligible" => "Uygun", "Excluded" => "Elendi", _ => "Alıcı yok" };
+
     /// <summary>Koşul kurallarını anlatan kısa not (NULL ve gün sınırı davranışı).</summary>
     public const string NullNote = "Boş değerler eşittir, içerir ve aralık koşullarıyla eşleşmez; 'eşit değildir' boş değerleri de kapsar. Tarih sınırları firmanın saat dilimine göredir.";
 }

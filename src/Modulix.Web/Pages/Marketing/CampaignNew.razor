@@ -1,0 +1,150 @@
+@page "/pazarlama/kampanyalar/yeni"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>Yeni kampanya · Modulix</PageTitle>
+
+<AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.CampaignsWrite">
+    <div class="page-header">
+        <div>
+            <h1>Yeni kampanya</h1>
+            <p class="text-muted mb-0">Hedef türü ve kanal oluşturulduktan sonra değiştirilemez. Hedef kitleyi (segment ve kayıtlar) bir sonraki adımda eklersiniz.</p>
+        </div>
+        <div class="header-actions"><a class="btn btn-outline-secondary" href="pazarlama/kampanyalar">Listeye dön</a></div>
+    </div>
+
+    <Notice Text="@message" Failed="true" />
+    <ErrorSummary Errors="@errors" />
+
+    <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <fieldset disabled="@busy">
+            <div class="form-grid">
+                <div class="span-6">
+                    <label class="form-label" for="k-name">Ad</label>
+                    <input id="k-name" class="form-control" maxlength="150" @bind="name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div class="span-6">
+                    <label class="form-label" for="k-code">Kod</label>
+                    <input id="k-code" class="form-control" maxlength="40" placeholder="antrepo-2026" aria-describedby="k-code-help" @bind="code" />
+                    <small id="k-code-help" class="text-muted">Küçük harf, rakam ve tire; sonradan değişmez.</small>
+                    <FieldError Field="code" Errors="errors" />
+                </div>
+                <div class="span-6">
+                    <label class="form-label" for="k-target">Hedef türü</label>
+                    <select id="k-target" class="form-select" @bind="target">
+                        @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
+                    </select>
+                    <FieldError Field="target" Errors="errors" />
+                </div>
+                <div class="span-6">
+                    <label class="form-label" for="k-channel">Kanal</label>
+                    <select id="k-channel" class="form-select" @bind="channel">
+                        @foreach (var c in MarketingLabels.Channels) { <option value="@c.Key">@c.Label</option> }
+                    </select>
+                    <FieldError Field="channel" Errors="errors" />
+                </div>
+                @if (target == "Company")
+                {
+                    <div class="span-6">
+                        <label class="form-label" for="k-rule">Alıcı kişi seçimi</label>
+                        <select id="k-rule" class="form-select" @bind="rule">
+                            @foreach (var r in MarketingLabels.RecipientRules) { <option value="@r.Key">@r.Label</option> }
+                        </select>
+                        <small class="text-muted">Kural eşleşmezse rastgele kişiye gidilmez; hedef nedeniyle birlikte "alıcı yok" sayılır.</small>
+                        <FieldError Field="recipientRule" Errors="errors" />
+                    </div>
+                    @if (rule == "Role")
+                    {
+                        <div class="span-6">
+                            <label class="form-label" for="k-role">Aranan rol</label>
+                            <select id="k-role" class="form-select" @bind="role">
+                                <option value="">Seçin</option>
+                                @foreach (var r in Roles) { <option value="@r.Key">@r.Label</option> }
+                            </select>
+                            <FieldError Field="recipientRole" Errors="errors" />
+                        </div>
+                    }
+                }
+                <div class="span-6">
+                    <label class="form-label" for="k-max">Hedef başına en çok alıcı</label>
+                    <input id="k-max" class="form-control" type="number" min="1" max="1000" placeholder="Sınır yok" @bind="maxPerTarget" />
+                    <FieldError Field="maxPerTarget" Errors="errors" />
+                </div>
+                <div class="span-3">
+                    <label class="form-label" for="k-start">Başlangıç</label>
+                    <input id="k-start" class="form-control" type="date" @bind="startsOn" />
+                    <FieldError Field="startsOn" Errors="errors" />
+                </div>
+                <div class="span-3">
+                    <label class="form-label" for="k-end">Bitiş</label>
+                    <input id="k-end" class="form-control" type="date" @bind="endsOn" />
+                    <FieldError Field="endsOn" Errors="errors" />
+                </div>
+                <div class="span-12">
+                    <label class="form-label" for="k-purpose">Amaç</label>
+                    <input id="k-purpose" class="form-control" maxlength="200" placeholder="Ör. demo talebi, yenileme, etkinlik daveti" @bind="purpose" />
+                    <FieldError Field="purpose" Errors="errors" />
+                </div>
+                <div class="span-12">
+                    <label class="form-label" for="k-desc">Açıklama</label>
+                    <textarea id="k-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                </div>
+            </div>
+        </fieldset>
+        <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Oluştur</button></div>
+    </form>
+</AuthGate>
+
+@code {
+    private static readonly (string Key, string Label)[] Roles = [("Purchasing", "Satın alma"), ("Finance", "Finans"), ("Technical", "Teknik"), ("Management", "Yönetim"), ("Other", "Diğer")];
+
+    private string name = string.Empty;
+    private string code = string.Empty;
+    private string target = "Company";
+    private string channel = "Email";
+    private string rule = "PrimaryContact";
+    private string role = string.Empty;
+    private int? maxPerTarget;
+    private DateTime? startsOn;
+    private DateTime? endsOn;
+    private string purpose = string.Empty;
+    private string description = string.Empty;
+    private bool busy;
+    private string? message;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override Task OnInitializedAsync() => Session.EnsureLoadedAsync();
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<CampaignDto>("/api/marketing/campaigns", new SaveCampaignRequest(
+            Code: code.Trim(),
+            Name: name.Trim(),
+            Description: Blank(description),
+            Purpose: Blank(purpose),
+            Target: target,
+            Channel: channel,
+            RecipientRule: target == "Company" ? rule : "PrimaryContact",
+            RecipientRole: target == "Company" && rule == "Role" ? Blank(role) : null,
+            MaxPerTarget: maxPerTarget,
+            StartsOn: startsOn is { } s ? DateOnly.FromDateTime(s) : null,
+            EndsOn: endsOn is { } e ? DateOnly.FromDateTime(e) : null));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo($"pazarlama/kampanyalar/{result.Value!.Id}");
+            return;
+        }
+
+        message = result.FieldErrors.Count == 0 ? result.Error : null;
+        errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
+    }
+
+    private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

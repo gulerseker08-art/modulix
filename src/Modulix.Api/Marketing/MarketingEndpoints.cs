@@ -47,6 +47,8 @@ public static class MarketingEndpoints
                 [.. catalog.Unavailable.Select(u => new UnavailableSegmentFieldDto(u.Key, u.Label, u.Reason))]));
         }).RequirePermission(MarketingModule.Permissions.SegmentsRead);
 
+        CampaignEndpoints.MapCampaignEndpoints(group);
+
         var segments = group.MapGroup("/segments");
 
         // Önizleme hiçbir şey yazmaz; sayı alan yetkisi ve veri kapsamıyla hesaplanır, satırlar alıcı görüntüleme yetkisine bağlıdır.
