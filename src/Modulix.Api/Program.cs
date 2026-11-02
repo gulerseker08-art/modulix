@@ -9,6 +9,7 @@ using Modulix.Api.Development;
 using Modulix.Api.Email;
 using Modulix.Api.Events;
 using Modulix.Api.Lookups;
+using Modulix.Api.Marketing;
 using Modulix.Api.Organization;
 using Modulix.Api.Platform;
 using Modulix.Api.Records;
@@ -31,6 +32,7 @@ using Modulix.Modules.Orders;
 using Modulix.Api.Contracts;
 using Modulix.Api.Orders;
 using Modulix.Api.Support;
+using Modulix.Modules.Marketing;
 using Modulix.Modules.Support;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -66,6 +68,7 @@ builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modu
 builder.Services.AddScoped<Modulix.Modules.Contracts.Lifecycle.IContractPolicyProvider, Modulix.Api.Contracts.ContractPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Orders.Lifecycle.IOrderPolicyProvider, Modulix.Api.Orders.OrderPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Support.Lifecycle.ISupportPolicyProvider, Modulix.Api.Support.SupportPolicyProvider>();
+builder.Services.AddScoped<Modulix.Modules.Marketing.Runs.IMarketingPolicyProvider, Modulix.Api.Marketing.MarketingPolicyProvider>();
 builder.Services.Configure<Modulix.Api.Support.SupportJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Support.SupportJobsOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Support.SupportJobsRunner>();
 builder.Services.AddHostedService<Modulix.Api.Support.SupportJobsWorker>();
@@ -84,6 +87,7 @@ builder.Services.AddModulixEvents();
 builder.Services.AddLeadIntakeRateLimit(builder.Configuration);
 builder.Services.AddQuotePublicRateLimit(builder.Configuration);
 builder.Services.AddSupportSurveyRateLimit(builder.Configuration);
+builder.Services.AddCommunicationPublicRateLimit(builder.Configuration);
 builder.Services.AddContractSignatureRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
 builder.Services.Configure<Modulix.Api.Crm.QuoteExpiryOptions>(builder.Configuration.GetSection(Modulix.Api.Crm.QuoteExpiryOptions.SectionName));
@@ -186,9 +190,11 @@ app.MapCrmEndpoints();
 app.MapContractsEndpoints();
 app.MapOrdersEndpoints();
 app.MapSupportEndpoints();
+app.MapMarketingEndpoints();
 app.MapLeadIntakeEndpoints();
 app.MapQuotePublicEndpoints();
 app.MapSupportSurveyPublicEndpoints();
+app.MapCommunicationPublicEndpoints();
 app.MapContractSignatureWebhook();
 app.MapPlatformEndpoints();
 app.MapPlatformEventEndpoints();
@@ -216,5 +222,5 @@ public partial class Program;
 /// </summary>
 internal static class ModulixModules
 {
-    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule()];
+    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule(), new MarketingModule()];
 }

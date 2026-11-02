@@ -1,0 +1,120 @@
+@page "/pazarlama/kampanyalar"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Kampanyalar · Modulix</PageTitle>
+
+<AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.CampaignsRead">
+    <div class="page-header">
+        <div>
+            <h1>Kampanyalar</h1>
+            <p class="text-muted mb-0">Kampanya, hedef kitleyi segmentlerden ve seçilen kayıtlardan kurar; gönderimden önce hedef kitle dondurulur. Bu sürümde içerik, onay ve gönderim yoktur: hiçbir ileti gönderilmez.</p>
+        </div>
+        <div class="header-actions">
+            @if (Session.Can(MarketingAccess.CampaignsWrite))
+            {
+                <a class="btn btn-primary" href="pazarlama/kampanyalar/yeni">Yeni kampanya</a>
+            }
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+    }
+
+    <div class="filters">
+        <label class="visually-hidden" for="c-status">Durum</label>
+        <select id="c-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm durumlar</option>
+            @foreach (var s in MarketingLabels.CampaignStatuses) { <option value="@s.Key">@s.Label</option> }
+        </select>
+        <label class="visually-hidden" for="c-target">Hedef türü</label>
+        <select id="c-target" class="form-select form-select-sm filter-select" @bind="target" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm hedefler</option>
+            @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
+        </select>
+        <label class="visually-hidden" for="c-channel">Kanal</label>
+        <select id="c-channel" class="form-select form-select-sm filter-select" @bind="channel" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm kanallar</option>
+            @foreach (var c in MarketingLabels.Channels) { <option value="@c.Key">@c.Label</option> }
+        </select>
+    </div>
+
+    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <label class="visually-hidden" for="c-search">Kampanya ara</label>
+        <input id="c-search" class="form-control" type="search" placeholder="Ad veya kod ara" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (list is null && message is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (list is not null && list.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu süzgece uyan kampanya yok.@(Session.Can(MarketingAccess.CampaignsWrite) ? " Yeni kampanya oluşturabilirsiniz." : null)</p>
+    }
+    else if (list is not null)
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@list.TotalCount kampanya listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Kampanya listesi</caption>
+            <thead>
+                <tr><th scope="col">Kampanya</th><th scope="col">Hedef</th><th scope="col">Kanal</th><th scope="col">Dönem</th><th scope="col">Durum</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var c in list.Items)
+                {
+                    <tr>
+                        <td data-label="Kampanya" class="primary">
+                            <a href="pazarlama/kampanyalar/@c.Id">@c.Name</a>
+                            <small class="text-muted">@c.Code@(c.Purpose is null ? null : " · " + c.Purpose)</small>
+                        </td>
+                        <td data-label="Hedef">@MarketingLabels.Label(MarketingLabels.Targets, c.Target)</td>
+                        <td data-label="Kanal">@MarketingLabels.Label(MarketingLabels.Channels, c.Channel)</td>
+                        <td data-label="Dönem">@Period(c)</td>
+                        <td data-label="Durum"><span class="badge stage-@(c.Status == "Archived" ? "cancelled" : "lead")">@MarketingLabels.Label(MarketingLabels.CampaignStatuses, c.Status)</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="list.Page" PageSize="list.PageSize" TotalCount="list.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private PagedResult<CampaignDto>? list;
+    private string? message;
+    private string status = string.Empty;
+    private string target = string.Empty;
+    private string channel = string.Empty;
+    private string search = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(MarketingAccess.CampaignsRead)) { await LoadAsync(1); }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var parts = new List<string> { $"page={pageNumber}" };
+        if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
+        if (status != string.Empty) { parts.Add($"status={status}"); }
+        if (target != string.Empty) { parts.Add($"target={target}"); }
+        if (channel != string.Empty) { parts.Add($"channel={channel}"); }
+
+        var result = await Api.GetAsync<PagedResult<CampaignDto>>($"/api/marketing/campaigns?{string.Join('&', parts)}");
+        list = result.Value;
+        message = result.IsSuccess ? null : result.Error;
+    }
+
+    private static string Period(CampaignDto c) => (c.StartsOn, c.EndsOn) switch
+    {
+        ({ } s, { } e) => $"{s:dd.MM.yyyy} – {e:dd.MM.yyyy}",
+        ({ } s, null) => $"{s:dd.MM.yyyy} –",
+        (null, { } e) => $"– {e:dd.MM.yyyy}",
+        _ => "—",
+    };
+}

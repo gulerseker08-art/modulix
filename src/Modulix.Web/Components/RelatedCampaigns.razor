@@ -1,0 +1,54 @@
+@* Firma/kişi kartında pazarlama geçmişi (ADR-0025, dilim 8): bu müşteriye giden kampanya iletileri ve gelen yanıtlar. Adres gösterilmez. Pazarlama modülü bu tenant için kapalıysa ya da kullanıcının rapor ve
+   alıcı görüntüleme izni yoksa bileşen hiçbir şey çizmez ve istek yapmaz; liste sunucuda izin ve kampanya veri kapsamıyla süzülür. *@
+@inject ApiClient Api
+@inject SessionState Session
+
+@if (Available)
+{
+    <section class="detail-section" aria-labelledby="related-campaigns">
+        <div class="section-header"><h2 id="related-campaigns">Pazarlama geçmişi</h2></div>
+        @if (history is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (history.Items.Count == 0)
+        {
+            <p class="text-muted">Bu müşteriye giden kampanya iletisi ya da gelen yanıt yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">Pazarlama geçmişi</caption>
+                <thead><tr><th scope="col">Kampanya</th><th scope="col">Tür</th><th scope="col">Durum</th><th scope="col">Zaman</th></tr></thead>
+                <tbody>
+                    @foreach (var i in history.Items)
+                    {
+                        <tr>
+                            <td data-label="Kampanya" class="primary"><a href="pazarlama/kampanyalar/@i.CampaignId">@i.CampaignName</a></td>
+                            <td data-label="Tür">@(i.Kind == "Delivery" ? "İleti" : "Yanıt: " + MarketingLabels.ResponseKind(i.Detail ?? "Other"))</td>
+                            <td data-label="Durum">@(i.Kind == "Delivery" ? MarketingLabels.DeliveryStatus(i.Status) : MarketingLabels.ResponseStatus(i.Status))</td>
+                            <td data-label="Zaman">@CrmLabels.Time(i.At)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+}
+
+@code {
+    /// <summary>Ortak müşteri (taraf) ya da kişi kimliği; firma kartında firmanın <c>PartyId</c> değeri.</summary>
+    [Parameter] public Guid? TargetId { get; set; }
+
+    private TargetHistoryDto? history;
+    private Guid? loadedFor;
+
+    private bool Available => TargetId is not null && Session.IsModuleEnabled(MarketingAccess.ModuleKey) && Session.Can(MarketingAccess.ReportsRead) && Session.Can(MarketingAccess.RecipientsRead);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Available || loadedFor == TargetId) { return; }
+        loadedFor = TargetId;
+        history = (await Api.GetAsync<TargetHistoryDto>($"/api/marketing/targets/{TargetId}/history")).Value ?? new TargetHistoryDto([]);
+    }
+}
