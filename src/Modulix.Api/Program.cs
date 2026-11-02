@@ -9,6 +9,7 @@ using Modulix.Api.Development;
 using Modulix.Api.Email;
 using Modulix.Api.Events;
 using Modulix.Api.Lookups;
+using Modulix.Api.Marketing;
 using Modulix.Api.Organization;
 using Modulix.Api.Platform;
 using Modulix.Api.Records;
@@ -31,6 +32,7 @@ using Modulix.Modules.Orders;
 using Modulix.Api.Contracts;
 using Modulix.Api.Orders;
 using Modulix.Api.Support;
+using Modulix.Modules.Marketing;
 using Modulix.Modules.Support;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -185,6 +187,7 @@ app.MapCrmEndpoints();
 app.MapContractsEndpoints();
 app.MapOrdersEndpoints();
 app.MapSupportEndpoints();
+app.MapMarketingEndpoints();
 app.MapLeadIntakeEndpoints();
 app.MapQuotePublicEndpoints();
 app.MapSupportSurveyPublicEndpoints();
@@ -215,5 +218,5 @@ public partial class Program;
 /// </summary>
 internal static class ModulixModules
 {
-    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule()];
+    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule(), new MarketingModule()];
 }

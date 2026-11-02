@@ -973,6 +973,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<IRecordStore, ActivityRecordStore>();
         services.AddScoped<IRecordStore, ActivityLinkRecordStore>();
         services.AddScoped<IRecordStore, ActivityParticipantRecordStore>();
+        services.AddScoped<Modulix.Core.Contracts.Marketing.ISegmentFieldSource, CrmSegmentFieldSource>();
         services.AddScoped<IActivityLinkTarget, CompanyLinkTarget>();
         services.AddScoped<IActivityLinkTarget, ContactLinkTarget>();
         services.AddScoped<IActivityLinkTarget, OpportunityLinkTarget>();
