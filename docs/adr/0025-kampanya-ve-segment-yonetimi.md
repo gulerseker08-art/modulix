@@ -105,7 +105,7 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 | 6 — Abonelikten çıkma ve tercih merkezi (oturumsuz sayfa, tek tıkla çıkış, gönderimde zorunlu bağlantı) | Yapıldı; ayrıntı aşağıda |
 | 7 — Yanıt çalışma alanı, kampanya kaynak/UTM, yanıttan lead ve aktivite, çıkış yanıtı | Yapıldı; ayrıntı aşağıda (webhook ile otomatik yanıt toplama yok) |
 | 8 — Maliyet, kampanya raporu (ilk/son dokunuş), müşteri kartı pazarlama geçmişi | Yapıldı; ayrıntı aşağıda (fırsat/ciro atfı ve dışa aktarma yok) |
-| 9 | Planlı: kabul/regresyon ve performans ölçümü (100.000 kişi), işletim notu |
+| 9 — Ölçek ölçümü (100.000 kişi), kabul/regresyon, işletim notu (docs/pazarlama-isletim.md) | Yapıldı; hedef kitle sınırı ve gönderim hızı bulguları ayrıntıda |
 
 ### Dilim 2 — uygulama notları (sapmalar ve sınırlar)
 
@@ -175,3 +175,12 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 - **Kapsam ve gizlilik**: rapor yalnızca çağıranın görebildiği (izin + sorumluya bağlı veri kapsamı) kampanyaları sayar; sayımlar bu kampanyalar için yapılır. İlk dokunuş hesabı başka kampanyaların iletilerini de görür ama yalnızca çağıranın görebildiği kampanya satırlarına yazar. Müşteri geçmişi hem `marketing.reports.read` hem `marketing.recipients.read` ister; adres içermez; yanıtlar yanıt izni ve yanıt sorumlusu kapsamıyla boru hattından okunur. Firma kartında firmanın taraf (`PartyId`), kişi kartında kişi kimliği kullanılır (firma kampanyasında hedef taraf, kişi iletisinde kişi kimliği eşleşir).
 - **Bilerek yok / açık**: rapor dışa aktarma (CSV), tarih aralığı süzgeci ve zaman serisi, ağırlıklı atıf, fırsat/ciro/ROI, segment bazlı kırılım, rapor önbelleği (her istekte hesaplanır; 100.000 kişilik ölçüm dilim 9'da), kampanya karşılaştırma, müşteri kartında yanıt eylemi.
 - **Test**: 13 birim (gönderildi tanımı, birim maliyet, ilk dokunuş ve eşitlik), 5 entegrasyon (sayımlar, atıf ve birim maliyet; geçmiş ve adres yokluğu; maliyet doğrulama ve para birimi; tenant izolasyonu; izinler ve dar kapsam). Çok kampanyalı ilk dokunuş yalnızca birim testle sınandı; entegrasyon testi tek kampanyadır.
+
+### Dilim 9 — uygulama notları (ölçek ölçümü, kabul/regresyon, işletim notu)
+
+- **Yapılan**: 100.000 sentetik kişiyle ölçüm testi (`MarketingScaleTests`, `MODULIX_SCALE=1` ile; varsayılan atlanır), işletim notu `docs/pazarlama-isletim.md` (yapılandırma, ölçülen süreler, sınırlar, veri büyümesi, sorun giderme, dürüst sınırlar listesi). Yeni davranış eklenmedi.
+- **Ölçüm bulguları** (geliştirme bilgisayarı, SQL Server Docker, Release; ayrıntı işletim notunda): segment önizleme ~1 sn, yayımlama ~2 sn, 16.667 alıcılı hedef kitle önizleme ~12,5 sn, dondurma ~6,4 sn, çalıştırma başlatma (satır açma) ~24 sn, işleme ≈ 34 ileti/sn (100.000 ileti ≈ 50 dk). Bütçeler geniş sınırlardır, performans garantisi değildir.
+- **Bulgu — hedef kitle sınırı**: ilk ölçümde 33.334 hedefli segment hedef kitle önizlemesinde 409 ile reddedildi (en fazla 20.000). Bu bilinen bir güvenlik sınırıdır (sessiz kesme yok); ölçüm testi sınır altı (16.667) ve sınır üstü (33.334) durumu ayrı sınar. Daha büyük gönderim için segment bölme ya da sınırı ayrıca ölçerek artırma gerekir.
+- **Bulgu — gönderim hızı**: işleme satır satır olduğundan büyük gönderimler dakikalar sürer; paralel işçi, toplu kayıt ve otomatik işçi yapılmadı (gerçek sağlayıcıdan önce yapılmalı).
+- **Ölçülmedi**: rapor sorguları büyük yanıt/lead hacminde, eşzamanlı çok kullanıcı, üretim donanımı, gerçek sağlayıcı gecikmesi, belirteç/sıklık tablolarının büyümesi.
+- **Kabul/regresyon**: epik boyunca dört test türü (mutlu yol, doğrulama, tenant izolasyonu, yetki) her dilimde yazıldı; dilim 9'da tam entegrasyon paketi koşuldu (sonuç PR açıklamasında).
