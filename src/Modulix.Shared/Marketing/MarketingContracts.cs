@@ -76,3 +76,13 @@ public sealed record SegmentEvaluationDto(int Count, IReadOnlyList<SegmentRowDto
 public sealed record SegmentActionRequest(long? Version = null);
 
 public sealed record CopySegmentRequest(string Code, string Name);
+
+/// <summary>Arayüz menüsünün ve ekran denetimlerinin baktığı izin anahtarları; <c>MarketingModule.Permissions</c> ile aynı olmalıdır (mimari testle denetlenir).</summary>
+public static class MarketingAccess
+{
+    public const string ModuleKey = "marketing";
+    public const string SegmentsRead = "marketing.segments.read";
+    public const string SegmentsWrite = "marketing.segments.write";
+    public const string SegmentsPublish = "marketing.segments.publish";
+    public const string RecipientsRead = "marketing.recipients.read";
+}

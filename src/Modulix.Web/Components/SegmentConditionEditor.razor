@@ -1,0 +1,185 @@
+@* Segment koşul ağacı düzenleyicisi (ADR-0025): grup (VE/VEYA) ve koşul satırları; özyinelemelidir. Yalnızca çağıranın kullanabildiği alanlar
+   seçilir; operatörler alanın tipine göredir. Doğrulama sunucudadır. *@
+<div class="cond-group @(Depth > 0 ? "cond-nested" : null)" role="group" aria-label="@(Node.Group == "and" ? "Tümü sağlanmalı" : "Biri sağlanmalı")">
+    <div class="cond-head">
+        <label class="visually-hidden" for="@GroupId">Grup türü</label>
+        <select id="@GroupId" class="form-select form-select-sm filter-select" value="@Node.Group" @onchange="e => SetGroup(e.Value?.ToString())">
+            <option value="and">Tümü sağlanmalı (VE)</option>
+            <option value="or">Biri yeterli (VEYA)</option>
+        </select>
+        @if (Remove.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Remove.InvokeAsync()">Grubu sil</button>
+        }
+    </div>
+
+    @for (var idx = 0; idx < Node.Items.Count; idx++)
+    {
+        var item = Node.Items[idx];
+        var n = idx;
+        @if (item.IsGroup)
+        {
+            <SegmentConditionEditor Node="item" Fields="Fields" Depth="Depth + 1" Changed="Changed" Remove="@(EventCallback.Factory.Create(this, () => RemoveItem(item)))" />
+        }
+        else
+        {
+            var field = Fields.FirstOrDefault(f => f.Key == item.Field);
+            <div class="cond-leaf">
+                <label class="visually-hidden" for="@($"{GroupId}-f{n}")">Alan</label>
+                <select id="@($"{GroupId}-f{n}")" class="form-select form-select-sm" value="@item.Field" @onchange="e => SetField(item, e.Value?.ToString())">
+                    <option value="">Alan seçin</option>
+                    @foreach (var g in Fields.GroupBy(f => f.Group))
+                    {
+                        <optgroup label="@g.Key">
+                            @foreach (var f in g) { <option value="@f.Key">@f.Label</option> }
+                        </optgroup>
+                    }
+                </select>
+                <label class="visually-hidden" for="@($"{GroupId}-o{n}")">Operatör</label>
+                <select id="@($"{GroupId}-o{n}")" class="form-select form-select-sm" value="@item.Operator" disabled="@(field is null)" @onchange="e => SetOperator(item, e.Value?.ToString())">
+                    <option value="">Operatör</option>
+                    @if (field is not null)
+                    {
+                        @foreach (var o in field.Operators) { <option value="@o">@MarketingLabels.Operator(o)</option> }
+                    }
+                </select>
+                @if (field is not null && item.Operator != string.Empty)
+                {
+                    @ValueInputs(item, field, $"{GroupId}-v{n}")
+                }
+                <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Koşulu sil" @onclick="() => RemoveItem(item)">Sil</button>
+                @if (field?.Hint is { } hint)
+                {
+                    <small class="text-muted cond-hint">@hint</small>
+                }
+            </div>
+        }
+    }
+
+    <div class="cond-actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddLeaf">Koşul ekle</button>
+        @if (Depth < MaxDepth - 1)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddGroup">Grup ekle</button>
+        }
+    </div>
+</div>
+
+@code {
+    private const int MaxDepth = 4;
+
+    [Parameter, EditorRequired] public ConditionNode Node { get; set; } = default!;
+
+    [Parameter, EditorRequired] public IReadOnlyList<SegmentFieldDto> Fields { get; set; } = [];
+
+    [Parameter] public int Depth { get; set; }
+
+    [Parameter] public EventCallback Changed { get; set; }
+
+    [Parameter] public EventCallback Remove { get; set; }
+
+    private string GroupId => $"cond-{Depth}-{Node.GetHashCode():x}";
+
+    private RenderFragment ValueInputs(ConditionNode item, SegmentFieldDto field, string id) => @<span class="cond-values">
+        @{
+            var (min, max) = MarketingLabels.ValueCount(item.Operator);
+            var isDays = item.Operator is "lastdays" or "nextdays" || field.Type == "Relation";
+            var choices = field.Type == "Choice" && field.Options.Count > 0 ? field.Options : null;
+        }
+        @if (max == 0)
+        {
+        }
+        else if (item.Operator == "in")
+        {
+            <input id="@id" class="form-control form-control-sm" placeholder="Virgülle ayırın" aria-label="Değerler" value="@item.ListText"
+                   @onchange="e => SetList(item, e.Value?.ToString())" />
+        }
+        else
+        {
+            @for (var i = 0; i < max; i++)
+            {
+                var index = i;
+                var current = item.ValueAt(index);
+                var label = max == 2 ? (index == 0 ? "Başlangıç" : "Bitiş") : isDays ? (field.Type == "Relation" ? "Gün penceresi (isteğe bağlı)" : "Gün sayısı") : "Değer";
+                @if (choices is not null)
+                {
+                    <select id="@(index == 0 ? id : null)" class="form-select form-select-sm" aria-label="@label" value="@current" @onchange="e => SetValue(item, index, e.Value?.ToString())">
+                        <option value="">Seçin</option>
+                        @foreach (var o in choices) { <option value="@o.Key">@o.Value</option> }
+                    </select>
+                }
+                else if (field.Type == "Bool")
+                {
+                    <select id="@(index == 0 ? id : null)" class="form-select form-select-sm" aria-label="@label" value="@current" @onchange="e => SetValue(item, index, e.Value?.ToString())">
+                        <option value="">Seçin</option>
+                        <option value="true">Evet</option>
+                        <option value="false">Hayır</option>
+                    </select>
+                }
+                else if (isDays)
+                {
+                    <input id="@(index == 0 ? id : null)" class="form-control form-control-sm" type="number" min="1" max="3650" aria-label="@label" value="@current"
+                           @onchange="e => SetValue(item, index, e.Value?.ToString())" />
+                }
+                else
+                {
+                    <input id="@(index == 0 ? id : null)" class="form-control form-control-sm" type="@(field.Type == "Date" ? "date" : "text")" aria-label="@label" value="@current"
+                           @onchange="e => SetValue(item, index, e.Value?.ToString())" />
+                }
+            }
+        }
+    </span>;
+
+    private Task SetGroup(string? kind)
+    {
+        Node.Group = kind == "or" ? "or" : "and";
+        return Changed.InvokeAsync();
+    }
+
+    private Task SetField(ConditionNode item, string? key)
+    {
+        item.Field = key ?? string.Empty;
+        item.Operator = Fields.FirstOrDefault(f => f.Key == item.Field)?.Operators.FirstOrDefault() ?? string.Empty;
+        item.Values.Clear();
+        return Changed.InvokeAsync();
+    }
+
+    private Task SetOperator(ConditionNode item, string? op)
+    {
+        item.Operator = op ?? string.Empty;
+        item.Values.Clear();
+        return Changed.InvokeAsync();
+    }
+
+    private Task SetValue(ConditionNode item, int index, string? value)
+    {
+        item.SetValue(index, value ?? string.Empty);
+        return Changed.InvokeAsync();
+    }
+
+    private Task SetList(ConditionNode item, string? value)
+    {
+        item.ListText = value ?? string.Empty;
+        return Changed.InvokeAsync();
+    }
+
+    private Task AddLeaf()
+    {
+        Node.Items.Add(ConditionNode.NewLeaf());
+        return Changed.InvokeAsync();
+    }
+
+    private Task AddGroup()
+    {
+        var group = ConditionNode.NewGroup();
+        group.Items.Add(ConditionNode.NewLeaf());
+        Node.Items.Add(group);
+        return Changed.InvokeAsync();
+    }
+
+    private Task RemoveItem(ConditionNode item)
+    {
+        Node.Items.Remove(item);
+        return Changed.InvokeAsync();
+    }
+}
