@@ -1,0 +1,500 @@
+@page "/crm/satis-hedefleri"
+@using System.Globalization
+@using System.Net
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Satış hedefleri · Modulix</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.TargetsRead">
+    <a class="back-link" href="crm/satis-gorunumu">← Satış görünümü</a>
+    <div class="page-header">
+        <div>
+            <h1>Satış hedefleri</h1>
+            <p class="text-muted mb-0">
+                Kazanılan tutar ya da adet için dönem hedefleri; firma geneli veya kullanıcı bazında tanımlanır. Satış görünümü bu hedeflere göre ilerlemeyi gösterir.
+                Hedefin türü, kapsamı, para birimi ve dönemi oluşturulduktan sonra değişmez; yalnızca değer ve not güncellenir.
+            </p>
+        </div>
+        @if (CanManage && form is null)
+        {
+            <div class="header-actions"><button type="button" class="btn btn-primary" @onclick="StartCreate">Yeni hedef</button></div>
+        }
+    </div>
+
+    <Notice Text="@success" />
+    <Notice Text="@pageNotice" Failed="true" />
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault aria-labelledby="st-form-title">
+            <h2 id="st-form-title">@(form.Id is null ? "Yeni hedef" : "Hedefi düzenle")</h2>
+            <ErrorSummary Errors="errors" />
+            @if (formMessage is not null)
+            {
+                <div class="alert alert-danger" role="alert">@formMessage</div>
+            }
+
+            @if (form.Id is null)
+            {
+                <fieldset class="mb-3">
+                    <legend class="h6">Dönemi hızlı doldur</legend>
+                    <div class="form-grid">
+                        <div class="span-3">
+                            <label class="form-label" for="st-fill-kind">Dönem türü</label>
+                            <select id="st-fill-kind" class="form-select" @bind="fillKind">
+                                @foreach (var (key, label) in SalesLabels.PeriodKinds) { <option value="@key">@label</option> }
+                            </select>
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="st-fill-date">Dönemdeki bir gün</label>
+                            <input id="st-fill-date" class="form-control" type="date" @bind="fillDate" />
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="st-fill-go">&nbsp;</label>
+                            <button id="st-fill-go" type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="FillPeriodAsync">Dönem başı ve sonunu doldur</button>
+                        </div>
+                    </div>
+                    <p class="form-text mb-0">Mali yıl ayarı sunucudan alınır. Tarihleri aşağıdan elle de girebilirsiniz.</p>
+                </fieldset>
+            }
+
+            <div class="form-grid">
+                <div class="span-3">
+                    <label class="form-label required" for="st-metric">Hedef türü</label>
+                    <select id="st-metric" class="form-select" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.Metric" @bind:after="MetricChanged">
+                        @foreach (var (key, label) in SalesLabels.Metrics) { <option value="@key">@label</option> }
+                    </select>
+                    <FieldError Field="metric" Errors="errors" />
+                </div>
+                <div class="span-3">
+                    <label class="form-label required" for="st-scope">Kapsam</label>
+                    <select id="st-scope" class="form-select" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.Scope" @bind:after="ScopeChanged">
+                        @foreach (var (key, label) in SalesLabels.Scopes) { <option value="@key">@label</option> }
+                    </select>
+                    <FieldError Field="scopeType" Errors="errors" />
+                </div>
+                @if (form.Scope == SalesTargetScopes.User)
+                {
+                    <div class="span-3">
+                        <label class="form-label required" for="st-user">Kullanıcı</label>
+                        <select id="st-user" class="form-select" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.UserId">
+                            <option value="">Seçin…</option>
+                            @foreach (var member in Lookups.Members) { <option value="@member.UserId">@member.DisplayName</option> }
+                        </select>
+                        <FieldError Field="scopeUserId" Errors="errors" />
+                    </div>
+                }
+                @if (form.Metric == SalesTargetMetrics.WonAmount)
+                {
+                    <div class="span-3">
+                        <label class="form-label required" for="st-currency">Para birimi</label>
+                        <input id="st-currency" class="form-control" maxlength="3" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.Currency" />
+                        <FieldError Field="currency" Errors="errors" />
+                    </div>
+                }
+                <div class="span-3">
+                    <label class="form-label required" for="st-start">Dönem başı</label>
+                    <input id="st-start" class="form-control" type="date" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.PeriodStart" />
+                    <FieldError Field="periodStart" Errors="errors" />
+                </div>
+                <div class="span-3">
+                    <label class="form-label required" for="st-end">Dönem sonu</label>
+                    <input id="st-end" class="form-control" type="date" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.PeriodEnd" />
+                    <FieldError Field="periodEnd" Errors="errors" />
+                </div>
+                <div class="span-3">
+                    <label class="form-label required" for="st-value">@(form.Metric == SalesTargetMetrics.WonAmount ? "Hedef tutarı (vergi hariç net)" : "Hedef adedi")</label>
+                    <input id="st-value" class="form-control" type="number" min="0" step="@(form.Metric == SalesTargetMetrics.WonCount ? "1" : "any")" inputmode="decimal"
+                           required aria-required="true" @bind="form.Value" />
+                    <FieldError Field="value" Errors="errors" />
+                </div>
+                @if (form.Id is not null && ValueEdited)
+                {
+                    <div class="span-12">
+                        <label class="form-label required" for="st-reason">Değişiklik gerekçesi</label>
+                        <input id="st-reason" class="form-control" maxlength="500" required aria-required="true" aria-describedby="st-reason-help" @bind="form.Reason" />
+                        <div id="st-reason-help" class="form-text">Hedef değeri değişince gerekçe zorunludur; eski ve yeni değer gerekçeyle birlikte revizyon olarak saklanır.</div>
+                        <FieldError Field="changeReason" Errors="errors" />
+                    </div>
+                }
+                <div class="span-12">
+                    <label class="form-label" for="st-note">Not</label>
+                    <textarea id="st-note" class="form-control" rows="2" maxlength="1000" @bind="form.Note"></textarea>
+                    <FieldError Field="note" Errors="errors" />
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">
+                    @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
+                    Kaydet
+                </button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelForm">Vazgeç</button>
+                @if (form.Id is not null && confirmDelete)
+                {
+                    <span class="confirm ms-auto" role="alert">
+                        <span>Bu hedef kalıcı olarak silinsin mi?</span>
+                        <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="DeleteAsync">Evet, sil</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDelete = false">Vazgeç</button>
+                    </span>
+                }
+                else if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="() => confirmDelete = true">Sil</button>
+                }
+            </div>
+        </form>
+    }
+
+    <form class="form-grid mb-3" @onsubmit="ApplyFiltersAsync" @onsubmit:preventDefault aria-label="Hedef süzgeçleri">
+        <div class="span-3">
+            <label class="form-label" for="stf-from">Dönem başlangıcı (en erken)</label>
+            <input id="stf-from" class="form-control" type="date" @bind="from" @bind:after="ApplyFiltersAsync" />
+        </div>
+        <div class="span-3">
+            <label class="form-label" for="stf-to">Dönem bitişi (en geç)</label>
+            <input id="stf-to" class="form-control" type="date" @bind="to" @bind:after="ApplyFiltersAsync" />
+        </div>
+        <div class="span-3">
+            <label class="form-label" for="stf-metric">Hedef türü</label>
+            <select id="stf-metric" class="form-select" @bind="filterMetric" @bind:after="ApplyFiltersAsync">
+                <option value="">Tümü</option>
+                @foreach (var (key, label) in SalesLabels.Metrics) { <option value="@key">@label</option> }
+            </select>
+        </div>
+        <div class="span-3">
+            <label class="form-label" for="stf-scope">Kapsam</label>
+            <select id="stf-scope" class="form-select" @bind="filterScope" @bind:after="ApplyFiltersAsync">
+                <option value="">Tümü</option>
+                @foreach (var (key, label) in SalesLabels.Scopes) { <option value="@key">@label</option> }
+            </select>
+        </div>
+        @if (filterScope == SalesTargetScopes.User)
+        {
+            <div class="span-3">
+                <label class="form-label" for="stf-user">Kullanıcı</label>
+                <select id="stf-user" class="form-select" @bind="filterUser" @bind:after="ApplyFiltersAsync">
+                    <option value="">Tüm kullanıcılar</option>
+                    @foreach (var member in Lookups.Members) { <option value="@member.UserId">@member.DisplayName</option> }
+                </select>
+            </div>
+        }
+    </form>
+
+    @if (listError is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @listError
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="() => LoadAsync(page?.Page ?? 1)">Tekrar dene</button>
+        </div>
+    }
+
+    @if (loading && page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page is not null)
+    {
+        @if (page.Items.Count == 0)
+        {
+            <p class="text-muted">Bu süzgeç için hedef tanımlı değil.@(CanManage ? " \"Yeni hedef\" ile ekleyebilirsiniz." : null)</p>
+        }
+        else
+        {
+            <table class="table record-table" aria-busy="@(loading ? "true" : "false")">
+                <caption class="visually-hidden">Satış hedefleri</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Dönem</th><th scope="col">Hedef türü</th><th scope="col">Kapsam</th><th scope="col">Hedef</th><th scope="col">Revizyon</th><th scope="col">Not</th>
+                        @if (CanManage) { <th scope="col"><span class="visually-hidden">İşlemler</span></th> }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var target in page.Items)
+                    {
+                        <tr>
+                            <td data-label="Dönem" class="primary">@SalesLabels.Period(target.PeriodStart, target.PeriodEnd)</td>
+                            <td data-label="Hedef türü">@SalesLabels.Metric(target.Metric)</td>
+                            <td data-label="Kapsam">@(target.ScopeType == SalesTargetScopes.User ? $"Kullanıcı: {Lookups.MemberName(target.ScopeUserId)}" : "Tüm firma")</td>
+                            <td data-label="Hedef">@ValueText(target)</td>
+                            <td data-label="Revizyon">@(target.RevisionNo > 0 ? $"{target.RevisionNo}. revizyon" : "İlk değer")</td>
+                            <td data-label="Not">@(target.Note ?? "—")</td>
+                            @if (CanManage)
+                            {
+                                <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" aria-label="@($"{SalesLabels.Period(target.PeriodStart, target.PeriodEnd)} hedefini düzenle")" @onclick="() => StartEdit(target)">Düzenle</button></td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        }
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/sales-targets";
+
+    private CrmPage<SalesTargetDto>? page;
+    private TargetForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? formMessage;
+    private string? listError;
+    private string? success;
+    private string? pageNotice;
+    private bool loading;
+    private bool busy;
+    private bool confirmDelete;
+    private int requestId;
+
+    private DateOnly? from;
+    private DateOnly? to;
+    private string filterMetric = string.Empty;
+    private string filterScope = string.Empty;
+    private string filterUser = string.Empty;
+
+    private string fillKind = SalesPeriodKinds.Month;
+    private DateOnly? fillDate = DateOnly.FromDateTime(Regional.Now.DateTime);
+
+    private bool CanManage => Session.Can(SalesAccess.TargetsManage);
+
+    private bool ValueEdited => form is { OriginalValue: { } original } && form.Value != original;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(SalesAccess.TargetsRead))
+        {
+            var year = Regional.Now.Year;
+            from = new DateOnly(year, 1, 1);
+            to = new DateOnly(year, 12, 31);
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private Task ApplyFiltersAsync() => LoadAsync(1);
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var id = ++requestId;
+        loading = true;
+        listError = null;
+
+        var query = new List<string> { $"page={pageNumber}" };
+        if (from is { } f) { query.Add($"from={Iso(f)}"); }
+        if (to is { } t) { query.Add($"to={Iso(t)}"); }
+        if (filterMetric.Length > 0) { query.Add($"metric={filterMetric}"); }
+        if (filterScope.Length > 0) { query.Add($"scopeType={filterScope}"); }
+        if (filterScope == SalesTargetScopes.User && filterUser.Length > 0) { query.Add($"scopeUserId={Uri.EscapeDataString(filterUser)}"); }
+
+        var result = await Api.GetAsync<CrmPage<SalesTargetDto>>($"{Url}?{string.Join('&', query)}");
+        if (id != requestId)
+        {
+            return;
+        }
+
+        loading = false;
+        if (result.IsSuccess)
+        {
+            page = result.Value;
+        }
+        else
+        {
+            listError = result.Error;
+        }
+    }
+
+    private static string ValueText(SalesTargetDto target) =>
+        target.Metric == SalesTargetMetrics.WonAmount && target.Currency is { } currency
+            ? CrmLabels.Amount(target.Value, currency)
+            : target.Value.ToString("N0", Regional.Numbers);
+
+    private void StartCreate()
+    {
+        form = new TargetForm { Currency = Regional.Currency };
+        ResetFormState();
+    }
+
+    private void StartEdit(SalesTargetDto target)
+    {
+        form = new TargetForm
+        {
+            Id = target.Id,
+            Version = target.Version,
+            Metric = target.Metric,
+            Scope = target.ScopeType,
+            UserId = target.ScopeUserId?.ToString() ?? string.Empty,
+            Currency = target.Currency ?? string.Empty,
+            PeriodStart = target.PeriodStart,
+            PeriodEnd = target.PeriodEnd,
+            Value = target.Value,
+            OriginalValue = target.Value,
+            Note = target.Note ?? string.Empty,
+        };
+        ResetFormState();
+    }
+
+    private void ResetFormState()
+    {
+        errors = null;
+        formMessage = null;
+        success = null;
+        pageNotice = null;
+        confirmDelete = false;
+    }
+
+    private void CancelForm()
+    {
+        form = null;
+        ResetFormState();
+    }
+
+    private void MetricChanged()
+    {
+        if (form is { Id: null })
+        {
+            form.Currency = form.Metric == SalesTargetMetrics.WonAmount ? Regional.Currency : string.Empty;
+        }
+    }
+
+    private void ScopeChanged()
+    {
+        if (form is { Scope: SalesTargetScopes.Tenant })
+        {
+            form.UserId = string.Empty;
+        }
+    }
+
+    private async Task FillPeriodAsync()
+    {
+        if (form is null)
+        {
+            return;
+        }
+
+        var day = fillDate ?? DateOnly.FromDateTime(Regional.Now.DateTime);
+        var (start, end) = SalesLabels.CalendarPeriod(fillKind, day);
+
+        // Mali yıl ayarı sunucudadır; dönemi oradan al, ulaşılamazsa takvim dönemi kalır.
+        if (Session.Can(SalesAccess.ReportsRead))
+        {
+            busy = true;
+            var result = await Api.GetAsync<SalesOverviewDto>($"/api/crm/sales/overview?kind={fillKind}&date={Iso(day)}");
+            busy = false;
+            if (result.IsSuccess && result.Value is { } overview)
+            {
+                (start, end) = (overview.PeriodStart, overview.PeriodEnd);
+            }
+        }
+
+        form.PeriodStart = start;
+        form.PeriodEnd = end;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (form is null || busy)
+        {
+            return;
+        }
+
+        busy = true;
+        formMessage = null;
+        var isAmount = form.Metric == SalesTargetMetrics.WonAmount;
+        var request = new SaveSalesTargetRequest(
+            form.Metric,
+            form.Scope,
+            form.Scope == SalesTargetScopes.User && Guid.TryParse(form.UserId, out var userId) ? userId : null,
+            isAmount ? form.Currency.Trim().ToUpperInvariant() : null,
+            form.PeriodStart ?? default,
+            form.PeriodEnd ?? default,
+            form.Value ?? 0m,
+            string.IsNullOrWhiteSpace(form.Note) ? null : form.Note.Trim(),
+            ValueEdited ? form.Reason.Trim() : null,
+            form.Version);
+
+        var result = form.Id is { } id
+            ? await Api.PutAsync<SalesTargetDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<SalesTargetDto>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            var created = form.Id is null;
+            form = null;
+            ResetFormState();
+            success = created ? "Hedef eklendi." : "Hedef güncellendi.";
+            await LoadAsync(created ? 1 : page?.Page ?? 1);
+            return;
+        }
+
+        if (result.Status == HttpStatusCode.Conflict)
+        {
+            // Başkası değiştirmiş: güncel liste yüklenir, form kapanır; kullanıcı güncel değerle yeniden düzenler.
+            form = null;
+            ResetFormState();
+            await LoadAsync(page?.Page ?? 1);
+            pageNotice = "Hedef başka biri tarafından değiştirildi; liste güncellendi. Düzenlemeyi güncel değerle yeniden açın.";
+            return;
+        }
+
+        errors = result.FieldErrors;
+        formMessage = result.FieldErrors.Count == 0 ? result.Error : null;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (form?.Id is not { } id || busy)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            ResetFormState();
+            success = "Hedef silindi.";
+            await LoadAsync(1);
+            return;
+        }
+
+        confirmDelete = false;
+        formMessage = result.Error;
+    }
+
+    private sealed class TargetForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Metric { get; set; } = SalesTargetMetrics.WonAmount;
+
+        public string Scope { get; set; } = SalesTargetScopes.Tenant;
+
+        public string UserId { get; set; } = string.Empty;
+
+        public string Currency { get; set; } = string.Empty;
+
+        public DateOnly? PeriodStart { get; set; }
+
+        public DateOnly? PeriodEnd { get; set; }
+
+        public decimal? Value { get; set; }
+
+        public decimal? OriginalValue { get; init; }
+
+        public string Note { get; set; } = string.Empty;
+
+        public string Reason { get; set; } = string.Empty;
+    }
+}

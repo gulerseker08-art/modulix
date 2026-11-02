@@ -11,6 +11,7 @@ using Modulix.Modules.Crm.Pricing;
 using Modulix.Core.Contracts.Sales;
 using Modulix.Modules.Crm.Quotes;
 using Modulix.Modules.Crm.Records;
+using Modulix.Modules.Crm.Reporting;
 
 namespace Modulix.Modules.Crm;
 
@@ -102,6 +103,17 @@ public sealed class CrmModule : IModule
         public const string QuoteRulesManage = "crm.quote-rules.manage";
         public const string QuotesExport = "crm.quotes.export";
         public const string QuoteCostsRead = "crm.quote-costs.read";
+
+        // Satış raporlama ve tahmin (ADR-0026). Rapor görüntüleme, hedef yönetimi ve tahminin her adımı ayrı izindir; hiçbiri veri erişimi kazandırmaz:
+        // raporlar kayıt boru hattından okunur, kullanıcının fırsat izni, veri kapsamı ve tutar iznini aşan hiçbir kayıt toplama girmez.
+        public const string SalesReportsRead = "crm.sales-reports.read";
+        public const string SalesTargetsRead = "crm.sales-targets.read";
+        public const string SalesTargetsManage = "crm.sales-targets.manage";
+        public const string ForecastsRead = "crm.forecasts.read";
+        public const string ForecastsWrite = "crm.forecasts.write";
+        public const string ForecastsSubmit = "crm.forecasts.submit";
+        public const string ForecastsLock = "crm.forecasts.lock";
+        public const string ForecastsReopen = "crm.forecasts.reopen";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -136,6 +148,8 @@ public sealed class CrmModule : IModule
         public const string QuoteLine = "crm.quote-line";
         public const string QuoteApprovalRule = "crm.quote-approval-rule";
         public const string QuoteApprovalDelegation = "crm.quote-approval-delegation";
+        public const string SalesTarget = "crm.sales-target";
+        public const string ForecastSubmission = "crm.forecast-submission";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -264,6 +278,14 @@ public sealed class CrmModule : IModule
         new(Permissions.QuoteRulesManage, "Teklif iç onay kurallarını (indirim/tutar eşiği, onaylayan) tanımlar ve değiştirir", "Teklifler"),
         new(Permissions.QuotesExport, "Teklif listesini CSV olarak dışa aktarır (maliyet ve iç not hariç)", "Teklifler"),
         new(Permissions.QuoteCostsRead, "Teklif kalemlerinin maliyetini görür ve düzenler", "Teklif maliyeti"),
+        new(Permissions.SalesReportsRead, "Satış genel görünümünü ve satış raporlarını görüntüler (yalnızca yetkili olduğu fırsatlar toplanır)", "Satış raporları"),
+        new(Permissions.SalesTargetsRead, "Satış hedeflerini görüntüler", "Satış hedefleri"),
+        new(Permissions.SalesTargetsManage, "Satış hedefi ekler, değiştirir (sürümlü) ve siler", "Satış hedefleri"),
+        new(Permissions.ForecastsRead, "Satış tahminlerini ve geçmiş sürümlerini görüntüler", "Satış tahmini"),
+        new(Permissions.ForecastsWrite, "Tahmin taslağı açar, yeniler, kategori/tutar/olasılık düzeltmesi yapar", "Satış tahmini"),
+        new(Permissions.ForecastsSubmit, "Tahmini sunar ve taslağa geri çeker", "Satış tahmini"),
+        new(Permissions.ForecastsLock, "Sunulan tahmini kilitler", "Satış tahmini"),
+        new(Permissions.ForecastsReopen, "Kilitli tahmini gerekçeyle yeniden açar (yeni sürüm üretir)", "Satış tahmini"),
     ];
 
     /// <summary>Devre dışı bırakılan kişinin firmaları, açık fırsatları ve açık aktiviteleri devredilir.</summary>
@@ -295,6 +317,21 @@ public sealed class CrmModule : IModule
         {
             // Y8: temsilci yalnızca sorumlusu olduğu kayıtları görür; ekip lideri için kapsam rolde genişletilir.
             Scope = RecordScope.Own,
+        },
+        // Satış tahmini ve hedefleri (ADR-0026): tüm kayıtları görür; tahminin her adımı ayrı izindir, mevcut rollere eklenmez.
+        new(
+            "crm.sales-manager",
+            "Satış yöneticisi",
+            "Tüm fırsatları, satış raporlarını, hedefleri ve sürümlü satış tahminini yönetir.",
+            [
+                Permissions.CompaniesRead, Permissions.ContactsRead,
+                Permissions.OpportunitiesRead, Permissions.OpportunityAmountsRead, Permissions.QuotesRead,
+                Permissions.ActivitiesRead, Permissions.ActivitiesManageCalendar,
+                Permissions.SalesReportsRead, Permissions.SalesTargetsRead, Permissions.SalesTargetsManage,
+                Permissions.ForecastsRead, Permissions.ForecastsWrite, Permissions.ForecastsSubmit, Permissions.ForecastsLock, Permissions.ForecastsReopen,
+            ])
+        {
+            Scope = RecordScope.All,
         },
         // Lead dağıtımı: atama bekleyen havuzu görür, Lead açar ve atar; nitelendirme/dönüşüm satış tarafındadır.
         new(
@@ -546,6 +583,28 @@ public sealed class CrmModule : IModule
             Description = "Onay bekleyen teklif bu kadar saat karar almadan beklerse, o adımın adlı onaylayanlarına (ve vekillerine) bir kez e-posta hatırlatması gönderilir. Adlı onaylayanı olmayan adımda gönderilmez. 0 kapalıdır.",
             Pattern = @"^[0-9]{1,3}$",
             PatternMessage = "0-999 arası tam sayı girin.",
+            MaxLength = 3,
+        },
+        // Satış raporlama ve tahmin (ADR-0026). Değişiklik yalnızca sonraki hesapları etkiler; kilitli tahmin ve kaydedilmiş kurlar yeniden yorumlanmaz.
+        new(SettingKeys.FiscalYearStartMonth, "Mali yıl başlangıç ayı", "CRM Raporlama", SettingType.Text, "1")
+        {
+            Description = "Çeyrek ve yıl dönemleri bu aya göre kurulur (1 = Ocak). Ay dönemi her zaman takvim ayıdır. Tanımlı hedefler ve kilitli tahminler tarihleriyle saklandığından geçmiş değişmez.",
+            Pattern = @"^([1-9]|1[0-2])$",
+            PatternMessage = "1-12 arası ay numarası girin.",
+            MaxLength = 2,
+        },
+        new(SettingKeys.ForecastCommitMinProbability, "Tahmin: Taahhüt için en düşük olasılık (%)", "CRM Raporlama", SettingType.Text, "80")
+        {
+            Description = "Olasılığı bu değer ve üstü olan açık fırsat tahminde varsayılan olarak Taahhüt kategorisine girer. Yönetici kategoriyi gerekçeyle değiştirebilir.",
+            Pattern = @"^(100|[1-9][0-9]?)$",
+            PatternMessage = "1-100 arası tam sayı girin.",
+            MaxLength = 3,
+        },
+        new(SettingKeys.ForecastBestCaseMinProbability, "Tahmin: En İyi Durum için en düşük olasılık (%)", "CRM Raporlama", SettingType.Text, "50")
+        {
+            Description = "Olasılığı bu değer ve üstü (Taahhüt eşiğinin altında) olan açık fırsat varsayılan olarak En İyi Durum kategorisine girer; altı Pipeline, 0 olanlar Hariç'tir.",
+            Pattern = @"^(100|[1-9][0-9]?)$",
+            PatternMessage = "1-100 arası tam sayı girin.",
             MaxLength = 3,
         },
         new(SettingKeys.QuoteSellerDetails, "Teklif belgesi: satıcı bilgileri", "CRM Teklif", SettingType.Text)
@@ -803,6 +862,26 @@ public sealed class CrmModule : IModule
         {
             References = new Dictionary<string, string> { ["quoteId"] = Entities.Quote, ["productId"] = Entities.Product },
         },
+        new(Entities.SalesTarget, "Satış hedefi (CRM)", Permissions.SalesTargetsRead, new Dictionary<string, string>
+        {
+            ["metric"] = "Metrik", ["scopeType"] = "Kapsam", ["scopeUserId"] = "Kullanıcı", ["currency"] = "Para birimi", ["periodStart"] = "Dönem başı",
+            ["periodEnd"] = "Dönem sonu", ["value"] = "Hedef", ["revisionNo"] = "Sürüm", ["note"] = "Not",
+        }, "metric")
+        {
+            UserFields = ["scopeUserId"],
+        },
+        new(Entities.ForecastSubmission, "Satış tahmini (CRM)", Permissions.ForecastsRead, new Dictionary<string, string>
+        {
+            ["periodKind"] = "Dönem türü", ["periodStart"] = "Dönem başı", ["periodEnd"] = "Dönem sonu", ["scopeType"] = "Kapsam", ["scopeUserId"] = "Kullanıcı",
+            ["reportingCurrency"] = "Raporlama para birimi", ["versionNo"] = "Sürüm", ["status"] = "Durum", ["previousSubmissionId"] = "Önceki sürüm",
+            ["note"] = "Not", ["submittedAt"] = "Sunulma", ["submittedBy"] = "Sunan", ["lockedAt"] = "Kilitlenme", ["lockedBy"] = "Kilitleyen",
+            ["reopenReason"] = "Yeniden açma gerekçesi", ["returnReason"] = "Geri çekme gerekçesi", ["realizedAtLock"] = "Kilit anındaki gerçekleşen", ["realizedPartial"] = "Gerçekleşen kısmi",
+            ["refreshedAt"] = "Yenilenme", ["changedAt"] = "Son değişiklik",
+        }, "periodStart")
+        {
+            UserFields = ["scopeUserId", "submittedBy", "lockedBy"],
+            References = new Dictionary<string, string> { ["previousSubmissionId"] = Entities.ForecastSubmission },
+        },
         new(Entities.LeadForm, "Lead formu (CRM)", Permissions.LeadFormsManage, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["formKey"] = "Form kimliği", ["isActive"] = "Aktif", ["defaultOwnerId"] = "Varsayılan sorumlu",
@@ -920,6 +999,9 @@ public sealed class CrmModule : IModule
         public const string QuoteExpiryReminderDays = "crm.quote.expiry-reminder-days";
         public const string QuoteSyncOpportunityAmount = "crm.quote.sync-opportunity-amount";
         public const string QuoteApprovalReminderHours = "crm.quote.approval-reminder-hours";
+        public const string FiscalYearStartMonth = "crm.reporting.fiscal-year-start-month";
+        public const string ForecastCommitMinProbability = "crm.forecast.commit-min-probability";
+        public const string ForecastBestCaseMinProbability = "crm.forecast.best-case-min-probability";
     }
 
     public void ConfigureServices(IServiceCollection services)
@@ -963,6 +1045,13 @@ public sealed class CrmModule : IModule
         services.AddScoped<IQuoteCustomerPortal, QuoteCustomerPortal>();
         services.AddScoped<QuoteCustomerAnchor>();
         services.AddScoped<IPriceCalculator, PriceCalculator>();
+        services.AddScoped<IRecordStore, SalesTargetRecordStore>();
+        services.AddScoped<IRecordStore, ForecastSubmissionRecordStore>();
+        services.AddScoped<ForecastWorkflowGate>();
+        services.AddScoped<SalesOpportunityReader>();
+        services.AddScoped<SalesPlanningData>();
+        services.AddScoped<ISalesOverview, SalesOverview>();
+        services.AddScoped<IForecastWorkflow, ForecastWorkflow>();
         services.AddScoped<IRecordStore, OpportunityContactRecordStore>();
         services.AddScoped<IRecordStore, OpportunityCompetitorRecordStore>();
         services.AddScoped<OpportunityWorkflowGate>();
