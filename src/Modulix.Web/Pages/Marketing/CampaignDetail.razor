@@ -104,6 +104,21 @@
                             <FieldError Field="utmCampaign" Errors="generalErrors" />
                         </div>
                         <p class="span-12 small text-muted mb-0">Kaynak/UTM değerleri küçük harfe çevrilir; yanıttan açılan lead'e yazılır.</p>
+                        <div class="span-4">
+                            <label class="form-label" for="g-budget">Bütçe</label>
+                            <input id="g-budget" class="form-control" type="number" min="0" step="0.01" placeholder="Yok" @bind="budget" />
+                            <FieldError Field="budget" Errors="generalErrors" />
+                        </div>
+                        <div class="span-4">
+                            <label class="form-label" for="g-cost">Gerçekleşen maliyet</label>
+                            <input id="g-cost" class="form-control" type="number" min="0" step="0.01" placeholder="Yok" @bind="actualCost" />
+                            <FieldError Field="actualCost" Errors="generalErrors" />
+                        </div>
+                        <div class="span-4">
+                            <label class="form-label" for="g-currency">Para birimi</label>
+                            <input id="g-currency" class="form-control" maxlength="3" @bind="costCurrency" />
+                            <FieldError Field="costCurrency" Errors="generalErrors" />
+                        </div>
                         <div class="span-12">
                             <label class="form-label" for="g-desc">Açıklama</label>
                             <textarea id="g-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
@@ -353,6 +368,9 @@
     private string utmSource = string.Empty;
     private string utmMedium = string.Empty;
     private string utmCampaign = string.Empty;
+    private decimal? budget;
+    private decimal? actualCost;
+    private string costCurrency = "TRY";
     private string rule = "PrimaryContact";
     private string role = string.Empty;
     private int? maxPerTarget;
@@ -411,6 +429,9 @@
         utmSource = value.UtmSource ?? string.Empty;
         utmMedium = value.UtmMedium ?? string.Empty;
         utmCampaign = value.UtmCampaign ?? string.Empty;
+        budget = value.Budget;
+        actualCost = value.ActualCost;
+        costCurrency = value.CostCurrency ?? "TRY";
         rule = value.RecipientRule;
         role = value.RecipientRole ?? string.Empty;
         maxPerTarget = value.MaxPerTarget;
@@ -449,7 +470,7 @@
             campaign!.Version, campaign.Code, name.Trim(), Blank(description), Blank(purpose), campaign.Target, campaign.Channel,
             campaign.Target == "Company" ? rule : campaign.RecipientRule, campaign.Target == "Company" && rule == "Role" ? Blank(role) : null,
             maxPerTarget, startsOn is { } s ? DateOnly.FromDateTime(s) : null, endsOn is { } e ? DateOnly.FromDateTime(e) : null, campaign.OwnerId,
-            Blank(utmSource), Blank(utmMedium), Blank(utmCampaign)));
+            Blank(utmSource), Blank(utmMedium), Blank(utmCampaign), budget, actualCost, Blank(costCurrency)));
         busy = false;
         if (result.IsSuccess) { Apply(result.Value!); preview = null; Report("Kampanya kaydedildi.", false); }
         else { generalErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }

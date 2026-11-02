@@ -23,7 +23,10 @@ public sealed record CampaignDto(
     Guid? UpdatedBy,
     string? UtmSource = null,
     string? UtmMedium = null,
-    string? UtmCampaign = null);
+    string? UtmCampaign = null,
+    decimal? Budget = null,
+    decimal? ActualCost = null,
+    string? CostCurrency = null);
 
 /// <summary>Kod, hedef türü ve kanal oluşturulduktan sonra değiştirilemez (PUT için aynı değerler gönderilir).</summary>
 public sealed record SaveCampaignRequest(
@@ -42,7 +45,10 @@ public sealed record SaveCampaignRequest(
     Guid? OwnerId = null,
     string? UtmSource = null,
     string? UtmMedium = null,
-    string? UtmCampaign = null);
+    string? UtmCampaign = null,
+    decimal? Budget = null,
+    decimal? ActualCost = null,
+    string? CostCurrency = null);
 
 /// <summary>Hedef kitle girdisi: <c>SegmentId</c> ya da <c>TargetId</c>'den tam biri (hedef: taraf, ortak kişi ya da lead kimliği). Mod: Include, Exclude.</summary>
 public sealed record CampaignAudienceEntryDto(Guid Id, long Version, Guid CampaignId, string Mode, Guid? SegmentId, Guid? TargetId, string? Reason, Guid? AddedBy);

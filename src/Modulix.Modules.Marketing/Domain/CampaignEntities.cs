@@ -70,6 +70,13 @@ public sealed class Campaign : MarketingEntity, IOwnedEntity
 
     public string? UtmCampaign { get; internal set; }
 
+    /// <summary>Maliyet (ADR-0025, dilim 8): planlanan bütçe ve gerçekleşen maliyet, <see cref="CostCurrency"/> para biriminde. Kur dönüşümü yoktur; farklı para birimleri toplanmaz.</summary>
+    public decimal? Budget { get; internal set; }
+
+    public decimal? ActualCost { get; internal set; }
+
+    public string CostCurrency { get; internal set; } = "TRY";
+
     public Guid? OwnerId { get; internal set; }
 
     public string Status { get; internal set; } = CampaignStatuses.Draft;

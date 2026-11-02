@@ -45,6 +45,9 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
         Field.Text<Campaign>("utmSource", Campaign.UtmMaxLength, c => c.UtmSource, (c, v) => c.UtmSource = v),
         Field.Text<Campaign>("utmMedium", Campaign.UtmMaxLength, c => c.UtmMedium, (c, v) => c.UtmMedium = v),
         Field.Text<Campaign>("utmCampaign", Campaign.UtmMaxLength, c => c.UtmCampaign, (c, v) => c.UtmCampaign = v),
+        Field.Money<Campaign>("budget", c => c.Budget, (c, v) => c.Budget = v),
+        Field.Money<Campaign>("actualCost", c => c.ActualCost, (c, v) => c.ActualCost = v),
+        Field.Text<Campaign>("costCurrency", 3, c => c.CostCurrency, (c, v) => c.CostCurrency = (v ?? "TRY").ToUpperInvariant()),
         Field.Owner<Campaign>("ownerId", c => c.OwnerId, (c, v) => c.OwnerId = v),
         Field.Choice<Campaign>("status", CampaignStatuses.All, c => c.Status, (c, v) => c.Status = v).AsSystem(),
         Field.Id<Campaign>("createdBy", c => c.CreatedBy, (c, v) => c.CreatedBy = v).AsSystem(),
@@ -91,6 +94,11 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
         else
         {
             entity.RecipientRole = null;
+        }
+
+        if (!CurrencyPattern().IsMatch(entity.CostCurrency))
+        {
+            errors.Add(new RecordFieldError("costCurrency", "Para birimi 3 harfli kod olmalıdır (ör. TRY)."));
         }
 
         if (entity.MaxPerTarget is < 1)
@@ -150,6 +158,9 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
 
         return text;
     }
+
+    [GeneratedRegex("^[A-Z]{3}$")]
+    private static partial Regex CurrencyPattern();
 
     [GeneratedRegex("^[a-z0-9][a-z0-9-]{1,39}$")]
     private static partial Regex CodePattern();
