@@ -127,3 +127,55 @@ internal sealed class AudienceSnapshotConfiguration : IEntityTypeConfiguration<A
             .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class CampaignContentConfiguration : IEntityTypeConfiguration<CampaignContent>
+{
+    public void Configure(EntityTypeBuilder<CampaignContent> builder)
+    {
+        MarketingTables.ConfigureCommon(builder, "CampaignContents");
+        builder.Property(c => c.Subject).HasMaxLength(CampaignContent.SubjectMaxLength);
+        builder.Property(c => c.Body).IsRequired();
+        builder.HasIndex(c => new { c.TenantId, c.CampaignId, c.VersionNo }).IsUnique().HasDatabaseName("UX_CampaignContents_No");
+        builder.HasOne<Campaign>().WithMany().HasForeignKey(c => new { c.TenantId, c.CampaignId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class CampaignRunConfiguration : IEntityTypeConfiguration<CampaignRun>
+{
+    public void Configure(EntityTypeBuilder<CampaignRun> builder)
+    {
+        MarketingTables.ConfigureCommon(builder, "CampaignRuns");
+        builder.Property(r => r.Status).HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Note).HasMaxLength(CampaignRun.NoteMaxLength);
+        builder.HasIndex(r => new { r.TenantId, r.CampaignId, r.Status });
+        builder.HasIndex(r => new { r.TenantId, r.Status, r.ScheduledAt });
+        builder.HasOne<Campaign>().WithMany().HasForeignKey(r => new { r.TenantId, r.CampaignId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<AudienceSnapshot>().WithMany().HasForeignKey(r => new { r.TenantId, r.SnapshotId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CampaignContent>().WithMany().HasForeignKey(r => new { r.TenantId, r.ContentId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class CampaignDeliveryConfiguration : IEntityTypeConfiguration<CampaignDelivery>
+{
+    public void Configure(EntityTypeBuilder<CampaignDelivery> builder)
+    {
+        builder.ToTable("CampaignDeliveries", MarketingTables.Schema);
+        builder.HasKey(d => d.Id);
+        builder.Property(d => d.Id).ValueGeneratedNever();
+        builder.Property(d => d.TenantId).IsRequired();
+        builder.Property(d => d.IdempotencyKey).HasMaxLength(CampaignDelivery.KeyLength).IsRequired();
+        builder.Property(d => d.Status).HasMaxLength(20).IsRequired();
+        builder.Property(d => d.Code).HasMaxLength(CampaignDelivery.CodeMaxLength);
+        builder.Property(d => d.ProviderMessageId).HasMaxLength(CampaignDelivery.ProviderIdMaxLength);
+
+        // Aynı çalıştırmada aynı alıcıya (anahtar) ikinci gönderim satırı açılamaz: tekrar başlatma ve işçi yeniden başlaması çift satır üretmez.
+        builder.HasIndex(d => new { d.TenantId, d.RunId, d.IdempotencyKey }).IsUnique().HasDatabaseName("UX_CampaignDeliveries_Key");
+        builder.HasIndex(d => new { d.TenantId, d.RunId, d.Status });
+        builder.HasOne<CampaignRun>().WithMany().HasForeignKey(d => new { d.TenantId, d.RunId })
+            .HasPrincipalKey(r => new { r.TenantId, r.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}

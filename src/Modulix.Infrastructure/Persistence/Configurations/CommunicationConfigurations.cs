@@ -66,3 +66,22 @@ internal sealed class CommunicationSuppressionConfiguration : IEntityTypeConfigu
         builder.HasAlternateKey(s => new { s.TenantId, s.Id });
     }
 }
+
+internal sealed class FrequencyWindowConfiguration : IEntityTypeConfiguration<FrequencyWindow>
+{
+    public void Configure(EntityTypeBuilder<FrequencyWindow> builder)
+    {
+        builder.ToTable("FrequencyWindows", DatabaseSchemas.Core);
+        builder.HasKey(w => w.Id);
+        builder.Property(w => w.Id).ValueGeneratedNever();
+        builder.Property(w => w.TenantId).IsRequired();
+        builder.Property(w => w.Channel).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(w => w.Address).HasMaxLength(FrequencyWindow.AddressMaxLength).IsRequired();
+        builder.Property(w => w.Day).IsRequired();
+        builder.Property(w => w.Count).IsRequired();
+
+        // Atomik rezervasyonun dayanağı: tenant, kanal, adres ve gün başına tek satır.
+        builder.HasIndex(w => new { w.TenantId, w.Channel, w.Address, w.Day }).IsUnique();
+        builder.ToTable(t => t.HasCheckConstraint("CK_FrequencyWindows_Count", "[Count] >= 0"));
+    }
+}

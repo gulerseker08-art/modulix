@@ -72,6 +72,35 @@ public static class MarketingLabels
         ["suppressed:manual"] = "Engelli: elle engellenmiş",
     };
 
+    public static readonly (string Key, string Label)[] RunStatuses =
+    [
+        ("Draft", "Taslak"), ("PendingApproval", "Onay bekliyor"), ("Approved", "Onaylandı"), ("Running", "Çalışıyor"), ("Paused", "Duraklatıldı"),
+        ("Completed", "Tamamlandı"), ("Cancelled", "İptal edildi"),
+    ];
+
+    public static string RunBadge(string status) => status switch
+    {
+        "Running" or "Completed" => "won", "Cancelled" => "cancelled", "Paused" => "onhold", "PendingApproval" or "Approved" => "negotiation", _ => "lead",
+    };
+
+    /// <summary>Teslimat durumu; "Kabul edildi" sağlayıcının iletiyi aldığı anlamına gelir, teslim edildi demek değildir.</summary>
+    public static string DeliveryStatus(string status) => status switch
+    {
+        "Queued" => "Sırada", "Sending" => "İşleniyor", "Accepted" => "Sağlayıcıya kabul edildi", "Failed" => "Başarısız", "Skipped" => "Atlandı",
+        "Unknown" => "Sonuç belirsiz", "Cancelled" => "İptal edildi", _ => status,
+    };
+
+    private static readonly Dictionary<string, string> DeliveryCodes = new()
+    {
+        ["address-gone"] = "Adres artık yok (iletişim noktası pasif ya da silinmiş)", ["frequency-limit"] = "Günlük ileti sınırı doldu", ["run-cancelled"] = "Çalıştırma iptal edildi",
+        ["address-rejected"] = "Sağlayıcı adresi reddetti", ["rate-limited"] = "Sağlayıcı hız sınırı (geçici hata, deneme hakkı bitti)",
+        ["timeout-after-accept"] = "Kabulden sonra yanıt kayboldu; teslim durumu belirsiz", ["stale-sending"] = "İşlem yarıda kaldı; gönderilip gönderilmediği belirsiz",
+        ["timeout"] = "Sağlayıcı yanıt vermedi; sonuç belirsiz", ["provider-exception"] = "Sağlayıcı hatası; sonuç belirsiz",
+    };
+
+    /// <summary>Teslimat neden kodu: önce teslimata özgü, yoksa hedef kitle/izin nedenleri.</summary>
+    public static string DeliveryReason(string code) => DeliveryCodes.TryGetValue(code, out var text) ? text : Reason(code);
+
     /// <summary>Hedef kitle neden kodunun Türkçe açıklaması; bilinmeyen kod olduğu gibi gösterilir.</summary>
     public static string Reason(string code) => Reasons.GetValueOrDefault(code, code);
 

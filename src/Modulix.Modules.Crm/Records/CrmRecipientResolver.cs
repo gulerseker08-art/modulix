@@ -12,7 +12,7 @@ namespace Modulix.Modules.Crm.Records;
 /// Kural eşleşmezse rastgele kişiye gidilmez; nedeni (<see cref="RecipientCodes"/>) hedefle birlikte döner. İletişim noktası pazarlama izni değildir:
 /// izin ve engel kararı çekirdekte, pazarlama modülündedir. SMS ve WhatsApp telefon noktalarını kullanır.
 /// </summary>
-internal sealed class CrmRecipientResolver(IModuleData data, TimeProvider time) : IRecipientResolver
+internal sealed class CrmRecipientResolver(IModuleData data, TimeProvider time) : IRecipientResolver, IAddressLookup
 {
     private const int ChunkSize = 1000;
 
@@ -37,6 +37,90 @@ internal sealed class CrmRecipientResolver(IModuleData data, TimeProvider time) 
         }
 
         return new RecipientResolution(contacts, unresolved);
+    }
+
+
+    /// <summary>
+    /// Gönderimden hemen önce adresi yeniden çözer (ADR-0025, dilim 5): iletişim noktası pasifleşmiş/silinmiş, kişi firmadan ayrılmış (ilişki bitmiş) ya da lead'in adresi
+    /// boşalmışsa sonuçta yer almaz; çağıran o alıcıyı atlar. Anlık görüntüdeki eski kimlikle yeni bir adrese gönderilmez.
+    /// </summary>
+    public async Task<IReadOnlyList<ResolvedAddress>> LookupAsync(
+        SegmentTarget target, CommunicationChannel channel, IReadOnlyCollection<AddressLookup> items, CancellationToken cancellationToken)
+    {
+        var results = new List<ResolvedAddress>();
+        foreach (var chunk in items.Chunk(ChunkSize))
+        {
+            results.AddRange(target switch
+            {
+                SegmentTarget.Lead => await LookupLeadsAsync(chunk, channel, cancellationToken),
+                SegmentTarget.Person => await LookupPeopleAsync(chunk, channel, cancellationToken),
+                _ => await LookupCompaniesAsync(chunk, channel, cancellationToken),
+            });
+        }
+
+        return results;
+    }
+
+    private async Task<List<ResolvedAddress>> LookupLeadsAsync(AddressLookup[] items, CommunicationChannel channel, CancellationToken cancellationToken)
+    {
+        var ids = items.Select(i => i.TargetId).ToList();
+        var leads = await data.Set<Lead>().AsNoTracking().Where(l => ids.Contains(l.Id)).Select(l => new { l.Id, l.Email, l.Phone }).ToListAsync(cancellationToken);
+        return [.. leads
+            .Select(l => new ResolvedAddress(l.Id, null, channel == CommunicationChannel.Email ? l.Email ?? string.Empty : l.Phone ?? string.Empty))
+            .Where(a => a.Address.Length > 0)];
+    }
+
+    private async Task<List<ResolvedAddress>> LookupPeopleAsync(AddressLookup[] items, CommunicationChannel channel, CancellationToken cancellationToken)
+    {
+        var pointIds = items.Where(i => i.ContactPointId is not null).Select(i => i.ContactPointId).ToList();
+        var personIds = items.Select(i => i.TargetId).ToList();
+        var chName = PointChannel(channel);
+        var rows = await (
+            from point in data.Set<ContactPoint>().AsNoTracking()
+            join contact in data.Set<Contact>().AsNoTracking() on point.ContactId equals contact.Id
+            where pointIds.Contains(point.Id) && point.IsActive && point.Channel == chName && personIds.Contains(contact.PersonId)
+            select new { PointId = point.Id, contact.PersonId, point.Value }).ToListAsync(cancellationToken);
+        return [.. rows.Select(r => new ResolvedAddress(r.PersonId, r.PointId, r.Value))];
+    }
+
+    private async Task<List<ResolvedAddress>> LookupCompaniesAsync(AddressLookup[] items, CommunicationChannel channel, CancellationToken cancellationToken)
+    {
+        var chName = PointChannel(channel);
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        var pointIds = items.Where(i => i.ContactPointId is not null).Select(i => i.ContactPointId).ToList();
+        var partyIds = items.Select(i => i.TargetId).ToList();
+        var companies = await data.Set<Company>().AsNoTracking().Where(c => partyIds.Contains(c.PartyId)).Select(c => new { c.Id, c.PartyId }).ToListAsync(cancellationToken);
+        var companyIds = companies.Select(c => c.Id).ToList();
+        var points = await data.Set<ContactPoint>().AsNoTracking()
+            .Where(p => pointIds.Contains(p.Id) && p.IsActive && p.Channel == chName)
+            .Select(p => new { p.Id, p.CompanyId, p.ContactId, p.Value })
+            .ToListAsync(cancellationToken);
+        var relations = await data.Set<CompanyContact>().AsNoTracking()
+            .Where(r => companyIds.Contains(r.CompanyId) && r.IsActive && (r.EndDate == null || r.EndDate >= today))
+            .Select(r => new { r.CompanyId, r.ContactId })
+            .ToListAsync(cancellationToken);
+
+        var results = new List<ResolvedAddress>();
+        foreach (var item in items)
+        {
+            var company = companies.FirstOrDefault(c => c.PartyId == item.TargetId);
+            var point = points.FirstOrDefault(p => p.Id == item.ContactPointId);
+            if (company is null || point is null)
+            {
+                continue;
+            }
+
+            // Firma noktası firmaya ait olmalı; kişi noktasının kişisi bu firmada hâlâ aktif ilişkide olmalı.
+            var valid = point.ContactId is null
+                ? point.CompanyId == company.Id
+                : relations.Any(r => r.CompanyId == company.Id && r.ContactId == point.ContactId);
+            if (valid)
+            {
+                results.Add(new ResolvedAddress(item.TargetId, point.Id, point.Value));
+            }
+        }
+
+        return results;
     }
 
     /// <summary>CRM iletişim noktası kanalı: e-posta "Email", diğer kanallar telefon numarası kullanır.</summary>

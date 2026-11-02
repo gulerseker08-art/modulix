@@ -24,6 +24,8 @@ internal static class CampaignEndpoints
         ResourceEndpoints.MapResource<AudienceSnapshotDto, SaveAudienceSnapshotRequest>(group, Prefix, "audience-snapshots", MarketingModule.Entities.AudienceSnapshot,
             MarketingModule.Permissions.CampaignsRead, MarketingModule.Permissions.CampaignsAudience);
 
+        RunEndpoints.MapRunEndpoints(group);
+
         var campaigns = group.MapGroup("/campaigns");
         campaigns.MapPost("/{id:guid}/audience/preview", async (Guid id, ICampaignAudience audience, CancellationToken ct) =>
         {

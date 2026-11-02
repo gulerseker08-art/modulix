@@ -298,7 +298,7 @@ internal sealed class CampaignAudienceService(
         x = row.Code,
     };
 
-    private static List<AudienceRow> Unpack(string? json)
+    internal static List<AudienceRow> Unpack(string? json)
     {
         var rows = new List<AudienceRow>();
         if (string.IsNullOrEmpty(json) || JsonNode.Parse(json) is not JsonArray array)
