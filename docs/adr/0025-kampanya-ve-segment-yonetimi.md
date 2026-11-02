@@ -98,5 +98,14 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 |---|---|
 | 0 — Analiz ve ADR | Yapıldı (bu belge) |
 | 1 — Çekirdek iletişim tercihi ve engel (arka uç, API, denetim, RLS, 9 entegrasyon + 43 birim testi) | Yapıldı; ekran yok (dilim 3'te segment ekranlarıyla) |
-| 2 — Pazarlama modülü, segment motoru (arka uç) | Planlı |
+| 2 — Pazarlama modülü, segment motoru (arka uç) | Yapıldı; ayrıntı aşağıda |
 | 3–8 | Planlı |
+
+### Dilim 2 — uygulama notları (sapmalar ve sınırlar)
+
+- **Yapılan**: `marketing` modülü (`Segment`, `SegmentVersion`, `SegmentMember`; migration `MarketingSegments`, RLS, şema izni), koşul ağacı (`SegmentConditions`: ayrıştırma, derinlik ≤4, koşul ≤25, tip/operatör/değer doğrulaması), motor (`SegmentEngine`: kimlik kümeleri üzerinde kesişim/birleşim, `(koşul ∪ dahil) ∖ hariç`, 30 sn süre sınırı), `ISegmentFieldSource` sözleşmesi ve CRM kaynağı (firma 11, kişi 3, lead 7 alan), `ITenantClock` (gün sınırları tenant saat diliminde), yayım/yenile/arşiv/geri al/kopya eylemleri, `/api/marketing` uç noktaları, dört izin ve üç rol şablonu.
+- **SegmentComputation tablosu yapılmadı**: hesaplama geçmişi yerine segmentte yalnızca son hesaplama özeti (zaman, sayı, süre, hata) tutulur. Hesaplama geçmişi ve üye değişimi (eklenen/çıkan) bu yüzden yoktur (K6).
+- **Yetki**: alanı görme, alanın ait olduğu kaydı okuma izniyle (`ReadEntityKey`) ve modülün tenant için açık olmasıyla belirlenir; olmayan alan sunulmaz, nedeni `Unavailable` listesinde açıklanır, o alanla önizleme/yayım reddedilir. Sayılar çağıranın veri kapsamıyla hesaplanır. `marketing.recipients.read` ortak firma/kişi kaydını okutur; CRM okuma izni olan kişi zaten okuyabildiği için satırlar ona da görünür. Statik üyeler segmentin sorumlusunun kapsamıyla görünür, üyelerin her birinin kapsamıyla süzülmez.
+- **Bilerek yok**: CRM'de bulunmayan alanlar (firma büyüklüğü, bölge, ürün sahipliği), son aktivite alanı, sözleşme bitişi (`Contracts` kaynağı dilim 2b), segmentin başka segmente başvurusu, zamanlanmış otomatik yenileme (sistem yetki bağlamı kararı bekliyor), statik segmente toplu içe aktarma/CSV, üye dışa aktarma, lead satırlarında ad (yalnızca kimlik), ekranlar (dilim 3).
+- **Davranış notları**: metin karşılaştırmaları veritabanı harmanına (büyük/küçük harf duyarsız) uyar; "X olmayan" (`ne`) boş değeri de kapsar; yayımlanmış segment silinmez, arşivlenir; hedef türü, tür ve kod değişmez; yayımlanmış sürüm değişmez ve silinmez; dahil/hariç istisna aynı hedef için tekildir (hariç, dahilin önüne geçer).
+- **Test**: 36 birim (koşul ağacı), 10 birim (CRM ifade ağacı: NULL, harf, gün sınırları), 9 entegrasyon (AND/OR/NULL/ilişki, sürüm değişmezliği, statik/istisna, doğrulama, yaşam döngüsü, tenant izolasyonu, alan yetkisi/kapalı modül, veri kapsamı, eylem izinleri). Performans ölçümü (100.000 sentetik kişi) yapılmadı; dilim 8.

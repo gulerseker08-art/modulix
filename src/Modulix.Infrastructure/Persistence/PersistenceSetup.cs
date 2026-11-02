@@ -117,6 +117,7 @@ public static class PersistenceSetup
         // Denetim kaydı okuma (Y5).
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<ITenantSettings, TenantSettings>();
+        services.AddScoped<ITenantClock, TenantClock>();
         services.AddScoped<ITenantLogo, TenantLogoStore>();
         services.AddScoped<TenantDisplayNames>();
         return services;

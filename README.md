@@ -582,6 +582,17 @@ Modül anahtarı `support`, şema `support`; sektörden bağımsızdır, **CRM k
 - **Ekranlar:** `/destek/talepler` (çalışma alanı: sayılı hızlı görünümler, süzgeç, arama), `/destek/talepler/yeni`, `/destek/talepler/{id}` (işlemler, yazışma, tarihçe, çözüm), `/destek/ayarlar` (kuyruk ve kategori).
 - **Henüz yok (sonraki dilimler):** rapor zamanlaması/CSV, tekrarlayan neden için anlamsal eşleştirme, düzeltici aksiyon bildirimi/eskalasyonu, "sonraki müşteri mesajına yanıt" SLA sayacı, otomatik alındı mesajı, gerçek gelen e-posta alıcısı (IMAP/webhook) ve gönderenden müşteri eşleştirme, ek dosya taraması ve genel dosya deposu, müşteri portalı, finans iade/tazmin ve lojistik sevkiyat bağları (hedef kayıt türü yok), kapalı modülde karşı sayfada salt okunur talep gösterimi. Ayrıntı, dilim planı ve kabul kriteri izlenebilirliği: ADR-0024.
 
+## Pazarlama modülü ([ADR-0025](docs/adr/0025-kampanya-ve-segment-yonetimi.md)) — dilim 2 (EPIC 12 kısmen)
+
+Segment yönetimi (arka uç). Sektörden ve CRM'den bağımsızdır; modül anahtarı `marketing`, şema `marketing`. Segment üyeliği gönderim izni vermez; izin ve engel kararı çekirdekteki iletişim tercihindedir (yukarıda).
+
+- **Segment**: hedef türü `Company` (üyelik kimliği ortak taraf), `Person` (ortak kişi) ya da `Lead`; tür `Static` (üyeler elle) ya da `Dynamic` (koşuldan). Hedef türü, tür ve kod oluşturulduktan sonra değişmez. Durum `Draft → Active → Archived`; durum, yayın sürümü ve son hesaplama özeti yalnızca eylem uç noktalarıyla değişir.
+- **Koşul ağacı**: iç içe `and`/`or` (derinlik ≤4, ≤25 koşul), koşul `{"field","operator","values"}`; operatörler `eq, ne, contains, in, between, empty, notempty, lastdays, nextdays, before, after, exists, notexists` ve her alan tipinde yalnızca uyumlu olanlar geçerlidir. SQL/kod yazılmaz. `ne` boş değeri de kapsar; eşitlik/içerir/aralık boşla eşleşmez; gün sınırları firmanın saat dilimindedir.
+- **Alanlar** `GET /api/marketing/segment-fields?target=` ile listelenir: yalnızca çağıranın okuyabildikleri; kapalı modül ya da yetkisiz alan `unavailable` altında nedeniyle görünür ve o alanla önizleme/yayım 422 verir. CRM alanları: firma (ad, şehir, sektör, durum, kaynak, etiket, sorumlu, oluşturma tarihi; kişisi/açık fırsatı/kazanılmış fırsatı var), kişi (unvan, firma sektörü, oluşturma tarihi), lead (durum, kaynak, ülke, şehir, sektör, UTM kampanyası, oluşturma tarihi). Sayılar çağıranın veri kapsamıyla hesaplanır.
+- **Uç noktalar** (`/api/marketing`): `segments`, `segment-members` (dahil/hariç; statikte yalnızca dahil), `segment-versions` (salt okunur), `POST segments/preview` (`marketing.segments.read`; hiçbir şey yazmaz), `GET segments/{id}/members`, `POST segments/{id}/publish|refresh|archive|restore` (`marketing.segments.publish`), `POST segments/{id}/copy`. Üyelik: dinamikte yayımlanmış sürüm ∪ dahil ∖ hariç, statikte dahil ∖ hariç. Yayımlanmış sürüm değişmez; taslak düzenlenebilir.
+- İzinler: `marketing.segments.read|write|publish`, `marketing.recipients.read`. Rol şablonları: Pazarlama uzmanı, yöneticisi, izleyicisi.
+- Kod: `src/Modulix.Modules.Marketing` (`Domain`, `Records`, `Segments`), CRM kaynağı `Modulix.Modules.Crm/Records/CrmSegmentFieldSource.cs`, sözleşme `Modulix.Core.Contracts/Marketing`. **Henüz yok:** ekranlar, kampanya/hedef kitle/gönderim, sözleşme bitişi ve son aktivite alanları, zamanlanmış yenileme, üye değişimi geçmişi, dışa aktarma (ADR-0025 bölüm 6 ve 9).
+
 ## E-posta
 
 Uygulama e-postayı hemen göndermez: `IEmailQueue.Enqueue(...)` e-postayı `platform.EmailMessages` kuyruğuna yazar, arka plandaki işleyici (her 10 saniyede) SMTP ile gönderir. Kuyruğa yazma, çağıranın kaydıyla aynı işlemdedir; kayıt geri alınırsa e-posta da gitmez. Aktif tenant varsa e-posta o tenant'a bağlanır; yoksa platform e-postasıdır (ör. şifre sıfırlama). `IEmailQueue` `Modulix.Core.Contracts` içindedir, modüller de kullanabilir.
@@ -671,6 +682,7 @@ dotnet run --project src/Modulix.Api
 | `Modulix.Modules.Contracts` | Sözleşme yönetimi (şablon, sürüm, onay, imza, taahhüt, yenileme) | Core.Contracts |
 | `Modulix.Modules.Orders` | Sipariş ve satış devri (tekliften sipariş; devir, operasyon ve teslimat sonraki dilimlerde) | Core.Contracts |
 | `Modulix.Modules.Support` | Destek ve şikâyet yönetimi (talep, kuyruk, kategori, durum makinesi, mesaj/iç not; SLA ve diğerleri sonraki dilimlerde) | Core.Contracts |
+| `Modulix.Modules.Marketing` | Pazarlama: segment ve (sonraki dilimlerde) kampanya yönetimi; başka modüllerin alanları `ISegmentFieldSource` ile | Core.Contracts |
 | `Modulix.AI` | LLM katmanı, tool sözleşmesi | Core.Contracts |
 | `Modulix.Shared` | API DTO'ları ve doğrulama kuralları | — |
 | `Modulix.Api` | Host, endpoint'ler | Hepsi |
