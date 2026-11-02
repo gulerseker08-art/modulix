@@ -1,0 +1,195 @@
+@page "/yonetim/departmanlar/{BusinessUnitId:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>@(detail?.Unit.Name ?? "Departman") · Modulix</PageTitle>
+
+@* Departman ayrıntısı (ADR-0026): bilgiler, kapatma ve kullanıcılar. Kullanıcıyı başka departmana taşıma kullanıcı kartındadır. *@
+<AuthGate Permission="@CoreAccess.ManageUsers">
+    <a class="back-link" href="yonetim/departmanlar">← Departmanlar</a>
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (detail is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        var unit = detail.Unit;
+        <div class="page-header">
+            <div>
+                <h1>@unit.Name</h1>
+                <div class="header-meta">
+                    <span class="badge tag">@BusinessUnitKindLabels.Of(unit.Kind)</span>
+                    @if (!unit.IsActive)
+                    {
+                        <span class="badge tag">Kapalı</span>
+                    }
+                    <small class="text-muted">@unit.PathNames</small>
+                </div>
+            </div>
+        </div>
+
+        <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>Departman bilgileri</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="unit-name">Departman adı *</label>
+                    <input id="unit-name" class="form-control" maxlength="200" @bind="name" @bind:event="oninput" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="unit-code">Kod</label>
+                    <input id="unit-code" class="form-control" maxlength="50" @bind="code" @bind:event="oninput" />
+                    <FieldError Field="code" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="unit-kind">Tür *</label>
+                    @if (unit.ParentId is null)
+                    {
+                        <input id="unit-kind" class="form-control" value="@BusinessUnitKindLabels.Of(unit.Kind)" disabled />
+                    }
+                    else
+                    {
+                        <select id="unit-kind" class="form-select" @bind="kind">
+                            <option value="@BusinessUnitKindLabels.Dealer">@BusinessUnitKindLabels.Of(BusinessUnitKindLabels.Dealer)</option>
+                            <option value="@BusinessUnitKindLabels.Other">@BusinessUnitKindLabels.Of(BusinessUnitKindLabels.Other)</option>
+                        </select>
+                    }
+                    <FieldError Field="kind" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary"
+                        disabled="@(busy || string.IsNullOrWhiteSpace(name) || (name.Trim() == unit.Name && (code ?? "") == (unit.Code ?? "") && kind == unit.Kind))">Kaydet</button>
+            </div>
+        </form>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Kullanıcılar</h2></div>
+            @if (detail.Members.Count == 0)
+            {
+                <p class="text-muted">Bu departmanda kullanıcı yok. Kullanıcıyı <a href="yonetim/kullanicilar">kullanıcı kartından</a> bu departmana atayabilirsiniz.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <thead><tr><th>Kullanıcı</th><th>E-posta</th></tr></thead>
+                    <tbody>
+                        @foreach (var member in detail.Members)
+                        {
+                            <tr>
+                                <td data-label="Kullanıcı" class="primary"><a href="yonetim/kullanicilar/@member.MembershipId">@member.DisplayName</a></td>
+                                <td data-label="E-posta">@member.Email</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        @if (unit.ParentId is not null)
+        {
+            <section class="detail-section">
+                <div class="section-header"><h2>@(unit.IsActive ? "Departmanı kapat" : "Departmanı yeniden aç")</h2></div>
+                <div class="account-actions">
+                    <div>
+                        <button type="button" class="@(unit.IsActive ? "btn btn-outline-danger" : "btn btn-outline-secondary")" disabled="@busy" @onclick="ToggleActiveAsync">
+                            @(unit.IsActive ? "Departmanı kapat" : "Departmanı yeniden aç")
+                        </button>
+                        <small class="text-muted">
+                            Departmanlar silinmez. Kapalı departmana yeni departman ya da kullanıcı eklenemez.
+                            @if (unit.IsActive)
+                            {
+                                <text> Kullanıcısı veya etkin alt departmanı olan departman kapatılamaz.</text>
+                            }
+                        </small>
+                    </div>
+                </div>
+            </section>
+        }
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid BusinessUnitId { get; set; }
+
+    private BusinessUnitDetailDto? detail;
+    private string name = string.Empty;
+    private string? code;
+    private string kind = string.Empty;
+    private bool busy;
+    private string? message;
+    private string? notice;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(CoreAccess.ManageUsers))
+        {
+            return;
+        }
+
+        var result = await Api.GetAsync<BusinessUnitDetailDto>($"/api/business-units/{BusinessUnitId}");
+        message = result.Error;
+        if (result.Value is { } loaded)
+        {
+            Show(loaded);
+        }
+    }
+
+    private void Show(BusinessUnitDetailDto loaded)
+    {
+        detail = loaded;
+        name = loaded.Unit.Name;
+        code = loaded.Unit.Code;
+        kind = loaded.Unit.Kind;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        notice = null;
+        var result = await Api.PutAsync<BusinessUnitDetailDto>($"/api/business-units/{BusinessUnitId}", new UpdateBusinessUnitRequest(name, code, kind));
+        busy = false;
+        errors = result.FieldErrors;
+        if (result.Value is { } saved)
+        {
+            Show(saved);
+            (notice, message) = ("Departman kaydedildi.", null);
+            return;
+        }
+
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+    }
+
+    private async Task ToggleActiveAsync()
+    {
+        busy = true;
+        notice = null;
+        var open = detail!.Unit.IsActive;
+        var result = await Api.PutAsync<BusinessUnitDetailDto>($"/api/business-units/{BusinessUnitId}/active", new SetBusinessUnitActiveRequest(!open));
+        busy = false;
+        if (result.Value is { } saved)
+        {
+            Show(saved);
+            (notice, message) = (open ? "Departman kapatıldı." : "Departman yeniden açıldı.", null);
+            return;
+        }
+
+        message = result.Error;
+    }
+}

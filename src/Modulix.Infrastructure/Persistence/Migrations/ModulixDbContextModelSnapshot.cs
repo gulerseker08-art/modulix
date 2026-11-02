@@ -151,6 +151,49 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Roles", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Communication.CommunicationLinkToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .IsFixedLength();
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("CommunicationLinkTokens", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Communication.CommunicationPreference", b =>
                 {
                     b.Property<Guid>("Id")
@@ -319,6 +362,41 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "PreferenceId", "ChangedAt");
 
                     b.ToTable("ConsentEvents", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Communication.FrequencyWindow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Channel", "Address", "Day")
+                        .IsUnique();
+
+                    b.ToTable("FrequencyWindows", "core", t =>
+                        {
+                            t.HasCheckConstraint("CK_FrequencyWindows_Count", "[Count] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Modulix.Core.Contracts.SharedRecords.Party", b =>
@@ -651,6 +729,85 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Branches", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Organization.BusinessUnit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Depth")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_BusinessUnits_TenantId_Root")
+                        .HasFilter("[ParentId] IS NULL");
+
+                    b.HasIndex("TenantId", "Path");
+
+                    b.HasIndex("TenantId", "ParentId", "Name")
+                        .IsUnique()
+                        .HasFilter("[ParentId] IS NOT NULL");
+
+                    b.ToTable("BusinessUnits", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Organization.BusinessUnitMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("MembershipId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "BusinessUnitId");
+
+                    b.HasIndex("TenantId", "MembershipId")
+                        .IsUnique();
+
+                    b.ToTable("BusinessUnitMembers", "core");
                 });
 
             modelBuilder.Entity("Modulix.Core.Organization.Company", b =>
@@ -6371,6 +6528,742 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.AudienceSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("EligibleCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ExcludedCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Exclusions")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PersonCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Recipients")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ResolvedTargetCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Sources")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("TakenAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("TakenBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("TargetCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("UniqueAddressCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Unresolved")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CampaignId", "TakenAt");
+
+                    b.ToTable("AudienceSnapshots", "marketing");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.Campaign", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("ActualCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("Budget")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("CostCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateOnly?>("EndsOn")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("MaxPerTarget")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Purpose")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RecipientRole")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RecipientRule")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateOnly?>("StartsOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UtmCampaign")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("UtmMedium")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("UtmSource")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Campaigns_Code");
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.ToTable("Campaigns", "marketing");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignAudienceEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AddedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("SegmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "SegmentId");
+
+                    b.HasIndex("TenantId", "CampaignId", "SegmentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CampaignAudience_Segment")
+                        .HasFilter("[SegmentId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "CampaignId", "TargetId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CampaignAudience_Target")
+                        .HasFilter("[TargetId] IS NOT NULL");
+
+                    b.ToTable("CampaignAudienceEntries", "marketing", t =>
+                        {
+                            t.HasCheckConstraint("CK_CampaignAudience_OneSource", "([SegmentId] IS NULL AND [TargetId] IS NOT NULL) OR ([SegmentId] IS NOT NULL AND [TargetId] IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignContent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("VersionNo")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CampaignId", "VersionNo")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CampaignContents_No");
+
+                    b.ToTable("CampaignContents", "marketing");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<Guid?>("ContactPointId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RunId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CampaignDeliveries_Key");
+
+                    b.HasIndex("TenantId", "RunId", "Status");
+
+                    b.ToTable("CampaignDeliveries", "marketing");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignResponse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ActivityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ClosedReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("OptOutAppliedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("RunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "DeliveryId");
+
+                    b.HasIndex("TenantId", "RunId");
+
+                    b.HasIndex("TenantId", "CampaignId", "Status");
+
+                    b.HasIndex("TenantId", "OwnerId", "Status");
+
+                    b.ToTable("CampaignResponses", "marketing");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ApprovedContentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ApprovedSnapshotId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ContentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ScheduledAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("SnapshotId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("SubmittedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ContentId");
+
+                    b.HasIndex("TenantId", "SnapshotId");
+
+                    b.HasIndex("TenantId", "CampaignId", "Status");
+
+                    b.HasIndex("TenantId", "Status", "ScheduledAt");
+
+                    b.ToTable("CampaignRuns", "marketing");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.Segment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Draft")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("LastComputeMs")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("LastComputedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("LastMemberCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("PublishedVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Purpose")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Segments_Code");
+
+                    b.HasIndex("TenantId", "Status", "Target");
+
+                    b.ToTable("Segments", "marketing");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.SegmentMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AddedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("SegmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "SegmentId", "TargetId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_SegmentMembers_Target");
+
+                    b.ToTable("SegmentMembers", "marketing");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.SegmentVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Definition")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("PublishedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SegmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("VersionNo")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "SegmentId", "VersionNo")
+                        .IsUnique()
+                        .HasDatabaseName("UX_SegmentVersions_No");
+
+                    b.ToTable("SegmentVersions", "marketing");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Orders.Domain.OperationJob", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9270,6 +10163,32 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Modulix.Core.Organization.BusinessUnit", b =>
+                {
+                    b.HasOne("Modulix.Core.Organization.BusinessUnit", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ParentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Core.Organization.BusinessUnitMember", b =>
+                {
+                    b.HasOne("Modulix.Core.Organization.BusinessUnit", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "BusinessUnitId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Core.Platform.Membership", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "MembershipId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Core.Organization.MembershipCompany", b =>
                 {
                     b.HasOne("Modulix.Core.Organization.Branch", null)
@@ -10027,6 +10946,110 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Modules.Crm.Domain.SalesTarget", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "TargetId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.AudienceSnapshot", b =>
+                {
+                    b.HasOne("Modulix.Modules.Marketing.Domain.Campaign", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CampaignId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignAudienceEntry", b =>
+                {
+                    b.HasOne("Modulix.Modules.Marketing.Domain.Campaign", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CampaignId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Marketing.Domain.Segment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SegmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignContent", b =>
+                {
+                    b.HasOne("Modulix.Modules.Marketing.Domain.Campaign", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CampaignId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignDelivery", b =>
+                {
+                    b.HasOne("Modulix.Modules.Marketing.Domain.CampaignRun", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RunId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignResponse", b =>
+                {
+                    b.HasOne("Modulix.Modules.Marketing.Domain.Campaign", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CampaignId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Marketing.Domain.CampaignRun", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RunId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignRun", b =>
+                {
+                    b.HasOne("Modulix.Modules.Marketing.Domain.Campaign", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CampaignId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Marketing.Domain.CampaignContent", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ContentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Marketing.Domain.AudienceSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SnapshotId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.SegmentMember", b =>
+                {
+                    b.HasOne("Modulix.Modules.Marketing.Domain.Segment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SegmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.SegmentVersion", b =>
+                {
+                    b.HasOne("Modulix.Modules.Marketing.Domain.Segment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SegmentId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

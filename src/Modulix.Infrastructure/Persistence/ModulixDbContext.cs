@@ -77,9 +77,17 @@ public class ModulixDbContext(
 
     public DbSet<CommunicationSuppression> CommunicationSuppressions => Set<CommunicationSuppression>();
 
+    public DbSet<FrequencyWindow> FrequencyWindows => Set<FrequencyWindow>();
+
+    public DbSet<CommunicationLinkToken> CommunicationLinkTokens => Set<CommunicationLinkToken>();
+
     public DbSet<Company> Companies => Set<Company>();
 
     public DbSet<Branch> Branches => Set<Branch>();
+
+    public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
+
+    public DbSet<BusinessUnitMember> BusinessUnitMembers => Set<BusinessUnitMember>();
 
     public DbSet<MembershipCompany> MembershipCompanies => Set<MembershipCompany>();
 

@@ -3,7 +3,7 @@ using Modulix.Core.Contracts.Tenancy;
 namespace Modulix.Core.Teams;
 
 /// <summary>
-/// Firmanın ekibi ya da departmanı (Y8, ör. "İstanbul Satış"). "Ekibimin kayıtları" kapsamı ekip arkadaşlarının sorumlu
+/// Firmanın ekibi, yani çalışma grubu (Y8, ör. "İstanbul Satış"). Örgüt yapısındaki departman değildir (ADR-0026). "Ekibimin kayıtları" kapsamı ekip arkadaşlarının sorumlu
 /// olduğu kayıtları açar. Bir kişi birden fazla ekipte olabilir. Tenant verisidir; Row-Level Security ile korunur.
 /// </summary>
 public sealed class Team : ITenantEntity, ICompanyShared

@@ -4439,3 +4439,59 @@ button.pipeline-label {
         gap: .5rem;
         margin-bottom: .5rem;
     }
+
+/* Segment koşul düzenleyicisi (ADR-0025) */
+.cond-group {
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    padding: var(--mx-space-3, .75rem);
+    margin-bottom: .75rem;
+}
+
+    .cond-group.cond-nested {
+        background: var(--mx-surface-muted);
+        margin: .5rem 0 .5rem 1rem;
+    }
+
+.cond-head,
+.cond-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+    margin-bottom: .5rem;
+}
+
+.cond-leaf {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+    margin-bottom: .5rem;
+}
+
+    .cond-leaf > select {
+        flex: 1 1 11rem;
+    }
+
+.cond-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    flex: 2 1 14rem;
+}
+
+    .cond-values > * {
+        flex: 1 1 8rem;
+    }
+
+.cond-hint {
+    flex: 1 0 100%;
+}
+
+.cond-json {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: var(--mx-fs-helper);
+}

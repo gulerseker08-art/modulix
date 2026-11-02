@@ -1,6 +1,7 @@
 using Modulix.Shared.Access;
 using Modulix.Shared.Contracts;
 using Modulix.Shared.Crm;
+using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
 using Modulix.Shared.Support;
 
@@ -53,6 +54,7 @@ public static class AppCatalog
     public const string Contracts = "contracts";
     public const string Orders = "orders";
     public const string Support = "support";
+    public const string Marketing = "marketing";
     public const string Admin = "admin";
     public const string Platform = "platform";
 
@@ -104,10 +106,16 @@ public static class AppCatalog
         new("support.reports", Support, "Raporlar", "list", "destek/raporlar", 92, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
         new("support.complaints", Support, "Şikâyet inceleme", "shield", "destek/sikayetler", 93, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
 
+        new(Marketing, null, "Pazarlama", "trending-up", null, 28, ModuleKey: MarketingAccess.ModuleKey),
+        new("marketing.segments", Marketing, "Segmentler", "list", "pazarlama/segmentler", 10, MarketingAccess.ModuleKey, MarketingAccess.SegmentsRead),
+        new("marketing.campaigns", Marketing, "Kampanyalar", "target", "pazarlama/kampanyalar", 20, MarketingAccess.ModuleKey, MarketingAccess.CampaignsRead, Tone: AppTone.Teal),
+        new("marketing.report", Marketing, "Kampanya raporu", "dashboard", "pazarlama/rapor", 30, MarketingAccess.ModuleKey, MarketingAccess.ReportsRead),
+
         new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal),
         new("admin.home", Admin, "Genel bakış", "dashboard", "yonetim", 10, AnyPermission: CoreAccess.AdministrationPermissions, ExactMatch: true),
         new("admin.users", Admin, "Kullanıcılar", "user-check", "yonetim/kullanicilar", 20, Permission: CoreAccess.ManageUsers, Tone: AppTone.Teal),
         new("admin.teams", Admin, "Ekipler", "users", "yonetim/ekipler", 30, Permission: CoreAccess.ManageUsers),
+        new("admin.business-units", Admin, "Departmanlar", "building", "yonetim/departmanlar", 35, Permission: CoreAccess.ManageUsers),
         new("admin.roles", Admin, "Roller", "key", "yonetim/roller", 40, Permission: CoreAccess.ManageRoles, Tone: AppTone.Teal),
         new("admin.companies", Admin, "Şirketler", "landmark", "yonetim/sirketler", 50, Permission: CoreAccess.ManageCompanies),
         new("admin.settings", Admin, "Firma ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),

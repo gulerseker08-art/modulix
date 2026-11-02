@@ -1,0 +1,129 @@
+@page "/pazarlama/segmentler"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Segmentler · Modulix</PageTitle>
+
+<AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.SegmentsRead">
+    <div class="page-header">
+        <div>
+            <h1>Segmentler</h1>
+            <p class="text-muted mb-0">Belirli kriterleri sağlayan firma, kişi veya lead grupları. Segmentte olmak iletişim izni vermez; izin ve engel kontrolü gönderimden önce ayrıca yapılır.</p>
+        </div>
+        <div class="header-actions">
+            @if (Session.Can(MarketingAccess.SegmentsWrite))
+            {
+                <a class="btn btn-primary" href="pazarlama/segmentler/yeni">Yeni segment</a>
+            }
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+    }
+
+    <div class="filters">
+        <label class="visually-hidden" for="status-filter">Durum</label>
+        <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm durumlar</option>
+            @foreach (var s in MarketingLabels.Statuses) { <option value="@s.Key">@s.Label</option> }
+        </select>
+        <label class="visually-hidden" for="target-filter">Hedef türü</label>
+        <select id="target-filter" class="form-select form-select-sm filter-select" @bind="target" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm hedefler</option>
+            @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
+        </select>
+        <label class="visually-hidden" for="kind-filter">Tür</label>
+        <select id="kind-filter" class="form-select form-select-sm filter-select" @bind="kind" @bind:after="() => LoadAsync(1)">
+            <option value="">Statik ve dinamik</option>
+            @foreach (var k in MarketingLabels.Kinds) { <option value="@k.Key">@k.Label</option> }
+        </select>
+        <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@(mine ? "true" : "false")" @onclick="ToggleMineAsync">Benim segmentlerim</button>
+    </div>
+
+    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <label class="visually-hidden" for="segment-search">Segment ara</label>
+        <input id="segment-search" class="form-control" type="search" placeholder="Ad veya kod ara" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (list is null && message is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (list is not null && list.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu süzgece uyan segment yok.@(Session.Can(MarketingAccess.SegmentsWrite) ? " Yeni segment oluşturabilirsiniz." : null)</p>
+    }
+    else if (list is not null)
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@list.TotalCount segment listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Segment listesi</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Segment</th><th scope="col">Hedef</th><th scope="col">Tür</th><th scope="col">Durum</th>
+                    <th scope="col">Üye sayısı</th><th scope="col">Son hesaplama</th><th scope="col">Sürüm</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in list.Items)
+                {
+                    <tr>
+                        <td data-label="Segment" class="primary">
+                            <a href="pazarlama/segmentler/@s.Id">@s.Name</a>
+                            <small class="text-muted">@s.Code</small>
+                        </td>
+                        <td data-label="Hedef">@MarketingLabels.Label(MarketingLabels.Targets, s.Target)</td>
+                        <td data-label="Tür">@(s.Kind == "Static" ? "Statik" : "Dinamik")</td>
+                        <td data-label="Durum"><span class="badge stage-@MarketingLabels.StatusBadge(s.Status)">@MarketingLabels.Label(MarketingLabels.Statuses, s.Status)</span></td>
+                        <td data-label="Üye sayısı">@(s.LastMemberCount?.ToString("N0") ?? "—")</td>
+                        <td data-label="Son hesaplama">
+                            @(s.LastComputedAt is { } at ? CrmLabels.Time(at) : "—")
+                            @if (s.LastError is not null) { <small class="text-danger d-block">Hata: @s.LastError</small> }
+                        </td>
+                        <td data-label="Sürüm">@(s.PublishedVersion == 0 ? "—" : "v" + s.PublishedVersion)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="list.Page" PageSize="list.PageSize" TotalCount="list.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private PagedResult<SegmentDto>? list;
+    private string? message;
+    private string status = string.Empty;
+    private string target = string.Empty;
+    private string kind = string.Empty;
+    private string search = string.Empty;
+    private bool mine;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(MarketingAccess.SegmentsRead)) { await LoadAsync(1); }
+    }
+
+    private async Task ToggleMineAsync()
+    {
+        mine = !mine;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var parts = new List<string> { $"page={pageNumber}" };
+        if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
+        if (status != string.Empty) { parts.Add($"status={status}"); }
+        if (target != string.Empty) { parts.Add($"target={target}"); }
+        if (kind != string.Empty) { parts.Add($"kind={kind}"); }
+        if (mine) { parts.Add("ownerId=me"); }
+
+        var result = await Api.GetAsync<PagedResult<SegmentDto>>($"/api/marketing/segments?{string.Join('&', parts)}");
+        list = result.Value;
+        message = result.IsSuccess ? null : result.Error;
+    }
+}

@@ -12,6 +12,7 @@ using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
+using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.IntegrationTests;
@@ -98,6 +99,8 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
                         command.CommandText =
                             "EXEC sys.sp_set_session_context @key = N'TenantId', @value = @t;" +
                             "DELETE FROM [core].[TeamMembers] WHERE [TenantId] = @t;" +
+                            "DELETE FROM [core].[BusinessUnitMembers] WHERE [TenantId] = @t;" +
+                            "DELETE FROM [core].[BusinessUnits] WHERE [TenantId] = @t;" +
                             "DELETE FROM [core].[MembershipRoles] WHERE [TenantId] = @t;" +
                             "DELETE FROM [core].[MembershipCompanies] WHERE [TenantId] = @t;" +
                             "DELETE FROM [platform].[Memberships] WHERE [TenantId] = @t;" +
@@ -130,12 +133,24 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         Assert.True(result.Succeeded, string.Join("; ", result.Errors.Select(e => e.Description)));
 
         var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-        foreach (var tenant in memberOf)
+        var memberships = memberOf.Select(tenant => (Tenant: tenant, Membership: new Membership(tenant.Id, user.Id))).ToList();
+        foreach (var (_, membership) in memberships)
         {
-            db.Memberships.Add(new Membership(tenant.Id, user.Id));
+            db.Memberships.Add(membership);
         }
 
         await db.SaveChangesAsync();
+
+        // Her üyelik bir departmandadır (ADR-0026 K4): gerçek akışlar köke bağlar, test yardımcısı da aynısını yapar.
+        foreach (var (tenant, membership) in memberships)
+        {
+            using var tenantScope = OpenScope(tenant.Id);
+            var tenantDb = tenantScope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+            var root = await DefaultBusinessUnit.EnsureRootAsync(tenantDb, tenant.Name, CancellationToken.None);
+            await DefaultBusinessUnit.EnsureMemberAsync(tenantDb, membership.Id, root, CancellationToken.None);
+            await tenantDb.SaveChangesAsync();
+        }
+
         return user;
     }
 

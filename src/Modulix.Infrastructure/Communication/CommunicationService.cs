@@ -149,16 +149,19 @@ internal sealed class CommunicationService(
             }
 
             var now = time.GetUtcNow();
+
+            // Oturumsuz tercih merkezinde kullanıcı yoktur (Guid.Empty): değişikliği yapan kişi bilinmez, kaynak ve kanıt alanları yeterlidir.
+            var actor = tenant.UserId == Guid.Empty ? (Guid?)null : tenant.UserId;
             var isNew = preference is null;
             preference ??= new CommunicationPreference(change.Channel, address, change.Purpose, now);
             var before = isNew ? null : Snapshot(preference, null);
-            preference.Apply(change.Status, source, evidence, change.PartyId, change.PersonId, tenant.UserId, now);
+            preference.Apply(change.Status, source, evidence, change.PartyId, change.PersonId, actor, now);
             if (isNew)
             {
                 db.CommunicationPreferences.Add(preference);
             }
 
-            db.ConsentEvents.Add(new ConsentEvent(preference.Id, current, change.Status, source, evidence, reason, tenant.UserId, now));
+            db.ConsentEvents.Add(new ConsentEvent(preference.Id, current, change.Status, source, evidence, reason, actor, now));
             AddAudit(tenant, CoreModule.AuditedEntityKeys.CommunicationPreference, preference.Id, isNew ? AuditAction.Created : AuditAction.Updated, before, Snapshot(preference, reason));
 
             try

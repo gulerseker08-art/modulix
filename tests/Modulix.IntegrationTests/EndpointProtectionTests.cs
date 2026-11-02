@@ -37,6 +37,12 @@ public partial class EndpointProtectionTests(ModulixApiFactory factory) : IClass
         // tenant URL'den çözülür, hız sınırı ve tek tip 404 uygulanır.
         "POST /api/public/support-survey/{tenant}/view",
         "POST /api/public/support-survey/{tenant}/answer",
+        // Abonelikten çıkma ve tercih merkezi (ADR-0025 dilim 6): oturumsuzdur; kimlik doğrulama kişiye özel, rastgele bağlantı belirtecine sahip olmaktır (yalnızca karması saklanır)
+        // ve belirteç yalnızca o adresin pazarlama tercihini değiştirir. Tenant URL'den çözülür, hız ve boyut sınırı ile tek tip 404 uygulanır; uçlar yalnızca POST (tek tıkla çıkış: RFC 8058).
+        "POST /api/public/communication/{tenant}/view",
+        "POST /api/public/communication/{tenant}/unsubscribe",
+        "POST /api/public/communication/{tenant}/resubscribe",
+        "POST /api/public/communication/{tenant}/one-click/{token}",
         // İmza sağlayıcısı webhook'u (ADR-0022 dilim 6): oturumsuzdur; kimlik doğrulama HMAC imzası ve zaman damgasıdır, gizli anahtar yapılandırmadan gelir
         // (yoksa uç nokta kapalı: 404), tenant sağlayıcı referansından çözülür, hız ve boyut sınırı uygulanır.
         "POST /api/public/contracts/signature/{provider}/events",

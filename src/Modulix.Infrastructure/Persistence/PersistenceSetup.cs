@@ -83,8 +83,14 @@ public static class PersistenceSetup
         services.AddScoped<CommunicationService>();
         services.AddScoped<ICommunicationPreferences>(sp => sp.GetRequiredService<CommunicationService>());
         services.AddScoped<ICommunicationAdministration>(sp => sp.GetRequiredService<CommunicationService>());
+        services.AddScoped<IFrequencyLimiter, FrequencyLimiter>();
+        services.AddScoped<IUnsubscribeLinks, UnsubscribeLinks>();
+        services.AddScoped<IOptOutRecorder, OptOutRecorder>();
+        services.AddScoped<ICommunicationPortal, CommunicationPortal>();
+        services.AddScoped<IJournalWriter, JournalWriter>();
         services.AddScoped<ICompanyAdministration, CompanyAdministration>();
         services.AddScoped<IBranchAdministration, BranchAdministration>();
+        services.AddScoped<IBusinessUnitService, BusinessUnitService>();
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());
         services.AddScoped<ICustomFieldProvider>(sp => sp.GetRequiredService<CustomFieldService>());
@@ -117,6 +123,7 @@ public static class PersistenceSetup
         // Denetim kaydı okuma (Y5).
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<ITenantSettings, TenantSettings>();
+        services.AddScoped<ITenantClock, TenantClock>();
         services.AddScoped<ITenantLogo, TenantLogoStore>();
         services.AddScoped<TenantDisplayNames>();
         return services;

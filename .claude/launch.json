@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "modulix-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/Modulix.Api", "-c", "Release", "--no-build", "--launch-profile", "http"],
+      "port": 5034
+    },
+    {
+      "name": "modulix-api-alt",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/Modulix.Api", "-c", "Release", "--no-build", "--no-launch-profile", "--", "--environment", "Development", "--urls", "http://localhost:5036"],
+      "port": 5036
+    }
+  ]
+}

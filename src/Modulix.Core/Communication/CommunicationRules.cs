@@ -103,6 +103,28 @@ public static class CommunicationRules
         return null;
     }
 
+    /// <summary>
+    /// Kişinin kendi bağlantısından aboneliği yeniden açıp açamayacağı (ADR-0025, dilim 6): yalnızca kendi çıkışını (abonelikten çıkma ya da tercih
+    /// merkezi) geri alabilir. Firmanın elle, içe aktarmayla ya da sağlayıcı olayıyla kaydettiği ret ve aktif bir engel bağlantıyla kaldırılamaz.
+    /// Hata metni ya da null.
+    /// </summary>
+    public static string? SelfResubscribeBlock(ConsentStatus current, string source, bool suppressed)
+    {
+        if (suppressed)
+        {
+            return "Bu adres için gönderim engellenmiş. Lütfen firmayla iletişime geçin.";
+        }
+
+        if (current != ConsentStatus.Denied)
+        {
+            return "Aboneliği yeniden açmak için önce abonelikten çıkılmış olmalıdır.";
+        }
+
+        return source is ConsentSources.Unsubscribe or ConsentSources.PreferenceCenter
+            ? null
+            : "Bu tercih firma tarafından kaydedilmiş. Lütfen firmayla iletişime geçin.";
+    }
+
     private static string SuppressionMessage(SuppressionReason reason) => reason switch
     {
         SuppressionReason.HardBounce => "Adres kalıcı olarak teslim edilemedi (engelli).",
