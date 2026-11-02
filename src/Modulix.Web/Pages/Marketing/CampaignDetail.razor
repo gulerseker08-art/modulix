@@ -1,0 +1,621 @@
+@page "/pazarlama/kampanyalar/{Id:guid}"
+@using System.Text.Json
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>@(campaign?.Name ?? "Kampanya") · Modulix</PageTitle>
+
+<AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.CampaignsRead">
+    @if (campaign is null && loadError is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (campaign is null)
+    {
+        <div class="alert alert-danger" role="alert">@loadError <a href="pazarlama/kampanyalar">Listeye dön</a></div>
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <h1>@campaign.Name</h1>
+                <p class="text-muted mb-0">
+                    <span class="badge stage-@(IsArchived ? "cancelled" : "lead")">@MarketingLabels.Label(MarketingLabels.CampaignStatuses, campaign.Status)</span>
+                    @MarketingLabels.Label(MarketingLabels.Targets, campaign.Target) · @MarketingLabels.Label(MarketingLabels.Channels, campaign.Channel) · <code>@campaign.Code</code>
+                </p>
+            </div>
+            <div class="header-actions">
+                <a class="btn btn-outline-secondary" href="pazarlama/kampanyalar">Listeye dön</a>
+                @if (CanAudience)
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ToggleArchiveAsync">@(IsArchived ? "Arşivden geri al" : "Arşivle")</button>
+                }
+            </div>
+        </div>
+
+        <Notice Text="@message" Failed="@failed" />
+        <div class="alert alert-info" role="note">Gerçek gönderim kapalıdır: sağlayıcı ayarlanmadıkça ileti gitmez, test sağlayıcısı iletiyi hiçbir yere göndermez. Her gönderimden önce izin ve engel yeniden denetlenir; segmentte olmak izin vermez.</div>
+
+        <TabBar Tabs="Tabs" State="tabState" Label="Kampanya bölümleri" Changed="OnTabChangedAsync" />
+
+        <div id="tabpanel-genel" role="tabpanel" aria-labelledby="tab-genel" hidden="@tabState.Hidden("genel")">
+            <form class="record-form" novalidate @onsubmit="SaveGeneralAsync" @onsubmit:preventDefault>
+                <fieldset disabled="@(busy || !CanWrite || IsArchived)">
+                    <div class="form-grid">
+                        <div class="span-6">
+                            <label class="form-label" for="g-name">Ad</label>
+                            <input id="g-name" class="form-control" maxlength="150" @bind="name" />
+                            <FieldError Field="name" Errors="generalErrors" />
+                        </div>
+                        <div class="span-6">
+                            <label class="form-label" for="g-purpose">Amaç</label>
+                            <input id="g-purpose" class="form-control" maxlength="200" @bind="purpose" />
+                            <FieldError Field="purpose" Errors="generalErrors" />
+                        </div>
+                        @if (campaign.Target == "Company")
+                        {
+                            <div class="span-6">
+                                <label class="form-label" for="g-rule">Alıcı kişi seçimi</label>
+                                <select id="g-rule" class="form-select" @bind="rule">
+                                    @foreach (var r in MarketingLabels.RecipientRules) { <option value="@r.Key">@r.Label</option> }
+                                </select>
+                                <FieldError Field="recipientRule" Errors="generalErrors" />
+                            </div>
+                            @if (rule == "Role")
+                            {
+                                <div class="span-6">
+                                    <label class="form-label" for="g-role">Aranan rol</label>
+                                    <select id="g-role" class="form-select" @bind="role">
+                                        <option value="">Seçin</option>
+                                        @foreach (var r in Roles) { <option value="@r.Key">@r.Label</option> }
+                                    </select>
+                                    <FieldError Field="recipientRole" Errors="generalErrors" />
+                                </div>
+                            }
+                        }
+                        <div class="span-6">
+                            <label class="form-label" for="g-max">Hedef başına en çok alıcı</label>
+                            <input id="g-max" class="form-control" type="number" min="1" max="1000" placeholder="Sınır yok" @bind="maxPerTarget" />
+                            <FieldError Field="maxPerTarget" Errors="generalErrors" />
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="g-start">Başlangıç</label>
+                            <input id="g-start" class="form-control" type="date" @bind="startsOn" />
+                            <FieldError Field="startsOn" Errors="generalErrors" />
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="g-end">Bitiş</label>
+                            <input id="g-end" class="form-control" type="date" @bind="endsOn" />
+                            <FieldError Field="endsOn" Errors="generalErrors" />
+                        </div>
+                        <div class="span-4">
+                            <label class="form-label" for="g-utm-source">UTM kaynak</label>
+                            <input id="g-utm-source" class="form-control" maxlength="80" placeholder="varsayılan: kampanya" @bind="utmSource" />
+                            <FieldError Field="utmSource" Errors="generalErrors" />
+                        </div>
+                        <div class="span-4">
+                            <label class="form-label" for="g-utm-medium">UTM ortam</label>
+                            <input id="g-utm-medium" class="form-control" maxlength="80" placeholder="varsayılan: kanal" @bind="utmMedium" />
+                            <FieldError Field="utmMedium" Errors="generalErrors" />
+                        </div>
+                        <div class="span-4">
+                            <label class="form-label" for="g-utm-campaign">UTM kampanya</label>
+                            <input id="g-utm-campaign" class="form-control" maxlength="80" placeholder="varsayılan: kampanya kodu" @bind="utmCampaign" />
+                            <FieldError Field="utmCampaign" Errors="generalErrors" />
+                        </div>
+                        <p class="span-12 small text-muted mb-0">Kaynak/UTM değerleri küçük harfe çevrilir; yanıttan açılan lead'e yazılır.</p>
+                        <div class="span-4">
+                            <label class="form-label" for="g-budget">Bütçe</label>
+                            <input id="g-budget" class="form-control" type="number" min="0" step="0.01" placeholder="Yok" @bind="budget" />
+                            <FieldError Field="budget" Errors="generalErrors" />
+                        </div>
+                        <div class="span-4">
+                            <label class="form-label" for="g-cost">Gerçekleşen maliyet</label>
+                            <input id="g-cost" class="form-control" type="number" min="0" step="0.01" placeholder="Yok" @bind="actualCost" />
+                            <FieldError Field="actualCost" Errors="generalErrors" />
+                        </div>
+                        <div class="span-4">
+                            <label class="form-label" for="g-currency">Para birimi</label>
+                            <input id="g-currency" class="form-control" maxlength="3" @bind="costCurrency" />
+                            <FieldError Field="costCurrency" Errors="generalErrors" />
+                        </div>
+                        <div class="span-12">
+                            <label class="form-label" for="g-desc">Açıklama</label>
+                            <textarea id="g-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
+                        </div>
+                    </div>
+                </fieldset>
+                @if (IsArchived)
+                {
+                    <p class="text-muted">Arşivlenen kampanya düzenlenemez ve hedef kitlesi dondurulamaz. Düzenlemek için arşivden geri alın.</p>
+                }
+                else if (CanWrite)
+                {
+                    <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button></div>
+                }
+            </form>
+        </div>
+
+        @if (tabState.Rendered("kitle"))
+        {
+            <div id="tabpanel-kitle" role="tabpanel" aria-labelledby="tab-kitle" hidden="@tabState.Hidden("kitle")">
+                <section aria-labelledby="entries-title">
+                    <h2 id="entries-title" class="h5">Hedef kitle kaynakları</h2>
+                    <p class="text-muted">Dahil edilenlerin birleşiminden hariç tutulanlar çıkarılır. Yalnızca etkin (yayımlanmış) segmentler ve @MarketingLabels.Label(MarketingLabels.Targets, campaign.Target).ToLowerInvariant() hedefleri kullanılır.</p>
+                    @if (entries is null)
+                    {
+                        <p class="text-muted" role="status">Yükleniyor…</p>
+                    }
+                    else if (entries.Count == 0)
+                    {
+                        <p class="text-muted">Henüz kaynak yok. En az bir dahil edilen segment ya da hedef ekleyin.</p>
+                    }
+                    else
+                    {
+                        <table class="table record-table">
+                            <caption class="visually-hidden">Hedef kitle kaynakları</caption>
+                            <thead><tr><th scope="col">Tür</th><th scope="col">Kaynak</th><th scope="col">Gerekçe</th>@if (CanEntries) { <th scope="col">İşlem</th> }</tr></thead>
+                            <tbody>
+                                @foreach (var e in entries)
+                                {
+                                    <tr>
+                                        <td data-label="Tür"><span class="badge stage-@(e.Mode == "Exclude" ? "lost" : "won")">@(e.Mode == "Exclude" ? "Hariç" : "Dahil")</span></td>
+                                        <td data-label="Kaynak">@(e.SegmentId is { } sid ? SegmentName(sid) : "Elle seçilen hedef …" + e.TargetId.ToString()![^8..])</td>
+                                        <td data-label="Gerekçe">@(e.Reason ?? "—")</td>
+                                        @if (CanEntries)
+                                        {
+                                            <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => RemoveEntryAsync(e)">Kaldır</button></td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+
+                    @if (CanEntries)
+                    {
+                        <form class="record-form" novalidate @onsubmit="AddSegmentAsync" @onsubmit:preventDefault>
+                            <fieldset disabled="@busy">
+                                <legend class="h6">Segment ekle</legend>
+                                <div class="filters">
+                                    <label class="visually-hidden" for="e-segment">Segment</label>
+                                    <select id="e-segment" class="form-select form-select-sm" @bind="segmentChoice">
+                                        <option value="">Segment seçin</option>
+                                        @foreach (var s in segments ?? []) { <option value="@s.Id">@s.Name (@(s.LastMemberCount?.ToString("N0") ?? "?") hedef)</option> }
+                                    </select>
+                                    <label class="visually-hidden" for="e-mode">Tür</label>
+                                    <select id="e-mode" class="form-select form-select-sm filter-select" @bind="entryMode">
+                                        <option value="Include">Dahil et</option>
+                                        <option value="Exclude">Hariç tut</option>
+                                    </select>
+                                    <label class="visually-hidden" for="e-reason">Gerekçe</label>
+                                    <input id="e-reason" class="form-control" maxlength="200" placeholder="Gerekçe (isteğe bağlı)" @bind="entryReason" />
+                                    <button type="submit" class="btn btn-outline-secondary" disabled="@(segmentChoice == string.Empty)">Ekle</button>
+                                </div>
+                                @if (segments is { Count: 0 }) { <p class="small text-muted">Bu hedef türünde etkin segment yok; önce bir segment yayımlayın.</p> }
+                            </fieldset>
+                        </form>
+
+                        <form class="record-form" novalidate @onsubmit="SearchTargetsAsync" @onsubmit:preventDefault>
+                            <fieldset disabled="@busy">
+                                <legend class="h6">Hedef kayıt ekle</legend>
+                                <p class="small text-muted">Hedefi CRM kayıtlarında arayın (CRM okuma yetkisi gerekir). Ekleme, yukarıda seçili dahil/hariç türüyle yapılır.</p>
+                                <div class="filters">
+                                    <label class="visually-hidden" for="t-search">Hedef ara</label>
+                                    <input id="t-search" class="form-control" type="search" placeholder="Ad ara" @bind="targetSearch" />
+                                    <button type="submit" class="btn btn-outline-secondary">Ara</button>
+                                </div>
+                            </fieldset>
+                            @if (targetMessage is not null) { <div class="alert alert-warning" role="status">@targetMessage</div> }
+                            @if (targetResults is { Count: > 0 })
+                            {
+                                <ul class="list-unstyled">
+                                    @foreach (var t in targetResults)
+                                    {
+                                        <li><button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => AddTargetAsync(t.Id)">@t.Label — ekle</button></li>
+                                    }
+                                </ul>
+                            }
+                        </form>
+                    }
+                </section>
+
+                <section aria-labelledby="preview-title">
+                    <h2 id="preview-title" class="h5">Hedef kitle önizlemesi</h2>
+                    <p class="text-muted">Hiçbir şey yazmaz. Sayılar yetkiniz ve veri kapsamınızla hesaplanır; uygunluk her zaman iletişim tercihinden ve engellerden gelir.</p>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="PreviewAsync">Önizle</button>
+                        @if (CanAudience && !IsArchived)
+                        {
+                            <button type="button" class="btn btn-primary" disabled="@(busy || preview is null)" @onclick="SnapshotAsync">Hedef kitleyi dondur</button>
+                        }
+                    </div>
+                    @if (previewError is not null) { <div class="alert alert-danger" role="alert">@previewError</div> }
+                    @if (preview is not null)
+                    {
+                        <p role="status" aria-live="polite">
+                            <strong>@preview.Summary.Eligible.ToString("N0")</strong> uygun alıcı · kanal: @MarketingLabels.Label(MarketingLabels.Channels, campaign.Channel)
+                            · dondurmak bu sayıyı sabitler, gönderimden önce izin yeniden denetlenir.
+                        </p>
+                        <dl class="summary-list">
+                            <div><dt>Hedef (@MarketingLabels.Label(MarketingLabels.Targets, campaign.Target).ToLowerInvariant())</dt><dd>@preview.Summary.Targets.ToString("N0")</dd></div>
+                            <div><dt>Alıcısı bulunan hedef</dt><dd>@preview.Summary.ResolvedTargets.ToString("N0")</dd></div>
+                            <div><dt>Çözümlenen kişi</dt><dd>@preview.Summary.Persons.ToString("N0")</dd></div>
+                            <div><dt>Benzersiz iletişim noktası</dt><dd>@preview.Summary.UniqueAddresses.ToString("N0")</dd></div>
+                            <div><dt>Uygun alıcı</dt><dd>@preview.Summary.Eligible.ToString("N0")</dd></div>
+                            <div><dt>Elenen alıcı</dt><dd>@preview.Summary.Excluded.ToString("N0")</dd></div>
+                        </dl>
+                        <p class="small text-muted">Bir hedef firmada birden çok kişi olabildiği için alıcı sayısı hedef sayısından farklı olabilir; alıcısı bulunamayan hedefler ve elenen alıcılar aşağıda nedenleriyle sayılır.</p>
+                        @ReasonTable("Elenen alıcıların nedenleri", preview.Summary.Exclusions)
+                        @ReasonTable("Alıcısı bulunamayan hedeflerin nedenleri", preview.Summary.Unresolved)
+                        @if (preview.Sources.Count > 0)
+                        {
+                            <h3 class="h6">Kaynaklar</h3>
+                            <ul>
+                                @foreach (var s in preview.Sources) { <li>@(s.Mode == "Exclude" ? "Hariç" : "Dahil"): @(s.Name ?? "elle seçilen hedefler") — @s.Count.ToString("N0") hedef</li> }
+                            </ul>
+                        }
+                    }
+                </section>
+            </div>
+        }
+
+        @if (tabState.Rendered("calistirmalar"))
+        {
+            <div id="tabpanel-calistirmalar" role="tabpanel" aria-labelledby="tab-calistirmalar" hidden="@tabState.Hidden("calistirmalar")">
+                <CampaignRunsPanel Campaign="campaign" />
+            </div>
+        }
+
+        @if (tabState.Rendered("yanitlar"))
+        {
+            <div id="tabpanel-yanitlar" role="tabpanel" aria-labelledby="tab-yanitlar" hidden="@tabState.Hidden("yanitlar")">
+                <CampaignResponsesPanel Campaign="campaign" />
+            </div>
+        }
+
+        @if (tabState.Rendered("dondurulmus"))
+        {
+            <div id="tabpanel-dondurulmus" role="tabpanel" aria-labelledby="tab-dondurulmus" hidden="@tabState.Hidden("dondurulmus")">
+                @if (snapshots is null)
+                {
+                    <p class="text-muted" role="status">Yükleniyor…</p>
+                }
+                else if (snapshots.Count == 0)
+                {
+                    <p class="text-muted">Henüz dondurulmuş hedef kitle yok. Dondurulan kitle değişmez; sonradan segment ya da izin değişse bile o andaki seçim korunur.</p>
+                }
+                else
+                {
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Dondurulmuş hedef kitleler</caption>
+                        <thead><tr><th scope="col">Zaman</th><th scope="col">Hedef</th><th scope="col">Alıcısı bulunan</th><th scope="col">Uygun</th><th scope="col">Elenen</th><th scope="col">İşlem</th></tr></thead>
+                        <tbody>
+                            @foreach (var s in snapshots)
+                            {
+                                <tr>
+                                    <td data-label="Zaman" class="primary">@CrmLabels.Time(s.TakenAt)</td>
+                                    <td data-label="Hedef">@s.TargetCount.ToString("N0")</td>
+                                    <td data-label="Alıcısı bulunan">@s.ResolvedTargetCount.ToString("N0")</td>
+                                    <td data-label="Uygun">@s.EligibleCount.ToString("N0")</td>
+                                    <td data-label="Elenen">@s.ExcludedCount.ToString("N0")</td>
+                                    <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => OpenSnapshotAsync(s)">Alıcıları gör</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+
+                @if (opened is not null)
+                {
+                    <section aria-labelledby="recipients-title">
+                        <h2 id="recipients-title" class="h5">Alıcılar — @CrmLabels.Time(opened.TakenAt)</h2>
+                        @ReasonTable("Elenen alıcıların nedenleri", Parse(opened.Exclusions))
+                        @ReasonTable("Alıcısı bulunamayan hedeflerin nedenleri", Parse(opened.Unresolved))
+                        <div class="filters">
+                            <label class="visually-hidden" for="r-status">Durum</label>
+                            <select id="r-status" class="form-select form-select-sm filter-select" @bind="recipientStatus" @bind:after="() => LoadRecipientsAsync(1)">
+                                <option value="">Tüm durumlar</option>
+                                <option value="Eligible">Uygun</option>
+                                <option value="Excluded">Elendi</option>
+                                <option value="Unresolved">Alıcı yok</option>
+                            </select>
+                        </div>
+                        @if (recipientsError is not null)
+                        {
+                            <div class="alert alert-warning" role="alert">@recipientsError</div>
+                        }
+                        else if (recipients is not null)
+                        {
+                            <table class="table record-table">
+                                <caption class="visually-hidden">Dondurulmuş alıcılar</caption>
+                                <thead><tr><th scope="col">Hedef</th><th scope="col">Durum</th><th scope="col">Neden</th></tr></thead>
+                                <tbody>
+                                    @foreach (var r in recipients.Items)
+                                    {
+                                        <tr>
+                                            <td data-label="Hedef" class="primary">@(r.Label ?? "…" + r.TargetId.ToString()[^8..])</td>
+                                            <td data-label="Durum"><span class="badge stage-@(r.Status == "Eligible" ? "won" : r.Status == "Excluded" ? "lost" : "onhold")">@MarketingLabels.RecipientStatus(r.Status)</span></td>
+                                            <td data-label="Neden">@(r.Code is null ? "—" : MarketingLabels.Reason(r.Code))</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                            <Pager Page="recipients.Page" PageSize="recipients.PageSize" TotalCount="recipients.TotalCount" PageChanged="LoadRecipientsAsync" />
+                        }
+                    </section>
+                }
+            </div>
+        }
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private static readonly (string Key, string Label)[] Roles = [("Purchasing", "Satın alma"), ("Finance", "Finans"), ("Technical", "Teknik"), ("Management", "Yönetim"), ("Other", "Diğer")];
+
+    private CampaignDto? campaign;
+    private string? loadError;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private readonly TabState tabState = new("genel");
+
+    private string name = string.Empty;
+    private string purpose = string.Empty;
+    private string description = string.Empty;
+    private string utmSource = string.Empty;
+    private string utmMedium = string.Empty;
+    private string utmCampaign = string.Empty;
+    private decimal? budget;
+    private decimal? actualCost;
+    private string costCurrency = "TRY";
+    private string rule = "PrimaryContact";
+    private string role = string.Empty;
+    private int? maxPerTarget;
+    private DateTime? startsOn;
+    private DateTime? endsOn;
+    private IReadOnlyDictionary<string, string[]>? generalErrors;
+
+    private List<CampaignAudienceEntryDto>? entries;
+    private List<SegmentDto>? segments;
+    private string segmentChoice = string.Empty;
+    private string entryMode = "Include";
+    private string entryReason = string.Empty;
+    private string targetSearch = string.Empty;
+    private List<TargetChoice>? targetResults;
+    private string? targetMessage;
+    private AudiencePreviewDto? preview;
+    private string? previewError;
+
+    private List<AudienceSnapshotDto>? snapshots;
+    private AudienceSnapshotDto? opened;
+    private AudienceRecipientsPageDto? recipients;
+    private string recipientStatus = string.Empty;
+    private string? recipientsError;
+
+    private sealed record TargetChoice(Guid Id, string Label);
+
+    private bool IsArchived => campaign?.Status == "Archived";
+
+    private bool CanWrite => Session.Can(MarketingAccess.CampaignsWrite);
+
+    private bool CanAudience => Session.Can(MarketingAccess.CampaignsAudience);
+
+    private bool CanEntries => CanWrite && !IsArchived;
+
+    private IReadOnlyList<TabItem> Tabs =>
+    [
+        new("genel", "Genel"), new("kitle", "Hedef kitle"), new("dondurulmus", "Dondurulmuş kitleler"), new("calistirmalar", "İçerik ve çalıştırmalar"),
+        .. (Session.Can(MarketingAccess.ResponsesRead) ? new[] { new TabItem("yanitlar", "Yanıtlar") } : []),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(MarketingAccess.CampaignsRead)) { return; }
+        var result = await Api.GetAsync<CampaignDto>($"/api/marketing/campaigns/{Id}");
+        if (!result.IsSuccess) { loadError = result.Error; return; }
+        Apply(result.Value!);
+    }
+
+    private void Apply(CampaignDto value)
+    {
+        campaign = value;
+        name = value.Name;
+        purpose = value.Purpose ?? string.Empty;
+        description = value.Description ?? string.Empty;
+        utmSource = value.UtmSource ?? string.Empty;
+        utmMedium = value.UtmMedium ?? string.Empty;
+        utmCampaign = value.UtmCampaign ?? string.Empty;
+        budget = value.Budget;
+        actualCost = value.ActualCost;
+        costCurrency = value.CostCurrency ?? "TRY";
+        rule = value.RecipientRule;
+        role = value.RecipientRole ?? string.Empty;
+        maxPerTarget = value.MaxPerTarget;
+        startsOn = value.StartsOn?.ToDateTime(TimeOnly.MinValue);
+        endsOn = value.EndsOn?.ToDateTime(TimeOnly.MinValue);
+    }
+
+    private async Task OnTabChangedAsync(string key)
+    {
+        switch (key)
+        {
+            case "kitle" when entries is null:
+                await LoadEntriesAsync();
+                segments = (await Api.GetAsync<PagedResult<SegmentDto>>($"/api/marketing/segments?status=Active&target={campaign!.Target}&pageSize=100")).Value?.Items.ToList() ?? [];
+                break;
+            case "dondurulmus" when snapshots is null:
+                await LoadSnapshotsAsync();
+                break;
+        }
+    }
+
+    private async Task LoadEntriesAsync() =>
+        entries = (await Api.GetAsync<PagedResult<CampaignAudienceEntryDto>>($"/api/marketing/campaign-audience?campaignId={Id}&pageSize=100")).Value?.Items.ToList() ?? [];
+
+    private async Task LoadSnapshotsAsync() =>
+        snapshots = (await Api.GetAsync<PagedResult<AudienceSnapshotDto>>($"/api/marketing/audience-snapshots?campaignId={Id}&pageSize=50")).Value?.Items.ToList() ?? [];
+
+    private string SegmentName(Guid segmentId) => segments?.FirstOrDefault(s => s.Id == segmentId)?.Name ?? "Segment …" + segmentId.ToString()[^8..];
+
+    private async Task SaveGeneralAsync()
+    {
+        busy = true;
+        generalErrors = null;
+        message = null;
+        var result = await Api.PutAsync<CampaignDto>($"/api/marketing/campaigns/{Id}", new SaveCampaignRequest(
+            campaign!.Version, campaign.Code, name.Trim(), Blank(description), Blank(purpose), campaign.Target, campaign.Channel,
+            campaign.Target == "Company" ? rule : campaign.RecipientRule, campaign.Target == "Company" && rule == "Role" ? Blank(role) : null,
+            maxPerTarget, startsOn is { } s ? DateOnly.FromDateTime(s) : null, endsOn is { } e ? DateOnly.FromDateTime(e) : null, campaign.OwnerId,
+            Blank(utmSource), Blank(utmMedium), Blank(utmCampaign), budget, actualCost, Blank(costCurrency)));
+        busy = false;
+        if (result.IsSuccess) { Apply(result.Value!); preview = null; Report("Kampanya kaydedildi.", false); }
+        else { generalErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }
+    }
+
+    private async Task ToggleArchiveAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<CampaignDto>($"/api/marketing/campaigns/{Id}/{(IsArchived ? "restore" : "archive")}", new SegmentActionRequest(campaign!.Version));
+        busy = false;
+        if (result.IsSuccess) { Apply(result.Value!); Report(IsArchived ? "Kampanya arşivlendi." : "Kampanya arşivden geri alındı.", false); }
+        else { Report(result.Error, true); }
+    }
+
+    private Task AddSegmentAsync() => AddEntryAsync(Guid.Parse(segmentChoice), null);
+
+    private Task AddTargetAsync(Guid targetId) => AddEntryAsync(null, targetId);
+
+    private async Task AddEntryAsync(Guid? segmentId, Guid? targetId)
+    {
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<CampaignAudienceEntryDto>("/api/marketing/campaign-audience",
+            new SaveCampaignAudienceEntryRequest(CampaignId: Id, Mode: entryMode, SegmentId: segmentId, TargetId: targetId, Reason: Blank(entryReason)));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Report(result.FieldErrors.Count == 0 ? result.Error : string.Join(" ", result.FieldErrors.Values.SelectMany(v => v)), true);
+            return;
+        }
+
+        segmentChoice = string.Empty;
+        targetResults = null;
+        preview = null;
+        previewError = null;
+        Report("Kaynak eklendi.", false);
+        await LoadEntriesAsync();
+    }
+
+    private async Task RemoveEntryAsync(CampaignAudienceEntryDto entry)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/marketing/campaign-audience/{entry.Id}?version={entry.Version}");
+        busy = false;
+        if (!result.IsSuccess) { Report(result.Error, true); return; }
+        preview = null;
+        previewError = null;
+        Report("Kaynak kaldırıldı.", false);
+        await LoadEntriesAsync();
+    }
+
+    private async Task SearchTargetsAsync()
+    {
+        targetMessage = null;
+        targetResults = null;
+        var term = Uri.EscapeDataString(targetSearch.Trim());
+        switch (campaign!.Target)
+        {
+            case "Company":
+                var companies = await Api.GetAsync<CrmPage<CompanyDto>>($"/api/crm/companies?search={term}&pageSize=10");
+                targetResults = companies.Value?.Items.Where(c => c.PartyId is not null).Select(c => new TargetChoice(c.PartyId!.Value, c.Name)).ToList();
+                targetMessage = companies.IsSuccess ? null : companies.Error;
+                break;
+            case "Person":
+                var people = await Api.GetAsync<CrmPage<ContactDto>>($"/api/crm/contacts?search={term}&pageSize=10");
+                targetResults = people.Value?.Items.Where(c => c.PersonId is not null).Select(c => new TargetChoice(c.PersonId!.Value, $"{c.FirstName} {c.LastName}".Trim())).ToList();
+                targetMessage = people.IsSuccess ? null : people.Error;
+                break;
+            default:
+                var leads = await Api.GetAsync<CrmPage<LeadDto>>($"/api/crm/leads?search={term}&pageSize=10");
+                targetResults = leads.Value?.Items.Select(l => new TargetChoice(l.Id, $"{l.Subject} ({l.LeadNumber})")).ToList();
+                targetMessage = leads.IsSuccess ? null : leads.Error;
+                break;
+        }
+
+        if (targetMessage is null && targetResults is { Count: 0 }) { targetMessage = "Aramaya uyan kayıt yok."; }
+    }
+
+    private async Task PreviewAsync()
+    {
+        busy = true;
+        previewError = null;
+        var result = await Api.PostAsync<AudiencePreviewDto>($"/api/marketing/campaigns/{Id}/audience/preview", new { });
+        busy = false;
+        preview = result.Value;
+        previewError = result.IsSuccess ? null : result.FieldErrors.Count == 0 ? result.Error : string.Join(" ", result.FieldErrors.Values.SelectMany(v => v));
+    }
+
+    private async Task SnapshotAsync()
+    {
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<AudienceSnapshotDto>($"/api/marketing/campaigns/{Id}/audience/snapshot", new { });
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Report(result.FieldErrors.Count == 0 ? result.Error : string.Join(" ", result.FieldErrors.Values.SelectMany(v => v)), true);
+            return;
+        }
+
+        snapshots = null;
+        Report($"Hedef kitle donduruldu: {result.Value!.EligibleCount:N0} uygun alıcı ({MarketingLabels.Label(MarketingLabels.Channels, result.Value.Channel)}).", false);
+        if (tabState.Rendered("dondurulmus")) { await LoadSnapshotsAsync(); }
+    }
+
+    private async Task OpenSnapshotAsync(AudienceSnapshotDto snapshot)
+    {
+        opened = snapshot;
+        recipientStatus = string.Empty;
+        await LoadRecipientsAsync(1);
+    }
+
+    private async Task LoadRecipientsAsync(int pageNumber)
+    {
+        var status = recipientStatus == string.Empty ? string.Empty : $"&status={recipientStatus}";
+        var result = await Api.GetAsync<AudienceRecipientsPageDto>($"/api/marketing/audience-snapshots/{opened!.Id}/recipients?page={pageNumber}&pageSize=10{status}");
+        recipients = result.Value;
+        recipientsError = result.IsSuccess ? null : result.Error;
+    }
+
+    private RenderFragment ReasonTable(string title, IReadOnlyDictionary<string, int> counts) => @<text>
+        @if (counts.Count > 0)
+        {
+            <h3 class="h6">@title</h3>
+            <table class="table record-table">
+                <caption class="visually-hidden">@title</caption>
+                <thead><tr><th scope="col">Neden</th><th scope="col">Sayı</th></tr></thead>
+                <tbody>
+                    @foreach (var (code, count) in counts.OrderByDescending(c => c.Value))
+                    {
+                        <tr><td data-label="Neden" class="primary">@MarketingLabels.Reason(code)</td><td data-label="Sayı">@count.ToString("N0")</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </text>;
+
+    private static IReadOnlyDictionary<string, int> Parse(string json) =>
+        JsonSerializer.Deserialize<Dictionary<string, int>>(json) ?? [];
+
+    private void Report(string? text, bool isFailure)
+    {
+        message = text;
+        failed = isFailure;
+    }
+
+    private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

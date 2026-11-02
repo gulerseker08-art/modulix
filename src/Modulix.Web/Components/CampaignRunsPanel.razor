@@ -1,0 +1,296 @@
+@* Kampanya içeriği ve çalıştırmalar (ADR-0025, dilim 5): içerik sürümleri, çalıştırma oluşturma, onay akışı, başlatma ve işleme, sonuç özeti.
+   Bu sürümde yalnızca test sağlayıcısı vardır; ileti hiçbir yere gönderilmez. "Kabul edildi" teslim edildi demek değildir. *@
+@inject ApiClient Api
+@inject SessionState Session
+
+<Notice Text="@message" Failed="@failed" />
+<div class="alert alert-warning" role="note">
+    Gönderim sağlayıcısı ayarlanmadıkça gerçek gönderim bloklıdır; test sağlayıcısı iletiyi hiçbir yere göndermez. Her gönderimden hemen önce adres yeniden çözülür, izin ve engel yeniden denetlenir ve günlük ileti sınırı uygulanır.
+    Otomatik işçi bu sürümde yoktur: çalışan bir çalıştırmayı "Sıradaki grubu işle" ile ilerletirsiniz.
+</div>
+
+<section aria-labelledby="content-title">
+    <h2 id="content-title" class="h5">İçerik sürümleri</h2>
+    @if (contents is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (contents.Count == 0)
+    {
+        <p class="text-muted">Henüz içerik yok. İçerik düz metindir; bağlantılar yalnızca http/https olabilir. Yayımlanan sürüm değişmez, değişiklik yeni sürümdür.</p>
+    }
+    else
+    {
+        <ul class="list-unstyled">
+            @foreach (var c in contents)
+            {
+                <li><details><summary>v@(c.VersionNo) — @(c.Subject ?? "(konusuz)")</summary><pre class="cond-json">@c.Body</pre></details></li>
+            }
+        </ul>
+    }
+
+    @if (CanWrite && !Archived)
+    {
+        <form class="record-form" novalidate @onsubmit="AddContentAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <legend class="h6">Yeni içerik sürümü</legend>
+                <div class="form-grid">
+                    <div class="span-12">
+                        <label class="form-label" for="ct-subject">Konu</label>
+                        <input id="ct-subject" class="form-control" maxlength="200" @bind="subject" />
+                        <FieldError Field="subject" Errors="contentErrors" />
+                    </div>
+                    <div class="span-12">
+                        <label class="form-label" for="ct-body">Metin</label>
+                        <textarea id="ct-body" class="form-control" rows="5" maxlength="10000" @bind="body"></textarea>
+                        <FieldError Field="body" Errors="contentErrors" />
+                    </div>
+                </div>
+            </fieldset>
+            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Sürüm ekle</button></div>
+        </form>
+    }
+</section>
+
+<section aria-labelledby="runs-title">
+    <h2 id="runs-title" class="h5">Çalıştırmalar</h2>
+    @if (runs is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (runs.Count == 0)
+    {
+        <p class="text-muted">Henüz çalıştırma yok. Çalıştırma, dondurulmuş bir hedef kitleyi bir içerik sürümüyle gönderir.</p>
+    }
+    else
+    {
+        @foreach (var r in runs)
+        {
+            <article class="sla-card" aria-label="Çalıştırma">
+                <header>
+                    <strong>Çalıştırma …@r.Id.ToString()[^6..]</strong>
+                    <span class="badge stage-@MarketingLabels.RunBadge(r.Status)">@MarketingLabels.Label(MarketingLabels.RunStatuses, r.Status)</span>
+                </header>
+                <p class="mb-1 small">
+                    Hedef kitle: @(SnapshotText(r.SnapshotId)) · İçerik: @(ContentText(r.ContentId)) · Planlanan: @(r.ScheduledAt is { } at ? CrmLabels.Time(at) : "hemen (onaydan sonra)")
+                    @(r.Note is null ? null : " · Gerekçe: " + r.Note)
+                </p>
+                @if (summaries.TryGetValue(r.Id, out var s))
+                {
+                    <p class="mb-1 small" role="status">
+                        @s.Total teslimat —
+                        @string.Join(", ", s.Statuses.Select(x => $"{MarketingLabels.DeliveryStatus(x.Key)}: {x.Value}"))
+                        @(s.ProviderConfigured ? null : " · sağlayıcı yapılandırılmamış")
+                        @(s.UnsubscribeLinkAvailable ? null : " · abonelikten çıkma bağlantısı üretilemiyor (genel adres ayarlı değil)")
+                    </p>
+                    @if (s.Codes.Count > 0)
+                    {
+                        <ul class="small mb-1">
+                            @foreach (var (key, count) in s.Codes) { <li>@MarketingLabels.DeliveryStatus(key.Split(':')[0]) — @MarketingLabels.DeliveryReason(key[(key.IndexOf(':') + 1)..]): @count</li> }
+                        </ul>
+                    }
+                }
+
+                <div class="filters">
+                    @if (r.Status == "Draft" && CanWrite) { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "submit")'>Onaya gönder</button> }
+                    @if (r.Status == "PendingApproval" && CanApprove)
+                    {
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "approve")'>Onayla</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "reject", true)'>Reddet</button>
+                    }
+                    @if (r.Status is "PendingApproval" or "Approved" && CanWrite) { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "reopen", true)'>Taslağa al</button> }
+                    @if (r.Status == "Approved" && CanSend) { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "start")'>Başlat</button> }
+                    @if (r.Status == "Running" && CanSend)
+                    {
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick="() => ProcessAsync(r)">Sıradaki grubu işle</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "pause")'>Duraklat</button>
+                    }
+                    @if (r.Status == "Paused" && CanSend) { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "resume")'>Sürdür</button> }
+                    @if (r.Status is "Draft" or "PendingApproval" or "Approved" or "Running" or "Paused" && (CanSend || CanWrite))
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "cancel", true)'>İptal et</button>
+                    }
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => LoadSummaryAsync(r)">Özeti yenile</button>
+                </div>
+                @if (askReason == r.Id)
+                {
+                    <div class="filters">
+                        <label class="visually-hidden" for="run-reason">Gerekçe</label>
+                        <input id="run-reason" class="form-control" maxlength="500" placeholder="Gerekçe (zorunlu)" @bind="reason" />
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" @onclick="ConfirmReasonAsync">Onayla</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => askReason = null">Vazgeç</button>
+                    </div>
+                }
+            </article>
+        }
+    }
+
+    @if (CanWrite && !Archived)
+    {
+        <form class="record-form" novalidate @onsubmit="CreateRunAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <legend class="h6">Yeni çalıştırma</legend>
+                <div class="form-grid">
+                    <div class="span-4">
+                        <label class="form-label" for="rn-snapshot">Dondurulmuş hedef kitle</label>
+                        <select id="rn-snapshot" class="form-select" @bind="snapshotChoice">
+                            <option value="">Seçin</option>
+                            @foreach (var s in snapshots ?? []) { <option value="@s.Id">@CrmLabels.Time(s.TakenAt) — @s.EligibleCount uygun alıcı</option> }
+                        </select>
+                        <FieldError Field="snapshotId" Errors="runErrors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="rn-content">İçerik sürümü</label>
+                        <select id="rn-content" class="form-select" @bind="contentChoice">
+                            <option value="">Seçin</option>
+                            @foreach (var c in contents ?? []) { <option value="@c.Id">v@(c.VersionNo) — @(c.Subject ?? "(konusuz)")</option> }
+                        </select>
+                        <FieldError Field="contentId" Errors="runErrors" />
+                    </div>
+                    <div class="span-4">
+                        <label class="form-label" for="rn-at">Planlanan zaman (isteğe bağlı)</label>
+                        <input id="rn-at" class="form-control" type="datetime-local" @bind="scheduledLocal" />
+                        <small class="text-muted">Yerel saatinizle girilir, UTC saklanır.</small>
+                        <FieldError Field="scheduledAt" Errors="runErrors" />
+                    </div>
+                </div>
+            </fieldset>
+            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Taslak çalıştırma oluştur</button></div>
+        </form>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public CampaignDto Campaign { get; set; } = default!;
+
+    private List<CampaignContentDto>? contents;
+    private List<AudienceSnapshotDto>? snapshots;
+    private List<CampaignRunDto>? runs;
+    private readonly Dictionary<Guid, RunSummaryDto> summaries = [];
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private string subject = string.Empty;
+    private string body = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? contentErrors;
+    private string snapshotChoice = string.Empty;
+    private string contentChoice = string.Empty;
+    private DateTime? scheduledLocal;
+    private IReadOnlyDictionary<string, string[]>? runErrors;
+    private Guid? askReason;
+    private string pendingAction = string.Empty;
+    private string reason = string.Empty;
+
+    private bool Archived => Campaign.Status == "Archived";
+
+    private bool CanWrite => Session.Can(MarketingAccess.CampaignsWrite);
+
+    private bool CanApprove => Session.Can(MarketingAccess.CampaignsApprove);
+
+    private bool CanSend => Session.Can(MarketingAccess.CampaignsSend);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        await LoadAllAsync();
+    }
+
+    private async Task LoadAllAsync()
+    {
+        contents = (await Api.GetAsync<PagedResult<CampaignContentDto>>($"/api/marketing/campaign-contents?campaignId={Campaign.Id}&pageSize=100")).Value?.Items.ToList() ?? [];
+        snapshots = (await Api.GetAsync<PagedResult<AudienceSnapshotDto>>($"/api/marketing/audience-snapshots?campaignId={Campaign.Id}&pageSize=50")).Value?.Items.ToList() ?? [];
+        runs = (await Api.GetAsync<PagedResult<CampaignRunDto>>($"/api/marketing/campaign-runs?campaignId={Campaign.Id}&pageSize=50")).Value?.Items.ToList() ?? [];
+        foreach (var run in runs.Where(r => r.Status is "Running" or "Paused" or "Completed" or "Cancelled"))
+        {
+            await LoadSummaryAsync(run);
+        }
+    }
+
+    private async Task LoadSummaryAsync(CampaignRunDto run)
+    {
+        var result = await Api.GetAsync<RunSummaryDto>($"/api/marketing/campaign-runs/{run.Id}/summary");
+        if (result.IsSuccess) { summaries[run.Id] = result.Value!; }
+    }
+
+    private string SnapshotText(Guid? id) => id is null ? "yok" : snapshots?.FirstOrDefault(s => s.Id == id) is { } s ? $"{CrmLabels.Time(s.TakenAt)} ({s.EligibleCount} uygun)" : "…" + id.ToString()![^8..];
+
+    private string ContentText(Guid? id) => id is null ? "yok" : contents?.FirstOrDefault(c => c.Id == id) is { } c ? $"v{c.VersionNo}" : "…" + id.ToString()![^8..];
+
+    private async Task AddContentAsync()
+    {
+        busy = true;
+        contentErrors = null;
+        var result = await Api.PostAsync<CampaignContentDto>("/api/marketing/campaign-contents",
+            new SaveCampaignContentRequest(CampaignId: Campaign.Id, Subject: string.IsNullOrWhiteSpace(subject) ? null : subject.Trim(), Body: body));
+        busy = false;
+        if (result.IsSuccess) { subject = string.Empty; body = string.Empty; Report($"İçerik v{result.Value!.VersionNo} eklendi.", false); await LoadAllAsync(); }
+        else { contentErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }
+    }
+
+    private async Task CreateRunAsync()
+    {
+        busy = true;
+        runErrors = null;
+        var result = await Api.PostAsync<CampaignRunDto>("/api/marketing/campaign-runs", new SaveCampaignRunRequest(
+            CampaignId: Campaign.Id,
+            SnapshotId: Guid.TryParse(snapshotChoice, out var s) ? s : null,
+            ContentId: Guid.TryParse(contentChoice, out var c) ? c : null,
+            ScheduledAt: scheduledLocal is { } at ? new DateTimeOffset(DateTime.SpecifyKind(at, DateTimeKind.Local)).ToUniversalTime() : null));
+        busy = false;
+        if (result.IsSuccess) { snapshotChoice = string.Empty; contentChoice = string.Empty; scheduledLocal = null; Report("Taslak çalıştırma oluşturuldu.", false); await LoadAllAsync(); }
+        else { runErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }
+    }
+
+    private Task ActAsync(CampaignRunDto run, string action, bool needsReason = false)
+    {
+        if (needsReason)
+        {
+            askReason = run.Id;
+            pendingAction = action;
+            reason = string.Empty;
+            return Task.CompletedTask;
+        }
+
+        return RunActionAsync(run.Id, action, null, run.Version);
+    }
+
+    private async Task ConfirmReasonAsync()
+    {
+        var id = askReason!.Value;
+        var version = runs!.First(r => r.Id == id).Version;
+        askReason = null;
+        await RunActionAsync(id, pendingAction, reason.Trim(), version);
+    }
+
+    private async Task RunActionAsync(Guid id, string action, string? why, long version)
+    {
+        busy = true;
+        var result = await Api.PostAsync<CampaignRunDto>($"/api/marketing/campaign-runs/{id}/{action}", new RunActionRequest(version, why));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Report(result.FieldErrors.Count == 0 ? result.Error : string.Join(" ", result.FieldErrors.Values.SelectMany(v => v)), true);
+            return;
+        }
+
+        Report("İşlem yapıldı.", false);
+        await LoadAllAsync();
+    }
+
+    private async Task ProcessAsync(CampaignRunDto run)
+    {
+        busy = true;
+        var result = await Api.PostAsync<ProcessResultDto>($"/api/marketing/campaign-runs/{run.Id}/process?batchSize=50", new { });
+        busy = false;
+        if (!result.IsSuccess) { Report(result.Error, true); return; }
+        var p = result.Value!;
+        Report($"{p.Processed} teslimat işlendi: {p.Accepted} kabul edildi, {p.Skipped} atlandı, {p.Failed} başarısız, {p.Unknown} belirsiz, {p.Requeued} yeniden sıraya alındı. Kalan: {p.Remaining}{(p.Completed ? " — çalıştırma tamamlandı." : ".")}", false);
+        await LoadAllAsync();
+    }
+
+    private void Report(string? text, bool isFailure)
+    {
+        message = text;
+        failed = isFailure;
+    }
+}

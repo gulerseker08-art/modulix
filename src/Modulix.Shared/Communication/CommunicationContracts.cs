@@ -66,3 +66,10 @@ public sealed record SuppressionPageDto(IReadOnlyList<SuppressionDto> Items, int
 public sealed record SaveSuppressionRequest(string Channel, string Address, string Reason, string? Note, DateTimeOffset? EndsAt);
 
 public sealed record LiftSuppressionRequest(string Reason);
+
+// Oturumsuz tercih merkezi (ADR-0025, dilim 6). Adres maskelidir; durum: subscribed, unsubscribed, blocked, no-consent.
+
+public sealed record PublicCommunicationTokenRequest(string Token);
+
+public sealed record PublicCommunicationView(
+    string Channel, string MaskedAddress, string State, bool CanUnsubscribe, bool CanResubscribe, string? Message, string TenantName, DateTimeOffset ExpiresAt);

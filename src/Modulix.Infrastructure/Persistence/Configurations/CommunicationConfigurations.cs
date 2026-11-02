@@ -66,3 +66,38 @@ internal sealed class CommunicationSuppressionConfiguration : IEntityTypeConfigu
         builder.HasAlternateKey(s => new { s.TenantId, s.Id });
     }
 }
+
+internal sealed class CommunicationLinkTokenConfiguration : IEntityTypeConfiguration<CommunicationLinkToken>
+{
+    public void Configure(EntityTypeBuilder<CommunicationLinkToken> builder)
+    {
+        builder.ToTable("CommunicationLinkTokens", DatabaseSchemas.Core);
+        builder.HasKey(t => t.Id);
+        builder.Property(t => t.Id).ValueGeneratedNever();
+        builder.Property(t => t.TenantId).IsRequired();
+        builder.Property(t => t.TokenHash).HasMaxLength(CommunicationLinkToken.HashLength).IsFixedLength().IsRequired();
+        builder.Property(t => t.Channel).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(t => t.Address).HasMaxLength(CommunicationPreference.AddressMaxLength).IsRequired();
+        builder.Property(t => t.Reference).HasMaxLength(CommunicationLinkToken.ReferenceMaxLength).IsRequired();
+        builder.HasIndex(t => new { t.TenantId, t.TokenHash }).IsUnique();
+    }
+}
+
+internal sealed class FrequencyWindowConfiguration : IEntityTypeConfiguration<FrequencyWindow>
+{
+    public void Configure(EntityTypeBuilder<FrequencyWindow> builder)
+    {
+        builder.ToTable("FrequencyWindows", DatabaseSchemas.Core);
+        builder.HasKey(w => w.Id);
+        builder.Property(w => w.Id).ValueGeneratedNever();
+        builder.Property(w => w.TenantId).IsRequired();
+        builder.Property(w => w.Channel).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(w => w.Address).HasMaxLength(FrequencyWindow.AddressMaxLength).IsRequired();
+        builder.Property(w => w.Day).IsRequired();
+        builder.Property(w => w.Count).IsRequired();
+
+        // Atomik rezervasyonun dayanağı: tenant, kanal, adres ve gün başına tek satır.
+        builder.HasIndex(w => new { w.TenantId, w.Channel, w.Address, w.Day }).IsUnique();
+        builder.ToTable(t => t.HasCheckConstraint("CK_FrequencyWindows_Count", "[Count] >= 0"));
+    }
+}

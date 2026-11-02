@@ -1,0 +1,88 @@
+@page "/pazarlama/rapor"
+@inject ApiClient Api
+
+<PageTitle>Kampanya raporu · Modulix</PageTitle>
+
+@* Kampanya raporu (ADR-0025, dilim 8). "Gönderildi" sağlayıcının kabul ettiği ve sonucu belirsiz iletilerdir; teslim edildi demek değildir. İlk dokunuş: lead açılan hedefe giden en eski ileti bu kampanyadandı.
+   Son dokunuş: lead açılan yanıt bu kampanyanın iletisine verilmişti. Fırsat ve ciro atfı yoktur; maliyet para birimleri arasında toplanmaz. *@
+<AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.ReportsRead">
+    <a class="back-link" href="pazarlama/kampanyalar">← Kampanyalar</a>
+    <div class="page-header"><h1>Kampanya raporu</h1></div>
+
+    <form class="filters" @onsubmit="LoadAsync" @onsubmit:preventDefault>
+        <label class="form-label" for="cr-channel">Kanal</label>
+        <select id="cr-channel" class="form-select" @bind="channel">
+            <option value="">Hepsi</option>
+            <option value="Email">E-posta</option>
+            <option value="Sms">SMS</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Phone">Telefon</option>
+        </select>
+        <button type="submit" class="btn btn-primary" disabled="@busy">Raporu getir</button>
+    </form>
+
+    <Notice Text="@message" Failed="true" />
+    @if (report is null)
+    {
+        <p class="text-muted" role="status">@(busy ? "Yükleniyor…" : "Rapor yüklenemedi.")</p>
+    }
+    else if (report.Rows.Count == 0)
+    {
+        <p class="text-muted">Görebildiğiniz kampanya yok.</p>
+    }
+    else
+    {
+        <p class="small text-muted">@CrmLabels.Time(report.GeneratedAt) tarihinde hazırlandı@(report.Truncated ? " · ilk 1000 kampanya" : null). Kabul edilen ileti teslim edilmiş sayılmaz.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Kampanya raporu</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Kampanya</th><th scope="col">Gönderildi</th><th scope="col">Hatalı</th><th scope="col">Atlandı</th><th scope="col">Yanıt</th>
+                    <th scope="col">İlgi</th><th scope="col">Çıkış</th><th scope="col">Lead</th><th scope="col">İlk dokunuş</th><th scope="col">Son dokunuş</th>
+                    <th scope="col">Maliyet</th><th scope="col">Yanıt başına</th><th scope="col">Lead başına</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in report.Rows)
+                {
+                    <tr>
+                        <td data-label="Kampanya" class="primary"><a href="pazarlama/kampanyalar/@r.CampaignId">@r.Name</a> <small class="text-muted">@r.Code</small></td>
+                        <td data-label="Gönderildi">@r.Sent.ToString("N0")@(r.Unknown > 0 ? $" ({r.Unknown} belirsiz)" : null)</td>
+                        <td data-label="Hatalı">@r.Failed.ToString("N0")</td>
+                        <td data-label="Atlandı">@r.Skipped.ToString("N0")</td>
+                        <td data-label="Yanıt">@r.Responses.ToString("N0")</td>
+                        <td data-label="İlgi">@r.Interested.ToString("N0")</td>
+                        <td data-label="Çıkış">@r.OptOuts.ToString("N0")</td>
+                        <td data-label="Lead">@r.Leads.ToString("N0")</td>
+                        <td data-label="İlk dokunuş">@r.FirstTouchLeads.ToString("N0")</td>
+                        <td data-label="Son dokunuş">@r.LastTouchLeads.ToString("N0")</td>
+                        <td data-label="Maliyet">@Money(r.ActualCost, r.Currency)</td>
+                        <td data-label="Yanıt başına">@Money(r.CostPerResponse, r.Currency)</td>
+                        <td data-label="Lead başına">@Money(r.CostPerLead, r.Currency)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private CampaignReportDto? report;
+    private string channel = string.Empty;
+    private string? message;
+    private bool busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        busy = true;
+        message = null;
+        var result = await Api.GetAsync<CampaignReportDto>(channel.Length == 0 ? "/api/marketing/reports/campaigns" : $"/api/marketing/reports/campaigns?channel={channel}");
+        busy = false;
+        report = result.Value;
+        if (!result.IsSuccess) { message = result.Error; }
+    }
+
+    private static string Money(decimal? amount, string currency) => amount is null ? "—" : CrmLabels.Amount(amount.Value, currency);
+}

@@ -1,0 +1,594 @@
+@page "/pazarlama/segmentler/{Id:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(segment?.Name ?? "Segment") · Modulix</PageTitle>
+
+<AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.SegmentsRead">
+    @if (segment is null && loadError is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (segment is null)
+    {
+        <div class="alert alert-danger" role="alert">@loadError <a href="pazarlama/segmentler">Listeye dön</a></div>
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <h1>@segment.Name</h1>
+                <p class="text-muted mb-0">
+                    <span class="badge stage-@MarketingLabels.StatusBadge(segment.Status)">@MarketingLabels.Label(MarketingLabels.Statuses, segment.Status)</span>
+                    @MarketingLabels.Label(MarketingLabels.Targets, segment.Target) · @(IsDynamic ? "Dinamik" : "Statik") · <code>@segment.Code</code>
+                    @(segment.PublishedVersion > 0 ? $" · yayımlanmış sürüm v{segment.PublishedVersion}" : " · hiç yayımlanmadı")
+                </p>
+            </div>
+            <div class="header-actions">
+                <a class="btn btn-outline-secondary" href="pazarlama/segmentler">Listeye dön</a>
+                @if (CanPublish && !IsArchived)
+                {
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="PublishAsync">@(segment.Status == "Active" ? "Yeni sürümü yayımla" : "Yayımla")</button>
+                }
+                @if (CanPublish && segment.Status == "Active")
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="RefreshAsync">Yenile</button>
+                }
+                @if (CanPublish)
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ToggleArchiveAsync">@(IsArchived ? "Arşivden geri al" : "Arşivle")</button>
+                }
+                @if (CanWrite)
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => copying = !copying">Kopyala</button>
+                }
+            </div>
+        </div>
+
+        <Notice Text="@message" Failed="@failed" />
+
+        @if (copying)
+        {
+            <form class="record-form" novalidate @onsubmit="CopyAsync" @onsubmit:preventDefault>
+                <fieldset disabled="@busy">
+                    <legend class="h6">Segmenti kopyala</legend>
+                    <p class="small text-muted">Hedef, tür, amaç ve koşul kopyalanır; üyeler ve sürüm geçmişi kopyalanmaz. Kopya taslak olarak açılır.</p>
+                    <div class="form-grid">
+                        <div class="span-6">
+                            <label class="form-label" for="copy-name">Yeni ad</label>
+                            <input id="copy-name" class="form-control" maxlength="150" @bind="copyName" />
+                        </div>
+                        <div class="span-6">
+                            <label class="form-label" for="copy-code">Yeni kod</label>
+                            <input id="copy-code" class="form-control" maxlength="40" @bind="copyCode" />
+                        </div>
+                    </div>
+                </fieldset>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Kopyayı oluştur</button></div>
+            </form>
+        }
+
+        <section class="summary-cards" aria-label="Hesaplama özeti">
+            <dl class="summary-list">
+                <div><dt>Son üye sayısı</dt><dd>@(segment.LastMemberCount?.ToString("N0") ?? "—")</dd></div>
+                <div><dt>Son hesaplama</dt><dd>@(segment.LastComputedAt is { } at ? CrmLabels.Time(at) : "—")</dd></div>
+                <div><dt>Süre</dt><dd>@(segment.LastComputeMs is { } ms ? $"{ms} ms" : "—")</dd></div>
+            </dl>
+            @if (segment.LastError is not null)
+            {
+                <div class="alert alert-danger" role="alert">Son hesaplama hatası: @segment.LastError</div>
+            }
+        </section>
+
+        <TabBar Tabs="Tabs" State="tabState" Label="Segment bölümleri" Changed="OnTabChangedAsync" />
+
+        <div id="tabpanel-genel" role="tabpanel" aria-labelledby="tab-genel" hidden="@tabState.Hidden("genel")">
+            <form class="record-form" novalidate @onsubmit="SaveGeneralAsync" @onsubmit:preventDefault>
+                <fieldset disabled="@(busy || !CanWrite || IsArchived)">
+                    <div class="form-grid">
+                        <div class="span-6">
+                            <label class="form-label" for="g-name">Ad</label>
+                            <input id="g-name" class="form-control" maxlength="150" @bind="name" />
+                            <FieldError Field="name" Errors="generalErrors" />
+                        </div>
+                        <div class="span-6">
+                            <label class="form-label" for="g-purpose">Amaç</label>
+                            <input id="g-purpose" class="form-control" maxlength="200" @bind="purpose" />
+                            <FieldError Field="purpose" Errors="generalErrors" />
+                        </div>
+                        <div class="span-12">
+                            <label class="form-label" for="g-desc">Açıklama</label>
+                            <textarea id="g-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
+                            <FieldError Field="description" Errors="generalErrors" />
+                        </div>
+                    </div>
+                </fieldset>
+                @if (IsArchived)
+                {
+                    <p class="text-muted">Arşivlenen segment düzenlenemez; geçmiş raporlarda kalır, yeni kullanımda seçilemez. Düzenlemek için arşivden geri alın.</p>
+                }
+                else if (CanWrite)
+                {
+                    <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button></div>
+                }
+            </form>
+        </div>
+
+        @if (IsDynamic && tabState.Rendered("kosullar"))
+        {
+            <div id="tabpanel-kosullar" role="tabpanel" aria-labelledby="tab-kosullar" hidden="@tabState.Hidden("kosullar")">
+                <p class="text-muted">
+                    Taslak koşul düzenlenir; yayımlanan sürüm değişmez. Önizleme hiçbir şey yazmaz ve yalnızca görebildiğiniz alanlar ve kayıtlarla hesaplanır. @MarketingLabels.NullNote
+                </p>
+                @if (catalog is not null && catalog.Unavailable.Count > 0)
+                {
+                    <details class="mb-2">
+                        <summary>Kullanılamayan alanlar (@catalog.Unavailable.Count)</summary>
+                        <ul>
+                            @foreach (var u in catalog.Unavailable) { <li>@u.Label — @u.Reason</li> }
+                        </ul>
+                    </details>
+                }
+
+                @if (catalog is null)
+                {
+                    <p class="text-muted" role="status">Alanlar yükleniyor…</p>
+                }
+                else if (catalog.Fields.Count == 0)
+                {
+                    <div class="alert alert-warning">Bu hedef türü için kullanabileceğiniz alan yok. İlgili modül bu firma için kapalı olabilir ya da okuma yetkiniz yok.</div>
+                }
+                else if (root is not null)
+                {
+                    <SegmentConditionEditor Node="root" Fields="catalog.Fields" Changed="OnConditionChanged" />
+                }
+
+                <ErrorSummary Errors="conditionErrors" />
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline-secondary" disabled="@(busy || root is null)" @onclick="() => PreviewAsync(1)">Önizle</button>
+                    @if (CanWrite && !IsArchived)
+                    {
+                        <button type="button" class="btn btn-primary" disabled="@(busy || root is null)" @onclick="SaveDraftAsync">Taslağı kaydet</button>
+                    }
+                    @if (draftDirty) { <span class="text-muted" role="status">Kaydedilmemiş değişiklik var.</span> }
+                </div>
+
+                @if (preview is not null)
+                {
+                    <section aria-labelledby="preview-title">
+                        <h2 id="preview-title" class="h5">Önizleme</h2>
+                        <p role="status" aria-live="polite"><strong>@preview.Count.ToString("N0")</strong> hedef · @preview.DurationMs ms</p>
+                        @if (preview.RowsHidden)
+                        {
+                            <p class="text-muted">Alıcı listesini görüntüleme yetkiniz yok; yalnızca sayı gösterilir.</p>
+                        }
+                        else if (preview.Rows.Count > 0)
+                        {
+                            <table class="table record-table">
+                                <caption class="visually-hidden">Önizleme örnek satırları</caption>
+                                <thead><tr><th scope="col">Hedef</th></tr></thead>
+                                <tbody>
+                                    @foreach (var r in preview.Rows) { <tr><td data-label="Hedef" class="primary">@(r.Label ?? r.Id.ToString())</td></tr> }
+                                </tbody>
+                            </table>
+                            <Pager Page="previewPage" PageSize="10" TotalCount="preview.Count" PageChanged="PreviewAsync" />
+                        }
+                    </section>
+                }
+            </div>
+        }
+
+        @if (tabState.Rendered("uyeler"))
+        {
+            <div id="tabpanel-uyeler" role="tabpanel" aria-labelledby="tab-uyeler" hidden="@tabState.Hidden("uyeler")">
+                @if (IsDynamic && segment.PublishedVersion == 0)
+                {
+                    <div class="alert alert-info">Segment henüz yayımlanmadı: aşağıda yalnızca elle dahil ettiğiniz hedefler görünür. Koşul sonucu yayımlandıktan sonra eklenir.</div>
+                }
+                <section aria-labelledby="members-title">
+                    <h2 id="members-title" class="h5">Güncel üyelik @(members is null ? null : $"({members.Count:N0})")</h2>
+                    <p class="text-muted">@(IsDynamic ? "Yayımlanmış koşul sonucu, artı elle dahil edilenler, eksi hariç tutulanlar." : "Elle dahil edilen hedefler.")</p>
+                    @if (membersError is not null)
+                    {
+                        <div class="alert alert-danger" role="alert">@membersError</div>
+                    }
+                    else if (members is null)
+                    {
+                        <p class="text-muted" role="status">Yükleniyor…</p>
+                    }
+                    else if (members.RowsHidden)
+                    {
+                        <p class="text-muted">Alıcı listesini görüntüleme yetkiniz yok; yalnızca sayı gösterilir.</p>
+                    }
+                    else if (members.Rows.Count == 0)
+                    {
+                        <p class="text-muted">Bu segmentte üye yok.</p>
+                    }
+                    else
+                    {
+                        <table class="table record-table">
+                            <caption class="visually-hidden">Segment üyeleri</caption>
+                            <thead><tr><th scope="col">Hedef</th>@if (CanManageMembers && IsDynamic) { <th scope="col">İşlem</th> }</tr></thead>
+                            <tbody>
+                                @foreach (var r in members.Rows)
+                                {
+                                    <tr>
+                                        <td data-label="Hedef" class="primary">@(r.Label ?? r.Id.ToString())</td>
+                                        @if (CanManageMembers && IsDynamic)
+                                        {
+                                            <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => ExcludeAsync(r)">Hariç tut</button></td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <Pager Page="membersPage" PageSize="10" TotalCount="members.Count" PageChanged="LoadMembersAsync" />
+                    }
+                </section>
+
+                <section aria-labelledby="exceptions-title">
+                    <h2 id="exceptions-title" class="h5">@(IsDynamic ? "Dahil/hariç istisnalar" : "Elle eklenen üyeler")</h2>
+                    @if (exceptions is null)
+                    {
+                        <p class="text-muted" role="status">Yükleniyor…</p>
+                    }
+                    else if (exceptions.Count == 0)
+                    {
+                        <p class="text-muted">Kayıtlı @(IsDynamic ? "istisna" : "üye") yok.</p>
+                    }
+                    else
+                    {
+                        <table class="table record-table">
+                            <caption class="visually-hidden">Segment üye kayıtları</caption>
+                            <thead><tr><th scope="col">Tür</th><th scope="col">Hedef kimliği</th><th scope="col">Gerekçe</th>@if (CanManageMembers) { <th scope="col">İşlem</th> }</tr></thead>
+                            <tbody>
+                                @foreach (var m in exceptions)
+                                {
+                                    <tr>
+                                        <td data-label="Tür"><span class="badge stage-@(m.Kind == "Exclude" ? "lost" : "won")">@(m.Kind == "Exclude" ? "Hariç" : "Dahil")</span></td>
+                                        <td data-label="Hedef kimliği"><code>…@m.TargetId.ToString()[^8..]</code></td>
+                                        <td data-label="Gerekçe">@(m.Reason ?? "—")</td>
+                                        @if (CanManageMembers)
+                                        {
+                                            <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => RemoveMemberAsync(m)">Kaldır</button></td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+
+                    @if (CanManageMembers)
+                    {
+                        <form class="record-form" novalidate @onsubmit="SearchTargetsAsync" @onsubmit:preventDefault>
+                            <fieldset disabled="@busy">
+                                <legend class="h6">Hedef ekle</legend>
+                                <p class="small text-muted">Hedefi CRM kayıtlarında arayın (CRM okuma yetkisi gerekir). Yalnızca erişebildiğiniz kayıtlar eklenir.</p>
+                                <div class="filters">
+                                    <label class="visually-hidden" for="t-search">Hedef ara</label>
+                                    <input id="t-search" class="form-control" type="search" placeholder="Ad ara" @bind="targetSearch" />
+                                    <label class="visually-hidden" for="t-kind">Tür</label>
+                                    <select id="t-kind" class="form-select form-select-sm filter-select" @bind="memberKind">
+                                        <option value="Include">Dahil et</option>
+                                        @if (IsDynamic) { <option value="Exclude">Hariç tut</option> }
+                                    </select>
+                                    <label class="visually-hidden" for="t-reason">Gerekçe</label>
+                                    <input id="t-reason" class="form-control" maxlength="200" placeholder="Gerekçe (isteğe bağlı)" @bind="memberReason" />
+                                    <button type="submit" class="btn btn-outline-secondary">Ara</button>
+                                </div>
+                            </fieldset>
+                            @if (targetMessage is not null) { <div class="alert alert-warning" role="status">@targetMessage</div> }
+                            @if (targetResults is { Count: > 0 })
+                            {
+                                <ul class="list-unstyled">
+                                    @foreach (var t in targetResults)
+                                    {
+                                        <li><button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => AddMemberAsync(t.Id)">@t.Label — ekle</button></li>
+                                    }
+                                </ul>
+                            }
+                        </form>
+                    }
+                </section>
+            </div>
+        }
+
+        @if (IsDynamic && tabState.Rendered("surumler"))
+        {
+            <div id="tabpanel-surumler" role="tabpanel" aria-labelledby="tab-surumler" hidden="@tabState.Hidden("surumler")">
+                @if (versions is null)
+                {
+                    <p class="text-muted" role="status">Yükleniyor…</p>
+                }
+                else if (versions.Count == 0)
+                {
+                    <p class="text-muted">Henüz yayımlanmış sürüm yok. Yayımlanan koşul değişmez; kampanyalar sürüm numarasına bağlanır.</p>
+                }
+                else
+                {
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Yayımlanmış sürümler</caption>
+                        <thead><tr><th scope="col">Sürüm</th><th scope="col">Yayın zamanı</th><th scope="col">Koşul</th></tr></thead>
+                        <tbody>
+                            @foreach (var v in versions)
+                            {
+                                <tr>
+                                    <td data-label="Sürüm" class="primary">v@(v.VersionNo)</td>
+                                    <td data-label="Yayın zamanı">@CrmLabels.Time(v.PublishedAt)</td>
+                                    <td data-label="Koşul"><details><summary>Koşulu göster</summary><pre class="cond-json">@v.Definition</pre></details></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        }
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private SegmentDto? segment;
+    private string? loadError;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private bool copying;
+    private string copyName = string.Empty;
+    private string copyCode = string.Empty;
+
+    private readonly TabState tabState = new("genel");
+    private string name = string.Empty;
+    private string purpose = string.Empty;
+    private string description = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? generalErrors;
+
+    private SegmentFieldsResponse? catalog;
+    private ConditionNode? root;
+    private bool draftDirty;
+    private SegmentEvaluationDto? preview;
+    private int previewPage = 1;
+    private IReadOnlyDictionary<string, string[]>? conditionErrors;
+
+    private SegmentEvaluationDto? members;
+    private int membersPage = 1;
+    private string? membersError;
+    private List<SegmentMemberDto>? exceptions;
+    private string targetSearch = string.Empty;
+    private string memberKind = "Include";
+    private string memberReason = string.Empty;
+    private List<TargetChoice>? targetResults;
+    private string? targetMessage;
+
+    private List<SegmentVersionDto>? versions;
+
+    private sealed record TargetChoice(Guid Id, string Label);
+
+    private bool IsDynamic => segment?.Kind == "Dynamic";
+
+    private bool IsArchived => segment?.Status == "Archived";
+
+    private bool CanWrite => Session.Can(MarketingAccess.SegmentsWrite);
+
+    private bool CanPublish => Session.Can(MarketingAccess.SegmentsPublish);
+
+    private bool CanManageMembers => CanWrite && !IsArchived;
+
+    private IReadOnlyList<TabItem> Tabs => segment is null
+        ? []
+        : [new("genel", "Genel"), .. IsDynamic ? new[] { new TabItem("kosullar", "Koşullar") } : [], new("uyeler", "Üyeler"), .. IsDynamic ? new[] { new TabItem("surumler", "Sürümler", segment.PublishedVersion) } : []];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(MarketingAccess.SegmentsRead)) { await LoadAsync(); }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<SegmentDto>($"/api/marketing/segments/{Id}");
+        if (!result.IsSuccess)
+        {
+            loadError = result.Error;
+            return;
+        }
+
+        Apply(result.Value!);
+    }
+
+    private void Apply(SegmentDto value)
+    {
+        segment = value;
+        name = value.Name;
+        purpose = value.Purpose ?? string.Empty;
+        description = value.Description ?? string.Empty;
+        root = IsDynamic ? ConditionNode.FromJson(value.Draft) ?? NewRoot() : null;
+        draftDirty = false;
+    }
+
+    private static ConditionNode NewRoot()
+    {
+        var group = ConditionNode.NewGroup();
+        group.Items.Add(ConditionNode.NewLeaf());
+        return group;
+    }
+
+    private async Task OnTabChangedAsync(string key)
+    {
+        switch (key)
+        {
+            case "kosullar" when catalog is null:
+                catalog = (await Api.GetAsync<SegmentFieldsResponse>($"/api/marketing/segment-fields?target={segment!.Target}")).Value;
+                break;
+            case "uyeler" when exceptions is null:
+                await LoadMembersAsync(1);
+                await LoadExceptionsAsync();
+                break;
+            case "surumler" when versions is null:
+                versions = (await Api.GetAsync<PagedResult<SegmentVersionDto>>($"/api/marketing/segment-versions?segmentId={Id}&pageSize=50")).Value?.Items.ToList() ?? [];
+                break;
+        }
+    }
+
+    private void OnConditionChanged()
+    {
+        draftDirty = true;
+        preview = null;
+    }
+
+    private SaveSegmentRequest Save(string? draft) =>
+        new(segment!.Version, segment.Code, name.Trim(), Blank(description), segment.Target, segment.Kind, Blank(purpose), segment.OwnerId, draft);
+
+    private async Task SaveGeneralAsync()
+    {
+        busy = true;
+        generalErrors = null;
+        message = null;
+        var result = await Api.PutAsync<SegmentDto>($"/api/marketing/segments/{Id}", Save(segment!.Draft));
+        busy = false;
+        if (result.IsSuccess) { Apply(result.Value!); Report("Segment kaydedildi.", false); }
+        else { generalErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }
+    }
+
+    private async Task SaveDraftAsync()
+    {
+        busy = true;
+        conditionErrors = null;
+        message = null;
+        var result = await Api.PutAsync<SegmentDto>($"/api/marketing/segments/{Id}", Save(root!.ToJson().ToJsonString()));
+        busy = false;
+        if (result.IsSuccess) { Apply(result.Value!); Report("Taslak koşul kaydedildi. Yeni sürüm için Yayımla'yı kullanın.", false); }
+        else { conditionErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }
+    }
+
+    private async Task PreviewAsync(int pageNumber)
+    {
+        busy = true;
+        conditionErrors = null;
+        message = null;
+        previewPage = pageNumber;
+        var result = await Api.PostAsync<SegmentEvaluationDto>("/api/marketing/segments/preview", new PreviewSegmentRequest(segment!.Target, root!.ToJson(), pageNumber, 10));
+        busy = false;
+        if (result.IsSuccess) { preview = result.Value; }
+        else { preview = null; conditionErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }
+    }
+
+    private Task PublishAsync() => RunActionAsync($"/api/marketing/segments/{Id}/publish", new SegmentActionRequest(segment!.Version), "Segment yayımlandı.");
+
+    private Task RefreshAsync() => RunActionAsync($"/api/marketing/segments/{Id}/refresh", new SegmentActionRequest(), "Segment yenilendi.");
+
+    private Task ToggleArchiveAsync() =>
+        RunActionAsync($"/api/marketing/segments/{Id}/{(IsArchived ? "restore" : "archive")}", new SegmentActionRequest(segment!.Version), IsArchived ? "Segment arşivden geri alındı." : "Segment arşivlendi.");
+
+    private async Task RunActionAsync(string url, object body, string done)
+    {
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<SegmentDto>(url, body);
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Report(result.FieldErrors.Count == 0 ? result.Error : string.Join(" ", result.FieldErrors.Values.SelectMany(v => v)), true);
+            return;
+        }
+
+        Apply(result.Value!);
+        Report(done, false);
+        preview = null;
+        if (tabState.Rendered("uyeler")) { await LoadMembersAsync(1); }
+        versions = null;
+        if (tabState.Rendered("surumler")) { await OnTabChangedAsync("surumler"); }
+    }
+
+    private async Task CopyAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<SegmentDto>($"/api/marketing/segments/{Id}/copy", new CopySegmentRequest(copyCode.Trim(), copyName.Trim()));
+        busy = false;
+        if (result.IsSuccess) { Navigation.NavigateTo($"pazarlama/segmentler/{result.Value!.Id}"); }
+        else { Report(result.FieldErrors.Count == 0 ? result.Error : string.Join(" ", result.FieldErrors.Values.SelectMany(v => v)), true); }
+    }
+
+    private async Task LoadMembersAsync(int pageNumber)
+    {
+        membersPage = pageNumber;
+        var result = await Api.GetAsync<SegmentEvaluationDto>($"/api/marketing/segments/{Id}/members?page={pageNumber}&pageSize=10");
+        members = result.Value;
+        membersError = result.IsSuccess ? null : result.Error;
+    }
+
+    private async Task LoadExceptionsAsync() =>
+        exceptions = (await Api.GetAsync<PagedResult<SegmentMemberDto>>($"/api/marketing/segment-members?segmentId={Id}&pageSize=100")).Value?.Items.ToList() ?? [];
+
+    private async Task ExcludeAsync(SegmentRowDto row) => await AddMemberCoreAsync(row.Id, "Exclude");
+
+    private Task AddMemberAsync(Guid targetId) => AddMemberCoreAsync(targetId, memberKind);
+
+    private async Task AddMemberCoreAsync(Guid targetId, string kind)
+    {
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<SegmentMemberDto>("/api/marketing/segment-members",
+            new SaveSegmentMemberRequest(SegmentId: Id, TargetId: targetId, Kind: kind, Reason: Blank(memberReason)));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Report(result.FieldErrors.Count == 0 ? result.Error : string.Join(" ", result.FieldErrors.Values.SelectMany(v => v)), true);
+            return;
+        }
+
+        Report(kind == "Exclude" ? "Hedef hariç tutuldu." : "Hedef eklendi.", false);
+        targetResults = null;
+        await LoadMembersAsync(1);
+        await LoadExceptionsAsync();
+    }
+
+    private async Task RemoveMemberAsync(SegmentMemberDto member)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/marketing/segment-members/{member.Id}?version={member.Version}");
+        busy = false;
+        if (!result.IsSuccess) { Report(result.Error, true); return; }
+        Report("Kayıt kaldırıldı.", false);
+        await LoadMembersAsync(1);
+        await LoadExceptionsAsync();
+    }
+
+    /// <summary>Hedef arama CRM kayıtlarından yapılır (ortak firma/kişi/lead); CRM kapalı ya da yetki yoksa nedeni gösterilir.</summary>
+    private async Task SearchTargetsAsync()
+    {
+        targetMessage = null;
+        targetResults = null;
+        var term = Uri.EscapeDataString(targetSearch.Trim());
+        switch (segment!.Target)
+        {
+            case "Company":
+                var companies = await Api.GetAsync<CrmPage<CompanyDto>>($"/api/crm/companies?search={term}&pageSize=10");
+                targetResults = companies.Value?.Items.Where(c => c.PartyId is not null).Select(c => new TargetChoice(c.PartyId!.Value, c.Name)).ToList();
+                targetMessage = companies.IsSuccess ? null : companies.Error;
+                break;
+            case "Person":
+                var people = await Api.GetAsync<CrmPage<ContactDto>>($"/api/crm/contacts?search={term}&pageSize=10");
+                targetResults = people.Value?.Items.Where(c => c.PersonId is not null).Select(c => new TargetChoice(c.PersonId!.Value, $"{c.FirstName} {c.LastName}".Trim())).ToList();
+                targetMessage = people.IsSuccess ? null : people.Error;
+                break;
+            default:
+                var leads = await Api.GetAsync<CrmPage<LeadDto>>($"/api/crm/leads?search={term}&pageSize=10");
+                targetResults = leads.Value?.Items.Select(l => new TargetChoice(l.Id, $"{l.Subject} ({l.LeadNumber})")).ToList();
+                targetMessage = leads.IsSuccess ? null : leads.Error;
+                break;
+        }
+
+        if (targetMessage is null && targetResults is { Count: 0 }) { targetMessage = "Aramaya uyan kayıt yok."; }
+    }
+
+    private void Report(string? text, bool isFailure)
+    {
+        message = text;
+        failed = isFailure;
+    }
+
+    private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}
