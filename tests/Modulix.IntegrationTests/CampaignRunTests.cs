@@ -23,7 +23,7 @@ namespace Modulix.IntegrationTests;
 /// ADR-0025 dilim 5: içerik sürümü, onay (görev ayrılığı), başlatma, işleme, gönderim öncesi yeniden denetim, sıklık sınırı ve belirsiz sonuç. Dört test türü: mutlu yol,
 /// hata/doğrulama, tenant izolasyonu, yetki. Test sağlayıcısı iletiyi hiçbir yere göndermez; bu testlerde gerçek ileti gitmez.
 /// </summary>
-public class CampaignRunTests : IClassFixture<ModulixApiFactory>, IAsyncLifetime
+public partial class CampaignRunTests : IClassFixture<ModulixApiFactory>, IAsyncLifetime
 {
     private static readonly System.Collections.Concurrent.ConcurrentBag<MessageRequest> Sent = [];
 

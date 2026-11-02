@@ -974,6 +974,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<IRecordStore, ActivityLinkRecordStore>();
         services.AddScoped<IRecordStore, ActivityParticipantRecordStore>();
         services.AddScoped<Modulix.Core.Contracts.Marketing.ISegmentFieldSource, CrmSegmentFieldSource>();
+        services.AddScoped<Modulix.Core.Contracts.Marketing.ICampaignLeads, CrmCampaignLeads>();
         services.AddScoped<Modulix.Core.Contracts.Marketing.IRecipientResolver, CrmRecipientResolver>();
         services.AddScoped<Modulix.Core.Contracts.Marketing.IAddressLookup>(sp => (CrmRecipientResolver)sp.GetRequiredService<Modulix.Core.Contracts.Marketing.IRecipientResolver>());
         services.AddScoped<IActivityLinkTarget, CompanyLinkTarget>();

@@ -84,6 +84,9 @@ internal sealed class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
         builder.Property(c => c.Channel).HasMaxLength(20).IsRequired();
         builder.Property(c => c.RecipientRule).HasMaxLength(20).IsRequired();
         builder.Property(c => c.RecipientRole).HasMaxLength(Campaign.RoleMaxLength);
+        builder.Property(c => c.UtmSource).HasMaxLength(Campaign.UtmMaxLength);
+        builder.Property(c => c.UtmMedium).HasMaxLength(Campaign.UtmMaxLength);
+        builder.Property(c => c.UtmCampaign).HasMaxLength(Campaign.UtmMaxLength);
         builder.Property(c => c.Status).HasMaxLength(20).IsRequired();
 
         builder.HasIndex(c => new { c.TenantId, c.Code }).IsUnique().HasDatabaseName("UX_Campaigns_Code");
@@ -177,5 +180,24 @@ internal sealed class CampaignDeliveryConfiguration : IEntityTypeConfiguration<C
         builder.HasIndex(d => new { d.TenantId, d.RunId, d.Status });
         builder.HasOne<CampaignRun>().WithMany().HasForeignKey(d => new { d.TenantId, d.RunId })
             .HasPrincipalKey(r => new { r.TenantId, r.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class CampaignResponseConfiguration : IEntityTypeConfiguration<CampaignResponse>
+{
+    public void Configure(EntityTypeBuilder<CampaignResponse> builder)
+    {
+        MarketingTables.ConfigureCommon(builder, "CampaignResponses");
+        builder.Property(r => r.Kind).HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Status).HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Note).HasMaxLength(CampaignResponse.NoteMaxLength);
+        builder.Property(r => r.ClosedReason).HasMaxLength(CampaignResponse.ReasonMaxLength);
+        builder.HasIndex(r => new { r.TenantId, r.CampaignId, r.Status });
+        builder.HasIndex(r => new { r.TenantId, r.OwnerId, r.Status });
+        builder.HasIndex(r => new { r.TenantId, r.DeliveryId });
+        builder.HasOne<Campaign>().WithMany().HasForeignKey(r => new { r.TenantId, r.CampaignId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CampaignRun>().WithMany().HasForeignKey(r => new { r.TenantId, r.RunId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }

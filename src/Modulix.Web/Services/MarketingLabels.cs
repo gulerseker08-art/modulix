@@ -28,6 +28,19 @@ public static class MarketingLabels
 
     public static string Label((string Key, string Label)[] list, string key) => list.FirstOrDefault(i => i.Key == key).Label ?? key;
 
+    public static readonly (string Key, string Label)[] ResponseKinds =
+    [
+        ("Interested", "İlgilendi"), ("Question", "Soru"), ("MeetingRequest", "Görüşme talebi"), ("NotInterested", "İlgilenmiyor"),
+        ("OptOut", "İletişim istemiyor"), ("Complaint", "Şikâyet"), ("Other", "Diğer"),
+    ];
+
+    public static string ResponseKind(string kind) => Label(ResponseKinds, kind);
+
+    public static string ResponseStatus(string status) => status switch
+    {
+        "New" => "Yeni", "InProgress" => "İşlemde", "Converted" => "Lead'e dönüştü", "Closed" => "Kapalı", _ => status,
+    };
+
     public static string Operator(string key) => Operators.GetValueOrDefault(key, key);
 
     public static string StatusBadge(string status) => status switch { "Active" => "won", "Archived" => "cancelled", _ => "lead" };
