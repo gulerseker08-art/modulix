@@ -9,10 +9,12 @@ using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
+using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Identity;
+using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.Infrastructure.Users;
@@ -78,6 +80,12 @@ internal sealed class UserAdministration(
             members = members.Where(m => db.MembershipRoles.Any(mr => mr.RoleId == roleId && mr.MembershipId == m.Membership.Id));
         }
 
+        if (query.BusinessUnitId is { } businessUnitId)
+        {
+            // Departman üyelikleri RLS altındadır; alt sorgu aynı veritabanında çalışır (ADR-0020).
+            members = members.Where(m => db.BusinessUnitMembers.Any(bm => bm.BusinessUnitId == businessUnitId && bm.MembershipId == m.Membership.Id));
+        }
+
         var total = await members.CountAsync(cancellationToken);
         var rows = await members
             .OrderBy(m => m.User.DisplayName).ThenBy(m => m.User.Email)
@@ -86,7 +94,10 @@ internal sealed class UserAdministration(
             .ToListAsync(cancellationToken);
 
         var rolesByMembership = await LoadRolesAsync(rows.Select(r => r.Membership.Id).ToList(), cancellationToken);
-        var items = rows.Select(r => ToUser(r.Membership, r.User, rolesByMembership, tenant)).ToList();
+        var unitNames = await LoadBusinessUnitNamesAsync(rows.Select(r => r.Membership.Id).ToList(), cancellationToken);
+        var items = rows
+            .Select(r => ToUser(r.Membership, r.User, rolesByMembership, tenant) with { BusinessUnitName = unitNames.GetValueOrDefault(r.Membership.Id) })
+            .ToList();
         return new UserPage(items, page, pageSize, total);
     }
 
@@ -106,7 +117,8 @@ internal sealed class UserAdministration(
         }
 
         var rolesByMembership = await LoadRolesAsync([membershipId], cancellationToken);
-        return ToUser(row.Membership, row.User, rolesByMembership, tenant);
+        var unitNames = await LoadBusinessUnitNamesAsync([membershipId], cancellationToken);
+        return ToUser(row.Membership, row.User, rolesByMembership, tenant) with { BusinessUnitName = unitNames.GetValueOrDefault(membershipId) };
     }
 
     public Task<InvitationResult> InviteAsync(UserInvitation invitation, CancellationToken cancellationToken) =>
@@ -143,6 +155,7 @@ internal sealed class UserAdministration(
             await EnsureActorIsAdministratorAsync(tenant, cancellationToken);
         }
 
+        var businessUnit = await ResolveInviteBusinessUnitAsync(tenant, invitation.BusinessUnitId, cancellationToken);
         var now = time.GetUtcNow();
         await EnsureInvitationAllowanceAsync(tenant, now, cancellationToken);
 
@@ -178,12 +191,15 @@ internal sealed class UserAdministration(
             db.MembershipRoles.Add(new MembershipRole(membership.Id, roleId));
         }
 
+        db.BusinessUnitMembers.Add(new BusinessUnitMember(businessUnit.Id, membership.Id));
+
         Audit(tenant, membership.Id, AuditAction.Created, before: null, after: new JsonObject
         {
             ["email"] = email,
             ["displayName"] = user.DisplayName,
             ["status"] = membership.Status.ToString(),
             ["roles"] = new JsonArray([.. assignable.Select(r => r.Name).Order(StringComparer.Ordinal).Select(n => JsonValue.Create(n))]),
+            ["businessUnit"] = businessUnit.Name,
         });
 
         await db.SaveChangesAsync(cancellationToken);
@@ -514,6 +530,28 @@ internal sealed class UserAdministration(
 
         return assignments.GroupBy(a => a.MembershipId).ToDictionary(g => g.Key, g => g.Select(a => a.Role).ToList());
     }
+
+    /// <summary>Davetin departmanı: verilmişse etkin olmalı, verilmemişse kök departman (ADR-0026 K4).</summary>
+    private async Task<BusinessUnit> ResolveInviteBusinessUnitAsync(TenantContext tenant, Guid? businessUnitId, CancellationToken cancellationToken)
+    {
+        if (businessUnitId is { } id)
+        {
+            return await db.BusinessUnits.SingleOrDefaultAsync(u => u.Id == id && u.IsActive, cancellationToken)
+                ?? throw new ArgumentException("Bu kuruluşta bulunmayan ya da kapalı bir departman seçildi.", "businessUnitId");
+        }
+
+        var tenantName = await db.Tenants.AsNoTracking()
+            .Where(t => t.Id == tenant.TenantId).Select(t => t.Name).SingleAsync(cancellationToken);
+        return await DefaultBusinessUnit.EnsureRootAsync(db, tenantName, cancellationToken);
+    }
+
+    private async Task<Dictionary<Guid, string>> LoadBusinessUnitNamesAsync(IReadOnlyCollection<Guid> membershipIds, CancellationToken cancellationToken) =>
+        await (
+            from member in db.BusinessUnitMembers.AsNoTracking()
+            join unit in db.BusinessUnits.AsNoTracking() on member.BusinessUnitId equals unit.Id
+            where membershipIds.Contains(member.MembershipId)
+            select new { member.MembershipId, unit.Name })
+            .ToDictionaryAsync(x => x.MembershipId, x => x.Name, cancellationToken);
 
     /// <summary>Hedef üyelik yöneticiyse işlemi yalnızca yönetici yapabilir.</summary>
     private async Task EnsureMayManageAsync(TenantContext tenant, Guid membershipId, CancellationToken cancellationToken)

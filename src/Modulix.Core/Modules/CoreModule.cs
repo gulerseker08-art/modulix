@@ -94,6 +94,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Şube (ADR-0008): ad ve bağlı olduğu şirket; kaydın kimliği şubenin kimliğidir.</summary>
         public const string Branch = "core.branch";
+
+        /// <summary>Departman (ADR-0026): ad, kod, tür, üst departman ve açık/kapalı; kaydın kimliği departmanın kimliğidir.</summary>
+        public const string BusinessUnit = "core.business-unit";
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
         public const string Audit = "core.audit";
@@ -268,10 +271,20 @@ public sealed class CoreModule : IModule
         {
             ["name"] = "Ad", ["company"] = "Şirket",
         }, "name"),
+        new(AuditedEntityKeys.BusinessUnit, "Departman", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["code"] = "Kod", ["kind"] = "Tür", ["parent"] = "Üst departman", ["isActive"] = "Etkin",
+        }, "name")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["kind"] = new Dictionary<string, string> { ["Center"] = "Merkez", ["Dealer"] = "Bayi", ["Other"] = "Diğer" },
+            },
+        },
         new(AuditedEntityKeys.Membership, "Kullanıcı", null, new Dictionary<string, string>
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["status"] = "Durum", ["roles"] = "Roller",
-            ["companies"] = "Şirketler",
+            ["companies"] = "Şirketler", ["businessUnit"] = "Departman",
             ["invitedAt"] = "Davet", ["lockedOut"] = "Kilit", ["passwordResetRequestedAt"] = "Şifre sıfırlama bağlantısı",
             ["sessionsClosedAt"] = "Oturumları kapatıldı",
         }, "displayName")

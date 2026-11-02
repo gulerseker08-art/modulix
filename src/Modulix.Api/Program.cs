@@ -174,6 +174,7 @@ app.MapAccessEndpoints();
 app.MapUserEndpoints();
 app.MapCompanyEndpoints();
 app.MapTeamEndpoints();
+app.MapBusinessUnitEndpoints();
 app.MapCommunicationEndpoints();
 app.MapCustomFieldEndpoints();
 app.MapChoiceListEndpoints();

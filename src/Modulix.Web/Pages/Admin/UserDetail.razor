@@ -46,6 +46,7 @@
 
         <dl class="detail-grid">
             <div><dt>E-posta</dt><dd>@user.Email</dd></div>
+            <div><dt>Departman</dt><dd>@(currentUnit?.PathNames ?? user.BusinessUnitName ?? "—")</dd></div>
             <div><dt>Son giriş</dt><dd>@(user.LastSignInAt is { } at ? CrmLabels.Time(at) : "—")</dd></div>
             <div><dt>Eklenme</dt><dd>@CrmLabels.Time(user.CreatedAt)</dd></div>
             @if (user.InvitedAt is { } invitedAt)
@@ -58,6 +59,33 @@
         {
             <div class="alert alert-info">Bu kullanıcı bir yönetici. Hesabında yalnızca bir yönetici işlem yapabilir.</div>
         }
+
+        @* Departman (ADR-0026): kullanıcı tam bir departmandadır. Departman değişince kullanıcının sorumlu olduğu kayıtlar da yeni departmanla görünür. *@
+        <section class="detail-section">
+            <div class="section-header"><h2>Departman</h2></div>
+            @if (units.Count == 0)
+            {
+                <p class="text-muted">Departman bilgisi yüklenemedi.</p>
+            }
+            else
+            {
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="user-unit">Departman</label>
+                        <select id="user-unit" class="form-select" @bind="selectedUnitId" disabled="@Locked">
+                            @foreach (var unit in units.Where(u => u.IsActive || u.Id == currentUnit?.Id))
+                            {
+                                <option value="@unit.Id">@unit.PathNames@(unit.IsActive ? "" : " (kapalı)")</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <p class="text-muted small">Departmanı değiştirmek, kullanıcının sorumlu olduğu kayıtların hangi departmanda görüneceğini değiştirir.</p>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" disabled="@(busy || Locked || selectedUnitId == currentUnit?.Id)" @onclick="SaveUnitAsync">Departmanı kaydet</button>
+                </div>
+            }
+        </section>
 
         <section class="detail-section">
             <div class="section-header"><h2>Roller</h2></div>
@@ -194,6 +222,9 @@
     private HashSet<Guid> selectedRoles = [];
     private IReadOnlyList<TeamDto> teams = [];
     private HashSet<Guid> selectedTeams = [];
+    private IReadOnlyList<BusinessUnitDto> units = [];
+    private MembershipBusinessUnitDto? currentUnit;
+    private Guid selectedUnitId;
     private IReadOnlyList<OperatingCompanyDto> companies = [];
     private Dictionary<Guid, CompanyAssignmentState> assignments = [];
     private Dictionary<Guid, IReadOnlyList<BranchDto>> branchesByCompany = [];
@@ -233,6 +264,7 @@
             roles = (await Api.GetAsync<List<RoleDto>>("/api/roles")).Value ?? [];
             await LoadAsync();
             await LoadTeamsAsync();
+            await LoadUnitAsync();
             if (Session.Can(CoreAccess.ManageCompanies))
             {
                 await LoadCompaniesAsync();
@@ -349,6 +381,32 @@
         notice = action.Handover && receiverId is not null
             ? $"{action.Done} Kayıtlar {receivers.FirstOrDefault(r => r.MembershipId == receiverId)?.DisplayName} kişisine devredildi."
             : action.Done;
+    }
+
+    private async Task LoadUnitAsync()
+    {
+        units = (await Api.GetAsync<List<BusinessUnitDto>>("/api/business-units")).Value ?? [];
+        currentUnit = (await Api.GetAsync<MembershipBusinessUnitDto>($"/api/users/{MembershipId}/business-unit")).Value;
+        selectedUnitId = currentUnit?.Id ?? Guid.Empty;
+    }
+
+    private async Task SaveUnitAsync()
+    {
+        busy = true;
+        notice = null;
+        message = null;
+        var result = await Api.PutAsync<bool>($"/api/users/{MembershipId}/business-unit", new SetMembershipBusinessUnitRequest(selectedUnitId));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            message = result.FieldErrors.Count > 0 ? string.Join(" ", result.FieldErrors.Values.SelectMany(v => v)) : result.Error;
+            return;
+        }
+
+        await LoadAsync();
+        await LoadUnitAsync();
+        accessVersion++;
+        notice = "Departman kaydedildi.";
     }
 
     private async Task LoadTeamsAsync()

@@ -143,6 +143,7 @@ internal sealed class PlatformAdministration(
 
         var administrator = await roles.EnsureSystemRoleAsync(cancellationToken);
         await DefaultCompany.EnsureAsync(tenantDb, tenant.Name, cancellationToken);
+        await DefaultBusinessUnit.EnsureRootAsync(tenantDb, tenant.Name, cancellationToken);
         foreach (var template in templates)
         {
             await roles.CreateAsync(template.Name, template.Permissions, cancellationToken, scope: template.Scope);
