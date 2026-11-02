@@ -4,7 +4,6 @@
 name: modulix
 
 x-sqlserver-image: &sqlserver-image mcr.microsoft.com/mssql/server:2025-latest
-
 services:
   sqlserver:
     image: *sqlserver-image
@@ -48,6 +47,21 @@ services:
     ports:
       - "${MAILPIT_SMTP_PORT:-1025}:1025"
       - "${MAILPIT_UI_PORT:-8025}:8025"
+  api:
+    build:
+      context: .
+      dockerfile: src/Modulix.Api/Dockerfile
+    image: modulix:local
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Modulix: "Server=sqlserver,1433;Database=Modulix;User Id=modulix_app;Password=${MODULIX_APP_PASSWORD:?MODULIX_APP_PASSWORD eksik};TrustServerCertificate=True"
+      ConnectionStrings__ModulixMigrations: "Server=sqlserver,1433;Database=Modulix;User Id=modulix_migrator;Password=${MODULIX_MIGRATOR_PASSWORD:?MODULIX_MIGRATOR_PASSWORD eksik};TrustServerCertificate=True"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
 
 volumes:
   sqlserver-data:

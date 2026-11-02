@@ -9,3 +9,4 @@
 **/secrets.json
 **/*.pfx
 **/*.p12
+.vs/

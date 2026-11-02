@@ -5,13 +5,20 @@ WORKDIR /src
 # API ve bağlı projelerin tamamını kopyala
 COPY . .
 
-# API yayın çıktısını oluştur. Blazor arayüzü (Modulix.Web) proje başvurusu olarak bu yayına dahildir;
-# Web'i ayrıca yayınlayıp wwwroot'un üzerine kopyalamak iki ayrı derlemenin dosyalarını karıştırır
-# (kapsamlı CSS kimlikleri WASM derlemesiyle eşleşmez, stiller uygulanmaz).
+# API yayın çıktısını oluştur
 RUN dotnet publish "src/Modulix.Api/Modulix.Api.csproj" \
     -c Release \
     -o /app/publish \
     /p:UseAppHost=false
+
+# Blazor arayüzünü ayrıca yayınla (index.html parmak izi/importmap işlemesi yalnızca bu yayında yapılır)
+RUN dotnet publish "src/Modulix.Web/Modulix.Web.csproj" \
+    -c Release \
+    -o /app/web-publish
+
+# wwwroot'u tamamen Web yayınından al: iki ayrı derlemenin dosyalarını karıştırmak, kapsamlı CSS
+# kimliklerinin (b-xxxx) WASM derlemesiyle eşleşmemesine ve stillerin uygulanmamasına yol açar.
+RUN rm -rf /app/publish/wwwroot && cp -a /app/web-publish/wwwroot /app/publish/wwwroot
 
 # Yayınlanan uygulamayı çalıştır
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
