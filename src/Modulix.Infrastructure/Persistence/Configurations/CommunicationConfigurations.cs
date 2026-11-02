@@ -67,6 +67,22 @@ internal sealed class CommunicationSuppressionConfiguration : IEntityTypeConfigu
     }
 }
 
+internal sealed class CommunicationLinkTokenConfiguration : IEntityTypeConfiguration<CommunicationLinkToken>
+{
+    public void Configure(EntityTypeBuilder<CommunicationLinkToken> builder)
+    {
+        builder.ToTable("CommunicationLinkTokens", DatabaseSchemas.Core);
+        builder.HasKey(t => t.Id);
+        builder.Property(t => t.Id).ValueGeneratedNever();
+        builder.Property(t => t.TenantId).IsRequired();
+        builder.Property(t => t.TokenHash).HasMaxLength(CommunicationLinkToken.HashLength).IsFixedLength().IsRequired();
+        builder.Property(t => t.Channel).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(t => t.Address).HasMaxLength(CommunicationPreference.AddressMaxLength).IsRequired();
+        builder.Property(t => t.Reference).HasMaxLength(CommunicationLinkToken.ReferenceMaxLength).IsRequired();
+        builder.HasIndex(t => new { t.TenantId, t.TokenHash }).IsUnique();
+    }
+}
+
 internal sealed class FrequencyWindowConfiguration : IEntityTypeConfiguration<FrequencyWindow>
 {
     public void Configure(EntityTypeBuilder<FrequencyWindow> builder)

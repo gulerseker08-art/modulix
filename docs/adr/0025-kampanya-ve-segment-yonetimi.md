@@ -76,7 +76,7 @@ CRM'in sunduğu alanlar (yalnızca olanlar): firma — ad, şehir, sektör (serb
 - **Dilim 3**: segment ekranları (liste, düzenleyici, önizleme, üyeler), dışa aktarma.
 - **Dilim 4**: kampanya, hedef kitle (dahil/hariç), alıcı çözümleme (kişi seçme kuralı), anlık görüntü, sayı ayrımı ve elenme nedenleri.
 - **Dilim 5**: içerik sürümü, onay, planlama, çalıştırma/teslim (idempotency anahtarı), sahte sağlayıcı, sıklık rezervasyonu, duraklat/iptal, abonelikten çıkma uç noktası.
-- **Dilim 6**: yanıt çalışma alanı, kaynak/UTM, yanıttan aktivite/lead/fırsat.
+- **Dilim 7** (taslakta 6; abonelikten çıkma dilim 6'ya alındı): yanıt çalışma alanı, kaynak/UTM, yanıttan aktivite/lead/fırsat.
 - **Dilim 7**: maliyet, attribution (ilk/son dokunuş), raporlar, müşteri kartı sekmeleri.
 - **Dilim 8**: kabul/regresyon, performans ölçümü (100.000 sentetik kişi), işletim notu.
 
@@ -87,7 +87,7 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 ## 8. Açık işler ve dürüstlük sınırları
 
 - Gerçek e-posta/SMS/WhatsApp sağlayıcısı bağlanmadı; bağlanana kadar çalıştırma bloklu.
-- İYS, KVKK aydınlatma/rıza metni sürümü, tek tıkla abonelikten çıkma başlığı (RFC 8058) için hukuki karar ve entegrasyon bekliyor.
+- İYS ve KVKK aydınlatma/rıza metni sürümü için hukuki karar ve entegrasyon bekliyor. Tek tıkla çıkış (RFC 8058) ucu ve bağlantısı dilim 6'da yapıldı; `List-Unsubscribe` başlıklarını yazmak gerçek e-posta sağlayıcısının (henüz yok) yükümlülüğüdür.
 - Dinamik segment üye değişimi (eklenen/çıkan) ve zamanlanmış otomatik yenileme: sistem yetki bağlamı kararı bekliyor.
 - Firma büyüklüğü, bölge, ürün sahipliği alanları kaynak veri olmadığı için yok.
 - Modülix'in kendi satış CRM'i senaryosu için lisans durumu projeksiyonu yok; "ilgilenilen ürün" alanıyla çalışır.
@@ -102,7 +102,8 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 | 3 — Segment ekranları (liste, detay, koşul düzenleyici, önizleme, üyeler, sürümler) | Yapıldı; ayrıntı aşağıda |
 | 4 — Kampanya, hedef kitle, alıcı çözümleme, uygunluk, anlık görüntü (arka uç ve ekranlar) | Yapıldı; ayrıntı aşağıda |
 | 5 — İçerik, onay, çalıştırma, gönderim çekirdeği (test sağlayıcısı) | Yapıldı; abonelikten çıkma, otomatik işçi, gerçek sağlayıcı yok (aşağıda) |
-| 6–8 | Planlı (abonelikten çıkma ve tercih merkezi dilim 6'ya eklendi) |
+| 6 — Abonelikten çıkma ve tercih merkezi (oturumsuz sayfa, tek tıkla çıkış, gönderimde zorunlu bağlantı) | Yapıldı; ayrıntı aşağıda |
+| 7–9 | Planlı: yanıt çalışma alanı ve kaynak/UTM (7), maliyet, atıf ve raporlar (8), kabul/regresyon ve performans (9) |
 
 ### Dilim 2 — uygulama notları (sapmalar ve sınırlar)
 
@@ -140,3 +141,14 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 - **Duraklat/iptal**: duraklatma ve iptal yeni işi durdurur; iptalde sırada kalanlar iptal edilir, sağlayıcıya verilmiş iletiler geri alınmış gibi gösterilmez. Modül kapanınca işleme ve eylemler 403 döner, veriler silinmez.
 - **Bilerek yok / açık**: otomatik işçi ve planlanan zamanda kendiliğinden başlatma (şimdilik elle "başlat" ve "sıradaki grubu işle"; tasarım idempotenttir), gerçek sağlayıcı ve webhook (teslim/tıklama/geri dönüş), abonelikten çıkma uç noktası ve tercih merkezi (dilim 6), kişi bazlı değişken ve önizleme (içerik düz metin), test gönderimi ve gönderici profili, HTML içerik, gönderim penceresi ve saatlik hız sınırı, sıklık için haftalık pencere, teslimatın kapanış raporu, kampanya durum makinesi (kampanya hâlâ yalnızca Taslak/Arşiv).
 - **Test**: 31 birim (durum makinesi, içerik kuralları, teslimat anahtarı), 13 entegrasyon (onay akışı ve görev ayrılığı, sağlayıcı bloklu başlatma, işleme ve hata sınıfları, yeniden denetim, pasif iletişim noktası, ortak sıklık sınırı, eşzamanlı rezervasyon, duraklat/iptal, planlı zaman ve kampanya dönemi, doğrulama, tenant izolasyonu, izinler ve kapalı modül); tarayıcıda içerik ekle → çalıştırma oluştur → hazır olmayanın reddi akışı denendi (görsel düzen, duyarlı görünüm ve koyu tema elle gözden geçirilmedi; uygun alıcılı çalıştırmanın ekrandan işlenmesi tarayıcıda denenmedi, API testleriyle kapsanıyor).
+
+### Dilim 6 — uygulama notları (abonelikten çıkma ve tercih merkezi)
+
+- **Yapılan**: gönderilen her pazarlama iletisine kişiye özel çıkış bağlantısı; oturumsuz tercih merkezi sayfası (`/abonelik/{tenant}`); RFC 8058 tek tıkla çıkış ucu; kişinin kendi çıkışını geri alması; `App:PublicUrl` yokken başlatmanın bloklanması.
+- **Sözleşme** (Core.Contracts): `IUnsubscribeLinks` (`IsAvailable`, `IssueAsync` → `UnsubscribeLink(PageUrl, OneClickUrl)`). `MessageRequest` bağlantıyı taşır (`Unsubscribe`); gerçek bir e-posta sağlayıcısı `OneClickUrl` ile `List-Unsubscribe` ve `List-Unsubscribe-Post` başlıklarını yazmakla yükümlüdür (henüz sağlayıcı yok). Çekirdek: `CommunicationLinkToken` (`core.CommunicationLinkTokens`, `IJournalEntity`, RLS), `LinkTokens` (üretim/karma/biçim, saf), `ICommunicationPortal` (görüntüle, çık, geri al).
+- **Belirteç tasarımı**: rastgele 256 bit (base64url), yalnızca SHA-256 karması saklanır; adres normalize biçimde satırdadır, böylece adres URL'ye girmez. Kişiye ve her gönderime özeldir; yeniden denenen gönderimde kullanılmamış belirteç zararsızdır. Belirteç iletiden **önce** kaydedilir (gönderimden sonra çökme bağlantıyı geçersiz bırakmaz). Belirtecin yetkisi yalnızca o adresin pazarlama tercihidir; oturum ya da yönetim yetkisi vermez. Ömür 400 gün. Satır birikimi (gönderim başına bir satır) için temizlik işi ve gönderimde belirteç yeniden kullanımı bir sonraki ölçek işidir (bkz. açık işler).
+- **Çıkış kuralları**: çıkış pazarlama iznini `Denied` yapar (kaynak `unsubscribe`, kanıt yok, değiştiren kullanıcı yok); zaten reddedilmişse değişiklik/olay/denetim yazılmaz (tekrar güvenli). Süresi dolmuş bağlantıyla da çıkılır (iletişimi azaltmak her zaman güvenlidir). Aktif engelli adreste çıkış yine kaydedilir ama durum "engelli" görünür. Geri alma (`SelfResubscribeBlock`): yalnızca kendi çıkışı (`unsubscribe`/`preference-center`) geri alınır; firmanın elle, içe aktarmayla ya da sağlayıcı olayıyla yazdığı ret ve aktif engel bağlantıyla kaldırılamaz; süresi dolmuş bağlantıyla geri alınamaz; kanıt `link:<belirteç kimliği>`.
+- **Güvenlik**: sayfa belirteci `#` parçasında taşır (sunucu günlüğü/Referer'a gitmez); sayfa açılışta hiçbir şey değiştirmez, çıkış yalnızca düğmeyle olur. Uçlar yalnızca POST'tur (GET işlem yapmaz), hız sınırlı (`CommunicationPublic:RateLimitPerMinute`, varsayılan 30/dk, IP+tenant), gövde ≤ 4 KB, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex`. Biçimsiz, bilinmeyen ve başka tenant'ın belirteci ile bilinmeyen tenant aynı 404 yanıtını verir (ayrım sızdırmaz). Adres sayfada maskelidir. Tek tıkla çıkış adresinde belirteç yoldadır (posta istemcisi o adrese POST eder); bu adres sunucu günlüğüne düşebilir, bu yüzden belirteç yalnızca tercih daraltabilir ve tekrar güvenlidir. Tenant her çağrıda adresten çözülür, belirteç yalnızca o tenant'ın satır güvenliği altında aranır.
+- **Gönderimle bütünleşme**: `SendBlock` sağlayıcının yanında bağlantı üretilebilirliğini de denetler; `App:PublicUrl` ayarsızsa başlatma ve işleme 409 verir, hiçbir teslimat satırı açılmaz (özette `unsubscribeLinkAvailable=false`, ekranda uyarı). Gönderim anında (izin, engel ve sıklık denetiminden sonra) bağlantı üretilir; metne `ContentRules.WithUnsubscribeFooter` ile alt bilgi eklenir (içerik sürümü değişmez). Üretilemezse satır `Failed: unsubscribe-link-unavailable` olur ve sıklık hakkı geri verilir. Bir sonraki çalıştırma çıkışı gönderimden hemen önce görür.
+- **Bilerek yok / açık**: tercih merkezinde konu/liste bazlı tercih (yalnızca "pazarlama" amacı vardır), kanal bazlı (SMS/WhatsApp) çıkış sayfası dili, çıkış sonrası geri bildirim (neden sorusu), yönetim ekranında tercih listesi (API var, ekran yok), belirteç satırı temizliği ve gönderim başına satır yerine yeniden kullanım (hacim ölçümü dilim 9'da), `List-Unsubscribe` başlıklarını yazan gerçek sağlayıcı, İYS/KVKK metinleri için hukuki karar.
+- **Test**: 19 birim (belirteç, karma, biçim, ömür, geri alma kuralı, alt bilgi), 10 entegrasyon (8 portal: çıkış/tekrar/geri alma ve olay sayıları, tek tıkla çıkış ve GET'in işlem yapmaması, geçersiz/yabancı belirteç, firma kaydı ve engel, süresi dolmuş bağlantı, üretici doğrulaması ve yalnızca karma, tenant izolasyonu, yalnızca POST/gövde sınırı/yönetim uçlarının açılmaması; 2 kampanya: her iletide kişiye özel çalışan bağlantı ve sonraki çalıştırmanın çıkışı görmesi, genel adres yokken başlatmanın bloklanması).

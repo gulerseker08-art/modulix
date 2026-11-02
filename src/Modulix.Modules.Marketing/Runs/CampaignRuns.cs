@@ -12,7 +12,8 @@ using Modulix.Modules.Marketing.Records;
 namespace Modulix.Modules.Marketing.Runs;
 
 public sealed record RunSummary(
-    string Status, int Total, IReadOnlyDictionary<string, int> Statuses, IReadOnlyDictionary<string, int> Codes, bool ProviderConfigured, string Provider);
+    string Status, int Total, IReadOnlyDictionary<string, int> Statuses, IReadOnlyDictionary<string, int> Codes, bool ProviderConfigured, string Provider,
+    bool UnsubscribeLinkAvailable);
 
 public sealed record DeliveryItem(Guid Id, Guid TargetId, Guid? PersonId, string Status, string? Code, int Attempts, string? ProviderMessageId, DateTimeOffset UpdatedAt);
 
@@ -48,6 +49,7 @@ internal sealed class CampaignRuns(
     IEnumerable<IAddressLookup> lookups,
     ICommunicationPreferences preferences,
     IFrequencyLimiter frequency,
+    IUnsubscribeLinks unsubscribe,
     IJournalWriter journal,
     ITransactionLock locks,
     ICurrentAccess permissions,
@@ -263,7 +265,7 @@ internal sealed class CampaignRuns(
         }
 
         var info = CampaignInfo.From(campaign.Value!);
-        if (ProviderBlock(policy, info.Channel) is { } blocked)
+        if (SendBlock(policy, info.Channel) is { } blocked)
         {
             return Fail<RecordData>(RecordErrorCode.Conflict, blocked);
         }
@@ -387,7 +389,7 @@ internal sealed class CampaignRuns(
 
         var campaign = CampaignInfo.From(campaignResult.Value!);
         var policy = await policyProvider.GetAsync(cancellationToken);
-        if (ProviderBlock(policy, campaign.Channel) is { } blocked)
+        if (SendBlock(policy, campaign.Channel) is { } blocked)
         {
             return Fail<ProcessResult>(RecordErrorCode.Conflict, blocked);
         }
@@ -510,12 +512,21 @@ internal sealed class CampaignRuns(
         CampaignDelivery delivery, string address, CampaignInfo campaign, IMessageProvider provider, MarketingPolicy policy, DateOnly today,
         string? subject, string body, Tally counts, CancellationToken cancellationToken)
     {
+        // Bağlantı iletiden önce kaydedilir; üretilemezse ileti gönderilmez ve ayrılan sıklık hakkı geri verilir.
+        if (await unsubscribe.IssueAsync(campaign.Channel, address, delivery.IdempotencyKey, cancellationToken) is not { } link)
+        {
+            await ReleaseAsync(campaign, address, today, policy, cancellationToken);
+            Finish(delivery, DeliveryStatuses.Failed, "unsubscribe-link-unavailable", counts);
+            return;
+        }
+
         ProviderResult result;
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(ProviderTimeout);
-            result = await provider.SendAsync(new MessageRequest(delivery.IdempotencyKey, campaign.Channel, address, subject, body), timeout.Token);
+            result = await provider.SendAsync(
+                new MessageRequest(delivery.IdempotencyKey, campaign.Channel, address, subject, ContentRules.WithUnsubscribeFooter(body, link.PageUrl), link), timeout.Token);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
@@ -585,7 +596,7 @@ internal sealed class CampaignRuns(
         var policy = await policyProvider.GetAsync(cancellationToken);
         return RecordResult<RunSummary>.Ok(new RunSummary(
             RunState.From(loaded.Value!).Status, statuses.Values.Sum(), statuses, await deliveries.CodesAsync(runId, cancellationToken),
-            policy.HasProvider && providers.Any(p => p.Key == policy.Provider), policy.Provider));
+            policy.HasProvider && providers.Any(p => p.Key == policy.Provider), policy.Provider, unsubscribe.IsAvailable));
     }
 
     public async Task<RecordResult<DeliveryPage>> DeliveriesAsync(Guid runId, string? status, string? code, int page, int pageSize, CancellationToken cancellationToken)
@@ -610,7 +621,7 @@ internal sealed class CampaignRuns(
 
     // ---- Yardımcılar ----
 
-    private string? ProviderBlock(MarketingPolicy policy, CommunicationChannel channel)
+    private string? SendBlock(MarketingPolicy policy, CommunicationChannel channel)
     {
         if (!policy.HasProvider)
         {
@@ -618,9 +629,15 @@ internal sealed class CampaignRuns(
         }
 
         var provider = providers.FirstOrDefault(p => p.Key == policy.Provider);
-        return provider is null || !provider.Supports(channel)
-            ? $"Seçilen sağlayıcı ('{policy.Provider}') bu kanalı desteklemiyor ya da kayıtlı değil."
-            : null;
+        if (provider is null || !provider.Supports(channel))
+        {
+            return $"Seçilen sağlayıcı ('{policy.Provider}') bu kanalı desteklemiyor ya da kayıtlı değil.";
+        }
+
+        // Abonelikten çıkma bağlantısı olmayan pazarlama iletisi gönderilmez (ADR-0025, dilim 6).
+        return unsubscribe.IsAvailable
+            ? null
+            : "Abonelikten çıkma bağlantısı üretilemiyor (uygulamanın genel adresi, App:PublicUrl, ayarlı değil); pazarlama iletisi bağlantısız gönderilmez.";
     }
 
     private async Task<bool> HasAnyAsync(IReadOnlyList<string> needed, CancellationToken cancellationToken)

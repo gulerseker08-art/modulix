@@ -151,6 +151,49 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Roles", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Communication.CommunicationLinkToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .IsFixedLength();
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("CommunicationLinkTokens", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Communication.CommunicationPreference", b =>
                 {
                     b.Property<Guid>("Id")

@@ -48,7 +48,7 @@ internal static class RunEndpoints
         {
             var result = await service.SummaryAsync(id, ct);
             return result.IsSuccess
-                ? Results.Ok(new RunSummaryDto(result.Value!.Status, result.Value.Total, result.Value.Statuses, result.Value.Codes, result.Value.ProviderConfigured, result.Value.Provider))
+                ? Results.Ok(new RunSummaryDto(result.Value!.Status, result.Value.Total, result.Value.Statuses, result.Value.Codes, result.Value.ProviderConfigured, result.Value.Provider, result.Value.UnsubscribeLinkAvailable))
                 : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.CampaignsRead);
 

@@ -109,4 +109,18 @@ public class RunRulesTests
         Assert.Equal(64, key.Length);
         Assert.DoesNotContain("ayse", key, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void The_unsubscribe_footer_is_appended_to_every_message_without_touching_the_content()
+    {
+        const string url = "https://app.example.test/abonelik/x#t=abc";
+        const string body = "Merhaba.\n\nKampanya metni.\n\n";
+
+        var text = ContentRules.WithUnsubscribeFooter(body, url);
+
+        Assert.StartsWith("Merhaba.\n\nKampanya metni.\n\n--\n", text);
+        Assert.EndsWith($"abonelikten çıkabilirsiniz: {url}", text);
+        Assert.Equal(text, ContentRules.WithUnsubscribeFooter(body, url));
+        Assert.NotEqual(text, ContentRules.WithUnsubscribeFooter(body, url + "2"));
+    }
 }

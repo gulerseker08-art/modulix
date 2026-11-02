@@ -81,6 +81,7 @@
                         @s.Total teslimat —
                         @string.Join(", ", s.Statuses.Select(x => $"{MarketingLabels.DeliveryStatus(x.Key)}: {x.Value}"))
                         @(s.ProviderConfigured ? null : " · sağlayıcı yapılandırılmamış")
+                        @(s.UnsubscribeLinkAvailable ? null : " · abonelikten çıkma bağlantısı üretilemiyor (genel adres ayarlı değil)")
                     </p>
                     @if (s.Codes.Count > 0)
                     {
