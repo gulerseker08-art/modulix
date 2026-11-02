@@ -70,3 +70,60 @@ internal sealed class SegmentMemberConfiguration : IEntityTypeConfiguration<Segm
             .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
+{
+    public void Configure(EntityTypeBuilder<Campaign> builder)
+    {
+        MarketingTables.ConfigureCommon(builder, "Campaigns");
+        builder.Property(c => c.Code).HasMaxLength(Campaign.CodeMaxLength).IsRequired();
+        builder.Property(c => c.Name).HasMaxLength(Campaign.NameMaxLength).IsRequired();
+        builder.Property(c => c.Description).HasMaxLength(Campaign.DescriptionMaxLength);
+        builder.Property(c => c.Purpose).HasMaxLength(Campaign.PurposeMaxLength);
+        builder.Property(c => c.Target).HasMaxLength(20).IsRequired();
+        builder.Property(c => c.Channel).HasMaxLength(20).IsRequired();
+        builder.Property(c => c.RecipientRule).HasMaxLength(20).IsRequired();
+        builder.Property(c => c.RecipientRole).HasMaxLength(Campaign.RoleMaxLength);
+        builder.Property(c => c.Status).HasMaxLength(20).IsRequired();
+
+        builder.HasIndex(c => new { c.TenantId, c.Code }).IsUnique().HasDatabaseName("UX_Campaigns_Code");
+        builder.HasIndex(c => new { c.TenantId, c.Status });
+    }
+}
+
+internal sealed class CampaignAudienceEntryConfiguration : IEntityTypeConfiguration<CampaignAudienceEntry>
+{
+    public void Configure(EntityTypeBuilder<CampaignAudienceEntry> builder)
+    {
+        MarketingTables.ConfigureCommon(builder, "CampaignAudienceEntries");
+        builder.Property(e => e.Mode).HasMaxLength(20).IsRequired();
+        builder.Property(e => e.Reason).HasMaxLength(CampaignAudienceEntry.ReasonMaxLength);
+
+        // Aynı segment ya da hedef bir kampanyada bir kez bulunur (dahil ya da hariç).
+        builder.HasIndex(e => new { e.TenantId, e.CampaignId, e.SegmentId }).IsUnique().HasFilter("[SegmentId] IS NOT NULL").HasDatabaseName("UX_CampaignAudience_Segment");
+        builder.HasIndex(e => new { e.TenantId, e.CampaignId, e.TargetId }).IsUnique().HasFilter("[TargetId] IS NOT NULL").HasDatabaseName("UX_CampaignAudience_Target");
+        builder.ToTable(t => t.HasCheckConstraint("CK_CampaignAudience_OneSource", "([SegmentId] IS NULL AND [TargetId] IS NOT NULL) OR ([SegmentId] IS NOT NULL AND [TargetId] IS NULL)"));
+        builder.HasOne<Campaign>().WithMany().HasForeignKey(e => new { e.TenantId, e.CampaignId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Segment>().WithMany().HasForeignKey(e => new { e.TenantId, e.SegmentId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class AudienceSnapshotConfiguration : IEntityTypeConfiguration<AudienceSnapshot>
+{
+    public void Configure(EntityTypeBuilder<AudienceSnapshot> builder)
+    {
+        MarketingTables.ConfigureCommon(builder, "AudienceSnapshots");
+        builder.Property(s => s.Target).HasMaxLength(20).IsRequired();
+        builder.Property(s => s.Channel).HasMaxLength(20).IsRequired();
+        builder.Property(s => s.Exclusions).IsRequired();
+        builder.Property(s => s.Unresolved).IsRequired();
+        builder.Property(s => s.Sources).IsRequired();
+        builder.Property(s => s.Recipients).IsRequired();
+
+        builder.HasIndex(s => new { s.TenantId, s.CampaignId, s.TakenAt });
+        builder.HasOne<Campaign>().WithMany().HasForeignKey(s => new { s.TenantId, s.CampaignId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}

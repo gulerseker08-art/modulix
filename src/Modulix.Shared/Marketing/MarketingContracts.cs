@@ -85,4 +85,7 @@ public static class MarketingAccess
     public const string SegmentsWrite = "marketing.segments.write";
     public const string SegmentsPublish = "marketing.segments.publish";
     public const string RecipientsRead = "marketing.recipients.read";
+    public const string CampaignsRead = "marketing.campaigns.read";
+    public const string CampaignsWrite = "marketing.campaigns.write";
+    public const string CampaignsAudience = "marketing.campaigns.audience";
 }

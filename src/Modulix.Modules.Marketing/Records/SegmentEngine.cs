@@ -50,25 +50,7 @@ internal sealed class SegmentEngine(
 
     public async Task<SegmentEvaluation> EvaluateAsync(SegmentEvaluationRequest request, CancellationToken cancellationToken)
     {
-        if (request.Condition is null && request.SegmentId is null)
-        {
-            throw new SegmentConditionException([new ConditionError("", "Koşul ya da segment gerekli.")]);
-        }
-
-        var catalog = await CatalogAsync(request.Target, cancellationToken);
-        var byKey = catalog.Fields.ToDictionary(f => f.Key, StringComparer.Ordinal);
-        if (request.Condition is not null)
-        {
-            var errors = SegmentConditions.Validate(request.Condition, byKey, request.Target);
-            if (errors.Count > 0)
-            {
-                throw new SegmentConditionException(errors);
-            }
-        }
-
-        var day = await clock.GetAsync(cancellationToken);
-        var context = new SegmentEvaluationContext(await access.GetOwnersAsync(cancellationToken), day.Today, day.StartOfDay);
-        var query = Build(request, byKey, context);
+        var query = await PrepareAsync(request, cancellationToken);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Limit);
@@ -100,6 +82,51 @@ internal sealed class SegmentEngine(
         {
             throw new SegmentTimeoutException(Limit);
         }
+    }
+
+    public async Task<IReadOnlyList<Guid>> ResolveIdsAsync(SegmentEvaluationRequest request, int limit, CancellationToken cancellationToken)
+    {
+        var query = await PrepareAsync(request, cancellationToken);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Limit);
+        try
+        {
+            var count = await query.CountAsync(timeout.Token);
+            if (count > limit)
+            {
+                throw new SegmentTooLargeException(count, limit);
+            }
+
+            return await query.OrderBy(id => id).ToListAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new SegmentTimeoutException(Limit);
+        }
+    }
+
+    /// <summary>Koşulu doğrular, çağıranın alan yetkisi ve veri kapsamıyla kimlik sorgusunu kurar (çalıştırmaz).</summary>
+    private async Task<IQueryable<Guid>> PrepareAsync(SegmentEvaluationRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Condition is null && request.SegmentId is null)
+        {
+            throw new SegmentConditionException([new ConditionError("", "Koşul ya da segment gerekli.")]);
+        }
+
+        var catalog = await CatalogAsync(request.Target, cancellationToken);
+        var byKey = catalog.Fields.ToDictionary(f => f.Key, StringComparer.Ordinal);
+        if (request.Condition is not null)
+        {
+            var errors = SegmentConditions.Validate(request.Condition, byKey, request.Target);
+            if (errors.Count > 0)
+            {
+                throw new SegmentConditionException(errors);
+            }
+        }
+
+        var day = await clock.GetAsync(cancellationToken);
+        var context = new SegmentEvaluationContext(await access.GetOwnersAsync(cancellationToken), day.Today, day.StartOfDay);
+        return Build(request, byKey, context);
     }
 
     private IQueryable<Guid> Build(SegmentEvaluationRequest request, Dictionary<string, SegmentFieldDefinition> byKey, SegmentEvaluationContext context)
