@@ -62,6 +62,16 @@ public static class CrmAccess
     public const string QuoteRulesManage = "crm.quote-rules.manage";
     public const string QuotesExport = "crm.quotes.export";
     public const string QuoteCostsRead = "crm.quote-costs.read";
+
+    // Satış raporlama ve tahmin (ADR-0026)
+    public const string SalesReportsRead = "crm.sales-reports.read";
+    public const string SalesTargetsRead = "crm.sales-targets.read";
+    public const string SalesTargetsManage = "crm.sales-targets.manage";
+    public const string ForecastsRead = "crm.forecasts.read";
+    public const string ForecastsWrite = "crm.forecasts.write";
+    public const string ForecastsSubmit = "crm.forecasts.submit";
+    public const string ForecastsLock = "crm.forecasts.lock";
+    public const string ForecastsReopen = "crm.forecasts.reopen";
 }
 
 /// <summary>Kayıt türü anahtarları; kayıt geçmişi (<c>/api/records/{tür}/{id}/history</c>) bunlarla çağrılır.</summary>

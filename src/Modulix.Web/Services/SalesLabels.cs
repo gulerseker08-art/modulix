@@ -8,11 +8,11 @@ namespace Modulix.Web.Services;
 /// </summary>
 public static class SalesAccess
 {
-    public const string ReportsRead = "crm.sales-reports.read";
-    public const string TargetsRead = "crm.sales-targets.read";
-    public const string TargetsManage = "crm.sales-targets.manage";
-    public const string ForecastsRead = "crm.forecasts.read";
-    public const string ForecastsWrite = "crm.forecasts.write";
+    public const string ReportsRead = CrmAccess.SalesReportsRead;
+    public const string TargetsRead = CrmAccess.SalesTargetsRead;
+    public const string TargetsManage = CrmAccess.SalesTargetsManage;
+    public const string ForecastsRead = CrmAccess.ForecastsRead;
+    public const string ForecastsWrite = CrmAccess.ForecastsWrite;
 }
 
 /// <summary>Satış raporlama ve tahmin ekranlarının Türkçe etiketleri ve gösterim yardımcıları. Hesap sunucudadır; burada yalnızca biçim vardır.</summary>
