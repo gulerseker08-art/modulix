@@ -38,6 +38,24 @@ public sealed class CoreModule : IModule
 
         /// <summary>İletişim noktasını engeller ve engeli gerekçeyle kaldırır (ADR-0025).</summary>
         public const string SuppressCommunication = "core.communication.suppress";
+
+        /// <summary>Kural altyapısı (ADR-0027): kuralları, şablonları ve yetenek kataloğunu görüntüler.</summary>
+        public const string ReadAutomation = "core.automation.read";
+
+        /// <summary>Kural taslağı oluşturur, düzenler, siler ve yan etkisiz önizler. Yayınlamak ayrı izindir.</summary>
+        public const string ManageAutomation = "core.automation.manage";
+
+        /// <summary>Kuralı yayınlar, açar ve kapatır. Yayınlayan, sahip olmadığı izni gerektiren aksiyonu yayınlayamaz.</summary>
+        public const string PublishAutomation = "core.automation.publish";
+
+        /// <summary>Kuralı elle çalıştırır (ADR-0027 Dilim 2).</summary>
+        public const string RunAutomation = "core.automation.run";
+
+        /// <summary>Otomasyon çalışma geçmişini görüntüler (ADR-0027 Dilim 2).</summary>
+        public const string ReadAutomationLogs = "core.automation-logs.read";
+
+        /// <summary>Otomasyonun bekleyen onaylarını karara bağlar (ADR-0027 Dilim 4).</summary>
+        public const string ApproveAutomation = "core.automation.approve";
     }
 
     public string Key => ModuleKey;
@@ -55,6 +73,12 @@ public sealed class CoreModule : IModule
         new(Permissions.ReadCommunication, "İletişim tercihlerini, izin geçmişini ve engelleri görüntüler", "İletişim tercihleri"),
         new(Permissions.ManageCommunication, "İletişim izni ve ret kaydeder (kanıtla)", "İletişim tercihleri"),
         new(Permissions.SuppressCommunication, "İletişim noktasını engeller ve engeli gerekçeyle kaldırır", "İletişim tercihleri"),
+        new(Permissions.ReadAutomation, "Otomasyon kurallarını ve yeteneklerini görüntüler", "Otomasyon"),
+        new(Permissions.ManageAutomation, "Otomasyon kuralı taslağı oluşturur, düzenler ve önizler", "Otomasyon"),
+        new(Permissions.PublishAutomation, "Otomasyon kuralını yayınlar, açar ve kapatır", "Otomasyon"),
+        new(Permissions.RunAutomation, "Otomasyon kuralını elle çalıştırır", "Otomasyon"),
+        new(Permissions.ReadAutomationLogs, "Otomasyon çalışma geçmişini görüntüler", "Otomasyon geçmişi"),
+        new(Permissions.ApproveAutomation, "Otomasyonun bekleyen onaylarını karara bağlar", "Otomasyon"),
     ];
 
     /// <summary>Çekirdeğin olay abonelikleri (ADR-0007).</summary>
@@ -97,6 +121,10 @@ public sealed class CoreModule : IModule
 
         /// <summary>Departman (ADR-0026): ad, kod, tür, üst departman ve açık/kapalı; kaydın kimliği departmanın kimliğidir.</summary>
         public const string BusinessUnit = "core.business-unit";
+
+        /// <summary>Otomasyon kuralı (ADR-0027); kaydın kimliği kuralın kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
+        public const string AutomationRule = "core.automation-rule";
+
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
         public const string Audit = "core.audit";
@@ -279,6 +307,18 @@ public sealed class CoreModule : IModule
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
                 ["kind"] = new Dictionary<string, string> { ["Center"] = "Merkez", ["Dealer"] = "Bayi", ["Other"] = "Diğer" },
+            },
+        },
+        new(AuditedEntityKeys.AutomationRule, "Otomasyon kuralı", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["module"] = "Modül", ["entity"] = "Kayıt türü", ["status"] = "Durum", ["priority"] = "Öncelik",
+            ["stopProcessing"] = "Sonraki kuralları durdur", ["activeFrom"] = "Etkinlik başlangıcı", ["activeUntil"] = "Etkinlik bitişi",
+            ["version"] = "Sürüm", ["summary"] = "Özet",
+        }, "name")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string> { ["Draft"] = "Taslak", ["Active"] = "Açık", ["Inactive"] = "Kapalı" },
             },
         },
         new(AuditedEntityKeys.Membership, "Kullanıcı", null, new Dictionary<string, string>

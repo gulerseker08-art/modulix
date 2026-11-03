@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.SharedRecords;
 
 namespace Modulix.Core.Contracts.Modules;
@@ -94,6 +95,13 @@ public interface IModule
     /// firma yöneticisi üzerine kendi düzenini kurar (alan taşır, sekme açar, zorunluluk ekler). Anahtar modül anahtarıyla başlar.
     /// </summary>
     IReadOnlyList<FormDefinition> Forms => [];
+
+    /// <summary>
+    /// Modülün kural ve iş akışı altyapısına beyan ettiği yetenekler (ADR-0027): kural yazılabilen kayıt türleri, olaylar, okunabilir
+    /// alanlar, ilişkiler ve aksiyonlar. Anahtarlar modül anahtarıyla başlar; beyan açılışta doğrulanır. Bildirmeyen modülde kural
+    /// yazılamaz; Core modülün kayıt türlerini ve alanlarını bilmez, yalnızca bu beyanı kullanır.
+    /// </summary>
+    AutomationCapabilities Automation => AutomationCapabilities.None;
 
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)

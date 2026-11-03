@@ -1,6 +1,7 @@
 using Modulix.Api.Access;
 using Modulix.Api.Account;
 using Modulix.Api.Audit;
+using Modulix.Api.Automation;
 using Modulix.Api.Auth;
 using Modulix.Api.Communication;
 using Modulix.Api.Crm;
@@ -179,6 +180,7 @@ app.MapUserEndpoints();
 app.MapCompanyEndpoints();
 app.MapTeamEndpoints();
 app.MapBusinessUnitEndpoints();
+app.MapAutomationEndpoints();
 app.MapCommunicationEndpoints();
 app.MapCustomFieldEndpoints();
 app.MapChoiceListEndpoints();
