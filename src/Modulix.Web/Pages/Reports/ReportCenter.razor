@@ -12,15 +12,22 @@
         {
             <a class="btn btn-primary" href="raporlar/yeni">Yeni rapor</a>
         }
+        @if (Session.Can(ReportAccess.Export))
+        {
+            <a class="btn btn-outline-secondary" href="raporlar/disa-aktarimlar">Dışa aktarımlar</a>
+        }
     </PageHeader>
 
     <TabBar Tabs="Tabs" State="tabs" Label="Rapor bölümleri" Changed="OnTabChangedAsync" />
 
+    @if (tabs.Active != SchedulesTab)
+    {
     <form class="search" role="search" @onsubmit="ApplySearchAsync" @onsubmit:preventDefault>
         <label class="visually-hidden" for="rc-search">Rapor ara</label>
         <input id="rc-search" class="form-control" type="search" maxlength="100" placeholder="@(tabs.Active == ReadyTab ? "Hazır raporlarda ara" : "Ad ya da açıklamada ara")" @bind="search" />
         <button type="submit" class="btn btn-outline-secondary">Ara</button>
     </form>
+    }
 
     @if (actionMessage is not null)
     {
@@ -104,6 +111,12 @@
             }
         </div>
     }
+    else if (tabs.Active == SchedulesTab)
+    {
+        <div id="tabpanel-schedules" role="tabpanel" aria-labelledby="tab-schedules">
+            <ReportSchedulesPanel />
+        </div>
+    }
     else
     {
         <div id="tabpanel-@tabs.Active" role="tabpanel" aria-labelledby="tab-@tabs.Active" aria-busy="@(listLoading ? "true" : "false")">
@@ -184,9 +197,12 @@
     private const string FavoritesTab = "favorites";
     private const int PageSize = 20;
 
-    private static readonly IReadOnlyList<TabItem> Tabs =
+    private const string SchedulesTab = "schedules";
+
+    private IReadOnlyList<TabItem> Tabs =>
     [
         new(ReadyTab, "Hazır raporlar"), new(MineTab, "Raporlarım"), new(SharedTab, "Benimle paylaşılan"), new(FavoritesTab, "Favoriler"),
+        .. (Session.Can(ReportAccess.Schedule) ? new[] { new TabItem(SchedulesTab, "Zamanlamalarım") } : Array.Empty<TabItem>()),
     ];
 
     private readonly TabState tabs = new(ReadyTab);

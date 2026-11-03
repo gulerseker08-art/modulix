@@ -200,6 +200,8 @@ public static class CoreAccess
     public const string ReadReports = "core.reports.read";
     public const string ManageReports = "core.reports.manage";
     public const string ShareReports = "core.reports.share";
+    public const string ExportReports = "core.reports.export";
+    public const string ScheduleReports = "core.reports.schedule";
 
     /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
     public static IReadOnlyList<string> AdministrationPermissions { get; } =

@@ -105,6 +105,12 @@ public class ModulixDbContext(
 
     public DbSet<ReportFavorite> ReportFavorites => Set<ReportFavorite>();
 
+    public DbSet<ReportExport> ReportExports => Set<ReportExport>();
+
+    public DbSet<ReportSchedule> ReportSchedules => Set<ReportSchedule>();
+
+    public DbSet<ReportScheduleRun> ReportScheduleRuns => Set<ReportScheduleRun>();
+
     public DbSet<BusinessUnitRole> BusinessUnitRoles => Set<BusinessUnitRole>();
 
     public DbSet<MembershipCompany> MembershipCompanies => Set<MembershipCompany>();

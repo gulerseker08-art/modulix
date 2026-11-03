@@ -1,0 +1,318 @@
+@* Zamanlanmış rapor teslimi (ADR-0026 dilim 4, core.reports.schedule). ReportId verilirse o raporun zamanlamaları ve yeni/düzenle formu; verilmezse
+   kullanıcının bütün zamanlamaları (açma/kapama ve silme; düzenleme rapor sayfasında). Kullanıcı yalnızca kendi zamanlamalarını görür. *@
+@using System.Net
+@inject ApiClient Api
+@inject SessionState Session
+
+<section class="detail-section" aria-labelledby="rsp-title" id="zamanlamalar">
+    <div class="section-header">
+        <h2 id="rsp-title">Zamanlamalar</h2>
+        @if (ReportId is not null && !formOpen)
+        {
+            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(items.Count >= ReportCenterLabels.MaxSchedules || loading)" @onclick="NewSchedule">Yeni zamanlama</button>
+        }
+    </div>
+    <p class="text-muted small">
+        Rapor sizin yetkinizle çalışır; yetkiniz kalkarsa teslim durur. E-postada veri yok, yalnızca indirme bağlantısı vardır
+        (dosya <a href="raporlar/disa-aktarimlar">Dışa aktarımlar</a> sayfasında da görünür). En fazla @ReportCenterLabels.MaxSchedules zamanlama.
+        Saatler firmanın saat dilimindedir (@Regional.Zone.Id).
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert @(messageFailed ? "alert-danger" : "alert-success")" role="@(messageFailed ? "alert" : "status")">
+            @message
+            @if (conflict)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@busy" @onclick="ReloadAfterConflictAsync">Listeyi yenile</button>
+            }
+        </div>
+    }
+
+    @if (formOpen)
+    {
+        <form class="report-builder-section" @onsubmit="SaveAsync" @onsubmit:preventDefault aria-label="@(editingId is null ? "Yeni zamanlama" : "Zamanlamayı düzenle")">
+            <h3 class="h6">@(editingId is null ? "Yeni zamanlama" : "Zamanlamayı düzenle")</h3>
+            <div class="form-grid">
+                <div class="span-3">
+                    <label class="form-label" for="rsp-frequency">Sıklık</label>
+                    <select id="rsp-frequency" class="form-select" @bind="frequency">
+                        @foreach (var (key, label) in ReportCenterLabels.Frequencies)
+                        {
+                            <option value="@key">@label</option>
+                        }
+                    </select>
+                </div>
+                @if (frequency == "weekly")
+                {
+                    <div class="span-3">
+                        <label class="form-label" for="rsp-weekday">Haftanın günü</label>
+                        <select id="rsp-weekday" class="form-select" @bind="weekday">
+                            @foreach (var (key, label) in ReportCenterLabels.Weekdays)
+                            {
+                                <option value="@key">@label</option>
+                            }
+                        </select>
+                    </div>
+                }
+                @if (frequency == "monthly")
+                {
+                    <div class="span-3">
+                        <label class="form-label" for="rsp-monthday">Ayın günü</label>
+                        <select id="rsp-monthday" class="form-select" aria-describedby="rsp-monthday-help" @bind="monthDay">
+                            @for (var d = 1; d <= 28; d++)
+                            {
+                                <option value="@d">@d</option>
+                            }
+                        </select>
+                        <div id="rsp-monthday-help" class="form-text">Her ayda bulunması için 1-28 arası seçilebilir.</div>
+                    </div>
+                }
+                <div class="span-3">
+                    <label class="form-label" for="rsp-hour">Saat</label>
+                    <select id="rsp-hour" class="form-select" @bind="hour">
+                        @for (var h = 0; h < 24; h++)
+                        {
+                            <option value="@h">@ReportCenterLabels.Hour(h)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">
+                    @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
+                    Kaydet
+                </button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CloseForm">Vazgeç</button>
+            </div>
+        </form>
+    }
+
+    <AnalyticsStatus Loading="loading" Error="@error" Forbidden="forbidden" OnRetry="LoadAsync" />
+
+    @if (!loading && error is null && loaded)
+    {
+        @if (items.Count == 0)
+        {
+            <p class="text-muted" role="status">@(ReportId is null ? "Henüz zamanlamanız yok. Bir raporun sayfasından zamanlama ekleyebilirsiniz." : "Bu rapor için zamanlamanız yok.")</p>
+        }
+
+        @foreach (var item in items)
+        {
+            var stopped = !string.IsNullOrWhiteSpace(item.StoppedReason);
+            <div class="report-row">
+                <div class="report-row-main">
+                    <h3>@ReportCenterLabels.ScheduleSummary(item)</h3>
+                    @if (ReportId is null)
+                    {
+                        <p class="mb-0"><a href="raporlar/@item.ReportId">@(item.ReportName ?? "Rapor")</a></p>
+                    }
+
+                    <div class="report-row-meta">
+                        <span class="badge @(item.Enabled ? "status-customer" : "status-inactive")">@(item.Enabled ? "Açık" : "Kapalı")</span>
+                        @if (item.Enabled)
+                        {
+                            <span class="badge tag">Sonraki çalışma: @CrmLabels.Time(item.NextRunAt)</span>
+                        }
+                        <span class="badge tag">
+                            Son durum: @ReportCenterLabels.ScheduleStatus(item.LastStatus)@(item.LastRunAt is { } last ? $" ({CrmLabels.Time(last)})" : null)
+                        </span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(item.LastMessage))
+                    {
+                        <p class="small text-muted mt-2 mb-0">@item.LastMessage</p>
+                    }
+                    @if (stopped)
+                    {
+                        <div class="alert alert-warning mt-2 mb-0" role="alert">
+                            <strong>Teslim durduruldu.</strong> @item.StoppedReason
+                            Bu zamanlamadan dosya gelmiyor; nedeni giderildikten sonra zamanlamayı yeniden açabilirsiniz.
+                        </div>
+                    }
+                </div>
+                <div class="report-row-actions">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-pressed="@(item.Enabled ? "true" : "false")"
+                            aria-label="@(item.Enabled ? "Kapat" : "Aç"): @ReportCenterLabels.ScheduleSummary(item)" @onclick="() => ToggleAsync(item)">
+                        @(item.Enabled ? "Kapat" : "Aç")
+                    </button>
+                    @if (ReportId is not null)
+                    {
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="Düzenle: @ReportCenterLabels.ScheduleSummary(item)" @onclick="() => Edit(item)">Düzenle</button>
+                    }
+                    else
+                    {
+                        <a class="btn btn-outline-secondary btn-sm" href="raporlar/@item.ReportId#zamanlamalar" aria-label="Rapor sayfasında düzenle: @ReportCenterLabels.ScheduleSummary(item)">Düzenle</a>
+                    }
+                    @if (confirmDeleteId == item.Id)
+                    {
+                        <span class="confirm" role="alert">
+                            <span>Zamanlama silinsin mi?</span>
+                            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">Evet, sil</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDeleteId = null">Vazgeç</button>
+                        </span>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="Sil: @ReportCenterLabels.ScheduleSummary(item)" @onclick="() => confirmDeleteId = item.Id">Sil</button>
+                    }
+                </div>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private readonly List<ReportScheduleDto> items = [];
+    private bool loading;
+    private bool loaded;
+    private string? error;
+    private bool forbidden;
+    private bool busy;
+    private Guid? confirmDeleteId;
+    private string? message;
+    private bool messageFailed;
+    private bool conflict;
+
+    private bool formOpen;
+    private Guid? editingId;
+    private long? editingVersion;
+    private string frequency = "daily";
+    private string weekday = "monday";
+    private int monthDay = 1;
+    private int hour = 9;
+
+    /// <summary>Verilirse yalnızca bu raporun zamanlamaları; boşsa kullanıcının tüm zamanlamaları.</summary>
+    [Parameter] public Guid? ReportId { get; set; }
+
+    private Guid? loadedFor;
+    private bool firstLoadDone;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(ReportAccess.Schedule) || (firstLoadDone && loadedFor == ReportId))
+        {
+            return;
+        }
+
+        firstLoadDone = true;
+        loadedFor = ReportId;
+        formOpen = false;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        forbidden = false;
+        var url = ReportId is { } id ? $"/api/reports/schedules?reportId={id}" : "/api/reports/schedules";
+        var result = await Api.GetAsync<List<ReportScheduleDto>>(url);
+        loading = false;
+        loaded = true;
+        error = result.Error;
+        forbidden = result.Status == HttpStatusCode.Forbidden;
+        items.Clear();
+        if (result.Value is { } value)
+        {
+            items.AddRange(value.OrderBy(s => s.NextRunAt));
+        }
+    }
+
+    private void NewSchedule()
+    {
+        editingId = null;
+        editingVersion = null;
+        frequency = "daily";
+        weekday = "monday";
+        monthDay = 1;
+        hour = 9;
+        message = null;
+        conflict = false;
+        formOpen = true;
+    }
+
+    private void Edit(ReportScheduleDto item)
+    {
+        editingId = item.Id;
+        editingVersion = item.Version;
+        frequency = item.Frequency;
+        weekday = item.DayOfWeek ?? "monday";
+        monthDay = item.DayOfMonth ?? 1;
+        hour = item.Hour;
+        message = null;
+        conflict = false;
+        formOpen = true;
+    }
+
+    private void CloseForm() => formOpen = false;
+
+    private async Task SaveAsync()
+    {
+        if (ReportId is not { } reportId)
+        {
+            return;
+        }
+
+        busy = true;
+        message = null;
+        conflict = false;
+        var body = new SaveReportScheduleRequest(
+            frequency, hour, frequency == "weekly" ? weekday : null, frequency == "monthly" ? monthDay : null, editingId is null ? null : editingVersion);
+        var result = editingId is { } id
+            ? await Api.PutAsync<ReportScheduleDto>($"/api/reports/schedules/{id}", body)
+            : await Api.PostAsync<ReportScheduleDto>($"/api/reports/{reportId}/schedules", body);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            formOpen = false;
+            messageFailed = false;
+            message = editingId is null ? "Zamanlama eklendi." : "Zamanlama güncellendi.";
+            await LoadAsync();
+            return;
+        }
+
+        messageFailed = true;
+        conflict = result.Status == HttpStatusCode.Conflict;
+        message = conflict
+            ? "Bu zamanlama başka bir yerde değiştirilmiş; kaydedilmedi. Listeyi yenileyip değişikliği yeniden yapın."
+            : result.Issues.Count > 0 ? $"{result.Error} {string.Join(" ", result.Issues.Select(i => i.Message))}" : result.Error;
+    }
+
+    private async Task ReloadAfterConflictAsync()
+    {
+        formOpen = false;
+        message = null;
+        conflict = false;
+        await LoadAsync();
+    }
+
+    private async Task ToggleAsync(ReportScheduleDto item)
+    {
+        busy = true;
+        message = null;
+        var result = await Api.PutAsync<ReportScheduleDto>($"/api/reports/schedules/{item.Id}/enabled", new SetReportScheduleEnabledRequest(!item.Enabled));
+        busy = false;
+        messageFailed = !result.IsSuccess;
+        message = result.IsSuccess ? (result.Value!.Enabled ? "Zamanlama açıldı." : "Zamanlama kapatıldı.") : result.Error;
+        if (result.IsSuccess || result.Status == HttpStatusCode.NotFound)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteAsync(ReportScheduleDto item)
+    {
+        busy = true;
+        message = null;
+        var result = await Api.DeleteAsync($"/api/reports/schedules/{item.Id}");
+        busy = false;
+        confirmDeleteId = null;
+        messageFailed = !result.IsSuccess;
+        message = result.IsSuccess ? "Zamanlama silindi." : result.Error;
+        if (result.IsSuccess || result.Status == HttpStatusCode.NotFound)
+        {
+            await LoadAsync();
+        }
+    }
+}

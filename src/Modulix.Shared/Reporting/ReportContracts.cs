@@ -15,6 +15,8 @@ public static class ReportAccess
     public const string Read = "core.reports.read";
     public const string Manage = "core.reports.manage";
     public const string Share = "core.reports.share";
+    public const string Export = "core.reports.export";
+    public const string Schedule = "core.reports.schedule";
 }
 
 public sealed class ReportFilterDto
@@ -158,3 +160,46 @@ public sealed record ReportResultDto(
     string? DatasetName,
     string? RecordPath,
     string Chart);
+
+// ---- Dışa aktarma ve zamanlama (dilim 4)
+
+/// <summary>Hazırlanmış CSV dosyası. Kaynak: manual, schedule. Süresi dolan dosya indirilemez; yeniden dışa aktarılır.</summary>
+public sealed record ReportExportDto(
+    Guid Id,
+    Guid? ReportId,
+    string ReportName,
+    string DatasetKey,
+    string FileName,
+    long SizeBytes,
+    int RowCount,
+    bool Truncated,
+    string Source,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset ExpiresAt,
+    int DownloadCount,
+    bool Expired);
+
+/// <summary>Kayıtsız tanımı (oluşturucudaki önizleme) dışa aktarır.</summary>
+public sealed record ExportReportRequest(ReportSpecDto? Spec, string? Name);
+
+/// <summary>Sıklık: daily, weekly, monthly. Haftanın günü: sunday..saturday (haftalıkta zorunlu). Ayın günü 1-28 (aylıkta zorunlu). Saat firmanın saat diliminde yerel saattir.</summary>
+public sealed record SaveReportScheduleRequest(string Frequency, int Hour, string? DayOfWeek = null, int? DayOfMonth = null, long? ExpectedVersion = null);
+
+public sealed record SetReportScheduleEnabledRequest(bool Enabled);
+
+/// <summary>Son durum: Delivered, Stopped, Failed. Durdurulduysa <see cref="StoppedReason"/> nedeni söyler (ör. yetki kaybı).</summary>
+public sealed record ReportScheduleDto(
+    Guid Id,
+    Guid ReportId,
+    string? ReportName,
+    string Frequency,
+    int Hour,
+    string? DayOfWeek,
+    int? DayOfMonth,
+    bool Enabled,
+    DateTimeOffset NextRunAt,
+    DateTimeOffset? LastRunAt,
+    string? LastStatus,
+    string? LastMessage,
+    string? StoppedReason,
+    long Version);
