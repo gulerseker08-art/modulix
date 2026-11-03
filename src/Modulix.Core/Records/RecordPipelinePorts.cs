@@ -30,6 +30,9 @@ public interface IDataScopeService
     /// çözülür (ADR-0028); <paramref name="entityKey"/> süzülecek kayıt türünün anahtarıdır.
     /// </summary>
     Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken);
+
+    /// <summary>Kapsam dışı ortak kayıtlar gizli mi (ADR-0026 K8); varsayılan hayır.</summary>
+    Task<bool> HidesOutOfScopeSharedAsync(TenantContext tenant, CancellationToken cancellationToken) => Task.FromResult(false);
 }
 
 /// <summary>

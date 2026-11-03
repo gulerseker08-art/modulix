@@ -14,6 +14,8 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
+    <TabBar Tabs="FormTabs" State="tabs" Label="Firma açma formu bölümleri" />
+    <TabPanel State="tabs" Key="form-firma">
     <div class="form-grid">
         <div>
             <label class="form-label" for="tenantName">Firma adı *</label>
@@ -36,6 +38,10 @@
             <input id="adminName" class="form-control" maxlength="200" @bind="administratorName" />
             <FieldError Field="administratorName" Errors="errors" />
         </div>
+    </div>
+    </TabPanel>
+    <TabPanel State="tabs" Key="form-sektor">
+    <div class="form-grid">
         @if (Profiles.Count > 0)
         {
             <div class="span-all">
@@ -66,6 +72,12 @@
             }
             <FieldError Field="modules" Errors="errors" />
         </fieldset>
+    </div>
+    </TabPanel>
+    @if (Templates.Count > 0)
+    {
+    <TabPanel State="tabs" Key="form-roller">
+    <div class="form-grid">
         @if (Templates.Count > 0)
         {
             <fieldset class="span-all">
@@ -84,6 +96,8 @@
             </fieldset>
         }
     </div>
+    </TabPanel>
+    }
 
     <div class="form-actions">
         <button type="submit" class="btn btn-primary" disabled="@busy">Firmayı aç</button>
@@ -111,6 +125,29 @@
     private string administratorName = string.Empty;
     private string? message;
     private IReadOnlyDictionary<string, string[]>? errors;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
+    private readonly TabState tabs = new("form-firma");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs
+    {
+        get
+        {
+            List<TabItem> items =
+            [
+                new("form-firma", "Firma ve yönetici", Errors: ErrorCount("name", "slug", "administratorEmail", "administratorName")),
+                new("form-sektor", "Sektör ve modüller", Errors: ErrorCount("profile", "modules")),
+            ];
+            if (Templates.Count > 0)
+            {
+                items.Add(new("form-roller", "Hazır roller", Errors: ErrorCount("roleTemplates")));
+            }
+
+            return items;
+        }
+    }
     private bool busy;
 
     /// <summary>Seçili modüllerin hazır rolleri; en az bir modül seçiliyse "Salt okur" da.</summary>
@@ -178,6 +215,7 @@
         {
             message = result.Error;
             errors = result.FieldErrors;
+            tabs.RevealFirstFailing(FormTabs);
             return;
         }
 

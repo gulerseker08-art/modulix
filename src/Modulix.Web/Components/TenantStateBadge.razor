@@ -1,4 +1,4 @@
-<span class="badge @(State == TenantState.Active ? "user-active" : "user-disabled")">@TenantStateText.Of(State)</span>
+<span class="badge @(State is TenantState.Active or TenantState.Trial ? "user-active" : "user-disabled")">@TenantStateText.Of(State)</span>
 
 @code {
     [Parameter, EditorRequired] public TenantState State { get; set; }

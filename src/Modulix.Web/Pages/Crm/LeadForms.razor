@@ -4,12 +4,12 @@
 @inject CrmLookups Lookups
 @inject NavigationManager Navigation
 
-<PageTitle>Lead formları · Modulix</PageTitle>
+<PageTitle>Müşteri adayı formları · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.LeadFormsManage">
-    <a class="back-link" href="crm/leadler">← Lead'ler</a>
+    <a class="back-link" href="crm/leadler">← Müşteri adayları</a>
     <div class="page-header">
-        <h1>Lead formları ve entegrasyonlar</h1>
+        <h1>Müşteri adayı formları ve entegrasyonlar</h1>
         @if (!editing)
         {
             <button type="button" class="btn btn-primary" @onclick="() => Open(null)">Yeni form</button>
@@ -39,6 +39,7 @@
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <h2>@(selected is null ? "Yeni form" : "Formu düzenle")</h2>
+            <FormTabs Title="Form bilgileri" Label="Müşteri adayı formu bölümleri">
             <div class="form-grid">
                 <div class="span-all">
                     <label class="form-label" for="form-name">Ad *</label>
@@ -54,7 +55,7 @@
                             <option value="@member.UserId">@member.DisplayName</option>
                         }
                     </select>
-                    <small class="text-muted">Sorumlu pasifse Lead havuza düşer; rastgele kullanıcıya atanmaz.</small>
+                    <small class="text-muted">Sorumlu pasifse müşteri adayı havuza düşer; rastgele kullanıcıya atanmaz.</small>
                     <FieldError Field="defaultOwnerId" Errors="errors" />
                 </div>
                 <div class="span-all">
@@ -71,6 +72,7 @@
                     <label class="form-check-label" for="form-server">Yalnızca sunucudan (sırlı) gönderim</label>
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="() => editing = false">Vazgeç</button>
@@ -124,7 +126,7 @@ Origin: @(FirstOrigin(form))
   "website2": ""
 }</pre>
                     <p class="text-muted small">
-                        Yanıt her zaman 202 <code>{"accepted":true}</code> döner (kayıtlı müşteri/e-posta belli edilmez). Aynı <code>submissionId</code> tekrar gönderilirse yeni Lead açılmaz.
+                        Yanıt her zaman 202 <code>{"accepted":true}</code> döner (kayıtlı müşteri/e-posta belli edilmez). Aynı <code>submissionId</code> tekrar gönderilirse yeni müşteri adayı açılmaz.
                         <code>website2</code> görünmez bal tuzağı alanıdır; boş bırakın. Tenant, durum, sorumlu ve öncelik alanları gönderilemez.
                     </p>
                 </details>

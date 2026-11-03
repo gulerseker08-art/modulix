@@ -11,10 +11,6 @@
         <h1>Teklifler</h1>
         <div class="header-actions">
             <a class="btn btn-outline-secondary" href="crm/teklif-raporu">Rapor</a>
-            @if (Session.Can(CrmAccess.QuotesWrite))
-            {
-                <a class="btn btn-primary" href="crm/teklifler/yeni">Yeni teklif</a>
-            }
         </div>
     </div>
 
@@ -38,11 +34,18 @@
         </select>
     </div>
 
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="quote-search">Teklif ara</label>
-        <input id="quote-search" class="form-control" type="search" placeholder="Başlık veya teklif no ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="quote-search">Teklif ara</label>
+            <input id="quote-search" class="form-control" type="search" placeholder="Başlık veya teklif no ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <ColumnPicker />
+        @if (Session.Can(CrmAccess.QuotesWrite))
+        {
+            <a class="btn btn-primary" href="crm/teklifler/yeni"><AppIcon Name="plus" Size="16" /> Yeni teklif</a>
+        }
+    </div>
 
     @if (page is null)
     {
@@ -78,12 +81,12 @@
                         <td data-label="Onay"><span class="badge stage-@QuoteLabels.ApprovalBadge(quote.ApprovalStatus)">@QuoteLabels.Label(QuoteLabels.Approvals, quote.ApprovalStatus)</span></td>
                         <td data-label="Toplam" class="text-end">@QuoteLabels.Money(quote.GrossTotal, quote.Currency)</td>
                         <td data-label="Geçerlilik">@(quote.ValidUntil is { } until ? CrmLabels.Time(until) : "—")</td>
-                        <td data-label="Sorumlu">@Lookups.MemberName(quote.OwnerId)</td>
+                        <td data-label="Sorumlu"><OwnerCell Name="@Lookups.MemberName(quote.OwnerId)" /></td>
                     </tr>
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -109,7 +112,7 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var url = $"/api/crm/quotes?page={pageNumber}";
+        var url = $"/api/crm/quotes?page={pageNumber}&pageSize={ListPaging.Size}";
         if (!string.IsNullOrWhiteSpace(search)) { url += $"&search={Uri.EscapeDataString(search.Trim())}"; }
         if (!string.IsNullOrEmpty(status) && !expiring) { url += $"&status={status}"; }
         if (mine) { url += "&ownerId=me"; }

@@ -22,7 +22,7 @@ public class QuoteSharingTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var s = await SetUpAsync();
         using var admin = await LoginAsync(s.Admin);
         var quote = await NewQuoteAsync(admin, s.CompanyId, internalNotes: "GIZLI-IC-NOT");
-        await AddLineAsync(admin, quote.Id, price: 1000m, quantity: 2m, tax: 20m, cost: 777m);
+        await AddLineAsync(admin, quote.Id, price: 1000m, quantity: 2m, tax: 20m, cost: 777.31m);
         await PresentAsync(admin, quote.Id);
 
         var documents = (await admin.GetFromJsonAsync<List<QuoteDocumentDto>>($"/api/crm/quotes/{quote.Id}/documents"))!;
@@ -42,7 +42,7 @@ public class QuoteSharingTests(ModulixApiFactory factory) : IClassFixture<Moduli
         using var anonymous = factory.CreateClient();
         var raw = await (await anonymous.PostAsJsonAsync($"/api/public/quotes/{s.Slug}/view", new PublicQuoteTokenRequest(token))).Content.ReadAsStringAsync();
         Assert.DoesNotContain("GIZLI-IC-NOT", raw);
-        Assert.DoesNotContain("777", raw);
+        Assert.DoesNotContain("777.31", raw);
         Assert.DoesNotContain("unitCost", raw, StringComparison.OrdinalIgnoreCase);
     }
 

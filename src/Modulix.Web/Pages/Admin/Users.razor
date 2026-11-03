@@ -9,10 +9,6 @@
 
     <div class="page-header">
         <h1>Kullanıcılar</h1>
-        @if (!inviting)
-        {
-            <button type="button" class="btn btn-primary" @onclick="() => inviting = true">Kullanıcı davet et</button>
-        }
     </div>
 
     @if (notice is not null)
@@ -30,11 +26,12 @@
         <InviteUserForm Roles="roles" Units="units" CanGrantAdministrator="Session.IsAdministrator" Invited="InvitedAsync" Cancelled="() => inviting = false" />
     }
 
-    <div class="filters" role="group" aria-label="Durum">
-        <button type="button" class="chip @(status is null ? "active" : null)" @onclick="() => FilterAsync(null)">Tümü</button>
-        @foreach (var value in Enum.GetValues<UserStatus>())
+    <div class="list-toolbar">
+        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status?.ToString() ?? "all")" ValueChanged="ChooseStatusAsync" />
+        <ColumnPicker />
+        @if (!inviting)
         {
-            <button type="button" class="chip @(status == value ? "active" : null)" @onclick="() => FilterAsync(value)">@UserLabels.Of(value)</button>
+            <button type="button" class="btn btn-primary" @onclick="() => inviting = true"><AppIcon Name="plus" Size="16" /> Kullanıcı davet et</button>
         }
     </div>
 
@@ -100,7 +97,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -128,6 +125,11 @@
         }
     }
 
+    private IReadOnlyList<ViewOption> StatusOptions =>
+        [new("all", "Tüm kullanıcılar"), .. Enum.GetValues<UserStatus>().Select(v => new ViewOption(v.ToString(), UserLabels.Of(v)))];
+
+    private Task ChooseStatusAsync(string key) => FilterAsync(key == "all" ? null : Enum.Parse<UserStatus>(key));
+
     private async Task FilterAsync(UserStatus? value)
     {
         status = value;
@@ -136,7 +138,7 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var url = $"/api/users?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        var url = $"/api/users?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
         if (status is { } s)
         {
             url += $"&status={s}";

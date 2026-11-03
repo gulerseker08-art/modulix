@@ -85,14 +85,17 @@ public static class PersistenceSetup
         services.AddScoped<CommunicationService>();
         services.AddScoped<ICommunicationPreferences>(sp => sp.GetRequiredService<CommunicationService>());
         services.AddScoped<ICommunicationAdministration>(sp => sp.GetRequiredService<CommunicationService>());
+        services.AddScoped<ICommunicationTopics>(sp => sp.GetRequiredService<CommunicationService>());
         services.AddScoped<IFrequencyLimiter, FrequencyLimiter>();
         services.AddScoped<IUnsubscribeLinks, UnsubscribeLinks>();
+        services.AddScoped<CommunicationCleanup>();
         services.AddScoped<IOptOutRecorder, OptOutRecorder>();
         services.AddScoped<ICommunicationPortal, CommunicationPortal>();
         services.AddScoped<IJournalWriter, JournalWriter>();
         services.AddScoped<ICompanyAdministration, CompanyAdministration>();
         services.AddScoped<IBranchAdministration, BranchAdministration>();
         services.AddScoped<IBusinessUnitService, BusinessUnitService>();
+        services.AddScoped<IMembershipScope, MembershipScope>();
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());

@@ -45,6 +45,8 @@
         else
         {
             <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <TabBar Tabs="FormTabs" State="tabs" Label="Rol formu bölümleri" />
+                <TabPanel State="tabs" Key="form-genel">
                 <div class="form-grid">
                     @if (IsNew && templates.Count > 0)
                     {
@@ -70,6 +72,8 @@
                     </div>
                 </div>
 
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-izin">
                 @if (!Session.IsAdministrator)
                 {
                     <p class="text-muted">Yalnızca kendinizde olan izinleri verebilir veya kaldırabilirsiniz; diğerleri kilitli görünür.</p>
@@ -78,6 +82,20 @@
                 <PermissionMatrix Permissions="permissions" Selected="selected" CanGrant="CanGrant" />
                 <FieldError Field="permissions" Errors="errors" />
 
+                @if (skippedFromTemplate > 0)
+                {
+                    <p class="text-muted">Şablondaki @skippedFromTemplate izin sizde olmadığı için eklenmedi.</p>
+                }
+
+                @if (HiddenCount > 0)
+                {
+                    <p class="text-muted">
+                        Bu rolde kapalı modüllere ait @HiddenCount izin var. Bu izinler korunur ve modül yeniden açılınca geçerli olur.
+                    </p>
+                }
+
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-kapsam">
                 <fieldset class="scope-choice">
                     <legend class="form-label">Kayıt kapsamı</legend>
                     <p class="text-muted small">
@@ -127,17 +145,24 @@
                     <FieldError Field="assignLevel" Errors="errors" />
                 </fieldset>
 
-                @if (skippedFromTemplate > 0)
-                {
-                    <p class="text-muted">Şablondaki @skippedFromTemplate izin sizde olmadığı için eklenmedi.</p>
-                }
-
-                @if (HiddenCount > 0)
-                {
-                    <p class="text-muted">
-                        Bu rolde kapalı modüllere ait @HiddenCount izin var. Bu izinler korunur ve modül yeniden açılınca geçerli olur.
-                    </p>
-                }
+                @* Bayi izolasyonu (ADR-0026 K8): kapsam dışı ortak firma/kişiler asgari kimlikle bile görünmesin. *@
+                <fieldset class="scope-choice">
+                    <legend class="form-label">Kapsam dışı ortak kayıtlar</legend>
+                    <div class="form-check">
+                        <input id="hide-shared" class="form-check-input" type="checkbox" checked="@hideOutOfScopeShared"
+                               @onchange="e => hideOutOfScopeShared = e.Value is true" />
+                        <label class="form-check-label" for="hide-shared">
+                            <strong>Kapsam dışı firma ve kişileri gizle</strong>
+                            <span class="text-muted">
+                                Kapalıyken, kayıt kapsamınız dışındaki ortak firma ve kişiler genel arama ve seçim listelerinde yalnızca asgari kimlikle
+                                (ad, vergi numarası) görünür. Açıkken hiç görünmez; sayıya, aramaya ve mükerrer önerisine de girmez. Bayi rolleri
+                                için açık olması önerilir. Kişinin birden fazla rolü varsa, hepsi gizlediğinde gizlenir.
+                            </span>
+                        </label>
+                    </div>
+                    <FieldError Field="hideOutOfScopeShared" Errors="errors" />
+                </fieldset>
+                </TabPanel>
 
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" disabled="@busy">@(IsNew ? "Rolü oluştur" : "Kaydet")</button>
@@ -220,6 +245,7 @@
     private string name = string.Empty;
     private RecordScope scope = RecordScope.All;
     private RoleAssignLevel assignLevel = RoleAssignLevel.User;
+    private bool hideOutOfScopeShared;
     private Guid? moveTo;
     private bool loaded;
     private bool deleting;
@@ -227,6 +253,18 @@
     private string? message;
     private string? notice;
     private IReadOnlyDictionary<string, string[]>? errors;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
+    private readonly TabState tabs = new("form-genel");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs =>
+    [
+        new("form-genel", "Genel", Errors: ErrorCount("name")),
+        new("form-izin", "İzinler", Errors: ErrorCount("permissions")),
+        new("form-kapsam", "Kapsam ve düzey", Errors: ErrorCount("scope", "assignLevel", "hideOutOfScopeShared")),
+    ];
 
     private bool IsNew => RoleId is null;
 
@@ -251,6 +289,7 @@
         deleting = false;
         moveTo = null;
         errors = null;
+        tabs.Select("form-genel");
         message = null;
 
         var permissionResult = await Api.GetAsync<List<PermissionDto>>("/api/roles/permissions");
@@ -267,6 +306,7 @@
             selected = role?.Permissions.ToHashSet() ?? [];
             scope = role?.Scope ?? RecordScope.All;
             assignLevel = role?.AssignLevel ?? RoleAssignLevel.User;
+            hideOutOfScopeShared = role?.HideOutOfScopeShared ?? false;
         }
         else
         {
@@ -276,6 +316,7 @@
             selected = source?.Permissions.ToHashSet() ?? [];
             scope = source?.Scope ?? (Session.IsAdministrator ? RecordScope.All : Session.Scope);
             assignLevel = source?.AssignLevel ?? RoleAssignLevel.User;
+            hideOutOfScopeShared = source?.HideOutOfScopeShared ?? false;
             templateKey = null;
             skippedFromTemplate = 0;
             templates = source is null ? (await Api.GetAsync<List<RoleTemplateDto>>("/api/roles/templates")).Value ?? [] : [];
@@ -330,7 +371,7 @@
     {
         busy = true;
         notice = null;
-        var request = new SaveRoleRequest(name, selected.Order(StringComparer.Ordinal).ToList(), scope, assignLevel);
+        var request = new SaveRoleRequest(name, selected.Order(StringComparer.Ordinal).ToList(), scope, assignLevel, hideOutOfScopeShared);
         var result = IsNew
             ? await Api.PostAsync<RoleDto>("/api/roles", request)
             : await Api.PutAsync<RoleDto>($"/api/roles/{RoleId}", request);
@@ -340,6 +381,7 @@
         {
             message = result.Error;
             errors = result.FieldErrors;
+            tabs.RevealFirstFailing(FormTabs);
             return;
         }
 
@@ -357,6 +399,7 @@
             Permissions = result.Value.Permissions,
             Scope = result.Value.Scope,
             AssignLevel = result.Value.AssignLevel,
+            HideOutOfScopeShared = result.Value.HideOutOfScopeShared,
         };
         selected = role.Permissions.ToHashSet();
         message = null;

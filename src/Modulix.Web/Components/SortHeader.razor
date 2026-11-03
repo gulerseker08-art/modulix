@@ -1,0 +1,41 @@
+@* Sıralanabilir tablo başlığı (<th> içine konur): tıklama artan → azalan → varsayılan sırayla döner. Sıralama sunucudadır
+   (liste uç noktasının sort anahtarları); bu bileşen yalnızca anahtarı seçer. Desc verilmezse artan ↔ varsayılan döner. *@
+<button type="button" class="sort-button @(Active ? "active" : null)" aria-label="@AriaText" @onclick="ClickAsync">
+    @Label
+    <AppIcon Name="@Icon" Size="12" />
+</button>
+
+@code {
+    /// <summary>Başlık metni.</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    /// <summary>Artan sıralama anahtarı (ör. "title").</summary>
+    [Parameter] public string? Asc { get; set; }
+
+    /// <summary>Azalan sıralama anahtarı (ör. "-title"); yoksa yalnızca artan vardır.</summary>
+    [Parameter] public string? Desc { get; set; }
+
+    /// <summary>Geçerli sıralama anahtarı.</summary>
+    [Parameter] public string? Value { get; set; }
+
+    /// <summary>Liste varsayılan sırası; döngü sonunda buna dönülür.</summary>
+    [Parameter, EditorRequired] public string Default { get; set; } = string.Empty;
+
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    private bool Ascending => Asc is not null && Value == Asc;
+
+    private bool Descending => Desc is not null && Value == Desc;
+
+    private bool Active => Ascending || Descending;
+
+    private string Icon => Ascending ? "arrow-up" : Descending ? "arrow-down" : "chevrons-up-down";
+
+    private string AriaText => Ascending ? $"{Label}: artan sırada" : Descending ? $"{Label}: azalan sırada" : $"{Label} sütununa göre sırala";
+
+    private Task ClickAsync()
+    {
+        var next = Ascending ? (Desc ?? Default) : Descending ? Default : (Asc ?? Desc ?? Default);
+        return ValueChanged.InvokeAsync(next);
+    }
+}

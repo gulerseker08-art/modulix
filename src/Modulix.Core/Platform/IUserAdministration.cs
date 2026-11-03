@@ -100,6 +100,37 @@ public sealed record UserAccess(bool IsAdministrator, IReadOnlyList<PermissionGr
     public IReadOnlyList<UserRoleSource> Roles { get; init; } = [];
 }
 
+/// <summary>
+/// Kullanıcının departmanını değiştirmenin etkisi (ADR-0026 K7). Kayıt görünürlüğü sahibin güncel departmanına göre
+/// hesaplandığı için kullanıcının kayıtları yeni departmanla görünür; eski departmandaki iş arkadaşları artık görmez.
+/// <see cref="OwnedRecords"/> işlemi yapanın görebildiği kadardır (<see cref="OwnedRecordSummary.Count"/> boşsa göremiyor).
+/// </summary>
+public sealed record BusinessUnitChangePreview(
+    Guid MembershipId,
+    string DisplayName,
+    MembershipStatus Status,
+    Guid? CurrentBusinessUnitId,
+    string? CurrentPath,
+    Guid TargetBusinessUnitId,
+    string TargetPath,
+    bool IsChange,
+    IReadOnlyList<OwnedRecordSummary> OwnedRecords,
+    int OwnedTotal,
+    bool OwnedUnknown,
+    bool DecisionRequired,
+    bool ReasonRequired,
+    IReadOnlyList<string> LostRoles,
+    IReadOnlyList<string> GainedRoles,
+    IReadOnlyList<string> Warnings);
+
+/// <summary>
+/// Departman değişikliği isteği. Kullanıcının kayıtları varsa (ya da sayılamıyorsa) <see cref="MoveRecordsWithUser"/> ya da
+/// <see cref="TransferRecordsToMembershipId"/> verilmelidir (ikisi birden olmaz); devir yalnızca kullanıcının eski departmanındaki
+/// etkin bir üyeye yapılır. Kayıt varsa ya da kullanıcı etkin değilse <see cref="Reason"/> zorunludur.
+/// </summary>
+public sealed record BusinessUnitChange(
+    Guid BusinessUnitId, string? Reason, bool MoveRecordsWithUser, Guid? TransferRecordsToMembershipId);
+
 public sealed class UserAdministrationException(UserAdministrationError error, string message) : Exception(message)
 {
     public UserAdministrationError Error { get; } = error;
@@ -162,6 +193,19 @@ public interface IUserAdministration
     /// İşlemi yapanın kayıtları düzenleme izni yoksa <see cref="UserAdministrationError.PermissionDenied"/>.
     /// </summary>
     Task<int> TransferRecordsAsync(Guid membershipId, Guid toMembershipId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Kullanıcıyı başka bir departmana taşımanın etkisini gösterir; hiçbir şey değiştirmez (ADR-0026 K7). Yönetici olmayan
+    /// işlemi yapan yalnızca kendi kapsamındaki departmanlar arasında taşıyabilir (<see cref="UserAdministrationError.PermissionDenied"/>).
+    /// </summary>
+    Task<BusinessUnitChangePreview> PreviewBusinessUnitChangeAsync(Guid membershipId, Guid businessUnitId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Kullanıcıyı departmana taşır ve gerekiyorsa kayıtlarını eski departmandaki bir üyeye devreder; devir, taşıma ve denetim kaydı
+    /// tek işlemdedir. Kayıt kararı ya da gerekçe eksikse <see cref="UserAdministrationError.Conflict"/> / <see cref="ArgumentException"/>.
+    /// Devredilen kayıt sayısını döner (devir yoksa 0).
+    /// </summary>
+    Task<int> ChangeBusinessUnitAsync(Guid membershipId, BusinessUnitChange change, CancellationToken cancellationToken);
 
     Task EnableAsync(Guid membershipId, CancellationToken cancellationToken);
 

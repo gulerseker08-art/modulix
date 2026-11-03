@@ -19,4 +19,20 @@ public interface IUnsubscribeLinks
     /// <param name="reference">Bağlantının hangi gönderim için üretildiği (ör. teslimat anahtarı); yalnızca izleme içindir.</param>
     /// <returns>Üretilen bağlantılar; genel adres ayarlı değilse null.</returns>
     Task<UnsubscribeLink?> IssueAsync(CommunicationChannel channel, string address, string reference, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Bir grup için bağlantı üretir (dilim 10: toplu gönderim tek kayıt turuyla çalışır). Sonuç girdiyle aynı sırada ve aynı uzunluktadır; genel adres ayarlı
+    /// değilse her öğe null olur. Varsayılan uygulama tek tek üretir.
+    /// </summary>
+    async Task<IReadOnlyList<UnsubscribeLink?>> IssueManyAsync(
+        CommunicationChannel channel, IReadOnlyList<(string Address, string Reference)> items, CancellationToken cancellationToken)
+    {
+        var links = new List<UnsubscribeLink?>(items.Count);
+        foreach (var (address, reference) in items)
+        {
+            links.Add(await IssueAsync(channel, address, reference, cancellationToken));
+        }
+
+        return links;
+    }
 }

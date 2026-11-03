@@ -42,6 +42,7 @@ public partial class EndpointProtectionTests(ModulixApiFactory factory) : IClass
         "POST /api/public/communication/{tenant}/view",
         "POST /api/public/communication/{tenant}/unsubscribe",
         "POST /api/public/communication/{tenant}/resubscribe",
+        "POST /api/public/communication/{tenant}/topic",
         "POST /api/public/communication/{tenant}/one-click/{token}",
         // İmza sağlayıcısı webhook'u (ADR-0022 dilim 6): oturumsuzdur; kimlik doğrulama HMAC imzası ve zaman damgasıdır, gizli anahtar yapılandırmadan gelir
         // (yoksa uç nokta kapalı: 404), tenant sağlayıcı referansından çözülür, hız ve boyut sınırı uygulanır.

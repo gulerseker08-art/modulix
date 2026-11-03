@@ -37,6 +37,10 @@ internal sealed class MembershipDataScope(
         return owners;
     }
 
+    /// <summary>Olay işleyicisi tenant genelini görür (<c>GetOwnersAsync</c> ile aynı kural); kullanıcı isteğinde rollerin ayarına bakılır.</summary>
+    public async Task<bool> HidesOutOfScopeSharedAsync(TenantContext tenant, CancellationToken cancellationToken) =>
+        handling.Subscription is null && await permissions.HidesOutOfScopeSharedAsync(tenant.MembershipId, cancellationToken);
+
     /// <summary>
     /// Kişinin etkin rollerinin (doğrudan ve departmandan gelen) her kapsamı bir sahip kümesi üretir; sonuç kümelerin
     /// birleşimidir (ADR-0026 K5). Herhangi biri "tümü" ise süzgeç yoktur (<c>null</c>). Her kapsam kişinin kendi kayıtlarını

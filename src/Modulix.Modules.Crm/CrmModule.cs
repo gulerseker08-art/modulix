@@ -251,16 +251,16 @@ public sealed class CrmModule : IModule
         new(Permissions.ActivitiesReopen, "Kapanmış aktiviteyi yeniden açar", "Aktiviteler"),
         new(Permissions.ActivitiesManageCalendar, "Ekip takvimini ve başkalarının meşguliyetini görür", "Aktiviteler"),
         new(Permissions.ActivitiesViewPrivate, "Özel aktivitelerin ayrıntısını görür", "Aktiviteler"),
-        new(Permissions.LeadsRead, "Lead'leri görüntüler", "Lead'ler"),
-        new(Permissions.LeadsCreate, "Lead oluşturur", "Lead'ler"),
-        new(Permissions.LeadsUpdate, "Lead alanlarını düzenler", "Lead'ler"),
-        new(Permissions.LeadsDelete, "Lead siler", "Lead'ler"),
-        new(Permissions.LeadsAssign, "Lead atar ve atama bekleyen Lead'leri görür", "Lead'ler"),
-        new(Permissions.LeadsQualify, "Lead'i nitelendirir ve daha sonra takibe alır", "Lead'ler"),
-        new(Permissions.LeadsDisqualify, "Lead'i eler ve elenen Lead'i yeniden açar", "Lead'ler"),
-        new(Permissions.LeadsConvert, "Nitelikli Lead'i fırsata dönüştürür", "Lead'ler"),
-        new(Permissions.LeadsExport, "Lead listesini dışa aktarır", "Lead'ler"),
-        new(Permissions.LeadFormsManage, "Lead toplama formlarını ve entegrasyon sırlarını yönetir", "Lead formları"),
+        new(Permissions.LeadsRead, "Müşteri adaylarını görüntüler", "Müşteri adayları"),
+        new(Permissions.LeadsCreate, "Müşteri adayı oluşturur", "Müşteri adayları"),
+        new(Permissions.LeadsUpdate, "Müşteri adayı alanlarını düzenler", "Müşteri adayları"),
+        new(Permissions.LeadsDelete, "Müşteri adayı siler", "Müşteri adayları"),
+        new(Permissions.LeadsAssign, "Müşteri adayı atar ve atama bekleyen müşteri adaylarını görür", "Müşteri adayları"),
+        new(Permissions.LeadsQualify, "Müşteri adayını nitelendirir ve daha sonra takibe alır", "Müşteri adayları"),
+        new(Permissions.LeadsDisqualify, "Müşteri adayını eler ve elenen müşteri adayını yeniden açar", "Müşteri adayları"),
+        new(Permissions.LeadsConvert, "Nitelikli müşteri adayını fırsata dönüştürür", "Müşteri adayları"),
+        new(Permissions.LeadsExport, "Müşteri adayı listesini dışa aktarır", "Müşteri adayları"),
+        new(Permissions.LeadFormsManage, "Müşteri adayı toplama formlarını ve entegrasyon sırlarını yönetir", "Müşteri adayı formları"),
         new(Permissions.ProductsRead, "Ürün, hizmet, kategori ve birimleri görüntüler", "Ürün kataloğu"),
         new(Permissions.ProductsWrite, "Ürün, hizmet, kategori ve birim ekler, düzenler", "Ürün kataloğu"),
         new(Permissions.ProductCostsRead, "Ürün maliyetini görür ve düzenler", "Ürün maliyeti"),
@@ -295,7 +295,7 @@ public sealed class CrmModule : IModule
         // Yürüyen (açık ve beklemedeki) fırsatlar devredilir; kazanılan/kaybedilen/iptal edilen geçmiş olarak eski sorumlusunda kalır.
         new(Entities.Opportunity, "açık fırsat", new Dictionary<string, string> { ["live"] = "true" }) { Path = "crm/firsatlar/{id}" },
         new(Entities.Activity, "açık aktivite", new Dictionary<string, string> { ["open"] = "true" }) { Path = "crm/aktiviteler" },
-        new(Entities.Lead, "açık lead", new Dictionary<string, string> { ["open"] = "true" }) { Path = "crm/leadler/{id}" },
+        new(Entities.Lead, "açık müşteri adayı", new Dictionary<string, string> { ["open"] = "true" }) { Path = "crm/leadler/{id}" },
     ];
 
     IReadOnlyList<RoleTemplate> IModule.RoleTemplates { get; } =
@@ -336,8 +336,8 @@ public sealed class CrmModule : IModule
         // Lead dağıtımı: atama bekleyen havuzu görür, Lead açar ve atar; nitelendirme/dönüşüm satış tarafındadır.
         new(
             "crm.lead-coordinator",
-            "Lead koordinatörü",
-            "Lead'leri toplar, atama bekleyenleri sorumlulara dağıtır ve raporlar.",
+            "Müşteri adayı koordinatörü",
+            "Müşteri adaylarını toplar, atama bekleyenleri sorumlulara dağıtır ve raporlar.",
             [
                 Permissions.LeadsRead, Permissions.LeadsCreate, Permissions.LeadsUpdate, Permissions.LeadsAssign, Permissions.LeadsExport,
                 Permissions.ActivitiesRead, Permissions.ActivitiesWrite, Permissions.ActivitiesAssign, Permissions.ActivitiesReopen,
@@ -472,7 +472,7 @@ public sealed class CrmModule : IModule
         },
         new(
             Lists.LeadSource,
-            "Lead kaynağı",
+            "Müşteri adayı kaynağı",
             Entities.Lead,
             "source",
             Required: false,
@@ -483,7 +483,7 @@ public sealed class CrmModule : IModule
             ]),
         new(
             Lists.LeadDisqualificationReason,
-            "Lead eleme nedeni",
+            "Müşteri adayı eleme nedeni",
             Entities.Lead,
             "disqualificationReason",
             Required: false,
@@ -497,9 +497,9 @@ public sealed class CrmModule : IModule
     /// <summary>İlk temas hedefi: Lead'in ilk temasının beklenen en uzun süresi. Çalışma saati takvimi olmadığı için TAKVİM saati cinsindendir.</summary>
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
     [
-        new(SettingKeys.LeadFirstContactTargetHours, "İlk temas hedefi (takvim saati)", "CRM Lead", SettingType.Text, "24")
+        new(SettingKeys.LeadFirstContactTargetHours, "İlk temas hedefi (takvim saati)", "CRM Müşteri adayı", SettingType.Text, "24")
         {
-            Description = "Lead'in ilk temasının hedeflenen en uzun süresi, takvim saati olarak (iş saati değildir). Boş bırakılırsa hedef uygulanmaz.",
+            Description = "Müşteri adayının ilk temasının hedeflenen en uzun süresi, takvim saati olarak (iş saati değildir). Boş bırakılırsa hedef uygulanmaz.",
             Pattern = @"^[1-9][0-9]{0,3}$",
             PatternMessage = "1-9999 arası tam sayı girin.",
             MaxLength = 4,
@@ -699,7 +699,7 @@ public sealed class CrmModule : IModule
         {
             ["title"] = "Başlık", ["companyId"] = "Firma", ["contactId"] = "Kişi", ["stage"] = "Aşama", ["amount"] = "Tutar",
             ["currency"] = "Para birimi", ["expectedCloseDate"] = "Tahmini kapanış", ["probability"] = "Olasılık (%)",
-            ["lostReason"] = "Kaybetme açıklaması", ["sourceLeadId"] = "Kaynak Lead", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+            ["lostReason"] = "Kaybetme açıklaması", ["sourceLeadId"] = "Kaynak müşteri adayı", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
             ["opportunityNumber"] = "Fırsat no", ["description"] = "Açıklama", ["status"] = "Durum", ["statusReason"] = "Durum gerekçesi",
             ["priority"] = "Öncelik", ["type"] = "Tür", ["source"] = "Kaynak", ["customerBudget"] = "Müşteri bütçesi",
             ["budgetStatus"] = "Bütçe durumu", ["needDescription"] = "İhtiyaç", ["currentProblem"] = "Mevcut sorun",
@@ -882,7 +882,7 @@ public sealed class CrmModule : IModule
             UserFields = ["scopeUserId", "submittedBy", "lockedBy"],
             References = new Dictionary<string, string> { ["previousSubmissionId"] = Entities.ForecastSubmission },
         },
-        new(Entities.LeadForm, "Lead formu (CRM)", Permissions.LeadFormsManage, new Dictionary<string, string>
+        new(Entities.LeadForm, "Müşteri adayı formu (CRM)", Permissions.LeadFormsManage, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["formKey"] = "Form kimliği", ["isActive"] = "Aktif", ["defaultOwnerId"] = "Varsayılan sorumlu",
             ["allowedOrigins"] = "İzinli kaynaklar", ["serverOnly"] = "Yalnızca sunucudan", ["secretRotatedAt"] = "Sır yenilenme",
@@ -890,9 +890,9 @@ public sealed class CrmModule : IModule
         {
             UserFields = ["defaultOwnerId"],
         },
-        new(Entities.Lead, "Lead (CRM)", Permissions.LeadsRead, new Dictionary<string, string>
+        new(Entities.Lead, "Müşteri adayı (CRM)", Permissions.LeadsRead, new Dictionary<string, string>
         {
-            ["leadNumber"] = "Lead no", ["subject"] = "Konu", ["description"] = "Açıklama", ["status"] = "Durum", ["statusReason"] = "Durum gerekçesi",
+            ["leadNumber"] = "Müşteri adayı no", ["subject"] = "Konu", ["description"] = "Açıklama", ["status"] = "Durum", ["statusReason"] = "Durum gerekçesi",
             ["priority"] = "Öncelik", ["firstName"] = "Ad", ["lastName"] = "Soyad", ["companyName"] = "Firma adı", ["email"] = "E-posta",
             ["phone"] = "Telefon", ["jobTitle"] = "Unvan", ["website"] = "Web sitesi", ["country"] = "Ülke", ["city"] = "Şehir",
             ["companyId"] = "Mevcut firma", ["contactId"] = "Mevcut kişi", ["productInterest"] = "İlgilenilen ürün/hizmet",
@@ -1051,6 +1051,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<SalesOpportunityReader>();
         services.AddScoped<SalesPlanningData>();
         services.AddScoped<ISalesOverview, SalesOverview>();
+        services.AddScoped<ISalesAnalytics, SalesAnalytics>();
         services.AddScoped<IForecastWorkflow, ForecastWorkflow>();
         services.AddScoped<IRecordStore, OpportunityContactRecordStore>();
         services.AddScoped<IRecordStore, OpportunityCompetitorRecordStore>();

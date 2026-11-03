@@ -321,7 +321,7 @@ public class LeadTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFact
         Assert.Equal(LeadStatus.New, fresh.Status);
 
         var missing = await ProblemAsync(await client.PostAsJsonAsync("/api/crm/activities", new SaveActivityRequest("Yok", LeadId: Guid.NewGuid())));
-        Assert.Equal(["Lead bulunamadı."], missing.Errors["leadId"]);
+        Assert.Equal(["Müşteri adayı bulunamadı."], missing.Errors["leadId"]);
     }
 
     [Fact]

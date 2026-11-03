@@ -3,6 +3,7 @@ using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
+using Modulix.Core.Platform;
 using Modulix.Shared.Users;
 
 namespace Modulix.Api.Users;
@@ -53,8 +54,18 @@ public static class BusinessUnitEndpoints
             await service.GetMembershipBusinessUnitAsync(membershipId, ct) is { } unit
                 ? Results.Ok(new MembershipBusinessUnitDto(unit.Id, unit.Name, unit.PathNames, unit.Kind, unit.IsActive))
                 : UserNotFound());
-        membership.MapPut("/", (Guid membershipId, SetMembershipBusinessUnitRequest request, IBusinessUnitService service, CancellationToken ct) => RunAsync(async () =>
-            await service.SetMembershipBusinessUnitAsync(membershipId, request.BusinessUnitId, ct) ? Results.NoContent() : UserNotFound()));
+        membership.MapGet("/change-preview", (Guid membershipId, Guid businessUnitId, IUserAdministration admin, CancellationToken ct) => RunAsync(async () =>
+            Results.Ok(ToDto(await admin.PreviewBusinessUnitChangeAsync(membershipId, businessUnitId, ct)))));
+
+        // Kayıt kararı, gerekçe ve kapsam sınırı IUserAdministration'dadır; başka tenant'ın üyeliği "bulunamadı" döner.
+        membership.MapPut("/", (Guid membershipId, SetMembershipBusinessUnitRequest request, IUserAdministration admin, CancellationToken ct) => RunAsync(async () =>
+        {
+            await admin.ChangeBusinessUnitAsync(
+                membershipId,
+                new BusinessUnitChange(request.BusinessUnitId, request.Reason, request.MoveRecordsWithUser, request.TransferRecordsToMembershipId),
+                ct);
+            return Results.NoContent();
+        }));
 
         return app;
     }
@@ -77,6 +88,24 @@ public static class BusinessUnitEndpoints
     private static BusinessUnitDetailDto ToDto(BusinessUnitDetail detail) => new(
         ToDto(detail.Unit),
         detail.Members.Select(m => new BusinessUnitMemberDto(m.MembershipId, m.UserId, m.DisplayName, m.Email)).ToList());
+
+    private static BusinessUnitChangePreviewDto ToDto(BusinessUnitChangePreview p) => new(
+        p.MembershipId,
+        p.DisplayName,
+        (UserStatus)p.Status,
+        p.CurrentBusinessUnitId,
+        p.CurrentPath,
+        p.TargetBusinessUnitId,
+        p.TargetPath,
+        p.IsChange,
+        p.OwnedRecords.Select(o => new OwnedRecordsDto(o.EntityKey, o.Label, o.Count)).ToList(),
+        p.OwnedTotal,
+        p.OwnedUnknown,
+        p.DecisionRequired,
+        p.ReasonRequired,
+        p.LostRoles,
+        p.GainedRoles,
+        p.Warnings);
 
     private static BusinessUnitRoleDto ToDto(BusinessUnitRoleAssignment role) =>
         new(role.RoleId, role.RoleName, (Shared.Access.RecordScope)role.Scope, role.InheritToChildren);

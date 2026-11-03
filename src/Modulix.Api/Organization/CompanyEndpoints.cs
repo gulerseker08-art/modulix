@@ -2,6 +2,7 @@ using Modulix.Api.Access;
 using Modulix.Api.Users;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
+using Modulix.Core.Platform;
 using Modulix.Shared.Access;
 
 namespace Modulix.Api.Organization;
@@ -114,20 +115,22 @@ public static class CompanyEndpoints
         }
     }
 
-    private static async Task<IResult> GetMembershipCompaniesAsync(Guid membershipId, ICompanyAdministration companies, CancellationToken ct) =>
-        await companies.GetMembershipCompaniesAsync(membershipId, ct) is { } assignments
+    // Kapsam dışı üyelik (başka bayinin kullanıcısı) başka tenant'ınki gibi "bulunamadı" döner (ADR-0026).
+    private static async Task<IResult> GetMembershipCompaniesAsync(
+        Guid membershipId, ICompanyAdministration companies, IMembershipScope scope, CancellationToken ct) =>
+        await scope.CanManageAsync(membershipId, ct) && await companies.GetMembershipCompaniesAsync(membershipId, ct) is { } assignments
             ? Results.Ok(assignments.Select(a => new CompanyAssignment(a.CompanyId, a.ValidFrom, a.ValidUntil, a.BranchId)).ToList())
             : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Kullanıcı bulunamadı.");
 
     private static async Task<IResult> SetMembershipCompaniesAsync(
-        Guid membershipId, SetMembershipCompaniesRequest request, ICompanyAdministration companies, CancellationToken ct)
+        Guid membershipId, SetMembershipCompaniesRequest request, ICompanyAdministration companies, IMembershipScope scope, CancellationToken ct)
     {
         try
         {
             var assignments = (request.Assignments ?? [])
                 .Select(a => new MembershipCompanyAssignment(a.CompanyId, a.ValidFrom, a.ValidUntil, a.BranchId))
                 .ToList();
-            return await companies.SetMembershipCompaniesAsync(membershipId, assignments, ct)
+            return await scope.CanManageAsync(membershipId, ct) && await companies.SetMembershipCompaniesAsync(membershipId, assignments, ct)
                 ? Results.NoContent()
                 : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Kullanıcı bulunamadı.");
         }

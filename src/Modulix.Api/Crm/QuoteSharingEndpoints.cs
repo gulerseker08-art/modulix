@@ -262,7 +262,7 @@ internal static class QuoteSharingEndpoints
     {
         var slug = tenant.Trim().ToLowerInvariant();
         var found = await platform.Tenants.AsNoTracking()
-            .Where(t => t.Slug == slug && t.Status == TenantStatus.Active)
+            .Where(t => t.Slug == slug && TenantStatusRules.Operational.Contains(t.Status))
             .Select(t => t.Id)
             .FirstOrDefaultAsync(ct);
         if (found == Guid.Empty)

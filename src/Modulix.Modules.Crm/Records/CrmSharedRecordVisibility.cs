@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
@@ -13,6 +14,38 @@ namespace Modulix.Modules.Crm.Records;
 /// </summary>
 internal sealed class CrmSharedRecordVisibility(IModuleData data, IRecordAccess access) : ISharedRecordVisibility
 {
+    /// <summary>
+    /// Kapsam dışı firma/kişileri gizleyen roller (ADR-0026 K8): CRM firması kapsam dışında kalan taraflar ve CRM kişisi
+    /// kapsam dışında kalan kişiler, asgari kimlikle bile görünmez. CRM'de kaydı olmayan taraf/kişi (başka modüle ait) CRM
+    /// kapsamıyla kısıtlanmaz. Kısıt yoksa (tüm kayıtlar, CRM okuma izni yok, gizleme kapalı) null.
+    /// </summary>
+    public async Task<IQueryable<Guid>?> HiddenAsync(string sharedEntityKey, CancellationToken cancellationToken)
+    {
+        var entityKey = sharedEntityKey switch
+        {
+            SharedEntities.Party => CrmModule.Entities.Company,
+            SharedEntities.Person => CrmModule.Entities.Contact,
+            _ => null,
+        };
+        if (entityKey is null
+            || !await access.CanAsync(entityKey, RecordOperation.Read, cancellationToken)
+            || await access.GetOwnersAsync(cancellationToken) is not { } owners
+            || !await access.HidesOutOfScopeSharedRecordsAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        if (sharedEntityKey == SharedEntities.Party)
+        {
+            var ownerIds = owners.Select(id => (Guid?)id).ToList();
+            return data.Set<Company>().AsNoTracking().Where(c => c.OwnerId == null || !ownerIds.Contains(c.OwnerId)).Select(c => c.PartyId);
+        }
+
+        var visible = ContactRecordStore.VisibleTo(data, owners);
+        var hidden = Expression.Lambda<Func<Contact, bool>>(Expression.Not(visible.Body), visible.Parameters);
+        return data.Set<Contact>().AsNoTracking().Where(hidden).Select(c => c.PersonId);
+    }
+
     public async Task<IReadOnlySet<Guid>> RestrictedAsync(
         string sharedEntityKey, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
     {

@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Infrastructure.Authorization;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Records;
@@ -15,16 +16,25 @@ namespace Modulix.Infrastructure.Organization;
 /// Departman değişiklikleri <c>core.business-unit</c>, kullanıcının departmanı <c>core.membership</c> kaydı olarak denetime yazılır.
 /// </summary>
 internal sealed class BusinessUnitService(
-    ModulixDbContext db, ITenantContextAccessor tenantAccessor, IAuditWriter audit) : IBusinessUnitService
+    ModulixDbContext db, ITenantContextAccessor tenantAccessor, MembershipPermissions permissions, IAuditWriter audit) : IBusinessUnitService
 {
     private const string PathSeparator = " › ";
 
+    /// <summary>
+    /// Yönetici olmayan işlemi yapan yalnızca kendi kapsamındaki departmanları görür ve yönetir (ADR-0026): başka bayilerin
+    /// departmanı "bulunamadı" sayılır, adı ve üyeleri belli edilmez. Tüm kayıtlar kapsamında kısıt yoktur.
+    /// </summary>
+    private async Task<IReadOnlySet<Guid>?> VisibleAsync(CancellationToken cancellationToken) =>
+        await permissions.GetVisibleUnitIdsAsync(RequireTenant().MembershipId, cancellationToken);
+
     public async Task<IReadOnlyList<BusinessUnitSummary>> ListAsync(CancellationToken cancellationToken)
     {
+        var visible = await VisibleAsync(cancellationToken);
         var units = await db.BusinessUnits.AsNoTracking().ToListAsync(cancellationToken);
         var counts = await MemberCountsAsync(cancellationToken);
         var names = units.ToDictionary(u => u.Id, u => u.Name);
         return units
+            .Where(u => visible is null || visible.Contains(u.Id))
             .OrderBy(u => u.Depth)
             .ThenBy(u => u.Name, StringComparer.CurrentCulture)
             .Select(u => ToSummary(u, names, counts))
@@ -34,15 +44,18 @@ internal sealed class BusinessUnitService(
     public async Task<BusinessUnitDetail?> GetAsync(Guid businessUnitId, CancellationToken cancellationToken)
     {
         var unit = await db.BusinessUnits.AsNoTracking().SingleOrDefaultAsync(u => u.Id == businessUnitId, cancellationToken);
-        return unit is null ? null : await DetailAsync(unit, cancellationToken);
+        return unit is null || !await IsVisibleAsync(unit.Id, cancellationToken) ? null : await DetailAsync(unit, cancellationToken);
     }
+
+    private async Task<bool> IsVisibleAsync(Guid businessUnitId, CancellationToken cancellationToken) =>
+        await VisibleAsync(cancellationToken) is not { } visible || visible.Contains(businessUnitId);
 
     public async Task<BusinessUnitDetail?> CreateAsync(
         Guid parentId, string name, string? code, string kind, CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
         var parent = await db.BusinessUnits.AsNoTracking().SingleOrDefaultAsync(u => u.Id == parentId, cancellationToken);
-        if (parent is null)
+        if (parent is null || !await IsVisibleAsync(parent.Id, cancellationToken))
         {
             return null;
         }
@@ -69,7 +82,7 @@ internal sealed class BusinessUnitService(
     {
         var tenant = RequireTenant();
         var unit = await db.BusinessUnits.SingleOrDefaultAsync(u => u.Id == businessUnitId, cancellationToken);
-        if (unit is null)
+        if (unit is null || !await IsVisibleAsync(unit.Id, cancellationToken))
         {
             return null;
         }
@@ -94,7 +107,7 @@ internal sealed class BusinessUnitService(
     {
         var tenant = RequireTenant();
         var unit = await db.BusinessUnits.SingleOrDefaultAsync(u => u.Id == businessUnitId, cancellationToken);
-        if (unit is null)
+        if (unit is null || !await IsVisibleAsync(unit.Id, cancellationToken))
         {
             return null;
         }
@@ -130,7 +143,8 @@ internal sealed class BusinessUnitService(
 
             if (await db.BusinessUnitMembers.AnyAsync(m => m.BusinessUnitId == unit.Id, cancellationToken))
             {
-                throw new BusinessUnitConflictException("Kullanıcısı olan departman kapatılamaz; önce kullanıcıları başka bir departmana taşıyın.");
+                throw new BusinessUnitConflictException(
+                    "Kullanıcısı olan departman kapatılamaz; önce kullanıcıları (devre dışı olanlar dahil) başka bir departmana taşıyın.");
             }
 
             unit.Close();
@@ -158,12 +172,26 @@ internal sealed class BusinessUnitService(
             return null;
         }
 
+        // Kullanıcı başka bir bayinin departmanındaysa adı belli edilmez (kullanıcı kartında departman boş görünür).
+        if (!await IsVisibleAsync(unitId.Value, cancellationToken))
+        {
+            return null;
+        }
+
         var units = await db.BusinessUnits.AsNoTracking().ToListAsync(cancellationToken);
         var names = units.ToDictionary(u => u.Id, u => u.Name);
         return units.Where(u => u.Id == unitId).Select(u => new MembershipBusinessUnit(u.Id, u.Name, PathNames(u, names), u.Kind, u.IsActive)).SingleOrDefault();
     }
 
-    public async Task<bool> SetMembershipBusinessUnitAsync(Guid membershipId, Guid businessUnitId, CancellationToken cancellationToken)
+    public async Task<BusinessUnitSummary?> FindAsync(Guid businessUnitId, CancellationToken cancellationToken)
+    {
+        var units = await db.BusinessUnits.AsNoTracking().ToListAsync(cancellationToken);
+        var names = units.ToDictionary(u => u.Id, u => u.Name);
+        return units.Where(u => u.Id == businessUnitId).Select(u => ToSummary(u, names, new Dictionary<Guid, int>())).SingleOrDefault();
+    }
+
+    public async Task<bool> SetMembershipBusinessUnitAsync(
+        Guid membershipId, Guid businessUnitId, CancellationToken cancellationToken, string? reason = null, string? recordsNote = null)
     {
         var tenant = RequireTenant();
         if (!await MembershipExistsAsync(tenant, membershipId, cancellationToken))
@@ -196,12 +224,24 @@ internal sealed class BusinessUnitService(
             current.MoveTo(target.Id);
         }
 
+        // Gerekçe ve kayıtların akıbeti yalnızca sonraki hâlde yazılır; değişiklik farkında görünürler.
+        var after = new JsonObject { ["businessUnit"] = PathNames(target, names) };
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            after["businessUnitChangeReason"] = reason.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(recordsNote))
+        {
+            after["businessUnitRecords"] = recordsNote.Trim();
+        }
+
         Audit(
             tenant,
             membershipId,
             AuditAction.Updated,
             new JsonObject { ["businessUnit"] = previous is null ? null : PathNames(previous, names) },
-            new JsonObject { ["businessUnit"] = PathNames(target, names) },
+            after,
             CoreModule.AuditedEntityKeys.Membership);
         await db.SaveChangesAsync(cancellationToken);
         return true;

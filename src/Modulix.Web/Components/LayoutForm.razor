@@ -1,14 +1,15 @@
 @* Metadata'dan çizilen form gövdesi (ADR-0021): firmanın form düzenindeki sekmeler, bölüm kartları ve alanlar sırayla çizilir.
    Her alan için editör kendi girdisini verir (Field şablonu, anahtara göre); özel alanlar CustomFieldInputs ile aynı yerde çizilir.
-   Gizli alan ve bütün alanları gizli bölüm çizilmez; birden fazla sekme varsa TabBar kullanılır (bütün sekmeler DOM'da kalır,
-   kaydedilmemiş girdi kaybolmaz). *@
+   Gizli alan ve bütün alanları gizli bölüm çizilmez. Her form sekmelidir: tek sekme bile olsa TabBar çizilir (bütün sekmeler
+   DOM'da kalır, kaydedilmemiş girdi kaybolmaz). Sunucu hatası olan alanın sekmesi hata işareti taşır; kayıt denemesinden sonra
+   etkin sekmede hata yoksa hatalı ilk sekmeye geçilir. *@
 @if (Layout is null)
 {
     <p class="text-muted" role="status">Form düzeni yükleniyor…</p>
 }
 else
 {
-    var multi = Layout.Tabs.Count > 1;
+    var multi = Layout.Tabs.Count > 0;
     if (multi && tabs is not null)
     {
         <TabBar Tabs="TabItems" State="tabs" Label="@TabsLabel" Changed="_ => { }" />
@@ -56,6 +57,7 @@ else
 @code {
     private TabState? tabs;
     private string? tabsFor;
+    private IReadOnlyDictionary<string, string[]>? handledErrors;
 
     /// <summary>Formun etkin düzeni; null iken yükleniyor iletisi çizilir.</summary>
     [Parameter, EditorRequired] public FormLayoutDto? Layout { get; set; }
@@ -77,7 +79,20 @@ else
     // Sekme anahtarları "form-" önekiyle: aynı sayfadaki kayıt sekmeleriyle (tabpanel-genel) çakışmaz.
     private static string TabKey(string key) => "form-" + key;
 
-    private IReadOnlyList<TabItem> TabItems => Layout is null ? [] : [.. Layout.Tabs.Select(t => new TabItem(TabKey(t.Key), t.Label))];
+    private IReadOnlyList<TabItem> TabItems => Layout is null ? [] : [.. Layout.Tabs.Select(t => new TabItem(TabKey(t.Key), t.Label, Errors: ErrorCount(t)))];
+
+    /// <summary>Sekmedeki, sunucunun hata döndürdüğü görünür alan sayısı.</summary>
+    private int ErrorCount(FormTabDto tab)
+    {
+        if (Layout is null || Errors is not { Count: > 0 })
+        {
+            return 0;
+        }
+
+        return Layout.Sections.Where(s => s.Tab == tab.Key)
+            .SelectMany(s => Layout.Fields.Where(f => f.Section == s.Key && f.Visible && Shows(f)))
+            .Count(f => Errors.ContainsKey(f.Key));
+    }
 
     protected override void OnParametersSet()
     {
@@ -91,6 +106,16 @@ else
         {
             tabs = new TabState(first);
             tabsFor = Layout.EntityKey;
+        }
+
+        // Yeni bir hata kümesi geldiğinde (kayıt denemesi) etkin sekmede hata yoksa hatalı ilk sekmeye geç; kullanıcı sonra serbestçe gezer.
+        if (!ReferenceEquals(Errors, handledErrors))
+        {
+            handledErrors = Errors;
+            if (Errors is { Count: > 0 })
+            {
+                tabs.RevealFirstFailing(TabItems);
+            }
         }
     }
 }

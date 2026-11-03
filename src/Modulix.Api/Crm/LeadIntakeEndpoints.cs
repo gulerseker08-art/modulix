@@ -52,7 +52,7 @@ internal static class LeadIntakeEndpoints
         var group = app.MapGroup("/api/public/lead-forms/{tenant}/{formKey}")
             .AllowAnonymous()
             .RequireRateLimiting(RateLimitPolicy)
-            .WithTags("Lead formu (herkese açık)");
+            .WithTags("Müşteri adayı formu (herkese açık)");
         group.MapPost("", SubmitAsync);
         group.MapMethods("", ["OPTIONS"], PreflightAsync);
 
@@ -109,7 +109,7 @@ internal static class LeadIntakeEndpoints
 
         var slug = tenant.Trim().ToLowerInvariant();
         var found = await platform.Tenants.AsNoTracking()
-            .Where(t => t.Slug == slug && t.Status == TenantStatus.Active)
+            .Where(t => t.Slug == slug && TenantStatusRules.Operational.Contains(t.Status))
             .Select(t => t.Id)
             .FirstOrDefaultAsync(ct);
         if (found == Guid.Empty)
@@ -151,7 +151,7 @@ internal static class LeadIntakeEndpoints
         var origin = http.Request.Headers.Origin.ToString();
         var slug = tenant.Trim().ToLowerInvariant();
         var found = await platform.Tenants.AsNoTracking()
-            .Where(t => t.Slug == slug && t.Status == TenantStatus.Active).Select(t => t.Id).FirstOrDefaultAsync(ct);
+            .Where(t => t.Slug == slug && TenantStatusRules.Operational.Contains(t.Status)).Select(t => t.Id).FirstOrDefaultAsync(ct);
         if (found != Guid.Empty && origin.Length > 0)
         {
             await using var scope = scopes.Create(new TenantContext(found, Guid.Empty, Guid.Empty));

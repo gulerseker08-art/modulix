@@ -64,7 +64,7 @@
                     <tr>
                         <td data-label="Firma" class="primary">
                             <a href="platform/firmalar/@tenant.Id">@tenant.Name</a>
-                            @if (tenant.Status == TenantState.Closed)
+                            @if (tenant.Status != TenantState.Active)
                             {
                                 <TenantStateBadge State="tenant.Status" />
                             }
@@ -81,7 +81,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </PlatformGate>
 
@@ -112,7 +112,7 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var url = $"/api/platform/tenants?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        var url = $"/api/platform/tenants?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
         if (status is { } s)
         {
             url += $"&status={s}";

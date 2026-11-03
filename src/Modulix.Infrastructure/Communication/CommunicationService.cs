@@ -18,7 +18,7 @@ namespace Modulix.Infrastructure.Communication;
 /// </summary>
 internal sealed class CommunicationService(
     ModulixDbContext db, ITenantContextAccessor tenantAccessor, IAuditWriter audit, TimeProvider time)
-    : ICommunicationPreferences, ICommunicationAdministration
+    : ICommunicationPreferences, ICommunicationAdministration, ICommunicationTopics
 {
     private const int MaxPageSize = 100;
 
@@ -29,11 +29,20 @@ internal sealed class CommunicationService(
         return decisions[address];
     }
 
+    public Task<IReadOnlyDictionary<string, CommunicationDecision>> EvaluateManyAsync(
+        CommunicationChannel channel, CommunicationPurpose purpose, IReadOnlyCollection<string> addresses, CancellationToken cancellationToken) =>
+        EvaluateManyAsync(channel, purpose, addresses, null, cancellationToken);
+
     public async Task<IReadOnlyDictionary<string, CommunicationDecision>> EvaluateManyAsync(
-        CommunicationChannel channel, CommunicationPurpose purpose, IReadOnlyCollection<string> addresses, CancellationToken cancellationToken)
+        CommunicationChannel channel, CommunicationPurpose purpose, IReadOnlyCollection<string> addresses, string? topic, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(addresses);
         RequireTenant();
+        if (topic is not null && TopicRules.ValidateKey(topic) is { } topicError)
+        {
+            throw new ArgumentException(topicError, nameof(topic));
+        }
+
         var now = time.GetUtcNow();
         var result = new Dictionary<string, CommunicationDecision>(addresses.Count, StringComparer.Ordinal);
         var normalized = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -52,8 +61,17 @@ internal sealed class CommunicationService(
         // Kayıt sayısı büyük olabilir (kampanya alıcıları): sorgular parçalar halinde, adres kümesine indeksle yapılır.
         var statuses = new Dictionary<string, ConsentStatus>(StringComparer.Ordinal);
         var suppressions = new Dictionary<string, List<SuppressionReason>>(StringComparer.Ordinal);
+        var topicOptOuts = new HashSet<string>(StringComparer.Ordinal);
         foreach (var chunk in normalized.Values.Distinct(StringComparer.Ordinal).Chunk(1000))
         {
+            if (topic is not null && purpose == CommunicationPurpose.Marketing)
+            {
+                topicOptOuts.UnionWith(await db.CommunicationTopicPreferences.AsNoTracking()
+                    .Where(p => p.Channel == channel && p.TopicKey == topic && p.OptedOut && chunk.Contains(p.Address))
+                    .Select(p => p.Address)
+                    .ToListAsync(cancellationToken));
+            }
+
             if (purpose == CommunicationPurpose.Marketing)
             {
                 var rows = await db.CommunicationPreferences.AsNoTracking()
@@ -84,11 +102,18 @@ internal sealed class CommunicationService(
 
         foreach (var (raw, address) in normalized)
         {
-            result[raw] = CommunicationRules.Decide(
+            var decision = CommunicationRules.Decide(
                 purpose, statuses.GetValueOrDefault(address), suppressions.TryGetValue(address, out var reasons) ? reasons : []);
+            result[raw] = TopicRules.ApplyTopic(decision, purpose, topicOptOuts.Contains(address));
         }
 
         return result;
+    }
+
+    public async Task<bool> IsActiveAsync(string key, CancellationToken cancellationToken)
+    {
+        RequireTenant();
+        return TopicRules.ValidateKey(key) is null && await db.CommunicationTopics.AsNoTracking().AnyAsync(t => t.Key == key && t.IsActive, cancellationToken);
     }
 
     public async Task<CommunicationPage<PreferenceView>> ListPreferencesAsync(PreferenceQuery query, CancellationToken cancellationToken)
@@ -294,6 +319,169 @@ internal sealed class CommunicationService(
         return ToView(suppression, now);
     }
 
+    public async Task<IReadOnlyList<TopicView>> ListTopicsAsync(bool activeOnly, CancellationToken cancellationToken)
+    {
+        RequireTenant();
+        var source = db.CommunicationTopics.AsNoTracking().AsQueryable();
+        if (activeOnly)
+        {
+            source = source.Where(t => t.IsActive);
+        }
+
+        var rows = await source.OrderBy(t => t.Name).ThenBy(t => t.Key).ToListAsync(cancellationToken);
+        return [.. rows.Select(ToView)];
+    }
+
+    public async Task<TopicView> SaveTopicAsync(string key, string name, bool isActive, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var cleanKey = key?.Trim() ?? string.Empty;
+        if (TopicRules.ValidateKey(cleanKey) is { } keyError)
+        {
+            throw new ArgumentException(keyError, nameof(key));
+        }
+
+        if (TopicRules.ValidateName(name) is { } nameError)
+        {
+            throw new ArgumentException(nameError, nameof(name));
+        }
+
+        var cleanName = name.Trim();
+        for (var attempt = 0; ; attempt++)
+        {
+            var now = time.GetUtcNow();
+            var topic = await db.CommunicationTopics.SingleOrDefaultAsync(t => t.Key == cleanKey, cancellationToken);
+            if (topic is not null && topic.Name == cleanName && topic.IsActive == isActive)
+            {
+                return ToView(topic);
+            }
+
+            var isNew = topic is null;
+            var before = isNew ? null : Snapshot(topic!);
+            if (isNew)
+            {
+                topic = new CommunicationTopic(cleanKey, cleanName, now);
+                topic.Apply(cleanName, isActive, now);
+                db.CommunicationTopics.Add(topic);
+            }
+            else
+            {
+                topic!.Apply(cleanName, isActive, now);
+            }
+
+            AddAudit(tenant, CoreModule.AuditedEntityKeys.CommunicationTopic, topic.Id, isNew ? AuditAction.Created : AuditAction.Updated, before, Snapshot(topic));
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                return ToView(topic);
+            }
+            catch (DbUpdateException) when (isNew && attempt == 0)
+            {
+                // Aynı anahtarla eşzamanlı ilk kayıt: benzersiz indeksi kaybettik; mevcut satırla yeniden değerlendir.
+                db.ChangeTracker.Clear();
+            }
+        }
+    }
+
+    public async Task<CommunicationPage<TopicPreferenceView>> ListTopicPreferencesAsync(TopicPreferenceQuery query, CancellationToken cancellationToken)
+    {
+        RequireTenant();
+        var source = db.CommunicationTopicPreferences.AsNoTracking().AsQueryable();
+        if (query.Channel is { } channel)
+        {
+            source = source.Where(p => p.Channel == channel);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.TopicKey))
+        {
+            var topic = query.TopicKey.Trim();
+            source = source.Where(p => p.TopicKey == topic);
+        }
+
+        if (query.OptedOut is { } optedOut)
+        {
+            source = source.Where(p => p.OptedOut == optedOut);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Address))
+        {
+            var term = query.Address.Trim().ToLowerInvariant();
+            source = source.Where(p => p.Address.Contains(term));
+        }
+
+        var (page, size) = Paging(query.Page, query.PageSize);
+        var total = await source.CountAsync(cancellationToken);
+        var rows = await source.OrderByDescending(p => p.ChangedAt).ThenBy(p => p.Id).Skip((page - 1) * size).Take(size).ToListAsync(cancellationToken);
+        return new CommunicationPage<TopicPreferenceView>([.. rows.Select(ToView)], page, size, total);
+    }
+
+    public async Task<TopicPreferenceView> RecordTopicPreferenceAsync(TopicPreferenceChange change, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        var tenant = RequireTenant();
+        var address = CommunicationAddress.Normalize(change.Channel, change.Address)
+            ?? throw new ArgumentException("Adres geçersiz.", nameof(change.Address));
+        var source = change.Source?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (!ConsentSources.All.Contains(source))
+        {
+            throw new ArgumentException("Kaynak geçersiz.", nameof(change.Source));
+        }
+
+        var topicKey = change.TopicKey?.Trim() ?? string.Empty;
+        if (TopicRules.ValidateKey(topicKey) is { } keyError)
+        {
+            throw new ArgumentException(keyError, nameof(change.TopicKey));
+        }
+
+        if (!await db.CommunicationTopics.AsNoTracking().AnyAsync(t => t.Key == topicKey, cancellationToken))
+        {
+            throw new ArgumentException("Konu tanımlı değil.", nameof(change.TopicKey));
+        }
+
+        for (var attempt = 0; ; attempt++)
+        {
+            var preference = await db.CommunicationTopicPreferences.SingleOrDefaultAsync(
+                p => p.Channel == change.Channel && p.Address == address && p.TopicKey == topicKey, cancellationToken);
+            var currentOptedOut = preference?.OptedOut ?? false;
+
+            // Aynı değerin yeniden kaydı denetim kaydı üretmez (tekrarlı istek güvenlidir); ilk kaydın kaynağı ezilmez.
+            if (currentOptedOut == change.OptedOut && (preference is not null || !change.OptedOut))
+            {
+                return preference is null
+                    ? new TopicPreferenceView(Guid.Empty, change.Channel, address, topicKey, false, source, null, time.GetUtcNow())
+                    : ToView(preference);
+            }
+
+            // Çıkış her kaynakla kaydedilir (iletişimi azaltmak güvenlidir); çıkışı geri açma yalnızca kişinin kendisi ya da yetkili kullanıcıdır.
+            if (currentOptedOut && !change.OptedOut && !ConsentSources.CanReGrant.Contains(source))
+            {
+                throw new ArgumentException("Konudan çıkış içe aktarma, sağlayıcı ya da sistem kaynağıyla geri açılamaz.", nameof(change.Source));
+            }
+
+            var now = time.GetUtcNow();
+            var actor = tenant.UserId == Guid.Empty ? (Guid?)null : tenant.UserId;
+            var isNew = preference is null;
+            preference ??= new CommunicationTopicPreference(change.Channel, address, topicKey, now);
+            var before = isNew ? null : Snapshot(preference);
+            preference.Apply(change.OptedOut, source, actor, now);
+            if (isNew)
+            {
+                db.CommunicationTopicPreferences.Add(preference);
+            }
+
+            AddAudit(tenant, CoreModule.AuditedEntityKeys.CommunicationTopicPreference, preference.Id, isNew ? AuditAction.Created : AuditAction.Updated, before, Snapshot(preference));
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                return ToView(preference);
+            }
+            catch (DbUpdateException) when (isNew && attempt == 0)
+            {
+                db.ChangeTracker.Clear();
+            }
+        }
+    }
+
     private TenantContext RequireTenant() =>
         tenantAccessor.Current ?? throw new InvalidOperationException("Aktif tenant olmadan iletişim tercihleri kullanılamaz.");
 
@@ -324,6 +512,27 @@ internal sealed class CommunicationService(
         ["lifted"] = s.LiftedAt is not null,
         ["liftReason"] = s.LiftReason,
     };
+
+    private static JsonObject Snapshot(CommunicationTopic t) => new()
+    {
+        ["key"] = t.Key,
+        ["name"] = t.Name,
+        ["active"] = t.IsActive,
+    };
+
+    private static JsonObject Snapshot(CommunicationTopicPreference p) => new()
+    {
+        ["channel"] = p.Channel.ToString(),
+        ["address"] = CommunicationAddress.Mask(p.Channel, p.Address),
+        ["topic"] = p.TopicKey,
+        ["optedOut"] = p.OptedOut,
+        ["source"] = p.Source,
+    };
+
+    private static TopicView ToView(CommunicationTopic t) => new(t.Id, t.Key, t.Name, t.IsActive, t.CreatedAt, t.ChangedAt);
+
+    private static TopicPreferenceView ToView(CommunicationTopicPreference p) =>
+        new(p.Id, p.Channel, p.Address, p.TopicKey, p.OptedOut, p.Source, p.ChangedBy, p.ChangedAt);
 
     private static PreferenceView ToView(CommunicationPreference p) =>
         new(p.Id, p.Channel, p.Address, p.Purpose, p.Status, p.Source, p.EvidenceRef, p.PartyId, p.PersonId, p.ChangedBy, p.ChangedAt);

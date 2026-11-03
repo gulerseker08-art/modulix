@@ -12,6 +12,11 @@
             {
                 <span class="record-tab-count">@count</span>
             }
+            @if (tab.Errors > 0)
+            {
+                @* Hata renk dışında "!" işareti ve gizli metinle de anlatılır. *@
+                <span class="record-tab-count record-tab-invalid"><span aria-hidden="true">!</span><span class="visually-hidden">@tab.Errors hatalı alan</span></span>
+            }
         </button>
     }
 </div>

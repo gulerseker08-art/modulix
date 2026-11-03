@@ -15,4 +15,10 @@ public interface IRecordAccess
 
     /// <summary>Kullanıcının kayıt türünde işlem izni (modül tenant için açık ve izin rollerinde) var mı?</summary>
     Task<bool> CanAsync(string entityKey, RecordOperation operation, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Kullanıcının tüm rolleri "kapsam dışı ortak kayıtları gizle" diyor mu (ADR-0026 K8)? Evetse kapsam dışı ortak firma ve
+    /// kişiler asgari kimlikle bile görünmez. Yönetici, rolü olmayan kişi ve olay işleyicisi için hayırdır.
+    /// </summary>
+    Task<bool> HidesOutOfScopeSharedRecordsAsync(CancellationToken cancellationToken) => Task.FromResult(false);
 }

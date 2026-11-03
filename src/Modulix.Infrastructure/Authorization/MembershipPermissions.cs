@@ -20,6 +20,12 @@ internal sealed record MembershipAccess(bool IsAdministrator, IReadOnlySet<strin
     /// <summary>Gösterim için en geniş kapsam; yetki kararı <see cref="Scopes"/> ile verilir.</summary>
     public RecordScope Scope => RecordScopeRules.Widest(Scopes);
 
+    /// <summary>
+    /// Kapsam dışı ortak firma/kişiler gizli mi (ADR-0026 K8)? Yalnızca <b>tüm</b> etkin roller gizliyorsa: roller izinler gibi
+    /// eklenir, bir rol asgari kimliği göstermeye izin veriyorsa gösterilir. Yönetici ve rolü olmayan kişi için hayır.
+    /// </summary>
+    public bool HidesOutOfScopeShared => !IsAdministrator && Roles.Count > 0 && Roles.All(r => r.HideOutOfScopeShared);
+
     /// <summary>İzni veren roller; sistem rolü her izni verir.</summary>
     public IEnumerable<GrantingRole> RolesGranting(string permission) =>
         Permissions.Contains(permission) ? Roles.Where(r => r.IsSystem || r.Permissions.Contains(permission)) : [];
@@ -34,7 +40,8 @@ internal sealed record GrantingRole(
     bool IsSystem,
     IReadOnlyList<string> Permissions,
     RecordScope Scope = RecordScope.All,
-    string? ViaBusinessUnit = null);
+    string? ViaBusinessUnit = null,
+    bool HideOutOfScopeShared = false);
 
 /// <summary>Üyeliğin departmanı ve kimlik yolu.</summary>
 internal sealed record MembershipUnit(Guid Id, string Name, string Path);
@@ -65,6 +72,14 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
         return ScopesOf(roles.Any(r => r.IsSystem && r.ViaBusinessUnit is null), roles.Where(r => !r.IsSystem || r.ViaBusinessUnit is null).Select(r => r.Scope));
     }
 
+    /// <summary>Üyeliğin rolleri kapsam dışı ortak kayıtları gizliyor mu (ADR-0026 K8); bkz. <see cref="MembershipAccess.HidesOutOfScopeShared"/>.</summary>
+    public async Task<bool> HidesOutOfScopeSharedAsync(Guid membershipId, CancellationToken cancellationToken)
+    {
+        var roles = await LoadRolesAsync(membershipId, cancellationToken);
+        var effective = roles.Where(r => !r.IsSystem || r.ViaBusinessUnit is null).ToList();
+        return !effective.Any(r => r.IsSystem) && effective.Count > 0 && effective.All(r => r.HideOutOfScopeShared);
+    }
+
     /// <summary>Üyeliğin en geniş kapsamı (gösterim için); karar <see cref="GetScopesAsync"/> ile verilir.</summary>
     public async Task<RecordScope> GetScopeAsync(Guid membershipId, CancellationToken cancellationToken) =>
         RecordScopeRules.Widest(await GetScopesAsync(membershipId, cancellationToken));
@@ -79,6 +94,40 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
             .SingleOrDefaultAsync(cancellationToken);
 
     /// <summary>
+    /// Kişinin görebildiği ve yönetebildiği departmanlar (ADR-0026): null tüm departmanlardır (tüm kayıtlar kapsamı). Aksi halde
+    /// kendi departmanı; "departman ve altı" kapsamı varsa altındaki departmanlar da. Başka bayilerin departman adları, üyeleri ve
+    /// rolleri bu kümenin dışında kalır; departman uçları, kullanıcı listesindeki departman adı ve davet bu kümeye bakar.
+    /// Departmanı olmayan (bozuk veri) üye hiçbir departmanı göremez. Üyeliği olmayan bağlam (platform yöneticisinin işlemi,
+    /// sistem, iç çağrılar) bir üyelik değildir ve kısıtlanmaz: gerçek bir istekte işlemi yapan her zaman sunucuca doğrulanmış
+    /// bir üyeliktir, üyeliği olmayan kimse bu uçlara izinle erişemez.
+    /// </summary>
+    public async Task<IReadOnlySet<Guid>?> GetVisibleUnitIdsAsync(Guid membershipId, CancellationToken cancellationToken)
+    {
+        if (membershipId == Guid.Empty || !await db.Memberships.AsNoTracking().AnyAsync(m => m.Id == membershipId, cancellationToken))
+        {
+            return null;
+        }
+
+        var scopes = await GetScopesAsync(membershipId, cancellationToken);
+        if (scopes.Contains(RecordScope.All))
+        {
+            return null;
+        }
+
+        var visible = new HashSet<Guid>();
+        if (await GetUnitAsync(membershipId, cancellationToken) is { } unit)
+        {
+            visible.Add(unit.Id);
+            if (scopes.Contains(RecordScope.UnitAndBelow))
+            {
+                visible.UnionWith(await GetUnitTreeIdsAsync(unit.Path, cancellationToken));
+            }
+        }
+
+        return visible;
+    }
+
+    /// <summary>
     /// Departman ve altı kapsamı için: verilen departmanın kendisi ve altındaki departmanların kimlikleri (kimlik yolu
     /// önekiyle). Kök departmanda tüm departmanlardır.
     /// </summary>
@@ -87,6 +136,28 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
         // Ağaç küçüktür (tenant başına onlarca departman); yol karşılaştırması bellekte, ham SQL ve LIKE kaçışı olmadan yapılır.
         var units = await db.BusinessUnits.AsNoTracking().Select(u => new { u.Id, u.Path }).ToListAsync(cancellationToken);
         return units.Where(u => u.Path.StartsWith(unitPath, StringComparison.Ordinal)).Select(u => u.Id).ToList();
+    }
+
+    /// <summary>
+    /// Bir departmanın kullanıcılarına verdiği roller (ADR-0026 K6): o departmana atananlar ile üst departmanlarda "alt
+    /// departmanlara da uygula" işaretli olanlar; sistem rolü yetki vermez. Departman taşıma önizlemesinde kaybedilen ve
+    /// kazanılan rolleri bulmak için kullanılır.
+    /// </summary>
+    public async Task<IReadOnlyList<(Guid Id, string Name)>> GetUnitRolesAsync(Guid unitId, string unitPath, CancellationToken cancellationToken)
+    {
+        var assigned = await (
+            from assignment in db.BusinessUnitRoles.AsNoTracking()
+            join owner in db.BusinessUnits.AsNoTracking() on assignment.BusinessUnitId equals owner.Id
+            join role in db.Roles.AsNoTracking() on assignment.RoleId equals role.Id
+            where !role.IsSystem
+            select new { assignment.InheritToChildren, OwnerId = owner.Id, OwnerPath = owner.Path, role.Id, role.Name })
+            .ToListAsync(cancellationToken);
+        return assigned
+            .Where(a => a.OwnerId == unitId || (a.InheritToChildren && unitPath.StartsWith(a.OwnerPath, StringComparison.Ordinal)))
+            .Select(a => (a.Id, a.Name))
+            .DistinctBy(r => r.Id)
+            .OrderBy(r => r.Name, StringComparer.CurrentCulture)
+            .ToList();
     }
 
     internal static IReadOnlyList<RecordScope> ScopesOf(bool isAdministrator, IEnumerable<RecordScope> roleScopes) =>
@@ -101,7 +172,7 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
             join role in db.Roles.AsNoTracking() on assignment.RoleId equals role.Id
             where assignment.MembershipId == membershipId
             orderby role.Name
-            select new GrantingRole(role.Id, role.Name, role.IsSystem, role.Permissions, role.Scope, null))
+            select new GrantingRole(role.Id, role.Name, role.IsSystem, role.Permissions, role.Scope, null, role.HideOutOfScopeShared))
             .ToListAsync(cancellationToken);
 
         var unit = await GetUnitAsync(membershipId, cancellationToken);
@@ -124,7 +195,7 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
             .Where(a => a.OwnerId == unit.Id || (a.InheritToChildren && unit.Path.StartsWith(a.OwnerPath, StringComparison.Ordinal)))
             .Where(a => !directIds.Contains(a.Role.Id))
             .OrderBy(a => a.Role.Name, StringComparer.CurrentCulture)
-            .Select(a => new GrantingRole(a.Role.Id, a.Role.Name, a.Role.IsSystem, a.Role.Permissions, a.Role.Scope, a.OwnerName))
+            .Select(a => new GrantingRole(a.Role.Id, a.Role.Name, a.Role.IsSystem, a.Role.Permissions, a.Role.Scope, a.OwnerName, a.Role.HideOutOfScopeShared))
             .DistinctBy(r => r.Id);
         return [.. direct, .. viaUnit];
     }

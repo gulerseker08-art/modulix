@@ -32,6 +32,7 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <FormTabs Title="İletişim bilgisi" Label="İletişim bilgisi formu bölümleri">
             <div class="form-grid">
                 <div>
                     <label class="form-label">Kanal</label>
@@ -74,6 +75,7 @@
                     </div>
                 }
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">Vazgeç</button>

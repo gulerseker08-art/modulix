@@ -26,6 +26,7 @@
 
         @if (taxForm is not null)
         {
+            <FormTabs Title="Vergi oranı" Label="Vergi oranı formu bölümleri">
             <form class="form-grid" novalidate @onsubmit="SaveTaxAsync" @onsubmit:preventDefault>
                 <div>
                     <label class="form-label" for="taxCode">Kod *</label>
@@ -68,6 +69,7 @@
                     }
                 </div>
             </form>
+            </FormTabs>
         }
 
         @if (taxes is null)
@@ -116,6 +118,7 @@
 
         @if (rateForm is not null)
         {
+            <FormTabs Title="Döviz kuru" Label="Döviz kuru formu bölümleri">
             <form class="form-grid" novalidate @onsubmit="SaveRateAsync" @onsubmit:preventDefault>
                 <div>
                     <label class="form-label" for="rateFrom">Kaynak para birimi *</label>
@@ -160,6 +163,7 @@
                     }
                 </div>
             </form>
+            </FormTabs>
         }
 
         @if (rates is null)

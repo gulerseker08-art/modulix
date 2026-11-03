@@ -24,7 +24,16 @@
         <ul class="list-unstyled">
             @foreach (var c in contents)
             {
-                <li><details><summary>v@(c.VersionNo) — @(c.Subject ?? "(konusuz)")</summary><pre class="cond-json">@c.Body</pre></details></li>
+                <li>
+                    <details>
+                        <summary>v@(c.VersionNo) — @(c.Subject ?? "(konusuz)")</summary>
+                        <pre class="cond-json">@c.Body</pre>
+                        @if (CanWrite && Campaign.Channel == "Email")
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => TestSendAsync(c)">Kendime test gönder</button>
+                        }
+                    </details>
+                </li>
             }
         </ul>
     }
@@ -42,7 +51,11 @@
                     </div>
                     <div class="span-12">
                         <label class="form-label" for="ct-body">Metin</label>
-                        <textarea id="ct-body" class="form-control" rows="5" maxlength="10000" @bind="body"></textarea>
+                        <textarea id="ct-body" class="form-control" rows="5" maxlength="10000" @bind="body" aria-describedby="ct-vars"></textarea>
+                        <small id="ct-vars" class="text-muted">
+                            Kişiye özel değişkenler: <code>{{ad|Değerli müşterimiz}}</code>, <code>{{soyad|…}}</code>, <code>{{ad_soyad|…}}</code>, <code>{{firma|…}}</code>.
+                            Çubuktan sonraki yedek metin zorunludur (değer yoksa o yazılır). Konuda da kullanılabilir.
+                        </small>
                         <FieldError Field="body" Errors="contentErrors" />
                     </div>
                 </div>
@@ -225,6 +238,17 @@
         busy = false;
         if (result.IsSuccess) { subject = string.Empty; body = string.Empty; Report($"İçerik v{result.Value!.VersionNo} eklendi.", false); await LoadAllAsync(); }
         else { contentErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }
+    }
+
+    /// <summary>Sürümü yalnızca kendi hesap e-postanıza gönderir (örnek değişken değerleriyle); adres istemciden alınmaz.</summary>
+    private async Task TestSendAsync(CampaignContentDto content)
+    {
+        busy = true;
+        var result = await Api.PostAsync<TestSendResultDto>($"/api/marketing/campaign-contents/{content.Id}/test-send", new { });
+        busy = false;
+        Report(result.IsSuccess
+            ? result.Value!.Outcome == "Accepted" ? "Test iletisi sağlayıcıya verildi (hesap e-postanıza)." : $"Test sonucu: {result.Value.Outcome}{(result.Value.Code is null ? null : " (" + result.Value.Code + ")")}"
+            : result.Error, !result.IsSuccess || result.Value!.Outcome != "Accepted");
     }
 
     private async Task CreateRunAsync()

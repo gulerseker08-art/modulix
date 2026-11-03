@@ -56,6 +56,7 @@
         <form class="record-form" novalidate @onsubmit="AddQueueAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
                 <legend class="h6">Yeni kuyruk</legend>
+                <FormTabs Title="Kuyruk bilgileri" Label="Kuyruk formu bölümleri">
                 <div class="form-grid">
                     <div class="span-6">
                         <label class="form-label" for="q-name">Ad</label>
@@ -72,6 +73,7 @@
                         <FieldError Field="isDefault" Errors="queueErrors" />
                     </div>
                 </div>
+                </FormTabs>
             </fieldset>
             <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Kuyruk ekle</button></div>
         </form>
@@ -111,6 +113,7 @@
         <form class="record-form" novalidate @onsubmit="AddCategoryAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
                 <legend class="h6">Yeni kategori</legend>
+                <FormTabs Title="Kategori bilgileri" Label="Kategori formu bölümleri">
                 <div class="form-grid">
                     <div class="span-4">
                         <label class="form-label" for="c-name">Ad</label>
@@ -139,6 +142,7 @@
                         <FieldError Field="requiredFields" Errors="categoryErrors" />
                     </div>
                 </div>
+                </FormTabs>
             </fieldset>
             <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Kategori ekle</button></div>
         </form>

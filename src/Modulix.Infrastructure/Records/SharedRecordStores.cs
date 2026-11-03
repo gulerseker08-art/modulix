@@ -74,13 +74,14 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
 
     public async Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken)
     {
-        var entity = await Set.AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await (await VisibleAsync(Set.AsNoTracking(), cancellationToken)).SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         return entity is null ? null : (await RedactAsync([ToData(entity)], cancellationToken))[0];
     }
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
-        IQueryable<TEntity> source = Set.AsNoTracking();
+        // Kapsam dışı kayıtları gizleyen rollerde (ADR-0026 K8) bu kayıtlar liste, sayım, arama ve süzgeçten önce elenir.
+        IQueryable<TEntity> source = await VisibleAsync(Set.AsNoTracking(), cancellationToken);
         var errors = new List<RecordFieldError>();
         foreach (var (name, value) in query.Filters ?? new Dictionary<string, string>())
         {
@@ -128,7 +129,7 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
 
     public async Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken)
     {
-        var entity = await Set.SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await (await VisibleAsync(Set, cancellationToken)).SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         if (entity is null || await IsRestrictedAsync(id, cancellationToken))
         {
             return null;
@@ -147,7 +148,7 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
 
     public async Task<bool> DeleteAsync(Guid id, long? expectedVersion, CancellationToken cancellationToken)
     {
-        var entity = await Set.SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await (await VisibleAsync(Set, cancellationToken)).SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         if (entity is null || await IsRestrictedAsync(id, cancellationToken))
         {
             return false;
@@ -225,6 +226,38 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
 
     private async Task<bool> IsRestrictedAsync(Guid id, CancellationToken cancellationToken) =>
         (await RestrictedAsync([id], cancellationToken)).Contains(id);
+
+    /// <summary>
+    /// Çağıranın rolleri kapsam dışı ortak kayıtları gizliyorsa (ADR-0026 K8) o kayıtları sorgudan eler; her modülün bildirdiği
+    /// gizli kümeler birlikte uygulanır. Gizleme yoksa sorgu değişmez. Gizli kayıt yok sayılır: tekil okuma, güncelleme ve
+    /// silme "bulunamadı" döner, kimlik ve ad belli edilmez.
+    /// </summary>
+    protected async Task<IQueryable<TEntity>> VisibleAsync(IQueryable<TEntity> source, CancellationToken cancellationToken)
+    {
+        foreach (var visibility in services.GetServices<ISharedRecordVisibility>())
+        {
+            if (await visibility.HiddenAsync(EntityKey, cancellationToken) is { } hidden)
+            {
+                source = source.Where(e => !hidden.Contains(e.Id));
+            }
+        }
+
+        return source;
+    }
+
+    /// <summary>Çağıranın rolleri kapsam dışı ortak kayıtları gizliyor mu (herhangi bir modül gizli küme bildiriyor mu)?</summary>
+    protected async Task<bool> HidesOutOfScopeAsync(CancellationToken cancellationToken)
+    {
+        foreach (var visibility in services.GetServices<ISharedRecordVisibility>())
+        {
+            if (await visibility.HiddenAsync(EntityKey, cancellationToken) is not null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private async Task<IReadOnlySet<Guid>> RestrictedAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
     {
@@ -330,9 +363,19 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
         if (entity.TaxNumber is { } number
             && await Set.AnyAsync(p => p.TaxNumber == number && p.Id != entity.Id, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("taxNumber", "Bu vergi numarasıyla kayıtlı bir firma var.")]);
+            // Kayıt kapsam dışında olabilir (ADR-0026 K9): ileti kaydın kimliğini, adını ya da sahibini içermez ve kayıt görünse de
+            // görünmese de aynıdır; kapsam dışı kayıtları gizleyen rollerde yetkiliye başvuru yönlendirmesi eklenir.
+            throw new RecordValidationException([new RecordFieldError("taxNumber", await TaxNumberTakenMessageAsync(cancellationToken))]);
         }
     }
+
+    internal const string TaxNumberTaken = "Bu vergi numarasıyla kayıtlı bir firma var.";
+
+    /// <summary>Gizleme açıksa kaydı göremeyen kişiye ne yapacağını söyler; kaydın görünür olup olmadığı belli edilmez.</summary>
+    private async Task<string> TaxNumberTakenMessageAsync(CancellationToken cancellationToken) =>
+        await HidesOutOfScopeAsync(cancellationToken)
+            ? TaxNumberTaken + " Kaydı göremiyorsanız yetkili (merkez) kullanıcıya başvurun."
+            : TaxNumberTaken;
 }
 
 /// <summary>Kişi: müşteri yetkilisi, çalışan, sürücü...</summary>

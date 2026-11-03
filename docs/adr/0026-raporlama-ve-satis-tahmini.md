@@ -118,4 +118,15 @@ Ekranlar: Satış görünümü (`/crm/satis-gorunumu`), Satış hedefleri (`/crm
 - Geçmişe dönük tahmin snapshot'ı üretilmez: tahmin doğruluğu, ilk kilitli sürümden itibaren birikir.
 - AI açıklaması eklenmedi.
 
-Dilim planı: **2** teklif/lead kohortları + aşama dönüşümü + ekip performansı + veri kalitesi; **3** rapor merkezi ve sınırlı oluşturucu; **4** dışa aktarma, zamanlama, önbellek ve performans.
+**Dilim 2 — yapıldı (ayrı PR):** `Reporting/CohortMetrics.cs` (saf hesap), `Reporting/SalesAnalytics.cs` (boru hattından okuyan servis), `GET /api/crm/sales/analytics/{quotes|leads|stages|team|quality}` (`sales-reports.read` + alttaki kaydın okuma izni), üç ekran (Satış analizi: Teklif kohortu / Lead dönüşümü / Aşama dönüşümü; Ekip performansı; Veri kalitesi). Yeni izin, tablo ya da migration yoktur.
+- **Teklif kohortu:** birim teklif **ailesi**; kohort = ailenin ilk gönderilme anı dönemde olanlar; sonuç kesim anına göre (kesimden sonra kabul edilen aile Beklemede); aile kabul oranı yanında revizyon kabul oranı, gönderilen revizyon sayısı, kabul süresi ortalama/medyan, kabul edilen net tutar (kabul günü kuruyla). Taslaklar girmez.
+- **Lead kohortu:** tekil lead, alınma anı kohortu; iki oran (tüm kohort / uygun = elenenler hariç); olgunluk 30 gün; kaynak kırılımı.
+- **Aşama dönüşümü:** `OpportunityHistory`'den, oluşturulma kohortuyla; aşamaya giren tekil fırsat (geri dönüş/tekrar bir kez, atlanan aşama sayılmaz), ilerleme (kaybedilen ilerleme değildir), aşamadan kayıp/kazanım, şu an orada; izleme başlangıcı gösterilir, tarihçesi olmayan dönem için dönüşüm üretilmez. Fırsatın **bugünkü** sorumlusu çağıranın veri kapsamındaysa sayılır.
+- **Ekip performansı:** kullanıcı (bugünkü sorumlu) bazında gerçekleşen, kazanılan/kaybedilen, kazanma oranı, iş yükü (açık fırsat sayısı), pipeline/ağırlıklı, gecikmiş, döngü ortalama/medyan **ve örneklem adedi**, kullanıcı hedefi ve gerçekleşme. Aktivite sayısı başarı ölçütü olarak yoktur.
+- **Veri kalitesi:** açık fırsatlarda eksik tutar, kuru yok, olasılık yok, kapanış tarihi yok, gecikmiş, hareketsiz, tarihçesi yok; sorun başına adet ve örnek kayıt. Tutar izni yoksa tutar/kur/olasılık sorunları hesaplanmaz.
+- **Testler:** 14 yeni birim (`CohortMetricsTests`, `DataQualityTests`: kabul senaryosu 4 = %40, kesim sonrası kabul, kohort kuralı, olgunluk, aşama akışı, medyan, veri kalitesi) ve 8 entegrasyon (`SalesAnalyticsTests`: teklif kohortu ve revizyon oranı, kesim, lead dönüşümü, aşama akışı geri dönüş/tekrar/geçmiş dönem, ekip performansı + hedef + tutar izni, veri kalitesi + kur, yetki ve veri kapsamı, tenant izolasyonu).
+- **Dilim 2'de yapılmadı:** ekip/birim/kanal-bayi boyutu (modülün erişebildiği bir ekip/birim sözleşmesi `Core.Contracts`'ta yok; şu an kırılım kullanıcı bazındadır), ürün/hizmet ve sektör filtresi, iş ortağı katkı dağıtımı, aşamada kalma süresinin tamamlanmış aralıklardan hesabı, sahiplik değişimine karşı tarihsel sahiplik görünümü, siparişe bağlantı. Lead eleme tarihi kesime göre ayrıştırılmaz (güncel durum). Quote kohortu lower bound'suz okur (ilk sunum tarihi için kesime kadar tüm sunumlar gerekir; okuma sınırı 5000). Ekranlar tarayıcıda görsel doğrulanmadı.
+
+
+
+Dilim planı: **3** rapor merkezi ve sınırlı oluşturucu; **4** dışa aktarma, zamanlama, önbellek ve performans.

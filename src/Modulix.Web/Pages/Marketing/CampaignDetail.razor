@@ -74,6 +74,15 @@
                             }
                         }
                         <div class="span-6">
+                            <label class="form-label" for="g-topic">İletişim konusu</label>
+                            <select id="g-topic" class="form-select" @bind="topic" disabled="@(!CanWrite)">
+                                <option value="">Konu yok (konu tercihi uygulanmaz)</option>
+                                @foreach (var t in TopicOptions) { <option value="@t.Key">@t.Name</option> }
+                            </select>
+                            <FieldError Field="topic" Errors="generalErrors" />
+                            <div class="form-text">Konudan çıkmış alıcılara gönderilmez. Konu pazarlama izni vermez.</div>
+                        </div>
+                        <div class="span-6">
                             <label class="form-label" for="g-max">Hedef başına en çok alıcı</label>
                             <input id="g-max" class="form-control" type="number" min="1" max="1000" placeholder="Sınır yok" @bind="maxPerTarget" />
                             <FieldError Field="maxPerTarget" Errors="generalErrors" />
@@ -103,7 +112,7 @@
                             <input id="g-utm-campaign" class="form-control" maxlength="80" placeholder="varsayılan: kampanya kodu" @bind="utmCampaign" />
                             <FieldError Field="utmCampaign" Errors="generalErrors" />
                         </div>
-                        <p class="span-12 small text-muted mb-0">Kaynak/UTM değerleri küçük harfe çevrilir; yanıttan açılan lead'e yazılır.</p>
+                        <p class="span-12 small text-muted mb-0">Kaynak/UTM değerleri küçük harfe çevrilir; yanıttan açılan müşteri adayına yazılır.</p>
                         <div class="span-4">
                             <label class="form-label" for="g-budget">Bütçe</label>
                             <input id="g-budget" class="form-control" type="number" min="0" step="0.01" placeholder="Yok" @bind="budget" />
@@ -368,6 +377,8 @@
     private string utmSource = string.Empty;
     private string utmMedium = string.Empty;
     private string utmCampaign = string.Empty;
+    private string topic = string.Empty;
+    private List<TopicDto> topics = [];
     private decimal? budget;
     private decimal? actualCost;
     private string costCurrency = "TRY";
@@ -418,7 +429,19 @@
         var result = await Api.GetAsync<CampaignDto>($"/api/marketing/campaigns/{Id}");
         if (!result.IsSuccess) { loadError = result.Error; return; }
         Apply(result.Value!);
+
+        // Konu listesi çekirdeğin iletişim okuma iznini ister; izin yoksa yalnızca kampanyanın mevcut konusu gösterilir.
+        if (Session.Can(CoreAccess.ReadCommunication))
+        {
+            topics = (await Api.GetAsync<List<TopicDto>>("/api/communication/topics?activeOnly=true")).Value ?? [];
+        }
     }
+
+    /// <summary>Açık konular; kampanyanın konusu sonradan kapanmışsa kaybolmaması için listeye eklenir.</summary>
+    private IEnumerable<TopicDto> TopicOptions =>
+        string.IsNullOrEmpty(topic) || topics.Any(t => t.Key == topic)
+            ? topics
+            : [.. topics, new TopicDto(Guid.Empty, topic, topic, false, default, default)];
 
     private void Apply(CampaignDto value)
     {
@@ -429,6 +452,7 @@
         utmSource = value.UtmSource ?? string.Empty;
         utmMedium = value.UtmMedium ?? string.Empty;
         utmCampaign = value.UtmCampaign ?? string.Empty;
+        topic = value.Topic ?? string.Empty;
         budget = value.Budget;
         actualCost = value.ActualCost;
         costCurrency = value.CostCurrency ?? "TRY";
@@ -470,7 +494,7 @@
             campaign!.Version, campaign.Code, name.Trim(), Blank(description), Blank(purpose), campaign.Target, campaign.Channel,
             campaign.Target == "Company" ? rule : campaign.RecipientRule, campaign.Target == "Company" && rule == "Role" ? Blank(role) : null,
             maxPerTarget, startsOn is { } s ? DateOnly.FromDateTime(s) : null, endsOn is { } e ? DateOnly.FromDateTime(e) : null, campaign.OwnerId,
-            Blank(utmSource), Blank(utmMedium), Blank(utmCampaign), budget, actualCost, Blank(costCurrency)));
+            Blank(utmSource), Blank(utmMedium), Blank(utmCampaign), budget, actualCost, Blank(costCurrency), Blank(topic)));
         busy = false;
         if (result.IsSuccess) { Apply(result.Value!); preview = null; Report("Kampanya kaydedildi.", false); }
         else { generalErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }

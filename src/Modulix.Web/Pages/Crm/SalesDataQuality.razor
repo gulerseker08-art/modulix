@@ -1,0 +1,214 @@
+@page "/crm/veri-kalitesi"
+@using System.Net
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Veri kalitesi · Modulix</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ReportsRead">
+    <a class="back-link" href="crm/satis-analizi">← Satış analizi</a>
+    <div class="page-header">
+        <div>
+            <h1>Veri kalitesi</h1>
+            <p class="text-muted mb-0">
+                Açık fırsatlardaki eksikler, satış raporlarının doğruluğunu doğrudan etkiler: eksik tutar, kur ya da olasılık olan fırsat toplamlara girmez.
+                Her kod için sorunlu fırsatların bir kısmı örnek olarak listelenir.
+            </p>
+        </div>
+        <div class="header-actions">
+            <a class="btn btn-outline-secondary" href="crm/ekip-performansi">Ekip performansı</a>
+        </div>
+    </div>
+
+    <form class="form-grid mb-3" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="Veri kalitesi süzgeçleri">
+        <div class="span-4">
+            <label class="form-label" for="dq-owner">Kullanıcı (sorumlu)</label>
+            <select id="dq-owner" class="form-select" @bind="owner" @bind:after="LoadAsync">
+                <option value="">Tüm kullanıcılar</option>
+                @foreach (var member in Lookups.Members)
+                {
+                    <option value="@member.UserId">@member.DisplayName</option>
+                }
+            </select>
+        </div>
+        <div class="span-3">
+            <label class="form-label" for="dq-currency">Para birimi</label>
+            <input id="dq-currency" class="form-control" maxlength="3" placeholder="@Regional.Currency" aria-describedby="dq-currency-help" @bind="currency" @bind:after="LoadAsync" />
+            <div id="dq-currency-help" class="form-text">Kur denetimi bu para birimine göre yapılır. Boşsa firmanın raporlama para birimi.</div>
+        </div>
+        <div class="span-3">
+            <label class="form-label" for="dq-refresh">&nbsp;</label>
+            <button id="dq-refresh" type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="LoadAsync">Yenile</button>
+        </div>
+    </form>
+
+    <AnalyticsStatus Loading="loading" Error="error" Forbidden="forbidden" OnRetry="LoadAsync" />
+
+    @if (report is { } r)
+    {
+        var d = r.Data;
+        <AnalyticsFrame T="DataQualityDto" Report="r">
+            @if (d.OpenCount == 0)
+            {
+                <p class="text-muted">Bu süzgeç için açık fırsat yok; denetlenecek kayıt bulunmuyor.</p>
+            }
+            else
+            {
+                <div class="kpi-grid" role="group" aria-label="Veri kalitesi özeti">
+                    <SalesKpiCard Label="Açık fırsat" Icon="target" Tone="info" Value="@SalesLabels.Count(d.OpenCount)" Detail="Denetlenen açık fırsat sayısı" />
+                    <SalesKpiCard Label="Sorunlu kod" Icon="shield" Tone="@(IssueCodeCount(r) > 0 ? "danger" : "success")" Value="@IssueCodeCount(r).ToString()"
+                                  Detail="@(IssueCodeCount(r) > 0 ? "Sorun bulunan denetim sayısı" : "Hiçbir denetimde sorun yok")" />
+                </div>
+            }
+
+            <section class="detail-section" aria-labelledby="dq-issues">
+                <div class="section-header"><h2 id="dq-issues">Denetimler</h2></div>
+                @foreach (var (issueCode, label, help) in SalesAnalysisLabels.QualityCodes)
+                {
+                    var issue = d.Issues.FirstOrDefault(i => i.Code == issueCode);
+                    var blocked = !r.AmountsVisible && SalesAnalysisLabels.AmountDependentCodes.Contains(issueCode);
+                    var count = issue?.Count ?? 0;
+                    var panelId = $"dq-samples-{issueCode}";
+                    var title = issueCode == DataQualityCodes.Stale ? $"{label} (eşik {d.StaleDays} gün)" : label;
+                    var description = issueCode == DataQualityCodes.Stale ? $"{d.StaleDays} günden uzun süredir etkileşim kaydı olmayan açık fırsat." : help;
+                    <div class="detail-section" role="group" aria-labelledby="dq-title-@issueCode">
+                        <div class="section-header">
+                            <h3 id="dq-title-@issueCode" class="h6 mb-0">@title</h3>
+                            @if (blocked)
+                            {
+                                <span class="badge tag">Yetkiniz yok</span>
+                            }
+                            else if (count == 0)
+                            {
+                                <span class="badge stage-won">Sorun yok</span>
+                            }
+                            else
+                            {
+                                <span class="badge stage-lost">@SalesLabels.Count(count) fırsat</span>
+                            }
+                        </div>
+                        <p class="small text-muted mb-1">@description</p>
+                        @if (blocked)
+                        {
+                            <p class="mb-0">Yetkiniz yok — bu denetim tutar iznini ister. Sorun olmadığı anlamına gelmez; denetim sizin için çalıştırılmadı.</p>
+                        }
+                        else if (count == 0)
+                        {
+                            <p class="mb-0">Sorun yok.</p>
+                        }
+                        else if (issue is not null)
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm" aria-expanded="@(expanded.Contains(issueCode) ? "true" : "false")" aria-controls="@panelId"
+                                    @onclick="() => Toggle(issueCode)">
+                                @(expanded.Contains(issueCode) ? "Örnekleri gizle" : $"Örnekleri göster ({issue.Samples.Count})")
+                            </button>
+                            @if (expanded.Contains(issueCode))
+                            {
+                                <div id="@panelId" class="mt-2">
+                                    @if (issue.Samples.Count == 0)
+                                    {
+                                        <p class="text-muted">Örnek kayıt yok.</p>
+                                    }
+                                    else
+                                    {
+                                        <table class="table record-table">
+                                            <caption class="visually-hidden">@title için örnek fırsatlar</caption>
+                                            <thead>
+                                                <tr><th scope="col">No</th><th scope="col">Başlık</th><th scope="col">Sorumlu</th><th scope="col">Ayrıntı</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var item in issue.Samples)
+                                                {
+                                                    <tr>
+                                                        <td data-label="No" class="primary"><a href="crm/firsatlar/@item.Id">@item.Number</a></td>
+                                                        <td data-label="Başlık">@item.Title</td>
+                                                        <td data-label="Sorumlu">@SalesAnalysisLabels.Owner(Lookups, item.OwnerId)</td>
+                                                        <td data-label="Ayrıntı">@(string.IsNullOrWhiteSpace(item.Detail) ? "—" : item.Detail)</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                        @if (count > issue.Samples.Count)
+                                        {
+                                            <p class="small text-muted">İlk @issue.Samples.Count örnek gösteriliyor; toplam @SalesLabels.Count(count) fırsat. Kullanıcı seçerek daraltabilirsiniz.</p>
+                                        }
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            </section>
+        </AnalyticsFrame>
+    }
+</AuthGate>
+
+@code {
+    private string owner = string.Empty;
+    private string currency = string.Empty;
+
+    private AnalyticsDto<DataQualityDto>? report;
+    private string? error;
+    private bool forbidden;
+    private bool loading;
+    private int requestId;
+    private readonly HashSet<string> expanded = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(SalesAccess.ReportsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private string BuildQuery()
+    {
+        var query = new List<string>();
+        if (owner.Length > 0)
+        {
+            query.Add($"ownerId={Uri.EscapeDataString(owner)}");
+        }
+
+        // Yarım yazılmış para birimi gönderilmez (3 harf olunca uygulanır).
+        if (currency.Trim().Length == 3)
+        {
+            query.Add($"currency={Uri.EscapeDataString(currency.Trim().ToUpperInvariant())}");
+        }
+
+        return string.Join('&', query);
+    }
+
+    private async Task LoadAsync()
+    {
+        var id = ++requestId;
+        loading = true;
+        error = null;
+        forbidden = false;
+        expanded.Clear();
+
+        var result = await Api.GetAsync<AnalyticsDto<DataQualityDto>>($"/api/crm/sales/analytics/quality?{BuildQuery()}");
+        if (id != requestId)
+        {
+            return;
+        }
+
+        loading = false;
+        report = result.IsSuccess ? result.Value : null;
+        error = result.Error;
+        forbidden = result.Status == HttpStatusCode.Forbidden;
+    }
+
+    private void Toggle(string code)
+    {
+        if (!expanded.Remove(code))
+        {
+            expanded.Add(code);
+        }
+    }
+
+    private static int IssueCodeCount(AnalyticsDto<DataQualityDto> r) => r.Data.Issues.Count(i => i.Count > 0);
+}

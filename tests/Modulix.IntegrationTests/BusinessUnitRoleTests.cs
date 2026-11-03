@@ -295,6 +295,9 @@ public class BusinessUnitRoleTests(ModulixApiFactory factory) : IClassFixture<Mo
         // Kullanıcı yönetebilen ama yalnızca firma okuyabilen ve yalnızca kendi kayıtlarını gören kişi.
         var manager = await factory.CreateUserAsync(t.Tenant);
         await factory.CreateRoleAsync(t.Tenant.Id, [ManageUsers, CompaniesRead], Scope.Own, manager);
+        // Yönetici yalnızca kendi kapsamındaki departmanları görür (ADR-0026): atama yapacağı bayiye üye olmalıdır.
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync(
+            $"/api/users/{await factory.GetMembershipIdAsync(manager.Id, t.Tenant.Id)}/business-unit", new SetMembershipBusinessUnitRequest(t.UnitA.Id))).StatusCode);
         using var managerClient = await LoginAsync(manager);
 
         // Kendinde olmayan izni (firma yazma) ya da kapsamı (departman) departmana veremez; kendinde olanı verebilir.
@@ -302,9 +305,11 @@ public class BusinessUnitRoleTests(ModulixApiFactory factory) : IClassFixture<Mo
         Assert.Equal(HttpStatusCode.Forbidden, (await PutRoles(managerClient, t.UnitA.Id, (unitScoped.Id, false))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await PutRoles(managerClient, t.UnitA.Id, (readOnly.Id, false))).StatusCode);
 
-        // Aynı kural kaldırmada da geçerlidir: kendinde olmayan izni içeren atamayı kaldıramaz.
+        // Yönetici kendi departmanına rol atayınca o rol yöneticiye de geçer (departmandan gelen roller kullanıcıya eklenir):
+        // artık bu izne sahip olduğu için aynı atamayı kaldırabilir. Kendinde olmayan izni içeren atamayı kaldırma sınırı
+        // yalnızca başka departmanda anlamlıdır ve o departman bu yöneticiden gizlidir (BusinessUnitVisibilityTests).
         await AssignAsync(admin, t.UnitA.Id, (readOnly.Id, false), (withWrite.Id, false));
-        Assert.Equal(HttpStatusCode.Forbidden, (await PutRoles(managerClient, t.UnitA.Id, (readOnly.Id, false))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PutRoles(managerClient, t.UnitA.Id, (readOnly.Id, false))).StatusCode);
 
         // Kullanıcı yönetme izni olmayan kişi hiçbir şey yapamaz.
         var plain = await factory.CreateUserAsync(t.Tenant);

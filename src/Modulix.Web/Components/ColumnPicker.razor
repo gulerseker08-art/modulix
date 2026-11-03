@@ -1,0 +1,100 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+@* "Sütunlar" düğmesi: sayfadaki liste tablosunun (varsayılan ilk .record-table) sütunlarını göster/gizle. Tablo işaretlemesi değişmez;
+   gizleme CSS sınıfıyla yapılır (js/table-columns.js), seçim tarayıcıda sayfa yoluna göre saklanır. İlk sütun (kayıt adı) hep görünür. *@
+<div class="view-selector">
+    <button type="button" class="btn btn-ghost" aria-haspopup="true" aria-expanded="@(open ? "true" : "false")" @onclick="ToggleAsync">
+        <AppIcon Name="columns" Size="16" /> Sütunlar
+    </button>
+    @if (open)
+    {
+        <div class="view-selector-backdrop" aria-hidden="true" @onclick="Close"></div>
+        <div class="view-menu column-menu" role="group" aria-label="Görünen sütunlar">
+            @if (columns.Count == 0)
+            {
+                <p class="view-menu-group">Listede sütun yok.</p>
+            }
+
+            @foreach (var column in columns)
+            {
+                <label class="column-item">
+                    <input type="checkbox" class="form-check-input" checked="@column.Visible" disabled="@column.Locked"
+                           @onchange="e => SetAsync(column, e.Value is true)" />
+                    <span>@column.Label</span>
+                </label>
+            }
+
+            <div class="view-menu-divider" role="separator"></div>
+            <button type="button" class="view-menu-item" @onclick="ResetAsync">Varsayılana dön</button>
+        </div>
+    }
+</div>
+
+@code {
+    private bool open;
+    private List<ColumnInfo> columns = [];
+
+    /// <summary>Tablonun CSS seçicisi.</summary>
+    [Parameter] public string Table { get; set; } = ".record-table";
+
+    private string StorageKey => "modulix.cols." + new Uri(Navigation.Uri).AbsolutePath;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("modulixTable.restore", Table, StorageKey);
+        }
+    }
+
+    private async Task ToggleAsync()
+    {
+        if (open)
+        {
+            open = false;
+            return;
+        }
+
+        columns = await JS.InvokeAsync<List<ColumnInfo>>("modulixTable.columns", Table, StorageKey);
+        open = true;
+    }
+
+    private void Close() => open = false;
+
+    private async Task SetAsync(ColumnInfo column, bool visible)
+    {
+        column.Visible = visible;
+        await JS.InvokeVoidAsync("modulixTable.set", Table, StorageKey, column.Index, visible);
+    }
+
+    private async Task ResetAsync()
+    {
+        await JS.InvokeVoidAsync("modulixTable.reset", Table, StorageKey);
+        columns = await JS.InvokeAsync<List<ColumnInfo>>("modulixTable.columns", Table, StorageKey);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("modulixTable.release", StorageKey);
+        }
+        catch (JSDisconnectedException)
+        {
+            // Devre dışı kalmış bağlantıda temizlik gerekmez.
+        }
+    }
+
+    public sealed class ColumnInfo
+    {
+        public int Index { get; set; }
+
+        public string Label { get; set; } = string.Empty;
+
+        public bool Visible { get; set; }
+
+        public bool Locked { get; set; }
+    }
+}

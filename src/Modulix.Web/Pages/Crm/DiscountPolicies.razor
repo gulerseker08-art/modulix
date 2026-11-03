@@ -24,6 +24,7 @@
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <h2>@(form.Id is null ? "Yeni indirim politikası" : "Politikayı düzenle")</h2>
+            <FormTabs Title="Politika bilgileri" Label="İndirim politikası formu bölümleri">
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="name">Ad *</label>
@@ -98,6 +99,7 @@
                     </select>
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>

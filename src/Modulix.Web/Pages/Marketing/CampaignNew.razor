@@ -18,81 +18,92 @@
     <ErrorSummary Errors="@errors" />
 
     <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <TabBar Tabs="FormTabs" State="tabs" Label="Kampanya formu bölümleri" />
         <fieldset disabled="@busy">
-            <div class="form-grid">
-                <div class="span-6">
-                    <label class="form-label" for="k-name">Ad</label>
-                    <input id="k-name" class="form-control" maxlength="150" @bind="name" />
-                    <FieldError Field="name" Errors="errors" />
-                </div>
-                <div class="span-6">
-                    <label class="form-label" for="k-code">Kod</label>
-                    <input id="k-code" class="form-control" maxlength="40" placeholder="antrepo-2026" aria-describedby="k-code-help" @bind="code" />
-                    <small id="k-code-help" class="text-muted">Küçük harf, rakam ve tire; sonradan değişmez.</small>
-                    <FieldError Field="code" Errors="errors" />
-                </div>
-                <div class="span-6">
-                    <label class="form-label" for="k-target">Hedef türü</label>
-                    <select id="k-target" class="form-select" @bind="target">
-                        @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
-                    </select>
-                    <FieldError Field="target" Errors="errors" />
-                </div>
-                <div class="span-6">
-                    <label class="form-label" for="k-channel">Kanal</label>
-                    <select id="k-channel" class="form-select" @bind="channel">
-                        @foreach (var c in MarketingLabels.Channels) { <option value="@c.Key">@c.Label</option> }
-                    </select>
-                    <FieldError Field="channel" Errors="errors" />
-                </div>
-                @if (target == "Company")
-                {
+            <TabPanel State="tabs" Key="form-genel">
+                <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="k-rule">Alıcı kişi seçimi</label>
-                        <select id="k-rule" class="form-select" @bind="rule">
-                            @foreach (var r in MarketingLabels.RecipientRules) { <option value="@r.Key">@r.Label</option> }
-                        </select>
-                        <small class="text-muted">Kural eşleşmezse rastgele kişiye gidilmez; hedef nedeniyle birlikte "alıcı yok" sayılır.</small>
-                        <FieldError Field="recipientRule" Errors="errors" />
+                        <label class="form-label" for="k-name">Ad</label>
+                        <input id="k-name" class="form-control" maxlength="150" @bind="name" />
+                        <FieldError Field="name" Errors="errors" />
                     </div>
-                    @if (rule == "Role")
+                    <div class="span-6">
+                        <label class="form-label" for="k-code">Kod</label>
+                        <input id="k-code" class="form-control" maxlength="40" placeholder="antrepo-2026" aria-describedby="k-code-help" @bind="code" />
+                        <small id="k-code-help" class="text-muted">Küçük harf, rakam ve tire; sonradan değişmez.</small>
+                        <FieldError Field="code" Errors="errors" />
+                    </div>
+                    <div class="span-12">
+                        <label class="form-label" for="k-purpose">Amaç</label>
+                        <input id="k-purpose" class="form-control" maxlength="200" placeholder="Ör. demo talebi, yenileme, etkinlik daveti" @bind="purpose" />
+                        <FieldError Field="purpose" Errors="errors" />
+                    </div>
+                    <div class="span-12">
+                        <label class="form-label" for="k-desc">Açıklama</label>
+                        <textarea id="k-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
+                        <FieldError Field="description" Errors="errors" />
+                    </div>
+                </div>
+            </TabPanel>
+            <TabPanel State="tabs" Key="form-hedef">
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label" for="k-target">Hedef türü</label>
+                        <select id="k-target" class="form-select" @bind="target">
+                            @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
+                        </select>
+                        <FieldError Field="target" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="k-channel">Kanal</label>
+                        <select id="k-channel" class="form-select" @bind="channel">
+                            @foreach (var c in MarketingLabels.Channels) { <option value="@c.Key">@c.Label</option> }
+                        </select>
+                        <FieldError Field="channel" Errors="errors" />
+                    </div>
+                    @if (target == "Company")
                     {
                         <div class="span-6">
-                            <label class="form-label" for="k-role">Aranan rol</label>
-                            <select id="k-role" class="form-select" @bind="role">
-                                <option value="">Seçin</option>
-                                @foreach (var r in Roles) { <option value="@r.Key">@r.Label</option> }
+                            <label class="form-label" for="k-rule">Alıcı kişi seçimi</label>
+                            <select id="k-rule" class="form-select" @bind="rule">
+                                @foreach (var r in MarketingLabels.RecipientRules) { <option value="@r.Key">@r.Label</option> }
                             </select>
-                            <FieldError Field="recipientRole" Errors="errors" />
+                            <small class="text-muted">Kural eşleşmezse rastgele kişiye gidilmez; hedef nedeniyle birlikte "alıcı yok" sayılır.</small>
+                            <FieldError Field="recipientRule" Errors="errors" />
                         </div>
+                        @if (rule == "Role")
+                        {
+                            <div class="span-6">
+                                <label class="form-label" for="k-role">Aranan rol</label>
+                                <select id="k-role" class="form-select" @bind="role">
+                                    <option value="">Seçin</option>
+                                    @foreach (var r in Roles) { <option value="@r.Key">@r.Label</option> }
+                                </select>
+                                <FieldError Field="recipientRole" Errors="errors" />
+                            </div>
+                        }
                     }
-                }
-                <div class="span-6">
-                    <label class="form-label" for="k-max">Hedef başına en çok alıcı</label>
-                    <input id="k-max" class="form-control" type="number" min="1" max="1000" placeholder="Sınır yok" @bind="maxPerTarget" />
-                    <FieldError Field="maxPerTarget" Errors="errors" />
+                    <div class="span-6">
+                        <label class="form-label" for="k-max">Hedef başına en çok alıcı</label>
+                        <input id="k-max" class="form-control" type="number" min="1" max="1000" placeholder="Sınır yok" @bind="maxPerTarget" />
+                        <FieldError Field="maxPerTarget" Errors="errors" />
+                    </div>
                 </div>
-                <div class="span-3">
-                    <label class="form-label" for="k-start">Başlangıç</label>
-                    <input id="k-start" class="form-control" type="date" @bind="startsOn" />
-                    <FieldError Field="startsOn" Errors="errors" />
+            </TabPanel>
+            <TabPanel State="tabs" Key="form-zaman">
+                <div class="form-grid">
+                    <div class="span-3">
+                        <label class="form-label" for="k-start">Başlangıç</label>
+                        <input id="k-start" class="form-control" type="date" @bind="startsOn" />
+                        <FieldError Field="startsOn" Errors="errors" />
+                    </div>
+                    <div class="span-3">
+                        <label class="form-label" for="k-end">Bitiş</label>
+                        <input id="k-end" class="form-control" type="date" @bind="endsOn" />
+                        <FieldError Field="endsOn" Errors="errors" />
+                    </div>
                 </div>
-                <div class="span-3">
-                    <label class="form-label" for="k-end">Bitiş</label>
-                    <input id="k-end" class="form-control" type="date" @bind="endsOn" />
-                    <FieldError Field="endsOn" Errors="errors" />
-                </div>
-                <div class="span-12">
-                    <label class="form-label" for="k-purpose">Amaç</label>
-                    <input id="k-purpose" class="form-control" maxlength="200" placeholder="Ör. demo talebi, yenileme, etkinlik daveti" @bind="purpose" />
-                    <FieldError Field="purpose" Errors="errors" />
-                </div>
-                <div class="span-12">
-                    <label class="form-label" for="k-desc">Açıklama</label>
-                    <textarea id="k-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
-                    <FieldError Field="description" Errors="errors" />
-                </div>
-            </div>
+            </TabPanel>
         </fieldset>
         <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Oluştur</button></div>
     </form>
@@ -115,6 +126,18 @@
     private bool busy;
     private string? message;
     private IReadOnlyDictionary<string, string[]>? errors;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır ve kayıt denemesinden sonra açılır.
+    private readonly TabState tabs = new("form-genel");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs =>
+    [
+        new("form-genel", "Genel", Errors: ErrorCount("name", "code", "purpose", "description")),
+        new("form-hedef", "Hedef ve kanal", Errors: ErrorCount("target", "channel", "recipientRule", "recipientRole", "maxPerTarget")),
+        new("form-zaman", "Zamanlama", Errors: ErrorCount("startsOn", "endsOn")),
+    ];
 
     protected override Task OnInitializedAsync() => Session.EnsureLoadedAsync();
 
@@ -144,6 +167,7 @@
 
         message = result.FieldErrors.Count == 0 ? result.Error : null;
         errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
+        tabs.RevealFirstFailing(FormTabs);
     }
 
     private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -52,4 +52,32 @@ public sealed record SetBusinessUnitRolesRequest(IReadOnlyList<BusinessUnitRoleI
 /// <summary>Kullanıcının departmanı (kullanıcı kartı).</summary>
 public sealed record MembershipBusinessUnitDto(Guid Id, string Name, string PathNames, string Kind, bool IsActive);
 
-public sealed record SetMembershipBusinessUnitRequest(Guid BusinessUnitId);
+/// <summary>
+/// Kullanıcının departmanını değiştirir (ADR-0026 K7). Kullanıcının kayıtları varsa <see cref="MoveRecordsWithUser"/> (kayıtlar
+/// kullanıcıyla yeni departmana geçer) ya da <see cref="TransferRecordsToMembershipId"/> (kayıtlar eski departmanda kalan etkin bir
+/// üyeye devredilir) verilmelidir; ikisi birden verilmez. Kayıt varsa ya da kullanıcı etkin değilse <see cref="Reason"/> zorunludur.
+/// </summary>
+public sealed record SetMembershipBusinessUnitRequest(
+    Guid BusinessUnitId,
+    string? Reason = null,
+    bool MoveRecordsWithUser = false,
+    Guid? TransferRecordsToMembershipId = null);
+
+/// <summary>Departman değişikliğinin etkisi; hiçbir şeyi değiştirmeyen önizleme (<c>GET .../business-unit/change-preview</c>).</summary>
+public sealed record BusinessUnitChangePreviewDto(
+    Guid MembershipId,
+    string DisplayName,
+    UserStatus Status,
+    Guid? CurrentBusinessUnitId,
+    string? CurrentPath,
+    Guid TargetBusinessUnitId,
+    string TargetPath,
+    bool IsChange,
+    IReadOnlyList<OwnedRecordsDto> OwnedRecords,
+    int OwnedTotal,
+    bool OwnedUnknown,
+    bool DecisionRequired,
+    bool ReasonRequired,
+    IReadOnlyList<string> LostRoles,
+    IReadOnlyList<string> GainedRoles,
+    IReadOnlyList<string> Warnings);

@@ -18,6 +18,8 @@ internal sealed class ModuleEntitlementConfiguration : IEntityTypeConfiguration<
         builder.Property(e => e.ModuleKey).HasMaxLength(AccessKeys.ModuleKeyMaxLength).IsRequired();
         builder.Property(e => e.IsEnabled).IsRequired();
         builder.Property(e => e.UpdatedAt).IsRequired();
+        builder.Property(e => e.Source).IsRequired().HasDefaultValue(EntitlementSource.Manual);
+        builder.Property(e => e.Note).HasMaxLength(ModuleEntitlement.NoteMaxLength);
         builder.HasIndex(e => new { e.TenantId, e.ModuleKey }).IsUnique();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Restrict);
     }
@@ -42,6 +44,9 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         // Atanabilir düzey (ADR-0026 K6): mevcut roller yalnızca kullanıcıya atanır; departmana atama açık işaretlemeyle başlar.
         builder.Property(r => r.AssignLevel).IsRequired().HasDefaultValue(Core.Contracts.Authorization.RoleAssignLevel.User);
         builder.Ignore(r => r.AssignableToUnit);
+
+        // Kapsam dışı ortak firma/kişileri gizleme (ADR-0026 K8): mevcut roller bugünkü davranışı korur (asgari kimlik görünür).
+        builder.Property(r => r.HideOutOfScopeShared).IsRequired().HasDefaultValue(false);
         builder.Ignore(r => r.AssignableToUser);
 
         // Her tenant'ta en fazla bir sistem rolü ("Yönetici").

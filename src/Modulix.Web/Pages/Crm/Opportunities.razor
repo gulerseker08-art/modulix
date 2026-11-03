@@ -9,10 +9,6 @@
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.OpportunitiesRead">
     <PageHeader Title="Fırsatlar" Icon="target" Subtitle="Satış fırsatlarınızı aşama aşama takip edin.">
         <a class="btn btn-outline-secondary" href="crm/firsat-raporu">Rapor</a>
-        @if (Session.Can(CrmAccess.OpportunitiesWrite) && !editing)
-        {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><span aria-hidden="true">+</span> Yeni fırsat</button>
-        }
     </PageHeader>
 
     @if (message is not null)
@@ -43,10 +39,20 @@
         </select>
     </div>
 
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Başlık ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Fırsat ara" placeholder="Başlık ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        @if (!board)
+        {
+            <ColumnPicker />
+        }
+        @if (Session.Can(CrmAccess.OpportunitiesWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni fırsat</button>
+        }
+    </div>
 
     @if (board)
     {
@@ -83,7 +89,7 @@
                                 {
                                     <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span>
                                 }
-                                @if (opportunity.SourceLeadId is { } cardLead && Session.Can(CrmAccess.LeadsRead)) { <a class="small" href="crm/leadler/@cardLead">Kaynak Lead</a> }
+                                @if (opportunity.SourceLeadId is { } cardLead && Session.Can(CrmAccess.LeadsRead)) { <a class="small" href="crm/leadler/@cardLead">Kaynak müşteri adayı</a> }
                                 <a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a>
                                 @if (ShowAmounts)
                                 {
@@ -148,7 +154,7 @@
                         <td data-label="Başlık" class="primary"><a href="crm/firsatlar/@opportunity.Id">@opportunity.Title</a> <small class="text-muted">@opportunity.OpportunityNumber</small>
                             @if (opportunity.SourceLeadId is { } sourceLead && Session.Can(CrmAccess.LeadsRead))
                             {
-                                <a class="small d-block" href="crm/leadler/@sourceLead">Kaynak Lead</a>
+                                <a class="small d-block" href="crm/leadler/@sourceLead">Kaynak müşteri adayı</a>
                             }
                         </td>
                         <td data-label="Firma"><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></td>
@@ -158,7 +164,7 @@
                             <td data-label="Tutar" class="text-end">@FormatAmount(opportunity)</td>
                             <td data-label="Olasılık">@(opportunity.Probability is { } p ? $"%{p}" : null)</td>
                         }
-                        <td data-label="Sorumlu">@Lookups.MemberName(opportunity.OwnerId)</td>
+                        <td data-label="Sorumlu"><OwnerCell Name="@Lookups.MemberName(opportunity.OwnerId)" /></td>
                         <td data-label="Kapanış">@(opportunity.ExpectedCloseDate is { } date ? CrmLabels.Date(date) : null)</td>
                         @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Opportunity))
                         {
@@ -174,7 +180,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -274,7 +280,7 @@
             return;
         }
 
-        var result = await Api.GetAsync<CrmPage<OpportunityDto>>($"{Url}?page={pageNumber}{Filters()}");
+        var result = await Api.GetAsync<CrmPage<OpportunityDto>>($"{Url}?page={pageNumber}&pageSize={ListPaging.Size}{Filters()}");
         page = result.Value;
         message = result.Error;
     }

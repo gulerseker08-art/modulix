@@ -95,7 +95,7 @@ public static class AppCatalog
     public static IReadOnlyList<AppDefinition> All { get; } =
     [
         new(Crm, null, "CRM", "users", null, 10, ModuleKey: CrmAccess.ModuleKey, Group: SalesGroup),
-        new("crm.leads", Crm, "Lead'ler", "inbox", "crm/leadler", 5, CrmAccess.ModuleKey, CrmAccess.LeadsRead, Group: CrmProcessGroup),
+        new("crm.leads", Crm, "Müşteri adayları", "inbox", "crm/leadler", 5, CrmAccess.ModuleKey, CrmAccess.LeadsRead, Group: CrmProcessGroup),
         new("crm.companies", Crm, "Firmalar", "building", "crm/firmalar", 10, CrmAccess.ModuleKey, CrmAccess.CompaniesRead, Group: CrmProcessGroup),
         new("crm.contacts", Crm, "Kişiler", "user", "crm/kisiler", 20, CrmAccess.ModuleKey, CrmAccess.ContactsRead, Tone: AppTone.Teal, Group: CrmProcessGroup),
         new("crm.opportunities", Crm, "Fırsatlar", "target", "crm/firsatlar", 30, CrmAccess.ModuleKey, CrmAccess.OpportunitiesRead, Group: CrmProcessGroup),
@@ -114,6 +114,9 @@ public static class AppCatalog
         new("crm.sales-overview", Crm, "Satış görünümü", "dashboard", "crm/satis-gorunumu", 41, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmPerformanceGroup),
         new("crm.sales-targets", Crm, "Satış hedefleri", "target", "crm/satis-hedefleri", 42, CrmAccess.ModuleKey, SalesAccess.TargetsRead, Tone: AppTone.Teal, Group: CrmPerformanceGroup),
         new("crm.sales-forecasts", Crm, "Satış tahmini", "trending-up", "crm/satis-tahmini", 43, CrmAccess.ModuleKey, SalesAccess.ForecastsRead, Group: CrmPerformanceGroup),
+        new("crm.sales-analysis", Crm, "Satış analizi", "percent", "crm/satis-analizi", 44, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmPerformanceGroup),
+        new("crm.sales-team", Crm, "Ekip performansı", "users", "crm/ekip-performansi", 45, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmPerformanceGroup),
+        new("crm.sales-data-quality", Crm, "Veri kalitesi", "shield", "crm/veri-kalitesi", 46, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmPerformanceGroup),
 
         new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal, Group: SalesGroup),
         new("contracts.dashboard", Contracts, "Pano", "dashboard", "sozlesmeler/ozet", 5, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, ExactMatch: true),
@@ -154,6 +157,7 @@ public static class AppCatalog
         new("admin.companies", Admin, "Şirketler", "landmark", "yonetim/sirketler", 50, Permission: CoreAccess.ManageCompanies),
         new("admin.settings", Admin, "Firma ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
+        new("admin.communication", Admin, "İletişim tercihleri", "mail", "yonetim/iletisim-tercihleri", 75, Permission: CoreAccess.ReadCommunication),
         new("admin.custom-fields", Admin, "Özel alanlar", "square-pen", "yonetim/ozel-alanlar", 80, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
         new("admin.lists", Admin, "Listeler", "list", "yonetim/listeler", 90, Permission: CoreAccess.ManageCustomization),
         new("admin.sector-profile", Admin, "Sektör profili", "layers", "yonetim/sektor-profili", 100, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),

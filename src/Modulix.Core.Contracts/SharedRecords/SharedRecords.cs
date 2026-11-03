@@ -141,4 +141,13 @@ public interface ISharedRecordVisibility
 {
     /// <summary>Verilen ortak kayıtlardan, çağıranın bu modüldeki kapsamı nedeniyle tam profilini göremeyecek olanların kimlikleri.</summary>
     Task<IReadOnlySet<Guid>> RestrictedAsync(string sharedEntityKey, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Çağıranın rolleri "kapsam dışı ortak kayıtları gizle" diyorsa (ADR-0026 K8), kapsam dışı ortak kayıtların kimlik sorgusu:
+    /// bunlar asgari kimlikle bile görünmez (liste, sayım, arama, lookup, tekil okuma ve mükerrer önerisinde yok sayılır).
+    /// Gizleme yoksa ya da modül kısıt bildirmiyorsa <c>null</c>. Sorgu, ortak kayıt depolarının sorgusuna alt sorgu olarak
+    /// eklenir; bu yüzden aynı veri bağlamından kurulmalıdır (ADR-0020: tek <c>DbContext</c>).
+    /// </summary>
+    Task<IQueryable<Guid>?> HiddenAsync(string sharedEntityKey, CancellationToken cancellationToken) =>
+        Task.FromResult<IQueryable<Guid>?>(null);
 }
