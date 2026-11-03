@@ -332,6 +332,7 @@ public sealed class CoreModule : IModule
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["status"] = "Durum", ["roles"] = "Roller",
             ["companies"] = "Şirketler", ["businessUnit"] = "Departman",
+            ["businessUnitChangeReason"] = "Departman değişikliği gerekçesi", ["businessUnitRecords"] = "Departman değişikliğinde kayıtlar",
             ["invitedAt"] = "Davet", ["lockedOut"] = "Kilit", ["passwordResetRequestedAt"] = "Şifre sıfırlama bağlantısı",
             ["sessionsClosedAt"] = "Oturumları kapatıldı",
         }, "displayName")

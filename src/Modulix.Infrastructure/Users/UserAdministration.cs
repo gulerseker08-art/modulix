@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Modulix.Core.Authorization;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -37,6 +38,7 @@ internal sealed class UserAdministration(
     IAuditWriter audit,
     RecordHandover handover,
     MembershipPermissions membershipPermissions,
+    IBusinessUnitService businessUnits,
     IModuleEntitlements entitlements,
     UserSessions sessions,
     TimeProvider time,
@@ -395,6 +397,219 @@ internal sealed class UserAdministration(
         var moved = await handover.TransferAsync(membership.UserId, receiver.UserId, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return moved;
+    }
+
+    public async Task<BusinessUnitChangePreview> PreviewBusinessUnitChangeAsync(
+        Guid membershipId, Guid businessUnitId, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var (membership, user) = await LoadAsync(tenant, membershipId, cancellationToken);
+        await EnsureMayManageAsync(tenant, membershipId, cancellationToken);
+        var context = await LoadChangeContextAsync(tenant, membership, businessUnitId, cancellationToken);
+        return await BuildChangePreviewAsync(membership, user, context, cancellationToken);
+    }
+
+    public async Task<int> ChangeBusinessUnitAsync(Guid membershipId, BusinessUnitChange change, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        var tenant = RequireTenant();
+        var (membership, user) = await LoadAsync(tenant, membershipId, cancellationToken);
+        await EnsureMayManageAsync(tenant, membershipId, cancellationToken);
+        var context = await LoadChangeContextAsync(tenant, membership, change.BusinessUnitId, cancellationToken);
+        if (!context.IsChange)
+        {
+            return 0;
+        }
+
+        if (change.MoveRecordsWithUser && change.TransferRecordsToMembershipId is not null)
+        {
+            throw new ArgumentException(
+                "Kayıtlar ya kullanıcıyla birlikte taşınır ya da devredilir; ikisi birlikte seçilemez.", "transferRecordsToMembershipId");
+        }
+
+        var preview = await BuildChangePreviewAsync(membership, user, context, cancellationToken);
+        var reason = change.Reason?.Trim();
+        if (reason?.Length > ChangeReasonMaxLength)
+        {
+            throw new ArgumentException($"Gerekçe en fazla {ChangeReasonMaxLength} karakter olabilir.", "reason");
+        }
+
+        if (preview.DecisionRequired && !change.MoveRecordsWithUser && change.TransferRecordsToMembershipId is null)
+        {
+            throw Conflict(
+                $"Bu kullanıcının {preview.OwnedTotal} kaydı var{(preview.OwnedUnknown ? " (göremediğiniz kayıt türleri de olabilir)" : string.Empty)}. "
+                + "Departman değişince kayıtlar yeni departmanla görünür: kayıtları eski departmandaki bir kullanıcıya devredin "
+                + "ya da kayıtların kullanıcıyla birlikte taşınacağını onaylayın.");
+        }
+
+        if (preview.ReasonRequired && string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("Bu değişiklik için gerekçe zorunludur.", "reason");
+        }
+
+        var receiver = change.TransferRecordsToMembershipId is { } to
+            ? await LoadStayingReceiverAsync(tenant, membership, context, to, cancellationToken)
+            : null;
+        var receiverName = receiver is null ? null : (await users.FindByIdAsync(receiver.UserId.ToString()))?.DisplayName;
+
+        // Devir, taşıma ve denetim kaydı tek işlemdedir: devir başarısız olursa kullanıcı eski departmanında kalır.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var transferred = receiver is null ? 0 : await handover.TransferAsync(membership.UserId, receiver.UserId, cancellationToken);
+        var note = receiver is not null
+            ? $"{transferred} kayıt {receiverName} kişisine devredildi (eski departmanda kaldı)"
+            : preview.DecisionRequired ? $"{preview.OwnedTotal} kayıt kullanıcıyla birlikte yeni departmana taşındı" : null;
+        if (!await businessUnits.SetMembershipBusinessUnitAsync(membershipId, change.BusinessUnitId, cancellationToken, reason, note))
+        {
+            throw NotFound();
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return transferred;
+    }
+
+    private const int ChangeReasonMaxLength = 500;
+
+    private sealed record ChangeContext(MembershipUnit? Current, string? CurrentPathNames, BusinessUnit Target, string TargetPathNames)
+    {
+        public bool IsChange => Current?.Id != Target.Id;
+    }
+
+    /// <summary>
+    /// Taşımanın tarafları: hedef departman bu tenant'ta olmalı ve etkin olmalı; yönetici olmayan işlemi yapan yalnızca kendi
+    /// kapsamındaki departmanlar arasında taşıyabilir (ADR-0026 K6): "departman ve altı" kendi ağacını, diğerleri yalnızca kendi
+    /// departmanını kapsar. Taşıma görünürlüğü değiştirdiği için bu sınır önizlemede de uygulanır.
+    /// </summary>
+    private async Task<ChangeContext> LoadChangeContextAsync(
+        TenantContext tenant, Membership membership, Guid businessUnitId, CancellationToken cancellationToken)
+    {
+        var target = await db.BusinessUnits.AsNoTracking().SingleOrDefaultAsync(u => u.Id == businessUnitId, cancellationToken)
+            ?? throw new ArgumentException("Bu firmada bulunmayan departman seçildi.", "businessUnitId");
+        if (!target.IsActive)
+        {
+            throw new ArgumentException("Kapalı bir departmana kullanıcı taşınamaz.", "businessUnitId");
+        }
+
+        var current = await membershipPermissions.GetUnitAsync(membership.Id, cancellationToken);
+        var scopes = await membershipPermissions.GetScopesAsync(tenant.MembershipId, cancellationToken);
+        if (!scopes.Contains(RecordScope.All))
+        {
+            var actorUnit = await membershipPermissions.GetUnitAsync(tenant.MembershipId, cancellationToken);
+            var allowed = new HashSet<Guid>();
+            if (actorUnit is not null)
+            {
+                allowed.Add(actorUnit.Id);
+                if (scopes.Contains(RecordScope.UnitAndBelow))
+                {
+                    allowed.UnionWith(await membershipPermissions.GetUnitTreeIdsAsync(actorUnit.Path, cancellationToken));
+                }
+            }
+
+            if ((current is not null && !allowed.Contains(current.Id)) || !allowed.Contains(target.Id))
+            {
+                throw new UserAdministrationException(
+                    UserAdministrationError.PermissionDenied,
+                    "Kullanıcıyı yalnızca kendi departmanınız ve kapsamınızdaki departmanlar arasında taşıyabilirsiniz.");
+            }
+        }
+
+        var targetNames = (await businessUnits.FindAsync(target.Id, cancellationToken))?.PathNames ?? target.Name;
+        var currentNames = current is null ? null : (await businessUnits.FindAsync(current.Id, cancellationToken))?.PathNames ?? current.Name;
+        return new ChangeContext(current, currentNames, target, targetNames);
+    }
+
+    private async Task<BusinessUnitChangePreview> BuildChangePreviewAsync(
+        Membership membership, ModulixUser user, ChangeContext context, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<OwnedRecordSummary> owned = context.IsChange ? await handover.CountAsync(membership.UserId, cancellationToken) : Array.Empty<OwnedRecordSummary>();
+        var total = owned.Sum(o => o.Count ?? 0);
+        var unknown = owned.Any(o => o.Count is null);
+        var decision = context.IsChange && (total > 0 || unknown);
+        var reason = context.IsChange && (decision || membership.Status != MembershipStatus.Active);
+
+        // Departmandan gelen roller değişir; kullanıcıya doğrudan verilenler korunur.
+        var lost = new List<string>();
+        var gained = new List<string>();
+        if (context.IsChange)
+        {
+            var direct = (await db.MembershipRoles.AsNoTracking().Where(mr => mr.MembershipId == membership.Id).Select(mr => mr.RoleId).ToListAsync(cancellationToken)).ToHashSet();
+            IReadOnlyList<(Guid Id, string Name)> before = context.Current is null ? Array.Empty<(Guid Id, string Name)>() : await membershipPermissions.GetUnitRolesAsync(context.Current.Id, context.Current.Path, cancellationToken);
+            var after = await membershipPermissions.GetUnitRolesAsync(context.Target.Id, context.Target.Path, cancellationToken);
+            lost.AddRange(before.Where(b => after.All(a => a.Id != b.Id) && !direct.Contains(b.Id)).Select(b => b.Name));
+            gained.AddRange(after.Where(a => before.All(b => b.Id != a.Id) && !direct.Contains(a.Id)).Select(a => a.Name));
+        }
+
+        var warnings = new List<string>();
+        if (context.IsChange && total > 0)
+        {
+            warnings.Add($"{total} kayıt kullanıcıyla birlikte yeni departmana geçer: eski departmandaki iş arkadaşları bunları artık görmez, yeni departman görür. "
+                + "Kayıtları eski departmanda tutmak için bir iş arkadaşına devredin.");
+        }
+
+        if (unknown)
+        {
+            warnings.Add("Bazı kayıt türlerini görme yetkiniz olmadığı için kayıt sayısı eksik olabilir.");
+        }
+
+        if (membership.Status == MembershipStatus.Disabled)
+        {
+            warnings.Add("Kullanıcı devre dışı. Kayıtları bulunduğu departmanda görünmeye devam eder; taşırsanız yeni departmanla görünür.");
+        }
+
+        if (lost.Count > 0)
+        {
+            warnings.Add($"Departmandan gelen şu roller kalkar: {string.Join(", ", lost)}.");
+        }
+
+        if (gained.Count > 0)
+        {
+            warnings.Add($"Yeni departmandan şu roller gelir: {string.Join(", ", gained)}.");
+        }
+
+        return new BusinessUnitChangePreview(
+            membership.Id,
+            user.DisplayName,
+            membership.Status,
+            context.Current?.Id,
+            context.CurrentPathNames,
+            context.Target.Id,
+            context.TargetPathNames,
+            context.IsChange,
+            owned,
+            total,
+            unknown,
+            decision,
+            reason,
+            lost,
+            gained,
+            warnings);
+    }
+
+    /// <summary>
+    /// Kayıtları devralacak üye: etkin olmalı, devreden kişi olmamalı ve kayıtlar eski departmanda kalsın diye o departmanda olmalı.
+    /// </summary>
+    private async Task<Membership> LoadStayingReceiverAsync(
+        TenantContext tenant, Membership from, ChangeContext context, Guid toMembershipId, CancellationToken cancellationToken)
+    {
+        const string field = "transferRecordsToMembershipId";
+        if (toMembershipId == from.Id)
+        {
+            throw new ArgumentException("Kayıtlar aynı kişiye devredilemez.", field);
+        }
+
+        var receiver = await db.Memberships.AsNoTracking()
+            .SingleOrDefaultAsync(m => m.Id == toMembershipId && m.TenantId == tenant.TenantId, cancellationToken);
+        if (receiver is not { Status: MembershipStatus.Active })
+        {
+            throw new ArgumentException("Kayıtları devralacak kişi bu kuruluşun etkin bir üyesi olmalı.", field);
+        }
+
+        var currentId = context.Current?.Id;
+        if (currentId is null || !await db.BusinessUnitMembers.AnyAsync(m => m.MembershipId == toMembershipId && m.BusinessUnitId == currentId, cancellationToken))
+        {
+            throw new ArgumentException("Kayıtları, kullanıcının eski departmanında kalan bir üyeye devredin.", field);
+        }
+
+        return receiver;
     }
 
     public async Task EnableAsync(Guid membershipId, CancellationToken cancellationToken)
