@@ -108,6 +108,7 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 | 9 — Ölçek ölçümü (100.000 kişi), kabul/regresyon, işletim notu (docs/pazarlama-isletim.md) | Yapıldı; hedef kitle sınırı ve gönderim hızı bulguları ayrıntıda |
 | 10 — Gönderim işçisi, toplu gönderim (dilim 9 bulgusu) | Yapıldı; ayrıntı aşağıda (hedef kitle sınırı değişmedi) |
 | 11 — Kişiye özel değişkenler ve kendi adresine test gönderimi | Yapıldı; ayrıntı aşağıda |
+| 12 — Gönderim günlüğü temizliği (bağlantı belirteci, sıklık penceresi) | Yapıldı; ayrıntı aşağıda |
 
 ### Dilim 2 — uygulama notları (sapmalar ve sınırlar)
 
@@ -207,3 +208,12 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 - **Test gönderimi** (`ICampaignTestSends`, `POST /api/marketing/campaign-contents/{id}/test-send`): alıcı **yalnızca çağıranın kendi hesap e-postasıdır** (istekten adres alınmaz; sistem kimliği ve üyeliği kapalı kullanıcı gönderemez). Yalnızca e-posta kampanyası, `marketing.campaigns.write`, sağlayıcı seçili olmalı. Değişkenler örnek değerlerle (Ayşe Yılmaz, Örnek A.Ş.) doldurulur; konu "[TEST]" ile başlar, gövde test olduğunu söyler, abonelik bağlantısı eklenmez. Günde kullanıcı başına 10 (sıklık sayacı ayrı `test:` anahtarıyla tutulur, gerçek pazarlama sınırını tüketmez; başarısız denemede hak geri verilmez). Her deneme `marketing.CampaignTestSends` günlüğüne adressiz yazılır (yeni tablo, RLS'li, kampanya silinmesini engellemez).
 - **Bilerek yok / açık**: alıcıya özel önizleme ekranı (gerçek bir kişinin verisiyle), telefon kanalında test (kullanıcının telefonu kayıtlı değildir), başkasının adresine test, koşullu bloklar/döngüler, HTML şablon, kullanıcı tanımlı değişkenler, özel alan değişkenleri.
 - **Test**: 13 birim (doldurma, yedek metin, doğrulama, başlık enjeksiyonu, yeniden yorumlama yok), 8 entegrasyon (değişkenlerle gönderim ve şablonun değişmemesi; geçersiz şablon reddi; tenant'ın kendi kayıtları; yetki; test gönderimi: kendi adres/örnek değer/bağlantısız, sağlayıcı yok/bilinmeyen içerik/günlük sınır, başka tenant içeriği, yetkisiz kullanıcı).
+
+### Dilim 12 — uygulama notları (gönderim günlüğü temizliği)
+
+- **Yapılan**: `CommunicationCleanup` (Infrastructure) ve `CommunicationCleanupWorker` (`CommunicationCleanup:WorkerEnabled`, `IntervalMinutes` = 360). Etkin her tenant için, kendi tenant kapsamında ve tenant başına oturum kilidiyle çalışır; tekrar çalışması güvenlidir. Yeni indeksler: `CommunicationLinkTokens(TenantId, ExpiresAt)`, `FrequencyWindows(TenantId, Day)` (migration `CommunicationCleanupIndexes`; yeni tablo yok, RLS değişmedi).
+- **Saklama kuralları**: bağlantı belirteci, **süresi dolmasının üstünden 365 gün** geçince silinir (belirteç ömrü 400 gün; toplam ≈ 2,1 yıl). Gerekçe: süresi dolan bağlantıyla çıkış hâlâ kabul edilir (iletişimi azaltmak güvenli); erken silmek eski bir iletideki çıkış bağlantısını bozardı. Sıklık penceresi **7 günden eski** olunca silinir (yalnızca bugün sınırı etkiler).
+- **Sonuç / dürüst sınır**: 2,1 yıldan eski bir iletideki çıkış bağlantısı artık "geçersiz bağlantı" der; kişi çıkışı firmaya bildirmek zorunda kalır (firma çıkışı engel listesinden kaydedebilir). Bu süreyi uzatmak ya da kısaltmak bir ürün/hukuk kararıdır (`TokenGraceDays`).
+- **Sınırlı tur**: silme 1000'lik gruplarla, tablo başına en çok 50 grupla yapılır (uzun kilit ve işlem günlüğü şişmesi olmaz); sınır dolarsa sonraki tur devam eder.
+- **Silinmeyenler**: teslimat satırları (denetim izi), anlık görüntüler, test gönderimi günlüğü, tercih/engel kayıtları ve tercih tarihçesi. Bunlar için saklama süresi kararı verilmedi.
+- **Test**: 4 entegrasyon (eski belirteç/pencere silinir, yakın süresi dolan ve bugünkü kalır; ikinci tur silmez, silinen bağlantı bilinmez, yakın süresi dolan bağlantıyla çıkış çalışır; başka tenant'a dokunmaz; HTTP yüzeyi yok ve saklama sabitleri).

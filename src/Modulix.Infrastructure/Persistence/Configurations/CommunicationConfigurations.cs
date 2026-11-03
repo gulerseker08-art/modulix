@@ -80,6 +80,7 @@ internal sealed class CommunicationLinkTokenConfiguration : IEntityTypeConfigura
         builder.Property(t => t.Address).HasMaxLength(CommunicationPreference.AddressMaxLength).IsRequired();
         builder.Property(t => t.Reference).HasMaxLength(CommunicationLinkToken.ReferenceMaxLength).IsRequired();
         builder.HasIndex(t => new { t.TenantId, t.TokenHash }).IsUnique();
+        builder.HasIndex(t => new { t.TenantId, t.ExpiresAt });   // temizlik taraması (dilim 12)
     }
 }
 
@@ -98,6 +99,7 @@ internal sealed class FrequencyWindowConfiguration : IEntityTypeConfiguration<Fr
 
         // Atomik rezervasyonun dayanağı: tenant, kanal, adres ve gün başına tek satır.
         builder.HasIndex(w => new { w.TenantId, w.Channel, w.Address, w.Day }).IsUnique();
+        builder.HasIndex(w => new { w.TenantId, w.Day });   // temizlik taraması (dilim 12)
         builder.ToTable(t => t.HasCheckConstraint("CK_FrequencyWindows_Count", "[Count] >= 0"));
     }
 }

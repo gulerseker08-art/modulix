@@ -70,6 +70,9 @@ builder.Services.AddScoped<Modulix.Modules.Contracts.Lifecycle.IContractPolicyPr
 builder.Services.AddScoped<Modulix.Modules.Orders.Lifecycle.IOrderPolicyProvider, Modulix.Api.Orders.OrderPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Support.Lifecycle.ISupportPolicyProvider, Modulix.Api.Support.SupportPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Marketing.Runs.IMarketingPolicyProvider, Modulix.Api.Marketing.MarketingPolicyProvider>();
+builder.Services.Configure<Modulix.Api.Communication.CommunicationCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Communication.CommunicationCleanupOptions.SectionName));
+builder.Services.AddSingleton<Modulix.Api.Communication.CommunicationCleanupRunner>();
+builder.Services.AddHostedService<Modulix.Api.Communication.CommunicationCleanupWorker>();
 builder.Services.Configure<Modulix.Api.Marketing.MarketingSendOptions>(builder.Configuration.GetSection(Modulix.Api.Marketing.MarketingSendOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Marketing.MarketingSendRunner>();
 builder.Services.AddHostedService<Modulix.Api.Marketing.MarketingSendWorker>();
