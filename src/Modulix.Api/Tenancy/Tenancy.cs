@@ -162,7 +162,7 @@ public static class TenancySetup
 
         // Sorumlu seçimi için üye adları; her üye görebilir (e-posta ve rol bilgisi verilmez). assignable=true: yalnızca
         // kişinin kayıt kapsamındaki üyeler (Y8), yani sorumlu olarak atayabileceği ve süzgeçte seçebileceği kişiler.
-        // Kapsam kayıt türüne göre çözüldüğü için assignable=true ile entityKey (ör. crm.opportunities) zorunludur (ADR-0028).
+        // Kapsam kayıt türüne göre çözüldüğü için assignable=true ile entityKey (ör. crm.opportunities) zorunludur (ADR-0029).
         app.MapGet("/api/tenant/members", async (
                 bool? assignable, string? entityKey, ITenantMembers members, IDataScopeService scope, ITenantContextAccessor tenant,
                 CancellationToken ct) =>

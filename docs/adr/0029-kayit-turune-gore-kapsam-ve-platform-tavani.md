@@ -1,8 +1,8 @@
-# ADR-0028 — Kayıt türüne göre kayıt kapsamı ve platform görünürlük tavanı
+# ADR-0029 — Kayıt türüne göre kayıt kapsamı ve platform görünürlük tavanı
 
 Durum: **taslak** (3 Kasım 2026, tartışma için; kabul edilmedi). Bu belge tek başına hiçbir şeyi uygulamaz. "Doğrulandı" yazılanlar kodda okunmuş, "doğrulanmadı" yazılanlar bölüm 9'da listelenmiştir.
 
-Numara notu: `docs/adr` altında iki belge 0026 numarasını taşır (departman hiyerarşisi, raporlama) ve 0027 otomasyondur; bu belge bir sonraki boş numarayı kullanır.
+Numara notu: `docs/adr` altında iki belge 0026, `0027` otomasyon ve `0028` platform lisans ve tenant yönetimi numarasını taşır; bu belge bir sonraki boş numarayı (0029) kullanır. Taslak 0028 olarak açılmış, #135 sonrası 0028 başka belgeye verildiği için yeniden numaralandı.
 
 ## 1. Bağlam ve amaç
 
@@ -102,7 +102,8 @@ Her dilim ayrı PR'dır; her biri bu belgenin bölüm 6'sındaki ilgili testlerl
 | CRM firma, kişi, fırsat, aktivite, teklif, lead erişim denetimleri | kendi türü (`crm.company`, `crm.contact`, `crm.opportunity`, `crm.activity`, `crm.quote`, `crm.lead`) |
 | Lead kaydı, bağlanan firma ve kişi doğrulaması | firma için `crm.company`, kişi için `crm.contact` (iki ayrı küme) |
 | Ortak kayıt görünürlüğü (`CrmSharedRecordVisibility`) | ortak türün karşılığı: firma `crm.company`, kişi `crm.contact` |
-| Satış görünümü ve tahmin iş akışı | `crm.opportunity` |
+| Satış görünümü, tahmin iş akışı ve satış analitiği | `crm.opportunity` |
+| Çakışma iletisindeki "yetkiliye başvurun" ipucu (ADR-0026 K9) | deponun kendi türü |
 | Segment motoru | hedefin türü (firma `crm.company`, kişi `crm.contact`, lead `crm.lead`); açık karar 3 |
 | Sözleşme, sipariş, destek bağlantı hedefleri ve alt kayıtları | `contracts.contract`, `orders.order`, `support.ticket` |
 | Üye lookup'ı | lookup tanımının `SourceEntityKey`'i |

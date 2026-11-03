@@ -133,7 +133,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
     /// ile kapsam içi kayıt ayırt edilemez.
     /// </summary>
     private async Task<string> WithReferralHintAsync(string message, CancellationToken cancellationToken) =>
-        await Context.Access.GetOwnersAsync(cancellationToken) is not null
+        await Context.Access.GetOwnersAsync(EntityKey, cancellationToken) is not null
         && await Context.Access.HidesOutOfScopeSharedRecordsAsync(cancellationToken)
             ? message + " Kaydı göremiyorsanız yetkili (merkez) kullanıcıya başvurun."
             : message;

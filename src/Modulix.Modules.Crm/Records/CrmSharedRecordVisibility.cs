@@ -29,7 +29,7 @@ internal sealed class CrmSharedRecordVisibility(IModuleData data, IRecordAccess 
         };
         if (entityKey is null
             || !await access.CanAsync(entityKey, RecordOperation.Read, cancellationToken)
-            || await access.GetOwnersAsync(cancellationToken) is not { } owners
+            || await access.GetOwnersAsync(entityKey, cancellationToken) is not { } owners
             || !await access.HidesOutOfScopeSharedRecordsAsync(cancellationToken))
         {
             return null;

@@ -27,7 +27,7 @@ public interface IDataScopeService
 {
     /// <summary>
     /// Null: tüm kayıtlar. Aksi halde yalnızca sorumlusu bu kullanıcılardan biri olan kayıtlar. Kapsam kayıt türüne göre
-    /// çözülür (ADR-0028); <paramref name="entityKey"/> süzülecek kayıt türünün anahtarıdır.
+    /// çözülür (ADR-0029); <paramref name="entityKey"/> süzülecek kayıt türünün anahtarıdır.
     /// </summary>
     Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken);
 
