@@ -127,3 +127,34 @@ public sealed record AutomationActionDto(
     IReadOnlyList<AutomationParameterDto> Parameters);
 
 public sealed record AutomationCatalogDto(IReadOnlyList<AutomationEntityDto> Entities, IReadOnlyList<AutomationActionDto> Actions);
+
+// Çalışma geçmişi (ADR-0027, Dilim 2). Kayıt değeri ve parametre içermez; yalnızca durum, özet ve kimlikler.
+public sealed record AutomationRunDto(
+    Guid Id,
+    Guid RuleId,
+    string RuleName,
+    int VersionNo,
+    string EntityKey,
+    Guid RecordId,
+    string Origin,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? CompletedAt,
+    string? Note);
+
+public sealed record AutomationRunPageDto(IReadOnlyList<AutomationRunDto> Items, int Page, int PageSize, int TotalCount);
+
+public sealed record AutomationRunStepDto(
+    int StepNo,
+    string StepId,
+    string Action,
+    string Status,
+    int Attempts,
+    string? Summary,
+    string? EffectEntityKey,
+    Guid? EffectRecordId,
+    DateTimeOffset? CompletedAt);
+
+public sealed record AutomationRunDetailDto(AutomationRunDto Run, DateTimeOffset NextAttemptAt, IReadOnlyList<AutomationRunStepDto> Steps);
+
+public sealed record RunAutomationRuleRequest(Guid RecordId);

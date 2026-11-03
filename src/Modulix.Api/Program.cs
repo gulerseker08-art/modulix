@@ -74,6 +74,8 @@ builder.Services.AddScoped<Modulix.Modules.Marketing.Runs.IMarketingPolicyProvid
 builder.Services.Configure<Modulix.Api.Support.SupportJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Support.SupportJobsOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Support.SupportJobsRunner>();
 builder.Services.AddHostedService<Modulix.Api.Support.SupportJobsWorker>();
+builder.Services.Configure<Modulix.Infrastructure.Automation.AutomationOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Automation.AutomationOptions.SectionName));
+builder.Services.AddHostedService<Modulix.Api.Automation.AutomationWorker>();
 builder.Services.AddSingleton<Modulix.Modules.Contracts.Lifecycle.IContractPdfRenderer, Modulix.Api.Contracts.ContractPdfRenderer>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDocumentService>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDelivery>();
