@@ -127,4 +127,43 @@ public class FormLayoutRulesTests
         var noTabs = new FormLayoutInput([], [new("temel", "Temel", null, "genel")], Valid().Fields);
         Assert.Contains(FormLayoutRules.Validate(Form, custom, noTabs), e => e.Field == "tabs");
     }
+
+    [Fact]
+    public void Legacy_single_tab_layout_is_upgraded_to_the_definition_tabs_but_a_tenant_made_tab_is_kept()
+    {
+        var tabbed = new FormDefinition(
+            "crm.deal",
+            "Fırsat",
+            [new("genel", "Genel bilgiler"), new("finans", "Finans")],
+            [new("temel", "Temel bilgiler", "target"), new("tutar", "Tutar", "coins", "finans"), new("ek", "Ek bilgiler")],
+            [new("title", "Başlık", "temel", 12, Required: true, Fixed: true), new("amount", "Tutar", "tutar", 4)]);
+
+        // Eski kayıt: tek sekme, firma yalnızca kendi bölümünü eklemiş.
+        var legacy = new FormLayoutInput(
+            [new("genel", "Genel bilgiler")],
+            [new("temel", "Temel bilgiler", "target", "genel"), new("tutar", "Tutar", "coins", "genel"), new("ek", "Ek bilgiler", null, "genel"), new("ozel", "Özel", "star", "genel")],
+            [new("title", "temel", 12, Required: true, Visible: true), new("amount", "tutar", 4, Required: false, Visible: true)]);
+        var upgraded = FormLayoutRules.Resolve(tabbed, [], legacy, version: 2);
+
+        Assert.True(upgraded.Customized);
+        Assert.Equal(["genel", "finans"], upgraded.Tabs.Select(t => t.Key));
+        Assert.Equal("finans", upgraded.Sections.Single(s => s.Key == "tutar").Tab);
+        Assert.Equal("genel", upgraded.Sections.Single(s => s.Key == "temel").Tab);
+        Assert.Equal("genel", upgraded.Sections.Single(s => s.Key == "ozel").Tab);
+
+        // Firma kendi sekmesini eklemişse düzeni olduğu gibi kalır.
+        var own = new FormLayoutInput(
+            [new("genel", "Genel"), new("benim", "Benim sekmem")],
+            [new("temel", "Temel bilgiler", "target", "genel"), new("tutar", "Tutar", "coins", "genel"), new("ek", "Ek bilgiler", null, "benim")],
+            [new("title", "temel", 12, Required: true, Visible: true), new("amount", "tutar", 4, Required: false, Visible: true)]);
+        var kept = FormLayoutRules.Resolve(tabbed, [], own, version: 3);
+
+        Assert.Equal(["genel", "benim"], kept.Tabs.Select(t => t.Key));
+        Assert.Equal("genel", kept.Sections.Single(s => s.Key == "tutar").Tab);
+        Assert.Equal("benim", kept.Sections.Single(s => s.Key == "ek").Tab);
+
+        // Tek sekmeli tanımda (yükseltilecek sekme yok) tek sekme korunur.
+        var single = FormLayoutRules.Resolve(Form, [], new FormLayoutInput([new("genel", "Genel")], [new("temel", "Temel", "target", "genel")], [new("title", "temel", 12, Required: true, Visible: true)]), version: 1);
+        Assert.Equal(["genel"], single.Tabs.Select(t => t.Key));
+    }
 }

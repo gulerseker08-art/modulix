@@ -36,45 +36,50 @@
             <input id="ticket-search" class="form-control" type="search" placeholder="Konu, talep numarası veya başvuran ara" @bind="search" />
             <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
         @if (Session.Can(SupportAccess.TicketsCreate))
         {
             <a class="btn btn-primary" href="destek/talepler/yeni"><AppIcon Name="plus" Size="16" /> Yeni talep</a>
         }
     </div>
 
-    <div class="filters">
-        <label class="visually-hidden" for="status-filter">Durum</label>
-        <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm durumlar</option>
-            @foreach (var s in SupportLabels.Statuses)
-            {
-                <option value="@s.Key">@s.Label</option>
-            }
-        </select>
-        <label class="visually-hidden" for="priority-filter">Öncelik</label>
-        <select id="priority-filter" class="form-select form-select-sm filter-select" @bind="priority" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm öncelikler</option>
-            @foreach (var p in SupportLabels.Priorities)
-            {
-                <option value="@p.Key">@p.Label</option>
-            }
-        </select>
-        <label class="visually-hidden" for="type-filter">Tür</label>
-        <select id="type-filter" class="form-select form-select-sm filter-select" @bind="typeKey" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm türler</option>
-            @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList))
-            {
-                <option value="@t.Key">@t.Label</option>
-            }
-        </select>
-        <label class="visually-hidden" for="sort-select">Sıralama</label>
-        <select id="sort-select" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
-            @foreach (var (key, label) in SupportLabels.Sorts)
-            {
-                <option value="@key">Sıralama: @label</option>
-            }
-        </select>
-    </div>
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="status-filter">Durum</label>
+            <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm durumlar</option>
+                @foreach (var s in SupportLabels.Statuses)
+                {
+                    <option value="@s.Key">@s.Label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="priority-filter">Öncelik</label>
+            <select id="priority-filter" class="form-select form-select-sm filter-select" @bind="priority" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm öncelikler</option>
+                @foreach (var p in SupportLabels.Priorities)
+                {
+                    <option value="@p.Key">@p.Label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="type-filter">Tür</label>
+            <select id="type-filter" class="form-select form-select-sm filter-select" @bind="typeKey" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm türler</option>
+                @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList))
+                {
+                    <option value="@t.Key">@t.Label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="sort-select">Sıralama</label>
+            <select id="sort-select" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
+                @foreach (var (key, label) in SupportLabels.Sorts)
+                {
+                    <option value="@key">Sıralama: @label</option>
+                }
+            </select>
+        </div>
+    }
 
     @if (page is null && message is null)
     {
@@ -173,6 +178,11 @@
 </AuthGate>
 
 @code {
+    private bool filtersOpen;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
+    private int ActiveFilters => (string.IsNullOrEmpty(status) ? 0 : 1) + (string.IsNullOrEmpty(priority) ? 0 : 1) + (string.IsNullOrEmpty(typeKey) ? 0 : 1);
+
     private const string DefaultSort = "-createdAt";
 
     /// <summary>Hızlı görünümler; her biri sunucudaki süzgeçlerden birine karşılık gelir.</summary>

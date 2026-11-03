@@ -57,7 +57,7 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
         Field.Reference<Activity, Company>("companyId", "Firma bulunamadı.", a => a.CompanyId, (a, v) => a.CompanyId = v),
         Field.Reference<Activity, Contact>("contactId", "Kişi bulunamadı.", a => a.ContactId, (a, v) => a.ContactId = v),
         Field.Reference<Activity, Opportunity>("opportunityId", "Fırsat bulunamadı.", a => a.OpportunityId, (a, v) => a.OpportunityId = v),
-        Field.Reference<Activity, Lead>("leadId", "Lead bulunamadı.", a => a.LeadId, (a, v) => a.LeadId = v),
+        Field.Reference<Activity, Lead>("leadId", "Müşteri adayı bulunamadı.", a => a.LeadId, (a, v) => a.LeadId = v),
         Field.Owner<Activity>(OwnerField, a => a.OwnerId, (a, v) => a.OwnerId = v).GatedUpdate(),
         Field.Id<Activity>("createdBy", a => a.CreatedBy, (a, v) => a.CreatedBy = v).AsSystem(),
         Field.Text<Activity>("source", 20, a => a.Source, (a, v) => a.Source = v!).AsSystem(),
@@ -322,7 +322,7 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
             ("companyId", CrmModule.Entities.Company, "Firma bulunamadı.", entity.CompanyId, stored?.CompanyId),
             ("contactId", CrmModule.Entities.Contact, "Kişi bulunamadı.", entity.ContactId, stored?.ContactId),
             ("opportunityId", CrmModule.Entities.Opportunity, "Fırsat bulunamadı.", entity.OpportunityId, stored?.OpportunityId),
-            ("leadId", CrmModule.Entities.Lead, "Lead bulunamadı.", entity.LeadId, stored?.LeadId),
+            ("leadId", CrmModule.Entities.Lead, "Müşteri adayı bulunamadı.", entity.LeadId, stored?.LeadId),
         };
 
         foreach (var (field, entityKey, message, value, old) in checks)

@@ -1,10 +1,24 @@
-@* Sayfalama: önceki / sonraki ve toplam kayıt sayısı. *@
+@* Sayfalama: "1–8 / 24 kayıt" + sayfa numaraları (ilk, son ve geçerli sayfanın komşuları; arası "…"). *@
 @if (TotalCount > 0)
 {
     <nav class="pager" aria-label="Sayfalar">
-        <button type="button" class="btn btn-outline-secondary" disabled="@(Page <= 1)" @onclick="() => Go(Page - 1)">Önceki</button>
-        <span class="text-muted">Sayfa @Page / @PageCount · @TotalCount kayıt</span>
-        <button type="button" class="btn btn-outline-secondary" disabled="@(Page >= PageCount)" @onclick="() => Go(Page + 1)">Sonraki</button>
+        <span class="pager-info text-muted" role="status">@First–@Last / @TotalCount kayıt</span>
+        <div class="pager-pages">
+            <button type="button" class="pager-btn" aria-label="Önceki sayfa" disabled="@(Page <= 1)" @onclick="() => Go(Page - 1)">‹</button>
+            @foreach (var item in Items())
+            {
+                @if (item == 0)
+                {
+                    <span class="pager-gap" aria-hidden="true">…</span>
+                }
+                else
+                {
+                    <button type="button" class="pager-btn @(item == Page ? "active" : null)" aria-label="Sayfa @item" aria-current="@(item == Page ? "page" : null)"
+                            disabled="@(item == Page)" @onclick="() => Go(item)">@item</button>
+                }
+            }
+            <button type="button" class="pager-btn" aria-label="Sonraki sayfa" disabled="@(Page >= PageCount)" @onclick="() => Go(Page + 1)">›</button>
+        </div>
     </nav>
 }
 
@@ -18,6 +32,30 @@
     [Parameter] public EventCallback<int> PageChanged { get; set; }
 
     private int PageCount => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)Math.Max(1, PageSize)));
+
+    private int First => Math.Min(TotalCount, ((Math.Max(1, Page) - 1) * Math.Max(1, PageSize)) + 1);
+
+    private int Last => Math.Min(TotalCount, Math.Max(1, Page) * Math.Max(1, PageSize));
+
+    /// <summary>Gösterilecek sayfa numaraları; 0 "…" boşluğudur.</summary>
+    private List<int> Items()
+    {
+        var shown = new SortedSet<int> { 1, PageCount, Page - 1, Page, Page + 1 };
+        var items = new List<int>();
+        var previous = 0;
+        foreach (var number in shown.Where(n => n >= 1 && n <= PageCount))
+        {
+            if (previous != 0 && number - previous > 1)
+            {
+                items.Add(0);
+            }
+
+            items.Add(number);
+            previous = number;
+        }
+
+        return items;
+    }
 
     private Task Go(int page) => PageChanged.InvokeAsync(page);
 }

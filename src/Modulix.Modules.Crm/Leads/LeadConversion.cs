@@ -123,7 +123,7 @@ internal sealed class LeadConversion(
         // Dönüşüm izni olmadan hiçbir kayıt açılmaz (aynı denetim son güncellemede boru hattında da yapılır).
         if (!await access.HasPermissionAsync(CrmModule.Permissions.LeadsConvert, cancellationToken))
         {
-            return RecordResult<LeadConversionResult>.Fail(RecordErrorCode.PermissionDenied, "Lead dönüştürme izniniz yok.");
+            return RecordResult<LeadConversionResult>.Fail(RecordErrorCode.PermissionDenied, "Müşteri adayı dönüştürme izniniz yok.");
         }
 
         if ((request.CompanyId is not null) == request.CreateCompany)
@@ -161,14 +161,14 @@ internal sealed class LeadConversion(
         if (lead.Version != request.Version)
         {
             return RecordResult<LeadConversionResult>.Fail(RecordErrorCode.Conflict,
-                $"Lead siz düzenlerken değişti (beklenen sürüm {request.Version}, güncel sürüm {lead.Version}). Güncel halini alıp tekrar deneyin.");
+                $"Müşteri adayı siz düzenlerken değişti (beklenen sürüm {request.Version}, güncel sürüm {lead.Version}). Güncel halini alıp tekrar deneyin.");
         }
 
         // Dönüşüm sırasında da nitelendirme koşulları sağlanıyor olmalı (nitelendirmeden sonra veri silinmiş olabilir).
         var missing = rules.SelectMany(r => r.Check(LeadWorkflow.Snapshot(lead))).Distinct().ToList();
         if (missing.Count > 0)
         {
-            return RecordResult<LeadConversionResult>.Fail(RecordErrorCode.ValidationFailed, "Lead dönüştürülemedi: eksik bilgiler var.",
+            return RecordResult<LeadConversionResult>.Fail(RecordErrorCode.ValidationFailed, "Müşteri adayı dönüştürülemedi: eksik bilgiler var.",
                 [.. missing.Select(m => new RecordFieldError("qualification", m))]);
         }
 

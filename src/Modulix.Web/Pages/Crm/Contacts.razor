@@ -6,12 +6,7 @@
 <PageTitle>Kişiler · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ContactsRead">
-    <PageHeader Title="Kişiler" Icon="user" Subtitle="Firmalardaki ilgili kişileri ve iletişim bilgilerini yönetin.">
-        @if (Session.Can(CrmAccess.ContactsWrite) && !editing)
-        {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><span aria-hidden="true">+</span> Yeni kişi</button>
-        }
-    </PageHeader>
+    <PageHeader Title="Kişiler" Icon="user" Subtitle="@(page is null ? "Firmalardaki ilgili kişileri ve iletişim bilgilerini yönetin." : $"{page.TotalCount} kayıt")" />
 
     @if (message is not null)
     {
@@ -23,21 +18,19 @@
         <ContactEditor Contact="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
     }
 
-    @* Filtreler sunucuda uygulanır; sayfalama ve toplam doğru kalır. *@
-    <div class="filters" role="group" aria-label="Filtre">
-        <button type="button" class="chip @(role is null && !withoutCompany && !mine ? "active" : null)" @onclick="() => FilterAsync(null, false, false)">Tümü</button>
-        <button type="button" class="chip @(mine ? "active" : null)" @onclick="() => FilterAsync(null, false, true)">Benim kişilerim</button>
-        <button type="button" class="chip @(withoutCompany ? "active" : null)" @onclick="() => FilterAsync(null, true, false)">Firmasız</button>
-        @foreach (var (key, label) in CrmRelationshipRoles.Labels)
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@CurrentView" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Kişi ara" placeholder="Ad, soyad, e-posta veya telefon ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <ColumnPicker />
+        @if (Session.Can(CrmAccess.ContactsWrite) && !editing)
         {
-            <button type="button" class="chip @(role == key ? "active" : null)" @onclick="() => FilterAsync(key, false, false)">@label</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni kişi</button>
         }
     </div>
-
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Ad, soyad, e-posta veya telefon ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
 
     @if (page is null)
     {
@@ -107,11 +100,27 @@
         }
     }
 
-    private async Task FilterAsync(string? roleKey, bool noCompany, bool onlyMine)
+    private const string AllViews = "all";
+    private const string MineView = "mine";
+    private const string WithoutCompanyView = "no-company";
+    private const string RolePrefix = "role:";
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Benim kişilerim, Firmasız, ilişki rolü); kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm kişiler"),
+        new(MineView, "Benim kişilerim"),
+        new(WithoutCompanyView, "Firmasız"),
+        .. CrmRelationshipRoles.Labels.Select(r => new ViewOption(RolePrefix + r.Key, r.Value, "İlişki rolüne göre")),
+    ];
+
+    private string CurrentView => mine ? MineView : withoutCompany ? WithoutCompanyView : role is { } r ? RolePrefix + r : AllViews;
+
+    private async Task ChooseViewAsync(string key)
     {
-        role = roleKey;
-        withoutCompany = noCompany;
-        mine = onlyMine;
+        mine = key == MineView;
+        withoutCompany = key == WithoutCompanyView;
+        role = key.StartsWith(RolePrefix, StringComparison.Ordinal) ? key[RolePrefix.Length..] : null;
         await LoadAsync(1);
     }
 

@@ -17,34 +17,34 @@ public static class LeadRules
 {
     /// <summary>Atama yalnızca açık Lead'lerde yapılır; elenmiş Lead önce yeniden açılır, dönüşmüş Lead değişmez.</summary>
     public static string? CanAssign(string status) =>
-        LeadStatus.IsOpen(status) ? null : "Yalnızca açık Lead'ler atanabilir.";
+        LeadStatus.IsOpen(status) ? null : "Yalnızca açık müşteri adayları atanabilir.";
 
     public static string? CanStartContacting(string status) =>
-        status is LeadStatus.New or LeadStatus.Nurturing ? null : "İletişime geçilebilmesi için Lead yeni ya da daha sonra takipte olmalıdır.";
+        status is LeadStatus.New or LeadStatus.Nurturing ? null : "İletişime geçilebilmesi için müşteri adayı yeni ya da daha sonra takipte olmalıdır.";
 
     public static string? CanQualify(string status) =>
         status is LeadStatus.New or LeadStatus.Contacting or LeadStatus.Nurturing
             ? null
-            : status == LeadStatus.Qualified ? "Lead zaten nitelikli." : "Bu durumdaki Lead nitelendirilemez.";
+            : status == LeadStatus.Qualified ? "Müşteri adayı zaten nitelikli." : "Bu durumdaki müşteri adayı nitelendirilemez.";
 
     public static string? CanNurture(string status) =>
         status is LeadStatus.New or LeadStatus.Contacting or LeadStatus.Qualified
             ? null
-            : status == LeadStatus.Nurturing ? "Lead zaten daha sonra takipte (tarihi değiştirmek için yeniden takibe alın)." : "Bu durumdaki Lead takibe alınamaz.";
+            : status == LeadStatus.Nurturing ? "Müşteri adayı zaten daha sonra takipte (tarihi değiştirmek için yeniden takibe alın)." : "Bu durumdaki müşteri adayı takibe alınamaz.";
 
     public static string? CanDisqualify(string status) =>
-        LeadStatus.IsOpen(status) ? null : "Yalnızca açık Lead'ler elenebilir.";
+        LeadStatus.IsOpen(status) ? null : "Yalnızca açık müşteri adayları elenebilir.";
 
     public static string? CanReopen(string status) =>
         status == LeadStatus.Disqualified ? null
-        : status == LeadStatus.Converted ? "Dönüştürülmüş Lead yeniden açılamaz."
-        : "Yalnızca elenmiş Lead yeniden açılabilir.";
+        : status == LeadStatus.Converted ? "Dönüştürülmüş müşteri adayı yeniden açılamaz."
+        : "Yalnızca elenmiş müşteri adayı yeniden açılabilir.";
 
     /// <summary>Dönüşüm yalnızca nitelikli Lead'lerde ve yalnızca bir kez yapılır.</summary>
     public static string? CanConvert(string status) =>
         status == LeadStatus.Qualified ? null
-        : status == LeadStatus.Converted ? "Lead zaten dönüştürülmüş."
-        : "Yalnızca nitelikli Lead dönüştürülebilir.";
+        : status == LeadStatus.Converted ? "Müşteri adayı zaten dönüştürülmüş."
+        : "Yalnızca nitelikli müşteri adayı dönüştürülebilir.";
 
     /// <summary>Yeniden açılan Lead, ilk teması gerçekleşmişse İletişimde, değilse Yeni durumuna döner.</summary>
     public static string ReopenedStatus(DateTimeOffset? firstContactAt) =>

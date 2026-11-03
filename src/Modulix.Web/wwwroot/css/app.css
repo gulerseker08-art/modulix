@@ -359,16 +359,20 @@ a, .btn-link {
     --bs-btn-active-border-color: transparent;
 }
 
+/* Çerçeveli birincil düğme: yumuşak (tonal) görünüm; çerçeve yok, hover'da bir ton koyulaşır. Bütün sayfalarda ortak. */
 .btn-outline-primary {
-    --bs-btn-color: var(--mx-brand-primary);
-    --bs-btn-bg: var(--mx-surface);
-    --bs-btn-border-color: var(--mx-brand-primary);
-    --bs-btn-hover-color: var(--mx-text-on-brand);
-    --bs-btn-hover-bg: var(--mx-brand-primary);
-    --bs-btn-hover-border-color: var(--mx-brand-primary);
-    --bs-btn-active-color: var(--mx-text-on-brand);
-    --bs-btn-active-bg: var(--mx-brand-primary-hover);
-    --bs-btn-active-border-color: var(--mx-brand-primary-hover);
+    --bs-btn-color: var(--mx-tone-brand-fg);
+    --bs-btn-bg: var(--mx-tone-brand-bg);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-tone-brand-fg);
+    --bs-btn-hover-bg: var(--mx-tone-info-bg);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-tone-brand-fg);
+    --bs-btn-active-bg: var(--mx-tone-info-bg);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
 }
 
 /* İkincil düğmeler (İptal, Ara, sayfalama): yüzey zemin, ince çerçeve */
@@ -389,13 +393,20 @@ a, .btn-link {
     box-shadow: 0 2px 6px rgba(16, 29, 53, 0.06);
 }
 
+/* Yıkıcı eylem: yumuşak kırmızı; hover'da dolgu koyulaşır (onay gerektiren eylemler zaten ayrı adımda). */
 .btn-outline-danger {
-    --bs-btn-color: var(--mx-danger-text);
-    --bs-btn-bg: var(--mx-surface);
-    --bs-btn-border-color: var(--mx-tone-danger-bg);
+    --bs-btn-color: var(--mx-tone-danger-fg);
+    --bs-btn-bg: var(--mx-tone-danger-bg);
+    --bs-btn-border-color: transparent;
     --bs-btn-hover-color: #fff;
-    --bs-btn-hover-bg: var(--mx-danger);
-    --bs-btn-hover-border-color: var(--mx-danger);
+    --bs-btn-hover-bg: var(--mx-danger-text);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: var(--mx-danger-text);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
 }
 
 .btn-danger {
@@ -1045,7 +1056,7 @@ tr.done td.primary {
 }
 
 @media (max-width: 767.98px) {
-    .pager span {
+    .pager .pager-info {
         order: -1;
         width: 100%;
         text-align: center;
@@ -1214,6 +1225,95 @@ tr.done td.primary {
     height: 1px;
     margin: var(--mx-space-2) var(--mx-space-1);
     background: var(--mx-border);
+}
+
+/* Sayfalama: "1–8 / 24 kayıt" solda, sayfa numaraları sağda */
+.pager-pages {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-1);
+}
+
+.pager-btn {
+    display: inline-grid;
+    place-items: center;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    padding: 0 var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface);
+    color: var(--mx-text-primary);
+    font-weight: 600;
+}
+
+    .pager-btn:hover:not(:disabled) {
+        background: var(--mx-surface-muted);
+    }
+
+    .pager-btn:disabled {
+        color: var(--mx-text-secondary);
+        opacity: 0.55;
+    }
+
+    /* Geçerli sayfa: degrade + beyaz ("disabled" olsa da tam opaklıkla okunur). */
+    .pager-btn.active {
+        border-color: transparent;
+        background: var(--mx-gradient-brand);
+        color: var(--mx-text-on-brand);
+        opacity: 1;
+    }
+
+.pager-gap {
+    padding: 0 var(--mx-space-1);
+    color: var(--mx-text-secondary);
+}
+
+/* Sütunlar menüsü (ColumnPicker) ve etkin süzgeç sayısı rozeti */
+.column-menu {
+    min-width: 14rem;
+}
+
+.column-item {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-3);
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border-radius: var(--mx-radius-input);
+    font-weight: 500;
+}
+
+    .column-item:hover {
+        background: var(--mx-surface-hover);
+    }
+
+.filter-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--mx-gradient-brand);
+    color: var(--mx-text-on-brand);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+}
+
+/* Gizlenen sütun (ColumnPicker): başlık ve bütün hücreler; telefonda kart satırlarında da gizlenir. */
+.record-table .col-hidden {
+    display: none !important;
+}
+
+/* Satır eylemleri: ikincil (beyaz çerçeveli) düğme tabloda yumuşak görünür; birincil/yıkıcı zaten global yumuşaktır. */
+.record-table td.actions .btn-outline-secondary {
+    --bs-btn-color: var(--mx-tone-brand-fg);
+    --bs-btn-bg: var(--mx-tone-brand-bg);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-tone-brand-fg);
+    --bs-btn-hover-bg: var(--mx-tone-info-bg);
+    --bs-btn-hover-border-color: transparent;
+    box-shadow: none;
 }
 
 @media (max-width: 575.98px) {
