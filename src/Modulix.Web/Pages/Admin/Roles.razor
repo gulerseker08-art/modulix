@@ -47,7 +47,13 @@
                             }
                         </td>
                         <td data-label="İzinler">@(role.IsSystem ? "Tüm izinler, düzenlenemez" : $"{role.Permissions.Count} izin")</td>
-                        <td data-label="Kayıt kapsamı">@RecordScopeLabels.Of(role.Scope)</td>
+                        <td data-label="Kayıt kapsamı">
+                            @RecordScopeLabels.Of(role.Scope)
+                            @if (role.HideOutOfScopeShared)
+                            {
+                                <span class="badge tag">Kapsam dışı ortak kayıtlar gizli</span>
+                            }
+                        </td>
                         <td data-label="Atanabilir düzey">@RoleAssignLevelLabels.Of(role.AssignLevel)</td>
                         <td data-label="Üyeler">@role.MemberCount</td>
                         <td data-label="Departmanlar">@role.UnitCount</td>
