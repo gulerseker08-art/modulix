@@ -1,0 +1,56 @@
+@* Satış görünümü / tahmin özet kartı (docs/design-system/component-catalog.md → KPIStatCard). OnClick verilirse tıklanabilir düğme
+   (aria-pressed ile açık/kapalı), verilmezse salt okunur kartır. "Kısmi" rozeti renkle değil metinle anlatılır. *@
+@if (OnClick.HasDelegate)
+{
+    <button type="button" class="stat-card kpi-card tone-@Tone" aria-pressed="@(Pressed ? "true" : "false")" aria-controls="@Controls" @onclick="OnClick">
+        @Inner
+    </button>
+}
+else
+{
+    <div class="stat-card kpi-card tone-@Tone" style="cursor: default">
+        @Inner
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+
+    [Parameter] public string Icon { get; set; } = "coins";
+
+    /// <summary>brand, success, info ya da danger.</summary>
+    [Parameter] public string Tone { get; set; } = "brand";
+
+    /// <summary>Değerin altındaki küçük açıklama.</summary>
+    [Parameter] public string? Detail { get; set; }
+
+    /// <summary>Toplam eksik tutar/kur yüzünden kısmi mi?</summary>
+    [Parameter] public bool Partial { get; set; }
+
+    [Parameter] public string? PartialHint { get; set; }
+
+    [Parameter] public bool Pressed { get; set; }
+
+    /// <summary>Açılan panelin kimliği (aria-controls).</summary>
+    [Parameter] public string? Controls { get; set; }
+
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private RenderFragment Inner => @<text>
+        <span class="stat-icon" aria-hidden="true"><AppIcon Name="@Icon" Size="22" /></span>
+        <span class="kpi-text">
+            <span class="kpi-label">@Label</span>
+            <strong>@Value</strong>
+            @if (Detail is not null)
+            {
+                <small>@Detail</small>
+            }
+            @if (Partial)
+            {
+                <small><span class="badge stage-onhold">Kısmi</span> @PartialHint</small>
+            }
+        </span>
+    </text>;
+}

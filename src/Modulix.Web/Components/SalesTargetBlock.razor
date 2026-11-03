@@ -1,0 +1,93 @@
+@* Satış görünümünde bir hedef bloğu (tutar ya da adet): hedef, gerçekleşme, kalan, pipeline kapsama. Hedef yoksa ya da sıfırsa oran gösterilmez;
+   hedef karşılandıysa "Hedef karşılandı" yazılır ve kapsama oranı gösterilmez (ADR-0026). *@
+<section class="detail-section" aria-labelledby="@headingId">
+    <div class="section-header"><h3 id="@headingId" class="h5">@Title</h3></div>
+    @if (Hidden is not null)
+    {
+        <p class="text-muted">@Hidden</p>
+    }
+    else if (Block is null)
+    {
+        <p class="text-muted">Hedef bilgisi gösterilemiyor (hedefleri görme izni gerekir).</p>
+    }
+    else if (Block.Value is null)
+    {
+        <p class="text-muted">Hedef tanımlı değil.</p>
+        @if (Block.Problem is not null)
+        {
+            <div class="alert alert-warning" role="status">@Block.Problem</div>
+        }
+    }
+    else
+    {
+        <p class="small text-muted">@SourceText(Block.Source)</p>
+        @if (Block.ChildExcess is { } excess)
+        {
+            <div class="alert alert-warning" role="status">
+                Uyarı: kullanıcı hedeflerinin toplamı firma hedefini @Number(excess) aşıyor. Karşılaştırma firma hedefine göredir; alt hedefler eklenmez.
+            </div>
+        }
+        @if (Block.Progress is { } progress)
+        {
+            <dl class="detail-grid">
+                <div><dt>Hedef</dt><dd>@Number(progress.Target)</dd></div>
+                <div><dt>Gerçekleşen</dt><dd>@Number(progress.Realized)</dd></div>
+                <div>
+                    <dt>Gerçekleşme</dt>
+                    <dd>
+                        @(progress.AttainmentPercent is { } attainment ? SalesLabels.Percent(attainment) : "—")
+                        @if (progress.AttainmentPercent is { } value)
+                        {
+                            <progress value="@Math.Min(100m, Math.Max(0m, value)).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" max="100" aria-label="@Title gerçekleşme oranı"></progress>
+                        }
+                    </dd>
+                </div>
+                @if (progress.TargetMet)
+                {
+                    <div><dt>Durum</dt><dd><span class="badge stage-won">Hedef karşılandı</span>@(progress.Remaining < 0 ? $" (hedefi {Number(-progress.Remaining)} aştı)" : null)</dd></div>
+                }
+                else
+                {
+                    <div><dt>Kalan</dt><dd>@Number(progress.Remaining)</dd></div>
+                    <div>
+                        <dt>Pipeline kapsama</dt>
+                        <dd>@(progress.Coverage is { } coverage ? $"{coverage.ToString("0.##", Regional.Numbers)} kat" : "—")</dd>
+                    </div>
+                }
+            </dl>
+            @if (!progress.TargetMet)
+            {
+                <p class="small text-muted">Pipeline kapsama: bu dönem beklenen açık tutarın kalan hedefe oranı.</p>
+            }
+        }
+        else
+        {
+            <p>Hedef: <strong>@Number(Block.Value.Value)</strong>. Hedef sıfır ya da tanımsız olduğundan oran hesaplanmadı.</p>
+        }
+    }
+</section>
+
+@code {
+    private readonly string headingId = $"target-{Guid.NewGuid():N}";
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    [Parameter] public TargetBlockDto? Block { get; set; }
+
+    /// <summary>Dolu ise blok yerine bu açıklama gösterilir (ör. tutar izni yok).</summary>
+    [Parameter] public string? Hidden { get; set; }
+
+    private bool IsAmount => Block?.Metric == SalesTargetMetrics.WonAmount;
+
+    private string Number(decimal value) => IsAmount && Block?.Currency is { } currency
+        ? CrmLabels.Amount(value, currency)
+        : value.ToString("N0", Regional.Numbers);
+
+    private static string SourceText(string source) => source switch
+    {
+        "User" => "Kaynak: kullanıcı hedefi",
+        "UserSum" => "Kaynak: kullanıcı hedeflerinin toplamı",
+        "Tenant" => "Kaynak: firma hedefi",
+        _ => "Kaynak: hedef",
+    };
+}

@@ -1,0 +1,259 @@
+@page "/crm/satis-tahmini"
+@using System.Globalization
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+@inject NavigationManager Navigation
+
+<PageTitle>Satış tahmini · Modulix</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ForecastsRead">
+    <a class="back-link" href="crm/satis-gorunumu">← Satış görünümü</a>
+    <div class="page-header">
+        <div>
+            <h1>Satış tahmini</h1>
+            <p class="text-muted mb-0">
+                Dönem ve kapsam için açık fırsatların bir anlık görüntüsüdür; yönetici kategori, tutar ve olasılığı gerekçesiyle düzeltir, tahmini sunar ve kilitler.
+                Kilitli tahmin değişmez; yeniden açmak gerekçe ister ve yeni bir sürüm üretir. Dönem bitince kilitli tahminin doğruluğu gerçekleşenle ölçülür.
+            </p>
+        </div>
+        @if (CanWrite && !creating)
+        {
+            <div class="header-actions"><button type="button" class="btn btn-primary" @onclick="StartCreate">Yeni taslak</button></div>
+        }
+    </div>
+
+    @if (creating)
+    {
+        <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault aria-labelledby="sf-new-title">
+            <h2 id="sf-new-title">Yeni tahmin taslağı</h2>
+            <p class="small text-muted">Taslak, seçilen dönemde kapanması beklenen açık fırsatlardan oluşturulur. Aynı dönem, kapsam ve para birimi için yalnızca bir sürüm zinciri vardır.</p>
+            <ErrorSummary Errors="createErrors" />
+            @if (createMessage is not null)
+            {
+                <div class="alert alert-danger" role="alert">@createMessage</div>
+            }
+            <div class="form-grid">
+                <div class="span-3">
+                    <label class="form-label required" for="sf-kind">Dönem türü</label>
+                    <select id="sf-kind" class="form-select" required aria-required="true" @bind="newKind">
+                        @foreach (var (key, label) in SalesLabels.PeriodKinds) { <option value="@key">@label</option> }
+                    </select>
+                    <FieldError Field="kind" Errors="createErrors" />
+                </div>
+                <div class="span-3">
+                    <label class="form-label" for="sf-anchor">Dönemdeki bir gün</label>
+                    <input id="sf-anchor" class="form-control" type="date" @bind="newAnchor" />
+                    <FieldError Field="anchor" Errors="createErrors" />
+                </div>
+                <div class="span-3">
+                    <label class="form-label required" for="sf-scope">Kapsam</label>
+                    <select id="sf-scope" class="form-select" required aria-required="true" @bind="newScope" @bind:after="ScopeChanged">
+                        @foreach (var (key, label) in SalesLabels.Scopes) { <option value="@key">@label</option> }
+                    </select>
+                    <FieldError Field="scopeType" Errors="createErrors" />
+                </div>
+                @if (newScope == SalesTargetScopes.User)
+                {
+                    <div class="span-3">
+                        <label class="form-label required" for="sf-user">Kullanıcı</label>
+                        <select id="sf-user" class="form-select" required aria-required="true" @bind="newUser">
+                            <option value="">Seçin…</option>
+                            @foreach (var member in Lookups.Members) { <option value="@member.UserId">@member.DisplayName</option> }
+                        </select>
+                        <FieldError Field="scopeUserId" Errors="createErrors" />
+                    </div>
+                }
+                <div class="span-3">
+                    <label class="form-label" for="sf-currency">Para birimi</label>
+                    <input id="sf-currency" class="form-control" maxlength="3" placeholder="@Regional.Currency" aria-describedby="sf-currency-help" @bind="newCurrency" />
+                    <div id="sf-currency-help" class="form-text">Boşsa firmanın raporlama para birimi.</div>
+                    <FieldError Field="currency" Errors="createErrors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">
+                    @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
+                    Taslağı oluştur
+                </button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelCreate">Vazgeç</button>
+            </div>
+        </form>
+    }
+
+    <form class="form-grid mb-3" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="Tahmin süzgeçleri">
+        <div class="span-3">
+            <label class="form-label" for="sff-from">Dönem başlangıcı (en erken)</label>
+            <input id="sff-from" class="form-control" type="date" @bind="from" @bind:after="LoadAsync" />
+        </div>
+        <div class="span-3">
+            <label class="form-label" for="sff-to">Dönem bitişi (en geç)</label>
+            <input id="sff-to" class="form-control" type="date" @bind="to" @bind:after="LoadAsync" />
+        </div>
+        <div class="span-3">
+            <label class="form-label" for="sff-status">Durum</label>
+            <select id="sff-status" class="form-select" @bind="status" @bind:after="LoadAsync">
+                <option value="">Tümü</option>
+                @foreach (var (key, label) in SalesLabels.Statuses) { <option value="@key">@label</option> }
+            </select>
+        </div>
+    </form>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @error
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">Tekrar dene</button>
+        </div>
+    }
+
+    @if (loading && items is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (items is not null)
+    {
+        @if (items.Count == 0)
+        {
+            <p class="text-muted">Bu süzgeçle tahmin yok.@(CanWrite ? " \"Yeni taslak\" ile başlayabilirsiniz." : null)</p>
+        }
+        else
+        {
+            <table class="table record-table" aria-busy="@(loading ? "true" : "false")">
+                <caption class="visually-hidden">Satış tahminleri</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Dönem</th><th scope="col">Kapsam</th><th scope="col">Para birimi</th><th scope="col">Sürüm</th><th scope="col">Durum</th>
+                        <th scope="col">Son güncelleme</th><th scope="col"><span class="visually-hidden">Aç</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var forecast in items)
+                    {
+                        <tr>
+                            <td data-label="Dönem" class="primary">@SalesLabels.PeriodKind(forecast.PeriodKind) · @SalesLabels.Period(forecast.PeriodStart, forecast.PeriodEnd)</td>
+                            <td data-label="Kapsam">@(forecast.ScopeType == SalesTargetScopes.User ? $"Kullanıcı: {Lookups.MemberName(forecast.ScopeUserId)}" : "Tüm firma")</td>
+                            <td data-label="Para birimi">@forecast.ReportingCurrency</td>
+                            <td data-label="Sürüm">V@(forecast.VersionNo)</td>
+                            <td data-label="Durum"><span class="badge stage-@SalesLabels.StatusBadge(forecast.Status)">@SalesLabels.Status(forecast.Status)</span></td>
+                            <td data-label="Son güncelleme">@(forecast.ChangedAt is { } changed ? CrmLabels.Time(changed) : "—")</td>
+                            <td class="actions"><a class="btn btn-outline-primary btn-sm" href="crm/satis-tahmini/@forecast.Id" aria-label="@($"{SalesLabels.Period(forecast.PeriodStart, forecast.PeriodEnd)} V{forecast.VersionNo} tahminini aç")">Aç</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+</AuthGate>
+
+@code {
+    private IReadOnlyList<ForecastHeaderDto>? items;
+    private string? error;
+    private bool loading;
+    private int requestId;
+
+    private DateOnly? from;
+    private DateOnly? to;
+    private string status = string.Empty;
+
+    private bool creating;
+    private bool busy;
+    private string newKind = SalesPeriodKinds.Month;
+    private DateOnly? newAnchor = DateOnly.FromDateTime(Regional.Now.DateTime);
+    private string newScope = SalesTargetScopes.Tenant;
+    private string newUser = string.Empty;
+    private string newCurrency = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? createErrors;
+    private string? createMessage;
+
+    private bool CanWrite => Session.Can(SalesAccess.ForecastsWrite);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(SalesAccess.ForecastsRead))
+        {
+            var year = Regional.Now.Year;
+            from = new DateOnly(year, 1, 1);
+            to = new DateOnly(year, 12, 31);
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private async Task LoadAsync()
+    {
+        var id = ++requestId;
+        loading = true;
+        error = null;
+
+        var query = new List<string>();
+        if (from is { } f) { query.Add($"from={Iso(f)}"); }
+        if (to is { } t) { query.Add($"to={Iso(t)}"); }
+        if (status.Length > 0) { query.Add($"status={status}"); }
+
+        var result = await Api.GetAsync<List<ForecastHeaderDto>>($"/api/crm/sales/forecasts?{string.Join('&', query)}");
+        if (id != requestId)
+        {
+            return;
+        }
+
+        loading = false;
+        if (result.IsSuccess)
+        {
+            items = result.Value ?? [];
+        }
+        else
+        {
+            error = result.Error;
+        }
+    }
+
+    private void StartCreate()
+    {
+        creating = true;
+        createErrors = null;
+        createMessage = null;
+    }
+
+    private void CancelCreate() => creating = false;
+
+    private void ScopeChanged()
+    {
+        if (newScope == SalesTargetScopes.Tenant)
+        {
+            newUser = string.Empty;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (busy)
+        {
+            return;
+        }
+
+        busy = true;
+        createMessage = null;
+        var request = new CreateForecastRequestDto(
+            newKind,
+            newAnchor,
+            newScope,
+            newScope == SalesTargetScopes.User && Guid.TryParse(newUser, out var userId) ? userId : null,
+            string.IsNullOrWhiteSpace(newCurrency) ? null : newCurrency.Trim().ToUpperInvariant());
+
+        var result = await Api.PostAsync<ForecastDetailDto>("/api/crm/sales/forecasts", request);
+        busy = false;
+
+        if (result.IsSuccess && result.Value is { } created)
+        {
+            Navigation.NavigateTo($"crm/satis-tahmini/{created.Header.Id}");
+            return;
+        }
+
+        createErrors = result.FieldErrors;
+        createMessage = result.FieldErrors.Count == 0 ? result.Error : null;
+    }
+}
