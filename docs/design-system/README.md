@@ -28,7 +28,8 @@ Modulix'in bütün modülleri tek bir ürün ailesi gibi görünmelidir. Bu klas
 6. **Liste ekranları `record-table`** kullanır; telefonda kart listesine dönüşmesi için hücrelere `data-label` verilir.
 7. **Yazı tipi Manrope, düğmeler ve gridler seçenek 4'e göredir** (3.11.2026 kararı; bütün modüller): birincil `btn-primary` (degrade + parlama, ekranda en çok bir), ikincil `btn-outline-secondary`, üçüncül `btn-tonal`, araç çubuğu `btn-ghost`; liste ekranı araç çubuğu (`list-toolbar`) = `ViewSelector` ("Görünüm: … ▾") + arama + birincil eylem (Filtrele/Sütunlar özellikleri gelince eklenir); `record-table` büyük harf başlıklı kart. Ayrıntı: `theme-tokens.md`, `component-catalog.md`.
 8. **Her kayıt formu sekmelidir** (`LayoutForm` + `TabBar`; tek sekmeli form da sekme çubuğuyla çizilir). Sekmeler `FormSection` kartlarını gruplar; sekmeler arası girdi kaybolmaz; alan yerleşimi metadata'dandır (ADR-0021).
-9. **Erişilebilirlik**: her ikon düğmesinde erişilebilir ad (`aria-label`, `title` ya da `visually-hidden` metin); durum yalnızca renkle anlatılmaz (metin, ikon ya da çizgi eşlik eder).
+9. **Terim: "Müşteri adayı".** Arayüz metinlerinde "Lead" yazılmaz (menü, başlık, düğme, ileti, izin adı); kodda, API yolunda ve URL'de teknik ad `lead` kalır.
+10. **Erişilebilirlik**: her ikon düğmesinde erişilebilir ad (`aria-label`, `title` ya da `visually-hidden` metin); durum yalnızca renkle anlatılmaz (metin, ikon ya da çizgi eşlik eder).
 
 ## Marka
 
