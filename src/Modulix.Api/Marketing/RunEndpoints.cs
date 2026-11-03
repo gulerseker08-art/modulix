@@ -24,6 +24,13 @@ internal static class RunEndpoints
         ResourceEndpoints.MapResource<CampaignRunDto, SaveCampaignRunRequest>(group, Prefix, "campaign-runs", MarketingModule.Entities.CampaignRun,
             MarketingModule.Permissions.CampaignsRead, MarketingModule.Permissions.CampaignsWrite);
 
+        // Test gönderimi (dilim 11): alıcı isteğten alınmaz, yalnızca çağıranın kendi hesap e-postasıdır; servis yazma iznini ve günlük sınırı denetler.
+        group.MapPost("/campaign-contents/{id:guid}/test-send", async (Guid id, ICampaignTestSends service, CancellationToken ct) =>
+        {
+            var result = await service.SendAsync(id, ct);
+            return result.IsSuccess ? Results.Ok(new TestSendResultDto(result.Value!.Outcome, result.Value.Code)) : RecordEndpoints.ToProblem(result.Error!);
+        }).RequirePermission(MarketingModule.Permissions.CampaignsRead);
+
         var runs = group.MapGroup("/campaign-runs");
         foreach (var action in Actions)
         {

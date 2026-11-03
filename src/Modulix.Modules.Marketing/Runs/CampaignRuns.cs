@@ -512,11 +512,12 @@ internal sealed class CampaignRuns(
         var found = lookup is null
             ? []
             : (await lookup.LookupAsync(campaign.TargetType, campaign.Channel, [.. batch.Select(d => new AddressLookup(d.TargetId, d.ContactPointId))], cancellationToken))
-                .ToDictionary(a => (a.TargetId, a.ContactPointId), a => a.Address);
+                .ToDictionary(a => (a.TargetId, a.ContactPointId));
 
         var normalized = batch.ToDictionary(
             d => d.Id,
-            d => found.TryGetValue((d.TargetId, d.ContactPointId), out var raw) ? CommunicationAddress.Normalize(campaign.Channel, raw) : null);
+            d => found.TryGetValue((d.TargetId, d.ContactPointId), out var raw) ? CommunicationAddress.Normalize(campaign.Channel, raw.Address) : null);
+        var variables = batch.ToDictionary(d => d.Id, d => found.TryGetValue((d.TargetId, d.ContactPointId), out var raw) ? raw.Variables : null);
 
         // İzin ve engel her gönderimden hemen önce yeniden değerlendirilir (anlık görüntüdeki durum geçerli sayılmaz).
         var decisions = normalized.Values.Any(a => a is not null)
@@ -553,13 +554,13 @@ internal sealed class CampaignRuns(
                 }
             }
 
-            await SendPendingAsync(pending, campaign, provider, policy, today, subject, body, counts, cancellationToken);
+            await SendPendingAsync(pending, variables, campaign, provider, policy, today, subject, body, counts, cancellationToken);
             await journal.SaveAsync(cancellationToken);
         }
     }
 
     private async Task SendPendingAsync(
-        List<(CampaignDelivery Delivery, string Address)> pending, CampaignInfo campaign, IMessageProvider provider, MarketingPolicy policy, DateOnly today,
+        List<(CampaignDelivery Delivery, string Address)> pending, Dictionary<Guid, IReadOnlyDictionary<string, string>?> variables, CampaignInfo campaign, IMessageProvider provider, MarketingPolicy policy, DateOnly today,
         string? subject, string body, Tally counts, CancellationToken cancellationToken)
     {
         if (pending.Count == 0)
@@ -591,7 +592,7 @@ internal sealed class CampaignRuns(
             await limiter.WaitAsync(cancellationToken);
             try
             {
-                results[index] = await CallProviderAsync(item.Delivery, item.Address, item.Link, campaign, provider, subject, body, cancellationToken);
+                results[index] = await CallProviderAsync(item.Delivery, item.Address, item.Link, campaign, provider, subject, body, variables[item.Delivery.Id], cancellationToken);
             }
             finally
             {
@@ -607,14 +608,17 @@ internal sealed class CampaignRuns(
 
     private static async Task<ProviderResult> CallProviderAsync(
         CampaignDelivery delivery, string address, UnsubscribeLink link, CampaignInfo campaign, IMessageProvider provider, string? subject, string body,
-        CancellationToken cancellationToken)
+        IReadOnlyDictionary<string, string>? variables, CancellationToken cancellationToken)
     {
         try
         {
+            // Kişiye özel değişkenler gönderim anında doldurulur (dilim 11); alt bilgi doldurmadan sonra eklenir, değerler bağlantıya karışmaz.
+            var personalSubject = subject is null ? null : ContentTemplate.Render(subject, variables);
+            var personalBody = ContentTemplate.Render(body, variables);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(ProviderTimeout);
             return await provider.SendAsync(
-                new MessageRequest(delivery.IdempotencyKey, campaign.Channel, address, subject, ContentRules.WithUnsubscribeFooter(body, link.PageUrl), link), timeout.Token);
+                new MessageRequest(delivery.IdempotencyKey, campaign.Channel, address, personalSubject, ContentRules.WithUnsubscribeFooter(personalBody, link.PageUrl), link), timeout.Token);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {

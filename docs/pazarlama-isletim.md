@@ -63,4 +63,4 @@ Ortam: geliştirme bilgisayarı (Windows), SQL Server Docker kapsayıcısında, 
 
 ## 6. Bilinen sınırlar (dürüst liste)
 
-Gerçek sağlayıcı ve webhook, planlanan zamanda otomatik başlatma, kişi bazlı değişken, HTML içerik, gönderim penceresi, konu bazlı tercih, yönetim ekranında tercih listesi, fırsat/ciro atfı, rapor dışa aktarma, alan düzeyi maliyet yetkisi, belirteç/sıklık satırı temizliği, ölçeğin üretim donanımında doğrulanması. Hukuki uygunluk (KVKK/İYS/ETK) bu yazılımla garanti edilmez; hukuki karar ayrıca verilmelidir.
+Gerçek sağlayıcı ve webhook, planlanan zamanda otomatik başlatma, özel alan değişkenleri, HTML içerik, gönderim penceresi, konu bazlı tercih, yönetim ekranında tercih listesi, fırsat/ciro atfı, rapor dışa aktarma, alan düzeyi maliyet yetkisi, belirteç/sıklık satırı temizliği, ölçeğin üretim donanımında doğrulanması. Hukuki uygunluk (KVKK/İYS/ETK) bu yazılımla garanti edilmez; hukuki karar ayrıca verilmelidir.
