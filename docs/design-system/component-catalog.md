@@ -21,7 +21,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 
 | Bileşen | Durum | Nerede / nasıl |
 |---|---|---|
-| Button | Stil | `btn btn-primary` (birincil), `btn-outline-secondary` (ikincil/İptal), `btn-outline-danger` (yıkıcı), `btn-sm` |
+| Button | Stil | `btn btn-primary` (birincil: marka degradesi + parlama), `btn-outline-secondary` (ikincil/İptal), `btn-tonal` (üçüncül, pastel), `btn-ghost` (araç çubuğu: Filtrele, Sütunlar), `btn-outline-danger` (yıkıcı), `btn-sm` |
 | IconButton | Stil | `<button class="icon-button" aria-label="…">` + `AppIcon` |
 | Badge / StatusBadge | Stil + Var | `badge` + `stage-*`, `status-*`, `user-*` tonları; `TenantStateBadge`, `UserStatusBadge` |
 | Card / SectionCard | Var | `Components/FormSection.razor` — ikon başlıklı bölüm kartı (`Title`, `Icon`, `Description`, `Actions`, `Class`); form ve detay bölümleri bununla kurulur. Eski stiller: `record-form`, `detail-section`, `detail-grid`, `chart-card`, `tile` |

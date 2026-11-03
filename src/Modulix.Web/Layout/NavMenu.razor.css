@@ -43,7 +43,7 @@
     }
 
 .nav-item ::deep a.active {
-    background-color: var(--mx-surface-muted);
+    background: var(--mx-nav-active-bg);
     color: var(--mx-tone-brand-fg); /* açık zeminde AA kontrast */
     font-weight: 600;
 }
