@@ -263,7 +263,7 @@
     [
         new("form-genel", "Genel", Errors: ErrorCount("name")),
         new("form-izin", "İzinler", Errors: ErrorCount("permissions")),
-        new("form-kapsam", "Kapsam ve düzey", Errors: ErrorCount("scope", "assignLevel")),
+        new("form-kapsam", "Kapsam ve düzey", Errors: ErrorCount("scope", "assignLevel", "hideOutOfScopeShared")),
     ];
 
     private bool IsNew => RoleId is null;
