@@ -29,6 +29,8 @@ public enum AppTone
 /// <param name="AnyPermission">Bunlardan en az biri gerekir.</param>
 /// <param name="PlatformOnly">Yalnızca platform yöneticisi görür.</param>
 /// <param name="ExactMatch">Aktif sayfa yalnızca route tam eşleşince bu uygulamadır (genel bakış ekranları).</param>
+/// <param name="Tone">Panel ikonunun rengi.</param>
+/// <param name="Group">Ana uygulamanın panelde altında listelendiği başlık (<see cref="AppCatalog.Groups"/>); alt uygulamada <c>null</c>.</param>
 public sealed record AppDefinition(
     string Id,
     string? ParentId,
@@ -41,7 +43,17 @@ public sealed record AppDefinition(
     IReadOnlyList<string>? AnyPermission = null,
     bool PlatformOnly = false,
     bool ExactMatch = false,
-    AppTone Tone = AppTone.Indigo);
+    AppTone Tone = AppTone.Indigo,
+    string? Group = null);
+
+/// <summary>
+/// Panelde ana uygulamaları bir araya getiren başlık. Yalnızca görsel kümelemedir: modül sahipliğini, izinleri ve
+/// route'ları etkilemez; hiçbir uygulaması görünmeyen grup panelde çıkmaz.
+/// </summary>
+/// <param name="Id">Benzersiz grup kimliği.</param>
+/// <param name="Name">Kullanıcıya görünen başlık.</param>
+/// <param name="Order">Gruplar arası sıralama.</param>
+public sealed record AppGroup(string Id, string Name, int Order);
 
 /// <summary>
 /// Projedeki gerçek modül ve ekranların tanımı. Yeni modül ya da ekran eklemek bu listeye satır eklemektir; panel ve
@@ -58,9 +70,20 @@ public static class AppCatalog
     public const string Admin = "admin";
     public const string Platform = "platform";
 
+    public const string SalesGroup = "sales";
+    public const string ServiceGroup = "service";
+    public const string ManagementGroup = "management";
+
+    public static IReadOnlyList<AppGroup> Groups { get; } =
+    [
+        new(SalesGroup, "Satış ve müşteri", 10),
+        new(ServiceGroup, "Müşteri hizmetleri", 20),
+        new(ManagementGroup, "Yönetim", 30),
+    ];
+
     public static IReadOnlyList<AppDefinition> All { get; } =
     [
-        new(Crm, null, "CRM", "users", null, 10, ModuleKey: CrmAccess.ModuleKey),
+        new(Crm, null, "CRM", "users", null, 10, ModuleKey: CrmAccess.ModuleKey, Group: SalesGroup),
         new("crm.leads", Crm, "Lead'ler", "inbox", "crm/leadler", 5, CrmAccess.ModuleKey, CrmAccess.LeadsRead),
         new("crm.companies", Crm, "Firmalar", "building", "crm/firmalar", 10, CrmAccess.ModuleKey, CrmAccess.CompaniesRead),
         new("crm.contacts", Crm, "Kişiler", "user", "crm/kisiler", 20, CrmAccess.ModuleKey, CrmAccess.ContactsRead, Tone: AppTone.Teal),
@@ -81,7 +104,7 @@ public static class AppCatalog
         new("crm.sales-targets", Crm, "Satış hedefleri", "target", "crm/satis-hedefleri", 42, CrmAccess.ModuleKey, SalesAccess.TargetsRead, Tone: AppTone.Teal),
         new("crm.sales-forecasts", Crm, "Satış tahmini", "trending-up", "crm/satis-tahmini", 43, CrmAccess.ModuleKey, SalesAccess.ForecastsRead),
 
-        new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal),
+        new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal, Group: SalesGroup),
         new("contracts.dashboard", Contracts, "Pano", "dashboard", "sozlesmeler/ozet", 5, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, ExactMatch: true),
         new("contracts.list", Contracts, "Sözleşmeler", "file-text", "sozlesmeler", 10, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
         new("contracts.templates", Contracts, "Şablonlar", "layers", "sozlesmeler/sablonlar", 20, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
@@ -92,12 +115,12 @@ public static class AppCatalog
         new("contracts.settings", Contracts, "Sözleşme ayarları", "wrench", "yonetim/ayarlar?grup=S%C3%B6zle%C5%9Fmeler", 90, ContractsAccess.ModuleKey, CoreAccess.ManageSettings),
         new("contracts.approval-rules", Contracts, "Onay kuralları", "shield", "sozlesmeler/onay-kurallari", 40, ContractsAccess.ModuleKey, ContractsAccess.ApprovalsManage),
 
-        new(Orders, null, "Siparişler", "package", null, 25, ModuleKey: OrdersAccess.ModuleKey),
+        new(Orders, null, "Siparişler", "package", null, 25, ModuleKey: OrdersAccess.ModuleKey, Group: SalesGroup),
         new("orders.dashboard", Orders, "Pano", "dashboard", "siparisler/ozet", 5, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, ExactMatch: true),
         new("orders.list", Orders, "Siparişler", "package", "siparisler", 10, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead),
         new("orders.jobs", Orders, "Operasyon işleri", "clipboard-list", "siparisler/isler", 20, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, Tone: AppTone.Teal),
 
-        new(Support, null, "Destek", "message-square", null, 27, ModuleKey: SupportAccess.ModuleKey, Tone: AppTone.Teal),
+        new(Support, null, "Destek", "message-square", null, 27, ModuleKey: SupportAccess.ModuleKey, Tone: AppTone.Teal, Group: ServiceGroup),
         new("support.tickets", Support, "Talepler", "inbox", "destek/talepler", 10, SupportAccess.ModuleKey, SupportAccess.TicketsRead, ExactMatch: true),
         new("support.new", Support, "Yeni talep", "clipboard-list", "destek/talepler/yeni", 20, SupportAccess.ModuleKey, SupportAccess.TicketsCreate, ExactMatch: true),
         new("support.settings", Support, "Kuyruklar ve kategoriler", "wrench", "destek/ayarlar", 90, SupportAccess.ModuleKey, SupportAccess.SettingsManage),
@@ -106,12 +129,12 @@ public static class AppCatalog
         new("support.reports", Support, "Raporlar", "list", "destek/raporlar", 92, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
         new("support.complaints", Support, "Şikâyet inceleme", "shield", "destek/sikayetler", 93, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
 
-        new(Marketing, null, "Pazarlama", "trending-up", null, 28, ModuleKey: MarketingAccess.ModuleKey),
+        new(Marketing, null, "Pazarlama", "trending-up", null, 28, ModuleKey: MarketingAccess.ModuleKey, Group: SalesGroup),
         new("marketing.segments", Marketing, "Segmentler", "list", "pazarlama/segmentler", 10, MarketingAccess.ModuleKey, MarketingAccess.SegmentsRead),
         new("marketing.campaigns", Marketing, "Kampanyalar", "target", "pazarlama/kampanyalar", 20, MarketingAccess.ModuleKey, MarketingAccess.CampaignsRead, Tone: AppTone.Teal),
         new("marketing.report", Marketing, "Kampanya raporu", "dashboard", "pazarlama/rapor", 30, MarketingAccess.ModuleKey, MarketingAccess.ReportsRead),
 
-        new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal),
+        new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal, Group: ManagementGroup),
         new("admin.home", Admin, "Genel bakış", "dashboard", "yonetim", 10, AnyPermission: CoreAccess.AdministrationPermissions, ExactMatch: true),
         new("admin.users", Admin, "Kullanıcılar", "user-check", "yonetim/kullanicilar", 20, Permission: CoreAccess.ManageUsers, Tone: AppTone.Teal),
         new("admin.teams", Admin, "Ekipler", "users", "yonetim/ekipler", 30, Permission: CoreAccess.ManageUsers),
@@ -125,7 +148,7 @@ public static class AppCatalog
         new("admin.sector-profile", Admin, "Sektör profili", "layers", "yonetim/sektor-profili", 100, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
         new("admin.form-designer", Admin, "Form tasarımı", "clipboard-list", "yonetim/form-tasarimi", 85, Permission: CoreAccess.ManageCustomization),
 
-        new(Platform, null, "Platform", "shield", null, 100, PlatformOnly: true),
+        new(Platform, null, "Platform", "shield", null, 100, PlatformOnly: true, Group: ManagementGroup),
         new("platform.home", Platform, "Genel bakış", "dashboard", "platform", 10, PlatformOnly: true, ExactMatch: true),
         new("platform.tenants", Platform, "Firmalar", "building", "platform/firmalar", 20, PlatformOnly: true, Tone: AppTone.Teal),
         new("platform.modules", Platform, "Modül hakları", "toggle", "platform/moduller", 30, PlatformOnly: true),

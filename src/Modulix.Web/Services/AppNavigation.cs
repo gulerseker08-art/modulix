@@ -1,5 +1,8 @@
 namespace Modulix.Web.Services;
 
+/// <summary>Panelde bir başlık altındaki ana uygulamalar; <paramref name="Group"/> boşsa başlıksız kümedir.</summary>
+public sealed record AppRootGroup(AppGroup? Group, IReadOnlyList<AppDefinition> Apps);
+
 /// <summary>
 /// <see cref="AppCatalog"/> tanımlarını oturuma göre süzer: tenant'ın açık modülü, platform yöneticiliği ve kullanıcının
 /// izinleri birlikte değerlendirilir. Sonuç önbelleğe alınmaz; tenant değişince oturum yeniden okunur ve liste
@@ -42,6 +45,32 @@ public sealed class AppNavigation(SessionState session)
             .Where(a => a.ParentId is null && IsVisible(a) && (a.Route is not null || Children(a.Id).Count > 0))
             .OrderBy(a => a.Order)
             .ToList();
+
+    /// <summary>
+    /// Görünür ana uygulamalar, grup sırasına göre kümelenmiş. Hiç uygulaması görünmeyen grup yer almaz; grubu
+    /// tanımsız uygulamalar sonda başlıksız (<c>Group == null</c>) kümede toplanır.
+    /// </summary>
+    public IReadOnlyList<AppRootGroup> GroupedRoots()
+    {
+        IReadOnlyList<AppDefinition> roots = Roots();
+        List<AppRootGroup> result = [];
+        foreach (AppGroup group in AppCatalog.Groups.OrderBy(g => g.Order))
+        {
+            List<AppDefinition> apps = roots.Where(a => a.Group == group.Id).ToList();
+            if (apps.Count > 0)
+            {
+                result.Add(new AppRootGroup(group, apps));
+            }
+        }
+
+        List<AppDefinition> ungrouped = roots.Where(a => AppCatalog.Groups.All(g => g.Id != a.Group)).ToList();
+        if (ungrouped.Count > 0)
+        {
+            result.Add(new AppRootGroup(null, ungrouped));
+        }
+
+        return result;
+    }
 
     public AppDefinition? Find(string id) => AppCatalog.All.FirstOrDefault(a => a.Id == id);
 
