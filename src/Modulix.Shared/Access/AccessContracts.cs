@@ -196,6 +196,11 @@ public static class CoreAccess
     public const string ReadAutomationLogs = "core.automation-logs.read";
     public const string ApproveAutomation = "core.automation.approve";
 
+    // Rapor merkezi (ADR-0026): yönetim değil, kullanıcı özelliğidir; bu izinler "Yönetim" bölümünü açmaz (AdministrationPermissions dışında).
+    public const string ReadReports = "core.reports.read";
+    public const string ManageReports = "core.reports.manage";
+    public const string ShareReports = "core.reports.share";
+
     /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
         [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication,
