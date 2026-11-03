@@ -8,7 +8,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
     <div class="form-toolbar">
         <div>
-            <h2>@(Lead is null ? "Yeni Lead" : "Lead kartı")</h2>
+            <h2>@(Lead is null ? "Yeni müşteri adayı" : "Müşteri adayı kartı")</h2>
             @if (Lead is not null)
             {
                 <p>@Lead.LeadNumber · @Lead.Subject</p>
@@ -35,7 +35,7 @@
         <div class="alert alert-danger" role="alert">@layoutError</div>
     }
 
-    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Lead formu bölümleri">
+    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Müşteri adayı formu bölümleri">
         <Field Context="f">
             @switch (f.Key)
             {

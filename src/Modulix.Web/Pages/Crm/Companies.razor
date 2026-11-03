@@ -6,12 +6,7 @@
 <PageTitle>Firmalar · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.CompaniesRead">
-    <PageHeader Title="Firmalar" Icon="building" Subtitle="Müşteri, aday ve iş ortağı firmalarınızı yönetin.">
-        @if (Session.Can(CrmAccess.CompaniesWrite) && !editing)
-        {
-            <button type="button" class="btn btn-primary" @onclick="New"><span aria-hidden="true">+</span> Yeni firma</button>
-        }
-    </PageHeader>
+    <PageHeader Title="Firmalar" Icon="building" Subtitle="@(page is null ? "Müşteri, aday ve iş ortağı firmalarınızı yönetin." : $"{page.TotalCount} kayıt")" />
 
     @if (message is not null)
     {
@@ -23,19 +18,18 @@
         <CompanyEditor Company="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
     }
 
-    <div class="filters" role="group" aria-label="Durum">
-        <button type="button" class="chip @(status is null && !mine ? "active" : null)" @onclick="() => FilterAsync(null, false)">Tümü</button>
-        <button type="button" class="chip @(mine ? "active" : null)" @onclick="() => FilterAsync(null, true)">Benim firmalarım</button>
-        @foreach (var value in Lookups.Choices(CrmLists.CompanyStatus, status))
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@CurrentView" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Firma ara" placeholder="Ad, vergi no, şehir veya etiket ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <ColumnPicker />
+        @if (Session.Can(CrmAccess.CompaniesWrite) && !editing)
         {
-            <button type="button" class="chip @(status == value.Key ? "active" : null)" @onclick="() => FilterAsync(value.Key, false)">@value.Label</button>
+            <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> Yeni firma</button>
         }
     </div>
-
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Ad, vergi no, şehir veya etiket ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
 
     @if (page is null)
     {
@@ -99,10 +93,24 @@
         }
     }
 
-    private async Task FilterAsync(string? value, bool onlyMine)
+    private const string AllViews = "all";
+    private const string MineView = "mine";
+    private const string StatusPrefix = "status:";
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Benim firmalarım, durum); kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm firmalar"),
+        new(MineView, "Benim firmalarım"),
+        .. Lookups.Choices(CrmLists.CompanyStatus, status).Select(v => new ViewOption(StatusPrefix + v.Key, v.Label, "Duruma göre")),
+    ];
+
+    private string CurrentView => mine ? MineView : status is { } s ? StatusPrefix + s : AllViews;
+
+    private async Task ChooseViewAsync(string key)
     {
-        status = value;
-        mine = onlyMine;
+        mine = key == MineView;
+        status = key.StartsWith(StatusPrefix, StringComparison.Ordinal) ? key[StatusPrefix.Length..] : null;
         await LoadAsync(1);
     }
 

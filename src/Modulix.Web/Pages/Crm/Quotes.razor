@@ -11,10 +11,6 @@
         <h1>Teklifler</h1>
         <div class="header-actions">
             <a class="btn btn-outline-secondary" href="crm/teklif-raporu">Rapor</a>
-            @if (Session.Can(CrmAccess.QuotesWrite))
-            {
-                <a class="btn btn-primary" href="crm/teklifler/yeni">Yeni teklif</a>
-            }
         </div>
     </div>
 
@@ -38,11 +34,18 @@
         </select>
     </div>
 
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="quote-search">Teklif ara</label>
-        <input id="quote-search" class="form-control" type="search" placeholder="Başlık veya teklif no ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="quote-search">Teklif ara</label>
+            <input id="quote-search" class="form-control" type="search" placeholder="Başlık veya teklif no ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <ColumnPicker />
+        @if (Session.Can(CrmAccess.QuotesWrite))
+        {
+            <a class="btn btn-primary" href="crm/teklifler/yeni"><AppIcon Name="plus" Size="16" /> Yeni teklif</a>
+        }
+    </div>
 
     @if (page is null)
     {

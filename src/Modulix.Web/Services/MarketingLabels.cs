@@ -38,7 +38,7 @@ public static class MarketingLabels
 
     public static string ResponseStatus(string status) => status switch
     {
-        "New" => "Yeni", "InProgress" => "İşlemde", "Converted" => "Lead'e dönüştü", "Closed" => "Kapalı", _ => status,
+        "New" => "Yeni", "InProgress" => "İşlemde", "Converted" => "Müşteri adayına dönüştü", "Closed" => "Kapalı", _ => status,
     };
 
     public static string Operator(string key) => Operators.GetValueOrDefault(key, key);

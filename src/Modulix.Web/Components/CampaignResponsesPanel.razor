@@ -6,7 +6,7 @@
 <Notice Text="@message" Failed="@failed" />
 <div class="alert alert-info" role="note">
     Yanıtı siz kaydedersiniz; sağlayıcıdan otomatik yanıt gelmez. "İletişim istemiyorum" yanıtının çıkışı <strong>kendiliğinden uygulanmaz</strong>: yanıtı açıp "Çıkışı uygula" demeniz gerekir.
-    Ret, çıkış ve şikâyet yanıtları lead'e dönüşmez.
+    Ret, çıkış ve şikâyet yanıtları müşteri adayına dönüşmez.
 </div>
 
 <section aria-labelledby="resp-title">
@@ -27,7 +27,7 @@
                 <h3 class="h6">@MarketingLabels.ResponseKind(r.Kind) · @MarketingLabels.ResponseStatus(r.Status)</h3>
                 <p class="mb-1 small text-muted">
                     @CrmLabels.Time(r.ReceivedAt)
-                    @(r.LeadId is null ? null : " · lead açıldı")
+                    @(r.LeadId is null ? null : " · Müşteri adayı açıldı")
                     @(r.ActivityId is null ? null : " · aktivite açıldı")
                     @(r.OptOutAppliedAt is null ? null : " · çıkış uygulandı")
                     @(r.ClosedReason is null ? null : " · " + r.ClosedReason)
@@ -37,7 +37,7 @@
                 {
                     <div class="form-actions">
                         @if (r.Status == "New") { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "take")'>Üstlen</button> }
-                        @if (r.Status is "New" or "InProgress" && r.Kind is "Interested" or "Question" or "MeetingRequest") { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "convert-to-lead")'>Lead aç</button> }
+                        @if (r.Status is "New" or "InProgress" && r.Kind is "Interested" or "Question" or "MeetingRequest") { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "convert-to-lead")'>Müşteri adayı aç</button> }
                         @if (r.Status != "Closed" && r.ActivityId is null) { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "create-activity")'>Takip aktivitesi aç</button> }
                         @if (r.Status != "Closed" && r.Kind == "OptOut") { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "apply-opt-out")'>Çıkışı uygula</button> }
                         @if (r.Status != "Closed") { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => AskReason(r, "close")'>Kapat</button> }

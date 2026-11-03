@@ -45,7 +45,7 @@ public class RecordHandoverTests(ModulixApiFactory factory) : IClassFixture<Modu
 
         var owned = await client.GetFromJsonAsync<List<OwnedRecordsDto>>($"/api/users/{leaverMembership}/owned-records");
         Assert.Equal([2, 1, 1, 1], owned!.Select(o => o.Count));
-        Assert.Equal(["firma", "açık fırsat", "açık aktivite", "açık lead"], owned!.Select(o => o.Label));
+        Assert.Equal(["firma", "açık fırsat", "açık aktivite", "açık müşteri adayı"], owned!.Select(o => o.Label));
 
         var disabled = await client.PostAsJsonAsync($"/api/users/{leaverMembership}/disable", new DisableUserRequest(receiverMembership));
         Assert.Equal(HttpStatusCode.NoContent, disabled.StatusCode);

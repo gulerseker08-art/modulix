@@ -65,8 +65,8 @@ internal sealed class SalesAnalytics(
 
     public static IReadOnlyList<string> LeadDefinitions { get; } =
     [
-        "Kohort, alınma anı seçili dönemde olan lead'lerdir. Dönüşüm = kesime kadar fırsata dönüşen tekil lead (bir lead'den çok fırsat çıksa da bir kez).",
-        "İki oran: tüm kohorta göre ve uygun lead'lere göre (elenenler hariç). Elenen sayısı güncel durumdan gelir (eleme tarihi kesime göre ayrıştırılmaz).",
+        "Kohort, alınma anı seçili dönemde olan lead'lerdir. Dönüşüm = kesime kadar fırsata dönüşen tekil müşteri adayı (bir müşteri adayından çok fırsat çıksa da bir kez).",
+        "İki oran: tüm kohorta göre ve uygun müşteri adaylarına göre (elenenler hariç). Elenen sayısı güncel durumdan gelir (eleme tarihi kesime göre ayrıştırılmaz).",
         "Kohort, bitişinden sonra 30 gün geçmeden olgun sayılmaz; olgunlaşmamış kohortun oranı yanıltıcı olabilir.",
     ];
 

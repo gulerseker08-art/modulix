@@ -52,7 +52,7 @@ internal static class LeadIntakeEndpoints
         var group = app.MapGroup("/api/public/lead-forms/{tenant}/{formKey}")
             .AllowAnonymous()
             .RequireRateLimiting(RateLimitPolicy)
-            .WithTags("Lead formu (herkese açık)");
+            .WithTags("Müşteri adayı formu (herkese açık)");
         group.MapPost("", SubmitAsync);
         group.MapMethods("", ["OPTIONS"], PreflightAsync);
 

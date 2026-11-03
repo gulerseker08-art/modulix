@@ -30,37 +30,42 @@
             <input id="contract-search" class="form-control" type="search" placeholder="Başlık veya sözleşme no ara" @bind="search" />
             <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
         @if (Session.Can(ContractsAccess.ContractsWrite))
         {
             <a class="btn btn-primary" href="sozlesmeler/sihirbaz"><AppIcon Name="plus" Size="16" /> Yeni sözleşme</a>
         }
     </div>
 
-    <div class="filters">
-        <label class="visually-hidden" for="effective-filter">Yürürlük durumu</label>
-        <select id="effective-filter" class="form-select form-select-sm filter-select" @bind="effective" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm yürürlük durumları</option>
-            @foreach (var s in ContractLabels.Effectives)
-            {
-                <option value="@s.Key">@s.Label</option>
-            }
-        </select>
-        <label class="visually-hidden" for="type-filter">Tür</label>
-        <select id="type-filter" class="form-select form-select-sm filter-select" @bind="type" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm türler</option>
-            @foreach (var t in Lookups.Choices(ContractsAccess.ContractTypeList))
-            {
-                <option value="@t.Key">@t.Label</option>
-            }
-        </select>
-        <label class="visually-hidden" for="sort-select">Sıralama</label>
-        <select id="sort-select" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
-            @foreach (var (key, label) in ViewLabels.Sorts)
-            {
-                <option value="@key">Sıralama: @label</option>
-            }
-        </select>
-    </div>
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="effective-filter">Yürürlük durumu</label>
+            <select id="effective-filter" class="form-select form-select-sm filter-select" @bind="effective" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm yürürlük durumları</option>
+                @foreach (var s in ContractLabels.Effectives)
+                {
+                    <option value="@s.Key">@s.Label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="type-filter">Tür</label>
+            <select id="type-filter" class="form-select form-select-sm filter-select" @bind="type" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm türler</option>
+                @foreach (var t in Lookups.Choices(ContractsAccess.ContractTypeList))
+                {
+                    <option value="@t.Key">@t.Label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="sort-select">Sıralama</label>
+            <select id="sort-select" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
+                @foreach (var (key, label) in ViewLabels.Sorts)
+                {
+                    <option value="@key">Sıralama: @label</option>
+                }
+            </select>
+        </div>
+    }
 
     @if (approval is not null || preparation is not null)
     {
@@ -148,6 +153,11 @@
 </AuthGate>
 
 @code {
+    private bool filtersOpen;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
+    private int ActiveFilters => (string.IsNullOrEmpty(effective) ? 0 : 1) + (string.IsNullOrEmpty(type) ? 0 : 1);
+
     private const string DefaultSort = "-createdAt";
 
     private PagedResult<ContractDto>? page;

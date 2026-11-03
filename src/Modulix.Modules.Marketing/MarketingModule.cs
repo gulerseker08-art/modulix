@@ -104,7 +104,7 @@ public sealed class MarketingModule : IModule
         new(Permissions.CampaignsApprove, "Çalıştırmayı onaylar ya da reddeder (hazırlayan kendi çalıştırmasını onaylayamaz)", "Kampanyalar"),
         new(Permissions.CampaignsSend, "Onaylı çalıştırmayı başlatır, işler, duraklatır, sürdürür ve iptal eder", "Kampanyalar"),
         new(Permissions.ResponsesRead, "Kampanya yanıtlarını görüntüler", "Yanıtlar"),
-        new(Permissions.ResponsesWrite, "Yanıt kaydeder, üstlenir, kapatır; yanıttan lead ve aktivite açar; çıkış yanıtını uygular", "Yanıtlar"),
+        new(Permissions.ResponsesWrite, "Yanıt kaydeder, üstlenir, kapatır; yanıttan müşteri adayı ve aktivite açar; çıkış yanıtını uygular", "Yanıtlar"),
         new(Permissions.ReportsRead, "Kampanya raporunu ve firma/kişi pazarlama geçmişini görüntüler", "Raporlar"),
     ];
 
@@ -264,7 +264,7 @@ public sealed class MarketingModule : IModule
                     ["Interested"] = "İlgilendi", ["Question"] = "Soru", ["MeetingRequest"] = "Görüşme talebi", ["NotInterested"] = "İlgilenmiyor", ["OptOut"] = "İletişim istemiyor",
                     ["Complaint"] = "Şikâyet", ["Other"] = "Diğer",
                 },
-                ["status"] = new Dictionary<string, string> { ["New"] = "Yeni", ["InProgress"] = "İşlemde", ["Converted"] = "Lead'e dönüştü", ["Closed"] = "Kapalı" },
+                ["status"] = new Dictionary<string, string> { ["New"] = "Yeni", ["InProgress"] = "İşlemde", ["Converted"] = "Müşteri adayına dönüştü", ["Closed"] = "Kapalı" },
             },
         },
     ];
