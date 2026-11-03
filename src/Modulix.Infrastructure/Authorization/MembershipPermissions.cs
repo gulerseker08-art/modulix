@@ -94,6 +94,40 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
             .SingleOrDefaultAsync(cancellationToken);
 
     /// <summary>
+    /// Kişinin görebildiği ve yönetebildiği departmanlar (ADR-0026): null tüm departmanlardır (tüm kayıtlar kapsamı). Aksi halde
+    /// kendi departmanı; "departman ve altı" kapsamı varsa altındaki departmanlar da. Başka bayilerin departman adları, üyeleri ve
+    /// rolleri bu kümenin dışında kalır; departman uçları, kullanıcı listesindeki departman adı ve davet bu kümeye bakar.
+    /// Departmanı olmayan (bozuk veri) üye hiçbir departmanı göremez. Üyeliği olmayan bağlam (platform yöneticisinin işlemi,
+    /// sistem, iç çağrılar) bir üyelik değildir ve kısıtlanmaz: gerçek bir istekte işlemi yapan her zaman sunucuca doğrulanmış
+    /// bir üyeliktir, üyeliği olmayan kimse bu uçlara izinle erişemez.
+    /// </summary>
+    public async Task<IReadOnlySet<Guid>?> GetVisibleUnitIdsAsync(Guid membershipId, CancellationToken cancellationToken)
+    {
+        if (membershipId == Guid.Empty || !await db.Memberships.AsNoTracking().AnyAsync(m => m.Id == membershipId, cancellationToken))
+        {
+            return null;
+        }
+
+        var scopes = await GetScopesAsync(membershipId, cancellationToken);
+        if (scopes.Contains(RecordScope.All))
+        {
+            return null;
+        }
+
+        var visible = new HashSet<Guid>();
+        if (await GetUnitAsync(membershipId, cancellationToken) is { } unit)
+        {
+            visible.Add(unit.Id);
+            if (scopes.Contains(RecordScope.UnitAndBelow))
+            {
+                visible.UnionWith(await GetUnitTreeIdsAsync(unit.Path, cancellationToken));
+            }
+        }
+
+        return visible;
+    }
+
+    /// <summary>
     /// Departman ve altı kapsamı için: verilen departmanın kendisi ve altındaki departmanların kimlikleri (kimlik yolu
     /// önekiyle). Kök departmanda tüm departmanlardır.
     /// </summary>
