@@ -116,4 +116,10 @@ Kayıt sayfalarında bölümler `TabBar` + `TabState` ile sekmelere ayrılır (F
 - Sekme ilk seçildiğinde çizilir ve verisini o an yükler; başka sekmeye geçince DOM'da gizli kalır. Böylece açık bir düzenleme formu sekme değiştirince kaybolmaz.
 - Etkin sekme birincil renk alt çizgi ve koyu metinle gösterilir; sayı rozeti sunucudaki toplamdır.
 - Telefonda sekme çubuğu yatay kayar.
+### Her kayıt formu sekmelidir (seçenek 4 kararı, 3.11.2026)
+
+- **Metadata'dan çizilen formlar** (`LayoutForm`: Firma, Kişi, Lead, Fırsat, Aktivite, Sözleşme): tek sekme olsa bile `TabBar` çizilir. Modül varsayılan düzenleri (`CrmForms`, `ContractsForms`) çok sekmelidir; ilk sekme `genel`, zorunlu kimlik alanları ilk sekmededir (birim testle denetlenir: `CrmFormDefaultsTests`, `ContractFormDefaultsTests`). Yeni modül formu tanımlarken bölümleri sekmelere dağıt (`FormSectionDefinition.Tab`); `finans` gibi anahtarları firmaların ekleyeceği sekmelere bırak. Firması düzenini daha önce kaydetmişse kendi sekmeleri geçerlidir (tek sekmeli düzen tek sekmeli çubukla çizilir); "Varsayılana dön" yeni varsayılanı getirir.
+- **Metadata dışı kayıt formları** (ör. Yeni talep, Yeni kampanya, Yeni segment): `TabBar` + `TabState` + her sekme için `TabPanel` ve `fieldset` içinde panel; sekme anahtarları `form-` önekli. Sekmelerin `TabItem.Errors` değeri sunucunun döndürdüğü hatalı alanlardan hesaplanır; kayıt denemesinden sonra `tabs.RevealFirstFailing(...)` hatalı ilk sekmeyi açar. Hata renk dışında "!" rozeti ve gizli metinle de belirtilir.
+- Sekmeler arası geçişte girilen veri korunur (paneller gizlenir, silinmez). Zorunlu alanlar ilk sekmede durur.
+- Kapsam: kayıt oluşturma/düzenleme formları. Ayar ekranları ve sayfa içi küçük eylem formları (yorum ekle, görünüm adı, durum değiştir gibi) sekmesizdir.
 - Durum geçişleri gibi sayfa içi küçük seçimler için `filters` + `chip` (`aria-pressed`) kullanılmaya devam eder.

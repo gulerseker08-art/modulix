@@ -12,16 +12,17 @@ public static class CrmForms
     private const string General = FormDefinition.DefaultTab;
     private const string Extras = FormDefinition.ExtrasSection;
 
-    private static readonly FormTabDefinition[] GeneralOnly = [new(General, "Genel bilgiler")];
-
+    // Her kayıt formu sekmelidir (arayüz kuralı, CLAUDE.md → Arayüz tasarım kuralları): bölümler anlamlı sekmelere dağıtılır.
+    // Sekme anahtarları firmanın düzeninde saklanır; "finans" gibi anahtarlar firmaların eklediği sekmelere bırakılmıştır.
     public static IReadOnlyList<FormDefinition> All { get; } =
     [
-        new(CrmModule.Entities.Company, "Firma", GeneralOnly,
+        new(CrmModule.Entities.Company, "Firma",
+        [new(General, "Genel bilgiler"), new("iletisim", "İletişim"), new("notlar", "Notlar ve ek bilgiler")],
         [
             new("temel", "Temel bilgiler", "building"),
-            new("iletisim", "Genel iletişim bilgileri", "phone"),
-            new("notlar", "Notlar", "message-square"),
-            new(Extras, "Ek bilgiler", "square-pen"),
+            new("iletisim", "Genel iletişim bilgileri", "phone", Tab: "iletisim"),
+            new("notlar", "Notlar", "message-square", Tab: "notlar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
             new("name", "Firma adı", "temel", 6, Required: true, Fixed: true),
@@ -41,12 +42,13 @@ public static class CrmForms
             new("notes", "Notlar", "notlar", 12),
         ]),
 
-        new(CrmModule.Entities.Contact, "Kişi", GeneralOnly,
+        new(CrmModule.Entities.Contact, "Kişi",
+        [new(General, "Kişi bilgileri"), new("iletisim", "İletişim"), new("notlar", "Notlar ve ek bilgiler")],
         [
             new("kisi", "Kişi bilgileri", "user"),
-            new("iletisim", "İletişim", "phone"),
-            new("notlar", "Notlar", "message-square"),
-            new(Extras, "Ek bilgiler", "square-pen"),
+            new("iletisim", "İletişim", "phone", Tab: "iletisim"),
+            new("notlar", "Notlar", "message-square", Tab: "notlar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
             new("firstName", "Ad", "kisi", 6, Required: true, Fixed: true),
@@ -59,13 +61,14 @@ public static class CrmForms
             new("notes", "Notlar", "notlar", 12),
         ]),
 
-        new(CrmModule.Entities.Opportunity, "Fırsat", GeneralOnly,
+        new(CrmModule.Entities.Opportunity, "Fırsat",
+        [new(General, "Genel bilgiler"), new("tutar", "Tutar ve zamanlama"), new("detay", "Detaylar"), new("notlar", "Notlar ve ek bilgiler")],
         [
             new("temel", "Temel bilgiler", "target"),
-            new("tutar", "Tutar ve zamanlama", "coins"),
-            new("detay", "Detaylar", "clipboard-list"),
-            new("aciklama", "Açıklama ve notlar", "message-square"),
-            new(Extras, "Ek bilgiler", "square-pen"),
+            new("tutar", "Tutar ve zamanlama", "coins", Tab: "tutar"),
+            new("detay", "Detaylar", "clipboard-list", Tab: "detay"),
+            new("aciklama", "Açıklama ve notlar", "message-square", Tab: "notlar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
             new("title", "Fırsat adı", "temel", 12, Required: true, Fixed: true),
@@ -96,14 +99,15 @@ public static class CrmForms
             new("notes", "Notlar", "aciklama", 12),
         ]),
 
-        new(CrmModule.Entities.Lead, "Lead", GeneralOnly,
+        new(CrmModule.Entities.Lead, "Lead",
+        [new(General, "Talep ve sahip"), new("eslestirme", "Eşleştirme ve bütçe"), new("ihtiyac", "İhtiyaç ve ek bilgiler")],
         [
             new("talep", "Talep", "inbox"),
             new("sahip", "Talep sahibi", "user"),
-            new("eslestirme", "Eşleştirme ve sahiplik", "user-check"),
-            new("butce", "Bütçe ve zamanlama", "coins"),
-            new("ihtiyac", "İhtiyaç ve açıklama", "message-square"),
-            new(Extras, "Ek bilgiler", "square-pen"),
+            new("eslestirme", "Eşleştirme ve sahiplik", "user-check", Tab: "eslestirme"),
+            new("butce", "Bütçe ve zamanlama", "coins", Tab: "eslestirme"),
+            new("ihtiyac", "İhtiyaç ve açıklama", "message-square", Tab: "ihtiyac"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ihtiyac"),
         ],
         [
             new("subject", "Konu", "talep", 12, Required: true, Fixed: true),
@@ -131,13 +135,14 @@ public static class CrmForms
             new("description", "Açıklama / talep metni", "ihtiyac", 12),
         ]),
 
-        new(CrmModule.Entities.Activity, "Aktivite", GeneralOnly,
+        new(CrmModule.Entities.Activity, "Aktivite",
+        [new(General, "Aktivite ve zaman"), new("iliskili", "İlişkili kayıtlar"), new("yer", "Yer ve ayrıntılar")],
         [
             new("aktivite", "Aktivite", "activity"),
             new("zaman", "Zaman", "calendar"),
-            new("iliskili", "İlişkili kayıtlar", "users"),
-            new("yer", "Yer ve ayrıntılar", "map-pin"),
-            new(Extras, "Ek bilgiler", "square-pen"),
+            new("iliskili", "İlişkili kayıtlar", "users", Tab: "iliskili"),
+            new("yer", "Yer ve ayrıntılar", "map-pin", Tab: "yer"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "yer"),
         ],
         [
             new("subject", "Konu", "aktivite", 12, Required: true, Fixed: true),

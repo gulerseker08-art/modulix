@@ -1,0 +1,13 @@
+@* Sekme paneli (TabBar ile eşleşir): id="tabpanel-{Key}", aria-labelledby="tab-{Key}". Etkin olmayan panel gizlenir ama DOM'da kalır,
+   böylece içindeki kaydedilmemiş girdi sekme değişince kaybolmaz (docs/design-system/form-standards.md → Sekmeler). *@
+<div role="tabpanel" id="tabpanel-@Key" aria-labelledby="tab-@Key" class="record-tabpanel" hidden="@State.Hidden(Key)">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TabState State { get; set; } = default!;
+
+    [Parameter, EditorRequired] public string Key { get; set; } = string.Empty;
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

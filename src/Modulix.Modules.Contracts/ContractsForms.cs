@@ -14,13 +14,14 @@ public static class ContractsForms
 
     public static IReadOnlyList<FormDefinition> All { get; } =
     [
-        new(ContractsModule.Entities.Contract, "Sözleşme", [new(General, "Genel bilgiler")],
+        new(ContractsModule.Entities.Contract, "Sözleşme",
+        [new(General, "Genel ve ticari bilgiler"), new("sure", "Süre ve yenileme"), new("aciklama", "Açıklama ve ek bilgiler")],
         [
             new("temel", "Temel bilgiler", "file-text"),
-            new("sure", "Süre, yenileme ve bildirim", "calendar"),
+            new("sure", "Süre, yenileme ve bildirim", "calendar", Tab: "sure"),
             new("ticari", "Ticari koşullar", "coins"),
-            new("aciklama", "Açıklama ve koşullar", "message-square"),
-            new(Extras, "Ek bilgiler", "square-pen"),
+            new("aciklama", "Açıklama ve koşullar", "message-square", Tab: "aciklama"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "aciklama"),
         ],
         [
             new("title", "Başlık", "temel", 12, Required: true, Fixed: true),

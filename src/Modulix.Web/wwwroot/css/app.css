@@ -4016,6 +4016,18 @@ button.pipeline-label {
     font-weight: 700;
 }
 
+/* Hatalı alan içeren sekme: kırmızı rozet + "!" (renk dışında işaret ve ekran okuyucu metni de taşır). */
+.record-tab-count.record-tab-invalid {
+    background: var(--mx-tone-danger-bg);
+    color: var(--mx-tone-danger-fg);
+    font-weight: 700;
+}
+
+.record-tab.active .record-tab-count.record-tab-invalid {
+    background: var(--mx-tone-danger-bg);
+    color: var(--mx-tone-danger-fg);
+}
+
 .record-tabpanel[hidden] {
     display: none;
 }
