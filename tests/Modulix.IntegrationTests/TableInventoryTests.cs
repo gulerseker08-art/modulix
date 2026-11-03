@@ -29,6 +29,10 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["platform.EmailMessages"] = "TenantId (boş olabilir): e-posta kuyruğu merkezidir; giriş anındaki e-postaları da taşır.",
         ["platform.OutboxMessages"] = "TenantId: olay kuyruğu; dağıtım tenant bağlamını açıkça kurar (ADR-0007).",
         ["platform.EventDeliveries"] = "TenantId: aynı gerekçe; payload içermez (ADR-0007).",
+        ["platform.ActivityNodes"] = "Sektör/faaliyet kataloğu (ADR-0029): ürün standardı, TenantId yok; platform yöneticisi yönetir.",
+        ["platform.Capabilities"] = "Yetenek kataloğu (ADR-0029): TenantId yok.",
+        ["platform.CapabilityDependencies"] = "Yetenek bağımlılık grafiği (ADR-0029): TenantId yok.",
+        ["platform.ActivityNodeCapabilities"] = "Faaliyet–yetenek eşlemesi (ADR-0029): TenantId yok.",
     };
 
     [Fact]
