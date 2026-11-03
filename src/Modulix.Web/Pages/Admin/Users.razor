@@ -27,7 +27,7 @@
     }
 
     <div class="list-toolbar">
-        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status?.ToString() ?? "all")" ValueChanged="s => FilterAsync(s == "all" ? null : Enum.Parse<UserStatus>(s))" />
+        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status?.ToString() ?? "all")" ValueChanged="ChooseStatusAsync" />
         <ColumnPicker />
         @if (!inviting)
         {
@@ -127,6 +127,8 @@
 
     private IReadOnlyList<ViewOption> StatusOptions =>
         [new("all", "Tüm kullanıcılar"), .. Enum.GetValues<UserStatus>().Select(v => new ViewOption(v.ToString(), UserLabels.Of(v)))];
+
+    private Task ChooseStatusAsync(string key) => FilterAsync(key == "all" ? null : Enum.Parse<UserStatus>(key));
 
     private async Task FilterAsync(UserStatus? value)
     {

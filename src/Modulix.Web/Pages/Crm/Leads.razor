@@ -112,7 +112,7 @@
                     <tr>
                         <td data-label="No"><a href="crm/leadler/@lead.Id">@lead.LeadNumber</a></td>
                         <td data-label="Konu" class="primary">@lead.Subject</td>
-                        <td data-label="Talep sahibi">@Requester(Müşteri adayı)</td>
+                        <td data-label="Talep sahibi">@Requester(lead)</td>
                         <td data-label="Durum"><span class="badge stage-@lead.Status.ToLowerInvariant()">@LeadStatus.Label(lead.Status)</span></td>
                         <td data-label="Öncelik">@LeadPriority.Label(lead.Priority)</td>
                         <td data-label="Kaynak">@Lookups.Label(CrmLeadLists.Source, lead.Source)</td>

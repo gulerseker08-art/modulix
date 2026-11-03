@@ -154,7 +154,7 @@ internal sealed class LeadConversion(
             var already = Text(lead, "status") == LeadStatus.Converted;
             return RecordResult<LeadConversionResult>.Fail(
                 already ? RecordErrorCode.Conflict : RecordErrorCode.ValidationFailed,
-                already ? $"{blocked} Fırsat: {Text(Müşteri adayı, "convertedOpportunityId")}" : blocked,
+                already ? $"{blocked} Fırsat: {Text(lead, "convertedOpportunityId")}" : blocked,
                 [new RecordFieldError("status", blocked)]);
         }
 
