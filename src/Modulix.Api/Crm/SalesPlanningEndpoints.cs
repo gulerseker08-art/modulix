@@ -30,6 +30,18 @@ internal static class SalesPlanningEndpoints
         sales.MapGet("/overview", OverviewAsync).RequirePermission(CrmModule.Permissions.SalesReportsRead);
         sales.MapGet("/overview/cards/{card}", CardAsync).RequirePermission(CrmModule.Permissions.SalesReportsRead);
 
+        var analytics = sales.MapGroup("/analytics");
+        analytics.MapGet("/quotes", (string? kind, DateOnly? date, DateOnly? asOf, Guid? ownerId, string? currency, ISalesAnalytics analysis, CancellationToken ct) =>
+            AnalyzeAsync<QuoteCohortResult, AnalyticsDto<QuoteCohortDto>>(kind, date, asOf, ownerId, currency, analysis.QuoteCohortAsync, ct)).RequirePermission(CrmModule.Permissions.SalesReportsRead);
+        analytics.MapGet("/leads", (string? kind, DateOnly? date, DateOnly? asOf, Guid? ownerId, string? currency, ISalesAnalytics analysis, CancellationToken ct) =>
+            AnalyzeAsync<LeadCohortResult, AnalyticsDto<LeadCohortDto>>(kind, date, asOf, ownerId, currency, analysis.LeadCohortAsync, ct)).RequirePermission(CrmModule.Permissions.SalesReportsRead);
+        analytics.MapGet("/stages", (string? kind, DateOnly? date, DateOnly? asOf, Guid? ownerId, string? currency, ISalesAnalytics analysis, CancellationToken ct) =>
+            AnalyzeAsync<StageFlowResult, AnalyticsDto<StageFlowDto>>(kind, date, asOf, ownerId, currency, analysis.StageFlowAsync, ct)).RequirePermission(CrmModule.Permissions.SalesReportsRead);
+        analytics.MapGet("/team", (string? kind, DateOnly? date, DateOnly? asOf, Guid? ownerId, string? currency, ISalesAnalytics analysis, CancellationToken ct) =>
+            AnalyzeAsync<IReadOnlyList<TeamPerformanceRow>, AnalyticsDto<List<TeamPerformanceRowDto>>>(kind, date, asOf, ownerId, currency, analysis.TeamPerformanceAsync, ct)).RequirePermission(CrmModule.Permissions.SalesReportsRead);
+        analytics.MapGet("/quality", (string? kind, DateOnly? date, DateOnly? asOf, Guid? ownerId, string? currency, ISalesAnalytics analysis, CancellationToken ct) =>
+            AnalyzeAsync<DataQualityData, AnalyticsDto<DataQualityDto>>(kind, date, asOf, ownerId, currency, analysis.DataQualityAsync, ct)).RequirePermission(CrmModule.Permissions.SalesReportsRead);
+
         var forecasts = sales.MapGroup("/forecasts");
         forecasts.MapGet("", ListAsync).RequirePermission(CrmModule.Permissions.ForecastsRead);
         forecasts.MapGet("/{id:guid}", GetAsync).RequirePermission(CrmModule.Permissions.ForecastsRead);
@@ -72,6 +84,21 @@ internal static class SalesPlanningEndpoints
 
         var result = await overview.DetailAsync(parsed, new SalesOverviewQuery(periodKind, date, ownerId, currency), ct);
         return result.IsSuccess ? Results.Ok(Map<SalesCardDetailDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+    }
+
+    // ---- Analizler
+
+    private static async Task<IResult> AnalyzeAsync<TData, TDto>(
+        string? kind, DateOnly? date, DateOnly? asOf, Guid? ownerId, string? currency,
+        Func<AnalyticsQuery, CancellationToken, Task<RecordResult<AnalyticsResult<TData>>>> analyze, CancellationToken ct)
+    {
+        if (!TryKind(kind, out var periodKind))
+        {
+            return InvalidKind();
+        }
+
+        var result = await analyze(new AnalyticsQuery(periodKind, date, asOf, ownerId, currency), ct);
+        return result.IsSuccess ? Results.Ok(Map<TDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
     }
 
     // ---- Tahmin

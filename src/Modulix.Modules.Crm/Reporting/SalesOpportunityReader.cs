@@ -23,12 +23,15 @@ public interface ISalesReportingPolicyProvider
 /// <summary>Rapor için okunan fırsat satırı (kayıt boru hattından; izin, kapsam ve hassas alan kuralları uygulanmıştır).</summary>
 internal sealed record OpportunityRow(
     Guid Id, string Number, string Title, Guid? OwnerId, string Status, string Stage, decimal? Amount, string Currency, int? Probability,
-    bool ProbabilityManual, DateOnly? ExpectedCloseDate, DateOnly? ActualCloseDate, decimal? WonAmount, string? WonCurrency)
+    bool ProbabilityManual, DateOnly? ExpectedCloseDate, DateOnly? ActualCloseDate, decimal? WonAmount, string? WonCurrency, DateTimeOffset? LastInteractionAt = null)
 {
     public OpportunityFact ToFact() => new(Id, Status, Amount, Currency, Probability, ExpectedCloseDate, ActualCloseDate, WonAmount, WonCurrency);
 }
 
 internal sealed record OpportunityPage(List<OpportunityRow> Rows, bool Truncated, RecordError? Error);
+
+/// <summary>Herhangi bir kayıt türünün sayfalanarak okunmuş ham kayıtları.</summary>
+internal sealed record RawPage(List<RecordData> Rows, bool Truncated, RecordError? Error);
 
 /// <summary>Satış raporlarının fırsat okuyucusu: yalnızca <see cref="IRecordPipeline"/> üzerinden, sayfalayarak ve satır sınırıyla okur.</summary>
 internal sealed class SalesOpportunityReader(IRecordPipeline pipeline)
@@ -38,26 +41,33 @@ internal sealed class SalesOpportunityReader(IRecordPipeline pipeline)
 
     public async Task<OpportunityPage> ReadAsync(IReadOnlyDictionary<string, string> filters, CancellationToken cancellationToken)
     {
-        var rows = new List<OpportunityRow>();
+        var raw = await ReadRawAsync(CrmModule.Entities.Opportunity, filters, cancellationToken);
+        return new OpportunityPage([.. raw.Rows.Select(ToRow)], raw.Truncated, raw.Error);
+    }
+
+    /// <summary>Kayıt türünün kayıtlarını boru hattından (izin, veri kapsamı, hassas alan kuralları uygulanmış) sayfalayarak okur; satır sınırı aşılırsa <c>Truncated</c>.</summary>
+    public async Task<RawPage> ReadRawAsync(string entityKey, IReadOnlyDictionary<string, string> filters, CancellationToken cancellationToken)
+    {
+        var rows = new List<RecordData>();
         var pageNumber = 1;
         while (rows.Count < MaxRows)
         {
-            var result = await pipeline.QueryAsync(new RecordQuery(CrmModule.Entities.Opportunity, pageNumber, RecordQuery.MaxPageSize, null, filters), cancellationToken);
+            var result = await pipeline.QueryAsync(new RecordQuery(entityKey, pageNumber, RecordQuery.MaxPageSize, null, filters), cancellationToken);
             if (!result.IsSuccess)
             {
-                return new OpportunityPage([], false, result.Error);
+                return new RawPage([], false, result.Error);
             }
 
-            rows.AddRange(result.Value!.Items.Select(ToRow));
+            rows.AddRange(result.Value!.Items);
             if (result.Value.Items.Count == 0 || rows.Count >= result.Value.TotalCount)
             {
-                return new OpportunityPage(rows, false, null);
+                return new RawPage(rows, false, null);
             }
 
             pageNumber++;
         }
 
-        return new OpportunityPage(rows, true, null);
+        return new RawPage(rows, true, null);
     }
 
     public static Dictionary<string, string> Filters(Guid? ownerId, params string[] pairs)
@@ -91,6 +101,7 @@ internal sealed class SalesOpportunityReader(IRecordPipeline pipeline)
             record.Id, Text("opportunityNumber") ?? string.Empty, Text("title") ?? string.Empty, Id("ownerId"), Text("status") ?? OpportunityStatus.Open,
             Text("stage") ?? string.Empty, Money("amount"), Text("currency") ?? Opportunity.DefaultCurrency, Int("probability"),
             v["probabilityManual"] is JsonValue manual && manual.TryGetValue<bool>(out var flag) && flag,
-            Date("expectedCloseDate"), Date("actualCloseDate"), Money("wonAmount"), Text("wonCurrency"));
+            Date("expectedCloseDate"), Date("actualCloseDate"), Money("wonAmount"), Text("wonCurrency"),
+            DateTimeOffset.TryParse(Text("lastInteractionAt"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var interaction) ? interaction : null);
     }
 }
