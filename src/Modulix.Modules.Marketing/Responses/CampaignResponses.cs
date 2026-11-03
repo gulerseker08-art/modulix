@@ -176,7 +176,7 @@ internal sealed class CampaignResponses(
                 {
                     if (response.LeadId is not null)
                     {
-                        return Fail<RecordData>(RecordErrorCode.Conflict, "Bu yanıt zaten bir lead'e bağlı.");
+                        return Fail<RecordData>(RecordErrorCode.Conflict, "Bu yanıt zaten bir müşteri adayına bağlı.");
                     }
 
                     var lead = await ConvertAsync(response, ct);
@@ -241,13 +241,13 @@ internal sealed class CampaignResponses(
         if (campaign.Target == SegmentTarget.Lead)
         {
             return await ReadAsync(MarketingModule.ExternalEntities.Lead, delivery.TargetId, cancellationToken) is null
-                ? (null, Fail<RecordData>(RecordErrorCode.NotFound, "Lead bulunamadı ya da görme yetkiniz yok."))
+                ? (null, Fail<RecordData>(RecordErrorCode.NotFound, "Müşteri adayı bulunamadı ya da görme yetkiniz yok."))
                 : (delivery.TargetId, null);
         }
 
         if (leads.FirstOrDefault() is not { } creator)
         {
-            return (null, Fail<RecordData>(RecordErrorCode.Conflict, "Lead kullanılamıyor: bu firmada lead modülü kurulu değil."));
+            return (null, Fail<RecordData>(RecordErrorCode.Conflict, "Müşteri adayı kullanılamıyor: bu firmada müşteri adayı modülü kurulu değil."));
         }
 
         var contact = await ContactAsync(campaign, delivery, cancellationToken);
@@ -275,7 +275,7 @@ internal sealed class CampaignResponses(
 
         return (null, Fail<RecordData>(
             result.Forbidden ? RecordErrorCode.PermissionDenied : RecordErrorCode.Conflict,
-            result.Unavailable ? "Lead kullanılamıyor: bu firmada lead modülü kapalı." : result.Error ?? "Lead açılamadı."));
+            result.Unavailable ? "Müşteri adayı kullanılamıyor: bu firmada müşteri adayı modülü kapalı." : result.Error ?? "Müşteri adayı açılamadı."));
     }
 
     private async Task<(Guid? ActivityId, RecordResult<RecordData>? Failure)> ActivityAsync(ResponseState response, CancellationToken cancellationToken)
@@ -383,7 +383,7 @@ internal sealed class CampaignResponses(
 
     private static string NotAllowedMessage(string action, ResponseState response) => action switch
     {
-        ResponseActions.ConvertToLead when !ResponseTransitions.CanBecomeLead(response.Kind) => "Bu yanıt türü lead'e dönüştürülemez (yalnızca ilgi, soru ve görüşme talebi).",
+        ResponseActions.ConvertToLead when !ResponseTransitions.CanBecomeLead(response.Kind) => "Bu yanıt türü müşteri adayına dönüştürülemez (yalnızca ilgi, soru ve görüşme talebi).",
         ResponseActions.ApplyOptOut when response.Kind != ResponseKinds.OptOut => "Çıkış yalnızca 'iletişim istemiyorum' türündeki yanıttan uygulanır.",
         _ => $"'{StatusText(response.Status)}' durumundaki yanıtta bu işlem yapılamaz.",
     };
@@ -392,7 +392,7 @@ internal sealed class CampaignResponses(
     {
         ResponseStatuses.New => "yeni",
         ResponseStatuses.InProgress => "işlemde",
-        ResponseStatuses.Converted => "lead'e dönüştürüldü",
+        ResponseStatuses.Converted => "Müşteri adayına dönüştürüldü",
         _ => "kapalı",
     };
 

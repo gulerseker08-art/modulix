@@ -18,7 +18,7 @@ internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time
             join tenant in db.Tenants.AsNoTracking() on membership.TenantId equals tenant.Id
             where membership.UserId == userId
                   && membership.Status == MembershipStatus.Active
-                  && tenant.Status == TenantStatus.Active
+                  && TenantStatusRules.Operational.Contains(tenant.Status)
             orderby tenant.Name
             select new MembershipSummary(membership.Id, tenant.Id, tenant.Name, tenant.Slug))
             .ToListAsync(cancellationToken);
@@ -30,7 +30,7 @@ internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time
             where membership.UserId == userId
                   && membership.TenantId == tenantId
                   && membership.Status == MembershipStatus.Active
-                  && tenant.Status == TenantStatus.Active
+                  && TenantStatusRules.Operational.Contains(tenant.Status)
             select new MembershipSummary(membership.Id, tenant.Id, tenant.Name, tenant.Slug))
             .SingleOrDefaultAsync(cancellationToken);
 

@@ -33,13 +33,20 @@ public static class PlatformEndpoints
         platform.MapPost("/tenants", CreateTenantAsync);
         platform.MapPut("/tenants/{tenantId:guid}", (Guid tenantId, RenameTenantRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
             Run(() => admin.RenameTenantAsync(tenantId, request.Name, UserId(user), ct)));
-        platform.MapPost("/tenants/{tenantId:guid}/close", (Guid tenantId, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
-            Run(() => admin.CloseTenantAsync(tenantId, UserId(user), ct)));
-        platform.MapPost("/tenants/{tenantId:guid}/reopen", (Guid tenantId, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
-            Run(() => admin.ReopenTenantAsync(tenantId, UserId(user), ct)));
+        // Durum geçişleri (ADR-0028): gerekçe platform denetim kaydına yazılır; askıya almada zorunludur.
+        // Gövde isteğe bağlıdır (gövdesiz çağrı da geçerli); bu yüzden elle okunur: boş gövdeli POST'u bağlayıcı 404 yapar.
+        platform.MapPost("/tenants/{tenantId:guid}/close", (Guid tenantId, HttpRequest http, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
+            Transition(http, reason => admin.CloseTenantAsync(tenantId, UserId(user), ct, reason), ct));
+        platform.MapPost("/tenants/{tenantId:guid}/reopen", (Guid tenantId, HttpRequest http, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
+            Transition(http, reason => admin.ReopenTenantAsync(tenantId, UserId(user), ct, reason), ct));
+        platform.MapPost("/tenants/{tenantId:guid}/suspend", (Guid tenantId, HttpRequest http, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
+            Transition(http, reason => admin.SuspendTenantAsync(tenantId, reason ?? string.Empty, UserId(user), ct), ct));
+        platform.MapPost("/tenants/{tenantId:guid}/activate", (Guid tenantId, HttpRequest http, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
+            Transition(http, reason => admin.ActivateTenantAsync(tenantId, UserId(user), ct, reason), ct));
         platform.MapPost("/tenants/{tenantId:guid}/administrators", InviteAdministratorAsync);
         platform.MapPut("/tenants/{tenantId:guid}/modules/{moduleKey}", (Guid tenantId, string moduleKey, SetTenantModuleRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
-            Run(() => admin.SetModuleAsync(tenantId, moduleKey, request.Enabled, UserId(user), ct)));
+            Run(() => admin.SetModuleAsync(tenantId, moduleKey, request.Enabled, UserId(user), ct, ToTerms(request))));
+        platform.MapGet("/audit", ListAuditAsync);
         platform.MapGet("/catalog", GetCatalogAsync);
 
         // Sektör profilleri (Y9c): platform yöneticisi profilin kapalı modüllerini de açar.
@@ -79,6 +86,23 @@ public static class PlatformEndpoints
                 : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bu e-postayla kayıtlı hesap yok."));
 
         return app;
+    }
+
+    // Kaynak, bitiş veya not verilmediyse koşul verilmemiş sayılır (mevcut koşullar korunur).
+    private static EntitlementTerms? ToTerms(SetTenantModuleRequest request) =>
+        request.Source is null && request.ValidUntil is null && string.IsNullOrWhiteSpace(request.Note)
+            ? null
+            : new EntitlementTerms(
+                request.Source is { } source ? (EntitlementSource)source : EntitlementSource.Manual, request.ValidUntil, request.Note);
+
+    private static async Task<IResult> ListAuditAsync(
+        Guid? tenantId, string? action, int? page, int? pageSize, IPlatformAdministration admin, CancellationToken ct)
+    {
+        var result = await admin.ListAuditAsync(new PlatformAuditQuery(tenantId, action, page ?? 1, pageSize ?? 25), ct);
+        return Results.Ok(new PlatformAuditPageResponse(
+            [.. result.Items.Select(i => new PlatformAuditItemDto(
+                i.Id, i.OccurredAt, i.ActorUserId, i.ActorName, i.Action, i.TargetTenantId, i.Reason, i.Details))],
+            result.Page, result.PageSize, result.TotalCount));
     }
 
     private static PlatformModulesResponse ListModules(ModuleCatalog catalog)
@@ -135,7 +159,8 @@ public static class PlatformEndpoints
                     request.AdministratorEmail,
                     request.AdministratorName,
                     PublicUrl.Resolve(http),
-                    string.IsNullOrWhiteSpace(request.Profile) ? null : request.Profile),
+                    string.IsNullOrWhiteSpace(request.Profile) ? null : request.Profile,
+                    request.Trial),
                 UserId(user),
                 ct);
             return Results.Created($"/api/platform/tenants/{result.Tenant.Tenant.Id}", new CreateTenantResponse(ToDto(result.Tenant), result.ExistingAccount));
@@ -161,6 +186,25 @@ public static class PlatformEndpoints
         {
             return problem;
         }
+    }
+
+    private static async Task<IResult> Transition(HttpRequest http, Func<string?, Task> action, CancellationToken cancellationToken)
+    {
+        string? reason = null;
+        // Uzunluk bilinmeyebilir (parçalı gönderim); yalnızca açıkça boş olan ve JSON olmayan gövde okunmaz.
+        if (http.ContentLength != 0 && http.HasJsonContentType())
+        {
+            try
+            {
+                reason = (await http.ReadFromJsonAsync<TenantReasonRequest>(cancellationToken))?.Reason;
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "İstek gövdesi geçersiz.");
+            }
+        }
+
+        return await Run(() => action(reason));
     }
 
     private static async Task<IResult> Run(Func<Task> action)
@@ -198,7 +242,8 @@ public static class PlatformEndpoints
 
     private static PlatformTenantDetailResponse ToDto(PlatformTenantDetail detail) => new(
         ToDto(detail.Tenant),
-        detail.Administrators.Select(a => new TenantAdministratorDto(a.MembershipId, a.DisplayName, a.Email, (UserStatus)a.Status)).ToList());
+        detail.Administrators.Select(a => new TenantAdministratorDto(a.MembershipId, a.DisplayName, a.Email, (UserStatus)a.Status)).ToList(),
+        [.. (detail.Entitlements ?? []).Select(e => new TenantEntitlementDto(e.ModuleKey, e.IsEnabled, (LicenseSource)e.Source, e.ValidUntil, e.Note))]);
 
     private static IResult TenantNotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Firma bulunamadı.");

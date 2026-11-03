@@ -163,7 +163,7 @@
 
         if (crm && Session.Can(CrmAccess.LeadsRead))
         {
-            tasks.Add(FetchAsync<LeadDto>("Lead'ler", "inbox", "crm/leadler", "/api/crm/leads", text, failures,
+            tasks.Add(FetchAsync<LeadDto>("Müşteri adayları", "inbox", "crm/leadler", "/api/crm/leads", text, failures,
                 l => new SearchItem(l.Subject, Join(l.LeadNumber, l.CompanyName ?? $"{l.FirstName} {l.LastName}".Trim()), $"crm/leadler/{l.Id}")));
         }
 

@@ -181,7 +181,7 @@
             {
                 var l = lr.Data;
                 <AnalyticsFrame T="LeadCohortDto" Report="lr">
-                    <p class="small text-muted">Kohort: seçili dönemde alınan lead'ler. Kesim zamanı: @CrmLabels.Time(l.AsOf).</p>
+                    <p class="small text-muted">Kohort: seçili dönemde alınan müşteri adayları. Kesim zamanı: @CrmLabels.Time(l.AsOf).</p>
                     @if (!l.Mature)
                     {
                         <div class="alert alert-warning" role="status">
@@ -191,25 +191,25 @@
 
                     @if (l.Leads == 0)
                     {
-                        <p class="text-muted">Bu dönemde alınan lead yok.</p>
+                        <p class="text-muted">Bu dönemde alınan müşteri adayı yok.</p>
                     }
                     else
                     {
-                        <div class="kpi-grid" role="group" aria-label="Lead kohortu özeti">
-                            <SalesKpiCard Label="Kohort" Icon="inbox" Tone="info" Value="@SalesLabels.Count(l.Leads)" Detail="Dönemde alınan lead" />
+                        <div class="kpi-grid" role="group" aria-label="Müşteri adayı kohortu özeti">
+                            <SalesKpiCard Label="Kohort" Icon="inbox" Tone="info" Value="@SalesLabels.Count(l.Leads)" Detail="Dönemde alınan müşteri adayı" />
                             <SalesKpiCard Label="Dönüşen" Icon="check-circle" Tone="success" Value="@SalesLabels.Count(l.Converted)" Detail="Fırsata dönüşen" />
                             <SalesKpiCard Label="Elenen" Icon="shield" Tone="danger" Value="@SalesLabels.Count(l.Disqualified)" Detail="Uygun değil diye elenen" />
                             <SalesKpiCard Label="Açık" Icon="layers" Tone="brand" Value="@SalesLabels.Count(l.Open)" Detail="Henüz sonuçlanmamış" />
-                            <SalesKpiCard Label="Uygun lead" Icon="user-check" Tone="info" Value="@SalesLabels.Count(l.Eligible)" Detail="Elenenler hariç kohort" />
+                            <SalesKpiCard Label="Uygun müşteri adayı" Icon="user-check" Tone="info" Value="@SalesLabels.Count(l.Eligible)" Detail="Elenenler hariç kohort" />
                         </div>
 
                         <section class="detail-section" aria-labelledby="sa-l-rates">
                             <div class="section-header"><h2 id="sa-l-rates">Dönüşüm oranı</h2></div>
-                            <div class="kpi-grid" role="group" aria-label="Lead dönüşüm oranları">
+                            <div class="kpi-grid" role="group" aria-label="Müşteri adayı dönüşüm oranları">
                                 <SalesKpiCard Label="Tüm kohorta göre" Icon="percent" Tone="success" Value="@SalesAnalysisLabels.Rate(l.RateOfAllPercent)"
                                               Detail="@($"Dönüşen {l.Converted} / kohort {l.Leads}")" />
-                                <SalesKpiCard Label="Uygun lead'lere göre" Icon="percent" Tone="success" Value="@SalesAnalysisLabels.Rate(l.RateOfEligiblePercent)"
-                                              Detail="@(l.Eligible == 0 ? "Uygun lead yok" : $"Dönüşen {l.Converted} / uygun {l.Eligible}")" />
+                                <SalesKpiCard Label="Uygun müşteri adaylarına göre" Icon="percent" Tone="success" Value="@SalesAnalysisLabels.Rate(l.RateOfEligiblePercent)"
+                                              Detail="@(l.Eligible == 0 ? "Uygun müşteri adayı yok" : $"Dönüşen {l.Converted} / uygun {l.Eligible}")" />
                                 <SalesKpiCard Label="Dönüşme süresi" Icon="calendar" Tone="brand" Value="@SalesAnalysisLabels.Days(l.AverageDaysToConvert)"
                                               Detail="@($"Ortalama · medyan {SalesAnalysisLabels.Days(l.MedianDaysToConvert)}")" />
                             </div>
@@ -224,9 +224,9 @@
                             else
                             {
                                 <table class="table record-table">
-                                    <caption class="visually-hidden">Lead kohortunun kaynağa göre dağılımı</caption>
+                                    <caption class="visually-hidden">Müşteri adayı kohortunun kaynağa göre dağılımı</caption>
                                     <thead>
-                                        <tr><th scope="col">Kaynak</th><th scope="col">Lead</th><th scope="col">Dönüşen</th><th scope="col">Dönüşüm oranı</th></tr>
+                                        <tr><th scope="col">Kaynak</th><th scope="col">Müşteri adayı</th><th scope="col">Dönüşen</th><th scope="col">Dönüşüm oranı</th></tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var row in l.BySource)
@@ -342,7 +342,7 @@
 
     private static readonly IReadOnlyList<TabItem> Tabs =
     [
-        new(QuotesTab, "Teklif kohortu"), new(LeadsTab, "Lead dönüşümü"), new(StagesTab, "Aşama dönüşümü"),
+        new(QuotesTab, "Teklif kohortu"), new(LeadsTab, "Müşteri adayı dönüşümü"), new(StagesTab, "Aşama dönüşümü"),
     ];
 
     private readonly TabState tabs = new(QuotesTab);

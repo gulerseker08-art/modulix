@@ -28,24 +28,29 @@
             <input id="job-search" class="form-control" type="search" placeholder="İş numarası, başlık ya da ekip ara" @bind="search" />
             <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
     </div>
 
-    <div class="filters">
-        <label class="visually-hidden" for="job-status">İş durumu</label>
-        <select id="job-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm durumlar</option>
-            @foreach (var s in OrderLabels.JobStatuses) { <option value="@s.Key">@s.Label</option> }
-        </select>
-        <label class="visually-hidden" for="job-kind">İş türü</label>
-        <select id="job-kind" class="form-select form-select-sm filter-select" @bind="kind" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm türler</option>
-            @foreach (var k in OrderLabels.JobKinds) { <option value="@k.Key">@k.Label</option> }
-        </select>
-        <label class="visually-hidden" for="job-sort">Sıralama</label>
-        <select id="job-sort" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
-            @foreach (var (key, label) in OrderLabels.JobSorts) { <option value="@key">Sıralama: @label</option> }
-        </select>
-    </div>
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="job-status">İş durumu</label>
+            <select id="job-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm durumlar</option>
+                @foreach (var s in OrderLabels.JobStatuses) { <option value="@s.Key">@s.Label</option> }
+            </select>
+            <label class="visually-hidden" for="job-kind">İş türü</label>
+            <select id="job-kind" class="form-select form-select-sm filter-select" @bind="kind" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm türler</option>
+                @foreach (var k in OrderLabels.JobKinds) { <option value="@k.Key">@k.Label</option> }
+            </select>
+            <label class="visually-hidden" for="job-sort">Sıralama</label>
+            <select id="job-sort" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
+                @foreach (var (key, label) in OrderLabels.JobSorts) { <option value="@key">Sıralama: @label</option> }
+            </select>
+        </div>
+    }
 
     @if (page is null && message is null)
     {
@@ -62,8 +67,8 @@
             <caption class="visually-hidden">Operasyon işi kuyruğu</caption>
             <thead>
                 <tr>
-                    <th scope="col">İş</th><th scope="col">Tür</th><th scope="col">Durum</th><th scope="col">Sorumlu / ekip</th>
-                    <th scope="col">Planlanan</th><th scope="col">Öncelik</th>
+                    <th scope="col"><SortHeader Label="İş" Asc="number" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Tür</th><th scope="col">Durum</th><th scope="col">Sorumlu / ekip</th>
+                    <th scope="col"><SortHeader Label="Planlanan" Asc="plannedEnd" Desc="-plannedEnd" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Öncelik</th>
                 </tr>
             </thead>
             <tbody>
@@ -90,11 +95,16 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
 @code {
+    private bool filtersOpen;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
+    private int ActiveFilters => (string.IsNullOrEmpty(status) ? 0 : 1) + (string.IsNullOrEmpty(kind) ? 0 : 1);
+
     private const string DefaultSort = "-createdAt";
 
     /// <summary>Hızlı görünümler; her biri sunucudaki süzgeçlerden birine karşılık gelir.</summary>
@@ -112,6 +122,12 @@
     private string? status;
     private string? kind;
     private string sort = DefaultSort;
+
+    private Task SortAsync(string key)
+    {
+        sort = key;
+        return LoadAsync(1);
+    }
     private string search = string.Empty;
 
     protected override async Task OnInitializedAsync()
@@ -140,7 +156,7 @@
 
     private string Query(int pageNumber)
     {
-        var parts = new List<string> { $"page={pageNumber}" };
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
         switch (view)
         {

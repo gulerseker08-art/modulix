@@ -38,8 +38,8 @@
             <thead>
                 <tr>
                     <th scope="col">Kampanya</th><th scope="col">Gönderildi</th><th scope="col">Hatalı</th><th scope="col">Atlandı</th><th scope="col">Yanıt</th>
-                    <th scope="col">İlgi</th><th scope="col">Çıkış</th><th scope="col">Lead</th><th scope="col">İlk dokunuş</th><th scope="col">Son dokunuş</th>
-                    <th scope="col">Maliyet</th><th scope="col">Yanıt başına</th><th scope="col">Lead başına</th>
+                    <th scope="col">İlgi</th><th scope="col">Çıkış</th><th scope="col">Müşteri adayı</th><th scope="col">İlk dokunuş</th><th scope="col">Son dokunuş</th>
+                    <th scope="col">Maliyet</th><th scope="col">Yanıt başına</th><th scope="col">Müşteri adayı başına</th>
                 </tr>
             </thead>
             <tbody>
@@ -58,7 +58,7 @@
                         <td data-label="Son dokunuş">@r.LastTouchLeads.ToString("N0")</td>
                         <td data-label="Maliyet">@Money(r.ActualCost, r.Currency)</td>
                         <td data-label="Yanıt başına">@Money(r.CostPerResponse, r.Currency)</td>
-                        <td data-label="Lead başına">@Money(r.CostPerLead, r.Currency)</td>
+                        <td data-label="Müşteri adayı başına">@Money(r.CostPerLead, r.Currency)</td>
                     </tr>
                 }
             </tbody>

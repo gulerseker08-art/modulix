@@ -3,15 +3,15 @@
 
 <section class="detail-section lead-report">
     <div class="section-header">
-        <h2>Lead raporu</h2>
+        <h2>Müşteri adayı raporu</h2>
         <div class="filters">
             <label class="form-label-inline">Başlangıç <input class="form-control" type="date" @bind="from" @bind:after="LoadAsync" /></label>
             <label class="form-label-inline">Bitiş <input class="form-control" type="date" @bind="to" @bind:after="LoadAsync" /></label>
         </div>
     </div>
     <p class="text-muted small">
-        Dönem kohortu: seçilen tarihler arasında <strong>gelen</strong> Lead'ler. Dağılımlar, ilk temas ve dönüşüm oranı bu kohorta aittir;
-        dönemde yapılan ama önceki dönemde gelmiş Lead'lerin dönüşümü ayrıca "Dönemde yapılan dönüşüm" olarak gösterilir ve orana katılmaz.
+        Dönem kohortu: seçilen tarihler arasında <strong>gelen</strong> müşteri adayları. Dağılımlar, ilk temas ve dönüşüm oranı bu kohorta aittir;
+        dönemde yapılan ama önceki dönemde gelmiş müşteri adaylarının dönüşümü ayrıca "Dönemde yapılan dönüşüm" olarak gösterilir ve orana katılmaz.
         Süreler takvim saati cinsindendir (iş saati değildir). Payda sıfırsa oran gösterilmez.
     </p>
 
@@ -30,7 +30,7 @@
             <div class="alert alert-warning" role="alert">Kayıt sayısı rapor sınırını aştı; sayılar eksik olabilir. Tarih aralığını daraltın.</div>
         }
         <dl class="summary-grid">
-            <div><dt>Kohorttaki Lead</dt><dd>@report.CohortCount</dd></div>
+            <div><dt>Kohorttaki müşteri adayı</dt><dd>@report.CohortCount</dd></div>
             <div><dt>İlk teması olan</dt><dd>@report.WithFirstContact</dd></div>
             <div><dt>Ort. ilk temas süresi</dt><dd>@Hours(report.AverageFirstContactHours)</dd></div>
             <div><dt>Medyan ilk temas süresi</dt><dd>@Hours(report.MedianFirstContactHours)</dd></div>
@@ -57,10 +57,10 @@
                 @Table(report.DisqualificationReasons, k => k.Length == 0 ? "(belirtilmemiş)" : Lookups.Label(CrmLeadLists.DisqualificationReason, k))
             </div>
             <div>
-                <h3>Sorumluya göre açık Lead (şu an)</h3>
+                <h3>Sorumluya göre açık müşteri adayı (şu an)</h3>
                 @if (report.OpenByOwner.Count == 0)
                 {
-                    <p class="text-muted">Açık Lead yok.</p>
+                    <p class="text-muted">Açık müşteri adayı yok.</p>
                 }
                 else
                 {

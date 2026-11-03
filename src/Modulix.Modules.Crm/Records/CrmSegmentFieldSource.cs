@@ -154,7 +154,7 @@ internal sealed class CrmSegmentFieldSource(IModuleData data) : ISegmentFieldSou
             "crm.lead.industry" => Predicates.Text(leads, l => l.Industry, leaf),
             "crm.lead.utmCampaign" => Predicates.Text(leads, l => l.UtmCampaign, leaf),
             "crm.lead.createdAt" => Predicates.Date(leads, l => (DateTimeOffset?)l.CreatedAt, leaf, context),
-            _ => throw new FormatException($"CRM lead alanı tanınmıyor: {key}."),
+            _ => throw new FormatException($"CRM müşteri adayı alanı tanınmıyor: {key}."),
         };
         return filtered.Select(l => l.Id);
     }

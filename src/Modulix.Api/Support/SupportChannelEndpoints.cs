@@ -299,7 +299,7 @@ internal static class SupportChannelEndpoints
         string tenant, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
     {
         var key = tenant.Trim().ToLowerInvariant();
-        var query = platform.Tenants.AsNoTracking().Where(t => t.Status == TenantStatus.Active);
+        var query = platform.Tenants.AsNoTracking().Where(t => TenantStatusRules.Operational.Contains(t.Status));
         var found = Guid.TryParseExact(key, "N", out var id)
             ? await query.Where(t => t.Id == id).Select(t => t.Id).FirstOrDefaultAsync(ct)
             : await query.Where(t => t.Slug == key).Select(t => t.Id).FirstOrDefaultAsync(ct);
