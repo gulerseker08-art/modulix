@@ -135,6 +135,12 @@ public sealed class CoreModule : IModule
         /// <summary>İletişim engeli (ADR-0025); kaydın kimliği engel satırının kimliğidir. Adres maskeli yazılır.</summary>
         public const string CommunicationSuppression = "core.communication-suppression";
 
+        /// <summary>İletişim konusu tanımı (ADR-0025, dilim 14); kaydın kimliği konu satırının kimliğidir.</summary>
+        public const string CommunicationTopic = "core.communication-topic";
+
+        /// <summary>Konu çıkışı/dönüşü (ADR-0025, dilim 14); kaydın kimliği tercih satırının kimliğidir. Adres maskeli yazılır.</summary>
+        public const string CommunicationTopicPreference = "core.communication-topic-preference";
+
         /// <summary>Oturum olayları (giriş, hatalı şifre, kilitlenme, şifre sıfırlama, davet kabulü); kayıt kişinin hesabıdır.</summary>
         public const string Account = "core.account";
 
@@ -267,6 +273,20 @@ public sealed class CoreModule : IModule
                     ["HardBounce"] = "Kalıcı teslim hatası", ["Complaint"] = "Şikâyet", ["InvalidAddress"] = "Geçersiz adres",
                     ["OptOut"] = "İletişim istemiyor", ["Manual"] = "Elle engel",
                 },
+                ["channel"] = new Dictionary<string, string> { ["Email"] = "E-posta", ["Phone"] = "Telefon", ["Sms"] = "SMS", ["WhatsApp"] = "WhatsApp" },
+            },
+        },
+        new(AuditedEntityKeys.CommunicationTopic, "İletişim konusu", ReadCommunicationKey, new Dictionary<string, string>
+        {
+            ["key"] = "Anahtar", ["name"] = "Ad", ["active"] = "Açık",
+        }, "name"),
+        new(AuditedEntityKeys.CommunicationTopicPreference, "Konu tercihi", ReadCommunicationKey, new Dictionary<string, string>
+        {
+            ["channel"] = "Kanal", ["address"] = "Adres (maskeli)", ["topic"] = "Konu", ["optedOut"] = "Konudan çıktı", ["source"] = "Kaynak",
+        }, "address")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
                 ["channel"] = new Dictionary<string, string> { ["Email"] = "E-posta", ["Phone"] = "Telefon", ["Sms"] = "SMS", ["WhatsApp"] = "WhatsApp" },
             },
         },

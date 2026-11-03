@@ -70,6 +70,7 @@ public static class MarketingLabels
         ["granted"] = "İzinli",
         ["denied"] = "Pazarlama iletişimi reddedilmiş",
         ["unknown"] = "İzin bilinmiyor (gönderilmez)",
+        ["topic-opt-out"] = "Alıcı kampanyanın konusundan çıkmış",
         ["invalid-address"] = "Geçersiz adres",
         ["shared-address"] = "Paylaşılan adres (izin kişiye değil adrese bağlı; otomatik gönderilmez)",
         ["duplicate-address"] = "Aynı adres kitlede zaten var",

@@ -85,6 +85,7 @@ public static class PersistenceSetup
         services.AddScoped<CommunicationService>();
         services.AddScoped<ICommunicationPreferences>(sp => sp.GetRequiredService<CommunicationService>());
         services.AddScoped<ICommunicationAdministration>(sp => sp.GetRequiredService<CommunicationService>());
+        services.AddScoped<ICommunicationTopics>(sp => sp.GetRequiredService<CommunicationService>());
         services.AddScoped<IFrequencyLimiter, FrequencyLimiter>();
         services.AddScoped<IUnsubscribeLinks, UnsubscribeLinks>();
         services.AddScoped<CommunicationCleanup>();

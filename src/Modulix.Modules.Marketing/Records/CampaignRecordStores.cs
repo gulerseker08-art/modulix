@@ -21,7 +21,7 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
 
     private static readonly string[] Rules = [.. Enum.GetNames<RecipientRule>()];
 
-    private readonly Dictionary<Guid, (string Code, string Target, string Channel)> before = [];
+    private readonly Dictionary<Guid, (string Code, string Target, string Channel, string? Topic)> before = [];
 
     public override string EntityKey => MarketingModule.Entities.Campaign;
 
@@ -45,6 +45,7 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
         Field.Text<Campaign>("utmSource", Campaign.UtmMaxLength, c => c.UtmSource, (c, v) => c.UtmSource = v),
         Field.Text<Campaign>("utmMedium", Campaign.UtmMaxLength, c => c.UtmMedium, (c, v) => c.UtmMedium = v),
         Field.Text<Campaign>("utmCampaign", Campaign.UtmMaxLength, c => c.UtmCampaign, (c, v) => c.UtmCampaign = v),
+        Field.Text<Campaign>("topic", Campaign.TopicMaxLength, c => c.Topic, (c, v) => c.Topic = v),
         Field.Money<Campaign>("budget", c => c.Budget, (c, v) => c.Budget = v),
         Field.Money<Campaign>("actualCost", c => c.ActualCost, (c, v) => c.ActualCost = v),
         Field.Text<Campaign>("costCurrency", 3, c => c.CostCurrency, (c, v) => c.CostCurrency = (v ?? "TRY").ToUpperInvariant()),
@@ -67,7 +68,7 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
     protected override IQueryable<Campaign> Search(IQueryable<Campaign> source, string term) =>
         source.Where(c => c.Name.Contains(term) || c.Code.Contains(term));
 
-    protected override void OnUpdating(Campaign entity) => before[entity.Id] = (entity.Code, entity.Target, entity.Channel);
+    protected override void OnUpdating(Campaign entity) => before[entity.Id] = (entity.Code, entity.Target, entity.Channel, entity.Topic);
 
     protected override async Task AppliedAsync(Campaign entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
@@ -115,6 +116,14 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
         entity.UtmSource = NormalizeUtm("utmSource", entity.UtmSource, errors);
         entity.UtmMedium = NormalizeUtm("utmMedium", entity.UtmMedium, errors);
         entity.UtmCampaign = NormalizeUtm("utmCampaign", entity.UtmCampaign, errors);
+
+        // Konu (dilim 14): çekirdekte tanımlı ve açık olmalıdır. Konusu sonradan kapanan kampanya, konuyu değiştirmediği sürece düzenlenebilir.
+        entity.Topic = string.IsNullOrWhiteSpace(entity.Topic) ? null : entity.Topic.Trim();
+        var previousTopic = !isNew && before.TryGetValue(entity.Id, out var prior) ? prior.Topic : null;
+        if (entity.Topic is not null && entity.Topic != previousTopic && !await Context.Topics.IsActiveAsync(entity.Topic, cancellationToken))
+        {
+            errors.Add(new RecordFieldError("topic", "Konu tanımlı ve açık olmalıdır (Yönetim → İletişim tercihleri → Konular)."));
+        }
 
         if (errors.Count > 0)
         {

@@ -522,7 +522,7 @@ internal sealed class CampaignRuns(
         // İzin ve engel her gönderimden hemen önce yeniden değerlendirilir (anlık görüntüdeki durum geçerli sayılmaz).
         var decisions = normalized.Values.Any(a => a is not null)
             ? await preferences.EvaluateManyAsync(
-                campaign.Channel, CommunicationPurpose.Marketing, [.. normalized.Values.Where(a => a is not null).Select(a => a!).Distinct(StringComparer.Ordinal)], cancellationToken)
+                campaign.Channel, CommunicationPurpose.Marketing, [.. normalized.Values.Where(a => a is not null).Select(a => a!).Distinct(StringComparer.Ordinal)], campaign.Topic, cancellationToken)
             : new Dictionary<string, CommunicationDecision>();
 
         var subject = content.Values["subject"]?.GetValue<string>();
@@ -804,7 +804,7 @@ internal sealed class CampaignRuns(
         private static Guid? GuidOrNull(JsonNode? node) => node is null ? null : Guid.Parse(node.GetValue<string>());
     }
 
-    private sealed record CampaignInfo(SegmentTarget TargetType, CommunicationChannel Channel, string Status, DateOnly? StartsOn, DateOnly? EndsOn)
+    private sealed record CampaignInfo(SegmentTarget TargetType, CommunicationChannel Channel, string Status, DateOnly? StartsOn, DateOnly? EndsOn, string? Topic)
     {
         public static CampaignInfo From(RecordData data)
         {
@@ -814,7 +814,8 @@ internal sealed class CampaignRuns(
                 Enum.Parse<CommunicationChannel>(v["channel"]!.GetValue<string>()),
                 v["status"]!.GetValue<string>(),
                 v["startsOn"] is { } s ? DateOnly.Parse(s.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture) : null,
-                v["endsOn"] is { } e ? DateOnly.Parse(e.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture) : null);
+                v["endsOn"] is { } e ? DateOnly.Parse(e.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture) : null,
+                v["topic"]?.GetValue<string>());
         }
     }
 }

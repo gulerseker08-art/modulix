@@ -181,7 +181,7 @@ internal sealed class CampaignAudienceService(
         }
     }
 
-    private sealed record CampaignInfo(SegmentTarget TargetType, string Target, string Status, CommunicationChannel Channel, RecipientRule Rule, string? Role, int? MaxPerTarget);
+    private sealed record CampaignInfo(SegmentTarget TargetType, string Target, string Status, CommunicationChannel Channel, RecipientRule Rule, string? Role, int? MaxPerTarget, string? Topic);
 
     private async Task<RecordResult<Computed>> ComputeAsync(Guid campaignId, CancellationToken cancellationToken)
     {
@@ -199,7 +199,8 @@ internal sealed class CampaignAudienceService(
             Enum.Parse<CommunicationChannel>(v["channel"]!.GetValue<string>()),
             Enum.Parse<RecipientRule>(v["recipientRule"]!.GetValue<string>()),
             v["recipientRole"]?.GetValue<string>(),
-            v["maxPerTarget"]?.GetValue<int>());
+            v["maxPerTarget"]?.GetValue<int>(),
+            v["topic"]?.GetValue<string>());
 
         var entries = new List<RecordData>();
         for (var pageNumber = 1; ; pageNumber++)
@@ -283,7 +284,7 @@ internal sealed class CampaignAudienceService(
         var decisions = selection.Candidates.Count == 0
             ? new Dictionary<string, CommunicationDecision>()
             : (await preferences.EvaluateManyAsync(
-                campaign.Channel, CommunicationPurpose.Marketing, [.. selection.Candidates.Select(c => c.Address!).Distinct(StringComparer.Ordinal)], cancellationToken))
+                campaign.Channel, CommunicationPurpose.Marketing, [.. selection.Candidates.Select(c => c.Address!).Distinct(StringComparer.Ordinal)], campaign.Topic, cancellationToken))
                 .ToDictionary(d => d.Key, d => d.Value);
 
         return RecordResult<Computed>.Ok(new Computed(campaign, AudienceRules.Finish(selection, decisions), sources));

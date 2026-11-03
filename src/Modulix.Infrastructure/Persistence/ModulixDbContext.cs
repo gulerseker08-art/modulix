@@ -78,6 +78,10 @@ public class ModulixDbContext(
 
     public DbSet<CommunicationSuppression> CommunicationSuppressions => Set<CommunicationSuppression>();
 
+    public DbSet<CommunicationTopic> CommunicationTopics => Set<CommunicationTopic>();
+
+    public DbSet<CommunicationTopicPreference> CommunicationTopicPreferences => Set<CommunicationTopicPreference>();
+
     public DbSet<FrequencyWindow> FrequencyWindows => Set<FrequencyWindow>();
 
     public DbSet<CommunicationLinkToken> CommunicationLinkTokens => Set<CommunicationLinkToken>();

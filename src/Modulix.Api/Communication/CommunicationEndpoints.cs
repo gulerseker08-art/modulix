@@ -102,6 +102,38 @@ public static class CommunicationEndpoints
             await service.LiftAsync(id, request.Reason, ct) is { } view ? Results.Ok(ToDto(view)) : NotFound("Engel bulunamadı.")))
             .RequirePermission(CoreModule.Permissions.SuppressCommunication);
 
+        // Konular (ADR-0025, dilim 14): tanım ve konu tercihi okuma/yönetim izinleriyle aynı ayrımı izler (konu izin vermez, yalnızca daraltır).
+        group.MapGet("/topics", (bool? activeOnly, ICommunicationAdministration service, CancellationToken ct) => RunAsync(async () =>
+            Results.Ok((await service.ListTopicsAsync(activeOnly ?? false, ct)).Select(ToDto).ToList())))
+            .RequirePermission(CoreModule.Permissions.ReadCommunication);
+
+        group.MapPut("/topics", (SaveTopicRequest request, ICommunicationAdministration service, CancellationToken ct) => RunAsync(async () =>
+            Results.Ok(ToDto(await service.SaveTopicAsync(request.Key ?? string.Empty, request.Name ?? string.Empty, request.IsActive, ct)))))
+            .RequirePermission(CoreModule.Permissions.ManageCommunication);
+
+        group.MapGet("/topic-preferences", (string? channel, string? address, string? topic, bool? optedOut, int? page, int? pageSize,
+            ICommunicationAdministration service, CancellationToken ct) => RunAsync(async () =>
+        {
+            var result = await service.ListTopicPreferencesAsync(
+                new TopicPreferenceQuery(Optional<CommunicationChannel>(channel, nameof(channel)), address, topic, optedOut, page ?? 1, pageSize ?? 25), ct);
+            return Results.Ok(new TopicPreferencePageDto([.. result.Items.Select(ToDto)], result.Page, result.PageSize, result.TotalCount));
+        })).RequirePermission(CoreModule.Permissions.ReadCommunication);
+
+        group.MapPut("/topic-preferences", (SaveTopicPreferenceRequest request, ICommunicationAdministration service, CancellationToken ct) => RunAsync(async () =>
+        {
+            var source = string.IsNullOrWhiteSpace(request.Source) ? ConsentSources.Manual : request.Source.Trim().ToLowerInvariant();
+            if (!ApiSources.Contains(source))
+            {
+                throw new ArgumentException($"Kaynak '{string.Join("', '", ApiSources)}' değerlerinden biri olmalıdır.", nameof(request.Source));
+            }
+
+            var view = await service.RecordTopicPreferenceAsync(
+                new TopicPreferenceChange(
+                    Required<CommunicationChannel>(request.Channel, nameof(request.Channel)), request.Address ?? string.Empty, request.TopicKey ?? string.Empty, request.OptedOut, source),
+                ct);
+            return Results.Ok(ToDto(view));
+        })).RequirePermission(CoreModule.Permissions.ManageCommunication);
+
         return app;
     }
 
@@ -139,6 +171,11 @@ public static class CommunicationEndpoints
 
     private static PreferenceDto ToDto(PreferenceView p) => new(
         p.Id, p.Channel.ToString(), p.Address, p.Purpose.ToString(), p.Status.ToString(), p.Source, p.EvidenceRef, p.PartyId, p.PersonId, p.ChangedBy, p.ChangedAt);
+
+    private static TopicDto ToDto(TopicView t) => new(t.Id, t.Key, t.Name, t.IsActive, t.CreatedAt, t.ChangedAt);
+
+    private static TopicPreferenceDto ToDto(TopicPreferenceView p) =>
+        new(p.Id, p.Channel.ToString(), p.Address, p.TopicKey, p.OptedOut, p.Source, p.ChangedBy, p.ChangedAt);
 
     private static SuppressionDto ToDto(SuppressionView s) => new(
         s.Id, s.Channel.ToString(), s.Address, s.Reason.ToString(), s.Source, s.Note, s.StartsAt, s.EndsAt, s.IsActive, s.CreatedBy, s.CreatedAt,

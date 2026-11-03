@@ -74,6 +74,9 @@ public static class CommunicationCodes
     public const string NoConsentRequired = "no-consent-required";
     public const string InvalidAddress = "invalid-address";
 
+    /// <summary>Pazarlama izni var ama alıcı kampanyanın konusundan çıkmış (ADR-0025, dilim 14).</summary>
+    public const string TopicOptOut = "topic-opt-out";
+
     /// <summary>"suppressed:hard-bounce" gibi.</summary>
     public static string Suppressed(SuppressionReason reason) => "suppressed:" + reason switch
     {
@@ -97,6 +100,21 @@ public interface ICommunicationPreferences
     /// <summary>Anahtar, çağıranın verdiği adrestir (aynen). Geçersiz adres <see cref="CommunicationCodes.InvalidAddress"/> ile reddedilir.</summary>
     Task<IReadOnlyDictionary<string, CommunicationDecision>> EvaluateManyAsync(
         CommunicationChannel channel, CommunicationPurpose purpose, IReadOnlyCollection<string> addresses, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Konulu karar (ADR-0025, dilim 14): <paramref name="topic"/> boşsa <see cref="EvaluateManyAsync(CommunicationChannel, CommunicationPurpose, IReadOnlyCollection{string}, CancellationToken)"/>
+    /// ile aynıdır. Doluysa pazarlamada konudan çıkmış alıcı <see cref="CommunicationCodes.TopicOptOut"/> ile reddedilir; konu hiçbir zaman izin vermez
+    /// (izin yok/bilinmiyor/engelli kararı değişmez).
+    /// </summary>
+    Task<IReadOnlyDictionary<string, CommunicationDecision>> EvaluateManyAsync(
+        CommunicationChannel channel, CommunicationPurpose purpose, IReadOnlyCollection<string> addresses, string? topic, CancellationToken cancellationToken);
+}
+
+/// <summary>Konu tanımlarının modüllere açılan okuma yüzü (ADR-0025, dilim 14). Tanımın sahibi çekirdektir.</summary>
+public interface ICommunicationTopics
+{
+    /// <summary>Anahtar bu tenant'ta tanımlı ve açıksa true. Anahtar normalize edilmez (küçük harf, tire).</summary>
+    Task<bool> IsActiveAsync(string key, CancellationToken cancellationToken);
 }
 
 /// <summary>

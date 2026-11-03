@@ -67,6 +67,39 @@ internal sealed class CommunicationSuppressionConfiguration : IEntityTypeConfigu
     }
 }
 
+internal sealed class CommunicationTopicConfiguration : IEntityTypeConfiguration<CommunicationTopic>
+{
+    public void Configure(EntityTypeBuilder<CommunicationTopic> builder)
+    {
+        // İletişim konusu (ADR-0025, dilim 14): tenant başına anahtar benzersizdir; satır silinmez.
+        builder.ToTable("CommunicationTopics", DatabaseSchemas.Core);
+        builder.HasKey(t => t.Id);
+        builder.Property(t => t.Id).ValueGeneratedNever();
+        builder.Property(t => t.TenantId).IsRequired();
+        builder.Property(t => t.Key).HasMaxLength(CommunicationTopic.KeyMaxLength).IsRequired();
+        builder.Property(t => t.Name).HasMaxLength(CommunicationTopic.NameMaxLength).IsRequired();
+        builder.HasIndex(t => new { t.TenantId, t.Key }).IsUnique();
+    }
+}
+
+internal sealed class CommunicationTopicPreferenceConfiguration : IEntityTypeConfiguration<CommunicationTopicPreference>
+{
+    public void Configure(EntityTypeBuilder<CommunicationTopicPreference> builder)
+    {
+        builder.ToTable("CommunicationTopicPreferences", DatabaseSchemas.Core);
+        builder.HasKey(p => p.Id);
+        builder.Property(p => p.Id).ValueGeneratedNever();
+        builder.Property(p => p.TenantId).IsRequired();
+        builder.Property(p => p.Channel).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(p => p.Address).HasMaxLength(CommunicationPreference.AddressMaxLength).IsRequired();
+        builder.Property(p => p.TopicKey).HasMaxLength(CommunicationTopic.KeyMaxLength).IsRequired();
+        builder.Property(p => p.Source).HasMaxLength(CommunicationPreference.SourceMaxLength).IsRequired();
+
+        // Karar sorgusu (kanal + konu + adres kümesi) ve eşzamanlı ilk kaydın dayanağı.
+        builder.HasIndex(p => new { p.TenantId, p.Channel, p.TopicKey, p.Address }).IsUnique();
+    }
+}
+
 internal sealed class CommunicationLinkTokenConfiguration : IEntityTypeConfiguration<CommunicationLinkToken>
 {
     public void Configure(EntityTypeBuilder<CommunicationLinkToken> builder)
