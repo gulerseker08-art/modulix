@@ -183,7 +183,7 @@ public sealed class MarketingModule : IModule
         {
             ["code"] = "Kod", ["name"] = "Ad", ["description"] = "Açıklama", ["purpose"] = "Amaç", ["target"] = "Hedef türü", ["channel"] = "Kanal",
             ["recipientRule"] = "Kişi seçme kuralı", ["recipientRole"] = "Aranan rol", ["maxPerTarget"] = "Hedef başına alıcı sınırı",
-            ["startsOn"] = "Başlangıç", ["endsOn"] = "Bitiş", ["utmSource"] = "UTM kaynak", ["utmMedium"] = "UTM ortam", ["utmCampaign"] = "UTM kampanya", ["budget"] = "Bütçe", ["actualCost"] = "Gerçekleşen maliyet", ["costCurrency"] = "Para birimi", ["ownerId"] = "Sorumlu", ["status"] = "Durum",
+            ["startsOn"] = "Başlangıç", ["endsOn"] = "Bitiş", ["utmSource"] = "UTM kaynak", ["utmMedium"] = "UTM ortam", ["utmCampaign"] = "UTM kampanya", ["topic"] = "İletişim konusu", ["budget"] = "Bütçe", ["actualCost"] = "Gerçekleşen maliyet", ["costCurrency"] = "Para birimi", ["ownerId"] = "Sorumlu", ["status"] = "Durum",
         }, "name")
         {
             UserFields = ["ownerId", "createdBy", "updatedBy"],

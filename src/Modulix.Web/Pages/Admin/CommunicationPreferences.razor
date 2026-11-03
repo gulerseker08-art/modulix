@@ -20,6 +20,7 @@
     <div class="record-tabs" role="tablist" aria-label="Bölümler">
         <button type="button" role="tab" class="record-tab @(tab == "prefs" ? "active" : null)" aria-selected="@(tab == "prefs")" @onclick='() => SwitchAsync("prefs")'>Tercihler</button>
         <button type="button" role="tab" class="record-tab @(tab == "blocks" ? "active" : null)" aria-selected="@(tab == "blocks")" @onclick='() => SwitchAsync("blocks")'>Engeller</button>
+        <button type="button" role="tab" class="record-tab @(tab == "topics" ? "active" : null)" aria-selected="@(tab == "topics")" @onclick='() => SwitchAsync("topics")'>Konular</button>
     </div>
 
     @if (tab == "prefs")
@@ -139,7 +140,7 @@
             </form>
         }
     }
-    else
+    else if (tab == "blocks")
     {
         <div class="filters">
             <label class="visually-hidden" for="b-active">Durum</label>
@@ -238,6 +239,150 @@
             </form>
         }
     }
+    else
+    {
+        <p class="text-muted">
+            Konu, pazarlama iznini değil yalnızca kapsamını daraltır: kişi bir konudan çıkabilir, ama konuya dönmek izin vermez. Konusu seçilmiş bir kampanya, o konudan çıkmış alıcılara gönderilmez.
+            Kişiler konu tercihini abonelik bağlantısındaki tercih merkezinden de değiştirebilir.
+        </p>
+
+        @if (topics is null && message is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (topics is not null && topics.Count == 0)
+        {
+            <p class="text-muted" role="status">Henüz konu tanımlı değil.</p>
+        }
+        else if (topics is not null)
+        {
+            <div class="table-wrap">
+                <table class="table table-sm">
+                    <caption class="visually-hidden">Konular</caption>
+                    <thead><tr><th scope="col">Anahtar</th><th scope="col">Ad</th><th scope="col">Durum</th><th scope="col"><span class="visually-hidden">İşlem</span></th></tr></thead>
+                    <tbody>
+                    @foreach (var t in topics)
+                    {
+                        <tr>
+                            <td><code>@t.Key</code></td>
+                            <td>@t.Name</td>
+                            <td><span class="badge @(t.IsActive ? "text-bg-success" : "text-bg-secondary")">@(t.IsActive ? "Açık" : "Kapalı")</span></td>
+                            <td>
+                                @if (Session.Can(CoreAccess.ManageCommunication))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => ToggleTopicAsync(t)">@(t.IsActive ? "Kapat" : "Aç")</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (Session.Can(CoreAccess.ManageCommunication))
+        {
+            <form class="record-form" novalidate @onsubmit="SaveTopicAsync" @onsubmit:preventDefault>
+                <fieldset disabled="@busy">
+                    <legend class="h6">Konu ekle</legend>
+                    <p class="text-muted small">Anahtar küçük harf, rakam ve tireden oluşur ve sonradan değişmez (ör. haber-bulteni). Kapalı konu yeni kampanyada seçilemez ve tercih merkezinde görünmez; mevcut tercihler korunur.</p>
+                    <div class="form-grid">
+                        <div class="span-4">
+                            <label class="form-label" for="t-key">Anahtar</label>
+                            <input id="t-key" class="form-control" maxlength="40" @bind="topicKey" />
+                            <FieldError Field="key" Errors="errors" />
+                        </div>
+                        <div class="span-8">
+                            <label class="form-label" for="t-name">Ad</label>
+                            <input id="t-name" class="form-control" maxlength="100" @bind="topicName" />
+                            <FieldError Field="name" Errors="errors" />
+                        </div>
+                    </div>
+                </fieldset>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(topicKey) || string.IsNullOrWhiteSpace(topicName))">Kaydet</button></div>
+            </form>
+        }
+
+        <h2 class="h6 mt-4">Konudan çıkışlar</h2>
+        <div class="filters">
+            <label class="visually-hidden" for="tp-topic">Konu</label>
+            <select id="tp-topic" class="form-select form-select-sm filter-select" @bind="topicFilter" @bind:after="() => LoadTopicPrefsAsync(1)">
+                <option value="">Tüm konular</option>
+                @foreach (var t in topics ?? []) { <option value="@t.Key">@t.Name</option> }
+            </select>
+        </div>
+        @if (topicPrefs is null && message is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else if (topicPrefs is not null && topicPrefs.Items.Count == 0)
+        {
+            <p class="text-muted" role="status">Konudan çıkış kaydı yok.</p>
+        }
+        else if (topicPrefs is not null)
+        {
+            <div class="table-wrap">
+                <table class="table table-sm">
+                    <caption class="visually-hidden">Konu tercihleri</caption>
+                    <thead><tr><th scope="col">Kanal</th><th scope="col">Adres</th><th scope="col">Konu</th><th scope="col">Durum</th><th scope="col">Kaynak</th><th scope="col">Değişti</th></tr></thead>
+                    <tbody>
+                    @foreach (var p in topicPrefs.Items)
+                    {
+                        <tr>
+                            <td>@ChannelText(p.Channel)</td>
+                            <td>@p.Address</td>
+                            <td>@TopicName(p.TopicKey)</td>
+                            <td><span class="badge @(p.OptedOut ? "text-bg-danger" : "text-bg-success")">@(p.OptedOut ? "Konudan çıktı" : "Konuda")</span></td>
+                            <td>@p.Source</td>
+                            <td>@CrmLabels.Time(p.ChangedAt)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <Pager Page="topicPrefs.Page" PageSize="topicPrefs.PageSize" TotalCount="topicPrefs.TotalCount" PageChanged="LoadTopicPrefsAsync" />
+        }
+
+        @if (Session.Can(CoreAccess.ManageCommunication) && topics is { Count: > 0 })
+        {
+            <form class="record-form" novalidate @onsubmit="SaveTopicPrefAsync" @onsubmit:preventDefault>
+                <fieldset disabled="@busy">
+                    <legend class="h6">Konu çıkışı kaydet</legend>
+                    <p class="text-muted small">Konudan çıkış her kaynakla kaydedilir. Çıkışı geri açmak yalnızca kişinin kendisi (tercih merkezi) ya da yetkili kullanıcıyla olur ve pazarlama izni vermez.</p>
+                    <div class="form-grid">
+                        <div class="span-3">
+                            <label class="form-label" for="tp-ch">Kanal</label>
+                            <select id="tp-ch" class="form-select" @bind="tpChannel">
+                                @foreach (var c in Channels) { <option value="@c.Key">@c.Label</option> }
+                            </select>
+                            <FieldError Field="channel" Errors="errors" />
+                        </div>
+                        <div class="span-4">
+                            <label class="form-label" for="tp-addr">Adres</label>
+                            <input id="tp-addr" class="form-control" maxlength="254" @bind="tpAddress" />
+                            <FieldError Field="address" Errors="errors" />
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="tp-key">Konu</label>
+                            <select id="tp-key" class="form-select" @bind="tpTopic">
+                                <option value="">Seçin</option>
+                                @foreach (var t in topics) { <option value="@t.Key">@t.Name</option> }
+                            </select>
+                            <FieldError Field="topicKey" Errors="errors" />
+                        </div>
+                        <div class="span-2">
+                            <label class="form-label" for="tp-out">Durum</label>
+                            <select id="tp-out" class="form-select" @bind="tpOptedOut">
+                                <option value="true">Konudan çıktı</option>
+                                <option value="false">Konuya döndü</option>
+                            </select>
+                        </div>
+                    </div>
+                </fieldset>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(tpAddress) || tpTopic.Length == 0)">Kaydet</button></div>
+            </form>
+        }
+    }
 </AuthGate>
 
 @code {
@@ -265,6 +410,15 @@
     private string blockAddress = string.Empty;
     private string blockReason = "Manual";
     private string blockNote = string.Empty;
+    private List<TopicDto>? topics;
+    private TopicPreferencePageDto? topicPrefs;
+    private string topicKey = string.Empty;
+    private string topicName = string.Empty;
+    private string topicFilter = string.Empty;
+    private string tpChannel = "Email";
+    private string tpAddress = string.Empty;
+    private string tpTopic = string.Empty;
+    private string tpOptedOut = "true";
     private string? message;
     private bool failed;
     private bool busy;
@@ -281,8 +435,80 @@
         tab = next;
         message = null;
         errors = null;
-        if (next == "prefs") { await LoadPrefsAsync(1); } else { await LoadBlocksAsync(1); }
+        if (next == "prefs") { await LoadPrefsAsync(1); }
+        else if (next == "blocks") { await LoadBlocksAsync(1); }
+        else { await LoadTopicsAsync(); await LoadTopicPrefsAsync(1); }
     }
+
+    private async Task LoadTopicsAsync()
+    {
+        var result = await Api.GetAsync<List<TopicDto>>("/api/communication/topics");
+        if (result.IsSuccess) { topics = result.Value ?? []; } else { Report(result.Error, true); }
+    }
+
+    private async Task LoadTopicPrefsAsync(int page)
+    {
+        var result = await Api.GetAsync<TopicPreferencePageDto>(
+            $"/api/communication/topic-preferences?page={page}&pageSize=25" + (topicFilter.Length > 0 ? $"&topic={Uri.EscapeDataString(topicFilter)}" : null));
+        if (result.IsSuccess) { topicPrefs = result.Value; } else { Report(result.Error, true); }
+    }
+
+    private async Task SaveTopicAsync()
+    {
+        busy = true;
+        errors = null;
+        var result = await Api.PutAsync<TopicDto>("/api/communication/topics", new SaveTopicRequest(topicKey.Trim(), topicName.Trim(), true));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            topicKey = string.Empty; topicName = string.Empty;
+            await LoadTopicsAsync();
+            Report("Konu kaydedildi.", false);
+        }
+        else
+        {
+            errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
+            Report(result.Error, true);
+        }
+    }
+
+    private async Task ToggleTopicAsync(TopicDto topic)
+    {
+        busy = true;
+        var result = await Api.PutAsync<TopicDto>("/api/communication/topics", new SaveTopicRequest(topic.Key, topic.Name, !topic.IsActive));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            await LoadTopicsAsync();
+            Report(topic.IsActive ? "Konu kapatıldı." : "Konu açıldı.", false);
+        }
+        else
+        {
+            Report(result.Error, true);
+        }
+    }
+
+    private async Task SaveTopicPrefAsync()
+    {
+        busy = true;
+        errors = null;
+        var result = await Api.PutAsync<TopicPreferenceDto>("/api/communication/topic-preferences",
+            new SaveTopicPreferenceRequest(tpChannel, tpAddress.Trim(), tpTopic, tpOptedOut == "true", null));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            tpAddress = string.Empty;
+            await LoadTopicPrefsAsync(1);
+            Report("Konu tercihi kaydedildi.", false);
+        }
+        else
+        {
+            errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
+            Report(result.Error, true);
+        }
+    }
+
+    private string TopicName(string key) => topics?.FirstOrDefault(t => t.Key == key)?.Name ?? key;
 
     private async Task LoadPrefsAsync(int page)
     {

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Communication;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
@@ -30,6 +31,9 @@ internal sealed class MarketingStoreContext(
     public string? CommandReason => command?.Reason;
 
     public Guid? CurrentUserId => tenant.Current?.UserId;
+
+    /// <summary>İletişim konusu tanımları (çekirdek sözleşmesi, ADR-0025 dilim 14).</summary>
+    public ICommunicationTopics Topics => (ICommunicationTopics)services.GetService(typeof(ICommunicationTopics))!;
 
     /// <summary>Başka bir kaydı (ör. ortak taraf) çağıranın yetkisiyle kayıt boru hattından okur; yoksa ya da okunamıyorsa null.</summary>
     public async Task<RecordData?> ReadRecordAsync(string entityKey, Guid id, CancellationToken cancellationToken)

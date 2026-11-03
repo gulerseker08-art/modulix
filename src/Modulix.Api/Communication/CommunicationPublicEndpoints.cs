@@ -41,6 +41,9 @@ internal static class CommunicationPublicEndpoints
         group.MapPost("/resubscribe", (string tenant, PublicCommunicationTokenRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, CancellationToken ct) =>
             RunAsync(tenant, request.Token, http, platform, scopes, (portal, token) => portal.ResubscribeAsync(token, ct), ct)).RequireRateLimiting(Policy);
 
+        group.MapPost("/topic", (string tenant, PublicTopicRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, CancellationToken ct) =>
+            RunAsync(tenant, request.Token, http, platform, scopes, (portal, token) => portal.SetTopicAsync(token, request.TopicKey, request.Subscribed, ct), ct)).RequireRateLimiting(Policy);
+
         // RFC 8058 tek tıkla çıkış: posta istemcisi "List-Unsubscribe=One-Click" gövdesiyle POST eder. Form bağlamayı (ve çerez tabanlı sahte istek
         // korumasını) kullanmaz: oturum çerezi yoktur, kimlik belirteçtir. Gövde elle ve sınırlı okunur.
         group.MapPost("/one-click/{token}", async (string tenant, string token, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, CancellationToken ct) =>
@@ -95,7 +98,8 @@ internal static class CommunicationPublicEndpoints
 
         var view = result.View!;
         return Results.Ok(new PublicCommunicationView(
-            view.Channel.ToString(), view.MaskedAddress, view.State, view.CanUnsubscribe, view.CanResubscribe, view.Message, found.Name, view.ExpiresAt));
+            view.Channel.ToString(), view.MaskedAddress, view.State, view.CanUnsubscribe, view.CanResubscribe, view.Message, found.Name, view.ExpiresAt,
+            view.Topics?.Select(t => new PublicTopicDto(t.Key, t.Name, t.Subscribed, t.CanChange)).ToList()));
     }
 
     private static IResult? Guard(HttpContext http)

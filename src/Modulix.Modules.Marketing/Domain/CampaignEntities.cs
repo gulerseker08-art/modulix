@@ -35,6 +35,7 @@ public sealed class Campaign : MarketingEntity, IOwnedEntity
     public const int PurposeMaxLength = 200;
     public const int RoleMaxLength = 100;
     public const int UtmMaxLength = 80;
+    public const int TopicMaxLength = 40;
 
     public string Code { get; internal set; } = string.Empty;
 
@@ -69,6 +70,12 @@ public sealed class Campaign : MarketingEntity, IOwnedEntity
     public string? UtmMedium { get; internal set; }
 
     public string? UtmCampaign { get; internal set; }
+
+    /// <summary>
+    /// İletişim konusu anahtarı (ADR-0025, dilim 14; çekirdekteki <c>ICommunicationTopics</c>). Doluysa alıcılardan bu konudan çıkmış olanlara gönderilmez;
+    /// boşsa konu tercihi uygulanmaz. Konu pazarlama izni vermez, yalnızca daraltır.
+    /// </summary>
+    public string? Topic { get; internal set; }
 
     /// <summary>Maliyet (ADR-0025, dilim 8): planlanan bütçe ve gerçekleşen maliyet, <see cref="CostCurrency"/> para biriminde. Kur dönüşümü yoktur; farklı para birimleri toplanmaz.</summary>
     public decimal? Budget { get; internal set; }

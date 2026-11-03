@@ -18,9 +18,14 @@ public static class PortalStates
     public const string NoConsent = "no-consent";
 }
 
+/// <summary>Tercih merkezindeki bir konu. <see cref="Subscribed"/> kapalıysa kişi bu konudan çıkmıştır; <see cref="CanChange"/> kişinin bu konuyu değiştirip değiştiremeyeceğidir.</summary>
+public sealed record PortalTopic(string Key, string Name, bool Subscribed, bool CanChange);
+
 /// <param name="MaskedAddress">Adres maskelidir ("a***@example.com"): bağlantıyı bulan kişiye adresin tamamı gösterilmez.</param>
+/// <param name="Topics">Açık konular. Yalnızca pazarlama izni açıkken ve engel yokken doludur (konu izin vermez, yalnızca daraltır).</param>
 public sealed record PortalView(
-    CommunicationChannel Channel, string MaskedAddress, string State, bool CanUnsubscribe, bool CanResubscribe, string? Message, DateTimeOffset ExpiresAt);
+    CommunicationChannel Channel, string MaskedAddress, string State, bool CanUnsubscribe, bool CanResubscribe, string? Message, DateTimeOffset ExpiresAt,
+    IReadOnlyList<PortalTopic>? Topics = null);
 
 public enum PortalError
 {
@@ -55,4 +60,11 @@ public interface ICommunicationPortal
 
     /// <summary>Kişinin kendi çıkışını geri alması (kaynak "tercih merkezi"). Süresi dolmuş bağlantıyla, firma kaydıyla ve aktif engelle yapılamaz.</summary>
     Task<PortalResult> ResubscribeAsync(string token, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Konudan çıkar ya da konuya döner (ADR-0025, dilim 14). Çıkış her zaman yapılır (süresi dolmuş bağlantıyla da; iletişimi azaltmak güvenlidir).
+    /// Dönüş yalnızca süresi dolmamış bağlantıyla, pazarlama izni açıkken, engel yokken ve çıkış kişinin kendi kaydıysa yapılır. Bilinmeyen/kapalı
+    /// konu <see cref="PortalError.Refused"/> döner.
+    /// </summary>
+    Task<PortalResult> SetTopicAsync(string token, string topicKey, bool subscribed, CancellationToken cancellationToken);
 }
