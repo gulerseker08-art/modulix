@@ -74,7 +74,7 @@ internal static class CommunicationPublicEndpoints
         }
 
         var key = tenant.Trim().ToLowerInvariant();
-        var query = platform.Tenants.AsNoTracking().Where(t => t.Status == TenantStatus.Active);
+        var query = platform.Tenants.AsNoTracking().Where(t => TenantStatusRules.Operational.Contains(t.Status));
         var found = Guid.TryParseExact(key, "N", out var id)
             ? await query.Where(t => t.Id == id).Select(t => new { t.Id, t.Name }).FirstOrDefaultAsync(cancellationToken)
             : await query.Where(t => t.Slug == key).Select(t => new { t.Id, t.Name }).FirstOrDefaultAsync(cancellationToken);

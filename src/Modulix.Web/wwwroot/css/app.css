@@ -1146,6 +1146,10 @@ tr.done td.primary {
         min-width: 0;
     }
 
+.list-toolbar-spacer {
+    flex: 1 1 auto;
+}
+
 .view-selector {
     position: relative;
 }
@@ -1299,6 +1303,65 @@ tr.done td.primary {
     font-size: var(--mx-fs-helper);
     font-weight: 700;
 }
+
+/* Sıralanabilir başlık (SortHeader): başlık metni + yön oku; etkin sütun koyu ve renkli. */
+.sort-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-1);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    text-align: left;
+}
+
+    .sort-button .app-icon {
+        opacity: 0.55;
+    }
+
+    .sort-button:hover,
+    .sort-button.active {
+        color: var(--mx-tone-brand-fg);
+    }
+
+        .sort-button:hover .app-icon,
+        .sort-button.active .app-icon {
+            opacity: 1;
+        }
+
+/* Sayfa boyutu seçici ve sorumlu avatarı (OwnerCell) */
+.pager-size {
+    width: auto;
+    min-height: 2.25rem;
+    margin-left: auto;
+}
+
+.owner-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+}
+
+.avatar {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    font-size: 0.6875rem;
+    font-weight: 700;
+}
+
+.avatar-tone-0 { background: var(--mx-tone-brand-bg); color: var(--mx-tone-brand-fg); }
+.avatar-tone-1 { background: var(--mx-tone-teal-bg); color: var(--mx-tone-teal-fg); }
+.avatar-tone-2 { background: var(--mx-tone-violet-bg); color: var(--mx-tone-violet-fg); }
+.avatar-tone-3 { background: var(--mx-tone-warning-bg); color: var(--mx-tone-warning-fg); }
+.avatar-tone-4 { background: var(--mx-tone-success-bg); color: var(--mx-tone-success-fg); }
 
 /* Gizlenen sütun (ColumnPicker): başlık ve bütün hücreler; telefonda kart satırlarında da gizlenir. */
 .record-table .col-hidden {

@@ -164,7 +164,7 @@
                             <td data-label="Tutar" class="text-end">@FormatAmount(opportunity)</td>
                             <td data-label="Olasılık">@(opportunity.Probability is { } p ? $"%{p}" : null)</td>
                         }
-                        <td data-label="Sorumlu">@Lookups.MemberName(opportunity.OwnerId)</td>
+                        <td data-label="Sorumlu"><OwnerCell Name="@Lookups.MemberName(opportunity.OwnerId)" /></td>
                         <td data-label="Kapanış">@(opportunity.ExpectedCloseDate is { } date ? CrmLabels.Date(date) : null)</td>
                         @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Opportunity))
                         {
@@ -180,7 +180,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -280,7 +280,7 @@
             return;
         }
 
-        var result = await Api.GetAsync<CrmPage<OpportunityDto>>($"{Url}?page={pageNumber}{Filters()}");
+        var result = await Api.GetAsync<CrmPage<OpportunityDto>>($"{Url}?page={pageNumber}&pageSize={ListPaging.Size}{Filters()}");
         page = result.Value;
         message = result.Error;
     }

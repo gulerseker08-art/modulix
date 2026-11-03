@@ -18,6 +18,8 @@ internal sealed class ModuleEntitlementConfiguration : IEntityTypeConfiguration<
         builder.Property(e => e.ModuleKey).HasMaxLength(AccessKeys.ModuleKeyMaxLength).IsRequired();
         builder.Property(e => e.IsEnabled).IsRequired();
         builder.Property(e => e.UpdatedAt).IsRequired();
+        builder.Property(e => e.Source).IsRequired().HasDefaultValue(EntitlementSource.Manual);
+        builder.Property(e => e.Note).HasMaxLength(ModuleEntitlement.NoteMaxLength);
         builder.HasIndex(e => new { e.TenantId, e.ModuleKey }).IsUnique();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Restrict);
     }

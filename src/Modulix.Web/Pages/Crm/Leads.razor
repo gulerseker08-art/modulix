@@ -116,7 +116,7 @@
                         <td data-label="Durum"><span class="badge stage-@lead.Status.ToLowerInvariant()">@LeadStatus.Label(lead.Status)</span></td>
                         <td data-label="Öncelik">@LeadPriority.Label(lead.Priority)</td>
                         <td data-label="Kaynak">@Lookups.Label(CrmLeadLists.Source, lead.Source)</td>
-                        <td data-label="Sorumlu">@(lead.OwnerId is null ? "Atanmadı" : Lookups.MemberName(lead.OwnerId))</td>
+                        <td data-label="Sorumlu">@if (lead.OwnerId is null) { <span class="text-muted">Atanmadı</span> } else { <OwnerCell Name="@Lookups.MemberName(lead.OwnerId)" /> }</td>
                         <td data-label="Geliş">@CrmLabels.Time(lead.FirstReceivedAt)</td>
                         <td data-label="İlk temas">
                             @if (lead.FirstContactAt is { } contact)
@@ -136,7 +136,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -189,7 +189,7 @@
 
     private string Query(int pageNumber)
     {
-        var parts = new List<string> { $"page={pageNumber}", $"search={Uri.EscapeDataString(search ?? string.Empty)}" };
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}", $"search={Uri.EscapeDataString(search ?? string.Empty)}" };
         Add(parts, "status", status);
         Add(parts, "source", source);
         Add(parts, "priority", priority);

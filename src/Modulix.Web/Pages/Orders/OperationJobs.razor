@@ -67,8 +67,8 @@
             <caption class="visually-hidden">Operasyon işi kuyruğu</caption>
             <thead>
                 <tr>
-                    <th scope="col">İş</th><th scope="col">Tür</th><th scope="col">Durum</th><th scope="col">Sorumlu / ekip</th>
-                    <th scope="col">Planlanan</th><th scope="col">Öncelik</th>
+                    <th scope="col"><SortHeader Label="İş" Asc="number" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Tür</th><th scope="col">Durum</th><th scope="col">Sorumlu / ekip</th>
+                    <th scope="col"><SortHeader Label="Planlanan" Asc="plannedEnd" Desc="-plannedEnd" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Öncelik</th>
                 </tr>
             </thead>
             <tbody>
@@ -95,7 +95,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -122,6 +122,12 @@
     private string? status;
     private string? kind;
     private string sort = DefaultSort;
+
+    private Task SortAsync(string key)
+    {
+        sort = key;
+        return LoadAsync(1);
+    }
     private string search = string.Empty;
 
     protected override async Task OnInitializedAsync()
@@ -150,7 +156,7 @@
 
     private string Query(int pageNumber)
     {
-        var parts = new List<string> { $"page={pageNumber}" };
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
         switch (view)
         {

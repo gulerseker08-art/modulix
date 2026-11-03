@@ -174,7 +174,7 @@ public sealed class QuoteExpiryWorker(
         return await (
             from tenant in db.Tenants.AsNoTracking()
             join entitlement in db.ModuleEntitlements.AsNoTracking() on tenant.Id equals entitlement.TenantId
-            where tenant.Status == TenantStatus.Active && entitlement.ModuleKey == CrmModule.ModuleKey && entitlement.IsEnabled
+            where TenantStatusRules.Operational.Contains(tenant.Status) && entitlement.ModuleKey == CrmModule.ModuleKey && entitlement.IsEnabled
             select tenant.Id)
             .ToListAsync(cancellationToken);
     }
