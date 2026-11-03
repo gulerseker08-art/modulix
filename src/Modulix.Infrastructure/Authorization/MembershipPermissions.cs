@@ -97,12 +97,13 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
     /// Kişinin görebildiği ve yönetebildiği departmanlar (ADR-0026): null tüm departmanlardır (tüm kayıtlar kapsamı). Aksi halde
     /// kendi departmanı; "departman ve altı" kapsamı varsa altındaki departmanlar da. Başka bayilerin departman adları, üyeleri ve
     /// rolleri bu kümenin dışında kalır; departman uçları, kullanıcı listesindeki departman adı ve davet bu kümeye bakar.
-    /// Departmanı olmayan (bozuk veri) kişi hiçbir departmanı göremez.
+    /// Departmanı olmayan (bozuk veri) üye hiçbir departmanı göremez. Üyeliği olmayan bağlam (platform yöneticisinin işlemi,
+    /// sistem, iç çağrılar) bir üyelik değildir ve kısıtlanmaz: gerçek bir istekte işlemi yapan her zaman sunucuca doğrulanmış
+    /// bir üyeliktir, üyeliği olmayan kimse bu uçlara izinle erişemez.
     /// </summary>
     public async Task<IReadOnlySet<Guid>?> GetVisibleUnitIdsAsync(Guid membershipId, CancellationToken cancellationToken)
     {
-        // Üyeliği olmayan bağlam (platform yöneticisinin işlemi, sistem) kısıtlanmaz; gerçek istekte üyelik her zaman vardır.
-        if (membershipId == Guid.Empty)
+        if (membershipId == Guid.Empty || !await db.Memberships.AsNoTracking().AnyAsync(m => m.Id == membershipId, cancellationToken))
         {
             return null;
         }
