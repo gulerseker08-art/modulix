@@ -84,6 +84,13 @@ internal sealed class UserAdministration(
 
         if (query.BusinessUnitId is { } businessUnitId)
         {
+            // Başka bayinin departmanına göre süzmek hiçbir şey döndürmez; üyelerinin kim olduğu bu yolla da öğrenilemez (ADR-0026).
+            if (await membershipPermissions.GetVisibleUnitIdsAsync(tenant.MembershipId, cancellationToken) is { } visibleUnits
+                && !visibleUnits.Contains(businessUnitId))
+            {
+                return new UserPage([], page, pageSize, 0);
+            }
+
             // Departman üyelikleri RLS altındadır; alt sorgu aynı veritabanında çalışır (ADR-0020).
             members = members.Where(m => db.BusinessUnitMembers.Any(bm => bm.BusinessUnitId == businessUnitId && bm.MembershipId == m.Membership.Id));
         }
@@ -157,7 +164,7 @@ internal sealed class UserAdministration(
             await EnsureActorIsAdministratorAsync(tenant, cancellationToken);
         }
 
-        var businessUnit = await ResolveInviteBusinessUnitAsync(tenant, invitation.BusinessUnitId, cancellationToken);
+        var businessUnit = await ResolveInviteBusinessUnitAsync(tenant, invitation.BusinessUnitId, byPlatform, cancellationToken);
         var now = time.GetUtcNow();
         await EnsureInvitationAllowanceAsync(tenant, now, cancellationToken);
 
@@ -490,26 +497,12 @@ internal sealed class UserAdministration(
         }
 
         var current = await membershipPermissions.GetUnitAsync(membership.Id, cancellationToken);
-        var scopes = await membershipPermissions.GetScopesAsync(tenant.MembershipId, cancellationToken);
-        if (!scopes.Contains(RecordScope.All))
+        if (await membershipPermissions.GetVisibleUnitIdsAsync(tenant.MembershipId, cancellationToken) is { } allowed
+            && ((current is not null && !allowed.Contains(current.Id)) || !allowed.Contains(target.Id)))
         {
-            var actorUnit = await membershipPermissions.GetUnitAsync(tenant.MembershipId, cancellationToken);
-            var allowed = new HashSet<Guid>();
-            if (actorUnit is not null)
-            {
-                allowed.Add(actorUnit.Id);
-                if (scopes.Contains(RecordScope.UnitAndBelow))
-                {
-                    allowed.UnionWith(await membershipPermissions.GetUnitTreeIdsAsync(actorUnit.Path, cancellationToken));
-                }
-            }
-
-            if ((current is not null && !allowed.Contains(current.Id)) || !allowed.Contains(target.Id))
-            {
-                throw new UserAdministrationException(
-                    UserAdministrationError.PermissionDenied,
-                    "Kullanıcıyı yalnızca kendi departmanınız ve kapsamınızdaki departmanlar arasında taşıyabilirsiniz.");
-            }
+            throw new UserAdministrationException(
+                UserAdministrationError.PermissionDenied,
+                "Kullanıcıyı yalnızca kendi departmanınız ve kapsamınızdaki departmanlar arasında taşıyabilirsiniz.");
         }
 
         var targetNames = (await businessUnits.FindAsync(target.Id, cancellationToken))?.PathNames ?? target.Name;
@@ -756,12 +749,23 @@ internal sealed class UserAdministration(
     }
 
     /// <summary>Davetin departmanı: verilmişse etkin olmalı, verilmemişse kök departman (ADR-0026 K4).</summary>
-    private async Task<BusinessUnit> ResolveInviteBusinessUnitAsync(TenantContext tenant, Guid? businessUnitId, CancellationToken cancellationToken)
+    private async Task<BusinessUnit> ResolveInviteBusinessUnitAsync(TenantContext tenant, Guid? businessUnitId, bool byPlatform, CancellationToken cancellationToken)
     {
+        // Yönetici olmayan davet eden yalnızca kendi kapsamındaki departmanlara kullanıcı ekleyebilir; kapsam dışı departman
+        // "bulunmayan" ile aynı iletiyi alır. Departman verilmezse kök yerine kendi departmanı kullanılır.
+        var visible = byPlatform ? null : await membershipPermissions.GetVisibleUnitIdsAsync(tenant.MembershipId, cancellationToken);
         if (businessUnitId is { } id)
         {
-            return await db.BusinessUnits.SingleOrDefaultAsync(u => u.Id == id && u.IsActive, cancellationToken)
+            return await db.BusinessUnits.SingleOrDefaultAsync(
+                       u => u.Id == id && u.IsActive && (visible == null || visible.Contains(u.Id)), cancellationToken)
                 ?? throw new ArgumentException("Bu kuruluşta bulunmayan ya da kapalı bir departman seçildi.", "businessUnitId");
+        }
+
+        if (visible is not null)
+        {
+            var own = await membershipPermissions.GetUnitAsync(tenant.MembershipId, cancellationToken)
+                ?? throw new ArgumentException("Davet için bir departman seçin.", "businessUnitId");
+            return await db.BusinessUnits.SingleAsync(u => u.Id == own.Id, cancellationToken);
         }
 
         var tenantName = await db.Tenants.AsNoTracking()
@@ -769,13 +773,21 @@ internal sealed class UserAdministration(
         return await DefaultBusinessUnit.EnsureRootAsync(db, tenantName, cancellationToken);
     }
 
-    private async Task<Dictionary<Guid, string>> LoadBusinessUnitNamesAsync(IReadOnlyCollection<Guid> membershipIds, CancellationToken cancellationToken) =>
-        await (
+    /// <summary>
+    /// Kullanıcıların departman adları. Yönetici olmayan işlemi yapan başka bayinin departman adını göremez (ADR-0026): o
+    /// kullanıcılar için ad boş döner.
+    /// </summary>
+    private async Task<Dictionary<Guid, string>> LoadBusinessUnitNamesAsync(IReadOnlyCollection<Guid> membershipIds, CancellationToken cancellationToken)
+    {
+        var visible = await membershipPermissions.GetVisibleUnitIdsAsync(RequireTenant().MembershipId, cancellationToken);
+        var rows = await (
             from member in db.BusinessUnitMembers.AsNoTracking()
             join unit in db.BusinessUnits.AsNoTracking() on member.BusinessUnitId equals unit.Id
             where membershipIds.Contains(member.MembershipId)
-            select new { member.MembershipId, unit.Name })
-            .ToDictionaryAsync(x => x.MembershipId, x => x.Name, cancellationToken);
+            select new { member.MembershipId, UnitId = unit.Id, unit.Name })
+            .ToListAsync(cancellationToken);
+        return rows.Where(r => visible is null || visible.Contains(r.UnitId)).ToDictionary(r => r.MembershipId, r => r.Name);
+    }
 
     /// <summary>Hedef üyelik yöneticiyse işlemi yalnızca yönetici yapabilir.</summary>
     private async Task EnsureMayManageAsync(TenantContext tenant, Guid membershipId, CancellationToken cancellationToken)

@@ -296,13 +296,19 @@ internal sealed class RoleService(
 
     public async Task<IReadOnlyList<BusinessUnitRoleAssignment>?> GetBusinessUnitRolesAsync(Guid businessUnitId, CancellationToken cancellationToken)
     {
-        if (!await db.BusinessUnits.AnyAsync(u => u.Id == businessUnitId, cancellationToken))
+        if (!await db.BusinessUnits.AnyAsync(u => u.Id == businessUnitId, cancellationToken)
+            || !await UnitVisibleAsync(businessUnitId, cancellationToken))
         {
             return null;
         }
 
         return await UnitAssignmentsAsync(businessUnitId, cancellationToken);
     }
+
+    /// <summary>Yönetici olmayan işlemi yapan başka bayinin departmanının rollerini göremez ve değiştiremez ("bulunamadı").</summary>
+    private async Task<bool> UnitVisibleAsync(Guid businessUnitId, CancellationToken cancellationToken) =>
+        await membershipPermissions.GetVisibleUnitIdsAsync(RequireTenant().MembershipId, cancellationToken) is not { } visible
+        || visible.Contains(businessUnitId);
 
     public async Task<IReadOnlyList<BusinessUnitRoleAssignment>?> SetBusinessUnitRolesAsync(
         Guid businessUnitId,
@@ -313,7 +319,7 @@ internal sealed class RoleService(
         ArgumentNullException.ThrowIfNull(roles);
         var tenant = RequireTenant();
         var unit = await db.BusinessUnits.AsNoTracking().SingleOrDefaultAsync(u => u.Id == businessUnitId, cancellationToken);
-        if (unit is null)
+        if (unit is null || !await UnitVisibleAsync(unit.Id, cancellationToken))
         {
             return null;
         }
