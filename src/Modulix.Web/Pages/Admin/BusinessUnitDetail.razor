@@ -100,6 +100,50 @@
             }
         </section>
 
+        @* Departman rolleri (ADR-0026 K6): departmandaki her kullanıcı bu rollerin izinlerini ve kayıt kapsamını alır; kullanıcıya doğrudan atanan rollerle toplanır. *@
+        <section class="detail-section">
+            <div class="section-header"><h2>Departman rolleri</h2></div>
+            @if (assignable.Count == 0)
+            {
+                <p class="text-muted">
+                    Departmana atanabilecek rol yok. Bir rolün "Atanabilir düzey"ini "departmana" ya da "kullanıcıya ve departmana"
+                    yaparak buradan atanabilir hâle getirin (<a href="yonetim/roller">Roller</a>).
+                </p>
+            }
+            else
+            {
+                <p class="text-muted small">
+                    Seçilen roller bu departmandaki @unit.MemberCount kullanıcının tamamına verilir. "Alt departmanlara da uygula"
+                    kapalıyken rol yalnızca bu departmandaki kullanıcılar içindir; merkeze verilen rol kendiliğinden bayilere inmez.
+                </p>
+                <div class="role-picker">
+                    @foreach (var option in assignable)
+                    {
+                        <div>
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" checked="@selectedRoles.ContainsKey(option.Id)"
+                                       disabled="@(!unit.IsActive && !selectedRoles.ContainsKey(option.Id))"
+                                       @onchange="e => ToggleRole(option.Id, e.Value is true)" />
+                                <span class="form-check-label">@option.Name <small class="text-muted">· @RecordScopeLabels.Of(option.Scope)</small></span>
+                            </label>
+                            @if (selectedRoles.TryGetValue(option.Id, out var inherit))
+                            {
+                                <label class="form-check ms-4">
+                                    <input class="form-check-input" type="checkbox" checked="@inherit"
+                                           @onchange="e => selectedRoles[option.Id] = e.Value is true" />
+                                    <span class="form-check-label">Alt departmanlara da uygula</span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+                <FieldError Field="roles" Errors="roleErrors" />
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveRolesAsync">Departman rollerini kaydet</button>
+                </div>
+            }
+        </section>
+
         @if (unit.ParentId is not null)
         {
             <section class="detail-section">
@@ -127,6 +171,9 @@
     [Parameter] public Guid BusinessUnitId { get; set; }
 
     private BusinessUnitDetailDto? detail;
+    private IReadOnlyList<RoleDto> assignable = [];
+    private Dictionary<Guid, bool> selectedRoles = [];
+    private IReadOnlyDictionary<string, string[]>? roleErrors;
     private string name = string.Empty;
     private string? code;
     private string kind = string.Empty;
@@ -148,7 +195,51 @@
         if (result.Value is { } loaded)
         {
             Show(loaded);
+            await LoadRolesAsync();
         }
+    }
+
+    // Departmana yalnızca atanabilir düzeyi buna izin veren, sistem dışı roller verilir (sunucu da denetler).
+    private async Task LoadRolesAsync()
+    {
+        var all = (await Api.GetAsync<List<RoleDto>>("/api/roles")).Value ?? [];
+        var current = (await Api.GetAsync<List<BusinessUnitRoleDto>>($"/api/business-units/{BusinessUnitId}/roles")).Value ?? [];
+        assignable = all
+            .Where(r => !r.IsSystem && (r.AssignLevel is RoleAssignLevel.Unit or RoleAssignLevel.Both))
+            .OrderBy(r => r.Name)
+            .ToList();
+        selectedRoles = current.ToDictionary(r => r.RoleId, r => r.InheritToChildren);
+    }
+
+    private void ToggleRole(Guid roleId, bool on)
+    {
+        if (on)
+        {
+            selectedRoles.TryAdd(roleId, false);
+        }
+        else
+        {
+            selectedRoles.Remove(roleId);
+        }
+    }
+
+    private async Task SaveRolesAsync()
+    {
+        busy = true;
+        notice = null;
+        var request = new SetBusinessUnitRolesRequest(selectedRoles.Select(r => new BusinessUnitRoleItem(r.Key, r.Value)).ToList());
+        var result = await Api.PutAsync<List<BusinessUnitRoleDto>>($"/api/business-units/{BusinessUnitId}/roles", request);
+        busy = false;
+        roleErrors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            message = result.FieldErrors.Count > 0 ? null : result.Error;
+            return;
+        }
+
+        message = null;
+        await LoadRolesAsync();
+        notice = "Departman rolleri kaydedildi.";
     }
 
     private void Show(BusinessUnitDetailDto loaded)

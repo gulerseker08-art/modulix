@@ -1,0 +1,1045 @@
+@page "/crm/satis-tahmini/{Id:guid}"
+@using System.Globalization
+@using System.Net
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+@inject NavigationManager Navigation
+
+<PageTitle>Satış tahmini · Modulix</PageTitle>
+
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ForecastsRead">
+    <a class="back-link" href="crm/satis-tahmini">← Satış tahminleri</a>
+
+    @if (loading && detail is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+
+    @if (loadError is not null)
+    {
+        <div class="alert @(loadStatus == HttpStatusCode.Forbidden ? "alert-warning" : "alert-danger")" role="alert">
+            @loadError
+            @if (loadStatus is not (HttpStatusCode.Forbidden or HttpStatusCode.NotFound))
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">Tekrar dene</button>
+            }
+        </div>
+    }
+
+    <Notice Text="@notice" />
+    <Notice Text="@actionMessage" Failed="true" />
+
+    @if (detail is not null)
+    {
+        var d = detail;
+        var h = d.Header;
+        var cap = d.Capabilities;
+        var currency = h.ReportingCurrency;
+
+        <div class="page-header">
+            <div>
+                <h1>Satış tahmini <span class="badge stage-@SalesLabels.StatusBadge(h.Status)">@SalesLabels.Status(h.Status)</span></h1>
+                <p class="text-muted mb-0">
+                    @SalesLabels.PeriodKind(h.PeriodKind) · @SalesLabels.Period(h.PeriodStart, h.PeriodEnd) ·
+                    @(h.ScopeType == SalesTargetScopes.User ? $"Kullanıcı: {Lookups.MemberName(h.ScopeUserId)}" : "Tüm firma") ·
+                    para birimi @currency · sürüm V@(h.VersionNo)
+                </p>
+            </div>
+            <div class="header-actions">
+                @if (cap.CanWrite)
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="RefreshAsync">Yenile</button>
+                }
+                @if (cap.CanSubmit)
+                {
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SubmitAsync">Sun</button>
+                }
+                @if (cap.CanReturn)
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick='() => StartPending("return")'>Taslağa geri çek</button>
+                }
+                @if (cap.CanLock)
+                {
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick='() => StartPending("lock")'>Kilitle</button>
+                }
+                @if (cap.CanReopen)
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick='() => StartPending("reopen")'>Yeniden aç</button>
+                }
+                @if (cap.CanDelete)
+                {
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick='() => StartPending("delete")'>Sil</button>
+                }
+            </div>
+        </div>
+
+        @if (pending is not null)
+        {
+            <form class="record-form" novalidate @onsubmit="ConfirmPendingAsync" @onsubmit:preventDefault aria-labelledby="sfd-pending-title">
+                <h2 id="sfd-pending-title">@PendingTitle(pending)</h2>
+                <ErrorSummary Errors="actionErrors" />
+                @if (pending is "return" or "reopen")
+                {
+                    <p class="small text-muted">
+                        @(pending == "return"
+                            ? "Sunulan tahmin taslağa döner ve yeniden düzenlenebilir."
+                            : "Kilitli tahmin değişmez; yeniden açmak bu tahminin bir kopyası olarak YENİ bir sürüm (taslak) üretir. Kilitli sürüm olduğu gibi kalır.")
+                    </p>
+                    <div>
+                        <label class="form-label required" for="sfd-reason">Gerekçe</label>
+                        <textarea id="sfd-reason" class="form-control" rows="2" maxlength="500" required aria-required="true" @bind="reason"></textarea>
+                        <FieldError Field="reason" Errors="actionErrors" />
+                    </div>
+                }
+                else if (pending == "lock")
+                {
+                    <p>Tahmin kilitlenecek: dönem sonunda gerçekleşenle karşılaştırılarak doğruluğu ölçülür ve artık değiştirilemez. Kilitlensin mi?</p>
+                }
+                else if (pending == "delete")
+                {
+                    <p>Bu taslak tahmin, düzeltmeleri ve geçmişiyle birlikte silinecek. Bu işlem geri alınamaz. Silinsin mi?</p>
+                }
+                <div class="form-actions">
+                    <button type="submit" class="btn @(pending == "delete" ? "btn-danger" : "btn-primary")" disabled="@busy">
+                        @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
+                        @PendingConfirmText(pending)
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelPending">Vazgeç</button>
+                </div>
+            </form>
+        }
+
+        <dl class="detail-grid">
+            <div><dt>Son yenileme</dt><dd>@(h.RefreshedAt is { } refreshed ? CrmLabels.Time(refreshed) : "—")</dd></div>
+            @if (h.SubmittedAt is { } submittedAt)
+            {
+                <div><dt>Sunuldu</dt><dd>@CrmLabels.Time(submittedAt)@(h.SubmittedBy is { } submitter ? $" · {Lookups.MemberName(submitter)}" : null)</dd></div>
+            }
+            @if (h.LockedAt is { } lockedAt)
+            {
+                <div><dt>Kilitlendi</dt><dd>@CrmLabels.Time(lockedAt)@(h.LockedBy is { } locker ? $" · {Lookups.MemberName(locker)}" : null)</dd></div>
+            }
+            @if (h.ReturnReason is not null)
+            {
+                <div><dt>Taslağa geri çekme gerekçesi</dt><dd>@h.ReturnReason</dd></div>
+            }
+            @if (h.ReopenReason is not null)
+            {
+                <div><dt>Yeniden açma gerekçesi</dt><dd>@h.ReopenReason</dd></div>
+            }
+            @if (h.PreviousSubmissionId is { } previousId)
+            {
+                <div><dt>Önceki sürüm</dt><dd><a href="crm/satis-tahmini/@previousId">@VersionText(previousId)</a></dd></div>
+            }
+        </dl>
+
+        @if (d.Warnings.Count > 0)
+        {
+            <div class="alert alert-warning" role="status">
+                <strong>Verilerle ilgili uyarılar</strong>
+                <ul class="mb-0">
+                    @foreach (var warning in d.Warnings)
+                    {
+                        <li>@warning</li>
+                    }
+                </ul>
+            </div>
+        }
+        @if (!d.AmountsVisible)
+        {
+            <div class="alert alert-info" role="status">Tutarları görme yetkiniz yok; tutarlar ve senaryolar gösterilmiyor.</div>
+        }
+        else if (!d.ItemsVisible)
+        {
+            <div class="alert alert-info" role="status">Fırsat kayıtlarını görme yetkiniz yok; fırsat satırları gösterilmiyor.</div>
+        }
+
+        <section class="detail-section" aria-labelledby="sfd-scenarios">
+            <div class="section-header"><h2 id="sfd-scenarios">Senaryolar</h2></div>
+            @if (d.Scenarios is { } s)
+            {
+                <div class="kpi-grid" role="group" aria-label="Tahmin senaryoları">
+                    <SalesKpiCard Label="Gerçekleşen" Icon="check-circle" Tone="success" Value="@CrmLabels.Amount(s.Realized, currency)"
+                                  Detail="@(d.RealizedLive ? "Dönemde kazanılan (canlı)" : "Kilit anındaki değer")"
+                                  Partial="@h.RealizedPartial" PartialHint="Bazı kazanılan fırsatların tutarı ya da kuru yok." />
+                    <SalesKpiCard Label="Taahhüt" Icon="target" Tone="info" Value="@CrmLabels.Amount(s.CommitScenario, currency)" Detail="Gerçekleşen + Taahhüt kategorisi" />
+                    <SalesKpiCard Label="İyimser" Icon="trending-up" Tone="brand" Value="@CrmLabels.Amount(s.OptimisticScenario, currency)" Detail="Gerçekleşen + Taahhüt + En iyi durum" />
+                    <SalesKpiCard Label="Ağırlıklı" Icon="percent" Tone="brand" Value="@CrmLabels.Amount(s.WeightedScenario, currency)" Detail="Gerçekleşen + olasılıkla ağırlıklı açık tutar" />
+                </div>
+                <p class="small text-muted">
+                    Senaryolar ayrı ayrıdır ve birbirine eklenmez: ağırlıklı tahmin, kategori toplamlarının üstüne eklenen bir tutar değildir.
+                </p>
+            }
+            else
+            {
+                <p class="text-muted">Senaryo toplamları yetkiniz ya da veri kapsamınız nedeniyle gösterilemiyor.</p>
+            }
+        </section>
+
+        <section class="detail-section" aria-labelledby="sfd-categories">
+            <div class="section-header"><h2 id="sfd-categories">Kategoriler</h2></div>
+            @if (!d.AmountsVisible || d.ByCategory.Count == 0)
+            {
+                <p class="text-muted">@(d.AmountsVisible ? "Kategori toplamı yok." : "Tutarları görme yetkiniz yok.")</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Kategori özeti; kategoriler birbirini dışlar</caption>
+                    <thead><tr><th scope="col">Kategori</th><th scope="col">Fırsat</th><th scope="col">Tutar</th><th scope="col">Ağırlıklı tutar</th></tr></thead>
+                    <tbody>
+                        @foreach (var total in d.ByCategory)
+                        {
+                            <tr>
+                                <td data-label="Kategori" class="primary"><span class="badge stage-@SalesLabels.CategoryBadge(total.Category)">@SalesLabels.Category(total.Category)</span></td>
+                                <td data-label="Fırsat">@total.Count</td>
+                                <td data-label="Tutar">@CrmLabels.Amount(total.Amount, currency)</td>
+                                <td data-label="Ağırlıklı tutar">@CrmLabels.Amount(total.Weighted, currency)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <p class="small text-muted">Her fırsat yalnızca bir kategoridedir (Taahhüt, En iyi durum, Pipeline, Hariç).</p>
+            }
+        </section>
+
+        <section class="detail-section" aria-labelledby="sfd-note">
+            <div class="section-header"><h2 id="sfd-note">Not</h2></div>
+            @if (cap.CanWrite)
+            {
+                <form @onsubmit="SaveNoteAsync" @onsubmit:preventDefault>
+                    <label class="form-label" for="sfd-note-text">Tahmin notu</label>
+                    <textarea id="sfd-note-text" class="form-control" rows="2" maxlength="1000" @bind="noteText"></textarea>
+                    <FieldError Field="note" Errors="actionErrors" />
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-outline-primary btn-sm" disabled="@busy">Notu kaydet</button>
+                    </div>
+                </form>
+            }
+            else
+            {
+                <p>@(h.Note ?? "Not yok.")</p>
+            }
+        </section>
+
+        <section class="detail-section" aria-labelledby="sfd-accuracy">
+            <div class="section-header"><h2 id="sfd-accuracy">Tahmin doğruluğu</h2></div>
+            @if (d.Accuracy.State == "Ready")
+            {
+                var a = d.Accuracy;
+                <p>
+                    Tahmin ufku: kilitten dönem sonuna <strong>@(a.HorizonDays?.ToString() ?? "—") gün</strong> ·
+                    dönem sonunda gerçekleşen <strong>@(a.Actual is { } actual ? CrmLabels.Amount(actual, currency) : "—")</strong>
+                </p>
+                <table class="table record-table">
+                    <caption class="visually-hidden">Senaryo tahminleri ve gerçekleşen</caption>
+                    <thead>
+                        <tr><th scope="col">Senaryo</th><th scope="col">Tahmin</th><th scope="col">Gerçekleşen</th><th scope="col">Hata</th><th scope="col">Mutlak hata</th><th scope="col">Hata yüzdesi</th></tr>
+                    </thead>
+                    <tbody>
+                        @VarianceRow("Taahhüt", a.CommitScenario, currency)
+                        @VarianceRow("Ağırlıklı", a.WeightedScenario, currency)
+                    </tbody>
+                </table>
+                <p class="small text-muted">Hata = tahmin − gerçekleşen (artı: fazla tahmin, eksi: eksik tahmin). Gerçekleşen sıfırsa yüzde hesaplanmaz.</p>
+            }
+            else if (d.Accuracy.State == "Pending")
+            {
+                <p class="text-muted">Dönem sürüyor; dönem bittikten sonra kilitli tahmin gerçekleşenle karşılaştırılır.@(d.Accuracy.HorizonDays is { } horizon ? $" (Kilitten dönem sonuna {horizon} gün.)" : null)</p>
+            }
+            else
+            {
+                <p class="text-muted">Doğruluk yalnızca kilitli tahminler için hesaplanır.</p>
+            }
+        </section>
+
+        @if (adjusting is not null)
+        {
+            <form class="record-form" novalidate @onsubmit="AdjustAsync" @onsubmit:preventDefault aria-labelledby="sfd-adjust-title">
+                <h2 id="sfd-adjust-title" tabindex="-1" @ref="adjustHeading">Satırı düzelt: @adjusting.Number · @adjusting.Title</h2>
+                <ErrorSummary Errors="actionErrors" />
+                <div class="form-grid">
+                    <div class="span-3">
+                        <label class="form-label required" for="sfd-adj-kind">Düzeltme türü</label>
+                        <select id="sfd-adj-kind" class="form-select" required aria-required="true" @bind="adjusting.Kind" @bind:after="AdjustKindChanged">
+                            @foreach (var (key, label) in SalesLabels.AdjustmentKinds) { <option value="@key">@label</option> }
+                        </select>
+                        <FieldError Field="kind" Errors="actionErrors" />
+                    </div>
+                    <div class="span-3">
+                        @if (adjusting.Kind == ForecastAdjustmentKinds.Category)
+                        {
+                            <label class="form-label required" for="sfd-adj-value">Yeni kategori</label>
+                            <select id="sfd-adj-value" class="form-select" required aria-required="true" @bind="adjusting.CategoryValue">
+                                @foreach (var (key, label) in SalesLabels.Categories) { <option value="@key">@label</option> }
+                            </select>
+                        }
+                        else if (adjusting.Kind == ForecastAdjustmentKinds.Amount)
+                        {
+                            <label class="form-label" for="sfd-adj-value">Tutar farkı (@currency)</label>
+                            <input id="sfd-adj-value" class="form-control" type="number" step="0.01" inputmode="decimal" aria-describedby="sfd-adj-help" disabled="@(!adjusting.CanAdjustAmount)" @bind="adjusting.AmountValue" />
+                            <div id="sfd-adj-help" class="form-text">
+                                @(adjusting.CanAdjustAmount
+                                    ? "Temel tutara eklenecek fark (negatif olabilir); boş bırakmak düzeltmeyi kaldırır."
+                                    : "Tutarı ya da kuru olmayan satırın tutarı düzeltilemez; önce fırsatı tamamlayıp tahmini yenileyin.")
+                            </div>
+                        }
+                        else
+                        {
+                            <label class="form-label" for="sfd-adj-value">Olasılık (%)</label>
+                            <input id="sfd-adj-value" class="form-control" type="number" min="0" max="100" step="1" inputmode="numeric" aria-describedby="sfd-adj-help" @bind="adjusting.ProbabilityValue" />
+                            <div id="sfd-adj-help" class="form-text">0-100 arası tam sayı; boş bırakmak düzeltmeyi kaldırır ve aşama/fırsat olasılığına döner.</div>
+                        }
+                        <FieldError Field="value" Errors="actionErrors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label required" for="sfd-adj-reason">Gerekçe</label>
+                        <input id="sfd-adj-reason" class="form-control" maxlength="500" required aria-required="true" @bind="adjusting.Reason" />
+                        <FieldError Field="reason" Errors="actionErrors" />
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@busy">
+                        @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
+                        Düzeltmeyi kaydet
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelAdjust">Vazgeç</button>
+                </div>
+            </form>
+        }
+
+        <section class="detail-section" aria-labelledby="sfd-items">
+            <div class="section-header"><h2 id="sfd-items">Fırsat satırları (@d.Items.Count)</h2></div>
+            @if (!d.ItemsVisible)
+            {
+                <p class="text-muted">Fırsat satırlarını görme yetkiniz yok.</p>
+            }
+            else if (d.Items.Count == 0)
+            {
+                <p class="text-muted">Bu tahminde fırsat yok.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Tahmin satırları</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Fırsat</th><th scope="col">Sorumlu</th><th scope="col">Aşama</th><th scope="col">Kaynak tutar</th><th scope="col">Kur</th>
+                                <th scope="col">Temel tutar (@currency)</th><th scope="col">Düzeltme</th><th scope="col">Nihai tutar</th><th scope="col">Olasılık</th>
+                                <th scope="col">Kategori</th><th scope="col">Sorunlar</th>
+                                @if (cap.CanWrite) { <th scope="col"><span class="visually-hidden">İşlemler</span></th> }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in d.Items)
+                            {
+                                <tr>
+                                    <td data-label="Fırsat" class="primary"><a href="crm/firsatlar/@item.OpportunityId">@item.OpportunityNumber</a><br /><small>@item.Title</small></td>
+                                    <td data-label="Sorumlu">
+                                        @(item.CurrentOwnerId is null ? "Atanmadı" : Lookups.MemberName(item.CurrentOwnerId))
+                                        @if (item.OwnerId != item.CurrentOwnerId)
+                                        {
+                                            <br /><small class="text-muted">Tahmin anında: @(item.OwnerId is null ? "Atanmadı" : Lookups.MemberName(item.OwnerId))</small>
+                                        }
+                                    </td>
+                                    <td data-label="Aşama">@Lookups.Label(CrmLists.OpportunityStage, item.Stage)</td>
+                                    <td data-label="Kaynak tutar">@(item.SourceAmount is { } source ? CrmLabels.Amount(source, item.SourceCurrency) : "—")</td>
+                                    <td data-label="Kur">
+                                        @if (item.RateMissing)
+                                        {
+                                            <span class="badge stage-lost">Kur yok</span>
+                                        }
+                                        else if (item.RateUsed is { } rate)
+                                        {
+                                            @rate.ToString("0.####", Regional.Numbers)
+                                            @if (item.RateDate is { } rateDate)
+                                            {
+                                                <br /><small class="text-muted">@CrmLabels.Date(rateDate)</small>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <text>—</text>
+                                        }
+                                    </td>
+                                    <td data-label="Temel tutar">@(item.BaseAmount is { } baseAmount ? CrmLabels.Amount(baseAmount, currency) : "—")</td>
+                                    <td data-label="Düzeltme">@(item.AdjustmentAmount is { } delta ? $"{(delta > 0 ? "+" : null)}{CrmLabels.Amount(delta, currency)}" : "—")</td>
+                                    <td data-label="Nihai tutar">@(item.FinalAmount is { } final ? CrmLabels.Amount(final, currency) : "—")</td>
+                                    <td data-label="Olasılık">
+                                        @(item.EffectiveProbability is { } probability ? $"%{probability}" : "—")
+                                        <br /><small class="text-muted">@SalesLabels.Source(item.ProbabilitySource)</small>
+                                    </td>
+                                    <td data-label="Kategori">
+                                        <span class="badge stage-@SalesLabels.CategoryBadge(item.Category)">@SalesLabels.Category(item.Category)</span>
+                                        @if (item.Category != item.BaseCategory)
+                                        {
+                                            <br /><small class="text-muted">Varsayılan: @SalesLabels.Category(item.BaseCategory)</small>
+                                        }
+                                    </td>
+                                    <td data-label="Sorunlar">
+                                        @if (item.Flags.Count == 0)
+                                        {
+                                            <text>—</text>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var flag in item.Flags)
+                                            {
+                                                <span class="badge stage-lost">@SalesLabels.Flag(flag)</span>
+                                            }
+                                        }
+                                    </td>
+                                    @if (cap.CanWrite)
+                                    {
+                                        <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" aria-label="@($"{item.OpportunityNumber} satırını düzelt")" @onclick="() => StartAdjust(item)">Düzelt</button></td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="detail-section" aria-labelledby="sfd-history">
+            <div class="section-header"><h2 id="sfd-history">Düzeltme geçmişi (@d.Adjustments.Count)</h2></div>
+            @if (d.Adjustments.Count == 0)
+            {
+                <p class="text-muted">Bu sürümde düzeltme yapılmadı.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Düzeltme geçmişi</caption>
+                    <thead><tr><th scope="col">Zaman</th><th scope="col">Kullanıcı</th><th scope="col">Fırsat</th><th scope="col">Tür</th><th scope="col">Önceki</th><th scope="col">Yeni</th><th scope="col">Gerekçe</th></tr></thead>
+                    <tbody>
+                        @foreach (var adjustment in d.Adjustments)
+                        {
+                            <tr>
+                                <td data-label="Zaman">@CrmLabels.Time(adjustment.At)</td>
+                                <td data-label="Kullanıcı">@(adjustment.ChangedBy is { } who ? Lookups.MemberName(who) : "—")</td>
+                                <td data-label="Fırsat">@OpportunityText(d, adjustment.OpportunityId)</td>
+                                <td data-label="Tür">@SalesLabels.Label(SalesLabels.AdjustmentKinds, adjustment.Kind)</td>
+                                <td data-label="Önceki">@AdjustmentValue(adjustment.Kind, adjustment.FromValue, currency)</td>
+                                <td data-label="Yeni">@AdjustmentValue(adjustment.Kind, adjustment.ToValue, currency)</td>
+                                <td data-label="Gerekçe">@adjustment.Reason</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section class="detail-section" aria-labelledby="sfd-versions">
+            <div class="section-header"><h2 id="sfd-versions">Sürümler ve karşılaştırma</h2></div>
+            @if (versions is null)
+            {
+                <p class="text-muted" role="status">Sürümler yükleniyor…</p>
+            }
+            else
+            {
+                <ul class="item-list">
+                    @foreach (var version in versions)
+                    {
+                        <li>
+                            <div class="item-main">
+                                @if (version.Id == Id)
+                                {
+                                    <strong aria-current="page">V@(version.VersionNo) (bu sürüm)</strong>
+                                }
+                                else
+                                {
+                                    <a href="crm/satis-tahmini/@version.Id">V@(version.VersionNo)</a>
+                                }
+                                <span class="badge stage-@SalesLabels.StatusBadge(version.Status)">@SalesLabels.Status(version.Status)</span>
+                                <span class="text-muted">@(version.ChangedAt is { } changed ? CrmLabels.Time(changed) : null)</span>
+                            </div>
+                        </li>
+                    }
+                </ul>
+                @if (versions.Any(v => v.Id != Id))
+                {
+                    <form class="form-grid" @onsubmit="CompareAsync" @onsubmit:preventDefault aria-label="Sürüm karşılaştırması">
+                        <div class="span-4">
+                            <label class="form-label" for="sfd-against">Bu sürümü şununla karşılaştır</label>
+                            <select id="sfd-against" class="form-select" @bind="against">
+                                @foreach (var version in versions.Where(v => v.Id != Id))
+                                {
+                                    <option value="@version.Id">V@(version.VersionNo) · @SalesLabels.Status(version.Status)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="span-3">
+                            <label class="form-label" for="sfd-compare-go">&nbsp;</label>
+                            <button id="sfd-compare-go" type="submit" class="btn btn-outline-secondary" disabled="@comparing">Karşılaştır</button>
+                        </div>
+                    </form>
+                }
+                else
+                {
+                    <p class="text-muted">Karşılaştırılacak başka sürüm yok.</p>
+                }
+            }
+
+            @if (comparing)
+            {
+                <p class="text-muted" role="status">Karşılaştırılıyor…</p>
+            }
+
+            @if (compareError is not null)
+            {
+                <div class="alert alert-danger" role="alert">
+                    @compareError
+                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@comparing" @onclick="CompareAsync">Tekrar dene</button>
+                </div>
+            }
+
+            @if (comparison is { } c)
+            {
+                <h3 class="h5 mt-3" id="sfd-compare-title" tabindex="-1" @ref="compareHeading">V@(c.PreviousVersionNo) → V@(c.CurrentVersionNo) değişiklikleri</h3>
+                <p class="small text-muted">Eklenen: @c.Added.Count · çıkan: @c.Removed.Count · tutarı değişen: @c.AmountChanged.Count · kategorisi değişen: @c.CategoryChanged.Count</p>
+
+                <h4 class="h6">Eklenen fırsatlar (@c.Added.Count)</h4>
+                @if (c.Added.Count == 0) { <p class="text-muted">Yok.</p> }
+                else
+                {
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Eklenen fırsatlar</caption>
+                        <thead><tr><th scope="col">Fırsat</th>@if (c.AmountsVisible) { <th scope="col">Tutar</th> }<th scope="col">Kategori</th></tr></thead>
+                        <tbody>
+                            @foreach (var e in c.Added)
+                            {
+                                <tr>
+                                    <td data-label="Fırsat" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
+                                    @if (c.AmountsVisible) { <td data-label="Tutar">@AmountOrDash(e.AfterAmount, currency)</td> }
+                                    <td data-label="Kategori">@CategoryOrDash(e.AfterCategory)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+
+                <h4 class="h6">Çıkan fırsatlar (@c.Removed.Count)</h4>
+                @if (c.Removed.Count == 0) { <p class="text-muted">Yok.</p> }
+                else
+                {
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Çıkan fırsatlar</caption>
+                        <thead><tr><th scope="col">Fırsat</th>@if (c.AmountsVisible) { <th scope="col">Önceki tutar</th> }<th scope="col">Önceki kategori</th><th scope="col">Neden</th></tr></thead>
+                        <tbody>
+                            @foreach (var e in c.Removed)
+                            {
+                                <tr>
+                                    <td data-label="Fırsat" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
+                                    @if (c.AmountsVisible) { <td data-label="Önceki tutar">@AmountOrDash(e.BeforeAmount, currency)</td> }
+                                    <td data-label="Önceki kategori">@CategoryOrDash(e.BeforeCategory)</td>
+                                    <td data-label="Neden"><span class="badge stage-@OutcomeBadge(e.Outcome)">@SalesLabels.Outcome(e.Outcome)</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+
+                <h4 class="h6">Tutarı değişenler (@c.AmountChanged.Count)</h4>
+                @if (c.AmountChanged.Count == 0) { <p class="text-muted">Yok.</p> }
+                else
+                {
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Tutarı değişen fırsatlar</caption>
+                        <thead><tr><th scope="col">Fırsat</th><th scope="col">Önceki tutar</th><th scope="col">Yeni tutar</th></tr></thead>
+                        <tbody>
+                            @foreach (var e in c.AmountChanged)
+                            {
+                                <tr>
+                                    <td data-label="Fırsat" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
+                                    <td data-label="Önceki tutar">@(c.AmountsVisible ? AmountOrDash(e.BeforeAmount, currency) : "—")</td>
+                                    <td data-label="Yeni tutar">@(c.AmountsVisible ? AmountOrDash(e.AfterAmount, currency) : "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+
+                <h4 class="h6">Kategorisi değişenler (@c.CategoryChanged.Count)</h4>
+                @if (c.CategoryChanged.Count == 0) { <p class="text-muted">Yok.</p> }
+                else
+                {
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Kategorisi değişen fırsatlar</caption>
+                        <thead><tr><th scope="col">Fırsat</th><th scope="col">Önceki kategori</th><th scope="col">Yeni kategori</th></tr></thead>
+                        <tbody>
+                            @foreach (var e in c.CategoryChanged)
+                            {
+                                <tr>
+                                    <td data-label="Fırsat" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
+                                    <td data-label="Önceki kategori">@CategoryOrDash(e.BeforeCategory)</td>
+                                    <td data-label="Yeni kategori">@CategoryOrDash(e.AfterCategory)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+        </section>
+
+        <details class="detail-section">
+            <summary><strong>Hesap açıklaması</strong></summary>
+            <ul class="small text-muted mt-2">
+                @foreach (var definition in d.Definitions)
+                {
+                    <li>@definition</li>
+                }
+            </ul>
+        </details>
+    }
+</AuthGate>
+
+@code {
+    private const string BaseUrl = "/api/crm/sales/forecasts";
+
+    [Parameter] public Guid Id { get; set; }
+
+    private Guid loadedId;
+    private ForecastDetailDto? detail;
+    private IReadOnlyList<ForecastHeaderDto>? versions;
+    private string? loadError;
+    private HttpStatusCode loadStatus;
+    private bool loading;
+    private bool busy;
+    private int requestId;
+
+    private string? notice;
+    private bool keepNotice;
+    private string? actionMessage;
+    private IReadOnlyDictionary<string, string[]>? actionErrors;
+
+    private string? pending;
+    private string reason = string.Empty;
+    private string noteText = string.Empty;
+
+    private AdjustForm? adjusting;
+    private bool focusAdjust;
+    private ElementReference adjustHeading;
+
+    private string against = string.Empty;
+    private ForecastComparisonDto? comparison;
+    private string? compareError;
+    private bool comparing;
+    private bool focusCompare;
+    private ElementReference compareHeading;
+
+    private bool lookupsLoaded;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedId == Id)
+        {
+            return;
+        }
+
+        loadedId = Id;
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(SalesAccess.ForecastsRead))
+        {
+            return;
+        }
+
+        if (!lookupsLoaded)
+        {
+            await Lookups.LoadAsync();
+            lookupsLoaded = true;
+        }
+
+        if (!keepNotice)
+        {
+            notice = null;
+        }
+
+        keepNotice = false;
+        actionMessage = null;
+        actionErrors = null;
+        pending = null;
+        adjusting = null;
+        comparison = null;
+        compareError = null;
+        detail = null;
+        versions = null;
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusAdjust && adjusting is not null)
+        {
+            focusAdjust = false;
+            await adjustHeading.FocusAsync();
+        }
+        else if (focusCompare && comparison is not null)
+        {
+            focusCompare = false;
+            await compareHeading.FocusAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var id = ++requestId;
+        loading = true;
+        loadError = null;
+        var result = await Api.GetAsync<ForecastDetailDto>($"{BaseUrl}/{Id}");
+        if (id != requestId)
+        {
+            return;
+        }
+
+        loading = false;
+        if (!result.IsSuccess || result.Value is null)
+        {
+            loadStatus = result.Status;
+            loadError = result.Status == HttpStatusCode.NotFound ? "Tahmin bulunamadı ya da erişiminiz yok." : result.Error;
+            return;
+        }
+
+        Apply(result.Value);
+        await LoadVersionsAsync();
+    }
+
+    private void Apply(ForecastDetailDto value)
+    {
+        detail = value;
+        noteText = value.Header.Note ?? string.Empty;
+    }
+
+    private async Task LoadVersionsAsync()
+    {
+        if (detail is null)
+        {
+            return;
+        }
+
+        var h = detail.Header;
+        var result = await Api.GetAsync<List<ForecastHeaderDto>>($"{BaseUrl}?from={Iso(h.PeriodStart)}&to={Iso(h.PeriodEnd)}");
+        versions = (result.Value ?? [])
+            .Where(v => v.PeriodStart == h.PeriodStart && v.PeriodEnd == h.PeriodEnd && v.ScopeType == h.ScopeType && v.ScopeUserId == h.ScopeUserId && v.ReportingCurrency == h.ReportingCurrency)
+            .OrderByDescending(v => v.VersionNo)
+            .ToList();
+
+        var others = versions.Where(v => v.Id != Id).ToList();
+        against = others.Any(v => v.Id == h.PreviousSubmissionId)
+            ? h.PreviousSubmissionId!.Value.ToString()
+            : others.FirstOrDefault()?.Id.ToString() ?? string.Empty;
+    }
+
+    private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private string VersionText(Guid versionId) =>
+        versions?.FirstOrDefault(v => v.Id == versionId) is { } v ? $"V{v.VersionNo}" : "Önceki sürüm";
+
+    // ---- Eylemler
+
+    private long? Version => detail?.Header.Version;
+
+    private async Task RunAsync(Func<Task<ApiResult<ForecastDetailDto>>> call, string done)
+    {
+        if (busy)
+        {
+            return;
+        }
+
+        busy = true;
+        notice = null;
+        actionMessage = null;
+        actionErrors = null;
+        var result = await call();
+        busy = false;
+
+        if (result.IsSuccess && result.Value is { } updated)
+        {
+            pending = null;
+            adjusting = null;
+            reason = string.Empty;
+            comparison = null;
+            notice = done;
+            if (updated.Header.Id != Id)
+            {
+                // Yeniden açma yeni sürüm üretir: yeni sürümün sayfasına geçilir.
+                keepNotice = true;
+                Navigation.NavigateTo($"crm/satis-tahmini/{updated.Header.Id}");
+                return;
+            }
+
+            Apply(updated);
+            await LoadVersionsAsync();
+            return;
+        }
+
+        if (result.Status == HttpStatusCode.Conflict)
+        {
+            // Eşzamanlı değişiklik (ya da durum kuralı): güncel hali yeniden yükle ve bildir.
+            pending = null;
+            adjusting = null;
+            var fresh = await Api.GetAsync<ForecastDetailDto>($"{BaseUrl}/{Id}");
+            if (fresh.IsSuccess && fresh.Value is not null)
+            {
+                Apply(fresh.Value);
+                await LoadVersionsAsync();
+            }
+
+            actionMessage = $"{result.Error} Tahminin güncel hali yeniden yüklendi; işleminizi gözden geçirip gerekirse tekrar deneyin.";
+            return;
+        }
+
+        actionErrors = result.FieldErrors;
+        actionMessage = result.FieldErrors.Count == 0 ? result.Error : null;
+    }
+
+    private Task RefreshAsync() =>
+        RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/refresh", new ForecastVersionRequestDto(Version)), "Taslak güncel fırsatlarla yenilendi. Önceki düzeltmeleriniz korundu.");
+
+    private Task SubmitAsync() =>
+        RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/submit", new ForecastVersionRequestDto(Version)), "Tahmin sunuldu.");
+
+    private Task SaveNoteAsync() =>
+        RunAsync(() => Api.PutAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/note", new ForecastNoteRequestDto(string.IsNullOrWhiteSpace(noteText) ? null : noteText.Trim(), Version)), "Not kaydedildi.");
+
+    private void StartPending(string action)
+    {
+        pending = action;
+        reason = string.Empty;
+        actionErrors = null;
+        actionMessage = null;
+        notice = null;
+        adjusting = null;
+    }
+
+    private void CancelPending()
+    {
+        pending = null;
+        actionErrors = null;
+    }
+
+    private static string PendingTitle(string action) => action switch
+    {
+        "return" => "Tahmini taslağa geri çek",
+        "lock" => "Tahmini kilitle",
+        "reopen" => "Kilitli tahmini yeniden aç",
+        _ => "Taslağı sil",
+    };
+
+    private static string PendingConfirmText(string action) => action switch
+    {
+        "return" => "Taslağa geri çek",
+        "lock" => "Evet, kilitle",
+        "reopen" => "Yeni sürüm olarak aç",
+        _ => "Evet, sil",
+    };
+
+    private Task ConfirmPendingAsync() => pending switch
+    {
+        "return" => RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/return", new ForecastReasonRequestDto(reason.Trim(), Version)), "Tahmin taslağa geri çekildi."),
+        "lock" => RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/lock", new ForecastVersionRequestDto(Version)), "Tahmin kilitlendi."),
+        "reopen" => RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/reopen", new ForecastReasonRequestDto(reason.Trim(), Version)), "Yeni sürüm taslak olarak açıldı."),
+        "delete" => DeleteAsync(),
+        _ => Task.CompletedTask,
+    };
+
+    private async Task DeleteAsync()
+    {
+        if (busy)
+        {
+            return;
+        }
+
+        busy = true;
+        actionMessage = null;
+        var result = await Api.DeleteAsync($"{BaseUrl}/{Id}?version={Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("crm/satis-tahmini");
+            return;
+        }
+
+        pending = null;
+        actionMessage = result.Status == HttpStatusCode.Conflict
+            ? $"{result.Error} Tahmin silinmedi; güncel hali yeniden yükleniyor."
+            : result.Error;
+        if (result.Status == HttpStatusCode.Conflict)
+        {
+            await LoadAsync();
+        }
+    }
+
+    // ---- Düzeltme
+
+    private void StartAdjust(ForecastItemDto item)
+    {
+        pending = null;
+        actionErrors = null;
+        actionMessage = null;
+        notice = null;
+        adjusting = new AdjustForm
+        {
+            ItemId = item.Id,
+            Number = item.OpportunityNumber,
+            Title = item.Title,
+            CanAdjustAmount = item.BaseAmount is not null,
+            CurrentCategory = item.Category,
+            CurrentAmount = item.AdjustmentAmount,
+            CurrentProbability = item.ProbabilityOverride,
+            Kind = ForecastAdjustmentKinds.Category,
+            CategoryValue = item.Category,
+        };
+        focusAdjust = true;
+    }
+
+    private void AdjustKindChanged()
+    {
+        if (adjusting is null)
+        {
+            return;
+        }
+
+        adjusting.CategoryValue = adjusting.CurrentCategory;
+        adjusting.AmountValue = adjusting.CurrentAmount;
+        adjusting.ProbabilityValue = adjusting.CurrentProbability;
+    }
+
+    private void CancelAdjust()
+    {
+        adjusting = null;
+        actionErrors = null;
+    }
+
+    private Task AdjustAsync()
+    {
+        if (adjusting is not { } form)
+        {
+            return Task.CompletedTask;
+        }
+
+        var value = form.Kind switch
+        {
+            ForecastAdjustmentKinds.Category => form.CategoryValue,
+            ForecastAdjustmentKinds.Amount => form.AmountValue?.ToString(CultureInfo.InvariantCulture),
+            _ => form.ProbabilityValue?.ToString(CultureInfo.InvariantCulture),
+        };
+
+        return RunAsync(
+            () => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/adjust", new AdjustForecastRequestDto(form.ItemId, form.Kind, value, form.Reason.Trim(), Version)),
+            "Düzeltme kaydedildi.");
+    }
+
+    // ---- Karşılaştırma
+
+    private async Task CompareAsync()
+    {
+        if (comparing || !Guid.TryParse(against, out var againstId))
+        {
+            return;
+        }
+
+        comparing = true;
+        compareError = null;
+        comparison = null;
+        var result = await Api.GetAsync<ForecastComparisonDto>($"{BaseUrl}/{Id}/compare?against={againstId}");
+        comparing = false;
+        comparison = result.Value;
+        compareError = result.Error;
+        focusCompare = comparison is not null;
+    }
+
+    // ---- Gösterim yardımcıları
+
+    private static string AmountOrDash(decimal? amount, string currency) => amount is { } value ? CrmLabels.Amount(value, currency) : "—";
+
+    private static string CategoryOrDash(string? category) => category is null ? "—" : SalesLabels.Category(category);
+
+    private static string OutcomeBadge(string? outcome) => outcome switch
+    {
+        "Won" => "won",
+        "Lost" => "lost",
+        "Cancelled" => "cancelled",
+        "OnHold" or "Postponed" => "onhold",
+        _ => "open",
+    };
+
+    private static string OpportunityText(ForecastDetailDto d, Guid opportunityId) =>
+        d.Items.FirstOrDefault(i => i.OpportunityId == opportunityId) is { } item ? $"{item.OpportunityNumber} · {item.Title}" : "—";
+
+    private static string AdjustmentValue(string kind, string? value, string currency)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "— (yok)";
+        }
+
+        return kind switch
+        {
+            ForecastAdjustmentKinds.Category => SalesLabels.Category(value),
+            ForecastAdjustmentKinds.Probability => $"%{value}",
+            _ => decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) ? CrmLabels.Amount(amount, currency) : value,
+        };
+    }
+
+    private static RenderFragment VarianceRow(string label, ForecastVarianceDto? variance, string currency) => builder =>
+    {
+        if (variance is null)
+        {
+            return;
+        }
+
+        var seq = 0;
+        builder.OpenElement(seq++, "tr");
+        Cell(builder, ref seq, "Senaryo", label, "primary");
+        Cell(builder, ref seq, "Tahmin", CrmLabels.Amount(variance.Forecast, currency));
+        Cell(builder, ref seq, "Gerçekleşen", CrmLabels.Amount(variance.Actual, currency));
+        Cell(builder, ref seq, "Hata", $"{(variance.Error > 0 ? "+" : null)}{CrmLabels.Amount(variance.Error, currency)}");
+        Cell(builder, ref seq, "Mutlak hata", CrmLabels.Amount(variance.AbsoluteError, currency));
+        Cell(builder, ref seq, "Hata yüzdesi", variance.ErrorPercent is { } percent ? $"{(percent > 0 ? "+" : null)}{SalesLabels.Percent(percent)}" : "Hesaplanmadı");
+        builder.CloseElement();
+    };
+
+    private static void Cell(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder, ref int seq, string label, string text, string? css = null)
+    {
+        builder.OpenElement(seq++, "td");
+        builder.AddAttribute(seq++, "data-label", label);
+        if (css is not null)
+        {
+            builder.AddAttribute(seq++, "class", css);
+        }
+
+        builder.AddContent(seq++, text);
+        builder.CloseElement();
+    }
+
+    private sealed class AdjustForm
+    {
+        public Guid ItemId { get; init; }
+
+        public string Number { get; init; } = string.Empty;
+
+        public string Title { get; init; } = string.Empty;
+
+        public bool CanAdjustAmount { get; init; }
+
+        public string CurrentCategory { get; init; } = string.Empty;
+
+        public decimal? CurrentAmount { get; init; }
+
+        public int? CurrentProbability { get; init; }
+
+        public string Kind { get; set; } = ForecastAdjustmentKinds.Category;
+
+        public string CategoryValue { get; set; } = string.Empty;
+
+        public decimal? AmountValue { get; set; }
+
+        public int? ProbabilityValue { get; set; }
+
+        public string Reason { get; set; } = string.Empty;
+    }
+}

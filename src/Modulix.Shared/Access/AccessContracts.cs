@@ -66,6 +66,8 @@ public enum RecordScope
     All = 1,
     Team = 2,
     Own = 3,
+    Unit = 4,
+    UnitAndBelow = 5,
 }
 
 public static class RecordScopeLabels
@@ -73,6 +75,8 @@ public static class RecordScopeLabels
     public static string Of(RecordScope scope) => scope switch
     {
         RecordScope.All => "Tüm kayıtlar",
+        RecordScope.UnitAndBelow => "Departmanın ve alt departmanların kayıtları",
+        RecordScope.Unit => "Departmanın kayıtları",
         RecordScope.Team => "Ekibinin kayıtları",
         RecordScope.Own => "Yalnızca kendi kayıtları",
         _ => scope.ToString(),
@@ -81,9 +85,52 @@ public static class RecordScopeLabels
     public static string Describe(RecordScope scope) => scope switch
     {
         RecordScope.All => "Firmadaki bütün kayıtlar.",
+        RecordScope.UnitAndBelow => "Kendi departmanındaki ve alt departmanlardaki kişilerin sorumlu olduğu kayıtlar.",
+        RecordScope.Unit => "Kendi departmanındaki kişilerin sorumlu olduğu kayıtlar.",
         RecordScope.Team => "Kendisinin ve ekip arkadaşlarının sorumlu olduğu kayıtlar.",
         RecordScope.Own => "Yalnızca sorumlusu kendisi olan kayıtlar.",
         _ => string.Empty,
+    };
+}
+
+/// <summary>
+/// Kayıt kapsamlarının genişlik ve kapsama kuralları (sunucudaki <c>RecordScopeRules</c> ile aynı); sayısal değere bakılmaz.
+/// Ekip ile departman birbirini kapsamaz. Karar sunucuda verilir; ekran yalnızca seçenekleri önceden süzmek için kullanır.
+/// </summary>
+public static class RecordScopeRules
+{
+    public static int Breadth(RecordScope scope) => scope switch
+    {
+        RecordScope.All => 5,
+        RecordScope.UnitAndBelow => 4,
+        RecordScope.Unit => 3,
+        RecordScope.Team => 2,
+        _ => 1,
+    };
+
+    public static bool Covers(RecordScope holder, RecordScope wanted) =>
+        holder == RecordScope.All
+        || holder == wanted
+        || wanted == RecordScope.Own
+        || (holder == RecordScope.UnitAndBelow && wanted == RecordScope.Unit);
+}
+
+/// <summary>Rolün hangi düzeyde atanabileceği (ADR-0026 K6): kullanıcıya, departmana ya da ikisine.</summary>
+public enum RoleAssignLevel
+{
+    User = 1,
+    Unit = 2,
+    Both = 3,
+}
+
+public static class RoleAssignLevelLabels
+{
+    public static string Of(RoleAssignLevel level) => level switch
+    {
+        RoleAssignLevel.User => "Yalnızca kullanıcıya",
+        RoleAssignLevel.Unit => "Yalnızca departmana",
+        RoleAssignLevel.Both => "Kullanıcıya ve departmana",
+        _ => level.ToString(),
     };
 }
 
@@ -92,14 +139,22 @@ public static class RecordScopeLabels
 /// <see cref="MemberCount"/> rol listesinde doldurulur.
 /// </summary>
 public sealed record RoleDto(
-    Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem = false, int MemberCount = 0, RecordScope Scope = RecordScope.All);
+    Guid Id,
+    string Name,
+    IReadOnlyList<string> Permissions,
+    bool IsSystem = false,
+    int MemberCount = 0,
+    RecordScope Scope = RecordScope.All,
+    RoleAssignLevel AssignLevel = RoleAssignLevel.User,
+    int UnitCount = 0);
 
 /// <summary>Hazır rol önerisi; "Şablondan başla" ile yeni rol formunu doldurur.</summary>
 public sealed record RoleTemplateDto(
     string Key, string Name, string Description, IReadOnlyList<string> Permissions, RecordScope Scope = RecordScope.All);
 
 /// <summary><see cref="Scope"/> verilmezse yeni rol tüm kayıtları görür, mevcut rolün kapsamı değişmez.</summary>
-public sealed record SaveRoleRequest(string Name, IReadOnlyList<string> Permissions, RecordScope? Scope = null);
+public sealed record SaveRoleRequest(
+    string Name, IReadOnlyList<string> Permissions, RecordScope? Scope = null, RoleAssignLevel? AssignLevel = null);
 
 public sealed record SetMembershipRolesRequest(IReadOnlyList<Guid> RoleIds);
 

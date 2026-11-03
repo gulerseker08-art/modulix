@@ -115,6 +115,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("AssignLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -940,6 +945,33 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("BusinessUnitMembers", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Organization.BusinessUnitRole", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("InheritToChildren")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RoleId");
+
+                    b.HasIndex("TenantId", "BusinessUnitId", "RoleId")
+                        .IsUnique();
+
+                    b.ToTable("BusinessUnitRoles", "core");
                 });
 
             modelBuilder.Entity("Modulix.Core.Organization.Company", b =>
@@ -4169,6 +4201,303 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.ForecastAdjustment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ChangedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FromValue")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<Guid>("OpportunityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ToValue")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "SubmissionId", "OpportunityId");
+
+                    b.ToTable("ForecastAdjustments", "crm", t =>
+                        {
+                            t.HasCheckConstraint("CK_ForecastAdjustments_Kind", "[Kind] IN ('Category','Amount','Probability')");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.ForecastItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("AdjustmentAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("BaseAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("BaseCategory")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly?>("ExpectedCloseDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("OpportunityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OpportunityNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Probability")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("ProbabilityManual")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("ProbabilityOverride")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly?>("RateDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("RateMissing")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("RateUsed")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("decimal(28,10)");
+
+                    b.Property<decimal?>("SourceAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("SourceCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "SubmissionId", "OpportunityId")
+                        .IsUnique();
+
+                    b.ToTable("ForecastItems", "crm", t =>
+                        {
+                            t.HasCheckConstraint("CK_ForecastItems_BaseCategory", "[BaseCategory] IN ('Omitted','Pipeline','BestCase','Commit')");
+
+                            t.HasCheckConstraint("CK_ForecastItems_Category", "[Category] IN ('Omitted','Pipeline','BestCase','Commit')");
+
+                            t.HasCheckConstraint("CK_ForecastItems_Probability", "([Probability] IS NULL OR [Probability] BETWEEN 0 AND 100) AND ([ProbabilityOverride] IS NULL OR [ProbabilityOverride] BETWEEN 0 AND 100)");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.ForecastSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ChangedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("LockedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("LockedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date");
+
+                    b.Property<string>("PeriodKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("PreviousSubmissionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("RealizedAtLock")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("RealizedPartial")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("RefreshedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReopenReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ReportingCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
+
+                    b.Property<string>("ReturnReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid?>("ScopeUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("SubmittedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("VersionNo")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.HasIndex("TenantId", "PeriodStart", "PeriodEnd", "ScopeType", "ScopeUserId", "ReportingCurrency")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ForecastSubmissions_Open")
+                        .HasFilter("[Status] <> 'Locked'");
+
+                    b.HasIndex("TenantId", "PeriodStart", "PeriodEnd", "ScopeType", "ScopeUserId", "ReportingCurrency", "VersionNo")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ForecastSubmissions_Version")
+                        .HasFilter("[ScopeUserId] IS NOT NULL");
+
+                    b.ToTable("ForecastSubmissions", "crm", t =>
+                        {
+                            t.HasCheckConstraint("CK_ForecastSubmissions_Locked", "[Status] <> 'Locked' OR [LockedAt] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_ForecastSubmissions_Period", "[PeriodEnd] >= [PeriodStart]");
+
+                            t.HasCheckConstraint("CK_ForecastSubmissions_Scope", "([ScopeType] = 'Tenant' AND [ScopeUserId] IS NULL) OR ([ScopeType] = 'User' AND [ScopeUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ForecastSubmissions_Status", "[Status] IN ('Draft','Submitted','Locked')");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Lead", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6168,6 +6497,139 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "QuoteId", "CreatedAt");
 
                     b.ToTable("QuoteShareLinks", "crm");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.SalesTarget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Metric")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date");
+
+                    b.Property<int>("RevisionNo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid?>("ScopeUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "PeriodStart", "PeriodEnd");
+
+                    b.HasIndex("TenantId", "Metric", "ScopeType", "ScopeUserId", "Currency", "PeriodStart")
+                        .IsUnique()
+                        .HasDatabaseName("UX_SalesTargets_Slot")
+                        .HasFilter("[ScopeUserId] IS NOT NULL AND [Currency] IS NOT NULL");
+
+                    b.ToTable("SalesTargets", "crm", t =>
+                        {
+                            t.HasCheckConstraint("CK_SalesTargets_Currency", "([Metric] = 'WonAmount' AND [Currency] IS NOT NULL) OR ([Metric] = 'WonCount' AND [Currency] IS NULL)");
+
+                            t.HasCheckConstraint("CK_SalesTargets_Metric", "[Metric] IN ('WonAmount','WonCount')");
+
+                            t.HasCheckConstraint("CK_SalesTargets_Period", "[PeriodEnd] >= [PeriodStart]");
+
+                            t.HasCheckConstraint("CK_SalesTargets_Scope", "([ScopeType] = 'Tenant' AND [ScopeUserId] IS NULL) OR ([ScopeType] = 'User' AND [ScopeUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_SalesTargets_Value", "[Value] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.SalesTargetRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ChangedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("NewValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("OldValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("RevisionNo")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "TargetId", "RevisionNo")
+                        .IsUnique();
+
+                    b.ToTable("SalesTargetRevisions", "crm");
                 });
 
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.TaxRate", b =>
@@ -9901,6 +10363,23 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Modulix.Core.Organization.BusinessUnitRole", b =>
+                {
+                    b.HasOne("Modulix.Core.Organization.BusinessUnit", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "BusinessUnitId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Core.Authorization.Role", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RoleId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Core.Organization.MembershipCompany", b =>
                 {
                     b.HasOne("Modulix.Core.Organization.Branch", null)
@@ -10336,6 +10815,26 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.ForecastAdjustment", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.ForecastSubmission", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SubmissionId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.ForecastItem", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.ForecastSubmission", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SubmissionId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Lead", b =>
                 {
                     b.HasOne("Modulix.Modules.Crm.Domain.Company", null)
@@ -10628,6 +11127,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Modules.Crm.Domain.Quote", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "QuoteId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.SalesTargetRevision", b =>
+                {
+                    b.HasOne("Modulix.Modules.Crm.Domain.SalesTarget", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TargetId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

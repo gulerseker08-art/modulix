@@ -1,4 +1,6 @@
 using Modulix.Api.Access;
+using Modulix.Core.Authorization;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Shared.Users;
@@ -29,6 +31,18 @@ public static class BusinessUnitEndpoints
             await service.UpdateAsync(businessUnitId, request.Name, request.Code, request.Kind, ct) is { } unit ? Results.Ok(ToDto(unit)) : UnitNotFound()));
         units.MapPut("/{businessUnitId:guid}/active", (Guid businessUnitId, SetBusinessUnitActiveRequest request, IBusinessUnitService service, CancellationToken ct) => RunAsync(async () =>
             await service.SetActiveAsync(businessUnitId, request.IsActive, ct) is { } unit ? Results.Ok(ToDto(unit)) : UnitNotFound()));
+
+        // Departmana atanmış roller (ADR-0026 K6): departmandaki her kullanıcı rolün izinlerini ve kapsamını alır.
+        units.MapGet("/{businessUnitId:guid}/roles", async (Guid businessUnitId, IRoleService roles, CancellationToken ct) =>
+            await roles.GetBusinessUnitRolesAsync(businessUnitId, ct) is { } list ? Results.Ok(list.Select(ToDto).ToList()) : UnitNotFound());
+        units.MapPut("/{businessUnitId:guid}/roles", (Guid businessUnitId, SetBusinessUnitRolesRequest request, IRoleService roles, ITenantContextAccessor tenant, CancellationToken ct) => RunAsync(async () =>
+            await roles.SetBusinessUnitRolesAsync(
+                businessUnitId,
+                (request.Roles ?? []).Select(r => new BusinessUnitRoleRequest(r.RoleId, r.InheritToChildren)).ToList(),
+                ct,
+                tenant.Current!.MembershipId) is { } list
+                ? Results.Ok(list.Select(ToDto).ToList())
+                : UnitNotFound()));
 
         // Kullanıcı kartındaki "Departman".
         var membership = app.MapGroup("/api/users/{membershipId:guid}/business-unit")
@@ -63,6 +77,9 @@ public static class BusinessUnitEndpoints
     private static BusinessUnitDetailDto ToDto(BusinessUnitDetail detail) => new(
         ToDto(detail.Unit),
         detail.Members.Select(m => new BusinessUnitMemberDto(m.MembershipId, m.UserId, m.DisplayName, m.Email)).ToList());
+
+    private static BusinessUnitRoleDto ToDto(BusinessUnitRoleAssignment role) =>
+        new(role.RoleId, role.RoleName, (Shared.Access.RecordScope)role.Scope, role.InheritToChildren);
 
     private static IResult UnitNotFound() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Departman bulunamadı.");
 

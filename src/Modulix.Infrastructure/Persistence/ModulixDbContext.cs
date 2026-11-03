@@ -94,6 +94,8 @@ public class ModulixDbContext(
 
     public DbSet<AutomationRuleVersion> AutomationRuleVersions => Set<AutomationRuleVersion>();
 
+    public DbSet<BusinessUnitRole> BusinessUnitRoles => Set<BusinessUnitRole>();
+
     public DbSet<MembershipCompany> MembershipCompanies => Set<MembershipCompany>();
 
     public DbSet<CustomField> CustomFields => Set<CustomField>();

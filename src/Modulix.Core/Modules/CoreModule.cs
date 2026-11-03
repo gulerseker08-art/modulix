@@ -221,13 +221,19 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.Role, "Rol", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["permissions"] = "İzinler", ["isSystem"] = "Sistem rolü", ["scope"] = "Kayıt kapsamı",
+            ["assignLevel"] = "Atanabilir düzey",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
                 ["scope"] = new Dictionary<string, string>
                 {
-                    ["All"] = "Tüm kayıtlar", ["Team"] = "Ekibinin kayıtları", ["Own"] = "Yalnızca kendi kayıtları",
+                    ["All"] = "Tüm kayıtlar", ["UnitAndBelow"] = "Departmanın ve alt departmanların kayıtları",
+                    ["Unit"] = "Departmanın kayıtları", ["Team"] = "Ekibinin kayıtları", ["Own"] = "Yalnızca kendi kayıtları",
+                },
+                ["assignLevel"] = new Dictionary<string, string>
+                {
+                    ["User"] = "Yalnızca kullanıcıya", ["Unit"] = "Yalnızca departmana", ["Both"] = "Kullanıcıya ve departmana",
                 },
             },
         },
@@ -302,6 +308,7 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.BusinessUnit, "Departman", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["code"] = "Kod", ["kind"] = "Tür", ["parent"] = "Üst departman", ["isActive"] = "Etkin",
+            ["roles"] = "Roller", ["affectedUsers"] = "Etkilenen kullanıcı",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>

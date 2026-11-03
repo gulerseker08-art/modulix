@@ -46,6 +46,35 @@ internal sealed class BusinessUnitConfiguration : IEntityTypeConfiguration<Busin
     }
 }
 
+internal sealed class BusinessUnitRoleConfiguration : IEntityTypeConfiguration<BusinessUnitRole>
+{
+    public void Configure(EntityTypeBuilder<BusinessUnitRole> builder)
+    {
+        // Tenant verisi (ADR-0026 K6): core şemasında; Row-Level Security ile korunur (migration: TenantIsolationSql).
+        builder.ToTable("BusinessUnitRoles", DatabaseSchemas.Core);
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).ValueGeneratedNever();
+        builder.Property(r => r.TenantId).IsRequired();
+        builder.Property(r => r.InheritToChildren).IsRequired();
+        builder.HasIndex(r => new { r.TenantId, r.BusinessUnitId, r.RoleId }).IsUnique();
+        builder.HasIndex(r => new { r.TenantId, r.RoleId });
+
+        // Bileşik yabancı anahtarlar tenant içindedir: başka tenant'ın departmanı ya da rolü veritabanı düzeyinde de atanamaz.
+        // Departman silinmez; rol silinirken atamaları aynı işlemde hedef role taşınır ya da kaldırılır.
+        builder.HasOne<BusinessUnit>()
+            .WithMany()
+            .HasForeignKey(r => new { r.TenantId, r.BusinessUnitId })
+            .HasPrincipalKey(u => new { u.TenantId, u.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Core.Authorization.Role>()
+            .WithMany()
+            .HasForeignKey(r => new { r.TenantId, r.RoleId })
+            .HasPrincipalKey(r => new { r.TenantId, r.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class BusinessUnitMemberConfiguration : IEntityTypeConfiguration<BusinessUnitMember>
 {
     public void Configure(EntityTypeBuilder<BusinessUnitMember> builder)

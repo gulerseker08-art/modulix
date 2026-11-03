@@ -10,7 +10,19 @@ public sealed record RoleSummary(Guid Id, string Name, IReadOnlyList<string> Per
 {
     /// <summary>Kayıt kapsamı (Y8).</summary>
     public RecordScope Scope { get; init; } = RecordScope.All;
+
+    /// <summary>Rolün kullanıcıya, departmana ya da ikisine atanabilmesi (ADR-0026).</summary>
+    public RoleAssignLevel AssignLevel { get; init; } = RoleAssignLevel.User;
+
+    /// <summary>Rolün atandığı departman sayısı; yalnızca listede doldurulur.</summary>
+    public int UnitCount { get; init; }
 }
+
+/// <summary>Departmana atanmış rol (ADR-0026 K6).</summary>
+public sealed record BusinessUnitRoleAssignment(Guid RoleId, string RoleName, RecordScope Scope, bool InheritToChildren);
+
+/// <summary>Departmana atanacak rol ve alt departmanlara inip inmeyeceği.</summary>
+public sealed record BusinessUnitRoleRequest(Guid RoleId, bool InheritToChildren = false);
 
 /// <summary>
 /// İstek kurallara uygun ama tenant'ın durumuyla çelişiyor: sistem rolünü düzenlemek veya son yöneticinin
@@ -40,16 +52,21 @@ public interface IRoleService
         IReadOnlyCollection<string> permissions,
         CancellationToken cancellationToken,
         Guid? actingMembershipId = null,
-        RecordScope scope = RecordScope.All);
+        RecordScope scope = RecordScope.All,
+        RoleAssignLevel? assignLevel = null);
 
-    /// <summary>Rol bu tenant'ta yoksa <c>null</c>. <paramref name="scope"/> verilmezse kapsam değişmez.</summary>
+    /// <summary>
+    /// Rol bu tenant'ta yoksa <c>null</c>. <paramref name="scope"/> ve <paramref name="assignLevel"/> verilmezse değişmez.
+    /// Departmana atanmış bir rolün atanabilir düzeyi "yalnızca kullanıcıya" yapılamaz (önce departman atamaları kaldırılır).
+    /// </summary>
     Task<RoleSummary?> UpdateAsync(
         Guid roleId,
         string name,
         IReadOnlyCollection<string> permissions,
         CancellationToken cancellationToken,
         Guid? actingMembershipId = null,
-        RecordScope? scope = null);
+        RecordScope? scope = null,
+        RoleAssignLevel? assignLevel = null);
 
     /// <summary>
     /// Rolü siler; rol bu tenant'ta yoksa <c>false</c>. Sistem rolü silinemez (<see cref="RoleConflictException"/>).
@@ -74,6 +91,22 @@ public interface IRoleService
     Task<bool> SetMembershipRolesAsync(
         Guid membershipId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken, Guid? actingMembershipId = null);
 
-    /// <summary>Üyeliğin rolleri; üyelik aktif tenant'a ait değilse <c>null</c>.</summary>
+    /// <summary>Üyeliğin <b>doğrudan</b> rolleri; üyelik aktif tenant'a ait değilse <c>null</c>. Departmandan gelenler dahil değildir.</summary>
     Task<IReadOnlyList<RoleSummary>?> GetMembershipRolesAsync(Guid membershipId, CancellationToken cancellationToken);
+
+    /// <summary>Departmana atanmış roller (role göre sıralı); departman bu tenant'ta yoksa <c>null</c>.</summary>
+    Task<IReadOnlyList<BusinessUnitRoleAssignment>?> GetBusinessUnitRolesAsync(Guid businessUnitId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Departmanın rollerini verilen listeyle değiştirir (ADR-0026 K6); departman yoksa <c>null</c>. Kurallar: sistem rolü
+    /// ("Yönetici") departmana atanamaz; rolün atanabilir düzeyi departmanı içermelidir; departman etkin olmalıdır (rol
+    /// eklenirken); <paramref name="actingMembershipId"/> verilirse işlemi yapan, rolün izinlerini ve kapsamını kendisi de
+    /// taşımalıdır (yönetici hariç). Aksi halde <see cref="RoleConflictException"/>, <see cref="ArgumentException"/> ya da
+    /// <see cref="Platform.UserAdministrationException"/>. Değişiklik, etkilenen kullanıcı sayısıyla denetim kaydına yazılır.
+    /// </summary>
+    Task<IReadOnlyList<BusinessUnitRoleAssignment>?> SetBusinessUnitRolesAsync(
+        Guid businessUnitId,
+        IReadOnlyCollection<BusinessUnitRoleRequest> roles,
+        CancellationToken cancellationToken,
+        Guid? actingMembershipId = null);
 }

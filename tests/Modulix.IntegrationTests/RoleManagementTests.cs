@@ -161,9 +161,9 @@ public class RoleManagementTests(ModulixApiFactory factory) : IClassFixture<Modu
         using var client = await LoginAsync(admin);
 
         var templates = await client.GetFromJsonAsync<List<RoleTemplateDto>>("/api/roles/templates");
-        Assert.Equal(["crm.sales-rep", "crm.lead-coordinator", "core.read-only"], templates!.Select(t => t.Key));
-        Assert.All(templates![2].Permissions, p => Assert.StartsWith("crm.", p));
-        Assert.All(templates[2].Permissions, p => Assert.EndsWith(".read", p));
+        Assert.Equal(["crm.sales-rep", "crm.sales-manager", "crm.lead-coordinator", "core.read-only"], templates!.Select(t => t.Key));
+        Assert.All(templates![3].Permissions, p => Assert.StartsWith("crm.", p));
+        Assert.All(templates[3].Permissions, p => Assert.EndsWith(".read", p));
 
         // Şablonun izinleriyle rol oluşturulabilir.
         var sales = templates[0];

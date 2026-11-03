@@ -6,6 +6,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
+using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
@@ -26,6 +27,8 @@ internal sealed class RoleService(
 
     public const string MembershipEntityKey = "core.membership";
 
+    private const string UnitEntityKey = CoreModule.AuditedEntityKeys.BusinessUnit;
+
     public async Task<IReadOnlyList<RoleSummary>> ListAsync(CancellationToken cancellationToken)
     {
         var roles = await db.Roles.AsNoTracking().OrderBy(r => r.Name).ToListAsync(cancellationToken);
@@ -33,7 +36,13 @@ internal sealed class RoleService(
             .GroupBy(mr => mr.RoleId)
             .Select(g => new { RoleId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.RoleId, g => g.Count, cancellationToken);
-        return roles.Select(r => ToSummary(r) with { MemberCount = counts.GetValueOrDefault(r.Id) }).ToList();
+        var unitCounts = await db.BusinessUnitRoles.AsNoTracking()
+            .GroupBy(ur => ur.RoleId)
+            .Select(g => new { RoleId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.RoleId, g => g.Count, cancellationToken);
+        return roles
+            .Select(r => ToSummary(r) with { MemberCount = counts.GetValueOrDefault(r.Id), UnitCount = unitCounts.GetValueOrDefault(r.Id) })
+            .ToList();
     }
 
     public async Task<RoleSummary> CreateAsync(
@@ -41,10 +50,16 @@ internal sealed class RoleService(
         IReadOnlyCollection<string> permissions,
         CancellationToken cancellationToken,
         Guid? actingMembershipId = null,
-        RecordScope scope = RecordScope.All)
+        RecordScope scope = RecordScope.All,
+        RoleAssignLevel? assignLevel = null)
     {
         var tenant = RequireTenant();
         var role = new Role(name, permissions, scope);
+        if (assignLevel is { } level)
+        {
+            role.SetAssignLevel(level);
+        }
+
         EnsureKnownPermissions(role);
         await EnsureUniqueNameAsync(role.Name, exceptRoleId: null, cancellationToken);
         await EnsureActorMayChangeAsync(actingMembershipId, role.Permissions, cancellationToken);
@@ -62,7 +77,8 @@ internal sealed class RoleService(
         IReadOnlyCollection<string> permissions,
         CancellationToken cancellationToken,
         Guid? actingMembershipId = null,
-        RecordScope? scope = null)
+        RecordScope? scope = null,
+        RoleAssignLevel? assignLevel = null)
     {
         var tenant = RequireTenant();
         var role = await db.Roles.SingleOrDefaultAsync(r => r.Id == roleId, cancellationToken);
@@ -81,6 +97,16 @@ internal sealed class RoleService(
             role.SetScope(wanted);
         }
 
+        if (assignLevel is { } level)
+        {
+            role.SetAssignLevel(level);
+            if (!role.AssignableToUnit && await db.BusinessUnitRoles.AnyAsync(ur => ur.RoleId == role.Id, cancellationToken))
+            {
+                throw new RoleConflictException(
+                    $"'{role.Name}' rolü departmanlara atanmış; atanabilir düzeyi yalnızca kullanıcıya yapmadan önce departman atamalarını kaldırın.");
+            }
+        }
+
         EnsureKnownPermissions(role);
         await EnsureUniqueNameAsync(role.Name, role.Id, cancellationToken);
 
@@ -90,7 +116,8 @@ internal sealed class RoleService(
         if (role.Scope != previousScope)
         {
             // Daraltmak da genişletmek de rolün üyelerini etkiler; ikisi de işlemi yapanın kapsamıyla sınırlıdır.
-            await EnsureActorMayGrantScopeAsync(actingMembershipId, (RecordScope)Math.Min((int)role.Scope, (int)previousScope), cancellationToken);
+            await EnsureActorMayGrantScopeAsync(actingMembershipId, role.Scope, cancellationToken);
+            await EnsureActorMayGrantScopeAsync(actingMembershipId, previousScope, cancellationToken);
         }
 
         var after = Snapshot(role);
@@ -125,10 +152,19 @@ internal sealed class RoleService(
         await EnsureActorMayChangeAsync(actingMembershipId, role.Permissions, cancellationToken);
 
         var assignments = await db.MembershipRoles.Where(mr => mr.RoleId == roleId).ToListAsync(cancellationToken);
-        if (assignments.Count > 0)
+        var unitAssignments = await db.BusinessUnitRoles.Where(ur => ur.RoleId == roleId).ToListAsync(cancellationToken);
+        if (assignments.Count > 0 || unitAssignments.Count > 0)
         {
-            var target = await LoadMoveTargetAsync(role, moveToRoleId, assignments.Count, actingMembershipId, cancellationToken);
+            // Departmana atanmış rol de silinince departmanın kullanıcılarından kalkar; üyeler gibi hedef role taşınır.
+            var target = await LoadMoveTargetAsync(role, moveToRoleId, assignments.Count + unitAssignments.Count, actingMembershipId, cancellationToken);
+            if (unitAssignments.Count > 0 && !target.AssignableToUnit)
+            {
+                throw new RoleConflictException(
+                    $"'{role.Name}' rolü departmanlara atanmış; taşınacağı '{target.Name}' rolünün atanabilir düzeyi departmanı içermiyor.");
+            }
+
             await MoveMembersAsync(tenant, role, target, assignments, cancellationToken);
+            await MoveUnitAssignmentsAsync(tenant, role, target, unitAssignments, cancellationToken);
         }
 
         db.Roles.Remove(role);
@@ -246,6 +282,180 @@ internal sealed class RoleService(
         return roles.Select(ToSummary).ToList();
     }
 
+    public async Task<IReadOnlyList<BusinessUnitRoleAssignment>?> GetBusinessUnitRolesAsync(Guid businessUnitId, CancellationToken cancellationToken)
+    {
+        if (!await db.BusinessUnits.AnyAsync(u => u.Id == businessUnitId, cancellationToken))
+        {
+            return null;
+        }
+
+        return await UnitAssignmentsAsync(businessUnitId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<BusinessUnitRoleAssignment>?> SetBusinessUnitRolesAsync(
+        Guid businessUnitId,
+        IReadOnlyCollection<BusinessUnitRoleRequest> roles,
+        CancellationToken cancellationToken,
+        Guid? actingMembershipId = null)
+    {
+        ArgumentNullException.ThrowIfNull(roles);
+        var tenant = RequireTenant();
+        var unit = await db.BusinessUnits.AsNoTracking().SingleOrDefaultAsync(u => u.Id == businessUnitId, cancellationToken);
+        if (unit is null)
+        {
+            return null;
+        }
+
+        var wanted = roles.GroupBy(r => r.RoleId).ToDictionary(g => g.Key, g => g.Last().InheritToChildren);
+        var wantedIds = wanted.Keys.ToList();
+        var found = await db.Roles.AsNoTracking().Where(r => wantedIds.Contains(r.Id)).ToListAsync(cancellationToken);
+        var missing = wantedIds.Except(found.Select(r => r.Id)).ToList();
+        if (missing.Count > 0)
+        {
+            throw new ArgumentException($"Bu tenant'ta bulunmayan rol: {string.Join(", ", missing)}.", "roles");
+        }
+
+        // Sistem rolü ("Yönetici") departmana atanamaz: son yönetici koruması yalnızca doğrudan atamaya bakar ve
+        // yöneticilik departman üyeliğinden kendiliğinden doğmamalıdır.
+        if (found.FirstOrDefault(r => r.IsSystem) is { } system)
+        {
+            throw new RoleConflictException($"'{system.Name}' sistem rolüdür; departmana atanamaz.");
+        }
+
+        if (found.FirstOrDefault(r => !r.AssignableToUnit) is { } notAssignable)
+        {
+            throw new RoleConflictException(
+                $"'{notAssignable.Name}' rolü departmana atanamaz; rolün atanabilir düzeyi yalnızca kullanıcıya. Önce rolün düzeyini değiştirin.");
+        }
+
+        var current = await db.BusinessUnitRoles.Where(ur => ur.BusinessUnitId == unit.Id).ToListAsync(cancellationToken);
+        var currentByRole = current.ToDictionary(ur => ur.RoleId);
+        var added = wanted.Keys.Except(currentByRole.Keys).ToList();
+        var removed = currentByRole.Keys.Except(wanted.Keys).ToList();
+        var toggled = wanted.Where(w => currentByRole.TryGetValue(w.Key, out var c) && c.InheritToChildren != w.Value).Select(w => w.Key).ToList();
+        var changedIds = added.Concat(removed).Concat(toggled).ToHashSet();
+        if (changedIds.Count == 0)
+        {
+            return await UnitAssignmentsAsync(unit.Id, cancellationToken);
+        }
+
+        if (added.Count > 0 && !unit.IsActive)
+        {
+            throw new RoleConflictException("Kapalı departmana rol eklenemez.");
+        }
+
+        // Yetki yükseltmeye karşı: departman rolü verilen ya da kaldırılan her rolün izinleri ve kapsamı, işlemi yapanın
+        // elinde olmalıdır (yönetici hariç).
+        var changedRoles = await db.Roles.AsNoTracking().Where(r => changedIds.Contains(r.Id)).ToListAsync(cancellationToken);
+        foreach (var role in changedRoles)
+        {
+            await EnsureActorMayChangeAsync(actingMembershipId, role.Permissions, cancellationToken);
+            await EnsureActorMayGrantScopeAsync(actingMembershipId, role.Scope, cancellationToken);
+        }
+
+        var nameIds = wantedIds.Concat(currentByRole.Keys).Distinct().ToList();
+        var names = await db.Roles.AsNoTracking()
+            .Where(r => nameIds.Contains(r.Id))
+            .ToDictionaryAsync(r => r.Id, r => r.Name, cancellationToken);
+        var before = UnitRolesSnapshot(currentByRole.ToDictionary(c => c.Key, c => c.Value.InheritToChildren), names);
+
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        db.BusinessUnitRoles.RemoveRange(current.Where(ur => removed.Contains(ur.RoleId)));
+        foreach (var roleId in added)
+        {
+            db.BusinessUnitRoles.Add(new BusinessUnitRole(unit.Id, roleId, wanted[roleId]));
+        }
+
+        foreach (var ur in current.Where(ur => toggled.Contains(ur.RoleId)))
+        {
+            ur.SetInheritToChildren(wanted[ur.RoleId]);
+        }
+
+        // Etkilenen kullanıcılar: departmandakiler; alt departmanlara inen bir rol varsa onlar da.
+        var reachesChildren = wanted.Any(w => changedIds.Contains(w.Key) && w.Value) || current.Any(ur => changedIds.Contains(ur.RoleId) && ur.InheritToChildren);
+        var affected = await CountUsersAsync(unit, reachesChildren, cancellationToken);
+        var after = UnitRolesSnapshot(wanted, names);
+        after["affectedUsers"] = affected;
+        Audit(tenant, UnitEntityKey, unit.Id, AuditAction.Updated, before, after);
+
+        await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        return await UnitAssignmentsAsync(unit.Id, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<BusinessUnitRoleAssignment>> UnitAssignmentsAsync(Guid businessUnitId, CancellationToken cancellationToken) =>
+        await (
+            from assignment in db.BusinessUnitRoles.AsNoTracking()
+            join role in db.Roles.AsNoTracking() on assignment.RoleId equals role.Id
+            where assignment.BusinessUnitId == businessUnitId
+            orderby role.Name
+            select new BusinessUnitRoleAssignment(role.Id, role.Name, role.Scope, assignment.InheritToChildren))
+            .ToListAsync(cancellationToken);
+
+    private async Task<int> CountUsersAsync(BusinessUnit unit, bool includeBelow, CancellationToken cancellationToken)
+    {
+        var unitIds = includeBelow
+            ? (await db.BusinessUnits.AsNoTracking().Select(u => new { u.Id, u.Path }).ToListAsync(cancellationToken))
+                .Where(u => u.Path.StartsWith(unit.Path, StringComparison.Ordinal)).Select(u => u.Id).ToList()
+            : [unit.Id];
+        return await db.BusinessUnitMembers.AsNoTracking().CountAsync(m => unitIds.Contains(m.BusinessUnitId), cancellationToken);
+    }
+
+    /// <summary>Silinen rolün departman atamalarını hedef role taşır; departmanda hedef rol zaten varsa yalnızca eskisi kalkar.</summary>
+    private async Task MoveUnitAssignmentsAsync(
+        TenantContext tenant, Role role, Role target, IReadOnlyList<BusinessUnitRole> assignments, CancellationToken cancellationToken)
+    {
+        if (assignments.Count == 0)
+        {
+            return;
+        }
+
+        var unitIds = assignments.Select(a => a.BusinessUnitId).ToHashSet();
+        var existing = await db.BusinessUnitRoles.AsNoTracking()
+            .Where(ur => unitIds.Contains(ur.BusinessUnitId))
+            .ToListAsync(cancellationToken);
+        var roleIds = existing.Select(e => e.RoleId).Append(role.Id).Append(target.Id).Distinct().ToList();
+        var names = await db.Roles.AsNoTracking()
+            .Where(r => roleIds.Contains(r.Id))
+            .ToDictionaryAsync(r => r.Id, r => r.Name, cancellationToken);
+
+        db.BusinessUnitRoles.RemoveRange(assignments);
+        foreach (var assignment in assignments)
+        {
+            var before = existing.Where(e => e.BusinessUnitId == assignment.BusinessUnitId).ToDictionary(e => e.RoleId, e => e.InheritToChildren);
+            var after = before.Where(b => b.Key != role.Id).ToDictionary(b => b.Key, b => b.Value);
+            if (!after.TryGetValue(target.Id, out var inherit))
+            {
+                db.BusinessUnitRoles.Add(new BusinessUnitRole(assignment.BusinessUnitId, target.Id, assignment.InheritToChildren));
+                after[target.Id] = assignment.InheritToChildren;
+            }
+            else if (assignment.InheritToChildren && !inherit)
+            {
+                // Hedef rol zaten atanmış ama alt departmanlara inmiyordu; silinen rol iniyordu, en geniş hâli korunur.
+                var kept = await db.BusinessUnitRoles.SingleAsync(
+                    ur => ur.BusinessUnitId == assignment.BusinessUnitId && ur.RoleId == target.Id, cancellationToken);
+                kept.SetInheritToChildren(true);
+                after[target.Id] = true;
+            }
+
+            Audit(tenant, UnitEntityKey, assignment.BusinessUnitId, AuditAction.Updated, UnitRolesSnapshot(before, names), UnitRolesSnapshot(after, names));
+        }
+    }
+
+    private static JsonObject UnitRolesSnapshot(IReadOnlyDictionary<Guid, bool> roles, IReadOnlyDictionary<Guid, string> names) => new()
+    {
+        ["roles"] = new JsonArray([.. roles
+            .Select(r => (names.GetValueOrDefault(r.Key, r.Key.ToString()) + (r.Value ? " (alt departmanlara da)" : string.Empty)))
+            .Order(StringComparer.Ordinal)
+            .Select(n => JsonValue.Create(n))]),
+    };
+
     private async Task<Role> LoadMoveTargetAsync(
         Role role, Guid? moveToRoleId, int memberCount, Guid? actingMembershipId, CancellationToken cancellationToken)
     {
@@ -351,8 +561,9 @@ internal sealed class RoleService(
             return;
         }
 
+        // Ekip ile departman birbirini kapsamaz; karar sayısal sıraya değil kapsama kuralına göre verilir (ADR-0026 K5).
         var access = await GetActorAccessAsync(actor, cancellationToken);
-        if (!access.IsAdministrator && scope < access.Scope)
+        if (!access.IsAdministrator && !RecordScopeRules.CoversAny(access.Scopes, scope))
         {
             throw new UserAdministrationException(
                 UserAdministrationError.PermissionDenied,
@@ -408,10 +619,12 @@ internal sealed class RoleService(
         ["isSystem"] = role.IsSystem,
         ["permissions"] = new JsonArray([.. role.Permissions.Select(p => JsonValue.Create(p))]),
         ["scope"] = role.Scope.ToString(),
+        ["assignLevel"] = role.AssignLevel.ToString(),
     };
 
     private static JsonArray RoleNames(IEnumerable<Guid> roleIds, IReadOnlyDictionary<Guid, string> names) =>
         new([.. roleIds.Select(id => names.GetValueOrDefault(id, id.ToString())).Order(StringComparer.Ordinal).Select(n => JsonValue.Create(n))]);
 
-    private static RoleSummary ToSummary(Role role) => new(role.Id, role.Name, role.Permissions, role.IsSystem) { Scope = role.Scope };
+    private static RoleSummary ToSummary(Role role) =>
+        new(role.Id, role.Name, role.Permissions, role.IsSystem) { Scope = role.Scope, AssignLevel = role.AssignLevel };
 }

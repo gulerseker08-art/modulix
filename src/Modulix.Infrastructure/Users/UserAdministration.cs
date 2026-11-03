@@ -363,8 +363,10 @@ internal sealed class UserAdministration(
 
         var grants = access.Permissions
             .Order(StringComparer.Ordinal)
-            .Select(p => new PermissionGrant(p, access.RolesGranting(p).Select(r => new UserRole(r.Id, r.Name, r.IsSystem)).ToList()))
+            .Select(p => new PermissionGrant(
+                p, access.RolesGranting(p).Select(r => new UserRole(r.Id, r.Name, r.IsSystem) { ViaBusinessUnit = r.ViaBusinessUnit }).ToList()))
             .ToList();
+        var unit = await membershipPermissions.GetUnitAsync(membershipId, cancellationToken);
         var teams = await (
             from member in db.TeamMembers.AsNoTracking()
             join team in db.Teams.AsNoTracking() on member.TeamId equals team.Id
@@ -372,7 +374,14 @@ internal sealed class UserAdministration(
             orderby team.Name
             select team.Name)
             .ToListAsync(cancellationToken);
-        return new UserAccess(access.IsAdministrator, grants) { Scope = access.Scope, Teams = teams };
+        return new UserAccess(access.IsAdministrator, grants)
+        {
+            Scope = access.Scope,
+            Teams = teams,
+            BusinessUnit = unit?.Name,
+            Scopes = access.Scopes,
+            Roles = access.Roles.Select(r => new UserRoleSource(r.Id, r.Name, r.IsSystem, r.Scope, r.ViaBusinessUnit)).ToList(),
+        };
     }
 
     public async Task<int> TransferRecordsAsync(Guid membershipId, Guid toMembershipId, CancellationToken cancellationToken)
