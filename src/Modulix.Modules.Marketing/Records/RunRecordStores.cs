@@ -250,5 +250,9 @@ internal sealed class DeliveryJournal(MarketingStoreContext context)
     public Task<bool> AnyOpenAsync(Guid runId, CancellationToken cancellationToken) =>
         For(runId).AsNoTracking().AnyAsync(d => d.Status == DeliveryStatuses.Queued || d.Status == DeliveryStatuses.Sending, cancellationToken);
 
+    /// <summary>Çalışan çalıştırmalar (işçi için); en eski başlayan önce.</summary>
+    public async Task<List<Guid>> RunningRunIdsAsync(int take, CancellationToken cancellationToken) =>
+        await context.Data.Set<CampaignRun>().AsNoTracking().Where(r => r.Status == RunStatuses.Running).OrderBy(r => r.StartedAt).Select(r => r.Id).Take(take).ToListAsync(cancellationToken);
+
     public Task<bool> HasAnyAsync(Guid runId, CancellationToken cancellationToken) => For(runId).AsNoTracking().AnyAsync(cancellationToken);
 }
