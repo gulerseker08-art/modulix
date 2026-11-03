@@ -109,6 +109,7 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 | 10 — Gönderim işçisi, toplu gönderim (dilim 9 bulgusu) | Yapıldı; ayrıntı aşağıda (hedef kitle sınırı değişmedi) |
 | 11 — Kişiye özel değişkenler ve kendi adresine test gönderimi | Yapıldı; ayrıntı aşağıda |
 | 12 — Gönderim günlüğü temizliği (bağlantı belirteci, sıklık penceresi) | Yapıldı; ayrıntı aşağıda |
+| 13 — İletişim tercihi yönetim ekranı (Yönetim → İletişim tercihleri) | Yapıldı; ayrıntı aşağıda (konu bazlı tercih yok) |
 
 ### Dilim 2 — uygulama notları (sapmalar ve sınırlar)
 
@@ -217,3 +218,10 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 - **Sınırlı tur**: silme 1000'lik gruplarla, tablo başına en çok 50 grupla yapılır (uzun kilit ve işlem günlüğü şişmesi olmaz); sınır dolarsa sonraki tur devam eder.
 - **Silinmeyenler**: teslimat satırları (denetim izi), anlık görüntüler, test gönderimi günlüğü, tercih/engel kayıtları ve tercih tarihçesi. Bunlar için saklama süresi kararı verilmedi.
 - **Test**: 4 entegrasyon (eski belirteç/pencere silinir, yakın süresi dolan ve bugünkü kalır; ikinci tur silmez, silinen bağlantı bilinmez, yakın süresi dolan bağlantıyla çıkış çalışır; başka tenant'a dokunmaz; HTTP yüzeyi yok ve saklama sabitleri).
+
+### Dilim 13 — uygulama notları (iletişim tercihi yönetim ekranı)
+
+- **Yapılan**: Yönetim → "İletişim tercihleri" (`/yonetim/iletisim-tercihleri`). Tercihler sekmesi: kanal/durum/adres süzgeci, tercih listesi (kanal, adres, amaç, durum, kaynak ve kanıt), satırda izin geçmişi (durum geçişi, kaynak, kanıt, gerekçe) ve "izin ya da ret kaydet" formu. Engeller sekmesi: etkin/kaldırılmış süzgeci, engel listesi, "adresi engelle" formu ve gerekçeli "engeli kaldır". Menü girişi `core.communication.read` ister; yazma eylemleri `manage` ve `suppress` izinlerini (düğme yetkiye göre görünür; asıl denetim sunucudadır).
+- **Yeni API yok**: ekran mevcut `/api/communication/*` uçlarını kullanır (dilim 1'de dört test türüyle sınandı). Ekran için ayrı otomatik arayüz testi yazılmadı; tarayıcıda elle doğrulandı (kayıt, listeleme, geçmiş, sekme geçişi). Uyarı: yalnızca "Pazarlama" amacı kaydedilir; işlemsel/hizmet amaçları ekrandan yazılmaz.
+- **Gizlilik**: adresler tam gösterilir (yalnızca `core.communication.read` sahibine); kişi kartlarında adresin izni gösterilmez (ayrı iş).
+- **Bilerek yok / açık**: toplu içe aktarma (CSV), dışa aktarma, kişi kartından izin görüntüleme/düzenleme, engel süresi (bitiş tarihi) seçimi, konu bazlı tercih.
