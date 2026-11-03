@@ -54,6 +54,16 @@ dotnet run --project src/Modulix.Api -- tenant-delete <slug> --confirm <slug>  #
 - Her özellik dört testle teslim edilir: mutlu yol, hata/doğrulama, tenant izolasyonu (A tenant'ı B'nin verisine erişemez), yetki (yetkisiz kullanıcı işlemi yapamaz veya veriyi göremez).
 - Küçük, incelenebilir adımlarla ilerle; her adımın sonunda neyin yapıldığını ve neyin kaldığını özetle. Bu kurallara aykırı bir şey gerekiyorsa uygulamadan önce açıkça belirt.
 
+## Arayüz tasarım kuralları (seçenek 4 "Canlı & Enerjik", 3.11.2026 kararı; bütün modüllerde geçerli)
+
+Yeni ve dokunulan her ekran (CRM ve sonraki bütün modüller) bu kurallara uyar; ayrıntı `docs/design-system/` altındadır. Bu kurallara aykırı bir şey gerekiyorsa uygulamadan önce açıkça belirt.
+
+- **Yazı tipi Manrope** (yerel woff2, `--mx-font`); ekranda başka yazı tipi tanımlanmaz. Renk, köşe, gölge ve degrade yalnızca `--mx-*` tokenlarından gelir; bileşene sabit renk ya da ekrana özel CSS yazılmaz, mevcut sınıflar kullanılır. Beyaz metin üstünde kontrast en az 4.5:1 (AA); açık ve koyu tema birlikte tanımlanır.
+- **Düğmeler:** birincil `btn btn-primary` (marka degradesi + parlama; ekranda en çok bir tane, sağda ve en sonda), ikincil/İptal `btn-outline-secondary`, üçüncül `btn-tonal`, araç çubuğu `btn-ghost`, yıkıcı `btn-outline-danger`. Parlama gölgesi başka öğeye eklenmez.
+- **Liste ekranları (grid):** `record-table` (kartın içinde, büyük harf başlık, `data-label` ile telefonda kart listesi), durumlar hap biçimli `badge` (tonlar tokenlardan), sayfalama `Pager`. Araç çubuğu düzeni: sol başta "Görünüm: … ▾" seçici, sağda arama, Filtrele, Sütunlar ve birincil "Yeni …" düğmesi. Kayıt görünümleri açılır görünüm seçicisiyle sunulur (bileşen 2/3 adımında eklenir; hazır olana kadar mevcut çip satırı kalır, yeni ekranda çip satırıyla görünüm uydurulmaz).
+- **Formlar sekmelidir:** her kayıt formu `LayoutForm`/`TabBar` ile sekmeli kurulur (alan yerleşimi ADR-0021 uyarınca metadata'dan; Razor'a sabit yazılmaz). Sekmeler bölüm kartlarını (`FormSection`) gruplar; etkin sekmede degrade çizgi, dolu sekmelerde sayaç rozeti. Tek sekmeli form da sekme çubuğuyla çizilir (3/3 adımında `LayoutForm` buna göre güncellenir); sekmeler arasında girilen veri kaybolmaz.
+- Yeni ekranın ekran görüntüsü açık ve koyu temada kontrol edilir; yeni sınıf ya da token gerekiyorsa önce `docs/design-system/` güncellenir.
+
 ## Kod stili
 
 - `.editorconfig`: file-scoped namespace, primary constructor, `var` yerine açık tip, Allman süslü parantez, 4 boşluk.
