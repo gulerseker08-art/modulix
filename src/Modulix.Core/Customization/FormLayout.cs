@@ -146,9 +146,24 @@ public static partial class FormLayoutRules
         }
 
         var tabs = stored.Tabs.Select(t => new FormTabLayout(t.Key, t.Label)).ToList();
+
+        // Eski tek sekmeli düzen: firma sekme eklememiş, yalnızca alan/bölüm özelleştirmiş. Her kayıt formu sekmelidir (arayüz kuralı);
+        // bu yüzden modülün varsayılan sekmelerine yükseltilir: tanımdaki bölümler kendi sekmesine geçer, firmanın kendi bölümleri
+        // ilk sekmede kalır. Firma kendi sekmesini eklemişse (birden fazla sekme) düzenine dokunulmaz.
+        var upgraded = tabs.Count == 1 && tabs[0].Key == FormDefinition.DefaultTab && definition.Tabs.Count > 1;
+        if (upgraded)
+        {
+            tabs = [.. definition.Tabs.Select(t => new FormTabLayout(t.Key, t.Label))];
+        }
+
+        var definitionTabOf = definition.Sections.ToDictionary(s => s.Key, s => s.Tab, StringComparer.Ordinal);
         var firstTab = tabs[0].Key;
         var sections = stored.Sections
-            .Select(s => new FormSectionLayout(s.Key, s.Label, s.Icon, tabs.Any(t => t.Key == s.Tab) ? s.Tab : firstTab))
+            .Select(s => new FormSectionLayout(
+                s.Key,
+                s.Label,
+                s.Icon,
+                upgraded && definitionTabOf.TryGetValue(s.Key, out var definitionTab) ? definitionTab : tabs.Any(t => t.Key == s.Tab) ? s.Tab : firstTab))
             .ToList();
         var firstSection = sections[0].Key;
         var byKey = defaults.ToDictionary(f => f.Key, StringComparer.Ordinal);

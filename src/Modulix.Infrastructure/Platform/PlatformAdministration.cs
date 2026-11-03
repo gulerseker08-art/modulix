@@ -62,10 +62,28 @@ internal sealed class PlatformAdministration(
         var total = await tenants.CountAsync(cancellationToken);
         var rows = await tenants.OrderBy(t => t.Name).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
 
+        // Üye sayısı ve açık modüller platform tablolarındandır: sayfadaki bütün firmalar için birer sorguyla okunur.
+        // Yönetici sayısı firma verisidir (RLS) ve firmanın bağlamında okunur; firma başına bir kapsam gerekir.
+        var ids = rows.Select(t => t.Id).ToList();
+        var memberCounts = await db.Memberships.AsNoTracking()
+            .Where(m => ids.Contains(m.TenantId) && m.Status == MembershipStatus.Active)
+            .GroupBy(m => m.TenantId)
+            .Select(g => new { TenantId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.TenantId, g => g.Count, cancellationToken);
+        var moduleRows = await db.ModuleEntitlements.AsNoTracking()
+            .Where(e => ids.Contains(e.TenantId) && e.IsEnabled)
+            .Select(e => new { e.TenantId, e.ModuleKey })
+            .ToListAsync(cancellationToken);
+        var modulesByTenant = moduleRows.GroupBy(e => e.TenantId).ToDictionary(g => g.Key, g => g.Select(e => e.ModuleKey).ToHashSet());
+
         var items = new List<PlatformTenant>(rows.Count);
         foreach (var tenant in rows)
         {
-            items.Add(await SummarizeAsync(tenant, cancellationToken));
+            items.Add(await SummarizeAsync(
+                tenant,
+                cancellationToken,
+                activeMembers: memberCounts.GetValueOrDefault(tenant.Id),
+                enabledModules: modulesByTenant.GetValueOrDefault(tenant.Id)));
         }
 
         return new PlatformTenantPage(items, page, pageSize, total);
@@ -81,8 +99,19 @@ internal sealed class PlatformAdministration(
 
         await using var scope = tenantScopes.Create(new TenantContext(tenant.Id, Guid.Empty, Guid.Empty));
         var administrators = await ListAdministratorsAsync(scope.ServiceProvider.GetRequiredService<ModulixDbContext>(), cancellationToken);
-        var summary = await SummarizeAsync(tenant, cancellationToken, administrators.Count(a => a.Status != MembershipStatus.Disabled));
-        return new PlatformTenantDetail(summary, administrators);
+        var summary = await SummarizeAsync(tenant, cancellationToken, administratorCount: administrators.Count(a => a.Status != MembershipStatus.Disabled));
+        var entitlements = await db.ModuleEntitlements.AsNoTracking()
+            .Where(e => e.TenantId == tenantId)
+            .Select(e => new { e.ModuleKey, e.IsEnabled, e.Source, e.ValidUntil, e.Note })
+            .ToListAsync(cancellationToken);
+        var order = catalog.Modules.Select((m, i) => (m.Key, i)).ToDictionary(x => x.Key, x => x.i);
+        return new PlatformTenantDetail(
+            summary,
+            administrators,
+            [.. entitlements
+                .Where(e => order.ContainsKey(e.ModuleKey))
+                .OrderBy(e => order[e.ModuleKey])
+                .Select(e => new TenantEntitlement(e.ModuleKey, e.IsEnabled, e.Source, e.ValidUntil, e.Note))]);
     }
 
     public async Task<TenantCreationResult> CreateTenantAsync(TenantCreation creation, Guid actingUserId, CancellationToken cancellationToken)
@@ -90,7 +119,7 @@ internal sealed class PlatformAdministration(
         ArgumentNullException.ThrowIfNull(creation);
         var name = Required(creation.Name, "name", "Firma adı zorunludur.");
         var slug = Required(creation.Slug, "slug", "Kısa ad zorunludur.");
-        var tenant = new Tenant(name, slug);
+        var tenant = new Tenant(name, slug, creation.Trial);
         var modules = ValidateModules(creation.Modules ?? []);
         var templates = ValidateTemplates(creation.RoleTemplates ?? [], modules);
         if (creation.Profile is { } profileKey && profiles.Find(profileKey) is null)
@@ -157,6 +186,13 @@ internal sealed class PlatformAdministration(
             ["modules"] = new JsonArray([.. modules.Select(m => JsonValue.Create(m))]),
             ["roles"] = new JsonArray([.. templates.Select(t => JsonValue.Create(t.Name))]),
         });
+        AuditPlatform(tenantDb, actingUserId, PlatformAuditActions.TenantCreated, tenant.Id, null, new JsonObject
+        {
+            ["name"] = tenant.Name,
+            ["slug"] = tenant.Slug,
+            ["status"] = tenant.Status.ToString(),
+            ["modules"] = new JsonArray([.. modules.Select(m => JsonValue.Create(m))]),
+        });
         await tenantDb.SaveChangesAsync(cancellationToken);
 
         // Profil seçilen modüllere eklenir; modül listesi yöneticinin seçimidir (ekran profilin modüllerini önceden seçer).
@@ -189,13 +225,13 @@ internal sealed class PlatformAdministration(
     public async Task RenameTenantAsync(Guid tenantId, string name, Guid actingUserId, CancellationToken cancellationToken)
     {
         var trimmed = Required(name, "name", "Firma adı zorunludur.");
-        await ChangeAsync(tenantId, actingUserId, tenant => tenant.Rename(trimmed), cancellationToken);
+        await ChangeAsync(tenantId, actingUserId, PlatformAuditActions.TenantRenamed, null, tenant => tenant.Rename(trimmed), cancellationToken);
     }
 
-    public Task CloseTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken) =>
-        ChangeAsync(tenantId, actingUserId, tenant =>
+    public Task CloseTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken, string? reason = null) =>
+        ChangeAsync(tenantId, actingUserId, PlatformAuditActions.TenantClosed, reason, tenant =>
         {
-            if (!tenant.IsActive)
+            if (tenant.Status == TenantStatus.Closed)
             {
                 throw new UserAdministrationException(UserAdministrationError.Conflict, "Firma zaten kapalı.");
             }
@@ -203,8 +239,8 @@ internal sealed class PlatformAdministration(
             tenant.Close();
         }, cancellationToken);
 
-    public Task ReopenTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken) =>
-        ChangeAsync(tenantId, actingUserId, tenant =>
+    public Task ReopenTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken, string? reason = null) =>
+        ChangeAsync(tenantId, actingUserId, PlatformAuditActions.TenantReopened, reason, tenant =>
         {
             if (tenant.IsActive)
             {
@@ -214,6 +250,61 @@ internal sealed class PlatformAdministration(
             tenant.Reopen();
         }, cancellationToken);
 
+    public Task SuspendTenantAsync(Guid tenantId, string reason, Guid actingUserId, CancellationToken cancellationToken)
+    {
+        var trimmed = Required(reason, "reason", "Askıya alma için gerekçe zorunludur.");
+        return ChangeAsync(tenantId, actingUserId, PlatformAuditActions.TenantSuspended, trimmed, tenant =>
+        {
+            if (!tenant.IsActive)
+            {
+                throw new UserAdministrationException(UserAdministrationError.Conflict, "Yalnızca açık firma askıya alınabilir.");
+            }
+
+            tenant.Suspend();
+        }, cancellationToken);
+    }
+
+    public Task ActivateTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken, string? reason = null) =>
+        ChangeAsync(tenantId, actingUserId, PlatformAuditActions.TenantActivated, reason, tenant =>
+        {
+            if (tenant.Status != TenantStatus.Trial)
+            {
+                throw new UserAdministrationException(UserAdministrationError.Conflict, "Yalnızca deneme firması etkinleştirilir.");
+            }
+
+            tenant.Activate();
+        }, cancellationToken);
+
+    public async Task<PlatformAuditPage> ListAuditAsync(PlatformAuditQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
+
+        var entries = db.PlatformAuditLog.AsNoTracking();
+        if (query.TenantId is { } tenantId)
+        {
+            entries = entries.Where(e => e.TargetTenantId == tenantId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Action))
+        {
+            var action = query.Action.Trim();
+            entries = entries.Where(e => e.Action == action);
+        }
+
+        var total = await entries.CountAsync(cancellationToken);
+        var items = await (
+            from entry in entries.OrderByDescending(e => e.OccurredAt).ThenByDescending(e => e.Id).Skip((page - 1) * pageSize).Take(pageSize)
+            join user in db.Users.AsNoTracking() on entry.ActorUserId equals user.Id into actors
+            from actor in actors.DefaultIfEmpty()
+            orderby entry.OccurredAt descending, entry.Id descending
+            select new PlatformAuditItem(
+                entry.Id, entry.OccurredAt, entry.ActorUserId, actor == null ? null : actor.DisplayName, entry.Action, entry.TargetTenantId, entry.Reason, entry.Details))
+            .ToListAsync(cancellationToken);
+        return new PlatformAuditPage(items, page, pageSize, total);
+    }
+
     public async Task<InvitationResult> InviteAdministratorAsync(
         Guid tenantId, string email, string displayName, string publicUrl, Guid actingUserId, CancellationToken cancellationToken)
     {
@@ -221,17 +312,21 @@ internal sealed class PlatformAdministration(
         if (!tenant.IsActive)
         {
             throw new UserAdministrationException(
-                UserAdministrationError.Conflict, "Kapalı firmaya davet gönderilemez. Önce firmayı yeniden açın.");
+                UserAdministrationError.Conflict, "Kapalı veya askıdaki firmaya davet gönderilemez. Önce firmayı yeniden açın.");
         }
 
-        // Davet, Yönetici rolüyle core.membership kaydı olarak firmanın denetim kaydına yazılır.
+        // Davet, Yönetici rolüyle core.membership kaydı olarak firmanın denetim kaydına yazılır. Platform denetim kaydı davetin
+        // kaydedildiği SaveChanges'te birlikte yazılsın diye önceden eklenir; davet başarısız olursa kapsamla birlikte atılır.
         await using var scope = tenantScopes.Create(new TenantContext(tenant.Id, actingUserId, Guid.Empty));
+        AuditPlatform(scope.ServiceProvider.GetRequiredService<ModulixDbContext>(), actingUserId,
+            PlatformAuditActions.AdministratorInvited, tenant.Id, null, null);
         var administrator = await scope.ServiceProvider.GetRequiredService<IRoleService>().EnsureSystemRoleAsync(cancellationToken);
         return await scope.ServiceProvider.GetRequiredService<UserAdministration>().InviteAsPlatformAsync(
             new UserInvitation(email, displayName, [administrator.Id], publicUrl), cancellationToken);
     }
 
-    public async Task SetModuleAsync(Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken)
+    public async Task SetModuleAsync(
+        Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken, EntitlementTerms? terms = null)
     {
         if (!catalog.ContainsModule(moduleKey) || ModuleCatalog.IsAlwaysEnabled(moduleKey))
         {
@@ -248,28 +343,61 @@ internal sealed class PlatformAdministration(
         var services = scope.ServiceProvider;
         var tenantDb = services.GetRequiredService<ModulixDbContext>();
         var entitlements = services.GetRequiredService<IModuleEntitlements>();
+        // Hak koşulları (kaynak, bitiş, not) yalnızca açarken anlamlıdır; kapatırken verilirse yok sayılır.
+        terms = enabled ? terms : null;
         var before = await entitlements.GetEnabledAsync(tenantId, cancellationToken);
-        if (before.Contains(moduleKey) == enabled)
+        if (before.Contains(moduleKey) == enabled && terms is null)
         {
             return;
         }
 
+        var existing = await tenantDb.ModuleEntitlements.AsNoTracking()
+            .SingleOrDefaultAsync(e => e.TenantId == tenantId && e.ModuleKey == moduleKey, cancellationToken);
         var tenant = await db.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId, cancellationToken);
         var after = enabled ? before.Append(moduleKey) : before.Where(m => m != moduleKey);
-        Audit(services, tenant, actingUserId, AuditAction.Updated,
-            new JsonObject { ["modules"] = ModuleList(before) },
-            new JsonObject { ["modules"] = ModuleList(after) });
-        await entitlements.SetEnabledAsync(tenantId, moduleKey, enabled, cancellationToken);
-        await tenantDb.SaveChangesAsync(cancellationToken); // denetim kaydını tenant bağlamına yaz
+        var beforeAudit = new JsonObject { ["modules"] = ModuleList(before) };
+        var afterAudit = new JsonObject { ["modules"] = ModuleList(after) };
+        if (terms is not null)
+        {
+            // Koşullar değişince (ör. bitiş tarihi) modül listesi aynı kalsa da fark denetim kaydında görünür.
+            beforeAudit["terms"] = existing is { IsEnabled: true } ? TermsJson(existing.Source, existing.ValidUntil, existing.Note) : null;
+            afterAudit["terms"] = TermsJson(terms.Source, terms.ValidUntil, terms.Note);
+        }
+
+        // Denetim kayıtları hak değişikliğinden önce eklenir: SetEnabledAsync hepsini tek SaveChanges'te yazar. Koşullar geçersizse
+        // (Enable doğrular) hata fırlar ve hiçbir şey yazılmaz.
+        var platformDetails = new JsonObject
+        {
+            ["module"] = moduleKey,
+            ["enabled"] = enabled,
+            ["before"] = beforeAudit.DeepClone(),
+            ["after"] = afterAudit.DeepClone(),
+        };
+        Audit(services, tenant, actingUserId, AuditAction.Updated, beforeAudit, afterAudit);
+        AuditPlatform(tenantDb, actingUserId, PlatformAuditActions.ModuleChanged, tenantId, terms?.Note, platformDetails);
+        await entitlements.SetEnabledAsync(tenantId, moduleKey, enabled, cancellationToken, terms);
+        await tenantDb.SaveChangesAsync(cancellationToken);
     }
+
+    private static JsonObject TermsJson(EntitlementSource source, DateTimeOffset? validUntil, string? note) => new()
+    {
+        ["source"] = source.ToString(),
+        ["validUntil"] = validUntil?.ToString("O"),
+        ["note"] = note,
+    };
 
     public Task<ProfilePlan?> PreviewProfileAsync(Guid tenantId, string profileKey, CancellationToken cancellationToken) =>
         InTenantAsync(tenantId, Guid.Empty, p => p.PreviewAsync(profileKey, enableModules: true, cancellationToken), cancellationToken);
 
     public Task<ProfilePlan?> ApplyProfileAsync(Guid tenantId, string profileKey, Guid actingUserId, CancellationToken cancellationToken) =>
-        InTenantAsync(tenantId, actingUserId, p => p.ApplyAsync(profileKey, enableModules: true, cancellationToken), cancellationToken);
+        InTenantAsync(tenantId, actingUserId, p => p.ApplyAsync(profileKey, enableModules: true, cancellationToken), cancellationToken,
+            // Platform denetim kaydı profilin kaydedildiği SaveChanges'te birlikte yazılsın diye önceden eklenir.
+            audit: tenantDb => AuditPlatform(tenantDb, actingUserId, PlatformAuditActions.ProfileApplied, tenantId, null,
+                new JsonObject { ["profile"] = profileKey }));
 
-    private async Task<T> InTenantAsync<T>(Guid tenantId, Guid actingUserId, Func<ISectorProfileService, Task<T>> action, CancellationToken cancellationToken)
+    private async Task<T> InTenantAsync<T>(
+        Guid tenantId, Guid actingUserId, Func<ISectorProfileService, Task<T>> action, CancellationToken cancellationToken,
+        Action<ModulixDbContext>? audit = null)
     {
         if (!await db.Tenants.AnyAsync(t => t.Id == tenantId, cancellationToken))
         {
@@ -277,6 +405,7 @@ internal sealed class PlatformAdministration(
         }
 
         await using var scope = tenantScopes.Create(new TenantContext(tenantId, actingUserId, Guid.Empty));
+        audit?.Invoke(scope.ServiceProvider.GetRequiredService<ModulixDbContext>());
         return await action(scope.ServiceProvider.GetRequiredService<ISectorProfileService>());
     }
 
@@ -285,7 +414,7 @@ internal sealed class PlatformAdministration(
         var counts = await (
             from entitlement in db.ModuleEntitlements.AsNoTracking()
             join tenant in db.Tenants.AsNoTracking() on entitlement.TenantId equals tenant.Id
-            where entitlement.IsEnabled && tenant.Status == TenantStatus.Active
+            where entitlement.IsEnabled && TenantStatusRules.Operational.Contains(tenant.Status)
             group entitlement by entitlement.ModuleKey into g
             select new { ModuleKey = g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.ModuleKey, g => g.Count, cancellationToken);
@@ -299,7 +428,8 @@ internal sealed class PlatformAdministration(
     private JsonArray ModuleList(IEnumerable<string> modules) =>
         new([.. catalog.Modules.Select(m => m.Key).Where(modules.Contains).Select(k => JsonValue.Create(k))]);
 
-    private async Task ChangeAsync(Guid tenantId, Guid actingUserId, Action<Tenant> change, CancellationToken cancellationToken)
+    private async Task ChangeAsync(
+        Guid tenantId, Guid actingUserId, string platformAction, string? reason, Action<Tenant> change, CancellationToken cancellationToken)
     {
         // Tenant kaydı platform tablolarındadır (ADR-0020); değişiklik orada, denetim kaydı tenant bağlamında yazılır.
         var tenant = await db.Tenants.SingleOrDefaultAsync(t => t.Id == tenantId, cancellationToken) ?? throw NotFound();
@@ -315,17 +445,30 @@ internal sealed class PlatformAdministration(
         await using var scope = tenantScopes.Create(new TenantContext(tenantId, actingUserId, Guid.Empty));
         Audit(scope.ServiceProvider, tenant, actingUserId, AuditAction.Updated, before, after);
         await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().SaveChangesAsync(cancellationToken); // denetim: tenant DB
-        await db.SaveChangesAsync(cancellationToken); // tenant kaydı: platform DB
+
+        // Tenant kaydı ve platform denetim kaydı platform bağlamında tek SaveChanges'te yazılır (ADR-0028).
+        AuditPlatform(db, actingUserId, platformAction, tenant.Id, reason,
+            new JsonObject { ["before"] = before.DeepClone(), ["after"] = after.DeepClone() });
+        await db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<PlatformTenant> SummarizeAsync(Tenant tenant, CancellationToken cancellationToken, int? administratorCount = null)
+    private static void AuditPlatform(ModulixDbContext target, Guid actingUserId, string action, Guid? tenantId, string? reason, JsonObject? details) =>
+        target.PlatformAuditLog.Add(new PlatformAuditEntry(
+            actingUserId, action, tenantId, reason, details?.ToJsonString(), Activity.Current?.TraceId.ToString()));
+
+    private async Task<PlatformTenant> SummarizeAsync(
+        Tenant tenant,
+        CancellationToken cancellationToken,
+        int? administratorCount = null,
+        int? activeMembers = null,
+        IReadOnlySet<string>? enabledModules = null)
     {
-        var activeMembers = await db.Memberships.CountAsync(
+        activeMembers ??= await db.Memberships.CountAsync(
             m => m.TenantId == tenant.Id && m.Status == MembershipStatus.Active, cancellationToken);
-        var modules = await db.ModuleEntitlements.AsNoTracking()
+        var modules = enabledModules ?? (await db.ModuleEntitlements.AsNoTracking()
             .Where(e => e.TenantId == tenant.Id && e.IsEnabled)
             .Select(e => e.ModuleKey)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken)).ToHashSet();
 
         if (administratorCount is null)
         {
@@ -341,7 +484,7 @@ internal sealed class PlatformAdministration(
             tenant.Slug,
             tenant.Status,
             tenant.CreatedAt,
-            activeMembers,
+            activeMembers.Value,
             administratorCount.Value,
             [.. catalog.Modules.Select(m => m.Key).Where(modules.Contains)],
             tenant.ProfileKey,

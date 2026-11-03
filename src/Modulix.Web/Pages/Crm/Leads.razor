@@ -3,11 +3,11 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Lead'ler · Modulix</PageTitle>
+<PageTitle>Müşteri adayları · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.LeadsRead">
     <div class="page-header">
-        <h1>Lead'ler</h1>
+        <h1>Müşteri adayları</h1>
         <div class="header-actions">
             @if (Session.Can(CrmAccess.LeadFormsManage))
             {
@@ -39,46 +39,51 @@
     <div class="list-toolbar">
         <ViewSelector Items="ViewOptions" Value="@current" ValueChanged="SelectAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Lead ara" placeholder="Konu, no, ad, firma ya da e-posta ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="Müşteri adayı ara" placeholder="Konu, no, ad, firma ya da e-posta ara" @bind="search" />
             <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
         @if (Session.Can(CrmAccess.LeadsCreate) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => editing = true"><AppIcon Name="plus" Size="16" /> Yeni Lead</button>
+            <button type="button" class="btn btn-primary" @onclick="() => editing = true"><AppIcon Name="plus" Size="16" /> Yeni müşteri adayı</button>
         }
     </div>
-    <div class="filters">
-        <select class="form-select" aria-label="Durum" @bind="status" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm durumlar</option>
-            @foreach (var s in LeadStatus.All)
-            {
-                <option value="@s">@LeadStatus.Label(s)</option>
-            }
-        </select>
-        <select class="form-select" aria-label="Kaynak" @bind="source" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm kaynaklar</option>
-            @foreach (var s in Lookups.ValuesOf(CrmLeadLists.Source))
-            {
-                <option value="@s.Key">@s.Label</option>
-            }
-        </select>
-        <select class="form-select" aria-label="Öncelik" @bind="priority" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm öncelikler</option>
-            @foreach (var p in LeadPriority.All)
-            {
-                <option value="@p">@LeadPriority.Label(p)</option>
-            }
-        </select>
-        <select class="form-select" aria-label="Sorumlu" @bind="owner" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm sorumlular</option>
-            @foreach (var member in Lookups.Members)
-            {
-                <option value="@member.UserId">@member.DisplayName</option>
-            }
-        </select>
-        <label class="form-label-inline">Geliş: <input class="form-control" type="date" aria-label="Başlangıç" @bind="from" @bind:after="() => LoadAsync(1)" /></label>
-        <label class="form-label-inline">– <input class="form-control" type="date" aria-label="Bitiş" @bind="to" @bind:after="() => LoadAsync(1)" /></label>
-    </div>
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="Durum" @bind="status" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm durumlar</option>
+                @foreach (var s in LeadStatus.All)
+                {
+                    <option value="@s">@LeadStatus.Label(s)</option>
+                }
+            </select>
+            <select class="form-select" aria-label="Kaynak" @bind="source" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm kaynaklar</option>
+                @foreach (var s in Lookups.ValuesOf(CrmLeadLists.Source))
+                {
+                    <option value="@s.Key">@s.Label</option>
+                }
+            </select>
+            <select class="form-select" aria-label="Öncelik" @bind="priority" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm öncelikler</option>
+                @foreach (var p in LeadPriority.All)
+                {
+                    <option value="@p">@LeadPriority.Label(p)</option>
+                }
+            </select>
+            <select class="form-select" aria-label="Sorumlu" @bind="owner" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm sorumlular</option>
+                @foreach (var member in Lookups.Members)
+                {
+                    <option value="@member.UserId">@member.DisplayName</option>
+                }
+            </select>
+            <label class="form-label-inline">Geliş: <input class="form-control" type="date" aria-label="Başlangıç" @bind="from" @bind:after="() => LoadAsync(1)" /></label>
+            <label class="form-label-inline">– <input class="form-control" type="date" aria-label="Bitiş" @bind="to" @bind:after="() => LoadAsync(1)" /></label>
+        </div>
+    }
 
     @if (target is { } hours && current == "firstContactOverdue")
     {
@@ -91,7 +96,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Bu görünümde Lead yok.</p>
+        <p class="text-muted">Bu görünümde müşteri adayı yok.</p>
     }
     else
     {
@@ -111,7 +116,7 @@
                         <td data-label="Durum"><span class="badge stage-@lead.Status.ToLowerInvariant()">@LeadStatus.Label(lead.Status)</span></td>
                         <td data-label="Öncelik">@LeadPriority.Label(lead.Priority)</td>
                         <td data-label="Kaynak">@Lookups.Label(CrmLeadLists.Source, lead.Source)</td>
-                        <td data-label="Sorumlu">@(lead.OwnerId is null ? "Atanmadı" : Lookups.MemberName(lead.OwnerId))</td>
+                        <td data-label="Sorumlu">@if (lead.OwnerId is null) { <span class="text-muted">Atanmadı</span> } else { <OwnerCell Name="@Lookups.MemberName(lead.OwnerId)" /> }</td>
                         <td data-label="Geliş">@CrmLabels.Time(lead.FirstReceivedAt)</td>
                         <td data-label="İlk temas">
                             @if (lead.FirstContactAt is { } contact)
@@ -131,19 +136,24 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
 @code {
+    private bool filtersOpen;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
+    private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (source.Length > 0 ? 1 : 0) + (priority.Length > 0 ? 1 : 0) + (owner.Length > 0 ? 1 : 0) + (from is null ? 0 : 1) + (to is null ? 0 : 1);
+
     private const string Url = "/api/crm/leads";
 
     // Görünümler yalnızca süzgeçtir; kapsamı sunucu uygular (kimse yetkisi dışındaki Lead'i listeleyemez).
     private static readonly ViewDefinition[] Views =
     [
         new("all", "Tümü", _ => true),
-        new("mine", "Benim Lead'lerim", _ => true),
-        new("team", "Ekip Lead'leri", s => s.Scope != RecordScope.Own),
+        new("mine", "Benim müşteri adaylarım", _ => true),
+        new("team", "Ekip müşteri adayları", s => s.Scope != RecordScope.Own),
         new("unassigned", "Atama bekleyenler", s => s.Can(CrmAccess.LeadsAssign)),
         new("firstContactOverdue", "İlk temas gecikmiş", _ => true),
         new("followUpOverdue", "Takibi geciken", _ => true),
@@ -179,7 +189,7 @@
 
     private string Query(int pageNumber)
     {
-        var parts = new List<string> { $"page={pageNumber}", $"search={Uri.EscapeDataString(search ?? string.Empty)}" };
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}", $"search={Uri.EscapeDataString(search ?? string.Empty)}" };
         Add(parts, "status", status);
         Add(parts, "source", source);
         Add(parts, "priority", priority);

@@ -146,7 +146,7 @@
                     <div><dt>Edinim kaynağı</dt><dd>@(opportunity.Source is null ? "—" : Lookups.Label(CrmLeadLists.Source, opportunity.Source))</dd></div>
                     @if (opportunity.SourceLeadId is { } leadId && Session.Can(CrmAccess.LeadsRead))
                     {
-                        <div><dt>Kaynak Lead</dt><dd><a href="crm/leadler/@leadId">Lead'i aç</a></dd></div>
+                        <div><dt>Kaynak müşteri adayı</dt><dd><a href="crm/leadler/@leadId">Müşteri adayını aç</a></dd></div>
                     }
                     @if (ShowAmounts)
                     {

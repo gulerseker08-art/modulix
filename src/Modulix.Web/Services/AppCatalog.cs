@@ -97,7 +97,7 @@ public static class AppCatalog
     public static IReadOnlyList<AppDefinition> All { get; } =
     [
         new(Crm, null, "CRM", "users", null, 10, ModuleKey: CrmAccess.ModuleKey, Group: SalesGroup),
-        new("crm.leads", Crm, "Lead'ler", "inbox", "crm/leadler", 5, CrmAccess.ModuleKey, CrmAccess.LeadsRead, Group: CrmProcessGroup),
+        new("crm.leads", Crm, "Müşteri adayları", "inbox", "crm/leadler", 5, CrmAccess.ModuleKey, CrmAccess.LeadsRead, Group: CrmProcessGroup),
         new("crm.companies", Crm, "Firmalar", "building", "crm/firmalar", 10, CrmAccess.ModuleKey, CrmAccess.CompaniesRead, Group: CrmProcessGroup),
         new("crm.contacts", Crm, "Kişiler", "user", "crm/kisiler", 20, CrmAccess.ModuleKey, CrmAccess.ContactsRead, Tone: AppTone.Teal, Group: CrmProcessGroup),
         new("crm.opportunities", Crm, "Fırsatlar", "target", "crm/firsatlar", 30, CrmAccess.ModuleKey, CrmAccess.OpportunitiesRead, Group: CrmProcessGroup),

@@ -430,9 +430,9 @@ public sealed class EventDispatcher(
             .Where(t => t.Id == delivery.TenantId)
             .Select(t => (TenantStatus?)t.Status)
             .SingleOrDefaultAsync(cancellationToken);
-        if (status != TenantStatus.Active)
+        if (status is not { } current || !TenantStatusRules.IsOperational(current))
         {
-            return "Firma kapalı.";
+            return status == TenantStatus.Suspended ? "Firma askıda." : "Firma kapalı.";
         }
 
         var modules = await EnabledModulesAsync(delivery.TenantId, cancellationToken);

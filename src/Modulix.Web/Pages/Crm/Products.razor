@@ -7,10 +7,6 @@
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ProductsRead">
     <div class="page-header">
         <h1>Ürün ve hizmetler</h1>
-        @if (Session.Can(CrmAccess.ProductsWrite) && form is null)
-        {
-            <button type="button" class="btn btn-primary" @onclick="New">Yeni ürün/hizmet</button>
-        }
     </div>
 
     <p class="text-muted">
@@ -278,22 +274,19 @@
         </div>
     }
 
-    <div class="filters" role="group" aria-label="Filtre">
-        <button type="button" class="chip @(status is null && kind is null ? "active" : null)" @onclick="() => FilterAsync(null, null)">Tümü</button>
-        @foreach (var item in CatalogLabels.Kinds)
+    <div class="list-toolbar">
+        <ViewSelector Label="Tür" Items="KindOptions" Value="@(kind ?? AllOption)" ValueChanged="k => FilterAsync(status, k == AllOption ? null : k)" />
+        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status ?? AllOption)" ValueChanged="s => FilterAsync(s == AllOption ? null : s, kind)" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Ürün ara" placeholder="Kod, ad, barkod veya etiket ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <ColumnPicker />
+        @if (Session.Can(CrmAccess.ProductsWrite) && form is null)
         {
-            <button type="button" class="chip @(kind == item.Key ? "active" : null)" @onclick="() => FilterAsync(status, item.Key)">@item.Label</button>
-        }
-        @foreach (var item in CatalogLabels.Statuses)
-        {
-            <button type="button" class="chip @(status == item.Key ? "active" : null)" @onclick="() => FilterAsync(item.Key, kind)">@item.Label</button>
+            <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> Yeni ürün/hizmet</button>
         }
     </div>
-
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Kod, ad, barkod veya etiket ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
 
     @if (page is null)
     {
@@ -327,7 +320,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -408,6 +401,12 @@
         return items;
     }
 
+    private const string AllOption = "all";
+
+    private IReadOnlyList<ViewOption> KindOptions => [new(AllOption, "Tüm türler"), .. CatalogLabels.Kinds.Select(k => new ViewOption(k.Key, k.Label))];
+
+    private IReadOnlyList<ViewOption> StatusOptions => [new(AllOption, "Tüm durumlar"), .. CatalogLabels.Statuses.Select(s => new ViewOption(s.Key, s.Label))];
+
     private async Task FilterAsync(string? statusValue, string? kindValue)
     {
         status = statusValue;
@@ -417,7 +416,7 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var url = $"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
         if (status is not null)
         {
             url += $"&status={Uri.EscapeDataString(status)}";

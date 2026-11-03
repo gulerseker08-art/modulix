@@ -22,6 +22,26 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
     }
 }
 
+internal sealed class PlatformAuditEntryConfiguration : IEntityTypeConfiguration<PlatformAuditEntry>
+{
+    public void Configure(EntityTypeBuilder<PlatformAuditEntry> builder)
+    {
+        // Platform geneli, RLS dışı, ekleme-yalnız (migration uygulama rolüne UPDATE/DELETE'i yasaklar). Firma silinse de saklanır:
+        // yabancı anahtar yoktur ve sütun adı TenantId olmadığı için tenant dışa aktarma/silme kapsamında değildir.
+        builder.ToTable("PlatformAuditLog", DatabaseSchemas.Platform);
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).ValueGeneratedNever();
+        builder.Property(e => e.OccurredAt).IsRequired();
+        builder.Property(e => e.ActorUserId).IsRequired();
+        builder.Property(e => e.Action).HasMaxLength(PlatformAuditEntry.ActionMaxLength).IsRequired();
+        builder.Property(e => e.Reason).HasMaxLength(PlatformAuditEntry.ReasonMaxLength);
+        builder.Property(e => e.Details).HasMaxLength(PlatformAuditEntry.DetailsMaxLength);
+        builder.Property(e => e.TraceId).HasMaxLength(64);
+        builder.HasIndex(e => e.OccurredAt);
+        builder.HasIndex(e => new { e.TargetTenantId, e.OccurredAt });
+    }
+}
+
 internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>
 {
     public void Configure(EntityTypeBuilder<Membership> builder)
