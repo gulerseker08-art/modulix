@@ -53,6 +53,7 @@
         }
 
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <TabBar Tabs="HeaderTabs" State="headerTabs" Label="Teklif formu bölümleri" />
             <fieldset disabled="@(!CanEditHeader || busy)">
                 <legend class="visually-hidden">Genel bilgiler</legend>
                 @if (errors is { Count: > 0 })
@@ -67,6 +68,7 @@
                         </ul>
                     </div>
                 }
+                <TabPanel State="headerTabs" Key="form-genel">
                 <div class="form-grid" @oninput="() => dirty = true">
                     <div class="span-all">
                         <label class="form-label" for="q-title">Başlık *</label>
@@ -95,6 +97,10 @@
                         <label class="form-label" for="ownerId">Sorumlu</label>
                         <LookupPicker Id="ownerId" LookupKey="crm.quote.owner" @bind-Value="form.OwnerId" Placeholder="@(quote is null ? "Ben" : "—")" ReadOnly="@(!CanEditHeader)" />
                     </div>
+                </div>
+                </TabPanel>
+                <TabPanel State="headerTabs" Key="form-fiyat">
+                <div class="form-grid" @oninput="() => dirty = true">
                     <div>
                         <label class="form-label" for="priceListId">Fiyat listesi</label>
                         <LookupPicker Id="priceListId" LookupKey="crm.quote.price-list" @bind-Value="form.PriceListId" Placeholder="Varsayılan seçim"
@@ -135,6 +141,10 @@
                             <FieldError Field="documentDiscountValue" Errors="errors" />
                         </div>
                     }
+                </div>
+                </TabPanel>
+                <TabPanel State="headerTabs" Key="form-kosul">
+                <div class="form-grid" @oninput="() => dirty = true">
                     <div class="span-all">
                         <label class="form-label" for="q-pay">Ödeme koşulları</label>
                         <textarea id="q-pay" class="form-control" rows="2" maxlength="4000" @bind="form.PaymentTerms"></textarea>
@@ -152,6 +162,7 @@
                         <textarea id="q-int" class="form-control" rows="2" maxlength="4000" @bind="form.InternalNotes"></textarea>
                     </div>
                 </div>
+                </TabPanel>
             </fieldset>
             @if (CanEditHeader)
             {
@@ -176,6 +187,8 @@
                     <form class="record-form" novalidate @onsubmit="SaveLineAsync" @onsubmit:preventDefault>
                         <h3>@(lineForm.Id is null ? "Yeni kalem" : "Kalemi düzenle")</h3>
                         @if (lineMessage is not null) { <div class="alert alert-danger" role="alert">@lineMessage</div> }
+                        <TabBar Tabs="LineTabs" State="lineTabs" Label="Kalem formu bölümleri" />
+                        <TabPanel State="lineTabs" Key="line-kalem">
                         <div class="form-grid" @oninput="() => lineDirty = true">
                             <div>
                                 <label class="form-label" for="l-kind">Tür</label>
@@ -212,6 +225,14 @@
                                        disabled="@(lineForm.ProductId is not null && !Session.Can(CrmAccess.QuotesManualPrice))" />
                                 <FieldError Field="unitPrice" Errors="lineErrors" />
                             </div>
+                            <div class="span-all">
+                                <label class="form-label" for="l-desc">Açıklama</label>
+                                <textarea id="l-desc" class="form-control" rows="2" maxlength="2000" @bind="lineForm.Description"></textarea>
+                            </div>
+                        </div>
+                        </TabPanel>
+                        <TabPanel State="lineTabs" Key="line-vergi">
+                        <div class="form-grid" @oninput="() => lineDirty = true">
                             <div>
                                 <label class="form-label" for="l-tax">Vergi oranı (%)</label>
                                 <input id="l-tax" type="number" step="any" min="0" max="100" class="form-control" @bind="lineForm.TaxRatePercent"
@@ -232,6 +253,24 @@
                                     <FieldError Field="discountValue" Errors="lineErrors" />
                                 </div>
                             }
+                            <div>
+                                <label class="form-label" for="l-period">Faturalama</label>
+                                <select id="l-period" class="form-select" @bind="lineForm.RecurringPeriod">
+                                    @foreach (var period in QuoteLabels.Periods) { <option value="@period.Key">@period.Label</option> }
+                                </select>
+                                <FieldError Field="recurringPeriod" Errors="lineErrors" />
+                            </div>
+                            @if (Session.Can(CrmAccess.QuoteCostsRead))
+                            {
+                                <div>
+                                    <label class="form-label" for="l-cost">Birim maliyet <small class="text-muted">(yalnızca yetkililer)</small></label>
+                                    <input id="l-cost" type="number" step="any" min="0" class="form-control" @bind="lineForm.UnitCost" />
+                                </div>
+                            }
+                        </div>
+                        </TabPanel>
+                        <TabPanel State="lineTabs" Key="line-rol">
+                        <div class="form-grid" @oninput="() => lineDirty = true">
                             <div>
                                 <label class="form-label" for="l-role">Kalemin rolü</label>
                                 <select id="l-role" class="form-select" @bind="lineForm.Role">
@@ -259,25 +298,8 @@
                                     <label class="form-check-label" for="l-sel">Seçili (ana toplama dahil)</label>
                                 </div>
                             }
-                            <div>
-                                <label class="form-label" for="l-period">Faturalama</label>
-                                <select id="l-period" class="form-select" @bind="lineForm.RecurringPeriod">
-                                    @foreach (var period in QuoteLabels.Periods) { <option value="@period.Key">@period.Label</option> }
-                                </select>
-                                <FieldError Field="recurringPeriod" Errors="lineErrors" />
-                            </div>
-                            @if (Session.Can(CrmAccess.QuoteCostsRead))
-                            {
-                                <div>
-                                    <label class="form-label" for="l-cost">Birim maliyet <small class="text-muted">(yalnızca yetkililer)</small></label>
-                                    <input id="l-cost" type="number" step="any" min="0" class="form-control" @bind="lineForm.UnitCost" />
-                                </div>
-                            }
-                            <div class="span-all">
-                                <label class="form-label" for="l-desc">Açıklama</label>
-                                <textarea id="l-desc" class="form-control" rows="2" maxlength="2000" @bind="lineForm.Description"></textarea>
-                            </div>
                         </div>
+                        </TabPanel>
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary" disabled="@busy">Kalemi kaydet</button>
                             <button type="button" class="btn btn-outline-secondary" @onclick="CancelLine">Vazgeç</button>
@@ -496,6 +518,26 @@
     private List<QuoteDto> family = [];
     private QuoteForm form = new();
     private LineForm? lineForm;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
+    private readonly TabState headerTabs = new("form-genel");
+    private readonly TabState lineTabs = new("line-kalem");
+
+    private static int ErrorCount(IReadOnlyDictionary<string, string[]>? source, params string[] fields) => source is null ? 0 : fields.Count(source.ContainsKey);
+
+    private IReadOnlyList<TabItem> HeaderTabs =>
+    [
+        new("form-genel", "Genel", Errors: ErrorCount(errors, "title", "companyId", "contactId", "opportunityId")),
+        new("form-fiyat", "Fiyat ve indirim", Errors: ErrorCount(errors, "priceListId", "currency", "validUntil", "priceIncludesTax", "documentDiscountValue")),
+        new("form-kosul", "Koşullar ve notlar", Errors: ErrorCount(errors, "paymentTerms", "deliveryTerms", "commercialTerms", "internalNotes")),
+    ];
+
+    private IReadOnlyList<TabItem> LineTabs =>
+    [
+        new("line-kalem", "Kalem", Errors: ErrorCount(lineErrors, "kind", "productId", "name", "quantity", "unitPrice", "description")),
+        new("line-vergi", "Vergi ve indirim", Errors: ErrorCount(lineErrors, "taxRatePercent", "discountValue", "recurringPeriod")),
+        new("line-rol", "Paket ve rol", Errors: ErrorCount(lineErrors, "parentStableKey")),
+    ];
     private IReadOnlyDictionary<string, string[]>? errors;
     private IReadOnlyDictionary<string, string[]>? lineErrors;
     private string? notice;
@@ -585,6 +627,7 @@
         if (!result.IsSuccess)
         {
             errors = result.FieldErrors;
+            headerTabs.RevealFirstFailing(HeaderTabs);
             Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Sayfayı yenileyip tekrar deneyin." : result.Error, failed: true);
             return;
         }
@@ -605,6 +648,7 @@
     private void NewLine()
     {
         lineForm = new LineForm();
+        lineTabs.Select("line-kalem");
         lineErrors = null;
         lineMessage = null;
         lineDirty = false;
@@ -613,6 +657,7 @@
     private void EditLine(QuoteLineDto line)
     {
         lineForm = LineForm.From(line);
+        lineTabs.Select("line-kalem");
         lineErrors = null;
         lineMessage = null;
         lineDirty = false;
@@ -641,6 +686,7 @@
         {
             lineErrors = result.FieldErrors;
             lineMessage = result.Error;
+            lineTabs.RevealFirstFailing(LineTabs);
             return;
         }
 
