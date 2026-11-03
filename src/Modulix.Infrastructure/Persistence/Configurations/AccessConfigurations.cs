@@ -39,6 +39,11 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         builder.Property(r => r.IsSystem).IsRequired();
         builder.Property(r => r.Scope).IsRequired().HasDefaultValue(Core.Contracts.Authorization.RecordScope.All);
 
+        // Atanabilir düzey (ADR-0026 K6): mevcut roller yalnızca kullanıcıya atanır; departmana atama açık işaretlemeyle başlar.
+        builder.Property(r => r.AssignLevel).IsRequired().HasDefaultValue(Core.Contracts.Authorization.RoleAssignLevel.User);
+        builder.Ignore(r => r.AssignableToUnit);
+        builder.Ignore(r => r.AssignableToUser);
+
         // Her tenant'ta en fazla bir sistem rolü ("Yönetici").
         builder.HasIndex(r => r.TenantId)
             .IsUnique()

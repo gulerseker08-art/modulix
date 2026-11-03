@@ -41,6 +41,14 @@ public sealed record UpdateBusinessUnitRequest(string Name, string? Code, string
 
 public sealed record SetBusinessUnitActiveRequest(bool IsActive);
 
+/// <summary>Departmana atanmış rol (ADR-0026 K6); <see cref="Scope"/> rolün kayıt kapsamıdır.</summary>
+public sealed record BusinessUnitRoleDto(Guid RoleId, string RoleName, Access.RecordScope Scope, bool InheritToChildren);
+
+public sealed record BusinessUnitRoleItem(Guid RoleId, bool InheritToChildren = false);
+
+/// <summary>Departmanın rollerini verilen listeyle değiştirir.</summary>
+public sealed record SetBusinessUnitRolesRequest(IReadOnlyList<BusinessUnitRoleItem> Roles);
+
 /// <summary>Kullanıcının departmanı (kullanıcı kartı).</summary>
 public sealed record MembershipBusinessUnitDto(Guid Id, string Name, string PathNames, string Kind, bool IsActive);
 

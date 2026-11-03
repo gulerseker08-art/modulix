@@ -30,9 +30,25 @@
             }
             @(Disabled ? " Kişi devre dışı olduğu için şu an hiçbirini kullanamaz." : null)
         </p>
+        @if (access.Roles is { Count: > 0 } sources)
+        {
+            @* Rolün kaynağı (ADR-0026): doğrudan atanmış ya da departmandan gelen. *@
+            <p class="scope-line">
+                <strong>Roller:</strong>
+                @foreach (var source in sources)
+                {
+                    <span class="badge tag">@source.Name · @(source.ViaBusinessUnit is { } via ? $"Departman: {via}" : "Doğrudan")</span>
+                }
+            </p>
+        }
         <p class="scope-line">
-            <strong>Kayıt kapsamı:</strong> @RecordScopeLabels.Of(access.Scope)
-            @if (access.Scope == RecordScope.Team)
+            <strong>Kayıt kapsamı:</strong>
+            @ScopeText()
+            @if (Scopes.Contains(RecordScope.Unit) || Scopes.Contains(RecordScope.UnitAndBelow))
+            {
+                @DepartmentText()
+            }
+            @if (Scopes.Contains(RecordScope.Team))
             {
                 @(access.Teams is { Count: > 0 } teams ? $" ({string.Join(", ", teams)})" : " (henüz bir ekipte değil; yalnızca kendi kayıtlarını görür)")
             }
@@ -62,9 +78,21 @@
         granted = access?.Permissions.Select(p => p.Key).ToHashSet() ?? [];
     }
 
+    /// <summary>Kapsamların listesi (en geniş önce); eski yanıtta yoksa tek kapsam.</summary>
+    private IReadOnlyList<RecordScope> Scopes =>
+        access is null ? [] : (access.Scopes is { Count: > 0 } list ? list.OrderByDescending(RecordScopeRules.Breadth).ToList() : [access.Scope]);
+
+    // Birden fazla kapsam varsa kişi hepsinin gördüğü kayıtları görür (birleşim).
+    private string ScopeText() =>
+        Scopes.Count > 1
+            ? string.Join(" + ", Scopes.Select(RecordScopeLabels.Of)) + " (birleşimi)"
+            : RecordScopeLabels.Of(access!.Scope);
+
+    private string DepartmentText() => " · Departman: " + (access!.BusinessUnit ?? "yok");
+
     private string? Describe(string key) =>
         access?.Permissions.FirstOrDefault(p => p.Key == key) is { } grant
-            ? $"Veren rol: {string.Join(", ", grant.GrantedBy.Select(r => r.Name))}"
+            ? $"Veren rol: {string.Join(", ", grant.GrantedBy.Select(r => r.ViaBusinessUnit is { } via ? $"{r.Name} (departman: {via})" : r.Name))}"
             : "Kişide bu izin yok";
 
     // "Satış temsilcisi: 8 izin" gibi; kişi birden fazla rolden aynı izni alabilir.

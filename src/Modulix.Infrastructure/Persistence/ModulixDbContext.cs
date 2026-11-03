@@ -89,6 +89,8 @@ public class ModulixDbContext(
 
     public DbSet<BusinessUnitMember> BusinessUnitMembers => Set<BusinessUnitMember>();
 
+    public DbSet<BusinessUnitRole> BusinessUnitRoles => Set<BusinessUnitRole>();
+
     public DbSet<MembershipCompany> MembershipCompanies => Set<MembershipCompany>();
 
     public DbSet<CustomField> CustomFields => Set<CustomField>();

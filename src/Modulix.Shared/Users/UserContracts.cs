@@ -13,7 +13,13 @@ public enum UserStatus
     Invited = 3,
 }
 
-public sealed record UserRoleDto(Guid Id, string Name, bool IsSystem);
+public sealed record UserRoleDto(Guid Id, string Name, bool IsSystem, string? ViaBusinessUnit = null);
+
+/// <summary>
+/// Kullanıcının etkin rolü ve kaynağı (ADR-0026): <see cref="ViaBusinessUnit"/> boşsa kullanıcıya doğrudan atanmıştır, doluysa
+/// o departmandan gelir. <see cref="Scope"/> rolün kayıt kapsamıdır.
+/// </summary>
+public sealed record UserRoleSourceDto(Guid Id, string Name, bool IsSystem, RecordScope Scope, string? ViaBusinessUnit);
 
 /// <summary>Kuruluşun bir üyesi. Kimlik <see cref="MembershipId"/>'dir; işlemler bu kimlikle yapılır.</summary>
 public sealed record UserDto(
@@ -56,7 +62,10 @@ public sealed record UserAccessDto(
     IReadOnlyList<PermissionDto> Assignable,
     IReadOnlyList<PermissionGrantDto> Permissions,
     RecordScope Scope = RecordScope.All,
-    IReadOnlyList<string>? Teams = null);
+    IReadOnlyList<string>? Teams = null,
+    string? BusinessUnit = null,
+    IReadOnlyList<RecordScope>? Scopes = null,
+    IReadOnlyList<UserRoleSourceDto>? Roles = null);
 
 /// <summary><see cref="TransferToMembershipId"/> verilirse kişinin kayıtları önce bu üyeye devredilir.</summary>
 public sealed record DisableUserRequest(Guid? TransferToMembershipId);
