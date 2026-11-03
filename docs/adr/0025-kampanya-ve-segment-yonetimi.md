@@ -106,6 +106,7 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 | 7 — Yanıt çalışma alanı, kampanya kaynak/UTM, yanıttan lead ve aktivite, çıkış yanıtı | Yapıldı; ayrıntı aşağıda (webhook ile otomatik yanıt toplama yok) |
 | 8 — Maliyet, kampanya raporu (ilk/son dokunuş), müşteri kartı pazarlama geçmişi | Yapıldı; ayrıntı aşağıda (fırsat/ciro atfı ve dışa aktarma yok) |
 | 9 — Ölçek ölçümü (100.000 kişi), kabul/regresyon, işletim notu (docs/pazarlama-isletim.md) | Yapıldı; hedef kitle sınırı ve gönderim hızı bulguları ayrıntıda |
+| 10 — Gönderim işçisi, toplu gönderim (dilim 9 bulgusu) | Yapıldı; ayrıntı aşağıda (hedef kitle sınırı değişmedi) |
 
 ### Dilim 2 — uygulama notları (sapmalar ve sınırlar)
 
@@ -184,3 +185,14 @@ Anlık görüntü yalnızca hedef kimliğini, kaynak segment sürümünü ve se�
 - **Bulgu — gönderim hızı**: işleme satır satır olduğundan büyük gönderimler dakikalar sürer; paralel işçi, toplu kayıt ve otomatik işçi yapılmadı (gerçek sağlayıcıdan önce yapılmalı).
 - **Ölçülmedi**: rapor sorguları büyük yanıt/lead hacminde, eşzamanlı çok kullanıcı, üretim donanımı, gerçek sağlayıcı gecikmesi, belirteç/sıklık tablolarının büyümesi.
 - **Kabul/regresyon**: epik boyunca dört test türü (mutlu yol, doğrulama, tenant izolasyonu, yetki) her dilimde yazıldı; dilim 9'da tam entegrasyon paketi koşuldu (sonuç PR açıklamasında).
+
+### Dilim 10 — uygulama notları (gönderim işçisi, toplu gönderim)
+
+- **Yapılan**: arka plan işçisi (`MarketingSendWorker`, `MarketingSend:WorkerEnabled`) "çalışıyor" durumundaki çalıştırmaların sıradaki satırlarını kullanıcı isteği olmadan gönderir; gönderim döngüsü 25'lik gruplarla çalışır (grup başına tek bağlantı üretimi ve tek günlük kaydı, sağlayıcı çağrıları en çok 8 paralel).
+- **İşçi neyi yapmaz**: çalıştırmayı başlatmaz, onaylamaz, duraklatılmış ya da iptal edilmiş çalıştırmaya dokunmaz; planlanan zamanda kendiliğinden başlatma yoktur (başlatma hâlâ `marketing.campaigns.send` sahibi bir kullanıcının eylemidir). Pazarlama modülü kapalı tenant'ı atlar. Sağlayıcı kapatılmışsa ya da `App:PublicUrl` yoksa çalıştırma işlenmez; neden günlüğe yalnızca değişince yazılır.
+- **Kimlik**: `marketing.sender` sistem kimliği (olay aboneliği çapası, Support'taki `support.scheduler` kalıbı); yalnızca `campaigns.read|write|send` ve `recipients.read` izinleri vardır. Onay, segment yayımlama ve yanıt izinleri yoktur (testle sabit). Kayıt kapsamı tenant geneli, tenant kendi kapsamındadır.
+- **Çoklu örnek**: tur, tenant başına oturum kilidiyle (`sp_getapplock`) tek örnekte koşar; satır talebi zaten kilitli ve atomik olduğundan elle "işle" çağrısı ile işçi aynı anda çalışsa da bir satır iki kez gönderilmez.
+- **Toplu gönderim ve çökme penceresi**: önceden her ileti ayrı kaydedilirdi; şimdi grup sonunda kaydedilir. Çökme durumunda kaydedilmemiş (en çok 25) satır "işleniyor" kalır ve süre dolunca "belirsiz" olur; kör yeniden deneme yine yoktur. Sıklık hakkı ve bağlantılar iletiden önce ayrıldığı için çift gönderim riski artmadı, belirsiz kalan satır sayısı üst sınırı arttı (1 → 25).
+- **Sözleşme**: `IUnsubscribeLinks.IssueManyAsync` (varsayılan arayüz uygulaması tek tek üretir; çekirdek uygulaması tek kayıt turuyla üretir).
+- **Bilerek yok / açık**: hedef kitle sınırı (20.000) değişmedi (dondurma hâlâ istek içinde çalışır; sınırı artırmak için arka plan işi gerekir), planlanan zamanda otomatik başlatma, çalıştırma başına hız sınırı ayarı, sağlayıcıya özgü eşzamanlılık sınırı (sabit 8).
+- **Test**: 5 entegrasyon (işçi çalıştırmayı tamamlar ve sayımlar elle işlemeyle aynıdır; başlatılmamış/duraklatılmış çalıştırmaya dokunmaz ve kapalı sağlayıcıyı bildirir; tenant izolasyonu; modül kapalıyken iş yok; işçi kimliği onay/yayımlama/yanıt izni taşımaz). Mevcut çalıştırma testleri yeni gönderim döngüsüyle yeniden koşuldu.

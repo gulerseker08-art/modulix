@@ -1,4 +1,4 @@
-# Pazarlama modülü — işletim notu (ADR-0025, dilim 9)
+# Pazarlama modülü — işletim notu (ADR-0025, dilim 9-10)
 
 Bu not kampanya/segment modülünü işleten kişi içindir. Davranışın ayrıntısı README'de ("Pazarlama modülü", "İletişim tercihi ve engel"), kararlar `docs/adr/0025-kampanya-ve-segment-yonetimi.md` içindedir.
 
@@ -6,7 +6,7 @@ Bu not kampanya/segment modülünü işleten kişi içindir. Davranışın ayrı
 
 - Gerçek e-posta/SMS/WhatsApp sağlayıcısı **yoktur**. Firma ayarı `marketing.provider` varsayılan "yok"tur; bu durumda çalıştırma başlatılamaz. Seçilebilen tek sağlayıcı iletiyi hiçbir yere göndermeyen test sağlayıcısıdır. Bu sürümde hiçbir ileti müşteriye ulaşmaz.
 - Sağlayıcı bağlanmadan önce: İYS ve KVKK kararları (aydınlatma/rıza metni sürümü, İYS kaydı), `List-Unsubscribe` başlıklarının sağlayıcıda yazılması (RFC 8058), geri dönen ileti ve şikâyet olaylarının (webhook) engel olarak işlenmesi. Bunlar yapılmadan gerçek gönderim açılmamalıdır.
-- **Otomatik işçi yoktur:** çalıştırma elle "başlat" ve "sıradaki grubu işle" ile ilerler (planlanan zamanda kendiliğinden başlamaz).
+- **Gönderim işçisi (dilim 10):** kullanıcı bir çalıştırmayı "başlat" ile başlattıktan sonra sıradaki satırları arka plan işçisi gönderir (`MarketingSend:WorkerEnabled`, varsayılan açık). İşçi başlatmaz, onaylamaz; planlanan zamanda kendiliğinden başlama **yoktur**. Elle "sıradaki grubu işle" de çalışmaya devam eder.
 
 ## 2. Gerekli yapılandırma
 
@@ -16,6 +16,7 @@ Bu not kampanya/segment modülünü işleten kişi içindir. Davranışın ayrı
 | `marketing.provider` (firma ayarı) | Varsayılan `none`. |
 | `marketing.frequency.daily-limit` (firma ayarı) | Adres başına günlük pazarlama iletisi sınırı, varsayılan 1; kampanyalar arasında ortak; 0 kapatır. |
 | `marketing.approval.required` (firma ayarı) | Varsayılan evet; hazırlayan kendi çalıştırmasını onaylayamaz. |
+| `MarketingSend:WorkerEnabled` / `PollIntervalSeconds` / `BusyIntervalSeconds` | Gönderim işçisi (varsayılan açık, boşta 15 sn, iş varken 2 sn). `BatchSize` (100), `MaxBatchesPerRun` (5) ve `MaxRunsPerTenant` (5) bir turda bir tenant'ın harcayacağı işi sınırlar. Birden çok uygulama örneği güvenle çalışır. |
 | `CommunicationPublic:RateLimitPerMinute` | Oturumsuz tercih merkezi uçlarının IP+tenant başına dakikalık sınırı, varsayılan 30. |
 
 ## 3. Ölçülen performans (100.000 sentetik kişi)
@@ -62,4 +63,4 @@ Ortam: geliştirme bilgisayarı (Windows), SQL Server Docker kapsayıcısında, 
 
 ## 6. Bilinen sınırlar (dürüst liste)
 
-Gerçek sağlayıcı ve webhook, otomatik işçi, kişi bazlı değişken, HTML içerik, gönderim penceresi, konu bazlı tercih, yönetim ekranında tercih listesi, fırsat/ciro atfı, rapor dışa aktarma, alan düzeyi maliyet yetkisi, belirteç/sıklık satırı temizliği, ölçeğin üretim donanımında doğrulanması. Hukuki uygunluk (KVKK/İYS/ETK) bu yazılımla garanti edilmez; hukuki karar ayrıca verilmelidir.
+Gerçek sağlayıcı ve webhook, planlanan zamanda otomatik başlatma, kişi bazlı değişken, HTML içerik, gönderim penceresi, konu bazlı tercih, yönetim ekranında tercih listesi, fırsat/ciro atfı, rapor dışa aktarma, alan düzeyi maliyet yetkisi, belirteç/sıklık satırı temizliği, ölçeğin üretim donanımında doğrulanması. Hukuki uygunluk (KVKK/İYS/ETK) bu yazılımla garanti edilmez; hukuki karar ayrıca verilmelidir.
