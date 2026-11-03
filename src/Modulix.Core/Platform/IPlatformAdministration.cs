@@ -1,4 +1,5 @@
 using Modulix.Core.Customization;
+using Modulix.Core.Modules;
 
 namespace Modulix.Core.Platform;
 
@@ -23,7 +24,22 @@ public sealed record PlatformTenantPage(IReadOnlyList<PlatformTenant> Items, int
 /// <summary>Firmanın Yönetici rolündeki üyesi; davet bekleyenler de listelenir.</summary>
 public sealed record TenantAdministrator(Guid MembershipId, string DisplayName, string Email, MembershipStatus Status);
 
-public sealed record PlatformTenantDetail(PlatformTenant Tenant, IReadOnlyList<TenantAdministrator> Administrators);
+/// <summary>Firmanın bir modül hakkının koşulları (ADR-0028); kapalı hak da satır olarak gelir.</summary>
+public sealed record TenantEntitlement(string ModuleKey, bool IsEnabled, EntitlementSource Source, DateTimeOffset? ValidUntil, string? Note);
+
+public sealed record PlatformTenantDetail(
+    PlatformTenant Tenant,
+    IReadOnlyList<TenantAdministrator> Administrators,
+    IReadOnlyList<TenantEntitlement>? Entitlements = null);
+
+/// <summary>Platform denetim kaydı sorgusu (ADR-0028); en yeni üstte. <see cref="TenantId"/> boşsa bütün firmalar.</summary>
+public sealed record PlatformAuditQuery(Guid? TenantId, string? Action, int Page, int PageSize);
+
+/// <summary><see cref="ActorName"/>: işlemi yapan platform yöneticisinin adı (hesap silinmişse boş).</summary>
+public sealed record PlatformAuditItem(
+    Guid Id, DateTimeOffset OccurredAt, Guid ActorUserId, string? ActorName, string Action, Guid? TargetTenantId, string? Reason, string? Details);
+
+public sealed record PlatformAuditPage(IReadOnlyList<PlatformAuditItem> Items, int Page, int PageSize, int TotalCount);
 
 /// <summary>
 /// Firma açılışı. <see cref="Modules"/>: açılacak modüller (çekirdek her zaman açıktır). <see cref="RoleTemplates"/>:
@@ -39,7 +55,8 @@ public sealed record TenantCreation(
     string AdministratorEmail,
     string AdministratorName,
     string PublicUrl,
-    string? Profile = null);
+    string? Profile = null,
+    bool Trial = false);
 
 /// <summary><see cref="ExistingAccount"/>: yöneticinin e-postası platformda kayıtlıydı; üyelik hemen etkin oldu.</summary>
 public sealed record TenantCreationResult(PlatformTenantDetail Tenant, bool ExistingAccount);
@@ -77,10 +94,26 @@ public interface IPlatformAdministration
 
     Task RenameTenantAsync(Guid tenantId, string name, Guid actingUserId, CancellationToken cancellationToken);
 
-    /// <summary>Firmayı kapatır; veri silinmez. Kullanıcılar bir sonraki isteklerinde erişimi kaybeder.</summary>
-    Task CloseTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken);
+    /// <summary>
+    /// Firmayı kapatır; veri silinmez. Kullanıcılar bir sonraki isteklerinde erişimi kaybeder. Gerekçe isteğe bağlıdır ve
+    /// platform denetim kaydına yazılır. Zaten kapalıysa çakışma.
+    /// </summary>
+    Task CloseTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken, string? reason = null);
 
-    Task ReopenTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken);
+    /// <summary>Kapalı veya askıdaki firmayı açar. Zaten açıksa (Active, Trial) çakışma.</summary>
+    Task ReopenTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken, string? reason = null);
+
+    /// <summary>
+    /// Açık firmayı (Active, Trial) askıya alır (ADR-0028): erişim durur, veri silinmez. Gerekçe zorunludur
+    /// (<see cref="ArgumentException"/>, ParamName <c>reason</c>). Açık olmayan firma için çakışma.
+    /// </summary>
+    Task SuspendTenantAsync(Guid tenantId, string reason, Guid actingUserId, CancellationToken cancellationToken);
+
+    /// <summary>Denemedeki firmayı etkinleştirir (Trial → Active). Deneme değilse çakışma.</summary>
+    Task ActivateTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken, string? reason = null);
+
+    /// <summary>Platform denetim kaydı (ADR-0028): bütün firmalar veya tek firma; en yeni üstte, sayfa 50'yi aşmaz.</summary>
+    Task<PlatformAuditPage> ListAuditAsync(PlatformAuditQuery query, CancellationToken cancellationToken);
 
     /// <summary>
     /// Firmaya Yönetici rolüyle bir kişi davet eder (firmanın yöneticileri ayrıldıysa kurtarma yolu). Kapalı firmaya
@@ -92,10 +125,12 @@ public interface IPlatformAdministration
     /// <summary>
     /// Firmada bir modülü açar veya kapatır (Y4b). Veri silinmez; rollerdeki izinler korunur ve modül yeniden açılınca
     /// geçerli olur. Değişiklik firmanın bir sonraki isteğinde geçerlidir ve firmanın denetim kaydına <c>core.tenant</c>
-    /// olarak yazılır. Durum zaten istenen gibiyse bir şey yapılmaz. Bilinmeyen veya çekirdek modül için
-    /// <see cref="ArgumentException"/> (ParamName <c>moduleKey</c>).
+    /// olarak yazılır. Durum zaten istenen gibiyse ve <paramref name="terms"/> verilmediyse bir şey yapılmaz. Bilinmeyen veya
+    /// çekirdek modül için <see cref="ArgumentException"/> (ParamName <c>moduleKey</c>). <paramref name="terms"/> (kaynak,
+    /// bitiş, not) yalnızca açarken geçerlidir; bu dilimde bitiş tarihi kaydedilir ama otomatik uygulanmaz (ADR-0028).
     /// </summary>
-    Task SetModuleAsync(Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken);
+    Task SetModuleAsync(
+        Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken, EntitlementTerms? terms = null);
 
     /// <summary>
     /// Sektör profilinin firmaya ekleyeceği şeyler (Y9c); platform yöneticisi kapalı modülleri de açar. Tanımsız profil için

@@ -16,7 +16,8 @@ internal sealed class ModuleEntitlements(ModulixDbContext db, ModuleCatalog cata
         return keys.ToHashSet(StringComparer.Ordinal);
     }
 
-    public async Task SetEnabledAsync(Guid tenantId, string moduleKey, bool enabled, CancellationToken cancellationToken)
+    public async Task SetEnabledAsync(
+        Guid tenantId, string moduleKey, bool enabled, CancellationToken cancellationToken, EntitlementTerms? terms = null)
     {
         if (!catalog.ContainsModule(moduleKey))
         {
@@ -38,11 +39,11 @@ internal sealed class ModuleEntitlements(ModulixDbContext db, ModuleCatalog cata
                 return;
             }
 
-            db.ModuleEntitlements.Add(new ModuleEntitlement(tenantId, moduleKey));
+            db.ModuleEntitlements.Add(new ModuleEntitlement(tenantId, moduleKey, terms));
         }
         else if (enabled)
         {
-            entitlement.Enable();
+            entitlement.Enable(terms);
         }
         else
         {

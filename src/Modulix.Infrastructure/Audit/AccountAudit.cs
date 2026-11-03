@@ -93,7 +93,7 @@ public sealed class AccountAudit(ModulixDbContext db, ITenantScopeFactory tenant
             join tenant in db.Tenants.AsNoTracking() on membership.TenantId equals tenant.Id
             where membership.UserId == userId
                   && membership.Status == MembershipStatus.Active
-                  && tenant.Status == TenantStatus.Active
+                  && TenantStatusRules.Operational.Contains(tenant.Status)
             select tenant.Id)
             .ToListAsync(cancellationToken);
 }

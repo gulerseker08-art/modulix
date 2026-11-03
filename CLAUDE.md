@@ -33,6 +33,7 @@ dotnet run --project src/Modulix.Api -- tenant-delete <slug> --confirm <slug>  #
 - Tenant'a ait her entity `ITenantEntity` uygular; tablo şeması = modül anahtarı.  Her tenant entity ayrıca `ICompanyShared` ya da `ICompanyScoped` uygular (ADR-0008; yoksa `TableInventoryTests` kırılır). Her yeni tenant tablosu için migration'da `TenantIsolationSql.AddTable` ekle (yoksa RLS testi kırılır).
 - Kayıt işlemleri kayıt boru hattından geçer (izin, kapsam, hassas alan, özel alan, audit, outbox). Uç noktada boru hattını atlayıp doğrudan `DbContext`'e yazma.
 - Tenant istemciden gelen başlık/parametreden değil, oturumdan belirlenir ve her istekte doğrulanır.
+- Firmanın erişime açık olup olmadığı `TenantStatusRules.Operational` ile sorulur (Active ve Trial); sorgularda `Status == TenantStatus.Active` yazma (ADR-0028).
 - Uç noktalar `.RequirePermission(...)` / `.RequireModule(...)` ile korunur. Yeni yönetim işlemleri denetim kaydına yazılmalı.
 - E-posta `IEmailQueue.Enqueue` ile kuyruğa yazılır; HTML'e giren kullanıcı girdisi `WebUtility.HtmlEncode` ile kodlanır.
 - Yeni sektör modülü için CRM'i örnek al (`src/Modulix.Modules.Crm`: `Domain`, `Persistence`, `Records`).
