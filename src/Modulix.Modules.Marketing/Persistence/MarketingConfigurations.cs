@@ -204,3 +204,17 @@ internal sealed class CampaignResponseConfiguration : IEntityTypeConfiguration<C
             .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class CampaignTestSendConfiguration : IEntityTypeConfiguration<CampaignTestSend>
+{
+    public void Configure(EntityTypeBuilder<CampaignTestSend> builder)
+    {
+        builder.ToTable("CampaignTestSends", MarketingTables.Schema);
+        builder.HasKey(t => t.Id);
+        builder.Property(t => t.Id).ValueGeneratedNever();
+        builder.Property(t => t.TenantId).IsRequired();
+        builder.Property(t => t.Outcome).HasMaxLength(CampaignTestSend.OutcomeMaxLength).IsRequired();
+        builder.Property(t => t.Code).HasMaxLength(CampaignTestSend.CodeMaxLength);
+        builder.HasIndex(t => new { t.TenantId, t.CampaignId, t.CreatedAt });
+    }
+}

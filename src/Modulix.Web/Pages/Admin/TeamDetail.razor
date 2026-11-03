@@ -33,6 +33,7 @@
 
         <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <h2>Ekip bilgileri</h2>
+            <FormTabs Title="Ekip bilgileri" Label="Ekip formu bölümleri">
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="teamName">Ekip adı *</label>
@@ -45,6 +46,7 @@
                     <FieldError Field="description" Errors="errors" />
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary"
                         disabled="@(busy || string.IsNullOrWhiteSpace(name) || (name.Trim() == team.Name && (description ?? "") == (team.Description ?? "")))">Kaydet</button>

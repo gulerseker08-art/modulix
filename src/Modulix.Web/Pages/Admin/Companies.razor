@@ -26,6 +26,7 @@
 
     <form class="record-form settings-group" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
         <h2>Yeni şirket</h2>
+        <FormTabs Title="Şirket bilgileri" Label="Şirket formu bölümleri">
         <div class="form-grid">
             <div>
                 <label class="form-label" for="companyName">Şirket adı *</label>
@@ -33,6 +34,7 @@
                 <FieldError Field="name" Errors="errors" />
             </div>
         </div>
+        </FormTabs>
         <div class="form-actions">
             <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name))">Şirket ekle</button>
         </div>

@@ -18,10 +18,6 @@
                 <a class="btn btn-outline-secondary" href="@ExportUrl()" download="leadler.csv">CSV indir</a>
             }
             <button type="button" class="btn btn-outline-secondary" @onclick="ToggleReportAsync">@(showReport ? "Raporu gizle" : "Rapor")</button>
-            @if (Session.Can(CrmAccess.LeadsCreate) && !editing)
-            {
-                <button type="button" class="btn btn-primary" @onclick="() => editing = true">Yeni Lead</button>
-            }
         </div>
     </div>
 
@@ -40,14 +36,15 @@
         <LeadReportPanel Lookups="Lookups" />
     }
 
-    <div class="filters">
-        @foreach (var view in Views)
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@current" ValueChanged="SelectAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Lead ara" placeholder="Konu, no, ad, firma ya da e-posta ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        @if (Session.Can(CrmAccess.LeadsCreate) && !editing)
         {
-            @if (view.Visible(Session))
-            {
-                <button type="button" class="chip @(current == view.Key ? "active" : null)" aria-pressed="@((current == view.Key) ? "true" : "false")"
-                        @onclick="() => SelectAsync(view.Key)">@view.Label</button>
-            }
+            <button type="button" class="btn btn-primary" @onclick="() => editing = true"><AppIcon Name="plus" Size="16" /> Yeni Lead</button>
         }
     </div>
     <div class="filters">
@@ -87,11 +84,6 @@
     {
         <p class="text-muted small">İlk temas hedefi @hours saat (takvim saati; iş saati değildir).</p>
     }
-
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Konu, no, ad, firma ya da e-posta ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
 
     @if (page is null)
     {
@@ -157,6 +149,8 @@
         new("followUpOverdue", "Takibi geciken", _ => true),
         new("qualified", "Nitelikli, dönüşmemiş", _ => true),
     ];
+
+    private IReadOnlyList<ViewOption> ViewOptions => [.. Views.Where(v => v.Visible(Session)).Select(v => new ViewOption(v.Key, v.Label))];
 
     private CrmPage<LeadDto>? page;
     private string current = "all";

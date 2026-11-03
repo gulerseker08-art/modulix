@@ -26,6 +26,7 @@
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <h2>@(form.Id is null ? "Yeni kural" : "Kuralı düzenle")</h2>
+            <FormTabs Title="Kural bilgileri" Label="Teklif kuralı formu bölümleri">
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="r-name">Ad *</label>
@@ -73,6 +74,7 @@
                     <textarea id="r-description" class="form-control" rows="2" maxlength="500" @bind="form.Description"></textarea>
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Vazgeç</button>

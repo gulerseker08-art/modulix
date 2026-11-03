@@ -9,6 +9,7 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
+    <FormTabs Title="İlişki bilgileri" Label="Kişi ilişkisi formu bölümleri">
     <div class="form-grid">
         <div class="span-all">
             <label class="form-label" for="link-contact">Kişi *</label>
@@ -66,6 +67,7 @@
             <FieldError Field="endDate" Errors="errors" />
         </div>
     </div>
+    </FormTabs>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
         <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>

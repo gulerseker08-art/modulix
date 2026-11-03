@@ -22,6 +22,7 @@
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <h2>@(form.Id is null ? "Yeni kategori" : "Kategoriyi düzenle")</h2>
+            <FormTabs Title="Kategori bilgileri" Label="Ürün kategorisi formu bölümleri">
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="name">Ad *</label>
@@ -47,6 +48,7 @@
                     </select>
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>

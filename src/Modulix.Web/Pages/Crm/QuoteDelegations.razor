@@ -25,6 +25,7 @@
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <h2>@(form.Id is null ? "Yeni vekâlet" : "Vekâleti düzenle")</h2>
+            <FormTabs Title="Vekâlet bilgileri" Label="Teklif vekâleti formu bölümleri">
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="fromUserId">Vekâlet veren *</label>
@@ -57,6 +58,7 @@
                     <input id="d-note" class="form-control" maxlength="300" @bind="form.Note" />
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>

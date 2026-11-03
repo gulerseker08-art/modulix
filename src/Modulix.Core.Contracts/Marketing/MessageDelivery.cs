@@ -46,7 +46,8 @@ public interface IMessageProvider
 /// <summary>Bir hedefin (ve varsa iletişim noktasının) gönderim anındaki adresi. Adres anlık görüntüde saklanmaz; gönderimden önce yeniden çözülür.</summary>
 public sealed record AddressLookup(Guid TargetId, Guid? ContactPointId);
 
-public sealed record ResolvedAddress(Guid TargetId, Guid? ContactPointId, string Address);
+/// <param name="Variables">İleti metnindeki kişiye özel değişkenlerin değerleri (anahtarlar: ad, soyad, firma); bilinmeyen/boş değer yoktur (dilim 11). Adres değildir; yalnızca ileti metnine girer.</param>
+public sealed record ResolvedAddress(Guid TargetId, Guid? ContactPointId, string Address, IReadOnlyDictionary<string, string>? Variables = null);
 
 /// <summary>
 /// Gönderimden hemen önce adresi yeniden çözer: iletişim noktası silinmiş, pasifleşmiş ya da kişi artık erişilemiyorsa sonuçta yer almaz (o alıcı atlanır).

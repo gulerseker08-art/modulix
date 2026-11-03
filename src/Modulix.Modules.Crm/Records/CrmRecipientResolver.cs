@@ -64,9 +64,10 @@ internal sealed class CrmRecipientResolver(IModuleData data, TimeProvider time) 
     private async Task<List<ResolvedAddress>> LookupLeadsAsync(AddressLookup[] items, CommunicationChannel channel, CancellationToken cancellationToken)
     {
         var ids = items.Select(i => i.TargetId).ToList();
-        var leads = await data.Set<Lead>().AsNoTracking().Where(l => ids.Contains(l.Id)).Select(l => new { l.Id, l.Email, l.Phone }).ToListAsync(cancellationToken);
+        var leads = await data.Set<Lead>().AsNoTracking().Where(l => ids.Contains(l.Id)).Select(l => new { l.Id, l.Email, l.Phone, l.FirstName, l.LastName, l.CompanyName }).ToListAsync(cancellationToken);
         return [.. leads
-            .Select(l => new ResolvedAddress(l.Id, null, channel == CommunicationChannel.Email ? l.Email ?? string.Empty : l.Phone ?? string.Empty))
+            .Select(l => new ResolvedAddress(
+                l.Id, null, channel == CommunicationChannel.Email ? l.Email ?? string.Empty : l.Phone ?? string.Empty, Variables(l.FirstName, l.LastName, l.CompanyName)))
             .Where(a => a.Address.Length > 0)];
     }
 
@@ -79,8 +80,26 @@ internal sealed class CrmRecipientResolver(IModuleData data, TimeProvider time) 
             from point in data.Set<ContactPoint>().AsNoTracking()
             join contact in data.Set<Contact>().AsNoTracking() on point.ContactId equals contact.Id
             where pointIds.Contains(point.Id) && point.IsActive && point.Channel == chName && personIds.Contains(contact.PersonId)
-            select new { PointId = point.Id, contact.PersonId, point.Value }).ToListAsync(cancellationToken);
-        return [.. rows.Select(r => new ResolvedAddress(r.PersonId, r.PointId, r.Value))];
+            select new
+            {
+                PointId = point.Id,
+                contact.PersonId,
+                point.Value,
+                contact.Person.FirstName,
+                contact.Person.LastName,
+                CompanyName = data.Set<Company>().Where(c => c.Id == contact.CompanyId).Select(c => c.Party.Name).FirstOrDefault(),
+            }).ToListAsync(cancellationToken);
+        return [.. rows.Select(r => new ResolvedAddress(r.PersonId, r.PointId, r.Value, Variables(r.FirstName, r.LastName, r.CompanyName)))];
+    }
+
+    /// <summary>İleti metni değişkenleri (ADR-0025, dilim 11): yalnızca dolu değerler; adres değildir.</summary>
+    private static Dictionary<string, string> Variables(string? firstName, string? lastName, string? companyName)
+    {
+        var values = new Dictionary<string, string>();
+        if (!string.IsNullOrWhiteSpace(firstName)) { values["ad"] = firstName.Trim(); }
+        if (!string.IsNullOrWhiteSpace(lastName)) { values["soyad"] = lastName.Trim(); }
+        if (!string.IsNullOrWhiteSpace(companyName)) { values["firma"] = companyName.Trim(); }
+        return values;
     }
 
     private async Task<List<ResolvedAddress>> LookupCompaniesAsync(AddressLookup[] items, CommunicationChannel channel, CancellationToken cancellationToken)
@@ -89,7 +108,7 @@ internal sealed class CrmRecipientResolver(IModuleData data, TimeProvider time) 
         var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
         var pointIds = items.Where(i => i.ContactPointId is not null).Select(i => i.ContactPointId).ToList();
         var partyIds = items.Select(i => i.TargetId).ToList();
-        var companies = await data.Set<Company>().AsNoTracking().Where(c => partyIds.Contains(c.PartyId)).Select(c => new { c.Id, c.PartyId }).ToListAsync(cancellationToken);
+        var companies = await data.Set<Company>().AsNoTracking().Where(c => partyIds.Contains(c.PartyId)).Select(c => new { c.Id, c.PartyId, c.Party.Name }).ToListAsync(cancellationToken);
         var companyIds = companies.Select(c => c.Id).ToList();
         var points = await data.Set<ContactPoint>().AsNoTracking()
             .Where(p => pointIds.Contains(p.Id) && p.IsActive && p.Channel == chName)
@@ -98,6 +117,12 @@ internal sealed class CrmRecipientResolver(IModuleData data, TimeProvider time) 
         var relations = await data.Set<CompanyContact>().AsNoTracking()
             .Where(r => companyIds.Contains(r.CompanyId) && r.IsActive && (r.EndDate == null || r.EndDate >= today))
             .Select(r => new { r.CompanyId, r.ContactId })
+            .ToListAsync(cancellationToken);
+
+        var contactIds = points.Where(p => p.ContactId != null).Select(p => p.ContactId).Distinct().ToList();
+        var people = await data.Set<Contact>().AsNoTracking()
+            .Where(c => contactIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.Person.FirstName, c.Person.LastName })
             .ToListAsync(cancellationToken);
 
         var results = new List<ResolvedAddress>();
@@ -116,7 +141,8 @@ internal sealed class CrmRecipientResolver(IModuleData data, TimeProvider time) 
                 : relations.Any(r => r.CompanyId == company.Id && r.ContactId == point.ContactId);
             if (valid)
             {
-                results.Add(new ResolvedAddress(item.TargetId, point.Id, point.Value));
+                var person = people.FirstOrDefault(p => p.Id == point.ContactId);
+                results.Add(new ResolvedAddress(item.TargetId, point.Id, point.Value, Variables(person?.FirstName, person?.LastName, company.Name)));
             }
         }
 

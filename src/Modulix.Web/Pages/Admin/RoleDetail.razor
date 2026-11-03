@@ -45,6 +45,8 @@
         else
         {
             <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <TabBar Tabs="FormTabs" State="tabs" Label="Rol formu bölümleri" />
+                <TabPanel State="tabs" Key="form-genel">
                 <div class="form-grid">
                     @if (IsNew && templates.Count > 0)
                     {
@@ -70,6 +72,8 @@
                     </div>
                 </div>
 
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-izin">
                 @if (!Session.IsAdministrator)
                 {
                     <p class="text-muted">Yalnızca kendinizde olan izinleri verebilir veya kaldırabilirsiniz; diğerleri kilitli görünür.</p>
@@ -78,6 +82,20 @@
                 <PermissionMatrix Permissions="permissions" Selected="selected" CanGrant="CanGrant" />
                 <FieldError Field="permissions" Errors="errors" />
 
+                @if (skippedFromTemplate > 0)
+                {
+                    <p class="text-muted">Şablondaki @skippedFromTemplate izin sizde olmadığı için eklenmedi.</p>
+                }
+
+                @if (HiddenCount > 0)
+                {
+                    <p class="text-muted">
+                        Bu rolde kapalı modüllere ait @HiddenCount izin var. Bu izinler korunur ve modül yeniden açılınca geçerli olur.
+                    </p>
+                }
+
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-kapsam">
                 <fieldset class="scope-choice">
                     <legend class="form-label">Kayıt kapsamı</legend>
                     <p class="text-muted small">
@@ -144,18 +162,7 @@
                     </div>
                     <FieldError Field="hideOutOfScopeShared" Errors="errors" />
                 </fieldset>
-
-                @if (skippedFromTemplate > 0)
-                {
-                    <p class="text-muted">Şablondaki @skippedFromTemplate izin sizde olmadığı için eklenmedi.</p>
-                }
-
-                @if (HiddenCount > 0)
-                {
-                    <p class="text-muted">
-                        Bu rolde kapalı modüllere ait @HiddenCount izin var. Bu izinler korunur ve modül yeniden açılınca geçerli olur.
-                    </p>
-                }
+                </TabPanel>
 
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" disabled="@busy">@(IsNew ? "Rolü oluştur" : "Kaydet")</button>
@@ -247,6 +254,18 @@
     private string? notice;
     private IReadOnlyDictionary<string, string[]>? errors;
 
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
+    private readonly TabState tabs = new("form-genel");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs =>
+    [
+        new("form-genel", "Genel", Errors: ErrorCount("name")),
+        new("form-izin", "İzinler", Errors: ErrorCount("permissions")),
+        new("form-kapsam", "Kapsam ve düzey", Errors: ErrorCount("scope", "assignLevel", "hideOutOfScopeShared")),
+    ];
+
     private bool IsNew => RoleId is null;
 
     private RoleTemplateDto? Template => templates.FirstOrDefault(t => t.Key == templateKey);
@@ -270,6 +289,7 @@
         deleting = false;
         moveTo = null;
         errors = null;
+        tabs.Select("form-genel");
         message = null;
 
         var permissionResult = await Api.GetAsync<List<PermissionDto>>("/api/roles/permissions");
@@ -361,6 +381,7 @@
         {
             message = result.Error;
             errors = result.FieldErrors;
+            tabs.RevealFirstFailing(FormTabs);
             return;
         }
 

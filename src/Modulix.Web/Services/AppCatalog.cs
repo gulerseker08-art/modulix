@@ -114,6 +114,9 @@ public static class AppCatalog
         new("crm.sales-overview", Crm, "Satış görünümü", "dashboard", "crm/satis-gorunumu", 41, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmPerformanceGroup),
         new("crm.sales-targets", Crm, "Satış hedefleri", "target", "crm/satis-hedefleri", 42, CrmAccess.ModuleKey, SalesAccess.TargetsRead, Tone: AppTone.Teal, Group: CrmPerformanceGroup),
         new("crm.sales-forecasts", Crm, "Satış tahmini", "trending-up", "crm/satis-tahmini", 43, CrmAccess.ModuleKey, SalesAccess.ForecastsRead, Group: CrmPerformanceGroup),
+        new("crm.sales-analysis", Crm, "Satış analizi", "percent", "crm/satis-analizi", 44, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmPerformanceGroup),
+        new("crm.sales-team", Crm, "Ekip performansı", "users", "crm/ekip-performansi", 45, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmPerformanceGroup),
+        new("crm.sales-data-quality", Crm, "Veri kalitesi", "shield", "crm/veri-kalitesi", 46, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmPerformanceGroup),
 
         new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal, Group: SalesGroup),
         new("contracts.dashboard", Contracts, "Pano", "dashboard", "sozlesmeler/ozet", 5, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, ExactMatch: true),

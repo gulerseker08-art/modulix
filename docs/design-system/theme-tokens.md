@@ -4,7 +4,7 @@ Kaynak: `src/Modulix.Web/wwwroot/css/app.css` başındaki `:root, [data-theme="l
 
 ## Marka renkleri
 
-Modulix paleti **lacivert / mavi / turkuaz** üzerine kuruludur (referans CRM tasarımı, 31.10.2026 kararı; önceki indigo/lila/krem denemesi geri alındı). Logo işareti (`modulix-mark.svg`) aynı paleti taşır: iki çapraz şeritten oluşan "X", sol yarı lacivert, sağ üst turkuaz, sağ alt mavi; koyu tema için `modulix-mark-dark.svg`.
+Modulix paleti **lacivert / mavi / turkuaz** üzerine kuruludur (referans CRM tasarımı, 31.10.2026 kararı; önceki indigo/lila/krem denemesi geri alındı). Logo (`wwwroot/img/modulix-logo*.png`, `modulix-mark*.png`) aynı paleti taşır: iki çapraz şeritten oluşan "X", sol yarı lacivert, sağ üst turkuaz, sağ alt mavi; koyu tema için `-dark` sürümleri.
 
 | Token | Açık | Koyu | Kullanım |
 |---|---|---|---|
@@ -57,7 +57,7 @@ Koyu temada her ton koyu zemin + açık metin olarak yeniden tanımlıdır (en d
 
 ## Tipografi
 
-Yazı tipi **Inter** (Google Fonts, `latin-ext` alt kümesi Türkçe karakterleri içerir; OFL lisanslı; `index.html` yalnızca 400–800 ağırlıklarını yükler). Yüklenemezse Segoe UI / system-ui'ye düşer.
+Yazı tipi **Manrope** (OFL lisanslı, değişken ağırlık 400–800). Dosyalar `wwwroot/fonts/` altından yerel sunulur (`manrope-latin.woff2`, `manrope-latin-ext.woff2`; `latin-ext` Türkçe karakterleri ve ₺ simgesini içerir), `@font-face` bildirimi `app.css` başındadır; dış CDN'e bağımlılık yoktur (on-prem uyumlu). Yüklenemezse Segoe UI / system-ui'ye düşer. Önceki yazı tipi Inter'di (31.10.2026 → seçenek 4 kararı).
 
 | Token | Değer | Kullanım |
 |---|---|---|
@@ -73,10 +73,11 @@ Yazı tipi **Inter** (Google Fonts, `latin-ext` alt kümesi Türkçe karakterler
 ## Boşluk, köşe, gölge
 
 - Boşluk (4px tabanlı): `--mx-space-1` 4px · `-2` 8px · `-3` 12px · `-4` 16px · `-5` 20px · `-6` 24px · `-8` 32px.
-- Köşe: input 8px, button 9px, card 12px, drawer 14px, modal 14px, badge 6px (`--mx-radius-*`).
-- Gölge: `--mx-shadow-card` (kart), `--mx-shadow-raised` (hover), `--mx-shadow-popover` (açılır menü/panel). Lacivert tabanlı, hafif; glow ve ağır gölge yok.
+- Köşe: input 10px, button 12px, card 16px, drawer 16px, modal 16px, badge hap (999px) (`--mx-radius-*`).
+- Gölge: `--mx-shadow-card` (kart), `--mx-shadow-raised` (hover), `--mx-shadow-popover` (açılır menü/panel): lacivert tabanlı, yumuşak. `--mx-shadow-glow` marka renginde parlama gölgesidir ve yalnızca birincil düğmede kullanılır; başka öğeye eklenmez.
+- Marka degradesi: `--mx-gradient-brand` (`#087DB8` → `#1F5FCB`; koyu temada `#3BAEE6` → `#6FA8FA` + koyu metin) birincil düğme, etkin sekme çizgisi ve sayaç rozeti, etkin çip, bölüm kartı ikonu için; `--mx-gradient-brand-hover` hover durumu; `--mx-nav-active-bg` seçili menü öğesi. Beyaz metinle en düşük kontrast 4.5:1'dir (AA); bu yüzden açık uç `#087DB8`'den açık tutulmaz.
 - Odak: `--mx-focus-ring` (3px, birincil rengin %28'i).
-- Kabuk: `--mx-header-height` 64px, `--mx-sidebar-width` 248px, `--mx-sidebar-collapsed-width` 72px, `--mx-control-height` 40px (dokunmatik ekranda 44px).
+- Kabuk: `--mx-header-height` 64px, `--mx-sidebar-width` 248px, `--mx-sidebar-collapsed-width` 72px, `--mx-control-height` 42px (dokunmatik ekranda 44px).
 
 ## Grafik serileri
 
