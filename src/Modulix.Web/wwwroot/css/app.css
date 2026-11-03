@@ -1116,6 +1116,113 @@ tr.done td.primary {
         color: var(--mx-text-on-brand);
     }
 
+/* ---- Liste araç çubuğu ve görünüm seçici (ViewSelector): solda "Görünüm: … ▾", sağda arama + eylemler ---- */
+.list-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin: var(--mx-space-4) 0 var(--mx-space-3);
+}
+
+    /* Arama kutusu seçicinin sağına yaslanır; sonraki eylemler (Filtrele, Sütunlar, birincil) onu izler. */
+    .list-toolbar > .search {
+        flex: 0 1 22rem;
+        margin: 0 0 0 auto;
+    }
+
+    .list-toolbar > .search .form-control {
+        min-width: 0;
+    }
+
+.view-selector {
+    position: relative;
+}
+
+.view-selector-button {
+    gap: var(--mx-space-2);
+}
+
+.view-selector-prefix {
+    color: var(--mx-text-secondary);
+    font-weight: 600;
+}
+
+/* Menü dışına tıklama: görünmez tam ekran katman menüyü kapatır. */
+.view-selector-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+}
+
+.view-menu {
+    position: absolute;
+    z-index: 1050;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 16rem;
+    max-width: min(24rem, 90vw);
+    padding: var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow-popover);
+}
+
+.view-menu-group {
+    padding: var(--mx-space-2) var(--mx-space-3) var(--mx-space-1);
+    color: var(--mx-text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.view-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mx-space-2);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border: 0;
+    border-radius: var(--mx-radius-input);
+    background: transparent;
+    color: var(--mx-text-primary);
+    font-weight: 500;
+    text-align: left;
+}
+
+    .view-menu-item:hover {
+        background: var(--mx-surface-hover);
+    }
+
+    /* Seçili görünüm: renk + kalın yazı + onay işareti (yalnızca renkle anlatılmaz). */
+    .view-menu-item.selected {
+        background: var(--mx-nav-active-bg);
+        color: var(--mx-tone-brand-fg);
+        font-weight: 700;
+    }
+
+    .view-menu-item.view-menu-new {
+        justify-content: flex-start;
+        font-weight: 600;
+    }
+
+.view-menu-divider {
+    height: 1px;
+    margin: var(--mx-space-2) var(--mx-space-1);
+    background: var(--mx-border);
+}
+
+@media (max-width: 575.98px) {
+    .list-toolbar > .search {
+        flex: 1 1 100%;
+        margin-left: 0;
+    }
+}
+
 .badge.status-prospect {
     background: var(--mx-tone-warning-bg);
     color: var(--mx-tone-warning-fg);
