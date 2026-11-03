@@ -30,8 +30,10 @@ Modulix'in bütün modülleri tek bir ürün ailesi gibi görünmelidir. Bu klas
 
 ## Marka
 
-- Logo: `Components/BrandLogo.razor`. İşaret `wwwroot/img/modulix-mark.svg` dosyasıdır (referans logo): iki çapraz, uçları eğik kesilmiş şeritten oluşan "X"; sol yarı lacivert, "/" şeridi sağ üstte turkuaza, "\\" şeridi sağ altta maviye geçer. Koyu temada `modulix-mark-dark.svg` (lacivert yarısı açık çelik mavi) görünür; `favicon.png` ve `icon-192.png` aynı geometriden üretilir. Yazı "Moduli" + turkuaz "x" (Inter 800); slogan **MODÜLER İŞİN GÜCÜ** (`ShowTagline="false"` ile gizlenir; daraltılmış menüde ve çok dar ekranda kendiliğinden gizlenir).
-- Favicon `favicon.png` ve `img/modulix-mark.svg`; `index.html` `theme-color` değeri `--mx-brand-navy` ile aynıdır.
+- Logo: `Components/BrandLogo.razor`. Onaylı logo görselidir (işaret + "Modulix" yazısı + "İŞİN YENİ ZEKÂSI." sloganı); kaynak `docs/design-system/assets/modulix-logo-source.png`. Türetilmiş varlıklar `wwwroot/img/` altındadır (şeffaf arka plan): `modulix-logo.png` (sloganlı), `modulix-logo-wordmark.png` (sloganlı olmayan; üst çubuk için), `modulix-mark.png` (yalnızca işaret) ve her birinin `-dark` sürümü (koyu tema: yazı açık tona, işaretin lacivert yarısı açık çelik maviye çekilir). `favicon.png` (64px) ve `icon-192.png` aynı işaretten üretilir.
+- Varlıkları yeniden üretmek için: `python3 scripts/make-logo-assets.py` (pillow + numpy gerekir). Logo değişirse yalnızca kaynak görsel güncellenip betik çalıştırılır.
+- `BrandLogo` parametreleri: `Size` (px yükseklik, varsayılan 36), `ShowTagline` (varsayılan kapalı; slogan küçük boyutta okunmaz, büyük alanlarda `ShowTagline="true"` ve daha büyük `Size` ver). Açık/koyu tema ve daraltılmış menüde yalnızca işaret gösterimini CSS seçer (`data-theme`, `sidebar-collapsed`). Logo metni başka yerde elle yazılmaz.
+- Favicon `favicon.png`; `index.html` `theme-color` değeri `--mx-brand-navy` ile aynıdır.
 
 ## Tema
 

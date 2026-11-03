@@ -1788,73 +1788,49 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 .brand-logo {
     display: inline-flex;
     align-items: center;
-    gap: var(--mx-space-2);
     min-width: 0;
 }
 
-    .brand-logo .brand-mark {
+    .brand-logo img {
+        display: none;
         flex: none;
+        max-width: 100%;
+        height: auto;
     }
 
-    /* Koyu temada lacivert yarısı açık tonlu ikinci işaret dosyası görünür. */
-    .brand-logo .brand-mark-dark {
-        display: none;
+    /* Varsayılan: açık tema, tam logo. Koyu temada koyu sürüm görünür. */
+    .brand-logo .brand-full.brand-light {
+        display: block;
     }
 
-    [data-theme="dark"] .brand-logo .brand-mark-light {
-        display: none;
-    }
-
-    [data-theme="dark"] .brand-logo .brand-mark-dark {
-        display: inline;
-    }
-
-.brand-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1;
-    min-width: 0;
+[data-theme="dark"] .brand-logo .brand-full.brand-light {
+    display: none;
 }
 
-.brand-name {
-    font-size: 1.4rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--mx-brand-navy);
+[data-theme="dark"] .brand-logo .brand-full.brand-dark {
+    display: block;
 }
 
-[data-theme="dark"] .brand-name {
-    color: var(--mx-text-primary);
-}
-
-/* Son "x" turkuaz vurgulu (açık zeminde erişilebilir koyu turkuaz). */
-.brand-x {
-    color: var(--mx-brand-teal-dark);
-}
-
-.brand-tagline {
-    margin-top: 0.2rem;
-    font-size: 0.5rem;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    color: var(--mx-text-secondary);
-    white-space: nowrap;
-}
-
-/* Daraltılmış menüde ve çok dar alanlarda yalnızca işaret görünür. */
+/* Daraltılmış menüde yalnızca işaret görünür. */
 @media (min-width: 641px) {
-    html.sidebar-collapsed .sidebar .brand-text {
+    html.sidebar-collapsed .sidebar .brand-logo .brand-full {
         display: none;
+    }
+
+    html.sidebar-collapsed .sidebar .brand-logo .brand-mark.brand-light {
+        display: block;
+    }
+
+    html.sidebar-collapsed[data-theme="dark"] .sidebar .brand-logo .brand-mark.brand-light {
+        display: none;
+    }
+
+    html.sidebar-collapsed[data-theme="dark"] .sidebar .brand-logo .brand-mark.brand-dark {
+        display: block;
     }
 
     html.sidebar-collapsed .sidebar .app-launcher .brand-button {
         margin-left: 0;
-    }
-}
-
-@media (max-width: 359.98px) {
-    .brand-tagline {
-        display: none;
     }
 }
 

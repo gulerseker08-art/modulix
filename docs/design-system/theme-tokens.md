@@ -4,7 +4,7 @@ Kaynak: `src/Modulix.Web/wwwroot/css/app.css` başındaki `:root, [data-theme="l
 
 ## Marka renkleri
 
-Modulix paleti **lacivert / mavi / turkuaz** üzerine kuruludur (referans CRM tasarımı, 31.10.2026 kararı; önceki indigo/lila/krem denemesi geri alındı). Logo işareti (`modulix-mark.svg`) aynı paleti taşır: iki çapraz şeritten oluşan "X", sol yarı lacivert, sağ üst turkuaz, sağ alt mavi; koyu tema için `modulix-mark-dark.svg`.
+Modulix paleti **lacivert / mavi / turkuaz** üzerine kuruludur (referans CRM tasarımı, 31.10.2026 kararı; önceki indigo/lila/krem denemesi geri alındı). Logo (`wwwroot/img/modulix-logo*.png`, `modulix-mark*.png`) aynı paleti taşır: iki çapraz şeritten oluşan "X", sol yarı lacivert, sağ üst turkuaz, sağ alt mavi; koyu tema için `-dark` sürümleri.
 
 | Token | Açık | Koyu | Kullanım |
 |---|---|---|---|
