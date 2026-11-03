@@ -165,7 +165,7 @@ internal static class ContractSignatureEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Olay geçersiz.");
         }
 
-        if (!await platform.Tenants.AsNoTracking().AnyAsync(t => t.Id == tenantId && t.Status == TenantStatus.Active, ct))
+        if (!await platform.Tenants.AsNoTracking().AnyAsync(t => t.Id == tenantId && TenantStatusRules.Operational.Contains(t.Status), ct))
         {
             return Results.NotFound();
         }

@@ -174,7 +174,7 @@ public sealed class TwoFactorAccounts(
         var memberships = await (
             from membership in db.Memberships.AsNoTracking()
             join tenant in db.Tenants.AsNoTracking() on membership.TenantId equals tenant.Id
-            where membership.UserId == userId && membership.Status == MembershipStatus.Active && tenant.Status == TenantStatus.Active
+            where membership.UserId == userId && membership.Status == MembershipStatus.Active && TenantStatusRules.Operational.Contains(tenant.Status)
             select new { membership.Id, TenantId = tenant.Id, tenant.Name })
             .ToListAsync(cancellationToken);
 

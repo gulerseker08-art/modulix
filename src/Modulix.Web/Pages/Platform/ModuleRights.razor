@@ -64,7 +64,7 @@
                     <tr>
                         <td data-label="Firma" class="primary">
                             <a href="platform/firmalar/@tenant.Id">@tenant.Name</a>
-                            @if (tenant.Status == TenantState.Closed)
+                            @if (tenant.Status != TenantState.Active)
                             {
                                 <TenantStateBadge State="tenant.Status" />
                             }

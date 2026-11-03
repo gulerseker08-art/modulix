@@ -163,7 +163,7 @@ public sealed class OrderJobsWorker(IServiceScopeFactory scopes, OrderJobsRunner
         return await (
             from tenant in db.Tenants.AsNoTracking()
             join entitlement in db.ModuleEntitlements.AsNoTracking() on tenant.Id equals entitlement.TenantId
-            where tenant.Status == TenantStatus.Active && entitlement.ModuleKey == OrdersModule.ModuleKey && entitlement.IsEnabled
+            where TenantStatusRules.Operational.Contains(tenant.Status) && entitlement.ModuleKey == OrdersModule.ModuleKey && entitlement.IsEnabled
             select tenant.Id)
             .ToListAsync(cancellationToken);
     }

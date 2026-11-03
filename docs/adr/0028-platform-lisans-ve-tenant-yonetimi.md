@@ -118,3 +118,15 @@ Gerçek SQL Server'a bağlı entegrasyon ortamında EF komutları sayıldı (Deb
 5. **Faturalama:** ödeme sağlayıcısına bağlanacak mı, yoksa panel yalnızca lisans kaydı mı tutacak?
 6. **Platform ekibi:** kaç kişi, hangi roller gerçekten gerekli?
 7. **On-prem:** ilk müşteri on-prem mi (imzalı lisans dosyası dilim sırasını değiştirir)?
+
+## Uygulama durumu
+
+**Dilim 1 (uygulandı, `gseker/platform-lisans-dilim1`):**
+
+- `TenantStatus`: `Trial` ve `Suspended` eklendi; erişim kararı `TenantStatusRules.Operational`'da (Active, Trial). Doğrudan `Status == Active` karşılaştıran işleyiciler, genel uç noktalar, üyelik/hesap sorguları ve olay dağıtıcısı buna taşındı. Olay dağıtıcısı askıdaki firma için "Firma askıda." nedeniyle teslimi atlar.
+- Geçişler: `suspend` (gerekçe zorunlu), `activate` (Trial → Active), `close`/`reopen` (isteğe bağlı gerekçe). `reopen` önceki deneme durumunu tutmaz (Active'e döner).
+- `ModuleEntitlement`: `Source` (Manual/Plan/Trial/Exception), `ValidUntil`, `Note`. Mevcut kayıtlar Manual ve süresiz taşındı. İstisna için not zorunlu, bitiş gelecekte olmalı. **Bitiş tarihi yalnızca kayıttır; uygulanması Dilim 3'tedir.**
+- `platform.PlatformAuditLog`: ekleme-yalnız (uygulama rolüne `UPDATE/DELETE` yasak), firma silinse de saklanır; sütun `TargetTenantId`. Okuma: `GET /api/platform/audit`. Durum geçişlerinde platform kaydı ve firma kaydı aynı `SaveChanges`'te yazılır; modül, davet ve profil işlemlerinde platform kaydı işlemin kendi `SaveChanges`'ine önceden eklenir (tek işlem).
+- Firma listesi: üye sayısı ve açık modüller sayfa için tek sorguyla okunur (önceden firma başına iki sorgu). **Yönetici sayısı hâlâ firma başına bir tenant kapsamı açar:** roller RLS altındadır ve çapraz firma toplanamaz; çözüm (ör. platform tablosunda tutulan sayaç) Dilim 2'dedir.
+
+Bilinen eksikler: iki adımlı doğrulama sıfırlama platform kaydına yazılmaz; platform denetim kaydının ekranı yoktur; `tenant-delete` platform kaydına satır eklemez; arayüzde hak koşulları yalnızca okunur (API'den girilir); `GracePeriod`/`ReadOnly` durumları ve süre dolumu işçisi Dilim 3'tedir.

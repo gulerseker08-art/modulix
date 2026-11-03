@@ -52,6 +52,18 @@
                                   Enabled="tenant.EnabledModules.Contains(module.Key)" ShowLabel="true"
                                   Changed="error => ModuleChangedAsync(module, error)" />
                 }
+
+                @if (Conditions().Count > 0)
+                {
+                    <h3>Hak koşulları</h3>
+                    <p class="text-muted">Bitiş tarihi şimdilik yalnızca kayıttır; süre dolunca modül kendiliğinden kapanmaz.</p>
+                    <ul>
+                        @foreach (var line in Conditions())
+                        {
+                            <li>@line</li>
+                        }
+                    </ul>
+                }
             </section>
         }
 
@@ -112,7 +124,7 @@
                 </table>
             }
 
-            @if (tenant.Status == TenantState.Active)
+            @if (IsOperational(tenant.Status))
             {
                 <form class="inline-form" novalidate @onsubmit="InviteAsync" @onsubmit:preventDefault>
                     <h3>Yönetici davet et</h3>
@@ -164,20 +176,43 @@
                     <button type="button" class="btn btn-outline-secondary" @onclick="() => confirmingClose = false">Vazgeç</button>
                 </div>
             }
-            else if (tenant.Status == TenantState.Active)
+            else if (IsOperational(tenant.Status))
             {
                 <div class="account-actions">
+                    @if (tenant.Status == TenantState.Trial)
+                    {
+                        <div>
+                            <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="ActivateAsync">Denemeyi etkinleştir</button>
+                            <small class="text-muted">Firma deneme durumundan açık duruma geçer. Deneme süresi henüz otomatik uygulanmaz.</small>
+                        </div>
+                    }
                     <div>
                         <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => confirmingClose = true">Firmayı kapat</button>
                         <small class="text-muted">Kullanıcılar giriş yapamaz; veri silinmez.</small>
                     </div>
                 </div>
+                <form class="inline-form" novalidate @onsubmit="SuspendAsync" @onsubmit:preventDefault>
+                    <h3>Askıya al</h3>
+                    <p class="text-muted">Erişim geçici olarak durur; veri silinmez. Gerekçe platform denetim kaydına yazılır.</p>
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label" for="suspendReason">Gerekçe *</label>
+                            <input id="suspendReason" class="form-control" maxlength="500" @bind="suspendReason" @bind:event="oninput" />
+                            <FieldError Field="reason" Errors="suspendErrors" />
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-outline-danger" disabled="@(busy || string.IsNullOrWhiteSpace(suspendReason))">Askıya al</button>
+                    </div>
+                </form>
             }
             else
             {
                 <div class="account-actions">
                     <div>
-                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="ReopenAsync">Firmayı yeniden aç</button>
+                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="ReopenAsync">
+                            @(tenant.Status == TenantState.Suspended ? "Askıyı kaldır" : "Firmayı yeniden aç")
+                        </button>
                         <small class="text-muted">Üyeler ve bekleyen davetler yeniden çalışır.</small>
                     </div>
                 </div>
@@ -199,6 +234,8 @@
     private string inviteName = string.Empty;
     private IReadOnlyDictionary<string, string[]>? inviteErrors;
     private IReadOnlyDictionary<string, string[]>? renameErrors;
+    private string suspendReason = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? suspendErrors;
     private bool confirmingClose;
     private bool busy;
     private string? message;
@@ -260,15 +297,29 @@
 
     private Task ReopenAsync() => ChangeStateAsync("reopen", "Firma yeniden açıldı.");
 
-    private async Task ChangeStateAsync(string action, string success)
+    private Task ActivateAsync() => ChangeStateAsync("activate", "Deneme etkinleştirildi.");
+
+    private async Task SuspendAsync()
+    {
+        await ChangeStateAsync("suspend", "Firma askıya alındı. Veri silinmedi.", suspendReason);
+        if (suspendErrors is null || suspendErrors.Count == 0)
+        {
+            suspendReason = string.Empty;
+        }
+    }
+
+    private static bool IsOperational(TenantState state) => state is TenantState.Active or TenantState.Trial;
+
+    private async Task ChangeStateAsync(string action, string success, string? reason = null)
     {
         busy = true;
-        var result = await Api.PostAsync<bool>($"/api/platform/tenants/{TenantId}/{action}", new { });
+        var result = await Api.PostAsync<bool>($"/api/platform/tenants/{TenantId}/{action}", new TenantReasonRequest(reason));
         busy = false;
         confirmingClose = false;
+        suspendErrors = result.FieldErrors;
         if (!result.IsSuccess)
         {
-            Show(error: result.Error);
+            Show(error: result.FieldErrors.Count > 0 ? null : result.Error);
             return;
         }
 
@@ -321,6 +372,19 @@
         plan.Fields.Count > 0 ? $"{plan.Fields.Count} alan" : null,
         plan.ListValues.Count > 0 ? $"{plan.ListValues.Count} liste değeri" : null,
     }.Where(p => p is not null));
+
+    // Yalnızca açık ve varsayılandan farklı koşullar (elle ve süresiz olmayanlar) listelenir.
+    private List<string> Conditions() =>
+        (detail?.Entitlements ?? [])
+            .Where(e => e.IsEnabled && (e.Source != LicenseSource.Manual || e.ValidUntil is not null || !string.IsNullOrWhiteSpace(e.Note)))
+            .Select(e => string.Join(" · ", new[]
+            {
+                modules?.Modules.FirstOrDefault(m => m.Key == e.ModuleKey)?.DisplayName ?? e.ModuleKey,
+                LicenseSourceText.Of(e.Source),
+                e.ValidUntil is { } until ? $"{CrmLabels.Time(until)} tarihine kadar" : null,
+                e.Note,
+            }.Where(p => !string.IsNullOrWhiteSpace(p))))
+            .ToList();
 
     private string ProfileName(string? key) => key is null ? "—" : profiles.FirstOrDefault(p => p.Key == key)?.Name ?? key;
 
