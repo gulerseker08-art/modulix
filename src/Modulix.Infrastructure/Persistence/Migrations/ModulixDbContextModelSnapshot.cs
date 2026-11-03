@@ -1260,6 +1260,146 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Tenants", "platform");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Sectors.ActivityNode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Readiness")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("ParentId");
+
+                    b.ToTable("ActivityNodes", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Sectors.ActivityNodeCapability", b =>
+                {
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CapabilityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("NodeId", "CapabilityId");
+
+                    b.HasIndex("CapabilityId");
+
+                    b.ToTable("ActivityNodeCapabilities", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Sectors.Capability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Capabilities", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Sectors.CapabilityDependency", b =>
+                {
+                    b.Property<Guid>("CapabilityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DependsOnId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("CapabilityId", "DependsOnId");
+
+                    b.HasIndex("DependsOnId");
+
+                    b.ToTable("CapabilityDependencies", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Sectors.TenantActivitySelection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("SelectedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("NodeId");
+
+                    b.HasIndex("TenantId", "NodeId")
+                        .IsUnique();
+
+                    b.ToTable("ActivitySelections", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Settings.TenantLogo", b =>
                 {
                     b.Property<Guid>("Id")
@@ -10594,6 +10734,53 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Infrastructure.Identity.ModulixUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Sectors.ActivityNode", b =>
+                {
+                    b.HasOne("Modulix.Core.Sectors.ActivityNode", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Core.Sectors.ActivityNodeCapability", b =>
+                {
+                    b.HasOne("Modulix.Core.Sectors.Capability", null)
+                        .WithMany()
+                        .HasForeignKey("CapabilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Core.Sectors.ActivityNode", null)
+                        .WithMany()
+                        .HasForeignKey("NodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Sectors.CapabilityDependency", b =>
+                {
+                    b.HasOne("Modulix.Core.Sectors.Capability", null)
+                        .WithMany()
+                        .HasForeignKey("CapabilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Core.Sectors.Capability", null)
+                        .WithMany()
+                        .HasForeignKey("DependsOnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Sectors.TenantActivitySelection", b =>
+                {
+                    b.HasOne("Modulix.Core.Sectors.ActivityNode", null)
+                        .WithMany()
+                        .HasForeignKey("NodeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
