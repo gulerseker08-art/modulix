@@ -338,6 +338,7 @@ public sealed class MarketingModule : IModule
         services.AddScoped<IRecordStore, CampaignRunRecordStore>();
         services.AddScoped<DeliveryJournal>();
         services.AddScoped<ICampaignRuns, CampaignRuns>();
+        services.AddScoped<ICampaignTestSends, CampaignTestSends>();
         services.AddScoped<IRecordStore, CampaignResponseRecordStore>();
         services.AddScoped<ICampaignResponses, CampaignResponses>();
         services.AddScoped<ICampaignReports, CampaignReports>();

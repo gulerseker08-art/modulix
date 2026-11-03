@@ -7105,6 +7105,42 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("CampaignRuns", "marketing");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.CampaignTestSend", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<Guid>("ContentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CampaignId", "CreatedAt");
+
+                    b.ToTable("CampaignTestSends", "marketing");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Marketing.Domain.Segment", b =>
                 {
                     b.Property<Guid>("Id")

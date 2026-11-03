@@ -38,6 +38,9 @@ public sealed record RunSummaryDto(
     string Status, int Total, IReadOnlyDictionary<string, int> Statuses, IReadOnlyDictionary<string, int> Codes, bool ProviderConfigured, string Provider,
     bool UnsubscribeLinkAvailable);
 
+/// <summary>Test gönderimi sonucu (dilim 11): alıcı yalnızca çağıranın kendi hesap e-postasıdır, adres dönmez.</summary>
+public sealed record TestSendResultDto(string Outcome, string? Code);
+
 public sealed record ProcessResultDto(int Processed, int Accepted, int Failed, int Skipped, int Unknown, int Requeued, int Remaining, bool Completed);
 
 public sealed record CampaignDeliveryDto(Guid Id, Guid TargetId, Guid? PersonId, string Status, string? Code, int Attempts, string? ProviderMessageId, DateTimeOffset UpdatedAt);
