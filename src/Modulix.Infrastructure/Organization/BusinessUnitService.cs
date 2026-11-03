@@ -130,7 +130,8 @@ internal sealed class BusinessUnitService(
 
             if (await db.BusinessUnitMembers.AnyAsync(m => m.BusinessUnitId == unit.Id, cancellationToken))
             {
-                throw new BusinessUnitConflictException("Kullanıcısı olan departman kapatılamaz; önce kullanıcıları başka bir departmana taşıyın.");
+                throw new BusinessUnitConflictException(
+                    "Kullanıcısı olan departman kapatılamaz; önce kullanıcıları (devre dışı olanlar dahil) başka bir departmana taşıyın.");
             }
 
             unit.Close();
@@ -163,7 +164,15 @@ internal sealed class BusinessUnitService(
         return units.Where(u => u.Id == unitId).Select(u => new MembershipBusinessUnit(u.Id, u.Name, PathNames(u, names), u.Kind, u.IsActive)).SingleOrDefault();
     }
 
-    public async Task<bool> SetMembershipBusinessUnitAsync(Guid membershipId, Guid businessUnitId, CancellationToken cancellationToken)
+    public async Task<BusinessUnitSummary?> FindAsync(Guid businessUnitId, CancellationToken cancellationToken)
+    {
+        var units = await db.BusinessUnits.AsNoTracking().ToListAsync(cancellationToken);
+        var names = units.ToDictionary(u => u.Id, u => u.Name);
+        return units.Where(u => u.Id == businessUnitId).Select(u => ToSummary(u, names, new Dictionary<Guid, int>())).SingleOrDefault();
+    }
+
+    public async Task<bool> SetMembershipBusinessUnitAsync(
+        Guid membershipId, Guid businessUnitId, CancellationToken cancellationToken, string? reason = null, string? recordsNote = null)
     {
         var tenant = RequireTenant();
         if (!await MembershipExistsAsync(tenant, membershipId, cancellationToken))
@@ -196,12 +205,24 @@ internal sealed class BusinessUnitService(
             current.MoveTo(target.Id);
         }
 
+        // Gerekçe ve kayıtların akıbeti yalnızca sonraki hâlde yazılır; değişiklik farkında görünürler.
+        var after = new JsonObject { ["businessUnit"] = PathNames(target, names) };
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            after["businessUnitChangeReason"] = reason.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(recordsNote))
+        {
+            after["businessUnitRecords"] = recordsNote.Trim();
+        }
+
         Audit(
             tenant,
             membershipId,
             AuditAction.Updated,
             new JsonObject { ["businessUnit"] = previous is null ? null : PathNames(previous, names) },
-            new JsonObject { ["businessUnit"] = PathNames(target, names) },
+            after,
             CoreModule.AuditedEntityKeys.Membership);
         await db.SaveChangesAsync(cancellationToken);
         return true;

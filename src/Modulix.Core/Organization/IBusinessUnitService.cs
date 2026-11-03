@@ -62,5 +62,14 @@ public interface IBusinessUnitService
     /// Kullanıcıyı departmana taşır. Bu, kullanıcının sahip olduğu kayıtların görünürlüğünü değiştirir (ADR-0026 K7); bu dilimde
     /// kapsam henüz departmana bağlı değildir. Üyelik bu tenant'ta yoksa false.
     /// </summary>
-    Task<bool> SetMembershipBusinessUnitAsync(Guid membershipId, Guid businessUnitId, CancellationToken cancellationToken);
+    /// <remarks>
+    /// <paramref name="reason"/> ve <paramref name="recordsNote"/> (kayıtların ne olduğu: kullanıcıyla taşındı / kime devredildi)
+    /// denetim kaydına yazılır. Kayıt kararı, gerekçe ve yetki kuralları <c>IUserAdministration.ChangeBusinessUnitAsync</c>'tedir;
+    /// bu metot yalnızca ağaç kurallarını (var olma, etkin departman) uygular.
+    /// </remarks>
+    Task<bool> SetMembershipBusinessUnitAsync(
+        Guid membershipId, Guid businessUnitId, CancellationToken cancellationToken, string? reason = null, string? recordsNote = null);
+
+    /// <summary>Departman kimliğinin bu tenant'ta olup olmadığı ve etkin olup olmadığı (taşıma öncesi doğrulama için).</summary>
+    Task<BusinessUnitSummary?> FindAsync(Guid businessUnitId, CancellationToken cancellationToken);
 }

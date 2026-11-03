@@ -104,6 +104,28 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
         return units.Where(u => u.Path.StartsWith(unitPath, StringComparison.Ordinal)).Select(u => u.Id).ToList();
     }
 
+    /// <summary>
+    /// Bir departmanın kullanıcılarına verdiği roller (ADR-0026 K6): o departmana atananlar ile üst departmanlarda "alt
+    /// departmanlara da uygula" işaretli olanlar; sistem rolü yetki vermez. Departman taşıma önizlemesinde kaybedilen ve
+    /// kazanılan rolleri bulmak için kullanılır.
+    /// </summary>
+    public async Task<IReadOnlyList<(Guid Id, string Name)>> GetUnitRolesAsync(Guid unitId, string unitPath, CancellationToken cancellationToken)
+    {
+        var assigned = await (
+            from assignment in db.BusinessUnitRoles.AsNoTracking()
+            join owner in db.BusinessUnits.AsNoTracking() on assignment.BusinessUnitId equals owner.Id
+            join role in db.Roles.AsNoTracking() on assignment.RoleId equals role.Id
+            where !role.IsSystem
+            select new { assignment.InheritToChildren, OwnerId = owner.Id, OwnerPath = owner.Path, role.Id, role.Name })
+            .ToListAsync(cancellationToken);
+        return assigned
+            .Where(a => a.OwnerId == unitId || (a.InheritToChildren && unitPath.StartsWith(a.OwnerPath, StringComparison.Ordinal)))
+            .Select(a => (a.Id, a.Name))
+            .DistinctBy(r => r.Id)
+            .OrderBy(r => r.Name, StringComparer.CurrentCulture)
+            .ToList();
+    }
+
     internal static IReadOnlyList<RecordScope> ScopesOf(bool isAdministrator, IEnumerable<RecordScope> roleScopes) =>
         isAdministrator ? [RecordScope.All] : roleScopes.Distinct().DefaultIfEmpty(RecordScope.Own).ToList();
 
