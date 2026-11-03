@@ -99,6 +99,9 @@ jobs:
       - name: Pazarlama birim testleri
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Modules.Marketing.Tests/Modulix.Modules.Marketing.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/marketing-tests.log"
 
+      - name: Lojistik birim testleri
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Modules.Logistics.Tests/Modulix.Modules.Logistics.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/logistics-tests.log"
+
       - name: Entegrasyon testleri
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/integration-tests.log"
 

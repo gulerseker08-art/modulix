@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
+using Modulix.Core.Automation;
 using Modulix.Core.Communication;
 using Modulix.Core.Customization;
 using Modulix.Core.Lookups;
@@ -88,6 +89,10 @@ public class ModulixDbContext(
     public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
 
     public DbSet<BusinessUnitMember> BusinessUnitMembers => Set<BusinessUnitMember>();
+
+    public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
+
+    public DbSet<AutomationRuleVersion> AutomationRuleVersions => Set<AutomationRuleVersion>();
 
     public DbSet<BusinessUnitRole> BusinessUnitRoles => Set<BusinessUnitRole>();
 

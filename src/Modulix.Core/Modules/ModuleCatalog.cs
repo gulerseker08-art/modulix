@@ -202,6 +202,9 @@ public sealed partial class ModuleCatalog
         }
 
         Modules = [.. this.modules.Values.OrderBy(m => m.Key, StringComparer.Ordinal)];
+
+        // Kural yetenekleri izinlere, modüllere ve lookup'lara başvurur; hepsi okunduktan sonra doğrulanır (ADR-0027).
+        RegisterAutomation();
     }
 
     /// <summary>"Salt okur" şablonu: açık modüllerin tüm görüntüleme izinleri; çekirdek tanımlar.</summary>
