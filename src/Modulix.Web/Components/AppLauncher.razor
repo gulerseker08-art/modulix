@@ -146,7 +146,7 @@
     private AppDefinition? openRoot;
     private bool showSearch;
 
-    // Başlıklı gösterim yalnızca ilk düzeyde, aramasız ve birden çok grup görünürken; aksi halde düz liste.
+    // Başlıklı gösterim yalnızca aramasız ve birden çok grup görünürken (ana ve alt düzeyde); aksi halde düz liste.
     private IReadOnlyList<AppRootGroup> groups = [];
 
     // Erişim bilgisi yüklenemedi: tenant var ama erişim okunamadı (iki adımlı doğrulama beklerken bilerek boştur).
@@ -176,9 +176,7 @@
             : listed.Where(a => Matches(a.Name, query.Trim())).ToList();
         showSearch = Session.IsLoaded && !loadFailed && listed.Count > 0;
 
-        IReadOnlyList<AppRootGroup> grouped = openRoot is null && string.IsNullOrWhiteSpace(query)
-            ? Apps.GroupedRoots()
-            : [];
+        IReadOnlyList<AppRootGroup> grouped = string.IsNullOrWhiteSpace(query) ? Apps.Grouped(listed) : [];
         groups = grouped.Count > 1 ? grouped : [];
     }
 

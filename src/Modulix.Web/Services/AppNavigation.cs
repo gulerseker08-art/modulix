@@ -47,23 +47,23 @@ public sealed class AppNavigation(SessionState session)
             .ToList();
 
     /// <summary>
-    /// Görünür ana uygulamalar, grup sırasına göre kümelenmiş. Hiç uygulaması görünmeyen grup yer almaz; grubu
-    /// tanımsız uygulamalar sonda başlıksız (<c>Group == null</c>) kümede toplanır.
+    /// Verilen (görünür, sıralı) uygulamaları grup sırasına göre kümeler; kümeler içinde sıra korunur. Hiç uygulaması
+    /// olmayan grup yer almaz; grubu tanımsız uygulamalar sonda başlıksız (<c>Group == null</c>) kümede toplanır.
+    /// Ana uygulamalar da (<see cref="Roots"/>) bir uygulamanın alt uygulamaları da (<see cref="Children"/>) bu yolla gruplanır.
     /// </summary>
-    public IReadOnlyList<AppRootGroup> GroupedRoots()
+    public IReadOnlyList<AppRootGroup> Grouped(IReadOnlyList<AppDefinition> listed)
     {
-        IReadOnlyList<AppDefinition> roots = Roots();
         List<AppRootGroup> result = [];
         foreach (AppGroup group in AppCatalog.Groups.OrderBy(g => g.Order))
         {
-            List<AppDefinition> apps = roots.Where(a => a.Group == group.Id).ToList();
+            List<AppDefinition> apps = listed.Where(a => a.Group == group.Id).ToList();
             if (apps.Count > 0)
             {
                 result.Add(new AppRootGroup(group, apps));
             }
         }
 
-        List<AppDefinition> ungrouped = roots.Where(a => AppCatalog.Groups.All(g => g.Id != a.Group)).ToList();
+        List<AppDefinition> ungrouped = listed.Where(a => AppCatalog.Groups.All(g => g.Id != a.Group)).ToList();
         if (ungrouped.Count > 0)
         {
             result.Add(new AppRootGroup(null, ungrouped));

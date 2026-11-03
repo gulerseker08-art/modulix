@@ -30,7 +30,7 @@ public enum AppTone
 /// <param name="PlatformOnly">Yalnızca platform yöneticisi görür.</param>
 /// <param name="ExactMatch">Aktif sayfa yalnızca route tam eşleşince bu uygulamadır (genel bakış ekranları).</param>
 /// <param name="Tone">Panel ikonunun rengi.</param>
-/// <param name="Group">Ana uygulamanın panelde altında listelendiği başlık (<see cref="AppCatalog.Groups"/>); alt uygulamada <c>null</c>.</param>
+/// <param name="Group">Uygulamanın panelde altında listelendiği başlık (<see cref="AppCatalog.Groups"/>): ana uygulamada alan başlığı, alt uygulamada kendi uygulamasının içindeki bölüm; <c>null</c> ise gruplanmaz.</param>
 public sealed record AppDefinition(
     string Id,
     string? ParentId,
@@ -74,35 +74,46 @@ public static class AppCatalog
     public const string ServiceGroup = "service";
     public const string ManagementGroup = "management";
 
+    public const string CrmProcessGroup = "crm.process";
+    public const string CrmQuoteGroup = "crm.quote";
+    public const string CrmCatalogGroup = "crm.catalog";
+    public const string CrmPerformanceGroup = "crm.performance";
+
+    /// <summary>Hem ana uygulamaların hem de bir uygulamanın alt uygulamalarının başlıkları; bir tanım <c>Group</c> ile birini seçer.</summary>
     public static IReadOnlyList<AppGroup> Groups { get; } =
     [
         new(SalesGroup, "Satış ve müşteri", 10),
         new(ServiceGroup, "Müşteri hizmetleri", 20),
         new(ManagementGroup, "Yönetim", 30),
+
+        new(CrmProcessGroup, "Müşteri ve satış süreci", 10),
+        new(CrmQuoteGroup, "Teklif", 20),
+        new(CrmCatalogGroup, "Ürün ve fiyat", 30),
+        new(CrmPerformanceGroup, "Satış performansı", 40),
     ];
 
     public static IReadOnlyList<AppDefinition> All { get; } =
     [
         new(Crm, null, "CRM", "users", null, 10, ModuleKey: CrmAccess.ModuleKey, Group: SalesGroup),
-        new("crm.leads", Crm, "Lead'ler", "inbox", "crm/leadler", 5, CrmAccess.ModuleKey, CrmAccess.LeadsRead),
-        new("crm.companies", Crm, "Firmalar", "building", "crm/firmalar", 10, CrmAccess.ModuleKey, CrmAccess.CompaniesRead),
-        new("crm.contacts", Crm, "Kişiler", "user", "crm/kisiler", 20, CrmAccess.ModuleKey, CrmAccess.ContactsRead, Tone: AppTone.Teal),
-        new("crm.opportunities", Crm, "Fırsatlar", "target", "crm/firsatlar", 30, CrmAccess.ModuleKey, CrmAccess.OpportunitiesRead),
-        new("crm.products", Crm, "Ürün ve hizmetler", "package", "crm/urunler", 35, CrmAccess.ModuleKey, CrmAccess.ProductsRead),
-        new("crm.product-categories", Crm, "Ürün kategorileri", "layers", "crm/urun-kategorileri", 35, CrmAccess.ModuleKey, CrmAccess.ProductsRead),
-        new("crm.units", Crm, "Ölçü birimleri", "sliders", "crm/birimler", 35, CrmAccess.ModuleKey, CrmAccess.ProductsRead),
-        new("crm.price-lists", Crm, "Fiyat listeleri", "list", "crm/fiyat-listeleri", 36, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal),
-        new("crm.tax-rates", Crm, "Vergi ve kur", "landmark", "crm/vergi-kur", 37, CrmAccess.ModuleKey, CrmAccess.PricesRead),
-        new("crm.discounts", Crm, "İndirimler", "zap", "crm/indirimler", 38, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal),
-        new("crm.price-calculator", Crm, "Fiyat hesapla", "search", "crm/fiyat-hesapla", 39, CrmAccess.ModuleKey, CrmAccess.PricesRead),
-        new("crm.quotes", Crm, "Teklifler", "file-text", "crm/teklifler", 32, CrmAccess.ModuleKey, CrmAccess.QuotesRead),
-        new("crm.quote-approvals", Crm, "Teklif onayları", "check-circle", "crm/teklif-onaylari", 33, CrmAccess.ModuleKey, CrmAccess.QuotesApprove, Tone: AppTone.Teal),
-        new("crm.quote-rules", Crm, "Teklif kuralları", "shield", "crm/teklif-kurallari", 34, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage),
-        new("crm.quote-delegations", Crm, "Onay vekâletleri", "users", "crm/onay-vekaletleri", 34, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage),
-        new("crm.activities", Crm, "Aktiviteler", "activity", "crm/aktiviteler", 40, CrmAccess.ModuleKey, CrmAccess.ActivitiesRead, Tone: AppTone.Teal),
-        new("crm.sales-overview", Crm, "Satış görünümü", "dashboard", "crm/satis-gorunumu", 41, CrmAccess.ModuleKey, SalesAccess.ReportsRead),
-        new("crm.sales-targets", Crm, "Satış hedefleri", "target", "crm/satis-hedefleri", 42, CrmAccess.ModuleKey, SalesAccess.TargetsRead, Tone: AppTone.Teal),
-        new("crm.sales-forecasts", Crm, "Satış tahmini", "trending-up", "crm/satis-tahmini", 43, CrmAccess.ModuleKey, SalesAccess.ForecastsRead),
+        new("crm.leads", Crm, "Lead'ler", "inbox", "crm/leadler", 5, CrmAccess.ModuleKey, CrmAccess.LeadsRead, Group: CrmProcessGroup),
+        new("crm.companies", Crm, "Firmalar", "building", "crm/firmalar", 10, CrmAccess.ModuleKey, CrmAccess.CompaniesRead, Group: CrmProcessGroup),
+        new("crm.contacts", Crm, "Kişiler", "user", "crm/kisiler", 20, CrmAccess.ModuleKey, CrmAccess.ContactsRead, Tone: AppTone.Teal, Group: CrmProcessGroup),
+        new("crm.opportunities", Crm, "Fırsatlar", "target", "crm/firsatlar", 30, CrmAccess.ModuleKey, CrmAccess.OpportunitiesRead, Group: CrmProcessGroup),
+        new("crm.products", Crm, "Ürün ve hizmetler", "package", "crm/urunler", 35, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmCatalogGroup),
+        new("crm.product-categories", Crm, "Ürün kategorileri", "layers", "crm/urun-kategorileri", 35, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmCatalogGroup),
+        new("crm.units", Crm, "Ölçü birimleri", "sliders", "crm/birimler", 35, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmCatalogGroup),
+        new("crm.price-lists", Crm, "Fiyat listeleri", "list", "crm/fiyat-listeleri", 36, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal, Group: CrmCatalogGroup),
+        new("crm.tax-rates", Crm, "Vergi ve kur", "landmark", "crm/vergi-kur", 37, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmCatalogGroup),
+        new("crm.discounts", Crm, "İndirimler", "zap", "crm/indirimler", 38, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal, Group: CrmCatalogGroup),
+        new("crm.price-calculator", Crm, "Fiyat hesapla", "search", "crm/fiyat-hesapla", 39, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmCatalogGroup),
+        new("crm.quotes", Crm, "Teklifler", "file-text", "crm/teklifler", 32, CrmAccess.ModuleKey, CrmAccess.QuotesRead, Group: CrmQuoteGroup),
+        new("crm.quote-approvals", Crm, "Teklif onayları", "check-circle", "crm/teklif-onaylari", 33, CrmAccess.ModuleKey, CrmAccess.QuotesApprove, Tone: AppTone.Teal, Group: CrmQuoteGroup),
+        new("crm.quote-rules", Crm, "Teklif kuralları", "shield", "crm/teklif-kurallari", 34, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmQuoteGroup),
+        new("crm.quote-delegations", Crm, "Onay vekâletleri", "users", "crm/onay-vekaletleri", 34, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmQuoteGroup),
+        new("crm.activities", Crm, "Aktiviteler", "activity", "crm/aktiviteler", 40, CrmAccess.ModuleKey, CrmAccess.ActivitiesRead, Tone: AppTone.Teal, Group: CrmProcessGroup),
+        new("crm.sales-overview", Crm, "Satış görünümü", "dashboard", "crm/satis-gorunumu", 41, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmPerformanceGroup),
+        new("crm.sales-targets", Crm, "Satış hedefleri", "target", "crm/satis-hedefleri", 42, CrmAccess.ModuleKey, SalesAccess.TargetsRead, Tone: AppTone.Teal, Group: CrmPerformanceGroup),
+        new("crm.sales-forecasts", Crm, "Satış tahmini", "trending-up", "crm/satis-tahmini", 43, CrmAccess.ModuleKey, SalesAccess.ForecastsRead, Group: CrmPerformanceGroup),
 
         new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal, Group: SalesGroup),
         new("contracts.dashboard", Contracts, "Pano", "dashboard", "sozlesmeler/ozet", 5, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, ExactMatch: true),
