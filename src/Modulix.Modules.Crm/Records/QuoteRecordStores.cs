@@ -338,7 +338,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
             return null;
         }
 
-        var scope = await Context.Access.GetOwnersAsync(cancellationToken);
+        var scope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Quote, cancellationToken);
         return scope is null || (quote.OwnerId is { } owner && scope.Contains(owner)) ? quote : null;
     }
 
@@ -576,7 +576,7 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
             return null;
         }
 
-        var scope = await Context.Access.GetOwnersAsync(cancellationToken);
+        var scope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Quote, cancellationToken);
         return scope is null || (parent.OwnerId is { } owner && scope.Contains(owner)) ? parent : null;
     }
 

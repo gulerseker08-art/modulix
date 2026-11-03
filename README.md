@@ -245,7 +245,7 @@ Roller "hangi tür kaydı", kayıt kapsamı "hangi kayıtları" belirler. Kapsam
 
 - Kapsam yalnızca sorumlu alanı olan kayıt türlerine uygulanır (`IRecordStore.OwnerField`; CRM'de firma, fırsat, aktivite). Boru hattı (`IDataScopeService`) listede kapsamı sorguya koyar (`RecordQuery.Owners`), böylece sayfalama ve toplam doğru kalır; kapsam dışındaki tek kayıt 404 döner. Sorumlu kapsam dışına atanamaz (422, `ownerId`). Sorumlusu boş kayıt yalnızca "Tüm kayıtlar"da görünür.
 - **Ekipler** (Yönetim → Ekipler, `core.users.manage`): `/api/teams` (liste, ekle, düzenle, sil), `PUT /api/teams/{id}/members`, kullanıcı ayrıntısında `GET/PUT /api/users/{üyelik}/teams`. Bir kişi birden fazla ekipte olabilir; ekip silinince yalnızca ekip ilişkisi kalkar. Değişiklikler denetim kaydına "Ekip" olarak yazılır.
-- `GET /api/tenant/members?assignable=true`: kişinin sorumlu atayabileceği üyeler. `GET /api/tenant/access` ve kullanıcının "Erişim" görünümü kapsamı (ve ekipleri) gösterir.
+- `GET /api/tenant/members?assignable=true&entityKey=<tür>`: kişinin sorumlu atayabileceği üyeler; kapsam kayıt türüne göre çözüldüğü için tür anahtarı (ör. `crm.company`) zorunludur, verilmezse 400 döner (ADR-0028). `GET /api/tenant/access` ve kullanıcının "Erişim" görünümü kapsamı (ve ekipleri) gösterir.
 - Yönetici olmayan rol yöneticisi kendi kapsamından geniş kapsam veremez (403).
 
 ### Departman ağacı ([ADR-0026](docs/adr/0026-departman-hiyerarsisi-ve-departman-bazli-gorunurluk.md), dilim 1)
@@ -376,7 +376,7 @@ Pazarlama izninin tek sahibi çekirdektir; kampanya, destek gibi modüller yaln�
 | `POST /api/crm/companies/{targetId}/merge`, `POST /api/crm/contacts/{targetId}/merge` | Kaynağı hedefe birleştirir (gövde: `sourceId`, `sourceVersion`, `targetVersion`, `fieldChoices`). Her iki kayıt çağıranın kapsamında olmalı. Tek işlemde; engel, eski sürüm (409) ya da çakışmada hiçbir şey yazılmaz. Tekrarlanan istek 409 "zaten birleştirilmiş" döner | `crm.companies.merge` / `crm.contacts.merge` |
 | `GET /api/crm/companies/merged/{oldId}`, `GET /api/crm/contacts/merged/{oldId}` | Birleştirilmiş eski kimliğin gittiği kayıt (`targetId`). Hedefi göremeyen çağıran için 404 | `crm.companies.read` / `crm.contacts.read` |
 | `/api/crm/contacts`, `/api/crm/opportunities`, `/api/crm/activities` | Aynı kalıp (fırsat eylemleri için bkz. Fırsat yönetimi) | `crm.<kaynak>.read` / `.write` |
-| `GET /api/tenant/members` | Kuruluşun etkin üyeleri (sorumlu seçimi) | Aktif tenant |
+| `GET /api/tenant/members` | Kuruluşun etkin üyeleri (sorumlu seçimi); `assignable=true` ile `entityKey` gerekir | Aktif tenant |
 
 Listeler filtre alır; bilinmeyen filtre veya geçersiz değer 422 döner. `ownerId=me` isteği yapan kullanıcıdır. Fırsat listesinde `stageCategory=open|won|lost` aşama kategorisine göre süzer. Kişi listesinde `ownerId`, `withoutCompany=true` süzgeçleri vardır.
 

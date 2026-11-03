@@ -14,8 +14,8 @@ internal sealed class RecordAccess(
 {
     private static readonly IReadOnlySet<Guid> NoOwners = new HashSet<Guid>();
 
-    public async Task<IReadOnlySet<Guid>?> GetOwnersAsync(CancellationToken cancellationToken) =>
-        tenant.Current is { } current ? await dataScope.GetOwnersAsync(current, cancellationToken) : NoOwners;
+    public async Task<IReadOnlySet<Guid>?> GetOwnersAsync(string entityKey, CancellationToken cancellationToken) =>
+        tenant.Current is { } current ? await dataScope.GetOwnersAsync(current, entityKey, cancellationToken) : NoOwners;
 
     public async Task<bool> CanAsync(string entityKey, RecordOperation operation, CancellationToken cancellationToken) =>
         tenant.Current is { } current

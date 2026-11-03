@@ -494,7 +494,7 @@ public class RecordPipelineTests
             Task.FromResult(allow());
 
         // Kapsam dışı: hiçbir sorumlunun kaydı görünmez.
-        public Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken) =>
+        public Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlySet<Guid>?>(allow() ? null : new HashSet<Guid>());
     }
 

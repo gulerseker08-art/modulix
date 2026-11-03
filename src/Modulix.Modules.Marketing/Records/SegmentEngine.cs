@@ -125,7 +125,7 @@ internal sealed class SegmentEngine(
         }
 
         var day = await clock.GetAsync(cancellationToken);
-        var context = new SegmentEvaluationContext(await access.GetOwnersAsync(cancellationToken), day.Today, day.StartOfDay);
+        var context = new SegmentEvaluationContext(await access.GetOwnersAsync(ScopeEntityKey(request.Target), cancellationToken), day.Today, day.StartOfDay);
         return Build(request, byKey, context);
     }
 
@@ -157,6 +157,11 @@ internal sealed class SegmentEngine(
             ? parts.Aggregate((a, b) => a.Intersect(b))
             : parts.Aggregate((a, b) => a.Union(b));
     }
+
+    // Segmentin veri kapsamı hedef türün kapsamıdır (ADR-0028). Koşullar başka türlere (ör. kazanılan fırsat) bakabilse de
+    // tek sahip kümesiyle çalışılır; hedef türün kapsamı alınır (ADR-0028 açık karar 3).
+    private static string ScopeEntityKey(SegmentTarget target) =>
+        target switch { SegmentTarget.Person => "crm.contact", SegmentTarget.Lead => "crm.lead", _ => "crm.company" };
 
     /// <summary>Satır (ad) gösterimi alıcı görüntüleme yetkisine bağlıdır: ortak kaydı (ya da lead'i) okuyamayan satır görmez.</summary>
     private Task<bool> CanSeeRowsAsync(SegmentTarget target, CancellationToken cancellationToken) => access.CanAsync(

@@ -25,8 +25,11 @@ public interface IPermissionService
 /// </summary>
 public interface IDataScopeService
 {
-    /// <summary>Null: tüm kayıtlar. Aksi halde yalnızca sorumlusu bu kullanıcılardan biri olan kayıtlar.</summary>
-    Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken);
+    /// <summary>
+    /// Null: tüm kayıtlar. Aksi halde yalnızca sorumlusu bu kullanıcılardan biri olan kayıtlar. Kapsam kayıt türüne göre
+    /// çözülür (ADR-0028); <paramref name="entityKey"/> süzülecek kayıt türünün anahtarıdır.
+    /// </summary>
+    Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -88,7 +91,7 @@ public sealed class AllowAllPermissions : IPermissionService
 
 public sealed class TenantWideDataScope : IDataScopeService
 {
-    public Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken) =>
+    public Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlySet<Guid>?>(null);
 }
 

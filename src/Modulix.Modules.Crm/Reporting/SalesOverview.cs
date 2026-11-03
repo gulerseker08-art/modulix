@@ -172,7 +172,7 @@ internal sealed class SalesOverview(
         var today = ReportPeriods.Today(now, policy.TimeZone);
         var period = ReportPeriods.Containing(query.Kind, query.Anchor ?? today, policy.FiscalStartMonth);
         var currency = (query.Currency ?? policy.DefaultCurrency).Trim().ToUpperInvariant();
-        var owners = await recordAccess.GetOwnersAsync(cancellationToken);
+        var owners = await recordAccess.GetOwnersAsync(CrmModule.Entities.Opportunity, cancellationToken);
         var amountsVisible = await access.HasPermissionAsync(CrmModule.Permissions.OpportunityAmountsRead, cancellationToken);
 
         var windowStart = withTrend ? ReportPeriods.Shift(period, -(TrendPeriods - 1), policy.FiscalStartMonth).Start : period.Start;

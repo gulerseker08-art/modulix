@@ -224,7 +224,8 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
     private async Task EnsureReferencesVisibleAsync(Lead entity, JsonObject values, CancellationToken cancellationToken)
     {
         var errors = new List<RecordFieldError>();
-        var scope = await Context.Access.GetOwnersAsync(cancellationToken);
+        var companyScope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Company, cancellationToken);
+        var contactScope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Contact, cancellationToken);
         var stored = await Context.Data.Set<Lead>().AsNoTracking().Where(l => l.Id == entity.Id)
             .Select(l => new { l.CompanyId, l.ContactId }).SingleOrDefaultAsync(cancellationToken);
 
@@ -233,7 +234,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
             var owner = await Context.Data.Set<Company>().AsNoTracking().Where(c => c.Id == companyId)
                 .Select(c => c.OwnerId).SingleOrDefaultAsync(cancellationToken);
             var visible = await Context.Access.CanAsync(CrmModule.Entities.Company, RecordOperation.Read, cancellationToken)
-                && (scope is null || (owner is { } ownerId && scope.Contains(ownerId)));
+                && (companyScope is null || (owner is { } ownerId && companyScope.Contains(ownerId)));
             if (!visible)
             {
                 errors.Add(new RecordFieldError("companyId", "Firma bulunamadı."));
@@ -243,8 +244,8 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         if (values.ContainsKey("contactId") && entity.ContactId is { } contactId && stored?.ContactId != contactId)
         {
             var visible = await Context.Access.CanAsync(CrmModule.Entities.Contact, RecordOperation.Read, cancellationToken)
-                && (scope is null || await Context.Data.Set<Contact>().AsNoTracking().Where(c => c.Id == contactId)
-                    .Where(ContactRecordStore.VisibleTo(Context.Data, scope)).AnyAsync(cancellationToken));
+                && (contactScope is null || await Context.Data.Set<Contact>().AsNoTracking().Where(c => c.Id == contactId)
+                    .Where(ContactRecordStore.VisibleTo(Context.Data, contactScope)).AnyAsync(cancellationToken));
             if (!visible)
             {
                 errors.Add(new RecordFieldError("contactId", "Kişi bulunamadı."));

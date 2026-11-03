@@ -162,14 +162,24 @@ public static class TenancySetup
 
         // Sorumlu seçimi için üye adları; her üye görebilir (e-posta ve rol bilgisi verilmez). assignable=true: yalnızca
         // kişinin kayıt kapsamındaki üyeler (Y8), yani sorumlu olarak atayabileceği ve süzgeçte seçebileceği kişiler.
+        // Kapsam kayıt türüne göre çözüldüğü için assignable=true ile entityKey (ör. crm.opportunities) zorunludur (ADR-0028).
         app.MapGet("/api/tenant/members", async (
-                bool? assignable, ITenantMembers members, IDataScopeService scope, ITenantContextAccessor tenant, CancellationToken ct) =>
+                bool? assignable, string? entityKey, ITenantMembers members, IDataScopeService scope, ITenantContextAccessor tenant,
+                CancellationToken ct) =>
             {
-                var owners = assignable == true ? await scope.GetOwnersAsync(tenant.Current!, ct) : null;
-                return (await members.ListActiveAsync(ct))
+                if (assignable == true && string.IsNullOrWhiteSpace(entityKey))
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["entityKey"] = ["Atanabilir üyeler için kayıt türü anahtarı gerekir."],
+                    });
+                }
+
+                var owners = assignable == true ? await scope.GetOwnersAsync(tenant.Current!, entityKey!, ct) : null;
+                return Results.Ok((await members.ListActiveAsync(ct))
                     .Where(m => owners is null || owners.Contains(m.UserId))
                     .Select(m => new TenantMemberResponse(m.UserId, m.DisplayName))
-                    .ToList();
+                    .ToList());
             })
             .RequireAuthorization()
             .AddEndpointFilter<RequireTenantFilter>()

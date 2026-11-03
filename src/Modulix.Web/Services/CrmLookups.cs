@@ -14,6 +14,10 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
 {
     private const int Size = 200;
 
+    // Atanabilir üye listesi şimdilik CRM genelinde tek listedir; kapsam henüz türe göre değişmediği için (ADR-0028 dilim 1)
+    // hangi tür anahtarının sorulduğu sonucu etkilemez. Türe özel kapsam gelince form türüne göre ayrı istenmelidir (dilim 3).
+    private const string AssignableEntityKey = CrmEntityKeys.Opportunity;
+
     public IReadOnlyList<CompanyDto> Companies { get; private set; } = [];
 
     public IReadOnlyList<ContactDto> Contacts { get; private set; } = [];
@@ -72,7 +76,7 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
         Members = (await api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members")).Value ?? [];
         AssignableMembers = session.Scope == RecordScope.All && session.Access is not null
             ? Members
-            : (await api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members?assignable=true")).Value ?? [];
+            : (await api.GetAsync<List<TenantMemberResponse>>($"/api/tenant/members?assignable=true&entityKey={AssignableEntityKey}")).Value ?? [];
 
         if (session.Can(CrmAccess.CompaniesRead))
         {

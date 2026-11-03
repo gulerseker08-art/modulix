@@ -416,7 +416,7 @@ internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmR
 
         var owner = await Context.Data.Set<Company>().AsNoTracking()
             .Where(c => c.Id == companyId).Select(c => c.OwnerId).SingleOrDefaultAsync(cancellationToken);
-        var scope = await Context.Access.GetOwnersAsync(cancellationToken);
+        var scope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Company, cancellationToken);
         var visible = await Context.Access.CanAsync(CrmModule.Entities.Company, RecordOperation.Read, cancellationToken)
             && (scope is null || (owner is { } ownerId && scope.Contains(ownerId)));
         if (!visible)

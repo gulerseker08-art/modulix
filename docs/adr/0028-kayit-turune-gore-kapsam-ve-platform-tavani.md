@@ -92,6 +92,27 @@ Kapsam dışı: alan seviyesi yetki (Y8b), kayıt bazlı paylaşım, koşullu/if
 
 Her dilim ayrı PR'dır; her biri bu belgenin bölüm 6'sındaki ilgili testlerle teslim edilir.
 
+### Dilim 1 sonucu (uygulandı; davranış değişmedi)
+
+`IDataScopeService.GetOwnersAsync(tenant, entityKey, ct)` ve `IRecordAccess.GetOwnersAsync(entityKey, ct)`; türsüz sürüm kaldırıldı. `MembershipDataScope` anahtarı doğrular (boşsa hata) ama sonucu hâlâ üyelik başına tek hesaptır. Mimari test (`RecordScopeRulesTests`) türsüz çağrıyı yasaklar. Çağrı noktalarında kullanılan tür:
+
+| Çağrı noktası | Tür |
+|---|---|
+| Kayıt boru hattı (liste, tek kayıt) | `store.EntityKey` |
+| CRM firma, kişi, fırsat, aktivite, teklif, lead erişim denetimleri | kendi türü (`crm.company`, `crm.contact`, `crm.opportunity`, `crm.activity`, `crm.quote`, `crm.lead`) |
+| Lead kaydı, bağlanan firma ve kişi doğrulaması | firma için `crm.company`, kişi için `crm.contact` (iki ayrı küme) |
+| Ortak kayıt görünürlüğü (`CrmSharedRecordVisibility`) | ortak türün karşılığı: firma `crm.company`, kişi `crm.contact` |
+| Satış görünümü ve tahmin iş akışı | `crm.opportunity` |
+| Segment motoru | hedefin türü (firma `crm.company`, kişi `crm.contact`, lead `crm.lead`); açık karar 3 |
+| Sözleşme, sipariş, destek bağlantı hedefleri ve alt kayıtları | `contracts.contract`, `orders.order`, `support.ticket` |
+| Üye lookup'ı | lookup tanımının `SourceEntityKey`'i |
+| `GET /api/tenant/members?assignable=true` | `entityKey` sorgu parametresi zorunlu (yoksa 400) |
+
+Dilim 2'ye bırakılanlar (dilim 1'de sonuç değişmediği için güvenli, ama türe özel kapsam gelince yanlış sonuç verebilir):
+
+- **Alt kayıt türleri.** Boru hattı alt kayıt deposu için kendi anahtarını sorar (ör. aktivite notu, fırsat iletişimcisi); ana kaydın kapsamını izlemesi gerekir. Dilim 2 alt türleri ana türe eşleyen bir kural (ör. `IRecordStore` üzerinde kapsam türü) ister.
+- **Arayüzdeki atanabilir üye listesi** (`CrmLookups`) CRM genelinde tek listedir ve `crm.opportunity` ile sorulur; form türüne göre ayrı istenmelidir (dilim 3).
+
 ## 6. Test planı (dört test ilkesi)
 
 - **Mutlu yol:** aynı rol firmada `All`, fırsatta `Unit` istisnasıyla kişiyi doğru kümelerle görür; tavan `Unit` iken `Unit` istisnası kaydedilir; liste, sayfalama ve toplam doğru kalır.
@@ -106,7 +127,7 @@ Entegrasyon testleri SQL Server ister; veritabanı yoksa çalıştırılamadığ
 
 1. **Yönetici muafiyeti (K6).** Öneri: muaf. Alternatif: tavan yöneticiyi de bağlar; bu durumda tenant'ın kendi yöneticisi bazı türleri göremez ve kilitlenme/kurtarma yolu (platform tavanı gevşetir) gerekir.
 2. **Tavanın biçimi (K4).** Öneri: tek değer + `Covers`. Sonuç: tavan "Ekip" ise departman verilemez. Alternatif: tür başına izinli kapsamlar kümesi (esnek ama ekran ve doğrulama daha karmaşık).
-3. **Rapor/özet sorguları.** Bazı çağrı noktaları (ör. satış görünümü, tahmin, segment motoru) tek sahip kümesiyle birden çok türü süzüyor olabilir. Dilim 1'de her çağrının hangi tür için kullanıldığı belirlenir; belirsiz olan en dar kapsamı alır ve burada listelenir. Henüz incelenmedi.
+3. **Rapor/özet sorguları.** Bazı çağrı noktaları tek sahip kümesiyle birden çok türü süzüyor. Dilim 1'de incelendi (bölüm 5, "Dilim 1 sonucu"): satış görünümü ve tahmin yalnızca fırsatı süzer (tek tür, sorun yok); segment motoru tek sahip kümesini firma, kişi, lead ve "kazanılan fırsat" koşullarına birlikte uygular. Dilim 1'de segment için hedef türün kapsamı alınır; "kazanılan fırsat" koşulu fırsat türünün kapsamıyla değerlendirilmez. Dilim 2'de karar gerekir: koşulu türüne göre ayrı kapsamla değerlendirmek (doğru, kaynak başına ayrı küme) ya da hedef türle sınırlamak.
 
 ## 8. Sonraki işler (bu kararın dışında)
 
@@ -116,7 +137,7 @@ Entegrasyon testleri SQL Server ister; veritabanı yoksa çalıştırılamadığ
 
 ## 9. Doğrulanmadı
 
-- 20 modül çağrısının her birinin hangi kayıt türü anahtarıyla taşınacağı (özellikle `CrmSharedRecordVisibility`, rapor ve segment çağrıları).
+- ~~Modül çağrılarının tür anahtarları~~ dilim 1'de belirlendi (bölüm 5); segment motorunun çok türlü koşulları açık karar 3'te kalır.
 - `tenant-export` ve `tenant-delete` komutlarının yeni platform tablosunu (`ModuleEntitlements` gibi) kapsayıp kapsamadığı; kapsamıyorsa dilim 2 ekler.
 - Web tarafındaki `SessionState` kapsam gösterimlerinin tür bazında değişmesi gerekip gerekmediği (şu an tek `Scope` görüntüsü gösteriliyor).
 - Performans etkisi ölçülmedi; vaat edilmez. Beklenti: rol yükleme aynı kalır, yalnızca bir küçük istisna sorgusu eklenir.

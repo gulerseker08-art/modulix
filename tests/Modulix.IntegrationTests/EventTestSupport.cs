@@ -111,7 +111,7 @@ public abstract class ProbeSubscriber(
     {
         var access = services.GetRequiredService<ICurrentAccess>();
         var tenant = services.GetRequiredService<Modulix.Core.Contracts.Tenancy.ITenantContextAccessor>().Current!;
-        var owners = await services.GetRequiredService<IDataScopeService>().GetOwnersAsync(tenant, cancellationToken);
+        var owners = await services.GetRequiredService<IDataScopeService>().GetOwnersAsync(tenant, envelope.EntityKey, cancellationToken);
 
         // RLS: sorgu filtresi kapalıyken bile yalnızca olayın tenant'ının satırları görünür.
         var visible = await services.GetRequiredService<ModulixDbContext>().AuditLog.IgnoreQueryFilters()
