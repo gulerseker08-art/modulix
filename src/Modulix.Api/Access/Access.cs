@@ -246,9 +246,10 @@ public static class AccessEndpoints
         }
     }
 
-    private static async Task<IResult> GetMembershipRolesAsync(Guid membershipId, IRoleService roles, CancellationToken ct)
+    private static async Task<IResult> GetMembershipRolesAsync(Guid membershipId, IRoleService roles, IMembershipScope scope, CancellationToken ct)
     {
-        var assigned = await roles.GetMembershipRolesAsync(membershipId, ct);
+        // Kapsam dışı üyelik (başka bayinin kullanıcısı) başka tenant'ınki gibi "bulunamadı" döner (ADR-0026).
+        var assigned = await scope.CanManageAsync(membershipId, ct) ? await roles.GetMembershipRolesAsync(membershipId, ct) : null;
         return assigned is null ? MembershipNotFound() : Results.Ok(assigned.Select(ToDto).ToList());
     }
 

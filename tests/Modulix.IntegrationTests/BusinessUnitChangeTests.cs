@@ -174,7 +174,8 @@ public class BusinessUnitChangeTests(ModulixApiFactory factory) : IClassFixture<
 
         // Yalnızca kendi departmanı: başka departmana, başka departmandaki kullanıcıya ve alt departmana yetkisi yok.
         Assert.Equal(HttpStatusCode.Forbidden, (await Put(unitManager, a2, new SetMembershipBusinessUnitRequest(t.UnitB.Id))).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await Put(unitManager, b1, new SetMembershipBusinessUnitRequest(t.UnitA.Id))).StatusCode);
+        // Başka bayinin kullanıcısı kapsam dışındadır: yok sayılır (404), yetki hatası bile belli etmez.
+        Assert.Equal(HttpStatusCode.NotFound, (await Put(unitManager, b1, new SetMembershipBusinessUnitRequest(t.UnitA.Id))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await Put(unitManager, a2, new SetMembershipBusinessUnitRequest(child.Id))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,
             (await unitManager.GetAsync($"/api/users/{a2}/business-unit/change-preview?businessUnitId={t.UnitB.Id}")).StatusCode);
