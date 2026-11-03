@@ -52,7 +52,7 @@
                         <td data-label="Ad" class="primary"><a href="crm/firmalar/@company.Id">@company.Name</a></td>
                         <td data-label="Durum"><span class="badge status-@Lookups.Badge(CrmLists.CompanyStatus, company.Status)">@Lookups.Label(CrmLists.CompanyStatus, company.Status)</span></td>
                         <td data-label="Şehir">@company.City</td>
-                        <td data-label="Sorumlu">@Lookups.MemberName(company.OwnerId)</td>
+                        <td data-label="Sorumlu"><OwnerCell Name="@Lookups.MemberName(company.OwnerId)" /></td>
                         <td data-label="Telefon">@company.Phone</td>
                         @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Company))
                         {
@@ -68,7 +68,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -116,7 +116,7 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var url = $"{Url}?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
         if (status is { } s)
         {
             url += $"&status={Uri.EscapeDataString(s)}";

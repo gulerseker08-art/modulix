@@ -97,7 +97,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -138,7 +138,7 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var url = $"/api/users?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        var url = $"/api/users?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
         if (status is { } s)
         {
             url += $"&status={s}";

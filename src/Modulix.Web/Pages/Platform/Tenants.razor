@@ -8,10 +8,6 @@
 
     <div class="page-header">
         <h1>Firmalar</h1>
-        @if (!creating && modules is not null)
-        {
-            <button type="button" class="btn btn-primary" @onclick="() => creating = true">Firma aç</button>
-        }
     </div>
 
     @if (notice is not null)
@@ -29,18 +25,18 @@
         <CreateTenantForm Modules="modules" Profiles="profiles" Created="CreatedAsync" Cancelled="() => creating = false" />
     }
 
-    <div class="filters" role="group" aria-label="Durum">
-        <button type="button" class="chip @(status is null ? "active" : null)" @onclick="() => FilterAsync(null)">Tümü</button>
-        @foreach (var value in Enum.GetValues<TenantState>())
+    <div class="list-toolbar">
+        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status?.ToString() ?? "all")" ValueChanged="ChooseStatusAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Firma ara" placeholder="Ad veya kısa ad ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <ColumnPicker />
+        @if (!creating && modules is not null)
         {
-            <button type="button" class="chip @(status == value ? "active" : null)" @onclick="() => FilterAsync(value)">@TenantStateText.Of(value)</button>
+            <button type="button" class="btn btn-primary" @onclick="() => creating = true"><AppIcon Name="plus" Size="16" /> Firma aç</button>
         }
     </div>
-
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Ad veya kısa ad ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
 
     @if (page is null)
     {
@@ -83,7 +79,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </PlatformGate>
 
@@ -108,6 +104,11 @@
         }
     }
 
+    private IReadOnlyList<ViewOption> StatusOptions =>
+        [new("all", "Tüm firmalar"), .. Enum.GetValues<TenantState>().Select(v => new ViewOption(v.ToString(), TenantStateText.Of(v)))];
+
+    private Task ChooseStatusAsync(string key) => FilterAsync(key == "all" ? null : Enum.Parse<TenantState>(key));
+
     private async Task FilterAsync(TenantState? value)
     {
         status = value;
@@ -116,7 +117,7 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var url = $"/api/platform/tenants?page={pageNumber}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        var url = $"/api/platform/tenants?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
         if (status is { } s)
         {
             url += $"&status={s}";

@@ -94,7 +94,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -118,7 +118,7 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var result = await Api.GetAsync<CrmPage<MeasureUnitDto>>($"{Url}?page={pageNumber}");
+        var result = await Api.GetAsync<CrmPage<MeasureUnitDto>>($"{Url}?page={pageNumber}&pageSize={ListPaging.Size}");
         page = result.Value;
         message = result.Error;
     }

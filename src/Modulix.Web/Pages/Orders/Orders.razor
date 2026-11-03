@@ -69,8 +69,8 @@
             <caption class="visually-hidden">Sipariş listesi</caption>
             <thead>
                 <tr>
-                    <th scope="col">Sipariş</th><th scope="col">Müşteri</th><th scope="col">Teklif</th><th scope="col">Durumlar</th>
-                    <th scope="col">Planlanan teslim</th><th scope="col" class="text-end">Tutar</th><th scope="col">Sorumlu</th>
+                    <th scope="col"><SortHeader Label="Sipariş" Asc="number" Desc="-number" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Müşteri</th><th scope="col">Teklif</th><th scope="col">Durumlar</th>
+                    <th scope="col"><SortHeader Label="Planlanan teslim" Asc="deliveryDate" Desc="-deliveryDate" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col" class="text-end">Tutar</th><th scope="col">Sorumlu</th>
                 </tr>
             </thead>
             <tbody>
@@ -95,7 +95,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -123,6 +123,12 @@
     private string? view;
     private string? status;
     private string sort = DefaultSort;
+
+    private Task SortAsync(string key)
+    {
+        sort = key;
+        return LoadAsync(1);
+    }
     private string search = string.Empty;
 
     protected override async Task OnInitializedAsync()
@@ -149,7 +155,7 @@
 
     private string Query(int pageNumber)
     {
-        var parts = new List<string> { $"page={pageNumber}" };
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
         switch (view)
         {

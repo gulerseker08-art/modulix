@@ -121,8 +121,8 @@
             <caption class="visually-hidden">Sözleşme listesi</caption>
             <thead>
                 <tr>
-                    <th scope="col">Sözleşme</th><th scope="col">Müşteri</th><th scope="col">Tür</th><th scope="col">Durumlar</th>
-                    <th scope="col">Başlangıç / Bitiş</th><th scope="col">Kritik tarih</th><th scope="col" class="text-end">Toplam</th><th scope="col">Sorumlu</th>
+                    <th scope="col"><SortHeader Label="Sözleşme" Asc="title" Desc="-title" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Müşteri</th><th scope="col">Tür</th><th scope="col">Durumlar</th>
+                    <th scope="col"><SortHeader Label="Başlangıç / Bitiş" Asc="endDate" Desc="-endDate" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col"><SortHeader Label="Kritik tarih" Asc="noticeDeadline" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col" class="text-end">Toplam</th><th scope="col">Sorumlu</th>
                 </tr>
             </thead>
             <tbody>
@@ -143,12 +143,12 @@
                         <td data-label="Başlangıç / Bitiş">@ContractLabels.Date(c.StartDate) – @(c.IsIndefinite ? "Belirsiz süreli" : ContractLabels.Date(c.EndDate))</td>
                         <td data-label="Kritik tarih">@Critical(c)</td>
                         <td data-label="Toplam" class="text-end">@ContractLabels.Money(c.GrossTotal, c.Currency)</td>
-                        <td data-label="Sorumlu">@Lookups.MemberName(c.OwnerId)</td>
+                        <td data-label="Sorumlu"><OwnerCell Name="@Lookups.MemberName(c.OwnerId)" /></td>
                     </tr>
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -170,6 +170,12 @@
     private string? approval;
     private string? preparation;
     private string sort = DefaultSort;
+
+    private Task SortAsync(string key)
+    {
+        sort = key;
+        return LoadAsync(1);
+    }
     private string search = string.Empty;
     private readonly Dictionary<Guid, string> partyNames = [];
 
@@ -249,7 +255,7 @@
     private string Query(int? pageNumber)
     {
         var parts = new List<string>();
-        if (pageNumber is { } n) { parts.Add($"page={n}"); }
+        if (pageNumber is { } n) { parts.Add($"page={n}&pageSize={ListPaging.Size}"); }
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
         parts.AddRange(Filters().Select(f => $"{f.Key}={Uri.EscapeDataString(f.Value)}"));
         return string.Join('&', parts);
