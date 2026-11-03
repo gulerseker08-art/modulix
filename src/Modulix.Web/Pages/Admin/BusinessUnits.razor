@@ -28,6 +28,7 @@
     {
         <form class="record-form settings-group" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
             <h2>Yeni departman</h2>
+            <FormTabs Title="Departman bilgileri" Label="Departman formu bölümleri">
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="unit-parent">Üst departman *</label>
@@ -60,6 +61,7 @@
                     <FieldError Field="kind" Errors="errors" />
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name) || parentId == Guid.Empty)">Departman ekle</button>
             </div>

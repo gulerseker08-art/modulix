@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Marketing;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
@@ -304,8 +305,22 @@ public sealed class MarketingModule : IModule
         new(SharedEntities.Person, Permissions.RecipientsRead),
     ];
 
+    /// <summary>
+    /// Sistem kimliği (oturumsuz çağıran, dilim 10): gönderim işçisi bu kimlikle, kendi tenant kapsamında ve yalnızca bildirilen izinlerle çalışır. Onay ve başlatma
+    /// izinleri yoktur: işçi çalıştırmayı başlatmaz, onaylamaz; yalnızca bir kullanıcının zaten başlattığı çalıştırmanın sıradaki satırlarını gönderir.
+    /// </summary>
+    IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
+    [
+        EventSubscription.For<MarketingSenderAnchor>(
+            "marketing.sender",
+            [DomainEventTypes.RecordDeleted],
+            [Entities.CampaignRun],
+            [Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsSend, Permissions.RecipientsRead]),
+    ];
+
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<MarketingSenderAnchor>();
         services.AddScoped<MarketingStoreContext>();
         services.AddScoped<SegmentWorkflowGate>();
         services.AddScoped<IRecordStore, SegmentRecordStore>();
@@ -323,6 +338,7 @@ public sealed class MarketingModule : IModule
         services.AddScoped<IRecordStore, CampaignRunRecordStore>();
         services.AddScoped<DeliveryJournal>();
         services.AddScoped<ICampaignRuns, CampaignRuns>();
+        services.AddScoped<ICampaignTestSends, CampaignTestSends>();
         services.AddScoped<IRecordStore, CampaignResponseRecordStore>();
         services.AddScoped<ICampaignResponses, CampaignResponses>();
         services.AddScoped<ICampaignReports, CampaignReports>();

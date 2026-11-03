@@ -32,7 +32,8 @@ public class FormLayoutTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         var initial = await LayoutAsync(rep, Company);
         Assert.False(initial.Customized);
         Assert.Equal(0, initial.Version);
-        Assert.Equal(["genel"], initial.Tabs.Select(t => t.Key));
+        // Her kayıt formu sekmelidir: firma varsayılanı Genel / İletişim / Notlar sekmeleridir.
+        Assert.Equal(["genel", "iletisim", "notlar"], initial.Tabs.Select(t => t.Key));
         Assert.Contains(initial.Sections, s => s.Key == "temel");
         var name = initial.Fields.Single(f => f.Key == "name");
         Assert.True(name.Required && name.Fixed && name.Visible);
@@ -56,7 +57,7 @@ public class FormLayoutTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         var saved = await PutAsync(admin, Company, request);
         Assert.True(saved.Customized);
         Assert.Equal(1, saved.Version);
-        Assert.Equal(["genel", "finans"], saved.Tabs.Select(t => t.Key));
+        Assert.Equal(["genel", "iletisim", "notlar", "finans"], saved.Tabs.Select(t => t.Key));
         Assert.Equal("finans", saved.Sections.Single(s => s.Key == "finans-bilgi").Tab);
         var taxNumber = saved.Fields.Single(f => f.Key == "taxNumber");
         Assert.Equal(("finans-bilgi", 4), (taxNumber.Section, taxNumber.Span));
@@ -84,7 +85,7 @@ public class FormLayoutTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         var back = (await reset.Content.ReadFromJsonAsync<FormLayoutDto>())!;
         Assert.False(back.Customized);
         Assert.Equal(2, back.Version);
-        Assert.Equal(["genel"], back.Tabs.Select(t => t.Key));
+        Assert.Equal(["genel", "iletisim", "notlar"], back.Tabs.Select(t => t.Key));
     }
 
     [Fact]

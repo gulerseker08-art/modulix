@@ -33,7 +33,7 @@ public class ContractFormTests(ModulixApiFactory factory) : IClassFixture<Moduli
         using var adminB = await LoginAsync(b.Admin);
 
         var layout = await LayoutAsync(adminA);
-        Assert.Equal(["genel"], layout.Tabs.Select(t => t.Key));
+        Assert.Equal(["genel", "sure", "aciklama"], layout.Tabs.Select(t => t.Key));
         Assert.Contains(layout.Fields, f => f is { Key: "title", Fixed: true, Required: true });
         Assert.Contains(layout.Fields, f => f is { Key: "paymentTerms", Required: false, Fixed: false });
 

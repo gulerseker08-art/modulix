@@ -36,6 +36,7 @@
                 <div class="alert alert-danger" role="alert">@formMessage</div>
             }
 
+            <FormTabs Title="Hedef bilgileri" Label="Satış hedefi formu bölümleri">
             @if (form.Id is null)
             {
                 <fieldset class="mb-3">
@@ -125,6 +126,7 @@
                     <FieldError Field="note" Errors="errors" />
                 </div>
             </div>
+            </FormTabs>
 
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">

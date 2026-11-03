@@ -16,10 +16,6 @@
             {
                 <a class="btn btn-outline-secondary" href="api/support/tickets/export?@Query(1)" download="talepler.csv">CSV dışa aktar</a>
             }
-            @if (Session.Can(SupportAccess.TicketsCreate))
-            {
-                <a class="btn btn-primary" href="destek/talepler/yeni">Yeni talep</a>
-            }
         </div>
     </div>
 
@@ -33,14 +29,19 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
-    <div class="filters" role="group" aria-label="Hızlı görünümler">
-        @foreach (var preset in Presets)
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@(view ?? AllViews)" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="ticket-search">Talep ara</label>
+            <input id="ticket-search" class="form-control" type="search" placeholder="Konu, talep numarası veya başvuran ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        @if (Session.Can(SupportAccess.TicketsCreate))
         {
-            <button type="button" class="chip @(view == preset.Key ? "active" : null)" aria-pressed="@(view == preset.Key ? "true" : "false")" @onclick="() => TogglePresetAsync(preset.Key)">
-                @preset.Label@(Count(preset.Key) is { } n ? $" ({n})" : null)
-            </button>
+            <a class="btn btn-primary" href="destek/talepler/yeni"><AppIcon Name="plus" Size="16" /> Yeni talep</a>
         }
     </div>
+
     <div class="filters">
         <label class="visually-hidden" for="status-filter">Durum</label>
         <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
@@ -74,12 +75,6 @@
             }
         </select>
     </div>
-
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="ticket-search">Talep ara</label>
-        <input id="ticket-search" class="form-control" type="search" placeholder="Konu, talep numarası veya başvuran ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
 
     @if (page is null && message is null)
     {
@@ -262,9 +257,18 @@
         _ => null,
     };
 
-    private async Task TogglePresetAsync(string key)
+    private const string AllViews = "all";
+
+    // Her hızlı görünümün yanında özet sayısı gösterilir (varsa).
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm talepler"),
+        .. Presets.Select(p => new ViewOption(p.Key, p.Label + (Count(p.Key) is { } n ? $" ({n})" : null))),
+    ];
+
+    private async Task ChooseViewAsync(string key)
     {
-        view = view == key ? null : key;
+        view = key == AllViews ? null : key;
         await LoadAsync(1);
     }
 

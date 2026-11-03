@@ -62,6 +62,46 @@ internal sealed class SalesPlanningData(IModuleData data)
     public async Task<List<ForecastAdjustment>> AdjustmentsAsync(Guid submissionId, CancellationToken cancellationToken) =>
         await data.Set<ForecastAdjustment>().AsNoTracking().Where(a => a.SubmissionId == submissionId).OrderBy(a => a.CreatedAt).ToListAsync(cancellationToken);
 
+    // ---- Fırsat tarihçesi (aşama akışı, döngü süresi, veri kalitesi)
+
+    /// <summary>Oluşturulma anı [from, toExclusive) içinde olan fırsatların <c>Created</c> kayıtları.</summary>
+    public async Task<List<OpportunityHistory>> CreatedEventsAsync(DateTimeOffset from, DateTimeOffset toExclusive, CancellationToken cancellationToken) =>
+        await data.Set<OpportunityHistory>().AsNoTracking()
+            .Where(h => h.Kind == OpportunityHistoryKinds.Created && h.At >= from && h.At < toExclusive).ToListAsync(cancellationToken);
+
+    /// <summary>Verilen fırsatların tüm tarihçe kayıtları (zaman sırasıyla).</summary>
+    public async Task<Dictionary<Guid, List<OpportunityHistory>>> HistoryAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<Guid, List<OpportunityHistory>>();
+        foreach (var chunk in ids.Distinct().Chunk(1000))
+        {
+            var rows = await data.Set<OpportunityHistory>().AsNoTracking().Where(h => chunk.Contains(h.OpportunityId))
+                .OrderBy(h => h.At).ThenBy(h => h.Id).ToListAsync(cancellationToken);
+            foreach (var group in rows.GroupBy(h => h.OpportunityId))
+            {
+                result[group.Key] = [.. group];
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>Tarihçe kaydı olan fırsatların kimlikleri (olmayanlar izleme başlamadan önce açılmıştır).</summary>
+    public async Task<HashSet<Guid>> IdsWithHistoryAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
+    {
+        var result = new HashSet<Guid>();
+        foreach (var chunk in ids.Distinct().Chunk(1000))
+        {
+            result.UnionWith(await data.Set<OpportunityHistory>().AsNoTracking().Where(h => chunk.Contains(h.OpportunityId)).Select(h => h.OpportunityId).Distinct().ToListAsync(cancellationToken));
+        }
+
+        return result;
+    }
+
+    /// <summary>Tarihçe izlemesinin başladığı an (en eski <c>Created</c> kaydı); hiç kayıt yoksa null.</summary>
+    public async Task<DateTimeOffset?> TrackingStartAsync(CancellationToken cancellationToken) =>
+        await data.Set<OpportunityHistory>().AsNoTracking().Where(h => h.Kind == OpportunityHistoryKinds.Created).MinAsync(h => (DateTimeOffset?)h.At, cancellationToken);
+
     // ---- Yazma (yalnızca kapı etkisi içinde)
 
     public async Task<List<ForecastItem>> TrackedItemsAsync(Guid submissionId, CancellationToken cancellationToken) =>

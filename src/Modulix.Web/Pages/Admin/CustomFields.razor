@@ -37,6 +37,7 @@
         {
             <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
                 <h2>@(form.Id is null ? "Yeni alan" : "Alanı düzenle")</h2>
+                <FormTabs Title="Alan bilgileri" Label="Özel alan formu bölümleri">
                 <div class="form-grid">
                     <div>
                         <label class="form-label" for="fieldLabel">Alan adı *</label>
@@ -96,6 +97,7 @@
                         </fieldset>
                     }
                 </div>
+                </FormTabs>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(form.Label))">
                         @(form.Id is null ? "Alanı ekle" : "Kaydet")

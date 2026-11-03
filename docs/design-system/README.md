@@ -26,12 +26,16 @@ Modulix'in bütün modülleri tek bir ürün ailesi gibi görünmelidir. Bu klas
 4. **Logo metnini elle yazma.** Logo yalnızca `BrandLogo` bileşeninden gelir. Ürün adı her yerde **Modulix** yazılır (M büyük, diğerleri küçük, `ü` yok).
 5. **Formlar bölüm kartlarıyla kurulur**: `record-form sectioned` + `form-toolbar` (İptal / Kaydet), `FormSection` kartları (ikon + başlık), 12 kolonlu `form-grid` (`span-3/4/6/8/12`), `form-label`, `form-control`/`form-select`, `input-icon`, `FieldError`, `form-actions`. Ayrıntı: `form-standards.md`.
 6. **Liste ekranları `record-table`** kullanır; telefonda kart listesine dönüşmesi için hücrelere `data-label` verilir.
-7. **Erişilebilirlik**: her ikon düğmesinde erişilebilir ad (`aria-label`, `title` ya da `visually-hidden` metin); durum yalnızca renkle anlatılmaz (metin, ikon ya da çizgi eşlik eder).
+7. **Yazı tipi Manrope, düğmeler ve gridler seçenek 4'e göredir** (3.11.2026 kararı; bütün modüller): birincil `btn-primary` (degrade + parlama, ekranda en çok bir), ikincil `btn-outline-secondary`, üçüncül `btn-tonal`, araç çubuğu `btn-ghost`; liste ekranı araç çubuğu (`list-toolbar`) = `ViewSelector` ("Görünüm: … ▾") + arama + birincil eylem (Filtrele/Sütunlar özellikleri gelince eklenir); `record-table` büyük harf başlıklı kart. Ayrıntı: `theme-tokens.md`, `component-catalog.md`.
+8. **Her kayıt formu sekmelidir** (`LayoutForm` + `TabBar`; tek sekmeli form da sekme çubuğuyla çizilir). Sekmeler `FormSection` kartlarını gruplar; sekmeler arası girdi kaybolmaz; alan yerleşimi metadata'dandır (ADR-0021).
+9. **Erişilebilirlik**: her ikon düğmesinde erişilebilir ad (`aria-label`, `title` ya da `visually-hidden` metin); durum yalnızca renkle anlatılmaz (metin, ikon ya da çizgi eşlik eder).
 
 ## Marka
 
-- Logo: `Components/BrandLogo.razor`. İşaret `wwwroot/img/modulix-mark.svg` dosyasıdır (referans logo): iki çapraz, uçları eğik kesilmiş şeritten oluşan "X"; sol yarı lacivert, "/" şeridi sağ üstte turkuaza, "\\" şeridi sağ altta maviye geçer. Koyu temada `modulix-mark-dark.svg` (lacivert yarısı açık çelik mavi) görünür; `favicon.png` ve `icon-192.png` aynı geometriden üretilir. Yazı "Moduli" + turkuaz "x" (Inter 800); slogan **MODÜLER İŞİN GÜCÜ** (`ShowTagline="false"` ile gizlenir; daraltılmış menüde ve çok dar ekranda kendiliğinden gizlenir).
-- Favicon `favicon.png` ve `img/modulix-mark.svg`; `index.html` `theme-color` değeri `--mx-brand-navy` ile aynıdır.
+- Logo: `Components/BrandLogo.razor`. Onaylı logo görselidir (işaret + "Modulix" yazısı + "İŞİN YENİ ZEKÂSI." sloganı); kaynak `docs/design-system/assets/modulix-logo-source.png`. Türetilmiş varlıklar `wwwroot/img/` altındadır (şeffaf arka plan): `modulix-logo.png` (sloganlı), `modulix-logo-wordmark.png` (sloganlı olmayan; üst çubuk için), `modulix-mark.png` (yalnızca işaret) ve her birinin `-dark` sürümü (koyu tema: yazı açık tona, işaretin lacivert yarısı açık çelik maviye çekilir). `favicon.png` (64px) ve `icon-192.png` aynı işaretten üretilir.
+- Varlıkları yeniden üretmek için: `python3 scripts/make-logo-assets.py` (pillow + numpy gerekir). Logo değişirse yalnızca kaynak görsel güncellenip betik çalıştırılır.
+- `BrandLogo` parametreleri: `Size` (px yükseklik, varsayılan 36), `ShowTagline` (varsayılan kapalı; slogan küçük boyutta okunmaz, büyük alanlarda `ShowTagline="true"` ve daha büyük `Size` ver). Açık/koyu tema ve daraltılmış menüde yalnızca işaret gösterimini CSS seçer (`data-theme`, `sidebar-collapsed`). Logo metni başka yerde elle yazılmaz.
+- Favicon `favicon.png`; `index.html` `theme-color` değeri `--mx-brand-navy` ile aynıdır.
 
 ## Tema
 

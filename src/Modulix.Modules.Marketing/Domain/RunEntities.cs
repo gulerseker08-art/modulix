@@ -143,3 +143,30 @@ public sealed class CampaignDelivery : IJournalEntity, ICompanyShared
 
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
+
+/// <summary>
+/// Test gönderimi izi (günlük, ADR-0025 dilim 11): kimin, hangi içerik sürümünü kendi adresine denediği. Adres saklanmaz; yalnızca sonuç ve kod tutulur.
+/// Kampanyaya yabancı anahtar yoktur: test izi kampanyanın silinmesini engellemez.
+/// </summary>
+public sealed class CampaignTestSend : IJournalEntity, ICompanyShared
+{
+    public const int OutcomeMaxLength = 20;
+    public const int CodeMaxLength = 60;
+
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+
+    public Guid TenantId { get; private set; }
+
+    public Guid CampaignId { get; set; }
+
+    public Guid ContentId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    /// <summary>Sağlayıcı sonucu (<see cref="Modulix.Core.Contracts.Marketing.ProviderOutcome"/> adı).</summary>
+    public string Outcome { get; set; } = string.Empty;
+
+    public string? Code { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}

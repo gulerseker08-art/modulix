@@ -11,12 +11,6 @@
             <h1>Siparişler</h1>
             <p class="text-muted mb-0">Siparişler kabul edilmiş tekliften oluşur. Tutarlar her siparişin kendi para birimindedir; farklı para birimleri toplanmaz. Sipariş tutarı tahsilat ya da gelir değildir.</p>
         </div>
-        @if (Session.Can(OrdersAccess.OrdersCreate))
-        {
-            <div class="header-actions">
-                <a class="btn btn-primary" href="crm/teklifler">Teklif seç</a>
-            </div>
-        }
     </div>
 
     @if (message is not null)
@@ -24,11 +18,20 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
-    <div class="filters" role="group" aria-label="Hızlı görünümler">
-        @foreach (var (key, label) in Presets)
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@(view ?? AllViews)" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="order-search">Sipariş ara</label>
+            <input id="order-search" class="form-control" type="search" placeholder="Başlık, sipariş no, teklif no veya müşteri ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        @if (Session.Can(OrdersAccess.OrdersCreate))
         {
-            <button type="button" class="chip @(view == key ? "active" : null)" aria-pressed="@(view == key ? "true" : "false")" @onclick="() => TogglePresetAsync(key)">@label</button>
+            <a class="btn btn-primary" href="crm/teklifler"><AppIcon Name="plus" Size="16" /> Teklif seç</a>
         }
+    </div>
+
+    <div class="filters">
         <label class="visually-hidden" for="status-filter">Sipariş durumu</label>
         <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
             <option value="">Tüm durumlar</option>
@@ -45,12 +48,6 @@
             }
         </select>
     </div>
-
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="order-search">Sipariş ara</label>
-        <input id="order-search" class="form-control" type="search" placeholder="Başlık, sipariş no, teklif no veya müşteri ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
 
     @if (page is null && message is null)
     {
@@ -130,9 +127,13 @@
         }
     }
 
-    private async Task TogglePresetAsync(string key)
+    private const string AllViews = "all";
+
+    private IReadOnlyList<ViewOption> ViewOptions => [new(AllViews, "Tüm siparişler"), .. Presets.Select(p => new ViewOption(p.Key, p.Label))];
+
+    private async Task ChooseViewAsync(string key)
     {
-        view = view == key ? null : key;
+        view = key == AllViews ? null : key;
         await LoadAsync(1);
     }
 

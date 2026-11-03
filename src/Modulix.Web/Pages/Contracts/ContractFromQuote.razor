@@ -48,9 +48,10 @@
         </section>
 
         <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+            <TabBar Tabs="FormTabs" State="tabs" Label="Sözleşme formu bölümleri" />
             <fieldset disabled="@(busy || !preview.CustomerLinked)">
                 <legend class="visually-hidden">Sözleşmeye alınacak kalemler ve seçenekler</legend>
-                <h2>Kapsam</h2>
+                <TabPanel State="tabs" Key="form-kapsam">
                 <p class="text-muted">Bir tekliften birden çok sözleşme açılabilir: yalnızca bu sözleşmeye alınacak kalemleri seçin. Başka bir sözleşmede olan kalem ikinci kez alınamaz.</p>
                 <table class="table record-table">
                     <caption class="visually-hidden">Teklif kalemleri</caption>
@@ -77,8 +78,8 @@
                     </tbody>
                 </table>
                 <FieldError Field="lineKeys" Errors="errors" />
-
-                <h2>Süre ve yenileme</h2>
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-sure">
                 <div class="form-grid">
                     <div class="span-4">
                         <label class="form-label" for="f-type">Tür</label>
@@ -115,6 +116,7 @@
                         <FieldError Field="noticePeriodDays" Errors="errors" />
                     </div>
                 </div>
+                </TabPanel>
             </fieldset>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@(busy || !preview.CustomerLinked || selected.Count == 0)">Sözleşme taslağını oluştur</button>
@@ -129,6 +131,17 @@
     private QuoteSourceDto? preview;
     private readonly HashSet<Guid> selected = [];
     private IReadOnlyDictionary<string, string[]>? errors;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
+    private readonly TabState tabs = new("form-kapsam");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs =>
+    [
+        new("form-kapsam", "Kapsam", Errors: ErrorCount("lineKeys")),
+        new("form-sure", "Süre ve yenileme", Errors: ErrorCount("type", "startDate", "termMonths", "renewalMode", "renewalPeriodMonths", "noticePeriodDays")),
+    ];
     private string? message;
     private bool notFound;
     private bool busy;
@@ -181,6 +194,7 @@
         if (!result.IsSuccess)
         {
             errors = result.FieldErrors;
+            tabs.RevealFirstFailing(FormTabs);
             message = result.Error;
             return;
         }
