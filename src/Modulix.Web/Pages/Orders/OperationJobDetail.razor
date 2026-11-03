@@ -107,6 +107,7 @@
                     <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
                         <fieldset disabled="@busy">
                             <legend class="visually-hidden">İş bilgileri</legend>
+                            <FormTabs Title="İş bilgileri" Label="Operasyon işi formu bölümleri">
                             <div class="form-grid">
                                 <div class="span-12"><label class="form-label" for="e-title">Başlık</label><input id="e-title" class="form-control" maxlength="200" @bind="form.Title" /><FieldError Field="title" Errors="errors" /></div>
                                 <div class="span-4">
@@ -120,6 +121,7 @@
                                 <div class="span-12"><label class="form-label" for="e-location">Lokasyon</label><input id="e-location" class="form-control" maxlength="1000" @bind="form.Location" /></div>
                                 <div class="span-12"><label class="form-label" for="e-notes">Not</label><textarea id="e-notes" class="form-control" rows="2" maxlength="4000" @bind="form.Notes"></textarea></div>
                             </div>
+                            </FormTabs>
                         </fieldset>
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>

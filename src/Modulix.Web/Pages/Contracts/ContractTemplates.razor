@@ -85,6 +85,7 @@
             }
 
             <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <TabBar Tabs="FormTabs" State="tabs" Label="Şablon formu bölümleri" />
                 <fieldset disabled="@(!CanEditSelected || busy)">
                     <legend class="visually-hidden">Şablon bilgileri</legend>
                     @if (errors is { Count: > 0 })
@@ -94,6 +95,7 @@
                             <ul class="mb-0">@foreach (var (_, messages) in errors) { foreach (var text in messages) { <li>@text</li> } }</ul>
                         </div>
                     }
+                    <TabPanel State="tabs" Key="form-genel">
                     <div class="form-grid" @oninput="() => dirty = true" @onchange="() => dirty = true">
                         <div class="span-6">
                             <label class="form-label required" for="t-name">Ad</label>
@@ -127,6 +129,10 @@
                             <input id="t-example" type="checkbox" class="form-check-input" @bind="form.IsExample" />
                             <label class="form-check-label" for="t-example">Örnek metin (hukuki inceleme yapılmamış; üretilen her belgede açıkça işaretlenir)</label>
                         </div>
+                    </div>
+                    </TabPanel>
+                    <TabPanel State="tabs" Key="form-metin">
+                    <div class="form-grid" @oninput="() => dirty = true" @onchange="() => dirty = true">
                         <div class="span-12">
                             <label class="form-label required" for="t-body">Şablon metni</label>
                             <textarea id="t-body" class="form-control template-body" maxlength="20000" aria-required="true" aria-describedby="t-body-help" @bind="form.Body" @bind:event="oninput"></textarea>
@@ -136,8 +142,6 @@
                             <FieldError Field="body" Errors="errors" />
                         </div>
                     </div>
-                </fieldset>
-
                 <details class="variable-catalog">
                     <summary>Değişken kataloğu (@variables.Count)</summary>
                     <table class="table record-table">
@@ -161,6 +165,8 @@
                         </tbody>
                     </table>
                 </details>
+                    </TabPanel>
+                </fieldset>
 
                 <div class="form-actions">
                     @if (CanEditSelected)
@@ -254,6 +260,17 @@
     private ContractPreviewDto? preview;
     private Guid? previewContractId;
     private IReadOnlyDictionary<string, string[]>? errors;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
+    private readonly TabState tabs = new("form-genel");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs =>
+    [
+        new("form-genel", "Genel", Errors: ErrorCount("name", "contractType")),
+        new("form-metin", "Şablon metni", Errors: ErrorCount("body")),
+    ];
     private string? notice;
     private bool noticeFailed;
     private string? statusFilter;
@@ -303,6 +320,7 @@
         form = new TemplateForm { Language = "tr" };
         versions = [];
         preview = null;
+        tabs.Select("form-genel");
         errors = null;
         action = null;
         dirty = false;
@@ -329,6 +347,7 @@
         selected = template;
         form = TemplateForm.From(template);
         preview = null;
+        tabs.Select("form-genel");
         errors = null;
         action = null;
         dirty = false;
@@ -365,6 +384,7 @@
         if (!result.IsSuccess)
         {
             errors = result.FieldErrors;
+            tabs.RevealFirstFailing(FormTabs);
             Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Şablonu yeniden açıp tekrar deneyin." : result.Error, true);
             return;
         }

@@ -30,6 +30,7 @@
     {
         <form class="record-form" novalidate @onsubmit="SaveRuleAsync" @onsubmit:preventDefault>
             <h2>@(form.Id is null ? "Yeni kural" : "Kuralı düzenle")</h2>
+            <FormTabs Title="Kural bilgileri" Label="Onay kuralı formu bölümleri">
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="r-name">Ad *</label>
@@ -102,6 +103,7 @@
                     <textarea id="r-description" class="form-control" rows="2" maxlength="500" @bind="form.Description"></textarea>
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="CancelRule">Vazgeç</button>
@@ -118,6 +120,7 @@
         <form class="record-form" novalidate @onsubmit="SaveDelegationAsync" @onsubmit:preventDefault>
             <h2>@(delegationForm.Id is null ? "Yeni vekâlet" : "Vekâleti düzenle")</h2>
             <p class="text-muted">Vekil, vekâlet verenin yerine onay verebilir; onay iznine kendisi de sahip olmalıdır. Karar vekâleten işaretlenir ve geçmişte kalır.</p>
+            <FormTabs Title="Vekâlet bilgileri" Label="Onay vekâleti formu bölümleri">
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="fromUserId">Vekâlet veren *</label>
@@ -150,6 +153,7 @@
                     <input id="d-note" class="form-control" maxlength="300" @bind="delegationForm.Note" />
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="() => delegationForm = null">Vazgeç</button>

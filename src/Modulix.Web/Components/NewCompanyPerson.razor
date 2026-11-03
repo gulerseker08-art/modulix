@@ -11,6 +11,7 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
+    <FormTabs Title="Kişi bilgileri" Label="Yeni kişi formu bölümleri">
     <div class="form-grid">
         <div>
             <label class="form-label" for="np-first">Ad *</label>
@@ -59,6 +60,7 @@
             <label class="form-check-inline"><input type="checkbox" @bind="form.IsDecisionMaker" /> Karar verici</label>
         </div>
     </div>
+    </FormTabs>
     <small class="text-muted">Kişi diğer firmalarla da ilişkilendirilebilir; zaten kayıtlı bir kişiyse "Kişi ilişkilendir"i kullanın.</small>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary" disabled="@busy">Oluştur ve bağla</button>

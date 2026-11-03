@@ -39,6 +39,7 @@
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <h2>@(selected is null ? "Yeni form" : "Formu düzenle")</h2>
+            <FormTabs Title="Form bilgileri" Label="Lead formu bölümleri">
             <div class="form-grid">
                 <div class="span-all">
                     <label class="form-label" for="form-name">Ad *</label>
@@ -71,6 +72,7 @@
                     <label class="form-check-label" for="form-server">Yalnızca sunucudan (sırlı) gönderim</label>
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="() => editing = false">Vazgeç</button>
