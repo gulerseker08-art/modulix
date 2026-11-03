@@ -325,6 +325,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TenantId", "ExpiresAt");
+
                     b.HasIndex("TenantId", "TokenHash")
                         .IsUnique();
 
@@ -526,6 +528,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Day");
 
                     b.HasIndex("TenantId", "Channel", "Address", "Day")
                         .IsUnique();

@@ -44,9 +44,9 @@ Ortam: geliştirme bilgisayarı (Windows), SQL Server Docker kapsayıcısında, 
 
 ## 4. Veri büyümesi ve temizlik
 
-- `core.CommunicationLinkTokens`: gönderim başına bir satır (400 gün ömürlü). **Temizlik işi yoktur**; gönderim hacmi büyüdükçe tablo büyür. Gerçek gönderim açılmadan temizlik (süresi dolanları silme) ve gerekirse belirteç yeniden kullanımı eklenmelidir.
+- `core.CommunicationLinkTokens`: gönderim başına bir satır (400 gün ömürlü). **Temizlik işi vardır (dilim 12)**: süresi dolmasının üstünden 365 gün geçen satırlar silinir (`CommunicationCleanup:WorkerEnabled`, `IntervalMinutes`); 2,1 yıldan eski bir iletideki çıkış bağlantısı artık çalışmaz.
 - `marketing.CampaignDeliveries`: çalıştırma başına alıcı sayısı kadar satır; silinmez (denetim izi). `marketing.AudienceSnapshots` alıcı listesini JSON olarak tutar (adres içermez).
-- `core.FrequencyWindows`: adres × gün başına bir satır; eski günler temizlenmez.
+- `core.FrequencyWindows`: adres × gün başına bir satır; 7 günden eskiler temizlik işiyle silinir (dilim 12).
 - Tenant dışa aktarma/silme (`tenant-export`, `tenant-delete`) bu tabloları `TenantId` ile kapsar (envanter testi denetler).
 
 ## 5. Sorun giderme
@@ -63,4 +63,4 @@ Ortam: geliştirme bilgisayarı (Windows), SQL Server Docker kapsayıcısında, 
 
 ## 6. Bilinen sınırlar (dürüst liste)
 
-Gerçek sağlayıcı ve webhook, planlanan zamanda otomatik başlatma, özel alan değişkenleri, HTML içerik, gönderim penceresi, konu bazlı tercih, yönetim ekranında tercih listesi, fırsat/ciro atfı, rapor dışa aktarma, alan düzeyi maliyet yetkisi, belirteç/sıklık satırı temizliği, ölçeğin üretim donanımında doğrulanması. Hukuki uygunluk (KVKK/İYS/ETK) bu yazılımla garanti edilmez; hukuki karar ayrıca verilmelidir.
+Gerçek sağlayıcı ve webhook, planlanan zamanda otomatik başlatma, özel alan değişkenleri, HTML içerik, gönderim penceresi, konu bazlı tercih, yönetim ekranında tercih listesi, fırsat/ciro atfı, rapor dışa aktarma, alan düzeyi maliyet yetkisi, ölçeğin üretim donanımında doğrulanması. Hukuki uygunluk (KVKK/İYS/ETK) bu yazılımla garanti edilmez; hukuki karar ayrıca verilmelidir.
