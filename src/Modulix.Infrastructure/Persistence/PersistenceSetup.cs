@@ -94,6 +94,7 @@ public static class PersistenceSetup
         services.AddScoped<ICompanyAdministration, CompanyAdministration>();
         services.AddScoped<IBranchAdministration, BranchAdministration>();
         services.AddScoped<IBusinessUnitService, BusinessUnitService>();
+        services.AddScoped<IMembershipScope, MembershipScope>();
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());

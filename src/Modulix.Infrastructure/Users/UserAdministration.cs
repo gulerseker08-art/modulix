@@ -39,6 +39,7 @@ internal sealed class UserAdministration(
     RecordHandover handover,
     MembershipPermissions membershipPermissions,
     IBusinessUnitService businessUnits,
+    IMembershipScope memberScope,
     IModuleEntitlements entitlements,
     UserSessions sessions,
     TimeProvider time,
@@ -74,6 +75,13 @@ internal sealed class UserAdministration(
         if (query.TwoFactorEnabled is { } twoFactor)
         {
             members = members.Where(m => m.User.TwoFactorEnabled == twoFactor);
+        }
+
+        // Yönetici olmayan işlemi yapan yalnızca kendi kapsamındaki departmanların kullanıcılarını listeler (ADR-0026).
+        if (await membershipPermissions.GetVisibleUnitIdsAsync(tenant.MembershipId, cancellationToken) is { } scopeUnits)
+        {
+            var scopeList = scopeUnits.ToList();
+            members = members.Where(m => db.BusinessUnitMembers.Any(bm => bm.MembershipId == m.Membership.Id && scopeList.Contains(bm.BusinessUnitId)));
         }
 
         if (query.RoleId is { } roleId)
@@ -120,7 +128,7 @@ internal sealed class UserAdministration(
             select new { Membership = membership, User = user })
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (row is null)
+        if (row is null || !await memberScope.CanManageAsync(membershipId, cancellationToken))
         {
             return null;
         }
@@ -591,7 +599,7 @@ internal sealed class UserAdministration(
 
         var receiver = await db.Memberships.AsNoTracking()
             .SingleOrDefaultAsync(m => m.Id == toMembershipId && m.TenantId == tenant.TenantId, cancellationToken);
-        if (receiver is not { Status: MembershipStatus.Active })
+        if (receiver is not { Status: MembershipStatus.Active } || !await memberScope.CanManageAsync(toMembershipId, cancellationToken))
         {
             throw new ArgumentException("Kayıtları devralacak kişi bu kuruluşun etkin bir üyesi olmalı.", field);
         }
@@ -700,7 +708,8 @@ internal sealed class UserAdministration(
     public async Task SetRolesAsync(Guid membershipId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
-        if (!await roles.SetMembershipRolesAsync(membershipId, roleIds, cancellationToken, actingMembershipId: tenant.MembershipId))
+        if (!await memberScope.CanManageAsync(membershipId, cancellationToken)
+            || !await roles.SetMembershipRolesAsync(membershipId, roleIds, cancellationToken, actingMembershipId: tenant.MembershipId))
         {
             throw NotFound();
         }
@@ -716,6 +725,13 @@ internal sealed class UserAdministration(
         var membership = await db.Memberships
             .SingleOrDefaultAsync(m => m.Id == membershipId && m.TenantId == tenant.TenantId, cancellationToken)
             ?? throw NotFound();
+
+        // Kapsam dışı üyelik başka tenant'ınki gibi "bulunamadı" sayılır (ADR-0026).
+        if (!await memberScope.CanManageAsync(membershipId, cancellationToken))
+        {
+            throw NotFound();
+        }
+
         var user = await users.FindByIdAsync(membership.UserId.ToString()) ?? throw NotFound();
         return (membership, user);
     }
@@ -730,7 +746,7 @@ internal sealed class UserAdministration(
 
         var receiver = await db.Memberships.AsNoTracking()
             .SingleOrDefaultAsync(m => m.Id == toMembershipId && m.TenantId == tenant.TenantId, cancellationToken);
-        return receiver is { Status: MembershipStatus.Active }
+        return receiver is { Status: MembershipStatus.Active } && await memberScope.CanManageAsync(toMembershipId, cancellationToken)
             ? receiver
             : throw new ArgumentException("Kayıtları devralacak kişi bu kuruluşun etkin bir üyesi olmalı.", "transferToMembershipId");
     }

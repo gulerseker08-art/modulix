@@ -101,6 +101,12 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
     /// </summary>
     public async Task<IReadOnlySet<Guid>?> GetVisibleUnitIdsAsync(Guid membershipId, CancellationToken cancellationToken)
     {
+        // Üyeliği olmayan bağlam (platform yöneticisinin işlemi, sistem) kısıtlanmaz; gerçek istekte üyelik her zaman vardır.
+        if (membershipId == Guid.Empty)
+        {
+            return null;
+        }
+
         var scopes = await GetScopesAsync(membershipId, cancellationToken);
         if (scopes.Contains(RecordScope.All))
         {

@@ -77,11 +77,11 @@ public class BusinessUnitVisibilityTests(ModulixApiFactory factory) : IClassFixt
 
         var page = (await manager.GetFromJsonAsync<UserPageResponse>("/api/users?pageSize=100"))!;
         Assert.Equal("Bayi A", page.Items.Single(u => u.MembershipId == a2).BusinessUnitName);
-        Assert.Null(page.Items.Single(u => u.MembershipId == b1).BusinessUnitName);
+        Assert.DoesNotContain(page.Items, u => u.MembershipId == b1);
         Assert.DoesNotContain(page.Items, u => u.BusinessUnitName is "Bayi B" or "Bayi A Alt");
 
-        // Kullanıcı kartı ve kartın departman ucu da başka bayinin adını vermez.
-        Assert.Null((await manager.GetFromJsonAsync<UserDto>($"/api/users/{b1}"))!.BusinessUnitName);
+        // Kullanıcı kartı ve kartın departman ucu da başka bayinin kullanıcısını ve departman adını vermez (kullanıcı dizini kapsamlıdır).
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync($"/api/users/{b1}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync($"/api/users/{b1}/business-unit")).StatusCode);
         Assert.Equal("Bayi A", (await manager.GetFromJsonAsync<MembershipBusinessUnitDto>($"/api/users/{a2}/business-unit"))!.Name);
 
