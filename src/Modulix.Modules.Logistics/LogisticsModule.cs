@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Automation;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 
 namespace Modulix.Modules.Logistics;
@@ -30,6 +32,50 @@ public sealed class LogisticsModule : IModule
         new(Permissions.CostsRead, "Maliyetleri görüntüler", "Maliyetler"),
         new(Permissions.CostsWrite, "Maliyet ekler ve düzenler", "Maliyetler"),
     ];
+
+    /// <summary>Kural altyapısında kullanılan kayıt türleri (ADR-0027).</summary>
+    public static class AutomationEntityKeys
+    {
+        public const string Shipment = "logistics.shipment";
+        public const string Vehicle = "logistics.vehicle";
+    }
+
+    /// <summary>
+    /// Kural altyapısı yetenekleri (ADR-0027): belge eksikliği, bakım tarihi ve kapasite eşiği kuralları CRM olmadan, aynı sözleşmeyle
+    /// yazılabilir. Lojistik henüz iskelet modüldür (sevkiyat ve araç kayıt depoları yok); bu beyan yeteneğin Core'a modül koduna
+    /// dokunmadan eklenebildiğini gösterir ve kayıt depoları gelince kural çalıştırmak ek Core değişikliği gerektirmez. Aksiyon
+    /// beyan edilmez: lojistik aksiyonları kayıt servisleriyle birlikte gelir.
+    /// </summary>
+    AutomationCapabilities IModule.Automation { get; } = new()
+    {
+        Entities =
+        [
+            new(AutomationEntityKeys.Shipment, "Sevkiyat", Permissions.ShipmentsRead),
+            new(AutomationEntityKeys.Vehicle, "Araç", Permissions.CarriersRead),
+        ],
+        Events =
+        [
+            new("logistics.shipment.created", AutomationEntityKeys.Shipment, DomainEventTypes.RecordCreated, "Sevkiyat oluşturuldu"),
+            new("logistics.shipment.updated", AutomationEntityKeys.Shipment, DomainEventTypes.RecordUpdated, "Sevkiyat güncellendi"),
+            new("logistics.vehicle.updated", AutomationEntityKeys.Vehicle, DomainEventTypes.RecordUpdated, "Araç güncellendi"),
+        ],
+        Fields =
+        [
+            new(AutomationEntityKeys.Shipment, "documentStatus", "Belge durumu", AutomationFieldType.Choice)
+            {
+                Options = [new("complete", "Tam"), new("missing", "Eksik")],
+                Hint = "Eksik belgesi olan sevkiyatı yakalamak için.",
+            },
+            new(AutomationEntityKeys.Shipment, "capacityUsagePercent", "Kapasite kullanımı (%)", AutomationFieldType.Number)
+            {
+                Hint = "Kapasite eşiği kuralları için.",
+            },
+            new(AutomationEntityKeys.Vehicle, "nextMaintenanceDate", "Sonraki bakım tarihi", AutomationFieldType.Date)
+            {
+                Hint = "Bakım tarihi yaklaşan araçlar için (tarihe kala tetikleyicisi).",
+            },
+        ],
+    };
 
     IReadOnlyList<RoleTemplate> IModule.RoleTemplates { get; } =
     [

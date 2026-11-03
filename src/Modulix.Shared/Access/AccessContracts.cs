@@ -188,7 +188,16 @@ public static class CoreAccess
     /// <summary>İletişim noktasını engeller ve engeli gerekçeyle kaldırır (ADR-0025).</summary>
     public const string SuppressCommunication = "core.communication.suppress";
 
+    /// <summary>Otomasyon kuralları (ADR-0027): görüntüleme, taslak/önizleme, yayın, elle çalıştırma, geçmiş ve onay.</summary>
+    public const string ReadAutomation = "core.automation.read";
+    public const string ManageAutomation = "core.automation.manage";
+    public const string PublishAutomation = "core.automation.publish";
+    public const string RunAutomation = "core.automation.run";
+    public const string ReadAutomationLogs = "core.automation-logs.read";
+    public const string ApproveAutomation = "core.automation.approve";
+
     /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
-        [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication];
+        [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication,
+         ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation];
 }

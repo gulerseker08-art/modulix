@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Automation;
 using Modulix.Core.Contracts.Modules;
 
 namespace Modulix.Core.Modules;
@@ -22,6 +23,12 @@ public static class ModuleServiceCollectionExtensions
         }
 
         services.AddSingleton(catalog);
+
+        // Kural altyapısının saf ve katalogla çalışan parçaları (ADR-0027); kural deposu ve servisi Infrastructure'da.
+        services.AddScoped<IAutomationCatalog, AutomationCatalogService>();
+        services.AddScoped<AutomationDefinitionValidator>();
+        services.AddScoped<IAutomationRelationCounter, AutomationRelationCounter>();
+        services.AddScoped<IAutomationPreview, AutomationPreviewService>();
         return services;
     }
 }
