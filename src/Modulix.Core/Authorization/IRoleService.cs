@@ -16,6 +16,9 @@ public sealed record RoleSummary(Guid Id, string Name, IReadOnlyList<string> Per
 
     /// <summary>Rolün atandığı departman sayısı; yalnızca listede doldurulur.</summary>
     public int UnitCount { get; init; }
+
+    /// <summary>Kapsam dışı ortak firma/kişiler gizlenir mi (ADR-0026 K8).</summary>
+    public bool HideOutOfScopeShared { get; init; }
 }
 
 /// <summary>Departmana atanmış rol (ADR-0026 K6).</summary>
@@ -53,7 +56,8 @@ public interface IRoleService
         CancellationToken cancellationToken,
         Guid? actingMembershipId = null,
         RecordScope scope = RecordScope.All,
-        RoleAssignLevel? assignLevel = null);
+        RoleAssignLevel? assignLevel = null,
+        bool? hideOutOfScopeShared = null);
 
     /// <summary>
     /// Rol bu tenant'ta yoksa <c>null</c>. <paramref name="scope"/> ve <paramref name="assignLevel"/> verilmezse değişmez.
@@ -66,7 +70,8 @@ public interface IRoleService
         CancellationToken cancellationToken,
         Guid? actingMembershipId = null,
         RecordScope? scope = null,
-        RoleAssignLevel? assignLevel = null);
+        RoleAssignLevel? assignLevel = null,
+        bool? hideOutOfScopeShared = null);
 
     /// <summary>
     /// Rolü siler; rol bu tenant'ta yoksa <c>false</c>. Sistem rolü silinemez (<see cref="RoleConflictException"/>).

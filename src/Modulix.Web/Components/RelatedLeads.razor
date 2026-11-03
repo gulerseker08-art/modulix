@@ -7,7 +7,7 @@
 @if (Session.Can(CrmAccess.LeadsRead) && leads is { Count: > 0 })
 {
     <section class="detail-section">
-        <div class="section-header"><h2>İlişkili Lead'ler</h2></div>
+        <div class="section-header"><h2>İlişkili müşteri adayları</h2></div>
         <ul class="item-list">
             @foreach (var lead in leads)
             {

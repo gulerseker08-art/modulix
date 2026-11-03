@@ -110,7 +110,7 @@ public sealed class AccountLinks(ModulixDbContext db, UserManager<ModulixUser> u
             join tenant in db.Tenants.AsNoTracking() on membership.TenantId equals tenant.Id
             where membership.Id == membershipId
                   && membership.Status == MembershipStatus.Invited
-                  && tenant.Status == TenantStatus.Active
+                  && TenantStatusRules.Operational.Contains(tenant.Status)
             select new { Membership = membership, TenantName = tenant.Name })
             .SingleOrDefaultAsync(cancellationToken);
         if (row is null)

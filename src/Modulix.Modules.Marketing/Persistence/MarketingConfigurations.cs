@@ -87,6 +87,7 @@ internal sealed class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
         builder.Property(c => c.UtmSource).HasMaxLength(Campaign.UtmMaxLength);
         builder.Property(c => c.UtmMedium).HasMaxLength(Campaign.UtmMaxLength);
         builder.Property(c => c.UtmCampaign).HasMaxLength(Campaign.UtmMaxLength);
+        builder.Property(c => c.Topic).HasMaxLength(Campaign.TopicMaxLength);
         builder.Property(c => c.Budget).HasPrecision(18, 2);
         builder.Property(c => c.ActualCost).HasPrecision(18, 2);
         builder.Property(c => c.CostCurrency).HasMaxLength(3).IsRequired();
@@ -202,5 +203,19 @@ internal sealed class CampaignResponseConfiguration : IEntityTypeConfiguration<C
             .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CampaignRun>().WithMany().HasForeignKey(r => new { r.TenantId, r.RunId })
             .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class CampaignTestSendConfiguration : IEntityTypeConfiguration<CampaignTestSend>
+{
+    public void Configure(EntityTypeBuilder<CampaignTestSend> builder)
+    {
+        builder.ToTable("CampaignTestSends", MarketingTables.Schema);
+        builder.HasKey(t => t.Id);
+        builder.Property(t => t.Id).ValueGeneratedNever();
+        builder.Property(t => t.TenantId).IsRequired();
+        builder.Property(t => t.Outcome).HasMaxLength(CampaignTestSend.OutcomeMaxLength).IsRequired();
+        builder.Property(t => t.Code).HasMaxLength(CampaignTestSend.CodeMaxLength);
+        builder.HasIndex(t => new { t.TenantId, t.CampaignId, t.CreatedAt });
     }
 }

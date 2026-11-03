@@ -115,20 +115,22 @@
         </section>
 
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <TabBar Tabs="FormTabs" State="tabs" Label="Devir formu bölümleri" />
             <fieldset disabled="@(!Editable || busy)">
                 <legend class="visually-hidden">Devir bilgileri</legend>
                 @if (!Editable)
                 {
                     <p class="text-muted">@(h.Status == "Accepted" ? "Kabul edilen devir değişmez; sonraki değişiklikler için siparişte değişiklik talebi açın." : "Gönderilen devir karara bağlanana kadar değişmez.")</p>
                 }
-                <h2>Kapsam ve çıktılar</h2>
+                <TabPanel State="tabs" Key="form-kapsam">
                 <div class="form-grid">
                     <div class="span-12"><label class="form-label" for="f-scope">Satılan kapsam (zorunlu)</label><textarea id="f-scope" class="form-control" rows="2" maxlength="4000" @bind="form.Scope"></textarea></div>
                     <div class="span-12"><label class="form-label" for="f-out">Kapsam dışı işler</label><textarea id="f-out" class="form-control" rows="2" maxlength="4000" @bind="form.OutOfScope"></textarea></div>
                     <div class="span-12"><label class="form-label" for="f-deliverables">Teslim edilecek çıktılar (zorunlu)</label><textarea id="f-deliverables" class="form-control" rows="2" maxlength="4000" @bind="form.Deliverables"></textarea></div>
                     <div class="span-12"><label class="form-label" for="f-commitments">Müşteriye verilen taahhütler</label><textarea id="f-commitments" class="form-control" rows="2" maxlength="4000" @bind="form.Commitments"></textarea></div>
                 </div>
-                <h2>Lokasyon ve iletişim</h2>
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-lokasyon">
                 <div class="form-grid">
                     <div class="span-12"><label class="form-label" for="f-location">Lokasyon (zorunlu)</label><input id="f-location" class="form-control" maxlength="1000" @bind="form.Location" /></div>
                     <div class="span-4"><label class="form-label" for="f-contact">Müşteri tarafı ilgili kişi (zorunlu)</label><input id="f-contact" class="form-control" maxlength="300" @bind="form.ContactName" /></div>
@@ -136,7 +138,8 @@
                     <div class="span-4"><label class="form-label" for="f-email">E-posta</label><input id="f-email" type="email" class="form-control" maxlength="254" @bind="form.ContactEmail" /><FieldError Field="contactEmail" Errors="errors" /></div>
                     <div class="span-12"><small class="text-muted">İlgili kişi için telefon ya da e-postadan en az biri zorunludur.</small></div>
                 </div>
-                <h2>Tarih, öncelik ve sorumluluk</h2>
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-tarih">
                 <div class="form-grid">
                     <div class="span-4"><label class="form-label" for="f-start">Hedef başlangıç (zorunlu)</label><input id="f-start" type="date" class="form-control" @bind="form.TargetStartDate" /></div>
                     <div class="span-4"><label class="form-label" for="f-end">Hedef bitiş</label><input id="f-end" type="date" class="form-control" @bind="form.TargetEndDate" /><FieldError Field="targetEndDate" Errors="errors" /></div>
@@ -150,7 +153,8 @@
                     <div class="span-6"><label class="form-label" for="f-team">Sorumlu operasyon ekibi</label><input id="f-team" class="form-control" maxlength="300" @bind="form.ResponsibleTeam" /></div>
                     <div class="span-12"><small class="text-muted">Sorumlu kullanıcı ya da ekipten en az biri zorunludur.</small></div>
                 </div>
-                <h2>Belgeler, koşullar ve riskler</h2>
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-belge">
                 <div class="form-grid">
                     <div class="span-12"><label class="form-label" for="f-docs">Gerekli belgeler</label><textarea id="f-docs" class="form-control" rows="2" maxlength="4000" @bind="form.RequiredDocuments"></textarea></div>
                     <div class="span-12"><label class="form-label" for="f-pre">Müşteri ön koşulları</label><textarea id="f-pre" class="form-control" rows="2" maxlength="4000" @bind="form.CustomerPrerequisites"></textarea></div>
@@ -159,11 +163,13 @@
                     <div class="span-12"><label class="form-label" for="f-special">Özel talepler</label><textarea id="f-special" class="form-control" rows="2" maxlength="4000" @bind="form.SpecialRequests"></textarea></div>
                     <div class="span-12"><label class="form-label" for="f-deps">Bağımlılıklar</label><textarea id="f-deps" class="form-control" rows="2" maxlength="4000" @bind="form.Dependencies"></textarea></div>
                 </div>
-                <h2>Kabul kriterleri</h2>
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-kabul">
                 <div class="form-grid">
                     <div class="span-12"><label class="form-label" for="f-complete">Tamamlanma kriterleri (zorunlu)</label><textarea id="f-complete" class="form-control" rows="2" maxlength="4000" @bind="form.CompletionCriteria"></textarea></div>
                     <div class="span-12"><label class="form-label" for="f-accept">Müşteri kabul kriterleri (zorunlu)</label><textarea id="f-accept" class="form-control" rows="2" maxlength="4000" @bind="form.AcceptanceCriteria"></textarea></div>
                 </div>
+                </TabPanel>
             </fieldset>
             @if (Editable)
             {
@@ -222,6 +228,20 @@
     private HandoverDetailDto? detail;
     private HandoverActionDto? selected;
     private IReadOnlyDictionary<string, string[]>? errors;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
+    private readonly TabState tabs = new("form-kapsam");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs =>
+    [
+        new("form-kapsam", "Kapsam ve çıktılar", Errors: ErrorCount("scope", "outOfScope", "deliverables", "commitments")),
+        new("form-lokasyon", "Lokasyon ve iletişim", Errors: ErrorCount("location", "contactName", "contactPhone", "contactEmail")),
+        new("form-tarih", "Tarih ve sorumluluk", Errors: ErrorCount("targetStartDate", "targetEndDate", "priority", "responsibleUserId", "responsibleTeam")),
+        new("form-belge", "Belgeler ve riskler", Errors: ErrorCount("requiredDocuments", "customerPrerequisites", "paymentConditions", "risks", "specialRequests", "dependencies")),
+        new("form-kabul", "Kabul kriterleri", Errors: ErrorCount("completionCriteria", "acceptanceCriteria")),
+    ];
     private string? notice;
     private bool failed;
     private bool loading = true;
@@ -324,6 +344,7 @@
         busy = false;
         failed = !result.IsSuccess;
         errors = result.FieldErrors;
+        tabs.RevealFirstFailing(FormTabs);
         notice = result.IsSuccess ? "Devir bilgileri kaydedildi." : result.Error;
         await LoadAsync();
     }

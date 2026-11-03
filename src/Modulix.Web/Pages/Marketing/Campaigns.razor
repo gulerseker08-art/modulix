@@ -10,12 +10,6 @@
             <h1>Kampanyalar</h1>
             <p class="text-muted mb-0">Kampanya, hedef kitleyi segmentlerden ve seçilen kayıtlardan kurar; gönderimden önce hedef kitle dondurulur. Bu sürümde içerik, onay ve gönderim yoktur: hiçbir ileti gönderilmez.</p>
         </div>
-        <div class="header-actions">
-            @if (Session.Can(MarketingAccess.CampaignsWrite))
-            {
-                <a class="btn btn-primary" href="pazarlama/kampanyalar/yeni">Yeni kampanya</a>
-            }
-        </div>
     </div>
 
     @if (message is not null)
@@ -23,29 +17,40 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
-    <div class="filters">
-        <label class="visually-hidden" for="c-status">Durum</label>
-        <select id="c-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm durumlar</option>
-            @foreach (var s in MarketingLabels.CampaignStatuses) { <option value="@s.Key">@s.Label</option> }
-        </select>
-        <label class="visually-hidden" for="c-target">Hedef türü</label>
-        <select id="c-target" class="form-select form-select-sm filter-select" @bind="target" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm hedefler</option>
-            @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
-        </select>
-        <label class="visually-hidden" for="c-channel">Kanal</label>
-        <select id="c-channel" class="form-select form-select-sm filter-select" @bind="channel" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm kanallar</option>
-            @foreach (var c in MarketingLabels.Channels) { <option value="@c.Key">@c.Label</option> }
-        </select>
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="c-search">Kampanya ara</label>
+            <input id="c-search" class="form-control" type="search" placeholder="Ad veya kod ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
+        @if (Session.Can(MarketingAccess.CampaignsWrite))
+        {
+            <a class="btn btn-primary" href="pazarlama/kampanyalar/yeni"><AppIcon Name="plus" Size="16" /> Yeni kampanya</a>
+        }
     </div>
 
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="c-search">Kampanya ara</label>
-        <input id="c-search" class="form-control" type="search" placeholder="Ad veya kod ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="c-status">Durum</label>
+            <select id="c-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm durumlar</option>
+                @foreach (var s in MarketingLabels.CampaignStatuses) { <option value="@s.Key">@s.Label</option> }
+            </select>
+            <label class="visually-hidden" for="c-target">Hedef türü</label>
+            <select id="c-target" class="form-select form-select-sm filter-select" @bind="target" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm hedefler</option>
+                @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
+            </select>
+            <label class="visually-hidden" for="c-channel">Kanal</label>
+            <select id="c-channel" class="form-select form-select-sm filter-select" @bind="channel" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm kanallar</option>
+                @foreach (var c in MarketingLabels.Channels) { <option value="@c.Key">@c.Label</option> }
+            </select>
+        </div>
+    }
 
     @if (list is null && message is null)
     {
@@ -79,11 +84,16 @@
                 }
             </tbody>
         </table>
-        <Pager Page="list.Page" PageSize="list.PageSize" TotalCount="list.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="list.Page" PageSize="list.PageSize" TotalCount="list.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
 @code {
+    private bool filtersOpen;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
+    private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (target.Length > 0 ? 1 : 0) + (channel.Length > 0 ? 1 : 0);
+
     private PagedResult<CampaignDto>? list;
     private string? message;
     private string status = string.Empty;
@@ -99,7 +109,7 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var parts = new List<string> { $"page={pageNumber}" };
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
         if (status != string.Empty) { parts.Add($"status={status}"); }
         if (target != string.Empty) { parts.Add($"target={target}"); }

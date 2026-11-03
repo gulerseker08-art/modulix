@@ -120,7 +120,7 @@ internal sealed class LeadWorkflow(
         var missing = rules.SelectMany(r => r.Check(Snapshot(lead))).Distinct().ToList();
         if (missing.Count > 0)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Lead nitelendirilemedi: eksik bilgiler var.",
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Müşteri adayı nitelendirilemedi: eksik bilgiler var.",
                 [.. missing.Select(m => new RecordFieldError("qualification", m))]);
         }
 
@@ -175,7 +175,7 @@ internal sealed class LeadWorkflow(
         var follow = followUpAt ?? await EarliestOpenActivityDueAsync(leadId, cancellationToken);
         if (follow is null)
         {
-            return Invalid("Takip tarihi girin ya da Lead'e vadeli bir takip aktivitesi ekleyin.", "followUpAt");
+            return Invalid("Takip tarihi girin ya da müşteri adayına vadeli bir takip aktivitesi ekleyin.", "followUpAt");
         }
 
         if (followUpAt is not null && followUpAt <= time.GetUtcNow())

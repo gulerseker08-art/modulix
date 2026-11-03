@@ -1,0 +1,20 @@
+@* "Filtrele" düğmesi: sayfanın süzgeç satırını (select alanları) açıp kapatır; etkin süzgeç sayısı rozetle görünür.
+   Süzgeç satırını sayfa çizer: @if (open || count > 0) { <div class="filters">…</div> }. *@
+<button type="button" class="btn btn-ghost" aria-expanded="@(Open || Count > 0 ? "true" : "false")" @onclick="ToggleAsync">
+    <AppIcon Name="filter" Size="16" /> Filtrele
+    @if (Count > 0)
+    {
+        <span class="filter-count" aria-label="@Count etkin süzgeç">@Count</span>
+    }
+</button>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    /// <summary>Etkin süzgeç sayısı; sıfırdan büyükse satır kapatılamaz (neyin süzüldüğü görünür kalır).</summary>
+    [Parameter] public int Count { get; set; }
+
+    private Task ToggleAsync() => OpenChanged.InvokeAsync(!Open);
+}

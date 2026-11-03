@@ -1,0 +1,22 @@
+@* Tek bölümlü kayıt formunun gövdesi: tek sekmeli sekme çubuğu + panel (CLAUDE.md → Arayüz tasarım kuralları: her kayıt formu sekmelidir).
+   Birden fazla bölümü olan formlar TabBar + TabPanel ile kurulur (hatalı sekme rozeti ve RevealFirstFailing için). *@
+<TabBar Tabs="items" State="state" Label="@Label" />
+<TabPanel State="state" Key="@key">@ChildContent</TabPanel>
+
+@code {
+    private readonly string key = "form-" + Guid.NewGuid().ToString("N")[..8];
+    private TabState state = default!;
+    private IReadOnlyList<TabItem> items = [];
+
+    /// <summary>Sekme başlığı (ör. "Birim bilgileri").</summary>
+    [Parameter] public string Title { get; set; } = "Genel bilgiler";
+
+    /// <summary>Sekme çubuğunun erişilebilir adı.</summary>
+    [Parameter] public string Label { get; set; } = "Form bölümleri";
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized() => state = new TabState(key);
+
+    protected override void OnParametersSet() => items = [new TabItem(key, Title)];
+}

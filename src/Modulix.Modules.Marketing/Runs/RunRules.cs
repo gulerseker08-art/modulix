@@ -93,6 +93,9 @@ public static partial class ContentRules
             errors.Add(("subject", "Konu tek satır olmalıdır."));
         }
 
+        errors.AddRange(ContentTemplate.Validate(subject).Select(m => ("subject", m)));
+        errors.AddRange(ContentTemplate.Validate(body).Select(m => ("body", m)));
+
         foreach (var text in new[] { subject, body })
         {
             if (text is null)

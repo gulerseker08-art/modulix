@@ -16,10 +16,6 @@
             {
                 <a class="btn btn-outline-secondary" href="api/support/tickets/export?@Query(1)" download="talepler.csv">CSV dışa aktar</a>
             }
-            @if (Session.Can(SupportAccess.TicketsCreate))
-            {
-                <a class="btn btn-primary" href="destek/talepler/yeni">Yeni talep</a>
-            }
         </div>
     </div>
 
@@ -33,53 +29,57 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
-    <div class="filters" role="group" aria-label="Hızlı görünümler">
-        @foreach (var preset in Presets)
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@(view ?? AllViews)" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="ticket-search">Talep ara</label>
+            <input id="ticket-search" class="form-control" type="search" placeholder="Konu, talep numarası veya başvuran ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
+        @if (Session.Can(SupportAccess.TicketsCreate))
         {
-            <button type="button" class="chip @(view == preset.Key ? "active" : null)" aria-pressed="@(view == preset.Key ? "true" : "false")" @onclick="() => TogglePresetAsync(preset.Key)">
-                @preset.Label@(Count(preset.Key) is { } n ? $" ({n})" : null)
-            </button>
+            <a class="btn btn-primary" href="destek/talepler/yeni"><AppIcon Name="plus" Size="16" /> Yeni talep</a>
         }
     </div>
-    <div class="filters">
-        <label class="visually-hidden" for="status-filter">Durum</label>
-        <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm durumlar</option>
-            @foreach (var s in SupportLabels.Statuses)
-            {
-                <option value="@s.Key">@s.Label</option>
-            }
-        </select>
-        <label class="visually-hidden" for="priority-filter">Öncelik</label>
-        <select id="priority-filter" class="form-select form-select-sm filter-select" @bind="priority" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm öncelikler</option>
-            @foreach (var p in SupportLabels.Priorities)
-            {
-                <option value="@p.Key">@p.Label</option>
-            }
-        </select>
-        <label class="visually-hidden" for="type-filter">Tür</label>
-        <select id="type-filter" class="form-select form-select-sm filter-select" @bind="typeKey" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm türler</option>
-            @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList))
-            {
-                <option value="@t.Key">@t.Label</option>
-            }
-        </select>
-        <label class="visually-hidden" for="sort-select">Sıralama</label>
-        <select id="sort-select" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
-            @foreach (var (key, label) in SupportLabels.Sorts)
-            {
-                <option value="@key">Sıralama: @label</option>
-            }
-        </select>
-    </div>
 
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="ticket-search">Talep ara</label>
-        <input id="ticket-search" class="form-control" type="search" placeholder="Konu, talep numarası veya başvuran ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="status-filter">Durum</label>
+            <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm durumlar</option>
+                @foreach (var s in SupportLabels.Statuses)
+                {
+                    <option value="@s.Key">@s.Label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="priority-filter">Öncelik</label>
+            <select id="priority-filter" class="form-select form-select-sm filter-select" @bind="priority" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm öncelikler</option>
+                @foreach (var p in SupportLabels.Priorities)
+                {
+                    <option value="@p.Key">@p.Label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="type-filter">Tür</label>
+            <select id="type-filter" class="form-select form-select-sm filter-select" @bind="typeKey" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm türler</option>
+                @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList))
+                {
+                    <option value="@t.Key">@t.Label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="sort-select">Sıralama</label>
+            <select id="sort-select" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
+                @foreach (var (key, label) in SupportLabels.Sorts)
+                {
+                    <option value="@key">Sıralama: @label</option>
+                }
+            </select>
+        </div>
+    }
 
     @if (page is null && message is null)
     {
@@ -143,8 +143,8 @@
                     {
                         <th scope="col"><span class="visually-hidden">Seç</span></th>
                     }
-                    <th scope="col">Talep</th><th scope="col">Müşteri</th><th scope="col">Tür</th><th scope="col">Öncelik</th><th scope="col">Durum</th>
-                    <th scope="col">Sorumlu</th><th scope="col">Yaş</th><th scope="col">SLA hedefleri</th><th scope="col">Son hareket</th>
+                    <th scope="col"><SortHeader Label="Talep" Asc="number" Desc="-number" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Müşteri</th><th scope="col">Tür</th><th scope="col"><SortHeader Label="Öncelik" Asc="priority" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Durum</th>
+                    <th scope="col">Sorumlu</th><th scope="col">Yaş</th><th scope="col">SLA hedefleri</th><th scope="col"><SortHeader Label="Son hareket" Desc="-lastActivity" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
                 </tr>
             </thead>
             <tbody>
@@ -173,11 +173,16 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
 @code {
+    private bool filtersOpen;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
+    private int ActiveFilters => (string.IsNullOrEmpty(status) ? 0 : 1) + (string.IsNullOrEmpty(priority) ? 0 : 1) + (string.IsNullOrEmpty(typeKey) ? 0 : 1);
+
     private const string DefaultSort = "-createdAt";
 
     /// <summary>Hızlı görünümler; her biri sunucudaki süzgeçlerden birine karşılık gelir.</summary>
@@ -203,6 +208,12 @@
     private string? priority;
     private string? typeKey;
     private string sort = DefaultSort;
+
+    private Task SortAsync(string key)
+    {
+        sort = key;
+        return LoadAsync(1);
+    }
     private string search = string.Empty;
     private readonly HashSet<Guid> selected = [];
     private string bulkAction = string.Empty;
@@ -262,15 +273,24 @@
         _ => null,
     };
 
-    private async Task TogglePresetAsync(string key)
+    private const string AllViews = "all";
+
+    // Her hızlı görünümün yanında özet sayısı gösterilir (varsa).
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm talepler"),
+        .. Presets.Select(p => new ViewOption(p.Key, p.Label + (Count(p.Key) is { } n ? $" ({n})" : null))),
+    ];
+
+    private async Task ChooseViewAsync(string key)
     {
-        view = view == key ? null : key;
+        view = key == AllViews ? null : key;
         await LoadAsync(1);
     }
 
     private string Query(int pageNumber)
     {
-        var parts = new List<string> { $"page={pageNumber}" };
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
         switch (view)
         {

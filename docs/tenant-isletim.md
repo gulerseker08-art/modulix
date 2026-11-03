@@ -56,7 +56,13 @@ Platform yönetimi yeni tenant açarken (`POST /api/platform/tenants` veya `IPla
 2. Tenant bağlamında başlangıç verisi tek işlemde yazılır: sistem rolü, varsayılan şirket, şablon roller, denetim kaydı.
 3. Modül hakları ve yönetici daveti platform bağlamında yazılır.
 
-Ayrı bir kurulum (provisioning) adımı, durum makinesi veya sağlık kontrolü yoktur. Dilim 2 ile adım 1–3 tek işlemdir: hata olursa yarım kurulmuş tenant kalmaz.
+Ayrı bir kurulum (provisioning) adımı veya sağlık kontrolü yoktur. Dilim 2 ile adım 1–3 tek işlemdir: hata olursa yarım kurulmuş tenant kalmaz.
+
+**Firma durumları (ADR-0028):** `Active`, `Trial` (erişim açık), `Suspended` (erişim durur, geçici), `Closed`. Erişimin açık olduğu durumlar
+`TenantStatusRules.Operational`'dadır; işleyiciler, genel uç noktalar ve üyelik sorguları buna göre süzer. Yeni durum eklenirse karar
+oraya yazılır. Askıya alma gerekçe ister; hiçbir durum geçişi veri silmez (silme yalnızca `tenant-delete`). Platform işlemleri
+`platform.PlatformAuditLog` tablosuna da yazılır (ekleme-yalnız, firma silinse de saklanır; `tenant-export`/`tenant-delete` kapsamı dışındadır,
+çünkü sütunu `TenantId` değil `TargetTenantId`'dir).
 
 ## Migration'lar
 

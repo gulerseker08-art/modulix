@@ -1,25 +1,31 @@
 @* Modulix logosu: uygulamadaki tek logo kaynağı (docs/design-system/README.md → Marka).
-   İşaret, onaylı img/modulix-mark.svg dosyasıdır; yazı "Modulix" (M büyük, son x turkuaz vurgulu), slogan isteğe bağlı.
-   Logo metni başka yerde elle yazılmaz; bu bileşen kullanılır. *@
-<span class="brand-logo @(ShowTagline ? null : "no-tagline")">
-    @* Açık ve koyu tema için iki işaret dosyası; hangisinin görüneceğini CSS (data-theme) seçer. *@
-    <img class="brand-mark brand-mark-light" src="img/modulix-mark.svg" alt="" width="@Size" height="@Size" />
-    <img class="brand-mark brand-mark-dark" src="img/modulix-mark-dark.svg" alt="" width="@Size" height="@Size" />
-    <span class="brand-text">
-        <span class="brand-name">Moduli<span class="brand-x">x</span></span>
-        @if (ShowTagline)
-        {
-            <span class="brand-tagline">MODÜLER İŞİN GÜCÜ</span>
-        }
-    </span>
+   Onaylı logo görselidir (işaret + "Modulix" yazısı, isteğe bağlı "İŞİN YENİ ZEKÂSI." sloganı); metin elle yazılmaz.
+   Açık/koyu tema ve daraltılmış menü (yalnızca işaret) görünümünü CSS (data-theme, sidebar-collapsed) seçer. *@
+<span class="brand-logo">
+    <img class="brand-full brand-light" src="@FullSrc" alt="Modulix" width="@FullWidth" height="@Size" />
+    <img class="brand-full brand-dark" src="@FullDarkSrc" alt="Modulix" width="@FullWidth" height="@Size" />
+    <img class="brand-mark brand-light" src="img/modulix-mark.png" alt="Modulix" width="@MarkWidth" height="@Size" />
+    <img class="brand-mark brand-dark" src="img/modulix-mark-dark.png" alt="Modulix" width="@MarkWidth" height="@Size" />
 </span>
 
 @code {
-    /// <summary>İşaretin piksel boyutu.</summary>
-    [Parameter]
-    public int Size { get; set; } = 32;
+    // Görsel en-boy oranları (wwwroot/img): tam logo 960x226, işaret 318x256.
+    private const double FullRatio = 960d / 226d;
+    private const double MarkRatio = 318d / 256d;
 
-    /// <summary>Slogan gösterilsin mi; dar alanlarda kapatılır.</summary>
+    /// <summary>Logonun piksel yüksekliği (genişlik orandan hesaplanır). Slogan görünecekse yazı küçüleceği için daha büyük verilir.</summary>
     [Parameter]
-    public bool ShowTagline { get; set; } = true;
+    public int Size { get; set; } = 36;
+
+    /// <summary>Slogan ("İŞİN YENİ ZEKÂSI.") gösterilsin mi; küçük boyutlarda okunmaz, bu yüzden varsayılan kapalıdır.</summary>
+    [Parameter]
+    public bool ShowTagline { get; set; }
+
+    private string FullSrc => ShowTagline ? "img/modulix-logo.png" : "img/modulix-logo-wordmark.png";
+
+    private string FullDarkSrc => ShowTagline ? "img/modulix-logo-dark.png" : "img/modulix-logo-wordmark-dark.png";
+
+    private int FullWidth => (int)Math.Round(Size * FullRatio);
+
+    private int MarkWidth => (int)Math.Round(Size * MarkRatio);
 }

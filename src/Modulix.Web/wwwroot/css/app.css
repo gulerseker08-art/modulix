@@ -1,3 +1,22 @@
+/* Manrope (OFL), değişken ağırlık 400–800; latin-ext Türkçe karakterleri (İ ı ş ğ) ve ₺ simgesini içerir. Yerelden sunulur. */
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url('../fonts/manrope-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url('../fonts/manrope-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* =====================================================================
    Modulix tasarım sistemi — tasarım tokenları (docs/design-system/theme-tokens.md)
    Bütün renk, tipografi, boşluk, köşe ve gölge değerleri buradan gelir.
@@ -62,8 +81,8 @@
     --chart-c4: #EF4444;
     --chart-c5: #94A3B8;
 
-    /* Tipografi: Inter (Google Fonts, latin-ext alt kümesi Türkçe karakterleri içerir) */
-    --mx-font: 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    /* Tipografi: Manrope (yerel woff2, latin-ext Türkçe karakterleri içerir) */
+    --mx-font: 'Manrope', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
     --mx-fs-page-title: 1.75rem;     /* 28px / 700 */
     --mx-fs-section-title: 1.125rem; /* 18px / 600 */
     --mx-fs-card-title: 1rem;        /* 16px / 600 */
@@ -84,24 +103,30 @@
     --mx-space-8: 2rem;
 
     /* Köşe yarıçapları */
-    --mx-radius-input: 8px;
-    --mx-radius-button: 9px;
-    --mx-radius-card: 12px;
-    --mx-radius-drawer: 14px;
-    --mx-radius-modal: 14px;
-    --mx-radius-badge: 6px;
+    --mx-radius-input: 10px;
+    --mx-radius-button: 12px;
+    --mx-radius-card: 16px;
+    --mx-radius-drawer: 16px;
+    --mx-radius-modal: 16px;
+    --mx-radius-badge: 999px;
 
-    /* Gölgeler: hafif; glow ve ağır gölge yok */
-    --mx-shadow-card: 0 1px 2px rgba(16, 29, 53, 0.04), 0 1px 3px rgba(16, 29, 53, 0.03);
-    --mx-shadow-raised: 0 4px 16px rgba(16, 29, 53, 0.08);
-    --mx-shadow-popover: 0 12px 32px rgba(16, 29, 53, 0.16);
+    /* Gölgeler: kartlarda yumuşak, düğmede marka renginde parlama (yalnızca birincil düğme ve etkin öğeler) */
+    --mx-shadow-card: 0 1px 2px rgba(16, 29, 53, 0.04), 0 8px 28px rgba(16, 29, 53, 0.06);
+    --mx-shadow-raised: 0 10px 32px rgba(16, 29, 53, 0.10);
+    --mx-shadow-popover: 0 14px 36px rgba(16, 29, 53, 0.16);
+    --mx-shadow-glow: 0 8px 20px rgba(31, 95, 203, 0.30);
+
+    /* Marka degradesi: birincil düğme, etkin sekme çizgisi, sayaç rozeti, bölüm ikonu (beyaz metinle AA: 4.5:1 ve üzeri) */
+    --mx-gradient-brand: linear-gradient(135deg, #087DB8 0%, #1F5FCB 100%);
+    --mx-gradient-brand-hover: linear-gradient(135deg, #066A9C 0%, #1A52B3 100%);
+    --mx-nav-active-bg: linear-gradient(90deg, #E1F4FA, #E5EEFD);
     --mx-focus-ring: 0 0 0 3px rgba(var(--mx-brand-primary-rgb), 0.28);
 
     /* Kabuk ölçüleri */
     --mx-header-height: 4rem;
     --mx-sidebar-width: 248px;
     --mx-sidebar-collapsed-width: 72px;
-    --mx-control-height: 40px;
+    --mx-control-height: 42px;
 
     /* Geriye uyumlu takma adlar (eski --mx-* adları; yeni kodda kullanma) */
     --mx-navy: var(--mx-brand-navy);
@@ -194,6 +219,12 @@
     --mx-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
     --mx-shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.35);
     --mx-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.5);
+    --mx-shadow-glow: 0 8px 20px rgba(59, 174, 230, 0.22);
+
+    /* Koyu zeminde açık degrade + koyu metin (--mx-text-on-brand) */
+    --mx-gradient-brand: linear-gradient(135deg, #3BAEE6 0%, #6FA8FA 100%);
+    --mx-gradient-brand-hover: linear-gradient(135deg, #6CC6F2 0%, #8DBBFC 100%);
+    --mx-nav-active-bg: var(--mx-surface-muted);
 
     --bs-body-bg: var(--mx-background);
     --bs-body-color: var(--mx-text-primary);
@@ -255,7 +286,7 @@ a, .btn-link {
 
 /* ---- Button ---- */
 .btn {
-    font-weight: 600;
+    font-weight: 700;
     font-size: var(--mx-fs-body);
     border-radius: var(--mx-radius-button);
     display: inline-flex;
@@ -277,18 +308,71 @@ a, .btn-link {
     --bs-btn-disabled-color: var(--mx-text-on-brand);
     --bs-btn-disabled-bg: var(--mx-brand-primary);
     --bs-btn-disabled-border-color: var(--mx-brand-primary);
+
+    /* Marka degradesi + parlama; Bootstrap'ın düz zemini degradenin altında kalır (degrade desteklemeyen ortam için yedek). */
+    background-image: var(--mx-gradient-brand);
+    border-color: transparent;
+    box-shadow: var(--mx-shadow-glow);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
+    .btn-primary:hover:not(:disabled):not(.disabled),
+    .btn-primary:focus-visible {
+        background-image: var(--mx-gradient-brand-hover);
+        border-color: transparent;
+        box-shadow: var(--mx-shadow-glow);
+    }
+
+    .btn-primary:active:not(:disabled):not(.disabled) {
+        background-image: var(--mx-gradient-brand-hover);
+        transform: translateY(1px);
+        box-shadow: none;
+    }
+
+    .btn-primary:disabled,
+    .btn-primary.disabled {
+        box-shadow: none;
+    }
+
+/* Tonal düğme: üçüncül eylem (ör. "Satır ekle"); hayalet düğme: araç çubuğu eylemleri (Filtrele, Sütunlar). */
+.btn-tonal {
+    --bs-btn-color: var(--mx-tone-brand-fg);
+    --bs-btn-bg: var(--mx-tone-brand-bg);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-tone-brand-fg);
+    --bs-btn-hover-bg: var(--mx-tone-info-bg);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-tone-brand-fg);
+    --bs-btn-active-bg: var(--mx-tone-info-bg);
+    --bs-btn-active-border-color: transparent;
+}
+
+.btn-ghost {
+    --bs-btn-color: var(--mx-text-label);
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-text-primary);
+    --bs-btn-hover-bg: var(--mx-surface-muted);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-text-primary);
+    --bs-btn-active-bg: var(--mx-surface-muted);
+    --bs-btn-active-border-color: transparent;
+}
+
+/* Çerçeveli birincil düğme: yumuşak (tonal) görünüm; çerçeve yok, hover'da bir ton koyulaşır. Bütün sayfalarda ortak. */
 .btn-outline-primary {
-    --bs-btn-color: var(--mx-brand-primary);
-    --bs-btn-bg: var(--mx-surface);
-    --bs-btn-border-color: var(--mx-brand-primary);
-    --bs-btn-hover-color: var(--mx-text-on-brand);
-    --bs-btn-hover-bg: var(--mx-brand-primary);
-    --bs-btn-hover-border-color: var(--mx-brand-primary);
-    --bs-btn-active-color: var(--mx-text-on-brand);
-    --bs-btn-active-bg: var(--mx-brand-primary-hover);
-    --bs-btn-active-border-color: var(--mx-brand-primary-hover);
+    --bs-btn-color: var(--mx-tone-brand-fg);
+    --bs-btn-bg: var(--mx-tone-brand-bg);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-tone-brand-fg);
+    --bs-btn-hover-bg: var(--mx-tone-info-bg);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-tone-brand-fg);
+    --bs-btn-active-bg: var(--mx-tone-info-bg);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
 }
 
 /* İkincil düğmeler (İptal, Ara, sayfalama): yüzey zemin, ince çerçeve */
@@ -305,15 +389,24 @@ a, .btn-link {
     --bs-btn-disabled-color: var(--mx-text-secondary);
     --bs-btn-disabled-bg: var(--mx-surface);
     --bs-btn-disabled-border-color: var(--mx-border);
+
+    box-shadow: 0 2px 6px rgba(16, 29, 53, 0.06);
 }
 
+/* Yıkıcı eylem: yumuşak kırmızı; hover'da dolgu koyulaşır (onay gerektiren eylemler zaten ayrı adımda). */
 .btn-outline-danger {
-    --bs-btn-color: var(--mx-danger-text);
-    --bs-btn-bg: var(--mx-surface);
-    --bs-btn-border-color: var(--mx-tone-danger-bg);
+    --bs-btn-color: var(--mx-tone-danger-fg);
+    --bs-btn-bg: var(--mx-tone-danger-bg);
+    --bs-btn-border-color: transparent;
     --bs-btn-hover-color: #fff;
-    --bs-btn-hover-bg: var(--mx-danger);
-    --bs-btn-hover-border-color: var(--mx-danger);
+    --bs-btn-hover-bg: var(--mx-danger-text);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: var(--mx-danger-text);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
 }
 
 .btn-danger {
@@ -778,7 +871,7 @@ code {
     background: var(--mx-tone-brand-bg);
     color: var(--mx-tone-brand-fg);
     font-size: var(--mx-fs-helper);
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.2;
     border-radius: var(--mx-radius-badge);
     padding: 0.35em 0.65em;
@@ -914,7 +1007,7 @@ tr.done td.primary {
     }
 
         .record-table > :not(caption) > * > * {
-            padding: 0.85rem 1rem;
+            padding: 0.95rem 1rem;
             vertical-align: middle;
         }
 
@@ -927,11 +1020,12 @@ tr.done td.primary {
         }
 
         .record-table thead th {
-            background: var(--mx-surface-muted);
+            background: var(--mx-surface-hover);
             color: var(--mx-text-secondary);
-            font-size: var(--mx-fs-helper);
-            font-weight: 600;
-            letter-spacing: 0.02em;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
             white-space: nowrap;
         }
 
@@ -962,7 +1056,7 @@ tr.done td.primary {
 }
 
 @media (max-width: 767.98px) {
-    .pager span {
+    .pager .pager-info {
         order: -1;
         width: 100%;
         text-align: center;
@@ -1028,10 +1122,269 @@ tr.done td.primary {
     }
 
     .chip.active {
-        background: var(--mx-indigo);
-        border-color: var(--mx-indigo);
+        background: var(--mx-gradient-brand);
+        border-color: transparent;
         color: var(--mx-text-on-brand);
     }
+
+/* ---- Liste araç çubuğu ve görünüm seçici (ViewSelector): solda "Görünüm: … ▾", sağda arama + eylemler ---- */
+.list-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin: var(--mx-space-4) 0 var(--mx-space-3);
+}
+
+    /* Arama kutusu seçicinin sağına yaslanır; sonraki eylemler (Filtrele, Sütunlar, birincil) onu izler. */
+    .list-toolbar > .search {
+        flex: 0 1 22rem;
+        margin: 0 0 0 auto;
+    }
+
+    .list-toolbar > .search .form-control {
+        min-width: 0;
+    }
+
+.list-toolbar-spacer {
+    flex: 1 1 auto;
+}
+
+.view-selector {
+    position: relative;
+}
+
+.view-selector-button {
+    gap: var(--mx-space-2);
+}
+
+.view-selector-prefix {
+    color: var(--mx-text-secondary);
+    font-weight: 600;
+}
+
+/* Menü dışına tıklama: görünmez tam ekran katman menüyü kapatır. */
+.view-selector-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+}
+
+.view-menu {
+    position: absolute;
+    z-index: 1050;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 16rem;
+    max-width: min(24rem, 90vw);
+    padding: var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow-popover);
+}
+
+.view-menu-group {
+    padding: var(--mx-space-2) var(--mx-space-3) var(--mx-space-1);
+    color: var(--mx-text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.view-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mx-space-2);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border: 0;
+    border-radius: var(--mx-radius-input);
+    background: transparent;
+    color: var(--mx-text-primary);
+    font-weight: 500;
+    text-align: left;
+}
+
+    .view-menu-item:hover {
+        background: var(--mx-surface-hover);
+    }
+
+    /* Seçili görünüm: renk + kalın yazı + onay işareti (yalnızca renkle anlatılmaz). */
+    .view-menu-item.selected {
+        background: var(--mx-nav-active-bg);
+        color: var(--mx-tone-brand-fg);
+        font-weight: 700;
+    }
+
+    .view-menu-item.view-menu-new {
+        justify-content: flex-start;
+        font-weight: 600;
+    }
+
+.view-menu-divider {
+    height: 1px;
+    margin: var(--mx-space-2) var(--mx-space-1);
+    background: var(--mx-border);
+}
+
+/* Sayfalama: "1–8 / 24 kayıt" solda, sayfa numaraları sağda */
+.pager-pages {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-1);
+}
+
+.pager-btn {
+    display: inline-grid;
+    place-items: center;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    padding: 0 var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface);
+    color: var(--mx-text-primary);
+    font-weight: 600;
+}
+
+    .pager-btn:hover:not(:disabled) {
+        background: var(--mx-surface-muted);
+    }
+
+    .pager-btn:disabled {
+        color: var(--mx-text-secondary);
+        opacity: 0.55;
+    }
+
+    /* Geçerli sayfa: degrade + beyaz ("disabled" olsa da tam opaklıkla okunur). */
+    .pager-btn.active {
+        border-color: transparent;
+        background: var(--mx-gradient-brand);
+        color: var(--mx-text-on-brand);
+        opacity: 1;
+    }
+
+.pager-gap {
+    padding: 0 var(--mx-space-1);
+    color: var(--mx-text-secondary);
+}
+
+/* Sütunlar menüsü (ColumnPicker) ve etkin süzgeç sayısı rozeti */
+.column-menu {
+    min-width: 14rem;
+}
+
+.column-item {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-3);
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border-radius: var(--mx-radius-input);
+    font-weight: 500;
+}
+
+    .column-item:hover {
+        background: var(--mx-surface-hover);
+    }
+
+.filter-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--mx-gradient-brand);
+    color: var(--mx-text-on-brand);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+}
+
+/* Sıralanabilir başlık (SortHeader): başlık metni + yön oku; etkin sütun koyu ve renkli. */
+.sort-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-1);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    text-align: left;
+}
+
+    .sort-button .app-icon {
+        opacity: 0.55;
+    }
+
+    .sort-button:hover,
+    .sort-button.active {
+        color: var(--mx-tone-brand-fg);
+    }
+
+        .sort-button:hover .app-icon,
+        .sort-button.active .app-icon {
+            opacity: 1;
+        }
+
+/* Sayfa boyutu seçici ve sorumlu avatarı (OwnerCell) */
+.pager-size {
+    width: auto;
+    min-height: 2.25rem;
+    margin-left: auto;
+}
+
+.owner-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+}
+
+.avatar {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    font-size: 0.6875rem;
+    font-weight: 700;
+}
+
+.avatar-tone-0 { background: var(--mx-tone-brand-bg); color: var(--mx-tone-brand-fg); }
+.avatar-tone-1 { background: var(--mx-tone-teal-bg); color: var(--mx-tone-teal-fg); }
+.avatar-tone-2 { background: var(--mx-tone-violet-bg); color: var(--mx-tone-violet-fg); }
+.avatar-tone-3 { background: var(--mx-tone-warning-bg); color: var(--mx-tone-warning-fg); }
+.avatar-tone-4 { background: var(--mx-tone-success-bg); color: var(--mx-tone-success-fg); }
+
+/* Gizlenen sütun (ColumnPicker): başlık ve bütün hücreler; telefonda kart satırlarında da gizlenir. */
+.record-table .col-hidden {
+    display: none !important;
+}
+
+/* Satır eylemleri: ikincil (beyaz çerçeveli) düğme tabloda yumuşak görünür; birincil/yıkıcı zaten global yumuşaktır. */
+.record-table td.actions .btn-outline-secondary {
+    --bs-btn-color: var(--mx-tone-brand-fg);
+    --bs-btn-bg: var(--mx-tone-brand-bg);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-tone-brand-fg);
+    --bs-btn-hover-bg: var(--mx-tone-info-bg);
+    --bs-btn-hover-border-color: transparent;
+    box-shadow: none;
+}
+
+@media (max-width: 575.98px) {
+    .list-toolbar > .search {
+        flex: 1 1 100%;
+        margin-left: 0;
+    }
+}
 
 .badge.status-prospect {
     background: var(--mx-tone-warning-bg);
@@ -1788,73 +2141,49 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 .brand-logo {
     display: inline-flex;
     align-items: center;
-    gap: var(--mx-space-2);
     min-width: 0;
 }
 
-    .brand-logo .brand-mark {
+    .brand-logo img {
+        display: none;
         flex: none;
+        max-width: 100%;
+        height: auto;
     }
 
-    /* Koyu temada lacivert yarısı açık tonlu ikinci işaret dosyası görünür. */
-    .brand-logo .brand-mark-dark {
-        display: none;
+    /* Varsayılan: açık tema, tam logo. Koyu temada koyu sürüm görünür. */
+    .brand-logo .brand-full.brand-light {
+        display: block;
     }
 
-    [data-theme="dark"] .brand-logo .brand-mark-light {
-        display: none;
-    }
-
-    [data-theme="dark"] .brand-logo .brand-mark-dark {
-        display: inline;
-    }
-
-.brand-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1;
-    min-width: 0;
+[data-theme="dark"] .brand-logo .brand-full.brand-light {
+    display: none;
 }
 
-.brand-name {
-    font-size: 1.4rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--mx-brand-navy);
+[data-theme="dark"] .brand-logo .brand-full.brand-dark {
+    display: block;
 }
 
-[data-theme="dark"] .brand-name {
-    color: var(--mx-text-primary);
-}
-
-/* Son "x" turkuaz vurgulu (açık zeminde erişilebilir koyu turkuaz). */
-.brand-x {
-    color: var(--mx-brand-teal-dark);
-}
-
-.brand-tagline {
-    margin-top: 0.2rem;
-    font-size: 0.5rem;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    color: var(--mx-text-secondary);
-    white-space: nowrap;
-}
-
-/* Daraltılmış menüde ve çok dar alanlarda yalnızca işaret görünür. */
+/* Daraltılmış menüde yalnızca işaret görünür. */
 @media (min-width: 641px) {
-    html.sidebar-collapsed .sidebar .brand-text {
+    html.sidebar-collapsed .sidebar .brand-logo .brand-full {
         display: none;
+    }
+
+    html.sidebar-collapsed .sidebar .brand-logo .brand-mark.brand-light {
+        display: block;
+    }
+
+    html.sidebar-collapsed[data-theme="dark"] .sidebar .brand-logo .brand-mark.brand-light {
+        display: none;
+    }
+
+    html.sidebar-collapsed[data-theme="dark"] .sidebar .brand-logo .brand-mark.brand-dark {
+        display: block;
     }
 
     html.sidebar-collapsed .sidebar .app-launcher .brand-button {
         margin-left: 0;
-    }
-}
-
-@media (max-width: 359.98px) {
-    .brand-tagline {
-        display: none;
     }
 }
 
@@ -2035,6 +2364,19 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
     margin: 0;
     padding: 0;
     list-style: none;
+}
+
+.app-group + .app-group {
+    margin-top: 0.9rem;
+}
+
+.app-group-title {
+    margin: 0 0 0.4rem 0.15rem;
+    color: var(--mx-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 .app-tile {
@@ -3801,9 +4143,10 @@ button.pipeline-label {
         color: var(--mx-text-primary);
     }
 
-    /* Etkin sekme: altta birincil renk çizgi (renk dışında kalın yazı ve çizgiyle de ayrılır). */
+    /* Etkin sekme: altta marka degradeli çizgi (renk dışında kalın yazı ve çizgiyle de ayrılır). */
     .record-tab.active {
         color: var(--mx-tone-brand-fg);
+        font-weight: 800;
     }
 
         .record-tab.active::after {
@@ -3814,7 +4157,7 @@ button.pipeline-label {
             bottom: -1px;
             height: 3px;
             border-radius: 3px 3px 0 0;
-            background: var(--mx-brand-primary);
+            background: var(--mx-gradient-brand);
         }
 
     .record-tab:focus-visible {
@@ -3831,8 +4174,21 @@ button.pipeline-label {
 }
 
 .record-tab.active .record-tab-count {
-    background: var(--mx-tone-brand-bg);
-    color: var(--mx-tone-brand-fg);
+    background: var(--mx-gradient-brand);
+    color: var(--mx-text-on-brand);
+    font-weight: 700;
+}
+
+/* Hatalı alan içeren sekme: kırmızı rozet + "!" (renk dışında işaret ve ekran okuyucu metni de taşır). */
+.record-tab-count.record-tab-invalid {
+    background: var(--mx-tone-danger-bg);
+    color: var(--mx-tone-danger-fg);
+    font-weight: 700;
+}
+
+.record-tab.active .record-tab-count.record-tab-invalid {
+    background: var(--mx-tone-danger-bg);
+    color: var(--mx-tone-danger-fg);
 }
 
 .record-tabpanel[hidden] {
@@ -4023,8 +4379,8 @@ button.pipeline-label {
     width: 2.25rem;
     height: 2.25rem;
     border-radius: 10px;
-    background: var(--mx-tone-brand-bg);
-    color: var(--mx-brand-primary);
+    background: var(--mx-gradient-brand);
+    color: var(--mx-text-on-brand);
 }
 
 .section-card-heading {

@@ -134,7 +134,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </PlatformGate>
 
@@ -191,7 +191,7 @@
         }
 
         var filter = Filter();
-        var query = new List<string> { $"page={pageNumber}" };
+        var query = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         Add(query, "tenantId", filter.TenantId?.ToString());
         Add(query, "subscription", filter.Subscription);
         Add(query, "eventType", filter.EventType);

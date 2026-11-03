@@ -51,13 +51,19 @@ internal sealed class RoleService(
         CancellationToken cancellationToken,
         Guid? actingMembershipId = null,
         RecordScope scope = RecordScope.All,
-        RoleAssignLevel? assignLevel = null)
+        RoleAssignLevel? assignLevel = null,
+        bool? hideOutOfScopeShared = null)
     {
         var tenant = RequireTenant();
         var role = new Role(name, permissions, scope);
         if (assignLevel is { } level)
         {
             role.SetAssignLevel(level);
+        }
+
+        if (hideOutOfScopeShared is { } hide)
+        {
+            role.SetHideOutOfScopeShared(hide);
         }
 
         EnsureKnownPermissions(role);
@@ -78,7 +84,8 @@ internal sealed class RoleService(
         CancellationToken cancellationToken,
         Guid? actingMembershipId = null,
         RecordScope? scope = null,
-        RoleAssignLevel? assignLevel = null)
+        RoleAssignLevel? assignLevel = null,
+        bool? hideOutOfScopeShared = null)
     {
         var tenant = RequireTenant();
         var role = await db.Roles.SingleOrDefaultAsync(r => r.Id == roleId, cancellationToken);
@@ -95,6 +102,11 @@ internal sealed class RoleService(
         if (scope is { } wanted)
         {
             role.SetScope(wanted);
+        }
+
+        if (hideOutOfScopeShared is { } hide)
+        {
+            role.SetHideOutOfScopeShared(hide);
         }
 
         if (assignLevel is { } level)
@@ -284,13 +296,19 @@ internal sealed class RoleService(
 
     public async Task<IReadOnlyList<BusinessUnitRoleAssignment>?> GetBusinessUnitRolesAsync(Guid businessUnitId, CancellationToken cancellationToken)
     {
-        if (!await db.BusinessUnits.AnyAsync(u => u.Id == businessUnitId, cancellationToken))
+        if (!await db.BusinessUnits.AnyAsync(u => u.Id == businessUnitId, cancellationToken)
+            || !await UnitVisibleAsync(businessUnitId, cancellationToken))
         {
             return null;
         }
 
         return await UnitAssignmentsAsync(businessUnitId, cancellationToken);
     }
+
+    /// <summary>Yönetici olmayan işlemi yapan başka bayinin departmanının rollerini göremez ve değiştiremez ("bulunamadı").</summary>
+    private async Task<bool> UnitVisibleAsync(Guid businessUnitId, CancellationToken cancellationToken) =>
+        await membershipPermissions.GetVisibleUnitIdsAsync(RequireTenant().MembershipId, cancellationToken) is not { } visible
+        || visible.Contains(businessUnitId);
 
     public async Task<IReadOnlyList<BusinessUnitRoleAssignment>?> SetBusinessUnitRolesAsync(
         Guid businessUnitId,
@@ -301,7 +319,7 @@ internal sealed class RoleService(
         ArgumentNullException.ThrowIfNull(roles);
         var tenant = RequireTenant();
         var unit = await db.BusinessUnits.AsNoTracking().SingleOrDefaultAsync(u => u.Id == businessUnitId, cancellationToken);
-        if (unit is null)
+        if (unit is null || !await UnitVisibleAsync(unit.Id, cancellationToken))
         {
             return null;
         }
@@ -620,11 +638,17 @@ internal sealed class RoleService(
         ["permissions"] = new JsonArray([.. role.Permissions.Select(p => JsonValue.Create(p))]),
         ["scope"] = role.Scope.ToString(),
         ["assignLevel"] = role.AssignLevel.ToString(),
+        ["hideOutOfScopeShared"] = role.HideOutOfScopeShared,
     };
 
     private static JsonArray RoleNames(IEnumerable<Guid> roleIds, IReadOnlyDictionary<Guid, string> names) =>
         new([.. roleIds.Select(id => names.GetValueOrDefault(id, id.ToString())).Order(StringComparer.Ordinal).Select(n => JsonValue.Create(n))]);
 
     private static RoleSummary ToSummary(Role role) =>
-        new(role.Id, role.Name, role.Permissions, role.IsSystem) { Scope = role.Scope, AssignLevel = role.AssignLevel };
+        new(role.Id, role.Name, role.Permissions, role.IsSystem)
+        {
+            Scope = role.Scope,
+            AssignLevel = role.AssignLevel,
+            HideOutOfScopeShared = role.HideOutOfScopeShared,
+        };
 }

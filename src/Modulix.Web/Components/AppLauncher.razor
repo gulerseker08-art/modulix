@@ -12,13 +12,13 @@
         <button type="button" class="navbar-brand brand-button" @ref="brandButton" @onclick="Toggle"
                 aria-haspopup="dialog" aria-expanded="@(isOpen ? "true" : "false")" aria-controls="app-launcher-panel"
                 aria-label="Modulix uygulama menüsü">
-            <BrandLogo Size="34" />
+            <BrandLogo Size="36" />
         </button>
     }
     else
     {
         <a class="navbar-brand" href="" aria-label="Modulix ana sayfa">
-            <BrandLogo Size="34" />
+            <BrandLogo Size="36" />
         </a>
     }
 
@@ -74,29 +74,33 @@
                 }
                 else
                 {
-                    <ul class="app-grid">
-                        @foreach (AppDefinition app in visible)
+                    @if (groups.Count > 0)
+                    {
+                        @foreach (AppRootGroup section in groups)
                         {
-                            <li>
-                                @if (openRoot is null && Apps.Children(app.Id).Count > 0)
+                            <section class="app-group" aria-labelledby="@(section.Group is null ? null : $"app-group-{section.Group.Id}")">
+                                @if (section.Group is not null)
                                 {
-                                    <button type="button" class="app-tile tone-@ToneClass(app) @(current?.ParentId == app.Id ? "is-current" : null)"
-                                            @onclick="() => OpenRoot(app)" aria-label="@app.Name, alt uygulamalar">
-                                        <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
-                                        <span class="app-tile-name">@app.Name</span>
-                                    </button>
+                                    <h3 id="app-group-@section.Group.Id" class="app-group-title">@section.Group.Name</h3>
                                 }
-                                else
-                                {
-                                    <a href="@app.Route" class="app-tile tone-@ToneClass(app) @(IsCurrent(app) ? "is-current" : null)"
-                                       aria-current="@(IsCurrent(app) ? "page" : null)" @onclick="() => Close(true)">
-                                        <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
-                                        <span class="app-tile-name">@app.Name</span>
-                                    </a>
-                                }
-                            </li>
+                                <ul class="app-grid">
+                                    @foreach (AppDefinition app in section.Apps)
+                                    {
+                                        @Tile(app)
+                                    }
+                                </ul>
+                            </section>
                         }
-                    </ul>
+                    }
+                    else
+                    {
+                        <ul class="app-grid">
+                            @foreach (AppDefinition app in visible)
+                            {
+                                @Tile(app)
+                            }
+                        </ul>
+                    }
                 }
             </div>
         </div>
@@ -142,6 +146,9 @@
     private AppDefinition? openRoot;
     private bool showSearch;
 
+    // Başlıklı gösterim yalnızca aramasız ve birden çok grup görünürken (ana ve alt düzeyde); aksi halde düz liste.
+    private IReadOnlyList<AppRootGroup> groups = [];
+
     // Erişim bilgisi yüklenemedi: tenant var ama erişim okunamadı (iki adımlı doğrulama beklerken bilerek boştur).
     private bool loadFailed => Session.IsLoaded && Session.HasActiveTenant && !Session.TwoFactorRequired && Session.Access is null;
 
@@ -168,7 +175,29 @@
             ? listed
             : listed.Where(a => Matches(a.Name, query.Trim())).ToList();
         showSearch = Session.IsLoaded && !loadFailed && listed.Count > 0;
+
+        IReadOnlyList<AppRootGroup> grouped = string.IsNullOrWhiteSpace(query) ? Apps.Grouped(listed) : [];
+        groups = grouped.Count > 1 ? grouped : [];
     }
+
+    private RenderFragment Tile(AppDefinition app) => @<li>
+        @if (openRoot is null && Apps.Children(app.Id).Count > 0)
+        {
+            <button type="button" class="app-tile tone-@ToneClass(app) @(current?.ParentId == app.Id ? "is-current" : null)"
+                    @onclick="() => OpenRoot(app)" aria-label="@app.Name, alt uygulamalar">
+                <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
+                <span class="app-tile-name">@app.Name</span>
+            </button>
+        }
+        else
+        {
+            <a href="@app.Route" class="app-tile tone-@ToneClass(app) @(IsCurrent(app) ? "is-current" : null)"
+               aria-current="@(IsCurrent(app) ? "page" : null)" @onclick="() => Close(true)">
+                <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
+                <span class="app-tile-name">@app.Name</span>
+            </a>
+        }
+    </li>;
 
     private static bool Matches(string name, string text) =>
         System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo

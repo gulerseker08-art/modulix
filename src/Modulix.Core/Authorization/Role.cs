@@ -61,6 +61,20 @@ public sealed class Role : ITenantEntity, ICompanyShared
     /// <summary>Rolün kullanıcıya, departmana ya da ikisine atanabilmesi (ADR-0026). Varsayılan yalnızca kullanıcıdır.</summary>
     public RoleAssignLevel AssignLevel { get; private set; } = RoleAssignLevel.User;
 
+    /// <summary>
+    /// Kapsam dışı ortak firma/kişiler bu rolde gizlenir mi (ADR-0026 K8)? Kapalıyken (varsayılan) bu kayıtlar genel uçlardan
+    /// yalnızca asgari kimlikle (ad, vergi no) görünür; açıkken hiç görünmez. Kişinin <b>tüm</b> rolleri gizliyorsa gizlenir:
+    /// rol izinleri gibi eklenir, bir rol göstermeye izin veriyorsa gösterilir. Bayi rolleri için açık olması önerilir.
+    /// </summary>
+    public bool HideOutOfScopeShared { get; private set; }
+
+    /// <summary>Sistem rolü (yönetici) tüm kayıtları gördüğü için bu ayar anlamsızdır ve değiştirilemez.</summary>
+    public void SetHideOutOfScopeShared(bool hide)
+    {
+        EnsureEditable();
+        HideOutOfScopeShared = hide;
+    }
+
     public bool AssignableToUnit => AssignLevel is RoleAssignLevel.Unit or RoleAssignLevel.Both;
 
     public bool AssignableToUser => AssignLevel is RoleAssignLevel.User or RoleAssignLevel.Both;
@@ -75,6 +89,7 @@ public sealed class Role : ITenantEntity, ICompanyShared
         Permissions = [];
         Scope = RecordScope.All;
         AssignLevel = RoleAssignLevel.User;
+        HideOutOfScopeShared = false;
     }
 
     /// <summary>Sistem rolü her zaman yalnızca kullanıcıya atanır (son yönetici koruması doğrudan atamaya bakar).</summary>

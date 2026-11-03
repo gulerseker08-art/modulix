@@ -23,6 +23,9 @@ public sealed record DeliveryPage(IReadOnlyList<DeliveryItem> Items, int Page, i
 /// <param name="Remaining">Hâlâ sırada ya da işlenmekte olan teslimat sayısı.</param>
 public sealed record ProcessResult(int Processed, int Accepted, int Failed, int Skipped, int Unknown, int Requeued, int Remaining, bool Completed);
 
+/// <param name="Error">İşlenemediyse nedeni (ör. sağlayıcı yapılandırılmamış); işlendiyse null.</param>
+public sealed record RunningProcess(Guid RunId, int Processed, bool Completed, string? Error);
+
 /// <summary>
 /// Kampanya çalıştırma (ADR-0025, dilim 5): onay akışı, başlatma ve işleme. Durum geçişleri kayıt boru hattından (denetim, olay, sürüm) geçer; teslimat satırları
 /// günlük yazıcıyla yazılır. Her gönderimden hemen önce adres yeniden çözülür, izin ve engel yeniden denetlenir, sıklık sınırı atomik ayrılır; anlık görüntü bu
@@ -35,6 +38,12 @@ public interface ICampaignRuns
 
     /// <summary>Çalışan çalıştırmanın sıradaki bir grubunu işler (işçi ya da elle çağrılır; tekrar çağrı güvenlidir).</summary>
     Task<RecordResult<ProcessResult>> ProcessAsync(Guid runId, int batchSize, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Arka plan işçisi için (dilim 10): aktif tenant'ta çalışan çalıştırmaların her birinden en çok <paramref name="maxBatches"/> grup işler. Çalıştırmanın başlatılması
+    /// ve onayı yine kullanıcı eylemidir; işçi yalnızca zaten "çalışıyor" olan çalıştırmanın sıradaki satırlarını gönderir. Bir çalıştırmanın hatası diğerlerini durdurmaz.
+    /// </summary>
+    Task<IReadOnlyList<RunningProcess>> ProcessRunningAsync(int batchSize, int maxBatches, int maxRuns, CancellationToken cancellationToken);
 
     Task<RecordResult<RunSummary>> SummaryAsync(Guid runId, CancellationToken cancellationToken);
 
@@ -62,6 +71,8 @@ internal sealed class CampaignRuns(
 {
     private const int MaxAttempts = 3;
     private const int MaxBatch = 200;
+    private const int SaveEvery = 25;
+    private const int ProviderParallelism = 8;
     private static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan ProviderTimeout = TimeSpan.FromSeconds(30);
 
@@ -462,6 +473,37 @@ internal sealed class CampaignRuns(
         return RecordResult<ProcessResult>.Ok(new ProcessResult(claimed.Count, counts.Accepted, counts.Failed, counts.Skipped, counts.Unknown, counts.Requeued, open2, completed));
     }
 
+    public async Task<IReadOnlyList<RunningProcess>> ProcessRunningAsync(int batchSize, int maxBatches, int maxRuns, CancellationToken cancellationToken)
+    {
+        var results = new List<RunningProcess>();
+        foreach (var runId in await deliveries.RunningRunIdsAsync(Math.Clamp(maxRuns, 1, 50), cancellationToken))
+        {
+            var processed = 0;
+            var completed = false;
+            string? error = null;
+            for (var i = 0; i < Math.Max(maxBatches, 1) && !completed; i++)
+            {
+                var step = await ProcessAsync(runId, batchSize, cancellationToken);
+                if (!step.IsSuccess)
+                {
+                    error = step.Error!.Message;
+                    break;
+                }
+
+                processed += step.Value!.Processed;
+                completed = step.Value.Completed;
+                if (step.Value.Processed == 0)
+                {
+                    break;
+                }
+            }
+
+            results.Add(new RunningProcess(runId, processed, completed, error));
+        }
+
+        return results;
+    }
+
     private async Task SendBatchAsync(
         List<CampaignDelivery> batch, CampaignInfo campaign, IMessageProvider provider, MarketingPolicy policy, RecordData content, Tally counts, CancellationToken cancellationToken)
     {
@@ -470,70 +512,125 @@ internal sealed class CampaignRuns(
         var found = lookup is null
             ? []
             : (await lookup.LookupAsync(campaign.TargetType, campaign.Channel, [.. batch.Select(d => new AddressLookup(d.TargetId, d.ContactPointId))], cancellationToken))
-                .ToDictionary(a => (a.TargetId, a.ContactPointId), a => a.Address);
+                .ToDictionary(a => (a.TargetId, a.ContactPointId));
 
         var normalized = batch.ToDictionary(
             d => d.Id,
-            d => found.TryGetValue((d.TargetId, d.ContactPointId), out var raw) ? CommunicationAddress.Normalize(campaign.Channel, raw) : null);
+            d => found.TryGetValue((d.TargetId, d.ContactPointId), out var raw) ? CommunicationAddress.Normalize(campaign.Channel, raw.Address) : null);
+        var variables = batch.ToDictionary(d => d.Id, d => found.TryGetValue((d.TargetId, d.ContactPointId), out var raw) ? raw.Variables : null);
 
         // İzin ve engel her gönderimden hemen önce yeniden değerlendirilir (anlık görüntüdeki durum geçerli sayılmaz).
         var decisions = normalized.Values.Any(a => a is not null)
             ? await preferences.EvaluateManyAsync(
-                campaign.Channel, CommunicationPurpose.Marketing, [.. normalized.Values.Where(a => a is not null).Select(a => a!).Distinct(StringComparer.Ordinal)], cancellationToken)
+                campaign.Channel, CommunicationPurpose.Marketing, [.. normalized.Values.Where(a => a is not null).Select(a => a!).Distinct(StringComparer.Ordinal)], campaign.Topic, cancellationToken)
             : new Dictionary<string, CommunicationDecision>();
 
         var subject = content.Values["subject"]?.GetValue<string>();
         var body = content.Values["body"]!.GetValue<string>();
-        foreach (var delivery in batch)
+
+        // Dilim 10: satırlar SaveEvery'lik gruplarla işlenir. Grup başına tek bağlantı üretimi ve tek günlük kaydı; sağlayıcı çağrıları sınırlı paralel.
+        // Çökme penceresi bir grupla sınırlıdır: kaydedilmemiş satırlar "işleniyor" kalır ve süre dolunca "belirsiz" olur (kör yeniden deneme yok).
+        foreach (var chunk in batch.Chunk(SaveEvery))
         {
-            var address = normalized[delivery.Id];
-            if (address is null)
+            var pending = new List<(CampaignDelivery Delivery, string Address)>();
+            foreach (var delivery in chunk)
             {
-                Finish(delivery, DeliveryStatuses.Skipped, "address-gone", counts);
-            }
-            else if (!decisions[address].IsAllowed)
-            {
-                Finish(delivery, DeliveryStatuses.Skipped, decisions[address].Code, counts);
-            }
-            else if (policy.DailyLimit > 0 && !await frequency.TryReserveAsync(campaign.Channel, address, today, policy.DailyLimit, cancellationToken))
-            {
-                Finish(delivery, DeliveryStatuses.Skipped, "frequency-limit", counts);
-            }
-            else
-            {
-                await SendAsync(delivery, address, campaign, provider, policy, today, subject, body, counts, cancellationToken);
+                var address = normalized[delivery.Id];
+                if (address is null)
+                {
+                    Finish(delivery, DeliveryStatuses.Skipped, "address-gone", counts);
+                }
+                else if (!decisions[address].IsAllowed)
+                {
+                    Finish(delivery, DeliveryStatuses.Skipped, decisions[address].Code, counts);
+                }
+                else if (policy.DailyLimit > 0 && !await frequency.TryReserveAsync(campaign.Channel, address, today, policy.DailyLimit, cancellationToken))
+                {
+                    Finish(delivery, DeliveryStatuses.Skipped, "frequency-limit", counts);
+                }
+                else
+                {
+                    pending.Add((delivery, address));
+                }
             }
 
+            await SendPendingAsync(pending, variables, campaign, provider, policy, today, subject, body, counts, cancellationToken);
             await journal.SaveAsync(cancellationToken);
         }
     }
 
-    private async Task SendAsync(
-        CampaignDelivery delivery, string address, CampaignInfo campaign, IMessageProvider provider, MarketingPolicy policy, DateOnly today,
+    private async Task SendPendingAsync(
+        List<(CampaignDelivery Delivery, string Address)> pending, Dictionary<Guid, IReadOnlyDictionary<string, string>?> variables, CampaignInfo campaign, IMessageProvider provider, MarketingPolicy policy, DateOnly today,
         string? subject, string body, Tally counts, CancellationToken cancellationToken)
     {
-        // Bağlantı iletiden önce kaydedilir; üretilemezse ileti gönderilmez ve ayrılan sıklık hakkı geri verilir.
-        if (await unsubscribe.IssueAsync(campaign.Channel, address, delivery.IdempotencyKey, cancellationToken) is not { } link)
+        if (pending.Count == 0)
         {
-            await ReleaseAsync(campaign, address, today, policy, cancellationToken);
-            Finish(delivery, DeliveryStatuses.Failed, "unsubscribe-link-unavailable", counts);
             return;
         }
 
-        ProviderResult result;
+        // Bağlantılar iletiden önce kaydedilir; üretilemezse ileti gönderilmez ve ayrılan sıklık hakkı geri verilir.
+        var links = await unsubscribe.IssueManyAsync(campaign.Channel, [.. pending.Select(p => (p.Address, p.Delivery.IdempotencyKey))], cancellationToken);
+        var ready = new List<(CampaignDelivery Delivery, string Address, UnsubscribeLink Link)>();
+        for (var i = 0; i < pending.Count; i++)
+        {
+            if (links[i] is { } link)
+            {
+                ready.Add((pending[i].Delivery, pending[i].Address, link));
+            }
+            else
+            {
+                await ReleaseAsync(campaign, pending[i].Address, today, policy, cancellationToken);
+                Finish(pending[i].Delivery, DeliveryStatuses.Failed, "unsubscribe-link-unavailable", counts);
+            }
+        }
+
+        // Yalnızca sağlayıcı çağrısı paraleldir; veritabanı işleri (bu bağlam iş parçacığı güvenli değildir) sıralı kalır.
+        var results = new ProviderResult[ready.Count];
+        using var limiter = new SemaphoreSlim(ProviderParallelism);
+        await Task.WhenAll(ready.Select(async (item, index) =>
+        {
+            await limiter.WaitAsync(cancellationToken);
+            try
+            {
+                results[index] = await CallProviderAsync(item.Delivery, item.Address, item.Link, campaign, provider, subject, body, variables[item.Delivery.Id], cancellationToken);
+            }
+            finally
+            {
+                limiter.Release();
+            }
+        }));
+
+        for (var i = 0; i < ready.Count; i++)
+        {
+            await ApplyResultAsync(ready[i].Delivery, ready[i].Address, results[i], campaign, policy, today, counts, cancellationToken);
+        }
+    }
+
+    private static async Task<ProviderResult> CallProviderAsync(
+        CampaignDelivery delivery, string address, UnsubscribeLink link, CampaignInfo campaign, IMessageProvider provider, string? subject, string body,
+        IReadOnlyDictionary<string, string>? variables, CancellationToken cancellationToken)
+    {
         try
         {
+            // Kişiye özel değişkenler gönderim anında doldurulur (dilim 11); alt bilgi doldurmadan sonra eklenir, değerler bağlantıya karışmaz.
+            var personalSubject = subject is null ? null : ContentTemplate.Render(subject, variables);
+            var personalBody = ContentTemplate.Render(body, variables);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(ProviderTimeout);
-            result = await provider.SendAsync(
-                new MessageRequest(delivery.IdempotencyKey, campaign.Channel, address, subject, ContentRules.WithUnsubscribeFooter(body, link.PageUrl), link), timeout.Token);
+            return await provider.SendAsync(
+                new MessageRequest(delivery.IdempotencyKey, campaign.Channel, address, personalSubject, ContentRules.WithUnsubscribeFooter(personalBody, link.PageUrl), link), timeout.Token);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             // Sağlayıcı iletiyi kabul etmiş olabilir: sonuç bilinmiyor, kör yeniden deneme yok, sıklık hakkı korunur.
-            result = new ProviderResult(ProviderOutcome.Unknown, null, ex is OperationCanceledException ? "timeout" : "provider-exception");
+            return new ProviderResult(ProviderOutcome.Unknown, null, ex is OperationCanceledException ? "timeout" : "provider-exception");
         }
+    }
 
+    private async Task ApplyResultAsync(
+        CampaignDelivery delivery, string address, ProviderResult result, CampaignInfo campaign, MarketingPolicy policy, DateOnly today, Tally counts,
+        CancellationToken cancellationToken)
+    {
         delivery.ProviderMessageId = result.ProviderMessageId;
         switch (result.Outcome)
         {
@@ -707,7 +804,7 @@ internal sealed class CampaignRuns(
         private static Guid? GuidOrNull(JsonNode? node) => node is null ? null : Guid.Parse(node.GetValue<string>());
     }
 
-    private sealed record CampaignInfo(SegmentTarget TargetType, CommunicationChannel Channel, string Status, DateOnly? StartsOn, DateOnly? EndsOn)
+    private sealed record CampaignInfo(SegmentTarget TargetType, CommunicationChannel Channel, string Status, DateOnly? StartsOn, DateOnly? EndsOn, string? Topic)
     {
         public static CampaignInfo From(RecordData data)
         {
@@ -717,7 +814,8 @@ internal sealed class CampaignRuns(
                 Enum.Parse<CommunicationChannel>(v["channel"]!.GetValue<string>()),
                 v["status"]!.GetValue<string>(),
                 v["startsOn"] is { } s ? DateOnly.Parse(s.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture) : null,
-                v["endsOn"] is { } e ? DateOnly.Parse(e.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture) : null);
+                v["endsOn"] is { } e ? DateOnly.Parse(e.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture) : null,
+                v["topic"]?.GetValue<string>());
         }
     }
 }

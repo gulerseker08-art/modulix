@@ -38,7 +38,7 @@ public static class MarketingLabels
 
     public static string ResponseStatus(string status) => status switch
     {
-        "New" => "Yeni", "InProgress" => "İşlemde", "Converted" => "Lead'e dönüştü", "Closed" => "Kapalı", _ => status,
+        "New" => "Yeni", "InProgress" => "İşlemde", "Converted" => "Müşteri adayına dönüştü", "Closed" => "Kapalı", _ => status,
     };
 
     public static string Operator(string key) => Operators.GetValueOrDefault(key, key);
@@ -70,6 +70,7 @@ public static class MarketingLabels
         ["granted"] = "İzinli",
         ["denied"] = "Pazarlama iletişimi reddedilmiş",
         ["unknown"] = "İzin bilinmiyor (gönderilmez)",
+        ["topic-opt-out"] = "Alıcı kampanyanın konusundan çıkmış",
         ["invalid-address"] = "Geçersiz adres",
         ["shared-address"] = "Paylaşılan adres (izin kişiye değil adrese bağlı; otomatik gönderilmez)",
         ["duplicate-address"] = "Aynı adres kitlede zaten var",

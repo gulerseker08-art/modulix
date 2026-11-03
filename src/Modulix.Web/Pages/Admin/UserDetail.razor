@@ -72,7 +72,7 @@
                 <div class="form-grid">
                     <div>
                         <label class="form-label" for="user-unit">Departman</label>
-                        <select id="user-unit" class="form-select" @bind="selectedUnitId" disabled="@Locked">
+                        <select id="user-unit" class="form-select" @bind="selectedUnitId" @bind:after="ResetUnitChange" disabled="@Locked">
                             @foreach (var unit in units.Where(u => u.IsActive || u.Id == currentUnit?.Id))
                             {
                                 <option value="@unit.Id">@unit.PathNames@(unit.IsActive ? "" : " (kapalı)")</option>
@@ -80,10 +80,77 @@
                         </select>
                     </div>
                 </div>
-                <p class="text-muted small">Departmanı değiştirmek, kullanıcının sorumlu olduğu kayıtların hangi departmanda görüneceğini değiştirir.</p>
+                <p class="text-muted small">Departmanı değiştirmek, kullanıcının sorumlu olduğu kayıtların hangi departmanda görüneceğini değiştirir. Değiştirmeden önce etkisi gösterilir.</p>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-primary" disabled="@(busy || Locked || selectedUnitId == currentUnit?.Id)" @onclick="SaveUnitAsync">Departmanı kaydet</button>
+                    <button type="button" class="btn btn-primary" disabled="@(busy || Locked || selectedUnitId == currentUnit?.Id || unitPreview is not null)" @onclick="PreviewUnitAsync">Departmanı değiştir…</button>
                 </div>
+
+                @* Etki ve onay (ADR-0026 K7): kayıtlar kullanıcıyla taşınır ya da eski departmanda kalan birine devredilir; gerekçe denetim kaydına yazılır. *@
+                @if (unitPreview is { IsChange: true } preview)
+                {
+                    <div class="alert alert-warning confirm" role="alertdialog" aria-label="Departman değişikliği onayı">
+                        <p><strong>@(preview.CurrentPath ?? "—") → @preview.TargetPath</strong></p>
+                        @foreach (var warning in preview.Warnings)
+                        {
+                            <p class="mb-1">@warning</p>
+                        }
+
+                        @if (preview.OwnedRecords.Any(o => o.Count > 0))
+                        {
+                            <ul>
+                                @foreach (var owned in preview.OwnedRecords.Where(o => o.Count > 0))
+                                {
+                                    <li>@owned.Label: @owned.Count</li>
+                                }
+                            </ul>
+                        }
+
+                        @if (preview.DecisionRequired)
+                        {
+                            <fieldset class="scope-choice">
+                                <legend class="form-label">Kayıtlar ne olsun?</legend>
+                                <div class="form-check">
+                                    <input id="rec-move" class="form-check-input" type="radio" name="rec-choice" checked="@(recordChoice == "move")"
+                                           @onchange="ChooseMove" />
+                                    <label class="form-check-label" for="rec-move">Kullanıcıyla birlikte yeni departmana geçsin</label>
+                                </div>
+                                <div class="form-check">
+                                    <input id="rec-transfer" class="form-check-input" type="radio" name="rec-choice" checked="@(recordChoice == "transfer")"
+                                           @onchange="ChooseTransfer" />
+                                    <label class="form-check-label" for="rec-transfer">Eski departmanda kalan bir kullanıcıya devredilsin</label>
+                                </div>
+                                @if (recordChoice == "transfer")
+                                {
+                                    @if (oldUnitMembers.Count == 0)
+                                    {
+                                        <p class="text-muted small">Eski departmanda devralabilecek etkin başka kullanıcı yok.</p>
+                                    }
+                                    else
+                                    {
+                                        <select class="form-select" aria-label="Kayıtları devralacak kullanıcı" @bind="transferTo">
+                                            <option value="">Kullanıcı seçin</option>
+                                            @foreach (var member in oldUnitMembers)
+                                            {
+                                                <option value="@member.MembershipId">@member.DisplayName</option>
+                                            }
+                                        </select>
+                                    }
+                                }
+                            </fieldset>
+                        }
+
+                        @if (preview.ReasonRequired)
+                        {
+                            <label class="form-label" for="unit-reason">Gerekçe *</label>
+                            <textarea id="unit-reason" class="form-control" rows="2" maxlength="500" @bind="unitReason" @bind:event="oninput"></textarea>
+                        }
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-warning" disabled="@(busy || !CanConfirmUnitChange)" @onclick="ApplyUnitAsync">Departmanı değiştir</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ResetUnitChange">Vazgeç</button>
+                        </div>
+                    </div>
+                }
             }
         </section>
 
@@ -390,12 +457,80 @@
         selectedUnitId = currentUnit?.Id ?? Guid.Empty;
     }
 
-    private async Task SaveUnitAsync()
+    private BusinessUnitChangePreviewDto? unitPreview;
+    private string recordChoice = string.Empty;
+    private Guid? transferTo;
+    private string unitReason = string.Empty;
+    private List<UserDto> oldUnitMembers = [];
+
+    private const string MoveChoice = "move";
+    private const string TransferChoice = "transfer";
+
+    private void ChooseMove() => recordChoice = MoveChoice;
+
+    private void ChooseTransfer() => recordChoice = TransferChoice;
+
+    private void ResetUnitChange()
+    {
+        unitPreview = null;
+        recordChoice = string.Empty;
+        transferTo = null;
+        unitReason = string.Empty;
+        oldUnitMembers = [];
+    }
+
+    /// <summary>Kayıt kararı ve gerekçe istenen durumlarda tamamlanmadan onaylanamaz (sunucu da aynısını ister).</summary>
+    private bool CanConfirmUnitChange =>
+        unitPreview is { } p
+        && (!p.DecisionRequired || recordChoice == MoveChoice || (recordChoice == TransferChoice && transferTo is not null))
+        && (!p.ReasonRequired || !string.IsNullOrWhiteSpace(unitReason));
+
+    // Önce etkisi gösterilir; kayıt, gerekçe ya da uyarı yoksa doğrudan uygulanır.
+    private async Task PreviewUnitAsync()
     {
         busy = true;
         notice = null;
         message = null;
-        var result = await Api.PutAsync<bool>($"/api/users/{MembershipId}/business-unit", new SetMembershipBusinessUnitRequest(selectedUnitId));
+        var result = await Api.GetAsync<BusinessUnitChangePreviewDto>(
+            $"/api/users/{MembershipId}/business-unit/change-preview?businessUnitId={selectedUnitId}");
+        busy = false;
+        if (result.Value is not { } preview)
+        {
+            message = result.Error;
+            return;
+        }
+
+        if (!preview.IsChange)
+        {
+            return;
+        }
+
+        ResetUnitChange();
+        unitPreview = preview;
+        if (!preview.DecisionRequired && !preview.ReasonRequired && preview.Warnings.Count == 0)
+        {
+            await ApplyUnitAsync();
+            return;
+        }
+
+        if (preview.DecisionRequired && preview.CurrentBusinessUnitId is { } current)
+        {
+            var page = (await Api.GetAsync<UserPageResponse>($"/api/users?businessUnitId={current}&pageSize=100")).Value;
+            oldUnitMembers = page?.Items.Where(u => u.Status == UserStatus.Active && u.MembershipId != MembershipId).ToList() ?? [];
+        }
+    }
+
+    private async Task ApplyUnitAsync()
+    {
+        busy = true;
+        notice = null;
+        message = null;
+        var request = new SetMembershipBusinessUnitRequest(
+            selectedUnitId,
+            string.IsNullOrWhiteSpace(unitReason) ? null : unitReason.Trim(),
+            recordChoice == MoveChoice,
+            recordChoice == TransferChoice ? transferTo : null);
+        var result = await Api.PutAsync<bool>($"/api/users/{MembershipId}/business-unit", request);
         busy = false;
         if (!result.IsSuccess)
         {
@@ -403,10 +538,11 @@
             return;
         }
 
+        ResetUnitChange();
         await LoadAsync();
         await LoadUnitAsync();
         accessVersion++;
-        notice = "Departman kaydedildi.";
+        notice = "Departman değiştirildi.";
     }
 
     private async Task LoadTeamsAsync()

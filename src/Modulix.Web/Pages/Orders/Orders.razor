@@ -11,12 +11,6 @@
             <h1>Siparişler</h1>
             <p class="text-muted mb-0">Siparişler kabul edilmiş tekliften oluşur. Tutarlar her siparişin kendi para birimindedir; farklı para birimleri toplanmaz. Sipariş tutarı tahsilat ya da gelir değildir.</p>
         </div>
-        @if (Session.Can(OrdersAccess.OrdersCreate))
-        {
-            <div class="header-actions">
-                <a class="btn btn-primary" href="crm/teklifler">Teklif seç</a>
-            </div>
-        }
     </div>
 
     @if (message is not null)
@@ -24,33 +18,41 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
-    <div class="filters" role="group" aria-label="Hızlı görünümler">
-        @foreach (var (key, label) in Presets)
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@(view ?? AllViews)" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="order-search">Sipariş ara</label>
+            <input id="order-search" class="form-control" type="search" placeholder="Başlık, sipariş no, teklif no veya müşteri ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
+        @if (Session.Can(OrdersAccess.OrdersCreate))
         {
-            <button type="button" class="chip @(view == key ? "active" : null)" aria-pressed="@(view == key ? "true" : "false")" @onclick="() => TogglePresetAsync(key)">@label</button>
+            <a class="btn btn-primary" href="crm/teklifler"><AppIcon Name="plus" Size="16" /> Teklif seç</a>
         }
-        <label class="visually-hidden" for="status-filter">Sipariş durumu</label>
-        <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm durumlar</option>
-            @foreach (var s in OrderLabels.Statuses)
-            {
-                <option value="@s.Key">@s.Label</option>
-            }
-        </select>
-        <label class="visually-hidden" for="sort-select">Sıralama</label>
-        <select id="sort-select" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
-            @foreach (var (key, label) in OrderLabels.Sorts)
-            {
-                <option value="@key">Sıralama: @label</option>
-            }
-        </select>
     </div>
 
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="order-search">Sipariş ara</label>
-        <input id="order-search" class="form-control" type="search" placeholder="Başlık, sipariş no, teklif no veya müşteri ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="status-filter">Sipariş durumu</label>
+            <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm durumlar</option>
+                @foreach (var s in OrderLabels.Statuses)
+                {
+                    <option value="@s.Key">@s.Label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="sort-select">Sıralama</label>
+            <select id="sort-select" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
+                @foreach (var (key, label) in OrderLabels.Sorts)
+                {
+                    <option value="@key">Sıralama: @label</option>
+                }
+            </select>
+        </div>
+    }
 
     @if (page is null && message is null)
     {
@@ -67,8 +69,8 @@
             <caption class="visually-hidden">Sipariş listesi</caption>
             <thead>
                 <tr>
-                    <th scope="col">Sipariş</th><th scope="col">Müşteri</th><th scope="col">Teklif</th><th scope="col">Durumlar</th>
-                    <th scope="col">Planlanan teslim</th><th scope="col" class="text-end">Tutar</th><th scope="col">Sorumlu</th>
+                    <th scope="col"><SortHeader Label="Sipariş" Asc="number" Desc="-number" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Müşteri</th><th scope="col">Teklif</th><th scope="col">Durumlar</th>
+                    <th scope="col"><SortHeader Label="Planlanan teslim" Asc="deliveryDate" Desc="-deliveryDate" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col" class="text-end">Tutar</th><th scope="col">Sorumlu</th>
                 </tr>
             </thead>
             <tbody>
@@ -93,11 +95,16 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
 @code {
+    private bool filtersOpen;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
+    private int ActiveFilters => (string.IsNullOrEmpty(status) ? 0 : 1);
+
     private const string DefaultSort = "-createdAt";
 
     /// <summary>Hızlı görünümler; her biri sunucudaki süzgeçlerden birine karşılık gelir.</summary>
@@ -116,6 +123,12 @@
     private string? view;
     private string? status;
     private string sort = DefaultSort;
+
+    private Task SortAsync(string key)
+    {
+        sort = key;
+        return LoadAsync(1);
+    }
     private string search = string.Empty;
 
     protected override async Task OnInitializedAsync()
@@ -130,15 +143,19 @@
         }
     }
 
-    private async Task TogglePresetAsync(string key)
+    private const string AllViews = "all";
+
+    private IReadOnlyList<ViewOption> ViewOptions => [new(AllViews, "Tüm siparişler"), .. Presets.Select(p => new ViewOption(p.Key, p.Label))];
+
+    private async Task ChooseViewAsync(string key)
     {
-        view = view == key ? null : key;
+        view = key == AllViews ? null : key;
         await LoadAsync(1);
     }
 
     private string Query(int pageNumber)
     {
-        var parts = new List<string> { $"page={pageNumber}" };
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
         switch (view)
         {

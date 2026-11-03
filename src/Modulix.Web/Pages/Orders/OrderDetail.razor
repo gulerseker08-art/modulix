@@ -152,6 +152,7 @@
                 <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
                     <fieldset disabled="@busy">
                         <legend class="visually-hidden">Taslak sipariş düzenleme</legend>
+                        <FormTabs Title="Ticari koşullar" Label="Sipariş koşulları formu bölümleri">
                         <div class="form-grid">
                             <div class="span-12">
                                 <label class="form-label" for="e-title">Başlık</label>
@@ -202,6 +203,7 @@
                                 <textarea id="e-notes" class="form-control" rows="2" maxlength="4000" @bind="form.OperationsNotes"></textarea>
                             </div>
                         </div>
+                        </FormTabs>
                     </fieldset>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
