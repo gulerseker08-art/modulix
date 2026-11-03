@@ -4688,3 +4688,165 @@ button.pipeline-label {
     word-break: break-word;
     font-size: var(--mx-fs-helper);
 }
+
+/* ---- Rapor merkezi (ADR-0026 dilim 3) ---- */
+.report-table-wrap {
+    margin-bottom: .5rem;
+}
+
+.report-table {
+    font-size: var(--mx-fs-table);
+}
+
+    .report-table th,
+    .report-table td {
+        vertical-align: middle;
+    }
+
+    .report-table thead th {
+        white-space: nowrap;
+    }
+
+    .report-table tbody tr.is-clickable {
+        cursor: pointer;
+    }
+
+    .report-table tfoot th,
+    .report-table tfoot td {
+        font-weight: 700;
+        border-top: 2px solid var(--mx-border-strong, var(--mx-border));
+    }
+
+.report-compare {
+    max-width: 48rem;
+}
+
+    .report-compare caption {
+        caption-side: top;
+        font-weight: 600;
+        color: var(--mx-text-secondary);
+    }
+
+.report-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1rem;
+    align-items: flex-start;
+    padding: .9rem 1rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    margin-bottom: .75rem;
+}
+
+.report-row-main {
+    flex: 1 1 18rem;
+    min-width: 0;
+}
+
+    .report-row-main h3,
+    .report-row-main h4 {
+        font-size: 1rem;
+        margin: 0 0 .25rem;
+    }
+
+.report-row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    margin-top: .4rem;
+}
+
+.report-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    align-items: center;
+}
+
+.report-star {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.report-builder-section {
+    padding: 1rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    margin-bottom: 1rem;
+}
+
+    .report-builder-section > h2 {
+        font-size: 1.1rem;
+        margin-bottom: .75rem;
+    }
+
+.report-builder-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: flex-end;
+    margin-bottom: .5rem;
+}
+
+    .report-builder-row > .grow {
+        flex: 1 1 11rem;
+        min-width: 0;
+    }
+
+    .report-builder-row > .grow-wide {
+        flex: 2 1 14rem;
+        min-width: 0;
+    }
+
+.report-choice-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem 1rem;
+}
+
+.report-member-list {
+    max-height: 16rem;
+    overflow: auto;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    padding: .5rem .75rem;
+}
+
+/* Çizgi grafik */
+.line-chart {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+
+    .line-chart svg {
+        width: 100%;
+        height: auto;
+        max-height: 20rem;
+    }
+
+.line-grid {
+    stroke: var(--mx-border);
+    stroke-width: 1;
+}
+
+.line-axis {
+    fill: var(--mx-text-secondary);
+    font-size: 11px;
+}
+
+.line-path {
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.line-dot {
+    fill: var(--mx-surface);
+    stroke-width: 2;
+}

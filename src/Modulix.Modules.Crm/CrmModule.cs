@@ -3,6 +3,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Reporting;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Leads;
@@ -371,6 +372,9 @@ public sealed class CrmModule : IModule
 
     /// <summary>Lookup alanları (ADR-0016); tanımlar <see cref="CrmLookupDefinitions"/>'tadır.</summary>
     IReadOnlyList<LookupDefinition> IModule.Lookups => CrmLookupDefinitions.All;
+
+    /// <summary>Ortak rapor merkezine katkı (ADR-0026, dilim 3): fırsat ve lead veri kümeleri, satış rapor ekranlarına bağlantılar.</summary>
+    ModuleReporting IModule.Reports => CrmReportDatasets.Reporting;
 
     /// <summary>Form düzenleri (ADR-0021); varsayılan yerleşimler <see cref="CrmForms"/>'tadır, firma üzerine kendi düzenini kurar.</summary>
     IReadOnlyList<FormDefinition> IModule.Forms => CrmForms.All;

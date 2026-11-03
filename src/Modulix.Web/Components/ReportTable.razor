@@ -1,0 +1,110 @@
+@* Rapor sonucunun tablosu (özet ya da kayıt satırları). Sütun başlıkları scope="col" ile etiketlidir; dar ekranda tablo yatay kaydırılabilir kapta durur.
+   Özet satırında "Ayrıntı" düğmesi klavye ve ekran okuyucu yoludur (satıra tıklamak yalnızca fare kolaylığıdır). Biçim kuralları ReportCenterLabels'tadır. *@
+<div class="table-responsive report-table-wrap" tabindex="0" role="region" aria-label="@Caption">
+    <table class="table report-table">
+        <caption class="visually-hidden">@Caption</caption>
+        <thead>
+            <tr>
+                @foreach (var column in Result.Columns)
+                {
+                    <th scope="col" class="@(IsNumeric(column) ? "text-end" : null)">@column.Label</th>
+                }
+                @if (CanDrill)
+                {
+                    <th scope="col"><span class="visually-hidden">Ayrıntı</span></th>
+                }
+                @if (HasRecordLink)
+                {
+                    <th scope="col"><span class="visually-hidden">Kayıt</span></th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Result.Rows)
+            {
+                var link = HasRecordLink ? ReportCenterLabels.RecordLink(Result.RecordPath, row.RecordId) : null;
+                var title = ReportCenterLabels.RowTitle(Result, row);
+                <tr class="@(CanDrill ? "is-clickable" : null) @(ReferenceEquals(row, Selected) ? "table-active" : null)" @onclick="() => DrillAsync(row)">
+                    @for (var i = 0; i < Result.Columns.Count; i++)
+                    {
+                        var column = Result.Columns[i];
+                        <td class="@(IsNumeric(column) ? "text-end" : null)">@(i < row.Cells.Count ? ReportCenterLabels.Cell(row.Cells[i], column, row.Currency) : "—")</td>
+                    }
+                    @if (CanDrill)
+                    {
+                        <td class="text-end">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Ayrıntıyı göster: @title"
+                                    aria-pressed="@(ReferenceEquals(row, Selected) ? "true" : "false")" @onclick="() => DrillAsync(row)" @onclick:stopPropagation>
+                                Ayrıntı
+                            </button>
+                        </td>
+                    }
+                    @if (HasRecordLink)
+                    {
+                        <td class="text-end">
+                            @if (link is not null)
+                            {
+                                <a href="@link" aria-label="Kaydı aç: @title">Aç</a>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+        @if (ShowTotals)
+        {
+            <tfoot>
+                @foreach (var total in Result.Totals)
+                {
+                    <tr>
+                        @for (var i = 0; i < Result.Columns.Count; i++)
+                        {
+                            var column = Result.Columns[i];
+                            if (i == 0)
+                            {
+                                <th scope="row">Toplam@(total.Currency is { Length: > 0 } currency ? $" ({currency})" : null)</th>
+                            }
+                            else if (column.Role == "group")
+                            {
+                                <td></td>
+                            }
+                            else
+                            {
+                                <td class="@(IsNumeric(column) ? "text-end" : null)">@(i < total.Cells.Count ? ReportCenterLabels.Cell(total.Cells[i], column, total.Currency) : "—")</td>
+                            }
+                        }
+                        @if (CanDrill)
+                        {
+                            <td></td>
+                        }
+                    </tr>
+                }
+            </tfoot>
+        }
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ReportResultDto Result { get; set; } = default!;
+
+    /// <summary>Tablonun ekran okuyucu başlığı.</summary>
+    [Parameter] public string Caption { get; set; } = "Rapor sonucu";
+
+    /// <summary>Özet satırında ayrıntıya inilebilir mi (çalıştırıcı verilmişse).</summary>
+    [Parameter] public bool Drillable { get; set; }
+
+    [Parameter] public ReportResultRowDto? Selected { get; set; }
+
+    [Parameter] public EventCallback<ReportResultRowDto> OnDrill { get; set; }
+
+    private bool CanDrill => Drillable && Result.IsSummary;
+
+    private bool HasRecordLink => !Result.IsSummary && !string.IsNullOrEmpty(Result.RecordPath) && Result.Rows.Any(r => r.RecordId is not null);
+
+    // Toplam satırı, gruplama varsa anlamlıdır; yalnızca ölçüsü olan raporun tek satırı zaten toplamdır.
+    private bool ShowTotals => Result.IsSummary && Result.Totals.Count > 0 && Result.Columns.Any(c => c.Role == "group");
+
+    private static bool IsNumeric(ReportResultColumnDto column) => column.Role == "measure" || column.Kind is "number" or "money";
+
+    private Task DrillAsync(ReportResultRowDto row) => CanDrill ? OnDrill.InvokeAsync(row) : Task.CompletedTask;
+}
