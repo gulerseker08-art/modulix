@@ -3,6 +3,16 @@
 {
     <nav class="pager" aria-label="Sayfalar">
         <span class="pager-info text-muted" role="status">@First–@Last / @TotalCount kayıt</span>
+        @if (PageSizeChoice)
+        {
+            <label class="visually-hidden" for="pager-size">Sayfa başına kayıt</label>
+            <select id="pager-size" class="form-select form-select-sm pager-size" @onchange="SizeChangedAsync">
+                @foreach (var option in ListPaging.Options)
+                {
+                    <option value="@option" selected="@(option == ListPaging.Size)">@option / sayfa</option>
+                }
+            </select>
+        }
         <div class="pager-pages">
             <button type="button" class="pager-btn" aria-label="Önceki sayfa" disabled="@(Page <= 1)" @onclick="() => Go(Page - 1)">‹</button>
             @foreach (var item in Items())
@@ -31,6 +41,9 @@
 
     [Parameter] public EventCallback<int> PageChanged { get; set; }
 
+    /// <summary>"25 / sayfa" seçicisi gösterilsin mi; yalnızca sorgusuna <see cref="ListPaging.Size"/> ekleyen listelerde açılır.</summary>
+    [Parameter] public bool PageSizeChoice { get; set; }
+
     private int PageCount => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)Math.Max(1, PageSize)));
 
     private int First => Math.Min(TotalCount, ((Math.Max(1, Page) - 1) * Math.Max(1, PageSize)) + 1);
@@ -58,4 +71,13 @@
     }
 
     private Task Go(int page) => PageChanged.InvokeAsync(page);
+
+    private async Task SizeChangedAsync(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var size))
+        {
+            ListPaging.Set(size);
+            await PageChanged.InvokeAsync(1);
+        }
+    }
 }

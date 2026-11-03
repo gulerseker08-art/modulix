@@ -143,8 +143,8 @@
                     {
                         <th scope="col"><span class="visually-hidden">Seç</span></th>
                     }
-                    <th scope="col">Talep</th><th scope="col">Müşteri</th><th scope="col">Tür</th><th scope="col">Öncelik</th><th scope="col">Durum</th>
-                    <th scope="col">Sorumlu</th><th scope="col">Yaş</th><th scope="col">SLA hedefleri</th><th scope="col">Son hareket</th>
+                    <th scope="col"><SortHeader Label="Talep" Asc="number" Desc="-number" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Müşteri</th><th scope="col">Tür</th><th scope="col"><SortHeader Label="Öncelik" Asc="priority" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Durum</th>
+                    <th scope="col">Sorumlu</th><th scope="col">Yaş</th><th scope="col">SLA hedefleri</th><th scope="col"><SortHeader Label="Son hareket" Desc="-lastActivity" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
                 </tr>
             </thead>
             <tbody>
@@ -173,7 +173,7 @@
                 }
             </tbody>
         </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
@@ -208,6 +208,12 @@
     private string? priority;
     private string? typeKey;
     private string sort = DefaultSort;
+
+    private Task SortAsync(string key)
+    {
+        sort = key;
+        return LoadAsync(1);
+    }
     private string search = string.Empty;
     private readonly HashSet<Guid> selected = [];
     private string bulkAction = string.Empty;
@@ -284,7 +290,7 @@
 
     private string Query(int pageNumber)
     {
-        var parts = new List<string> { $"page={pageNumber}" };
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
         switch (view)
         {

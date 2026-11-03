@@ -10,12 +10,6 @@
             <h1>Segmentler</h1>
             <p class="text-muted mb-0">Belirli kriterleri sağlayan firma, kişi veya müşteri adayı grupları. Segmentte olmak iletişim izni vermez; izin ve engel kontrolü gönderimden önce ayrıca yapılır.</p>
         </div>
-        <div class="header-actions">
-            @if (Session.Can(MarketingAccess.SegmentsWrite))
-            {
-                <a class="btn btn-primary" href="pazarlama/segmentler/yeni">Yeni segment</a>
-            }
-        </div>
     </div>
 
     @if (message is not null)
@@ -23,30 +17,41 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
-    <div class="filters">
-        <label class="visually-hidden" for="status-filter">Durum</label>
-        <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm durumlar</option>
-            @foreach (var s in MarketingLabels.Statuses) { <option value="@s.Key">@s.Label</option> }
-        </select>
-        <label class="visually-hidden" for="target-filter">Hedef türü</label>
-        <select id="target-filter" class="form-select form-select-sm filter-select" @bind="target" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm hedefler</option>
-            @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
-        </select>
-        <label class="visually-hidden" for="kind-filter">Tür</label>
-        <select id="kind-filter" class="form-select form-select-sm filter-select" @bind="kind" @bind:after="() => LoadAsync(1)">
-            <option value="">Statik ve dinamik</option>
-            @foreach (var k in MarketingLabels.Kinds) { <option value="@k.Key">@k.Label</option> }
-        </select>
-        <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@(mine ? "true" : "false")" @onclick="ToggleMineAsync">Benim segmentlerim</button>
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="segment-search">Segment ara</label>
+            <input id="segment-search" class="form-control" type="search" placeholder="Ad veya kod ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
+        @if (Session.Can(MarketingAccess.SegmentsWrite))
+        {
+            <a class="btn btn-primary" href="pazarlama/segmentler/yeni"><AppIcon Name="plus" Size="16" /> Yeni segment</a>
+        }
     </div>
 
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="segment-search">Segment ara</label>
-        <input id="segment-search" class="form-control" type="search" placeholder="Ad veya kod ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="status-filter">Durum</label>
+            <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm durumlar</option>
+                @foreach (var s in MarketingLabels.Statuses) { <option value="@s.Key">@s.Label</option> }
+            </select>
+            <label class="visually-hidden" for="target-filter">Hedef türü</label>
+            <select id="target-filter" class="form-select form-select-sm filter-select" @bind="target" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm hedefler</option>
+                @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
+            </select>
+            <label class="visually-hidden" for="kind-filter">Tür</label>
+            <select id="kind-filter" class="form-select form-select-sm filter-select" @bind="kind" @bind:after="() => LoadAsync(1)">
+                <option value="">Statik ve dinamik</option>
+                @foreach (var k in MarketingLabels.Kinds) { <option value="@k.Key">@k.Label</option> }
+            </select>
+            <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@(mine ? "true" : "false")" @onclick="ToggleMineAsync">Benim segmentlerim</button>
+        </div>
+    }
 
     @if (list is null && message is null)
     {
@@ -88,11 +93,16 @@
                 }
             </tbody>
         </table>
-        <Pager Page="list.Page" PageSize="list.PageSize" TotalCount="list.TotalCount" PageChanged="LoadAsync" />
+        <Pager PageSizeChoice="true" Page="list.Page" PageSize="list.PageSize" TotalCount="list.TotalCount" PageChanged="LoadAsync" />
     }
 </AuthGate>
 
 @code {
+    private bool filtersOpen;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
+    private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (target.Length > 0 ? 1 : 0) + (kind.Length > 0 ? 1 : 0) + (mine ? 1 : 0);
+
     private PagedResult<SegmentDto>? list;
     private string? message;
     private string status = string.Empty;
@@ -115,7 +125,7 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var parts = new List<string> { $"page={pageNumber}" };
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
         if (status != string.Empty) { parts.Add($"status={status}"); }
         if (target != string.Empty) { parts.Add($"target={target}"); }

@@ -1,0 +1,20 @@
+@* Liste hücresinde sorumlu: yuvarlak baş harf rozeti + ad. Rozet rengi addan türetilir (tokenlardan 5 ton); ad yoksa "—". *@
+@if (string.IsNullOrWhiteSpace(Name) || Name == "—")
+{
+    <span class="text-muted">—</span>
+}
+else
+{
+    <span class="owner-cell">
+        <span class="avatar avatar-tone-@Tone" aria-hidden="true">@Initials</span>
+        <span>@Name</span>
+    </span>
+}
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private string Initials => string.Concat((Name ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpperInvariant(p[0])));
+
+    private int Tone => Math.Abs((Name ?? string.Empty).Aggregate(17, (hash, c) => unchecked((hash * 31) + c))) % 5;
+}
