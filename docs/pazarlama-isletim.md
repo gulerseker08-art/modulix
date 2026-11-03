@@ -34,12 +34,12 @@ Ortam: geliştirme bilgisayarı (Windows), SQL Server Docker kapsayıcısında, 
 | Alıcı listesi ilk sayfa | ~2,0 sn | sayfa başına 100 |
 | Sınırı aşan hedef kitlenin reddi | ~0,3 sn | 33.334 hedef |
 | Çalıştırma başlatma (teslimat satırlarını açma) | ~24 sn | 16.667 satır |
-| İşleme grubu (200 ileti) | ~6 sn (≈34 ileti/sn) | adres çözme, izin/engel, bağlantı üretimi, test sağlayıcısı |
+| İşleme grubu (200 ileti) | ~2,6 sn (≈76 ileti/sn; dilim 10 öncesi ≈34) | adres çözme, izin/engel, toplu bağlantı üretimi, test sağlayıcısı |
 
 Çıkarımlar:
 
 - **Hedef kitle sınırı:** bir hedef kitle en fazla 20.000 hedefe çözülür; üstü "Segmenti daraltın" iletisiyle reddedilir (sessizce kesilmez). Daha büyük gönderimler için segmentleri bölün; sınırı artırmak ayrı bir ölçüm ister.
-- **Gönderim hızı:** işleme satır satır ilerler (her ileti kendi kaydıyla). Bir işleme çağrısı ≈ 34 ileti/sn; 16.667 ileti ≈ 8 dakika, 100.000 ileti ≈ 50 dakika sürer. Gerçek sağlayıcı gecikmesi bunun üstüne gelir. Paralel işçi, toplu kayıt ve sağlayıcı çağrılarının eşzamanlılığı **yapılmadı**; büyük gönderimlerden önce yapılmalıdır.
+- **Gönderim hızı:** dilim 10 ile grup başına tek bağlantı üretimi ve tek günlük kaydı yapılır, sağlayıcı çağrıları sınırlı paralel çalışır: bir işleme çağrısı ≈ 76 ileti/sn (dilim 9: ≈ 34); 16.667 ileti ≈ 3,7 dakika, 100.000 ileti ≈ 22 dakika. Gerçek sağlayıcı gecikmesi bunun üstüne gelir (paralellik sabit 8; sağlayıcı hız sınırına göre ayarlanabilir değildir). Test sağlayıcısı anlıktır, bu yüzden ölçüm veritabanı yolunu ölçer; paralel sağlayıcı çağrısının kazancı gerçek sağlayıcıyla ayrıca doğrulanmalıdır.
 - **Rapor** (dilim 8) her istekte hesaplanır, önbellek yoktur; 100.000 kişilik yanıt/lead hacminde ölçülmedi.
 
 ## 4. Veri büyümesi ve temizlik
