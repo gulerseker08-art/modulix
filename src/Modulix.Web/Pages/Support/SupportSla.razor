@@ -46,6 +46,7 @@
         <form class="record-form" novalidate @onsubmit="SaveCalendarAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
                 <legend class="h6">@(cal.Id is null ? "Yeni takvim" : "Takvimi düzenle")</legend>
+                <FormTabs Title="Takvim bilgileri" Label="İş takvimi formu bölümleri">
                 <div class="form-grid">
                     <div class="span-6">
                         <label class="form-label" for="cal-name">Ad</label>
@@ -95,6 +96,7 @@
                         <label class="form-check-label" for="cal-active">Etkin</label>
                     </div>
                 </div>
+                </FormTabs>
             </fieldset>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">@(cal.Id is null ? "Takvim ekle" : "Kaydet")</button>
@@ -130,8 +132,10 @@
         }
 
         <form class="record-form" novalidate @onsubmit="SavePolicyAsync" @onsubmit:preventDefault>
+            <TabBar Tabs="PolicyTabs" State="polTabs" Label="SLA politikası formu bölümleri" />
             <fieldset disabled="@busy">
                 <legend class="h6">@(pol.Id is null ? "Yeni politika" : "Politikayı düzenle (kaydedilince sürüm artar; açık talepler etkilenmez)")</legend>
+                <TabPanel State="polTabs" Key="form-genel">
                 <div class="form-grid">
                     <div class="span-6">
                         <label class="form-label" for="pol-name">Ad</label>
@@ -148,7 +152,10 @@
                         <label class="form-check-label" for="pol-active">Etkin</label>
                     </div>
                     <div class="span-12"><label class="form-label" for="pol-desc">Açıklama</label><input id="pol-desc" class="form-control" maxlength="500" @bind="pol.Description" /></div>
-
+                </div>
+                </TabPanel>
+                <TabPanel State="polTabs" Key="form-kapsam">
+                <div class="form-grid">
                     <div class="span-12 form-check">
                         <input id="pol-default" class="form-check-input" type="checkbox" @bind="pol.IsDefault" />
                         <label class="form-check-label" for="pol-default">Varsayılan (yedek) politika: kısıtsız olmalı; hiçbir özel politika uymazsa kullanılır</label>
@@ -190,6 +197,10 @@
                             </div>
                         }
                     }
+                </div>
+                </TabPanel>
+                <TabPanel State="polTabs" Key="form-hedef">
+                <div class="form-grid">
                     <div class="span-3">
                         <label class="form-label" for="pol-fr">İlk yanıt hedefi (dk)</label>
                         <input id="pol-fr" type="number" min="1" max="525600" class="form-control" @bind="pol.FirstResponseMinutes" />
@@ -264,6 +275,7 @@
                         <FieldError Field="escalationRules" Errors="polErrors" />
                     </div>
                 </div>
+                </TabPanel>
             </fieldset>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">@(pol.Id is null ? "Politika ekle" : "Kaydet")</button>
@@ -347,6 +359,18 @@
     private SlaPreviewDto? preview;
     private IReadOnlyDictionary<string, string[]>? calErrors;
     private IReadOnlyDictionary<string, string[]>? polErrors;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
+    private readonly TabState polTabs = new("form-genel");
+
+    private int PolErrorCount(params string[] fields) => polErrors is null ? 0 : fields.Count(polErrors.ContainsKey);
+
+    private IReadOnlyList<TabItem> PolicyTabs =>
+    [
+        new("form-genel", "Genel", Errors: PolErrorCount("name", "precedence")),
+        new("form-kapsam", "Kapsam", Errors: PolErrorCount("isDefault", "typeKey", "priority", "categoryId", "partyId", "contractId")),
+        new("form-hedef", "Hedefler ve eskalasyon", Errors: PolErrorCount("firstResponseMinutes", "resolutionMinutes", "calendarId", "escalationRules")),
+    ];
     private IReadOnlyDictionary<string, string[]>? pvErrors;
 
     protected override async Task OnInitializedAsync()
@@ -442,7 +466,7 @@
 
     // ---- Politika
 
-    private void NewPolicy() { pol = new PolForm(); polErrors = null; }
+    private void NewPolicy() { pol = new PolForm(); polErrors = null; polTabs.Select("form-genel"); }
 
     private void EditPolicy(SlaPolicyDto p)
     {
@@ -457,6 +481,7 @@
             pol.Rules = JsonSerializer.Deserialize<List<RuleRow>>(p.EscalationRules, Json) ?? [];
         }
 
+        polTabs.Select("form-genel");
         polErrors = null;
     }
 
@@ -475,7 +500,10 @@
                 "Politika kaydedildi.", e => polErrors = e))
         {
             NewPolicy();
+            return;
         }
+
+        polTabs.RevealFirstFailing(PolicyTabs);
     }
 
     private static string Constraints(SlaPolicyDto p)

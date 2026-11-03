@@ -73,6 +73,7 @@
                         <form class="record-form" novalidate @onsubmit="PlanAsync" @onsubmit:preventDefault>
                             <fieldset disabled="@busy">
                                 <legend>Yeni teslimat</legend>
+                                <FormTabs Title="Teslimat planı" Label="Teslimat planı formu bölümleri">
                                 <div class="form-grid">
                                     <div class="span-4"><label class="form-label" for="plan-date">Planlanan teslim tarihi</label><input id="plan-date" type="date" class="form-control" @bind="planDate" /></div>
                                     <div class="span-8"><label class="form-label" for="plan-notes">Not</label><input id="plan-notes" class="form-control" maxlength="2000" @bind="planNotes" /></div>
@@ -84,6 +85,7 @@
                                         </div>
                                     }
                                 </div>
+                                </FormTabs>
                             </fieldset>
                             @if (formError is not null) { <div class="invalid-feedback d-block" role="alert">@formError</div> }
                             <div class="form-actions">

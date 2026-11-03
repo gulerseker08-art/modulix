@@ -23,190 +23,200 @@
 
     @if (form is not null)
     {
-        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="record-form">
             <h2>@(form.Id is null ? "Yeni ürün/hizmet" : "Ürün/hizmeti düzenle")</h2>
-            <div class="form-grid">
-                <div>
-                    <label class="form-label" for="code">Kod *</label>
-                    <input id="code" class="form-control" maxlength="50" @bind="form.Code" />
-                    <FieldError Field="code" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="name">Ad *</label>
-                    <input id="name" class="form-control" maxlength="200" @bind="form.Name" />
-                    <FieldError Field="name" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="kind">Tür</label>
-                    <select id="kind" class="form-select" @bind="form.Kind">
-                        @foreach (var kind in CatalogLabels.Kinds)
-                        {
-                            <option value="@kind.Key">@kind.Label</option>
-                        }
-                    </select>
-                    <FieldError Field="kind" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="status">Durum</label>
-                    <select id="status" class="form-select" @bind="form.Status">
-                        @foreach (var status in CatalogLabels.Statuses)
-                        {
-                            <option value="@status.Key">@status.Label</option>
-                        }
-                    </select>
-                    <FieldError Field="status" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="category">Kategori</label>
-                    <select id="category" class="form-select" @bind="form.CategoryId">
-                        <option value="">—</option>
-                        @foreach (var category in categories)
-                        {
-                            <option value="@category.Id">@category.Name</option>
-                        }
-                    </select>
-                    <FieldError Field="categoryId" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="unit">Temel birim *</label>
-                    <select id="unit" class="form-select" @bind="form.BaseUnitId">
-                        <option value="@Guid.Empty">—</option>
-                        @foreach (var unit in units)
-                        {
-                            <option value="@unit.Id">@unit.Code — @unit.Name</option>
-                        }
-                    </select>
-                    <FieldError Field="baseUnitId" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="precision">Miktar hassasiyeti (ondalık)</label>
-                    <input id="precision" class="form-control" type="number" min="0" max="4" @bind="form.QuantityPrecision" />
-                    <FieldError Field="quantityPrecision" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="taxCategory">Vergi kategorisi</label>
-                    <input id="taxCategory" class="form-control" maxlength="30" @bind="form.TaxCategory" />
-                    <FieldError Field="taxCategory" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="includesTax">Fiyatlar</label>
-                    <select id="includesTax" class="form-select" @bind="form.PriceIncludesTax">
-                        <option value="False">Vergi hariç</option>
-                        <option value="True">Vergi dahil</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="form-label" for="chargeType">Ücretlendirme</label>
-                    <select id="chargeType" class="form-select" @bind="form.ChargeType">
-                        @foreach (var charge in CatalogLabels.ChargeTypes)
-                        {
-                            <option value="@charge.Key">@charge.Label</option>
-                        }
-                    </select>
-                    <FieldError Field="chargeType" Errors="errors" />
-                </div>
-                @if (form.ChargeType == "Recurring")
-                {
-                    <div>
-                        <label class="form-label" for="period">Periyot *</label>
-                        <select id="period" class="form-select" @bind="form.RecurringPeriod">
-                            <option value="">—</option>
-                            @foreach (var period in CatalogLabels.RecurringPeriods)
-                            {
-                                <option value="@period.Key">@period.Label</option>
-                            }
-                        </select>
-                        <FieldError Field="recurringPeriod" Errors="errors" />
+            <TabBar Tabs="FormTabs" State="tabs" Label="Ürün formu bölümleri" />
+            <form novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault hidden="@(tabs.Active == PackageTab)">
+                <TabPanel State="tabs" Key="form-genel">
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label" for="code">Kod *</label>
+                            <input id="code" class="form-control" maxlength="50" @bind="form.Code" />
+                            <FieldError Field="code" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="name">Ad *</label>
+                            <input id="name" class="form-control" maxlength="200" @bind="form.Name" />
+                            <FieldError Field="name" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="kind">Tür</label>
+                            <select id="kind" class="form-select" @bind="form.Kind">
+                                @foreach (var kind in CatalogLabels.Kinds)
+                                {
+                                    <option value="@kind.Key">@kind.Label</option>
+                                }
+                            </select>
+                            <FieldError Field="kind" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="status">Durum</label>
+                            <select id="status" class="form-select" @bind="form.Status">
+                                @foreach (var status in CatalogLabels.Statuses)
+                                {
+                                    <option value="@status.Key">@status.Label</option>
+                                }
+                            </select>
+                            <FieldError Field="status" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="category">Kategori</label>
+                            <select id="category" class="form-select" @bind="form.CategoryId">
+                                <option value="">—</option>
+                                @foreach (var category in categories)
+                                {
+                                    <option value="@category.Id">@category.Name</option>
+                                }
+                            </select>
+                            <FieldError Field="categoryId" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="unit">Temel birim *</label>
+                            <select id="unit" class="form-select" @bind="form.BaseUnitId">
+                                <option value="@Guid.Empty">—</option>
+                                @foreach (var unit in units)
+                                {
+                                    <option value="@unit.Id">@unit.Code — @unit.Name</option>
+                                }
+                            </select>
+                            <FieldError Field="baseUnitId" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="precision">Miktar hassasiyeti (ondalık)</label>
+                            <input id="precision" class="form-control" type="number" min="0" max="4" @bind="form.QuantityPrecision" />
+                            <FieldError Field="quantityPrecision" Errors="errors" />
+                        </div>
                     </div>
-                }
-                <div>
-                    <label class="form-label" for="saleStart">Satış başlangıcı</label>
-                    <input id="saleStart" class="form-control" type="date" @bind="form.SaleStart" />
-                    <FieldError Field="saleStart" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="saleEnd">Satış bitişi</label>
-                    <input id="saleEnd" class="form-control" type="date" @bind="form.SaleEnd" />
-                    <FieldError Field="saleEnd" Errors="errors" />
-                </div>
-                @if (form.Kind == "Service")
-                {
-                    <div>
-                        <label class="form-label" for="duration">Hizmet süresi (dk)</label>
-                        <input id="duration" class="form-control" type="number" min="1" @bind="form.ServiceDurationMinutes" />
-                        <FieldError Field="serviceDurationMinutes" Errors="errors" />
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-fiyat">
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label" for="taxCategory">Vergi kategorisi</label>
+                            <input id="taxCategory" class="form-control" maxlength="30" @bind="form.TaxCategory" />
+                            <FieldError Field="taxCategory" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="includesTax">Fiyatlar</label>
+                            <select id="includesTax" class="form-select" @bind="form.PriceIncludesTax">
+                                <option value="False">Vergi hariç</option>
+                                <option value="True">Vergi dahil</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label" for="chargeType">Ücretlendirme</label>
+                            <select id="chargeType" class="form-select" @bind="form.ChargeType">
+                                @foreach (var charge in CatalogLabels.ChargeTypes)
+                                {
+                                    <option value="@charge.Key">@charge.Label</option>
+                                }
+                            </select>
+                            <FieldError Field="chargeType" Errors="errors" />
+                        </div>
+                        @if (form.ChargeType == "Recurring")
+                        {
+                            <div>
+                                <label class="form-label" for="period">Periyot *</label>
+                                <select id="period" class="form-select" @bind="form.RecurringPeriod">
+                                    <option value="">—</option>
+                                    @foreach (var period in CatalogLabels.RecurringPeriods)
+                                    {
+                                        <option value="@period.Key">@period.Label</option>
+                                    }
+                                </select>
+                                <FieldError Field="recurringPeriod" Errors="errors" />
+                            </div>
+                        }
+                        <div>
+                            <label class="form-label" for="saleStart">Satış başlangıcı</label>
+                            <input id="saleStart" class="form-control" type="date" @bind="form.SaleStart" />
+                            <FieldError Field="saleStart" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="saleEnd">Satış bitişi</label>
+                            <input id="saleEnd" class="form-control" type="date" @bind="form.SaleEnd" />
+                            <FieldError Field="saleEnd" Errors="errors" />
+                        </div>
+                        @if (Session.Can(CrmAccess.ProductCostsRead))
+                        {
+                            <div>
+                                <label class="form-label" for="cost">Maliyet</label>
+                                <input id="cost" class="form-control" type="number" step="any" min="0" @bind="form.Cost" />
+                                <FieldError Field="cost" Errors="errors" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="costCurrency">Maliyet para birimi</label>
+                                <input id="costCurrency" class="form-control" maxlength="3" @bind="form.CostCurrency" />
+                                <FieldError Field="costCurrency" Errors="errors" />
+                            </div>
+                        }
                     </div>
-                    <div>
-                        <label class="form-label" for="delivery">Sunum şekli</label>
-                        <select id="delivery" class="form-select" @bind="form.DeliveryMode">
-                            <option value="">—</option>
-                            @foreach (var mode in CatalogLabels.DeliveryModes)
-                            {
-                                <option value="@mode.Key">@mode.Label</option>
-                            }
-                        </select>
-                        <FieldError Field="deliveryMode" Errors="errors" />
+                </TabPanel>
+                <TabPanel State="tabs" Key="form-detay">
+                    <div class="form-grid">
+                        @if (form.Kind == "Service")
+                        {
+                            <div>
+                                <label class="form-label" for="duration">Hizmet süresi (dk)</label>
+                                <input id="duration" class="form-control" type="number" min="1" @bind="form.ServiceDurationMinutes" />
+                                <FieldError Field="serviceDurationMinutes" Errors="errors" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="delivery">Sunum şekli</label>
+                                <select id="delivery" class="form-select" @bind="form.DeliveryMode">
+                                    <option value="">—</option>
+                                    @foreach (var mode in CatalogLabels.DeliveryModes)
+                                    {
+                                        <option value="@mode.Key">@mode.Label</option>
+                                    }
+                                </select>
+                                <FieldError Field="deliveryMode" Errors="errors" />
+                            </div>
+                        }
+                        <div>
+                            <label class="form-label" for="barcode">Barkod</label>
+                            <input id="barcode" class="form-control" maxlength="50" @bind="form.Barcode" />
+                            <FieldError Field="barcode" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="externalCode">Dış kod</label>
+                            <input id="externalCode" class="form-control" maxlength="50" @bind="form.ExternalCode" />
+                            <FieldError Field="externalCode" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="brand">Marka</label>
+                            <input id="brand" class="form-control" maxlength="100" @bind="form.Brand" />
+                            <FieldError Field="brand" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="model">Model</label>
+                            <input id="model" class="form-control" maxlength="100" @bind="form.Model" />
+                            <FieldError Field="model" Errors="errors" />
+                        </div>
+                        <div class="span-all">
+                            <label class="form-label" for="tags">Etiketler</label>
+                            <input id="tags" class="form-control" maxlength="500" placeholder="Virgülle ayırın" @bind="form.Tags" />
+                            <FieldError Field="tags" Errors="errors" />
+                        </div>
+                        <div class="span-all">
+                            <label class="form-label" for="description">Açıklama</label>
+                            <textarea id="description" class="form-control" rows="3" maxlength="4000" @bind="form.Description"></textarea>
+                            <FieldError Field="description" Errors="errors" />
+                        </div>
                     </div>
-                }
-                <div>
-                    <label class="form-label" for="barcode">Barkod</label>
-                    <input id="barcode" class="form-control" maxlength="50" @bind="form.Barcode" />
-                    <FieldError Field="barcode" Errors="errors" />
+                </TabPanel>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Close">Vazgeç</button>
+                    @if (form.Id is not null)
+                    {
+                        <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    }
                 </div>
-                <div>
-                    <label class="form-label" for="externalCode">Dış kod</label>
-                    <input id="externalCode" class="form-control" maxlength="50" @bind="form.ExternalCode" />
-                    <FieldError Field="externalCode" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="brand">Marka</label>
-                    <input id="brand" class="form-control" maxlength="100" @bind="form.Brand" />
-                    <FieldError Field="brand" Errors="errors" />
-                </div>
-                <div>
-                    <label class="form-label" for="model">Model</label>
-                    <input id="model" class="form-control" maxlength="100" @bind="form.Model" />
-                    <FieldError Field="model" Errors="errors" />
-                </div>
-                @if (Session.Can(CrmAccess.ProductCostsRead))
-                {
-                    <div>
-                        <label class="form-label" for="cost">Maliyet</label>
-                        <input id="cost" class="form-control" type="number" step="any" min="0" @bind="form.Cost" />
-                        <FieldError Field="cost" Errors="errors" />
-                    </div>
-                    <div>
-                        <label class="form-label" for="costCurrency">Maliyet para birimi</label>
-                        <input id="costCurrency" class="form-control" maxlength="3" @bind="form.CostCurrency" />
-                        <FieldError Field="costCurrency" Errors="errors" />
-                    </div>
-                }
-                <div class="span-all">
-                    <label class="form-label" for="tags">Etiketler</label>
-                    <input id="tags" class="form-control" maxlength="500" placeholder="Virgülle ayırın" @bind="form.Tags" />
-                    <FieldError Field="tags" Errors="errors" />
-                </div>
-                <div class="span-all">
-                    <label class="form-label" for="description">Açıklama</label>
-                    <textarea id="description" class="form-control" rows="3" maxlength="4000" @bind="form.Description"></textarea>
-                    <FieldError Field="description" Errors="errors" />
-                </div>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Close">Vazgeç</button>
-                @if (form.Id is not null)
-                {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
-                }
-            </div>
-        </form>
-    }
-
-    @if (form?.Id is { } packageId)
-    {
-        <section class="record-form">
-            <h2>Paket bileşenleri</h2>
+            </form>
+            @if (form.Id is { } packageId)
+            {
+                <TabPanel State="tabs" Key="form-paket">
+            <h3>Paket bileşenleri</h3>
             <p class="text-muted">Bu ürüne bileşen eklerseniz paket olarak davranır; fiyat hesabında bileşenler miktarla çarpılarak listelenir. Paket kendisini ya da (dolaylı olarak) kendisini içeren bir ürünü bileşen yapamaz.</p>
             @if (components.Count == 0)
             {
@@ -263,7 +273,9 @@
                     </div>
                 </form>
             }
-        </section>
+                </TabPanel>
+            }
+        </div>
     }
 
     <div class="filters" role="group" aria-label="Filtre">
@@ -326,6 +338,31 @@
     private List<ProductCategoryDto> categories = [];
     private List<MeasureUnitDto> units = [];
     private ProductForm? form;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
+    private const string PackageTab = "form-paket";
+    private readonly TabState tabs = new("form-genel");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs
+    {
+        get
+        {
+            List<TabItem> items =
+            [
+                new("form-genel", "Genel", Errors: ErrorCount("code", "name", "kind", "status", "categoryId", "baseUnitId", "quantityPrecision")),
+                new("form-fiyat", "Fiyatlama", Errors: ErrorCount("taxCategory", "chargeType", "recurringPeriod", "saleStart", "saleEnd", "cost", "costCurrency")),
+                new("form-detay", "Ayrıntılar", Errors: ErrorCount("serviceDurationMinutes", "deliveryMode", "barcode", "externalCode", "brand", "model", "tags", "description")),
+            ];
+            if (form?.Id is not null)
+            {
+                items.Add(new(PackageTab, "Paket bileşenleri", Count: components.Count));
+            }
+
+            return items;
+        }
+    }
     private List<ProductComponentDto> components = [];
     private List<ProductDto> allProducts = [];
     private ComponentForm componentForm = new();
@@ -399,6 +436,7 @@
     private void New()
     {
         form = new ProductForm();
+        tabs.Select("form-genel");
         errors = null;
         message = null;
     }
@@ -456,6 +494,7 @@
             CostCurrency = p.CostCurrency ?? "TRY", ServiceDurationMinutes = p.ServiceDurationMinutes, DeliveryMode = p.DeliveryMode,
             ChargeType = p.ChargeType, RecurringPeriod = p.RecurringPeriod,
         };
+        tabs.Select("form-genel");
         errors = null;
         message = null;
         componentForm = new ComponentForm();
@@ -492,6 +531,7 @@
 
         errors = result.FieldErrors;
         message = result.Error;
+        tabs.RevealFirstFailing(FormTabs);
     }
 
     private async Task DeleteAsync()

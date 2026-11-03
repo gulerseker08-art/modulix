@@ -21,11 +21,16 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
-    <div class="filters" role="group" aria-label="Hızlı görünümler">
-        @foreach (var (key, label) in Presets)
-        {
-            <button type="button" class="chip @(view == key ? "active" : null)" aria-pressed="@(view == key ? "true" : "false")" @onclick="() => TogglePresetAsync(key)">@label</button>
-        }
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@(view ?? AllViews)" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="job-search">İş ara</label>
+            <input id="job-search" class="form-control" type="search" placeholder="İş numarası, başlık ya da ekip ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+    </div>
+
+    <div class="filters">
         <label class="visually-hidden" for="job-status">İş durumu</label>
         <select id="job-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
             <option value="">Tüm durumlar</option>
@@ -41,12 +46,6 @@
             @foreach (var (key, label) in OrderLabels.JobSorts) { <option value="@key">Sıralama: @label</option> }
         </select>
     </div>
-
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="job-search">İş ara</label>
-        <input id="job-search" class="form-control" type="search" placeholder="İş numarası, başlık ya da ekip ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
 
     @if (page is null && message is null)
     {
@@ -126,9 +125,13 @@
         }
     }
 
-    private async Task TogglePresetAsync(string key)
+    private const string AllViews = "all";
+
+    private IReadOnlyList<ViewOption> ViewOptions => [new(AllViews, "Tüm işler"), .. Presets.Select(p => new ViewOption(p.Key, p.Label))];
+
+    private async Task ChooseViewAsync(string key)
     {
-        view = view == key ? null : key;
+        view = key == AllViews ? null : key;
         await LoadAsync(1);
     }
 

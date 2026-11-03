@@ -14,10 +14,6 @@
             {
                 <a class="btn btn-outline-secondary" href="@ExportUrl()" download="sozlesmeler.csv">CSV indir</a>
             }
-            @if (Session.Can(ContractsAccess.ContractsWrite))
-            {
-                <a class="btn btn-primary" href="sozlesmeler/sihirbaz">Yeni sözleşme</a>
-            }
         </div>
     </div>
 
@@ -27,11 +23,20 @@
     }
     <Notice Text="@notice" Failed="@noticeFailed" />
 
-    <div class="filters" role="group" aria-label="Hızlı görünümler">
-        @foreach (var (key, label) in ViewLabels.Presets)
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@CurrentView" ValueChanged="ChooseViewAsync" NewView="() => saving = true" NewViewText="Yeni görünüm kaydet" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="contract-search">Sözleşme ara</label>
+            <input id="contract-search" class="form-control" type="search" placeholder="Başlık veya sözleşme no ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        @if (Session.Can(ContractsAccess.ContractsWrite))
         {
-            <button type="button" class="chip @(view == key ? "active" : null)" aria-pressed="@(view == key ? "true" : "false")" @onclick="() => ToggleViewAsync(key)">@label</button>
+            <a class="btn btn-primary" href="sozlesmeler/sihirbaz"><AppIcon Name="plus" Size="16" /> Yeni sözleşme</a>
         }
+    </div>
+
+    <div class="filters">
         <label class="visually-hidden" for="effective-filter">Yürürlük durumu</label>
         <select id="effective-filter" class="form-select form-select-sm filter-select" @bind="effective" @bind:after="() => LoadAsync(1)">
             <option value="">Tüm yürürlük durumları</option>
@@ -71,41 +76,30 @@
         </div>
     }
 
+    @if (SelectedView is not null || saving)
+    {
     <section class="saved-views" aria-labelledby="views-title">
-        <h2 id="views-title" class="visually-hidden">Kaydedilmiş görünümler</h2>
-        <div class="filters">
-            <label class="visually-hidden" for="saved-view">Kaydedilmiş görünüm</label>
-            <select id="saved-view" class="form-select form-select-sm filter-select" value="@selectedViewId" @onchange="ApplyViewAsync">
-                <option value="">Kaydedilmiş görünüm seç…</option>
-                @foreach (var v in views)
-                {
-                    <option value="@v.Id">@v.Name</option>
-                }
-            </select>
-            @if (SelectedView is not null)
-            {
+        <h2 id="views-title" class="visually-hidden">Kaydedilmiş görünüm işlemleri</h2>
+        @if (SelectedView is not null)
+        {
+            <div class="filters">
                 <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="UpdateViewAsync">Görünümü güncelle</button>
                 <button type="button" class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="DeleteViewAsync">Görünümü sil</button>
-            }
-            <button type="button" class="btn btn-sm btn-outline-secondary" aria-expanded="@(saving ? "true" : "false")" aria-controls="save-view-form" @onclick="() => saving = !saving">Görünümü kaydet</button>
-        </div>
+            </div>
+        }
         @if (saving)
         {
             <form id="save-view-form" class="search" novalidate @onsubmit="SaveViewAsync" @onsubmit:preventDefault>
                 <label class="visually-hidden" for="view-name">Görünüm adı</label>
                 <input id="view-name" class="form-control" maxlength="100" placeholder="Görünüm adı (ör. Bu çeyrek biten hizmet sözleşmeleri)" @bind="viewName" aria-invalid="@(viewErrors is not null)" aria-describedby="@(viewErrors is null ? null : "view-name-error")" />
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => saving = false">Vazgeç</button>
                 @if (viewErrors is not null) { <div id="view-name-error" class="invalid-feedback d-block" role="alert">@viewErrors</div> }
             </form>
             <p class="small text-muted">Görünüm yalnızca sizin listenizi hatırlar; başkalarına gösterilmez ve yetkinizi genişletmez.</p>
         }
     </section>
-
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="contract-search">Sözleşme ara</label>
-        <input id="contract-search" class="form-control" type="search" placeholder="Başlık veya sözleşme no ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
+    }
 
     @if (page is null)
     {
@@ -187,6 +181,23 @@
 
     private ContractSavedViewDto? SelectedView => views.FirstOrDefault(v => v.Id.ToString() == selectedViewId);
 
+    private const string AllViews = "all";
+    private const string PresetPrefix = "preset:";
+    private const string SavedPrefix = "saved:";
+
+    // Görünüm seçici: tek menüde "Tüm sözleşmeler", hızlı görünümler ve kaydedilmiş görünümler (yalnızca süzgeç; kapsamı sunucu uygular).
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm sözleşmeler"),
+        .. ViewLabels.Presets.Select(p => new ViewOption(PresetPrefix + p.Key, p.Label, "Hızlı görünümler")),
+        .. views.Select(v => new ViewOption(SavedPrefix + v.Id, v.Name, "Kayıtlı görünümlerim")),
+    ];
+
+    private string CurrentView =>
+        SelectedView is { } saved ? SavedPrefix + saved.Id
+        : view is not null ? PresetPrefix + view
+        : AllViews;
+
     protected override async Task OnInitializedAsync()
     {
         await Session.EnsureLoadedAsync();
@@ -261,10 +272,18 @@
 
     private string PartyName(Guid id) => partyNames.TryGetValue(id, out var name) ? name : "—";
 
-    private Task ToggleViewAsync(string key)
+    private async Task ChooseViewAsync(string key)
     {
-        view = view == key ? null : key;
-        return LoadAsync(1);
+        if (key.StartsWith(SavedPrefix, StringComparison.Ordinal))
+        {
+            await ApplyViewAsync(key[SavedPrefix.Length..]);
+            return;
+        }
+
+        // Hızlı görünüm ya da "Tüm sözleşmeler": kaydedilmiş görünüm seçimi kalkar, diğer süzgeçler korunur.
+        selectedViewId = null;
+        view = key.StartsWith(PresetPrefix, StringComparison.Ordinal) ? key[PresetPrefix.Length..] : null;
+        await LoadAsync(1);
     }
 
     private Task ClearExtraAsync(bool approvalFilter)
@@ -300,9 +319,9 @@
         return string.Join('&', parts);
     }
 
-    private async Task ApplyViewAsync(ChangeEventArgs e)
+    private async Task ApplyViewAsync(string? id)
     {
-        selectedViewId = e.Value?.ToString();
+        selectedViewId = id;
         notice = null;
         view = effective = type = approval = preparation = null;
         search = string.Empty;

@@ -1,0 +1,94 @@
+@* Liste ekranı görünüm seçici: "Görünüm: Tüm kayıtlar ▾" düğmesi + açılır menü (docs/design-system/component-catalog.md).
+   Görünümler yalnızca süzgeçtir; kapsamı sunucu uygular, seçici yetki vermez. Seçili görünüm onay işaretiyle ve aria-checked ile belirtilir.
+   Esc ya da menü dışına tıklama kapatır. NewView doluysa menünün sonuna "+ Yeni görünüm" eylemi eklenir. *@
+<div class="view-selector" @onkeydown="OnKeyDown">
+    <button type="button" class="btn btn-outline-secondary view-selector-button" aria-haspopup="menu"
+            aria-expanded="@(open ? "true" : "false")" aria-controls="@menuId" @onclick="Toggle">
+        <span class="view-selector-prefix">@Label:</span>
+        <span class="view-selector-current">@CurrentLabel</span>
+        <AppIcon Name="chevron-down" Size="16" />
+    </button>
+    @if (open)
+    {
+        <div class="view-selector-backdrop" aria-hidden="true" @onclick="Close"></div>
+        <div id="@menuId" class="view-menu" role="menu" aria-label="@Label">
+            @foreach (var group in Items.GroupBy(i => i.Group))
+            {
+                @if (group.Key is not null)
+                {
+                    <div class="view-menu-group" role="presentation">@group.Key</div>
+                }
+
+                @foreach (var item in group)
+                {
+                    var selected = item.Key == Value;
+                    <button type="button" role="menuitemradio" aria-checked="@(selected ? "true" : "false")"
+                            class="view-menu-item @(selected ? "selected" : null)" @onclick="() => SelectAsync(item.Key)">
+                        <span>@item.Label</span>
+                        @if (selected)
+                        {
+                            <AppIcon Name="check" Size="16" />
+                        }
+                    </button>
+                }
+            }
+            @if (NewView.HasDelegate)
+            {
+                <div class="view-menu-divider" role="separator"></div>
+                <button type="button" role="menuitem" class="view-menu-item view-menu-new" @onclick="NewAsync">
+                    <AppIcon Name="plus" Size="16" /> <span>@NewViewText</span>
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private readonly string menuId = "view-menu-" + Guid.NewGuid().ToString("N")[..8];
+    private bool open;
+
+    /// <summary>Menüde listelenen görünümler; <see cref="ViewOption.Group"/> aynı olanlar başlık altında toplanır.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<ViewOption> Items { get; set; } = [];
+
+    /// <summary>Seçili görünümün anahtarı.</summary>
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    /// <summary>Düğmedeki ve menüdeki ad ön eki.</summary>
+    [Parameter] public string Label { get; set; } = "Görünüm";
+
+    /// <summary>Menünün sonundaki eylem (ör. kayıtlı görünüm oluştur); verilmezse eklenmez.</summary>
+    [Parameter] public EventCallback NewView { get; set; }
+
+    [Parameter] public string NewViewText { get; set; } = "Yeni görünüm";
+
+    private string CurrentLabel => Items.FirstOrDefault(i => i.Key == Value)?.Label ?? Items.FirstOrDefault()?.Label ?? "—";
+
+    private void Toggle() => open = !open;
+
+    private void Close() => open = false;
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (open && e.Key == "Escape")
+        {
+            open = false;
+        }
+    }
+
+    private async Task SelectAsync(string key)
+    {
+        open = false;
+        if (key != Value)
+        {
+            await ValueChanged.InvokeAsync(key);
+        }
+    }
+
+    private async Task NewAsync()
+    {
+        open = false;
+        await NewView.InvokeAsync();
+    }
+}

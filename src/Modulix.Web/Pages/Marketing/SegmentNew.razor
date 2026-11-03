@@ -18,44 +18,51 @@
     <ErrorSummary Errors="@errors" />
 
     <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <TabBar Tabs="FormTabs" State="tabs" Label="Segment formu bölümleri" />
         <fieldset disabled="@busy">
-            <div class="form-grid">
-                <div class="span-6">
-                    <label class="form-label" for="s-name">Ad</label>
-                    <input id="s-name" class="form-control" maxlength="150" @bind="name" />
-                    <FieldError Field="name" Errors="errors" />
+            <TabPanel State="tabs" Key="form-genel">
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label" for="s-name">Ad</label>
+                        <input id="s-name" class="form-control" maxlength="150" @bind="name" />
+                        <FieldError Field="name" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="s-code">Kod</label>
+                        <input id="s-code" class="form-control" maxlength="40" placeholder="tekstil-marmara" aria-describedby="s-code-help" @bind="code" />
+                        <small id="s-code-help" class="text-muted">Küçük harf, rakam ve tire; sonradan değişmez.</small>
+                        <FieldError Field="code" Errors="errors" />
+                    </div>
+                    <div class="span-12">
+                        <label class="form-label" for="s-purpose">Amaç</label>
+                        <input id="s-purpose" class="form-control" maxlength="200" placeholder="Ör. antrepo hizmeti tanıtımı" @bind="purpose" />
+                        <FieldError Field="purpose" Errors="errors" />
+                    </div>
+                    <div class="span-12">
+                        <label class="form-label" for="s-desc">Açıklama</label>
+                        <textarea id="s-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
+                        <FieldError Field="description" Errors="errors" />
+                    </div>
                 </div>
-                <div class="span-6">
-                    <label class="form-label" for="s-code">Kod</label>
-                    <input id="s-code" class="form-control" maxlength="40" placeholder="tekstil-marmara" aria-describedby="s-code-help" @bind="code" />
-                    <small id="s-code-help" class="text-muted">Küçük harf, rakam ve tire; sonradan değişmez.</small>
-                    <FieldError Field="code" Errors="errors" />
+            </TabPanel>
+            <TabPanel State="tabs" Key="form-hedef">
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label" for="s-target">Hedef türü</label>
+                        <select id="s-target" class="form-select" @bind="target">
+                            @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
+                        </select>
+                        <FieldError Field="target" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="s-kind">Tür</label>
+                        <select id="s-kind" class="form-select" @bind="kind">
+                            @foreach (var k in MarketingLabels.Kinds) { <option value="@k.Key">@k.Label</option> }
+                        </select>
+                        <FieldError Field="kind" Errors="errors" />
+                    </div>
                 </div>
-                <div class="span-6">
-                    <label class="form-label" for="s-target">Hedef türü</label>
-                    <select id="s-target" class="form-select" @bind="target">
-                        @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
-                    </select>
-                    <FieldError Field="target" Errors="errors" />
-                </div>
-                <div class="span-6">
-                    <label class="form-label" for="s-kind">Tür</label>
-                    <select id="s-kind" class="form-select" @bind="kind">
-                        @foreach (var k in MarketingLabels.Kinds) { <option value="@k.Key">@k.Label</option> }
-                    </select>
-                    <FieldError Field="kind" Errors="errors" />
-                </div>
-                <div class="span-12">
-                    <label class="form-label" for="s-purpose">Amaç</label>
-                    <input id="s-purpose" class="form-control" maxlength="200" placeholder="Ör. antrepo hizmeti tanıtımı" @bind="purpose" />
-                    <FieldError Field="purpose" Errors="errors" />
-                </div>
-                <div class="span-12">
-                    <label class="form-label" for="s-desc">Açıklama</label>
-                    <textarea id="s-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
-                    <FieldError Field="description" Errors="errors" />
-                </div>
-            </div>
+            </TabPanel>
         </fieldset>
         <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Oluştur</button></div>
     </form>
@@ -71,6 +78,17 @@
     private bool busy;
     private string? message;
     private IReadOnlyDictionary<string, string[]>? errors;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır ve kayıt denemesinden sonra açılır.
+    private readonly TabState tabs = new("form-genel");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs =>
+    [
+        new("form-genel", "Genel", Errors: ErrorCount("name", "code", "purpose", "description")),
+        new("form-hedef", "Hedef ve tür", Errors: ErrorCount("target", "kind")),
+    ];
 
     protected override Task OnInitializedAsync() => Session.EnsureLoadedAsync();
 
@@ -95,6 +113,7 @@
 
         message = result.FieldErrors.Count == 0 ? result.Error : null;
         errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
+        tabs.RevealFirstFailing(FormTabs);
     }
 
     private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

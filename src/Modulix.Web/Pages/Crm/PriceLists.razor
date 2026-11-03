@@ -24,6 +24,8 @@
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <h2>@(form.Id is null ? "Yeni fiyat listesi" : "Fiyat listesini düzenle")</h2>
+            <TabBar Tabs="FormTabs" State="tabs" Label="Fiyat listesi formu bölümleri" />
+            <TabPanel State="tabs" Key="form-genel">
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="name">Ad *</label>
@@ -67,6 +69,10 @@
                         <FieldError Field="segment" Errors="errors" />
                     </div>
                 }
+            </div>
+            </TabPanel>
+            <TabPanel State="tabs" Key="form-gecerlilik">
+            <div class="form-grid">
                 <div>
                     <label class="form-label" for="method">Kademe yöntemi</label>
                     <select id="method" class="form-select" @bind="form.TierMethod">
@@ -88,6 +94,7 @@
                     <FieldError Field="validTo" Errors="errors" />
                 </div>
             </div>
+            </TabPanel>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
@@ -250,6 +257,17 @@
     private PriceListDto? opened;
     private List<PriceListItemDto>? items;
     private ListForm? form;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
+    private readonly TabState tabs = new("form-genel");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs =>
+    [
+        new("form-genel", "Genel", Errors: ErrorCount("name", "currency", "scope", "companyId", "segment")),
+        new("form-gecerlilik", "Kademe ve geçerlilik", Errors: ErrorCount("tierMethod", "validFrom", "validTo")),
+    ];
     private ItemForm itemForm = new();
     private IReadOnlyDictionary<string, string[]>? errors;
     private IReadOnlyDictionary<string, string[]>? itemErrors;
@@ -309,6 +327,7 @@
     {
         await EnsureLookupsAsync();
         form = new ListForm();
+        tabs.Select("form-genel");
         errors = null;
         message = null;
     }
@@ -322,6 +341,7 @@
             Segment = list.Segment, TierMethod = list.TierMethod, Status = list.Status,
             ValidFrom = list.ValidFrom?.LocalDateTime, ValidTo = list.ValidTo?.LocalDateTime,
         };
+        tabs.Select("form-genel");
         errors = null;
         message = null;
     }
@@ -349,6 +369,7 @@
 
         errors = result.FieldErrors;
         message = result.Error;
+        tabs.RevealFirstFailing(FormTabs);
     }
 
     private async Task DeleteAsync()

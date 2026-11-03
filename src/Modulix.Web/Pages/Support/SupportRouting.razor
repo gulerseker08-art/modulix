@@ -81,6 +81,7 @@
         <form class="record-form" novalidate @onsubmit="SaveRuleAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
                 <legend class="h6">@(rule.Id is null ? "Yeni kural" : "Kuralı düzenle")</legend>
+                <FormTabs Title="Kural bilgileri" Label="Yönlendirme kuralı formu bölümleri">
                 <div class="form-grid">
                     <div class="span-6">
                         <label class="form-label" for="rule-name">Ad</label>
@@ -137,6 +138,7 @@
                         <FieldError Field="ownerId" Errors="ruleErrors" />
                     </div>
                 </div>
+                </FormTabs>
             </fieldset>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">@(rule.Id is null ? "Kural ekle" : "Kaydet")</button>

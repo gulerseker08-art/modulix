@@ -24,6 +24,7 @@
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <h2>@(form.Id is null ? "Yeni birim" : "Birimi düzenle")</h2>
+            <FormTabs Title="Birim bilgileri" Label="Ölçü birimi formu bölümleri">
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="code">Kod *</label>
@@ -51,6 +52,7 @@
                     <FieldError Field="factorToBase" Errors="errors" />
                 </div>
             </div>
+            </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>

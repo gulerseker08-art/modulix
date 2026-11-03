@@ -77,6 +77,7 @@
                     <div class="alert alert-danger" role="alert">@groupError</div>
                 }
 
+                <FormTabs Title="@group.Key" Label="Ayar grubu formu bölümleri">
                 <div class="form-grid">
                     @foreach (var setting in group)
                     {
@@ -111,6 +112,7 @@
                         </div>
                     }
                 </div>
+                </FormTabs>
 
                 @if (canEdit)
                 {
