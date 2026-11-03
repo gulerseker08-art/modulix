@@ -193,7 +193,7 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.Role, "Rol", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["permissions"] = "İzinler", ["isSystem"] = "Sistem rolü", ["scope"] = "Kayıt kapsamı",
-            ["assignLevel"] = "Atanabilir düzey",
+            ["assignLevel"] = "Atanabilir düzey", ["hideOutOfScopeShared"] = "Kapsam dışı ortak kayıtları gizle",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>

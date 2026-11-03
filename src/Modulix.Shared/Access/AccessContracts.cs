@@ -146,7 +146,8 @@ public sealed record RoleDto(
     int MemberCount = 0,
     RecordScope Scope = RecordScope.All,
     RoleAssignLevel AssignLevel = RoleAssignLevel.User,
-    int UnitCount = 0);
+    int UnitCount = 0,
+    bool HideOutOfScopeShared = false);
 
 /// <summary>Hazır rol önerisi; "Şablondan başla" ile yeni rol formunu doldurur.</summary>
 public sealed record RoleTemplateDto(
@@ -154,7 +155,11 @@ public sealed record RoleTemplateDto(
 
 /// <summary><see cref="Scope"/> verilmezse yeni rol tüm kayıtları görür, mevcut rolün kapsamı değişmez.</summary>
 public sealed record SaveRoleRequest(
-    string Name, IReadOnlyList<string> Permissions, RecordScope? Scope = null, RoleAssignLevel? AssignLevel = null);
+    string Name,
+    IReadOnlyList<string> Permissions,
+    RecordScope? Scope = null,
+    RoleAssignLevel? AssignLevel = null,
+    bool? HideOutOfScopeShared = null);
 
 public sealed record SetMembershipRolesRequest(IReadOnlyList<Guid> RoleIds);
 

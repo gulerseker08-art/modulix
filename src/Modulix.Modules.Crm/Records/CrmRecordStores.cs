@@ -112,8 +112,9 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
 
         if (await Context.Data.Set<Company>().AnyAsync(c => c.PartyId == party.Id, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError(field,
-                field == "partyId" ? "Bu firma CRM'de zaten kayıtlı." : "Bu vergi numarasıyla kayıtlı bir firma var.")]);
+            // Mevcut firma kapsam dışında olabilir (ADR-0026 K9): ileti kaydın adını, sahibini ya da kimliğini içermez.
+            throw new RecordValidationException([new RecordFieldError(field, await WithReferralHintAsync(
+                field == "partyId" ? "Bu firma CRM'de zaten kayıtlı." : "Bu vergi numarasıyla kayıtlı bir firma var.", cancellationToken))]);
         }
 
         entity.AttachParty(party);
@@ -126,6 +127,17 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         return (kept, true);
     }
 
+    /// <summary>
+    /// Kapsam dışı ortak kayıtları gizleyen rollerde çakışma iletisine, kaydı göremeyen kişiyi yetkiliye yönlendiren bir cümle
+    /// eklenir (ADR-0026 K9). Kaydın görünür olup olmadığına bakılmaz: ileti ikisinde de aynıdır, böylece kapsam dışı kayıt
+    /// ile kapsam içi kayıt ayırt edilemez.
+    /// </summary>
+    private async Task<string> WithReferralHintAsync(string message, CancellationToken cancellationToken) =>
+        await Context.Access.GetOwnersAsync(cancellationToken) is not null
+        && await Context.Access.HidesOutOfScopeSharedRecordsAsync(cancellationToken)
+            ? message + " Kaydı göremiyorsanız yetkili (merkez) kullanıcıya başvurun."
+            : message;
+
     /// <summary>Vergi numarası taraflar arasında tekildir; başka bir tarafın numarası verilirse alan hatası (409 değil).</summary>
     protected override async Task AppliedAsync(Company entity, JsonObject values, CancellationToken cancellationToken)
     {
@@ -133,7 +145,8 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         if (entity.Party.TaxNumber is { } number
             && await Context.Data.Set<Party>().AnyAsync(p => p.TaxNumber == number && p.Id != entity.PartyId, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("taxNumber", "Bu vergi numarasıyla kayıtlı bir firma var.")]);
+            throw new RecordValidationException([new RecordFieldError(
+                "taxNumber", await WithReferralHintAsync("Bu vergi numarasıyla kayıtlı bir firma var.", cancellationToken))]);
         }
 
         // Eski telefon/e-posta/şehir/adres alanları yapılandırılmış ana kayıtlara yansır (ADR-0012).

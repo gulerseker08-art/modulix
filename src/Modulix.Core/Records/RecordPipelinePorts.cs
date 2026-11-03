@@ -27,6 +27,9 @@ public interface IDataScopeService
 {
     /// <summary>Null: tüm kayıtlar. Aksi halde yalnızca sorumlusu bu kullanıcılardan biri olan kayıtlar.</summary>
     Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken);
+
+    /// <summary>Kapsam dışı ortak kayıtlar gizli mi (ADR-0026 K8); varsayılan hayır.</summary>
+    Task<bool> HidesOutOfScopeSharedAsync(TenantContext tenant, CancellationToken cancellationToken) => Task.FromResult(false);
 }
 
 /// <summary>
