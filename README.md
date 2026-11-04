@@ -344,6 +344,7 @@ Tek profil anahtarının yanında, sektör → faaliyet grubu → alt faaliyet a
 - Katalog `platform` şemasında global ve RLS dışıdır; yalnızca platform yöneticisi yönetir (`GET /api/platform/sectors`, `POST .../nodes`, `PUT .../nodes/{id}`, `PUT .../nodes/{id}/active`, `PUT .../nodes/{id}/capabilities`, `POST .../capabilities`, `PUT .../capabilities/{kod}/dependencies`). Düğüm silinmez, pasife alınır; aktif alt düğümü olan düğüm pasife alınamaz. Düğüm taşıma yoktur. Eşzamanlı düzenleme sürüm numarasıyla 409 döner. Her yazma `PlatformAuditLog`'a yazılır.
 - Firma yöneticisi (`core.customization.manage`) kataloğu okur ve kendi faaliyet seçimini yönetir (`GET /api/sectors/catalog`, `GET`/`PUT /api/sectors/selection`, `POST /api/sectors/selection/preview`). Seçim `core.ActivitySelections` (RLS altında); üst başlığı seçmek alt faaliyeti seçmiş saymaz, üst bağlam türetilir. Boş seçim geçerlidir. Pasif ya da bilinmeyen faaliyet reddedilir. Değişiklik firmanın denetim kaydına `core.activity-selection` olarak yazılır.
 - Eksik yetenek uyarıdır, engel değildir. Şimdilik "sağlanan yetenek" katalogdaki etkin yeteneklerdir; modüllerin yetenek beyanı sonraki dilimdedir.
+- Ekranlar (Dilim B): platform yöneticisi için Platform → Sektörler ve faaliyetler (`/platform/sektorler`: ağaç, düğüm ekle/düzenle/pasife al, hazırlık durumu, yetenek ve bağımlılıklar); firma yöneticisi için Yönetim → Faaliyetlerim (`/yonetim/faaliyetler`, `core.customization.manage`: çoklu seçim, anlık önizleme, kaydet).
 
 ### Ortak firma ve kişi kaydı (Ç3a)
 
