@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Modules;
@@ -13,6 +14,7 @@ using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Authorization;
+using Modulix.Infrastructure.Modules;
 using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Tenancy;
@@ -33,7 +35,9 @@ internal sealed class PlatformAdministration(
     ModulixDbContext db,
     ModuleCatalog catalog,
     SectorProfileCatalog profiles,
-    ITenantScopeFactory tenantScopes) : IPlatformAdministration
+    ITenantScopeFactory tenantScopes,
+    TimeProvider time,
+    IOptions<LicenseOptions> license) : IPlatformAdministration
 {
     public const int MaxPageSize = 50;
 
@@ -577,7 +581,8 @@ internal sealed class PlatformAdministration(
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.Status, g => g.Count, cancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = time.GetUtcNow();
+        var graceDays = license.Value.EffectiveGraceDays;
         var horizon = now.AddDays(90);
         var ends = await (
             from entitlement in db.ModuleEntitlements.AsNoTracking()
@@ -588,6 +593,7 @@ internal sealed class PlatformAdministration(
         return new PlatformOverview(
             counts,
             ends.Count(e => e < now),
+            ends.Count(e => EntitlementPhases.At(e, now, graceDays) == EntitlementPhase.ReadOnly),
             ends.Count(e => e >= now && e <= now.AddDays(30)),
             ends.Count(e => e >= now && e <= now.AddDays(60)),
             ends.Count(e => e >= now));
@@ -596,16 +602,19 @@ internal sealed class PlatformAdministration(
     // Erişime açık firmaların bitiş tarihi olan açık hakları; süresiz haklar ve kapalı firmalar dışarıda.
     public async Task<IReadOnlyList<PlatformExpiration>> ListExpirationsAsync(int days, CancellationToken cancellationToken)
     {
-        var horizon = DateTimeOffset.UtcNow.AddDays(Math.Clamp(days, 1, 365));
-        return await (
+        var now = time.GetUtcNow();
+        var graceDays = license.Value.EffectiveGraceDays;
+        var horizon = now.AddDays(Math.Clamp(days, 1, 365));
+        var rows = await (
             from entitlement in db.ModuleEntitlements.AsNoTracking()
             join tenant in db.Tenants.AsNoTracking() on entitlement.TenantId equals tenant.Id
             where entitlement.IsEnabled && entitlement.ValidUntil <= horizon && TenantStatusRules.Operational.Contains(tenant.Status)
             orderby entitlement.ValidUntil, tenant.Name
-            select new PlatformExpiration(
-                tenant.Id, tenant.Name, tenant.Slug, tenant.Status, entitlement.ModuleKey, entitlement.Source,
-                entitlement.ValidUntil!.Value, entitlement.Note))
+            select new { tenant.Id, tenant.Name, tenant.Slug, tenant.Status, entitlement.ModuleKey, entitlement.Source, ValidUntil = entitlement.ValidUntil!.Value, entitlement.Note })
             .ToListAsync(cancellationToken);
+        return [.. rows.Select(r => new PlatformExpiration(
+            r.Id, r.Name, r.Slug, r.Status, r.ModuleKey, r.Source, r.ValidUntil, r.Note,
+            EntitlementPhases.At(r.ValidUntil, now, graceDays), r.ValidUntil.AddDays(graceDays)))];
     }
 
     // Katalog sırasıyla; denetim kaydında karşılaştırılabilir olsun.

@@ -141,3 +141,13 @@ Bilinen eksikler: iki adımlı doğrulama sıfırlama platform kaydına yazılma
 - İki adımlı doğrulama sıfırlama platform denetim kaydına yazılır (`user.two-factor-reset`, hedef firma yok).
 
 Kalan eksikler: `tenant-delete` platform kaydına satır eklemez (CLI'da işlemi yapan kullanıcı yok); toplu işlemler ve süre takviminden doğrudan uzatma yok; bitiş tarihi uygulanmaz, `GracePeriod`/`ReadOnly` ve işçi Dilim 3'tedir; arayüz yalnızca derlenip incelendi, tarayıcıda gezilmedi.
+
+**Dilim 3 (uygulandı, `gseker/platform-lisans-dilim3`):**
+
+- **Sapma, gerekçesiyle:** ADR "süre dolumu işçisi" ve firma düzeyinde `GracePeriod`/`ReadOnly` durumları öngörüyordu. Bunun yerine **evre modül hakkı düzeyinde ve bitiş tarihinden her okumada hesaplanır** (`EntitlementPhases.At`); saklanan durum ve işçi yoktur. Sebep: işçiye bağlı geçiş gecikir ve çoklu örnekte tutarsızlaşır, hesaplanan evre tarih değişince anında doğrudur; firma durumları (`Suspended`/`Closed`) elle yönetilmeye devam eder. Tenant yaşam döngüsü tablosundaki `GracePeriod`/`ReadOnly` satırları modül hakkı için geçerlidir.
+- **Varsayılanlar (ürün kararı 3 ve 4 için, ürün sahibi onayıyla):** ek süre 14 gün (`License:GraceDays`), ardından salt okunur; askı otomatik değildir. Deneme modülleri aynı evrelerden geçer (otomatik askı yok).
+- **Uygulama noktaları:** `RequireModule` (yazma yöntemleri salt okunurda 403; `/preview` ile biten POST'lar hariç); modül işçileri (5); oturumsuz uçlar: web formu gönderimi, teklif bağlantısı (görüntüleme açık, karar yazma kapalı), anket (görüntüleme açık, yanıt kapalı), imza webhook'u. Daha önce oturumsuz uçlar modül kapalıyken de çalışıyordu; bu da kapandı. İletişim tercihi/abonelikten çıkma bağlantıları bilerek lisansa bağlanmadı.
+- **Yönetici uyarısı:** `GET /api/tenant/access` yanıtına `licenses` eklendi; arayüzde yalnızca firma yöneticisine banner. E-posta uyarısı yapılmadı (tekrar göndermemek için gönderim durumu saklamak gerekir).
+- Süre takvimi ve genel bakış evre ve salt okunur sayısı gösterir.
+
+Bilinen sınırlar: POST ile okuma yapan ve adı `/preview` ile bitmeyen uçlar (ör. rapor çalıştırma modül grubundaysa) salt okunurda reddedilir; yeni bulunursa adlandırma ya da süzgeç istisnasıyla çözülür. Evreyi hesaplayan okuma her yazma isteğinde bir ek sorgudur (önbellek yok; ölçülmedi). Arka plan işleyicilerinden (EventDispatcher, otomasyon) salt okunurda yazılanlar bu dilimde engellenmedi; olay teslimi modül açık mı bakar, yazma evresine bakmaz. Arayüz tarayıcıda gezilmedi.

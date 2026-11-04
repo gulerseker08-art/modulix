@@ -11,6 +11,7 @@ using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
@@ -175,7 +176,7 @@ internal static class ContractSignatureEndpoints
             Guid.NewGuid(), tenantId, DomainEventTypes.RecordDeleted, 1, ContractsModule.Entities.Contract, Guid.Empty, null, Guid.Empty,
             ExecutionSource.Import, http.TraceIdentifier, null, 0, new JsonObject(), time.GetUtcNow());
         scope.ServiceProvider.GetRequiredService<EventHandlingScope>().Begin(cause, "contracts.signature-webhook");
-        if (!await scope.ServiceProvider.GetRequiredService<ICurrentAccess>().IsModuleEnabledAsync(ContractsModule.ModuleKey, ct))
+        if (!await scope.ServiceProvider.GetRequiredService<IModuleLicense>().IsWritableAsync(tenantId, ContractsModule.ModuleKey, ct))
         {
             return Results.NotFound();
         }

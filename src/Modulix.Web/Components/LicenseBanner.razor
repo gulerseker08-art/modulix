@@ -1,0 +1,24 @@
+@inject SessionState Session
+
+@* Lisans süresi uyarısı (ADR-0028): yalnızca firma yöneticisine; süresi yaklaşan, ek sürede olan ve salt okunura geçmiş modüller.
+   Sunucu da yazmayı reddeder (salt okunur modüle yazma 403); bu yalnızca nedenini açıklar. *@
+@if (Session.Access is { IsAdministrator: true, Licenses.Count: > 0 } access)
+{
+    @foreach (var license in access.Licenses)
+    {
+        <div class="alert @(license.Phase == LicensePhase.ReadOnly ? "alert-danger" : "alert-warning")" role="alert">
+            @switch (license.Phase)
+            {
+                case LicensePhase.ReadOnly:
+                    <strong>@license.DisplayName</strong> <span>lisans süresi @CrmLabels.Time(license.ValidUntil) tarihinde doldu; modül salt okunur. Kayıtlarınız silinmedi, yalnızca görüntülenebilir. Yeniden etkinleştirmek için ürün sahibiyle iletişime geçin.</span>
+                    break;
+                case LicensePhase.Grace:
+                    <strong>@license.DisplayName</strong> <span>lisans süresi @CrmLabels.Time(license.ValidUntil) tarihinde doldu. @CrmLabels.Time(license.GraceEndsAt) tarihine kadar kullanmaya devam edebilirsiniz; sonrasında modül salt okunur olur.</span>
+                    break;
+                default:
+                    <strong>@license.DisplayName</strong> <span>lisansı @CrmLabels.Time(license.ValidUntil) tarihinde sona erecek.</span>
+                    break;
+            }
+        </div>
+    }
+}

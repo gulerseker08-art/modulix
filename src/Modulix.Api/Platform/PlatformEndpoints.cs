@@ -134,12 +134,13 @@ public static class PlatformEndpoints
         var overview = await admin.GetOverviewAsync(ct);
         return new PlatformOverviewResponse(
             [.. Enum.GetValues<TenantStatus>().Select(s => new TenantStateCountDto((TenantState)s, overview.TenantCounts.GetValueOrDefault(s)))],
-            overview.ExpiredEntitlements, overview.ExpiringIn30Days, overview.ExpiringIn60Days, overview.ExpiringIn90Days);
+            overview.ExpiredEntitlements, overview.ReadOnlyEntitlements, overview.ExpiringIn30Days, overview.ExpiringIn60Days, overview.ExpiringIn90Days);
     }
 
     private static async Task<List<PlatformExpirationDto>> ListExpirationsAsync(int? days, IPlatformAdministration admin, CancellationToken ct) =>
         [.. (await admin.ListExpirationsAsync(days ?? 90, ct)).Select(e => new PlatformExpirationDto(
-            e.TenantId, e.TenantName, e.TenantSlug, (TenantState)e.TenantStatus, e.ModuleKey, (LicenseSource)e.Source, e.ValidUntil, e.Note))];
+            e.TenantId, e.TenantName, e.TenantSlug, (TenantState)e.TenantStatus, e.ModuleKey, (LicenseSource)e.Source, e.ValidUntil, e.Note,
+            (Shared.Access.LicensePhase)e.Phase, e.GraceEndsAt))];
 
     private static async Task<IResult> ListAuditAsync(
         Guid? tenantId, string? action, int? page, int? pageSize, IPlatformAdministration admin, CancellationToken ct)

@@ -35,6 +35,7 @@ dotnet run --project src/Modulix.Api -- tenant-delete <slug> --confirm <slug>  #
 - Tenant istemciden gelen başlık/parametreden değil, oturumdan belirlenir ve her istekte doğrulanır.
 - Firmanın erişime açık olup olmadığı `TenantStatusRules.Operational` ile sorulur (Active ve Trial); sorgularda `Status == TenantStatus.Active` yazma (ADR-0028).
 - Uç noktalar `.RequirePermission(...)` / `.RequireModule(...)` ile korunur. Yeni yönetim işlemleri denetim kaydına yazılmalı.
+- Lisans süresi bitince modül önce ek sürede çalışır, sonra salt okunur olur (`IModuleLicense`, ADR-0028); salt okunurda `RequireModule` altındaki POST/PUT/DELETE 403 döner. Yazmayan POST uçlarının yolu `/preview` ile biter; oturumsuz ve arka plan yollarında modül kontrolü `IModuleLicense.AllowsAsync`/`IsWritableAsync` ile yapılır, `IsModuleEnabledAsync` ile değil.
 - E-posta `IEmailQueue.Enqueue` ile kuyruğa yazılır; HTML'e giren kullanıcı girdisi `WebUtility.HtmlEncode` ile kodlanır.
 - Yeni sektör modülü için CRM'i örnek al (`src/Modulix.Modules.Crm`: `Domain`, `Persistence`, `Records`).
 - Kayıt formlarının düzeni metadata'dan gelir (ADR-0021): modül `IModule.Forms` ile varsayılan sekme/bölüm/alan yerleşimini tanımlar, firma Form tasarımı ekranından özelleştirir, editör `LayoutForm` ile çizer. Yeni formda alan yerleşimini Razor'a sabit yazma; tanıma alan ekle ve editörde o anahtar için girdiyi ver.
