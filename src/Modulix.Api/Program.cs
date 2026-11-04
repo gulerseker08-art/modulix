@@ -204,6 +204,7 @@ app.MapLookupEndpoints();
 app.MapFormLayoutEndpoints();
 app.MapSectorProfileEndpoints();
 app.MapSectorEndpoints();
+app.MapRuleEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapContractsEndpoints();
