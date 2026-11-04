@@ -182,7 +182,7 @@ public class RecordMergePipelineTests
         public Task<bool> HasPermissionAsync(TenantContext tenant, string entityKey, RecordOperation operation, CancellationToken cancellationToken) =>
             Task.FromResult(permitted());
 
-        public Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken) =>
+        public Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlySet<Guid>?>(inScope() ? null : new HashSet<Guid>());
     }
 

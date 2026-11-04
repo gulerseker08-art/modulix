@@ -121,24 +121,9 @@ public sealed class AutomationPreviewService(
                 continue;
             }
 
-            var parameters = new JsonObject();
-            var notes = new List<string>();
-            foreach (var (name, value) in step.Parameters ?? new JsonObject())
-            {
-                if (ActionParameterBinding.FieldOf(value) is { } fieldKey)
-                {
-                    var fact = facts.Get(fieldKey, AutomationValueSource.New);
-                    parameters[name] = fact.State == AutomationFactState.Value ? ToJson(fact.Value!) : null;
-                    if (fact.State != AutomationFactState.Value)
-                    {
-                        notes.Add($"'{fields.Find(fieldKey)?.Label ?? fieldKey}' bu kayıtta {(fact.State == AutomationFactState.Hidden ? "görülemiyor" : "boş")}.");
-                    }
-                }
-                else
-                {
-                    parameters[name] = value?.DeepClone();
-                }
-            }
+            var resolved = AutomationParameterResolver.Resolve(step, fields, facts);
+            var parameters = resolved.Values;
+            var notes = resolved.Notes.ToList();
 
             var effect = view.Definition.SideEffect switch
             {
@@ -154,18 +139,6 @@ public sealed class AutomationPreviewService(
 
         return planned;
     }
-
-    private static JsonNode? ToJson(object value) => value switch
-    {
-        string text => text,
-        decimal number => number,
-        bool flag => flag,
-        DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        DateTimeOffset moment => moment.ToString("O", CultureInfo.InvariantCulture),
-        Guid id => id.ToString(),
-        AutomationMoney money => money.Amount,
-        _ => value.ToString(),
-    };
 }
 
 /// <summary>Kural sürümünün okunabilir özeti ("Şu olunca / koşul / aksiyonlar"); denetim kaydında ve ekranda kullanılır.</summary>

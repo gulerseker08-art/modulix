@@ -44,7 +44,7 @@ internal abstract class ActivityChildStore<TChild>(CrmStoreContext context) : Cr
     {
         var query = await ActivityVisibility.DetailVisibleAsync(
             Context.Data.Set<Activity>().AsNoTracking().Where(a => a.Id == activityId), Context, cancellationToken);
-        if (await Context.Access.GetOwnersAsync(cancellationToken) is { } owners)
+        if (await Context.Access.GetOwnersAsync(CrmModule.Entities.Activity, cancellationToken) is { } owners)
         {
             query = query.Where(ActivityVisibility.InScope(Context, owners));
         }

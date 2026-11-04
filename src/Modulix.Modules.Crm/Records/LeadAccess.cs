@@ -27,7 +27,7 @@ internal static class LeadAccess
             return false;
         }
 
-        if (await access.GetOwnersAsync(cancellationToken) is not { } scope)
+        if (await access.GetOwnersAsync(CrmModule.Entities.Lead, cancellationToken) is not { } scope)
         {
             return true;
         }

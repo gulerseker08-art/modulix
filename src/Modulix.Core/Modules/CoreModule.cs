@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Automation;
 using Modulix.Core.Events;
 using Modulix.Core.Settings;
 
@@ -109,6 +110,12 @@ public sealed class CoreModule : IModule
         /// ile bildirdiği türlerdir (katalog doldurur); yeni modül ek iş yapmadan katılır.
         /// </summary>
         public const string AssignmentEmail = "core.assignment-email";
+
+        /// <summary>
+        /// Kural altyapısı (ADR-0027, Dilim 2): kayıt olayını kuralların tetikleyicisiyle eşler ve çalışma satırı yazar. Kayıt türleri,
+        /// modüllerin <see cref="IModule.Automation"/> ile bildirdiği türlerdir (katalog doldurur); hiçbiri yoksa abonelik de yoktur.
+        /// </summary>
+        public const string Automation = "core.automation";
     }
 
     /// <summary>Denetim kayıt türleri (Y5). Yönetim kayıtlarının değerleri her denetim okuruna açıktır.</summary>
@@ -190,6 +197,9 @@ public sealed class CoreModule : IModule
         public const string Currency = "core.regional.currency";
         public const string Format = "core.regional.format";
         public const string RequireTwoFactor = "core.security.require-two-factor";
+
+        /// <summary>Acil durdurma (ADR-0027): "Hayır" ise firmanın hiçbir kuralı çalışmaz; kuyruktaki çalışmalar iptal edilir.</summary>
+        public const string AutomationEnabled = "core.automation.enabled";
     }
 
     /// <summary>Evet/Hayır ayarlarının değerleri.</summary>
@@ -205,6 +215,7 @@ public sealed class CoreModule : IModule
     private const string ProfileGroup = "Firma profili";
     private const string RegionalGroup = "Bölgesel ayarlar";
     private const string SecurityGroup = "Güvenlik";
+    private const string AutomationGroup = "Otomasyon";
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
     [
@@ -244,6 +255,13 @@ public sealed class CoreModule : IModule
         {
             Description = "Açıksa iki adımlı doğrulaması kapalı kullanıcılar firmaya girmeden önce doğrulama uygulamasını kurar. "
                 + "Açabilmek için sizin iki adımlı doğrulamanız açık olmalı.",
+            Options = [new(SettingValues.No, "Hayır"), new(SettingValues.Yes, "Evet")],
+        },
+
+        new(SettingKeys.AutomationEnabled, "Otomasyon kuralları çalışsın", AutomationGroup, SettingType.Choice, SettingValues.Yes)
+        {
+            Description = "Hayır derseniz bu firmanın hiçbir otomasyon kuralı çalışmaz ve kuyruktaki çalışmalar iptal edilir; kurallar silinmez. "
+                + "Beklenmedik bir davranışta hızlıca durdurmak içindir.",
             Options = [new(SettingValues.No, "Hayır"), new(SettingValues.Yes, "Evet")],
         },
     ];
@@ -366,7 +384,7 @@ public sealed class CoreModule : IModule
         {
             ["name"] = "Ad", ["module"] = "Modül", ["entity"] = "Kayıt türü", ["status"] = "Durum", ["priority"] = "Öncelik",
             ["stopProcessing"] = "Sonraki kuralları durdur", ["activeFrom"] = "Etkinlik başlangıcı", ["activeUntil"] = "Etkinlik bitişi",
-            ["version"] = "Sürüm", ["summary"] = "Özet",
+            ["version"] = "Sürüm", ["summary"] = "Özet", ["run"] = "Çalışma",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
@@ -489,9 +507,15 @@ public sealed class CoreModule : IModule
     [
         EventSubscription.For<AssignmentEmailSubscriber>(
             Subscriptions.AssignmentEmail, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
+        EventSubscription.For<AutomationEventSubscriber>(
+            Subscriptions.Automation, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
     ];
 
-    public void ConfigureServices(IServiceCollection services) => services.AddScoped<AssignmentEmailSubscriber>();
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddScoped<AssignmentEmailSubscriber>();
+        services.AddScoped<AutomationEventSubscriber>();
+    }
 
     /// <summary>Kişinin çalıştığı firma: kişisi olan taraf silinemez.</summary>
     IReadOnlyList<SharedRecordReference> IModule.SharedRecordReferences { get; } =

@@ -76,9 +76,9 @@ public class DataScopeTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
             new SaveCompanyRequest(rep2Company.Name, Version: movedCompany.Version, OwnerId: outsider.Id))).StatusCode);
 
         // Atanabilir üyeler kapsamla aynıdır; tüm üyeler (adlar için) herkese açıktır.
-        var rep1Assignable = await rep1Client.GetFromJsonAsync<List<TenantMemberResponse>>("/api/tenant/members?assignable=true");
+        var rep1Assignable = await rep1Client.GetFromJsonAsync<List<TenantMemberResponse>>("/api/tenant/members?assignable=true&entityKey=crm.company");
         Assert.Equal([rep1.Id], rep1Assignable!.Select(m => m.UserId));
-        var leadAssignable = await leadClient.GetFromJsonAsync<List<TenantMemberResponse>>("/api/tenant/members?assignable=true");
+        var leadAssignable = await leadClient.GetFromJsonAsync<List<TenantMemberResponse>>("/api/tenant/members?assignable=true&entityKey=crm.company");
         Assert.Equal(new[] { lead.Id, rep1.Id, rep2.Id }.Order(), leadAssignable!.Select(m => m.UserId).Order());
         Assert.Equal(5, (await rep1Client.GetFromJsonAsync<List<TenantMemberResponse>>("/api/tenant/members"))!.Count);
 
@@ -91,6 +91,18 @@ public class DataScopeTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
             $"/api/users/{await factory.GetMembershipIdAsync(lead.Id, tenant.Id)}/access");
         Assert.Equal(Modulix.Shared.Access.RecordScope.Team, leadAccess!.Scope);
         Assert.Equal(["Satış"], leadAccess.Teams);
+    }
+
+    [Fact]
+    public async Task Assignable_members_require_an_entity_key()
+    {
+        var (_, admin, _, _, _, _) = await SetUpAsync();
+        using var adminClient = await LoginAsync(admin);
+
+        // Kapsam kayıt türüne göre çözülür (ADR-0029); türsüz istek sessizce geniş sonuç vermek yerine reddedilir.
+        Assert.Equal(HttpStatusCode.BadRequest, (await adminClient.GetAsync("/api/tenant/members?assignable=true")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await adminClient.GetAsync("/api/tenant/members?assignable=true&entityKey=%20")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await adminClient.GetAsync("/api/tenant/members")).StatusCode);
     }
 
     [Fact]

@@ -60,4 +60,7 @@ public static class SettingKeys
     public const string Currency = "core.regional.currency";
     public const string Format = "core.regional.format";
     public const string RequireTwoFactor = "core.security.require-two-factor";
+
+    /// <summary>Otomasyon acil durdurma anahtarı (ADR-0027): "false" ise firmanın hiçbir kuralı çalışmaz.</summary>
+    public const string AutomationEnabled = "core.automation.enabled";
 }

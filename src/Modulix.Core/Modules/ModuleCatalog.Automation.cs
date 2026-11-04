@@ -139,6 +139,21 @@ public sealed partial class ModuleCatalog
                 }
             }
         }
+
+        // Kural aboneliği yalnızca kural yazılabilen kayıt türlerinin olaylarını alır (atama e-postasındaki gibi katalog doldurur):
+        // hiçbir modül kural yeteneği beyan etmediyse abonelik de yoktur ve olay teslimine ek yük binmez.
+        if (subscriptions.TryGetValue(CoreModule.Subscriptions.Automation, out var automation))
+        {
+            var entityKeys = automationEntities.Keys.Order(StringComparer.Ordinal).ToList();
+            if (entityKeys.Count == 0)
+            {
+                subscriptions.Remove(automation.Subscription.Key);
+            }
+            else
+            {
+                subscriptions[automation.Subscription.Key] = (automation.ModuleKey, automation.Subscription with { EntityKeys = entityKeys });
+            }
+        }
     }
 
     private void ValidateAutomationField(

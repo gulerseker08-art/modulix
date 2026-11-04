@@ -42,7 +42,7 @@ internal static class CompanyLinks
             return false;
         }
 
-        var scope = await context.Access.GetOwnersAsync(cancellationToken);
+        var scope = await context.Access.GetOwnersAsync(CrmModule.Entities.Company, cancellationToken);
         return scope is null || (owner.OwnerId is { } ownerId && scope.Contains(ownerId));
     }
 
@@ -55,7 +55,7 @@ internal static class CompanyLinks
         }
 
         var query = context.Data.Set<Contact>().AsNoTracking().Where(c => c.Id == contactId);
-        if (await context.Access.GetOwnersAsync(cancellationToken) is { } scope)
+        if (await context.Access.GetOwnersAsync(CrmModule.Entities.Contact, cancellationToken) is { } scope)
         {
             query = query.Where(ContactRecordStore.VisibleTo(context.Data, scope));
         }

@@ -204,7 +204,7 @@ internal sealed class LookupService(
     private async Task<RecordResult<LookupPage>> SearchMembersAsync(
         LookupInfo info, string? text, int page, int size, CancellationToken cancellationToken)
     {
-        var owners = await scope.GetOwnersAsync(tenantAccessor.Current!, cancellationToken);
+        var owners = await scope.GetOwnersAsync(tenantAccessor.Current!, info.Definition.SourceEntityKey, cancellationToken);
         var matches = (await members.ListActiveAsync(cancellationToken))
             .Where(m => owners is null || owners.Contains(m.UserId))
             .Where(m => text is null || TurkishCulture.CompareInfo.IndexOf(m.DisplayName, text, Loose) >= 0)

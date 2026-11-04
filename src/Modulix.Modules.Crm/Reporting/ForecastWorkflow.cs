@@ -717,7 +717,7 @@ internal sealed class ForecastWorkflow(
         var canRead = await access.HasPermissionAsync(CrmModule.Permissions.OpportunitiesRead, cancellationToken);
         var amounts = await access.HasPermissionAsync(CrmModule.Permissions.OpportunityAmountsRead, cancellationToken);
         return new Visibility(
-            canRead && amounts, amounts, await recordAccess.GetOwnersAsync(cancellationToken),
+            canRead && amounts, amounts, await recordAccess.GetOwnersAsync(CrmModule.Entities.Opportunity, cancellationToken),
             await access.HasPermissionAsync(CrmModule.Permissions.ForecastsWrite, cancellationToken),
             await access.HasPermissionAsync(CrmModule.Permissions.ForecastsSubmit, cancellationToken),
             await access.HasPermissionAsync(CrmModule.Permissions.ForecastsLock, cancellationToken),
@@ -955,7 +955,7 @@ internal sealed class ForecastWorkflow(
             return RecordResult<ForecastDetail>.Fail(RecordErrorCode.PermissionDenied, $"Tahmin için '{CrmModule.Permissions.OpportunitiesRead}' izni gerekir.");
         }
 
-        var owners = await recordAccess.GetOwnersAsync(cancellationToken);
+        var owners = await recordAccess.GetOwnersAsync(CrmModule.Entities.Opportunity, cancellationToken);
         if (owners is null)
         {
             return null;
