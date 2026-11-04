@@ -55,6 +55,12 @@ public class ModulixDbContext(
     /// <summary>Platform işlemlerinin tenant'lar arası, ekleme-yalnız kaydı (ADR-0028).</summary>
     public DbSet<PlatformAuditEntry> PlatformAuditLog => Set<PlatformAuditEntry>();
 
+    public DbSet<Plan> Plans => Set<Plan>();
+
+    public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+
+    public DbSet<LimitOverride> LimitOverrides => Set<LimitOverride>();
+
     public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     public DbSet<QueuedEmail> EmailMessages => Set<QueuedEmail>();

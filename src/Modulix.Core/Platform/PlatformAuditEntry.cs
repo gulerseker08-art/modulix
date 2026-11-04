@@ -13,6 +13,11 @@ public static class PlatformAuditActions
     public const string AdministratorInvited = "tenant.administrator-invited";
     public const string ProfileApplied = "tenant.profile-applied";
     public const string UserTwoFactorReset = "user.two-factor-reset";
+    public const string PlanCreated = "plan.created";
+    public const string PlanUpdated = "plan.updated";
+    public const string PlanAssigned = "tenant.plan-assigned";
+    public const string LimitOverridden = "tenant.limit-overridden";
+    public const string LimitRevoked = "tenant.limit-revoked";
 }
 
 /// <summary>

@@ -151,3 +151,13 @@ Kalan eksikler: `tenant-delete` platform kaydına satır eklemez (CLI'da işlemi
 - Süre takvimi ve genel bakış evre ve salt okunur sayısı gösterir.
 
 Bilinen sınırlar: POST ile okuma yapan ve adı `/preview` ile bitmeyen uçlar (ör. rapor çalıştırma modül grubundaysa) salt okunurda reddedilir; yeni bulunursa adlandırma ya da süzgeç istisnasıyla çözülür. Evreyi hesaplayan okuma her yazma isteğinde bir ek sorgudur (önbellek yok; ölçülmedi). Arka plan işleyicilerinden (EventDispatcher, otomasyon) salt okunurda yazılanlar bu dilimde engellenmedi; olay teslimi modül açık mı bakar, yazma evresine bakmaz. Arayüz tarayıcıda gezilmedi.
+
+**Dilim 4 (uygulandı, `gseker/platform-plan-dilim4`; Dilim 3 üzerine yığılı):**
+
+- **Değişmez ilke (ürün sahibi, 4 Kasım 2026): veri hiçbir zaman silinmez, yalnızca erişim sınırlanır.** Plan kapatılır (silinmez), abonelik kapatılır (geçmiş kalır), istisna geri alınır, plan değişince kapanan modülün verisi yerinde kalır, koltuk sınırı mevcut kullanıcıları kapatmaz.
+- Tablolar (`platform` şeması, RLS dışı): `Plans`, `PlanModules`, `PlanLimits`, `TenantSubscriptions` (firma başına tek geçerli kayıt, filtreli benzersiz indeks), `LimitOverrides`. Migration yalnızca tablo ekler (geriye uyumlu).
+- **Tasarım kararı:** plan modül hakları `ModuleEntitlements`'a kaynağı `Plan` olarak **yazılır** (materyalize); böylece Dilim 3'ün süre/salt okunur uygulaması ve bütün mevcut denetim noktaları değişmeden çalışır. `IEntitlementResolver` yalnızca limitleri çözer; modüller için tek kaynak `IModuleEntitlements` kalır.
+- **Varsayılanlar (ürün kararı 1 ve 2 için bekleyen cevaba karşı):** ticari model paket (plan) tabanlıdır; satışa konu tek limit koltuktur. Depolama, e-posta ve AI limitleri kullanım ölçümü olmadığı için tanımlanmadı; `LimitKeys` listesine eklenip kullanımı ölçülünce açılır.
+- Plan değişikliği mevcut abonelerin modüllerine yansımaz (yeniden atama gerekir): toplu etkiyi ve fiyatlama sonuçlarını önlemek için bilinçli.
+
+Bilinen sınırlar: plan atama birden fazla ayrı işlemdir (modüller, sonra abonelik); ortada hata olursa modüller değişmiş abonelik yazılmamış kalabilir, yeniden denemek aynı sonucu verir. İstisna yalnızca koltuk için arayüzde var. Plana toplu atama, fiyat ve fatura yok (ürün kararı 5). Arayüz tarayıcıda gezilmedi.

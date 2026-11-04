@@ -215,6 +215,7 @@ app.MapCommunicationPublicEndpoints();
 app.MapContractSignatureWebhook();
 app.MapPlatformEndpoints();
 app.MapPlatformEventEndpoints();
+app.MapPlatformPlanEndpoints();
 app.MapAuditEndpoints();
 app.MapSettingsEndpoints();
 

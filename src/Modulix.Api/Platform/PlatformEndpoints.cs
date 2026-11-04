@@ -222,7 +222,7 @@ public static class PlatformEndpoints
         return await Run(() => action(reason));
     }
 
-    private static async Task<IResult> Run(Func<Task> action)
+    internal static async Task<IResult> Run(Func<Task> action)
     {
         try
         {
@@ -236,7 +236,7 @@ public static class PlatformEndpoints
     }
 
     // Kullanıcı yönetimiyle aynı eşleme; "bulunamadı" burada firmadır.
-    private static IResult? ToProblem(Exception exception) => exception switch
+    internal static IResult? ToProblem(Exception exception) => exception switch
     {
         UserAdministrationException { Error: UserAdministrationError.NotFound } ex =>
             Results.Problem(statusCode: StatusCodes.Status404NotFound, title: ex.Message),
