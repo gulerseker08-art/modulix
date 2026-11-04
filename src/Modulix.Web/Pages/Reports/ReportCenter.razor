@@ -66,7 +66,7 @@
                             {
                                 <div class="report-row">
                                     <div class="report-row-main">
-                                        <h3><a href="raporlar/hazir/@Uri.EscapeDataString(ready.Key)">@ready.Title</a></h3>
+                                        <h3><a href="raporlar/hazir/@ready.Key.Replace('.', '~')">@ready.Title</a></h3>
                                         <p class="text-muted mb-0">@ready.Description</p>
                                         <div class="report-row-meta">
                                             <span class="badge tag">@(ReportCenterLabels.IsSummary(ready.Spec) ? "Özet rapor" : "Tablo rapor")</span>
@@ -77,7 +77,7 @@
                                         </div>
                                     </div>
                                     <div class="report-row-actions">
-                                        <a class="btn btn-outline-secondary btn-sm" href="raporlar/hazir/@Uri.EscapeDataString(ready.Key)" aria-label="Hazır raporu aç: @ready.Title">Aç</a>
+                                        <a class="btn btn-outline-secondary btn-sm" href="raporlar/hazir/@ready.Key.Replace('.', '~')" aria-label="Hazır raporu aç: @ready.Title">Aç</a>
                                         @if (Session.Can(ReportAccess.Manage))
                                         {
                                             <a class="btn btn-outline-secondary btn-sm" href="raporlar/yeni?hazir=@Uri.EscapeDataString(ready.Key)" aria-label="Kopyasını oluştur: @ready.Title">Kopyasını oluştur</a>

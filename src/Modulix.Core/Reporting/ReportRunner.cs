@@ -135,7 +135,7 @@ public sealed class ReportRunner(
         var rows = new List<RecordData>();
         for (var page = 1; rows.Count < ReportLimits.MaxRowsRead; page++)
         {
-            var result = await pipeline.QueryAsync(new RecordQuery(entityKey, page, RecordQuery.MaxPageSize, null, filters), cancellationToken);
+            var result = await pipeline.QueryAsync(new RecordQuery(entityKey, page, RecordQuery.MaxBulkPageSize, null, filters) { Bulk = true }, cancellationToken);
             if (!result.IsSuccess)
             {
                 return new ReadResult([], false, result.Error);

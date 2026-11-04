@@ -110,6 +110,83 @@ public sealed class ReportPerformanceMeasurementTests(ModulixApiFactory factory,
         Assert.All(results, r => Assert.Equal("200/201", r.Status));
     }
 
+    [PerfFact]
+    public async Task Profile_where_the_read_time_goes()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var admin = await factory.CreateUserAsync(tenant);
+        Guid membershipId;
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+            var system = await roles.EnsureSystemRoleAsync(CancellationToken.None);
+            membershipId = await factory.GetMembershipIdAsync(admin.Id, tenant.Id);
+            Assert.True(await roles.SetMembershipRolesAsync(membershipId, [system.Id], CancellationToken.None));
+        }
+
+        var client = factory.CreateBrowserClient();
+        await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(admin.Email!, ModulixApiFactory.Password));
+        var company = (await (await client.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Profil A.Ş."))).Content.ReadFromJsonAsync<CompanyDto>())!;
+        await SeedAsync(tenant.Id, company.Id, admin.Id, Count, Count);
+
+        await using var owner = factory.Services.GetRequiredService<Modulix.Infrastructure.Platform.ITenantScopeFactory>().Create(new Modulix.Core.Contracts.Tenancy.TenantContext(tenant.Id, admin.Id, membershipId));
+        var services = owner.ServiceProvider;
+        var pipeline = services.GetRequiredService<Modulix.Core.Contracts.Records.IRecordPipeline>();
+        var db = services.GetRequiredService<ModulixDbContext>();
+        var filters = new Dictionary<string, string> { ["status"] = "Open" };
+
+        async Task<double> TimeAsync(Func<Task<int>> work, string label)
+        {
+            await work();
+            var times = new List<double>();
+            var rows = 0;
+            for (var i = 0; i < 5; i++)
+            {
+                var clock = Stopwatch.StartNew();
+                rows = await work();
+                times.Add(clock.Elapsed.TotalMilliseconds);
+            }
+
+            times.Sort();
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{label}: p50 {times[2]:F0} ms, en yüksek {times[^1]:F0} ms, {rows} satır"));
+            return times[2];
+        }
+
+        async Task<int> PipelinePagesAsync(int pageSize)
+        {
+            var total = 0;
+            for (var page = 1; ; page++)
+            {
+                var result = await pipeline.QueryAsync(new Modulix.Core.Contracts.Records.RecordQuery("crm.opportunity", page, pageSize, null, filters) { Bulk = pageSize > 200 }, CancellationToken.None);
+                total += result.Value!.Items.Count;
+                if (result.Value.Items.Count == 0 || total >= result.Value.TotalCount)
+                {
+                    return total;
+                }
+            }
+        }
+
+        async Task<int> OnePageAsync(int size)
+        {
+            var result = await pipeline.QueryAsync(new Modulix.Core.Contracts.Records.RecordQuery("crm.opportunity", 1, size, null, filters), CancellationToken.None);
+            return result.Value!.Items.Count;
+        }
+
+        await OnePageAsync(1);
+        Console.WriteLine("##BASLA##");
+        await OnePageAsync(1);
+        Console.WriteLine("##BITTI##");
+        await TimeAsync(() => OnePageAsync(1), "Boru hattı: tek sayfa, 1 satır");
+        await TimeAsync(() => OnePageAsync(50), "Boru hattı: tek sayfa, 50 satır");
+        await TimeAsync(() => OnePageAsync(200), "Boru hattı: tek sayfa, 200 satır");
+        await TimeAsync(() => PipelinePagesAsync(200), "Kayıt boru hattı, 200'lük sayfalar (bugünkü yol)");
+        await TimeAsync(() => PipelinePagesAsync(1000), "Kayıt boru hattı, 1000'lik toplu sayfalar");
+        await TimeAsync(async () => (await db.Set<Opportunity>().AsNoTracking().Where(o => o.Status == "Open").ToListAsync()).Count, "Doğrudan EF, tüm sütunlar, tek sorgu");
+        await TimeAsync(async () => (await db.Set<Opportunity>().AsNoTracking().Where(o => o.Status == "Open").Select(o => new { o.Id, o.Stage, o.Amount, o.Currency, o.Probability, o.ExpectedCloseDate }).ToListAsync()).Count, "Doğrudan EF, 6 sütun, tek sorgu");
+        await TimeAsync(async () => await db.Set<Opportunity>().AsNoTracking().CountAsync(o => o.Status == "Open"), "COUNT(*) tek sorgu");
+    }
+
     private const int Runs = 10;
 
     private sealed record Measurement(string Name, double P50, double P95, double Max, string Status);

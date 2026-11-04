@@ -5914,6 +5914,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "Status", "ExpectedCloseDate");
 
+                    b.HasIndex("TenantId", "Status", "CreatedAt", "Id")
+                        .IsDescending(false, false, true, false)
+                        .HasDatabaseName("IX_Opportunities_TenantId_Status_CreatedAt");
+
                     b.ToTable("Opportunities", "crm");
                 });
 

@@ -56,7 +56,7 @@ public static class ReportCsv
     public static string FileSlug(string? name)
     {
         var slug = new StringBuilder();
-        foreach (var c in (name ?? string.Empty).Trim().Normalize(NormalizationForm.FormKD))
+        foreach (var c in Transliterate((name ?? string.Empty).Trim()).Normalize(NormalizationForm.FormKD))
         {
             if (char.IsAsciiLetterOrDigit(c))
             {
@@ -71,6 +71,11 @@ public static class ReportCsv
         var text = slug.ToString().Trim('-');
         return text.Length == 0 ? "rapor" : text[..Math.Min(text.Length, 60)];
     }
+
+    /// <summary>Türkçe harfler dosya adında düşmesin diye (açık → acik) ASCII karşılıklarına çevrilir; NFKD ı, İ ve ş'yi ayrıştırmaz.</summary>
+    private static string Transliterate(string text) => text
+        .Replace('ç', 'c').Replace('Ç', 'C').Replace('ğ', 'g').Replace('Ğ', 'G').Replace('ı', 'i').Replace('İ', 'I')
+        .Replace('ö', 'o').Replace('Ö', 'O').Replace('ş', 's').Replace('Ş', 'S').Replace('ü', 'u').Replace('Ü', 'U');
 
     private static string Cell(object? value) => value switch
     {

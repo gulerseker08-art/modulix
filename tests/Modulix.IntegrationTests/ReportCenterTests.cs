@@ -212,6 +212,54 @@ public class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Equal(3m, Cell(result.Totals.Single(), 1));
     }
 
+    [Fact]
+    public async Task Quote_dataset_sums_the_net_total_by_status_and_company_dataset_counts_by_industry()
+    {
+        var s = await SetUpAsync();
+        foreach (var price in new[] { 100m, 250m })
+        {
+            var quote = await PostAsync<QuoteDto>(s.Admin, "/api/crm/quotes", new SaveQuoteRequest("Teklif", s.CompanyId, ValidUntil: DateTimeOffset.UtcNow.AddDays(30)));
+            await PostAsync<QuoteLineDto>(s.Admin, "/api/crm/quote-lines", new SaveQuoteLineRequest(quote.Id, "Kalem", "Free", null, 1m, price, null, "None", 0m, 20m, null, "Standard"));
+        }
+
+        foreach (var (name, industry) in new[] { ("Yazılım A", "Yazılım"), ("Yazılım B", "Yazılım"), ("Lojistik C", "Lojistik") })
+        {
+            await PostAsync<CompanyDto>(s.Admin, "/api/crm/companies", new SaveCompanyRequest(name, Industry: industry));
+        }
+
+        var catalog = await ReadAsync<ReportCatalogDto>(await s.Admin.GetAsync($"{Reports}/catalog"));
+        Assert.Contains(catalog.Datasets, d => d is { Key: "crm.quotes", Available: true } && d.ReadyReports.Count == 3);
+        Assert.Contains(catalog.Datasets, d => d is { Key: "crm.companies", Available: true } && d.Columns.Any(c => c.Field == "industry"));
+
+        var quotes = await RunAsync(s.Admin, new ReportSpecDto
+        {
+            Dataset = "crm.quotes",
+            Groups = [new() { Field = "status" }],
+            Measures = [new() { Aggregation = "count" }, new() { Field = "netTotal", Aggregation = "sum" }],
+        });
+        var draft = Assert.Single(quotes.Rows);
+        Assert.Equal(("Draft", "TRY", 2m, 350m), (draft.Keys[0], draft.Currency, Cell(draft, 2), Cell(draft, 3)));
+        Assert.Equal("Taslak", draft.Cells[0].GetString());
+
+        var companies = await RunAsync(s.Admin, new ReportSpecDto
+        {
+            Dataset = "crm.companies",
+            Groups = [new() { Field = "industry" }],
+            Measures = [new() { Aggregation = "count" }],
+            Sort = new() { Field = "count", Direction = "descending" },
+        });
+        Assert.Equal(("Yazılım", 2m), (companies.Rows[0].Keys[0], Cell(companies.Rows[0], 1)));   // azalan sayıda ilk satır
+        Assert.Equal(1m, Cell(companies.Rows.Single(r => r.Keys[0] == "Lojistik"), 1));
+        // "Anka Ltd." sektörsüz: boş grup olarak ayrı satırdır.
+        Assert.Contains(companies.Rows, r => r.Keys[0] is null && Cell(r, 1) == 1m);
+
+        // Başka tenant bu teklif ve firmaları görmez; teklif izni olmayan teklif veri kümesini kullanamaz.
+        var other = await SetUpAsync();
+        Assert.Empty((await RunAsync(other.Admin, new ReportSpecDto { Dataset = "crm.quotes", Columns = ["title"] })).Rows);
+        var noQuotes = await UserAsync(s, [CompaniesRead, .. CoreRead], Scope.All);
+        Assert.Equal("forbidden", (await RunAsync(noQuotes, new ReportSpecDto { Dataset = "crm.quotes", Columns = ["title"] })).Status);
+    }
+
     // ---- Doğrulama
 
     [Fact]
@@ -278,6 +326,48 @@ public class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Equal((2m, 30m), (Cell(adminResult.Totals.Single(), 1), Cell(adminResult.Totals.Single(), 2)));
         Assert.Equal((1m, 20m), (Cell(ownResult.Totals.Single(), 1), Cell(ownResult.Totals.Single(), 2)));
         Assert.NotEqual(Guid.Empty, mine.Id);
+    }
+
+    [Fact]
+    public async Task Bulk_pages_hold_more_records_but_apply_the_same_scope_rules_and_the_report_reads_past_one_page()
+    {
+        var s = await SetUpAsync();
+        for (var i = 0; i < 205; i++)
+        {
+            await OpenAsync(s.Admin, s.CompanyId, $"Toplu {i}", 1m);
+        }
+
+        var userEntity = await factory.CreateUserAsync(s.Tenant);
+        await factory.CreateRoleAsync(s.TenantId, [.. DataRead, OpportunitiesWrite, CompaniesWrite, OpportunityAmountsRead, .. CoreRead], Scope.Own, userEntity);
+        var rep = await LoginAsync(userEntity);
+        var repCompany = await PostAsync<CompanyDto>(rep, "/api/crm/companies", new SaveCompanyRequest("Bulk Ltd."));
+        for (var i = 0; i < 3; i++)
+        {
+            await OpenAsync(rep, repCompany.Id, $"Temsilci {i}", 1m);
+        }
+
+        // Rapor 200'den fazla kaydı (sayfa sınırı aşılsa da) eksiksiz okur.
+        var count = new ReportSpecDto { Dataset = Opportunities, Measures = [new() { Aggregation = "count" }] };
+        var all = await RunAsync(s.Admin, count);
+        Assert.Equal((208, false), (all.RowsRead, all.Truncated));
+        Assert.Equal(208m, Cell(all.Totals.Single(), 0));
+
+        // Doğrudan boru hattı: toplu okuma 1000'e kadar sayfa verir, olağan okuma 200'de kalır; kapsam kuralı ikisinde de aynıdır.
+        var membershipId = await factory.GetMembershipIdAsync(userEntity.Id, s.TenantId);
+        var admin = await factory.GetMembershipIdAsync(s.AdminId, s.TenantId);
+        async Task<int> ReadAsync(Guid userId, Guid membership, bool bulk)
+        {
+            await using var owner = factory.Services.GetRequiredService<Modulix.Infrastructure.Platform.ITenantScopeFactory>()
+                .Create(new Modulix.Core.Contracts.Tenancy.TenantContext(s.TenantId, userId, membership));
+            var pipeline = owner.ServiceProvider.GetRequiredService<Modulix.Core.Contracts.Records.IRecordPipeline>();
+            var result = await pipeline.QueryAsync(
+                new Modulix.Core.Contracts.Records.RecordQuery("crm.opportunity", 1, 1000) { Bulk = bulk }, CancellationToken.None);
+            return result.Value!.Items.Count;
+        }
+
+        Assert.Equal(200, await ReadAsync(s.AdminId, admin, bulk: false));
+        Assert.Equal(208, await ReadAsync(s.AdminId, admin, bulk: true));
+        Assert.Equal(3, await ReadAsync(userEntity.Id, membershipId, bulk: true));   // kapsam: yalnızca kendi kayıtları
     }
 
     // ---- Kayıtlı rapor, sürüm ve doğrulama
@@ -577,7 +667,7 @@ public class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<Moduli
 
     // ---- Yardımcılar
 
-    private record Setup(HttpClient Admin, Tenant Tenant, Guid CompanyId)
+    private record Setup(HttpClient Admin, Tenant Tenant, Guid CompanyId, Guid AdminId)
     {
         public Guid TenantId => Tenant.Id;
     }
@@ -596,7 +686,7 @@ public class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<Moduli
 
         var client = await LoginAsync(admin);
         var company = await PostAsync<CompanyDto>(client, "/api/crm/companies", new SaveCompanyRequest("Anka Ltd."));
-        return new Setup(client, tenant, company.Id);
+        return new Setup(client, tenant, company.Id, admin.Id);
     }
 
     private async Task<HttpClient> UserAsync(Setup s, IReadOnlyCollection<string> permissions, Scope scope)
