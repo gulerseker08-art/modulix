@@ -132,6 +132,7 @@ public static class PersistenceSetup
         services.AddScoped<ILookupSearch>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ISectorProfileService, SectorProfileService>();
         services.AddScoped<ISectorCatalog, SectorCatalogService>();
+        services.AddScoped<IStarterPackages, StarterPackageInstaller>();
         services.AddScoped<ITenantActivitySelection, TenantActivitySelectionService>();
         services.AddScoped<IRulePackageService, RulePackageService>();
         services.AddScoped<ITenantFieldRules, TenantFieldRulesService>();

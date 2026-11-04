@@ -46,6 +46,13 @@ public static class SectorEndpoints
         catalog.MapPut("/capabilities/{code}/dependencies", (string code, CodeListRequest request, ClaimsPrincipal user, ISectorCatalog service, CancellationToken ct) =>
             Run(async () => Results.Ok(ToDto(await service.SetCapabilityDependenciesAsync(UserId(user), code, request.Codes, ct)))));
 
+        // Başlangıç paketleri (Dilim D): yalnızca ekler, tekrar çalıştırılabilir; doğrulanmamış paketler listede işaretlidir.
+        catalog.MapGet("/starter-packages", (IStarterPackages service) => service.List().Select(p => new StarterPackageDto(p.Code, p.Name, p.Description, p.Verified, p.VerificationNote, p.NodeCount, p.CapabilityCount)).ToList());
+        catalog.MapGet("/starter-packages/{code}/preview", (string code, IStarterPackages service, CancellationToken ct) =>
+            Run(async () => Results.Ok(ToDto(await service.PreviewAsync(code, ct)))));
+        catalog.MapPost("/starter-packages/{code}/install", (string code, ClaimsPrincipal user, IStarterPackages service, CancellationToken ct) =>
+            Run(async () => Results.Ok(ToDto(await service.InstallAsync(UserId(user), code, ct)))));
+
         var selection = app.MapGroup("/api/sectors")
             .RequireAuthorization()
             .AddEndpointFilter<RequireTenantFilter>()
@@ -68,6 +75,11 @@ public static class SectorEndpoints
         {
             return await action();
         }
+        catch (StarterPackageNotFoundException ex)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: ex.Message);
+        }
+
         catch (SectorCatalogNotFoundException ex)
         {
             return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: ex.Message);
@@ -99,6 +111,9 @@ public static class SectorEndpoints
 
     private static ActivityNodeDto ToDto(ActivityNodeView n) =>
         new(n.Id, n.Code, n.ParentId, n.Kind.ToString(), n.Name, n.Description, n.SortOrder, n.IsActive, n.Readiness.ToString(), n.Version, [.. n.Capabilities]);
+
+    private static StarterPackagePlanDto ToDto(StarterPackagePlan p) =>
+        new([.. p.CapabilitiesToCreate], [.. p.CapabilitiesExisting], [.. p.NodesToCreate], [.. p.NodesExisting], [.. p.Warnings], p.NothingToDo);
 
     private static CapabilityDto ToDto(CapabilityView c) => new(c.Id, c.Code, c.Name, c.IsActive, [.. c.DependsOn]);
 
