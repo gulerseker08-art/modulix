@@ -14,6 +14,7 @@ using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Core.Reporting;
+using Modulix.Core.Sectors;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Email;
 using Modulix.Infrastructure.Events;
@@ -123,6 +124,16 @@ public class ModulixDbContext(
     public DbSet<TenantLookupSetting> LookupSettings => Set<TenantLookupSetting>();
 
     public DbSet<TenantFormLayout> FormLayouts => Set<TenantFormLayout>();
+
+    public DbSet<ActivityNode> ActivityNodes => Set<ActivityNode>();
+
+    public DbSet<Capability> Capabilities => Set<Capability>();
+
+    public DbSet<CapabilityDependency> CapabilityDependencies => Set<CapabilityDependency>();
+
+    public DbSet<ActivityNodeCapability> ActivityNodeCapabilities => Set<ActivityNodeCapability>();
+
+    public DbSet<TenantActivitySelection> ActivitySelections => Set<TenantActivitySelection>();
 
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 

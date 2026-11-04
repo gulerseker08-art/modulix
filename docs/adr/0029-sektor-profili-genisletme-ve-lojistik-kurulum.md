@@ -4,6 +4,10 @@ Durum: **taslak** (3 Kasım 2026, tartışma için; kabul edilmedi). Bu belge te
 
 Bu belge önceki taslağın yerini alır: önceki taslak tek profil anahtarı üstüne rol/form ekleyen bir genişletmeydi; kullanıcının tarifi (sektör → faaliyet grubu → alt faaliyet → özellik, çoklu seçim, sektör altyapısının CRM'e özel olmaması) bunu aştığı için model yeniden kuruldu.
 
+İlgili: ADR-0002/0020 (tek veritabanı), ADR-0021 (form düzeni), ADR-0027 (kural altyapısı), ADR-0028 (kayıt türüne göre kapsam) ve ADR-0028 (platform lisans; numara çakışması var, iki belge de 0028'i taşıyor). Faaliyet seçiminin modül açması lisans çözümleyicisinden geçmelidir; lisans ADR'si kabul edilene kadar seçim hiçbir modülü kendiliğinden açmaz.
+
+Uygulama notu (Dilim A tabloları): katalog tabloları `platform` şemasında ve RLS dışıdır, tenant seçimi `core.ActivitySelections` RLS altındadır. Düğüm taşıma bu aşamada yoktur: kullanım sayısı tenant sınırı yüzünden platformdan okunamadığı için (K3) taşıma etkisi sonraki dilimde, platform tarafı sayaçla çözülecektir.
+
 ## 1. Bağlam ve girdiler
 
 Tek ortak CRM vardır; sektör kopyaları yoktur. Tenant'ın sektör/faaliyet seçimleri alanları, formları, seçenekleri, şablonları ve kuralları şekillendirir. Altyapı CRM'e özel olmaz (lojistik, depo ve sonraki modüller de kullanır). Veritabanı topolojisi değişmez (tek paylaşımlı DB, RLS + EF filtre; ADR-0002, ADR-0020). Pilot (Makaroğlu) için sabit kodlu davranış yoktur.
