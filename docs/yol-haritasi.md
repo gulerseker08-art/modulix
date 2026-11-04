@@ -163,7 +163,7 @@ Durum (3 Kasım 2026, [ADR-0027](adr/0027-kural-ve-is-akisi-altyapisi.md) Dilim 
 - Ç6b.3 Geçmiş: Hangi sürüm hangi koşulla ne yaptı, hata ve telafi. Kabul: Hatalı kural kapatılabilir; geçmiş örneklerin devam politikası nettir.
 Ç7 — İçe/dışa aktarma ve veri taşıma [GENİŞLETME / D1]
 Bağımlılık: Ç0, Ç2 minimum, Ç3, Ç4, Ç13.
-- Ç7.1 Import sihirbazı: CSV/XLSX, şablon, encoding, locale, sütun eşleme, özel alanlar, lookup çözümü ve kuru çalışma. Kabul: Ondalık/tarih yanlış yorumlanırsa kullanıcıya açık hata verilir.
+- Ç7.1 Import sihirbazı: CSV/XLSX, şablon, encoding, locale, sütun eşleme, özel alanlar, lookup çözümü ve kuru çalışma. Kabul: Ondalık/tarih yanlış yorumlanırsa kullanıcıya açık hata verilir. İçe aktarma takibi ve işlem günlüğü ekranı: [ADR-0030](adr/0030-import-takibi-ve-islem-gunlugu.md) (taslak).
 - Ç7.2 Uygulama: Satır bazlı domain komutu, batch/checkpoint, idempotency, ilerleme, kısmi hata ve devam. Kabul: Kesinti sonrası başarıyla işlenen satır tekrar yaratılmaz.
 - Ç7.3 Güncelleme ve geri alma: Dış sistem kimliği ve açık anahtar stratejisi; yaratılan/güncellenen ayrımı, önceki değer ve rowversion. Kabul: Sonradan değiştirilmiş veya faturaya bağlanmış kayıt topluca silinmez; telafi raporlanır.
 - Ç7.4 Export: Filtre/görünür alan, yetki, maskeleme, CSV enjeksiyon koruması, büyük işlerde süreli indirme. Kabul: Arka plan export çalışırken yetki kaldırılmışsa veri yeniden yetkilendirilir.
