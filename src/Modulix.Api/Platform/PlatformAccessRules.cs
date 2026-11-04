@@ -37,6 +37,7 @@ public static class PlatformAccessRules
         ["POST /api/platform/tenants/{tenantId}/activate"] = Ops,
         ["POST /api/platform/tenants/{tenantId}/administrators"] = Ops,
         ["POST /api/platform/tenants/{tenantId}/profile/{key}"] = Ops,
+        ["PUT /api/platform/tenants/{tenantId}/scope-limits"] = Ops, // kayıt görünürlük tavanı (ADR-0030)
         ["PUT /api/platform/tenants/{tenantId}/modules/{moduleKey}"] = Ops | Fin,
         ["POST /api/platform/users/reset-two-factor"] = Sup | Ops,
         ["POST /api/platform/events/deliveries/retry"] = Sup | Ops,
