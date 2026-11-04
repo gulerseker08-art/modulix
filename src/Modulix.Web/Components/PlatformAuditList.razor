@@ -1,0 +1,145 @@
+@using System.Text.Json
+@inject ApiClient Api
+
+@* Platform denetim kaydı satırları (ADR-0028). TenantId verilirse yalnızca o firmanın kaydı; verilmezse bütün firmalar ve
+   işlem süzgeci. Firma detayında "lisans zaman çizelgesi" olarak, platform denetim ekranında tam liste olarak kullanılır. *@
+@if (ShowFilter)
+{
+    <div class="list-toolbar">
+        <label class="form-label" for="auditAction">İşlem</label>
+        <select id="auditAction" class="form-select" value="@action" @onchange="e => FilterAsync((string?)e.Value)">
+            <option value="">Tümü</option>
+            @foreach (var (key, text) in PlatformAuditText.All)
+            {
+                <option value="@key">@text</option>
+            }
+        </select>
+    </div>
+}
+
+@if (message is not null)
+{
+    <div class="alert alert-danger" role="alert">@message</div>
+}
+
+@if (page is null)
+{
+    @if (message is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+}
+else if (page.Items.Count == 0)
+{
+    <p class="text-muted">Kayıt yok.</p>
+}
+else
+{
+    <table class="table record-table">
+        <thead>
+            <tr><th>Zaman</th><th>İşlem</th>@if (TenantId is null) { <th>Firma</th> }<th>Yapan</th><th>Gerekçe</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var item in page.Items)
+            {
+                <tr>
+                    <td data-label="Zaman">@CrmLabels.Time(item.OccurredAt)</td>
+                    <td data-label="İşlem" class="primary">
+                        @PlatformAuditText.Of(item.Action)
+                        @if (Detail(item) is { } detail)
+                        {
+                            <small class="text-muted d-block">@detail</small>
+                        }
+                    </td>
+                    @if (TenantId is null)
+                    {
+                        <td data-label="Firma">
+                            @if (item.TargetTenantId is { } id)
+                            {
+                                <a href="platform/firmalar/@id">@(item.TargetTenantName ?? "Silinmiş firma")</a>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </td>
+                    }
+                    <td data-label="Yapan">@(item.ActorName ?? "Silinmiş hesap")</td>
+                    <td data-label="Gerekçe">@(item.Reason ?? "—")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+}
+
+@code {
+    /// <summary>Verilirse yalnızca bu firmanın kaydı gösterilir.</summary>
+    [Parameter] public Guid? TenantId { get; set; }
+
+    /// <summary>İşlem türü süzgecini göster (tam liste).</summary>
+    [Parameter] public bool ShowFilter { get; set; }
+
+    /// <summary>Değiştiğinde (ör. firma detayında bir işlemden sonra) liste yeniden yüklenir.</summary>
+    [Parameter] public int Version { get; set; }
+
+    private PlatformAuditPageResponse? page;
+    private string? action;
+    private string? message;
+    private int loadedVersion = -1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedVersion != Version)
+        {
+            loadedVersion = Version;
+            await LoadAsync(1);
+        }
+    }
+
+    private Task FilterAsync(string? value)
+    {
+        action = string.IsNullOrEmpty(value) ? null : value;
+        return LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"/api/platform/audit?page={pageNumber}&pageSize=25";
+        if (TenantId is { } id)
+        {
+            url += $"&tenantId={id}";
+        }
+
+        if (action is not null)
+        {
+            url += $"&action={Uri.EscapeDataString(action)}";
+        }
+
+        var result = await Api.GetAsync<PlatformAuditPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    // Modül hakkı değişikliğinde hangi modül ve ne olduğu; diğer işlemlerde ek bilgi yoktur.
+    private static string? Detail(PlatformAuditItemDto item)
+    {
+        if (item.Action != "tenant.module-changed" || string.IsNullOrEmpty(item.Details))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(item.Details);
+            var root = document.RootElement;
+            var module = root.TryGetProperty("module", out var m) ? m.GetString() : null;
+            var enabled = root.TryGetProperty("enabled", out var e) && e.ValueKind == JsonValueKind.True;
+            return module is null ? null : $"{module}: {(enabled ? "açık" : "kapatıldı")}";
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+}

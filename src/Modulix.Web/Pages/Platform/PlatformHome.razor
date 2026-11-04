@@ -6,13 +6,37 @@
 @* Platform yönetiminin giriş sayfası (Y4). *@
 <PlatformGate>
     <h1>Platform</h1>
-    <p class="text-muted">Firmaları, modül haklarını ve olay teslimlerini yönetin. Firmaların kayıtları burada görünmez.</p>
+    <p class="text-muted">Firmaları, modül haklarını, süreleri ve olay teslimlerini yönetin. Firmaların kayıtları burada görünmez.</p>
+
+    @if (overview is not null)
+    {
+        <section class="detail-section" aria-label="Genel bakış">
+            <div class="section-header"><h2>Genel bakış</h2></div>
+            <dl class="detail-grid">
+                @foreach (var count in overview.TenantCounts)
+                {
+                    <div><dt>@TenantStateText.Of(count.State)</dt><dd>@count.Count</dd></div>
+                }
+                <div><dt>Başarısız teslim</dt><dd><a href="platform/olaylar">@(failedDeliveries?.ToString() ?? "—")</a></dd></div>
+            </dl>
+            <p class="text-muted">
+                Süresi yaklaşan haklar:
+                <a href="platform/sure-takvimi">30 günde @overview.ExpiringIn30Days · 60 günde @overview.ExpiringIn60Days · 90 günde @overview.ExpiringIn90Days</a>
+                @if (overview.Expired > 0)
+                {
+                    <span class="badge user-locked">@overview.Expired hakkın süresi geçti</span>
+                }
+            </p>
+        </section>
+    }
 
     <div class="tiles">
         <a class="tile" href="platform/firmalar"><strong>Firmalar</strong><span>Firma açma, kapatma, ilk yönetici</span></a>
         <a class="tile" href="platform/moduller"><strong>Modül hakları</strong><span>Firma × modül, aç/kapa</span></a>
         <a class="tile" href="platform/katalog"><strong>Modül kataloğu</strong><span>Modüller, izinler, hazır roller</span></a>
         <a class="tile" href="platform/olaylar"><strong>Olaylar</strong><span>Başarısız teslimler, yeniden dene, atla</span></a>
+        <a class="tile" href="platform/sure-takvimi"><strong>Süre takvimi</strong><span>Bitişi yaklaşan modül hakları</span></a>
+        <a class="tile" href="platform/denetim"><strong>Platform denetimi</strong><span>Firmalar arası işlem kaydı</span></a>
     </div>
 
     @* Y7b: telefonunu ve kurtarma kodlarını kaybeden kişinin iki adımlı doğrulaması yalnızca buradan sıfırlanır. *@
@@ -32,11 +56,19 @@
 </PlatformGate>
 
 @code {
+    private PlatformOverviewResponse? overview;
+    private int? failedDeliveries;
     private string email = string.Empty;
     private string? notice;
     private bool failed;
     private bool busy;
     private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        overview = (await Api.GetAsync<PlatformOverviewResponse>("/api/platform/overview")).Value;
+        failedDeliveries = (await Api.GetAsync<EventSummaryResponse>("/api/platform/events/summary")).Value?.Failed;
+    }
 
     private async Task ResetTwoFactorAsync()
     {

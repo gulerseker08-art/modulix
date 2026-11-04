@@ -53,7 +53,7 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ad</th><th>Kısa ad</th><th>Durum</th><th>Etkin üye</th><th>Yönetici</th><th>Modüller</th><th>Açılış</th></tr>
+                <tr><th>Ad</th><th>Kısa ad</th><th>Durum</th><th>Etkin üye</th><th>Modüller</th><th>Açılış</th></tr>
             </thead>
             <tbody>
                 @foreach (var tenant in page.Items)
@@ -63,16 +63,6 @@
                         <td data-label="Kısa ad">@tenant.Slug</td>
                         <td data-label="Durum"><TenantStateBadge State="tenant.Status" /></td>
                         <td data-label="Etkin üye">@tenant.ActiveMemberCount</td>
-                        <td data-label="Yönetici">
-                            @if (tenant.AdministratorCount == 0)
-                            {
-                                <span class="badge user-locked" title="Firmada yönetici yok; firma detayından davet edin.">Yok</span>
-                            }
-                            else
-                            {
-                                @tenant.AdministratorCount
-                            }
-                        </td>
                         <td data-label="Modüller">@ModuleNames(tenant.EnabledModules)</td>
                         <td data-label="Açılış">@CrmLabels.Time(tenant.CreatedAt)</td>
                     </tr>

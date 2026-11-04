@@ -1,5 +1,5 @@
 @* Bir firmada bir modülü açar veya kapatır (Y4b); modül hakları ekranı ve firma detayı kullanır. Kapatmadan önce
-   uyarı gösterir. Değişiklik firmanın bir sonraki isteğinde geçerli olur; sunucu firmanın denetim kaydına yazar. *@
+   uyarı gösterir ve gerekçe ister (platform denetim kaydına yazılır). Değişiklik firmanın bir sonraki isteğinde geçerli olur; sunucu firmanın denetim kaydına yazar. *@
 @inject ApiClient Api
 
 <div class="module-toggle">
@@ -16,7 +16,9 @@
                 Veri silinmez. Modülün menüsü ve uç noktaları bu firmada kapanır; rollerdeki izinler korunur ve modül
                 yeniden açılınca geçerli olur.
             </p>
-            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => SetAsync(false)">Kapat</button>
+            <label class="form-label" for="@(Id)-reason">Gerekçe *</label>
+            <input id="@(Id)-reason" class="form-control" maxlength="500" @bind="reason" @bind:event="oninput" />
+            <button type="button" class="btn btn-danger btn-sm" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" @onclick="() => SetAsync(false)">Kapat</button>
             <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Cancel">Vazgeç</button>
         </div>
     }
@@ -40,6 +42,7 @@
     [Parameter] public EventCallback<string?> Changed { get; set; }
 
     private bool confirming;
+    private string reason = string.Empty;
     private bool busy;
 
     // İşlem veya onay sürerken anahtarın gösterdiği değer; bitince yeniden Enabled gösterilir (sonuç ne olursa olsun
@@ -64,15 +67,17 @@
     private void Cancel()
     {
         confirming = false;
+        reason = string.Empty;
         shown = null;
     }
 
     private async Task SetAsync(bool enabled)
     {
         busy = true;
-        var result = await Api.PutAsync<bool>($"/api/platform/tenants/{TenantId}/modules/{ModuleKey}", new SetTenantModuleRequest(enabled));
+        var result = await Api.PutAsync<bool>($"/api/platform/tenants/{TenantId}/modules/{ModuleKey}", new SetTenantModuleRequest(enabled, Reason: enabled ? null : reason));
         busy = false;
         confirming = false;
+        reason = string.Empty;
         shown = null;
         await Changed.InvokeAsync(result.Error);
     }

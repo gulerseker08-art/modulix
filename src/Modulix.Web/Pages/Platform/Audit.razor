@@ -1,0 +1,14 @@
+@page "/platform/denetim"
+
+<PageTitle>Platform denetimi · Platform · Modulix</PageTitle>
+
+@* Platform yöneticilerinin işlemlerinin firmalar arası kaydı (ADR-0028). Ekleme-yalnızdır; silinemez ve değiştirilemez. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>Platform denetimi</h1>
+    <p class="text-muted">
+        Firma açma, kapatma, askı, modül hakları, yönetici daveti ve iki adımlı doğrulama sıfırlama gibi platform işlemleri.
+        Kayıt değiştirilemez ve silinemez; firma silinse de saklanır.
+    </p>
+    <PlatformAuditList ShowFilter="true" />
+</PlatformGate>

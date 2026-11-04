@@ -196,6 +196,13 @@ public class TwoFactorTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
             .Items.Single(i => i.Action == AuditOperation.TwoFactorReset);
         Assert.Equal(platform.Id, reset.UserId);
         Assert.Equal(user.Id, reset.RecordId);
+
+        // Hesap düzeyindeki işlem firmalar arası platform denetim kaydına da yazılır (ADR-0028).
+        var platformEntry = Assert.Single(
+            (await platformClient.GetFromJsonAsync<PlatformAuditPageResponse>("/api/platform/audit?action=user.two-factor-reset&pageSize=50"))!.Items,
+            i => i.Details!.Contains(user.Id.ToString()));
+        Assert.Equal(platform.Id, platformEntry.ActorUserId);
+        Assert.Null(platformEntry.TargetTenantId);
     }
 
     /// <summary>Kişinin iki adımlı doğrulamasını API ile açar; anahtarı ve kurtarma kodlarını döner.</summary>

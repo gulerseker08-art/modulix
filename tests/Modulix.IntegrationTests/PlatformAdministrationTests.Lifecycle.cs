@@ -108,7 +108,7 @@ public partial class PlatformAdministrationTests
             (await client.PostAsJsonAsync($"/api/platform/tenants/{Guid.NewGuid()}/suspend", new TenantReasonRequest("x"))).StatusCode);
 
         // Yalnızca açık firma askıya alınır; kapalı firma askıya alınamaz.
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync($"/api/platform/tenants/{tenant.Id}/close", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsJsonAsync($"/api/platform/tenants/{tenant.Id}/close", new TenantReasonRequest("Test gerekçesi"))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict,
             (await client.PostAsJsonAsync($"/api/platform/tenants/{tenant.Id}/suspend", new TenantReasonRequest("x"))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync($"/api/platform/tenants/{tenant.Id}/reopen", null)).StatusCode);
@@ -150,24 +150,25 @@ public partial class PlatformAdministrationTests
         Assert.Equal("30 günlük deneme", first.Note);
         Assert.Equal(until.ToUnixTimeSeconds(), first.ValidUntil!.Value.ToUnixTimeSeconds());
 
-        // Modül zaten açıkken koşulları değiştirmek (süre uzatma) yok sayılmaz ve denetlenir.
+        // Modül zaten açıkken koşulları değiştirmek (süre uzatma) yok sayılmaz, gerekçe ister ve denetlenir.
         var longer = until.AddDays(30);
         Assert.Equal(HttpStatusCode.NoContent,
-            (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(true, LicenseSource.Exception, longer, "Müşteri talebi, satış onayı"))).StatusCode);
+            (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(true, LicenseSource.Exception, longer, "Müşteri talebi, satış onayı", "Satış onayıyla uzatıldı"))).StatusCode);
         var second = Assert.Single((await client.GetFromJsonAsync<PlatformTenantDetailResponse>($"/api/platform/tenants/{tenant.Id}"))!.Entitlements!, e => e.ModuleKey == "crm");
         Assert.Equal(LicenseSource.Exception, second.Source);
         Assert.Equal(longer.ToUnixTimeSeconds(), second.ValidUntil!.Value.ToUnixTimeSeconds());
 
         var audit = await client.GetFromJsonAsync<PlatformAuditPageResponse>($"/api/platform/audit?tenantId={tenant.Id}&action=tenant.module-changed");
         Assert.Equal(2, audit!.Items.Count);
-        Assert.Contains(audit.Items, i => i.Reason == "Müşteri talebi, satış onayı");
+        Assert.Contains(audit.Items, i => i.Reason == "Satış onayıyla uzatıldı");
+        Assert.Contains(audit.Items, i => i.Reason == "30 günlük deneme"); // gerekçe verilmediyse not kullanılır
         Assert.All(audit.Items, i => Assert.Contains("terms", i.Details));
 
         // Koşulsuz yeniden açma mevcut koşulları korur; kapatmak koşulları siler ama veri ve kayıt satırı kalır.
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(true))).StatusCode);
         Assert.Equal(LicenseSource.Exception,
             Assert.Single((await client.GetFromJsonAsync<PlatformTenantDetailResponse>($"/api/platform/tenants/{tenant.Id}"))!.Entitlements!, e => e.ModuleKey == "crm").Source);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(false))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(false, Reason: "Test gerekçesi"))).StatusCode);
         Assert.False(Assert.Single((await client.GetFromJsonAsync<PlatformTenantDetailResponse>($"/api/platform/tenants/{tenant.Id}"))!.Entitlements!, e => e.ModuleKey == "crm").IsEnabled);
     }
 
