@@ -78,6 +78,8 @@ internal sealed class CompanyContactRecordStore(CrmStoreContext context) : CrmRe
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => CrmModule.Entities.Company;
+
     protected override IReadOnlyList<RecordField<CompanyContact>> Fields { get; } =
     [
         Field.SharedId<CompanyContact>("companyId", l => l.CompanyId),

@@ -51,6 +51,8 @@ internal sealed class OperationJobRecordStore(OrdersStoreContext context) : Orde
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => OrdersModule.Entities.Order;
+
     protected override bool DefaultsOwnerToCurrentUser => false;
 
     protected override IReadOnlyList<RecordField<OperationJob>> Fields { get; } =
@@ -199,6 +201,8 @@ internal sealed class OperationJobTaskRecordStore(OrdersStoreContext context) : 
     protected override string WritePermission => OrdersModule.Permissions.JobsManage;
 
     protected override bool UsesScope => true;
+
+    protected override string ScopeEntityKey => OrdersModule.Entities.Order;
 
     protected override bool DefaultsOwnerToCurrentUser => false;
 

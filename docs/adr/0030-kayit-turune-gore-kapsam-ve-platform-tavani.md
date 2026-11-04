@@ -118,6 +118,17 @@ Dilim 2'ye bırakılanlar (dilim 1'de sonuç değişmediği için güvenli, ama 
 - **Alt kayıt türleri.** Boru hattı alt kayıt deposu için kendi anahtarını sorar (ör. aktivite notu, fırsat iletişimcisi); ana kaydın kapsamını izlemesi gerekir. Dilim 2 alt türleri ana türe eşleyen bir kural (ör. `IRecordStore` üzerinde kapsam türü) ister.
 - **Arayüzdeki atanabilir üye listesi** (`CrmLookups`) CRM genelinde tek listedir ve `crm.opportunity` ile sorulur; form türüne göre ayrı istenmelidir (dilim 3).
 
+### Dilim 2a sonucu (uygulandı; roller henüz istisna yazamaz)
+
+Kapsam artık kayıt türüne ve platform tavanına göre hesaplanır; tavanı platform yazar. Rol tarafı (istisna alanı, doğrulama, uçlar) dilim 2b'dedir.
+
+- **Tablolar** (migration `RoleScopeOverridesAndLimits`, iki boş tablo, geriye uyumlu): `core.RoleScopeOverrides` (tenant verisi, RLS, `(TenantId, RoleId)` bileşik yabancı anahtar, rol silinince silinir, `(TenantId, RoleId, EntityKey)` tekil) ve `platform.TenantScopeLimits` (RLS dışı, `(TenantId, EntityKey)` tekil, `AppliesToAdministrators` varsayılan `false`). Dışa aktarma/silme tabloları katalogdan okuduğu için ikisini de kendiliğinden kapsar (testli).
+- **Etkin kapsam** (`MembershipDataScope`): rolün tür istisnası varsa o, yoksa varsayılanı; kişinin rollerinin kapsamları türe göre ayrı birleştirilir; sonra tavana indirilir (`RecordScopeRules.Clamp`: tavan kapsamı kapsıyorsa aynen, kapsam tavanı kapsıyorsa tavan, karşılaştırılamıyorsa `Own`). Yönetici yalnızca `AppliesToAdministrators` ise bağlanır. Önbellek istek başına `(üyelik, tür)`; istisna yoksa ek sorgu yapılmaz, tavan sorgusu tenant başına bir kez.
+- **Alt kayıtlar:** `IRecordStore.ScopeEntityKey`; 26 alt kayıt deposu sınıfı ana türünü bildirir (firma: kişi bağlantısı, ilişki, iletişim noktası, konum, adres; kişi: kişi iletişim noktası; fırsat: iletişimci, rakip; aktivite alt kayıtları; teklif satırı; sözleşme tarafı, satırı, taahhüt; sipariş alt kayıtları ve operasyon işleri; kampanya ve segment alt kayıtları).
+- **Segment:** her koşul kendi türünün kapsamıyla (`ISegmentFieldSource.ScopeEntityKeys`, `SegmentEvaluationContext.OwnersFor`; CRM: firma, kişi, lead, fırsat). Kapsam bildirilmeyen tür sorulursa istisna fırlar, sessizce atlanmaz.
+- **Platform ucu:** `GET`/`PUT /api/platform/tenants/{id}/scope-limits`; tür listesi kayıt depolarından (`ScopedRecordTypes`: sahip alanı olan, kapsamı kendi anahtarıyla çözülen depolar) ve firmada açık modüllerden gelir, koda sabit liste yoktur (`OwnedRecords` devir amaçlıdır ve kapsam türlerinin tamamını içermez; bu yüzden kullanılmadı). PUT tüm kümeyi değiştirir; geçersiz/kapalı/yinelenen tür ve geçersiz kapsam 400, firma yoksa 404. Denetim: firmanın `core.tenant` kaydı (alan `scopeLimits`, "Kayıt görünürlüğü") ve platform denetimi (`tenant.scope-limits-changed`, gerekçe, önce/sonra, etkilenen rol sayısı); aynı küme yeniden gönderilirse kayıt yazılmaz.
+- **Bilinen sınır:** kişi kaydı firmaya bağlıyken görünürlüğünü bugün `crm.contact` kapsamının sahip kümesi, firmanın sorumlusuna ve kişinin sorumlusuna birlikte uygulanarak belirler. Firma ile kişi için farklı kapsam/tavan verilirse kişi, firmanın kapsamını değil kişi türünün kapsamını izler. "Firmaya bağlı kişi firmanın kapsamıyla görünsün" kuralı ayrı bir karar gerektirir; dilim 2b öncesinde karara bağlanmalıdır.
+
 ## 6. Test planı (dört test ilkesi)
 
 - **Mutlu yol:** aynı rol firmada `All`, fırsatta `Unit` istisnasıyla kişiyi doğru kümelerle görür; tavan `Unit` iken `Unit` istisnası kaydedilir; liste, sayfalama ve toplam doğru kalır.
@@ -146,7 +157,7 @@ Açık karar kalmadı. Dilim 2'nin başında yeniden doğrulanacak noktalar böl
 ## 9. Doğrulanmadı
 
 - ~~Modül çağrılarının tür anahtarları~~ dilim 1'de belirlendi (bölüm 5); segment motorunun çok türlü koşulları açık karar 3'te kalır.
-- `tenant-export` ve `tenant-delete` komutlarının yeni platform tablosunu (`ModuleEntitlements` gibi) kapsayıp kapsamadığı; kapsamıyorsa dilim 2 ekler.
+- ~~`tenant-export` ve `tenant-delete` kapsamı~~ dilim 2a testiyle doğrulandı (katalogdan okunur).
 - Web tarafındaki `SessionState` kapsam gösterimlerinin tür bazında değişmesi gerekip gerekmediği (şu an tek `Scope` görüntüsü gösteriliyor).
 - Performans etkisi ölçülmedi; vaat edilmez. Beklenti: rol yükleme aynı kalır, yalnızca bir küçük istisna sorgusu eklenir.
 

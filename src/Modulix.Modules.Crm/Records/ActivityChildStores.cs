@@ -20,6 +20,8 @@ internal abstract class ActivityChildStore<TChild>(CrmStoreContext context) : Cr
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => CrmModule.Entities.Activity;
+
     protected override bool DefaultsOwnerToCurrentUser => false;
 
     protected override async Task<IQueryable<TChild>> RestrictAsync(IQueryable<TChild> source, CancellationToken cancellationToken)

@@ -10,6 +10,7 @@ public static class PlatformAuditActions
     public const string TenantSuspended = "tenant.suspended";
     public const string TenantActivated = "tenant.activated";
     public const string ModuleChanged = "tenant.module-changed";
+    public const string ScopeLimitsChanged = "tenant.scope-limits-changed";
     public const string AdministratorInvited = "tenant.administrator-invited";
     public const string ProfileApplied = "tenant.profile-applied";
     public const string UserTwoFactorReset = "user.two-factor-reset";

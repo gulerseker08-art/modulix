@@ -21,6 +21,8 @@ internal sealed class ContractPartyRecordStore(ContractsStoreContext context) : 
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => ContractsModule.Entities.Contract;
+
     protected override IReadOnlyList<RecordField<ContractParty>> Fields { get; } =
     [
         Field.Reference<ContractParty, Contract>("contractId", "Sözleşme bulunamadı.", p => p.ContractId, (p, v) => p.ContractId = v!.Value, required: true, createOnly: true),
@@ -104,6 +106,8 @@ internal sealed class ContractLineRecordStore(ContractsStoreContext context) : C
     protected override string WritePermission => ContractsModule.Permissions.ContractsWrite;
 
     protected override bool UsesScope => true;
+
+    protected override string ScopeEntityKey => ContractsModule.Entities.Contract;
 
     protected override IReadOnlyList<RecordField<ContractLine>> Fields { get; } =
     [

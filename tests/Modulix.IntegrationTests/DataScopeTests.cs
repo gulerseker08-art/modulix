@@ -99,7 +99,7 @@ public class DataScopeTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         var (_, admin, _, _, _, _) = await SetUpAsync();
         using var adminClient = await LoginAsync(admin);
 
-        // Kapsam kayıt türüne göre çözülür (ADR-0029); türsüz istek sessizce geniş sonuç vermek yerine reddedilir.
+        // Kapsam kayıt türüne göre çözülür (ADR-0030); türsüz istek sessizce geniş sonuç vermek yerine reddedilir.
         Assert.Equal(HttpStatusCode.BadRequest, (await adminClient.GetAsync("/api/tenant/members?assignable=true")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await adminClient.GetAsync("/api/tenant/members?assignable=true&entityKey=%20")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await adminClient.GetAsync("/api/tenant/members")).StatusCode);

@@ -23,6 +23,8 @@ internal sealed class CampaignContentRecordStore(MarketingStoreContext context) 
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => MarketingModule.Entities.Campaign;
+
     protected override IReadOnlyList<RecordField<CampaignContent>> Fields { get; } =
     [
         Field.Reference<CampaignContent, Campaign>("campaignId", "Kampanya bulunamadı.", c => c.CampaignId, (c, v) => c.CampaignId = v ?? Guid.Empty, required: true, createOnly: true),
