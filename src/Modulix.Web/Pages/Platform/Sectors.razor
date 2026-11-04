@@ -1,0 +1,373 @@
+@page "/platform/sektorler"
+@inject ApiClient Api
+
+<PageTitle>Sektörler ve faaliyetler · Platform · Modulix</PageTitle>
+
+@* Sektör/faaliyet kataloğu (ADR-0029, Dilim B). Global katalogdur; firmalar buradan faaliyet seçer. Düğüm silinmez, pasife alınır; taşıma yoktur. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>Sektörler ve faaliyetler</h1>
+    <p class="text-muted">
+        Sektör → faaliyet grubu → alt faaliyet ağacı. Faaliyetin katalogda bulunması ilgili operasyon modülünün hazır olduğunu söylemez:
+        hazırlık durumunu "Hazır" yapmadan faaliyet yalnızca katalog kaydıdır. Düğüm silinmez, pasife alınır.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @message
+            @if (details.Count > 0)
+            {
+                <ul class="mb-0">
+                    @foreach (var detail in details)
+                    {
+                        <li>@detail</li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+
+    @if (catalog is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        <div class="form-actions">
+            <button type="button" class="btn btn-primary" @onclick="() => NewNode(null)">Yeni sektör</button>
+        </div>
+
+        @if (form is not null)
+        {
+            <section class="record-form settings-group" aria-live="polite">
+                <h2>@(form.Id is null ? (form.ParentName is null ? "Yeni sektör" : $"Yeni alt kayıt · {form.ParentName}") : $"Düzenle · {form.Code}")</h2>
+                <form @onsubmit="SaveNodeAsync">
+                    <div class="form-grid">
+                        @if (form.Id is null)
+                        {
+                            <div>
+                                <label class="form-label" for="nodeCode">Kod *</label>
+                                <input id="nodeCode" class="form-control" maxlength="50" placeholder="ör. antrepo" @bind="form.Code" @bind:event="oninput" />
+                                <div class="form-text">Küçük harf, rakam ve "-". Sonradan değişmez.</div>
+                            </div>
+                            @if (form.ParentId is not null)
+                            {
+                                <div>
+                                    <label class="form-label" for="nodeKind">Tür</label>
+                                    <select id="nodeKind" class="form-select" @bind="form.Kind">
+                                        <option value="Group">Faaliyet grubu</option>
+                                        <option value="Activity">Alt faaliyet</option>
+                                    </select>
+                                </div>
+                            }
+                        }
+                        <div>
+                            <label class="form-label" for="nodeName">Ad *</label>
+                            <input id="nodeName" class="form-control" maxlength="100" @bind="form.Name" @bind:event="oninput" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="nodeOrder">Sıra</label>
+                            <input id="nodeOrder" class="form-control" type="number" @bind="form.SortOrder" />
+                        </div>
+                        @if (form.Id is not null)
+                        {
+                            <div>
+                                <label class="form-label" for="nodeReadiness">Operasyon modülü</label>
+                                <select id="nodeReadiness" class="form-select" @bind="form.Readiness">
+                                    <option value="CatalogOnly">Yalnızca katalog</option>
+                                    <option value="Available">Hazır</option>
+                                </select>
+                            </div>
+                        }
+                        <div>
+                            <label class="form-label" for="nodeDescription">Açıklama</label>
+                            <textarea id="nodeDescription" class="form-control" rows="2" maxlength="500" @bind="form.Description"></textarea>
+                        </div>
+                    </div>
+
+                    @if (form.Id is not null)
+                    {
+                        <fieldset class="mt-3">
+                            <legend class="form-label">Gerektirdiği yetenekler</legend>
+                            @if (catalog.Capabilities.Count == 0)
+                            {
+                                <p class="text-muted">Henüz yetenek tanımlı değil; aşağıdan ekleyebilirsiniz.</p>
+                            }
+                            @foreach (var capability in catalog.Capabilities)
+                            {
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" checked="@form.Capabilities.Contains(capability.Code)"
+                                           @onchange="e => ToggleCapability(capability.Code, (bool)e.Value!)" />
+                                    <span class="form-check-label">@capability.Name <code>@capability.Code</code></span>
+                                </label>
+                            }
+                        </fieldset>
+                    }
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(form.Name) || (form.Id is null && string.IsNullOrWhiteSpace(form.Code)))">Kaydet</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => form = null">Vazgeç</button>
+                    </div>
+                </form>
+            </section>
+        }
+
+        @if (catalog.Nodes.Count == 0)
+        {
+            <p class="text-muted">Katalog boş. "Yeni sektör" ile başlayın.</p>
+        }
+        else
+        {
+            <section class="detail-section">
+                <h2>Ağaç</h2>
+                <table class="table record-table">
+                    <thead><tr><th>Ad</th><th>Tür</th><th>Kod</th><th>Operasyon modülü</th><th>Durum</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var row in Rows())
+                        {
+                            <tr>
+                                <td data-label="Ad" class="primary">@(new string('—', row.Depth) + (row.Depth > 0 ? " " : string.Empty))@row.Node.Name</td>
+                                <td data-label="Tür">@KindLabel(row.Node.Kind)</td>
+                                <td data-label="Kod"><code>@row.Node.Code</code></td>
+                                <td data-label="Operasyon modülü">
+                                    <span class="badge @(row.Node.Readiness == "Available" ? "success" : "tag")">@(row.Node.Readiness == "Available" ? "Hazır" : "Yalnızca katalog")</span>
+                                </td>
+                                <td data-label="Durum">
+                                    <span class="badge @(row.Node.IsActive ? "success" : "category")">@(row.Node.IsActive ? "Etkin" : "Pasif")</span>
+                                </td>
+                                <td class="actions">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(row.Node)">Düzenle</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => NewNode(row.Node)">Alt kayıt ekle</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => SetActiveAsync(row.Node)">
+                                        @(row.Node.IsActive ? "Pasife al" : "Etkinleştir")
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </section>
+        }
+
+        <section class="detail-section">
+            <h2>Yetenekler</h2>
+            <p class="text-muted">
+                Uygulamanın desteklediği işlevler. Bir yetenek başka yeteneklere bağlı olabilir (döngü kabul edilmez). Faaliyetlere
+                yukarıdan, düğüm düzenlenirken bağlanır.
+            </p>
+            <form class="form-actions" @onsubmit="CreateCapabilityAsync">
+                <input class="form-control" aria-label="Yetenek kodu" maxlength="100" placeholder="kod, ör. quote.templates" @bind="capabilityCode" @bind:event="oninput" />
+                <input class="form-control" aria-label="Yetenek adı" maxlength="100" placeholder="Ad" @bind="capabilityName" @bind:event="oninput" />
+                <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(capabilityCode) || string.IsNullOrWhiteSpace(capabilityName))">Yetenek ekle</button>
+            </form>
+
+            @if (catalog.Capabilities.Count > 0)
+            {
+                <table class="table record-table">
+                    <thead><tr><th>Ad</th><th>Kod</th><th>Bağlı olduğu yetenekler</th></tr></thead>
+                    <tbody>
+                        @foreach (var capability in catalog.Capabilities)
+                        {
+                            <tr>
+                                <td data-label="Ad" class="primary">@capability.Name</td>
+                                <td data-label="Kod"><code>@capability.Code</code></td>
+                                <td data-label="Bağlı olduğu yetenekler">
+                                    @foreach (var other in catalog.Capabilities.Where(c => c.Code != capability.Code))
+                                    {
+                                        <label class="form-check">
+                                            <input class="form-check-input" type="checkbox" disabled="@busy" checked="@capability.DependsOn.Contains(other.Code)"
+                                                   @onchange="e => SetDependencyAsync(capability, other.Code, (bool)e.Value!)" />
+                                            <span class="form-check-label">@other.Name</span>
+                                        </label>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+    }
+</PlatformGate>
+
+@code {
+    private SectorCatalogResponse? catalog;
+    private NodeForm? form;
+    private string? message;
+    private List<string> details = [];
+    private bool busy;
+    private string capabilityCode = string.Empty;
+    private string capabilityName = string.Empty;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<SectorCatalogResponse>("/api/platform/sectors");
+        catalog = result.Value;
+        Report(result.Error, result.FieldErrors);
+    }
+
+    private IEnumerable<(ActivityNodeDto Node, int Depth)> Rows()
+    {
+        var byParent = catalog!.Nodes.ToLookup(n => n.ParentId);
+        IEnumerable<(ActivityNodeDto, int)> Walk(Guid? parentId, int depth) =>
+            byParent[parentId].OrderBy(n => n.SortOrder).ThenBy(n => n.Name).SelectMany(n => Walk(n.Id, depth + 1).Prepend((n, depth)));
+        return Walk(null, 0);
+    }
+
+    private static string KindLabel(string kind) => kind switch
+    {
+        "Sector" => "Sektör",
+        "Group" => "Faaliyet grubu",
+        "Activity" => "Alt faaliyet",
+        _ => kind,
+    };
+
+    private void NewNode(ActivityNodeDto? parent)
+    {
+        form = new NodeForm
+        {
+            ParentId = parent?.Id,
+            ParentName = parent?.Name,
+            Kind = parent is null ? "Sector" : parent.Kind == "Sector" ? "Group" : "Activity",
+        };
+    }
+
+    private void Edit(ActivityNodeDto node)
+    {
+        form = new NodeForm
+        {
+            Id = node.Id,
+            Code = node.Code,
+            Kind = node.Kind,
+            Name = node.Name,
+            Description = node.Description,
+            SortOrder = node.SortOrder,
+            Readiness = node.Readiness,
+            Version = node.Version,
+            Capabilities = [.. node.Capabilities],
+        };
+    }
+
+    private void ToggleCapability(string code, bool on)
+    {
+        if (on)
+        {
+            form!.Capabilities.Add(code);
+        }
+        else
+        {
+            form!.Capabilities.Remove(code);
+        }
+    }
+
+    private async Task SaveNodeAsync()
+    {
+        busy = true;
+        if (form!.Id is { } id)
+        {
+            var updated = await Api.PutAsync<ActivityNodeDto>($"/api/platform/sectors/nodes/{id}",
+                new UpdateActivityNodeRequest(form.Name, form.Description, form.SortOrder, form.Readiness, form.Version));
+            Report(updated.Error, updated.FieldErrors);
+            if (updated.Value is { } node)
+            {
+                form.Version = node.Version;
+                // Yetenekler ayrı uçtan yazılır; ad ve sıra kaydedildikten sonra bağlanır.
+                var linked = await Api.PutAsync<ActivityNodeDto>($"/api/platform/sectors/nodes/{id}/capabilities", new CodeListRequest([.. form.Capabilities]));
+                Report(linked.Error, linked.FieldErrors);
+                if (linked.Value is not null)
+                {
+                    form = null;
+                    await LoadAsync();
+                }
+            }
+        }
+        else
+        {
+            var created = await Api.PostAsync<ActivityNodeDto>("/api/platform/sectors/nodes",
+                new CreateActivityNodeRequest(form.Code, form.ParentId, form.Kind, form.Name, form.Description, form.SortOrder));
+            Report(created.Error, created.FieldErrors);
+            if (created.Value is not null)
+            {
+                form = null;
+                await LoadAsync();
+            }
+        }
+
+        busy = false;
+    }
+
+    private async Task SetActiveAsync(ActivityNodeDto node)
+    {
+        busy = true;
+        var result = await Api.PutAsync<ActivityNodeDto>($"/api/platform/sectors/nodes/{node.Id}/active", new SetActiveRequest(!node.IsActive));
+        Report(result.Error, result.FieldErrors);
+        if (result.Value is not null)
+        {
+            await LoadAsync();
+        }
+
+        busy = false;
+    }
+
+    private async Task CreateCapabilityAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<CapabilityDto>("/api/platform/sectors/capabilities", new CreateCapabilityRequest(capabilityCode.Trim(), capabilityName.Trim()));
+        Report(result.Error, result.FieldErrors);
+        if (result.Value is not null)
+        {
+            capabilityCode = capabilityName = string.Empty;
+            await LoadAsync();
+        }
+
+        busy = false;
+    }
+
+    private async Task SetDependencyAsync(CapabilityDto capability, string code, bool on)
+    {
+        busy = true;
+        List<string> wanted = on ? [.. capability.DependsOn, code] : [.. capability.DependsOn.Where(c => c != code)];
+        var result = await Api.PutAsync<CapabilityDto>($"/api/platform/sectors/capabilities/{Uri.EscapeDataString(capability.Code)}/dependencies", new CodeListRequest(wanted));
+        Report(result.Error, result.FieldErrors);
+        await LoadAsync(); // reddedilen değişiklikte (ör. döngü) kutu veritabanındaki duruma döner
+
+        busy = false;
+    }
+
+    private void Report(string? error, IReadOnlyDictionary<string, string[]>? fieldErrors)
+    {
+        message = error;
+        details = fieldErrors is null ? [] : [.. fieldErrors.Values.SelectMany(v => v)];
+    }
+
+    private sealed class NodeForm
+    {
+        public Guid? Id { get; set; }
+
+        public Guid? ParentId { get; set; }
+
+        public string? ParentName { get; set; }
+
+        public string Code { get; set; } = string.Empty;
+
+        public string Kind { get; set; } = "Sector";
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public int SortOrder { get; set; }
+
+        public string Readiness { get; set; } = "CatalogOnly";
+
+        public long Version { get; set; }
+
+        public HashSet<string> Capabilities { get; set; } = [];
+    }
+}
