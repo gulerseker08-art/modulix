@@ -41,6 +41,7 @@ internal sealed class UserAdministration(
     IBusinessUnitService businessUnits,
     IMembershipScope memberScope,
     IModuleEntitlements entitlements,
+    IEntitlementResolver limits,
     UserSessions sessions,
     TimeProvider time,
     IOptions<UserAdministrationOptions> options) : IUserAdministration
@@ -182,6 +183,12 @@ internal sealed class UserAdministration(
         {
             throw new UserAdministrationException(
                 UserAdministrationError.Conflict, "Bu e-posta adresi kuruluşunuzda zaten kayıtlı.");
+        }
+
+        // Koltuk sınırı (ADR-0028): yeni üyelik bir koltuk ayırır. Platform yöneticisinin kurtarma daveti sınırdan etkilenmez.
+        if (!byPlatform)
+        {
+            await EnsureSeatAvailableAsync(tenant, cancellationToken);
         }
 
         if (user is null)
@@ -629,6 +636,9 @@ internal sealed class UserAdministration(
 
         await EnsureMayManageAsync(tenant, membershipId, cancellationToken);
 
+        // Devre dışı üyelik koltuk saymaz; yeniden etkinleştirmek koltuk ister. Mevcut kullanıcılar sınır düşse de kapanmaz.
+        await EnsureSeatAvailableAsync(tenant, cancellationToken);
+
         membership.Enable();
         AuditStatus(tenant, membership, MembershipStatus.Disabled);
         await db.SaveChangesAsync(cancellationToken);
@@ -934,6 +944,21 @@ internal sealed class UserAdministration(
 
     private static UserAdministrationException NotFound() =>
         new(UserAdministrationError.NotFound, "Kullanıcı bulunamadı.");
+
+    private async Task EnsureSeatAvailableAsync(TenantContext tenant, CancellationToken cancellationToken)
+    {
+        var limit = await limits.GetLimitAsync(tenant.TenantId, LimitKeys.Seats, cancellationToken);
+        if (limit.Value is null)
+        {
+            return;
+        }
+
+        var usage = await limits.GetUsageAsync(tenant.TenantId, LimitKeys.Seats, cancellationToken);
+        if (!limit.Allows(usage))
+        {
+            throw Conflict($"Kullanıcı koltuğu sınırına ulaşıldı ({usage}/{limit.Value}). Yeni kullanıcı eklemek için planınızın yükseltilmesi gerekir; mevcut kullanıcılar etkilenmez.");
+        }
+    }
 
     private static UserAdministrationException Conflict(string message) =>
         new(UserAdministrationError.Conflict, message);

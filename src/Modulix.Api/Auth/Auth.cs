@@ -464,7 +464,8 @@ public static class AuthEndpoints
             activeTenantId,
             memberships.Select(m => new MembershipDto(m.TenantId, m.TenantName, m.TenantSlug, shown.GetValueOrDefault(m.TenantId))).ToList(),
             user.IsPlatformAdministrator,
-            user.TwoFactorEnabled);
+            user.TwoFactorEnabled,
+            PlatformRoles: [.. Modulix.Core.Platform.PlatformRoles.Split(Modulix.Core.Platform.PlatformRoles.Effective(user.IsPlatformAdministrator, user.PlatformRoles)).Select(r => r.ToString())]);
     }
 
     private static IResult InvalidLink(string message) =>

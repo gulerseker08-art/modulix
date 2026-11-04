@@ -44,6 +44,15 @@ internal sealed class PlatformAdministration(
     /// <summary>Denetim kaydındaki kayıt türü.</summary>
     public const string TenantEntityKey = "core.tenant";
 
+    public async Task<PlatformAccess?> GetAccessAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await db.Users.AsNoTracking()
+            .Where(u => u.Id == userId && u.IsPlatformAdministrator)
+            .Select(u => new { u.PlatformRoles, u.TwoFactorEnabled })
+            .SingleOrDefaultAsync(cancellationToken);
+        return user is null ? null : new PlatformAccess(PlatformRoles.Effective(true, user.PlatformRoles), user.TwoFactorEnabled);
+    }
+
     public Task<bool> IsPlatformAdministratorAsync(Guid userId, CancellationToken cancellationToken) =>
         db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsPlatformAdministrator, cancellationToken);
 

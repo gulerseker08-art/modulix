@@ -19,4 +19,10 @@ public class ModulixUser : IdentityUser<Guid>
     /// (RLS atlanmaz). Yalnızca komut satırıyla atanır: <c>-- platform-admin e-posta</c>.
     /// </summary>
     public bool IsPlatformAdministrator { get; set; }
+
+    /// <summary>
+    /// Platform rolleri (ADR-0028 Dilim 5; bayrak birleşimi). Boşsa ve <see cref="IsPlatformAdministrator"/> açıksa kişi Owner sayılır
+    /// (rol modelinden önce atanmış hesaplar); bkz. <see cref="Modulix.Core.Platform.PlatformRoles.Effective"/>.
+    /// </summary>
+    public Modulix.Core.Platform.PlatformRole PlatformRoles { get; set; }
 }

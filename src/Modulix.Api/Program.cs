@@ -105,6 +105,7 @@ builder.Services.AddSupportSurveyRateLimit(builder.Configuration);
 builder.Services.AddCommunicationPublicRateLimit(builder.Configuration);
 builder.Services.AddContractSignatureRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
+builder.Services.Configure<Modulix.Api.Platform.PlatformOptions>(builder.Configuration.GetSection(Modulix.Api.Platform.PlatformOptions.SectionName));
 builder.Services.Configure<Modulix.Infrastructure.Modules.LicenseOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Modules.LicenseOptions.SectionName));
 builder.Services.Configure<Modulix.Api.Crm.QuoteExpiryOptions>(builder.Configuration.GetSection(Modulix.Api.Crm.QuoteExpiryOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Crm.QuoteExpiryRunner>();
@@ -218,6 +219,8 @@ app.MapCommunicationPublicEndpoints();
 app.MapContractSignatureWebhook();
 app.MapPlatformEndpoints();
 app.MapPlatformEventEndpoints();
+app.MapPlatformPlanEndpoints();
+app.MapPlatformTeamEndpoints();
 app.MapAuditEndpoints();
 app.MapSettingsEndpoints();
 

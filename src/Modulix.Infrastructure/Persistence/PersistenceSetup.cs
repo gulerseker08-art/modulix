@@ -83,6 +83,9 @@ public static class PersistenceSetup
         // Modül hakları ve izinler; ModuleCatalog'u host kaydeder (AddModulixModules).
         services.AddScoped<IModuleEntitlements, ModuleEntitlements>();
         services.AddScoped<IModuleLicense, ModuleLicense>();
+        services.AddScoped<IEntitlementResolver, Modulix.Infrastructure.Platform.EntitlementResolver>();
+        services.AddScoped<IPlanAdministration, Modulix.Infrastructure.Platform.PlanAdministration>();
+        services.AddScoped<IPlatformTeam, Modulix.Infrastructure.Platform.PlatformTeam>();
         services.AddScoped<AdministratorGuard>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<MembershipPermissions>();
