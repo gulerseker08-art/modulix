@@ -267,3 +267,42 @@ Tasarımdan ayrılan / netleşen noktalar:
 ### Sonraki dilim (2) için bağımlılıklar
 
 `core.automation` olay aboneliği (ADR-0007 `IEventSubscriber`, `Ordered=false`), `AutomationRuns/Steps` ve `AutomationScanCursors` tabloları, `UNIQUE(TenantId, DedupeKey)`, kira/heartbeat kalıbı (`EventDispatcher`), tarama için `sp_getapplock` ve `ITenantClock`, `core.automation.enabled` ayarı (acil durdurma), tenant limitleri, sürüm bazlı kural önbelleği.
+
+### Dilim 2a (4 Kasım 2026)
+
+Kurallar artık olay yolundan çalışır (ayrıntı için README "Otomasyon kuralları → Yürütme"). Yapılanlar:
+
+- **Olay yolu:** `core.automation` aboneliği (`IEventSubscriber`, `Ordered=false`, izinsiz). Katalog aboneliğin `EntityKeys` değerini modüllerin kural için beyan ettiği varlıklara daraltır; hiçbir modül beyan etmediyse abonelik kaldırılır. Abone yalnızca olay farkından tetikleyiciyi eşler (`AutomationTriggerMatcher`) ve `Pending` bir `AutomationRun` yazar; değerlendirme ve yürütme `AutomationRunner`'dadır.
+- **Veri:** `core.AutomationRuns`, `core.AutomationRunSteps` (migration `AutomationRuns`, RLS). `UNIQUE(TenantId, DedupeKey)`; `DedupeKey = SHA256(tenant|olay|sürüm|varlık|kayıt)`. Çalışmalar kayıt değeri saklamaz; parametreler çalışma anında `AutomationParameterResolver` ile yeniden çözülür (önizleme ile aynı kod).
+- **Yürütme:** tenant başına `sp_getapplock`, çalışma bazında kira (koşullu UPDATE, 3 dk), adımlar sırayla ve adım başına `SHA256(DedupeKey|adım)` idempotency anahtarıyla; yeniden deneme 1/5/15/60 dk, en çok 5 deneme. Beklenmeyen istisnada çalışma `Failed` olur, yalnızca istisna türü yazılır. Zincir koruması: derinlik > 0 ise aynı kural + kayıt + korelasyon ikinci kez çalışmaz.
+- **Kuralın kimliği:** `EventHandlingScope.Begin(zarf, "core.automation", GrantedPermissions)`. İzinler tanımdan türetilir (varlık okuma, kullanılan hassas alan okumaları, aksiyonların gerekli izinleri); kapsam Tümü. Kural, kendi tanımının gerektirdiğinden fazlasını göremez ve değiştiremez.
+- **Acil durdurma:** platform `Automation:Enabled`, firma ayarı `core.automation.enabled` (varsayılan Evet), kural kapatma. Bir tenant'ın yürütmesi diğerlerini durdurmaz.
+- **Limitler:** firma başına etkin kural (varsayılan 200, `AutomationOptions.MaxActiveRulesPerTenant`), olay başına 50 aday kural, tur başına tenant başına 25 çalışma.
+- **Çalışan tetikleyiciler:** `RecordCreated`, `FieldChanged`, `StatusTransition`, `Manual`. `Scheduled`, `DateRelative`, `Inactivity` ve `DomainEvent` yayın/etkinleştirmede 422 ("henüz çalışmıyor") ile reddedilir (`AutomationTriggerMatcher.IsExecutable`); Dilim 2b işidir.
+- **Elle çalıştırma:** yalnızca etkin `ManualTrigger` kurallar; çağıran kaydı kendi izniyle okuyabilmeli; sürüm + kayıt + tenant günü başına bir elle çalışma (ikincisi 409 + `existingRunId`); `core.automation-rule` denetim kaydında "run" alanı.
+- **Geçmiş API'si:** çalışma listesi/ayrıntısı ve elle çalıştırma uç noktaları (`/api/automation`), `core.automation-logs.read` izniyle.
+- **Test dikişi:** `IAutomationRecordReader` (varsayılan `PipelineAutomationRecordReader`, kayıt boru hattı üzerinden); entegrasyon testleri `FakeRecordReader` ile değiştirir. `AutomationWorker` (BackgroundService) test fabrikasında kapalıdır (`Automation:WorkerEnabled=false`).
+
+Tasarımdan ayrılan / netleşen noktalar:
+
+- Dilim planındaki 2 iki parçaya bölündü: 2a (olay yolu, bu bölüm) ve 2b (tarama tabanlı tetikleyiciler).
+- Çalışmalar kayıt değeri saklamadığı için geçmişte "o gün hangi değer vardı" görünmez; yalnızca hangi sürümün hangi kayıtta ne yaptığı ve sonucu vardır.
+
+### Test sonuçları (Dilim 2a)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet build` | 0 hata |
+| `dotnet test tests/Modulix.ArchitectureTests` | 52 başarılı |
+| `dotnet test tests/Modulix.Core.Tests` | 539 başarılı |
+| Crm / Contracts / Logistics / Orders / Support / Marketing birim testleri | başarılı (258 / 146 / 4 / 109 / 145 / 133) |
+| Otomasyon entegrasyon testleri (`AutomationRunTests`, `AutomationRuleTests`; mutlu yol, doğrulama, tenant izolasyonu, yetki) ve `SettingsTests` | başarılı |
+| Tam entegrasyon paketi (yerel) | Beş test düştü, otomasyon/ayar/yönetim testlerinde hata yok. `QuotePostAcceptTests` (2), `QuoteOpportunityTests`, `EventTests.Self_assignment_and_unassignment_send_no_email` tam pakette düşer, tek tek koşunca geçer (9/9); Dilim 1'de de aynı kararsızlık gözlendi. `TableInventoryTests` yerel veritabanındaki, bu dalda kodu olmayan `platform.ActivityNodes`, `Capabilities`, `ActivityNodeCapabilities`, `CapabilityDependencies` tablolarından düşer (başka bir dalın migration'ından kalma olduğu varsayımı; migration geçmişiyle doğrulanmadı) |
+
+CI (GitHub Actions) bu dilim için çalışmadı: hesap faturalandırma/harcama limiti nedeniyle iş başlamadı. Migration'ın temiz veritabanında uygulanması ve tam paketin CI'da koşması merge öncesi doğrulanmalıdır.
+
+### Kalan işler (Dilim 2a sonrası)
+
+- Dilim 2b: tarama tabanlı tetikleyiciler, `AutomationScanCursors`, `IAutomationRecordSource`, iş olayı tetikleyicisi, çalışma saklama temizliği.
+- Hâlâ gerçek bir modülde aksiyon yoktur (CRM, Dilim 3); canlı uygulamada yayınlanabilir kural bulunmadığı için yürütme yalnızca testlerde uçtan uca görülmüştür.
+- `IFollowUpActivities` idempotency anahtarı (Dilim 3), özel alan olay farkı biçiminin gerçek outbox yüküyle doğrulanması hâlâ açıktır.
