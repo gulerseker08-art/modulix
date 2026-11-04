@@ -158,8 +158,8 @@ internal sealed class SegmentEngine(
             : parts.Aggregate((a, b) => a.Union(b));
     }
 
-    // Segmentin veri kapsamı hedef türün kapsamıdır (ADR-0029). Koşullar başka türlere (ör. kazanılan fırsat) bakabilse de
-    // tek sahip kümesiyle çalışılır; hedef türün kapsamı alınır (ADR-0029 açık karar 3).
+    // Segmentin veri kapsamı hedef türün kapsamıdır (ADR-0030). Koşullar başka türlere (ör. kazanılan fırsat) bakabilse de
+    // tek sahip kümesiyle çalışılır; hedef türün kapsamı alınır (ADR-0030 açık karar 3).
     private static string ScopeEntityKey(SegmentTarget target) =>
         target switch { SegmentTarget.Person => "crm.contact", SegmentTarget.Lead => "crm.lead", _ => "crm.company" };
 

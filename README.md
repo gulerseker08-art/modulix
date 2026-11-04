@@ -249,7 +249,7 @@ Roller "hangi tür kaydı", kayıt kapsamı "hangi kayıtları" belirler. Kapsam
 
 - Kapsam yalnızca sorumlu alanı olan kayıt türlerine uygulanır (`IRecordStore.OwnerField`; CRM'de firma, fırsat, aktivite). Boru hattı (`IDataScopeService`) listede kapsamı sorguya koyar (`RecordQuery.Owners`), böylece sayfalama ve toplam doğru kalır; kapsam dışındaki tek kayıt 404 döner. Sorumlu kapsam dışına atanamaz (422, `ownerId`). Sorumlusu boş kayıt yalnızca "Tüm kayıtlar"da görünür.
 - **Ekipler** (Yönetim → Ekipler, `core.users.manage`): `/api/teams` (liste, ekle, düzenle, sil), `PUT /api/teams/{id}/members`, kullanıcı ayrıntısında `GET/PUT /api/users/{üyelik}/teams`. Bir kişi birden fazla ekipte olabilir; ekip silinince yalnızca ekip ilişkisi kalkar. Değişiklikler denetim kaydına "Ekip" olarak yazılır.
-- `GET /api/tenant/members?assignable=true&entityKey=<tür>`: kişinin sorumlu atayabileceği üyeler; kapsam kayıt türüne göre çözüldüğü için tür anahtarı (ör. `crm.company`) zorunludur, verilmezse 400 döner (ADR-0029). `GET /api/tenant/access` ve kullanıcının "Erişim" görünümü kapsamı (ve ekipleri) gösterir.
+- `GET /api/tenant/members?assignable=true&entityKey=<tür>`: kişinin sorumlu atayabileceği üyeler; kapsam kayıt türüne göre çözüldüğü için tür anahtarı (ör. `crm.company`) zorunludur, verilmezse 400 döner (ADR-0030). `GET /api/tenant/access` ve kullanıcının "Erişim" görünümü kapsamı (ve ekipleri) gösterir.
 - Yönetici olmayan rol yöneticisi kendi kapsamından geniş kapsam veremez (403).
 
 ### Departman ağacı ([ADR-0026](docs/adr/0026-departman-hiyerarsisi-ve-departman-bazli-gorunurluk.md), dilim 1)
