@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Reporting;
 
 namespace Modulix.Core.Reporting;
 
@@ -13,13 +14,13 @@ namespace Modulix.Core.Reporting;
 /// </summary>
 public sealed class ReportAccessStamp(ICurrentAccess access, IRecordAccess records)
 {
-    public async Task<string> ComputeAsync(string datasetKey, CancellationToken cancellationToken)
+    public async Task<string> ComputeAsync(DatasetDefinition dataset, CancellationToken cancellationToken)
     {
         var permissions = await access.GetPermissionsAsync(cancellationToken);
         var scope = await access.GetScopeAsync(cancellationToken);
-        var owners = await records.GetOwnersAsync(cancellationToken);
+        var owners = await records.GetOwnersAsync(dataset.EntityKey, cancellationToken);
 
-        var text = new StringBuilder(datasetKey).Append('|').Append(scope).Append('|');
+        var text = new StringBuilder(dataset.Key).Append('|').Append(scope).Append('|');
         text.AppendJoin(',', permissions.Order(StringComparer.Ordinal)).Append('|');
         text.Append(owners is null ? "*" : string.Join(',', owners.Order()));
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())));

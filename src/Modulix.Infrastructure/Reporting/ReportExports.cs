@@ -86,7 +86,7 @@ internal sealed class ReportExports(
         var fileName = $"{ReportCsv.FileSlug(name)}-{now:yyyyMMdd-HHmm}.csv";
         var export = new ReportExport(
             tenant.UserId, reportId, name.Length > ReportDefinition.NameMaxLength ? name[..ReportDefinition.NameMaxLength] : name, resolved.Dataset.Key, fileName,
-            bytes, rows, result.Truncated || result.RowsLimited, await stamps.ComputeAsync(resolved.Dataset.Key, cancellationToken), source, now);
+            bytes, rows, result.Truncated || result.RowsLimited, await stamps.ComputeAsync(resolved.Dataset, cancellationToken), source, now);
         db.ReportExports.Add(export);
         audit.Add(new AuditEntry(
             tenant.TenantId, tenant.UserId, CoreModule.AuditedEntityKeys.Report, reportId ?? export.Id, AuditAction.Exported,
@@ -135,12 +135,12 @@ internal sealed class ReportExports(
             return new ReportDownload(ReportDownloadStatus.Forbidden, "Rapor dışa aktarma yetkiniz yok.");
         }
 
-        if (await resolver.ResolveAsync(meta.DatasetKey, cancellationToken) is not { Columns: not null })
+        if (await resolver.ResolveAsync(meta.DatasetKey, cancellationToken) is not { Columns: not null } resolved)
         {
             return new ReportDownload(ReportDownloadStatus.Forbidden, "Bu verilere erişiminiz kalmadı ya da modül etkin değil.");
         }
 
-        if (await stamps.ComputeAsync(meta.DatasetKey, cancellationToken) != meta.AccessStamp)
+        if (await stamps.ComputeAsync(resolved.Dataset, cancellationToken) != meta.AccessStamp)
         {
             return new ReportDownload(ReportDownloadStatus.AccessChanged, "Erişim yetkiniz dosya hazırlandıktan sonra değişti; raporu yeniden dışa aktarın.");
         }
