@@ -39,7 +39,7 @@ public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IC
         // Firmasında yönetici olmak platform yetkisi vermez.
         using var tenantClient = await LoginAsync(tenantAdmin);
         Assert.Equal(HttpStatusCode.Forbidden, (await tenantClient.GetAsync("/api/platform/tenants")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await tenantClient.PostAsync($"/api/platform/tenants/{tenant.Id}/close", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await tenantClient.PostAsJsonAsync($"/api/platform/tenants/{tenant.Id}/close", new TenantReasonRequest("Test gerekçesi"))).StatusCode);
         Assert.False((await tenantClient.GetFromJsonAsync<MeResponse>("/api/auth/me"))!.IsPlatformAdministrator);
 
         using var client = factory.CreateBrowserClient();
@@ -52,7 +52,9 @@ public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IC
         var listed = Assert.Single(page!.Items);
         Assert.Equal(tenant.Id, listed.Id);
         Assert.Equal(1, listed.ActiveMemberCount);
-        Assert.Equal(1, listed.AdministratorCount);
+        Assert.Null(listed.AdministratorCount); // liste firma başına kapsam açmaz; sayı yalnızca detayda gelir
+        var detail = await client.GetFromJsonAsync<PlatformTenantDetailResponse>($"/api/platform/tenants/{tenant.Id}");
+        Assert.Equal(1, detail!.Tenant.AdministratorCount);
 
         await SetPlatformAdministratorAsync(platformAdmin, false);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/platform/tenants")).StatusCode);
@@ -169,8 +171,8 @@ public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IC
         var invitationUrl = $"/api/auth/invitation?uyelik={link.Id}&token={Uri.EscapeDataString(link.Token)}";
         Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync(invitationUrl)).StatusCode);
 
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync($"/api/platform/tenants/{tenant.Id}/close", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsync($"/api/platform/tenants/{tenant.Id}/close", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsJsonAsync($"/api/platform/tenants/{tenant.Id}/close", new TenantReasonRequest("Test gerekçesi"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync($"/api/platform/tenants/{tenant.Id}/close", new TenantReasonRequest("Test gerekçesi"))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync($"/api/platform/tenants/{tenant.Id}/administrators",
             new InviteTenantAdministratorRequest($"x-{Guid.NewGuid():N}@test.modulix", "Baska"))).StatusCode);
 
@@ -190,7 +192,7 @@ public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IC
 
         Assert.Equal(HttpStatusCode.NoContent,
             (await client.PutAsJsonAsync($"/api/platform/tenants/{tenant.Id}", new RenameTenantRequest("Yeni Ad"))).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync($"/api/platform/tenants/{Guid.NewGuid()}/close", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync($"/api/platform/tenants/{Guid.NewGuid()}/close", new TenantReasonRequest("Test gerekçesi"))).StatusCode);
 
         using var scope = factory.OpenScope(tenant.Id);
         var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
@@ -232,20 +234,20 @@ public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IC
 
         // Firma kullanıcısı modül açıp kapatamaz.
         Assert.Equal(HttpStatusCode.Forbidden,
-            (await memberClient.PutAsJsonAsync($"/api/platform/tenants/{tenant.Id}/modules/crm", new SetTenantModuleRequest(false))).StatusCode);
+            (await memberClient.PutAsJsonAsync($"/api/platform/tenants/{tenant.Id}/modules/crm", new SetTenantModuleRequest(false, Reason: "Test gerekçesi"))).StatusCode);
 
         var url = $"/api/platform/tenants/{tenant.Id}/modules/crm";
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(false))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(false, Reason: "Test gerekçesi"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await memberClient.GetAsync("/api/crm/companies")).StatusCode);
 
         // Aynı durum ikinci kez denetim kaydı yazmaz.
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(false))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(false, Reason: "Test gerekçesi"))).StatusCode);
 
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(url, new SetTenantModuleRequest(true))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await memberClient.GetAsync("/api/crm/companies")).StatusCode);
 
         Assert.Equal(HttpStatusCode.BadRequest,
-            (await client.PutAsJsonAsync($"/api/platform/tenants/{tenant.Id}/modules/core", new SetTenantModuleRequest(false))).StatusCode);
+            (await client.PutAsJsonAsync($"/api/platform/tenants/{tenant.Id}/modules/core", new SetTenantModuleRequest(false, Reason: "Test gerekçesi"))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,
             (await client.PutAsJsonAsync($"/api/platform/tenants/{tenant.Id}/modules/yok", new SetTenantModuleRequest(true))).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,

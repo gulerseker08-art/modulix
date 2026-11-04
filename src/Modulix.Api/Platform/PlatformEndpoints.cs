@@ -33,10 +33,10 @@ public static class PlatformEndpoints
         platform.MapPost("/tenants", CreateTenantAsync);
         platform.MapPut("/tenants/{tenantId:guid}", (Guid tenantId, RenameTenantRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
             Run(() => admin.RenameTenantAsync(tenantId, request.Name, UserId(user), ct)));
-        // Durum geçişleri (ADR-0028): gerekçe platform denetim kaydına yazılır; askıya almada zorunludur.
+        // Durum geçişleri (ADR-0028): gerekçe platform denetim kaydına yazılır; askıya alma ve kapatmada zorunludur.
         // Gövde isteğe bağlıdır (gövdesiz çağrı da geçerli); bu yüzden elle okunur: boş gövdeli POST'u bağlayıcı 404 yapar.
         platform.MapPost("/tenants/{tenantId:guid}/close", (Guid tenantId, HttpRequest http, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
-            Transition(http, reason => admin.CloseTenantAsync(tenantId, UserId(user), ct, reason), ct));
+            Transition(http, reason => admin.CloseTenantAsync(tenantId, reason ?? string.Empty, UserId(user), ct), ct));
         platform.MapPost("/tenants/{tenantId:guid}/reopen", (Guid tenantId, HttpRequest http, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
             Transition(http, reason => admin.ReopenTenantAsync(tenantId, UserId(user), ct, reason), ct));
         platform.MapPost("/tenants/{tenantId:guid}/suspend", (Guid tenantId, HttpRequest http, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
@@ -45,8 +45,10 @@ public static class PlatformEndpoints
             Transition(http, reason => admin.ActivateTenantAsync(tenantId, UserId(user), ct, reason), ct));
         platform.MapPost("/tenants/{tenantId:guid}/administrators", InviteAdministratorAsync);
         platform.MapPut("/tenants/{tenantId:guid}/modules/{moduleKey}", (Guid tenantId, string moduleKey, SetTenantModuleRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
-            Run(() => admin.SetModuleAsync(tenantId, moduleKey, request.Enabled, UserId(user), ct, ToTerms(request))));
+            Run(() => admin.SetModuleAsync(tenantId, moduleKey, request.Enabled, UserId(user), ct, ToTerms(request), request.Reason)));
         platform.MapGet("/audit", ListAuditAsync);
+        platform.MapGet("/overview", GetOverviewAsync);
+        platform.MapGet("/expirations", ListExpirationsAsync);
         platform.MapGet("/catalog", GetCatalogAsync);
 
         // Sektör profilleri (Y9c): platform yöneticisi profilin kapalı modüllerini de açar.
@@ -95,13 +97,25 @@ public static class PlatformEndpoints
             : new EntitlementTerms(
                 request.Source is { } source ? (EntitlementSource)source : EntitlementSource.Manual, request.ValidUntil, request.Note);
 
+    private static async Task<PlatformOverviewResponse> GetOverviewAsync(IPlatformAdministration admin, CancellationToken ct)
+    {
+        var overview = await admin.GetOverviewAsync(ct);
+        return new PlatformOverviewResponse(
+            [.. Enum.GetValues<TenantStatus>().Select(s => new TenantStateCountDto((TenantState)s, overview.TenantCounts.GetValueOrDefault(s)))],
+            overview.ExpiredEntitlements, overview.ExpiringIn30Days, overview.ExpiringIn60Days, overview.ExpiringIn90Days);
+    }
+
+    private static async Task<List<PlatformExpirationDto>> ListExpirationsAsync(int? days, IPlatformAdministration admin, CancellationToken ct) =>
+        [.. (await admin.ListExpirationsAsync(days ?? 90, ct)).Select(e => new PlatformExpirationDto(
+            e.TenantId, e.TenantName, e.TenantSlug, (TenantState)e.TenantStatus, e.ModuleKey, (LicenseSource)e.Source, e.ValidUntil, e.Note))];
+
     private static async Task<IResult> ListAuditAsync(
         Guid? tenantId, string? action, int? page, int? pageSize, IPlatformAdministration admin, CancellationToken ct)
     {
         var result = await admin.ListAuditAsync(new PlatformAuditQuery(tenantId, action, page ?? 1, pageSize ?? 25), ct);
         return Results.Ok(new PlatformAuditPageResponse(
             [.. result.Items.Select(i => new PlatformAuditItemDto(
-                i.Id, i.OccurredAt, i.ActorUserId, i.ActorName, i.Action, i.TargetTenantId, i.Reason, i.Details))],
+                i.Id, i.OccurredAt, i.ActorUserId, i.ActorName, i.Action, i.TargetTenantId, i.TargetTenantName, i.Reason, i.Details))],
             result.Page, result.PageSize, result.TotalCount));
     }
 

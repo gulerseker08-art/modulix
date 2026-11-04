@@ -46,11 +46,12 @@ public sealed record TenantEntitlementDto(string ModuleKey, bool IsEnabled, Lice
 
 /// <summary>Platform denetim kaydındaki bir satır (ADR-0028).</summary>
 public sealed record PlatformAuditItemDto(
-    Guid Id, DateTimeOffset OccurredAt, Guid ActorUserId, string? ActorName, string Action, Guid? TargetTenantId, string? Reason, string? Details);
+    Guid Id, DateTimeOffset OccurredAt, Guid ActorUserId, string? ActorName, string Action, Guid? TargetTenantId, string? TargetTenantName,
+    string? Reason, string? Details);
 
 public sealed record PlatformAuditPageResponse(IReadOnlyList<PlatformAuditItemDto> Items, int Page, int PageSize, int TotalCount);
 
-/// <summary>Askıya alma gerekçesi zorunludur; kapatma, yeniden açma ve etkinleştirmede isteğe bağlıdır.</summary>
+/// <summary>Askıya alma ve kapatmada gerekçe zorunludur; yeniden açma ve etkinleştirmede isteğe bağlıdır.</summary>
 public sealed record TenantReasonRequest(string? Reason = null);
 
 public sealed record PlatformTenantDto(
@@ -60,7 +61,7 @@ public sealed record PlatformTenantDto(
     TenantState Status,
     DateTimeOffset CreatedAt,
     int ActiveMemberCount,
-    int AdministratorCount,
+    int? AdministratorCount,
     IReadOnlyList<string> EnabledModules,
     string? ProfileKey = null,
     DateTimeOffset? ProfileAppliedAt = null);
@@ -108,8 +109,25 @@ public sealed record PlatformModulesResponse(IReadOnlyList<PlatformModuleDto> Mo
 /// <summary>
 /// <see cref="Source"/>, <see cref="ValidUntil"/> ve <see cref="Note"/> yalnızca açarken geçerlidir (ADR-0028); boşsa mevcut
 /// koşullar korunur (yeni hak: elle, süresiz). İstisna için not zorunludur; bitiş gelecekte olmalıdır.
+/// <see cref="Reason"/> platform denetim kaydına yazılır; kapatırken ve süre uzatırken (bitişi ileri alma ya da kaldırma) zorunludur.
 /// </summary>
-public sealed record SetTenantModuleRequest(bool Enabled, LicenseSource? Source = null, DateTimeOffset? ValidUntil = null, string? Note = null);
+public sealed record SetTenantModuleRequest(
+    bool Enabled, LicenseSource? Source = null, DateTimeOffset? ValidUntil = null, string? Note = null, string? Reason = null);
+
+/// <summary>Firma sayısı: durum ve adet.</summary>
+public sealed record TenantStateCountDto(TenantState State, int Count);
+
+/// <summary>
+/// Platform genel bakışı (ADR-0028 Dilim 2): durumlara göre firma sayıları ve açık modül haklarının bitişi. Yaklaşan sayıları
+/// birikimlidir (30 gün içindekiler 60 ve 90'a da dahildir); <see cref="Expired"/> bitiş tarihi geçmiş ama henüz uygulanmamış haklardır.
+/// </summary>
+public sealed record PlatformOverviewResponse(
+    IReadOnlyList<TenantStateCountDto> TenantCounts, int Expired, int ExpiringIn30Days, int ExpiringIn60Days, int ExpiringIn90Days);
+
+/// <summary>Süre takvimindeki bir satır: bitiş tarihi olan açık modül hakkı.</summary>
+public sealed record PlatformExpirationDto(
+    Guid TenantId, string TenantName, string TenantSlug, TenantState TenantStatus, string ModuleKey, LicenseSource Source,
+    DateTimeOffset ValidUntil, string? Note);
 
 /// <summary>
 /// Katalogdaki bir modül (salt okunur). <see cref="EnabledTenantCount"/>: modülün açık olduğu açık firma sayısı;

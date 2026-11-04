@@ -3,7 +3,11 @@ using Modulix.Core.Modules;
 
 namespace Modulix.Core.Platform;
 
-/// <summary>Platform yöneticisinin gördüğü firma: platform tablolarındaki bilgiler ve sayılar; firma verisi değildir.</summary>
+/// <summary>
+/// Platform yöneticisinin gördüğü firma: platform tablolarındaki bilgiler ve sayılar; firma verisi değildir.
+/// <see cref="AdministratorCount"/> yalnızca firma detayında dolar: roller RLS altındadır ve firma başına bir kapsam
+/// gerektirir; liste bu maliyeti taşımaz (ADR-0028 Dilim 2), <c>null</c> gelir.
+/// </summary>
 public sealed record PlatformTenant(
     Guid Id,
     string Name,
@@ -11,7 +15,7 @@ public sealed record PlatformTenant(
     TenantStatus Status,
     DateTimeOffset CreatedAt,
     int ActiveMemberCount,
-    int AdministratorCount,
+    int? AdministratorCount,
     IReadOnlyList<string> EnabledModules,
     string? ProfileKey = null,
     DateTimeOffset? ProfileAppliedAt = null);
@@ -32,12 +36,35 @@ public sealed record PlatformTenantDetail(
     IReadOnlyList<TenantAdministrator> Administrators,
     IReadOnlyList<TenantEntitlement>? Entitlements = null);
 
+/// <summary>Firma durumlarına göre sayılar ve süresi dolan/yaklaşan haklar (genel bakış). Bitiş sayıları birikimlidir (30 ⊂ 60 ⊂ 90).</summary>
+public sealed record PlatformOverview(
+    IReadOnlyDictionary<TenantStatus, int> TenantCounts,
+    int ExpiredEntitlements,
+    int ExpiringIn30Days,
+    int ExpiringIn60Days,
+    int ExpiringIn90Days);
+
+/// <summary>Bitiş tarihi olan açık bir modül hakkı (süre takvimi). Geçmiş tarih de listelenir; bitiş henüz uygulanmaz.</summary>
+public sealed record PlatformExpiration(
+    Guid TenantId,
+    string TenantName,
+    string TenantSlug,
+    TenantStatus TenantStatus,
+    string ModuleKey,
+    EntitlementSource Source,
+    DateTimeOffset ValidUntil,
+    string? Note);
+
 /// <summary>Platform denetim kaydı sorgusu (ADR-0028); en yeni üstte. <see cref="TenantId"/> boşsa bütün firmalar.</summary>
 public sealed record PlatformAuditQuery(Guid? TenantId, string? Action, int Page, int PageSize);
 
-/// <summary><see cref="ActorName"/>: işlemi yapan platform yöneticisinin adı (hesap silinmişse boş).</summary>
+/// <summary>
+/// <see cref="ActorName"/>: işlemi yapan platform yöneticisinin adı (hesap silinmişse boş). <see cref="TargetTenantName"/>:
+/// firmanın bugünkü adı (hesap düzeyinde işlemde ya da firma silinmişse boş).
+/// </summary>
 public sealed record PlatformAuditItem(
-    Guid Id, DateTimeOffset OccurredAt, Guid ActorUserId, string? ActorName, string Action, Guid? TargetTenantId, string? Reason, string? Details);
+    Guid Id, DateTimeOffset OccurredAt, Guid ActorUserId, string? ActorName, string Action, Guid? TargetTenantId, string? TargetTenantName,
+    string? Reason, string? Details);
 
 public sealed record PlatformAuditPage(IReadOnlyList<PlatformAuditItem> Items, int Page, int PageSize, int TotalCount);
 
@@ -95,10 +122,10 @@ public interface IPlatformAdministration
     Task RenameTenantAsync(Guid tenantId, string name, Guid actingUserId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Firmayı kapatır; veri silinmez. Kullanıcılar bir sonraki isteklerinde erişimi kaybeder. Gerekçe isteğe bağlıdır ve
-    /// platform denetim kaydına yazılır. Zaten kapalıysa çakışma.
+    /// Firmayı kapatır; veri silinmez. Kullanıcılar bir sonraki isteklerinde erişimi kaybeder. Gerekçe zorunludur
+    /// (<see cref="ArgumentException"/>, ParamName <c>reason</c>) ve platform denetim kaydına yazılır. Zaten kapalıysa çakışma.
     /// </summary>
-    Task CloseTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken, string? reason = null);
+    Task CloseTenantAsync(Guid tenantId, string reason, Guid actingUserId, CancellationToken cancellationToken);
 
     /// <summary>Kapalı veya askıdaki firmayı açar. Zaten açıksa (Active, Trial) çakışma.</summary>
     Task ReopenTenantAsync(Guid tenantId, Guid actingUserId, CancellationToken cancellationToken, string? reason = null);
@@ -127,10 +154,22 @@ public interface IPlatformAdministration
     /// geçerli olur. Değişiklik firmanın bir sonraki isteğinde geçerlidir ve firmanın denetim kaydına <c>core.tenant</c>
     /// olarak yazılır. Durum zaten istenen gibiyse ve <paramref name="terms"/> verilmediyse bir şey yapılmaz. Bilinmeyen veya
     /// çekirdek modül için <see cref="ArgumentException"/> (ParamName <c>moduleKey</c>). <paramref name="terms"/> (kaynak,
-    /// bitiş, not) yalnızca açarken geçerlidir; bu dilimde bitiş tarihi kaydedilir ama otomatik uygulanmaz (ADR-0028).
+    /// bitiş, not) yalnızca açarken geçerlidir; bitiş tarihi kaydedilir ama otomatik uygulanmaz (ADR-0028, Dilim 3).
+    /// <paramref name="reason"/> platform denetim kaydına yazılır; kapatırken ve bitiş tarihini ileri alırken (süre uzatma)
+    /// zorunludur (<see cref="ArgumentException"/>, ParamName <c>reason</c>).
     /// </summary>
     Task SetModuleAsync(
-        Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken, EntitlementTerms? terms = null);
+        Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken,
+        EntitlementTerms? terms = null, string? reason = null);
+
+    /// <summary>Genel bakış: durumlara göre firma sayıları ve süresi dolan/yaklaşan haklar. Yalnızca platform tablolarından okunur.</summary>
+    Task<PlatformOverview> GetOverviewAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Süre takvimi: bitiş tarihi olan açık modül hakları, bugünden <paramref name="days"/> gün sonrasına kadar ve geçmiş
+    /// olanlar dahil; yalnızca erişime açık firmalar (Active, Trial). Bitişi en yakın olan üstte.
+    /// </summary>
+    Task<IReadOnlyList<PlatformExpiration>> ListExpirationsAsync(int days, CancellationToken cancellationToken);
 
     /// <summary>
     /// Sektör profilinin firmaya ekleyeceği şeyler (Y9c); platform yöneticisi kapalı modülleri de açar. Tanımsız profil için

@@ -130,3 +130,14 @@ Gerçek SQL Server'a bağlı entegrasyon ortamında EF komutları sayıldı (Deb
 - Firma listesi: üye sayısı ve açık modüller sayfa için tek sorguyla okunur (önceden firma başına iki sorgu). **Yönetici sayısı hâlâ firma başına bir tenant kapsamı açar:** roller RLS altındadır ve çapraz firma toplanamaz; çözüm (ör. platform tablosunda tutulan sayaç) Dilim 2'dedir.
 
 Bilinen eksikler: iki adımlı doğrulama sıfırlama platform kaydına yazılmaz; platform denetim kaydının ekranı yoktur; `tenant-delete` platform kaydına satır eklemez; arayüzde hak koşulları yalnızca okunur (API'den girilir); `GracePeriod`/`ReadOnly` durumları ve süre dolumu işçisi Dilim 3'tedir.
+
+**Dilim 2 (uygulandı, `gseker/platform-panel-dilim2`):**
+
+- **Genel bakış:** `GET /api/platform/overview` (durumlara göre firma sayıları; süresi geçmiş ve 30/60/90 günde dolacak açık haklar) ve `/platform` sayfasında başarısız olay sayısıyla birlikte gösterim. Yalnızca platform tablolarından okunur.
+- **Süre takvimi:** `GET /api/platform/expirations?days=` ve `/platform/sure-takvimi`. Açık firmaların bitiş tarihi olan açık hakları; geçmiş tarihliler üstte. Bitiş hâlâ uygulanmaz.
+- **Gerekçeli işlemler:** `close` (sunucuda zorunlu), modül kapatma ve süre uzatma (bitişi ileri alma ya da kaldırma) gerekçe ister; gerekçe platform denetim kaydına yazılır. `SetTenantModuleRequest.Reason` eklendi. Kısaltma ve ilk kez tarih vermek gerekçe istemez. Askı gerekçesi Dilim 1'den beri zorunludur. Toplu işlemler bu dilimde yoktur.
+- **Hak koşulları arayüzde düzenlenir** (modül, kaynak, bitiş, not, gerekçe) ve firma sayfasında "Lisans ve işlem geçmişi" bölümü firmanın platform kaydını gösterir. Tam liste `/platform/denetim` (işlem süzgeciyle).
+- **Yönetici sayısı:** firma listesi artık firma başına tenant kapsamı açmaz; `administratorCount` listede `null`, detayda dolu. Sayaç tutmak (4 farklı rol atama yolu) yerine bu seçildi; liste artık sayfa boyutundan bağımsız sabit sayıda sorgu çalıştırır. "Yönetici yok" uyarısı yalnızca firma detayındadır. Listede bu uyarıya ihtiyaç doğarsa sayaç ayrı bir iştir.
+- İki adımlı doğrulama sıfırlama platform denetim kaydına yazılır (`user.two-factor-reset`, hedef firma yok).
+
+Kalan eksikler: `tenant-delete` platform kaydına satır eklemez (CLI'da işlemi yapan kullanıcı yok); toplu işlemler ve süre takviminden doğrudan uzatma yok; bitiş tarihi uygulanmaz, `GracePeriod`/`ReadOnly` ve işçi Dilim 3'tedir; arayüz yalnızca derlenip incelendi, tarayıcıda gezilmedi.

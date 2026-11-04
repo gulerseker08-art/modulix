@@ -1,0 +1,98 @@
+@page "/platform/sure-takvimi"
+@inject ApiClient Api
+
+<PageTitle>Süre takvimi · Platform · Modulix</PageTitle>
+
+@* Bitiş tarihi olan açık modül hakları (ADR-0028 Dilim 2). Bitiş tarihi şimdilik yalnızca kayıttır: süre dolunca modül
+   kendiliğinden kapanmaz (Dilim 3). Geçmiş tarihliler "Süresi geçti" olarak en üstte görünür. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>Süre takvimi</h1>
+    <p class="text-muted">
+        Bitiş tarihi olan açık modül hakları. Bitiş tarihi şimdilik yalnızca kayıttır; süre dolunca modül kendiliğinden kapanmaz.
+        Süre uzatmak için firma detayındaki hak koşullarını kullanın.
+    </p>
+
+    <div class="filters" role="group" aria-label="Pencere">
+        @foreach (var choice in Windows)
+        {
+            <button type="button" class="chip @(days == choice ? "active" : null)" @onclick="() => LoadAsync(choice)">@choice gün</button>
+        }
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (items is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else if (items.Count == 0)
+    {
+        <p class="text-muted">Bu pencerede bitişi gelen hak yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead><tr><th>Firma</th><th>Modül</th><th>Kaynak</th><th>Bitiş</th><th>Kalan</th><th>Not</th></tr></thead>
+            <tbody>
+                @foreach (var item in items)
+                {
+                    <tr>
+                        <td data-label="Firma" class="primary">
+                            <a href="platform/firmalar/@item.TenantId">@item.TenantName</a>
+                            @if (item.TenantStatus != TenantState.Active)
+                            {
+                                <TenantStateBadge State="item.TenantStatus" />
+                            }
+                        </td>
+                        <td data-label="Modül">@ModuleName(item.ModuleKey)</td>
+                        <td data-label="Kaynak">@LicenseSourceText.Of(item.Source)</td>
+                        <td data-label="Bitiş">@CrmLabels.Time(item.ValidUntil)</td>
+                        <td data-label="Kalan">
+                            @if (item.ValidUntil < DateTimeOffset.UtcNow)
+                            {
+                                <span class="badge user-locked">Süresi geçti</span>
+                            }
+                            else
+                            {
+                                @($"{Math.Ceiling((item.ValidUntil - DateTimeOffset.UtcNow).TotalDays):0} gün")
+                            }
+                        </td>
+                        <td data-label="Not">@(item.Note ?? "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</PlatformGate>
+
+@code {
+    private static readonly int[] Windows = [30, 60, 90];
+
+    private IReadOnlyList<PlatformExpirationDto>? items;
+    private PlatformModulesResponse? modules;
+    private int days = 90;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        modules = (await Api.GetAsync<PlatformModulesResponse>("/api/platform/modules")).Value;
+        await LoadAsync(days);
+    }
+
+    private async Task LoadAsync(int window)
+    {
+        days = window;
+        var result = await Api.GetAsync<List<PlatformExpirationDto>>($"/api/platform/expirations?days={window}");
+        items = result.Value;
+        message = result.Error;
+    }
+
+    private string ModuleName(string key) => modules?.Modules.FirstOrDefault(m => m.Key == key)?.DisplayName ?? key;
+}

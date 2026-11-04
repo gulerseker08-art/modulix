@@ -165,6 +165,12 @@ public sealed class TwoFactorAccounts(
         await TurnOffAsync(user);
         await sessions.CloseAllAsync(user.Id, except: null, cancellationToken);
         await audit.RecordAsync(user, AuditAction.TwoFactorReset, null, client, cancellationToken, actorId: platformAdministratorId);
+
+        // Hesap düzeyinde işlem: firmalar arası platform denetim kaydına da yazılır (ADR-0028).
+        db.PlatformAuditLog.Add(new PlatformAuditEntry(
+            platformAdministratorId, PlatformAuditActions.UserTwoFactorReset, null, null,
+            new JsonObject { ["userId"] = user.Id }.ToJsonString(), System.Diagnostics.Activity.Current?.TraceId.ToString()));
+        await db.SaveChangesAsync(cancellationToken);
         return true;
     }
 

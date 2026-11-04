@@ -53,16 +53,67 @@
                                   Changed="error => ModuleChangedAsync(module, error)" />
                 }
 
+                <h3>Hak koşulları</h3>
+                <p class="text-muted">Bitiş tarihi şimdilik yalnızca kayıttır; süre dolunca modül kendiliğinden kapanmaz.</p>
                 @if (Conditions().Count > 0)
                 {
-                    <h3>Hak koşulları</h3>
-                    <p class="text-muted">Bitiş tarihi şimdilik yalnızca kayıttır; süre dolunca modül kendiliğinden kapanmaz.</p>
                     <ul>
                         @foreach (var line in Conditions())
                         {
                             <li>@line</li>
                         }
                     </ul>
+                }
+                else
+                {
+                    <p class="text-muted">Açık modüllerin hepsi elle ve süresiz.</p>
+                }
+
+                @if (tenant.EnabledModules.Count > 0)
+                {
+                    <form class="inline-form" novalidate @onsubmit="SaveTermsAsync" @onsubmit:preventDefault>
+                        <h3>Koşulları düzenle</h3>
+                        <div class="form-grid">
+                            <div>
+                                <label class="form-label" for="termsModule">Modül</label>
+                                <select id="termsModule" class="form-select" value="@termsModule" @onchange="e => ChooseTermsModule((string?)e.Value)">
+                                    <option value="">Seçin</option>
+                                    @foreach (var key in tenant.EnabledModules)
+                                    {
+                                        <option value="@key">@ModuleNames([key])</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" for="termsSource">Kaynak</label>
+                                <select id="termsSource" class="form-select" @bind="termsSource">
+                                    @foreach (var source in Enum.GetValues<LicenseSource>())
+                                    {
+                                        <option value="@source">@LicenseSourceText.Of(source)</option>
+                                    }
+                                </select>
+                                <FieldError Field="source" Errors="termsErrors" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="termsUntil">Bitiş (boş: süresiz)</label>
+                                <input id="termsUntil" class="form-control" type="date" @bind="termsUntil" />
+                                <FieldError Field="validUntil" Errors="termsErrors" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="termsNote">Not @(termsSource == LicenseSource.Exception ? "*" : null)</label>
+                                <input id="termsNote" class="form-control" maxlength="500" @bind="termsNote" @bind:event="oninput" />
+                                <FieldError Field="note" Errors="termsErrors" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="termsReason">Gerekçe (süre uzatırken zorunlu)</label>
+                                <input id="termsReason" class="form-control" maxlength="500" @bind="termsReason" @bind:event="oninput" />
+                                <FieldError Field="reason" Errors="termsErrors" />
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(termsModule))">Koşulları kaydet</button>
+                        </div>
+                    </form>
                 }
             </section>
         }
@@ -172,7 +223,9 @@
                         Firmanın @tenant.ActiveMemberCount kullanıcısı bir sonraki isteğinde erişimini kaybeder ve bekleyen
                         davetler çalışmaz. Veri silinmez; firmayı sonra yeniden açabilirsiniz.
                     </p>
-                    <button type="button" class="btn btn-danger" disabled="@busy" @onclick="CloseAsync">Firmayı kapat</button>
+                    <label class="form-label" for="closeReason">Gerekçe *</label>
+                    <input id="closeReason" class="form-control" maxlength="500" @bind="closeReason" @bind:event="oninput" />
+                    <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrWhiteSpace(closeReason))" @onclick="CloseAsync">Firmayı kapat</button>
                     <button type="button" class="btn btn-outline-secondary" @onclick="() => confirmingClose = false">Vazgeç</button>
                 </div>
             }
@@ -218,6 +271,12 @@
                 </div>
             }
         </section>
+
+        <section class="detail-section">
+            <div class="section-header"><h2>Lisans ve işlem geçmişi</h2></div>
+            <p class="text-muted">Bu firmada platform yöneticilerinin yaptığı işlemler; en yeni üstte. Kayıt değiştirilemez.</p>
+            <PlatformAuditList TenantId="TenantId" Version="auditVersion" />
+        </section>
     }
 </PlatformGate>
 
@@ -236,6 +295,14 @@
     private IReadOnlyDictionary<string, string[]>? renameErrors;
     private string suspendReason = string.Empty;
     private IReadOnlyDictionary<string, string[]>? suspendErrors;
+    private string closeReason = string.Empty;
+    private string? termsModule;
+    private LicenseSource termsSource = LicenseSource.Manual;
+    private DateOnly? termsUntil;
+    private string termsNote = string.Empty;
+    private string termsReason = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? termsErrors;
+    private int auditVersion;
     private bool confirmingClose;
     private bool busy;
     private string? message;
@@ -253,6 +320,7 @@
         var result = await Api.GetAsync<PlatformTenantDetailResponse>($"/api/platform/tenants/{TenantId}");
         detail = result.Value;
         message = result.Error;
+        auditVersion++;
         newName = detail?.Tenant.Name ?? string.Empty;
     }
 
@@ -293,7 +361,11 @@
         Show(success: "Firma adı kaydedildi.");
     }
 
-    private Task CloseAsync() => ChangeStateAsync("close", "Firma kapatıldı. Veri silinmedi.");
+    private async Task CloseAsync()
+    {
+        await ChangeStateAsync("close", "Firma kapatıldı. Veri silinmedi.", closeReason);
+        closeReason = string.Empty;
+    }
 
     private Task ReopenAsync() => ChangeStateAsync("reopen", "Firma yeniden açıldı.");
 
@@ -386,7 +458,42 @@
             }.Where(p => !string.IsNullOrWhiteSpace(p))))
             .ToList();
 
-    private string ProfileName(string? key) => key is null ? "—" : profiles.FirstOrDefault(p => p.Key == key)?.Name ?? key;
+    // Seçilen modülün mevcut koşulları forma yüklenir.
+    private void ChooseTermsModule(string? key)
+    {
+        termsModule = string.IsNullOrEmpty(key) ? null : key;
+        var current = detail?.Entitlements?.FirstOrDefault(e => e.ModuleKey == termsModule);
+        termsSource = current?.Source ?? LicenseSource.Manual;
+        termsUntil = current?.ValidUntil is { } until ? DateOnly.FromDateTime(until.UtcDateTime) : null;
+        termsNote = current?.Note ?? string.Empty;
+        termsReason = string.Empty;
+        termsErrors = null;
+    }
+
+    // Bitiş günü dahildir: seçilen günün sonu (UTC).
+    private async Task SaveTermsAsync()
+    {
+        busy = true;
+        DateTimeOffset? validUntil = termsUntil is { } day ? new DateTimeOffset(day.ToDateTime(new TimeOnly(23, 59, 59)), TimeSpan.Zero) : null;
+        var result = await Api.PutAsync<bool>(
+            $"/api/platform/tenants/{TenantId}/modules/{termsModule}",
+            new SetTenantModuleRequest(true, termsSource, validUntil, string.IsNullOrWhiteSpace(termsNote) ? null : termsNote, termsReason));
+        busy = false;
+        termsErrors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            Show(error: result.FieldErrors.Count > 0 ? null : result.Error);
+            return;
+        }
+
+        termsModule = null;
+        termsReason = termsNote = string.Empty;
+        await LoadAsync();
+        Show(success: "Hak koşulları kaydedildi.");
+    }
+
+    private string ProfileName(
+string? key) => key is null ? "—" : profiles.FirstOrDefault(p => p.Key == key)?.Name ?? key;
 
     private void Show(string? success = null, string? error = null)
     {
