@@ -218,8 +218,14 @@ public static class CoreAccess
     public const string ExportReports = "core.reports.export";
     public const string ScheduleReports = "core.reports.schedule";
 
+    /// <summary>İçe aktarma ve işlem günlüğü (ADR-0030): başlatma (kendi kayıtları), firmanın tamamını görme, toplu geri alma.</summary>
+    public const string RunImports = "core.imports.run";
+    public const string ReadImports = "core.imports.read";
+    public const string RollbackImports = "core.imports.rollback";
+
     /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
         [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication,
-         ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation];
+         ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation,
+         RunImports, ReadImports, RollbackImports];
 }
