@@ -79,11 +79,24 @@ public class AutomationExecutableTriggerTests
     }
 
     [Fact]
-    public void Scan_and_domain_event_triggers_are_not_executable_yet()
+    public void Scan_triggers_are_executable_and_flagged_as_scans()
     {
         Assert.All(
-            new AutomationTrigger[] { new ScheduledTrigger(), new DateRelativeTrigger(DueDate.Key, -3), new InactivityTrigger(Activities.Key, 14), new DomainEventTrigger("sales.deal.won") },
-            t => Assert.False(AutomationTriggerMatcher.IsExecutable(t)));
+            new AutomationTrigger[] { new ScheduledTrigger(), new DateRelativeTrigger(DueDate.Key, -3), new InactivityTrigger(Activities.Key, 14) },
+            t =>
+            {
+                Assert.True(AutomationTriggerMatcher.IsExecutable(t));
+                Assert.True(AutomationTriggerMatcher.IsScan(t));
+            });
+        Assert.All(
+            new AutomationTrigger[] { new RecordCreatedTrigger(), new FieldChangedTrigger([Amount.Key]), new StatusTransitionTrigger(Stage.Key, null, "won"), new ManualTrigger() },
+            t => Assert.False(AutomationTriggerMatcher.IsScan(t)));
+    }
+
+    [Fact]
+    public void Domain_event_trigger_is_not_executable_yet()
+    {
+        Assert.False(AutomationTriggerMatcher.IsExecutable(new DomainEventTrigger("sales.deal.won")));
     }
 }
 

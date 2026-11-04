@@ -111,6 +111,7 @@ public static class PersistenceSetup
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
         services.AddScoped<IAutomationRunStore, AutomationRunStore>();
         services.AddScoped<IAutomationRunService, AutomationRunService>();
+        services.AddSingleton<AutomationScanner>();
         services.AddSingleton<AutomationRunner>();
 
         // Ortak rapor merkezi (ADR-0026, dilim 3): veri kümeleri modüllerden gelir, okumalar kayıt boru hattından geçer.

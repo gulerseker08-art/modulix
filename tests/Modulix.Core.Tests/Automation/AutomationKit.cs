@@ -81,6 +81,12 @@ internal static class AutomationKit
         public Task<int> CountAsync(AutomationRelationQuery query, CancellationToken cancellationToken) => Task.FromResult(0);
     }
 
+    public sealed class NoopSource : IAutomationRecordSource
+    {
+        public Task<AutomationScanPage> ScanAsync(AutomationScanQuery query, CancellationToken cancellationToken) =>
+            Task.FromResult(new AutomationScanPage([]));
+    }
+
     public sealed class NoopAction : IAutomationAction
     {
         public Task<AutomationActionResult> ExecuteAsync(AutomationActionRequest request, AutomationCallContext context, CancellationToken cancellationToken) =>
@@ -120,7 +126,7 @@ internal static class AutomationKit
     {
         Entities =
         [
-            new(Entity, "Fırsat", "sales.deals.read"),
+            new(Entity, "Fırsat", "sales.deals.read") { RecordSource = typeof(NoopSource) },
             new(Activity, "Aktivite"),
         ],
         Events =

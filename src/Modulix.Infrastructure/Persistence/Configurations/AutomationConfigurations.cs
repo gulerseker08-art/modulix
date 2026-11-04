@@ -126,3 +126,25 @@ internal sealed class AutomationRunStepConfiguration : IEntityTypeConfiguration<
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class AutomationScanCursorConfiguration : IEntityTypeConfiguration<AutomationScanCursor>
+{
+    public void Configure(EntityTypeBuilder<AutomationScanCursor> builder)
+    {
+        builder.ToTable("AutomationScanCursors", DatabaseSchemas.Core);
+        builder.HasKey(c => c.Id);
+        builder.Property(c => c.Id).ValueGeneratedNever();
+        builder.Property(c => c.TenantId).IsRequired();
+        builder.Property(c => c.PeriodKey).HasMaxLength(AutomationScanCursor.PeriodKeyLength).IsRequired();
+
+        // Bir kural sürümünün bir tenant gününde tek imleci vardır; benzersizlik tenant ile birlikte.
+        builder.HasIndex(c => new { c.TenantId, c.RuleVersionId, c.PeriodKey }).IsUnique();
+        builder.HasIndex(c => new { c.TenantId, c.RuleId });
+
+        builder.HasOne<AutomationRuleVersion>()
+            .WithMany()
+            .HasForeignKey(c => new { c.TenantId, c.RuleVersionId })
+            .HasPrincipalKey(v => new { v.TenantId, v.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}

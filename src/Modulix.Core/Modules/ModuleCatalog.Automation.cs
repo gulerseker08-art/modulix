@@ -74,6 +74,12 @@ public sealed partial class ModuleCatalog
                 {
                     throw Fail($"kayıt türü '{entity.EntityKey}' modülün olmalı, tekil olmalı, adı ve (varsa) izni modülün olmalı");
                 }
+
+                if (entity.RecordSource is { } source
+                    && (!typeof(IAutomationRecordSource).IsAssignableFrom(source) || source.IsAbstract || source.IsInterface))
+                {
+                    throw Fail($"kayıt türü '{entity.EntityKey}' kayıt kaynağı IAutomationRecordSource uygulayan somut bir tip olmalı");
+                }
             }
 
             foreach (var automationEvent in capabilities.Events)

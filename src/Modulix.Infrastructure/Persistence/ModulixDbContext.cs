@@ -114,6 +114,8 @@ public class ModulixDbContext(
 
     public DbSet<AutomationRunStep> AutomationRunSteps => Set<AutomationRunStep>();
 
+    public DbSet<AutomationScanCursor> AutomationScanCursors => Set<AutomationScanCursor>();
+
     public DbSet<ReportDefinition> Reports => Set<ReportDefinition>();
 
     public DbSet<ReportShare> ReportShares => Set<ReportShare>();

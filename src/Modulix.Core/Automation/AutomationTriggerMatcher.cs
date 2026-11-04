@@ -8,8 +8,8 @@ namespace Modulix.Core.Automation;
 /// <summary>
 /// Olayın kuralın tetikleyicisine uyup uymadığına <b>yalnızca olayın farkından</b> karar verir (ADR-0027); kayıt okunmaz, koşul
 /// değerlendirilmez. Bu ucuz süzgeç, her olayın her kural için çalışma satırı üretmesini engeller. Zamanlama tetikleyicileri
-/// (<see cref="ScheduledTrigger"/>, <see cref="DateRelativeTrigger"/>, <see cref="InactivityTrigger"/>) ve iş olayı
-/// (<see cref="DomainEventTrigger"/>) olay yoluyla eşleşmez; bu dilimde çalışmazlar.
+/// (<see cref="ScheduledTrigger"/>, <see cref="DateRelativeTrigger"/>, <see cref="InactivityTrigger"/>) olay yoluyla eşleşmez, günlük
+/// taramayla çalışır (<c>AutomationScanner</c>); iş olayı (<see cref="DomainEventTrigger"/>) henüz çalışmaz.
 /// </summary>
 public static class AutomationTriggerMatcher
 {
@@ -43,11 +43,16 @@ public static class AutomationTriggerMatcher
     }
 
     /// <summary>
-    /// Tetikleyici bu sürümde çalışır mı? Kayıt olayı tetikleyicileri ve elle çalıştırma çalışır; tarama/zamanlama tetikleyicileri ile iş olayı
-    /// henüz çalışmaz (ADR-0027 Dilim 2b). Çalışmayan tetikleyiciyle yayın reddedilir: sessizce hiç tetiklenmeyen kural bırakılmaz.
+    /// Tetikleyici bu sürümde çalışır mı? Kayıt olayı tetikleyicileri, elle çalıştırma ve tarama tabanlı tetikleyiciler çalışır
+    /// (tarama için kayıt türünün kayıt kaynağı ayrıca doğrulanır); iş olayı henüz çalışmaz (ADR-0027 Dilim 2b-2). Çalışmayan
+    /// tetikleyiciyle yayın reddedilir: sessizce hiç tetiklenmeyen kural bırakılmaz.
     /// </summary>
     public static bool IsExecutable(AutomationTrigger trigger) =>
-        trigger is RecordCreatedTrigger or FieldChangedTrigger or StatusTransitionTrigger or ManualTrigger;
+        trigger is RecordCreatedTrigger or FieldChangedTrigger or StatusTransitionTrigger or ManualTrigger
+            or ScheduledTrigger or DateRelativeTrigger or InactivityTrigger;
+
+    /// <summary>Tetikleyici bir günlük taramayla mı çalışır (olay yoluyla değil)?</summary>
+    public static bool IsScan(AutomationTrigger trigger) => trigger is ScheduledTrigger or DateRelativeTrigger or InactivityTrigger;
 
     /// <summary>Tetikleyiciye göre olayda aranan alan adları (değişen kayıt değerleri bu adlarla gelir).</summary>
     private static string FieldName(string entityKey, string fieldKey) =>
