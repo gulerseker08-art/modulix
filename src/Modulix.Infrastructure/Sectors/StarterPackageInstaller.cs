@@ -41,14 +41,25 @@ internal sealed class StarterPackageInstaller(ISectorCatalog catalog) : IStarter
             await catalog.CreateCapabilityAsync(actingUserId, new CapabilityInput(capability.Code, capability.Name), cancellationToken);
         }
 
-        foreach (var capability in package.Capabilities.Where(c => createdCapabilities.Contains(c.Code) && c.DependsOn.Count > 0))
+        var completing = new HashSet<string>(plan.Completions, StringComparer.Ordinal);
+        foreach (var capability in package.Capabilities.Where(c => c.DependsOn.Count > 0 && (createdCapabilities.Contains(c.Code) || completing.Contains("dependencies:" + c.Code))))
         {
             await catalog.SetCapabilityDependenciesAsync(actingUserId, capability.Code, capability.DependsOn, cancellationToken);
         }
 
         var ids = current.Nodes.ToDictionary(n => n.Code, n => n.Id, StringComparer.Ordinal);
-        foreach (var node in StarterPackageRules.InParentOrder(package).Where(n => createdNodes.Contains(n.Code)))
+        foreach (var node in StarterPackageRules.InParentOrder(package))
         {
+            if (!createdNodes.Contains(node.Code))
+            {
+                if (completing.Contains("capabilities:" + node.Code))
+                {
+                    await catalog.SetNodeCapabilitiesAsync(actingUserId, ids[node.Code], node.Capabilities, cancellationToken);
+                }
+
+                continue;
+            }
+
             var parentId = node.ParentCode is null ? (Guid?)null : ids[node.ParentCode];
             var created = await catalog.CreateNodeAsync(
                 actingUserId, new ActivityNodeInput(node.Code, parentId, node.Kind, node.Name, node.Description, node.SortOrder), cancellationToken);
@@ -81,6 +92,9 @@ internal sealed class StarterPackageInstaller(ISectorCatalog catalog) : IStarter
         var codeOfId = current.Nodes.ToDictionary(n => n.Id, n => n.Code);
 
         var warnings = new List<string>();
+        var completions = new List<string>();
+        var depsOf = current.Capabilities.ToDictionary(c => c.Code, c => c.DependsOn.Count, StringComparer.Ordinal);
+        completions.AddRange(package.Capabilities.Where(c => c.DependsOn.Count > 0 && depsOf.TryGetValue(c.Code, out var n) && n == 0).Select(c => "dependencies:" + c.Code));
         var nodesToCreate = new List<string>();
         var nodesExisting = new List<string>();
         foreach (var node in StarterPackageRules.InParentOrder(package))
@@ -92,6 +106,11 @@ internal sealed class StarterPackageInstaller(ISectorCatalog catalog) : IStarter
             }
 
             nodesExisting.Add(node.Code);
+            if (node.Capabilities.Count > 0 && existing.Capabilities.Count == 0)
+            {
+                completions.Add("capabilities:" + node.Code);
+            }
+
             var existingParent = existing.ParentId is { } parentId ? codeOfId.GetValueOrDefault(parentId) : null;
             if (existing.Kind != node.Kind || !string.Equals(existingParent, node.ParentCode, StringComparison.Ordinal))
             {
@@ -117,7 +136,8 @@ internal sealed class StarterPackageInstaller(ISectorCatalog catalog) : IStarter
             [.. package.Capabilities.Where(c => existingCapabilities.Contains(c.Code)).Select(c => c.Code)],
             nodesToCreate,
             nodesExisting,
-            warnings);
+            warnings,
+            completions);
         return (package, plan, current);
     }
 

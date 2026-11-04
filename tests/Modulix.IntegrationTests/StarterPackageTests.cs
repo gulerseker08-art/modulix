@@ -105,6 +105,8 @@ public class StarterPackageTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Equal(HttpStatusCode.NotFound, (await platform.GetAsync("/api/platform/sectors/starter-packages/yok/preview")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await platform.PostAsJsonAsync("/api/platform/sectors/starter-packages/yok/install", new { })).StatusCode);
 
+        var preview = await platform.GetAsync($"/api/platform/sectors/starter-packages/{Logistics}/preview");
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         // Önizleme yalnızca plan döner. (Katalog sayısı karşılaştırılmaz: diğer testler aynı global kataloğa paralel yazar.)
         var plan = (await preview.Content.ReadFromJsonAsync<StarterPackagePlanDto>())!;
         Assert.Equal(plan.NodesToCreate.Count == 0 && plan.CapabilitiesToCreate.Count == 0, plan.NothingToDo);

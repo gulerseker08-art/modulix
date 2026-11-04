@@ -27,15 +27,18 @@ public sealed record StarterPackage(
     IReadOnlyList<StarterPackageCapability> Capabilities,
     IReadOnlyList<StarterPackageNode> Nodes);
 
+// Completions: pakette tanımlı olduğu halde boş kalmış bağımlılık ("dependencies:kod") ve düğüm–yetenek eşlemesi ("capabilities:kod"); yarım kalmış kurulumu tamamlar,
+// dolu olanlara dokunmaz.
 /// <summary>Kurulumun ne yapacağı (ya da yaptığı). Mevcut kayıt koda göre bulunur ve <b>hiçbir zaman değiştirilmez</b>; farklıysa uyarı olur.</summary>
 public sealed record StarterPackagePlan(
     IReadOnlyList<string> CapabilitiesToCreate,
     IReadOnlyList<string> CapabilitiesExisting,
     IReadOnlyList<string> NodesToCreate,
     IReadOnlyList<string> NodesExisting,
-    IReadOnlyList<string> Warnings)
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<string> Completions)
 {
-    public bool NothingToDo => CapabilitiesToCreate.Count == 0 && NodesToCreate.Count == 0;
+    public bool NothingToDo => CapabilitiesToCreate.Count == 0 && NodesToCreate.Count == 0 && Completions.Count == 0;
 }
 
 public sealed record StarterPackageSummary(string Code, string Name, string? Description, bool Verified, string? VerificationNote, int NodeCount, int CapabilityCount);

@@ -113,7 +113,7 @@ public static class SectorEndpoints
         new(n.Id, n.Code, n.ParentId, n.Kind.ToString(), n.Name, n.Description, n.SortOrder, n.IsActive, n.Readiness.ToString(), n.Version, [.. n.Capabilities]);
 
     private static StarterPackagePlanDto ToDto(StarterPackagePlan p) =>
-        new([.. p.CapabilitiesToCreate], [.. p.CapabilitiesExisting], [.. p.NodesToCreate], [.. p.NodesExisting], [.. p.Warnings], p.NothingToDo);
+        new([.. p.CapabilitiesToCreate], [.. p.CapabilitiesExisting], [.. p.NodesToCreate], [.. p.NodesExisting], [.. p.Warnings], [.. p.Completions], p.NothingToDo);
 
     private static CapabilityDto ToDto(CapabilityView c) => new(c.Id, c.Code, c.Name, c.IsActive, [.. c.DependsOn]);
 

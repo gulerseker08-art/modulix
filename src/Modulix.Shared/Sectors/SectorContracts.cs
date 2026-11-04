@@ -44,4 +44,5 @@ public sealed record StarterPackagePlanDto(
     List<string> NodesToCreate,
     List<string> NodesExisting,
     List<string> Warnings,
+    List<string> Completions,
     bool NothingToDo);
