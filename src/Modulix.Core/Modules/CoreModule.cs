@@ -433,7 +433,7 @@ public sealed class CoreModule : IModule
         },
         new(AuditedEntityKeys.Tenant, "Firma bilgileri", null, new Dictionary<string, string>
         {
-            ["name"] = "Ad", ["slug"] = "Kısa ad", ["status"] = "Durum", ["modules"] = "Açık modüller", ["roles"] = "Hazır roller", ["logo"] = "Logo", ["profile"] = "Sektör profili",
+            ["name"] = "Ad", ["slug"] = "Kısa ad", ["status"] = "Durum", ["modules"] = "Açık modüller", ["roles"] = "Hazır roller", ["logo"] = "Logo", ["profile"] = "Sektör profili", ["scopeLimits"] = "Kayıt görünürlüğü",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>

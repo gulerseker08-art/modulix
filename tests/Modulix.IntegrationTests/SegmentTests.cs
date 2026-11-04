@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Infrastructure.Identity;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Marketing;
@@ -364,6 +365,43 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
 
     private static Task<HttpResponseMessage> PreviewAsync(HttpClient client, string target, JsonObject condition) =>
         client.PostAsJsonAsync("/api/marketing/segments/preview", new PreviewSegmentRequest(target, condition));
+
+    // ---- Tür başına kapsam ve platform tavanı (ADR-0030) ----
+
+    [Fact]
+    public async Task Segment_conditions_follow_the_scope_of_their_own_record_type_and_the_platform_limit()
+    {
+        var tenant = await TenantAsync();
+        var manager = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions]);
+        var rep = await UserClientAsync(tenant, CrmPermissions, RecordScope.Own);
+        await CompanyAsync(manager, "Anka Tekstil", "Bursa", "Tekstil");
+        await CompanyAsync(rep, "Bora Tekstil", "İzmir", "Tekstil");
+        Assert.Equal(2, await CountAsync(manager, Leaf("crm.company.industry", "eq", "Tekstil")));
+
+        // Fırsat türüne konan tavan firma segmentini etkilemez: her koşul kendi türünün kapsamıyla değerlendirilir.
+        using var platform = await LoginAsync(await PlatformAdministratorAsync());
+        await SetLimitAsync(platform, tenant.Id, "crm.opportunity");
+        Assert.Equal(2, await CountAsync(manager, Leaf("crm.company.industry", "eq", "Tekstil")));
+
+        // Firma türüne konan tavan: geniş roldeki yönetici olmayan kullanıcı yalnızca kendi firmasını segmentte görür.
+        await SetLimitAsync(platform, tenant.Id, "crm.company");
+        Assert.Equal(1, await CountAsync(manager, Leaf("crm.company.industry", "eq", "Tekstil")));
+    }
+
+    private static async Task SetLimitAsync(HttpClient platform, Guid tenantId, string entityKey) =>
+        Assert.Equal(HttpStatusCode.OK, (await platform.PutAsJsonAsync($"/api/platform/tenants/{tenantId}/scope-limits",
+            new Modulix.Shared.Platform.SetScopeLimitsRequest([new Modulix.Shared.Platform.ScopeLimitDto(entityKey, Modulix.Shared.Access.RecordScope.Own)]))).StatusCode);
+
+    private async Task<ModulixUser> PlatformAdministratorAsync()
+    {
+        var user = await factory.CreateUserAsync();
+        using var scope = factory.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<ModulixUser>>();
+        var stored = (await users.FindByIdAsync(user.Id.ToString()))!;
+        stored.IsPlatformAdministrator = true;
+        Assert.True((await users.UpdateAsync(stored)).Succeeded);
+        return user;
+    }
 
     private static async Task<int> CountAsync(HttpClient client, JsonObject condition)
     {

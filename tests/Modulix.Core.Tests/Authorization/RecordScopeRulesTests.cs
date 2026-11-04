@@ -41,6 +41,39 @@ public class RecordScopeRulesTests
         Assert.Equal(expected, RecordScopeRules.Covers(holder, wanted));
     }
 
+    [Theory]
+    // Tavan kapsamı kapsıyorsa kapsam aynen kalır.
+    [InlineData(RecordScope.Own, RecordScope.Unit, RecordScope.Own)]
+    [InlineData(RecordScope.Unit, RecordScope.UnitAndBelow, RecordScope.Unit)]
+    [InlineData(RecordScope.Team, RecordScope.All, RecordScope.Team)]
+    [InlineData(RecordScope.Unit, RecordScope.Unit, RecordScope.Unit)]
+    // Kapsam tavandan genişse tavana iner.
+    [InlineData(RecordScope.All, RecordScope.Unit, RecordScope.Unit)]
+    [InlineData(RecordScope.UnitAndBelow, RecordScope.Unit, RecordScope.Unit)]
+    [InlineData(RecordScope.All, RecordScope.Own, RecordScope.Own)]
+    [InlineData(RecordScope.All, RecordScope.Team, RecordScope.Team)]
+    // Karşılaştırılamayanlar (ekip ve departman) güvenli varsayılana, kendi kayıtlarına düşer.
+    [InlineData(RecordScope.Unit, RecordScope.Team, RecordScope.Own)]
+    [InlineData(RecordScope.Team, RecordScope.Unit, RecordScope.Own)]
+    [InlineData(RecordScope.UnitAndBelow, RecordScope.Team, RecordScope.Own)]
+    public void Clamp_lowers_scope_to_the_ceiling_and_falls_back_to_own_when_incomparable(
+        RecordScope scope, RecordScope ceiling, RecordScope expected) =>
+        Assert.Equal(expected, RecordScopeRules.Clamp(scope, ceiling));
+
+    [Fact]
+    public void Clamp_never_widens_and_always_stays_covered_by_the_ceiling()
+    {
+        foreach (var scope in Enum.GetValues<RecordScope>())
+        {
+            foreach (var ceiling in Enum.GetValues<RecordScope>())
+            {
+                var clamped = RecordScopeRules.Clamp(scope, ceiling);
+                Assert.True(RecordScopeRules.Covers(ceiling, clamped), $"{scope}/{ceiling}: sonuç tavan altında değil.");
+                Assert.True(RecordScopeRules.Covers(scope, clamped), $"{scope}/{ceiling}: sonuç kapsamdan geniş.");
+            }
+        }
+    }
+
     [Fact]
     public void Team_and_unit_do_not_cover_each_other()
     {

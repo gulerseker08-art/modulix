@@ -127,6 +127,10 @@ public class ModulixDbContext(
 
     public DbSet<BusinessUnitRole> BusinessUnitRoles => Set<BusinessUnitRole>();
 
+    public DbSet<RoleScopeOverride> RoleScopeOverrides => Set<RoleScopeOverride>();
+
+    public DbSet<TenantScopeLimit> TenantScopeLimits => Set<TenantScopeLimit>();
+
     public DbSet<MembershipCompany> MembershipCompanies => Set<MembershipCompany>();
 
     public DbSet<CustomField> CustomFields => Set<CustomField>();

@@ -87,6 +87,8 @@ public static class PersistenceSetup
         services.AddScoped<AdministratorGuard>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<MembershipPermissions>();
+        services.AddScoped<ScopeLimits>();
+        services.AddScoped<ScopedRecordTypes>();
         services.AddScoped<ITeamService, TeamService>();
 
         // Ortak iletişim tercihi (ADR-0025): modüller okuma sözleşmesini, API yönetimi kullanır.

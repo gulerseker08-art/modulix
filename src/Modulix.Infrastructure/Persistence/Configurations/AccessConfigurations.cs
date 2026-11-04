@@ -136,3 +136,46 @@ internal sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMem
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal sealed class RoleScopeOverrideConfiguration : IEntityTypeConfiguration<RoleScopeOverride>
+{
+    public void Configure(EntityTypeBuilder<RoleScopeOverride> builder)
+    {
+        // Tenant verisi (ADR-0030 K2): core şemasında; Row-Level Security ile korunur (migration: TenantIsolationSql).
+        builder.ToTable("RoleScopeOverrides", DatabaseSchemas.Core);
+        builder.HasKey(o => o.Id);
+        builder.Property(o => o.Id).ValueGeneratedNever();
+        builder.Property(o => o.TenantId).IsRequired();
+        builder.Property(o => o.EntityKey).HasMaxLength(AccessKeys.EntityKeyMaxLength).IsRequired();
+        builder.Property(o => o.Scope).IsRequired();
+
+        // Bir rolün bir türde tek istisnası olur; kapsam hesabı rol kimliklerinden başlar.
+        builder.HasIndex(o => new { o.TenantId, o.RoleId, o.EntityKey }).IsUnique();
+
+        // Rol yabancı anahtarı tenant içindedir: başka tenant'ın rolüne istisna veritabanı düzeyinde de bağlanamaz.
+        // Rol silinince istisnaları da silinir.
+        builder.HasOne<Role>()
+            .WithMany()
+            .HasForeignKey(o => new { o.TenantId, o.RoleId })
+            .HasPrincipalKey(r => new { r.TenantId, r.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class TenantScopeLimitConfiguration : IEntityTypeConfiguration<TenantScopeLimit>
+{
+    public void Configure(EntityTypeBuilder<TenantScopeLimit> builder)
+    {
+        // Platform geneli (ADR-0030 K4): tavanı platform yöneticisi yazar, firma okur. RLS dışındadır; okuma her zaman
+        // aktif tenant'ın kimliğiyle açıkça süzülür.
+        builder.ToTable("TenantScopeLimits", DatabaseSchemas.Platform);
+        builder.HasKey(l => l.Id);
+        builder.Property(l => l.Id).ValueGeneratedNever();
+        builder.Property(l => l.EntityKey).HasMaxLength(AccessKeys.EntityKeyMaxLength).IsRequired();
+        builder.Property(l => l.MaxScope).IsRequired();
+        builder.Property(l => l.AppliesToAdministrators).IsRequired().HasDefaultValue(false);
+        builder.Property(l => l.UpdatedAt).IsRequired();
+        builder.HasIndex(l => new { l.TenantId, l.EntityKey }).IsUnique();
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(l => l.TenantId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

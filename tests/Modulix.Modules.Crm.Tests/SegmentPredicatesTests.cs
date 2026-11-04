@@ -15,7 +15,7 @@ public class SegmentPredicatesTests
 
     /// <summary>Bugün 15 Mart 2026 (İstanbul); gün başlangıçları UTC+3.</summary>
     private static SegmentEvaluationContext Context(DateOnly? today = null) => new(
-        null,
+        _ => null,
         today ?? new DateOnly(2026, 3, 15),
         day => new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), Istanbul.GetUtcOffset(day.ToDateTime(TimeOnly.MinValue))));
 

@@ -155,3 +155,20 @@ public static class TenantStateText
 
 /// <summary>Telefonunu ve kurtarma kodlarını kaybeden kişinin iki adımlı doğrulamasını sıfırlar (Y7b).</summary>
 public sealed record ResetTwoFactorRequest(string Email);
+
+/// <summary>
+/// Bir kayıt türündeki görünürlük tavanı (ADR-0030): firmanın rolleri bu türde <c>MaxScope</c>'tan geniş kapsam alamaz.
+/// <c>AppliesToAdministrators</c> doluysa tavan Yönetici rolünü de bağlar; varsayılan olarak yönetici muaftır.
+/// </summary>
+public sealed record ScopeLimitDto(string EntityKey, RecordScope MaxScope, bool AppliesToAdministrators = false);
+
+/// <summary>Tavan konabilecek kayıt türü (firmada açık modüllerin, kapsamı türe göre ayarlanabilen türleri).</summary>
+public sealed record ScopeLimitTypeDto(string EntityKey, string ModuleKey, string Label);
+
+public sealed record TenantScopeLimitsResponse(IReadOnlyList<ScopeLimitDto> Limits, IReadOnlyList<ScopeLimitTypeDto> Types);
+
+/// <summary>Tavan kümesini değiştirir: listede olmayan türün tavanı kalkar. <c>Reason</c> platform denetim kaydına yazılır.</summary>
+public sealed record SetScopeLimitsRequest(IReadOnlyList<ScopeLimitDto> Limits, string? Reason = null);
+
+/// <summary><c>AffectedRoleCount</c>: yeni tavanların kapsamı aştığı, okuma tarafında kısılacak yönetici olmayan rol sayısı.</summary>
+public sealed record SetScopeLimitsResponse(IReadOnlyList<ScopeLimitDto> Limits, int AffectedRoleCount);

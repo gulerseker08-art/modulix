@@ -91,6 +91,8 @@ internal sealed class OrderHandoverRecordStore(OrdersStoreContext context) : Ord
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => OrdersModule.Entities.Order;
+
     protected override bool DefaultsOwnerToCurrentUser => false;
 
     protected override IReadOnlyList<RecordField<OrderHandover>> Fields { get; } =
@@ -253,6 +255,8 @@ internal sealed class OrderHandoverItemRecordStore(OrdersStoreContext context) :
     protected override string WritePermission => OrdersModule.Permissions.HandoversWrite;
 
     protected override bool UsesScope => true;
+
+    protected override string ScopeEntityKey => OrdersModule.Entities.Order;
 
     protected override bool DefaultsOwnerToCurrentUser => false;
 

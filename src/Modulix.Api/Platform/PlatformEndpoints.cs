@@ -46,6 +46,38 @@ public static class PlatformEndpoints
         platform.MapPost("/tenants/{tenantId:guid}/administrators", InviteAdministratorAsync);
         platform.MapPut("/tenants/{tenantId:guid}/modules/{moduleKey}", (Guid tenantId, string moduleKey, SetTenantModuleRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
             Run(() => admin.SetModuleAsync(tenantId, moduleKey, request.Enabled, UserId(user), ct, ToTerms(request), request.Reason)));
+
+        // Kayıt görünürlük tavanı (ADR-0030): firmanın rolleri bir kayıt türünde tavandan geniş kapsam alamaz. Yalnızca platform yazar.
+        platform.MapGet("/tenants/{tenantId:guid}/scope-limits", async (Guid tenantId, IPlatformAdministration admin, CancellationToken ct) =>
+        {
+            try
+            {
+                var result = await admin.GetScopeLimitsAsync(tenantId, ct);
+                return Results.Ok(new TenantScopeLimitsResponse(
+                    [.. result.Limits.Select(ToDto)],
+                    [.. result.Types.Select(t => new ScopeLimitTypeDto(t.EntityKey, t.ModuleKey, t.Label))]));
+            }
+            catch (Exception ex) when (ToProblem(ex) is { } problem)
+            {
+                return problem;
+            }
+        });
+        platform.MapPut("/tenants/{tenantId:guid}/scope-limits", async (
+            Guid tenantId, SetScopeLimitsRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
+        {
+            try
+            {
+                var change = await admin.SetScopeLimitsAsync(
+                    tenantId,
+                    [.. (request.Limits ?? []).Select(l => new PlatformScopeLimit(l.EntityKey, (Core.Contracts.Authorization.RecordScope)l.MaxScope, l.AppliesToAdministrators))],
+                    request.Reason, UserId(user), ct);
+                return Results.Ok(new SetScopeLimitsResponse([.. change.Limits.Select(ToDto)], change.AffectedRoleCount));
+            }
+            catch (Exception ex) when (ToProblem(ex) is { } problem)
+            {
+                return problem;
+            }
+        });
         platform.MapGet("/audit", ListAuditAsync);
         platform.MapGet("/overview", GetOverviewAsync);
         platform.MapGet("/expirations", ListExpirationsAsync);
@@ -242,6 +274,8 @@ public static class PlatformEndpoints
             Results.Problem(statusCode: StatusCodes.Status404NotFound, title: ex.Message),
         _ => UserEndpoints.ToProblem(exception),
     };
+
+    private static ScopeLimitDto ToDto(PlatformScopeLimit limit) => new(limit.EntityKey, (Shared.Access.RecordScope)limit.MaxScope, limit.AppliesToAdministrators);
 
     private static PlatformTenantDto ToDto(PlatformTenant tenant) => new(
         tenant.Id,

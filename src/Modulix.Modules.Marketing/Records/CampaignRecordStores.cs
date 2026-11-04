@@ -193,6 +193,8 @@ internal sealed class CampaignAudienceRecordStore(MarketingStoreContext context)
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => MarketingModule.Entities.Campaign;
+
     protected override IReadOnlyList<RecordField<CampaignAudienceEntry>> Fields { get; } =
     [
         Field.Reference<CampaignAudienceEntry, Campaign>("campaignId", "Kampanya bulunamadı.", e => e.CampaignId, (e, v) => e.CampaignId = v ?? Guid.Empty, required: true, createOnly: true),
@@ -315,6 +317,8 @@ internal sealed class AudienceSnapshotRecordStore(MarketingStoreContext context,
     protected override bool DefaultsOwnerToCurrentUser => false;
 
     protected override bool UsesScope => true;
+
+    protected override string ScopeEntityKey => MarketingModule.Entities.Campaign;
 
     protected override IReadOnlyList<RecordField<AudienceSnapshot>> Fields { get; } =
     [
