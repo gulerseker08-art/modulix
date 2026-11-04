@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Modulix.Core.Automation;
+using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
@@ -21,6 +23,7 @@ internal sealed class AutomationRuleService(
     ModuleCatalog modules,
     IAutomationCatalog catalog,
     AutomationDefinitionValidator validator,
+    IOptions<AutomationOptions> automationOptions,
     TimeProvider time) : IAutomationRuleService
 {
     public async Task<AutomationRulePage> ListAsync(AutomationRuleQuery query, CancellationToken cancellationToken)
@@ -159,10 +162,15 @@ internal sealed class AutomationRuleService(
             throw new AutomationRuleConflictException("Taslak yayınlanmış sürümle aynı; yayınlanacak değişiklik yok.");
         }
 
-        var issues = await validator.ValidateAsync(rule.ModuleKey, rule.EntityKey, draft.Definition, cancellationToken);
+        var issues = await PublishIssuesAsync(rule, draft.Definition, cancellationToken);
         if (issues.Count > 0)
         {
             throw new AutomationPublishException(issues);
+        }
+
+        if (activate && rule.Status != AutomationRuleStatus.Active)
+        {
+            await EnsureActiveCapacityAsync(cancellationToken);
         }
 
         var before = await SnapshotAsync(rule, published, cancellationToken);
@@ -193,11 +201,13 @@ internal sealed class AutomationRuleService(
         if (active)
         {
             // Açarken tanım yeniden doğrulanır: bu arada alan, lookup ya da modül kaldırıldıysa kural sessizce açılmaz.
-            var issues = await validator.ValidateAsync(rule.ModuleKey, rule.EntityKey, published.Definition, cancellationToken);
+            var issues = await PublishIssuesAsync(rule, published.Definition, cancellationToken);
             if (issues.Count > 0)
             {
                 throw new AutomationPublishException(issues);
             }
+
+            await EnsureActiveCapacityAsync(cancellationToken);
         }
 
         var before = await SnapshotAsync(rule, published, cancellationToken);
@@ -236,6 +246,30 @@ internal sealed class AutomationRuleService(
 
         await SaveAsync(cancellationToken);
         return true;
+    }
+
+    // Yayın/açma sorunları: katalogla doğrulama + bu sürümde çalışmayan tetikleyici.
+    private async Task<IReadOnlyList<AutomationIssue>> PublishIssuesAsync(
+        AutomationRule rule, AutomationDefinition definition, CancellationToken cancellationToken)
+    {
+        var issues = (await validator.ValidateAsync(rule.ModuleKey, rule.EntityKey, definition, cancellationToken)).ToList();
+        if (!AutomationTriggerMatcher.IsExecutable(definition.Trigger))
+        {
+            issues.Add(new AutomationIssue(
+                "trigger", "Bu tetikleyici türü henüz çalışmıyor; kayıt oluşturma, alan değişimi, durum geçişi ya da elle çalıştırma kullanın."));
+        }
+
+        return issues;
+    }
+
+    // Tenant başına etkin kural sınırı (ADR-0027): her olay etkin kuralları taradığından bir firma ortak kaynağı şişiremesin.
+    private async Task EnsureActiveCapacityAsync(CancellationToken cancellationToken)
+    {
+        var limit = Math.Max(1, automationOptions.Value.MaxActiveRulesPerTenant);
+        if (await db.AutomationRules.CountAsync(r => r.Status == AutomationRuleStatus.Active, cancellationToken) >= limit)
+        {
+            throw new AutomationRuleConflictException($"Etkin kural sayısı sınırına ({limit}) ulaşıldı; önce başka bir kuralı kapatın.");
+        }
     }
 
     private async Task<AutomationRuleDetail> DetailAsync(AutomationRule rule, CancellationToken cancellationToken)

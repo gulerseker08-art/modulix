@@ -28,6 +28,7 @@ public static class ModuleServiceCollectionExtensions
         services.AddScoped<IAutomationCatalog, AutomationCatalogService>();
         services.AddScoped<AutomationDefinitionValidator>();
         services.AddScoped<IAutomationRelationCounter, AutomationRelationCounter>();
+        services.AddScoped<IAutomationRecordReader, PipelineAutomationRecordReader>();
         services.AddScoped<IAutomationPreview, AutomationPreviewService>();
         return services;
     }

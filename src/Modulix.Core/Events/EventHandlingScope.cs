@@ -17,7 +17,13 @@ public sealed class EventHandlingScope
     /// <summary>Çalışan aboneliğin anahtarı (ör. "core.assignment-email").</summary>
     public string? Subscription { get; private set; }
 
-    public void Begin(EventEnvelope envelope, string subscription)
+    /// <summary>
+    /// Doluysa aboneliğin bildirdiği izinler yerine bu küme geçerlidir (kural altyapısı: izinler kuralın tanımından gelir, ADR-0027).
+    /// Yalnızca <see cref="Begin(EventEnvelope, string, IReadOnlySet{string}?)"/> ile, otomasyon kodu tarafından doldurulur.
+    /// </summary>
+    public IReadOnlySet<string>? GrantedPermissions { get; private set; }
+
+    public void Begin(EventEnvelope envelope, string subscription, IReadOnlySet<string>? grantedPermissions = null)
     {
         ArgumentNullException.ThrowIfNull(envelope);
         ArgumentException.ThrowIfNullOrWhiteSpace(subscription);
@@ -28,5 +34,6 @@ public sealed class EventHandlingScope
 
         Event = envelope;
         Subscription = subscription;
+        GrantedPermissions = grantedPermissions;
     }
 }

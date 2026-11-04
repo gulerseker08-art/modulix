@@ -64,3 +64,65 @@ internal sealed class AutomationRuleVersionConfiguration : IEntityTypeConfigurat
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class AutomationRunConfiguration : IEntityTypeConfiguration<AutomationRun>
+{
+    public void Configure(EntityTypeBuilder<AutomationRun> builder)
+    {
+        builder.ToTable("AutomationRuns", DatabaseSchemas.Core);
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).ValueGeneratedNever();
+        builder.Property(r => r.TenantId).IsRequired();
+        builder.Property(r => r.EntityKey).HasMaxLength(100).IsRequired();
+        builder.Property(r => r.Origin).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(r => r.DedupeKey).HasMaxLength(AutomationRun.DedupeKeyLength).IsRequired();
+        builder.Property(r => r.CorrelationId).HasMaxLength(AutomationRun.CorrelationMaxLength);
+        builder.Property(r => r.Note).HasMaxLength(AutomationRun.NoteMaxLength);
+
+        builder.HasAlternateKey(r => new { r.TenantId, r.Id });
+
+        // Tekilleştirme (ADR-0027): aynı olay + kural sürümü + hedef kayıt için tenant içinde tek çalışma; benzersizlik tenant ile birlikte.
+        builder.HasIndex(r => new { r.TenantId, r.DedupeKey }).IsUnique();
+
+        // İşleyici sıradaki çalışmaları (durum + sıra zamanı) bu indeksle seçer.
+        builder.HasIndex(r => new { r.TenantId, r.Status, r.NextAttemptAt });
+
+        // Çalışma geçmişi kurala ve kayda göre listelenir; döngü korumasının "aynı iz" sorgusu da buradan geçer.
+        builder.HasIndex(r => new { r.TenantId, r.RuleId, r.CreatedAt });
+        builder.HasIndex(r => new { r.TenantId, r.RuleId, r.RecordId });
+        builder.HasIndex(r => new { r.TenantId, r.EntityKey, r.RecordId });
+
+        // Çalışma, bağlı olduğu sürümle aynı tenant'tadır; sürüm silinmez (yayınlanmış sürüm değişmez ve geçmiş ona bağlıdır).
+        builder.HasOne<AutomationRuleVersion>()
+            .WithMany()
+            .HasForeignKey(r => new { r.TenantId, r.RuleVersionId })
+            .HasPrincipalKey(v => new { v.TenantId, v.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class AutomationRunStepConfiguration : IEntityTypeConfiguration<AutomationRunStep>
+{
+    public void Configure(EntityTypeBuilder<AutomationRunStep> builder)
+    {
+        builder.ToTable("AutomationRunSteps", DatabaseSchemas.Core);
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).ValueGeneratedNever();
+        builder.Property(s => s.TenantId).IsRequired();
+        builder.Property(s => s.StepId).HasMaxLength(AutomationRunStep.StepIdMaxLength).IsRequired();
+        builder.Property(s => s.Action).HasMaxLength(AutomationRunStep.ActionMaxLength).IsRequired();
+        builder.Property(s => s.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(s => s.IdempotencyKey).HasMaxLength(AutomationRun.DedupeKeyLength).IsRequired();
+        builder.Property(s => s.Summary).HasMaxLength(AutomationRunStep.SummaryMaxLength);
+        builder.Property(s => s.EffectEntityKey).HasMaxLength(100);
+
+        builder.HasIndex(s => new { s.TenantId, s.RunId, s.StepNo }).IsUnique();
+
+        builder.HasOne<AutomationRun>()
+            .WithMany()
+            .HasForeignKey(s => new { s.TenantId, s.RunId })
+            .HasPrincipalKey(r => new { r.TenantId, r.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
