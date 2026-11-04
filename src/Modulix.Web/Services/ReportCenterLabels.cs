@@ -81,6 +81,7 @@ public static class ReportCenterLabels
         "flag" => "Evet/Hayır",
         "choice" => "Seçim",
         "lookup" => "Kayıt",
+        "user" => "Kullanıcı",
         _ => key,
     };
 

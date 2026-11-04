@@ -260,6 +260,68 @@ public class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Equal("forbidden", (await RunAsync(noQuotes, new ReportSpecDto { Dataset = "crm.quotes", Columns = ["title"] })).Status);
     }
 
+    [Fact]
+    public async Task Target_and_forecast_datasets_show_user_names_exclude_count_targets_from_amount_sums_and_hide_the_locked_amount_without_permission()
+    {
+        var s = await SetUpAsync();
+        var (start, end) = (new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31));
+        foreach (var target in new[]
+        {
+            new SaveSalesTargetRequest("WonAmount", "User", s.AdminId, "TRY", start, end, 600_000m),
+            new SaveSalesTargetRequest("WonAmount", "Tenant", null, "TRY", start, end, 1_000_000m),
+            new SaveSalesTargetRequest("WonCount", "Tenant", null, null, start, end, 4m),
+        })
+        {
+            await PostAsync<SalesTargetDto>(s.Admin, "/api/crm/sales-targets", target);
+        }
+
+        await PostAsync<ForecastHeaderDto>(s.Admin, "/api/crm/sales/forecasts", new CreateForecastRequestDto("Month", DateOnly.FromDateTime(DateTime.UtcNow), "Tenant", null, "TRY"));
+
+        // Kullanıcı kapsamlı tutar hedefi: grup etiketi kimlik değil kullanıcının adıdır.
+        var byUser = await RunAsync(s.Admin, new ReportSpecDto
+        {
+            Dataset = "crm.sales-targets",
+            Filters = [new() { Field = "metric", Operator = "equals", Value = "WonAmount" }, new() { Field = "scopeType", Operator = "equals", Value = "User" }],
+            Groups = [new() { Field = "scopeUserId" }],
+            Measures = [new() { Field = "value", Aggregation = "sum" }],
+        });
+        var row = Assert.Single(byUser.Rows);
+        Assert.Equal(s.AdminId.ToString(), row.Keys[0], ignoreCase: true);
+        Assert.NotEqual(row.Keys[0], row.Cells[0].GetString());
+        Assert.Equal(600_000m, Cell(row, 2));
+
+        // Adet hedefinin para birimi yok: tutar toplamına girmez ve dışlanan kayıt olarak sayılır (sıfır varsayılmaz).
+        var total = await RunAsync(s.Admin, new ReportSpecDto { Dataset = "crm.sales-targets", Measures = [new() { Field = "value", Aggregation = "sum" }] });
+        Assert.Equal(1_600_000m, Cell(total.Totals.Single(t => t.Currency == "TRY"), 1));
+        Assert.Equal(1, total.Columns.Single(c => c.Key == "sum:value").ExcludedRows);
+
+        var forecasts = await RunAsync(s.Admin, new ReportSpecDto
+        {
+            Dataset = "crm.forecasts",
+            Groups = [new() { Field = "status" }],
+            Measures = [new() { Aggregation = "count" }],
+        });
+        Assert.Equal(("Draft", "Taslak", 1m), (forecasts.Rows.Single().Keys[0], forecasts.Rows.Single().Cells[0].GetString(), Cell(forecasts.Rows.Single(), 1)));
+
+        // Katalog: kullanıcı sütunu etkin üyeleri seçenek olarak verir; kilit anındaki tutar yalnızca tutar iznine sahip olana görünür.
+        var catalog = await ReadAsync<ReportCatalogDto>(await s.Admin.GetAsync($"{Reports}/catalog"));
+        var users = catalog.Datasets.Single(d => d.Key == "crm.sales-targets").Columns.Single(c => c.Field == "scopeUserId");
+        Assert.Equal("user", users.Kind);
+        Assert.Contains(users.Options!, o => string.Equals(o.Key, s.AdminId.ToString(), StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(catalog.Datasets.Single(d => d.Key == "crm.forecasts").Columns, c => c.Field == "realizedAtLock");
+
+        var planner = await UserAsync(s, [ForecastsRead, SalesTargetsRead, .. CoreRead], Scope.All);
+        var limited = await ReadAsync<ReportCatalogDto>(await planner.GetAsync($"{Reports}/catalog"));
+        Assert.DoesNotContain(limited.Datasets.Single(d => d.Key == "crm.forecasts").Columns, c => c.Field == "realizedAtLock");
+        var blocked = await RunAsync(planner, new ReportSpecDto { Dataset = "crm.forecasts", Measures = [new() { Field = "realizedAtLock", Aggregation = "sum" }] });
+        Assert.Equal("forbidden", blocked.Status);
+
+        // Başka tenant bu hedef ve tahminleri görmez.
+        var other = await SetUpAsync();
+        Assert.Empty((await RunAsync(other.Admin, new ReportSpecDto { Dataset = "crm.sales-targets", Columns = ["metric"] })).Rows);
+        Assert.Empty((await RunAsync(other.Admin, new ReportSpecDto { Dataset = "crm.forecasts", Columns = ["status"] })).Rows);
+    }
+
     // ---- Doğrulama
 
     [Fact]

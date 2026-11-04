@@ -356,6 +356,8 @@ public sealed class CrmModule : IModule
     IReadOnlyList<SensitiveFields> IModule.SensitiveFields { get; } =
     [
         new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability", "customerBudget", "wonAmount"]),
+        // Tahmin sürümünün kilit anındaki gerçekleşen tutarı fırsat tutarlarından türer; tutar izni olmayan göremez (rapor veri kümesi dahil).
+        new(Entities.ForecastSubmission, Permissions.OpportunityAmountsRead, ["realizedAtLock"]),
         new(Entities.Product, Permissions.ProductCostsRead, ["cost", "costCurrency"]),
         new(Entities.QuoteLine, Permissions.QuoteCostsRead, ["unitCost"]),
     ];
