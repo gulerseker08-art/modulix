@@ -393,6 +393,10 @@
                 <div class="section-header"><h2 id="rb-preview-title">Önizleme</h2></div>
                 <p class="small text-muted">Önizleme, "Önizle" düğmesine bastığınız andaki tanımla çalıştı; sonradan yaptığınız değişiklikleri görmek için yeniden önizleyin. Kaydetmeden de çalışır.</p>
                 <ReportResultView Result="previewResult" Loading="previewing" DrillRunner="PreviewDrillAsync" PageChanged="PreviewPageAsync" />
+                @if (previewSpec is not null && previewResult is { Status: "ok" })
+                {
+                    <div class="mt-3"><ReportExportButton Spec="previewSpec" Name="@name" Disabled="previewing" /></div>
+                }
             </section>
         }
     }

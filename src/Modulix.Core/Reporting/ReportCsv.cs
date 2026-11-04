@@ -1,0 +1,109 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using Modulix.Core.Contracts.Reporting;
+
+namespace Modulix.Core.Reporting;
+
+/// <summary>
+/// Rapor sonucunu CSV'ye çevirir (ADR-0026, dilim 4). Dışa aktarma ekrandaki sonuçla <b>aynı</b> <see cref="ReportResult"/>'tan üretilir; ayrı bir
+/// hesap yoktur. CSV/Excel formül enjeksiyonuna karşı metin hücreleri ve başlıklar kaçışlanır: "=", "+", "-", "@", sekme ya da satır başı ile
+/// başlayan metin başına kesme işareti konur (sayısal hücreler metin değildir ve olduğu gibi yazılır). UTF-8 BOM'lu, CRLF satır sonlu, noktalı
+/// virgüllü değil virgüllü CSV; sayılar değişmez kültürle (nokta ondalık).
+/// </summary>
+public static class ReportCsv
+{
+    private static readonly char[] DangerousStarts = ['=', '+', '-', '@', '\t', '\r', '\n'];
+
+    public static byte[] Build(ReportResult result)
+    {
+        var builder = new StringBuilder();
+        var money = !result.IsSummary && result.Rows.Any(r => r.Currency is not null);
+        var header = result.Columns.Select(c => c.Label).ToList();
+        if (money)
+        {
+            header.Add("Para birimi");
+        }
+
+        AppendLine(builder, header.Select(Text));
+        foreach (var row in result.Rows)
+        {
+            var cells = row.Cells.Select(Cell).ToList();
+            if (money)
+            {
+                cells.Add(Text(row.Currency));
+            }
+
+            AppendLine(builder, cells);
+        }
+
+        // Toplam satırları özet raporda sütunlarla aynı hizadadır; ilk grup hücresine "Toplam" yazılır. Tablo raporunda toplam satırı yoktur.
+        foreach (var total in result.IsSummary ? result.Totals : [])
+        {
+            var cells = total.Cells.Select(Cell).ToList();
+            if (cells.Count > 0 && result.Columns[0].Role == ReportColumnRole.Group)
+            {
+                cells[0] = "Toplam";
+            }
+
+            AppendLine(builder, cells);
+        }
+
+        return [.. Encoding.UTF8.GetPreamble(), .. Encoding.UTF8.GetBytes(builder.ToString())];
+    }
+
+    /// <summary>Dosya adı için güvenli kısa metin (harf, rakam, tire); boşsa "rapor".</summary>
+    public static string FileSlug(string? name)
+    {
+        var slug = new StringBuilder();
+        foreach (var c in (name ?? string.Empty).Trim().Normalize(NormalizationForm.FormKD))
+        {
+            if (char.IsAsciiLetterOrDigit(c))
+            {
+                slug.Append(char.ToLowerInvariant(c));
+            }
+            else if (slug.Length > 0 && slug[^1] != '-' && (char.IsWhiteSpace(c) || c is '-' or '_' or '.'))
+            {
+                slug.Append('-');
+            }
+        }
+
+        var text = slug.ToString().Trim('-');
+        return text.Length == 0 ? "rapor" : text[..Math.Min(text.Length, 60)];
+    }
+
+    private static string Cell(object? value) => value switch
+    {
+        null => string.Empty,
+        JsonElement { ValueKind: JsonValueKind.Null or JsonValueKind.Undefined } => string.Empty,
+        JsonElement { ValueKind: JsonValueKind.Number } number => number.GetDecimal().ToString(CultureInfo.InvariantCulture),
+        JsonElement { ValueKind: JsonValueKind.True } => "Evet",
+        JsonElement { ValueKind: JsonValueKind.False } => "Hayır",
+        JsonElement element => Text(element.ToString()),
+        decimal d => d.ToString(CultureInfo.InvariantCulture),
+        int i => i.ToString(CultureInfo.InvariantCulture),
+        long l => l.ToString(CultureInfo.InvariantCulture),
+        double f => f.ToString(CultureInfo.InvariantCulture),
+        bool b => b ? "Evet" : "Hayır",
+        _ => Text(Convert.ToString(value, CultureInfo.InvariantCulture)),
+    };
+
+    /// <summary>Metin hücresi: formül başlangıcı kaçışlanır. Kaçışlanan değer bir sayı gibi görünse bile metin olarak kalır.</summary>
+    public static string Text(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        return DangerousStarts.Contains(value[0]) ? "'" + value : value;
+    }
+
+    private static void AppendLine(StringBuilder builder, IEnumerable<string> cells)
+    {
+        builder.Append(string.Join(',', cells.Select(Quote))).Append("\r\n");
+    }
+
+    private static string Quote(string value) =>
+        value.IndexOfAny([',', '"', '\r', '\n']) >= 0 ? "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : value;
+}

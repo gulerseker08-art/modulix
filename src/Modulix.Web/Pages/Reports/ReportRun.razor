@@ -166,6 +166,17 @@
             </section>
         }
 
+        <div class="mb-3">
+            @if (currentId is { } exportId)
+            {
+                <ReportExportButton @key="exportId" ReportId="exportId" Disabled="running" />
+            }
+            else
+            {
+                <ReportExportButton Spec="readySpec" Name="@title" Disabled="running" />
+            }
+        </div>
+
         @if (runError is not null)
         {
             <div class="alert @(runForbidden ? "alert-warning" : "alert-danger")" role="alert">
@@ -178,6 +189,11 @@
         }
 
         <ReportResultView Result="result" Loading="running" DrillRunner="DrillAsync" PageChanged="RunAsync" />
+
+        @if (detail is not null && Session.Can(ReportAccess.Schedule))
+        {
+            <ReportSchedulesPanel ReportId="detail.Summary.Id" />
+        }
     }
 </AuthGate>
 

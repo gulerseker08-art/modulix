@@ -75,3 +75,86 @@ internal sealed class ReportFavoriteConfiguration : IEntityTypeConfiguration<Rep
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal sealed class ReportExportConfiguration : IEntityTypeConfiguration<ReportExport>
+{
+    public void Configure(EntityTypeBuilder<ReportExport> builder)
+    {
+        // Hazırlanmış dışa aktarma dosyası (ADR-0026, dilim 4): tenant verisi, RLS'li; içerik en çok MaxBytes, süresi dolunca silinir.
+        builder.ToTable("ReportExports", DatabaseSchemas.Core);
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).ValueGeneratedNever();
+        builder.Property(e => e.TenantId).IsRequired();
+        builder.Property(e => e.OwnerUserId).IsRequired();
+        builder.Property(e => e.ReportName).HasMaxLength(ReportDefinition.NameMaxLength).IsRequired();
+        builder.Property(e => e.DatasetKey).HasMaxLength(100).IsRequired();
+        builder.Property(e => e.FileName).HasMaxLength(200).IsRequired();
+        builder.Property(e => e.ContentType).HasMaxLength(100).IsRequired();
+        builder.Property(e => e.Content).HasColumnType("varbinary(max)").IsRequired();
+        builder.Property(e => e.AccessStamp).HasMaxLength(64).IsRequired();
+        builder.Property(e => e.Source).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(e => e.CreatedAt).IsRequired();
+        builder.Property(e => e.ExpiresAt).IsRequired();
+
+        builder.HasAlternateKey(e => new { e.TenantId, e.Id });
+        builder.HasIndex(e => new { e.TenantId, e.OwnerUserId, e.CreatedAt });
+        builder.HasIndex(e => new { e.TenantId, e.ExpiresAt });
+    }
+}
+
+internal sealed class ReportScheduleConfiguration : IEntityTypeConfiguration<ReportSchedule>
+{
+    public void Configure(EntityTypeBuilder<ReportSchedule> builder)
+    {
+        builder.ToTable("ReportSchedules", DatabaseSchemas.Core);
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).ValueGeneratedNever();
+        builder.Property(s => s.TenantId).IsRequired();
+        builder.Property(s => s.Frequency).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(s => s.DayOfWeek).HasConversion<int?>();
+        builder.Property(s => s.LastStatus).HasMaxLength(20);
+        builder.Property(s => s.LastMessage).HasMaxLength(ReportSchedule.MessageMaxLength);
+        builder.Property(s => s.StoppedReason).HasMaxLength(ReportSchedule.MessageMaxLength);
+        builder.Property(s => s.NextRunAt).IsRequired();
+        builder.Property(s => s.CreatedAt).IsRequired();
+        builder.Property(s => s.UpdatedAt).IsRequired();
+        builder.Property(s => s.Version).IsConcurrencyToken();
+
+        builder.HasAlternateKey(s => new { s.TenantId, s.Id });
+        builder.HasIndex(s => new { s.TenantId, s.OwnerUserId });
+        // Vakti gelmiş zamanlamalar bu dizinle bulunur (yalnızca açık olanlar).
+        builder.HasIndex(s => new { s.TenantId, s.NextRunAt }).HasFilter("[Enabled] = 1").HasDatabaseName("IX_ReportSchedules_TenantId_NextRunAt_Enabled");
+
+        // Rapor silinince zamanlamaları da silinir.
+        builder.HasOne<ReportDefinition>()
+            .WithMany()
+            .HasForeignKey(s => new { s.TenantId, s.ReportId })
+            .HasPrincipalKey(r => new { r.TenantId, r.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class ReportScheduleRunConfiguration : IEntityTypeConfiguration<ReportScheduleRun>
+{
+    public void Configure(EntityTypeBuilder<ReportScheduleRun> builder)
+    {
+        builder.ToTable("ReportScheduleRuns", DatabaseSchemas.Core);
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).ValueGeneratedNever();
+        builder.Property(r => r.TenantId).IsRequired();
+        builder.Property(r => r.Status).HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Message).HasMaxLength(ReportSchedule.MessageMaxLength);
+        builder.Property(r => r.Slot).IsRequired();
+        builder.Property(r => r.StartedAt).IsRequired();
+
+        builder.HasAlternateKey(r => new { r.TenantId, r.Id });
+        // Aynı planlı an için tek çalışma: yarışan ikinci örnek bu kısıta takılır (idempotency).
+        builder.HasIndex(r => new { r.TenantId, r.ScheduleId, r.Slot }).IsUnique();
+
+        builder.HasOne<ReportSchedule>()
+            .WithMany()
+            .HasForeignKey(r => new { r.TenantId, r.ScheduleId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

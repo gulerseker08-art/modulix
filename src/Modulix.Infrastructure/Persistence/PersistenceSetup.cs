@@ -108,6 +108,9 @@ public static class PersistenceSetup
         services.AddScoped<IReportRunner, ReportRunner>();
         services.AddScoped<IReportCatalog, ReportCatalogService>();
         services.AddScoped<IReportCenter, ReportCenter>();
+        services.AddScoped<ReportAccessStamp>();
+        services.AddScoped<IReportExports, ReportExports>();
+        services.AddScoped<IReportSchedules, ReportSchedules>();
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());
         services.AddScoped<ICustomFieldProvider>(sp => sp.GetRequiredService<CustomFieldService>());

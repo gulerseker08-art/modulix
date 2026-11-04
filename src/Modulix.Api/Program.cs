@@ -75,6 +75,9 @@ builder.Services.AddScoped<Modulix.Modules.Marketing.Runs.IMarketingPolicyProvid
 builder.Services.Configure<Modulix.Api.Communication.CommunicationCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Communication.CommunicationCleanupOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Communication.CommunicationCleanupRunner>();
 builder.Services.AddHostedService<Modulix.Api.Communication.CommunicationCleanupWorker>();
+builder.Services.Configure<Modulix.Api.Reports.ReportJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Reports.ReportJobsOptions.SectionName));
+builder.Services.AddSingleton<Modulix.Api.Reports.ReportScheduleRunner>();
+builder.Services.AddHostedService<Modulix.Api.Reports.ReportScheduleWorker>();
 builder.Services.Configure<Modulix.Api.Marketing.MarketingSendOptions>(builder.Configuration.GetSection(Modulix.Api.Marketing.MarketingSendOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Marketing.MarketingSendRunner>();
 builder.Services.AddHostedService<Modulix.Api.Marketing.MarketingSendWorker>();

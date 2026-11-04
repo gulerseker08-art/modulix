@@ -66,6 +66,12 @@ public sealed class CoreModule : IModule
 
         /// <summary>Kendi raporunu firmayla ya da seçilen kullanıcılarla paylaşır. Paylaşım veri erişimi kazandırmaz.</summary>
         public const string ShareReports = "core.reports.share";
+
+        /// <summary>Rapor sonucunu CSV olarak dışa aktarır (ADR-0026, dilim 4). Dosya yalnızca sahibine, indirme anında yetki yeniden denetlenerek verilir.</summary>
+        public const string ExportReports = "core.reports.export";
+
+        /// <summary>Kendi raporlarını zamanlar; zamanlanmış rapor çalışırken sahibinin yetkisi yeniden denetlenir, yetki kaybında teslim durur.</summary>
+        public const string ScheduleReports = "core.reports.schedule";
     }
 
     public string Key => ModuleKey;
@@ -92,6 +98,8 @@ public sealed class CoreModule : IModule
         new(Permissions.ReadReports, "Rapor merkezini açar ve raporları çalıştırır", "Raporlar"),
         new(Permissions.ManageReports, "Kendi raporlarını oluşturur, düzenler ve siler", "Raporlar"),
         new(Permissions.ShareReports, "Kendi raporunu firmayla ya da kullanıcılarla paylaşır", "Raporlar"),
+        new(Permissions.ExportReports, "Rapor sonuçlarını CSV olarak dışa aktarır", "Raporlar"),
+        new(Permissions.ScheduleReports, "Kendi raporlarını zamanlar", "Raporlar"),
     ];
 
     /// <summary>Çekirdeğin olay abonelikleri (ADR-0007).</summary>
@@ -146,6 +154,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Kayıtlı rapor (ADR-0026, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string Report = "core.report";
+
+        /// <summary>Zamanlanmış rapor (ADR-0026, dilim 4); kaydın kimliği zamanlamanın kimliğidir.</summary>
+        public const string ReportSchedule = "core.report-schedule";
 
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
@@ -390,6 +401,17 @@ public sealed class CoreModule : IModule
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
                 ["visibility"] = new Dictionary<string, string> { ["Private"] = "Özel", ["Users"] = "Seçilen kullanıcılar", ["Tenant"] = "Firma" },
+            },
+        },
+        new(AuditedEntityKeys.ReportSchedule, "Zamanlanmış rapor", null, new Dictionary<string, string>
+        {
+            ["report"] = "Rapor", ["frequency"] = "Sıklık", ["hour"] = "Saat", ["dayOfWeek"] = "Haftanın günü", ["dayOfMonth"] = "Ayın günü",
+            ["enabled"] = "Açık", ["stoppedReason"] = "Durma nedeni",
+        }, "report")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["frequency"] = new Dictionary<string, string> { ["Daily"] = "Günlük", ["Weekly"] = "Haftalık", ["Monthly"] = "Aylık" },
             },
         },
         new(AuditedEntityKeys.Membership, "Kullanıcı", null, new Dictionary<string, string>

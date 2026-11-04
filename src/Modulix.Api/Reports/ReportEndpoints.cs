@@ -82,8 +82,115 @@ public static class ReportEndpoints
             await center.RunAsync(id, ToDrill(request.Drill), request.Page, request.PageSize, ct) is { } result ? Results.Ok(ToDto(result)) : NotFound()))
             .RequirePermission(CoreModule.Permissions.ReadReports);
 
+        MapExports(group);
+        MapSchedules(group);
         return app;
     }
+
+    /// <summary>
+    /// Dışa aktarma (<c>core.reports.export</c>): CSV, sahibine özel, 24 saat. İndirme anında yetki yeniden denetlenir; dosya yalnızca sahibine verilir.
+    /// Hata kodları: 404 yok/başkasının, 410 süresi doldu, 403 yetki yok (modül kapalı dahil), 409 yetki dosya hazırlandıktan sonra değişti.
+    /// </summary>
+    private static void MapExports(RouteGroupBuilder group)
+    {
+        group.MapGet("/exports", async (IReportExports exports, CancellationToken ct) =>
+            Results.Ok((await exports.ListAsync(ct)).Select(ToDto).ToList()))
+            .RequirePermission(CoreModule.Permissions.ExportReports);
+
+        group.MapPost("/exports", (ExportReportRequest request, IReportExports exports, CancellationToken ct) => RunAsync(async () =>
+        {
+            if (request.Spec is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["spec"] = ["Rapor tanımı gerekli."] }, statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var export = await exports.CreateAsync(ToSpec(request.Spec), request.Name, ct);
+            return Results.Created($"/api/reports/exports/{export.Id}", ToDto(export));
+        })).RequirePermission(CoreModule.Permissions.ExportReports);
+
+        group.MapPost("/{id:guid}/exports", (Guid id, IReportExports exports, CancellationToken ct) => RunAsync(async () =>
+            await exports.CreateAsync(id, ct) is { } export ? Results.Created($"/api/reports/exports/{export.Id}", ToDto(export)) : NotFound()))
+            .RequirePermission(CoreModule.Permissions.ExportReports);
+
+        group.MapGet("/exports/{id:guid}/download", async (Guid id, HttpContext http, IReportExports exports, CancellationToken ct) =>
+        {
+            var download = await exports.DownloadAsync(id, ct);
+            switch (download.Status)
+            {
+                case ReportDownloadStatus.Ok:
+                    // Dosya önbelleğe alınmaz, içerik türü sezilmez; her zaman indirme olarak sunulur.
+                    http.Response.Headers.CacheControl = "no-store";
+                    http.Response.Headers.XContentTypeOptions = "nosniff";
+                    return Results.File(download.Content!, download.ContentType, download.FileName);
+                case ReportDownloadStatus.Expired:
+                    return Results.Problem(statusCode: StatusCodes.Status410Gone, title: download.Message);
+                case ReportDownloadStatus.Forbidden:
+                    return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: download.Message);
+                case ReportDownloadStatus.AccessChanged:
+                    return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: download.Message);
+                default:
+                    return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: download.Message);
+            }
+        }).RequirePermission(CoreModule.Permissions.ExportReports);
+
+        group.MapDelete("/exports/{id:guid}", async (Guid id, IReportExports exports, CancellationToken ct) =>
+            await exports.DeleteAsync(id, ct) ? Results.NoContent() : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Dosya bulunamadı."))
+            .RequirePermission(CoreModule.Permissions.ExportReports);
+    }
+
+    /// <summary>
+    /// Zamanlanmış rapor (<c>core.reports.schedule</c>): kullanıcı yalnızca kendi zamanlamalarını görür ve yönetir. Çalışma anında sahibin yetkisi yeniden
+    /// denetlenir; yetki kaybında zamanlama durdurulur ve hiçbir şey teslim edilmez (<c>stoppedReason</c>).
+    /// </summary>
+    private static void MapSchedules(RouteGroupBuilder group)
+    {
+        group.MapGet("/schedules", async (Guid? reportId, IReportSchedules schedules, CancellationToken ct) =>
+            Results.Ok((await schedules.ListAsync(reportId, ct)).Select(ToDto).ToList()))
+            .RequirePermission(CoreModule.Permissions.ScheduleReports);
+
+        group.MapPost("/{id:guid}/schedules", (Guid id, SaveReportScheduleRequest request, IReportSchedules schedules, CancellationToken ct) => RunAsync(async () =>
+            await schedules.CreateAsync(id, ToInput(request), ct) is { } schedule ? Results.Created($"/api/reports/schedules/{schedule.Id}", ToDto(schedule)) : NotFound()))
+            .RequirePermission(CoreModule.Permissions.ScheduleReports);
+
+        group.MapPut("/schedules/{id:guid}", (Guid id, SaveReportScheduleRequest request, IReportSchedules schedules, CancellationToken ct) => RunAsync(async () =>
+            await schedules.UpdateAsync(id, ToInput(request), request.ExpectedVersion, ct) is { } schedule ? Results.Ok(ToDto(schedule)) : ScheduleNotFound()))
+            .RequirePermission(CoreModule.Permissions.ScheduleReports);
+
+        group.MapPut("/schedules/{id:guid}/enabled", (Guid id, SetReportScheduleEnabledRequest request, IReportSchedules schedules, CancellationToken ct) => RunAsync(async () =>
+            await schedules.SetEnabledAsync(id, request.Enabled, ct) is { } schedule ? Results.Ok(ToDto(schedule)) : ScheduleNotFound()))
+            .RequirePermission(CoreModule.Permissions.ScheduleReports);
+
+        group.MapDelete("/schedules/{id:guid}", (Guid id, IReportSchedules schedules, CancellationToken ct) => RunAsync(async () =>
+            await schedules.DeleteAsync(id, ct) ? Results.NoContent() : ScheduleNotFound()))
+            .RequirePermission(CoreModule.Permissions.ScheduleReports);
+    }
+
+    private static IResult ScheduleNotFound() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Zamanlama bulunamadı.");
+
+    private static ReportScheduleInput ToInput(SaveReportScheduleRequest request)
+    {
+        if (!Enum.TryParse<ScheduleFrequency>(request.Frequency, ignoreCase: true, out var frequency))
+        {
+            throw new ReportException("Sıklık daily, weekly ya da monthly olmalı.");
+        }
+
+        DayOfWeek? day = null;
+        if (!string.IsNullOrWhiteSpace(request.DayOfWeek))
+        {
+            day = Enum.TryParse<DayOfWeek>(request.DayOfWeek, ignoreCase: true, out var parsed)
+                ? parsed
+                : throw new ReportException("Haftanın günü sunday..saturday olmalı.");
+        }
+
+        return new ReportScheduleInput(frequency, request.Hour, day, request.DayOfMonth);
+    }
+
+    private static ReportExportDto ToDto(ReportExportInfo e) => new(
+        e.Id, e.ReportId, e.ReportName, e.DatasetKey, e.FileName, e.SizeBytes, e.RowCount, e.Truncated, Name(e.Source), e.CreatedAt, e.ExpiresAt, e.DownloadCount, e.Expired);
+
+    private static ReportScheduleDto ToDto(ReportScheduleInfo s) => new(
+        s.Id, s.ReportId, s.ReportName, Name(s.Frequency), s.Hour, s.DayOfWeek is { } day ? Name(day) : null, s.DayOfMonth, s.Enabled, s.NextRunAt, s.LastRunAt,
+        s.LastStatus, s.LastMessage, s.StoppedReason, s.Version);
 
     private static async Task<IResult> RunAsync(Func<Task<IResult>> action)
     {

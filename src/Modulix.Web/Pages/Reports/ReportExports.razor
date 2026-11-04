@@ -1,0 +1,179 @@
+@page "/raporlar/disa-aktarimlar"
+@using System.Net
+@inject ApiClient Api
+@inject SessionState Session
+@inject IJSRuntime Js
+
+<PageTitle>Rapor dışa aktarımları · Modulix</PageTitle>
+
+<AuthGate Permission="@ReportAccess.Export">
+    <a class="back-link" href="raporlar"><AppIcon Name="arrow-left" Size="16" /> Raporlar</a>
+
+    <PageHeader Title="Dışa aktarımlar" Icon="file-text"
+                Subtitle="Hazırladığınız ve zamanlamalarınızın size teslim ettiği CSV dosyaları. Dosyalar yalnızca size aittir, 24 saat saklanır ve en çok 20 dosya tutulur." />
+
+    <div class="alert alert-info" role="note">
+        Dosya, raporun ekrandaki sonucuyla aynı hesaptan ve sizin yetkinizle üretilir. İndirme sırasında yetkiniz yeniden denetlenir;
+        dosya hazırlandıktan sonra yetkiniz değiştiyse dosya verilmez, raporu yeniden dışa aktarmanız gerekir.
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert @(messageFailed ? "alert-danger" : "alert-success")" role="@(messageFailed ? "alert" : "status")">@message</div>
+    }
+
+    <AnalyticsStatus Loading="loading" Error="@error" Forbidden="forbidden" OnRetry="LoadAsync" />
+
+    @if (!loading && error is null && loaded)
+    {
+        @if (items.Count == 0)
+        {
+            <p class="text-muted" role="status">
+                Henüz dışa aktarılmış dosyanız yok. Bir raporu açıp "CSV olarak dışa aktar" düğmesini kullanın ya da raporu zamanlayın.
+            </p>
+        }
+        else
+        {
+            <p class="visually-hidden" role="status" aria-live="polite">@items.Count dosya listelendi.</p>
+            <div class="table-responsive report-table-wrap" tabindex="0" role="region" aria-label="Dışa aktarılan dosyalar">
+                <table class="table report-table">
+                    <caption class="visually-hidden">Dışa aktarılan CSV dosyaları</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Rapor</th>
+                            <th scope="col">Dosya</th>
+                            <th scope="col" class="text-end">Satır</th>
+                            <th scope="col" class="text-end">Boyut</th>
+                            <th scope="col">Kaynak</th>
+                            <th scope="col">Oluşturulma</th>
+                            <th scope="col">Geçerlilik sonu</th>
+                            <th scope="col" class="text-end">İndirme</th>
+                            <th scope="col"><span class="visually-hidden">İşlemler</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in items)
+                        {
+                            <tr>
+                                <td>
+                                    @if (item.ReportId is { } reportId)
+                                    {
+                                        <a href="raporlar/@reportId">@item.ReportName</a>
+                                    }
+                                    else
+                                    {
+                                        @item.ReportName
+                                    }
+                                    @if (item.Truncated)
+                                    {
+                                        <span class="badge status-prospect ms-1" title="Okuma sınırı aşıldığı için dosyada tüm kayıtlar olmayabilir">Eksik olabilir</span>
+                                    }
+                                    @if (item.Expired)
+                                    {
+                                        <span class="badge status-inactive ms-1">Süresi doldu</span>
+                                    }
+                                </td>
+                                <td>@item.FileName</td>
+                                <td class="text-end">@item.RowCount.ToString("N0", Regional.Numbers)</td>
+                                <td class="text-end">@ReportCenterLabels.Size(item.SizeBytes)</td>
+                                <td>@ReportCenterLabels.ExportSource(item.Source)</td>
+                                <td>@CrmLabels.Time(item.CreatedAt)</td>
+                                <td>@CrmLabels.Time(item.ExpiresAt)</td>
+                                <td class="text-end">@item.DownloadCount</td>
+                                <td class="text-end">
+                                    @if (item.Expired)
+                                    {
+                                        <span class="small text-muted me-2">Yeniden dışa aktarın</span>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="İndir: @item.FileName" @onclick="() => DownloadAsync(item)">İndir</button>
+                                    }
+                                    @if (confirmDeleteId == item.Id)
+                                    {
+                                        <span class="confirm" role="alert">
+                                            <span>Dosya silinsin mi?</span>
+                                            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">Evet, sil</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDeleteId = null">Vazgeç</button>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="Sil: @item.FileName" @onclick="() => confirmDeleteId = item.Id">Sil</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</AuthGate>
+
+@code {
+    private readonly List<ReportExportDto> items = [];
+    private bool loading;
+    private bool loaded;
+    private string? error;
+    private bool forbidden;
+    private bool busy;
+    private Guid? confirmDeleteId;
+    private string? message;
+    private bool messageFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(ReportAccess.Export))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        forbidden = false;
+        var result = await Api.GetAsync<List<ReportExportDto>>("/api/reports/exports");
+        loading = false;
+        loaded = true;
+        error = result.Error;
+        forbidden = result.Status == HttpStatusCode.Forbidden;
+        items.Clear();
+        if (result.Value is { } value)
+        {
+            items.AddRange(value.OrderByDescending(i => i.CreatedAt));
+        }
+    }
+
+    private async Task DownloadAsync(ReportExportDto item)
+    {
+        busy = true;
+        message = null;
+        var failure = await ReportExportDownloads.DownloadAsync(Api, Js, item);
+        busy = false;
+        messageFailed = failure is not null;
+        message = failure ?? $"\"{item.FileName}\" indirildi.";
+        if (failure is null)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteAsync(ReportExportDto item)
+    {
+        busy = true;
+        message = null;
+        var result = await Api.DeleteAsync($"/api/reports/exports/{item.Id}");
+        busy = false;
+        confirmDeleteId = null;
+        messageFailed = !result.IsSuccess;
+        message = result.IsSuccess ? $"\"{item.FileName}\" silindi." : result.Error;
+        if (result.IsSuccess || result.Status == HttpStatusCode.NotFound)
+        {
+            await LoadAsync();
+        }
+    }
+}
