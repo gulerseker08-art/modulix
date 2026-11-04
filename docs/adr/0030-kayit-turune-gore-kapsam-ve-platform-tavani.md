@@ -1,8 +1,8 @@
-# ADR-0029 — Kayıt türüne göre kayıt kapsamı ve platform görünürlük tavanı
+# ADR-0030 — Kayıt türüne göre kayıt kapsamı ve platform görünürlük tavanı
 
 Durum: **taslak** (3 Kasım 2026; açık kararlar 4 Kasım 2026'da cevaplandı, bölüm 7; dilim 1 uygulandı, dilim 2 bekliyor). Bu belge tek başına hiçbir şeyi uygulamaz. "Doğrulandı" yazılanlar kodda okunmuş, "doğrulanmadı" yazılanlar bölüm 9'da listelenmiştir.
 
-Numara notu: `docs/adr` altında iki belge 0026, `0027` otomasyon ve `0028` platform lisans ve tenant yönetimi numarasını taşır; bu belge bir sonraki boş numarayı (0029) kullanır. Taslak 0028 olarak açılmış, #135 sonrası 0028 başka belgeye verildiği için yeniden numaralandı.
+Numara notu: `docs/adr` altında iki belge 0026, `0027` otomasyon, `0028` platform lisans ve tenant yönetimi, `0029` sektör profili genişletme numarasını taşır; bu belge bir sonraki boş numarayı (0030) kullanır. Taslak önce 0028, sonra 0029 olarak açılmış; numaralar başka belgelere verildiği için yeniden numaralandı.
 
 ## 1. Bağlam ve amaç
 
