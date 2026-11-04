@@ -27,6 +27,12 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["platform.Memberships"] = "TenantId: üyelik, firma seçilmeden önce (giriş, firma listesi) doğrulanır.",
         ["platform.PlatformAuditLog"] = "Platform işlemlerinin firmalar arası kaydı (ADR-0028); ekleme-yalnız, firma silinse de saklanır. TargetTenantId firma verisi değildir.",
         ["platform.ModuleEntitlements"] ="TenantId: modül hakkını platform yöneticisi yönetir; firma yazamaz.",
+        ["platform.Plans"] = "Satış planı tanımı (ADR-0028 Dilim 4): TenantId yok, platform geneli; silinmez, kapatılır.",
+        ["platform.PlanModules"] = "Planın modül seti (ADR-0028): TenantId yok.",
+        ["platform.PlanLimits"] = "Planın limitleri (ADR-0028): TenantId yok.",
+        ["platform.TenantSubscriptions"] = "TenantId: firmanın plan aboneliği; platform yöneticisi yönetir, firma yazamaz. Geçmiş korunur (EndedAt).",
+        ["platform.LimitOverrides"] = "TenantId: limit istisnası; platform yöneticisi yönetir, gerekçe ve bitiş zorunlu. Geri alınır (RevokedAt), silinmez.",
+
         ["platform.EmailMessages"] = "TenantId (boş olabilir): e-posta kuyruğu merkezidir; giriş anındaki e-postaları da taşır.",
         ["platform.OutboxMessages"] = "TenantId: olay kuyruğu; dağıtım tenant bağlamını açıkça kurar (ADR-0007).",
         ["platform.EventDeliveries"] = "TenantId: aynı gerekçe; payload içermez (ADR-0007).",

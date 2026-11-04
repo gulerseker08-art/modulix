@@ -1,0 +1,200 @@
+@inject ApiClient Api
+
+@* Firmanın planı, limitleri ve kullanımı (ADR-0028 Dilim 4). Plan atamak ve limit istisnası gerekçe ister; hiçbir şey silinmez,
+   plan değişince önceki plandan gelen modüller kapanır ama veri yerinde kalır. *@
+<section class="detail-section">
+    <div class="section-header"><h2>Plan ve limitler</h2></div>
+    <Notice Text="@notice" Failed="failed" />
+
+    @if (overview is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else
+    {
+        <p>
+            @if (overview.Subscription is { } subscription)
+            {
+                <strong>@subscription.PlanName</strong>
+                <span class="text-muted"> · @CrmLabels.Time(subscription.StartsAt) tarihinden beri@(subscription.ValidUntil is { } until ? $" · {CrmLabels.Time(until)} tarihine kadar" : " · süresiz")</span>
+            }
+            else
+            {
+                <span class="text-muted">Bu firmaya plan atanmamış; modüller elle yönetiliyor ve limit yok.</span>
+            }
+        </p>
+
+        @foreach (var limit in overview.Limits)
+        {
+            <div class="mb-3">
+                <div>
+                    <strong>@limit.Name</strong>
+                    <span class="text-muted">
+                        @limit.Usage / @(limit.Limit?.ToString() ?? "sınırsız")
+                        @switch (limit.Source)
+                        {
+                            case LimitSourceDto.Override:
+                                <text> · istisna, @CrmLabels.Time(limit.OverrideUntil!.Value) tarihine kadar</text>
+                                break;
+                            case LimitSourceDto.Plan:
+                                <text> · plandan</text>
+                                break;
+                        }
+                    </span>
+                </div>
+                @if (limit.Limit is { } max)
+                {
+                    <progress class="w-100" max="@Math.Max(max, 1)" value="@Math.Min(limit.Usage, Math.Max(max, 1))"
+                              aria-label="@($"{limit.Name} kullanımı")"></progress>
+                    @if (limit.Usage >= max)
+                    {
+                        <small class="text-muted d-block">Sınıra ulaşıldı: yeni davet ve yeniden etkinleştirme durur; mevcut kullanıcılar etkilenmez.</small>
+                    }
+                }
+                @if (limit.Source == LimitSourceDto.Override)
+                {
+                    <button type="button" class="btn btn-outline-secondary btn-sm mt-1" disabled="@busy" @onclick="() => RevokeAsync(limit.Key)">İstisnayı geri al</button>
+                }
+            </div>
+        }
+
+        <form class="inline-form" novalidate @onsubmit="AssignAsync" @onsubmit:preventDefault>
+            <h3>Plan ata</h3>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="assignPlan">Plan</label>
+                    <select id="assignPlan" class="form-select" @bind="planKey">
+                        <option value="">Seçin</option>
+                        @foreach (var plan in plans.Where(p => p.IsActive))
+                        {
+                            <option value="@plan.Key">@plan.Name</option>
+                        }
+                    </select>
+                    <FieldError Field="planKey" Errors="assignErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="assignUntil">Bitiş (boş: süresiz)</label>
+                    <input id="assignUntil" class="form-control" type="date" @bind="planUntil" />
+                    <FieldError Field="validUntil" Errors="assignErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="assignReason">Gerekçe *</label>
+                    <input id="assignReason" class="form-control" maxlength="500" @bind="planReason" @bind:event="oninput" />
+                    <FieldError Field="reason" Errors="assignErrors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(planKey) || string.IsNullOrWhiteSpace(planReason))">Planı ata</button>
+            </div>
+        </form>
+
+        <form class="inline-form" novalidate @onsubmit="OverrideAsync" @onsubmit:preventDefault>
+            <h3>Koltuk istisnası</h3>
+            <p class="text-muted">Planın koltuk limitini geçici olarak değiştirir; gerekçe ve bitiş zorunludur.</p>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="ovValue">Koltuk sayısı</label>
+                    <input id="ovValue" class="form-control" type="number" min="0" @bind="overrideValue" />
+                    <FieldError Field="value" Errors="overrideErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="ovUntil">Bitiş *</label>
+                    <input id="ovUntil" class="form-control" type="date" @bind="overrideUntil" />
+                    <FieldError Field="validUntil" Errors="overrideErrors" />
+                </div>
+                <div>
+                    <label class="form-label" for="ovReason">Gerekçe *</label>
+                    <input id="ovReason" class="form-control" maxlength="500" @bind="overrideReason" @bind:event="oninput" />
+                    <FieldError Field="reason" Errors="overrideErrors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-outline-primary" disabled="@(busy || overrideValue is null || overrideUntil is null || string.IsNullOrWhiteSpace(overrideReason))">İstisna ekle</button>
+            </div>
+        </form>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid TenantId { get; set; }
+
+    /// <summary>Plan atanınca (modül listesi değişmiş olabilir) çağırana haber verir.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private TenantPlanResponse? overview;
+    private IReadOnlyList<PlanDto> plans = [];
+    private string planKey = string.Empty;
+    private DateOnly? planUntil;
+    private string planReason = string.Empty;
+    private int? overrideValue;
+    private DateOnly? overrideUntil;
+    private string overrideReason = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? assignErrors;
+    private IReadOnlyDictionary<string, string[]>? overrideErrors;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        plans = (await Api.GetAsync<PlansResponse>("/api/platform/plans")).Value?.Plans ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<TenantPlanResponse>($"/api/platform/tenants/{TenantId}/plan");
+        overview = result.Value;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.Error, true);
+        }
+    }
+
+    // Bitiş günü dahildir: seçilen günün sonu (UTC).
+    private static DateTimeOffset? EndOf(DateOnly? day) =>
+        day is { } d ? new DateTimeOffset(d.ToDateTime(new TimeOnly(23, 59, 59)), TimeSpan.Zero) : null;
+
+    private async Task AssignAsync()
+    {
+        busy = true;
+        var result = await Api.PutAsync<bool>($"/api/platform/tenants/{TenantId}/plan", new AssignPlanRequest(planKey, planReason, EndOf(planUntil)));
+        busy = false;
+        assignErrors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+            return;
+        }
+
+        (notice, failed, planKey, planReason, planUntil) = ("Plan atandı. Önceki plandan gelen modüller kapatıldı, veri silinmedi.", false, string.Empty, string.Empty, null);
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private async Task OverrideAsync()
+    {
+        busy = true;
+        var result = await Api.PutAsync<bool>(
+            $"/api/platform/tenants/{TenantId}/limits/seats", new SetLimitOverrideRequest(overrideValue!.Value, EndOf(overrideUntil)!.Value, overrideReason));
+        busy = false;
+        overrideErrors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+            return;
+        }
+
+        (notice, failed, overrideValue, overrideUntil, overrideReason) = ("Koltuk istisnası eklendi.", false, null, null, string.Empty);
+        await LoadAsync();
+    }
+
+    private async Task RevokeAsync(string key)
+    {
+        busy = true;
+        var result = await Api.PostAsync<bool>($"/api/platform/tenants/{TenantId}/limits/{key}/revoke", new RevokeLimitOverrideRequest("Platform yöneticisi geri aldı"));
+        busy = false;
+        (notice, failed) = result.IsSuccess ? ("İstisna geri alındı.", false) : (result.Error, true);
+        await LoadAsync();
+    }
+}
