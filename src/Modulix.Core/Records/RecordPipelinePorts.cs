@@ -226,6 +226,9 @@ public interface IUnitOfWorkTransaction : IAsyncDisposable
 public interface IRecordStoreRegistry
 {
     IRecordStore? Find(string entityKey);
+
+    /// <summary>Kayıtlı bütün depolar (ADR-0030: kapsam uygulanan kayıt türlerini listelemek için).</summary>
+    IReadOnlyCollection<IRecordStore> Stores { get; }
 }
 
 public sealed class RecordStoreRegistry(IEnumerable<IRecordStore> stores) : IRecordStoreRegistry
@@ -234,6 +237,8 @@ public sealed class RecordStoreRegistry(IEnumerable<IRecordStore> stores) : IRec
         stores.ToDictionary(s => s.EntityKey, StringComparer.OrdinalIgnoreCase);
 
     public IRecordStore? Find(string entityKey) => _stores.GetValueOrDefault(entityKey);
+
+    public IReadOnlyCollection<IRecordStore> Stores => _stores.Values;
 }
 
 /// <summary>Boru hattı, çalıştırdığı komutun nedenini kayıt depolarına bu sınıf üzerinden bildirir (istek ömürlü).</summary>

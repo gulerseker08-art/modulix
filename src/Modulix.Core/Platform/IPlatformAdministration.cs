@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Customization;
 using Modulix.Core.Modules;
 
@@ -91,6 +92,21 @@ public sealed record TenantCreationResult(PlatformTenantDetail Tenant, bool Exis
 /// <summary>Bir modülün kaç firmada açık olduğu (yalnızca açık firmalar sayılır).</summary>
 public sealed record ModuleUsage(string ModuleKey, int EnabledTenantCount);
 
+/// <summary>Bir kayıt türündeki tavan (ADR-0030): firmanın rolleri bu türde <see cref="MaxScope"/>'tan geniş kapsam alamaz.</summary>
+public sealed record PlatformScopeLimit(string EntityKey, RecordScope MaxScope, bool AppliesToAdministrators);
+
+/// <summary>Tavan konabilecek (kapsamı kayıt türüne göre ayarlanabilen) bir kayıt türü; firmada açık modüllerin türleri.</summary>
+public sealed record PlatformScopeType(string EntityKey, string ModuleKey, string Label);
+
+/// <summary>Firmanın tavanları ve tavan konabilecek türler.</summary>
+public sealed record PlatformScopeLimits(IReadOnlyList<PlatformScopeLimit> Limits, IReadOnlyList<PlatformScopeType> Types);
+
+/// <summary>
+/// Tavan değişikliğinin sonucu. <see cref="AffectedRoleCount"/>: yeni tavanların kapsamı aştığı, yani okuma tarafında kısılacak
+/// (ve rol ekranında düzeltilmesi gereken) yönetici olmayan rol sayısı.
+/// </summary>
+public sealed record PlatformScopeLimitsChange(IReadOnlyList<PlatformScopeLimit> Limits, int AffectedRoleCount);
+
 /// <summary>
 /// Platform yönetimi (Y4): firmaları açar, kapatır ve ilk yöneticiyi davet eder. Çağıran platform yöneticisi olmalıdır
 /// (API her istekte <see cref="IsPlatformAdministratorAsync"/> ile denetler).
@@ -161,6 +177,22 @@ public interface IPlatformAdministration
     Task SetModuleAsync(
         Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken,
         EntitlementTerms? terms = null, string? reason = null);
+
+    /// <summary>
+    /// Firmanın kayıt görünürlük tavanları (ADR-0030) ve tavan konabilecek türler (firmada açık modüllerin, kapsamı kayıt
+    /// türüne göre ayarlanabilen türleri). Firma yoksa <see cref="UserAdministrationException"/> (NotFound).
+    /// </summary>
+    Task<PlatformScopeLimits> GetScopeLimitsAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Firmanın tavan kümesini <paramref name="limits"/> ile değiştirir (listede olmayan türün tavanı kalkar). Tür, firmada açık
+    /// bir modülün kapsamı ayarlanabilen türü olmalı ve tekrarsız olmalıdır, kapsam tanımlı olmalıdır; aksi halde
+    /// <see cref="ArgumentException"/> (ParamName <c>limits</c>). Tavan firmanın bir sonraki isteğinde geçerlidir; rol kayıtları
+    /// değişmez, okuma tarafı kapsamı tavana indirir. Değişiklik firmanın denetim kaydına (<c>core.tenant</c>, "Kayıt görünürlüğü")
+    /// ve platform denetim kaydına, önce/sonra değeri ve etkilenen rol sayısıyla yazılır. Küme aynıysa bir şey yapılmaz.
+    /// </summary>
+    Task<PlatformScopeLimitsChange> SetScopeLimitsAsync(
+        Guid tenantId, IReadOnlyList<PlatformScopeLimit> limits, string? reason, Guid actingUserId, CancellationToken cancellationToken);
 
     /// <summary>Genel bakış: durumlara göre firma sayıları ve süresi dolan/yaklaşan haklar. Yalnızca platform tablolarından okunur.</summary>
     Task<PlatformOverview> GetOverviewAsync(CancellationToken cancellationToken);
