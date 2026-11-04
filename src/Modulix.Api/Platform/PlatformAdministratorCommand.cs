@@ -36,6 +36,7 @@ public static class PlatformAdministratorCommand
             }
 
             user.IsPlatformAdministrator = false;
+            user.PlatformRoles = Modulix.Core.Platform.PlatformRole.None;
             ThrowIfFailed(await users.UpdateAsync(user));
             logger.LogWarning("Platform yöneticiliği kaldırıldı: {UserId} ({Email})", user.Id, user.Email);
             return $"{user.Email} artık platform yöneticisi değil (bir sonraki isteğinde geçerli olur).";
@@ -56,12 +57,13 @@ public static class PlatformAdministratorCommand
 
             setPasswordLink = AccountTokens.PasswordResetLink(publicUrl, user.Id, await users.GeneratePasswordResetTokenAsync(user));
         }
-        else if (user.IsPlatformAdministrator)
+        else if (user.IsPlatformAdministrator && user.PlatformRoles == Modulix.Core.Platform.PlatformRole.None)
         {
             return $"{user.Email} zaten platform yöneticisi.";
         }
 
         user.IsPlatformAdministrator = true;
+        user.PlatformRoles = Modulix.Core.Platform.PlatformRole.None; // rol kaydı boş = Owner (ADR-0028 Dilim 5)
         ThrowIfFailed(await users.UpdateAsync(user));
         logger.LogWarning("Platform yöneticisi atandı: {UserId} ({Email})", user.Id, user.Email);
 

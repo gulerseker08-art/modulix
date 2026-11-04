@@ -36,3 +36,30 @@ public sealed record AssignPlanRequest(string PlanKey, string Reason, DateTimeOf
 public sealed record SetLimitOverrideRequest(int Value, DateTimeOffset ValidUntil, string Reason);
 
 public sealed record RevokeLimitOverrideRequest(string Reason);
+
+// Platform ekibi (ADR-0028 Dilim 5): /api/platform/team. Roller: Support, Operations, Finance (atanabilir) ve Owner (yalnızca komut satırıyla).
+
+public static class PlatformRoleNames
+{
+    public const string Support = "Support";
+    public const string Operations = "Operations";
+    public const string Finance = "Finance";
+    public const string Owner = "Owner";
+
+    public static string TextOf(string role) => role switch
+    {
+        Support => "Destek",
+        Operations => "Operasyon",
+        Finance => "Finans",
+        Owner => "Platform sahibi",
+        _ => role,
+    };
+}
+
+public sealed record PlatformTeamMemberDto(Guid UserId, string DisplayName, string Email, IReadOnlyList<string> Roles, bool TwoFactorEnabled);
+
+/// <summary>Rolleri değiştirir; boş liste üyenin platform erişimini kapatır (hesap ve verisi kalır).</summary>
+public sealed record SetPlatformRolesRequest(IReadOnlyList<string>? Roles);
+
+/// <summary>Kayıtlı bir hesabı e-postasıyla ekibe ekler (hesap burada açılmaz).</summary>
+public sealed record AddPlatformMemberRequest(string Email, IReadOnlyList<string>? Roles);

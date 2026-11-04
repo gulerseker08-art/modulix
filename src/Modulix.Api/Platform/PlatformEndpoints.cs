@@ -267,25 +267,6 @@ public static class PlatformEndpoints
         Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? throw new InvalidOperationException("Oturumda kullanıcı yok."));
 }
 
-/// <summary>Platform yöneticisi değilse 403. Bayrak her istekte okunur; kaldırılınca bir sonraki istekte geçerli olur.</summary>
-public sealed class RequirePlatformAdministratorFilter(IPlatformAdministration platform) : IEndpointFilter
-{
-    public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
-    {
-        var http = context.HttpContext;
-        if (Guid.TryParse(http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId)
-            && await platform.IsPlatformAdministratorAsync(userId, http.RequestAborted))
-        {
-            return await next(context);
-        }
-
-        return Results.Problem(
-            statusCode: StatusCodes.Status403Forbidden,
-            title: "Bu alan platform yöneticilerine açıktır.",
-            detail: "Bu alan platform yöneticilerine açıktır.");
-    }
-}
-
 /// <summary>Yeni kapsamda tenant bağlamını kurar (<see cref="HttpTenantContextAccessor"/>).</summary>
 public sealed class TenantScopeFactory(IServiceScopeFactory scopes) : ITenantScopeFactory
 {

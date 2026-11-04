@@ -1,0 +1,182 @@
+@page "/platform/ekip"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Platform ekibi · Platform · Modulix</PageTitle>
+
+@* Platform ekibi ve rolleri (ADR-0028 Dilim 5). Yalnızca platform sahibi (Owner) yönetir; sunucu her istekte denetler.
+   Hesap silinmez: rolleri boşaltmak yalnızca platform erişimini kapatır. Platform sahibi komut satırıyla atanır. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>Platform ekibi</h1>
+    <p class="text-muted">
+        <strong>Destek:</strong> izleme, olay yeniden deneme/atlama, iki adımlı doğrulama sıfırlama.
+        <strong>Operasyon:</strong> firma açma, kapatma, askı, modül hakkı, yönetici daveti.
+        <strong>Finans:</strong> plan, abonelik, limit istisnası, modül hakkı koşulları.
+        Roller toplanabilir. Platform hesapları için iki adımlı doğrulama zorunludur. Rolleri kaldırmak hesabı ya da verisini silmez, yalnızca platform erişimini kapatır.
+    </p>
+
+    @if (!Session.IsPlatformOwner)
+    {
+        <div class="alert alert-warning">Platform ekibini yalnızca platform sahibi yönetir.</div>
+    }
+    else
+    {
+        <Notice Text="@notice" Failed="failed" />
+
+        <form class="record-form settings-group" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault>
+            <h2>Ekibe ekle</h2>
+            <p class="text-muted">Kişinin Modulix hesabı olmalı (bir firmaya davet edilmiş); hesap burada açılmaz.</p>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="teamEmail">E-posta *</label>
+                    <input id="teamEmail" class="form-control" type="email" autocomplete="off" @bind="email" @bind:event="oninput" />
+                    <FieldError Field="email" Errors="errors" />
+                </div>
+            </div>
+            <fieldset class="mt-3">
+                <legend class="form-label">Roller</legend>
+                @foreach (var role in Assignable)
+                {
+                    <div class="form-check">
+                        <input id="new-@role" class="form-check-input" type="checkbox" checked="@newRoles.Contains(role)" @onchange="e => Toggle(newRoles, role, (bool)e.Value!)" />
+                        <label class="form-check-label" for="new-@role">@PlatformRoleNames.TextOf(role)</label>
+                    </div>
+                }
+                <FieldError Field="roles" Errors="errors" />
+            </fieldset>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(email) || newRoles.Count == 0)">Ekle</button>
+            </div>
+        </form>
+
+        @if (members is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <thead><tr><th>Ad</th><th>E-posta</th><th>Roller</th><th>İki adımlı</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var member in members)
+                    {
+                        <tr>
+                            <td data-label="Ad" class="primary">@member.DisplayName</td>
+                            <td data-label="E-posta">@member.Email</td>
+                            <td data-label="Roller">
+                                @if (member.Roles.Contains(PlatformRoleNames.Owner))
+                                {
+                                    <span class="badge user-active">@PlatformRoleNames.TextOf(PlatformRoleNames.Owner)</span>
+                                }
+                                else
+                                {
+                                    @foreach (var role in Assignable)
+                                    {
+                                        <label class="me-2">
+                                            <input type="checkbox" checked="@member.Roles.Contains(role)" disabled="@busy"
+                                                   @onchange="e => ChangeAsync(member, role, (bool)e.Value!)" />
+                                            @PlatformRoleNames.TextOf(role)
+                                        </label>
+                                    }
+                                }
+                            </td>
+                            <td data-label="İki adımlı">
+                                <span class="badge @(member.TwoFactorEnabled ? "user-active" : "user-locked")">@(member.TwoFactorEnabled ? "Açık" : "Kapalı")</span>
+                            </td>
+                            <td class="actions">
+                                @if (!member.Roles.Contains(PlatformRoleNames.Owner) && member.UserId != Session.User?.UserId)
+                                {
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveAsync(member)">Erişimi kapat</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+</PlatformGate>
+
+@code {
+    private static readonly string[] Assignable = [PlatformRoleNames.Support, PlatformRoleNames.Operations, PlatformRoleNames.Finance];
+
+    private IReadOnlyList<PlatformTeamMemberDto>? members;
+    private readonly HashSet<string> newRoles = [];
+    private string email = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.IsPlatformOwner)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<PlatformTeamMemberDto>>("/api/platform/team");
+        members = result.Value;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.Error, true);
+        }
+    }
+
+    private static void Toggle(HashSet<string> set, string role, bool on)
+    {
+        if (on)
+        {
+            set.Add(role);
+        }
+        else
+        {
+            set.Remove(role);
+        }
+    }
+
+    private async Task AddAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<PlatformTeamMemberDto>("/api/platform/team", new AddPlatformMemberRequest(email.Trim(), [.. newRoles]));
+        busy = false;
+        errors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+            return;
+        }
+
+        (notice, failed, email) = ($"{result.Value!.DisplayName} ekibe eklendi.", false, string.Empty);
+        newRoles.Clear();
+        await LoadAsync();
+    }
+
+    private async Task ChangeAsync(PlatformTeamMemberDto member, string role, bool on)
+    {
+        var roles = member.Roles.Where(r => r != role).ToList();
+        if (on)
+        {
+            roles.Add(role);
+        }
+
+        await SaveAsync(member, roles, $"{member.DisplayName} için roller güncellendi.");
+    }
+
+    private Task RemoveAsync(PlatformTeamMemberDto member) =>
+        SaveAsync(member, [], $"{member.DisplayName} için platform erişimi kapatıldı; hesabı ve verisi silinmedi.");
+
+    private async Task SaveAsync(PlatformTeamMemberDto member, IReadOnlyList<string> roles, string success)
+    {
+        busy = true;
+        var result = await Api.PutAsync<PlatformTeamMemberDto>($"/api/platform/team/{member.UserId}", new SetPlatformRolesRequest(roles));
+        busy = false;
+        (notice, failed) = result.IsSuccess ? (success, false) : (result.Error, true);
+        await LoadAsync();
+    }
+}

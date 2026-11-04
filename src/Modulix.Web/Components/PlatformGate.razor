@@ -16,6 +16,14 @@ else if (Session.IsSignedIn)
     }
     else
     {
+        @if (Session.PlatformNeedsTwoFactor)
+        {
+            <div class="alert alert-warning" role="alert">
+                Platform işlemleri için iki adımlı doğrulama zorunludur; açana kadar sunucu bu alandaki istekleri reddeder.
+                <a href="hesabim">Hesabım</a> sayfasından açın.
+            </div>
+        }
+
         @ChildContent
     }
 }

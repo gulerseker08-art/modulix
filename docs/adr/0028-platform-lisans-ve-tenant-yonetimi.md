@@ -161,3 +161,13 @@ Bilinen sınırlar: POST ile okuma yapan ve adı `/preview` ile bitmeyen uçlar 
 - Plan değişikliği mevcut abonelerin modüllerine yansımaz (yeniden atama gerekir): toplu etkiyi ve fiyatlama sonuçlarını önlemek için bilinçli.
 
 Bilinen sınırlar: plan atama birden fazla ayrı işlemdir (modüller, sonra abonelik); ortada hata olursa modüller değişmiş abonelik yazılmamış kalabilir, yeniden denemek aynı sonucu verir. İstisna yalnızca koltuk için arayüzde var. Plana toplu atama, fiyat ve fatura yok (ürün kararı 5). Arayüz tarayıcıda gezilmedi.
+
+**Dilim 5 (uygulandı, `gseker/platform-roller-dilim5`; Dilim 4 üzerine yığılı):**
+
+- **Roller:** `Support`, `Operations`, `Finance`, `Owner` (bayrak birleşimi). Kullanıcıya `PlatformRoles` sütunu eklendi (migration yalnızca sütun ekler, varsayılan 0). **Geriye uyum:** bayrak açık + rol boş = Owner; mevcut hesaplar ve CLI yetkisini korur.
+- **Karar tablosu:** `PlatformAccessRules` (okuma her role açık, yazma uçları tek tabloda). Tabloda olmayan yazma ucu Owner'a özeldir (varsayılan ret); bir mimari-benzeri test bütün `/api/platform` yazma uçlarının tabloda olmasını zorlar (bu test yazılırken `POST /api/platform/team/` sondaki "/" yüzünden eşleşmeyen gerçek bir açığı yakaladı; anahtar normalleştirildi).
+- **Rol varsayımları (ürün kararı 6 henüz cevaplanmadığı için):** ADR'deki dört rol aynen; Destek ayrıca iki adımlı doğrulama sıfırlar (Operasyon da yapar); modül hakkı Operasyon ve Finans'ta ortak. Ekip yönetimi yalnızca Owner; Owner ataması CLI'da kalır ve arayüzden değiştirilemez.
+- **İki adımlı doğrulama zorunluluğu:** `Platform:RequireTwoFactor` (varsayılan açık). Doğrulaması kapalı platform hesabının bütün platform istekleri 403 + `two-factor-required`; durum her istekte okunur.
+- **Veri silinmez:** ekipten çıkarmak yalnızca platform erişimini kapatır (bayrak ve roller), hesap ve firma üyelikleri kalır.
+
+Bilinen sınırlar: **dağıtımda mevcut platform yöneticileri iki adımlı doğrulamayı açana kadar platform alanına giremez** (ilk kurulumda `Platform:RequireTwoFactor=false` ile geçiş yapılabilir). Arayüz yalnızca derlendi; rol bazlı gizleme yalnızca Owner'a özel "Platform ekibi" kutusu ve ekip sayfasındadır, diğer ekranlar yetkisiz düğmeleri gizlemez (sunucu 403 döner). `platform-admin` komutu rol parametresi almaz. Owner'ı arayüzden düşürme ya da son Owner koruması yok (Owner'a arayüzden dokunulamadığı için gerekmedi). Platform hesabının oturum kapatma/yeniden doğrulama (step-up) akışı yok.

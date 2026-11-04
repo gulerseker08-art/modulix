@@ -116,6 +116,9 @@ public interface IPlatformAdministration
     /// <summary>Bayrak veritabanından okunur; kaldırılınca bir sonraki istekte geçerli olur.</summary>
     Task<bool> IsPlatformAdministratorAsync(Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>Platform hesabının etkin rolleri ve iki adımlı doğrulama durumu; platform hesabı değilse <c>null</c>. Her istekte okunur.</summary>
+    Task<PlatformAccess?> GetAccessAsync(Guid userId, CancellationToken cancellationToken);
+
     Task<PlatformTenantPage> ListTenantsAsync(PlatformTenantQuery query, CancellationToken cancellationToken);
 
     /// <summary>Firma yoksa <c>null</c>.</summary>

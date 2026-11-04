@@ -41,6 +41,9 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             // E-posta işleyicisi testlerde çalışmaz; e-posta testleri işleyiciyi kendisi çağırır (EmailTests).
             .UseSetting("Email:WorkerEnabled", "false")
 
+            // Platform hesapları için iki adımlı doğrulama zorunluluğu testlerde kapalıdır; zorunluluğu sınayan testler açar (PlatformRolesTests).
+            .UseSetting("Platform:RequireTwoFactor", "false")
+
             // Olay işleyicisi de çalışmaz; olay testleri işleyiciyi kendisi çağırır (EventTests).
             .UseSetting("Events:WorkerEnabled", "false")
             .UseSetting("QuoteExpiry:WorkerEnabled", "false")
