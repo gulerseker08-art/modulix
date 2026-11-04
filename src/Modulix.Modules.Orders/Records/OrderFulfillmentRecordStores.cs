@@ -22,6 +22,8 @@ internal sealed class OrderDeliveryRecordStore(OrdersStoreContext context) : Ord
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => OrdersModule.Entities.Order;
+
     protected override bool DefaultsOwnerToCurrentUser => false;
 
     protected override IReadOnlyList<RecordField<OrderDelivery>> Fields { get; } =
@@ -151,6 +153,8 @@ internal sealed class OrderServiceStartRecordStore(OrdersStoreContext context) :
     protected override string WritePermission => OrdersModule.Permissions.FulfillmentRecord;
 
     protected override bool UsesScope => true;
+
+    protected override string ScopeEntityKey => OrdersModule.Entities.Order;
 
     protected override bool DefaultsOwnerToCurrentUser => false;
 

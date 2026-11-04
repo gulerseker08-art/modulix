@@ -23,6 +23,8 @@ internal sealed class OrderLineRecordStore(OrdersStoreContext context) : OrdersR
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => OrdersModule.Entities.Order;
+
     protected override IReadOnlyList<RecordField<SalesOrderLine>> Fields { get; } =
     [
         Field.Reference<SalesOrderLine, SalesOrder>("orderId", "Sipariş bulunamadı.", l => l.OrderId, (l, v) => l.OrderId = v!.Value, required: true, createOnly: true),

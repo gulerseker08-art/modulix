@@ -422,6 +422,8 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => CrmModule.Entities.Quote;
+
     protected override bool DefaultsOwnerToCurrentUser => false;
 
     protected override bool GateOpen => gate.IsOpen;

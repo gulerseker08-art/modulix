@@ -67,6 +67,8 @@ internal sealed class LocationRecordStore(CrmStoreContext context) : CrmRecordSt
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => CrmModule.Entities.Company;
+
     protected override IReadOnlyList<RecordField<Location>> Fields { get; } =
     [
         Field.CreateOnlyId<Location>("companyId", l => l.CompanyId),
@@ -154,6 +156,8 @@ internal sealed class AddressRecordStore(CrmStoreContext context) : CrmRecordSto
     protected override string WritePermission => CrmModule.Permissions.CompaniesWrite;
 
     protected override bool UsesScope => true;
+
+    protected override string ScopeEntityKey => CrmModule.Entities.Company;
 
     protected override IReadOnlyList<RecordField<Address>> Fields { get; } =
     [

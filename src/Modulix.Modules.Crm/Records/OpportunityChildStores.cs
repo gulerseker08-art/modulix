@@ -49,6 +49,8 @@ internal sealed class OpportunityContactRecordStore(CrmStoreContext context) : C
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => CrmModule.Entities.Opportunity;
+
     protected override IReadOnlyList<RecordField<OpportunityContact>> Fields { get; } =
     [
         Field.SharedId<OpportunityContact>("opportunityId", l => l.OpportunityId),
@@ -154,6 +156,8 @@ internal sealed class OpportunityCompetitorRecordStore(CrmStoreContext context) 
     protected override string WritePermission => CrmModule.Permissions.OpportunitiesWrite;
 
     protected override bool UsesScope => true;
+
+    protected override string ScopeEntityKey => CrmModule.Entities.Opportunity;
 
     protected override IReadOnlyList<RecordField<OpportunityCompetitor>> Fields { get; } =
     [

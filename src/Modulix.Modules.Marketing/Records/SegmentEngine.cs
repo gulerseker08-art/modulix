@@ -125,7 +125,20 @@ internal sealed class SegmentEngine(
         }
 
         var day = await clock.GetAsync(cancellationToken);
-        var context = new SegmentEvaluationContext(await access.GetOwnersAsync(ScopeEntityKey(request.Target), cancellationToken), day.Today, day.StartOfDay);
+
+        // Her koşul kendi kayıt türünün kapsamıyla değerlendirilir (ADR-0030): kaynakların bildirdiği her tür için kapsam önceden çözülür.
+        var scopes = new Dictionary<string, IReadOnlySet<Guid>?>(StringComparer.Ordinal);
+        foreach (var entityKey in sources.SelectMany(s => s.ScopeEntityKeys).Distinct(StringComparer.Ordinal))
+        {
+            scopes[entityKey] = await access.GetOwnersAsync(entityKey, cancellationToken);
+        }
+
+        var context = new SegmentEvaluationContext(
+            entityKey => scopes.TryGetValue(entityKey, out var owners)
+                ? owners
+                : throw new InvalidOperationException($"'{entityKey}' kayıt türü kaynakların ScopeEntityKeys listesinde bildirilmemiş."),
+            day.Today,
+            day.StartOfDay);
         return Build(request, byKey, context);
     }
 
@@ -157,11 +170,6 @@ internal sealed class SegmentEngine(
             ? parts.Aggregate((a, b) => a.Intersect(b))
             : parts.Aggregate((a, b) => a.Union(b));
     }
-
-    // Segmentin veri kapsamı hedef türün kapsamıdır (ADR-0030). Koşullar başka türlere (ör. kazanılan fırsat) bakabilse de
-    // tek sahip kümesiyle çalışılır; hedef türün kapsamı alınır (ADR-0030 açık karar 3).
-    private static string ScopeEntityKey(SegmentTarget target) =>
-        target switch { SegmentTarget.Person => "crm.contact", SegmentTarget.Lead => "crm.lead", _ => "crm.company" };
 
     /// <summary>Satır (ad) gösterimi alıcı görüntüleme yetkisine bağlıdır: ortak kaydı (ya da lead'i) okuyamayan satır görmez.</summary>
     private Task<bool> CanSeeRowsAsync(SegmentTarget target, CancellationToken cancellationToken) => access.CanAsync(

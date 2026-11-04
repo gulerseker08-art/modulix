@@ -24,6 +24,10 @@ internal sealed class CrmSegmentFieldSource(IModuleData data) : ISegmentFieldSou
 
     public string ModuleKey => CrmModule.ModuleKey;
 
+    // Koşullar bu türlerin kapsamlarıyla ayrı ayrı değerlendirilir (ADR-0030): hedef firma, kişi, lead; "açık/kazanılan fırsat" koşulu fırsat.
+    public IReadOnlyList<string> ScopeEntityKeys { get; } =
+        [CrmModule.Entities.Company, CrmModule.Entities.Contact, CrmModule.Entities.Lead, CrmModule.Entities.Opportunity];
+
     public IReadOnlyList<SegmentFieldDefinition> Fields { get; } =
     [
         new("crm.company.name", "Firma adı", "Firma", SegmentTarget.Company, SegmentFieldType.Text, CrmModule.Entities.Company),
@@ -79,16 +83,18 @@ internal sealed class CrmSegmentFieldSource(IModuleData data) : ISegmentFieldSou
             throw new FormatException($"CRM kaynağı '{field.Key}' alanını tanımaz.");
         }
 
-        var owners = context.Owners?.Select(o => (Guid?)o).ToList();
+        List<Guid?>? OwnersOf(string entityKey) => context.OwnersFor(entityKey)?.Select(o => (Guid?)o).ToList();
+
         return field.Target switch
         {
-            SegmentTarget.Company => MatchCompany(field.Key, leaf, context, owners),
-            SegmentTarget.Person => MatchPerson(field.Key, leaf, context, owners),
-            _ => MatchLead(field.Key, leaf, context, owners),
+            SegmentTarget.Company => MatchCompany(field.Key, leaf, context, OwnersOf(CrmModule.Entities.Company), OwnersOf(CrmModule.Entities.Opportunity)),
+            SegmentTarget.Person => MatchPerson(field.Key, leaf, context, OwnersOf(CrmModule.Entities.Contact)),
+            _ => MatchLead(field.Key, leaf, context, OwnersOf(CrmModule.Entities.Lead)),
         };
     }
 
-    private IQueryable<Guid> MatchCompany(string key, SegmentLeaf leaf, SegmentEvaluationContext context, List<Guid?>? owners)
+    private IQueryable<Guid> MatchCompany(
+        string key, SegmentLeaf leaf, SegmentEvaluationContext context, List<Guid?>? owners, List<Guid?>? opportunityOwners)
     {
         var companies = data.Set<Company>().AsNoTracking2();
         if (owners is not null)
@@ -107,9 +113,9 @@ internal sealed class CrmSegmentFieldSource(IModuleData data) : ISegmentFieldSou
             "crm.company.owner" => Predicates.Id(companies, c => c.OwnerId, leaf),
             "crm.company.createdAt" => Predicates.Date(companies, c => (DateTimeOffset?)c.CreatedAt, leaf, context),
             "crm.company.contacts" => Exists(companies, leaf, c => data.Set<Contact>().Any(k => k.CompanyId == c.Id)),
-            "crm.company.openOpportunity" => Exists(companies, leaf, c => Opportunities(owners).Any(o =>
+            "crm.company.openOpportunity" => Exists(companies, leaf, c => Opportunities(opportunityOwners).Any(o =>
                 o.CompanyId == c.Id && (o.Status == OpportunityStatus.Open || o.Status == OpportunityStatus.OnHold))),
-            "crm.company.wonOpportunity" => WonOpportunity(companies, leaf, context, owners),
+            "crm.company.wonOpportunity" => WonOpportunity(companies, leaf, context, opportunityOwners),
             _ => throw new FormatException($"CRM firma alanı tanınmıyor: {key}."),
         };
         return filtered.Select(c => c.PartyId);
