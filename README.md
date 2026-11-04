@@ -336,6 +336,14 @@ Profil, bir sektör için hazır başlangıç paketidir: modüller, özel alanla
 - Firma yöneticisi Yönetim → Sektör profili'nden uygular (`/yonetim/sektor-profili`, `core.customization.manage`; `GET /api/customization/profiles`, `GET /{anahtar}/preview`, `POST /{anahtar}/apply`). Modül açamaz: kapalı modülün alanları ve değerleri eklenmez, önizlemede ayrıca belirtilir.
 - Menü sırası profilden gelmez: şimdilik yalnızca CRM'in ekranları var.
 
+#### Sektör/faaliyet kataloğu ve tenant seçimi (ADR-0029 taslak, Dilim A)
+
+Tek profil anahtarının yanında, sektör → faaliyet grubu → alt faaliyet ağacı ve yetenek kataloğu vardır ([ADR-0029](docs/adr/0029-sektor-profili-genisletme-ve-lojistik-kurulum.md), taslak). Henüz ekranı ve hazır içeriği yoktur: yalnızca API ve servisler; katalog boş başlar ve hiçbir modülü kendiliğinden açmaz.
+
+- Katalog `platform` şemasında global ve RLS dışıdır; yalnızca platform yöneticisi yönetir (`GET /api/platform/sectors`, `POST .../nodes`, `PUT .../nodes/{id}`, `PUT .../nodes/{id}/active`, `PUT .../nodes/{id}/capabilities`, `POST .../capabilities`, `PUT .../capabilities/{kod}/dependencies`). Düğüm silinmez, pasife alınır; aktif alt düğümü olan düğüm pasife alınamaz. Düğüm taşıma yoktur. Eşzamanlı düzenleme sürüm numarasıyla 409 döner. Her yazma `PlatformAuditLog`'a yazılır.
+- Firma yöneticisi (`core.customization.manage`) kataloğu okur ve kendi faaliyet seçimini yönetir (`GET /api/sectors/catalog`, `GET`/`PUT /api/sectors/selection`, `POST /api/sectors/selection/preview`). Seçim `core.ActivitySelections` (RLS altında); üst başlığı seçmek alt faaliyeti seçmiş saymaz, üst bağlam türetilir. Boş seçim geçerlidir. Pasif ya da bilinmeyen faaliyet reddedilir. Değişiklik firmanın denetim kaydına `core.activity-selection` olarak yazılır.
+- Eksik yetenek uyarıdır, engel değildir. Şimdilik "sağlanan yetenek" katalogdaki etkin yeteneklerdir; modüllerin yetenek beyanı sonraki dilimdedir.
+
 ### Ortak firma ve kişi kaydı (Ç3a)
 
 Firma (taraf) ve kişi çekirdekte tek kayıttır ([ADR-0006](docs/adr/0006-ortak-firma-ve-kisi.md)). Modüller kendi bilgilerini bu kayda bağlı uzantılarda tutar: CRM firması ve CRM kişisi bu kayıtların CRM uzantısıdır. Lojistik ve sonraki modüller yeni firma tablosu açmaz, aynı kaydı kullanır.

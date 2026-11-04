@@ -158,6 +158,9 @@ public sealed class CoreModule : IModule
         /// <summary>Zamanlanmış rapor (ADR-0026, dilim 4); kaydın kimliği zamanlamanın kimliğidir.</summary>
         public const string ReportSchedule = "core.report-schedule";
 
+        /// <summary>Tenant'ın faaliyet seçimi (ADR-0029); kaydın kimliği tenant'ın kimliğidir, seçimin tamamı bir kayıt olarak yazılır.</summary>
+        public const string ActivitySelection = "core.activity-selection";
+
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
         public const string Audit = "core.audit";
@@ -438,6 +441,10 @@ public sealed class CoreModule : IModule
                 ["status"] = new Dictionary<string, string> { ["Active"] = "Açık", ["Closed"] = "Kapalı" },
             },
         },
+        new(AuditedEntityKeys.ActivitySelection, "Faaliyet seçimi", null, new Dictionary<string, string>
+        {
+            ["activities"] = "Seçili faaliyetler",
+        }, "activities"),
         new(AuditedEntityKeys.TenantSetting, "Firma ayarı", null, new Dictionary<string, string>
         {
             ["key"] = "Ayar", ["value"] = "Değer",
