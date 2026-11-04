@@ -24,7 +24,7 @@
                 <a href="platform/sure-takvimi">30 günde @overview.ExpiringIn30Days · 60 günde @overview.ExpiringIn60Days · 90 günde @overview.ExpiringIn90Days</a>
                 @if (overview.Expired > 0)
                 {
-                    <span class="badge user-locked">@overview.Expired hakkın süresi geçti</span>
+                    <span class="badge user-locked">@overview.Expired hakkın süresi geçti (@overview.ReadOnly salt okunur)</span>
                 }
             </p>
         </section>

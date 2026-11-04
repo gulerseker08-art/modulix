@@ -36,15 +36,22 @@ public sealed record PlatformTenantDetail(
     IReadOnlyList<TenantAdministrator> Administrators,
     IReadOnlyList<TenantEntitlement>? Entitlements = null);
 
-/// <summary>Firma durumlarına göre sayılar ve süresi dolan/yaklaşan haklar (genel bakış). Bitiş sayıları birikimlidir (30 ⊂ 60 ⊂ 90).</summary>
+/// <summary>
+/// Firma durumlarına göre sayılar ve süresi dolan/yaklaşan haklar (genel bakış). Yaklaşan sayıları birikimlidir (30 ⊂ 60 ⊂ 90).
+/// <see cref="ExpiredEntitlements"/> bitişi geçmiş tüm haklardır (ek sürede olanlar ve <see cref="ReadOnlyEntitlements"/> dahil).
+/// </summary>
 public sealed record PlatformOverview(
     IReadOnlyDictionary<TenantStatus, int> TenantCounts,
     int ExpiredEntitlements,
+    int ReadOnlyEntitlements,
     int ExpiringIn30Days,
     int ExpiringIn60Days,
     int ExpiringIn90Days);
 
-/// <summary>Bitiş tarihi olan açık bir modül hakkı (süre takvimi). Geçmiş tarih de listelenir; bitiş henüz uygulanmaz.</summary>
+/// <summary>
+/// Bitiş tarihi olan açık bir modül hakkı (süre takvimi). Geçmiş tarih de listelenir. <see cref="Phase"/>: bugünkü evre;
+/// <see cref="GraceEndsAt"/>: ek sürenin bittiği, yani modülün salt okunura geçtiği an.
+/// </summary>
 public sealed record PlatformExpiration(
     Guid TenantId,
     string TenantName,
@@ -53,7 +60,9 @@ public sealed record PlatformExpiration(
     string ModuleKey,
     EntitlementSource Source,
     DateTimeOffset ValidUntil,
-    string? Note);
+    string? Note,
+    EntitlementPhase Phase,
+    DateTimeOffset GraceEndsAt);
 
 /// <summary>Platform denetim kaydı sorgusu (ADR-0028); en yeni üstte. <see cref="TenantId"/> boşsa bütün firmalar.</summary>
 public sealed record PlatformAuditQuery(Guid? TenantId, string? Action, int Page, int PageSize);
@@ -154,7 +163,7 @@ public interface IPlatformAdministration
     /// geçerli olur. Değişiklik firmanın bir sonraki isteğinde geçerlidir ve firmanın denetim kaydına <c>core.tenant</c>
     /// olarak yazılır. Durum zaten istenen gibiyse ve <paramref name="terms"/> verilmediyse bir şey yapılmaz. Bilinmeyen veya
     /// çekirdek modül için <see cref="ArgumentException"/> (ParamName <c>moduleKey</c>). <paramref name="terms"/> (kaynak,
-    /// bitiş, not) yalnızca açarken geçerlidir; bitiş tarihi kaydedilir ama otomatik uygulanmaz (ADR-0028, Dilim 3).
+    /// bitiş, not) yalnızca açarken geçerlidir; bitiş tarihi geçince modül ek sürede çalışır, ek süre de bitince salt okunur olur (<see cref="EntitlementPhase"/>).
     /// <paramref name="reason"/> platform denetim kaydına yazılır; kapatırken ve bitiş tarihini ileri alırken (süre uzatma)
     /// zorunludur (<see cref="ArgumentException"/>, ParamName <c>reason</c>).
     /// </summary>
@@ -167,7 +176,7 @@ public interface IPlatformAdministration
 
     /// <summary>
     /// Süre takvimi: bitiş tarihi olan açık modül hakları, bugünden <paramref name="days"/> gün sonrasına kadar ve geçmiş
-    /// olanlar dahil; yalnızca erişime açık firmalar (Active, Trial). Bitişi en yakın olan üstte.
+    /// olanlar dahil (evreleriyle); yalnızca erişime açık firmalar (Active, Trial). Bitişi en yakın olan üstte.
     /// </summary>
     Task<IReadOnlyList<PlatformExpiration>> ListExpirationsAsync(int days, CancellationToken cancellationToken);
 

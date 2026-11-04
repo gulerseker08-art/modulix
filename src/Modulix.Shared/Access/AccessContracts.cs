@@ -23,10 +23,25 @@ public sealed record MyAccessResponse(
     bool IsAdministrator = false,
     RecordScope Scope = RecordScope.All,
     IReadOnlyList<OperatingCompanyDto>? Companies = null,
-    Guid? ActiveCompanyId = null)
+    Guid? ActiveCompanyId = null,
+    IReadOnlyList<ModuleLicenseDto>? Licenses = null)
 {
     public IReadOnlyList<OperatingCompanyDto> Companies { get; init; } = Companies ?? [];
+
+    /// <summary>Süresi dolmuş, ek sürede ya da yakında dolacak modül hakları (ADR-0028); yöneticiye uyarı için.</summary>
+    public IReadOnlyList<ModuleLicenseDto> Licenses { get; init; } = Licenses ?? [];
 }
+
+/// <summary>Modül hakkının süre evresi: ek sürede yazma açık, salt okunurda kapalıdır.</summary>
+public enum LicensePhase
+{
+    Active = 1,
+    Grace = 2,
+    ReadOnly = 3,
+}
+
+/// <summary>Bir modül hakkının bitişi ve evresi. <see cref="GraceEndsAt"/>: ek sürenin bittiği, yani salt okunura geçilen an.</summary>
+public sealed record ModuleLicenseDto(string ModuleKey, string DisplayName, LicensePhase Phase, DateTimeOffset ValidUntil, DateTimeOffset GraceEndsAt);
 
 /// <summary>
 /// Erişilebilir bir işletici şirket (ADR-0008); müşteri firma (CRM <c>CompanyDto</c>, Taraf) değildir.
