@@ -1,0 +1,378 @@
+@page "/raporlar"
+@using System.Net
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Raporlar · Modulix</PageTitle>
+
+<AuthGate Permission="@ReportAccess.Read">
+    <PageHeader Title="Raporlar" Icon="file-text"
+                Subtitle="Hazır raporlar, kendi raporlarınız ve sizinle paylaşılanlar. Her rapor sizin yetkiniz ve veri kapsamınızla çalışır; paylaşım veri erişimi vermez.">
+        @if (Session.Can(ReportAccess.Manage))
+        {
+            <a class="btn btn-primary" href="raporlar/yeni">Yeni rapor</a>
+        }
+    </PageHeader>
+
+    <TabBar Tabs="Tabs" State="tabs" Label="Rapor bölümleri" Changed="OnTabChangedAsync" />
+
+    <form class="search" role="search" @onsubmit="ApplySearchAsync" @onsubmit:preventDefault>
+        <label class="visually-hidden" for="rc-search">Rapor ara</label>
+        <input id="rc-search" class="form-control" type="search" maxlength="100" placeholder="@(tabs.Active == ReadyTab ? "Hazır raporlarda ara" : "Ad ya da açıklamada ara")" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (actionMessage is not null)
+    {
+        <div class="alert @(actionFailed ? "alert-danger" : "alert-success")" role="@(actionFailed ? "alert" : "status")">@actionMessage</div>
+    }
+
+    @if (tabs.Active == ReadyTab)
+    {
+        <div id="tabpanel-ready" role="tabpanel" aria-labelledby="tab-ready" aria-busy="@(catalogLoading ? "true" : "false")">
+            <AnalyticsStatus Loading="catalogLoading" Error="@catalogError" Forbidden="catalogForbidden" OnRetry="LoadCatalogAsync" />
+            @if (catalog is not null)
+            {
+                var datasets = ReadyDatasets();
+                var links = VisibleLinks();
+                @if (datasets.Count == 0 && links.Count == 0)
+                {
+                    <p class="text-muted" role="status">
+                        @(appliedSearch.Length > 0 ? "Aramanıza uyan hazır rapor yok." : "Etkin modüllerde sizin için hazır rapor yok.")
+                    </p>
+                }
+
+                @foreach (var dataset in datasets)
+                {
+                    var headingId = $"rc-ds-{dataset.Key.Replace('.', '-')}";
+                    <section class="detail-section" aria-labelledby="@headingId">
+                        <div class="section-header"><h2 id="@headingId">@dataset.Name</h2></div>
+                        @if (!dataset.Available)
+                        {
+                            <div class="alert alert-warning" role="status">
+                                <strong>Bu veri kümesi şu an kullanılamıyor.</strong> @(dataset.UnavailableReason ?? "Yetkiniz ya da modül durumu uygun değil.")
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var ready in dataset.ReadyReports.Where(MatchesReady))
+                            {
+                                <div class="report-row">
+                                    <div class="report-row-main">
+                                        <h3><a href="raporlar/hazir/@Uri.EscapeDataString(ready.Key)">@ready.Title</a></h3>
+                                        <p class="text-muted mb-0">@ready.Description</p>
+                                        <div class="report-row-meta">
+                                            <span class="badge tag">@(ReportCenterLabels.IsSummary(ready.Spec) ? "Özet rapor" : "Tablo rapor")</span>
+                                            @if (ready.Spec.Chart != "none")
+                                            {
+                                                <span class="badge tag">Grafik: @ReportCenterLabels.Chart(ready.Spec.Chart)</span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="report-row-actions">
+                                        <a class="btn btn-outline-secondary btn-sm" href="raporlar/hazir/@Uri.EscapeDataString(ready.Key)" aria-label="Hazır raporu aç: @ready.Title">Aç</a>
+                                        @if (Session.Can(ReportAccess.Manage))
+                                        {
+                                            <a class="btn btn-outline-secondary btn-sm" href="raporlar/yeni?hazir=@Uri.EscapeDataString(ready.Key)" aria-label="Kopyasını oluştur: @ready.Title">Kopyasını oluştur</a>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </section>
+                }
+
+                @if (links.Count > 0)
+                {
+                    <section class="detail-section" aria-labelledby="rc-links">
+                        <div class="section-header"><h2 id="rc-links">Modül raporları</h2></div>
+                        <p class="small text-muted">Bu raporlar kendi modüllerinin ekranlarında hesaplanır (kur, dönem, kohort gibi kurallar orada uygulanır).</p>
+                        @foreach (var link in links)
+                        {
+                            <div class="report-row">
+                                <div class="report-row-main">
+                                    <h3><a href="@link.Path">@link.Title</a></h3>
+                                    <p class="text-muted mb-0">@link.Description</p>
+                                </div>
+                                <div class="report-row-actions">
+                                    <a class="btn btn-outline-secondary btn-sm" href="@link.Path" aria-label="Ekranı aç: @link.Title">Aç</a>
+                                </div>
+                            </div>
+                        }
+                    </section>
+                }
+            }
+        </div>
+    }
+    else
+    {
+        <div id="tabpanel-@tabs.Active" role="tabpanel" aria-labelledby="tab-@tabs.Active" aria-busy="@(listLoading ? "true" : "false")">
+            <AnalyticsStatus Loading="listLoading" Error="@listError" Forbidden="listForbidden" OnRetry="() => LoadListAsync(pageNumber)" />
+
+            @if (!listLoading && listError is null && loaded)
+            {
+                @if (items.Count == 0)
+                {
+                    <p class="text-muted" role="status">@EmptyText()</p>
+                }
+                else
+                {
+                    <p class="visually-hidden" role="status" aria-live="polite">@totalCount rapor listelendi.</p>
+                    @foreach (var item in items)
+                    {
+                        <div class="report-row">
+                            <div class="report-row-main">
+                                <h3><a href="raporlar/@item.Id">@item.Name</a></h3>
+                                @if (!string.IsNullOrWhiteSpace(item.Description))
+                                {
+                                    <p class="text-muted mb-0">@item.Description</p>
+                                }
+                                <div class="report-row-meta">
+                                    <span class="badge tag">@(item.DatasetName ?? item.DatasetKey)</span>
+                                    <span class="badge tag">Sahibi: @(item.IsOwner ? "Siz" : item.OwnerName ?? "—")</span>
+                                    <span class="badge tag">Paylaşım: @ReportCenterLabels.Visibility(item.Visibility, item.SharedWithCount)</span>
+                                    <span class="badge @ReportCenterLabels.HealthBadge(item.Health)">Durum: @ReportCenterLabels.Health(item.Health)</span>
+                                    <span class="badge tag">Güncelleme: @CrmLabels.Time(item.UpdatedAt)</span>
+                                </div>
+                                @if (item.Health != "ok")
+                                {
+                                    <p class="small text-warning-emphasis mt-2 mb-0">
+                                        <strong>@ReportCenterLabels.Health(item.Health).</strong>
+                                        @(item.HealthMessage ?? "Rapor şu an çalıştırılamıyor.")
+                                    </p>
+                                }
+                            </div>
+                            <div class="report-row-actions">
+                                <button type="button" class="btn btn-outline-secondary report-star" aria-pressed="@(item.IsFavorite ? "true" : "false")"
+                                        aria-label="@(item.IsFavorite ? "Favorilerden çıkar" : "Favorilere ekle"): @item.Name" disabled="@busy"
+                                        @onclick="() => ToggleFavoriteAsync(item)">
+                                    <span aria-hidden="true">@(item.IsFavorite ? "★" : "☆")</span>
+                                </button>
+                                <a class="btn btn-outline-secondary btn-sm" href="raporlar/@item.Id" aria-label="Raporu aç: @item.Name">Aç</a>
+                                @if (item.IsOwner && Session.Can(ReportAccess.Manage))
+                                {
+                                    <a class="btn btn-outline-secondary btn-sm" href="raporlar/@item.Id/duzenle" aria-label="Raporu düzenle: @item.Name">Düzenle</a>
+                                    @if (confirmDeleteId == item.Id)
+                                    {
+                                        <span class="confirm" role="alert">
+                                            <span>Bu rapor silinsin mi?</span>
+                                            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">Evet, sil</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDeleteId = null">Vazgeç</button>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="Raporu sil: @item.Name"
+                                                @onclick="() => confirmDeleteId = item.Id">Sil</button>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <Pager Page="pageNumber" PageSize="PageSize" TotalCount="totalCount" PageChanged="LoadListAsync" />
+                }
+            }
+        </div>
+    }
+</AuthGate>
+
+@code {
+    private const string ReadyTab = "ready";
+    private const string MineTab = "mine";
+    private const string SharedTab = "shared";
+    private const string FavoritesTab = "favorites";
+    private const int PageSize = 20;
+
+    private static readonly IReadOnlyList<TabItem> Tabs =
+    [
+        new(ReadyTab, "Hazır raporlar"), new(MineTab, "Raporlarım"), new(SharedTab, "Benimle paylaşılan"), new(FavoritesTab, "Favoriler"),
+    ];
+
+    private readonly TabState tabs = new(ReadyTab);
+
+    private ReportCatalogDto? catalog;
+    private string? catalogError;
+    private bool catalogForbidden;
+    private bool catalogLoading;
+
+    private readonly List<ReportSummaryDto> items = [];
+    private string? listError;
+    private bool listForbidden;
+    private bool listLoading;
+    private bool loaded;
+    private int pageNumber = 1;
+    private int totalCount;
+    private int listRequest;
+
+    private string search = string.Empty;
+    private string appliedSearch = string.Empty;
+
+    private bool busy;
+    private Guid? confirmDeleteId;
+    private string? actionMessage;
+    private bool actionFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(ReportAccess.Read))
+        {
+            await LoadCatalogAsync();
+        }
+    }
+
+    // ---- Hazır raporlar
+
+    private async Task LoadCatalogAsync()
+    {
+        catalogLoading = true;
+        catalogError = null;
+        catalogForbidden = false;
+        var result = await Api.GetAsync<ReportCatalogDto>("/api/reports/catalog");
+        catalogLoading = false;
+        catalog = result.IsSuccess ? result.Value : null;
+        catalogError = result.Error;
+        catalogForbidden = result.Status == HttpStatusCode.Forbidden;
+    }
+
+    private bool MatchesReady(ReadyReportDto ready) =>
+        appliedSearch.Length == 0
+        || ready.Title.Contains(appliedSearch, StringComparison.CurrentCultureIgnoreCase)
+        || ready.Description.Contains(appliedSearch, StringComparison.CurrentCultureIgnoreCase);
+
+    // Hazır raporu olan veri kümeleri; aramada yalnızca eşleşen rapor ya da veri kümesi adı kalır. Kullanılamayan veri kümesi nedeniyle gösterilir.
+    private List<ReportDatasetDto> ReadyDatasets() =>
+        [.. catalog!.Datasets.Where(d => d.ReadyReports.Count > 0
+            && (appliedSearch.Length == 0 || d.Name.Contains(appliedSearch, StringComparison.CurrentCultureIgnoreCase) || d.ReadyReports.Any(MatchesReady)))];
+
+    private List<ReportLinkDto> VisibleLinks() =>
+        [.. catalog!.Links.Where(l => appliedSearch.Length == 0
+            || l.Title.Contains(appliedSearch, StringComparison.CurrentCultureIgnoreCase)
+            || l.Description.Contains(appliedSearch, StringComparison.CurrentCultureIgnoreCase))];
+
+    // ---- Kayıtlı raporlar
+
+    private static string? ScopeOf(string tab) => tab switch
+    {
+        MineTab => "mine",
+        SharedTab => "shared",
+        FavoritesTab => "favorites",
+        _ => null,
+    };
+
+    private async Task OnTabChangedAsync(string key)
+    {
+        actionMessage = null;
+        confirmDeleteId = null;
+        if (key != ReadyTab)
+        {
+            await LoadListAsync(1);
+        }
+    }
+
+    private async Task ApplySearchAsync()
+    {
+        appliedSearch = search.Trim();
+        if (tabs.Active != ReadyTab)
+        {
+            await LoadListAsync(1);
+        }
+    }
+
+    private async Task LoadListAsync(int page)
+    {
+        if (ScopeOf(tabs.Active) is not { } scope)
+        {
+            return;
+        }
+
+        var request = ++listRequest;
+        listLoading = true;
+        listError = null;
+        listForbidden = false;
+        var url = $"/api/reports?scope={scope}&page={page}&pageSize={PageSize}";
+        if (appliedSearch.Length > 0)
+        {
+            url += $"&search={Uri.EscapeDataString(appliedSearch)}";
+        }
+
+        var result = await Api.GetAsync<ReportPageDto>(url);
+        if (request != listRequest)
+        {
+            return;
+        }
+
+        listLoading = false;
+        loaded = true;
+        listError = result.Error;
+        listForbidden = result.Status == HttpStatusCode.Forbidden;
+        items.Clear();
+        if (result.Value is { } value)
+        {
+            items.AddRange(value.Items);
+            totalCount = value.TotalCount;
+            pageNumber = value.Page;
+        }
+        else
+        {
+            totalCount = 0;
+        }
+    }
+
+    private string EmptyText() => appliedSearch.Length > 0
+        ? "Aramanıza uyan rapor yok."
+        : tabs.Active switch
+        {
+            MineTab => Session.Can(ReportAccess.Manage) ? "Henüz raporunuz yok. \"Yeni rapor\" ile ilk raporunuzu oluşturabilirsiniz." : "Henüz raporunuz yok.",
+            SharedTab => "Sizinle paylaşılan rapor yok.",
+            _ => "Favori raporunuz yok. Bir raporun yıldızına tıklayarak favorilerinize ekleyebilirsiniz.",
+        };
+
+    private async Task ToggleFavoriteAsync(ReportSummaryDto item)
+    {
+        busy = true;
+        actionMessage = null;
+        var result = await Api.PutAsync<FavoriteResponse>($"/api/reports/{item.Id}/favorite", new FavoriteReportRequest(!item.IsFavorite));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            actionMessage = result.Error;
+            actionFailed = true;
+            return;
+        }
+
+        if (tabs.Active == FavoritesTab)
+        {
+            await LoadListAsync(pageNumber);
+            return;
+        }
+
+        var index = items.FindIndex(i => i.Id == item.Id);
+        if (index >= 0)
+        {
+            items[index] = item with { IsFavorite = result.Value!.Favorite };
+        }
+    }
+
+    private async Task DeleteAsync(ReportSummaryDto item)
+    {
+        busy = true;
+        actionMessage = null;
+        var result = await Api.DeleteAsync($"/api/reports/{item.Id}");
+        busy = false;
+        confirmDeleteId = null;
+        if (!result.IsSuccess)
+        {
+            actionMessage = result.Error;
+            actionFailed = true;
+            return;
+        }
+
+        actionMessage = $"\"{item.Name}\" silindi.";
+        actionFailed = false;
+        await LoadListAsync(items.Count == 1 && pageNumber > 1 ? pageNumber - 1 : pageNumber);
+    }
+
+    private sealed record FavoriteResponse(bool Favorite);
+}
