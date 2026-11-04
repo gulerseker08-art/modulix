@@ -118,6 +118,8 @@ internal sealed class CompanyContactPointRecordStore(CrmStoreContext context) : 
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => CrmModule.Entities.Company;
+
     protected override IReadOnlyList<RecordField<ContactPoint>> Fields { get; } =
     [
         Field.CreateOnlyId<ContactPoint>("companyId", p => p.CompanyId),
@@ -189,6 +191,8 @@ internal sealed class PersonContactPointRecordStore(CrmStoreContext context) : C
     protected override string WritePermission => CrmModule.Permissions.ContactsWrite;
 
     protected override bool UsesScope => true;
+
+    protected override string ScopeEntityKey => CrmModule.Entities.Contact;
 
     protected override IReadOnlyList<RecordField<ContactPoint>> Fields { get; } =
     [

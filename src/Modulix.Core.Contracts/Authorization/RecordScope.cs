@@ -57,6 +57,21 @@ public static class RecordScopeRules
         || wanted == RecordScope.Own
         || (holder == RecordScope.UnitAndBelow && wanted == RecordScope.Unit);
 
+    /// <summary>
+    /// Kapsamı platform tavanına (ADR-0030) indirger: tavan kapsamı kapsıyorsa kapsam aynen kalır; kapsam tavanı kapsıyorsa
+    /// (daha geniş) tavan olur; ikisi karşılaştırılamazsa (ör. tavan ekip, kapsam departman) güvenli varsayılan
+    /// <see cref="RecordScope.Own"/>'dır.
+    /// </summary>
+    public static RecordScope Clamp(RecordScope scope, RecordScope ceiling)
+    {
+        if (Covers(ceiling, scope))
+        {
+            return scope;
+        }
+
+        return Covers(scope, ceiling) ? ceiling : RecordScope.Own;
+    }
+
     /// <summary>Kapsamlardan herhangi biri <paramref name="wanted"/> kapsamını kapsıyor mu.</summary>
     public static bool CoversAny(IEnumerable<RecordScope> holders, RecordScope wanted)
     {

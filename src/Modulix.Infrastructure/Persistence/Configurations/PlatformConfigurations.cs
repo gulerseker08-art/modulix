@@ -104,3 +104,78 @@ internal sealed class TenantLogoConfiguration : IEntityTypeConfiguration<Modulix
         builder.HasIndex(l => l.TenantId).IsUnique();
     }
 }
+
+internal sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
+{
+    public void Configure(EntityTypeBuilder<Plan> builder)
+    {
+        // Plan tanımı platform geneli ve RLS dışıdır; TenantId yoktur. Silinmez (IsActive ile kapatılır).
+        builder.ToTable("Plans", DatabaseSchemas.Platform);
+        builder.HasKey(p => p.Id);
+        builder.Property(p => p.Id).ValueGeneratedNever();
+        builder.Property(p => p.Key).HasMaxLength(Plan.KeyMaxLength).IsRequired();
+        builder.HasIndex(p => p.Key).IsUnique();
+        builder.Property(p => p.Name).HasMaxLength(Plan.NameMaxLength).IsRequired();
+        builder.Property(p => p.IsActive).IsRequired();
+        builder.Property(p => p.CreatedAt).IsRequired();
+        builder.Property(p => p.UpdatedAt).IsRequired();
+        builder.HasMany(p => p.Modules).WithOne().HasForeignKey(m => m.PlanId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(p => p.Limits).WithOne().HasForeignKey(l => l.PlanId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(p => p.Modules).AutoInclude();
+        builder.Navigation(p => p.Limits).AutoInclude();
+    }
+}
+
+internal sealed class PlanModuleConfiguration : IEntityTypeConfiguration<PlanModule>
+{
+    public void Configure(EntityTypeBuilder<PlanModule> builder)
+    {
+        builder.ToTable("PlanModules", DatabaseSchemas.Platform);
+        builder.HasKey(m => new { m.PlanId, m.ModuleKey });
+        builder.Property(m => m.ModuleKey).HasMaxLength(64).IsRequired();
+    }
+}
+
+internal sealed class PlanLimitConfiguration : IEntityTypeConfiguration<PlanLimit>
+{
+    public void Configure(EntityTypeBuilder<PlanLimit> builder)
+    {
+        builder.ToTable("PlanLimits", DatabaseSchemas.Platform);
+        builder.HasKey(l => new { l.PlanId, l.LimitKey });
+        builder.Property(l => l.LimitKey).HasMaxLength(64).IsRequired();
+        builder.Property(l => l.Value).IsRequired();
+    }
+}
+
+internal sealed class TenantSubscriptionConfiguration : IEntityTypeConfiguration<TenantSubscription>
+{
+    public void Configure(EntityTypeBuilder<TenantSubscription> builder)
+    {
+        // Abonelik kaydı platform tablosudur (modül hakkı gibi): TenantId taşır, RLS dışıdır, firmayı yalnızca platform yöneticisi değiştirir.
+        builder.ToTable("TenantSubscriptions", DatabaseSchemas.Platform);
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).ValueGeneratedNever();
+        builder.Property(s => s.StartsAt).IsRequired();
+        builder.Property(s => s.Reason).HasMaxLength(PlatformAuditEntry.ReasonMaxLength);
+        builder.HasOne<Plan>().WithMany().HasForeignKey(s => s.PlanId).OnDelete(DeleteBehavior.Restrict);
+
+        // Bir firmanın en çok bir geçerli (kapanmamış) aboneliği olur.
+        builder.HasIndex(s => s.TenantId).IsUnique().HasFilter("[EndedAt] IS NULL");
+        builder.HasIndex(s => new { s.TenantId, s.StartsAt });
+    }
+}
+
+internal sealed class LimitOverrideConfiguration : IEntityTypeConfiguration<LimitOverride>
+{
+    public void Configure(EntityTypeBuilder<LimitOverride> builder)
+    {
+        builder.ToTable("LimitOverrides", DatabaseSchemas.Platform);
+        builder.HasKey(o => o.Id);
+        builder.Property(o => o.Id).ValueGeneratedNever();
+        builder.Property(o => o.LimitKey).HasMaxLength(64).IsRequired();
+        builder.Property(o => o.Reason).HasMaxLength(LimitOverride.ReasonMaxLength).IsRequired();
+        builder.Property(o => o.ValidUntil).IsRequired();
+        builder.Property(o => o.CreatedAt).IsRequired();
+        builder.HasIndex(o => new { o.TenantId, o.LimitKey, o.CreatedAt });
+    }
+}

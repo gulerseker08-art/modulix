@@ -22,6 +22,8 @@ internal sealed class CompanyRelationRecordStore(CrmStoreContext context) : CrmR
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => CrmModule.Entities.Company;
+
     protected override IReadOnlyList<RecordField<CompanyRelation>> Fields { get; } =
     [
         Field.CreateOnlyId<CompanyRelation>("parentCompanyId", r => r.ParentCompanyId),

@@ -156,6 +156,8 @@ internal sealed class SegmentMemberRecordStore(MarketingStoreContext context) : 
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => MarketingModule.Entities.Segment;
+
     protected override IReadOnlyList<RecordField<SegmentMember>> Fields { get; } =
     [
         Field.Reference<SegmentMember, Segment>("segmentId", "Segment bulunamadı.", m => m.SegmentId, (m, v) => m.SegmentId = v ?? Guid.Empty, required: true, createOnly: true),
@@ -269,6 +271,8 @@ internal sealed class SegmentVersionRecordStore(MarketingStoreContext context) :
     protected override bool DefaultsOwnerToCurrentUser => false;
 
     protected override bool UsesScope => true;
+
+    protected override string ScopeEntityKey => MarketingModule.Entities.Segment;
 
     protected override IReadOnlyList<RecordField<SegmentVersion>> Fields { get; } =
     [

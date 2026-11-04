@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace Modulix.ArchitectureTests;
 
 /// <summary>
-/// ADR-0029: veri kapsamı kayıt türü anahtarıyla sorulur. Türsüz <c>GetOwnersAsync(cancellationToken)</c> çağrısı, bir rol türe
+/// ADR-0030: veri kapsamı kayıt türü anahtarıyla sorulur. Türsüz <c>GetOwnersAsync(cancellationToken)</c> çağrısı, bir rol türe
 /// özel daraltıldığında sessizce geniş sonuç verebileceği için (fail-open) kaynakta bulunmamalıdır. İmza değişikliği derleyiciyi
 /// zaten zorlar; bu test türsüz bir uyumluluk sürümünün sonradan eklenmesini yakalar.
 /// </summary>

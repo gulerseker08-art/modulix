@@ -38,6 +38,8 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
 
     protected override bool UsesScope => true;
 
+    protected override string ScopeEntityKey => ContractsModule.Entities.Contract;
+
     protected override bool DefaultsOwnerToCurrentUser => false;
 
     protected override IReadOnlyList<RecordField<ContractCommitment>> Fields { get; } =

@@ -27,6 +27,7 @@ public sealed class ReportRunner(
     IRecordPipeline pipeline,
     IChoiceLists choiceLists,
     ILookupSearch lookups,
+    ITenantMembers members,
     ITenantClock clock) : IReportRunner
 {
     public async Task<ReportResult> RunAsync(ReportRunRequest request, CancellationToken cancellationToken)
@@ -173,7 +174,7 @@ public sealed class ReportRunner(
             }
         }
 
-        var labeler = new Labeler(choiceLists, lookups);
+        var labeler = new Labeler(choiceLists, lookups, members);
         if (spec.IsSummary && request.Drill is null)
         {
             return await SummaryAsync(spec, columns, dataset, computation, read, day, issues, labeler, cancellationToken);
@@ -265,7 +266,7 @@ public sealed class ReportRunner(
         var slice = computation.Matched.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
         var labelMap = new Dictionary<string, IReadOnlyDictionary<string, string>>();
-        foreach (var column in shown.Where(c => c.Kind is DatasetColumnKind.Choice or DatasetColumnKind.Lookup))
+        foreach (var column in shown.Where(c => c.Kind is DatasetColumnKind.Choice or DatasetColumnKind.Lookup or DatasetColumnKind.User))
         {
             var keys = slice.Select(r => ReportAggregator.Text(ReportAggregator.Raw(r.Values, column.Field))).Where(k => k is not null).Select(k => k!).Distinct();
             labelMap[column.Field] = await labeler.ResolveAsync(column, keys, cancellationToken);
@@ -308,7 +309,7 @@ public sealed class ReportRunner(
                 return DateTimeOffset.TryParse(ReportAggregator.Text(node), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var time)
                     ? TimeZoneInfo.ConvertTime(time, zone).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
                     : null;
-            case DatasetColumnKind.Choice or DatasetColumnKind.Lookup:
+            case DatasetColumnKind.Choice or DatasetColumnKind.Lookup or DatasetColumnKind.User:
             {
                 var key = ReportAggregator.Text(node);
                 return key is null ? null : labels?.GetValueOrDefault(key, key) ?? key;
@@ -336,7 +337,7 @@ public sealed class ReportRunner(
         measure.Aggregation == Aggregation.Count || measure.Field is null ? DatasetColumnKind.Number : columns.Find(measure.Field)?.Kind ?? DatasetColumnKind.Number;
 
     /// <summary>Seçim ve lookup değerlerinin görünen etiketleri (çağıranın görebildiği ölçüde; erişilemeyen kayıt kimliğiyle kalır).</summary>
-    private sealed class Labeler(IChoiceLists choiceLists, ILookupSearch lookups)
+    private sealed class Labeler(IChoiceLists choiceLists, ILookupSearch lookups, ITenantMembers members)
     {
         public async Task<IReadOnlyDictionary<string, string>> ResolveAsync(DatasetColumn column, IEnumerable<string> keys, CancellationToken cancellationToken)
         {
@@ -359,6 +360,13 @@ public sealed class ReportRunner(
                     foreach (var option in column.Options ?? [])
                     {
                         labels[option.Key] = option.Label;
+                    }
+
+                    break;
+                case DatasetColumnKind.User:
+                    foreach (var member in await members.ListActiveAsync(cancellationToken))
+                    {
+                        labels[member.UserId.ToString()] = member.DisplayName;
                     }
 
                     break;

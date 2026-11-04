@@ -1,0 +1,193 @@
+@page "/platform/planlar"
+@inject ApiClient Api
+
+<PageTitle>Planlar · Platform · Modulix</PageTitle>
+
+@* Satış paketleri (ADR-0028 Dilim 4): modül seti ve limitler. Plan silinmez, kapatılır; plan değişikliği mevcut abonelerin modül
+   haklarını kendiliğinden değiştirmez (plan firmaya yeniden atanınca geçerli olur), limitler ise hemen güncel plandan çözülür. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>Planlar</h1>
+    <p class="text-muted">
+        Plan, bir firmaya atanan modül seti ve limitlerdir. Planlar silinmez; kapatılan plan yeni firmalara atanamaz, mevcut aboneler etkilenmez.
+        Plandaki modül değişikliği, plan firmaya yeniden atanınca uygulanır; limit değişikliği hemen geçerlidir.
+    </p>
+
+    <Notice Text="@notice" Failed="failed" />
+
+    <div class="list-toolbar">
+        @if (editing is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="StartNew"><AppIcon Name="plus" Size="16" /> Yeni plan</button>
+        }
+    </div>
+
+    @if (editing is not null && modules is not null)
+    {
+        <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(editing.Id is null ? "Yeni plan" : "Planı düzenle")</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="planKey">Anahtar *</label>
+                    <input id="planKey" class="form-control" maxlength="40" disabled="@(editing.Id is not null)" @bind="editing.Key" />
+                    <FieldError Field="key" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="planName">Ad *</label>
+                    <input id="planName" class="form-control" maxlength="100" @bind="editing.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="planSeats">Kullanıcı koltuğu (boş: sınırsız)</label>
+                    <input id="planSeats" class="form-control" type="number" min="0" @bind="editing.Seats" />
+                    <FieldError Field="limits" Errors="errors" />
+                </div>
+            </div>
+            <fieldset class="mt-3">
+                <legend class="form-label">Modüller</legend>
+                @foreach (var module in modules.Modules)
+                {
+                    <div class="form-check">
+                        <input id="pm-@module.Key" class="form-check-input" type="checkbox" checked="@editing.Modules.Contains(module.Key)"
+                               @onchange="e => ToggleModule(module.Key, (bool)e.Value!)" />
+                        <label class="form-check-label" for="pm-@module.Key">@module.DisplayName</label>
+                    </div>
+                }
+                <FieldError Field="modules" Errors="errors" />
+            </fieldset>
+            <div class="form-check mt-3">
+                <input id="planActive" class="form-check-input" type="checkbox" @bind="editing.IsActive" />
+                <label class="form-check-label" for="planActive">Etkin (yeni firmalara atanabilir)</label>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => editing = null">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+            </div>
+        </form>
+    }
+
+    @if (plans is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (plans.Count == 0)
+    {
+        <p class="text-muted">Henüz plan yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <thead><tr><th>Ad</th><th>Anahtar</th><th>Modüller</th><th>Koltuk</th><th>Abone</th><th>Durum</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var plan in plans)
+                {
+                    <tr>
+                        <td data-label="Ad" class="primary">@plan.Name</td>
+                        <td data-label="Anahtar">@plan.Key</td>
+                        <td data-label="Modüller">@ModuleNames(plan.Modules)</td>
+                        <td data-label="Koltuk">@(plan.Limits.TryGetValue("seats", out var seats) ? seats.ToString() : "Sınırsız")</td>
+                        <td data-label="Abone">@plan.SubscriberCount</td>
+                        <td data-label="Durum"><span class="badge @(plan.IsActive ? "user-active" : "user-disabled")">@(plan.IsActive ? "Etkin" : "Kapalı")</span></td>
+                        <td class="actions"><button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => Edit(plan)">Düzenle</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</PlatformGate>
+
+@code {
+    private sealed class PlanEditor
+    {
+        public Guid? Id { get; set; }
+
+        public string Key { get; set; } = string.Empty;
+
+        public string Name { get; set; } = string.Empty;
+
+        public int? Seats { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public HashSet<string> Modules { get; set; } = [];
+    }
+
+    private IReadOnlyList<PlanDto>? plans;
+    private PlatformModulesResponse? modules;
+    private PlanEditor? editing;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        modules = (await Api.GetAsync<PlatformModulesResponse>("/api/platform/modules")).Value;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<PlansResponse>("/api/platform/plans");
+        plans = result.Value?.Plans;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.Error, true);
+        }
+    }
+
+    private void StartNew()
+    {
+        editing = new PlanEditor();
+        errors = null;
+    }
+
+    private void Edit(PlanDto plan)
+    {
+        editing = new PlanEditor
+        {
+            Id = plan.Id,
+            Key = plan.Key,
+            Name = plan.Name,
+            IsActive = plan.IsActive,
+            Seats = plan.Limits.TryGetValue("seats", out var seats) ? seats : null,
+            Modules = [.. plan.Modules],
+        };
+        errors = null;
+    }
+
+    private void ToggleModule(string key, bool on)
+    {
+        if (on)
+        {
+            editing!.Modules.Add(key);
+        }
+        else
+        {
+            editing!.Modules.Remove(key);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var limits = editing!.Seats is { } seats ? new Dictionary<string, int> { ["seats"] = seats } : new Dictionary<string, int>();
+        var request = new SavePlanRequest(editing.Key, editing.Name, [.. editing.Modules], limits, editing.IsActive);
+        var result = editing.Id is { } id
+            ? await Api.PutAsync<PlanDto>($"/api/platform/plans/{id}", request)
+            : await Api.PostAsync<PlanDto>("/api/platform/plans", request);
+        busy = false;
+        errors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+            return;
+        }
+
+        (notice, failed, editing) = ("Plan kaydedildi.", false, null);
+        await LoadAsync();
+    }
+
+    private string ModuleNames(IReadOnlyList<string> keys) =>
+        keys.Count == 0 ? "—" : string.Join(", ", keys.Select(k => modules?.Modules.FirstOrDefault(m => m.Key == k)?.DisplayName ?? k));
+}

@@ -8,16 +8,20 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Infrastructure.Authorization;
 
 /// <summary>
-/// Boru hattının veri kapsamı adımı (Y8): kişinin rollerindeki en geniş kapsam. "Ekibimin kayıtları"nda kişi ve ekip
+/// Boru hattının veri kapsamı adımı (Y8, ADR-0030): kişinin rollerindeki kapsamların birleşimi, kayıt türüne göre. "Ekibimin kayıtları"nda kişi ve ekip
 /// arkadaşları (kişinin ekiplerinden herhangi birindeki herkes) sorumlu olabilir. İstek başına bir kez hesaplanır
 /// (scoped); rol veya ekip değişikliği bir sonraki istekte geçerli olur. Olay abonesinin kapsamı tenant genelidir (ADR-0007).
 /// </summary>
 internal sealed class MembershipDataScope(
-    ModulixDbContext db, MembershipPermissions permissions, EventHandlingScope handling) : IDataScopeService
+    ModulixDbContext db, MembershipPermissions permissions, ScopeLimits limits, EventHandlingScope handling) : IDataScopeService
 {
-    private (Guid MembershipId, IReadOnlySet<Guid>? Owners)? cached;
+    private readonly Dictionary<(Guid MembershipId, string EntityKey), IReadOnlySet<Guid>?> cached = [];
 
-    // Dilim 1 (ADR-0029): tür anahtarı iletilir ama kapsam henüz türe göre değişmez; sonuç üyelik başına tek hesaptır.
+    /// <summary>
+    /// Kapsam kayıt türüne göre çözülür (ADR-0030): rolün türe özel istisnası varsa o, yoksa varsayılan kapsamı; sonra platformun
+    /// o tür için koyduğu tavana indirilir (okuma tarafı savunması, tavan sonradan daralsa da rol kaydı beklenmez). İstek başına
+    /// (üyelik, tür) çifti için bir kez hesaplanır. Tavan ve istisna kaydı yoksa sonuç eski tek-kapsam hesabıyla aynıdır.
+    /// </summary>
     public async Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entityKey);
@@ -27,13 +31,13 @@ internal sealed class MembershipDataScope(
             return null;
         }
 
-        if (cached is { } hit && hit.MembershipId == tenant.MembershipId)
+        if (cached.TryGetValue((tenant.MembershipId, entityKey), out var hit))
         {
-            return hit.Owners;
+            return hit;
         }
 
-        var owners = await OwnersAsync(tenant, cancellationToken);
-        cached = (tenant.MembershipId, owners);
+        var owners = await OwnersAsync(tenant, entityKey, cancellationToken);
+        cached[(tenant.MembershipId, entityKey)] = owners;
         return owners;
     }
 
@@ -46,9 +50,17 @@ internal sealed class MembershipDataScope(
     /// birleşimidir (ADR-0026 K5). Herhangi biri "tümü" ise süzgeç yoktur (<c>null</c>). Her kapsam kişinin kendi kayıtlarını
     /// kapsar. "Departman ve altı" kök departmanda tüm firmadır ve "tümü"ne indirgenir (sahipsiz kayıtlar dahil).
     /// </summary>
-    private async Task<IReadOnlySet<Guid>?> OwnersAsync(TenantContext tenant, CancellationToken cancellationToken)
+    private async Task<IReadOnlySet<Guid>?> OwnersAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken)
     {
-        var scopes = await permissions.GetScopesAsync(tenant.MembershipId, cancellationToken);
+        var (isAdministrator, scopes) = await permissions.GetScopesForAsync(tenant.MembershipId, entityKey, cancellationToken);
+
+        // Platform tavanı (ADR-0030 K5/2, K6): tavan olan türde kapsam tavana indirilir; yönetici yalnızca tavan onu da bağlıyorsa.
+        if ((await limits.GetAsync(tenant.TenantId, cancellationToken)).TryGetValue(entityKey, out var limit)
+            && (!isAdministrator || limit.AppliesToAdministrators))
+        {
+            scopes = [.. scopes.Select(s => RecordScopeRules.Clamp(s, limit.MaxScope)).Distinct()];
+        }
+
         if (scopes.Contains(RecordScope.All))
         {
             return null;
