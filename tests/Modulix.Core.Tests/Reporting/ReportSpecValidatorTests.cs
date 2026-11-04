@@ -240,6 +240,23 @@ public sealed class ReportSpecValidatorTests
     }
 
     [Fact]
+    public void A_user_column_can_be_grouped_and_filtered_by_id_but_not_by_text_or_order()
+    {
+        var withUser = Dataset with { Columns = [.. Dataset.Columns, new DatasetColumn("assignee", "Atanan", DatasetColumnKind.User, ColumnUse.Group | ColumnUse.Filter | ColumnUse.Show)] };
+        var columns = ReportColumnSet.Build(withUser, new HashSet<string>(), []);
+        var id = Guid.NewGuid().ToString();
+
+        IReadOnlyList<ReportIssue> Check(ReportSpec spec) => ReportSpecValidator.Validate(ReportSpecValidator.Normalize(spec, columns), columns);
+
+        Assert.Empty(Check(Spec(groups: [new("assignee")], measures: [new(null, Aggregation.Count)])));
+        Assert.Empty(Check(Spec(columns: ["assignee"], filters: [new("assignee", FilterOperator.Equals, id)])));
+        Assert.Empty(Check(Spec(columns: ["assignee"], filters: [new("assignee", FilterOperator.In, Values: [id, Guid.NewGuid().ToString()])])));
+        Assert.Contains(Check(Spec(columns: ["assignee"], filters: [new("assignee", FilterOperator.Equals, "ahmet")])), i => i.Code == ReportIssueCode.InvalidValue);
+        Assert.Contains(Check(Spec(columns: ["assignee"], filters: [new("assignee", FilterOperator.Contains, id)])), i => i.Code == ReportIssueCode.InvalidOperator);
+        Assert.Contains(Check(Spec(columns: ["assignee"], filters: [new("assignee", FilterOperator.Greater, id)])), i => i.Code == ReportIssueCode.InvalidOperator);
+    }
+
+    [Fact]
     public void Measure_ids_are_stable_names_used_by_sorting()
     {
         Assert.Equal("count", ReportSpecValidator.MeasureId(new ReportMeasure(null, Aggregation.Count)));

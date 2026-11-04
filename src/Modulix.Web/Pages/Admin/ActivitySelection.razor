@@ -1,0 +1,201 @@
+@page "/yonetim/faaliyetler"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Faaliyetlerim · Modulix</PageTitle>
+
+@* Firmanın sektör/faaliyet seçimi (ADR-0029, Dilim B). Birden fazla faaliyet seçilebilir; üst başlığı seçmek alt faaliyetleri seçmiş saymaz. *@
+<AuthGate Permission="@CoreAccess.ManageCustomization">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Faaliyetlerim</h1>
+    </div>
+
+    <p class="text-muted">
+        Firmanızın yaptığı işleri seçin. Birden fazla faaliyet seçebilirsiniz; bağlı olduğu sektör ve grup otomatik gösterilir ama
+        alt faaliyetleri seçmiş sayılmaz. Seçim tek başına modül açmaz ve mevcut ayarlarınızı değiştirmez.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @message
+            @if (errors.Count > 0)
+            {
+                <ul class="mb-0">
+                    @foreach (var error in errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+
+    @if (catalog is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else if (catalog.Nodes.Count == 0)
+    {
+        <p class="text-muted">Platform kataloğunda henüz sektör tanımlı değil.</p>
+    }
+    else
+    {
+        <section class="record-form settings-group">
+            <fieldset>
+                <legend class="visually-hidden">Faaliyetler</legend>
+                @foreach (var row in Rows())
+                {
+                    <label class="form-check">
+                        <input class="form-check-input" type="checkbox" checked="@selected.Contains(row.Node.Id)" disabled="@(busy || !row.Node.IsActive)"
+                               @onchange="e => ToggleAsync(row.Node.Id, (bool)e.Value!)" />
+                        <span class="form-check-label">
+                            @(new string('—', row.Depth) + (row.Depth > 0 ? " " : string.Empty))@row.Node.Name
+                            @if (!row.Node.IsActive)
+                            {
+                                <span class="badge category">Pasif</span>
+                            }
+                            else if (row.Node.Readiness != "Available" && selected.Contains(row.Node.Id))
+                            {
+                                <span class="badge tag">Yalnızca katalog</span>
+                            }
+                        </span>
+                    </label>
+                }
+            </fieldset>
+        </section>
+
+        @if (preview is not null)
+        {
+            <section class="detail-section" aria-live="polite">
+                <h2>Seçiminizin özeti</h2>
+                @if (preview.ContextNodeIds.Count > 0)
+                {
+                    <p>Bağlı olduğu sektör ve gruplar: <strong>@string.Join(", ", preview.ContextNodeIds.Select(NameOf))</strong></p>
+                }
+                @if (preview.CatalogOnlyNodeIds.Count > 0)
+                {
+                    <p class="text-muted">
+                        Şu faaliyetlerin operasyon modülü henüz hazır değil, yalnızca katalog kaydı olarak tutulur:
+                        @string.Join(", ", preview.CatalogOnlyNodeIds.Select(NameOf)).
+                    </p>
+                }
+                @foreach (var gap in preview.Gaps)
+                {
+                    <p class="text-muted">Eksik yetenek: <code>@gap.Capability</code> (@string.Join(", ", gap.RequiredByNodes.Select(NameOf)))</p>
+                }
+                @foreach (var error in preview.Errors)
+                {
+                    <p class="text-danger">@error</p>
+                }
+            </section>
+        }
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || !Changed)" @onclick="ResetAsync">Vazgeç</button>
+            <button type="button" class="btn btn-primary" disabled="@(busy || !Changed)" @onclick="SaveAsync">Kaydet</button>
+        </div>
+        @if (saved)
+        {
+            <p class="text-muted" role="status">Seçiminiz kaydedildi.</p>
+        }
+    }
+</AuthGate>
+
+@code {
+    private SectorCatalogResponse? catalog;
+    private HashSet<Guid> selected = [];
+    private HashSet<Guid> original = [];
+    private SelectionPreviewDto? preview;
+    private string? message;
+    private List<string> errors = [];
+    private bool busy;
+    private bool saved;
+
+    private bool Changed => !selected.SetEquals(original);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ManageCustomization))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var catalogResult = await Api.GetAsync<SectorCatalogResponse>("/api/sectors/catalog");
+        var selectionResult = await Api.GetAsync<TenantActivitySelectionResponse>("/api/sectors/selection");
+        catalog = catalogResult.Value;
+        Report(catalogResult.Error ?? selectionResult.Error, null);
+        if (selectionResult.Value is { } selection)
+        {
+            selected = [.. selection.SelectedNodeIds];
+            original = [.. selection.SelectedNodeIds];
+            preview = selection.Preview;
+        }
+    }
+
+    private IEnumerable<(ActivityNodeDto Node, int Depth)> Rows()
+    {
+        var byParent = catalog!.Nodes.ToLookup(n => n.ParentId);
+        IEnumerable<(ActivityNodeDto, int)> Walk(Guid? parentId, int depth) =>
+            byParent[parentId].OrderBy(n => n.SortOrder).ThenBy(n => n.Name).SelectMany(n => Walk(n.Id, depth + 1).Prepend((n, depth)));
+        return Walk(null, 0);
+    }
+
+    private string NameOf(Guid id) => catalog!.Nodes.FirstOrDefault(n => n.Id == id)?.Name ?? id.ToString();
+
+    private async Task ToggleAsync(Guid id, bool on)
+    {
+        if (on)
+        {
+            selected.Add(id);
+        }
+        else
+        {
+            selected.Remove(id);
+        }
+
+        saved = false;
+        busy = true;
+        var result = await Api.PostAsync<SelectionPreviewDto>("/api/sectors/selection/preview", new ActivityIdsRequest([.. selected]));
+        Report(result.Error, result.FieldErrors);
+        preview = result.Value ?? preview;
+        busy = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var result = await Api.PutAsync<TenantActivitySelectionResponse>("/api/sectors/selection", new ActivityIdsRequest([.. selected]));
+        Report(result.Error, result.FieldErrors);
+        if (result.Value is { } selection)
+        {
+            original = [.. selection.SelectedNodeIds];
+            selected = [.. selection.SelectedNodeIds];
+            preview = selection.Preview;
+            saved = true;
+        }
+
+        busy = false;
+    }
+
+    private async Task ResetAsync()
+    {
+        saved = false;
+        await LoadAsync();
+    }
+
+    private void Report(string? error, IReadOnlyDictionary<string, string[]>? fieldErrors)
+    {
+        message = error;
+        errors = fieldErrors is null ? [] : [.. fieldErrors.Values.SelectMany(v => v)];
+    }
+}

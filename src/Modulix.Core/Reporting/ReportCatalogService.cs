@@ -1,6 +1,7 @@
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Reporting;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 
 namespace Modulix.Core.Reporting;
@@ -10,7 +11,8 @@ namespace Modulix.Core.Reporting;
 /// yoktur), özel alanlar eklenir, seçenekler firmanın güncel etiketleriyle gelir. Okuma yetkisi olmayan veri kümesi nedeniyle birlikte listelenir
 /// ama kullanılamaz (kullanıcı neden göremediğini bilsin).
 /// </summary>
-public sealed class ReportCatalogService(ModuleCatalog catalog, ReportColumnResolver resolver, ICurrentAccess access, IChoiceLists choiceLists) : IReportCatalog
+public sealed class ReportCatalogService(
+    ModuleCatalog catalog, ReportColumnResolver resolver, ICurrentAccess access, IChoiceLists choiceLists, ITenantMembers members) : IReportCatalog
 {
     public async Task<ReportCatalogView> GetAsync(CancellationToken cancellationToken)
     {
@@ -68,6 +70,12 @@ public sealed class ReportCatalogService(ModuleCatalog catalog, ReportColumnReso
 
     private async Task<IReadOnlyList<DatasetOption>?> OptionsAsync(DatasetColumn column, CancellationToken cancellationToken)
     {
+        if (column.Kind == DatasetColumnKind.User)
+        {
+            // Kullanıcı sütunu: seçenekler firmanın etkin üyeleridir (süzgeç değeri kullanıcı kimliğidir).
+            return [.. (await members.ListActiveAsync(cancellationToken)).OrderBy(m => m.DisplayName, StringComparer.CurrentCultureIgnoreCase).Select(m => new DatasetOption(m.UserId.ToString(), m.DisplayName))];
+        }
+
         if (column.Kind != DatasetColumnKind.Choice)
         {
             return null;
