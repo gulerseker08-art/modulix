@@ -250,7 +250,8 @@
         // İki rota aynı bileşeni kullanır; bileşen yeniden kullanılırsa rotada olmayan parametre eski değerinde kalabilir, bu yüzden adresten ayıklanır.
         var ready = Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("raporlar/hazir/", StringComparison.OrdinalIgnoreCase);
         var nextId = ready ? null : Id;
-        var nextKey = ready ? Key : null;
+        // Yol parçasında nokta olmaz (nokta içeren yol dosya sanılır, doğrudan açılışta ya da yenilemede 404 verir): anahtarın noktaları ~ ile taşınır.
+        var nextKey = ready ? Key?.Replace('~', '.') : null;
         if (loadedId == nextId && loadedKey == nextKey && (title is not null || loadError is not null))
         {
             return;

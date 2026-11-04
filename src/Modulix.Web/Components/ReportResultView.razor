@@ -448,7 +448,7 @@
 
     /// <summary>
     /// Özet satırının ölçüleri ile ayrıntı sonucunun toplam satırı aynı süzülmüş kayıt kümesinden hesaplanır; burada yan yana gösterilir.
-    /// Ayrıntı toplamlarının hücreleri [para birimi, ölçüler...] sırasındadır (grup sütunu yoktur).
+    /// Ayrıntı toplam satırı, özet sonucunun sütunlarıyla aynı hizadadır (grup hücreleri boş, sonra para birimi, sonra ölçüler).
     /// </summary>
     private List<CompareLine> Comparison(ReportResultDto summary, ReportResultDto detail)
     {
@@ -459,18 +459,17 @@
         }
 
         var total = detail.Totals[0];
-        var offset = summary.Columns.Any(c => c.Role == "currency") ? 1 : 0;
         var measures = MeasureColumns(summary);
         for (var j = 0; j < measures.Count; j++)
         {
             var column = summary.Columns[measures[j]];
             var summaryCell = drillRow.Cells[measures[j]];
-            if (offset + j >= total.Cells.Count)
+            if (measures[j] >= total.Cells.Count)
             {
                 continue;
             }
 
-            var detailCell = total.Cells[offset + j];
+            var detailCell = total.Cells[measures[j]];
             var a = ReportCenterLabels.Decimal(summaryCell);
             var b = ReportCenterLabels.Decimal(detailCell);
             var matches = (a is null && b is null) || (a is { } x && b is { } y && Math.Abs(x - y) < 0.005m);

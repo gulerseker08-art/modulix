@@ -170,7 +170,8 @@ public sealed class ReportDeliveryRulesTests
     {
         Assert.Equal("sales-report-2026", ReportCsv.FileSlug("Sales Report 2026"));
         Assert.Equal("rapor", ReportCsv.FileSlug("   "));
-        Assert.Equal("rapor", ReportCsv.FileSlug("ı"));
+        Assert.Equal("asamaya-gore-acik-firsatlar", ReportCsv.FileSlug("Aşamaya göre açık fırsatlar"));
+        Assert.Equal("rapor", ReportCsv.FileSlug("%%%"));
         var hostile = ReportCsv.FileSlug("../../etc/passwd");
         Assert.DoesNotContain('/', hostile);
         Assert.DoesNotContain('.', hostile);

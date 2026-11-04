@@ -62,6 +62,18 @@ public sealed record RecordQuery(
     public const int MaxFilters = 10;
 
     /// <summary>
+    /// <see cref="Bulk"/> okumada en büyük sayfa. Sayfa başına sabit bir maliyet (yetki, kapsam, alan çözümü, iki sorgu) olduğundan çok
+    /// kayıt okuyan rapor ve dışa aktarma bunu kullanır (ölçüm: tek sayfa ≈25 ms sabit, 200 kayıt ≈ 0,1 ms/kayıt).
+    /// </summary>
+    public const int MaxBulkPageSize = 1000;
+
+    /// <summary>
+    /// Toplu okuma (rapor, dışa aktarma): sayfa boyutu <see cref="MaxBulkPageSize"/>'a kadar olabilir. İzin, veri kapsamı, şirket kapsamı ve
+    /// hassas alan kuralları aynen uygulanır; yalnızca sayfa üst sınırı değişir.
+    /// </summary>
+    public bool Bulk { get; init; }
+
+    /// <summary>
     /// Veri kapsamı (Y8): doluysa yalnızca sorumlusu bu kullanıcılardan biri olan kayıtlar döner; sorumlusu boş kayıt
     /// dönmez. Boru hattı doldurur (çağıranın verdiği değer yok sayılır); sorumlu alanı olmayan depo bunu yok sayar.
     /// </summary>

@@ -12,6 +12,8 @@ internal static class CrmReportDatasets
 {
     public const string Opportunities = "crm.opportunities";
     public const string Leads = "crm.leads";
+    public const string Quotes = "crm.quotes";
+    public const string Companies = "crm.companies";
 
     private static readonly IReadOnlyList<DatasetOption> OpportunityStatuses =
     [
@@ -27,11 +29,29 @@ internal static class CrmReportDatasets
     private static readonly IReadOnlyList<DatasetOption> Priorities =
         [new("Low", "Düşük"), new("Normal", "Normal"), new("High", "Yüksek"), new("Urgent", "Acil")];
 
+
+    private static readonly IReadOnlyList<DatasetOption> QuoteStatuses =
+    [
+        new("Draft", "Taslak"), new("Presented", "Sunuldu"), new("Accepted", "Kabul edildi"), new("Rejected", "Reddedildi"),
+        new("Expired", "Süresi doldu"), new("Cancelled", "İptal"), new("Superseded", "Yeni revizyonla değişti"),
+    ];
+
+    private static readonly IReadOnlyList<DatasetOption> QuoteApprovals =
+    [
+        new("NotRequired", "Gerekmiyor"), new("Pending", "Bekliyor"), new("Approved", "Onaylandı"), new("Rejected", "Reddedildi"),
+        new("ChangesRequested", "Değişiklik istendi"),
+    ];
+
+    private static readonly IReadOnlyList<DatasetOption> QuoteDeliveries =
+    [
+        new("NotSent", "Gönderilmedi"), new("Pending", "Bekliyor"), new("Processing", "İşleniyor"), new("Succeeded", "Teslim edildi"), new("Failed", "Başarısız"),
+    ];
+
     private const ColumnUse All = ColumnUse.Group | ColumnUse.Filter | ColumnUse.Show;
     private const ColumnUse FilterShow = ColumnUse.Filter | ColumnUse.Show;
 
     public static ModuleReporting Reporting { get; } = new(
-        [OpportunityDataset(), LeadDataset()],
+        [OpportunityDataset(), LeadDataset(), QuoteDataset(), CompanyDataset()],
         [
             new("crm.reports.sales-overview", "Satış görünümü",
                 "Gerçekleşen, açık pipeline, ağırlıklı tahmin ve hedefe göre durum; kart toplamları detay listesiyle eşleşir.", "crm/satis-gorunumu", CrmModule.Permissions.SalesReportsRead),
@@ -117,6 +137,68 @@ internal static class CrmReportDatasets
                 new(Leads, [], [], [new("status")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Pie)),
             new("crm.leads.received-by-month", "Aylık gelen lead'ler", "Alınma ayına göre lead sayısı.",
                 new(Leads, [], [], [new("firstReceivedAt", DateGrain.Month)], [new(null, Aggregation.Count)], new("firstReceivedAt"), ChartKind.Line)),
+        ],
+    };
+
+    // Teklif: her satır bir teklif revizyonudur (aile değil); "yalnız son revizyon" süzgeci yoktur, bu yüzden revizyon sayısı tekliflerin sayısını şişirir.
+    // Aile bazlı kabul oranı ve kohortlar Satış analizi ekranındadır. Tutar sütunları teklifin net (vergi hariç) ve brüt toplamıdır.
+    private static DatasetDefinition QuoteDataset() => new(
+        Quotes, "Teklifler", CrmModule.Entities.Quote, 1,
+        [
+            new("quoteNumber", "Teklif no", DatasetColumnKind.Text, FilterShow),
+            new("title", "Başlık", DatasetColumnKind.Text, FilterShow),
+            new("revisionNo", "Revizyon", DatasetColumnKind.Number, ColumnUse.Measure | FilterShow),
+            new("status", "Durum", DatasetColumnKind.Choice, All) { Options = QuoteStatuses, StoreFilter = "status" },
+            new("approvalStatus", "Onay durumu", DatasetColumnKind.Choice, All) { Options = QuoteApprovals, StoreFilter = "approvalStatus" },
+            new("deliveryStatus", "Gönderim durumu", DatasetColumnKind.Choice, All) { Options = QuoteDeliveries, StoreFilter = "deliveryStatus" },
+            new("ownerId", "Sorumlu", DatasetColumnKind.Lookup, All) { LookupKey = CrmLookupDefinitions.QuoteOwner, StoreFilter = "ownerId" },
+            new("companyId", "Firma", DatasetColumnKind.Lookup, All) { LookupKey = CrmLookupDefinitions.QuoteCompany, StoreFilter = "companyId" },
+            new("currency", "Para birimi", DatasetColumnKind.Text, All) { StoreFilter = "currency" },
+            new("netTotal", "Net toplam", DatasetColumnKind.Money, ColumnUse.Measure | FilterShow) { CurrencyField = "currency" },
+            new("grossTotal", "Brüt toplam", DatasetColumnKind.Money, ColumnUse.Measure | FilterShow) { CurrencyField = "currency" },
+            new("issueDate", "Düzenleme tarihi", DatasetColumnKind.Date, All),
+            new("presentedAt", "Sunulma", DatasetColumnKind.DateTime, All),
+            new("decidedAt", "Karar", DatasetColumnKind.DateTime, All),
+            new("validUntil", "Geçerlilik sonu", DatasetColumnKind.DateTime, All),
+        ])
+    {
+        DefaultColumns = ["quoteNumber", "title", "status", "companyId", "ownerId", "netTotal", "validUntil"],
+        RecordPath = "crm/teklifler/{id}",
+        ReadyReports =
+        [
+            new("crm.quotes.by-status", "Duruma göre teklifler", "Teklif revizyonlarının adedi ve net tutarı, durum bazında (para birimine göre ayrı).",
+                new(Quotes, [], [], [new("status")], [new(null, Aggregation.Count), new("netTotal", Aggregation.Sum)], new("count", SortDirection.Descending), ChartKind.Bar)),
+            new("crm.quotes.accepted-by-month", "Aylık kabul edilen teklifler", "Kabul edilen tekliflerin karar ayına göre adedi ve net tutarı.",
+                new(Quotes, [], [new("status", FilterOperator.Equals, "Accepted")], [new("decidedAt", DateGrain.Month)], [new(null, Aggregation.Count), new("netTotal", Aggregation.Sum)],
+                    new("decidedAt"), ChartKind.Line)),
+            new("crm.quotes.presented-list", "Sunulmuş teklifler", "Sunulmuş (karar bekleyen) tekliflerin geçerlilik sonuna göre listesi.",
+                new(Quotes, ["quoteNumber", "title", "companyId", "ownerId", "netTotal", "validUntil"], [new("status", FilterOperator.Equals, "Presented")], [], [], new("validUntil"))),
+        ],
+    };
+
+    private static DatasetDefinition CompanyDataset() => new(
+        Companies, "Firmalar", CrmModule.Entities.Company, 1,
+        [
+            new("name", "Ad", DatasetColumnKind.Text, FilterShow),
+            new("status", "Durum", DatasetColumnKind.Choice, All) { ChoiceList = CrmModule.Lists.CompanyStatus, StoreFilter = "status" },
+            new("source", "Kaynak", DatasetColumnKind.Choice, All) { ChoiceList = CrmModule.Lists.CompanySource, StoreFilter = "source" },
+            new("industry", "Sektör", DatasetColumnKind.Text, All),
+            new("city", "Şehir", DatasetColumnKind.Text, All),
+            new("ownerId", "Sorumlu", DatasetColumnKind.Lookup, All) { LookupKey = CrmLookupDefinitions.CompanyOwner, StoreFilter = "ownerId" },
+            new("tags", "Etiketler", DatasetColumnKind.Text, FilterShow),
+        ])
+    {
+        AllowsCustomFields = true,
+        DefaultColumns = ["name", "status", "industry", "city", "ownerId"],
+        RecordPath = "crm/firmalar/{id}",
+        ReadyReports =
+        [
+            new("crm.companies.by-industry", "Sektöre göre firmalar", "Firma sayısı sektör bazında.",
+                new(Companies, [], [], [new("industry")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Bar)),
+            new("crm.companies.by-status", "Duruma göre firmalar", "Firma sayısı durum bazında.",
+                new(Companies, [], [], [new("status")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Pie)),
+            new("crm.companies.by-owner", "Sorumluya göre firmalar", "Firma sayısı sorumlu bazında.",
+                new(Companies, [], [], [new("ownerId")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Bar)),
         ],
     };
 }

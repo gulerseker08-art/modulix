@@ -52,7 +52,7 @@ internal sealed class SalesOpportunityReader(IRecordPipeline pipeline)
         var pageNumber = 1;
         while (rows.Count < MaxRows)
         {
-            var result = await pipeline.QueryAsync(new RecordQuery(entityKey, pageNumber, RecordQuery.MaxPageSize, null, filters), cancellationToken);
+            var result = await pipeline.QueryAsync(new RecordQuery(entityKey, pageNumber, RecordQuery.MaxBulkPageSize, null, filters) { Bulk = true }, cancellationToken);
             if (!result.IsSuccess)
             {
                 return new RawPage([], false, result.Error);
