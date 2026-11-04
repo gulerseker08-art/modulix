@@ -1,4 +1,4 @@
-# ADR-0030 — Depo modülü ve gümrüklü antrepo uzantısı
+# ADR-0032 — Depo modülü ve gümrüklü antrepo uzantısı
 
 Durum: **taslak** (4 Kasım 2026, tartışma için; kabul edilmedi). Bu belge tek başına hiçbir şeyi uygulamaz. Mevzuat ayrıntıları (tescil numarası biçimi, süreler, antrepo tipleri) saha analizi metninden alınmıştır ve **uzmanla doğrulanmamıştır**; bölüm 9'da listelidir. Doğrulanmamış hukuki kural zorunlu üretim kuralı yapılmaz.
 
