@@ -5450,8 +5450,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "ConvertedOpportunityId");
 
-                    b.HasIndex("TenantId", "FirstReceivedAt");
-
                     b.HasIndex("TenantId", "LeadNumber")
                         .IsUnique();
 
@@ -5463,7 +5461,13 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("[ExternalSource] IS NOT NULL AND [ExternalSubmissionId] IS NOT NULL");
 
+                    b.HasIndex("TenantId", "FirstReceivedAt", "Id")
+                        .IsDescending(false, true, false);
+
                     b.HasIndex("TenantId", "Status", "OwnerId");
+
+                    b.HasIndex("TenantId", "Status", "FirstReceivedAt", "Id")
+                        .IsDescending(false, false, true, false);
 
                     b.ToTable("Leads", "crm");
                 });

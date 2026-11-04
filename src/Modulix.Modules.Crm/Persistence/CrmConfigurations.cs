@@ -511,7 +511,11 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
 
         builder.HasIndex(l => new { l.TenantId, l.LeadNumber }).IsUnique();
         builder.HasIndex(l => new { l.TenantId, l.Status, l.OwnerId });
-        builder.HasIndex(l => new { l.TenantId, l.FirstReceivedAt });
+        // Liste ve rapor okumaları "en yeni önce" sıralıdır (ORDER BY FirstReceivedAt DESC, Id): sıralamanın indeksle verilmesi için Id açıkça ve aynı
+        // yönde yer alır (aksi halde SQL Server her sayfada tüm satırları sıralıyordu; ölçüm: 5000 lead okuması 3,5 sn, ADR-0026 bölüm 8).
+        // Eski (TenantId, FirstReceivedAt) dizininin yerini alır; dönem aralığı süzgeçleri aynı önek dizinden yararlanır.
+        builder.HasIndex(l => new { l.TenantId, l.FirstReceivedAt, l.Id }).IsDescending(false, true, false);
+        builder.HasIndex(l => new { l.TenantId, l.Status, l.FirstReceivedAt, l.Id }).IsDescending(false, false, true, false);
         builder.HasIndex(l => new { l.TenantId, l.NormalizedEmail });
         builder.HasIndex(l => new { l.TenantId, l.NormalizedPhone });
 
