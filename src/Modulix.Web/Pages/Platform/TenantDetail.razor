@@ -54,7 +54,7 @@
                 }
 
                 <h3>Hak koşulları</h3>
-                <p class="text-muted">Bitiş tarihi şimdilik yalnızca kayıttır; süre dolunca modül kendiliğinden kapanmaz.</p>
+                <p class="text-muted">Bitişten sonra modül ek sürede çalışır, ek süre de bitince salt okunur olur (veri silinmez). Süreyi uzatmak veya kaldırmak gerekçe ister.</p>
                 @if (Conditions().Count > 0)
                 {
                     <ul>
@@ -236,7 +236,7 @@
                     {
                         <div>
                             <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="ActivateAsync">Denemeyi etkinleştir</button>
-                            <small class="text-muted">Firma deneme durumundan açık duruma geçer. Deneme süresi henüz otomatik uygulanmaz.</small>
+                            <small class="text-muted">Firma deneme durumundan açık duruma geçer. Deneme modüllerinin süresi, modül hakkının bitişiyle uygulanır.</small>
                         </div>
                     }
                     <div>

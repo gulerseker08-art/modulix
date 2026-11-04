@@ -8,6 +8,7 @@ using Modulix.Api.Records;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Events;
 using Modulix.Infrastructure.Persistence;
@@ -118,6 +119,12 @@ internal static class LeadIntakeEndpoints
         }
 
         await using var scope = scopes.Create(new TenantContext(found, Guid.Empty, Guid.Empty));
+
+        // Lisans (ADR-0028): modül kapalıysa ya da salt okunursa form kabul edilmez.
+        if (!await scope.ServiceProvider.GetRequiredService<IModuleLicense>().AllowsAsync(found, CrmModule.ModuleKey, write: true, ct))
+        {
+            return Problem(StatusCodes.Status404NotFound, "Form bulunamadı.");
+        }
 
         // Sistem kimliği: izinler yalnızca "crm.lead-intake" aboneliğinin bildirdikleridir; kayıt boru hattı bunu uygular.
         var cause = new EventEnvelope(

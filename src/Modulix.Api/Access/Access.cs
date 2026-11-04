@@ -51,7 +51,11 @@ public static class AccessEndpointFilters
         return builder;
     }
 
-    /// <summary>Aktif tenant ister ve modül tenant için kapalıysa 403 döner.</summary>
+    /// <summary>
+    /// Aktif tenant ister ve modül tenant için kapalıysa 403 döner. Modülün lisans süresi ve ek süresi bittiyse (salt okunur,
+    /// ADR-0028) okuma yöntemleri (GET, HEAD, OPTIONS) ve yol adı <c>/preview</c> ile biten önizlemeler çalışır, diğerleri 403
+    /// döner; veri silinmez. Önizleme uç noktaları (POST olsa da) hiçbir şey yazmaz; yeni bir salt okunur POST ucu bu adla bitmelidir.
+    /// </summary>
     public static TBuilder RequireModule<TBuilder>(this TBuilder builder, string moduleKey)
         where TBuilder : IEndpointConventionBuilder
     {
@@ -59,13 +63,28 @@ public static class AccessEndpointFilters
         builder.AddEndpointFilter<TBuilder, RequireTenantFilter>();
         builder.AddEndpointFilter(async (context, next) =>
         {
-            var access = context.HttpContext.RequestServices.GetRequiredService<ICurrentAccess>();
-            return await access.IsModuleEnabledAsync(moduleKey, context.HttpContext.RequestAborted)
-                ? await next(context)
-                : Forbidden($"'{moduleKey}' modülü bu tenant için açık değil.");
+            var services = context.HttpContext.RequestServices;
+            var access = services.GetRequiredService<ICurrentAccess>();
+            if (!await access.IsModuleEnabledAsync(moduleKey, context.HttpContext.RequestAborted))
+            {
+                return Forbidden($"'{moduleKey}' modülü bu tenant için açık değil.");
+            }
+
+            if (!IsReadOnlySafe(context.HttpContext.Request)
+                && !await services.GetRequiredService<IModuleLicense>().IsWritableAsync(
+                    services.GetRequiredService<ITenantContextAccessor>().Current!.TenantId, moduleKey, context.HttpContext.RequestAborted))
+            {
+                return Forbidden($"'{moduleKey}' modülünün lisans süresi doldu; modül salt okunur. Yöneticinizle iletişime geçin.");
+            }
+
+            return await next(context);
         });
         return builder;
     }
+
+    private static bool IsReadOnlySafe(HttpRequest request) =>
+        HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) || HttpMethods.IsOptions(request.Method)
+        || request.Path.Value?.TrimEnd('/').EndsWith("/preview", StringComparison.OrdinalIgnoreCase) == true;
 
     private static IResult Forbidden(string detail) =>
         Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Yetkiniz yok.", detail: detail);
@@ -126,6 +145,8 @@ public static class AccessEndpoints
         ITenantContextAccessor tenant,
         IMembershipDirectory directory,
         ICompanyContextAccessor company,
+        IModuleLicense license,
+        TimeProvider time,
         CancellationToken ct)
     {
         var enabled = new List<string>();
@@ -150,7 +171,28 @@ public static class AccessEndpoints
             myRoles.Any(r => r.IsSystem),
             (Shared.Access.RecordScope)await access.GetScopeAsync(ct),
             companies,
-            company.Current?.ActiveCompanyId));
+            company.Current?.ActiveCompanyId,
+            await LicenseWarningsAsync(catalog, license, tenant.Current!.TenantId, time.GetUtcNow(), ct)));
+    }
+
+    /// <summary>Uyarı penceresi: bitişe bu kadar gün kala yönetici uyarılır; bitmiş haklar (ek süre, salt okunur) her zaman listelenir.</summary>
+    internal const int LicenseWarningDays = 30;
+
+    private static async Task<List<ModuleLicenseDto>> LicenseWarningsAsync(
+        ModuleCatalog catalog, IModuleLicense license, Guid tenantId, DateTimeOffset now, CancellationToken ct)
+    {
+        var warnings = new List<ModuleLicenseDto>();
+        var licenses = await license.GetAsync(tenantId, ct);
+        foreach (var module in catalog.Modules)
+        {
+            if (licenses.TryGetValue(module.Key, out var info) && info is { ValidUntil: { } until, GraceEndsAt: { } graceEnds }
+                && (info.Phase != EntitlementPhase.Active || until <= now.AddDays(LicenseWarningDays)))
+            {
+                warnings.Add(new ModuleLicenseDto(module.Key, module.DisplayName, (LicensePhase)info.Phase, until, graceEnds));
+            }
+        }
+
+        return warnings;
     }
 
     private static async Task<IResult> ListRolesAsync(IRoleService roles, CancellationToken ct) =>

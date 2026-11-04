@@ -119,15 +119,15 @@ public sealed record TenantStateCountDto(TenantState State, int Count);
 
 /// <summary>
 /// Platform genel bakışı (ADR-0028 Dilim 2): durumlara göre firma sayıları ve açık modül haklarının bitişi. Yaklaşan sayıları
-/// birikimlidir (30 gün içindekiler 60 ve 90'a da dahildir); <see cref="Expired"/> bitiş tarihi geçmiş ama henüz uygulanmamış haklardır.
+/// birikimlidir (30 gün içindekiler 60 ve 90'a da dahildir); <see cref="Expired"/> bitişi geçmiş tüm haklar (ek sürede olanlar dahil), <see cref="ReadOnly"/> ek süresi de bitip salt okunura geçmiş haklardır.
 /// </summary>
 public sealed record PlatformOverviewResponse(
-    IReadOnlyList<TenantStateCountDto> TenantCounts, int Expired, int ExpiringIn30Days, int ExpiringIn60Days, int ExpiringIn90Days);
+    IReadOnlyList<TenantStateCountDto> TenantCounts, int Expired, int ReadOnly, int ExpiringIn30Days, int ExpiringIn60Days, int ExpiringIn90Days);
 
 /// <summary>Süre takvimindeki bir satır: bitiş tarihi olan açık modül hakkı.</summary>
 public sealed record PlatformExpirationDto(
     Guid TenantId, string TenantName, string TenantSlug, TenantState TenantStatus, string ModuleKey, LicenseSource Source,
-    DateTimeOffset ValidUntil, string? Note);
+    DateTimeOffset ValidUntil, string? Note, Modulix.Shared.Access.LicensePhase Phase, DateTimeOffset GraceEndsAt);
 
 /// <summary>
 /// Katalogdaki bir modül (salt okunur). <see cref="EnabledTenantCount"/>: modülün açık olduğu açık firma sayısı;
