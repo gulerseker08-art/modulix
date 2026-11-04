@@ -161,6 +161,33 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Roles", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Authorization.RoleScopeOverride", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RoleId", "EntityKey")
+                        .IsUnique();
+
+                    b.ToTable("RoleScopeOverrides", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Automation.AutomationRule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1402,6 +1429,38 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Tenants", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.TenantScopeLimit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AppliesToAdministrators")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("EntityKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("MaxScope")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "EntityKey")
+                        .IsUnique();
+
+                    b.ToTable("TenantScopeLimits", "platform");
                 });
 
             modelBuilder.Entity("Modulix.Core.Reporting.ReportDefinition", b =>
@@ -11070,6 +11129,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Modulix.Core.Authorization.RoleScopeOverride", b =>
+                {
+                    b.HasOne("Modulix.Core.Authorization.Role", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RoleId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Core.Automation.AutomationRuleVersion", b =>
                 {
                     b.HasOne("Modulix.Core.Automation.AutomationRule", null)
@@ -11214,6 +11283,15 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Infrastructure.Identity.ModulixUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.TenantScopeLimit", b =>
+                {
+                    b.HasOne("Modulix.Core.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

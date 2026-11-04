@@ -72,6 +72,33 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
         return ScopesOf(roles.Any(r => r.IsSystem && r.ViaBusinessUnit is null), roles.Where(r => !r.IsSystem || r.ViaBusinessUnit is null).Select(r => r.Scope));
     }
 
+    /// <summary>
+    /// Üyeliğin bir kayıt türündeki kayıt kapsamları (ADR-0030 K2/K3): her etkin rol için tür istisnası varsa o, yoksa rolün
+    /// varsayılan kapsamı; sonuç kümeler birleştirilerek kullanılır (<see cref="ScopesOf"/>). <c>IsAdministrator</c> yönetici
+    /// sistem rolünün doğrudan atanmış olduğunu söyler (platform tavanı yöneticiyi yalnızca <c>AppliesToAdministrators</c> ise bağlar).
+    /// Platform tavanı burada uygulanmaz; <see cref="MembershipDataScope"/> uygular.
+    /// </summary>
+    public async Task<(bool IsAdministrator, IReadOnlyList<RecordScope> Scopes)> GetScopesForAsync(
+        Guid membershipId, string entityKey, CancellationToken cancellationToken)
+    {
+        var roles = await LoadRolesAsync(membershipId, cancellationToken);
+        var effective = roles.Where(r => !r.IsSystem || r.ViaBusinessUnit is null).ToList();
+        var isAdministrator = roles.Any(r => r.IsSystem && r.ViaBusinessUnit is null);
+        if (isAdministrator || effective.Count == 0)
+        {
+            return (isAdministrator, ScopesOf(isAdministrator, []));
+        }
+
+        // İstisnalar yalnızca kapsamı hesaplanan türde ve istisnası olan rollerde okunur; istisna yoksa ek sorgu yapılmaz.
+        var roleIds = effective.Select(r => r.Id).ToList();
+        var overrides = await db.RoleScopeOverrides.AsNoTracking()
+            .Where(o => o.EntityKey == entityKey && roleIds.Contains(o.RoleId))
+            .Select(o => new { o.RoleId, o.Scope })
+            .ToListAsync(cancellationToken);
+        var byRole = overrides.ToDictionary(o => o.RoleId, o => o.Scope);
+        return (false, ScopesOf(false, effective.Select(r => byRole.TryGetValue(r.Id, out var scope) ? scope : r.Scope)));
+    }
+
     /// <summary>Üyeliğin rolleri kapsam dışı ortak kayıtları gizliyor mu (ADR-0026 K8); bkz. <see cref="MembershipAccess.HidesOutOfScopeShared"/>.</summary>
     public async Task<bool> HidesOutOfScopeSharedAsync(Guid membershipId, CancellationToken cancellationToken)
     {
