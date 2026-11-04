@@ -34,6 +34,8 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["platform.Capabilities"] = "Yetenek kataloğu (ADR-0029): TenantId yok.",
         ["platform.CapabilityDependencies"] = "Yetenek bağımlılık grafiği (ADR-0029): TenantId yok.",
         ["platform.ActivityNodeCapabilities"] = "Faaliyet–yetenek eşlemesi (ADR-0029): TenantId yok.",
+        ["platform.RulePackages"] = "Alan kuralı paketi (ADR-0029 K8): platform kataloğu, TenantId yok.",
+        ["platform.RulePackageVersions"] = "Alan kuralı paketi sürümü (ADR-0029 K8): platform kataloğu, TenantId yok.",
     };
 
     [Fact]

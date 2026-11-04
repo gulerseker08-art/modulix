@@ -14,6 +14,7 @@ using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Core.Reporting;
+using Modulix.Core.FieldRules;
 using Modulix.Core.Sectors;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Email;
@@ -140,6 +141,9 @@ public class ModulixDbContext(
     public DbSet<ActivityNodeCapability> ActivityNodeCapabilities => Set<ActivityNodeCapability>();
 
     public DbSet<TenantActivitySelection> ActivitySelections => Set<TenantActivitySelection>();
+    public DbSet<RulePackage> RulePackages => Set<RulePackage>();
+    public DbSet<RulePackageVersion> RulePackageVersions => Set<RulePackageVersion>();
+    public DbSet<TenantRuleAdaptation> RuleAdaptations => Set<TenantRuleAdaptation>();
 
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
