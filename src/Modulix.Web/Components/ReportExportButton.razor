@@ -1,0 +1,102 @@
+@* "CSV olarak dışa aktar" (ADR-0026 dilim 4). Yalnızca core.reports.export izni olana görünür. Kayıtlı raporda ReportId, kayıtsız tanımda (önizleme,
+   hazır rapor) Spec verilir. Dosya sunucuda ekrandaki sonuçla aynı hesaptan, çağıranın yetkisiyle üretilir; hassas alanlar yetki yoksa dosyada olmaz. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject IJSRuntime Js
+
+@if (Session.Can(ReportAccess.Export))
+{
+    <div class="report-export">
+        <button type="button" class="btn btn-outline-secondary" disabled="@(Disabled || busy)" aria-describedby="rx-help" @onclick="ExportAsync">
+            @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
+            CSV olarak dışa aktar
+        </button>
+        <span id="rx-help" class="form-text ms-2">Ekrandaki sonuçla aynı hesaptan, yalnızca sizin yetkinizle üretilir; yetkiniz olmayan hassas alanlar dosyada yer almaz.</span>
+
+        <div aria-live="polite">
+            @if (error is not null)
+            {
+                <div class="alert alert-danger mt-2" role="alert">
+                    @error
+                    <ReportIssueList Issues="issues" />
+                </div>
+            }
+
+            @if (export is not null)
+            {
+                <div class="alert alert-success mt-2" role="status">
+                    <strong>Dosya hazır:</strong> @export.FileName
+                    (@export.RowCount.ToString("N0", Regional.Numbers) satır, @ReportCenterLabels.Size(export.SizeBytes)).
+                    Dosya @CrmLabels.Time(export.ExpiresAt) tarihine kadar saklanır.
+                    <button type="button" class="btn btn-primary btn-sm ms-2" disabled="@busy" @onclick="DownloadAsync">İndir</button>
+                    <a class="ms-2" href="raporlar/disa-aktarimlar">Dışa aktarımlarım</a>
+                </div>
+                @if (export.Truncated)
+                {
+                    <div class="alert alert-warning" role="status">
+                        <strong>Dosya eksik olabilir.</strong> Okuma sınırı aşıldığı için tüm kayıtlar dosyaya girmemiş olabilir; süzgeçlerle daraltıp yeniden dışa aktarın.
+                    </div>
+                }
+            }
+
+            @if (downloadError is not null)
+            {
+                <div class="alert alert-danger" role="alert">@downloadError</div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private ReportExportDto? export;
+    private string? error;
+    private string? downloadError;
+    private IReadOnlyList<ReportIssueDto> issues = [];
+    private bool busy;
+
+    /// <summary>Kayıtlı rapor; doluysa <c>/{id}/exports</c> çağrılır.</summary>
+    [Parameter] public Guid? ReportId { get; set; }
+
+    /// <summary>Kayıtsız tanım (ReportId boşken): oluşturucu önizlemesi ya da hazır rapor.</summary>
+    [Parameter] public ReportSpecDto? Spec { get; set; }
+
+    /// <summary>Kayıtsız tanımda dosya/rapor adı.</summary>
+    [Parameter] public string? Name { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    private async Task ExportAsync()
+    {
+        busy = true;
+        error = null;
+        downloadError = null;
+        export = null;
+        issues = [];
+        var result = ReportId is { } id
+            ? await Api.PostAsync<ReportExportDto>($"/api/reports/{id}/exports", new { })
+            : await Api.PostAsync<ReportExportDto>("/api/reports/exports", new ExportReportRequest(Spec, string.IsNullOrWhiteSpace(Name) ? null : Name.Trim()));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            export = result.Value;
+            return;
+        }
+
+        error = result.Status == System.Net.HttpStatusCode.Forbidden
+            ? $"Dışa aktarma yetkiniz yok ya da raporun modülü kapalı. {result.Error}"
+            : result.Error;
+        issues = result.Issues;
+    }
+
+    private async Task DownloadAsync()
+    {
+        if (export is null)
+        {
+            return;
+        }
+
+        busy = true;
+        downloadError = await ReportExportDownloads.DownloadAsync(Api, Js, export);
+        busy = false;
+    }
+}

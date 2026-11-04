@@ -182,6 +182,67 @@ public static class ReportCenterLabels
     public static decimal? Decimal(JsonElement cell) =>
         cell.ValueKind == JsonValueKind.Number && cell.TryGetDecimal(out var value) ? value : null;
 
+    // ---- Dışa aktarma ve zamanlama (dilim 4)
+
+    public static IReadOnlyList<(string Key, string Label)> Frequencies { get; } = [("daily", "Her gün"), ("weekly", "Her hafta"), ("monthly", "Her ay")];
+
+    /// <summary>Haftanın günleri Pazartesi'den başlar (Türkiye); anahtarlar sözleşmedeki sunday..saturday'dir.</summary>
+    public static IReadOnlyList<(string Key, string Label)> Weekdays { get; } =
+    [
+        ("monday", "pazartesi"), ("tuesday", "salı"), ("wednesday", "çarşamba"), ("thursday", "perşembe"),
+        ("friday", "cuma"), ("saturday", "cumartesi"), ("sunday", "pazar"),
+    ];
+
+    public const int MaxSchedules = 10;
+
+    public static string ExportSource(string key) => key switch { "schedule" => "Zamanlanmış", "manual" => "Elle", _ => key };
+
+    public static string Hour(int hour) => $"{hour:00}:00";
+
+    // "15'i", "3'ü": ayın günü (1-28) belirtme hâli eki, sayının okunuşuna göre.
+    private static readonly Dictionary<int, string> DaySuffix = new()
+    {
+        [1] = "i", [2] = "si", [3] = "ü", [4] = "ü", [5] = "i", [6] = "sı", [7] = "si", [8] = "i", [9] = "u", [10] = "u",
+        [11] = "i", [12] = "si", [13] = "ü", [14] = "ü", [15] = "i", [16] = "sı", [17] = "si", [18] = "i", [19] = "u", [20] = "si",
+        [21] = "i", [22] = "si", [23] = "ü", [24] = "ü", [25] = "i", [26] = "sı", [27] = "si", [28] = "i",
+    };
+
+    /// <summary>Sıklık özeti: "Her gün 09:00", "Her pazartesi 07:00", "Her ayın 15'i 06:00". Saat firmanın saat dilimindeki yerel saattir.</summary>
+    public static string ScheduleSummary(ReportScheduleDto schedule) => schedule.Frequency switch
+    {
+        "weekly" => $"Her {Find(Weekdays, schedule.DayOfWeek)} {Hour(schedule.Hour)}",
+        "monthly" when schedule.DayOfMonth is { } day => $"Her ayın {day}'{DaySuffix.GetValueOrDefault(day, "i")} {Hour(schedule.Hour)}",
+        "monthly" => $"Her ay {Hour(schedule.Hour)}",
+        _ => $"Her gün {Hour(schedule.Hour)}",
+    };
+
+    /// <summary>Son çalışma durumu (Delivered/Stopped/Failed; büyük/küçük harf fark etmez).</summary>
+    public static string ScheduleStatus(string? status) => status?.ToLowerInvariant() switch
+    {
+        "delivered" => "Teslim edildi",
+        "stopped" => "Durduruldu",
+        "failed" => "Başarısız",
+        null or "" => "Henüz çalışmadı",
+        _ => status,
+    };
+
+    public static string Size(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{(bytes / 1024d).ToString("0.#", Regional.Numbers)} KB",
+        _ => $"{(bytes / 1024d / 1024d).ToString("0.##", Regional.Numbers)} MB",
+    };
+
+    /// <summary>Dosya indirme hata kodlarının kullanıcıya söylenen karşılıkları (sunucunun iletisi varsa o da eklenir).</summary>
+    public static string DownloadError(System.Net.HttpStatusCode status, string? serverMessage) => status switch
+    {
+        System.Net.HttpStatusCode.NotFound => "Dosya bulunamadı; silinmiş olabilir.",
+        System.Net.HttpStatusCode.Gone => "Dosyanın süresi doldu (dosyalar 24 saat saklanır). Raporu yeniden dışa aktarın.",
+        System.Net.HttpStatusCode.Forbidden => "Dışa aktarma yetkiniz yok ya da raporun modülü bu firmada kapalı; dosya indirilemez.",
+        System.Net.HttpStatusCode.Conflict => "Yetkiniz dosya hazırlandıktan sonra değişti; güvenlik için dosya verilmiyor. Raporu yeniden dışa aktarın.",
+        _ => serverMessage ?? "Dosya indirilemedi.",
+    };
+
     /// <summary>Kayıt bağlantısı: sütun kümesinin <c>recordPath</c>'indeki <c>{id}</c> kayıt kimliğiyle değişir.</summary>
     public static string? RecordLink(string? recordPath, Guid? id) =>
         recordPath is { Length: > 0 } && id is { } recordId ? recordPath.Replace("{id}", recordId.ToString(), StringComparison.Ordinal).TrimStart('/') : null;
