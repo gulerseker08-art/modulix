@@ -41,6 +41,13 @@ public static class PlatformAccessRules
         ["POST /api/platform/users/reset-two-factor"] = Sup | Ops,
         ["POST /api/platform/events/deliveries/retry"] = Sup | Ops,
         ["POST /api/platform/events/deliveries/skip"] = Sup | Ops,
+        // Sektör ve faaliyet kataloğu (ADR-0029): ürün standardı katalog; Operasyon yönetir.
+        ["POST /api/platform/sectors/nodes"] = Ops,
+        ["PUT /api/platform/sectors/nodes/{id}"] = Ops,
+        ["PUT /api/platform/sectors/nodes/{id}/active"] = Ops,
+        ["PUT /api/platform/sectors/nodes/{id}/capabilities"] = Ops,
+        ["POST /api/platform/sectors/capabilities"] = Ops,
+        ["PUT /api/platform/sectors/capabilities/{code}/dependencies"] = Ops,
         ["POST /api/platform/plans"] = Fin,
         ["PUT /api/platform/plans/{planId}"] = Fin,
         ["PUT /api/platform/tenants/{tenantId}/plan"] = Fin,
