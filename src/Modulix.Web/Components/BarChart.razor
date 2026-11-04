@@ -10,7 +10,7 @@
         <div class="bar-row">
             <span class="bar-label">@Slices[i].Label</span>
             <span class="bar-track"><span class="bar-fill chart-bg-c@(i % 6)" style="width:@width.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></span></span>
-            <strong class="bar-value">@Slices[i].Value.ToString("N0", Regional.Numbers)</strong>
+            <strong class="bar-value">@Slices[i].Value.ToString(ValueFormat, Regional.Numbers)</strong>
         </div>
     }
 </div>
@@ -19,4 +19,7 @@
     [Parameter, EditorRequired] public IReadOnlyList<ChartSlice> Slices { get; set; } = [];
 
     [Parameter] public string Title { get; set; } = "Çubuk grafik";
+
+    /// <summary>Değer etiketinin sayı biçimi; ondalıklı değerlerde (ortalama, tutar) "N2" verilir.</summary>
+    [Parameter] public string ValueFormat { get; set; } = "N0";
 }

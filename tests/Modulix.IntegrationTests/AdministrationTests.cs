@@ -41,7 +41,8 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Equal(
             corePermissions,
             typeof(CoreAccess).GetFields().Where(f => f.Name != nameof(CoreAccess.ModuleKey)).Select(f => (string)f.GetValue(null)!).Order());
-        Assert.Equal(corePermissions, CoreAccess.AdministrationPermissions.Order());
+        // Rapor merkezi izinleri yönetim değildir: "Yönetim" bölümünü açmazlar.
+        Assert.Equal(corePermissions.Where(p => !p.StartsWith("core.reports.", StringComparison.Ordinal)), CoreAccess.AdministrationPermissions.Order());
     }
 
     [Fact]
@@ -104,7 +105,7 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
         using var client = await LoginAsync(admin);
 
         var before = await client.GetFromJsonAsync<MyAccessResponse>("/api/tenant/access");
-        Assert.Equal([ReadAudit, "core.automation-logs.read", "core.automation.approve", "core.automation.manage", "core.automation.publish", "core.automation.read", "core.automation.run", ManageCommunication, ReadCommunication, SuppressCommunication, ManageCompanies, ManageCustomization, ManageRoles, ManageSettings, ManageUsers], before!.Permissions);
+        Assert.Equal([ReadAudit, "core.automation-logs.read", "core.automation.approve", "core.automation.manage", "core.automation.publish", "core.automation.read", "core.automation.run", ManageCommunication, ReadCommunication, SuppressCommunication, ManageCompanies, ManageCustomization, "core.reports.manage", "core.reports.read", "core.reports.share", ManageRoles, ManageSettings, ManageUsers], before!.Permissions);
 
         // Sonradan açılan modülün izinleri yöneticiye kendiliğinden gelir.
         await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);

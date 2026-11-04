@@ -18,7 +18,7 @@ internal abstract class CrmActivityLinkTarget(IModuleData data, IRecordAccess ac
 
     public async Task<bool> IsVisibleAsync(Guid recordId, CancellationToken cancellationToken) =>
         await access.CanAsync(EntityKey, RecordOperation.Read, cancellationToken)
-        && await ExistsInScopeAsync(recordId, await access.GetOwnersAsync(cancellationToken), cancellationToken);
+        && await ExistsInScopeAsync(recordId, await access.GetOwnersAsync(EntityKey, cancellationToken), cancellationToken);
 
     public async Task<string?> GetTitleAsync(Guid recordId, CancellationToken cancellationToken) =>
         await IsVisibleAsync(recordId, cancellationToken) ? await TitleAsync(recordId, cancellationToken) : null;

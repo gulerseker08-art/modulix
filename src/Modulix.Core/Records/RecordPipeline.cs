@@ -66,7 +66,7 @@ public sealed class RecordPipeline(
         var normalized = query with
         {
             // Kapsam sorguda uygulanır; sayfalama ve toplam sayı doğru kalır.
-            Owners = !store!.UsesOwnerScope ? null : await dataScope.GetOwnersAsync(tenant!, cancellationToken),
+            Owners = !store!.UsesOwnerScope ? null : await dataScope.GetOwnersAsync(tenant!, store.EntityKey, cancellationToken),
             // Şirket kapsamı (ADR-0008): şirket kapsamlı depoda yalnızca erişilebilir şirketlerin kayıtları.
             Companies = store.CompanyField is null ? null : CompanyScope(),
             Page = Math.Max(1, query.Page),
@@ -470,7 +470,7 @@ public sealed class RecordPipeline(
             return false;
         }
 
-        if (!store.UsesOwnerScope || await dataScope.GetOwnersAsync(tenant, cancellationToken) is not { } owners)
+        if (!store.UsesOwnerScope || await dataScope.GetOwnersAsync(tenant, store.EntityKey, cancellationToken) is not { } owners)
         {
             return true;
         }

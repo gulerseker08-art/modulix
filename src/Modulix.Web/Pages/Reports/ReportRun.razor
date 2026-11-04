@@ -1,0 +1,456 @@
+@page "/raporlar/{id:guid}"
+@page "/raporlar/hazir/{key}"
+@using System.Net
+@using Modulix.Shared.Auth
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(title ?? "Rapor") · Modulix</PageTitle>
+
+<AuthGate Permission="@ReportAccess.Read">
+    <a class="back-link" href="raporlar"><AppIcon Name="arrow-left" Size="16" /> Raporlar</a>
+
+    @if (loading)
+    {
+        <p class="text-muted" role="status">Rapor yükleniyor…</p>
+    }
+    else if (loadError is not null)
+    {
+        <div class="alert @(notFound ? "alert-warning" : "alert-danger")" role="alert">
+            @loadError
+            @if (!notFound)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadAsync">Tekrar dene</button>
+            }
+        </div>
+    }
+    else if (title is not null)
+    {
+        <div class="page-header">
+            <div>
+                <h1>@title</h1>
+                @if (!string.IsNullOrWhiteSpace(description))
+                {
+                    <p class="text-muted mb-0">@description</p>
+                }
+                <div class="header-meta">
+                    <span class="badge tag">Veri kümesi: @datasetName</span>
+                    @if (detail is not null)
+                    {
+                        var summary = detail.Summary;
+                        <span class="badge tag">Sahibi: @(summary.IsOwner ? "Siz" : summary.OwnerName ?? "—")</span>
+                        <span class="badge tag">Paylaşım: @ReportCenterLabels.Visibility(summary.Visibility, summary.SharedWithCount)</span>
+                        <span class="badge @ReportCenterLabels.HealthBadge(summary.Health)">Durum: @ReportCenterLabels.Health(summary.Health)</span>
+                    }
+                    else
+                    {
+                        <span class="badge tag">Hazır rapor</span>
+                    }
+                </div>
+            </div>
+            <div class="header-actions">
+                <button type="button" class="btn btn-outline-secondary" disabled="@running" @onclick="() => RunAsync(1)">Yenile</button>
+                @if (detail is not null)
+                {
+                    <button type="button" class="btn btn-outline-secondary report-star" aria-pressed="@(detail.Summary.IsFavorite ? "true" : "false")"
+                            aria-label="@(detail.Summary.IsFavorite ? "Favorilerden çıkar" : "Favorilere ekle")" disabled="@busy" @onclick="ToggleFavoriteAsync">
+                        <span aria-hidden="true">@(detail.Summary.IsFavorite ? "★" : "☆")</span>
+                    </button>
+                    @if (detail.Summary.IsOwner && Session.Can(ReportAccess.Manage))
+                    {
+                        <a class="btn btn-outline-secondary" href="raporlar/@detail.Summary.Id/duzenle">Düzenle</a>
+                    }
+                    @if (detail.Summary.IsOwner && Session.Can(ReportAccess.Share))
+                    {
+                        <button type="button" class="btn btn-outline-secondary" aria-expanded="@(sharing ? "true" : "false")" aria-controls="rr-share" @onclick="ToggleSharingAsync">Paylaş</button>
+                    }
+                }
+                @if (Session.Can(ReportAccess.Manage))
+                {
+                    <a class="btn btn-primary" href="@CopyLink()">Kopyasını oluştur</a>
+                }
+            </div>
+        </div>
+
+        @if (detail is { Summary.Health: not "ok" } unhealthy)
+        {
+            <div class="alert alert-warning" role="status">
+                <strong>@ReportCenterLabels.Health(unhealthy.Summary.Health).</strong>
+                @(unhealthy.Summary.HealthMessage ?? "Rapor şu an çalıştırılamıyor.")
+                @if (unhealthy.Summary.IsOwner && Session.Can(ReportAccess.Manage))
+                {
+                    <text> Raporu <a href="raporlar/@unhealthy.Summary.Id/duzenle">düzenleyerek</a> sorunlu alanları çıkarabilirsiniz.</text>
+                }
+            </div>
+        }
+
+        @if (actionMessage is not null)
+        {
+            <div class="alert @(actionFailed ? "alert-danger" : "alert-success")" role="@(actionFailed ? "alert" : "status")">@actionMessage</div>
+        }
+
+        @if (sharing && detail is not null)
+        {
+            <section id="rr-share" class="report-builder-section" aria-labelledby="rr-share-title">
+                <h2 id="rr-share-title">Paylaşım</h2>
+                <p class="text-muted">
+                    Paylaşım veri erişimi vermez: raporu açan herkes verileri kendi yetkisi ve veri kapsamıyla görür; yetkisi olmayan kullanıcıya rapor yalnızca "yetkiniz yok" gösterir.
+                </p>
+                <fieldset class="mb-3">
+                    <legend class="form-label">Kimler görebilsin?</legend>
+                    @foreach (var (key, label) in ReportCenterLabels.Visibilities)
+                    {
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="rr-visibility" id="rr-vis-@key" checked="@(shareVisibility == key)" @onchange="() => shareVisibility = key" />
+                            <label class="form-check-label" for="rr-vis-@key">@label</label>
+                        </div>
+                    }
+                </fieldset>
+
+                @if (shareVisibility == "users")
+                {
+                    <div class="mb-3">
+                        <label class="form-label" for="rr-member-filter">Kullanıcı ara</label>
+                        <input id="rr-member-filter" class="form-control mb-2" type="search" placeholder="Ad yazın" @bind="memberFilter" @bind:event="oninput" />
+                        @if (membersError is not null)
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                @membersError
+                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadMembersAsync">Tekrar dene</button>
+                            </div>
+                        }
+                        else if (members is null)
+                        {
+                            <p class="text-muted" role="status">Kullanıcılar yükleniyor…</p>
+                        }
+                        else
+                        {
+                            <div class="report-member-list" role="group" aria-label="Paylaşılacak kullanıcılar">
+                                @foreach (var member in FilteredMembers())
+                                {
+                                    var id = member.UserId;
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="rr-mem-@id" checked="@shareUsers.Contains(id)" @onchange="e => ToggleMember(id, e.Value is true)" />
+                                        <label class="form-check-label" for="rr-mem-@id">@member.DisplayName</label>
+                                    </div>
+                                }
+                                @if (!FilteredMembers().Any())
+                                {
+                                    <p class="text-muted mb-0">Kullanıcı bulunamadı.</p>
+                                }
+                            </div>
+                            <p class="small text-muted mt-1" role="status">@shareUsers.Count kullanıcı seçili.</p>
+                        }
+                    </div>
+                }
+
+                @if (shareError is not null)
+                {
+                    <div class="alert alert-danger" role="alert">
+                        @shareError
+                        @if (shareConflict)
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadAsync">Sayfayı yenile</button>
+                        }
+                    </div>
+                }
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveSharingAsync">
+                        @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
+                        Paylaşımı kaydet
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => sharing = false">Vazgeç</button>
+                </div>
+            </section>
+        }
+
+        @if (runError is not null)
+        {
+            <div class="alert @(runForbidden ? "alert-warning" : "alert-danger")" role="alert">
+                @runError
+                @if (!runForbidden)
+                {
+                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@running" @onclick="() => RunAsync(pageNumber)">Tekrar dene</button>
+                }
+            </div>
+        }
+
+        <ReportResultView Result="result" Loading="running" DrillRunner="DrillAsync" PageChanged="RunAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const int PageSize = 50;
+
+    [Parameter] public Guid? Id { get; set; }
+
+    [Parameter] public string? Key { get; set; }
+
+    private Guid? loadedId;
+    private Guid? currentId;
+    private string? currentKey;
+    private string? loadedKey;
+
+    private ReportDetailDto? detail;
+    private ReportSpecDto? readySpec;
+    private string? title;
+    private string? description;
+    private string? datasetName;
+
+    private bool loading = true;
+    private string? loadError;
+    private bool notFound;
+
+    private ReportResultDto? result;
+    private bool running;
+    private string? runError;
+    private bool runForbidden;
+    private int pageNumber = 1;
+    private int runRequest;
+
+    private bool busy;
+    private string? actionMessage;
+    private bool actionFailed;
+
+    private bool sharing;
+    private string shareVisibility = "private";
+    private readonly HashSet<Guid> shareUsers = [];
+    private List<TenantMemberResponse>? members;
+    private string? membersError;
+    private string memberFilter = string.Empty;
+    private string? shareError;
+    private bool shareConflict;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(ReportAccess.Read))
+        {
+            return;
+        }
+
+        // İki rota aynı bileşeni kullanır; bileşen yeniden kullanılırsa rotada olmayan parametre eski değerinde kalabilir, bu yüzden adresten ayıklanır.
+        var ready = Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("raporlar/hazir/", StringComparison.OrdinalIgnoreCase);
+        var nextId = ready ? null : Id;
+        var nextKey = ready ? Key : null;
+        if (loadedId == nextId && loadedKey == nextKey && (title is not null || loadError is not null))
+        {
+            return;
+        }
+
+        loadedId = nextId;
+        loadedKey = nextKey;
+        currentId = nextId;
+        currentKey = nextKey;
+        await LoadAsync();
+    }
+
+    private string CopyLink() => currentId is { } id
+        ? $"raporlar/yeni?kopya={id}"
+        : $"raporlar/yeni?hazir={Uri.EscapeDataString(currentKey ?? string.Empty)}";
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        loadError = null;
+        notFound = false;
+        title = null;
+        detail = null;
+        readySpec = null;
+        result = null;
+        runError = null;
+        sharing = false;
+        actionMessage = null;
+        shareError = null;
+
+        if (currentId is { } id)
+        {
+            var response = await Api.GetAsync<ReportDetailDto>($"/api/reports/{id}");
+            if (!response.IsSuccess)
+            {
+                loading = false;
+                notFound = response.Status == HttpStatusCode.NotFound;
+                loadError = notFound ? "Rapor bulunamadı ya da bu raporu görme yetkiniz yok." : response.Error;
+                return;
+            }
+
+            detail = response.Value;
+            title = detail!.Summary.Name;
+            description = detail.Summary.Description;
+            datasetName = detail.Summary.DatasetName ?? detail.Summary.DatasetKey;
+        }
+        else
+        {
+            var response = await Api.GetAsync<ReportCatalogDto>("/api/reports/catalog");
+            if (!response.IsSuccess)
+            {
+                loading = false;
+                loadError = response.Error;
+                return;
+            }
+
+            ReportDatasetDto? foundDataset = null;
+            ReadyReportDto? foundReport = null;
+            foreach (var dataset in response.Value!.Datasets)
+            {
+                if (dataset.ReadyReports.FirstOrDefault(r => r.Key == currentKey) is { } ready)
+                {
+                    foundDataset = dataset;
+                    foundReport = ready;
+                    break;
+                }
+            }
+
+            if (foundDataset is null || foundReport is null)
+            {
+                loading = false;
+                notFound = true;
+                loadError = "Hazır rapor bulunamadı. Modül kapalı olabilir ya da bu rapor artık sunulmuyor.";
+                return;
+            }
+
+            readySpec = foundReport.Spec;
+            title = foundReport.Title;
+            description = foundReport.Description;
+            datasetName = foundDataset.Name;
+        }
+
+        loading = false;
+        await RunAsync(1);
+    }
+
+    private async Task RunAsync(int page)
+    {
+        var request = ++runRequest;
+        pageNumber = page;
+        running = true;
+        runError = null;
+        runForbidden = false;
+        var response = currentId is { } id
+            ? await Api.PostAsync<ReportResultDto>($"/api/reports/{id}/run", new RunReportRequest(null, null, page, PageSize))
+            : await Api.PostAsync<ReportResultDto>("/api/reports/run", new RunReportRequest(readySpec, null, page, PageSize));
+        if (request != runRequest)
+        {
+            return;
+        }
+
+        running = false;
+        runError = response.Error;
+        runForbidden = response.Status == HttpStatusCode.Forbidden;
+        if (response.IsSuccess)
+        {
+            result = response.Value;
+        }
+    }
+
+    private Task<ApiResult<ReportResultDto>> DrillAsync(ReportDrillDto drill, int page) => currentId is { } id
+        ? Api.PostAsync<ReportResultDto>($"/api/reports/{id}/run", new RunReportRequest(null, drill, page, PageSize))
+        : Api.PostAsync<ReportResultDto>("/api/reports/run", new RunReportRequest(readySpec, drill, page, PageSize));
+
+    // ---- Favori
+
+    private async Task ToggleFavoriteAsync()
+    {
+        if (detail is null)
+        {
+            return;
+        }
+
+        busy = true;
+        actionMessage = null;
+        var response = await Api.PutAsync<FavoriteResponse>($"/api/reports/{detail.Summary.Id}/favorite", new FavoriteReportRequest(!detail.Summary.IsFavorite));
+        busy = false;
+        if (!response.IsSuccess)
+        {
+            actionMessage = response.Error;
+            actionFailed = true;
+            return;
+        }
+
+        detail = detail with { Summary = detail.Summary with { IsFavorite = response.Value!.Favorite } };
+        actionMessage = detail.Summary.IsFavorite ? "Rapor favorilere eklendi." : "Rapor favorilerden çıkarıldı.";
+        actionFailed = false;
+    }
+
+    // ---- Paylaşım
+
+    private async Task ToggleSharingAsync()
+    {
+        sharing = !sharing;
+        if (!sharing || detail is null)
+        {
+            return;
+        }
+
+        shareError = null;
+        shareConflict = false;
+        shareVisibility = detail.Summary.Visibility;
+        shareUsers.Clear();
+        foreach (var user in detail.SharedWith)
+        {
+            shareUsers.Add(user);
+        }
+
+        if (members is null)
+        {
+            await LoadMembersAsync();
+        }
+    }
+
+    private async Task LoadMembersAsync()
+    {
+        membersError = null;
+        var response = await Api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members");
+        members = response.IsSuccess ? response.Value ?? [] : null;
+        membersError = response.Error;
+    }
+
+    private IEnumerable<TenantMemberResponse> FilteredMembers() =>
+        (members ?? []).Where(m => m.UserId != Session.User?.UserId
+            && (memberFilter.Length == 0 || m.DisplayName.Contains(memberFilter, StringComparison.CurrentCultureIgnoreCase)));
+
+    private void ToggleMember(Guid id, bool selected)
+    {
+        if (selected)
+        {
+            shareUsers.Add(id);
+        }
+        else
+        {
+            shareUsers.Remove(id);
+        }
+    }
+
+    private async Task SaveSharingAsync()
+    {
+        if (detail is null)
+        {
+            return;
+        }
+
+        busy = true;
+        shareError = null;
+        shareConflict = false;
+        var users = shareVisibility == "users" ? shareUsers.ToList() : [];
+        var response = await Api.PutAsync<ReportDetailDto>(
+            $"/api/reports/{detail.Summary.Id}/sharing", new ShareReportRequest(shareVisibility, users, detail.Summary.Version));
+        busy = false;
+        if (!response.IsSuccess)
+        {
+            shareConflict = response.Status == HttpStatusCode.Conflict;
+            shareError = shareConflict
+                ? "Bu rapor başka biri tarafından değiştirilmiş. Değişikliklerinizi kaybetmemek için sayfayı yenileyip paylaşımı yeniden ayarlayın."
+                : response.Error;
+            return;
+        }
+
+        detail = response.Value;
+        sharing = false;
+        actionMessage = "Paylaşım güncellendi.";
+        actionFailed = false;
+    }
+
+    private sealed record FavoriteResponse(bool Favorite);
+}

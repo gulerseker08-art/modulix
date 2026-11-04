@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Modulix.Shared.Reporting;
 
 namespace Modulix.Web.Services;
 
@@ -75,13 +76,13 @@ public sealed class ApiClient(HttpClient http)
                 HttpStatusCode.Forbidden => problem?.Detail ?? problem?.Title ?? "Bu işlem için yetkiniz yok.",
                 HttpStatusCode.NotFound => problem?.Title ?? "Kayıt bulunamadı.",
                 HttpStatusCode.Conflict => problem?.Title ?? "Kayıt başka biri tarafından değiştirildi.",
-                HttpStatusCode.UnprocessableEntity => problem?.Message ?? "Lütfen işaretli alanları düzeltin.",
+                HttpStatusCode.UnprocessableEntity => problem?.Message ?? (problem?.Issues is not null ? problem.Title : null) ?? "Lütfen işaretli alanları düzeltin.",
                 HttpStatusCode.TooManyRequests => "Çok fazla istek gönderdiniz. Lütfen biraz bekleyip tekrar deneyin.",
                 HttpStatusCode.BadRequest when problem?.Errors is { Count: > 0 } errors => errors.Values.SelectMany(e => e).First(),
                 _ => problem?.Title ?? "Beklenmeyen bir hata oluştu.",
             };
 
-            return ApiResult<T>.Fail(response.StatusCode, message, problem?.Errors, problem?.Code);
+            return ApiResult<T>.Fail(response.StatusCode, message, problem?.Errors, problem?.Code, problem?.Issues);
         }
     }
 
@@ -97,16 +98,20 @@ public sealed class ApiClient(HttpClient http)
         }
     }
 
-    private sealed record ApiProblem(string? Title, string? Detail, Dictionary<string, string[]>? Errors, string? Code = null, string? Message = null);
+    private sealed record ApiProblem(string? Title, string? Detail, Dictionary<string, string[]>? Errors, string? Code = null, string? Message = null, List<ReportIssueDto>? Issues = null);
 }
 
 public sealed class ApiResult<T>
 {
     private static readonly IReadOnlyDictionary<string, string[]> NoErrors = new Dictionary<string, string[]>();
 
-    private ApiResult(T? value, HttpStatusCode status, string? error, IReadOnlyDictionary<string, string[]>? fieldErrors, string? code = null)
+    private static readonly IReadOnlyList<ReportIssueDto> NoIssues = [];
+
+    private ApiResult(
+        T? value, HttpStatusCode status, string? error, IReadOnlyDictionary<string, string[]>? fieldErrors, string? code = null, IReadOnlyList<ReportIssueDto>? issues = null)
     {
         Code = code;
+        Issues = issues ?? NoIssues;
         Value = value;
         Status = status;
         Error = error;
@@ -130,6 +135,10 @@ public sealed class ApiResult<T>
 
     public static ApiResult<T> Ok(T value) => new(value, HttpStatusCode.OK, null, null);
 
-    public static ApiResult<T> Fail(HttpStatusCode status, string error, IReadOnlyDictionary<string, string[]>? fieldErrors = null, string? code = null) =>
-        new(default, status, error, fieldErrors, code);
+    /// <summary>Rapor merkezi 422 yanıtının <c>issues</c> uzantısı (sütun/süzgeç sorunları); yoksa boş.</summary>
+    public IReadOnlyList<ReportIssueDto> Issues { get; }
+
+    public static ApiResult<T> Fail(
+        HttpStatusCode status, string error, IReadOnlyDictionary<string, string[]>? fieldErrors = null, string? code = null, IReadOnlyList<ReportIssueDto>? issues = null) =>
+        new(default, status, error, fieldErrors, code, issues);
 }

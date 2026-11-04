@@ -291,7 +291,7 @@ internal sealed class SalesAnalytics(
 
         return new Ctx(
             policy, period, from, toExclusive, asOf, now, today, (query.Currency ?? policy.DefaultCurrency).Trim().ToUpperInvariant(),
-            await access.HasPermissionAsync(CrmModule.Permissions.OpportunityAmountsRead, cancellationToken), await recordAccess.GetOwnersAsync(cancellationToken));
+            await access.HasPermissionAsync(CrmModule.Permissions.OpportunityAmountsRead, cancellationToken), await recordAccess.GetOwnersAsync(CrmModule.Entities.Opportunity, cancellationToken));
     }
 
     private static List<string> Common(Ctx ctx, bool truncated, bool amounts)

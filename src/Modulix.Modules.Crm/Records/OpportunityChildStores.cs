@@ -18,7 +18,7 @@ internal static class OpportunityLinks
             return false;
         }
 
-        var scope = await context.Access.GetOwnersAsync(cancellationToken);
+        var scope = await context.Access.GetOwnersAsync(CrmModule.Entities.Opportunity, cancellationToken);
         return scope is null || (owner.OwnerId is { } ownerId && scope.Contains(ownerId));
     }
 

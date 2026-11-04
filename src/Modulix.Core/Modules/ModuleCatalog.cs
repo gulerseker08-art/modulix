@@ -205,6 +205,9 @@ public sealed partial class ModuleCatalog
 
         // Kural yetenekleri izinlere, modüllere ve lookup'lara başvurur; hepsi okunduktan sonra doğrulanır (ADR-0027).
         RegisterAutomation();
+
+        // Rapor veri kümeleri seçim listelerine, lookup'lara ve özelleştirilebilir kayıt türlerine başvurur (ADR-0026, dilim 3).
+        RegisterReporting();
     }
 
     /// <summary>"Salt okur" şablonu: açık modüllerin tüm görüntüleme izinleri; çekirdek tanımlar.</summary>

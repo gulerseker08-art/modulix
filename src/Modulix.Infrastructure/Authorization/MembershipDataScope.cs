@@ -17,8 +17,11 @@ internal sealed class MembershipDataScope(
 {
     private (Guid MembershipId, IReadOnlySet<Guid>? Owners)? cached;
 
-    public async Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, CancellationToken cancellationToken)
+    // Dilim 1 (ADR-0029): tür anahtarı iletilir ama kapsam henüz türe göre değişmez; sonuç üyelik başına tek hesaptır.
+    public async Task<IReadOnlySet<Guid>?> GetOwnersAsync(TenantContext tenant, string entityKey, CancellationToken cancellationToken)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(entityKey);
+
         if (handling.Subscription is not null)
         {
             return null;
