@@ -1617,6 +1617,50 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("PlatformAuditLog", "platform");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Platform.SupportAccessGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EndReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("EndedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("GrantedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("MembershipId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MembershipId", "ExpiresAt");
+
+                    b.HasIndex("TenantId", "GrantedAt");
+
+                    b.ToTable("SupportAccessGrants", "platform");
+                });
+
             modelBuilder.Entity("Modulix.Core.Platform.Tenant", b =>
                 {
                     b.Property<Guid>("Id")

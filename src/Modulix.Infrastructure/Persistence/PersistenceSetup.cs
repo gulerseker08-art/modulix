@@ -86,6 +86,7 @@ public static class PersistenceSetup
         services.AddScoped<IEntitlementResolver, Modulix.Infrastructure.Platform.EntitlementResolver>();
         services.AddScoped<IPlanAdministration, Modulix.Infrastructure.Platform.PlanAdministration>();
         services.AddScoped<IPlatformHealth, Modulix.Infrastructure.Platform.PlatformHealth>();
+        services.AddScoped<ISupportAccess, Modulix.Infrastructure.Platform.SupportAccessService>();
         services.AddScoped<IPlatformTeam, Modulix.Infrastructure.Platform.PlatformTeam>();
         services.AddScoped<AdministratorGuard>();
         services.AddScoped<IRoleService, RoleService>();

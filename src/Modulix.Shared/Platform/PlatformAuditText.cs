@@ -16,6 +16,8 @@ public static class PlatformAuditText
         ("tenant.administrator-invited", "Yönetici davet edildi"),
         ("tenant.profile-applied", "Sektör profili uygulandı"),
         ("user.two-factor-reset", "İki adımlı doğrulama sıfırlandı"),
+        ("tenant.support-access-granted", "Destek erişimi açıldı"),
+        ("tenant.support-access-revoked", "Destek erişimi kapatıldı"),
     ];
 
     public static string Of(string action) => All.FirstOrDefault(a => a.Action == action).Text ?? action;

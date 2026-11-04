@@ -20,6 +20,8 @@ public static class PlatformAuditActions
     public const string LimitOverridden = "tenant.limit-overridden";
     public const string LimitRevoked = "tenant.limit-revoked";
     public const string TeamChanged = "platform.team-changed";
+    public const string SupportAccessGranted = "tenant.support-access-granted";
+    public const string SupportAccessRevoked = "tenant.support-access-revoked";
 }
 
 /// <summary>

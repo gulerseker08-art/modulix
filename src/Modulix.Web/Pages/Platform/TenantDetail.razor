@@ -120,6 +120,8 @@
 
         <TenantPlanSection TenantId="TenantId" Changed="LoadAsync" />
 
+        <TenantSupportSection TenantId="TenantId" Operational="IsOperational(tenant.Status)" />
+
         @if (profiles.Count > 0)
         {
             <section class="detail-section">
