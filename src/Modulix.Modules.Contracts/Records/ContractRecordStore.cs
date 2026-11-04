@@ -317,7 +317,7 @@ internal static class ContractChildren
     public static async Task<Contract> EditableContractAsync(ContractsStoreContext context, Guid contractId, string field, CancellationToken cancellationToken)
     {
         var contract = await context.Data.Set<Contract>().SingleOrDefaultAsync(c => c.Id == contractId, cancellationToken);
-        if (contract is not null && !context.Gate.IsOpen && await context.Access.GetOwnersAsync(cancellationToken) is { } owners && !owners.Contains(contract.OwnerId ?? Guid.Empty))
+        if (contract is not null && !context.Gate.IsOpen && await context.Access.GetOwnersAsync(ContractsModule.Entities.Contract, cancellationToken) is { } owners && !owners.Contains(contract.OwnerId ?? Guid.Empty))
         {
             contract = null;
         }

@@ -159,7 +159,7 @@ public class CrmRecordStoreValidationTests
 
     private sealed class NoAccess : IRecordAccess
     {
-        public Task<IReadOnlySet<Guid>?> GetOwnersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlySet<Guid>?>(null);
+        public Task<IReadOnlySet<Guid>?> GetOwnersAsync(string entityKey, CancellationToken cancellationToken) => Task.FromResult<IReadOnlySet<Guid>?>(null);
 
         public Task<bool> CanAsync(string entityKey, RecordOperation operation, CancellationToken cancellationToken) => Task.FromResult(true);
     }
