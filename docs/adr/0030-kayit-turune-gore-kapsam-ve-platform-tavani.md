@@ -1,8 +1,8 @@
-# ADR-0029 — Kayıt türüne göre kayıt kapsamı ve platform görünürlük tavanı
+# ADR-0030 — Kayıt türüne göre kayıt kapsamı ve platform görünürlük tavanı
 
-Durum: **taslak** (3 Kasım 2026, tartışma için; kabul edilmedi). Bu belge tek başına hiçbir şeyi uygulamaz. "Doğrulandı" yazılanlar kodda okunmuş, "doğrulanmadı" yazılanlar bölüm 9'da listelenmiştir.
+Durum: **taslak** (3 Kasım 2026; açık kararlar 4 Kasım 2026'da cevaplandı, bölüm 7; dilim 1 uygulandı, dilim 2 bekliyor). Bu belge tek başına hiçbir şeyi uygulamaz. "Doğrulandı" yazılanlar kodda okunmuş, "doğrulanmadı" yazılanlar bölüm 9'da listelenmiştir.
 
-Numara notu: `docs/adr` altında iki belge 0026, `0027` otomasyon ve `0028` platform lisans ve tenant yönetimi numarasını taşır; bu belge bir sonraki boş numarayı (0029) kullanır. Taslak 0028 olarak açılmış, #135 sonrası 0028 başka belgeye verildiği için yeniden numaralandı.
+Numara notu: `docs/adr` altında iki belge 0026, `0027` otomasyon, `0028` platform lisans ve tenant yönetimi, `0029` sektör profili genişletme numarasını taşır; bu belge bir sonraki boş numarayı (0030) kullanır. Taslak önce 0028, sonra 0029 olarak açılmış; numaralar başka belgelere verildiği için yeniden numaralandı.
 
 ## 1. Bağlam ve amaç
 
@@ -47,14 +47,18 @@ Kapsam dışı: alan seviyesi yetki (Y8b), kayıt bazlı paylaşım, koşullu/if
 
 **K3 — Birleşim kuralı türe göre ayrı uygulanır.** ADR-0026 K5 aynen geçerlidir (kişinin etkin rollerinin, doğrudan ve departmandan gelenlerin, kapsamları birleşir; biri `All` ise tümü), ama her kayıt türü için o türün etkin kapsamlarıyla ayrı hesaplanır.
 
-**K4 — Platform tavanı.** Platform tablosu `platform.TenantScopeLimits(TenantId, EntityKey, MaxScope)` (RLS dışı, `ModuleEntitlements` gibi). Kayıt yoksa o tür için sınır yoktur. Tavan **tek değerdir** ve `RecordScopeRules.Covers(tavan, istenen)` ile doğrulanır; ekip ile departman birbirini kapsamadığı için tavan "Ekip" ise departman kapsamı verilemez ve tersi. Bu yön bilinçlidir (bölüm 7, açık karar 2).
+**K4 — Platform tavanı.** Platform tablosu `platform.TenantScopeLimits(TenantId, EntityKey, MaxScope, AppliesToAdministrators)` (RLS dışı, `ModuleEntitlements` gibi). Kayıt yoksa o tür için sınır yoktur. Tavan **tek değerdir** ve `RecordScopeRules.Covers(tavan, istenen)` ile doğrulanır; ekip ile departman birbirini kapsamadığı için tavan "Ekip" ise departman kapsamı verilemez ve tersi. Bu yön bilinçlidir (bölüm 7, açık karar 2).
 
 **K5 — Tavan iki yerde uygulanır.**
 
 1. **Yazarken:** rol varsayılanı veya türe özel istisna tavanı aşıyorsa reddedilir (409; yanıt hangi tür ve hangi tavan olduğunu söyler).
 2. **Okurken (savunma derinliği):** etkin kapsam tavanı aşıyorsa tavana indirilir; tavanla karşılaştırılamayan kapsam `Own`'a düşer (güvenli varsayılan). Böylece platform tavanı sonradan daralttığında mevcut roller bir sonraki istekte kısıtlanır, rol kaydı beklenmez.
 
-**K6 — Yönetici sistem rolü tavandan muaftır (öneri, açık karar 1).** "Yönetici her zaman tüm kayıtları görür" kuralı (Y8a) korunur; aksi halde tavan, firmanın kendi yöneticisini kilitleyebilir. Sonuç: tavan, yöneticiden gizlemeyi değil, **yönetici olmayan rollerin** ne kadar geniş görünürlük alabileceğini sınırlar.
+**K6 — Yönetici muafiyeti tenant ve tür başına yapılandırılır (karar 4 Kasım 2026).** Sabit "muaf" ya da "bağlı" kuralı yoktur (dinamik tasarım ilkesi). Her tavan kaydı `AppliesToAdministrators` taşır; **varsayılan `false`: Yönetici sistem rolü tavandan muaftır** ve "Yönetici her zaman tüm kayıtları görür" kuralı (Y8a) korunur. Platform yöneticisi bir tür için bunu `true` yaparsa tavan Yönetici rolünü de bağlar (ör. bir tenant'ın yöneticisinin başka birimin fırsatlarını görmemesi istenirse). Muafiyet kaydın kendisinde olduğu için tenant başına ve tür başına farklı olabilir.
+
+- Yönetici bağlandığında kilitlenme riski vardır: tavan yöneticinin kendi kayıtlarını (`Own`) hiçbir zaman kısmaz, yani yönetici en kötü durumda yalnızca kendi kayıtlarına iner ve rol/kapsam ekranına erişimi sürer. Kurtarma yolu platformun tavanı gevşetmesidir (platform ekranı, denetim kaydıyla).
+- `AppliesToAdministrators = true` yazılırken platform ekranı etkilenecek yönetici sayısını gösterir (bölüm 8, önizleme).
+- Okuma tarafı (K5/2) yöneticiye yalnızca `AppliesToAdministrators = true` ise tavan uygular.
 
 **K7 — Geriye uyum: boş tablo = bugünkü davranış.** İstisna ve tavan kaydı yoksa her tür için sonuç bugünkü `MembershipDataScope` sonucuyla aynıdır. Migration yalnızca iki boş tablo ekler; backfill gerekmez; mevcut `DataScopeTests` değişmeden geçmelidir.
 
@@ -86,7 +90,7 @@ Kapsam dışı: alan seviyesi yetki (Y8b), kayıt bazlı paylaşım, koşullu/if
 ## 5. Geçiş ve dilimler
 
 1. **Dilim 1 — Tür anahtarlı okuma (davranış değişmez).** K1'in imza değişikliği ve 25 çağrının taşınması; sonuç bugünküyle aynı. Mimari test: türsüz `GetOwnersAsync` çağrısı yok. En riskli mekanik adım önce yapılır ve tek başına incelenebilir.
-2. **Dilim 2 — Veri modeli ve etkin kapsam.** K2–K8: iki tablo, migration, `MembershipDataScope`, `RoleService` doğrulaması, platform ve rol uçları, denetim. Ekran yok.
+2. **Dilim 2 — Veri modeli ve etkin kapsam.** K2–K8: iki tablo, migration, `MembershipDataScope`, `RoleService` doğrulaması, platform ve rol uçları, denetim. Ayrıca bölüm 7 kararları: `AppliesToAdministrators` alanı, `IRecordStore` kapsam türü anahtarı (alt kayıtlar), segment motorunda türe göre kapsam çözümleyicisi. Ekran yok.
 3. **Dilim 3 — Ekranlar.** K10.
 4. **Dilim 4 — Belgeler.** README (Yönetim ve Platform bölümleri), `docs/tenant-isletim.md` (tavan kaldırma/daraltma runbook'u).
 
@@ -119,16 +123,19 @@ Dilim 2'ye bırakılanlar (dilim 1'de sonuç değişmediği için güvenli, ama 
 - **Mutlu yol:** aynı rol firmada `All`, fırsatta `Unit` istisnasıyla kişiyi doğru kümelerle görür; tavan `Unit` iken `Unit` istisnası kaydedilir; liste, sayfalama ve toplam doğru kalır.
 - **Hata/doğrulama:** tavanı aşan kapsam 409; geçersiz veya sahipsiz (`OwnerField`'ı olmayan) tür anahtarı 400; ekip tavanında departman kapsamı reddi; kapalı modülün türüne tavan konamaz.
 - **Tenant izolasyonu:** A'nın tavanı ve istisnaları B'yi etkilemez; `RoleScopeOverrides` RLS ve EF filtresiyle korunur (`TenantIsolationSql.AddTable`, RLS testi); B'nin rolüne A'nın tür istisnası bağlanamaz.
-- **Yetki:** tenant yöneticisi tavanı yazamaz (403); yönetici olmayan rol yöneticisi tavanın altında dahi kendi kapsamından geniş istisna veremez; yönetici muafiyeti (K6) testlidir.
+- **Yetki:** tenant yöneticisi tavanı yazamaz (403); yönetici olmayan rol yöneticisi tavanın altında dahi kendi kapsamından geniş istisna veremez; yönetici muafiyeti (K6) her iki değerde (`AppliesToAdministrators` false ve true) testlidir; true iken Yönetici tavana bağlanır ve platform tavanı gevşetince eski görünürlüğüne döner.
 - **Regresyon:** istisna ve tavan yokken `DataScopeTests` ve `RecordScopeRulesTests` değişmeden geçer; tavan sonradan daraltılınca mevcut rol bir sonraki istekte kısılır (K5/2).
 
 Entegrasyon testleri SQL Server ister; veritabanı yoksa çalıştırılamadığı açıkça belirtilir.
 
-## 7. Açık kararlar (kullanıcıya)
+## 7. Kararlar (4 Kasım 2026, kullanıcı cevapları)
 
-1. **Yönetici muafiyeti (K6).** Öneri: muaf. Alternatif: tavan yöneticiyi de bağlar; bu durumda tenant'ın kendi yöneticisi bazı türleri göremez ve kilitlenme/kurtarma yolu (platform tavanı gevşetir) gerekir.
-2. **Tavanın biçimi (K4).** Öneri: tek değer + `Covers`. Sonuç: tavan "Ekip" ise departman verilemez. Alternatif: tür başına izinli kapsamlar kümesi (esnek ama ekran ve doğrulama daha karmaşık).
-3. **Rapor/özet sorguları.** Bazı çağrı noktaları tek sahip kümesiyle birden çok türü süzüyor. Dilim 1'de incelendi (bölüm 5, "Dilim 1 sonucu"): satış görünümü ve tahmin yalnızca fırsatı süzer (tek tür, sorun yok); segment motoru tek sahip kümesini firma, kişi, lead ve "kazanılan fırsat" koşullarına birlikte uygular. Dilim 1'de segment için hedef türün kapsamı alınır; "kazanılan fırsat" koşulu fırsat türünün kapsamıyla değerlendirilmez. Dilim 2'de karar gerekir: koşulu türüne göre ayrı kapsamla değerlendirmek (doğru, kaynak başına ayrı küme) ya da hedef türle sınırlamak.
+1. **Yönetici muafiyeti (K6): dinamik.** Sabit kural yok; tenant ve tür başına `AppliesToAdministrators` (varsayılan muaf). Kullanıcı ifadesi: "dinamik kontrol olsun, her tenant için farklı kurallar olsun". Önerilen sabit "muaf" kuralı bu yüzden değiştirildi; muafiyet varsayılan kaldı.
+2. **Tavanın biçimi (K4): tek değer + `Covers`.** Tür başına izinli kapsamlar kümesi gerekirse sonradan geriye dönük uyumlu bir migration ile eklenir. Bilinen sonuç: tavan "Ekip" iken departman kapsamı verilemez ve tersi.
+3. **Segment ve rapor sorguları: her koşul kendi türünün kapsamıyla.** Satış görünümü ve tahmin yalnızca fırsatı süzer (sorun yok). Segment motoru tek sahip kümesi yerine türe göre küme veren bir çözümleyici alır (`SegmentEvaluationContext`, `Core.Contracts`; ör. "kazanılan fırsat" koşulu `crm.opportunity` kapsamıyla, firma koşulu `crm.company` kapsamıyla değerlendirilir). Hedef türle sınırlama reddedildi: mevcut segment özelliğini kısıtlar.
+4. **Alt kayıt türleri (karar değil, tasarım):** `IRecordStore` üzerinde varsayılanı kendi `EntityKey`'i olan bir kapsam türü anahtarı; alt kayıt depoları (aktivite notu, fırsat iletişimcisi vb.) ana türünü bildirir. Boru hattı kapsamı bu anahtarla sorar.
+
+Açık karar kalmadı. Dilim 2'nin başında yeniden doğrulanacak noktalar bölüm 9'dadır.
 
 ## 8. Sonraki işler (bu kararın dışında)
 
