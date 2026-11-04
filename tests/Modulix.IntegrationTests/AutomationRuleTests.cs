@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -8,11 +9,17 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Modulix.Api.Tenancy;
 using Modulix.Core.Authorization;
 using Modulix.Core.Automation;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Automation;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Events;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Identity;
@@ -526,23 +533,44 @@ public class AutomationRuleTests(AutomationFixture fixture) : IClassFixture<Auto
 
 /// <summary>
 /// Gerçek uygulamada henüz aksiyon beyan eden modül yoktur (CRM aksiyonları ADR-0027 Dilim 3). Bu test modülü yalnızca test
-/// sürecinde katalogu genişletir; aksiyon işleyicisi çağrılırsa test başarısız olur (yürütme Dilim 2'dir).
+/// sürecinde katalogu genişletir: <see cref="ItemEntity"/> kural yazılan kayıt türü, <see cref="NoteAction"/> işleyicisi
+/// <see cref="AutomationProbe"/> üzerinden ne gördüğünü kaydeder ve sonucu testin belirlediği gibi verir.
 /// </summary>
 public sealed class AutomationTestModule : IModule
 {
     public const string ModuleKey = "autotest";
+    public const string ItemEntity = "autotest.item";
     public const string NoteAction = "autotest.note.add";
     public const string SensitiveAction = "autotest.note.sensitive";
     public const string WritePermission = "autotest.notes.write";
+    public const string ItemsRead = "autotest.items.read";
+    public const string MarginRead = "autotest.margin.read";
 
     public string Key => ModuleKey;
 
     public string DisplayName => "Otomasyon testi";
 
-    public IReadOnlyList<PermissionDefinition> Permissions { get; } = [new(WritePermission, "Not ekler", "Notlar")];
+    public IReadOnlyList<PermissionDefinition> Permissions { get; } =
+    [
+        new(WritePermission, "Not ekler", "Notlar"),
+        new(ItemsRead, "Test kayıtlarını görür", "Notlar"),
+        new(MarginRead, "Marj alanını görür", "Notlar"),
+    ];
 
     public AutomationCapabilities Automation { get; } = new()
     {
+        Entities = [new(ItemEntity, "Test kaydı", ItemsRead)],
+        Events =
+        [
+            new("autotest.item.created", ItemEntity, DomainEventTypes.RecordCreated, "Kayıt oluşturuldu"),
+            new("autotest.item.updated", ItemEntity, DomainEventTypes.RecordUpdated, "Kayıt güncellendi"),
+        ],
+        Fields =
+        [
+            new(ItemEntity, "status", "Durum", AutomationFieldType.Choice) { Options = [new("open", "Açık"), new("hold", "Beklemede"), new("closed", "Kapalı")] },
+            new(ItemEntity, "title", "Başlık", AutomationFieldType.Text),
+            new(ItemEntity, "margin", "Marj", AutomationFieldType.Number) { ReadPermission = MarginRead },
+        ],
         Actions =
         [
             AutomationActionRegistration.For<Handler>(new(
@@ -556,34 +584,130 @@ public sealed class AutomationTestModule : IModule
 
     public void ConfigureServices(IServiceCollection services) => services.AddScoped<Handler>();
 
-    public sealed class Handler : IAutomationAction
+    public sealed class Handler(IServiceProvider services) : IAutomationAction
     {
-        public Task<AutomationActionResult> ExecuteAsync(AutomationActionRequest request, AutomationCallContext context, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("Dilim 1'de kurallar çalışmaz.");
+        public async Task<AutomationActionResult> ExecuteAsync(AutomationActionRequest request, AutomationCallContext context, CancellationToken cancellationToken)
+        {
+            var tenant = services.GetRequiredService<ITenantContextAccessor>().Current!.TenantId;
+            var access = services.GetRequiredService<ICurrentAccess>();
+            var handling = services.GetRequiredService<EventHandlingScope>();
+            AutomationProbe.Record(new AutomationCall(
+                tenant,
+                request,
+                context,
+                await access.GetPermissionsAsync(cancellationToken),
+                await access.GetScopeAsync(cancellationToken),
+                handling.Subscription,
+                handling.Event?.Id,
+                handling.Event?.CorrelationId,
+                handling.Event?.Depth));
+
+            if (AutomationProbe.Delay > TimeSpan.Zero)
+            {
+                await Task.Delay(AutomationProbe.Delay, cancellationToken);
+            }
+
+            return AutomationProbe.Behavior?.Invoke(request) ?? new AutomationActionResult(AutomationActionStatus.Succeeded, "Not eklendi.");
+        }
     }
+}
+
+/// <summary>Bir aksiyon çağrısında işleyicinin gördükleri: istek, bağlam ve çalıştığı kimlik.</summary>
+public sealed record AutomationCall(
+    Guid Tenant,
+    AutomationActionRequest Request,
+    AutomationCallContext Context,
+    IReadOnlySet<string> Permissions,
+    RecordScope Scope,
+    string? Subscription,
+    Guid? ScopeEventId,
+    string? EventCorrelation,
+    int? EventDepth);
+
+/// <summary>Test aksiyonunun ortak durumu; çağrılar tenant'a göre ayrılır, davranış testin başında sıfırlanır.</summary>
+public static class AutomationProbe
+{
+    private static readonly ConcurrentQueue<AutomationCall> Calls = new();
+
+    /// <summary>Doluysa işleyici sonucu buradan alır (istisna fırlatabilir); boşsa başarılı döner.</summary>
+    public static Func<AutomationActionRequest, AutomationActionResult>? Behavior { get; set; }
+
+    public static TimeSpan Delay { get; set; }
+
+    public static void Record(AutomationCall call) => Calls.Enqueue(call);
+
+    public static IReadOnlyList<AutomationCall> CallsOf(Guid tenantId) => [.. Calls.Where(c => c.Tenant == tenantId)];
+
+    public static int Attempts(Guid tenantId) => Calls.Count(c => c.Tenant == tenantId);
+
+    public static void Reset()
+    {
+        Behavior = null;
+        Delay = TimeSpan.Zero;
+    }
+}
+
+/// <summary>Test kayıt türünün kayıtları (tenant'a bağlı). Gerçek bir kayıt deposu yoktur; <see cref="FakeRecordReader"/> bunları okur.</summary>
+public static class AutomationRecords
+{
+    private static readonly ConcurrentDictionary<Guid, (Guid Tenant, string Entity, JsonObject Values)> Store = new();
+
+    public static Guid Add(Guid tenantId, string entity, string status, string? title, decimal? margin = null)
+    {
+        var id = Guid.NewGuid();
+        Store[id] = (tenantId, entity, new JsonObject { ["status"] = status, ["title"] = title, ["margin"] = margin });
+        return id;
+    }
+
+    public static RecordData? Find(Guid tenantId, string entity, Guid id) =>
+        Store.TryGetValue(id, out var found) && found.Tenant == tenantId && found.Entity == entity
+            ? new RecordData(entity, id, 1, (JsonObject)found.Values.DeepClone())
+            : null;
+}
+
+public sealed class FakeRecordReader(ITenantContextAccessor tenantAccessor) : IAutomationRecordReader
+{
+    public Task<RecordResult<RecordData>> ReadAsync(RecordRef record, CancellationToken cancellationToken) =>
+        Task.FromResult(
+            tenantAccessor.Current is { } tenant && AutomationRecords.Find(tenant.TenantId, record.EntityKey, record.Id) is { } found
+                ? RecordResult<RecordData>.Ok(found)
+                : RecordResult<RecordData>.Fail(RecordErrorCode.NotFound, "Kayıt bulunamadı."));
 }
 
 /// <summary>
 /// Test süreci için genişletilmiş katalogla çalışan API. Tenant ve kullanıcılar <see cref="Factory"/> ile (aynı veritabanı)
-/// kurulur; HTTP istemcisi katalogu <see cref="AutomationTestModule"/> ile genişleten ikinci konaktan gelir.
+/// kurulur; HTTP istemcisi katalogu <see cref="AutomationTestModule"/> ile genişleten ikinci konaktan gelir. İkinci konakta saat
+/// elle ilerler (<see cref="Time"/>), kayıtlar <see cref="FakeRecordReader"/>'dan okunur ve loglar <see cref="Logs"/>'ta toplanır.
 /// </summary>
 public sealed class AutomationFixture : IDisposable
 {
     public AutomationFixture()
     {
         Factory = new ModulixApiFactory();
-        Extended = Factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        Extended = Factory.WithWebHostBuilder(builder =>
         {
-            services.RemoveAll<ModuleCatalog>();
-            services.AddSingleton<IModule>(new AutomationTestModule());
-            services.AddScoped<AutomationTestModule.Handler>();
-            services.AddSingleton(sp => new ModuleCatalog(sp.GetServices<IModule>()));
-        }));
+            builder.ConfigureLogging(logging => logging.AddProvider(Logs));
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ModuleCatalog>();
+                services.AddSingleton<IModule>(new AutomationTestModule());
+                services.AddScoped<AutomationTestModule.Handler>();
+                services.AddSingleton(sp => new ModuleCatalog(sp.GetServices<IModule>()));
+                services.RemoveAll<IAutomationRecordReader>();
+                services.AddScoped<IAutomationRecordReader, FakeRecordReader>();
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton<TimeProvider>(Time);
+            });
+        });
     }
 
     public ModulixApiFactory Factory { get; }
 
     public WebApplicationFactory<Program> Extended { get; }
+
+    public MutableTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
+
+    public CapturingLoggerProvider Logs { get; } = new();
 
     public HttpClient CreateBrowserClient() =>
         Extended.CreateClient(new WebApplicationFactoryClientOptions
@@ -593,11 +717,25 @@ public sealed class AutomationFixture : IDisposable
             AllowAutoRedirect = false,
         });
 
-    public async Task SetTestModuleAsync(Guid tenantId)
+    // Roller test modülünün izinlerini de içerebilsin diye ikinci konakta (genişletilmiş katalog) kurulur.
+    public async Task CreateRoleAsync(Guid tenantId, IReadOnlyCollection<string> permissions, params ModulixUser[] assignTo)
+    {
+        using var scope = Extended.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(tenantId, Guid.NewGuid(), Guid.NewGuid());
+        var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+        var role = await roles.CreateAsync($"Rol {Guid.NewGuid():N}"[..20], permissions, CancellationToken.None, scope: RecordScope.All);
+        foreach (var user in assignTo)
+        {
+            var membershipId = await Factory.GetMembershipIdAsync(user.Id, tenantId);
+            Assert.True(await roles.SetMembershipRolesAsync(membershipId, [role.Id], CancellationToken.None));
+        }
+    }
+
+    public async Task SetTestModuleAsync(Guid tenantId, bool enabled = true)
     {
         using var scope = Extended.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<IModuleEntitlements>()
-            .SetEnabledAsync(tenantId, AutomationTestModule.ModuleKey, true, CancellationToken.None);
+            .SetEnabledAsync(tenantId, AutomationTestModule.ModuleKey, enabled, CancellationToken.None);
     }
 
     public void Dispose()

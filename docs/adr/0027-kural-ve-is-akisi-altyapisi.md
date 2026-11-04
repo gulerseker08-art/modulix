@@ -187,7 +187,8 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | --- | --- | --- |
 | 0 | İnceleme, bu ADR | Bu oturum |
 | 1 | `Core.Contracts` sözleşmeleri, koşul doğrulayıcı/değerlendirici, aksiyon sözleşmesi, `AutomationRules/Versions` + migration + RLS, kural servisi, yan etkisiz önizleme, `core.automation.*` izinleri, denetim, API, Logistics yetenek beyanı, testler | Bu oturum |
-| 2 | Olay ve tarama bağlantısı, `AutomationRuns`, tekilleştirme, kira, retry, acil durdurma, tenant limitleri | Sonra |
+| 2a | Olay yolu (`core.automation` aboneliği), `AutomationRuns/Steps`, tekilleştirme, kira, retry, kuralın kimliği, acil durdurma, tenant limitleri, elle çalıştırma, çalışma geçmişi API'si | Uygulandı (aşağıda "Dilim 2a") |
+| 2b | Tarama tabanlı tetikleyiciler (`Scheduled`, `DateRelative`, `Inactivity`), iş olayı tetikleyicisi, `AutomationScanCursors`, `IAutomationRecordSource`, saklama temizliği | Sonra |
 | 3 | CRM yetenek beyanı ve aksiyonları, ilk şablonlar (pasif), demo | Sonra |
 | 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Sonra |
 | 5 | Blazor ekranları | Sonra |

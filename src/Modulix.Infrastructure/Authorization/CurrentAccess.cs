@@ -49,7 +49,9 @@ internal sealed class CurrentAccess(
 
         if (permissions is null && handling.Subscription is { } subscriptionKey)
         {
-            var declared = catalog.FindSubscription(subscriptionKey)?.Subscription.Permissions ?? [];
+            IEnumerable<string> declared = handling.GrantedPermissions is { } granted
+                ? granted
+                : catalog.FindSubscription(subscriptionKey)?.Subscription.Permissions ?? [];
             permissions = catalog.EffectivePermissions(declared, await GetEnabledModulesAsync(cancellationToken));
         }
 

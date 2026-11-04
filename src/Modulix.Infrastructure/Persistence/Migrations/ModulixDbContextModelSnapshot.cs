@@ -280,8 +280,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("TenantId", "Id");
-
                     b.HasIndex("TenantId", "RuleId")
                         .IsUnique()
                         .HasDatabaseName("IX_AutomationRuleVersions_TenantId_RuleId_Draft")
@@ -291,6 +289,152 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("AutomationRuleVersions", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Automation.AutomationRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DedupeKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("Depth")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EntityKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("EventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("InitiatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("LeaseToken")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("RecordId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RuleVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "DedupeKey")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "RuleVersionId");
+
+                    b.HasIndex("TenantId", "EntityKey", "RecordId");
+
+                    b.HasIndex("TenantId", "RuleId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "RuleId", "RecordId");
+
+                    b.HasIndex("TenantId", "Status", "NextAttemptAt");
+
+                    b.ToTable("AutomationRuns", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Automation.AutomationRunStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("EffectEntityKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("EffectRecordId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("StepId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("StepNo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RunId", "StepNo")
+                        .IsUnique();
+
+                    b.ToTable("AutomationRunSteps", "core");
                 });
 
             modelBuilder.Entity("Modulix.Core.Communication.CommunicationLinkToken", b =>
@@ -10733,6 +10877,26 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Core.Automation.AutomationRule", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "RuleId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Automation.AutomationRun", b =>
+                {
+                    b.HasOne("Modulix.Core.Automation.AutomationRuleVersion", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RuleVersionId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Automation.AutomationRunStep", b =>
+                {
+                    b.HasOne("Modulix.Core.Automation.AutomationRun", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RunId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

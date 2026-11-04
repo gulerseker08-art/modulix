@@ -81,7 +81,51 @@ public static class AutomationEndpoints
             return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : ToProblem(result.Error!);
         })).RequirePermission(CoreModule.Permissions.ManageAutomation);
 
+        MapRunEndpoints(group);
+
         return app;
+    }
+
+    // Çalışma geçmişi ve elle müdahale (Dilim 2): okuma core.automation-logs.read, elle çalıştırma/yeniden deneme/iptal core.automation.run.
+    private static void MapRunEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/runs", async (
+            Guid? ruleId, string? status, Guid? recordId, int? page, int? pageSize, IAutomationRunService service, CancellationToken ct) =>
+        {
+            AutomationRunStatus? parsed = null;
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                if (!Enum.TryParse<AutomationRunStatus>(status, ignoreCase: true, out var value))
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["status"] = ["Durum Pending, Running, Succeeded, Failed, Cancelled ya da NotMatched olmalı."] },
+                        statusCode: StatusCodes.Status400BadRequest);
+                }
+
+                parsed = value;
+            }
+
+            var result = await service.ListAsync(new AutomationRunQuery(ruleId, parsed, recordId, page ?? 1, pageSize ?? 50), ct);
+            return Results.Ok(new AutomationRunPageDto([.. result.Items.Select(ToDto)], result.Page, result.PageSize, result.TotalCount));
+        }).RequirePermission(CoreModule.Permissions.ReadAutomationLogs);
+
+        group.MapGet("/runs/{runId:guid}", async (Guid runId, IAutomationRunService service, CancellationToken ct) =>
+            await service.GetAsync(runId, ct) is { } detail ? Results.Ok(ToDto(detail)) : RunNotFound())
+            .RequirePermission(CoreModule.Permissions.ReadAutomationLogs);
+
+        group.MapPost("/rules/{ruleId:guid}/run", (Guid ruleId, RunAutomationRuleRequest request, IAutomationRunService service, CancellationToken ct) => RunAsync(async () =>
+            await service.RunManuallyAsync(ruleId, request.RecordId, ct) is { } detail
+                ? Results.Created($"/api/automation/runs/{detail.Run.Id}", ToDto(detail))
+                : RuleNotFound()))
+            .RequirePermission(CoreModule.Permissions.RunAutomation);
+
+        group.MapPost("/runs/{runId:guid}/retry", (Guid runId, IAutomationRunService service, CancellationToken ct) => RunAsync(async () =>
+            await service.RetryAsync(runId, ct) is { } detail ? Results.Ok(ToDto(detail)) : RunNotFound()))
+            .RequirePermission(CoreModule.Permissions.RunAutomation);
+
+        group.MapPost("/runs/{runId:guid}/cancel", (Guid runId, IAutomationRunService service, CancellationToken ct) => RunAsync(async () =>
+            await service.CancelAsync(runId, ct) is { } detail ? Results.Ok(ToDto(detail)) : RunNotFound()))
+            .RequirePermission(CoreModule.Permissions.RunAutomation);
     }
 
     private static async Task<IResult> RunAsync(Func<Task<IResult>> action)
@@ -101,6 +145,17 @@ public static class AutomationEndpoints
         {
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
         }
+        catch (AutomationRunDuplicateException ex)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: ex.Message,
+                extensions: new Dictionary<string, object?> { ["existingRunId"] = ex.ExistingRunId });
+        }
+        catch (AutomationRunException ex)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: ex.Message);
+        }
         catch (Exception ex) when (ex is AutomationRuleException or FormatException)
         {
             return Results.ValidationProblem(
@@ -112,6 +167,8 @@ public static class AutomationEndpoints
 
     private static IResult RuleNotFound() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Kural bulunamadı.");
 
+    private static IResult RunNotFound() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Çalışma bulunamadı.");
+
     private static IResult ToProblem(RecordError error) => error.Code switch
     {
         RecordErrorCode.NotFound or RecordErrorCode.UnknownEntity => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: error.Message),
@@ -122,6 +179,16 @@ public static class AutomationEndpoints
     private static AutomationVersionContent ToContent(
         string name, string? description, int priority, bool stopProcessing, DateTimeOffset? from, DateTimeOffset? until, JsonElement definition) =>
         new(name, description, priority, stopProcessing, from, until, AutomationJson.Deserialize(definition));
+
+    private static AutomationRunDto ToDto(AutomationRunSummary run) => new(
+        run.Id, run.RuleId, run.RuleName, run.VersionNo, run.EntityKey, run.RecordId, run.Origin.ToString(), run.Status.ToString(),
+        run.CreatedAt, run.CompletedAt, run.Note);
+
+    private static AutomationRunDetailDto ToDto(AutomationRunDetail detail) => new(
+        ToDto(detail.Run),
+        detail.NextAttemptAt,
+        [.. detail.Steps.Select(s => new AutomationRunStepDto(
+            s.StepNo, s.StepId, s.Action, s.Status.ToString(), s.Attempts, s.Summary, s.EffectEntityKey, s.EffectRecordId, s.CompletedAt))]);
 
     private static AutomationRuleSummaryDto ToDto(AutomationRuleSummary rule) => new(
         rule.Id, rule.Name, rule.ModuleKey, rule.EntityKey, rule.Status.ToString(), rule.PublishedVersionNo, rule.HasDraft,
