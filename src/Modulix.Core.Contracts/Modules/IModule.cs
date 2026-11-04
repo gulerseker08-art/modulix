@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Reporting;
 using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.SharedRecords;
 
@@ -102,6 +103,13 @@ public interface IModule
     /// yazılamaz; Core modülün kayıt türlerini ve alanlarını bilmez, yalnızca bu beyanı kullanır.
     /// </summary>
     AutomationCapabilities Automation => AutomationCapabilities.None;
+
+    /// <summary>
+    /// Modülün ortak rapor merkezine katkısı (ADR-0026, dilim 3): raporlanabilir veri kümeleri ve modülün kendi rapor ekranlarına bağlantılar.
+    /// Veri kümesi kayıt boru hattından okunur; izin, kapsam ve hassas alan kuralları kayıt türünündür. Anahtarlar modül anahtarıyla başlar;
+    /// beyan açılışta doğrulanır.
+    /// </summary>
+    ModuleReporting Reports => ModuleReporting.None;
 
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)

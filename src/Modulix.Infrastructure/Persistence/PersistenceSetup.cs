@@ -17,6 +17,7 @@ using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
+using Modulix.Core.Reporting;
 using Modulix.Core.Settings;
 using Modulix.Core.Teams;
 using Modulix.Infrastructure.Audit;
@@ -29,6 +30,7 @@ using Modulix.Infrastructure.Lookups;
 using Modulix.Infrastructure.Modules;
 using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Platform;
+using Modulix.Infrastructure.Reporting;
 using Modulix.Infrastructure.Settings;
 using Modulix.Infrastructure.Teams;
 using Modulix.Infrastructure.Tenancy;
@@ -100,6 +102,12 @@ public static class PersistenceSetup
         services.AddScoped<IAutomationRunStore, AutomationRunStore>();
         services.AddScoped<IAutomationRunService, AutomationRunService>();
         services.AddSingleton<AutomationRunner>();
+
+        // Ortak rapor merkezi (ADR-0026, dilim 3): veri kümeleri modüllerden gelir, okumalar kayıt boru hattından geçer.
+        services.AddScoped<ReportColumnResolver>();
+        services.AddScoped<IReportRunner, ReportRunner>();
+        services.AddScoped<IReportCatalog, ReportCatalogService>();
+        services.AddScoped<IReportCenter, ReportCenter>();
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());
         services.AddScoped<ICustomFieldProvider>(sp => sp.GetRequiredService<CustomFieldService>());

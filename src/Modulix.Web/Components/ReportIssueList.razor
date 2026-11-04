@@ -1,0 +1,14 @@
+@* Rapor sorunlarının (ReportIssueDto) madde listesi; her madde sunucunun söylediği "ne yapılacağı" mesajıdır. *@
+@if (Issues.Count > 0)
+{
+    <ul class="mb-0 mt-2">
+        @foreach (var issue in Issues)
+        {
+            <li>@issue.Message</li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ReportIssueDto> Issues { get; set; } = [];
+}

@@ -113,7 +113,7 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
         }
 
         var contract = await data.Set<Contract>().AsNoTracking().SingleOrDefaultAsync(c => c.Id == entity.ContractId, cancellationToken);
-        if (contract is null || (await Context.Access.GetOwnersAsync(cancellationToken) is { } owners && !owners.Contains(contract.OwnerId ?? Guid.Empty)))
+        if (contract is null || (await Context.Access.GetOwnersAsync(ContractsModule.Entities.Contract, cancellationToken) is { } owners && !owners.Contains(contract.OwnerId ?? Guid.Empty)))
         {
             throw new RecordValidationException([new RecordFieldError("contractId", "Sözleşme bulunamadı.")]);
         }

@@ -13,6 +13,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
+using Modulix.Core.Reporting;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Email;
 using Modulix.Infrastructure.Events;
@@ -104,6 +105,12 @@ public class ModulixDbContext(
     public DbSet<AutomationRun> AutomationRuns => Set<AutomationRun>();
 
     public DbSet<AutomationRunStep> AutomationRunSteps => Set<AutomationRunStep>();
+
+    public DbSet<ReportDefinition> Reports => Set<ReportDefinition>();
+
+    public DbSet<ReportShare> ReportShares => Set<ReportShare>();
+
+    public DbSet<ReportFavorite> ReportFavorites => Set<ReportFavorite>();
 
     public DbSet<BusinessUnitRole> BusinessUnitRoles => Set<BusinessUnitRole>();
 

@@ -57,6 +57,15 @@ public sealed class CoreModule : IModule
 
         /// <summary>Otomasyonun bekleyen onaylarını karara bağlar (ADR-0027 Dilim 4).</summary>
         public const string ApproveAutomation = "core.automation.approve";
+
+        /// <summary>Rapor merkezini açar, hazır ve paylaşılan raporları çalıştırır (ADR-0026, dilim 3). Veri erişimi vermez: her rapor çalıştıranın kayıt yetkisiyle çalışır.</summary>
+        public const string ReadReports = "core.reports.read";
+
+        /// <summary>Kendi raporlarını oluşturur, düzenler ve siler; rapor oluşturucuyu kullanır.</summary>
+        public const string ManageReports = "core.reports.manage";
+
+        /// <summary>Kendi raporunu firmayla ya da seçilen kullanıcılarla paylaşır. Paylaşım veri erişimi kazandırmaz.</summary>
+        public const string ShareReports = "core.reports.share";
     }
 
     public string Key => ModuleKey;
@@ -80,6 +89,9 @@ public sealed class CoreModule : IModule
         new(Permissions.RunAutomation, "Otomasyon kuralını elle çalıştırır", "Otomasyon"),
         new(Permissions.ReadAutomationLogs, "Otomasyon çalışma geçmişini görüntüler", "Otomasyon geçmişi"),
         new(Permissions.ApproveAutomation, "Otomasyonun bekleyen onaylarını karara bağlar", "Otomasyon"),
+        new(Permissions.ReadReports, "Rapor merkezini açar ve raporları çalıştırır", "Raporlar"),
+        new(Permissions.ManageReports, "Kendi raporlarını oluşturur, düzenler ve siler", "Raporlar"),
+        new(Permissions.ShareReports, "Kendi raporunu firmayla ya da kullanıcılarla paylaşır", "Raporlar"),
     ];
 
     /// <summary>Çekirdeğin olay abonelikleri (ADR-0007).</summary>
@@ -131,6 +143,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Otomasyon kuralı (ADR-0027); kaydın kimliği kuralın kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string AutomationRule = "core.automation-rule";
+
+        /// <summary>Kayıtlı rapor (ADR-0026, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
+        public const string Report = "core.report";
 
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
@@ -364,6 +379,17 @@ public sealed class CoreModule : IModule
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
                 ["status"] = new Dictionary<string, string> { ["Draft"] = "Taslak", ["Active"] = "Açık", ["Inactive"] = "Kapalı" },
+            },
+        },
+        new(AuditedEntityKeys.Report, "Rapor", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["description"] = "Açıklama", ["dataset"] = "Veri kümesi", ["visibility"] = "Paylaşım", ["sharedWith"] = "Paylaşılan kullanıcılar",
+            ["summary"] = "Özet",
+        }, "name")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["visibility"] = new Dictionary<string, string> { ["Private"] = "Özel", ["Users"] = "Seçilen kullanıcılar", ["Tenant"] = "Firma" },
             },
         },
         new(AuditedEntityKeys.Membership, "Kullanıcı", null, new Dictionary<string, string>

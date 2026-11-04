@@ -8,9 +8,10 @@ public interface IRecordAccess
 {
     /// <summary>
     /// Veri kapsamı (Y8): null ise tüm kayıtlar; aksi halde yalnızca sorumlusu bu kullanıcılardan biri olan kayıtlar.
-    /// Aktif tenant yoksa boş küme.
+    /// Kapsam kayıt türüne göre sorulur (ADR-0029): <paramref name="entityKey"/> kapsamı süzülecek kayıt türünün anahtarıdır
+    /// (ör. <c>crm.opportunities</c>). Aktif tenant yoksa boş küme.
     /// </summary>
-    Task<IReadOnlySet<Guid>?> GetOwnersAsync(CancellationToken cancellationToken);
+    Task<IReadOnlySet<Guid>?> GetOwnersAsync(string entityKey, CancellationToken cancellationToken);
 
     /// <summary>Kullanıcının kayıt türünde işlem izni (modül tenant için açık ve izin rollerinde) var mı?</summary>
     Task<bool> CanAsync(string entityKey, RecordOperation operation, CancellationToken cancellationToken);

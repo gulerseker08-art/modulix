@@ -133,7 +133,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
     /// ile kapsam içi kayıt ayırt edilemez.
     /// </summary>
     private async Task<string> WithReferralHintAsync(string message, CancellationToken cancellationToken) =>
-        await Context.Access.GetOwnersAsync(cancellationToken) is not null
+        await Context.Access.GetOwnersAsync(EntityKey, cancellationToken) is not null
         && await Context.Access.HidesOutOfScopeSharedRecordsAsync(cancellationToken)
             ? message + " Kaydı göremiyorsanız yetkili (merkez) kullanıcıya başvurun."
             : message;
@@ -429,7 +429,7 @@ internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmR
 
         var owner = await Context.Data.Set<Company>().AsNoTracking()
             .Where(c => c.Id == companyId).Select(c => c.OwnerId).SingleOrDefaultAsync(cancellationToken);
-        var scope = await Context.Access.GetOwnersAsync(cancellationToken);
+        var scope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Company, cancellationToken);
         var visible = await Context.Access.CanAsync(CrmModule.Entities.Company, RecordOperation.Read, cancellationToken)
             && (scope is null || (owner is { } ownerId && scope.Contains(ownerId)));
         if (!visible)

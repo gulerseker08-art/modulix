@@ -69,7 +69,7 @@ internal sealed class TicketLinkTarget(IModuleData data, IRecordAccess access) :
         }
 
         var query = data.Set<SupportTicket>().AsNoTracking().Where(t => t.Id == recordId);
-        if (await access.GetOwnersAsync(cancellationToken) is { } owners)
+        if (await access.GetOwnersAsync(EntityKey, cancellationToken) is { } owners)
         {
             var ids = owners.Select(id => (Guid?)id).ToList();
             query = query.Where(t => t.OwnerId == null || ids.Contains(t.OwnerId));

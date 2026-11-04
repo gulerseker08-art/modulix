@@ -1,0 +1,482 @@
+@* Rapor çalıştırma sonucunun ortak gösterimi (rapor sayfası ve oluşturucunun önizlemesi). HTTP 200 ile gelen "status" alanına göre ayrı mesaj verir
+   (yetki yok / modül kapalı / tanım geçersiz / veri kümesi yok); ok ise kısmi veri uyarılarını, "veri yok" ile gerçek sıfırın ayrımını, grafiği
+   (tablo alternatifiyle birlikte), tabloyu ve özet satırından ayrıntıya inmeyi gösterir. Hesap sunucudadır; burada yalnızca gösterim vardır.
+   Renk tek başına bilgi taşımaz: her uyarı ve durum metinle yazılır. *@
+
+@if (Loading)
+{
+    <p class="text-muted" role="status">Rapor çalıştırılıyor…</p>
+}
+
+@if (Result is { } result)
+{
+    @if (result.Status == "forbidden")
+    {
+        <div class="alert alert-warning" role="alert">
+            <strong>Yetkiniz yok.</strong> Bu raporu çalıştırmak için gereken okuma izniniz (ya da raporda kullanılan hassas sütunlardan birinin izni) yok; veri okunmadı.
+            Paylaşım veri erişimi vermez: rapor herkes için kendi yetkisiyle çalışır.
+            <ReportIssueList Issues="result.Issues" />
+        </div>
+    }
+    else if (result.Status == "moduleDisabled")
+    {
+        <div class="alert alert-warning" role="alert">
+            <strong>Modül etkin değil.</strong> Raporun veri kümesinin modülü bu firmada kapalı; veri okunmadı. Yöneticinizle konuşun.
+            <ReportIssueList Issues="result.Issues" />
+        </div>
+    }
+    else if (result.Status == "unknownDataset")
+    {
+        <div class="alert alert-danger" role="alert">
+            <strong>Veri kümesi bulunamadı.</strong> Rapor, artık var olmayan bir veri kümesine bağlı; veri okunmadı.
+            <ReportIssueList Issues="result.Issues" />
+        </div>
+    }
+    else if (result.Status != "ok")
+    {
+        <div class="alert alert-danger" role="alert">
+            <strong>Rapor tanımı geçersiz.</strong> Tanım düzeltilmeden rapor çalışmaz; veri okunmadı.
+            <ReportIssueList Issues="result.Issues" />
+        </div>
+    }
+    else
+    {
+        <section class="report-result" aria-label="Rapor sonucu">
+            <p class="small text-muted" role="status">
+                Son güncelleme: <strong>@CrmLabels.Time(result.GeneratedAt)</strong> ·
+                @result.RowsRead.ToString("N0", Regional.Numbers) kayıt okundu ·
+                @result.RowsMatched.ToString("N0", Regional.Numbers) kayıt süzgeçlere uydu
+            </p>
+
+            @if (PartialMessages(result) is { Count: > 0 } partial)
+            {
+                <div class="alert alert-warning" role="status">
+                    <strong>Kısmi veri.</strong> Aşağıdaki sonuç eksik ya da dışlanmış kayıtlar içerebilir:
+                    <ul class="mb-0">
+                        @foreach (var message in partial)
+                        {
+                            <li>@message</li>
+                        }
+                    </ul>
+                </div>
+            }
+            @foreach (var drift in result.Issues.Where(i => i.Code == "versionDrift"))
+            {
+                <div class="alert alert-info" role="status"><strong>Veri kümesi sürümü değişmiş.</strong> @drift.Message</div>
+            }
+
+            @if (result.RowsMatched == 0)
+            {
+                <div class="alert alert-secondary" role="status">
+                    <strong>Veri yok.</strong>
+                    @if (result.RowsRead == 0)
+                    {
+                        <text>Bu veri kümesinde, yetkiniz ve veri kapsamınızla görebildiğiniz kayıt bulunmuyor.</text>
+                    }
+                    else
+                    {
+                        <text>@result.RowsRead.ToString("N0", Regional.Numbers) kayıt okundu, hiçbiri rapor süzgeçlerine uymadı. Bu bir "sıfır" değeri değil, eşleşen kayıt olmamasıdır.</text>
+                    }
+                </div>
+            }
+            else if (result.IsSummary)
+            {
+                @if (BuildChart(result) is { } chart)
+                {
+                    <section class="detail-section" aria-labelledby="rv-chart-title">
+                        <div class="section-header"><h2 id="rv-chart-title">Grafik</h2></div>
+                        @if (Currencies.Count > 1 || MeasureColumns(result).Count > 1)
+                        {
+                            <div class="filters" role="group" aria-label="Grafik seçenekleri">
+                                @if (MeasureColumns(result).Count > 1)
+                                {
+                                    <div>
+                                        <label class="form-label" for="rv-chart-measure">Grafikteki ölçü</label>
+                                        <select id="rv-chart-measure" class="form-select" @bind="chartMeasure">
+                                            @for (var m = 0; m < MeasureColumns(result).Count; m++)
+                                            {
+                                                <option value="@m">@result.Columns[MeasureColumns(result)[m]].Label</option>
+                                            }
+                                        </select>
+                                    </div>
+                                }
+                                @if (Currencies.Count > 1)
+                                {
+                                    <div>
+                                        <label class="form-label" for="rv-chart-currency">Grafikteki para birimi</label>
+                                        <select id="rv-chart-currency" class="form-select" @bind="chartCurrency">
+                                            @foreach (var iso in Currencies)
+                                            {
+                                                <option value="@iso">@iso</option>
+                                            }
+                                        </select>
+                                    </div>
+                                }
+                            </div>
+                            @if (Currencies.Count > 1)
+                            {
+                                <p class="small text-muted">Tutarlar para birimine göre ayrı toplanır, birbirine çevrilmez; grafik yalnızca seçili para birimini gösterir. Tablo tüm para birimlerini içerir.</p>
+                            }
+                        }
+
+                        <div class="chart-card">
+                            <h3 class="h6">@chart.Title</h3>
+                            @if (chart.Kind == "bar")
+                            {
+                                <BarChart Title="@chart.Title" Slices="chart.Slices" ValueFormat="@chart.Format" />
+                            }
+                            else if (chart.Kind == "pie")
+                            {
+                                <DonutChart Title="@chart.Title" Slices="chart.Slices" Caption="@chart.Caption" ValueFormat="@chart.Format" />
+                            }
+                            else
+                            {
+                                <LineChart Title="@chart.Title" Categories="chart.Categories" Series="chart.Series" />
+                            }
+                        </div>
+                        <p class="small text-muted mt-2">
+                            @chart.Note Grafik tablodaki değerlerin görsel özetidir; bütün değerler aşağıdaki tablodadır.
+                        </p>
+                    </section>
+                }
+
+                <section class="detail-section" aria-labelledby="rv-table-title">
+                    <div class="section-header"><h2 id="rv-table-title">Özet tablo</h2></div>
+                    <ReportTable Result="result" Caption="@($"{result.DatasetName} özet raporu")" Drillable="@(DrillRunner is not null)"
+                                 Selected="drillRow" OnDrill="DrillAsync" />
+                    @if (DrillRunner is not null)
+                    {
+                        <p class="small text-muted mt-2">Bir satırın ayrıntısını görmek için satıra tıklayın ya da satırdaki "Ayrıntı" düğmesini kullanın.</p>
+                    }
+                </section>
+
+                @if (drillRow is not null)
+                {
+                    <section class="detail-section report-drill" aria-labelledby="rv-drill-title" tabindex="-1" @ref="drillPanel">
+                        <div class="section-header">
+                            <h2 id="rv-drill-title">Ayrıntı: @drillTitle</h2>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CloseDrill">Ayrıntıyı kapat</button>
+                        </div>
+                        <div aria-live="polite">
+                            @if (drillLoading)
+                            {
+                                <p class="text-muted" role="status">Ayrıntı yükleniyor…</p>
+                            }
+                            else if (drillError is not null)
+                            {
+                                <div class="alert alert-danger" role="alert">
+                                    @drillError
+                                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadDrillAsync">Tekrar dene</button>
+                                </div>
+                            }
+                            else if (drillResult is { Status: not "ok" } failed)
+                            {
+                                <div class="alert alert-warning" role="alert">
+                                    <strong>Ayrıntı alınamadı.</strong> Rapor durumu: @failed.Status.
+                                    <ReportIssueList Issues="failed.Issues" />
+                                </div>
+                            }
+                            else if (drillResult is { } detail)
+                            {
+                                @if (Comparison(result, detail) is { Count: > 0 } lines)
+                                {
+                                    <table class="table report-compare">
+                                        <caption>Özet satırı ile ayrıntı toplamının karşılaştırması</caption>
+                                        <thead>
+                                            <tr>
+                                                <th scope="col">Ölçü</th>
+                                                <th scope="col" class="text-end">Özet satırı</th>
+                                                <th scope="col" class="text-end">Ayrıntı toplamı</th>
+                                                <th scope="col">Durum</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var line in lines)
+                                            {
+                                                <tr>
+                                                    <th scope="row">@line.Label</th>
+                                                    <td class="text-end">@line.Summary</td>
+                                                    <td class="text-end">@line.Detail</td>
+                                                    <td>@(line.Matches ? "Eşleşiyor" : "Fark var: veri bu arada değişmiş olabilir, raporu yenileyin")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+
+                                @if (detail.RowsMatched == 0)
+                                {
+                                    <div class="alert alert-secondary" role="status"><strong>Veri yok.</strong> Bu grup için ayrıntı kaydı bulunamadı.</div>
+                                }
+                                else
+                                {
+                                    <ReportTable Result="detail" Caption="@($"{drillTitle} ayrıntı kayıtları")" />
+                                    <Pager Page="detail.Page" PageSize="detail.PageSize" TotalCount="detail.RowsMatched" PageChanged="DrillPageAsync" />
+                                }
+                            }
+                        </div>
+                    </section>
+                }
+            }
+            else
+            {
+                <section class="detail-section" aria-labelledby="rv-table-title">
+                    <div class="section-header"><h2 id="rv-table-title">Kayıtlar</h2></div>
+                    <ReportTable Result="result" Caption="@($"{result.DatasetName} kayıt tablosu")" />
+                    <Pager Page="result.Page" PageSize="result.PageSize" TotalCount="result.RowsMatched" PageChanged="PageChanged" />
+                </section>
+            }
+        </section>
+    }
+}
+
+@code {
+    private const int MaxChartSlices = 20;
+
+    private ReportResultDto? seen;
+    private int chartMeasure;
+    private string? chartCurrency;
+    private ReportResultRowDto? drillRow;
+    private string drillTitle = string.Empty;
+    private ReportResultDto? drillResult;
+    private string? drillError;
+    private bool drillLoading;
+    private bool focusDrill;
+    private int drillPage = 1;
+    private int drillRequest;
+    private ElementReference drillPanel;
+
+    /// <summary>Gösterilecek sonuç; null ise (ve yüklenmiyorsa) hiçbir şey çizilmez.</summary>
+    [Parameter] public ReportResultDto? Result { get; set; }
+
+    [Parameter] public bool Loading { get; set; }
+
+    /// <summary>Özet satırının ayrıntısını (sayfalı) çalıştıran işlev; verilmezse ayrıntıya inilemez.</summary>
+    [Parameter] public Func<ReportDrillDto, int, Task<ApiResult<ReportResultDto>>>? DrillRunner { get; set; }
+
+    /// <summary>Tablo raporunda sayfa değişti (1 tabanlı).</summary>
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+
+    /// <summary>Özet raporundaki para birimleri (tutar ölçüsü yoksa boş).</summary>
+    private List<string> Currencies { get; set; } = [];
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(seen, Result))
+        {
+            return;
+        }
+
+        // Yeni sonuç geldi: eski ayrıntı ve grafik seçimleri geçersizdir (satırlar değişmiş olabilir).
+        seen = Result;
+        chartMeasure = 0;
+        drillRequest++;
+        drillRow = null;
+        drillResult = null;
+        drillError = null;
+        drillLoading = false;
+        Currencies = Result is { Status: "ok", IsSummary: true }
+            ? [.. Result.Rows.Select(r => r.Currency).Where(c => !string.IsNullOrEmpty(c)).Select(c => c!).Distinct()]
+            : [];
+        chartCurrency = Currencies.FirstOrDefault();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!focusDrill || drillLoading || drillRow is null)
+        {
+            return;
+        }
+
+        focusDrill = false;
+        try
+        {
+            await drillPanel.FocusAsync();
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or JSException)
+        {
+            // Odak taşınamazsa ayrıntı yine de görünür; yalnızca ekran okuyucu duyurusu eksik kalır.
+        }
+    }
+
+    // ---- Uyarılar
+
+    private static List<string> PartialMessages(ReportResultDto result)
+    {
+        var messages = result.Issues.Where(i => i.Code != "versionDrift" && !i.Blocking).Select(i => i.Message).ToList();
+        var hasTruncatedIssue = result.Issues.Any(i => i.Code == "truncated");
+        if (result.Truncated && !hasTruncatedIssue)
+        {
+            messages.Add("Okuma sınırına ulaşıldı; sonuç eksik olabilir. Süzgeçlerle daraltın.");
+        }
+
+        if (result.RowsLimited && !hasTruncatedIssue)
+        {
+            messages.Add("Yalnızca ilk gruplar gösteriliyor; süzgeçlerle daraltın.");
+        }
+
+        return messages;
+    }
+
+    // ---- Grafik
+
+    private sealed record ChartModel(
+        string Kind, string Title, string Format, string Caption, List<ChartSlice> Slices, List<string> Categories, List<LineSeries> Series, string Note);
+
+    private static List<int> GroupColumns(ReportResultDto result) =>
+        [.. result.Columns.Select((c, i) => (c, i)).Where(x => x.c.Role == "group").Select(x => x.i)];
+
+    private static List<int> MeasureColumns(ReportResultDto result) =>
+        [.. result.Columns.Select((c, i) => (c, i)).Where(x => x.c.Role == "measure").Select(x => x.i)];
+
+    private ChartModel? BuildChart(ReportResultDto result)
+    {
+        if (!result.IsSummary || result.Chart == "none")
+        {
+            return null;
+        }
+
+        var groups = GroupColumns(result);
+        var measures = MeasureColumns(result);
+        if (groups.Count == 0 || measures.Count == 0)
+        {
+            return null;
+        }
+
+        var measureIndex = measures[Math.Clamp(chartMeasure, 0, measures.Count - 1)];
+        var measure = result.Columns[measureIndex];
+        var rows = result.Rows.Where(r => Currencies.Count <= 1 || r.Currency == chartCurrency).ToList();
+        string Label(ReportResultRowDto row, int g) => ReportCenterLabels.Cell(row.Cells[groups[g]], result.Columns[groups[g]]);
+        decimal? Value(ReportResultRowDto row) => ReportCenterLabels.Decimal(row.Cells[measureIndex]);
+        string Key(ReportResultRowDto row) => string.Join(" / ", groups.Select((_, g) => Label(row, g)));
+
+        var fractional = measure.Kind == "money" || rows.Any(r => Value(r) is { } v && v != decimal.Truncate(v));
+        var currencyText = Currencies.Count > 0 && chartCurrency is not null ? $" ({chartCurrency})" : string.Empty;
+        var title = $"{measure.Label}{currencyText} · {string.Join(" / ", groups.Select(g => result.Columns[g].Label))}";
+        var format = fractional ? "N2" : "N0";
+
+        if (result.Chart == "line")
+        {
+            var categories = rows
+                .Select(r => (Key: r.Keys.Count > 0 ? r.Keys[0] : null, Label: Label(r, 0)))
+                .DistinctBy(c => c.Key ?? string.Empty)
+                .OrderBy(c => c.Key is null ? 1 : 0).ThenBy(c => c.Key, StringComparer.Ordinal)
+                .ToList();
+            var seriesNames = groups.Count > 1 ? rows.Select(r => Label(r, 1)).Distinct().ToList() : [measure.Label];
+            var series = new List<LineSeries>();
+            foreach (var name in seriesNames)
+            {
+                var values = new List<decimal?>();
+                foreach (var category in categories)
+                {
+                    var match = rows.FirstOrDefault(r => (r.Keys.Count > 0 ? r.Keys[0] : null) == category.Key && (groups.Count == 1 || Label(r, 1) == name));
+                    values.Add(match is null ? null : Value(match));
+                }
+
+                series.Add(new LineSeries(name, values));
+            }
+
+            return new ChartModel("line", title, format, measure.Label, [], [.. categories.Select(c => c.Label)], series,
+                groups.Count > 1 ? "Her çizgi ikinci gruplamanın bir değerini gösterir." : "Çizgi, tarih dilimlerine göre değişimi gösterir.");
+        }
+
+        if (result.Chart == "pie")
+        {
+            var pie = rows.Select(r => new ChartSlice(Key(r), Value(r) ?? 0)).Where(s => s.Value > 0).Take(MaxChartSlices).ToList();
+            return new ChartModel("pie", title, format, measure.Label, pie, [], [], "Pasta, yalnızca sıfırdan büyük değerleri gösterir.");
+        }
+
+        var all = rows.Select(r => new ChartSlice(Key(r), Value(r) ?? 0)).ToList();
+        return new ChartModel("bar", title, format, measure.Label, [.. all.Take(MaxChartSlices)], [], [],
+            all.Count > MaxChartSlices ? $"Grafikte ilk {MaxChartSlices} grup var." : "Çubuklar en büyük değere göre ölçeklenir.");
+    }
+
+    // ---- Ayrıntı
+
+    private sealed record CompareLine(string Label, string Summary, string Detail, bool Matches);
+
+    private Task DrillAsync(ReportResultRowDto row)
+    {
+        if (Result is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        drillRow = row;
+        drillTitle = ReportCenterLabels.RowTitle(Result, row);
+        drillPage = 1;
+        focusDrill = true;
+        return LoadDrillAsync();
+    }
+
+    private async Task LoadDrillAsync()
+    {
+        if (DrillRunner is null || drillRow is null)
+        {
+            return;
+        }
+
+        var request = ++drillRequest;
+        drillLoading = true;
+        drillError = null;
+        var result = await DrillRunner(new ReportDrillDto(drillRow.Keys, drillRow.Currency), drillPage);
+        if (request != drillRequest)
+        {
+            return;
+        }
+
+        drillLoading = false;
+        drillResult = result.IsSuccess ? result.Value : null;
+        drillError = result.Error;
+        focusDrill = true;
+    }
+
+    private Task DrillPageAsync(int page)
+    {
+        drillPage = page;
+        return LoadDrillAsync();
+    }
+
+    private void CloseDrill()
+    {
+        drillRequest++;
+        drillRow = null;
+        drillResult = null;
+        drillError = null;
+        drillLoading = false;
+    }
+
+    /// <summary>
+    /// Özet satırının ölçüleri ile ayrıntı sonucunun toplam satırı aynı süzülmüş kayıt kümesinden hesaplanır; burada yan yana gösterilir.
+    /// Ayrıntı toplamlarının hücreleri [para birimi, ölçüler...] sırasındadır (grup sütunu yoktur).
+    /// </summary>
+    private List<CompareLine> Comparison(ReportResultDto summary, ReportResultDto detail)
+    {
+        var lines = new List<CompareLine>();
+        if (drillRow is null || detail.Status != "ok" || detail.Totals.Count == 0)
+        {
+            return lines;
+        }
+
+        var total = detail.Totals[0];
+        var offset = summary.Columns.Any(c => c.Role == "currency") ? 1 : 0;
+        var measures = MeasureColumns(summary);
+        for (var j = 0; j < measures.Count; j++)
+        {
+            var column = summary.Columns[measures[j]];
+            var summaryCell = drillRow.Cells[measures[j]];
+            if (offset + j >= total.Cells.Count)
+            {
+                continue;
+            }
+
+            var detailCell = total.Cells[offset + j];
+            var a = ReportCenterLabels.Decimal(summaryCell);
+            var b = ReportCenterLabels.Decimal(detailCell);
+            var matches = (a is null && b is null) || (a is { } x && b is { } y && Math.Abs(x - y) < 0.005m);
+            lines.Add(new CompareLine(column.Label, ReportCenterLabels.Cell(summaryCell, column), ReportCenterLabels.Cell(detailCell, column), matches));
+        }
+
+        return lines;
+    }
+}
