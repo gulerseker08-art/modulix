@@ -2,7 +2,7 @@
 
 Durum: **taslak** (4 Kasım 2026, tartışma için; kabul edilmedi). Bu belge tek başına hiçbir şeyi uygulamaz. Rentcar iş kuralları, mevzuat ve entegrasyon ayrıntıları bir rentcar işletmesiyle **doğrulanmamıştır**; bölüm 9'da listelidir. Doğrulanmamış kural zorunlu üretim kuralı yapılmaz.
 
-Numara notu: `docs/adr/` altında 0030 numarası üç belgede kullanılıyor (kayıt türüne göre kapsam, depo/antrepo taslağı, içe aktarma günlüğü taslağı; son ikisi henüz `main`'de değil). Bu belge 0031'i aldı; yeniden numaralandırma teknik borçtur (yol haritası, teknik borç maddesi).
+Numara notu: `docs/adr/` altında 0030 numarası şu an iki belgede kullanılıyor (kayıt türüne göre kapsam ve içe aktarma günlüğü taslağı); depo/antrepo taslağı PR #166'da 0032'ye taşındı. Bu belge 0031'i aldı; kalan 0030 çakışması için yeniden numaralandırma teknik borçtur (yol haritası, teknik borç maddesi).
 
 İlgili: ADR-0006 (ortak firma/kişi), ADR-0008 (şirket ve şube kapsamı), ADR-0016 (lookup), ADR-0019 (teklif; `IAcceptedQuoteSource`), ADR-0020 (tek veritabanı), ADR-0021 (form düzeni), ADR-0022 (sözleşme), ADR-0027 (kural altyapısı), ADR-0028 (lisans), ADR-0029 (sektör/faaliyet modeli ve modül profili); yol haritası K5, K7, K15, Ç18a (tarife), Ç20.
 
