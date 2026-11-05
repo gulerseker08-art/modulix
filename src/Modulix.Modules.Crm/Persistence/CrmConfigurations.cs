@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
 
@@ -125,6 +126,7 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
         builder.Property(o => o.Type).HasMaxLength(ChoiceValueKeys.MaxLength);
         builder.Property(o => o.Source).HasMaxLength(ChoiceValueKeys.MaxLength);
         builder.Property(o => o.NeedDescription).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.ServiceScope).HasMaxLength(ActivityCodeList.StoredMaxLength);
         builder.Property(o => o.CurrentProblem).HasMaxLength(Opportunity.TextMaxLength);
         builder.Property(o => o.ExpectedBenefit).HasMaxLength(Opportunity.TextMaxLength);
         builder.Property(o => o.Scope).HasMaxLength(Opportunity.TextMaxLength);

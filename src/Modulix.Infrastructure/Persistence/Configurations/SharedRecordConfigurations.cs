@@ -47,6 +47,27 @@ internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
     }
 }
 
+internal sealed class PartyRelationshipConfiguration : IEntityTypeConfiguration<PartyRelationship>
+{
+    public void Configure(EntityTypeBuilder<PartyRelationship> builder)
+    {
+        SharedRecordTables.ConfigureCommon(builder, "PartyRelationships");
+        builder.Property(r => r.RoleCode).HasMaxLength(PartyRelationship.RoleCodeMaxLength).IsRequired();
+        builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Notes).HasMaxLength(PartyRelationship.NotesMaxLength);
+
+        // Firma + rol başına tek kayıt.
+        builder.HasIndex(r => new { r.TenantId, r.PartyId, r.RoleCode }).IsUnique();
+
+        // İlişki kaydı firmanın alt verisidir: firma silinince (ya da başka firmaya birleştirilince) birlikte gider.
+        builder.HasOne<Party>()
+            .WithMany()
+            .HasForeignKey(r => new { r.TenantId, r.PartyId })
+            .HasPrincipalKey(p => new { p.TenantId, p.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 internal sealed class PersonConfiguration : IEntityTypeConfiguration<Person>
 {
     public void Configure(EntityTypeBuilder<Person> builder)

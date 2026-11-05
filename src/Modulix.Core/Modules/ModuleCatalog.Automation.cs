@@ -13,6 +13,7 @@ public sealed partial class ModuleCatalog
     private readonly Dictionary<string, (string ModuleKey, AutomationFieldDefinition Field)> automationFields = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, AutomationRelationDefinition Relation)> automationRelations = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, AutomationActionRegistration Action)> automationActions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string ModuleKey, AutomationTemplateDefinition Template)> automationTemplates = new(StringComparer.Ordinal);
 
     /// <summary>Kural yazılabilen kayıt türleri, modül sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, AutomationEntityDefinition Entity)> AutomationEntities =>
@@ -46,6 +47,13 @@ public sealed partial class ModuleCatalog
 
     public (string ModuleKey, AutomationActionRegistration Action)? FindAutomationAction(string key) =>
         automationActions.TryGetValue(key, out var action) ? action : null;
+
+    /// <summary>Başlangıç şablonları ve modülleri, modül ve tanım sırasıyla.</summary>
+    public IEnumerable<(string ModuleKey, AutomationTemplateDefinition Template)> AutomationTemplates =>
+        Modules.SelectMany(m => m.Automation.Templates).Select(t => automationTemplates[t.Key]);
+
+    public (string ModuleKey, AutomationTemplateDefinition Template)? FindAutomationTemplate(string key) =>
+        automationTemplates.TryGetValue(key, out var template) ? template : null;
 
     [GeneratedRegex("^[a-z][A-Za-z0-9_]*(\\.[a-z][A-Za-z0-9_]*)*$", RegexOptions.CultureInvariant)]
     private static partial Regex AutomationFieldNamePattern();
@@ -146,6 +154,19 @@ public sealed partial class ModuleCatalog
             }
         }
 
+        // Şablonlar bütün aksiyonlar kayıtlandıktan sonra doğrulanır (aksiyon başka modülden de olabilir).
+        foreach (var module in Modules)
+        {
+            foreach (var template in module.Automation.Templates)
+            {
+                ValidateAutomationTemplate(module, template);
+                if (!automationTemplates.TryAdd(template.Key, (module.Key, template)))
+                {
+                    throw TemplateFail(module, template, "iki kez tanımlı");
+                }
+            }
+        }
+
         // Kural aboneliği yalnızca kural yazılabilen kayıt türlerinin olaylarını alır (atama e-postasındaki gibi katalog doldurur):
         // hiçbir modül kural yeteneği beyan etmediyse abonelik de yoktur ve olay teslimine ek yük binmez.
         if (subscriptions.TryGetValue(CoreModule.Subscriptions.Automation, out var automation))
@@ -159,6 +180,35 @@ public sealed partial class ModuleCatalog
             {
                 subscriptions[automation.Subscription.Key] = (automation.ModuleKey, automation.Subscription with { EntityKeys = entityKeys });
             }
+        }
+    }
+
+    private static InvalidOperationException TemplateFail(IModule module, AutomationTemplateDefinition template, string what) =>
+        new($"Geçersiz kural yeteneği beyanı ({module.Key}): şablon '{template.Key}' {what}.");
+
+    // Açılışta yalnızca yapı denetlenir; alan/koşul ayrıntısı kullanan kimliğin yetkisiyle yayında doğrulanır.
+    private void ValidateAutomationTemplate(IModule module, AutomationTemplateDefinition template)
+    {
+        if (!AutomationKeyPattern().IsMatch(template.Key)
+            || !template.Key.StartsWith(module.Key + ".", StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(template.DisplayName)
+            || template.DisplayName.Trim().Length > 200
+            || string.IsNullOrWhiteSpace(template.Description)
+            || !module.Automation.Entities.Any(e => e.EntityKey == template.EntityKey))
+        {
+            throw TemplateFail(module, template, "anahtarı modül önekli, adı ve açıklaması dolu, kayıt türü modülün olmalı");
+        }
+
+        var actions = template.Definition.Actions;
+        if (actions.Count == 0 || actions.Select(a => a.Id).Distinct(StringComparer.Ordinal).Count() != actions.Count)
+        {
+            throw TemplateFail(module, template, "en az bir aksiyon içermeli ve adım kimlikleri tekil olmalı");
+        }
+
+        var unknown = actions.Where(a => !automationActions.ContainsKey(a.Action)).Select(a => a.Action).ToList();
+        if (unknown.Count > 0)
+        {
+            throw TemplateFail(module, template, $"kayıtlı olmayan aksiyon kullanıyor: {string.Join(", ", unknown)}");
         }
     }
 

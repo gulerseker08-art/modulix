@@ -713,7 +713,7 @@ public sealed class CrmModule : IModule
             ["opportunityNumber"] = "Fırsat no", ["description"] = "Açıklama", ["status"] = "Durum", ["statusReason"] = "Durum gerekçesi",
             ["priority"] = "Öncelik", ["type"] = "Tür", ["source"] = "Kaynak", ["customerBudget"] = "Müşteri bütçesi",
             ["budgetStatus"] = "Bütçe durumu", ["needDescription"] = "İhtiyaç", ["currentProblem"] = "Mevcut sorun",
-            ["expectedBenefit"] = "Beklenen fayda", ["scope"] = "Kapsam", ["successCriteria"] = "Başarı ölçütleri", ["risks"] = "Riskler",
+            ["expectedBenefit"] = "Beklenen fayda", ["scope"] = "Kapsam", ["serviceScope"] = "Hizmet kapsamı", ["successCriteria"] = "Başarı ölçütleri", ["risks"] = "Riskler",
             ["decisionProcess"] = "Karar süreci", ["targetDecisionDate"] = "Hedef karar tarihi", ["nextAction"] = "Sonraki aksiyon",
             ["nextActionDate"] = "Aksiyon tarihi", ["lastInteractionAt"] = "Son müşteri etkileşimi", ["stageEnteredAt"] = "Aşamaya giriş",
             ["probabilityManual"] = "Olasılık elle girildi", ["actualCloseDate"] = "Gerçek kapanış", ["wonAmount"] = "Kazanılan tutar", ["primaryQuoteId"] = "Esas teklif",
@@ -933,6 +933,9 @@ public sealed class CrmModule : IModule
     [
         new(SharedEntities.Party, Permissions.CompaniesRead, Permissions.CompaniesWrite),
         new(SharedEntities.Person, Permissions.ContactsRead, Permissions.ContactsWrite),
+
+        // Firmanın ilişki rolündeki durumu (ADR-0029 K9) firmayla aynı izinlerle ve aynı kapsam kuralıyla açılır.
+        new(SharedEntities.PartyRelationship, Permissions.CompaniesRead, Permissions.CompaniesWrite),
     ];
 
     IReadOnlyList<SharedRecordReference> IModule.SharedRecordReferences { get; } =

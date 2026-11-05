@@ -2,6 +2,7 @@
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
+@inject ActivityOptions ActivityNames
 
 <PageTitle>@(opportunity?.OpportunityNumber ?? "Fırsat") · Modulix</PageTitle>
 
@@ -365,6 +366,18 @@
                             {
                                 <div class="span-all"><dt>@label</dt><dd class="notes">@text</dd></div>
                             }
+                        }
+                        @if (opportunity?.ServiceScope is { Count: > 0 } serviceScope)
+                        {
+                            <div class="span-all">
+                                <dt>Hizmet kapsamı</dt>
+                                <dd>
+                                    @foreach (var code in serviceScope)
+                                    {
+                                        <span class="badge tag">@ActivityNames.NameOf(code)</span>
+                                    }
+                                </dd>
+                            </div>
                         }
                     </dl>
                 </FormSection>
@@ -885,7 +898,7 @@
         }
     }
 
-    private bool HasNeedAnalysis => NeedFields.Any(f => !string.IsNullOrWhiteSpace(f.Text));
+    private bool HasNeedAnalysis => opportunity?.ServiceScope is { Count: > 0 } || NeedFields.Any(f => !string.IsNullOrWhiteSpace(f.Text));
 
     private IEnumerable<(string Label, string? Text)> NeedFields =>
     [
@@ -903,6 +916,7 @@
         }
 
         await Lookups.LoadAsync(contacts: true);
+        await ActivityNames.LoadAsync();
         staleDays = (await Api.GetAsync<OpportunitySettingsDto>("/api/crm/opportunities/settings")).Value?.StaleDays ?? 30;
         await LoadAsync();
     }

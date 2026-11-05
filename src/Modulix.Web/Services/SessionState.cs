@@ -1,5 +1,7 @@
+using Microsoft.JSInterop;
 using Modulix.Shared.Access;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Localization;
 using Modulix.Shared.Platform;
 using Modulix.Shared.Settings;
 
@@ -9,9 +11,11 @@ namespace Modulix.Web.Services;
 /// Oturumdaki kullanıcı, aktif tenant ve erişimi. Menü ve ekranlar buna göre gösterilir; asıl denetim
 /// her istekte sunucudadır. Giriş, çıkış ve tenant değişiminde yeniden yüklenir.
 /// </summary>
-public sealed class SessionState(ApiClient api)
+public sealed class SessionState(ApiClient api, IJSRuntime? js = null)
 {
     private Task? loading;
+    private bool languageDetected;
+    private string? detectedLanguage;
 
     public event Action? Changed;
 
@@ -88,7 +92,7 @@ public sealed class SessionState(ApiClient api)
         if (!result.IsSuccess)
         {
             return result.Status == System.Net.HttpStatusCode.Unauthorized
-                ? "E-posta veya şifre hatalı."
+                ? Texts.Get("auth.login.invalid")
                 : result.Error;
         }
 
@@ -161,7 +165,8 @@ public sealed class SessionState(ApiClient api)
         Access = null;
         Logo = null;
         Regional.Apply(null);
-        UiLanguage.Apply(null, null);
+        UiLanguage.Apply(null, null, await DetectLanguageAsync());
+        await LoadTextsAsync();
         loading = Task.CompletedTask;
         Changed?.Invoke();
     }
@@ -171,6 +176,7 @@ public sealed class SessionState(ApiClient api)
         var me = await api.GetAsync<MeResponse>("/api/auth/me");
         User = me.IsSuccess ? me.Value : null;
         Access = null;
+        var fallbackLanguage = await DetectLanguageAsync();
 
         if (User?.ActiveTenantId is not null && !TwoFactorRequired)
         {
@@ -180,17 +186,78 @@ public sealed class SessionState(ApiClient api)
             // Bölgesel ayarlar ve logo: ekranlar saatleri, biçimleri ve para birimini buradan alır.
             var settings = await api.GetAsync<SettingsResponse>("/api/settings");
             Regional.Apply(settings.Value?.Settings);
-            UiLanguage.Apply(User.PreferredLanguage, settings.Value?.Settings);
+            UiLanguage.Apply(User.PreferredLanguage, settings.Value?.Settings, fallbackLanguage);
             Logo = settings.Value?.Logo;
         }
         else
         {
             Regional.Apply(null);
-            UiLanguage.Apply(User?.PreferredLanguage, null);
+            UiLanguage.Apply(User?.PreferredLanguage, null, fallbackLanguage);
             Logo = null;
         }
 
+        await RememberLanguageAsync();
+        await LoadTextsAsync();
         IsLoaded = true;
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Giriş öncesi ekranların dili (ADR-0034): tarayıcıda hatırlanan dil, yoksa tarayıcının dili; ikisi de desteklenmiyorsa
+    /// <c>null</c> (Türkçe). Bir kez okunur. Depolama kapalıysa ya da çağrı başarısızsa sessizce Türkçeye döner.
+    /// </summary>
+    private async Task<string?> DetectLanguageAsync()
+    {
+        if (languageDetected || js is null)
+        {
+            return detectedLanguage;
+        }
+
+        languageDetected = true;
+        try
+        {
+            detectedLanguage = LanguageCodes.Normalize(await js.InvokeAsync<string?>("modulixShell.getLanguage"))
+                ?? LanguageCodes.FromCulture(await js.InvokeAsync<string?>("modulixShell.browserLanguage"));
+        }
+        catch (Exception)
+        {
+            // JS yüklenmemiş ya da depolama kapalı: dil algılanamaz, Türkçe kullanılır.
+        }
+
+        return detectedLanguage;
+    }
+
+    /// <summary>Kişi dilini açıkça seçtiyse giriş ekranının bir sonraki açılışında da o dil kullanılsın diye tarayıcıda saklar.</summary>
+    private async Task RememberLanguageAsync()
+    {
+        if (js is null || LanguageCodes.Normalize(User?.PreferredLanguage) is not { } language || language == detectedLanguage)
+        {
+            return;
+        }
+
+        detectedLanguage = language;
+        try
+        {
+            await js.InvokeVoidAsync("modulixShell.setLanguage", language);
+        }
+        catch (Exception)
+        {
+            // Depolama kapalıysa tercih yalnızca bu oturumda hatırlanır.
+        }
+    }
+
+    /// <summary>Etkin dilin metinlerini yükler (ADR-0034); dil değişmediyse yeniden indirmez. Yüklenemezse eski sözlük kalır.</summary>
+    private async Task LoadTextsAsync()
+    {
+        if (Texts.Language == UiLanguage.Code)
+        {
+            return;
+        }
+
+        var bundle = await api.GetAsync<TextBundleResponse>($"/api/i18n/{UiLanguage.Code}");
+        if (bundle.Value is { } loaded)
+        {
+            Texts.Apply(loaded);
+        }
     }
 }

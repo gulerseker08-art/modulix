@@ -1,0 +1,49 @@
+{
+  "common.save": "Kaydet",
+  "common.saved": "Kaydedildi.",
+  "common.email": "E-posta",
+  "common.password": "Şifre",
+  "common.loading": "Yükleniyor…",
+
+  "account.language.title": "Dil",
+  "account.language.label": "Arayüz dili",
+  "account.language.tenantDefault": "Firmanın varsayılanı",
+  "account.language.help": "Seçiminiz üye olduğunuz bütün kuruluşlarda geçerlidir. Kayıtlı verileriniz değişmez.",
+
+  "auth.backToLogin": "Giriş sayfasına dön",
+  "auth.goToLogin": "Giriş sayfasına git",
+  "auth.login.title": "Giriş",
+  "auth.login.submit": "Giriş yap",
+  "auth.login.forgot": "Şifremi unuttum",
+  "auth.login.invalid": "E-posta veya şifre hatalı.",
+  "auth.login.twoFactor.help": "Doğrulama uygulamanızdaki 6 haneli kodu girin. Telefonunuz yanınızda değilse kurtarma kodlarınızdan birini kullanabilirsiniz.",
+  "auth.login.twoFactor.code": "Doğrulama kodu",
+  "auth.login.twoFactor.submit": "Doğrula",
+
+  "auth.forgot.title": "Şifremi unuttum",
+  "auth.forgot.sent": "Bu adrese bağlı bir hesap varsa şifre sıfırlama bağlantısı gönderdik. E-postanızı kontrol edin; bağlantı 24 saat geçerlidir.",
+  "auth.forgot.help": "Giriş e-postanızı yazın; size yeni şifre belirleme bağlantısı gönderelim.",
+  "auth.forgot.submit": "Bağlantı gönder",
+
+  "auth.reset.pageTitle": "Şifre sıfırla",
+  "auth.reset.title": "Yeni şifre belirle",
+  "auth.reset.done": "Şifreniz değişti. Yeni şifrenizle giriş yapabilirsiniz.",
+  "auth.reset.linkMissing": "Şifre sıfırlama bağlantısı eksik. E-postadaki bağlantıyı açın.",
+  "auth.reset.submit": "Şifremi değiştir",
+
+  "auth.password.new": "Yeni şifre",
+  "auth.password.rules": "En az 10 karakter; büyük harf, küçük harf, rakam ve sembol içermeli.",
+  "auth.password.again": "Yeni şifre (tekrar)",
+  "auth.password.mismatch": "Şifreler aynı değil.",
+
+  "auth.invitation.title": "Daveti kabul et",
+  "auth.invitation.intro": "{0} sizi Modulix'e davet etti. Hesabınız: {1}. Şifrenizi belirleyin; ardından doğrudan giriş yapılır.",
+  "auth.invitation.linkMissing": "Davet bağlantısı eksik. E-postadaki bağlantıyı açın.",
+  "auth.invitation.submit": "Şifremi belirle ve giriş yap",
+
+  "auth.confirmEmail.title": "E-posta onayı",
+  "auth.confirmEmail.intro": "Hesabınızın e-postası {0} olarak değişecek. Onayladığınızda bütün oturumlarınız kapanır.",
+  "auth.confirmEmail.done": "E-postanız {0} olarak değişti. Güvenliğiniz için bütün oturumlarınız kapatıldı; yeni adresinizle giriş yapın.",
+  "auth.confirmEmail.linkMissing": "Onay bağlantısı eksik. E-postadaki bağlantıyı açın.",
+  "auth.confirmEmail.submit": "E-postamı değiştir"
+}

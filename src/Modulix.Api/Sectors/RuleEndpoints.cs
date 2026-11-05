@@ -78,6 +78,10 @@ public static class RuleEndpoints
         {
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
         }
+        catch (CorruptRulePackageException ex)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
+        }
         catch (ArgumentException ex)
         {
             return UserEndpoints.ToProblem(ex)!;

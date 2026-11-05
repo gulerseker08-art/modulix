@@ -16,6 +16,7 @@ public static class Regional
         ["tr-TR"] = ("dd.MM.yyyy", "HH:mm", ",", "."),
         ["en-GB"] = ("dd/MM/yyyy", "HH:mm", ".", ","),
         ["en-US"] = ("MM/dd/yyyy", "h:mm tt", ".", ","),
+        ["az-AZ"] = ("dd.MM.yyyy", "HH:mm", ",", "."),
     };
 
     private const string DefaultTimeZone = "Europe/Istanbul";

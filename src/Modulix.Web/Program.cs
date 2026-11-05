@@ -13,6 +13,7 @@ builder.Services.AddScoped<ApiClient>();
 builder.Services.AddScoped<SessionState>();
 builder.Services.AddScoped<LookupCatalog>();
 builder.Services.AddScoped<FormLayouts>();
+builder.Services.AddScoped<ActivityOptions>();
 builder.Services.AddScoped<AppNavigation>();
 builder.Services.AddTransient<CrmLookups>();
 

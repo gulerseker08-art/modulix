@@ -3,7 +3,7 @@ using Modulix.Core.Contracts.Modules;
 namespace Modulix.Core.Settings;
 
 /// <summary>
-/// Arayüz dilinin seçenekleri (ADR-0033). Dil, tarih/sayı biçiminden (<see cref="RegionalOptions.Formats"/>) ayrı bir tercihtir.
+/// Arayüz dilinin seçenekleri (ADR-0034). Dil, tarih/sayı biçiminden (<see cref="RegionalOptions.Formats"/>) ayrı bir tercihtir.
 /// Çözümleme sırası: kullanıcı tercihi → firma varsayılanı → <see cref="Default"/>.
 /// </summary>
 public static class LanguageOptions

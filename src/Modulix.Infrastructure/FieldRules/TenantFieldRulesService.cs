@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Modulix.Core.Automation;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -22,13 +23,23 @@ internal sealed class TenantFieldRulesService(
     ITenantContextAccessor tenantAccessor,
     ModuleCatalog modules,
     IAutomationCatalog catalog,
-    IAuditWriter audit) : ITenantFieldRules
+    IAuditWriter audit,
+    ILogger<TenantFieldRulesService> logger) : ITenantFieldRules
 {
     public async Task<RuleMergeResult> GetEffectiveAsync(CancellationToken cancellationToken)
     {
         _ = RequireTenant();
         var adaptation = await LoadAdaptationAsync(cancellationToken);
-        return RuleLayerMerger.Merge(await BuildLayersAsync(adaptation.Rules, adaptation.Disabled, cancellationToken));
+        try
+        {
+            return RuleLayerMerger.Merge(await BuildLayersAsync(adaptation.Rules, adaptation.Disabled, cancellationToken));
+        }
+        catch (CorruptRulePackageException exception)
+        {
+            // Yalnızca paket kodu ve sürümü loglanır (kural içeriği yok); etkilenen her yazma reddedilir, bu yüzden hata görünür kalmalı.
+            logger.LogError(exception, "Yayınlanmış kural paketi okunamıyor: {PackageCode} sürüm {Version}.", exception.PackageCode, exception.Version);
+            throw;
+        }
     }
 
     public async Task<TenantRuleAdaptationView> GetAdaptationAsync(CancellationToken cancellationToken)
@@ -122,10 +133,10 @@ internal sealed class TenantFieldRulesService(
                               join p in db.RulePackages.AsNoTracking() on v.PackageId equals p.Id
                               where v.Status == RulePackageStatus.Published
                               orderby p.Code
-                              select new { p.Layer, p.NodeId, v.RulesJson }).ToListAsync(cancellationToken);
+                              select new { p.Code, v.Number, p.Layer, p.NodeId, v.RulesJson }).ToListAsync(cancellationToken);
 
         List<FieldRule> Of(RuleLayerKind kind, Func<Guid?, bool> applies) =>
-            [.. packages.Where(p => p.Layer == kind && applies(p.NodeId)).SelectMany(p => FieldRuleJson.Deserialize(p.RulesJson))];
+            [.. packages.Where(p => p.Layer == kind && applies(p.NodeId)).SelectMany(p => FieldRuleJson.DeserializePackage(p.Code, p.Number, p.RulesJson))];
 
         return
         [

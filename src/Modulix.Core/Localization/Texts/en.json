@@ -1,0 +1,49 @@
+{
+  "common.save": "Save",
+  "common.saved": "Saved.",
+  "common.email": "Email",
+  "common.password": "Password",
+  "common.loading": "Loading…",
+
+  "account.language.title": "Language",
+  "account.language.label": "Interface language",
+  "account.language.tenantDefault": "Company default",
+  "account.language.help": "Your choice applies in every organization you belong to. Your saved data does not change.",
+
+  "auth.backToLogin": "Back to sign in",
+  "auth.goToLogin": "Go to sign in",
+  "auth.login.title": "Sign in",
+  "auth.login.submit": "Sign in",
+  "auth.login.forgot": "Forgot my password",
+  "auth.login.invalid": "Incorrect email or password.",
+  "auth.login.twoFactor.help": "Enter the 6-digit code from your authenticator app. If your phone is not with you, you can use one of your recovery codes.",
+  "auth.login.twoFactor.code": "Verification code",
+  "auth.login.twoFactor.submit": "Verify",
+
+  "auth.forgot.title": "Forgot my password",
+  "auth.forgot.sent": "If an account is linked to this address, we have sent a password reset link. Check your email; the link is valid for 24 hours.",
+  "auth.forgot.help": "Enter your sign-in email and we will send you a link to set a new password.",
+  "auth.forgot.submit": "Send link",
+
+  "auth.reset.pageTitle": "Reset password",
+  "auth.reset.title": "Set a new password",
+  "auth.reset.done": "Your password has been changed. You can now sign in with your new password.",
+  "auth.reset.linkMissing": "The password reset link is incomplete. Open the link from your email.",
+  "auth.reset.submit": "Change my password",
+
+  "auth.password.new": "New password",
+  "auth.password.rules": "At least 10 characters, including an uppercase letter, a lowercase letter, a digit and a symbol.",
+  "auth.password.again": "New password (again)",
+  "auth.password.mismatch": "The passwords do not match.",
+
+  "auth.invitation.title": "Accept the invitation",
+  "auth.invitation.intro": "{0} has invited you to Modulix. Your account: {1}. Set your password; you will then be signed in directly.",
+  "auth.invitation.linkMissing": "The invitation link is incomplete. Open the link from your email.",
+  "auth.invitation.submit": "Set my password and sign in",
+
+  "auth.confirmEmail.title": "Email confirmation",
+  "auth.confirmEmail.intro": "Your account email will change to {0}. When you confirm, all your sessions will be closed.",
+  "auth.confirmEmail.done": "Your email has changed to {0}. For your security all your sessions have been closed; sign in with your new address.",
+  "auth.confirmEmail.linkMissing": "The confirmation link is incomplete. Open the link from your email.",
+  "auth.confirmEmail.submit": "Change my email"
+}

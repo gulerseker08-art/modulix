@@ -2,6 +2,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Modules.Crm.Opportunities;
 
@@ -12,8 +13,11 @@ internal sealed class CrmStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
     ICurrentAccess permissions, IEnumerable<IActivityLinkTarget> linkTargets, LeadWorkflowGate? leadGate = null,
     ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null, OpportunityWorkflowGate? opportunityGate = null,
-    IOpportunityPolicyProvider? policy = null)
+    IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null)
 {
+    /// <summary>Faaliyet kataloğunu okuma sınırı (hizmet kapsamı doğrulaması); yoksa (ör. birim testi) katalog denetimi atlanır.</summary>
+    public IActivityCodeCatalog? ActivityCodes { get; } = activityCodes;
+
     /// <summary>Fırsat iş akışı kapısı (<see cref="OpportunityWorkflowGate"/>).</summary>
     public OpportunityWorkflowGate OpportunityGate { get; } = opportunityGate ?? new OpportunityWorkflowGate();
 

@@ -154,6 +154,14 @@ Kapsam artık kayıt türüne ve platform tavanına göre hesaplanır; tavanı p
 - ADR durumu "uygulandı" yapıldı; bölüm 7 ve 9'daki dilim 2 öncesi ifadeler güncellendi.
 - İçe aktarma günlüğü ADR'si 0033'e taşınmıştı ama kodda, testte ve README'de "ADR-0030" olarak kalmıştı; bu başvurular 0033'e çevrildi (yalnızca yorum ve belge metni, davranış değişmedi).
 
+### Önizleme sonucu (uygulandı; tavan kaydedilmeden etki özeti)
+
+- **Uç:** `POST /api/platform/tenants/{id}/scope-limits/preview` (gövde `SetScopeLimitsRequest`, `Reason` yok sayılır). Hiçbir şey yazmaz, denetim kaydı üretmez; doğrulama `PUT` ile aynıdır (geçersiz/kapalı/yinelenen tür 400, firma yok 404). Yolu `/preview` ile bittiği için salt okunur lisansta da çalışır. Rol tablosunda Operasyon (uygulayacak rolle aynı); firma yöneticisi giremez.
+- **Sonuç:** tür başına `AffectedRoles` (önerilen tavanı aşan yönetici olmayan roller), `NewlyRestrictedMembers`/`ReleasedMembers` ve yönetici karşılıkları; toplamlar farklı kişileri sayar. "Yeni kısılan" bugünkü tavanlarla kısılmayıp önerilenle kısılandır, "serbest kalan" tersidir; böylece aynı küme yeniden önizlenince yeni kısılan çıkmaz.
+- **Hesap:** kişi başına çalışma zamanındaki kapsam çözümü (`MembershipPermissions.GetScopesForTypesAsync`: rol istisnası, ekip/departman rolü, yönetici) ve `RecordScopeRules.Covers`; yönetici yalnızca `AppliesToAdministrators` ise sayılır. Yalnızca etkin üyelikler (`Active`), destek erişimi sayılmaz. Roller üyelik başına bir kez okunur (`GetScopesForTypesAsync`, tür sayısıyla çarpılmaz) ama yine üyelik başına birkaç sorgu yapılır; çok kalabalık firmada yavaş olabilir, ekran yalnızca "Etkiyi göster" ile çağırır. Demo firmada (2 üye) ilk çağrı birkaç saniye, sonrakiler yaklaşık 1 sn sürdü; kalabalık firma için ölçülmedi.
+- **Ekran:** Platform → Firma detayı → "Kayıt görünürlüğü" bölümünde "Etkiyi göster" düğmesi (yalnızca değişiklik varken); seçim değişince önizleme silinir, kaydedince de.
+- **Testler:** `ScopeLimitPreviewTests` (3): önizleme yazmaz ve kaydetmenin sonucuyla örtüşür, kaldırınca serbest kalan, yönetici yalnızca bağlanınca sayılır, doğrulama 400/404, firma yöneticisi 403, başka firmanın üyesi sayılmaz.
+
 ## 6. Test planı (dört test ilkesi)
 
 - **Mutlu yol:** aynı rol firmada `All`, fırsatta `Unit` istisnasıyla kişiyi doğru kümelerle görür; tavan `Unit` iken `Unit` istisnası kaydedilir; liste, sayfalama ve toplam doğru kalır.
@@ -177,15 +185,14 @@ Açık karar kalmadı. Doğrulanmayan noktalar bölüm 9'dadır.
 
 - Sektör profilinin varsayılan tavan önermesi (ör. "Lojistik" profili fırsatlarda `Unit`); önizleme ve onayla uygulanır, sessizce ezmez.
 - Kapsam dışı ortak firma/kişi için "gizle" seçeneği (ADR-0026 K8, dilim 3).
-- Tavanın platform ekranında "bu daralma kaç kullanıcıyı etkiler" önizlemesi (şu an yalnızca kayıttan sonra etkilenen rol sayısı gösterilir).
-- `AppliesToAdministrators = true` yazılırken etkilenecek yönetici sayısı (K6): ekran bugün yalnızca uyarı metni gösterir, sayı vermez.
-- Atanabilir üye listesi: `CrmLookups.LoadAsync` oturumdaki tek varsayılan kapsam `All` ise bütün üyeleri sunar; bu kapsam kayıt türüne göre istisna ve platform tavanıyla daralmış olabilir. Sunucu kapsamı ayrıca uyguladığı için güvenlik açığı değildir (bölüm 9), ama ekran sunucunun sonradan reddedeceği kişileri önerebilir. Çözüm: kısayolu kaldırıp her zaman `entityKey` ile sormak.
+- ~~Tavanın platform ekranında "bu daralma kaç kullanıcıyı etkiler" önizlemesi~~ ve ~~`AppliesToAdministrators = true` için etkilenecek yönetici sayısı~~ yapıldı (aşağıda "Önizleme sonucu").
+- ~~Atanabilir üye listesi~~ çözüldü: `CrmLookups.LoadAsync` oturumdaki tek varsayılan kapsam `All` ise bütün üyeleri sunuyordu ve aksi halde `crm.opportunity` ile soruyordu; oysa liste yalnızca aktivitenin "Yeniden ata" eylemini besler. Kısayol kaldırıldı, liste her zaman aktivitenin kendi türüyle (`crm.activity`) sorulur; tür istisnası ve platform tavanı listeye yansır (`AssignableMembersScopeTests`).
 
 ## 9. Doğrulanmadı
 
 - ~~Modül çağrılarının tür anahtarları~~ dilim 1'de belirlendi (bölüm 5); segment motorunun çok türlü koşulları açık karar 3'te kalır.
 - ~~`tenant-export` ve `tenant-delete` kapsamı~~ dilim 2a testiyle doğrulandı (katalogdan okunur).
-- Web tarafındaki `SessionState.Scope` tek, rolün varsayılan kapsamıdır (tür istisnası ve tavan yansımaz). Kodda yalnızca iki yerde okunur: `CrmLookups` (atanabilir üye kısayolu, bölüm 8) ve `RoleDetail` (kişinin hangi kapsamı verebileceği ipucu). Kaydın görünürlüğünü belirlemez; sunucu her istekte türe göre çözer. Sunucunun, kapsam dışı bir üyeyi sorumlu atama denemesini reddettiği bu dilimde ayrıca denenmedi.
+- Web tarafındaki `SessionState.Scope` tek, rolün varsayılan kapsamıdır (tür istisnası ve tavan yansımaz). Kodda artık yalnızca `RoleDetail`'de okunur (kişinin hangi kapsamı verebileceği ipucu; kesin karar sunucuda). Kaydın görünürlüğünü belirlemez; sunucu her istekte türe göre çözer. Sunucunun kapsam dışı sorumlu atamasını reddettiği `AssignableMembersScopeTests` ile doğrulandı (aktivite yeniden atama; tavan kaldırılınca atama geri gelir).
 - Performans etkisi ölçülmedi; vaat edilmez. Beklenti: rol yükleme aynı kalır, yalnızca bir küçük istisna sorgusu eklenir.
 
 ## 10. Maliyet ve dağıtım

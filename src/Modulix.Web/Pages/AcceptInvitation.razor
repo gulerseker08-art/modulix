@@ -4,37 +4,34 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>Daveti kabul et · Modulix</PageTitle>
+<PageTitle>@Texts.Get("auth.invitation.title") · Modulix</PageTitle>
 
 @* E-postadaki davet bağlantısı: kişi şifresini belirler ve davet eden kuruluşta oturum açar. *@
 <div class="narrow">
-    <h1>Daveti kabul et</h1>
+    <h1>@Texts.Get("auth.invitation.title")</h1>
 
     @if (invitation is null)
     {
         @if (linkError is not null)
         {
             <div class="alert alert-danger" role="alert">@linkError</div>
-            <a href="giris">Giriş sayfasına git</a>
+            <a href="giris">@Texts.Get("auth.goToLogin")</a>
         }
         else
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <p class="text-muted">@Texts.Get("common.loading")</p>
         }
     }
     else
     {
-        <p>
-            <strong>@invitation.TenantName</strong> sizi Modulix'e davet etti. Hesabınız: <strong>@invitation.Email</strong>.
-            Şifrenizi belirleyin; ardından doğrudan giriş yapılır.
-        </p>
+        <p>@Texts.Strong("auth.invitation.intro", invitation.TenantName, invitation.Email)</p>
 
         @if (message is not null)
         {
             <div class="alert alert-danger" role="alert">@message</div>
         }
 
-        <PasswordForm Errors="errors" Busy="busy" Submit="AcceptAsync" ButtonText="Şifremi belirle ve giriş yap" Email="@invitation.Email" />
+        <PasswordForm Errors="errors" Busy="busy" Submit="AcceptAsync" ButtonText="@Texts.Get("auth.invitation.submit")" Email="@invitation.Email" />
     }
 </div>
 
@@ -53,7 +50,7 @@
     {
         if (MembershipId is null || string.IsNullOrEmpty(Token))
         {
-            linkError = "Davet bağlantısı eksik. E-postadaki bağlantıyı açın.";
+            linkError = Texts.Get("auth.invitation.linkMissing");
             return;
         }
 
