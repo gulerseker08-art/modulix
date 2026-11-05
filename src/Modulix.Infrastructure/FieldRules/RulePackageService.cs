@@ -177,9 +177,9 @@ internal sealed class RulePackageService(ModulixDbContext db, ModuleCatalog modu
         var others = await (from v in db.RulePackageVersions.AsNoTracking()
                             join p in db.RulePackages.AsNoTracking() on v.PackageId equals p.Id
                             where v.Status == RulePackageStatus.Published && p.Id != package.Id
-                            select new { p.Layer, v.RulesJson }).ToListAsync(cancellationToken);
-        var productOthers = others.Where(o => o.Layer == RuleLayerKind.ProductStandard).SelectMany(o => FieldRuleJson.Deserialize(o.RulesJson)).ToList();
-        var sectorOthers = others.Where(o => o.Layer == RuleLayerKind.SectorPackage).SelectMany(o => FieldRuleJson.Deserialize(o.RulesJson)).ToList();
+                            select new { p.Code, v.Number, p.Layer, v.RulesJson }).ToListAsync(cancellationToken);
+        var productOthers = others.Where(o => o.Layer == RuleLayerKind.ProductStandard).SelectMany(o => FieldRuleJson.DeserializePackage(o.Code, o.Number, o.RulesJson)).ToList();
+        var sectorOthers = others.Where(o => o.Layer == RuleLayerKind.SectorPackage).SelectMany(o => FieldRuleJson.DeserializePackage(o.Code, o.Number, o.RulesJson)).ToList();
 
         var sameLayerKeys = (package.Layer == RuleLayerKind.ProductStandard ? productOthers : sectorOthers).Select(r => r.Key).ToHashSet(StringComparer.Ordinal);
         var conflicts = rules.Where(r => sameLayerKeys.Contains(r.Key))
