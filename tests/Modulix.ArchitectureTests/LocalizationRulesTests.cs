@@ -94,6 +94,6 @@ public partial class LocalizationRulesTests
     [GeneratedRegex(@"\{\d+\}")]
     private static partial Regex PlaceholderPattern();
 
-    [GeneratedRegex(@"Texts\.Get\(\s*""(?<key>[^""]+)""")]
+    [GeneratedRegex(@"Texts\.(?:Get|Strong)\(\s*""(?<key>[^""]+)""")]
     private static partial Regex UsedKey();
 }

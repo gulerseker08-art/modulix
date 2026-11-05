@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Net;
+using Microsoft.AspNetCore.Components;
 using Modulix.Shared.Localization;
 
 namespace Modulix.Web.Services;
@@ -26,4 +28,11 @@ public static class Texts
         var text = current.TryGetValue(key, out var found) ? found : key;
         return args.Length == 0 ? text : string.Format(CultureInfo.InvariantCulture, text, args);
     }
+
+    /// <summary>
+    /// Yer tutucuların kalın gösterildiği metin (ör. "{0} sizi davet etti"). Değerler HTML'e kodlanır; sözlük metni ürüne aittir,
+    /// kullanıcı girdisi yalnızca değer olarak girer.
+    /// </summary>
+    public static MarkupString Strong(string key, params string?[] values) =>
+        new(Get(key, [.. values.Select(v => (object?)$"<strong>{WebUtility.HtmlEncode(v ?? string.Empty)}</strong>")]));
 }

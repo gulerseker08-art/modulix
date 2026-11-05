@@ -21,6 +21,10 @@ public static class LanguageCodes
         return trimmed is not null && All.Any(l => l.Code == trimmed) ? trimmed : null;
     }
 
+    /// <summary>Kültür adından ("az-Latn-AZ", "en_US", "tr") desteklenen dil kodu; desteklenmiyorsa <c>null</c>.</summary>
+    public static string? FromCulture(string? culture) =>
+        Normalize(culture?.Split('-', '_')[0]);
+
     public static string Resolve(string? userPreference, string? tenantDefault) =>
         Normalize(userPreference) ?? Normalize(tenantDefault) ?? Default;
 }

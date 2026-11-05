@@ -10,9 +10,13 @@ public static class UiLanguage
 {
     public static string Code { get; private set; } = LanguageCodes.Default;
 
-    public static void Apply(string? userPreference, IReadOnlyList<SettingDto>? settings)
+    /// <param name="fallback">
+    /// Firma varsayılanı yoksa (oturum ya da firma seçilmemiş, giriş öncesi) kullanılacak dil: tarayıcıda hatırlanan ya da
+    /// tarayıcının dili.
+    /// </param>
+    public static void Apply(string? userPreference, IReadOnlyList<SettingDto>? settings, string? fallback = null)
     {
         var tenantDefault = settings?.FirstOrDefault(s => s.Key == SettingKeys.Language)?.Value;
-        Code = LanguageCodes.Resolve(userPreference, tenantDefault);
+        Code = LanguageCodes.Resolve(userPreference, tenantDefault ?? fallback);
     }
 }
