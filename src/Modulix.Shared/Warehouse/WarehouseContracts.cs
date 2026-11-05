@@ -25,6 +25,13 @@ public static class WarehouseAccess
     /// <summary>Alan türü listesi; kategorileri kodun anladığı anlamdır, adları tenant'ındır.</summary>
     public const string ZoneKindList = "warehouse.zone-kind";
 
+    // Lookup alanları (ADR-0016); seçim kutuları bu anahtarlarla çalışır.
+    public const string ZoneFacilityLookup = "warehouse.zone.facility";
+    public const string LocationLevelFacilityLookup = "warehouse.location-level.facility";
+    public const string LocationFacilityLookup = "warehouse.location.facility";
+    public const string LocationParentLookup = "warehouse.location.parent";
+    public const string LocationZoneLookup = "warehouse.location.zone";
+
     public const string ZoneKindControlled = "controlled";
     public const string ZoneKindFree = "free";
 }

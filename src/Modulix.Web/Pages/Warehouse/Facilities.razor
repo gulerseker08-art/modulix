@@ -62,10 +62,10 @@
                         <td data-label="Ad">@Text(facility, "name")</td>
                         <td data-label="Ülke">@Text(facility, "countryCode")</td>
                         <td data-label="Gümrük uzantısı">
-                            <span class="badge status-@(Flag(facility, "customsEnabled") ? "success" : "muted")">@(Flag(facility, "customsEnabled") ? "Açık" : "Kapalı")</span>
+                            <span class="badge @WarehouseLabels.ActiveBadge(Flag(facility, "customsEnabled"))">@(Flag(facility, "customsEnabled") ? "Açık" : "Kapalı")</span>
                         </td>
                         <td data-label="Durum">
-                            <span class="badge status-@(Flag(facility, "isActive") ? "success" : "muted")">@(Flag(facility, "isActive") ? "Etkin" : "Pasif")</span>
+                            <span class="badge @WarehouseLabels.ActiveBadge(Flag(facility, "isActive"))">@(Flag(facility, "isActive") ? "Etkin" : "Pasif")</span>
                         </td>
                         @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.FacilityEntityKey))
                         {
