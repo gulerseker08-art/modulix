@@ -98,6 +98,15 @@ public sealed class ContractsModule : IModule
         public const string ContractCommitment = "contracts.contract-commitment";
     }
 
+    /// <summary>Sözleşme türü listesinin kategorileri: türün hangi iş alanına ait olduğunu söyler (yeni türde zorunlu seçim).</summary>
+    public static class TypeCategories
+    {
+        public const string Sales = "sales";
+        public const string Purchase = "purchase";
+        public const string Employment = "employment";
+        public const string Other = "other";
+    }
+
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
     public static class Lists
     {
@@ -338,7 +347,11 @@ public sealed class ContractsModule : IModule
     /// <summary>Sözleşme formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021 form düzeni).</summary>
     IReadOnlyList<FormDefinition> IModule.Forms => ContractsForms.All;
 
-    /// <summary>Sözleşme türü (Y9b): hazır değerler örnektir; firma kendi türlerini ekler. Kod türe bakmaz (sektör koşulu yok).</summary>
+    /// <summary>
+    /// Sözleşme türü (Y9b): hazır değerler örnektir; firma kendi türlerini ekler. Kod türün adına bakmaz; her tür bir
+    /// <see cref="TypeCategories">kategoriye</see> bağlıdır (yeni türde seçilir) ve "Satış sözleşmeleri" görünümü kategoriyle belirlenir
+    /// (<see cref="ContractScopes"/>): firma kendi satış türlerini bu kategoride açar, satın alma ve personel sözleşmeleri CRM'e karışmaz.
+    /// </summary>
     IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
     [
         new(
@@ -347,15 +360,22 @@ public sealed class ContractsModule : IModule
             Entities.Contract,
             "type",
             Required: true,
-            [],
             [
-                new("Service", "Hizmet sözleşmesi"),
-                new("Sales", "Satış sözleşmesi"),
-                new("Framework", "Çerçeve sözleşme"),
-                new("Maintenance", "Bakım / destek sözleşmesi"),
-                new("Subscription", "Abonelik sözleşmesi"),
-                new("Nda", "Gizlilik sözleşmesi"),
-                new("Other", "Diğer"),
+                new(TypeCategories.Sales, "Satış / müşteri"),
+                new(TypeCategories.Purchase, "Satın alma"),
+                new(TypeCategories.Employment, "Personel"),
+                new(TypeCategories.Other, "Diğer"),
+            ],
+            [
+                new("Service", "Hizmet sözleşmesi", TypeCategories.Sales),
+                new("Sales", "Satış sözleşmesi", TypeCategories.Sales),
+                new("Framework", "Çerçeve sözleşme", TypeCategories.Sales),
+                new("Maintenance", "Bakım / destek sözleşmesi", TypeCategories.Sales),
+                new("Subscription", "Abonelik sözleşmesi", TypeCategories.Sales),
+                new("Purchase", "Satın alma sözleşmesi", TypeCategories.Purchase),
+                new("Employment", "Personel sözleşmesi", TypeCategories.Employment),
+                new("Nda", "Gizlilik sözleşmesi", TypeCategories.Other),
+                new("Other", "Diğer", TypeCategories.Other),
             ])
         {
             Default = "Service",

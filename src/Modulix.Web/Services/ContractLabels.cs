@@ -294,7 +294,7 @@ public static class ViewLabels
 {
     public static IReadOnlyList<(string Key, string Label)> Presets { get; } =
     [
-        ("mine", "Sözleşmelerim"), ("signature", "İmza bekleyen"), ("ending", "Bitişi yaklaşan (90 gün)"), ("notice", "Bildirim süresi yaklaşan (30 gün)"), ("overdue", "Taahhüdü geciken"),
+        ("mine", "Sözleşmelerim"), ("signature", "İmza bekleyen"), ("ending", "Bitişi yaklaşan (90 gün)"), ("notice", "Bildirim süresi yaklaşan (30 gün)"), ("overdue", "Taahhüdü geciken"), ("sales", "Satış sözleşmeleri"),
     ];
 
     public static IReadOnlyList<(string Key, string Label)> Sorts { get; } =

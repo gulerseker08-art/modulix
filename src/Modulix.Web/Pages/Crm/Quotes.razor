@@ -19,22 +19,8 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <div class="filters" role="group" aria-label="Hızlı görünümler">
-        <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@(mine ? "true" : "false")" @onclick="ToggleMineAsync">Tekliflerim</button>
-        <button type="button" class="chip @(pending ? "active" : null)" aria-pressed="@(pending ? "true" : "false")" @onclick="TogglePendingAsync">Onay bekleyenler</button>
-        <button type="button" class="chip @(expiring ? "active" : null)" aria-pressed="@(expiring ? "true" : "false")" @onclick="ToggleExpiringAsync">Süresi yaklaşanlar (7 gün)</button>
-        <button type="button" class="chip @(latestOnly ? "active" : null)" aria-pressed="@(latestOnly ? "true" : "false")" @onclick="ToggleLatestAsync">Yalnızca son revizyonlar</button>
-        <label class="visually-hidden" for="status-filter">Durum</label>
-        <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm durumlar</option>
-            @foreach (var s in QuoteLabels.Statuses)
-            {
-                <option value="@s.Key">@s.Label</option>
-            }
-        </select>
-    </div>
-
     <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@current" ValueChanged="SelectAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <label class="visually-hidden" for="quote-search">Teklif ara</label>
             <input id="quote-search" class="form-control" type="search" placeholder="Başlık veya teklif no ara" @bind="search" />
@@ -46,6 +32,9 @@
             <a class="btn btn-primary" href="crm/teklifler/yeni"><AppIcon Name="plus" Size="16" /> Yeni teklif</a>
         }
     </div>
+    <div class="filters" role="group" aria-label="Süzgeçler">
+        <button type="button" class="chip @(latestOnly ? "active" : null)" aria-pressed="@(latestOnly ? "true" : "false")" @onclick="ToggleLatestAsync">Yalnızca son revizyonlar</button>
+    </div>
 
     @if (page is null)
     {
@@ -53,7 +42,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Bu süzgece uyan teklif yok.</p>
+        <p class="text-muted">Bu görünümde teklif yok.</p>
     }
     else
     {
@@ -91,13 +80,25 @@
 </AuthGate>
 
 @code {
+    // Görünümler yalnızca süzgeçtir; kapsamı sunucu uygular (kimse yetkisi dışındaki teklifi listeleyemez).
+    private static readonly IReadOnlyList<ViewOption> ViewOptions =
+    [
+        new("all", "Tüm teklifler"),
+        new("mine", "Tekliflerim"),
+        new("pending", "Onay bekleyenler"),
+        new("expiring", "Süresi yaklaşanlar (7 gün)"),
+        new("status:Draft", "Taslaklar", "Duruma göre"),
+        new("status:Presented", "Gönderilenler", "Duruma göre"),
+        new("status:Accepted", "Kabul edilenler", "Duruma göre"),
+        new("status:Rejected", "Reddedilenler", "Duruma göre"),
+        new("status:Expired", "Süresi dolanlar", "Duruma göre"),
+        new("status:Cancelled", "İptal edilenler", "Duruma göre"),
+    ];
+
     private CrmPage<QuoteDto>? page;
     private string? message;
-    private string? status;
+    private string current = "all";
     private string search = string.Empty;
-    private bool mine;
-    private bool pending;
-    private bool expiring;
     private bool latestOnly = true;
 
     protected override async Task OnInitializedAsync()
@@ -114,13 +115,22 @@
     {
         var url = $"/api/crm/quotes?page={pageNumber}&pageSize={ListPaging.Size}";
         if (!string.IsNullOrWhiteSpace(search)) { url += $"&search={Uri.EscapeDataString(search.Trim())}"; }
-        if (!string.IsNullOrEmpty(status) && !expiring) { url += $"&status={status}"; }
-        if (mine) { url += "&ownerId=me"; }
-        if (pending) { url += "&approvalStatus=Pending"; }
-        if (expiring)
+
+        switch (current)
         {
-            // Sunulmuş ve önümüzdeki 7 gün içinde (bugün dahil) sona erenler.
-            url += $"&status=Presented&validFrom={DateTime.UtcNow:yyyy-MM-dd}&validTo={DateTime.UtcNow.AddDays(7):yyyy-MM-dd}";
+            case "mine":
+                url += "&ownerId=me";
+                break;
+            case "pending":
+                url += "&approvalStatus=Pending";
+                break;
+            case "expiring":
+                // Sunulmuş ve önümüzdeki 7 gün içinde (bugün dahil) sona erenler.
+                url += $"&status=Presented&validFrom={DateTime.UtcNow:yyyy-MM-dd}&validTo={DateTime.UtcNow.AddDays(7):yyyy-MM-dd}";
+                break;
+            case var view when view.StartsWith("status:", StringComparison.Ordinal):
+                url += $"&status={Uri.EscapeDataString(view["status:".Length..])}";
+                break;
         }
 
         if (latestOnly) { url += "&latestOnly=true"; }
@@ -130,11 +140,12 @@
         message = result.Error;
     }
 
-    private Task ToggleMineAsync() { mine = !mine; return LoadAsync(1); }
-
-    private Task TogglePendingAsync() { pending = !pending; return LoadAsync(1); }
-
-    private Task ToggleExpiringAsync() { expiring = !expiring; return LoadAsync(1); }
+    // Görünüm değişince sayfalama başa döner; arama metni ve "son revizyonlar" süzgeci korunur.
+    private Task SelectAsync(string view)
+    {
+        current = view;
+        return LoadAsync(1);
+    }
 
     private Task ToggleLatestAsync() { latestOnly = !latestOnly; return LoadAsync(1); }
 

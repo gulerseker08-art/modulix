@@ -641,6 +641,43 @@ code {
     margin: 2rem auto;
 }
 
+/* Breadcrumb (konum izi): "CRM / Satış / Teklifler"; ayırıcı CSS ile eklenir, ekran okuyucuya listeyi bozmaz. */
+.page-breadcrumb {
+    margin-bottom: var(--mx-space-3);
+    font-size: var(--mx-fs-body);
+}
+
+    .page-breadcrumb ol {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--mx-space-1) var(--mx-space-2);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: var(--mx-text-secondary);
+    }
+
+    .page-breadcrumb li + li::before {
+        content: "/";
+        margin-right: var(--mx-space-2);
+        color: var(--mx-text-secondary);
+    }
+
+    .page-breadcrumb a {
+        color: var(--mx-text-secondary);
+        text-decoration: none;
+    }
+
+        .page-breadcrumb a:hover {
+            color: var(--mx-text-primary);
+            text-decoration: underline;
+        }
+
+    .page-breadcrumb [aria-current="page"] {
+        color: var(--mx-text-primary);
+        font-weight: 600;
+    }
+
 .page-header {
     display: flex;
     flex-wrap: wrap;
@@ -2410,6 +2447,26 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
     .app-tile.is-current {
         border-color: var(--mx-indigo);
         background: var(--mx-lilac);
+    }
+
+/* Pasif kart (yol haritasındaki uygulama): tıklanmaz, odak almaz; kontrastı AA'nın altına inmez, pasifliği "Yakında" başlığı ve imleç anlatır. */
+.app-tile.is-planned {
+    cursor: default;
+    background: var(--mx-surface-muted);
+    border-style: dashed;
+    color: var(--mx-text-secondary);
+}
+
+    .app-tile.is-planned:hover {
+        background: var(--mx-surface-muted);
+        border-color: var(--mx-border);
+        box-shadow: none;
+        color: var(--mx-text-secondary);
+    }
+
+    .app-tile.is-planned .app-tile-icon {
+        background: transparent;
+        color: var(--mx-text-secondary);
     }
 
 .app-tile-name {
