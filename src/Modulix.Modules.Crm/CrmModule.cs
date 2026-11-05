@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
@@ -361,6 +362,9 @@ public sealed class CrmModule : IModule
         new(Entities.Product, Permissions.ProductCostsRead, ["cost", "costCurrency"]),
         new(Entities.QuoteLine, Permissions.QuoteCostsRead, ["unitCost"]),
     ];
+
+    /// <summary>Kural altyapısı yetenekleri (ADR-0027, Dilim 3): müşteri adayı ve fırsat olayları, alanlar, aktivite ilişkisi, tarama kaynağı, takip aktivitesi aksiyonu.</summary>
+    AutomationCapabilities IModule.Automation => Automation.CrmAutomation.Capabilities;
 
     /// <summary>Özel alanlar (Y9a): firma dört kayıt türüne de kendi alanlarını ekleyebilir.</summary>
     IReadOnlyList<CustomizableEntity> IModule.CustomizableEntities { get; } =
@@ -1081,6 +1085,10 @@ public sealed class CrmModule : IModule
         // Ana bilgisayarın (API) sistem kimliği köprüsü bu doğrudan uygulamayı kendi CRM sistem kimliği altında çağırır (aşağıdaki "crm.follow-up" aboneliği).
         services.AddKeyedScoped<Modulix.Core.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>("direct");
         services.AddScoped<CrmFollowUpAnchor>();
+        services.AddScoped<CrmFollowUpActivities>();
+        services.AddScoped<CrmAutomationRecordSource>();
+        services.AddScoped<CrmActivityRelationResolver>();
+        services.AddScoped<Automation.CreateFollowUpAction>();
         services.AddScoped<IActivityLinkTarget, QuoteLinkTarget>();
         services.AddScoped<ActivityWorkflowGate>();
         services.AddScoped<IActivityWorkflow, ActivityWorkflow>();
