@@ -116,6 +116,7 @@ public static class PersistenceSetup
         services.AddScoped<IAutomationRunStore, AutomationRunStore>();
         services.AddScoped<IAutomationRunService, AutomationRunService>();
         services.AddSingleton<AutomationScanner>();
+        services.AddScoped<AutomationRetention>();
         services.AddSingleton<AutomationRunner>();
         services.AddScoped<IImportLog, ImportLog>();
 

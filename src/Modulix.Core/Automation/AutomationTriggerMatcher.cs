@@ -44,7 +44,7 @@ public static class AutomationTriggerMatcher
 
     /// <summary>
     /// Tetikleyici bu sürümde çalışır mı? Kayıt olayı tetikleyicileri, elle çalıştırma ve tarama tabanlı tetikleyiciler çalışır
-    /// (tarama için kayıt türünün kayıt kaynağı ayrıca doğrulanır); iş olayı henüz çalışmaz (ADR-0027 Dilim 2b-2). Çalışmayan
+    /// (tarama için kayıt türünün kayıt kaynağı ayrıca doğrulanır); iş olayı henüz çalışmaz (ADR-0027 Dilim 2b-3; iş olayı yayınlama sözleşmesi Ç0.4 yok). Çalışmayan
     /// tetikleyiciyle yayın reddedilir: sessizce hiç tetiklenmeyen kural bırakılmaz.
     /// </summary>
     public static bool IsExecutable(AutomationTrigger trigger) =>
