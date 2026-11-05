@@ -1,6 +1,7 @@
 using Modulix.Api.Access;
 using Modulix.Api.Account;
 using Modulix.Api.Audit;
+using Modulix.Api.Imports;
 using Modulix.Api.Automation;
 using Modulix.Api.Reports;
 using Modulix.Api.Auth;
@@ -224,6 +225,7 @@ app.MapPlatformHealthEndpoints();
 app.MapSupportAccessEndpoints();
 app.MapPlatformTeamEndpoints();
 app.MapAuditEndpoints();
+app.MapImportEndpoints();
 app.MapSettingsEndpoints();
 
 // Bilinmeyen API adresi 404 döner; diğer adresler arayüzün sayfalarıdır.

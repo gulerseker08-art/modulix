@@ -13,6 +13,7 @@ using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
 using Modulix.Core.FieldRules;
+using Modulix.Core.Imports;
 using Modulix.Core.Sectors;
 using Modulix.Core.Lookups;
 using Modulix.Core.Modules;
@@ -28,6 +29,7 @@ using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Communication;
 using Modulix.Infrastructure.Customization;
 using Modulix.Infrastructure.FieldRules;
+using Modulix.Infrastructure.Imports;
 using Modulix.Infrastructure.Sectors;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Lookups;
@@ -114,6 +116,7 @@ public static class PersistenceSetup
         services.AddScoped<IAutomationRunStore, AutomationRunStore>();
         services.AddScoped<IAutomationRunService, AutomationRunService>();
         services.AddSingleton<AutomationRunner>();
+        services.AddScoped<IImportLog, ImportLog>();
 
         // Ortak rapor merkezi (ADR-0026, dilim 3): veri kümeleri modüllerden gelir, okumalar kayıt boru hattından geçer.
         services.AddScoped<ReportColumnResolver>();

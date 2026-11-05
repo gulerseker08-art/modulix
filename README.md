@@ -222,6 +222,15 @@ Platformu işleten ekip için ayrı bir alan: menüde **Platform** (`/platform`)
 - **Oturum olayları (Y5b):** kayıt türü "Oturum" (`core.account`): giriş, hatalı şifre, hesap kilitlenmesi, kilitliyken deneme, şifre sıfırlama ve davet kabulü; IP adresi ve tarayıcı bilgisiyle (kişisel veri, aydınlatma metnine eklenmeli). Başarılı giriş yalnızca seçilen firmaya yazılır (iki firması olan kişi için firma seçildiğinde). Hatalı şifre, kilitlenme ve şifre sıfırlama kişinin etkin üye olduğu tüm firmalara yazılır; davet kabulü daveti kabul edilen firmalara. Kayıtlı olmayan e-postayla deneme hiçbir firmaya yazılmaz, yalnızca uygulama günlüğüne (e-posta olmadan) düşer.
 - Modüller kayıt türlerini `IModule.AuditedEntities` ile tanımlar (alan etiketleri, seçenekler, kullanıcı ve bağlantı alanları, görüntüleme izni).
 
+### İşlem günlüğü: içe aktarmalar (ADR-0030, Dilim 1)
+
+**Yönetim → İşlem günlüğü** (`/yonetim/gunluk`). Bu dilimde yalnızca **okuma** vardır: içe aktarma motoru (CSV/XLSX, kuru çalışma, hata raporu indirme) Dilim 2-4'te gelir, bu yüzden liste şimdilik boştur. Tablolar `core.ImportRuns` (iş: kullanıcı, kayıt türü, dosya adı/boyutu/SHA-256 özeti, mod, politika, durum, satır sayıları, iz kimliği) ve `core.ImportRowIssues` (satır no, sütun, hata kodu, önem, ileti); ikisi de RLS'lidir. **Ham hücre değeri saklanmaz.**
+
+- **Görünürlük (rol izniyle):** `core.imports.read` firmanın bütün içe aktarmalarını, yalnızca `core.imports.run` kullanıcının kendi içe aktarmalarını görür; başkasının koşusu 404 döner. Kullanıcı süzgeci de bu sınırı aşamaz. `core.imports.rollback` ayrılmıştır (geri alma Dilim 4). Üçü de Yönetici rolündedir.
+- **API:** `GET /api/imports?status=&mode=&userId=&entityKey=&from=&to=&page=&pageSize=` (en yeni üstte; tarihler firma saat dilimiyle gün olarak yorumlanır, bitiş dahil) ve `GET /api/imports/{id}?severity=&code=&page=&pageSize=` (koşu özeti, hata kodu dağılımı ve sayfalı satır hataları). Geçersiz durum, mod, önem ya da hata kodu 400 döner.
+- **Hata kodları** kapalı listedir: `required-missing`, `format-invalid`, `lookup-unresolved`, `duplicate-exact`, `duplicate-possible`, `custom-field-invalid`, `permission-denied`, `business-rule`, `file-invalid`, `system-error`. Koşu başına en çok 5.000 satır hatası saklanması planlıdır; fazlası yalnızca sayılır.
+- **Henüz yok:** "Hatalı işlemler" sekmesi (e-posta, otomasyon, olay), saklama süresi ayarları ve temizlik işçisi, platform özeti, bitiş bildirimi. Tasarım: [ADR-0030](docs/adr/0030-import-takibi-ve-islem-gunlugu.md).
+
 ### Firma ayarları (Y6)
 
 **Yönetim → Firma ayarları** (`/yonetim/ayarlar`): firma profili (görünen ad, ticari unvan, vergi dairesi ve no, adres, telefon, e-posta) ve bölgesel ayarlar (saat dilimi, para birimi, tarih ve sayı biçimi). Her bölüm ayrı kaydedilir.

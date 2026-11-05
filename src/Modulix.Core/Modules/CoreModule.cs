@@ -72,6 +72,15 @@ public sealed class CoreModule : IModule
 
         /// <summary>Kendi raporlarını zamanlar; zamanlanmış rapor çalışırken sahibinin yetkisi yeniden denetlenir, yetki kaybında teslim durur.</summary>
         public const string ScheduleReports = "core.reports.schedule";
+
+        /// <summary>İçe aktarma başlatır; işlem günlüğünde yalnızca kendi içe aktarmalarını görür (ADR-0030).</summary>
+        public const string RunImports = "core.imports.run";
+
+        /// <summary>İşlem günlüğünde firmanın bütün içe aktarmalarını ve satır hatalarını görür (ADR-0030).</summary>
+        public const string ReadImports = "core.imports.read";
+
+        /// <summary>İçe aktarılmış kayıtları gerekçeyle toplu geri alır (ADR-0030, Dilim 4).</summary>
+        public const string RollbackImports = "core.imports.rollback";
     }
 
     public string Key => ModuleKey;
@@ -100,6 +109,9 @@ public sealed class CoreModule : IModule
         new(Permissions.ShareReports, "Kendi raporunu firmayla ya da kullanıcılarla paylaşır", "Raporlar"),
         new(Permissions.ExportReports, "Rapor sonuçlarını CSV olarak dışa aktarır", "Raporlar"),
         new(Permissions.ScheduleReports, "Kendi raporlarını zamanlar", "Raporlar"),
+        new(Permissions.RunImports, "İçe aktarma başlatır ve kendi içe aktarmalarını görür", "İçe aktarma"),
+        new(Permissions.ReadImports, "Firmanın bütün içe aktarmalarını ve satır hatalarını görüntüler", "İçe aktarma"),
+        new(Permissions.RollbackImports, "İçe aktarılmış kayıtları toplu geri alır", "İçe aktarma"),
     ];
 
     /// <summary>Çekirdeğin olay abonelikleri (ADR-0007).</summary>
