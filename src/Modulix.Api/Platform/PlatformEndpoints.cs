@@ -46,6 +46,38 @@ public static class PlatformEndpoints
         platform.MapPost("/tenants/{tenantId:guid}/administrators", InviteAdministratorAsync);
         platform.MapPut("/tenants/{tenantId:guid}/modules/{moduleKey}", (Guid tenantId, string moduleKey, SetTenantModuleRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
             Run(() => admin.SetModuleAsync(tenantId, moduleKey, request.Enabled, UserId(user), ct, ToTerms(request), request.Reason)));
+
+        // Kayıt görünürlük tavanı (ADR-0030): firmanın rolleri bir kayıt türünde tavandan geniş kapsam alamaz. Yalnızca platform yazar.
+        platform.MapGet("/tenants/{tenantId:guid}/scope-limits", async (Guid tenantId, IPlatformAdministration admin, CancellationToken ct) =>
+        {
+            try
+            {
+                var result = await admin.GetScopeLimitsAsync(tenantId, ct);
+                return Results.Ok(new TenantScopeLimitsResponse(
+                    [.. result.Limits.Select(ToDto)],
+                    [.. result.Types.Select(t => new ScopeLimitTypeDto(t.EntityKey, t.ModuleKey, t.Label))]));
+            }
+            catch (Exception ex) when (ToProblem(ex) is { } problem)
+            {
+                return problem;
+            }
+        });
+        platform.MapPut("/tenants/{tenantId:guid}/scope-limits", async (
+            Guid tenantId, SetScopeLimitsRequest request, ClaimsPrincipal user, IPlatformAdministration admin, CancellationToken ct) =>
+        {
+            try
+            {
+                var change = await admin.SetScopeLimitsAsync(
+                    tenantId,
+                    [.. (request.Limits ?? []).Select(l => new PlatformScopeLimit(l.EntityKey, (Core.Contracts.Authorization.RecordScope)l.MaxScope, l.AppliesToAdministrators))],
+                    request.Reason, UserId(user), ct);
+                return Results.Ok(new SetScopeLimitsResponse([.. change.Limits.Select(ToDto)], change.AffectedRoleCount));
+            }
+            catch (Exception ex) when (ToProblem(ex) is { } problem)
+            {
+                return problem;
+            }
+        });
         platform.MapGet("/audit", ListAuditAsync);
         platform.MapGet("/overview", GetOverviewAsync);
         platform.MapGet("/expirations", ListExpirationsAsync);
@@ -102,12 +134,13 @@ public static class PlatformEndpoints
         var overview = await admin.GetOverviewAsync(ct);
         return new PlatformOverviewResponse(
             [.. Enum.GetValues<TenantStatus>().Select(s => new TenantStateCountDto((TenantState)s, overview.TenantCounts.GetValueOrDefault(s)))],
-            overview.ExpiredEntitlements, overview.ExpiringIn30Days, overview.ExpiringIn60Days, overview.ExpiringIn90Days);
+            overview.ExpiredEntitlements, overview.ReadOnlyEntitlements, overview.ExpiringIn30Days, overview.ExpiringIn60Days, overview.ExpiringIn90Days);
     }
 
     private static async Task<List<PlatformExpirationDto>> ListExpirationsAsync(int? days, IPlatformAdministration admin, CancellationToken ct) =>
         [.. (await admin.ListExpirationsAsync(days ?? 90, ct)).Select(e => new PlatformExpirationDto(
-            e.TenantId, e.TenantName, e.TenantSlug, (TenantState)e.TenantStatus, e.ModuleKey, (LicenseSource)e.Source, e.ValidUntil, e.Note))];
+            e.TenantId, e.TenantName, e.TenantSlug, (TenantState)e.TenantStatus, e.ModuleKey, (LicenseSource)e.Source, e.ValidUntil, e.Note,
+            (Shared.Access.LicensePhase)e.Phase, e.GraceEndsAt))];
 
     private static async Task<IResult> ListAuditAsync(
         Guid? tenantId, string? action, int? page, int? pageSize, IPlatformAdministration admin, CancellationToken ct)
@@ -221,7 +254,7 @@ public static class PlatformEndpoints
         return await Run(() => action(reason));
     }
 
-    private static async Task<IResult> Run(Func<Task> action)
+    internal static async Task<IResult> Run(Func<Task> action)
     {
         try
         {
@@ -235,12 +268,14 @@ public static class PlatformEndpoints
     }
 
     // Kullanıcı yönetimiyle aynı eşleme; "bulunamadı" burada firmadır.
-    private static IResult? ToProblem(Exception exception) => exception switch
+    internal static IResult? ToProblem(Exception exception) => exception switch
     {
         UserAdministrationException { Error: UserAdministrationError.NotFound } ex =>
             Results.Problem(statusCode: StatusCodes.Status404NotFound, title: ex.Message),
         _ => UserEndpoints.ToProblem(exception),
     };
+
+    private static ScopeLimitDto ToDto(PlatformScopeLimit limit) => new(limit.EntityKey, (Shared.Access.RecordScope)limit.MaxScope, limit.AppliesToAdministrators);
 
     private static PlatformTenantDto ToDto(PlatformTenant tenant) => new(
         tenant.Id,
@@ -264,25 +299,6 @@ public static class PlatformEndpoints
 
     internal static Guid UserId(ClaimsPrincipal user) =>
         Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? throw new InvalidOperationException("Oturumda kullanıcı yok."));
-}
-
-/// <summary>Platform yöneticisi değilse 403. Bayrak her istekte okunur; kaldırılınca bir sonraki istekte geçerli olur.</summary>
-public sealed class RequirePlatformAdministratorFilter(IPlatformAdministration platform) : IEndpointFilter
-{
-    public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
-    {
-        var http = context.HttpContext;
-        if (Guid.TryParse(http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId)
-            && await platform.IsPlatformAdministratorAsync(userId, http.RequestAborted))
-        {
-            return await next(context);
-        }
-
-        return Results.Problem(
-            statusCode: StatusCodes.Status403Forbidden,
-            title: "Bu alan platform yöneticilerine açıktır.",
-            detail: "Bu alan platform yöneticilerine açıktır.");
-    }
 }
 
 /// <summary>Yeni kapsamda tenant bağlamını kurar (<see cref="HttpTenantContextAccessor"/>).</summary>

@@ -229,7 +229,7 @@ internal static class QuoteSharingEndpoints
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["decision"] = ["Karar 'accept' ya da 'reject' olmalıdır."] }, statusCode: StatusCodes.Status400BadRequest);
         }
 
-        if (await OpenAsync(tenant, http, platform, scopes, time, ct) is not { } opened)
+        if (await OpenAsync(tenant, http, platform, scopes, time, ct, write: true) is not { } opened)
         {
             return Unknown();
         }
@@ -258,7 +258,7 @@ internal static class QuoteSharingEndpoints
     }
 
     private static async Task<AsyncServiceScope?> OpenAsync(
-        string tenant, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct, bool write = false)
     {
         var slug = tenant.Trim().ToLowerInvariant();
         var found = await platform.Tenants.AsNoTracking()
@@ -271,6 +271,13 @@ internal static class QuoteSharingEndpoints
         }
 
         var scope = scopes.Create(new TenantContext(found, Guid.Empty, Guid.Empty));
+
+        // Lisans (ADR-0028): modül kapalıysa bağlantı çalışmaz; salt okunursa görüntüleme sürer, karar yazılamaz.
+        if (!await scope.ServiceProvider.GetRequiredService<IModuleLicense>().AllowsAsync(found, CrmModule.ModuleKey, write, ct))
+        {
+            await scope.DisposeAsync();
+            return null;
+        }
 
         // Sistem kimliği: izinler yalnızca "crm.quote-customer" aboneliğinin bildirdikleridir (teklifi okuma, karar kaydı).
         var cause = new EventEnvelope(

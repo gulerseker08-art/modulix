@@ -41,6 +41,9 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             // E-posta işleyicisi testlerde çalışmaz; e-posta testleri işleyiciyi kendisi çağırır (EmailTests).
             .UseSetting("Email:WorkerEnabled", "false")
 
+            // Platform hesapları için iki adımlı doğrulama zorunluluğu testlerde kapalıdır; zorunluluğu sınayan testler açar (PlatformRolesTests).
+            .UseSetting("Platform:RequireTwoFactor", "false")
+
             // Olay işleyicisi de çalışmaz; olay testleri işleyiciyi kendisi çağırır (EventTests).
             .UseSetting("Events:WorkerEnabled", "false")
             .UseSetting("QuoteExpiry:WorkerEnabled", "false")
@@ -198,6 +201,19 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         using var scope = Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<IModuleEntitlements>()
             .SetEnabledAsync(tenantId, moduleKey, enabled, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Modül hakkının bitiş tarihini doğrudan ayarlar (ADR-0028). API geçmiş tarih kabul etmez; ek süre ve salt okunur evreleri
+    /// sınamak için tarih sonradan geriye alınır. Tarih verilmezse hak süresiz olur.
+    /// </summary>
+    public async Task SetEntitlementEndAsync(Guid tenantId, string moduleKey, DateTimeOffset? validUntil)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var changed = await db.Database.ExecuteSqlAsync(
+            $"UPDATE platform.ModuleEntitlements SET ValidUntil = {validUntil} WHERE TenantId = {tenantId} AND ModuleKey = {moduleKey}");
+        Assert.Equal(1, changed);
     }
 
     public async Task<Guid> GetMembershipIdAsync(Guid userId, Guid tenantId)

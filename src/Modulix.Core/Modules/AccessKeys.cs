@@ -16,6 +16,12 @@ public static partial class AccessKeys
     public static bool IsValidPermissionKey(string? key) =>
         key is { Length: <= PermissionKeyMaxLength } && PermissionKeyPattern().IsMatch(key);
 
+    public const int EntityKeyMaxLength = 100;
+
+    /// <summary>Kayıt türü anahtarı: "modül.tür" biçiminde (ör. "crm.opportunity", "crm.company-contact"); en çok 100 karakter.</summary>
+    public static bool IsValidEntityKey(string? key) =>
+        key is { Length: <= EntityKeyMaxLength } && EntityKeyPattern().IsMatch(key);
+
     /// <summary>İzin anahtarının ait olduğu modül (ilk bölüm).</summary>
     public static string ModuleOf(string permissionKey)
     {
@@ -36,4 +42,7 @@ public static partial class AccessKeys
 
     [GeneratedRegex("^[a-z][a-z0-9]+(?:\\.[a-z][a-z0-9-]*){2,}$", RegexOptions.CultureInvariant)]
     private static partial Regex PermissionKeyPattern();
+
+    [GeneratedRegex("^[a-z][a-z0-9]+\\.[a-z][a-z0-9-]*$", RegexOptions.CultureInvariant)]
+    private static partial Regex EntityKeyPattern();
 }

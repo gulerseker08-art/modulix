@@ -16,6 +16,9 @@ public enum DatasetColumnKind
     Flag = 6,
     Choice = 7,
     Lookup = 8,
+
+    /// <summary>Kullanıcı (kimlik); etiket firmanın etkin üyesinin adıdır. Katalog seçenek olarak etkin üyeleri verir.</summary>
+    User = 9,
 }
 
 [Flags]

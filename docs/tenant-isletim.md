@@ -95,6 +95,16 @@ aksi halde `TableInventoryTests` kırılır.
 dotnet ef migrations add <Ad> --project src/Modulix.Infrastructure --startup-project src/Modulix.Api
 ```
 
+## Kayıt görünürlük tavanı (ADR-0030)
+
+Platform yöneticisi bir firma için kayıt türü başına görünürlük tavanı koyar (`PUT /api/platform/tenants/{id}/scope-limits`; `platform.TenantScopeLimits`, RLS dışı). Tavan firmanın bir sonraki isteğinde geçerlidir; rol kayıtları değişmez, okuma tarafı kapsamı tavana indirir.
+
+- **Daraltmak:** önce `GET` ile mevcut kümeyi ve tavan konabilecek türleri okuyun; `PUT` tüm kümeyi değiştirir (listede olmayan türün tavanı kalkar). Yanıttaki `AffectedRoleCount`, kapsamı yeni tavanı aşan yönetici olmayan rol sayısıdır; bu roller okuma tarafında hemen kısılır. Gerekçeyi (`Reason`) yazın; firmanın `core.tenant` ve platform denetim kaydına önce/sonra değeriyle düşer.
+- **Kaldırmak/gevşetmek:** türü `PUT` listesinden çıkarın ya da `MaxScope`'u genişletin; eski görünürlük bir sonraki istekte döner. Rol kayıtları hiç değişmediği için ek işlem gerekmez.
+- **Yöneticiyi bağlamak:** `AppliesToAdministrators = true` yalnızca o tür için Yönetici rolünü de tavana indirir. Yönetici kendi kayıtlarının altına inmez; yanlış bir tavan firmayı kilitlerse tavanı gevşetin (kurtarma yolu budur).
+- **Ekip/departman:** ikisi birbirini kapsamaz; tavan "Ekip" iken departman kapsamlı rol "yalnızca kendi kayıtları"na düşer ve tersi. Tavanı koymadan önce firmanın rollerinin kapsamlarına bakın.
+- **Dışa aktarma ve silme:** tablolar katalogdan okunur; `tenant-export` ve `tenant-delete` `platform.TenantScopeLimits` ve `core.RoleScopeOverrides` satırlarını kendiliğinden kapsar.
+
 ## Arka plan işleri
 
 E-posta işleyicisi platform kuyruğunu işler. Olay işleyicisi her turda tek sorguyla işi olan tenant'ları bulur (outbox/teslim tabloları RLS dışıdır) ve yalnızca

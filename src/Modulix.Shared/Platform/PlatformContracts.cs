@@ -119,15 +119,15 @@ public sealed record TenantStateCountDto(TenantState State, int Count);
 
 /// <summary>
 /// Platform genel bakışı (ADR-0028 Dilim 2): durumlara göre firma sayıları ve açık modül haklarının bitişi. Yaklaşan sayıları
-/// birikimlidir (30 gün içindekiler 60 ve 90'a da dahildir); <see cref="Expired"/> bitiş tarihi geçmiş ama henüz uygulanmamış haklardır.
+/// birikimlidir (30 gün içindekiler 60 ve 90'a da dahildir); <see cref="Expired"/> bitişi geçmiş tüm haklar (ek sürede olanlar dahil), <see cref="ReadOnly"/> ek süresi de bitip salt okunura geçmiş haklardır.
 /// </summary>
 public sealed record PlatformOverviewResponse(
-    IReadOnlyList<TenantStateCountDto> TenantCounts, int Expired, int ExpiringIn30Days, int ExpiringIn60Days, int ExpiringIn90Days);
+    IReadOnlyList<TenantStateCountDto> TenantCounts, int Expired, int ReadOnly, int ExpiringIn30Days, int ExpiringIn60Days, int ExpiringIn90Days);
 
 /// <summary>Süre takvimindeki bir satır: bitiş tarihi olan açık modül hakkı.</summary>
 public sealed record PlatformExpirationDto(
     Guid TenantId, string TenantName, string TenantSlug, TenantState TenantStatus, string ModuleKey, LicenseSource Source,
-    DateTimeOffset ValidUntil, string? Note);
+    DateTimeOffset ValidUntil, string? Note, Modulix.Shared.Access.LicensePhase Phase, DateTimeOffset GraceEndsAt);
 
 /// <summary>
 /// Katalogdaki bir modül (salt okunur). <see cref="EnabledTenantCount"/>: modülün açık olduğu açık firma sayısı;
@@ -155,3 +155,20 @@ public static class TenantStateText
 
 /// <summary>Telefonunu ve kurtarma kodlarını kaybeden kişinin iki adımlı doğrulamasını sıfırlar (Y7b).</summary>
 public sealed record ResetTwoFactorRequest(string Email);
+
+/// <summary>
+/// Bir kayıt türündeki görünürlük tavanı (ADR-0030): firmanın rolleri bu türde <c>MaxScope</c>'tan geniş kapsam alamaz.
+/// <c>AppliesToAdministrators</c> doluysa tavan Yönetici rolünü de bağlar; varsayılan olarak yönetici muaftır.
+/// </summary>
+public sealed record ScopeLimitDto(string EntityKey, RecordScope MaxScope, bool AppliesToAdministrators = false);
+
+/// <summary>Tavan konabilecek kayıt türü (firmada açık modüllerin, kapsamı türe göre ayarlanabilen türleri).</summary>
+public sealed record ScopeLimitTypeDto(string EntityKey, string ModuleKey, string Label);
+
+public sealed record TenantScopeLimitsResponse(IReadOnlyList<ScopeLimitDto> Limits, IReadOnlyList<ScopeLimitTypeDto> Types);
+
+/// <summary>Tavan kümesini değiştirir: listede olmayan türün tavanı kalkar. <c>Reason</c> platform denetim kaydına yazılır.</summary>
+public sealed record SetScopeLimitsRequest(IReadOnlyList<ScopeLimitDto> Limits, string? Reason = null);
+
+/// <summary><c>AffectedRoleCount</c>: yeni tavanların kapsamı aştığı, okuma tarafında kısılacak yönetici olmayan rol sayısı.</summary>
+public sealed record SetScopeLimitsResponse(IReadOnlyList<ScopeLimitDto> Limits, int AffectedRoleCount);

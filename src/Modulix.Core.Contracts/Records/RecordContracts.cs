@@ -237,6 +237,13 @@ public interface IRecordStore
     bool UsesOwnerScope => OwnerField is not null;
 
     /// <summary>
+    /// Veri kapsamının hangi kayıt türüne göre çözüleceği (ADR-0030): rolün kapsamı ve platform tavanı bu anahtarla aranır.
+    /// Varsayılan kendi anahtarıdır. Görünürlüğü ana kaydına bağlı alt kayıt deposu (ör. fırsat iletişimcisi, aktivite notu)
+    /// ana türünün anahtarını verir; böylece alt kayıt ana kaydın kapsamını izler.
+    /// </summary>
+    string ScopeEntityKey => EntityKey;
+
+    /// <summary>
     /// Şirket kimliği alanının adı (ADR-0008, adım 3); kayıt türü şirket kapsamlıysa (<see cref="Tenancy.ICompanyScoped"/>)
     /// verilir, değeri bir işletici şirketin kimliğidir. Varsa boru hattının şirket kapsam adımı bu alana göre uygulanır:
     /// okumada depo <see cref="RecordQuery.Companies"/>'i sorguda uygulamalı, yazmada boru hattı değerin erişilebilir

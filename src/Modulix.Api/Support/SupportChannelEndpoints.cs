@@ -12,6 +12,7 @@ using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
@@ -271,7 +272,7 @@ internal static class SupportChannelEndpoints
             return rejected;
         }
 
-        if (await OpenAsync(tenant, http, platform, scopes, time, ct) is not { } opened)
+        if (await OpenAsync(tenant, http, platform, scopes, time, ct, write: true) is not { } opened)
         {
             return Unknown();
         }
@@ -296,7 +297,7 @@ internal static class SupportChannelEndpoints
 
     /// <summary>Tenant adresteki anahtardan (tenant kimliği, N biçimi ya da kısa ad) çözülür; sistem kimliği "support.survey" yalnızca talebi okur ve tarihçe yazar.</summary>
     private static async Task<AsyncServiceScope?> OpenAsync(
-        string tenant, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct, bool write = false)
     {
         var key = tenant.Trim().ToLowerInvariant();
         var query = platform.Tenants.AsNoTracking().Where(t => TenantStatusRules.Operational.Contains(t.Status));
@@ -309,6 +310,14 @@ internal static class SupportChannelEndpoints
         }
 
         var scope = scopes.Create(new TenantContext(found, Guid.Empty, Guid.Empty));
+
+        // Lisans (ADR-0028): modül kapalıysa bağlantı çalışmaz; salt okunursa anket görüntülenir, yanıt yazılamaz.
+        if (!await scope.ServiceProvider.GetRequiredService<IModuleLicense>().AllowsAsync(found, SupportModule.ModuleKey, write, ct))
+        {
+            await scope.DisposeAsync();
+            return null;
+        }
+
         var cause = new EventEnvelope(
             Guid.NewGuid(), found, DomainEventTypes.RecordDeleted, 1, SupportModule.Entities.Ticket, Guid.Empty, null, Guid.Empty,
             ExecutionSource.Import, http.TraceIdentifier, null, 0, new JsonObject(), time.GetUtcNow());

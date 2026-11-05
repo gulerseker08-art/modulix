@@ -12,6 +12,7 @@ using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
+using Modulix.Core.FieldRules;
 using Modulix.Core.Sectors;
 using Modulix.Core.Lookups;
 using Modulix.Core.Modules;
@@ -26,6 +27,7 @@ using Modulix.Infrastructure.Automation;
 using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Communication;
 using Modulix.Infrastructure.Customization;
+using Modulix.Infrastructure.FieldRules;
 using Modulix.Infrastructure.Sectors;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Lookups;
@@ -80,9 +82,16 @@ public static class PersistenceSetup
 
         // Modül hakları ve izinler; ModuleCatalog'u host kaydeder (AddModulixModules).
         services.AddScoped<IModuleEntitlements, ModuleEntitlements>();
+        services.AddScoped<IModuleLicense, ModuleLicense>();
+        services.AddScoped<IEntitlementResolver, Modulix.Infrastructure.Platform.EntitlementResolver>();
+        services.AddScoped<IPlanAdministration, Modulix.Infrastructure.Platform.PlanAdministration>();
+        services.AddScoped<IPlatformHealth, Modulix.Infrastructure.Platform.PlatformHealth>();
+        services.AddScoped<IPlatformTeam, Modulix.Infrastructure.Platform.PlatformTeam>();
         services.AddScoped<AdministratorGuard>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<MembershipPermissions>();
+        services.AddScoped<ScopeLimits>();
+        services.AddScoped<ScopedRecordTypes>();
         services.AddScoped<ITeamService, TeamService>();
 
         // Ortak iletişim tercihi (ADR-0025): modüller okuma sözleşmesini, API yönetimi kullanır.
@@ -125,6 +134,8 @@ public static class PersistenceSetup
         services.AddScoped<ISectorProfileService, SectorProfileService>();
         services.AddScoped<ISectorCatalog, SectorCatalogService>();
         services.AddScoped<ITenantActivitySelection, TenantActivitySelectionService>();
+        services.AddScoped<IRulePackageService, RulePackageService>();
+        services.AddScoped<ITenantFieldRules, TenantFieldRulesService>();
         services.AddScoped<FormLayoutService>();
         services.AddScoped<IFormLayoutService>(sp => sp.GetRequiredService<FormLayoutService>());
         services.AddScoped<IFormLayoutProvider>(sp => sp.GetRequiredService<FormLayoutService>());

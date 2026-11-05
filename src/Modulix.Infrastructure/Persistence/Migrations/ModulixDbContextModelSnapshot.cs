@@ -161,6 +161,33 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Roles", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Authorization.RoleScopeOverride", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RoleId", "EntityKey")
+                        .IsUnique();
+
+                    b.ToTable("RoleScopeOverrides", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Automation.AutomationRule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1011,6 +1038,128 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("FormLayouts", "meta");
                 });
 
+            modelBuilder.Entity("Modulix.Core.FieldRules.RulePackage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Layer")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("NodeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("NodeId");
+
+                    b.ToTable("RulePackages", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.FieldRules.RulePackageVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("PackageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("PublishedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RulesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PackageId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "PackageId" }, "UX_RulePackageVersions_Draft")
+                        .IsUnique()
+                        .HasFilter("[Status] = N'Draft'");
+
+                    b.HasIndex(new[] { "PackageId" }, "UX_RulePackageVersions_Published")
+                        .IsUnique()
+                        .HasFilter("[Status] = N'Published'");
+
+                    b.ToTable("RulePackageVersions", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.FieldRules.TenantRuleAdaptation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DisabledKeysJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RulesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.ToTable("RuleAdaptations", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Lookups.TenantLookupSetting", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1293,6 +1442,43 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("MembershipCompanies", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Platform.LimitOverride", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LimitKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Value")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "LimitKey", "CreatedAt");
+
+                    b.ToTable("LimitOverrides", "platform");
+                });
+
             modelBuilder.Entity("Modulix.Core.Platform.Membership", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1326,6 +1512,69 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Memberships", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.Plan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("Plans", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.PlanLimit", b =>
+                {
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LimitKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("Value")
+                        .HasColumnType("int");
+
+                    b.HasKey("PlanId", "LimitKey");
+
+                    b.ToTable("PlanLimits", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.PlanModule", b =>
+                {
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ModuleKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("PlanId", "ModuleKey");
+
+                    b.ToTable("PlanModules", "platform");
                 });
 
             modelBuilder.Entity("Modulix.Core.Platform.PlatformAuditEntry", b =>
@@ -1402,6 +1651,75 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Tenants", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.TenantScopeLimit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AppliesToAdministrators")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("EntityKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("MaxScope")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "EntityKey")
+                        .IsUnique();
+
+                    b.ToTable("TenantScopeLimits", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.TenantSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ValidUntil")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlanId");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasFilter("[EndedAt] IS NULL");
+
+                    b.HasIndex("TenantId", "StartsAt");
+
+                    b.ToTable("TenantSubscriptions", "platform");
                 });
 
             modelBuilder.Entity("Modulix.Core.Reporting.ReportDefinition", b =>
@@ -2166,6 +2484,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
+
+                    b.Property<int>("PlatformRoles")
+                        .HasColumnType("int");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
@@ -5450,8 +5771,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "ConvertedOpportunityId");
 
-                    b.HasIndex("TenantId", "FirstReceivedAt");
-
                     b.HasIndex("TenantId", "LeadNumber")
                         .IsUnique();
 
@@ -5463,7 +5782,13 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("[ExternalSource] IS NOT NULL AND [ExternalSubmissionId] IS NOT NULL");
 
+                    b.HasIndex("TenantId", "FirstReceivedAt", "Id")
+                        .IsDescending(false, true, false);
+
                     b.HasIndex("TenantId", "Status", "OwnerId");
+
+                    b.HasIndex("TenantId", "Status", "FirstReceivedAt", "Id")
+                        .IsDescending(false, false, true, false);
 
                     b.ToTable("Leads", "crm");
                 });
@@ -11070,6 +11395,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Modulix.Core.Authorization.RoleScopeOverride", b =>
+                {
+                    b.HasOne("Modulix.Core.Authorization.Role", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RoleId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Core.Automation.AutomationRuleVersion", b =>
                 {
                     b.HasOne("Modulix.Core.Automation.AutomationRule", null)
@@ -11117,6 +11452,23 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId", "PartyId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Core.FieldRules.RulePackage", b =>
+                {
+                    b.HasOne("Modulix.Core.Sectors.ActivityNode", null)
+                        .WithMany()
+                        .HasForeignKey("NodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Core.FieldRules.RulePackageVersion", b =>
+                {
+                    b.HasOne("Modulix.Core.FieldRules.RulePackage", null)
+                        .WithMany()
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Modulix.Core.Modules.ModuleEntitlement", b =>
@@ -11214,6 +11566,42 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Infrastructure.Identity.ModulixUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.PlanLimit", b =>
+                {
+                    b.HasOne("Modulix.Core.Platform.Plan", null)
+                        .WithMany("Limits")
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.PlanModule", b =>
+                {
+                    b.HasOne("Modulix.Core.Platform.Plan", null)
+                        .WithMany("Modules")
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.TenantScopeLimit", b =>
+                {
+                    b.HasOne("Modulix.Core.Platform.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.TenantSubscription", b =>
+                {
+                    b.HasOne("Modulix.Core.Platform.Plan", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -12542,6 +12930,13 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.Plan", b =>
+                {
+                    b.Navigation("Limits");
+
+                    b.Navigation("Modules");
                 });
 #pragma warning restore 612, 618
         }

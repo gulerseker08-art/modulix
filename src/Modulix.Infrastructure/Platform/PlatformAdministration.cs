@@ -3,7 +3,9 @@ using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Modulix.Core.Authorization;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -11,6 +13,8 @@ using Modulix.Core.Customization;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
+using Modulix.Infrastructure.Authorization;
+using Modulix.Infrastructure.Modules;
 using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Tenancy;
@@ -31,12 +35,23 @@ internal sealed class PlatformAdministration(
     ModulixDbContext db,
     ModuleCatalog catalog,
     SectorProfileCatalog profiles,
-    ITenantScopeFactory tenantScopes) : IPlatformAdministration
+    ITenantScopeFactory tenantScopes,
+    TimeProvider time,
+    IOptions<LicenseOptions> license) : IPlatformAdministration
 {
     public const int MaxPageSize = 50;
 
     /// <summary>Denetim kaydındaki kayıt türü.</summary>
     public const string TenantEntityKey = "core.tenant";
+
+    public async Task<PlatformAccess?> GetAccessAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await db.Users.AsNoTracking()
+            .Where(u => u.Id == userId && u.IsPlatformAdministrator)
+            .Select(u => new { u.PlatformRoles, u.TwoFactorEnabled })
+            .SingleOrDefaultAsync(cancellationToken);
+        return user is null ? null : new PlatformAccess(PlatformRoles.Effective(true, user.PlatformRoles), user.TwoFactorEnabled);
+    }
 
     public Task<bool> IsPlatformAdministratorAsync(Guid userId, CancellationToken cancellationToken) =>
         db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsPlatformAdministrator, cancellationToken);
@@ -395,6 +410,134 @@ internal sealed class PlatformAdministration(
         await tenantDb.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<PlatformScopeLimits> GetScopeLimitsAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (!await db.Tenants.AnyAsync(t => t.Id == tenantId, cancellationToken))
+        {
+            throw NotFound();
+        }
+
+        // Tür listesi kayıt depolarından ve firmada açık modüllerden gelir; depolar tenant bağlamında çözülür.
+        await using var scope = tenantScopes.Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty));
+        var services = scope.ServiceProvider;
+        var enabled = (await services.GetRequiredService<IModuleEntitlements>().GetEnabledAsync(tenantId, cancellationToken)).ToHashSet();
+        var types = services.GetRequiredService<ScopedRecordTypes>().ForModules(enabled);
+        return new PlatformScopeLimits(
+            await ReadScopeLimitsAsync(tenantId, cancellationToken),
+            [.. types.Select(t => new PlatformScopeType(t.EntityKey, t.ModuleKey, t.Label))]);
+    }
+
+    public async Task<PlatformScopeLimitsChange> SetScopeLimitsAsync(
+        Guid tenantId, IReadOnlyList<PlatformScopeLimit> limits, string? reason, Guid actingUserId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(limits);
+        var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(t => t.Id == tenantId, cancellationToken) ?? throw NotFound();
+
+        // Tavan platform tablosunda, denetim kaydı ve rol sayımı tenant bağlamındadır (ADR-0020): tek SaveChanges'te yazılır.
+        await using var scope = tenantScopes.Create(new TenantContext(tenantId, actingUserId, Guid.Empty));
+        var services = scope.ServiceProvider;
+        var tenantDb = services.GetRequiredService<ModulixDbContext>();
+        var enabled = (await services.GetRequiredService<IModuleEntitlements>().GetEnabledAsync(tenantId, cancellationToken)).ToHashSet();
+        var allowed = services.GetRequiredService<ScopedRecordTypes>().ForModules(enabled).Select(t => t.EntityKey).ToHashSet(StringComparer.Ordinal);
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var limit in limits)
+        {
+            if (!Enum.IsDefined(limit.MaxScope))
+            {
+                throw new ArgumentException("Geçersiz kayıt kapsamı.", nameof(limits));
+            }
+
+            if (!allowed.Contains(limit.EntityKey))
+            {
+                throw new ArgumentException(
+                    $"'{limit.EntityKey}' için tavan konamaz: kayıt türü bilinmiyor, kapsamı ayarlanamıyor ya da modülü firmada kapalı.", nameof(limits));
+            }
+
+            if (!seen.Add(limit.EntityKey))
+            {
+                throw new ArgumentException($"'{limit.EntityKey}' için birden fazla tavan verildi.", nameof(limits));
+            }
+        }
+
+        var existing = await tenantDb.TenantScopeLimits.Where(l => l.TenantId == tenantId).ToListAsync(cancellationToken);
+        var beforeList = existing.OrderBy(l => l.EntityKey, StringComparer.Ordinal)
+            .Select(l => new PlatformScopeLimit(l.EntityKey, l.MaxScope, l.AppliesToAdministrators)).ToList();
+        var afterList = limits.OrderBy(l => l.EntityKey, StringComparer.Ordinal).ToList();
+        var affected = await CountAffectedRolesAsync(tenantDb, afterList, cancellationToken);
+        if (beforeList.SequenceEqual(afterList))
+        {
+            return new PlatformScopeLimitsChange(beforeList, affected);
+        }
+
+        foreach (var row in existing.Where(l => !seen.Contains(l.EntityKey)))
+        {
+            tenantDb.TenantScopeLimits.Remove(row);
+        }
+
+        foreach (var limit in afterList)
+        {
+            if (existing.SingleOrDefault(l => l.EntityKey == limit.EntityKey) is { } row)
+            {
+                row.Set(limit.MaxScope, limit.AppliesToAdministrators);
+            }
+            else
+            {
+                tenantDb.TenantScopeLimits.Add(new TenantScopeLimit(tenantId, limit.EntityKey, limit.MaxScope, limit.AppliesToAdministrators));
+            }
+        }
+
+        var beforeAudit = new JsonObject { ["scopeLimits"] = ScopeLimitsJson(beforeList) };
+        var afterAudit = new JsonObject { ["scopeLimits"] = ScopeLimitsJson(afterList) };
+        Audit(services, tenant, actingUserId, AuditAction.Updated, beforeAudit, afterAudit);
+        AuditPlatform(
+            tenantDb, actingUserId, PlatformAuditActions.ScopeLimitsChanged, tenantId, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
+            new JsonObject
+            {
+                ["before"] = beforeAudit["scopeLimits"]!.DeepClone(),
+                ["after"] = afterAudit["scopeLimits"]!.DeepClone(),
+                ["affectedRoles"] = affected,
+            });
+        await tenantDb.SaveChangesAsync(cancellationToken);
+        return new PlatformScopeLimitsChange(afterList, affected);
+    }
+
+    private async Task<IReadOnlyList<PlatformScopeLimit>> ReadScopeLimitsAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        (await db.TenantScopeLimits.AsNoTracking()
+            .Where(l => l.TenantId == tenantId)
+            .Select(l => new { l.EntityKey, l.MaxScope, l.AppliesToAdministrators })
+            .ToListAsync(cancellationToken))
+        .OrderBy(l => l.EntityKey, StringComparer.Ordinal)
+        .Select(l => new PlatformScopeLimit(l.EntityKey, l.MaxScope, l.AppliesToAdministrators))
+        .ToList();
+
+    /// <summary>Yönetici olmayan roller arasında, bir türde etkin kapsamı (istisna ya da varsayılan) tavanı aşanların sayısı.</summary>
+    private static async Task<int> CountAffectedRolesAsync(
+        ModulixDbContext tenantDb, IReadOnlyList<PlatformScopeLimit> limits, CancellationToken cancellationToken)
+    {
+        if (limits.Count == 0)
+        {
+            return 0;
+        }
+
+        var roles = await tenantDb.Roles.AsNoTracking().Where(r => !r.IsSystem).Select(r => new { r.Id, r.Scope }).ToListAsync(cancellationToken);
+        var overrides = (await tenantDb.RoleScopeOverrides.AsNoTracking().Select(o => new { o.RoleId, o.EntityKey, o.Scope }).ToListAsync(cancellationToken))
+            .ToDictionary(o => (o.RoleId, o.EntityKey), o => o.Scope);
+        return roles.Count(role => limits.Any(limit =>
+            !RecordScopeRules.Covers(limit.MaxScope, overrides.TryGetValue((role.Id, limit.EntityKey), out var scope) ? scope : role.Scope)));
+    }
+
+    private static JsonObject ScopeLimitsJson(IEnumerable<PlatformScopeLimit> limits)
+    {
+        var json = new JsonObject();
+        foreach (var limit in limits)
+        {
+            json[limit.EntityKey] = limit.AppliesToAdministrators ? $"{limit.MaxScope} (yönetici dahil)" : limit.MaxScope.ToString();
+        }
+
+        return json;
+    }
+
     private static JsonObject TermsJson(EntitlementSource source, DateTimeOffset? validUntil, string? note) => new()
     {
         ["source"] = source.ToString(),
@@ -447,7 +590,8 @@ internal sealed class PlatformAdministration(
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.Status, g => g.Count, cancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = time.GetUtcNow();
+        var graceDays = license.Value.EffectiveGraceDays;
         var horizon = now.AddDays(90);
         var ends = await (
             from entitlement in db.ModuleEntitlements.AsNoTracking()
@@ -458,6 +602,7 @@ internal sealed class PlatformAdministration(
         return new PlatformOverview(
             counts,
             ends.Count(e => e < now),
+            ends.Count(e => EntitlementPhases.At(e, now, graceDays) == EntitlementPhase.ReadOnly),
             ends.Count(e => e >= now && e <= now.AddDays(30)),
             ends.Count(e => e >= now && e <= now.AddDays(60)),
             ends.Count(e => e >= now));
@@ -466,16 +611,19 @@ internal sealed class PlatformAdministration(
     // Erişime açık firmaların bitiş tarihi olan açık hakları; süresiz haklar ve kapalı firmalar dışarıda.
     public async Task<IReadOnlyList<PlatformExpiration>> ListExpirationsAsync(int days, CancellationToken cancellationToken)
     {
-        var horizon = DateTimeOffset.UtcNow.AddDays(Math.Clamp(days, 1, 365));
-        return await (
+        var now = time.GetUtcNow();
+        var graceDays = license.Value.EffectiveGraceDays;
+        var horizon = now.AddDays(Math.Clamp(days, 1, 365));
+        var rows = await (
             from entitlement in db.ModuleEntitlements.AsNoTracking()
             join tenant in db.Tenants.AsNoTracking() on entitlement.TenantId equals tenant.Id
             where entitlement.IsEnabled && entitlement.ValidUntil <= horizon && TenantStatusRules.Operational.Contains(tenant.Status)
             orderby entitlement.ValidUntil, tenant.Name
-            select new PlatformExpiration(
-                tenant.Id, tenant.Name, tenant.Slug, tenant.Status, entitlement.ModuleKey, entitlement.Source,
-                entitlement.ValidUntil!.Value, entitlement.Note))
+            select new { tenant.Id, tenant.Name, tenant.Slug, tenant.Status, entitlement.ModuleKey, entitlement.Source, ValidUntil = entitlement.ValidUntil!.Value, entitlement.Note })
             .ToListAsync(cancellationToken);
+        return [.. rows.Select(r => new PlatformExpiration(
+            r.Id, r.Name, r.Slug, r.Status, r.ModuleKey, r.Source, r.ValidUntil, r.Note,
+            EntitlementPhases.At(r.ValidUntil, now, graceDays), r.ValidUntil.AddDays(graceDays)))];
     }
 
     // Katalog sırasıyla; denetim kaydında karşılaştırılabilir olsun.

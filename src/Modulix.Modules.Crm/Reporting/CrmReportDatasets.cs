@@ -14,6 +14,8 @@ internal static class CrmReportDatasets
     public const string Leads = "crm.leads";
     public const string Quotes = "crm.quotes";
     public const string Companies = "crm.companies";
+    public const string Targets = "crm.sales-targets";
+    public const string Forecasts = "crm.forecasts";
 
     private static readonly IReadOnlyList<DatasetOption> OpportunityStatuses =
     [
@@ -47,11 +49,19 @@ internal static class CrmReportDatasets
         new("NotSent", "Gönderilmedi"), new("Pending", "Bekliyor"), new("Processing", "İşleniyor"), new("Succeeded", "Teslim edildi"), new("Failed", "Başarısız"),
     ];
 
+    private static readonly IReadOnlyList<DatasetOption> TargetMetrics = [new("WonAmount", "Kazanılan tutar"), new("WonCount", "Kazanılan adet")];
+
+    private static readonly IReadOnlyList<DatasetOption> TargetScopes = [new("Tenant", "Firma geneli"), new("User", "Kullanıcı")];
+
+    private static readonly IReadOnlyList<DatasetOption> ForecastStatuses = [new("Draft", "Taslak"), new("Submitted", "Sunuldu"), new("Locked", "Kilitlendi")];
+
+    private static readonly IReadOnlyList<DatasetOption> PeriodKinds = [new("Month", "Ay"), new("Quarter", "Çeyrek"), new("Year", "Yıl")];
+
     private const ColumnUse All = ColumnUse.Group | ColumnUse.Filter | ColumnUse.Show;
     private const ColumnUse FilterShow = ColumnUse.Filter | ColumnUse.Show;
 
     public static ModuleReporting Reporting { get; } = new(
-        [OpportunityDataset(), LeadDataset(), QuoteDataset(), CompanyDataset()],
+        [OpportunityDataset(), LeadDataset(), QuoteDataset(), CompanyDataset(), TargetDataset(), ForecastDataset()],
         [
             new("crm.reports.sales-overview", "Satış görünümü",
                 "Gerçekleşen, açık pipeline, ağırlıklı tahmin ve hedefe göre durum; kart toplamları detay listesiyle eşleşir.", "crm/satis-gorunumu", CrmModule.Permissions.SalesReportsRead),
@@ -199,6 +209,64 @@ internal static class CrmReportDatasets
                 new(Companies, [], [], [new("status")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Pie)),
             new("crm.companies.by-owner", "Sorumluya göre firmalar", "Firma sayısı sorumlu bazında.",
                 new(Companies, [], [], [new("ownerId")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Bar)),
+        ],
+    };
+
+    // Satış hedefi: her satır bir hedef dilimidir (metrik × kapsam × para birimi × dönem). Adet hedeflerinde para birimi yoktur; değer sütunu "tutar"
+    // olduğundan para birimsiz (adet) hedefler tutar toplamına girmez ve "dışlanan kayıt" olarak sayılır; adet hedefleri için "Değer"i tabloda görün.
+    private static DatasetDefinition TargetDataset() => new(
+        Targets, "Satış hedefleri", CrmModule.Entities.SalesTarget, 1,
+        [
+            new("metric", "Metrik", DatasetColumnKind.Choice, All) { Options = TargetMetrics, StoreFilter = "metric" },
+            new("scopeType", "Kapsam", DatasetColumnKind.Choice, All) { Options = TargetScopes, StoreFilter = "scopeType" },
+            new("scopeUserId", "Kullanıcı", DatasetColumnKind.User, All) { StoreFilter = "scopeUserId" },
+            new("currency", "Para birimi", DatasetColumnKind.Text, All),
+            new("periodStart", "Dönem başı", DatasetColumnKind.Date, All) { StoreFilterFrom = "from", StoreFilterTo = "to" },
+            new("periodEnd", "Dönem sonu", DatasetColumnKind.Date, All) { StoreFilterFrom = "from", StoreFilterTo = "to" },
+            new("value", "Hedef değeri", DatasetColumnKind.Money, ColumnUse.Measure | FilterShow) { CurrencyField = "currency" },
+            new("revisionNo", "Sürüm", DatasetColumnKind.Number, FilterShow),
+            new("note", "Not", DatasetColumnKind.Text, FilterShow),
+        ])
+    {
+        DefaultColumns = ["metric", "scopeType", "scopeUserId", "periodStart", "periodEnd", "value", "currency"],
+        ReadyReports =
+        [
+            new("crm.sales-targets.list", "Satış hedefleri listesi", "Tüm hedef dilimleri, dönem başına.",
+                new(Targets, ["metric", "scopeType", "scopeUserId", "periodStart", "periodEnd", "value", "currency"], [], [], [], new("periodStart"))),
+            new("crm.sales-targets.by-user", "Kullanıcıya göre tutar hedefleri", "Kazanılan tutar hedeflerinin kullanıcı bazında toplamı (para birimine göre ayrı).",
+                new(Targets, [], [new("metric", FilterOperator.Equals, "WonAmount"), new("scopeType", FilterOperator.Equals, "User")], [new("scopeUserId")],
+                    [new("value", Aggregation.Sum)], new("sum:value", SortDirection.Descending), ChartKind.Bar)),
+        ],
+    };
+
+    // Tahmin sürümleri: başlık satırı (dönem, kapsam, sürüm, durum, kilit anındaki gerçekleşen). Fırsat satırları ve düzeltmeler Satış tahmini
+    // ekranındadır. Kilit anındaki gerçekleşen tutar, fırsat tutarından türediği için tutar iznine bağlıdır (hassas alan).
+    private static DatasetDefinition ForecastDataset() => new(
+        Forecasts, "Satış tahmini sürümleri", CrmModule.Entities.ForecastSubmission, 1,
+        [
+            new("periodKind", "Dönem türü", DatasetColumnKind.Choice, All) { Options = PeriodKinds },
+            new("periodStart", "Dönem başı", DatasetColumnKind.Date, All) { StoreFilterFrom = "from", StoreFilterTo = "to" },
+            new("periodEnd", "Dönem sonu", DatasetColumnKind.Date, All) { StoreFilterFrom = "from", StoreFilterTo = "to" },
+            new("scopeType", "Kapsam", DatasetColumnKind.Choice, All) { Options = TargetScopes },
+            new("scopeUserId", "Kullanıcı", DatasetColumnKind.User, All) { StoreFilter = "scopeUserId" },
+            new("reportingCurrency", "Raporlama para birimi", DatasetColumnKind.Text, All),
+            new("versionNo", "Sürüm", DatasetColumnKind.Number, FilterShow),
+            new("status", "Durum", DatasetColumnKind.Choice, All) { Options = ForecastStatuses, StoreFilter = "status" },
+            new("realizedAtLock", "Kilit anındaki gerçekleşen", DatasetColumnKind.Money, ColumnUse.Measure | FilterShow) { CurrencyField = "reportingCurrency" },
+            new("realizedPartial", "Gerçekleşen eksik (kur yok)", DatasetColumnKind.Flag, All),
+            new("submittedAt", "Sunulma", DatasetColumnKind.DateTime, All),
+            new("lockedAt", "Kilitlenme", DatasetColumnKind.DateTime, All),
+            new("note", "Not", DatasetColumnKind.Text, FilterShow),
+        ])
+    {
+        DefaultColumns = ["periodKind", "periodStart", "scopeType", "scopeUserId", "versionNo", "status", "realizedAtLock", "reportingCurrency"],
+        ReadyReports =
+        [
+            new("crm.forecasts.locked", "Kilitli tahmin sürümleri", "Kilitlenmiş tahmin sürümleri ve kilit anındaki gerçekleşen tutar.",
+                new(Forecasts, ["periodKind", "periodStart", "scopeType", "scopeUserId", "versionNo", "realizedAtLock", "reportingCurrency", "lockedAt"],
+                    [new("status", FilterOperator.Equals, "Locked")], [], [], new("periodStart", SortDirection.Descending))),
+            new("crm.forecasts.by-status", "Duruma göre tahmin sürümleri", "Tahmin sürümlerinin durum dağılımı.",
+                new(Forecasts, [], [], [new("status")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Pie)),
         ],
     };
 }

@@ -84,6 +84,11 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     /// <summary>Veri kapsamı uygulanır mı? Varsayılan: kayıt sorumlu alanı taşıyorsa; başka kayıta bağlı kapsamı olan depo true yapar.</summary>
     protected virtual bool UsesScope => IsOwned;
 
+    string IRecordStore.ScopeEntityKey => ScopeEntityKey;
+
+    /// <summary>Kapsamın çözüleceği kayıt türü (ADR-0030). Görünürlüğü ana kaydına bağlı alt kayıt deposu ana türünü verir.</summary>
+    protected virtual string ScopeEntityKey => EntityKey;
+
     Task<bool> IRecordStore.IsInOwnerScopeAsync(RecordData record, IReadOnlySet<Guid> owners, CancellationToken cancellationToken) =>
         IsInScopeAsync(record, owners, cancellationToken);
 

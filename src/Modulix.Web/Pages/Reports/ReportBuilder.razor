@@ -994,7 +994,7 @@
         @if (column is null || !ReportCenterLabels.NeedsValue(row.Operator))
         {
         }
-        else if (row.Operator == "in" && kind == "choice" && options is not null)
+        else if (row.Operator == "in" && kind is "choice" or "user" && options is not null)
         {
             <span class="report-choice-list" role="group" aria-label="Süzgeç @(index + 1) değerleri">
                 @foreach (var option in options)
@@ -1012,7 +1012,7 @@
             <textarea id="@inputId" class="form-control form-control-sm" rows="3" aria-label="Süzgeç @(index + 1) değerleri (her satıra bir değer)" placeholder="Her satıra bir değer (en çok 50)"
                       @onchange="e => SetInText(row, e.Value?.ToString())">@row.InText</textarea>
         }
-        else if (kind == "choice" && options is not null)
+        else if (kind is "choice" or "user" && options is not null)
         {
             <select id="@inputId" class="form-select form-select-sm" aria-label="Süzgeç @(index + 1) değeri" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty">
                 <option value="">Seçin</option>

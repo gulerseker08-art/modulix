@@ -14,7 +14,7 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
 {
     private const int Size = 200;
 
-    // Atanabilir üye listesi şimdilik CRM genelinde tek listedir; kapsam henüz türe göre değişmediği için (ADR-0029 dilim 1)
+    // Atanabilir üye listesi şimdilik CRM genelinde tek listedir; kapsam henüz türe göre değişmediği için (ADR-0030 dilim 1)
     // hangi tür anahtarının sorulduğu sonucu etkilemez. Türe özel kapsam gelince form türüne göre ayrı istenmelidir (dilim 3).
     private const string AssignableEntityKey = CrmEntityKeys.Opportunity;
 

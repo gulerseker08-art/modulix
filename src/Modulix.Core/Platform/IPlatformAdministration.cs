@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Customization;
 using Modulix.Core.Modules;
 
@@ -36,15 +37,22 @@ public sealed record PlatformTenantDetail(
     IReadOnlyList<TenantAdministrator> Administrators,
     IReadOnlyList<TenantEntitlement>? Entitlements = null);
 
-/// <summary>Firma durumlarına göre sayılar ve süresi dolan/yaklaşan haklar (genel bakış). Bitiş sayıları birikimlidir (30 ⊂ 60 ⊂ 90).</summary>
+/// <summary>
+/// Firma durumlarına göre sayılar ve süresi dolan/yaklaşan haklar (genel bakış). Yaklaşan sayıları birikimlidir (30 ⊂ 60 ⊂ 90).
+/// <see cref="ExpiredEntitlements"/> bitişi geçmiş tüm haklardır (ek sürede olanlar ve <see cref="ReadOnlyEntitlements"/> dahil).
+/// </summary>
 public sealed record PlatformOverview(
     IReadOnlyDictionary<TenantStatus, int> TenantCounts,
     int ExpiredEntitlements,
+    int ReadOnlyEntitlements,
     int ExpiringIn30Days,
     int ExpiringIn60Days,
     int ExpiringIn90Days);
 
-/// <summary>Bitiş tarihi olan açık bir modül hakkı (süre takvimi). Geçmiş tarih de listelenir; bitiş henüz uygulanmaz.</summary>
+/// <summary>
+/// Bitiş tarihi olan açık bir modül hakkı (süre takvimi). Geçmiş tarih de listelenir. <see cref="Phase"/>: bugünkü evre;
+/// <see cref="GraceEndsAt"/>: ek sürenin bittiği, yani modülün salt okunura geçtiği an.
+/// </summary>
 public sealed record PlatformExpiration(
     Guid TenantId,
     string TenantName,
@@ -53,7 +61,9 @@ public sealed record PlatformExpiration(
     string ModuleKey,
     EntitlementSource Source,
     DateTimeOffset ValidUntil,
-    string? Note);
+    string? Note,
+    EntitlementPhase Phase,
+    DateTimeOffset GraceEndsAt);
 
 /// <summary>Platform denetim kaydı sorgusu (ADR-0028); en yeni üstte. <see cref="TenantId"/> boşsa bütün firmalar.</summary>
 public sealed record PlatformAuditQuery(Guid? TenantId, string? Action, int Page, int PageSize);
@@ -91,6 +101,21 @@ public sealed record TenantCreationResult(PlatformTenantDetail Tenant, bool Exis
 /// <summary>Bir modülün kaç firmada açık olduğu (yalnızca açık firmalar sayılır).</summary>
 public sealed record ModuleUsage(string ModuleKey, int EnabledTenantCount);
 
+/// <summary>Bir kayıt türündeki tavan (ADR-0030): firmanın rolleri bu türde <see cref="MaxScope"/>'tan geniş kapsam alamaz.</summary>
+public sealed record PlatformScopeLimit(string EntityKey, RecordScope MaxScope, bool AppliesToAdministrators);
+
+/// <summary>Tavan konabilecek (kapsamı kayıt türüne göre ayarlanabilen) bir kayıt türü; firmada açık modüllerin türleri.</summary>
+public sealed record PlatformScopeType(string EntityKey, string ModuleKey, string Label);
+
+/// <summary>Firmanın tavanları ve tavan konabilecek türler.</summary>
+public sealed record PlatformScopeLimits(IReadOnlyList<PlatformScopeLimit> Limits, IReadOnlyList<PlatformScopeType> Types);
+
+/// <summary>
+/// Tavan değişikliğinin sonucu. <see cref="AffectedRoleCount"/>: yeni tavanların kapsamı aştığı, yani okuma tarafında kısılacak
+/// (ve rol ekranında düzeltilmesi gereken) yönetici olmayan rol sayısı.
+/// </summary>
+public sealed record PlatformScopeLimitsChange(IReadOnlyList<PlatformScopeLimit> Limits, int AffectedRoleCount);
+
 /// <summary>
 /// Platform yönetimi (Y4): firmaları açar, kapatır ve ilk yöneticiyi davet eder. Çağıran platform yöneticisi olmalıdır
 /// (API her istekte <see cref="IsPlatformAdministratorAsync"/> ile denetler).
@@ -106,6 +131,9 @@ public interface IPlatformAdministration
 {
     /// <summary>Bayrak veritabanından okunur; kaldırılınca bir sonraki istekte geçerli olur.</summary>
     Task<bool> IsPlatformAdministratorAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Platform hesabının etkin rolleri ve iki adımlı doğrulama durumu; platform hesabı değilse <c>null</c>. Her istekte okunur.</summary>
+    Task<PlatformAccess?> GetAccessAsync(Guid userId, CancellationToken cancellationToken);
 
     Task<PlatformTenantPage> ListTenantsAsync(PlatformTenantQuery query, CancellationToken cancellationToken);
 
@@ -154,7 +182,7 @@ public interface IPlatformAdministration
     /// geçerli olur. Değişiklik firmanın bir sonraki isteğinde geçerlidir ve firmanın denetim kaydına <c>core.tenant</c>
     /// olarak yazılır. Durum zaten istenen gibiyse ve <paramref name="terms"/> verilmediyse bir şey yapılmaz. Bilinmeyen veya
     /// çekirdek modül için <see cref="ArgumentException"/> (ParamName <c>moduleKey</c>). <paramref name="terms"/> (kaynak,
-    /// bitiş, not) yalnızca açarken geçerlidir; bitiş tarihi kaydedilir ama otomatik uygulanmaz (ADR-0028, Dilim 3).
+    /// bitiş, not) yalnızca açarken geçerlidir; bitiş tarihi geçince modül ek sürede çalışır, ek süre de bitince salt okunur olur (<see cref="EntitlementPhase"/>).
     /// <paramref name="reason"/> platform denetim kaydına yazılır; kapatırken ve bitiş tarihini ileri alırken (süre uzatma)
     /// zorunludur (<see cref="ArgumentException"/>, ParamName <c>reason</c>).
     /// </summary>
@@ -162,12 +190,28 @@ public interface IPlatformAdministration
         Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken,
         EntitlementTerms? terms = null, string? reason = null);
 
+    /// <summary>
+    /// Firmanın kayıt görünürlük tavanları (ADR-0030) ve tavan konabilecek türler (firmada açık modüllerin, kapsamı kayıt
+    /// türüne göre ayarlanabilen türleri). Firma yoksa <see cref="UserAdministrationException"/> (NotFound).
+    /// </summary>
+    Task<PlatformScopeLimits> GetScopeLimitsAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Firmanın tavan kümesini <paramref name="limits"/> ile değiştirir (listede olmayan türün tavanı kalkar). Tür, firmada açık
+    /// bir modülün kapsamı ayarlanabilen türü olmalı ve tekrarsız olmalıdır, kapsam tanımlı olmalıdır; aksi halde
+    /// <see cref="ArgumentException"/> (ParamName <c>limits</c>). Tavan firmanın bir sonraki isteğinde geçerlidir; rol kayıtları
+    /// değişmez, okuma tarafı kapsamı tavana indirir. Değişiklik firmanın denetim kaydına (<c>core.tenant</c>, "Kayıt görünürlüğü")
+    /// ve platform denetim kaydına, önce/sonra değeri ve etkilenen rol sayısıyla yazılır. Küme aynıysa bir şey yapılmaz.
+    /// </summary>
+    Task<PlatformScopeLimitsChange> SetScopeLimitsAsync(
+        Guid tenantId, IReadOnlyList<PlatformScopeLimit> limits, string? reason, Guid actingUserId, CancellationToken cancellationToken);
+
     /// <summary>Genel bakış: durumlara göre firma sayıları ve süresi dolan/yaklaşan haklar. Yalnızca platform tablolarından okunur.</summary>
     Task<PlatformOverview> GetOverviewAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Süre takvimi: bitiş tarihi olan açık modül hakları, bugünden <paramref name="days"/> gün sonrasına kadar ve geçmiş
-    /// olanlar dahil; yalnızca erişime açık firmalar (Active, Trial). Bitişi en yakın olan üstte.
+    /// olanlar dahil (evreleriyle); yalnızca erişime açık firmalar (Active, Trial). Bitişi en yakın olan üstte.
     /// </summary>
     Task<IReadOnlyList<PlatformExpiration>> ListExpirationsAsync(int days, CancellationToken cancellationToken);
 

@@ -3,14 +3,14 @@
 
 <PageTitle>Süre takvimi · Platform · Modulix</PageTitle>
 
-@* Bitiş tarihi olan açık modül hakları (ADR-0028 Dilim 2). Bitiş tarihi şimdilik yalnızca kayıttır: süre dolunca modül
-   kendiliğinden kapanmaz (Dilim 3). Geçmiş tarihliler "Süresi geçti" olarak en üstte görünür. *@
+@* Bitiş tarihi olan açık modül hakları (ADR-0028). Bitişten sonra ek süre başlar (yazma açık), ek süre de bitince modül salt okunur
+   olur; veri silinmez. Geçmiş tarihliler en üstte görünür. *@
 <PlatformGate>
     <a class="back-link" href="platform">← Platform</a>
     <h1>Süre takvimi</h1>
     <p class="text-muted">
-        Bitiş tarihi olan açık modül hakları. Bitiş tarihi şimdilik yalnızca kayıttır; süre dolunca modül kendiliğinden kapanmaz.
-        Süre uzatmak için firma detayındaki hak koşullarını kullanın.
+        Bitiş tarihi olan açık modül hakları. Bitişten sonra modül ek sürede çalışmaya devam eder; ek süre de bitince salt okunur olur
+        (kayıtlar görüntülenir, yazılamaz; veri silinmez). Süre uzatmak için firma detayındaki hak koşullarını kullanın.
     </p>
 
     <div class="filters" role="group" aria-label="Pencere">
@@ -39,7 +39,7 @@
     else
     {
         <table class="table record-table">
-            <thead><tr><th>Firma</th><th>Modül</th><th>Kaynak</th><th>Bitiş</th><th>Kalan</th><th>Not</th></tr></thead>
+            <thead><tr><th>Firma</th><th>Modül</th><th>Kaynak</th><th>Bitiş</th><th>Durum</th><th>Not</th></tr></thead>
             <tbody>
                 @foreach (var item in items)
                 {
@@ -54,14 +54,19 @@
                         <td data-label="Modül">@ModuleName(item.ModuleKey)</td>
                         <td data-label="Kaynak">@LicenseSourceText.Of(item.Source)</td>
                         <td data-label="Bitiş">@CrmLabels.Time(item.ValidUntil)</td>
-                        <td data-label="Kalan">
-                            @if (item.ValidUntil < DateTimeOffset.UtcNow)
+                        <td data-label="Durum">
+                            @switch (item.Phase)
                             {
-                                <span class="badge user-locked">Süresi geçti</span>
-                            }
-                            else
-                            {
-                                @($"{Math.Ceiling((item.ValidUntil - DateTimeOffset.UtcNow).TotalDays):0} gün")
+                                case LicensePhase.ReadOnly:
+                                    <span class="badge user-locked">Salt okunur</span>
+                                    break;
+                                case LicensePhase.Grace:
+                                    <span class="badge user-locked">Ek sürede</span>
+                                    <small class="text-muted d-block">@CrmLabels.Time(item.GraceEndsAt) tarihinde salt okunur olur</small>
+                                    break;
+                                default:
+                                    @($"{Math.Ceiling((item.ValidUntil - DateTimeOffset.UtcNow).TotalDays):0} gün kaldı")
+                                    break;
                             }
                         </td>
                         <td data-label="Not">@(item.Note ?? "—")</td>

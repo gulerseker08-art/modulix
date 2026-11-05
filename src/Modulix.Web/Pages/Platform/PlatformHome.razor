@@ -1,5 +1,6 @@
 @page "/platform"
 @inject ApiClient Api
+@inject SessionState Session
 
 <PageTitle>Platform · Modulix</PageTitle>
 
@@ -24,7 +25,7 @@
                 <a href="platform/sure-takvimi">30 günde @overview.ExpiringIn30Days · 60 günde @overview.ExpiringIn60Days · 90 günde @overview.ExpiringIn90Days</a>
                 @if (overview.Expired > 0)
                 {
-                    <span class="badge user-locked">@overview.Expired hakkın süresi geçti</span>
+                    <span class="badge user-locked">@overview.Expired hakkın süresi geçti (@overview.ReadOnly salt okunur)</span>
                 }
             </p>
         </section>
@@ -33,7 +34,14 @@
     <div class="tiles">
         <a class="tile" href="platform/firmalar"><strong>Firmalar</strong><span>Firma açma, kapatma, ilk yönetici</span></a>
         <a class="tile" href="platform/moduller"><strong>Modül hakları</strong><span>Firma × modül, aç/kapa</span></a>
+        @if (Session.IsPlatformOwner)
+        {
+            <a class="tile" href="platform/ekip"><strong>Platform ekibi</strong><span>Roller: Destek, Operasyon, Finans</span></a>
+        }
+        <a class="tile" href="platform/planlar"><strong>Planlar</strong><span>Modül seti ve limitler</span></a>
         <a class="tile" href="platform/katalog"><strong>Modül kataloğu</strong><span>Modüller, izinler, hazır roller</span></a>
+        <a class="tile" href="platform/sektorler"><strong>Sektörler ve faaliyetler</strong><span>Sektör → grup → faaliyet kataloğu, yetenekler</span></a>
+        <a class="tile" href="platform/saglik"><strong>Sağlık ve kullanım</strong><span>Kuyruk, sürüm, hata oranı, kullanım</span></a>
         <a class="tile" href="platform/olaylar"><strong>Olaylar</strong><span>Başarısız teslimler, yeniden dene, atla</span></a>
         <a class="tile" href="platform/sure-takvimi"><strong>Süre takvimi</strong><span>Bitişi yaklaşan modül hakları</span></a>
         <a class="tile" href="platform/denetim"><strong>Platform denetimi</strong><span>Firmalar arası işlem kaydı</span></a>

@@ -246,11 +246,6 @@ public sealed class ReportPerformanceMeasurementTests(ModulixApiFactory factory,
     /// </summary>
     private async Task SeedAsync(Guid tenantId, Guid companyId, Guid ownerId, int open, int closed)
     {
-        using var scope = factory.OpenScope(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-        var entity = db.Model.FindEntityType(typeof(Opportunity))!;
-        var table = $"[{entity.GetSchema()}].[{entity.GetTableName()}]";
-
         var total = open + closed;
         var overrides = new Dictionary<string, string>
         {
@@ -273,6 +268,18 @@ public sealed class ReportPerformanceMeasurementTests(ModulixApiFactory factory,
             ["Version"] = "1",
         };
 
+        await InsertAsync(
+            tenantId, typeof(Opportunity), total, overrides, new Microsoft.Data.SqlClient.SqlParameter("@tenant", tenantId),
+            new Microsoft.Data.SqlClient.SqlParameter("@company", companyId), new Microsoft.Data.SqlClient.SqlParameter("@owner", ownerId));
+    }
+
+    /// <summary>Verilen varlık türünün satırlarını EF modelinden üretilen tek SQL ifadesiyle ekler (belirtilmeyen zorunlu sütunlar türüne göre varsayılan alır).</summary>
+    private async Task InsertAsync(Guid tenantId, Type type, int total, Dictionary<string, string> overrides, params Microsoft.Data.SqlClient.SqlParameter[] parameters)
+    {
+        using var scope = factory.OpenScope(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var entity = db.Model.FindEntityType(type)!;
+        var table = $"[{entity.GetSchema()}].[{entity.GetTableName()}]";
         var names = new List<string>();
         var values = new List<string>();
         foreach (var property in entity.GetProperties())
@@ -307,9 +314,77 @@ public sealed class ReportPerformanceMeasurementTests(ModulixApiFactory factory,
             INSERT INTO {table} ({string.Join(", ", names)})
             SELECT {string.Join(", ", values)} FROM n
             """;
-        await db.Database.ExecuteSqlRawAsync(
-            sql, new Microsoft.Data.SqlClient.SqlParameter("@tenant", tenantId), new Microsoft.Data.SqlClient.SqlParameter("@company", companyId),
-            new Microsoft.Data.SqlClient.SqlParameter("@owner", ownerId));
-        Assert.Equal(total, await db.Set<Opportunity>().CountAsync());
+        var inserted = await db.Database.ExecuteSqlRawAsync(sql, parameters);
+        Assert.Equal(total, inserted);
+    }
+
+    [PerfFact]
+    public async Task Profile_lead_dataset_read_cost()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var admin = await factory.CreateUserAsync(tenant);
+        Guid membershipId;
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+            var system = await roles.EnsureSystemRoleAsync(CancellationToken.None);
+            membershipId = await factory.GetMembershipIdAsync(admin.Id, tenant.Id);
+            Assert.True(await roles.SetMembershipRolesAsync(membershipId, [system.Id], CancellationToken.None));
+        }
+
+        var rows = Count * 2;
+        var overrides = new Dictionary<string, string>
+        {
+            ["Id"] = "NEWID()",
+            ["TenantId"] = "@tenant",
+            ["LeadNumber"] = "N'PERF-L-' + CAST(n.i AS nvarchar(12))",
+            ["Subject"] = "N'Ölçüm lead ' + CAST(n.i AS nvarchar(12))",
+            ["Status"] = "CASE n.i % 5 WHEN 0 THEN N'New' WHEN 1 THEN N'Contacting' WHEN 2 THEN N'Qualified' WHEN 3 THEN N'Converted' ELSE N'Disqualified' END",
+            ["Priority"] = "N'Normal'",
+            ["Source"] = "CASE n.i % 3 WHEN 0 THEN N'Referral' WHEN 1 THEN N'Event' ELSE N'WebForm' END",
+            ["OwnerId"] = "@owner",
+            ["FirstReceivedAt"] = "DATEADD(minute, -n.i, SYSDATETIMEOFFSET())",
+            ["Version"] = "1",
+        };
+        await InsertAsync(tenant.Id, typeof(Lead), rows, overrides, new Microsoft.Data.SqlClient.SqlParameter("@tenant", tenant.Id), new Microsoft.Data.SqlClient.SqlParameter("@owner", admin.Id));
+
+        await using var owner = factory.Services.GetRequiredService<Modulix.Infrastructure.Platform.ITenantScopeFactory>().Create(new Modulix.Core.Contracts.Tenancy.TenantContext(tenant.Id, admin.Id, membershipId));
+        var pipeline = owner.ServiceProvider.GetRequiredService<Modulix.Core.Contracts.Records.IRecordPipeline>();
+
+        async Task<int> PagesAsync(Dictionary<string, string>? filters)
+        {
+            var total = 0;
+            for (var page = 1; ; page++)
+            {
+                var result = await pipeline.QueryAsync(new Modulix.Core.Contracts.Records.RecordQuery("crm.lead", page, 1000, null, filters) { Bulk = true }, CancellationToken.None);
+                total += result.Value!.Items.Count;
+                if (result.Value.Items.Count == 0 || total >= result.Value.TotalCount || total >= 5000)
+                {
+                    return total;
+                }
+            }
+        }
+
+        async Task TimeAsync(string label, Dictionary<string, string>? filters)
+        {
+            await PagesAsync(filters);
+            var times = new List<double>();
+            var read = 0;
+            for (var i = 0; i < 5; i++)
+            {
+                var clock = Stopwatch.StartNew();
+                read = await PagesAsync(filters);
+                times.Add(clock.Elapsed.TotalMilliseconds);
+            }
+
+            times.Sort();
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{label}: p50 {times[2]:F0} ms, en yüksek {times[^1]:F0} ms, {read} satır"));
+        }
+
+        await TimeAsync($"Lead, süzgeçsiz ({rows} kayıttan ilk 5000)", null);
+        await TimeAsync("Lead, status=New (2 bin kayıt)", new Dictionary<string, string> { ["status"] = "New" });
+        await TimeAsync("Lead, source=Referral (3,3 bin kayıt)", new Dictionary<string, string> { ["source"] = "Referral" });
+        await TimeAsync("Lead, status=Qualified + source=Event", new Dictionary<string, string> { ["status"] = "Qualified", ["source"] = "Event" });
     }
 }

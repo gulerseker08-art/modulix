@@ -1,5 +1,6 @@
 using Modulix.Shared.Access;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Platform;
 using Modulix.Shared.Settings;
 
 namespace Modulix.Web.Services;
@@ -26,6 +27,12 @@ public sealed class SessionState(ApiClient api)
 
     /// <summary>Platform yöneticisi (Y4): "Platform" menüsü görünür. Sunucu her istekte yeniden denetler.</summary>
     public bool IsPlatformAdministrator => User?.IsPlatformAdministrator == true;
+
+    /// <summary>Platform ekibini yönetebilir (Owner); yalnızca menüyü ve düğmeleri gizlemek içindir, sunucu her istekte denetler.</summary>
+    public bool IsPlatformOwner => User?.PlatformRoles?.Contains(PlatformRoleNames.Owner) == true;
+
+    /// <summary>Platform hesabı iki adımlı doğrulama açmadan platform uçlarını kullanamaz (sunucuda zorunlu).</summary>
+    public bool PlatformNeedsTwoFactor => IsPlatformAdministrator && User?.TwoFactorEnabled != true;
 
     /// <summary>
     /// Tenant gerektirmeyen ilk ekran: hiçbir firmaya üye olmayan platform yöneticisi platform alanına, diğerleri

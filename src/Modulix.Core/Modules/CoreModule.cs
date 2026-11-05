@@ -161,6 +161,9 @@ public sealed class CoreModule : IModule
         /// <summary>Tenant'ın faaliyet seçimi (ADR-0029); kaydın kimliği tenant'ın kimliğidir, seçimin tamamı bir kayıt olarak yazılır.</summary>
         public const string ActivitySelection = "core.activity-selection";
 
+        /// <summary>Tenant'ın alan kuralı uyarlaması (ADR-0029 K8); kaydın kimliği tenant'ın kimliğidir. Kural anahtarları yazılır.</summary>
+        public const string RuleAdaptation = "core.rule-adaptation";
+
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
         public const string Audit = "core.audit";
@@ -433,7 +436,7 @@ public sealed class CoreModule : IModule
         },
         new(AuditedEntityKeys.Tenant, "Firma bilgileri", null, new Dictionary<string, string>
         {
-            ["name"] = "Ad", ["slug"] = "Kısa ad", ["status"] = "Durum", ["modules"] = "Açık modüller", ["roles"] = "Hazır roller", ["logo"] = "Logo", ["profile"] = "Sektör profili",
+            ["name"] = "Ad", ["slug"] = "Kısa ad", ["status"] = "Durum", ["modules"] = "Açık modüller", ["roles"] = "Hazır roller", ["logo"] = "Logo", ["profile"] = "Sektör profili", ["scopeLimits"] = "Kayıt görünürlüğü",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
@@ -445,6 +448,10 @@ public sealed class CoreModule : IModule
         {
             ["activities"] = "Seçili faaliyetler",
         }, "activities"),
+        new(AuditedEntityKeys.RuleAdaptation, "Alan kuralı uyarlaması", null, new Dictionary<string, string>
+        {
+            ["rules"] = "Firmanın kuralları", ["disabled"] = "Kapatılan kurallar",
+        }, "rules"),
         new(AuditedEntityKeys.TenantSetting, "Firma ayarı", null, new Dictionary<string, string>
         {
             ["key"] = "Ayar", ["value"] = "Değer",

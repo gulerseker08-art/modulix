@@ -27,6 +27,13 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["platform.Memberships"] = "TenantId: üyelik, firma seçilmeden önce (giriş, firma listesi) doğrulanır.",
         ["platform.PlatformAuditLog"] = "Platform işlemlerinin firmalar arası kaydı (ADR-0028); ekleme-yalnız, firma silinse de saklanır. TargetTenantId firma verisi değildir.",
         ["platform.ModuleEntitlements"] ="TenantId: modül hakkını platform yöneticisi yönetir; firma yazamaz.",
+        ["platform.Plans"] = "Satış planı tanımı (ADR-0028 Dilim 4): TenantId yok, platform geneli; silinmez, kapatılır.",
+        ["platform.PlanModules"] = "Planın modül seti (ADR-0028): TenantId yok.",
+        ["platform.PlanLimits"] = "Planın limitleri (ADR-0028): TenantId yok.",
+        ["platform.TenantSubscriptions"] = "TenantId: firmanın plan aboneliği; platform yöneticisi yönetir, firma yazamaz. Geçmiş korunur (EndedAt).",
+        ["platform.LimitOverrides"] = "TenantId: limit istisnası; platform yöneticisi yönetir, gerekçe ve bitiş zorunlu. Geri alınır (RevokedAt), silinmez.",
+
+        ["platform.TenantScopeLimits"] = "TenantId: kayıt görünürlük tavanını (ADR-0030) platform yöneticisi yazar; firma yalnızca okur.",
         ["platform.EmailMessages"] = "TenantId (boş olabilir): e-posta kuyruğu merkezidir; giriş anındaki e-postaları da taşır.",
         ["platform.OutboxMessages"] = "TenantId: olay kuyruğu; dağıtım tenant bağlamını açıkça kurar (ADR-0007).",
         ["platform.EventDeliveries"] = "TenantId: aynı gerekçe; payload içermez (ADR-0007).",
@@ -34,6 +41,8 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["platform.Capabilities"] = "Yetenek kataloğu (ADR-0029): TenantId yok.",
         ["platform.CapabilityDependencies"] = "Yetenek bağımlılık grafiği (ADR-0029): TenantId yok.",
         ["platform.ActivityNodeCapabilities"] = "Faaliyet–yetenek eşlemesi (ADR-0029): TenantId yok.",
+        ["platform.RulePackages"] = "Alan kuralı paketi (ADR-0029 K8): platform kataloğu, TenantId yok.",
+        ["platform.RulePackageVersions"] = "Alan kuralı paketi sürümü (ADR-0029 K8): platform kataloğu, TenantId yok.",
     };
 
     [Fact]

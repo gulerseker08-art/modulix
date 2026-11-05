@@ -141,3 +141,41 @@ Bilinen eksikler: iki adımlı doğrulama sıfırlama platform kaydına yazılma
 - İki adımlı doğrulama sıfırlama platform denetim kaydına yazılır (`user.two-factor-reset`, hedef firma yok).
 
 Kalan eksikler: `tenant-delete` platform kaydına satır eklemez (CLI'da işlemi yapan kullanıcı yok); toplu işlemler ve süre takviminden doğrudan uzatma yok; bitiş tarihi uygulanmaz, `GracePeriod`/`ReadOnly` ve işçi Dilim 3'tedir; arayüz yalnızca derlenip incelendi, tarayıcıda gezilmedi.
+
+**Dilim 3 (uygulandı, `gseker/platform-lisans-dilim3`):**
+
+- **Sapma, gerekçesiyle:** ADR "süre dolumu işçisi" ve firma düzeyinde `GracePeriod`/`ReadOnly` durumları öngörüyordu. Bunun yerine **evre modül hakkı düzeyinde ve bitiş tarihinden her okumada hesaplanır** (`EntitlementPhases.At`); saklanan durum ve işçi yoktur. Sebep: işçiye bağlı geçiş gecikir ve çoklu örnekte tutarsızlaşır, hesaplanan evre tarih değişince anında doğrudur; firma durumları (`Suspended`/`Closed`) elle yönetilmeye devam eder. Tenant yaşam döngüsü tablosundaki `GracePeriod`/`ReadOnly` satırları modül hakkı için geçerlidir.
+- **Varsayılanlar (ürün kararı 3 ve 4 için, ürün sahibi onayıyla):** ek süre 14 gün (`License:GraceDays`), ardından salt okunur; askı otomatik değildir. Deneme modülleri aynı evrelerden geçer (otomatik askı yok).
+- **Uygulama noktaları:** `RequireModule` (yazma yöntemleri salt okunurda 403; `/preview` ile biten POST'lar hariç); modül işçileri (5); oturumsuz uçlar: web formu gönderimi, teklif bağlantısı (görüntüleme açık, karar yazma kapalı), anket (görüntüleme açık, yanıt kapalı), imza webhook'u. Daha önce oturumsuz uçlar modül kapalıyken de çalışıyordu; bu da kapandı. İletişim tercihi/abonelikten çıkma bağlantıları bilerek lisansa bağlanmadı.
+- **Yönetici uyarısı:** `GET /api/tenant/access` yanıtına `licenses` eklendi; arayüzde yalnızca firma yöneticisine banner. E-posta uyarısı yapılmadı (tekrar göndermemek için gönderim durumu saklamak gerekir).
+- Süre takvimi ve genel bakış evre ve salt okunur sayısı gösterir.
+
+Bilinen sınırlar: POST ile okuma yapan ve adı `/preview` ile bitmeyen uçlar (ör. rapor çalıştırma modül grubundaysa) salt okunurda reddedilir; yeni bulunursa adlandırma ya da süzgeç istisnasıyla çözülür. Evreyi hesaplayan okuma her yazma isteğinde bir ek sorgudur (önbellek yok; ölçülmedi). Arka plan işleyicilerinden (EventDispatcher, otomasyon) salt okunurda yazılanlar bu dilimde engellenmedi; olay teslimi modül açık mı bakar, yazma evresine bakmaz. Arayüz tarayıcıda gezilmedi.
+
+**Dilim 4 (uygulandı, `gseker/platform-plan-dilim4`; Dilim 3 üzerine yığılı):**
+
+- **Değişmez ilke (ürün sahibi, 4 Kasım 2026): veri hiçbir zaman silinmez, yalnızca erişim sınırlanır.** Plan kapatılır (silinmez), abonelik kapatılır (geçmiş kalır), istisna geri alınır, plan değişince kapanan modülün verisi yerinde kalır, koltuk sınırı mevcut kullanıcıları kapatmaz.
+- Tablolar (`platform` şeması, RLS dışı): `Plans`, `PlanModules`, `PlanLimits`, `TenantSubscriptions` (firma başına tek geçerli kayıt, filtreli benzersiz indeks), `LimitOverrides`. Migration yalnızca tablo ekler (geriye uyumlu).
+- **Tasarım kararı:** plan modül hakları `ModuleEntitlements`'a kaynağı `Plan` olarak **yazılır** (materyalize); böylece Dilim 3'ün süre/salt okunur uygulaması ve bütün mevcut denetim noktaları değişmeden çalışır. `IEntitlementResolver` yalnızca limitleri çözer; modüller için tek kaynak `IModuleEntitlements` kalır.
+- **Varsayılanlar (ürün kararı 1 ve 2 için bekleyen cevaba karşı):** ticari model paket (plan) tabanlıdır; satışa konu tek limit koltuktur. Depolama, e-posta ve AI limitleri kullanım ölçümü olmadığı için tanımlanmadı; `LimitKeys` listesine eklenip kullanımı ölçülünce açılır.
+- Plan değişikliği mevcut abonelerin modüllerine yansımaz (yeniden atama gerekir): toplu etkiyi ve fiyatlama sonuçlarını önlemek için bilinçli.
+
+Bilinen sınırlar: plan atama birden fazla ayrı işlemdir (modüller, sonra abonelik); ortada hata olursa modüller değişmiş abonelik yazılmamış kalabilir, yeniden denemek aynı sonucu verir. İstisna yalnızca koltuk için arayüzde var. Plana toplu atama, fiyat ve fatura yok (ürün kararı 5). Arayüz tarayıcıda gezilmedi.
+
+**Dilim 5 (uygulandı, `gseker/platform-roller-dilim5`; Dilim 4 üzerine yığılı):**
+
+- **Roller:** `Support`, `Operations`, `Finance`, `Owner` (bayrak birleşimi). Kullanıcıya `PlatformRoles` sütunu eklendi (migration yalnızca sütun ekler, varsayılan 0). **Geriye uyum:** bayrak açık + rol boş = Owner; mevcut hesaplar ve CLI yetkisini korur.
+- **Karar tablosu:** `PlatformAccessRules` (okuma her role açık, yazma uçları tek tabloda). Tabloda olmayan yazma ucu Owner'a özeldir (varsayılan ret); bir mimari-benzeri test bütün `/api/platform` yazma uçlarının tabloda olmasını zorlar (bu test yazılırken `POST /api/platform/team/` sondaki "/" yüzünden eşleşmeyen gerçek bir açığı yakaladı; anahtar normalleştirildi).
+- **Rol varsayımları (ürün kararı 6 henüz cevaplanmadığı için):** ADR'deki dört rol aynen; Destek ayrıca iki adımlı doğrulama sıfırlar (Operasyon da yapar); modül hakkı Operasyon ve Finans'ta ortak. Ekip yönetimi yalnızca Owner; Owner ataması CLI'da kalır ve arayüzden değiştirilemez.
+- **İki adımlı doğrulama zorunluluğu:** `Platform:RequireTwoFactor` (varsayılan açık). Doğrulaması kapalı platform hesabının bütün platform istekleri 403 + `two-factor-required`; durum her istekte okunur.
+- **Veri silinmez:** ekipten çıkarmak yalnızca platform erişimini kapatır (bayrak ve roller), hesap ve firma üyelikleri kalır.
+
+Bilinen sınırlar: **dağıtımda mevcut platform yöneticileri iki adımlı doğrulamayı açana kadar platform alanına giremez** (ilk kurulumda `Platform:RequireTwoFactor=false` ile geçiş yapılabilir). Arayüz yalnızca derlendi; rol bazlı gizleme yalnızca Owner'a özel "Platform ekibi" kutusu ve ekip sayfasındadır, diğer ekranlar yetkisiz düğmeleri gizlemez (sunucu 403 döner). `platform-admin` komutu rol parametresi almaz. Owner'ı arayüzden düşürme ya da son Owner koruması yok (Owner'a arayüzden dokunulamadığı için gerekmedi). Platform hesabının oturum kapatma/yeniden doğrulama (step-up) akışı yok.
+
+**Dilim 6 (uygulandı, `gseker/platform-saglik-dilim6`):**
+
+- `GET /api/platform/health` ve `/platform/saglik`: sürüm, kuyruk (e-posta, olay), son 24 saat hata oranı, kullanım ve güvenlik olayları. Ayrıntı README'dedir.
+- **Y4.3 kabul ölçütü ("Destek ödeme bilgisini veya tüm müşteri dosyalarını göremez") yapıdan sağlanır:** rapor yalnızca sayı, zaman ve firma adı taşır, hiçbir firma verisi ya da ödeme bilgisi okunmaz; test, firma kullanıcısının adı ve e-postasının yanıtta olmadığını doğrular. Okuma her platform rolüne açıktır (rol tablosunda GET varsayılanı).
+- **Yapılmayanlar (bilerek):** yedek durumu (uygulamanın bilgisi yok; veritabanı sunucusunda), ödeme bilgisi (faturalama ayrı karar, ürün kararı 5), tenant araması (firma listesi zaten arama sunuyor), dış izleme/uyarı (e-posta/pager).
+
+Bilinen sınırlar: e-postada başarısızlık anı saklanmadığı için e-posta hata oranı "son 24 saatte kuyruğa girip kalıcı başarısız olan" ile ölçülür (yaklaşık). "En eski bekleyen" yaşı bekleyenin oluşma anına göredir (yeniden deneme zamanına değil). Rapor her istekte hesaplanır (önbellek yok; birkaç toplu sorgu). Arayüz tarayıcıda gezilmedi.

@@ -97,13 +97,18 @@ public sealed record SegmentFieldDefinition(
 public sealed record SegmentLeaf(string Field, SegmentOperator Operator, IReadOnlyList<string> Values);
 
 /// <summary>
-/// Değerlendirme bağlamı. <see cref="Owners"/>: çağıranın veri kapsamı (null = hepsi); kaynak sorumlusu olan kayıtları buna göre
-/// kısıtlar. <see cref="Today"/>: tenant saat dilimindeki bugün; <see cref="StartOfDay"/> bir günün başlangıç anını UTC olarak verir
-/// (gün sınırları saat dilimine göredir, yaz saatine duyarlıdır).
+/// Değerlendirme bağlamı. <see cref="OwnersFor"/>: çağıranın bir kayıt türündeki veri kapsamı (null = hepsi; ADR-0030, kapsam kayıt
+/// türüne göredir); kaynak sorumlusu olan kayıtları ilgili türün kapsamıyla kısıtlar. <see cref="Today"/>: tenant saat dilimindeki bugün;
+/// <see cref="StartOfDay"/> bir günün başlangıç anını UTC olarak verir (gün sınırları saat dilimine göredir, yaz saatine duyarlıdır).
 /// </summary>
-public sealed class SegmentEvaluationContext(IReadOnlySet<Guid>? owners, DateOnly today, Func<DateOnly, DateTimeOffset> startOfDay)
+public sealed class SegmentEvaluationContext(
+    Func<string, IReadOnlySet<Guid>?> ownersFor, DateOnly today, Func<DateOnly, DateTimeOffset> startOfDay)
 {
-    public IReadOnlySet<Guid>? Owners { get; } = owners;
+    /// <summary>
+    /// Kayıt türünün kapsamı: null tüm kayıtlar. Yalnızca kaynağın <see cref="ISegmentFieldSource.ScopeEntityKeys"/> ile bildirdiği
+    /// türler sorulabilir; bildirilmeyen tür için istisna fırlatılır (kapsam sessizce atlanmaz).
+    /// </summary>
+    public IReadOnlySet<Guid>? OwnersFor(string entityKey) => ownersFor(entityKey);
 
     public DateOnly Today { get; } = today;
 
@@ -119,6 +124,12 @@ public interface ISegmentFieldSource
     string ModuleKey { get; }
 
     IReadOnlyList<SegmentFieldDefinition> Fields { get; }
+
+    /// <summary>
+    /// Koşulların kapsamını belirleyen kayıt türü anahtarları (ADR-0030). Motor bunların her biri için çağıranın kapsamını önceden
+    /// çözer; kaynak <see cref="SegmentEvaluationContext.OwnersFor"/> ile yalnızca burada bildirdiklerini sorabilir.
+    /// </summary>
+    IReadOnlyList<string> ScopeEntityKeys => [];
 
     /// <summary>
     /// Koşulu sağlayan hedef kimliklerinin sorgusu (ertelenmiş; çalıştırılmaz). Alan <see cref="Fields"/> içinde ve operatör tipine

@@ -323,7 +323,7 @@ public static class ReportSpecValidator
             DatasetColumnKind.Number or DatasetColumnKind.Money => decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out _),
             DatasetColumnKind.Date or DatasetColumnKind.DateTime => DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _),
             DatasetColumnKind.Flag => bool.TryParse(value, out _),
-            DatasetColumnKind.Lookup => Guid.TryParse(value, out _),
+            DatasetColumnKind.Lookup or DatasetColumnKind.User => Guid.TryParse(value, out _),
             _ => true,
         };
     }

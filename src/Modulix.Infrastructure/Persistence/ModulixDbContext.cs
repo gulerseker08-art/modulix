@@ -14,6 +14,7 @@ using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
 using Modulix.Core.Reporting;
+using Modulix.Core.FieldRules;
 using Modulix.Core.Sectors;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Email;
@@ -54,6 +55,12 @@ public class ModulixDbContext(
 
     /// <summary>Platform işlemlerinin tenant'lar arası, ekleme-yalnız kaydı (ADR-0028).</summary>
     public DbSet<PlatformAuditEntry> PlatformAuditLog => Set<PlatformAuditEntry>();
+
+    public DbSet<Plan> Plans => Set<Plan>();
+
+    public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+
+    public DbSet<LimitOverride> LimitOverrides => Set<LimitOverride>();
 
     public DbSet<UserSession> UserSessions => Set<UserSession>();
 
@@ -121,6 +128,10 @@ public class ModulixDbContext(
 
     public DbSet<BusinessUnitRole> BusinessUnitRoles => Set<BusinessUnitRole>();
 
+    public DbSet<RoleScopeOverride> RoleScopeOverrides => Set<RoleScopeOverride>();
+
+    public DbSet<TenantScopeLimit> TenantScopeLimits => Set<TenantScopeLimit>();
+
     public DbSet<MembershipCompany> MembershipCompanies => Set<MembershipCompany>();
 
     public DbSet<CustomField> CustomFields => Set<CustomField>();
@@ -140,6 +151,9 @@ public class ModulixDbContext(
     public DbSet<ActivityNodeCapability> ActivityNodeCapabilities => Set<ActivityNodeCapability>();
 
     public DbSet<TenantActivitySelection> ActivitySelections => Set<TenantActivitySelection>();
+    public DbSet<RulePackage> RulePackages => Set<RulePackage>();
+    public DbSet<RulePackageVersion> RulePackageVersions => Set<RulePackageVersion>();
+    public DbSet<TenantRuleAdaptation> RuleAdaptations => Set<TenantRuleAdaptation>();
 
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 

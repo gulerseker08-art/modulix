@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
@@ -44,7 +45,7 @@ public sealed class OrderJobsRunner(IServiceScopeFactory scopes, TimeProvider ti
         var tenantScopes = scope.ServiceProvider.GetRequiredService<ITenantScopeFactory>();
         await using var tenantScope = tenantScopes.Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty));
         var services = tenantScope.ServiceProvider;
-        if (!await services.GetRequiredService<ICurrentAccess>().IsModuleEnabledAsync(OrdersModule.ModuleKey, cancellationToken))
+        if (!await services.GetRequiredService<IModuleLicense>().IsWritableAsync(tenantId, OrdersModule.ModuleKey, cancellationToken))
         {
             return (null, false);
         }

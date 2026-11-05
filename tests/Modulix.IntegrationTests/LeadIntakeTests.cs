@@ -274,6 +274,29 @@ public class LeadIntakeTests(ModulixApiFactory factory) : IClassFixture<ModulixA
 
     private sealed record Setup(Tenant Tenant, HttpClient Admin, HttpClient Anonymous, LeadFormDto Form, ModulixUser DefaultOwner);
 
+    [Fact]
+    public async Task Form_is_accepted_during_the_licence_grace_period_but_refused_once_the_module_is_read_only_or_closed()
+    {
+        var setup = await SetUpAsync();
+        var other = await SetUpAsync();
+
+        // Ek sürede (bitiş 3 gün önce) form çalışır; başka firmanın formu zaten etkilenmez.
+        await factory.SetEntitlementEndAsync(setup.Tenant.Id, CrmModule.ModuleKey, DateTimeOffset.UtcNow.AddDays(-3));
+        Assert.Equal(HttpStatusCode.Accepted, (await PostAsync(setup, Submission("sub-lisans-1"), Site)).StatusCode);
+
+        // Ek süre bitince (20 gün önce) gönderim kabul edilmez ve lead oluşmaz; diğer firma kabul etmeye devam eder.
+        await factory.SetEntitlementEndAsync(setup.Tenant.Id, CrmModule.ModuleKey, DateTimeOffset.UtcNow.AddDays(-20));
+        Assert.Equal(HttpStatusCode.NotFound, (await PostAsync(setup, Submission("sub-lisans-2"), Site)).StatusCode);
+        Assert.Single((await setup.Admin.GetFromJsonAsync<CrmPage<LeadDto>>("/api/crm/leads"))!.Items);
+        Assert.Equal(HttpStatusCode.Accepted, (await PostAsync(other, Submission("sub-lisans-3"), Site)).StatusCode);
+
+        // Modül kapatılınca da kabul edilmez (önceden form kapalı modülde çalışmaya devam ediyordu).
+        await factory.SetEntitlementEndAsync(setup.Tenant.Id, CrmModule.ModuleKey, null);
+        Assert.Equal(HttpStatusCode.Accepted, (await PostAsync(setup, Submission("sub-lisans-4"), Site)).StatusCode);
+        await factory.SetModuleAsync(setup.Tenant.Id, CrmModule.ModuleKey, enabled: false);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostAsync(setup, Submission("sub-lisans-5"), Site)).StatusCode);
+    }
+
     private async Task<Setup> SetUpAsync(bool serverOnly = false)
     {
         var tenant = await factory.CreateTenantAsync();
