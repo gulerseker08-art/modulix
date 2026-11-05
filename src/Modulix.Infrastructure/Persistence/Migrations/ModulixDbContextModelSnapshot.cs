@@ -11691,6 +11691,75 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Facilities", "warehouse");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.LocationLevel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CharacterSet")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("FacilityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("MaxLength")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MinLength")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Separator")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "FacilityId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("UX_LocationLevels_Key");
+
+                    b.HasIndex("TenantId", "FacilityId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("UX_LocationLevels_Position");
+
+                    b.ToTable("LocationLevels", "warehouse");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.Zone", b =>
                 {
                     b.Property<Guid>("Id")
@@ -13346,6 +13415,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Modules.Support.Domain.SupportTicket", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "TicketId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.LocationLevel", b =>
+                {
+                    b.HasOne("Modulix.Modules.Warehouse.Domain.Facility", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "FacilityId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

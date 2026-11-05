@@ -20,6 +20,8 @@ public sealed class WarehouseModule : IModule
         public const string FacilitiesWrite = "warehouse.facilities.write";
         public const string ZonesRead = "warehouse.zones.read";
         public const string ZonesWrite = "warehouse.zones.write";
+        public const string LocationLevelsRead = "warehouse.locationlevels.read";
+        public const string LocationLevelsWrite = "warehouse.locationlevels.write";
         public const string LocationsRead = "warehouse.locations.read";
         public const string LocationsWrite = "warehouse.locations.write";
     }
@@ -29,6 +31,7 @@ public sealed class WarehouseModule : IModule
     {
         public const string Facility = "warehouse.facility";
         public const string Zone = "warehouse.zone";
+        public const string LocationLevel = "warehouse.location-level";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -54,6 +57,8 @@ public sealed class WarehouseModule : IModule
         new(Permissions.FacilitiesWrite, "Tesis ekler ve düzenler", "Tesisler"),
         new(Permissions.ZonesRead, "Alanları görüntüler", "Alanlar"),
         new(Permissions.ZonesWrite, "Alan ekler ve düzenler", "Alanlar"),
+        new(Permissions.LocationLevelsRead, "Lokasyon seviye tanımlarını görüntüler", "Lokasyon seviyeleri"),
+        new(Permissions.LocationLevelsWrite, "Lokasyon seviye tanımı ekler ve düzenler", "Lokasyon seviyeleri"),
         new(Permissions.LocationsRead, "Lokasyonları görüntüler", "Lokasyonlar"),
         new(Permissions.LocationsWrite, "Lokasyon ekler ve düzenler", "Lokasyonlar"),
     ];
@@ -69,6 +74,14 @@ public sealed class WarehouseModule : IModule
         new(Entities.Zone, "Alan", Permissions.ZonesRead, new Dictionary<string, string>
         {
             ["facilityId"] = "Tesis", ["code"] = "Kod", ["name"] = "Ad", ["kindKey"] = "Alan türü", ["description"] = "Açıklama", ["isActive"] = "Etkin",
+        }, "name")
+        {
+            References = new Dictionary<string, string> { ["facilityId"] = Entities.Facility },
+        },
+        new(Entities.LocationLevel, "Lokasyon seviyesi", Permissions.LocationLevelsRead, new Dictionary<string, string>
+        {
+            ["facilityId"] = "Tesis", ["position"] = "Sıra", ["key"] = "Anahtar", ["name"] = "Ad", ["characterSet"] = "Karakterler",
+            ["minLength"] = "En az uzunluk", ["maxLength"] = "En çok uzunluk", ["separator"] = "Ayraç",
         }, "name")
         {
             References = new Dictionary<string, string> { ["facilityId"] = Entities.Facility },
@@ -113,6 +126,7 @@ public sealed class WarehouseModule : IModule
             [
                 Permissions.FacilitiesRead, Permissions.FacilitiesWrite,
                 Permissions.ZonesRead, Permissions.ZonesWrite,
+                Permissions.LocationLevelsRead, Permissions.LocationLevelsWrite,
                 Permissions.LocationsRead, Permissions.LocationsWrite,
             ]),
     ];
@@ -122,5 +136,6 @@ public sealed class WarehouseModule : IModule
         services.AddScoped<WarehouseStoreContext>();
         services.AddScoped<IRecordStore, FacilityRecordStore>();
         services.AddScoped<IRecordStore, ZoneRecordStore>();
+        services.AddScoped<IRecordStore, LocationLevelRecordStore>();
     }
 }

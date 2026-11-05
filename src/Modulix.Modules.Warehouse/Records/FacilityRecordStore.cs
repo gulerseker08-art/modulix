@@ -90,9 +90,10 @@ internal sealed partial class FacilityRecordStore(WarehouseStoreContext context)
 
     protected override async Task BeforeDeleteAsync(Facility entity, CancellationToken cancellationToken)
     {
-        if (await Context.Data.Set<Zone>().AsNoTracking().AnyAsync(z => z.FacilityId == entity.Id, cancellationToken))
+        if (await Context.Data.Set<Zone>().AsNoTracking().AnyAsync(z => z.FacilityId == entity.Id, cancellationToken)
+            || await Context.Data.Set<LocationLevel>().AsNoTracking().AnyAsync(l => l.FacilityId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Tesise bağlı alanlar var; önce alanları silin.");
+            throw new RecordConflictException("Tesise bağlı alanlar veya lokasyon seviyeleri var; önce onları silin.");
         }
     }
 

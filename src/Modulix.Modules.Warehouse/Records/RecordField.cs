@@ -77,6 +77,24 @@ internal static class Field
             e => JsonValue.Create(get(e)),
             (e, v) => set(e, v is true));
 
+    /// <summary>Sınırlı aralıkta tam sayı. Zorunlu değilse boş bırakılabilir (verilmezse mevcut/varsayılan değer kalır).</summary>
+    public static RecordField<T> Integer<T>(string name, Func<T, int?> get, Action<T, int?> set, int min, int max, bool required = false) =>
+        new(name, required, nullable: !required, node =>
+                node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var value) && value >= min && value <= max
+                    ? ParsedValue.Of(value)
+                    : ParsedValue.Fail($"{min} ile {max} arasında bir tam sayı girin."),
+            e => get(e) is { } value ? JsonValue.Create(value) : null,
+            (e, v) => set(e, (int?)v));
+
+    /// <summary>Sabit anahtar listesinden tek değer (teknik doğrulama seçimi; tenant listesi değildir). Boş gönderilirse verilmemiş sayılır.</summary>
+    public static RecordField<T> Choice<T>(string name, IReadOnlyCollection<string> allowed, Func<T, string> get, Action<T, string> set) =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() == JsonValueKind.String && node.GetValue<string>().Trim() is var key && allowed.Contains(key)
+                    ? ParsedValue.Of(key)
+                    : ParsedValue.Fail($"Şunlardan biri olmalıdır: {string.Join(", ", allowed)}."),
+            e => get(e),
+            (e, v) => { if (v is string key) { set(e, key); } });
+
     /// <summary>Firmanın seçim listesinden bir değer (Y9b). Listede olup olmadığını depo aktif tenant'ın listesine bakarak denetler.</summary>
     public static RecordField<T> ListChoice<T>(string name, string listKey, Func<T, string?> get, Action<T, string?> set, bool required = true) =>
         new(name, required: false, nullable: !required, node =>
