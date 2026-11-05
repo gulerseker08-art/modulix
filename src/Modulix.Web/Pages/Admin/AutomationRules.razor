@@ -1,0 +1,132 @@
+@page "/yonetim/otomasyon"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Otomasyon kuralları · Modulix</PageTitle>
+
+@* Otomasyon kuralları (ADR-0027, Dilim 5a): liste. Okuma core.automation.read ister; yeni kural yalnızca şablondan başlar
+   (core.automation.manage). Düğmeleri gizlemek yetki değildir, sunucu uygular. *@
+<AuthGate Permission="@CoreAccess.ReadAutomation">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <PageHeader Title="Otomasyon kuralları" Icon="zap"
+                Subtitle="Bir olay ya da zamanlama olunca koşula bakar, uyarsa işi kendisi yapar. Taslak kural hiçbir şey çalıştırmaz; yayınlanıp açılana kadar beklemede kalır." />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+    }
+
+    <div class="list-toolbar">
+        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status ?? AutomationLabels.AllViews)" ValueChanged="ChooseStatusAsync" />
+        <ColumnPicker />
+        @if (Session.Can(CoreAccess.ManageAutomation))
+        {
+            <a class="btn btn-primary" href="yonetim/otomasyon/sablonlar"><AppIcon Name="plus" Size="16" /> Şablondan başlat</a>
+        }
+    </div>
+
+    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+        <input class="form-control" type="search" aria-label="Kural ara" placeholder="Kural adı ara" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+    </form>
+
+    @if (rulePage is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+    }
+    else if (rulePage.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">
+            @if (status is not null || !string.IsNullOrWhiteSpace(search))
+            {
+                <text>Bu süzgece uyan kural yok.</text>
+            }
+            else
+            {
+                <text>Henüz kural yok.</text>
+                @if (Session.Can(CoreAccess.ManageAutomation))
+                {
+                    <text> <a href="yonetim/otomasyon/sablonlar">Hazır şablonlardan</a> başlayabilirsiniz.</text>
+                }
+            }
+        </p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@rulePage.TotalCount kural listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Otomasyon kuralları</caption>
+            <thead>
+                <tr><th scope="col">Kural</th><th scope="col">Kayıt türü</th><th scope="col">Durum</th><th scope="col">Sürüm</th><th scope="col">Öncelik</th><th scope="col">Güncelleme</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var rule in rulePage.Items)
+                {
+                    <tr>
+                        <td data-label="Kural" class="primary">
+                            <a href="yonetim/otomasyon/@rule.Id">@rule.Name</a>
+                            <small class="text-muted d-block">@AutomationLabels.Behaviour(rule)</small>
+                        </td>
+                        <td data-label="Kayıt türü">@AutomationLabels.EntityName(entities, rule.EntityKey)</td>
+                        <td data-label="Durum">
+                            <span class="badge stage-@AutomationLabels.StatusBadge(rule.Status)">@AutomationLabels.Status(rule.Status)</span>
+                            @if (rule.HasDraft && rule.Status != AutomationLabels.Draft)
+                            {
+                                <span class="badge tag">Taslak var</span>
+                            }
+                        </td>
+                        <td data-label="Sürüm">@(rule.PublishedVersionNo is { } v ? $"v{v}" : "—")</td>
+                        <td data-label="Öncelik">@rule.Priority</td>
+                        <td data-label="Güncelleme">@CrmLabels.Time(rule.UpdatedAt)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="rulePage.Page" PageSize="rulePage.PageSize" TotalCount="rulePage.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private AutomationRulePageDto? rulePage;
+    private IReadOnlyList<AutomationEntityDto> entities = [];
+    private string? status;
+    private string? search;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ReadAutomation))
+        {
+            // Katalog kayıt türü adları içindir; alınamazsa liste teknik anahtarla yine çalışır.
+            entities = (await Api.GetAsync<AutomationCatalogDto>("/api/automation/catalog")).Value?.Entities ?? [];
+            await LoadAsync(1);
+        }
+    }
+
+    private static IReadOnlyList<ViewOption> StatusOptions =>
+        [new(AutomationLabels.AllViews, "Tüm kurallar"), .. AutomationLabels.Statuses.Select(s => new ViewOption(s, AutomationLabels.Status(s)))];
+
+    private Task ChooseStatusAsync(string key)
+    {
+        status = key == AutomationLabels.AllViews ? null : key;
+        return LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"/api/automation/rules?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (status is not null)
+        {
+            url += $"&status={status}";
+        }
+
+        var result = await Api.GetAsync<AutomationRulePageDto>(url);
+        rulePage = result.Value;
+        message = result.Error;
+    }
+}
