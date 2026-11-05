@@ -81,22 +81,45 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
     public async Task<(bool IsAdministrator, IReadOnlyList<RecordScope> Scopes)> GetScopesForAsync(
         Guid membershipId, string entityKey, CancellationToken cancellationToken)
     {
+        var (isAdministrator, byType) = await GetScopesForTypesAsync(membershipId, [entityKey], cancellationToken);
+        return (isAdministrator, byType[entityKey]);
+    }
+
+    /// <summary>
+    /// <see cref="GetScopesForAsync"/>'in çok türlü hâli: roller ve istisnalar bir kez okunur, her tür için aynı kural uygulanır.
+    /// Platform tavanı önizlemesi gibi bir üyeliğin birçok türdeki kapsamını isteyenler tür başına sorguyu tekrarlamaz.
+    /// </summary>
+    public async Task<(bool IsAdministrator, IReadOnlyDictionary<string, IReadOnlyList<RecordScope>> ScopesByType)> GetScopesForTypesAsync(
+        Guid membershipId, IReadOnlyCollection<string> entityKeys, CancellationToken cancellationToken)
+    {
         var roles = await LoadRolesAsync(membershipId, cancellationToken);
         var effective = roles.Where(r => !r.IsSystem || r.ViaBusinessUnit is null).ToList();
         var isAdministrator = roles.Any(r => r.IsSystem && r.ViaBusinessUnit is null);
+        var byType = new Dictionary<string, IReadOnlyList<RecordScope>>(StringComparer.Ordinal);
         if (isAdministrator || effective.Count == 0)
         {
-            return (isAdministrator, ScopesOf(isAdministrator, []));
+            var fixedScopes = ScopesOf(isAdministrator, []);
+            foreach (var key in entityKeys)
+            {
+                byType[key] = fixedScopes;
+            }
+
+            return (isAdministrator, byType);
         }
 
-        // İstisnalar yalnızca kapsamı hesaplanan türde ve istisnası olan rollerde okunur; istisna yoksa ek sorgu yapılmaz.
+        // İstisnalar yalnızca istenen türlerde ve etkin rollerde okunur; istisna yoksa ek sorgu yapılmaz.
         var roleIds = effective.Select(r => r.Id).ToList();
         var overrides = await db.RoleScopeOverrides.AsNoTracking()
-            .Where(o => o.EntityKey == entityKey && roleIds.Contains(o.RoleId))
-            .Select(o => new { o.RoleId, o.Scope })
+            .Where(o => entityKeys.Contains(o.EntityKey) && roleIds.Contains(o.RoleId))
+            .Select(o => new { o.RoleId, o.EntityKey, o.Scope })
             .ToListAsync(cancellationToken);
-        var byRole = overrides.ToDictionary(o => o.RoleId, o => o.Scope);
-        return (false, ScopesOf(false, effective.Select(r => byRole.TryGetValue(r.Id, out var scope) ? scope : r.Scope)));
+        var byRoleAndType = overrides.ToDictionary(o => (o.RoleId, o.EntityKey), o => o.Scope);
+        foreach (var key in entityKeys)
+        {
+            byType[key] = ScopesOf(false, effective.Select(r => byRoleAndType.TryGetValue((r.Id, key), out var scope) ? scope : r.Scope));
+        }
+
+        return (false, byType);
     }
 
     /// <summary>Üyeliğin rolleri kapsam dışı ortak kayıtları gizliyor mu (ADR-0026 K8); bkz. <see cref="MembershipAccess.HidesOutOfScopeShared"/>.</summary>

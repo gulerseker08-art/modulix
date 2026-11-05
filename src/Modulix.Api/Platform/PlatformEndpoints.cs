@@ -78,6 +78,27 @@ public static class PlatformEndpoints
                 return problem;
             }
         });
+        // Kaydetmeden önce etki önizlemesi: yazmaz; yolu "/preview" ile biter, bu yüzden salt okunur lisansta da çalışır.
+        platform.MapPost("/tenants/{tenantId:guid}/scope-limits/preview", async (
+            Guid tenantId, SetScopeLimitsRequest request, IPlatformAdministration admin, CancellationToken ct) =>
+        {
+            try
+            {
+                var preview = await admin.PreviewScopeLimitsAsync(
+                    tenantId,
+                    [.. (request.Limits ?? []).Select(l => new PlatformScopeLimit(l.EntityKey, (Core.Contracts.Authorization.RecordScope)l.MaxScope, l.AppliesToAdministrators))],
+                    ct);
+                return Results.Ok(new ScopeLimitsPreviewResponse(
+                    [.. preview.Types.Select(t => new ScopeImpactDto(
+                        t.EntityKey, t.AffectedRoles, t.NewlyRestrictedMembers, t.ReleasedMembers, t.NewlyRestrictedAdministrators, t.ReleasedAdministrators))],
+                    preview.AffectedRoleCount, preview.NewlyRestrictedMemberCount, preview.ReleasedMemberCount,
+                    preview.NewlyRestrictedAdministratorCount, preview.ReleasedAdministratorCount));
+            }
+            catch (Exception ex) when (ToProblem(ex) is { } problem)
+            {
+                return problem;
+            }
+        });
         platform.MapGet("/audit", ListAuditAsync);
         platform.MapGet("/overview", GetOverviewAsync);
         platform.MapGet("/expirations", ListExpirationsAsync);
