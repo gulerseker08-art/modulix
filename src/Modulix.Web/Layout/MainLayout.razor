@@ -95,7 +95,11 @@
             {
                 <Breadcrumb />
             }
-            @Body
+            @* Metinler oturumla birlikte yüklenir (ADR-0034); yüklenmeden çizilen sayfa anahtar adlarını gösterirdi. *@
+            @if (Session.IsLoaded)
+            {
+                @Body
+            }
         </main>
     </div>
 </div>

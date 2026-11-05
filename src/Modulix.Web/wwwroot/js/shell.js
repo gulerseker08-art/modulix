@@ -4,6 +4,7 @@
 (function () {
     const themeKey = 'modulix.theme';
     const sidebarKey = 'modulix.sidebarCollapsed';
+    const languageKey = 'modulix.language';
     const root = document.documentElement;
 
     function read(key) {
@@ -46,6 +47,10 @@
             return value;
         },
         toggleTheme: () => window.modulixShell.setTheme(window.modulixShell.getTheme() === 'dark' ? 'light' : 'dark'),
+        // Giriş öncesi ekranların dili: son seçilen dil, yoksa tarayıcının dili (ADR-0034). Oturum açınca sunucudaki tercih geçerli olur.
+        getLanguage: () => read(languageKey),
+        setLanguage: language => write(languageKey, language),
+        browserLanguage: () => (navigator.languages && navigator.languages[0]) || navigator.language || '',
         isNarrow: () => window.matchMedia('(max-width: 767.98px)').matches,
         isSidebarCollapsed: () => root.classList.contains('sidebar-collapsed'),
         setSidebarCollapsed: collapsed => {
