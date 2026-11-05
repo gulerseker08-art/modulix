@@ -51,7 +51,7 @@ public sealed record ImportIssueCodeCount(string Code, int Count);
 public sealed record ImportRunDetail(ImportRunSummary Run, IReadOnlyList<ImportIssueCodeCount> IssueCodes, ImportIssuePage Issues);
 
 /// <summary>
-/// İçe aktarma günlüğü okuması (ADR-0030, Dilim 1). Her işlem aktif tenant'ta çalışır (sorgu süzgeci + RLS).
+/// İçe aktarma günlüğü okuması (ADR-0033, Dilim 1). Her işlem aktif tenant'ta çalışır (sorgu süzgeci + RLS).
 /// <paramref name="onlyUserId"/> verilirse yalnızca o kullanıcının koşuları görünür: <c>core.imports.run</c> sahibi kendi
 /// koşularını, <c>core.imports.read</c> sahibi firmanın tamamını görür (API karar verir; servis yetkiye bakmaz).
 /// </summary>

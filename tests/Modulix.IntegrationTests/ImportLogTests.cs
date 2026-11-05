@@ -11,7 +11,7 @@ using static Modulix.Core.Modules.CoreModule.Permissions;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0030 Dilim 1: içe aktarma günlüğünün sunucu tarafı. Mutlu yol (liste, ayrıntı, hata kodu özeti), doğrulama (geçersiz
+/// ADR-0033 Dilim 1: içe aktarma günlüğünün sunucu tarafı. Mutlu yol (liste, ayrıntı, hata kodu özeti), doğrulama (geçersiz
 /// süzgeç), tenant izolasyonu (A, B'nin koşusunu göremez) ve yetki (izinsiz erişemez; yalnızca <c>core.imports.run</c> sahibi
 /// kendi koşularını görür).
 /// </summary>

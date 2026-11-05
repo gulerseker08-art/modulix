@@ -33,7 +33,7 @@ public enum ImportRunStatus
 
 public enum ImportFailurePolicy
 {
-    /// <summary>Varsayılan: hatasız satırlar alınır, hatalılar rapora yazılır (ADR-0030).</summary>
+    /// <summary>Varsayılan: hatasız satırlar alınır, hatalılar rapora yazılır (ADR-0033).</summary>
     SkipInvalidRows = 1,
 
     /// <summary>Tek hatalı satır bütün yüklemeyi durdurur.</summary>
@@ -46,7 +46,7 @@ public enum ImportIssueSeverity
     Warning = 2,
 }
 
-/// <summary>Satır hatası kodları: kapalı liste; süzgeç ve "en sık hatalar" özeti için kullanılır (ADR-0030).</summary>
+/// <summary>Satır hatası kodları: kapalı liste; süzgeç ve "en sık hatalar" özeti için kullanılır (ADR-0033).</summary>
 public static class ImportIssueCodes
 {
     public const string RequiredMissing = "required-missing";
@@ -70,7 +70,7 @@ public static class ImportIssueCodes
 }
 
 /// <summary>
-/// İçe aktarma işi (ADR-0030): bir dosyanın bir kayıt türüne yüklenmesi. Satır değeri saklanmaz; yalnızca kim, hangi dosya
+/// İçe aktarma işi (ADR-0033): bir dosyanın bir kayıt türüne yüklenmesi. Satır değeri saklanmaz; yalnızca kim, hangi dosya
 /// (adı, boyutu, özeti), hangi mod ve kaç satırın ne olduğu tutulur. Dosya özeti aynı dosyanın tekrar yüklenmesini
 /// ve "hepsi ya da hiç" için kuru çalışma eşlemesini mümkün kılar. Kayıtlar kayıt boru hattından yazılır; bu tablo yalnızca izdir.
 /// </summary>
@@ -248,7 +248,7 @@ public sealed class ImportRun : ITenantEntity, ICompanyShared
 }
 
 /// <summary>
-/// Satır hatası (ADR-0030). <b>Ham hücre değeri saklanmaz</b>: yalnızca satır no, sütun anahtarı, hata kodu ve değer içermeyen kısa
+/// Satır hatası (ADR-0033). <b>Ham hücre değeri saklanmaz</b>: yalnızca satır no, sütun anahtarı, hata kodu ve değer içermeyen kısa
 /// ileti. Düzeltme için asıl satır, yüklenen dosyadan indirme anında üretilen hata raporunda verilir.
 /// </summary>
 public sealed class ImportRowIssue : ITenantEntity, ICompanyShared

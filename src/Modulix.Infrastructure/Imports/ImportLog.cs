@@ -6,7 +6,7 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Infrastructure.Imports;
 
 /// <summary>
-/// <see cref="IImportLog"/>: içe aktarma günlüğü okuması (ADR-0030, Dilim 1). Sorgular aktif tenant'ta çalışır (sorgu
+/// <see cref="IImportLog"/>: içe aktarma günlüğü okuması (ADR-0033, Dilim 1). Sorgular aktif tenant'ta çalışır (sorgu
 /// süzgeci + RLS). Kişi adı firmanın üyesinin (veya eski üyesinin) görünen adıdır; üyeliği olmayan hesabın adı gösterilmez.
 /// </summary>
 internal sealed class ImportLog(ModulixDbContext db, ModuleCatalog catalog) : IImportLog
