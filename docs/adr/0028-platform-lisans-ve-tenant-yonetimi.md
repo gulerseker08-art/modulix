@@ -171,3 +171,11 @@ Bilinen sınırlar: plan atama birden fazla ayrı işlemdir (modüller, sonra ab
 - **Veri silinmez:** ekipten çıkarmak yalnızca platform erişimini kapatır (bayrak ve roller), hesap ve firma üyelikleri kalır.
 
 Bilinen sınırlar: **dağıtımda mevcut platform yöneticileri iki adımlı doğrulamayı açana kadar platform alanına giremez** (ilk kurulumda `Platform:RequireTwoFactor=false` ile geçiş yapılabilir). Arayüz yalnızca derlendi; rol bazlı gizleme yalnızca Owner'a özel "Platform ekibi" kutusu ve ekip sayfasındadır, diğer ekranlar yetkisiz düğmeleri gizlemez (sunucu 403 döner). `platform-admin` komutu rol parametresi almaz. Owner'ı arayüzden düşürme ya da son Owner koruması yok (Owner'a arayüzden dokunulamadığı için gerekmedi). Platform hesabının oturum kapatma/yeniden doğrulama (step-up) akışı yok.
+
+**Dilim 6 (uygulandı, `gseker/platform-saglik-dilim6`):**
+
+- `GET /api/platform/health` ve `/platform/saglik`: sürüm, kuyruk (e-posta, olay), son 24 saat hata oranı, kullanım ve güvenlik olayları. Ayrıntı README'dedir.
+- **Y4.3 kabul ölçütü ("Destek ödeme bilgisini veya tüm müşteri dosyalarını göremez") yapıdan sağlanır:** rapor yalnızca sayı, zaman ve firma adı taşır, hiçbir firma verisi ya da ödeme bilgisi okunmaz; test, firma kullanıcısının adı ve e-postasının yanıtta olmadığını doğrular. Okuma her platform rolüne açıktır (rol tablosunda GET varsayılanı).
+- **Yapılmayanlar (bilerek):** yedek durumu (uygulamanın bilgisi yok; veritabanı sunucusunda), ödeme bilgisi (faturalama ayrı karar, ürün kararı 5), tenant araması (firma listesi zaten arama sunuyor), dış izleme/uyarı (e-posta/pager).
+
+Bilinen sınırlar: e-postada başarısızlık anı saklanmadığı için e-posta hata oranı "son 24 saatte kuyruğa girip kalıcı başarısız olan" ile ölçülür (yaklaşık). "En eski bekleyen" yaşı bekleyenin oluşma anına göredir (yeniden deneme zamanına değil). Rapor her istekte hesaplanır (önbellek yok; birkaç toplu sorgu). Arayüz tarayıcıda gezilmedi.
