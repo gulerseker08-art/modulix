@@ -26,6 +26,22 @@ public static class FieldRuleJson
         }
     }
 
+    /// <summary>
+    /// Yayınlanmış paket sürümünün kurallarını çözer. Bozuksa <see cref="CorruptRulePackageException"/> fırlatır: hangi paketin bozuk olduğu hatada ve logda görünür,
+    /// kural değerlendirmesi güvenli tarafta (kapalı) kalır.
+    /// </summary>
+    public static IReadOnlyList<FieldRule> DeserializePackage(string packageCode, int version, string json)
+    {
+        try
+        {
+            return Deserialize(json);
+        }
+        catch (FormatException exception)
+        {
+            throw new CorruptRulePackageException(packageCode, version, exception);
+        }
+    }
+
     public static IReadOnlyList<string> DeserializeKeys(string json)
     {
         try
@@ -287,6 +303,18 @@ public sealed record RulePublishPreview(
     IReadOnlyList<string> Changed)
 {
     public bool CanPublish => Issues.Count == 0 && Conflicts.Count == 0;
+}
+
+/// <summary>
+/// Yayınlanmış bir kural paketi sürümünün içeriği okunamıyor. Paket <c>block</c> ya da onay kuralı taşıyor olabileceğinden bozuk paket sessizce atlanmaz:
+/// kural değerlendirmesi bu hatayla durur ve etkilenen yazma reddedilir (kapalı kalma). İleti kural içeriği taşımaz, yalnızca paket kodunu ve sürümü söyler.
+/// </summary>
+public sealed class CorruptRulePackageException(string packageCode, int version, Exception? inner = null)
+    : Exception($"Kural paketi '{packageCode}' (sürüm {version}) okunamıyor: yayınlanmış kural listesinin biçimi geçersiz. Güvenlik kuralları atlanmasın diye yazma durduruldu; platform yöneticisi paketi düzeltmelidir.", inner)
+{
+    public string PackageCode { get; } = packageCode;
+
+    public int Version { get; } = version;
 }
 
 public sealed class RulePackageNotFoundException(string message) : Exception(message);
