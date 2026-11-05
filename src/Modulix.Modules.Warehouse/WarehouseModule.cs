@@ -1,4 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Contracts.Records;
+using Modulix.Modules.Warehouse.Records;
 
 namespace Modulix.Modules.Warehouse;
 
@@ -15,8 +18,30 @@ public sealed class WarehouseModule : IModule
     {
         public const string FacilitiesRead = "warehouse.facilities.read";
         public const string FacilitiesWrite = "warehouse.facilities.write";
+        public const string ZonesRead = "warehouse.zones.read";
+        public const string ZonesWrite = "warehouse.zones.write";
         public const string LocationsRead = "warehouse.locations.read";
         public const string LocationsWrite = "warehouse.locations.write";
+    }
+
+    /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
+    public static class Entities
+    {
+        public const string Facility = "warehouse.facility";
+        public const string Zone = "warehouse.zone";
+    }
+
+    /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
+    public static class Lists
+    {
+        public const string ZoneKind = "warehouse.zone-kind";
+    }
+
+    /// <summary>Alan türü listesinin kategorileri: kodun anladığı anlam. Tenant türleri adlandırır, kategoriyi seçer.</summary>
+    public static class ZoneKindCategories
+    {
+        public const string Controlled = "controlled";
+        public const string Free = "free";
     }
 
     public string Key => ModuleKey;
@@ -27,8 +52,56 @@ public sealed class WarehouseModule : IModule
     [
         new(Permissions.FacilitiesRead, "Tesisleri görüntüler", "Tesisler"),
         new(Permissions.FacilitiesWrite, "Tesis ekler ve düzenler", "Tesisler"),
+        new(Permissions.ZonesRead, "Alanları görüntüler", "Alanlar"),
+        new(Permissions.ZonesWrite, "Alan ekler ve düzenler", "Alanlar"),
         new(Permissions.LocationsRead, "Lokasyonları görüntüler", "Lokasyonlar"),
         new(Permissions.LocationsWrite, "Lokasyon ekler ve düzenler", "Lokasyonlar"),
+    ];
+
+    /// <summary>Denetim kaydında görünen kayıt türleri (Y5): tesis değişiklikleri kim, ne zaman, neyi değiştirdi olarak izlenir.</summary>
+    IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
+    [
+        new(Entities.Facility, "Tesis", Permissions.FacilitiesRead, new Dictionary<string, string>
+        {
+            ["code"] = "Kod", ["name"] = "Ad", ["description"] = "Açıklama", ["countryCode"] = "Ülke",
+            ["customsEnabled"] = "Gümrük uzantısı", ["allowMixedZones"] = "Karma alanlara izin", ["isActive"] = "Etkin",
+        }, "name"),
+        new(Entities.Zone, "Alan", Permissions.ZonesRead, new Dictionary<string, string>
+        {
+            ["facilityId"] = "Tesis", ["code"] = "Kod", ["name"] = "Ad", ["kindKey"] = "Alan türü", ["description"] = "Açıklama", ["isActive"] = "Etkin",
+        }, "name")
+        {
+            References = new Dictionary<string, string> { ["facilityId"] = Entities.Facility },
+        },
+    ];
+
+    /// <summary>Firmanın özel alan ekleyebildiği kayıt türleri (Y9a).</summary>
+    IReadOnlyList<CustomizableEntity> IModule.CustomizableEntities { get; } =
+    [
+        new(Entities.Facility, "Tesis"),
+        new(Entities.Zone, "Alan"),
+    ];
+
+    /// <summary>
+    /// Alan türü (Y9b): hazır değerler örnektir; tenant kendi türlerini ekler. Kod türün adına bakmaz, <see cref="ZoneKindCategories">kategorisine</see>
+    /// bakar (gümrük denetimli / serbest); yeni türde kategori seçilir (K18).
+    /// </summary>
+    IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
+    [
+        new(
+            Lists.ZoneKind,
+            "Alan türü",
+            Entities.Zone,
+            "kindKey",
+            Required: true,
+            [new(ZoneKindCategories.Controlled, "Gümrük denetimli"), new(ZoneKindCategories.Free, "Serbest")],
+            [
+                new("Controlled", "Gümrük denetimli alan", ZoneKindCategories.Controlled),
+                new("Free", "Serbest alan", ZoneKindCategories.Free),
+            ])
+        {
+            Default = "Free",
+        },
     ];
 
     IReadOnlyList<RoleTemplate> IModule.RoleTemplates { get; } =
@@ -36,10 +109,18 @@ public sealed class WarehouseModule : IModule
         new(
             "warehouse.manager",
             "Depo sorumlusu",
-            "Tesisleri ve lokasyonları görüntüler ve düzenler.",
+            "Tesisleri, alanları ve lokasyonları görüntüler ve düzenler.",
             [
                 Permissions.FacilitiesRead, Permissions.FacilitiesWrite,
+                Permissions.ZonesRead, Permissions.ZonesWrite,
                 Permissions.LocationsRead, Permissions.LocationsWrite,
             ]),
     ];
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddScoped<WarehouseStoreContext>();
+        services.AddScoped<IRecordStore, FacilityRecordStore>();
+        services.AddScoped<IRecordStore, ZoneRecordStore>();
+    }
 }

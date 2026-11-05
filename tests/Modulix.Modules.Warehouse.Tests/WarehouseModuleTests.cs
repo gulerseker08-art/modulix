@@ -40,6 +40,29 @@ public class WarehouseModuleTests
     }
 
     [Fact]
+    public void Zone_kind_list_binds_to_the_zone_field_and_every_built_in_value_has_a_category_the_code_understands()
+    {
+        var list = Assert.Single(Module.ChoiceLists, l => l.Key == WarehouseModule.Lists.ZoneKind);
+
+        Assert.Equal((WarehouseModule.Entities.Zone, "kindKey"), (list.EntityKey, list.Field));
+        Assert.Equal(
+            [WarehouseModule.ZoneKindCategories.Controlled, WarehouseModule.ZoneKindCategories.Free],
+            list.Categories.Select(c => c.Key).Order());
+        Assert.All(list.Values, v => Assert.Contains(v.Category, list.Categories.Select(c => c.Key)));
+        Assert.Contains(list.Default, list.Values.Select(v => v.Key));
+    }
+
+    [Fact]
+    public void Audited_entities_cover_every_record_type_and_references_point_to_known_types()
+    {
+        var audited = Module.AuditedEntities.ToDictionary(a => a.EntityKey);
+
+        Assert.Contains(WarehouseModule.Entities.Facility, audited.Keys);
+        Assert.Contains(WarehouseModule.Entities.Zone, audited.Keys);
+        Assert.All(Module.AuditedEntities.SelectMany(a => a.References.Values), target => Assert.Contains(target, audited.Keys));
+    }
+
+    [Fact]
     public void Every_write_permission_has_a_matching_read_permission_so_a_writer_can_always_see_the_data()
     {
         var keys = Module.Permissions.Select(p => p.Key).ToHashSet(StringComparer.Ordinal);
