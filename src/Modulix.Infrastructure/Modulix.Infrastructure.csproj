@@ -21,4 +21,8 @@
     <!-- SMTP gönderimi (Email/SmtpEmailTransport). -->
     <PackageReference Include="MailKit" Version="4.18.*" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Sektör kataloğu başlangıç paketleri (ADR-0029 Dilim D): veri olarak gömülür. -->
+    <EmbeddedResource Include="Sectors/StarterPackages/*.json" LogicalName="Modulix.StarterPackages.%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

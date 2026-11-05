@@ -63,6 +63,8 @@ public class ModulixDbContext(
 
     public DbSet<LimitOverride> LimitOverrides => Set<LimitOverride>();
 
+    public DbSet<SupportAccessGrant> SupportAccessGrants => Set<SupportAccessGrant>();
+
     public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     public DbSet<QueuedEmail> EmailMessages => Set<QueuedEmail>();

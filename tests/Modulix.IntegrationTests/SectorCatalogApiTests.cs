@@ -112,7 +112,8 @@ public class SectorCatalogApiTests(ModulixApiFactory factory) : IClassFixture<Mo
 
         Assert.Equal(HttpStatusCode.BadRequest, (await platform.PutAsJsonAsync($"/api/platform/sectors/nodes/{group.Id}/capabilities", new CodeListRequest(["yok-boyle-yetenek"]))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await platform.PutAsJsonAsync($"/api/platform/sectors/capabilities/{a}/dependencies", new CodeListRequest([a]))).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await platform.PutAsJsonAsync($"/api/platform/sectors/capabilities/{a}/dependencies", new CodeListRequest([b]))).StatusCode);
+        var depends = await platform.PutAsJsonAsync($"/api/platform/sectors/capabilities/{a}/dependencies", new CodeListRequest([b]));
+        Assert.True(depends.IsSuccessStatusCode, await depends.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.BadRequest, (await platform.PutAsJsonAsync($"/api/platform/sectors/capabilities/{b}/dependencies", new CodeListRequest([a]))).StatusCode);
 
         // Tenant: pasif ve bilinmeyen faaliyet seçilemez; reddedilen seçim hiçbir şeyi değiştirmez.

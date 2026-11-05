@@ -179,3 +179,21 @@ internal sealed class LimitOverrideConfiguration : IEntityTypeConfiguration<Limi
         builder.HasIndex(o => new { o.TenantId, o.LimitKey, o.CreatedAt });
     }
 }
+
+internal sealed class SupportAccessGrantConfiguration : IEntityTypeConfiguration<SupportAccessGrant>
+{
+    public void Configure(EntityTypeBuilder<SupportAccessGrant> builder)
+    {
+        // Platform tablosu (RLS dışı): destek erişimini platform yönetir, firma yazamaz. TenantId taşır; firma silinince birlikte silinir.
+        // Üyelik yabancı anahtarıyla bağlıdır. Süresi dolan ya da geri alınan kayıt silinmez.
+        builder.ToTable("SupportAccessGrants", DatabaseSchemas.Platform);
+        builder.HasKey(g => g.Id);
+        builder.Property(g => g.Id).ValueGeneratedNever();
+        builder.Property(g => g.Reason).HasMaxLength(SupportAccessLimits.ReasonMaxLength).IsRequired();
+        builder.Property(g => g.GrantedAt).IsRequired();
+        builder.Property(g => g.ExpiresAt).IsRequired();
+        builder.Property(g => g.EndReason).HasMaxLength(SupportAccessLimits.ReasonMaxLength);
+        builder.HasIndex(g => new { g.MembershipId, g.ExpiresAt });
+        builder.HasIndex(g => new { g.TenantId, g.GrantedAt });
+    }
+}

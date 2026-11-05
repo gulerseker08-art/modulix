@@ -171,3 +171,20 @@ Bilinen sınırlar: plan atama birden fazla ayrı işlemdir (modüller, sonra ab
 - **Veri silinmez:** ekipten çıkarmak yalnızca platform erişimini kapatır (bayrak ve roller), hesap ve firma üyelikleri kalır.
 
 Bilinen sınırlar: **dağıtımda mevcut platform yöneticileri iki adımlı doğrulamayı açana kadar platform alanına giremez** (ilk kurulumda `Platform:RequireTwoFactor=false` ile geçiş yapılabilir). Arayüz yalnızca derlendi; rol bazlı gizleme yalnızca Owner'a özel "Platform ekibi" kutusu ve ekip sayfasındadır, diğer ekranlar yetkisiz düğmeleri gizlemez (sunucu 403 döner). `platform-admin` komutu rol parametresi almaz. Owner'ı arayüzden düşürme ya da son Owner koruması yok (Owner'a arayüzden dokunulamadığı için gerekmedi). Platform hesabının oturum kapatma/yeniden doğrulama (step-up) akışı yok.
+
+**Dilim 6 (uygulandı, `gseker/platform-saglik-dilim6`):**
+
+- `GET /api/platform/health` ve `/platform/saglik`: sürüm, kuyruk (e-posta, olay), son 24 saat hata oranı, kullanım ve güvenlik olayları. Ayrıntı README'dedir.
+- **Y4.3 kabul ölçütü ("Destek ödeme bilgisini veya tüm müşteri dosyalarını göremez") yapıdan sağlanır:** rapor yalnızca sayı, zaman ve firma adı taşır, hiçbir firma verisi ya da ödeme bilgisi okunmaz; test, firma kullanıcısının adı ve e-postasının yanıtta olmadığını doğrular. Okuma her platform rolüne açıktır (rol tablosunda GET varsayılanı).
+- **Yapılmayanlar (bilerek):** yedek durumu (uygulamanın bilgisi yok; veritabanı sunucusunda), ödeme bilgisi (faturalama ayrı karar, ürün kararı 5), tenant araması (firma listesi zaten arama sunuyor), dış izleme/uyarı (e-posta/pager).
+
+Bilinen sınırlar: e-postada başarısızlık anı saklanmadığı için e-posta hata oranı "son 24 saatte kuyruğa girip kalıcı başarısız olan" ile ölçülür (yaklaşık). "En eski bekleyen" yaşı bekleyenin oluşma anına göredir (yeniden deneme zamanına değil). Rapor her istekte hesaplanır (önbellek yok; birkaç toplu sorgu). Arayüz tarayıcıda gezilmedi.
+
+**Dilim 7a: destek erişimi (uygulandı, `gseker/platform-destek-erisimi-dilim7`; Dilim 6 üzerine yığılı):**
+
+- **Karar (ürün sahibi onayladı, 5 Kasım 2026: "onay beklemeden"):** erişim **kendi kendine açılır** (Destek, Operasyon veya Owner rolü, gerekçeyle), firma yöneticisinin onayı beklenmez; bunun yerine firma yöneticilerine e-posta gider, firmanın denetim kaydına yazılır ve firma yöneticisi erişimi erken kapatabilir. Onaylı model (yönetici onaylamadan açılmaz) istenirse `GrantAsync` bir "bekliyor" durumuna ve firma tarafı onay ekranına genişler.
+- **Tasarım:** destek erişimi gerçek bir üyelik üzerinden kurulur (`MembershipStatus.Support`), böylece izin, kapsam, RLS ve denetim mekanizmaları değişmeden çalışır. Bağlam yalnızca geçerli `SupportAccessGrant` varken kurulur (`MembershipDirectory`); süre dolumu zamanlayıcıya bağlı değildir. "Etkin" olmayan durum olduğu için koltuk, kullanıcı listesi, kayıt sahibi ve bildirim sorguları destek üyeliğini kendiliğinden dışarıda bırakır; kullanıcı yönetimi uçları ayrıca açıkça dışlar.
+- **Salt okunur:** rol yalnızca açık modüllerin `*.read` izinlerini taşır; çekirdek (kullanıcılar, roller, denetim, ayarlar) ve dışa aktarma kasıtlı olarak dışarıdadır ("hassas işlemler ayrıca kısıtlı" ölçütü yapıdan sağlanır).
+- **Veri silinmez:** erişim kaydı ve üyelik kalır; kapanış yalnızca erişimi keser.
+
+Bilinen sınırlar: okumalar tek tek denetlenmez (başlangıç, bitiş, gerekçe ve kapanış denetlenir); alan düzeyi "hassas alan" izni destek rolünde yoktur ama alanların maskelenmesi ayrıca doğrulanmadı. Destek rolü her açılışta açık modüllere göre güncellenir; erişim sürerken modül açılırsa yeni izin bir sonraki açılışta eklenir. Firma yöneticisi için arayüz yok (API var). Platform arayüzü tarayıcıda gezilmedi. **Dilim 7b (on-prem imzalı lisans) ve 7c (faturalama entegrasyonu) yapılmadı:** ikisi dış karar ister (imza biçimi/anahtar yönetimi; ödeme sağlayıcısı).
