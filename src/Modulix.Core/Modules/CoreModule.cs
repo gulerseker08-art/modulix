@@ -202,6 +202,7 @@ public sealed class CoreModule : IModule
         public const string TimeZone = "core.regional.time-zone";
         public const string Currency = "core.regional.currency";
         public const string Format = "core.regional.format";
+        public const string Language = "core.regional.language";
         public const string RequireTwoFactor = "core.security.require-two-factor";
 
         /// <summary>Acil durdurma (ADR-0027): "Hayır" ise firmanın hiçbir kuralı çalışmaz; kuyruktaki çalışmalar iptal edilir.</summary>
@@ -254,6 +255,11 @@ public sealed class CoreModule : IModule
         new(SettingKeys.Format, "Tarih ve sayı biçimi", RegionalGroup, SettingType.Choice, RegionalOptions.DefaultFormat)
         {
             Options = RegionalOptions.Formats,
+        },
+        new(SettingKeys.Language, "Arayüz dili", RegionalGroup, SettingType.Choice, LanguageOptions.Default)
+        {
+            Description = "Firmanın varsayılan dili. Dilini kendi hesabında seçmiş kullanıcılar kendi dilini görür. Kayıtlı veriler değişmez.",
+            Options = LanguageOptions.Languages,
         },
 
         // Y7b: açıkken iki adımlı doğrulaması kapalı biri bu firmanın ekranlarına giremez, önce kurulumu yapar.
@@ -499,6 +505,7 @@ public sealed class CoreModule : IModule
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["ip"] = "IP adresi", ["userAgent"] = "Tarayıcı",
             ["reason"] = "Neden", ["sessions"] = "Kapatılan oturum", ["recoveryCodesLeft"] = "Kalan kurtarma kodu",
+            ["language"] = "Arayüz dili",
         }, "email")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>

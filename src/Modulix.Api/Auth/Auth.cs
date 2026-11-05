@@ -6,6 +6,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
+using Modulix.Core.Settings;
 using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
@@ -465,7 +466,8 @@ public static class AuthEndpoints
             memberships.Select(m => new MembershipDto(m.TenantId, m.TenantName, m.TenantSlug, shown.GetValueOrDefault(m.TenantId))).ToList(),
             user.IsPlatformAdministrator,
             user.TwoFactorEnabled,
-            PlatformRoles: [.. Modulix.Core.Platform.PlatformRoles.Split(Modulix.Core.Platform.PlatformRoles.Effective(user.IsPlatformAdministrator, user.PlatformRoles)).Select(r => r.ToString())]);
+            PlatformRoles: [.. Modulix.Core.Platform.PlatformRoles.Split(Modulix.Core.Platform.PlatformRoles.Effective(user.IsPlatformAdministrator, user.PlatformRoles)).Select(r => r.ToString())],
+            PreferredLanguage: LanguageOptions.Normalize(user.PreferredLanguage));
     }
 
     private static IResult InvalidLink(string message) =>
