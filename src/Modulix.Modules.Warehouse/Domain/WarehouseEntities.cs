@@ -121,6 +121,49 @@ public sealed class LocationLevel : WarehouseEntity
 }
 
 /// <summary>
+/// Lokasyon ağacının bir düğümü (K11). Düğümün seviyesi derinliğinden gelir: n. derinlik, tesisin sıraya göre n. seviye tanımına
+/// uyar; değeri o seviyenin karakter kümesine ve uzunluk aralığına uymalıdır. <see cref="Code"/> üst düğümün kodu, seviyenin ayracı
+/// ve bu düğümün değerinden üretilir (ör. <c>ANT-A-02-04-C</c>) ve tesis içinde benzersizdir. Kod ve değer oluşturulduktan sonra
+/// değişmez (alt düğümlerin kodları buna bağlı olduğundan); düğüm taşınması sonraki bir adımdır. Kapasite ve kısıtlar stok
+/// dilimiyle gelir.
+/// </summary>
+public sealed class Location : WarehouseEntity
+{
+    public const int ValueMaxLength = LocationLevel.MaxValueLength;
+    public const int CodeMaxLength = 250;
+    public const int PathMaxLength = 450;
+    public const int NameMaxLength = 200;
+
+    public Guid FacilityId { get; internal set; }
+
+    /// <summary>Üst düğüm; kök düğümde (1. seviye) boş.</summary>
+    public Guid? ParentId { get; internal set; }
+
+    /// <summary>
+    /// Düğümün alanı (K18). Üst düğümün alanı varsa alt düğüm aynı alanı taşır. Gümrük denetimindeki malın serbest alana
+    /// yerleştirilememesi (K17) bu alanın türüne bakar; yerleştirme denetimi stok dilimiyle gelir.
+    /// </summary>
+    public Guid? ZoneId { get; internal set; }
+
+    /// <summary>1 kök düğüm; her alt düzey bir artar.</summary>
+    public int Depth { get; internal set; }
+
+    /// <summary>Bu düğümün seviye içindeki değeri (ör. "A", "02"); büyük harfe çevrilir.</summary>
+    public string Value { get; internal set; } = string.Empty;
+
+    /// <summary>Tam kod (üst kod + ayraç + değer); tesis içinde benzersiz.</summary>
+    public string Code { get; internal set; } = string.Empty;
+
+    /// <summary>Kökten kendine kimlik yolu ("/kök/…/kendi/"); alt ağaç sorguları için.</summary>
+    public string Path { get; internal set; } = string.Empty;
+
+    public string? Name { get; internal set; }
+
+    /// <summary>Pasif lokasyon yeni yerleştirme almaz; geçmiş kayıtları korunur.</summary>
+    public bool IsActive { get; internal set; } = true;
+}
+
+/// <summary>
 /// Tesis içindeki alan (K11, K18): gümrük denetimli ya da serbest bölge. Türün <b>kategorisi</b> kodun anladığı anlamdır
 /// (<c>controlled</c>, <c>free</c>); adı ve ek değerleri tenant'ındır. Gümrük denetimindeki mal serbest alana yerleştirilemez
 /// (K17); bu denetim lokasyon ve hareket dilimlerinde bu alan türüne bakar.

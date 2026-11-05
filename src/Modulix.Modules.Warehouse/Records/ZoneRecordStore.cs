@@ -83,6 +83,14 @@ internal sealed partial class ZoneRecordStore(WarehouseStoreContext context) : W
         }
     }
 
+    protected override async Task BeforeDeleteAsync(Zone entity, CancellationToken cancellationToken)
+    {
+        if (await Context.Data.Set<Location>().AsNoTracking().AnyAsync(l => l.ZoneId == entity.Id, cancellationToken))
+        {
+            throw new RecordConflictException("Alana bağlı lokasyonlar var; önce lokasyonları başka alana taşıyın ya da silin.");
+        }
+    }
+
     private static bool ChoiceValueKeysValid(string value) => Modulix.Core.Contracts.Customization.ChoiceValueKeys.IsValid(value);
 
     [GeneratedRegex("^[A-Z0-9_]+$")]

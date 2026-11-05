@@ -34,6 +34,15 @@ internal sealed class RecordField<TEntity>(
     /// <summary>Değeri firmanın seçim listesinden gelen alan (Y9b).</summary>
     public string? ChoiceListKey { get; init; }
 
+    /// <summary>Yalnızca sunucunun hesapladığı alan (kod, derinlik): genel uçlardan gelen değer sessizce yok sayılır.</summary>
+    public bool SystemOnly { get; private set; }
+
+    public RecordField<TEntity> AsSystem()
+    {
+        SystemOnly = true;
+        return this;
+    }
+
     /// <summary>Liste alanı verilmediyse (boş) yazılmaz: yeni kayıtta listenin varsayılanı, güncellemede mevcut değer kalır.</summary>
     public bool IsOmitted(JsonNode? node) => ChoiceListKey is not null && !Nullable && IsEmpty(node);
 
@@ -65,8 +74,12 @@ internal readonly record struct ParsedValue(object? Value, string? Error)
 /// <summary>Alan türleri. Biçimler: metin, mantıksal true/false, liste değeri anahtarı, kimlik GUID.</summary>
 internal static class Field
 {
-    public static RecordField<T> Text<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set, bool required = false) =>
-        new(name, required, nullable: !required, node => ParseText(node, maxLength), e => get(e), (e, v) => set(e, (string?)v));
+    public static RecordField<T> Text<T>(
+        string name, int maxLength, Func<T, string?> get, Action<T, string?> set, bool required = false, bool createOnly = false) =>
+        new(name, required, nullable: !required, node => ParseText(node, maxLength), e => get(e), (e, v) => set(e, (string?)v))
+        {
+            CreateOnly = createOnly,
+        };
 
     /// <summary>Evet/hayır alanı; boş gönderilirse hayır.</summary>
     public static RecordField<T> Flag<T>(string name, Func<T, bool> get, Action<T, bool> set) =>

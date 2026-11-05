@@ -8,8 +8,9 @@ namespace Modulix.Modules.Warehouse.Records;
 
 /// <summary>
 /// Lokasyon seviye tanımları (K11). Her tesis kendi seviyelerini tanımlar: sıra, teknik anahtar, görünen ad, izinli karakterler,
-/// uzunluk aralığı ve ayraç. Sıra ve anahtar tesis içinde benzersizdir; tesis sonradan değiştirilemez. Kullanımdaki tesiste yalnızca
-/// ekleme ve yeniden adlandırma yapılabilmesi kuralı, lokasyonlar bu tanıma bağlandığında bu depoya eklenir.
+/// uzunluk aralığı ve ayraç. Sıra ve anahtar tesis içinde benzersizdir; tesis sonradan değiştirilemez. Lokasyonu olan (kullanımdaki)
+/// tesiste tanım yalnızca eklenir ve yeniden adlandırılır: yeni seviye mevcutların sonuna gelir, diğer alanlar değişmez, kullanılan
+/// seviye silinemez; böylece üretilmiş lokasyon kodları bozulmaz.
 /// </summary>
 internal sealed partial class LocationLevelRecordStore(WarehouseStoreContext context) : WarehouseRecordStore<LocationLevel>(context)
 {
@@ -73,9 +74,48 @@ internal sealed partial class LocationLevelRecordStore(WarehouseStoreContext con
             errors.Add(new RecordFieldError("key", "Bu anahtar tesisteki başka bir seviyede kullanılıyor."));
         }
 
+        // Kullanımdaki tesiste (lokasyonu olan) tanım yalnızca eklenir ve yeniden adlandırılır (K11): mevcut kodlar bozulmaz.
+        if (await Context.Data.Set<Location>().AsNoTracking().AnyAsync(l => l.FacilityId == entity.FacilityId, cancellationToken))
+        {
+            if (isNew)
+            {
+                var deepest = await siblings.MaxAsync(l => (int?)l.Position, cancellationToken) ?? 0;
+                if (entity.Position <= deepest)
+                {
+                    errors.Add(new RecordFieldError("position", "Lokasyonu olan tesiste yeni seviye yalnızca mevcut seviyelerden sonra eklenebilir."));
+                }
+            }
+            else
+            {
+                var before = await Context.Data.Set<LocationLevel>().AsNoTracking().SingleAsync(l => l.Id == entity.Id, cancellationToken);
+                var changed = new Dictionary<string, bool>
+                {
+                    ["position"] = before.Position != entity.Position,
+                    ["key"] = before.Key != entity.Key,
+                    ["characterSet"] = before.CharacterSet != entity.CharacterSet,
+                    ["minLength"] = before.MinLength != entity.MinLength,
+                    ["maxLength"] = before.MaxLength != entity.MaxLength,
+                    ["separator"] = before.Separator != entity.Separator,
+                };
+                errors.AddRange(changed.Where(c => c.Value)
+                    .Select(c => new RecordFieldError(c.Key, "Lokasyonu olan tesiste seviye tanımı değiştirilemez; yalnızca ad değişir.")));
+            }
+        }
+
         if (errors.Count > 0)
         {
             throw new RecordValidationException(errors);
+        }
+    }
+
+    protected override async Task BeforeDeleteAsync(LocationLevel entity, CancellationToken cancellationToken)
+    {
+        // Seviyenin sırası: tesisin tanımları arasında kaçıncı. O derinlikte ya da daha derinde lokasyon varsa seviye silinemez.
+        var rank = await Context.Data.Set<LocationLevel>().AsNoTracking()
+            .CountAsync(l => l.FacilityId == entity.FacilityId && l.Position < entity.Position, cancellationToken) + 1;
+        if (await Context.Data.Set<Location>().AsNoTracking().AnyAsync(l => l.FacilityId == entity.FacilityId && l.Depth >= rank, cancellationToken))
+        {
+            throw new RecordConflictException("Bu seviyeyi kullanan lokasyonlar var; önce lokasyonları silin.");
         }
     }
 

@@ -32,6 +32,7 @@ public sealed class WarehouseModule : IModule
         public const string Facility = "warehouse.facility";
         public const string Zone = "warehouse.zone";
         public const string LocationLevel = "warehouse.location-level";
+        public const string Location = "warehouse.location";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -78,6 +79,17 @@ public sealed class WarehouseModule : IModule
         {
             References = new Dictionary<string, string> { ["facilityId"] = Entities.Facility },
         },
+        new(Entities.Location, "Lokasyon", Permissions.LocationsRead, new Dictionary<string, string>
+        {
+            ["facilityId"] = "Tesis", ["parentId"] = "Üst lokasyon", ["zoneId"] = "Alan", ["value"] = "Değer", ["depth"] = "Derinlik",
+            ["code"] = "Kod", ["name"] = "Ad", ["isActive"] = "Etkin",
+        }, "code")
+        {
+            References = new Dictionary<string, string>
+            {
+                ["facilityId"] = Entities.Facility, ["parentId"] = Entities.Location, ["zoneId"] = Entities.Zone,
+            },
+        },
         new(Entities.LocationLevel, "Lokasyon seviyesi", Permissions.LocationLevelsRead, new Dictionary<string, string>
         {
             ["facilityId"] = "Tesis", ["position"] = "Sıra", ["key"] = "Anahtar", ["name"] = "Ad", ["characterSet"] = "Karakterler",
@@ -93,6 +105,7 @@ public sealed class WarehouseModule : IModule
     [
         new(Entities.Facility, "Tesis"),
         new(Entities.Zone, "Alan"),
+        new(Entities.Location, "Lokasyon"),
     ];
 
     /// <summary>
@@ -137,5 +150,6 @@ public sealed class WarehouseModule : IModule
         services.AddScoped<IRecordStore, FacilityRecordStore>();
         services.AddScoped<IRecordStore, ZoneRecordStore>();
         services.AddScoped<IRecordStore, LocationLevelRecordStore>();
+        services.AddScoped<IRecordStore, LocationRecordStore>();
     }
 }
