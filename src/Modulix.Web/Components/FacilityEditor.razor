@@ -1,0 +1,247 @@
+@* Tesis ekleme/düzenleme formu; Tesisler ekranı kullanır. Düzen: üstte başlık + İptal / Kaydet, sağda firmanın form düzenine (ADR-0021)
+   göre çizilen sekmeler ve bölüm kartları. Her alanın girdisi burada, yeri ve zorunluluğu düzende tanımlıdır. Kayıt genel kayıt
+   uçlarından (/api/records/warehouse.facility) yapılır; doğrulama ve yetki sunucudadır. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Facility is null ? "Yeni tesis" : "Tesis kartı")</h2>
+            @if (Facility is not null)
+            {
+                <p>@form.Code · @form.Name</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Tesis özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="warehouse" Size="24" /></span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Name) ? "Tesis adı" : form.Name)</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.Code) ? "Kod" : form.Code.ToUpperInvariant())</span>
+                </div>
+                <h3 class="summary-heading">Tesis özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Ülke</dt><dd>@(string.IsNullOrWhiteSpace(form.CountryCode) ? "—" : form.CountryCode.ToUpperInvariant())</dd></div>
+                    <div><dt>Gümrük uzantısı</dt><dd>@(form.CustomsEnabled ? "Açık" : "Kapalı")</dd></div>
+                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "Pasif")</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Tesis formu bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "code":
+                            <label class="@f.LabelClass()" for="facility-code">@f.Label</label>
+                            <input id="facility-code" class="form-control" maxlength="30" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Code" />
+                            <FieldError Field="code" Errors="errors" />
+                            <small class="text-muted">Harf, rakam ve alt çizgi; büyük harfe çevrilir. Lokasyon kodlarında kullanılabilir.</small>
+                            break;
+                        case "name":
+                            <label class="@f.LabelClass()" for="facility-name">@f.Label</label>
+                            <input id="facility-name" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Name" />
+                            <FieldError Field="name" Errors="errors" />
+                            break;
+                        case "countryCode":
+                            <label class="@f.LabelClass()" for="facility-country">@f.Label</label>
+                            <input id="facility-country" class="form-control" maxlength="2" placeholder="TR" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.CountryCode" />
+                            <FieldError Field="countryCode" Errors="errors" />
+                            break;
+                        case "isActive":
+                            <label class="@f.LabelClass()" for="facility-active">@f.Label</label>
+                            <select id="facility-active" class="form-select" @bind="form.IsActive">
+                                <option value="True">Etkin</option>
+                                <option value="False">Pasif</option>
+                            </select>
+                            <FieldError Field="isActive" Errors="errors" />
+                            break;
+                        case "description":
+                            <label class="@f.LabelClass()" for="facility-description">@f.Label</label>
+                            <textarea id="facility-description" class="form-control" rows="3" maxlength="1000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                            <FieldError Field="description" Errors="errors" />
+                            break;
+                        case "customsEnabled":
+                            <div class="form-check">
+                                <input id="facility-customs" class="form-check-input" type="checkbox" @bind="form.CustomsEnabled" />
+                                <label class="form-check-label" for="facility-customs">@f.Label</label>
+                            </div>
+                            <FieldError Field="customsEnabled" Errors="errors" />
+                            <small class="text-muted">Kapalı tesiste gümrük denetimli alan tanımlanamaz. Gümrük denetimli alanı olan tesiste kapatılamaz.</small>
+                            break;
+                        case "allowMixedZones":
+                            <div class="form-check">
+                                <input id="facility-mixed" class="form-check-input" type="checkbox" @bind="form.AllowMixedZones" />
+                                <label class="form-check-label" for="facility-mixed">@f.Label</label>
+                            </div>
+                            <FieldError Field="allowMixedZones" Errors="errors" />
+                            <small class="text-muted">Varsayılan kapalı. Hukuki doğrulama yapılmadan açılması önerilmez.</small>
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private const string EntityKey = WarehouseAccess.FacilityEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private FacilityForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek tesis; null ise yeni tesis.</summary>
+    [Parameter] public RecordResponse? Facility { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    /// <summary>Firmanın form düzeni (ADR-0021): yüklenemezse form kaydedilemez.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir tesis verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Facility))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Facility;
+        form = Facility is { } r
+            ? new FacilityForm
+            {
+                Id = r.Id, Version = r.Version, Code = Text(r, "code"), Name = Text(r, "name"), Description = Text(r, "description"),
+                CountryCode = Text(r, "countryCode"), CustomsEnabled = Flag(r, "customsEnabled", false), AllowMixedZones = Flag(r, "allowMixedZones", false),
+                IsActive = Flag(r, "isActive", true), Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new FacilityForm();
+        errors = null;
+        message = null;
+    }
+
+    private static string Text(RecordResponse record, string field) => record.Values[field]?.GetValue<string>() ?? string.Empty;
+
+    private static bool Flag(RecordResponse record, string field, bool fallback) => record.Values[field]?.GetValue<bool>() ?? fallback;
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["code"] = form.Code,
+            ["name"] = form.Name,
+            ["description"] = form.Description,
+            ["countryCode"] = form.CountryCode,
+            ["customsEnabled"] = form.CustomsEnabled,
+            ["allowMixedZones"] = form.AllowMixedZones,
+            ["isActive"] = form.IsActive,
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class FacilityForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Code { get; set; } = string.Empty;
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public string? CountryCode { get; set; }
+
+        public bool CustomsEnabled { get; set; }
+
+        public bool AllowMixedZones { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}
