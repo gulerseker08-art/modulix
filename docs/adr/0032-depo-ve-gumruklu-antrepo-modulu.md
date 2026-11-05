@@ -22,7 +22,7 @@ Kısıtlar: modüller yalnızca `Modulix.Core.Contracts`'a başvurur ve birbirin
 
 **K4 — Vekâlet.** `PowerOfAttorney`: ithalatçı, müşavir, geçerlilik tarihleri, kapsam, belge, durum. Müşavir yalnızca geçerli vekâleti olduğu ithalatçıların kayıtlarını görür ve yazar; bu kapsam sunucuda sorgu seviyesinde uygulanır, arayüzde gizleme yetki sayılmaz.
 
-**K5 — Müşavir dış erişimi yalnızca ön bildirim ve belge ile sınırlıdır.** Müşavir `ASN` (ön bildirim) taslağı oluşturur/gönderir ve belge yükler (`warehouse.customs.asn.submit`, `warehouse.customs.documents.upload`). Stok hareketi yaratamaz; ASN'yi antrepo personeli kabul eder. Kimlik mekanizması (dış API anahtarı, portal) yol haritasında Ç11 ve Ç19.8'dedir ve henüz yoktur: ilk dilimde müşavir, kısıtlı rollü normal kullanıcıdır; API/portal sonra bağlanır ve aynı izin ve kapsam kurallarını kullanır.
+**K5 — Müşavir dış erişimi yalnızca ön bildirim ve belge ile sınırlıdır.** Müşavir `ASN` (ön bildirim) taslağı oluşturur/gönderir ve belge yükler (`warehouse.customs.asn.submit`, `warehouse.customs.documents.upload`). Stok hareketi yaratamaz; ASN'yi antrepo personeli kabul eder. Giriş **kanalı** dinamiktir: her ASN bir `Source` taşır (elle, Excel, kullanıcı, API, portal) ve tesis ayarı hangi kanalların açık olduğunu belirler; bütün kanallar aynı `asn.submit` iznine ve vekâlet kapsamına bağlıdır. İlk sürümde açık kanallar: (a) kısıtlı rollü kullanıcı (müşavir tenant'ta "Müşavir" rolüyle üyedir; kimlik platformda global olduğundan aynı kişi birden çok antrepoda üye olabilir) ve (b) içeri alma (e-posta/Excel ile gelen ASN'yi antrepo personeli kaydeder). Dış API anahtarı (Ç11) ve portal (Ç19.8) henüz yoktur; gelince aynı sözleşmeye bağlanır. Kanal önceliği pilot (Makaroğlu) akışına göre netleşir (doğrulanmadı).
 
 **K6 — Beyanname.** `CustomsDeclaration` (tescil no, tarih, gümrük idaresi, rejim kodu, ithalatçı, müşavir, durum, kaynak, dış referans) ve `CustomsDeclarationLine` (satır no, GTİP, tanım, kap cinsi, kap adedi, brüt/net kg, menşe, miktar+birim, bakiye, fatura değeri). `UNIQUE(TenantId, RegistrationNo)`. Yasal gerçek satırdadır: bakiye, kısmi çıkış ve mutabakat beyanname satırı üzerinden yürür; stok kartındaki GTİP yalnızca varsayılandır. Rejim kodu (7100 vb.) katalogdan (lookup) gelir, koda sabitlenmez.
 
@@ -38,17 +38,28 @@ Kısıtlar: modüller yalnızca `Modulix.Core.Contracts`'a başvurur ve birbirin
 
 **K12 — Serbest/gümrüklü aynı depoda.** Yol haritası M3.8 gereği hukuki doğrulama olmadan etkinleştirilmez: rejim profilindeki (K16) "birlikte bulunabilir" izni ve tesis bayrağı, varsayılan kapalı, `Doğrulanmadı` etiketiyle.
 
-**K13 — Stok hareket defteri.** `StockMovement` yalnızca eklenir: hareket türü (kod **kategoriye** bakar: giriş, çıkış, transfer, rezervasyon, serbest bırakma, düzeltme; tenant bu kategorilere bağlı kendi alt türlerini ve neden kodlarını tanımlar, K18), parti, kaynak/hedef lokasyon, beyanname satırı, miktar ve kilo, `OccurredAt` (UTC), `UserId`, `MembershipId` (bileşik FK), `CorrelationId`, neden kodu, belge referansı, **`IdempotencyKey`** (`UNIQUE(TenantId, Key)`; barkod/terminal tekrarı çift hareket üretmez). Düzeltme güncelleme değil ters kayıttır (`ReversesMovementId`). Bakiye defterden türetilir; eşzamanlı çıkış/rezervasyon `rowversion` ile korunur ve eksi stok politikasını aşamaz; bakiyeyi doğrudan değiştiren uç nokta yoktur. Genel denetim kaydı kayıt boru hattında ayrıca yazılır; hareket defteri alanın kendi kayıt defteridir.
+**K13 — Stok hareket defteri.** `StockMovement` yalnızca eklenir: hareket türü (kod **kategoriye** bakar: giriş, çıkış, transfer, rezervasyon, serbest bırakma, düzeltme; tenant bu kategorilere bağlı kendi alt türlerini ve neden kodlarını tanımlar, K18), parti, kaynak/hedef lokasyon, beyanname satırı, miktar ve kilo, `OccurredAt` (UTC), `UserId`, `MembershipId` (bileşik FK), `CorrelationId`, neden kodu, belge referansı, **`IdempotencyKey`** (`UNIQUE(TenantId, Key)`; barkod/terminal tekrarı çift hareket üretmez). Düzeltme güncelleme değil ters kayıttır (`ReversesMovementId`). Bakiye defterden türetilir; eşzamanlı çıkış/rezervasyon `rowversion` ile korunur ve eksi stok politikasını aşamaz; bakiyeyi doğrudan değiştiren uç nokta yoktur. **Denetim kaydı (karar, 4 Kasım 2026):** hareketler hareket defteri servisinden yazılır; servis aynı transaction'da `IAuditWriter` ve outbox'ı çağırır. `StockMovement` `AuditedEntities`'e girer (`warehouse.stockmovement`). Tek işlemler (elle çıkış, terminal okuması, düzeltme) hareket başına bir `Created` girdisi üretir. Toplu işlemlerde (kabul, Excel içe aktarma, toplu transfer) denetim ayrıntısı bir ayardır: varsayılan **özet** (tek satır; `RecordId` toplu işlem/kabul kaydıdır, `Changes` düz alanlardır: hareket adedi, toplam miktar ve kilo, hedef lokasyon, neden; iç içe liste yazılmaz, çünkü denetim ekranı `{alan: {old, new}}` biçimini bekler ve hassas alan gizleme alan adına bakar; `CorrelationId` özeti defterdeki hareketlere bağlar); isteyen tenant "hareket başına" seçer. Hareket düzeyinde iz her durumda defterdedir. Statü geçişi, `StockHold`, beyanname, ASN kabulü, vekâlet, profil seçimi, ayar ve lokasyon seviyesi değişiklikleri de denetime yazılır. Defter iş gerçeğidir, denetim kaydı "kim, hangi yolla" sorusunu cevaplar; biri ötekinin yerine geçmez.
 
 **K14 — Gümrük statüsü durum makinesidir; makine rejim profilinden gelir.** Statüler (antrepoda, serbest dolaşıma girdi, transit vb.), izinli geçişler ve her geçişin gerektirdiği belge türü koda yazılmaz; `RegimeProfile` (K16) tanımlar. Kod yalnızca statünün **kategorisine** bakar (örn. `under_customs`, `released`, `in_transit`). Geçiş belge gerektirir (ör. çıkış beyannamesi) ve `CustomsStatusTransition` olarak kim/ne zaman/neden/belge ile kaydedilir. Statü sıradan alan düzenlemesiyle, alan kuralıyla veya otomasyon aksiyonuyla değişmez, yalnızca geçiş servisinden değişir (M3.7). Karantina ve gümrük engeli ayrı `StockHold` kaydıdır; engelli mal sevk edilemez (M3.4).
 
 **K15 — Yetki ve kapsam.** İzinler `warehouse.*` ve `warehouse.customs.*` önekiyle; fatura değeri gibi alanlar alan seviyesi yetkiyle korunur. İş ortağı/müşteri portalı kullanıcısı başka maliklerin malını göremez (M3.9). Her varlık için `ICompanyShared`/`ICompanyScoped` seçimi ADR-0008'e göre uygulama diliminde yapılır.
 
-**K16 — Rejim profili (sürümlü paket).** Ülke/rejim/antrepo tipine göre değişen her şey `RegimeProfile` içinde tanımlıdır: rejim kodu, tescil no kuralı (K7), statüler ve izinli geçişler (K14), geçiş başına zorunlu belge türü, süre kuralı (gün, uzatma, uyarı eşiği), teminat gerekliliği, serbest/gümrüklü alan birlikteliği izni (K12), zorunlu beyanname alanları. Profil `platform` şemasında global ve sürümlüdür (taslak → uzman doğrulaması → yayın; ADR-0029 K8 paket kalıbı); tesis bir veya birden çok profil seçer. Tenant uyarlaması yalnızca **sıkılaştırabilir** (uyarıyı engele çevirir, ek zorunlu alan, daha kısa uyarı eşiği); profildeki yasal kuralı kaldıramaz. Yeni rejim veya ülke kod değişikliği olmadan yeni profil sürümüyle gelir. Profil yayını mevcut kayıtları değiştirmez; kayıt, işlendiği sürüme bağlı kalır.
+**K16 — Rejim profili (sürümlü paket).** Ülke/rejim/antrepo tipine göre değişen her şey `RegimeProfile` içinde tanımlıdır: rejim kodu, tescil no kuralı (K7), statüler ve izinli geçişler (K14), geçiş başına zorunlu belge türü, süre kuralı (gün, uzatma, uyarı eşiği), teminat gerekliliği, serbest/gümrüklü alan birlikteliği izni (K12), zorunlu beyanname alanları. Profil `platform` şemasında global ve sürümlüdür (taslak → uzman doğrulaması → yayın; ADR-0029 K8 paket kalıbı); tesis bir veya birden çok profil seçer. Profilin üç modu vardır (karar, 4 Kasım 2026: dinamik): (a) **platform paketi**: yalnızca platform yayınlar, yasal çekirdek budur; (b) **türetilmiş profil**: tenant bir paketi temel alır ve yalnızca sıkılaştırır; (c) **özel profil**: tenant statüleri, geçişleri ve belgeleri sıfırdan yazar; "Doğrulanmamış (tenant tanımlı)" etiketi taşır, resmi rapor taslakları kapalıdır, K17 sabitleri aynen geçerlidir ve yayın için en az bir `under_customs` ve bir `released` kategorili statü gerekir. Türetilmiş profilde tenant uyarlaması yalnızca **sıkılaştırabilir** (uyarıyı engele çevirir, ek zorunlu alan, daha kısa uyarı eşiği); profildeki yasal kuralı kaldıramaz. Yeni rejim veya ülke kod değişikliği olmadan yeni profil sürümüyle gelir. Profil yayını mevcut kayıtları değiştirmez; kayıt, işlendiği sürüme bağlı kalır.
 
 **K17 — Sabit kalanlar (gerekçeli).** Şunlar yapılandırılamaz, çünkü ihlalleri veri bütünlüğünü veya yasal izi bozar: tenant izolasyonu; hareket defterinin yalnızca eklenmesi ve idempotency; bakiyenin defterden türetilmesi; statünün yalnızca geçiş servisinden ve belgeyle değişmesi; sunucu tarafı yetki ve kapsam denetimi; yasal çekirdek alanların (GTİP, brüt/net kilo, menşe, kap cinsi, miktar, tescil no) varlığı ve gizlenememesi; net ≤ brüt değişmezi; gümrük denetimindeki malın serbest alana yerleştirilememesi. Bunlar dışında kalan her seçim tenant'a göre değişebilir ve kodda sabit yazılmaz.
 
-**K18 — Kod kategoriye bakar, ad ve değer tenant'ındır.** Mevcut seçim listesi kalıbı (`ChoiceListDefinition`: kategori + düzenlenebilir değer) kullanılır. Kodun anladığı sabit **kategoriler** küçük tutulur; tenant bu kategorilere bağlı kendi adlarını, sırasını ve etkinliğini yönetir. Kapsam: hareket türü ve neden kodu (kategori: giriş, çıkış, transfer, rezervasyon, serbest bırakma, düzeltme), alan türü (kategori: gümrük denetimli / serbest), karantina ve engel nedenleri, ASN ve kabul durumları, kabul farkı nedenleri (eksik, fazla, hasar). Kategoriye bağlı en az bir etkin değer her zaman kalır.
+**K18 — Kod kategoriye bakar, ad ve değer tenant'ındır.** Mevcut seçim listesi kalıbı (`ChoiceListDefinition`: kategori + düzenlenebilir değer) kullanılır. Kodun anladığı sabit **kategoriler** küçük tutulur; tenant bu kategorilere bağlı kendi adlarını, sırasını ve etkinliğini yönetir. Mevcut mekanizma bir kayıt türünün tek alanına bağlıdır (`ChoiceListDefinition`: `EntityKey` + `Field`); bu yüzden hareket, engel, ASN ve kabul satırı boru hattında kayıt türü olarak tanımlanır. İlk sürüm listeleri (yeni kategori eklemek kod değişikliğidir):
+
+| Liste | Bağlandığı alan | Kodun anladığı kategoriler |
+|---|---|---|
+| Hareket türü | hareketin türü | giriş, çıkış, transfer, rezervasyon, serbest bırakma, düzeltme |
+| Hareket nedeni | hareketin nedeni | kategorisiz |
+| Alan türü | alanın türü | gümrük denetimli, serbest |
+| Engel nedeni | `StockHold` nedeni | karantina, gümrük engeli |
+| ASN durumu | ASN durumu | taslak, gönderildi, kabul edildi, reddedildi |
+| Kabul farkı nedeni | kabul satırı | eksik, fazla, hasar |
+
+Gümrük statüsü seçim listesi değildir, rejim profilinden gelir (K14). Kap cinsi ve menşe lookup'tır (K10). Kategoriye bağlı en az bir etkin değer her zaman kalır.
 
 **K19 — Mevcut dinamik altyapı yeniden kullanılır; ikinci mekanizma yazılmaz.**
 
@@ -91,10 +102,13 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 - Seviye tanımı değişirse mevcut lokasyon kodları bozulabilir; etki raporu ve yalnızca ekleme/yeniden adlandırma kuralı gerekir.
 - Çok esneklik testi zorlaştırır: her profil ve sabit değişmez (K17) için sözleşme testi gerekir.
 - Tek paylaşımlı veritabanında hareket tablosu büyür; dizin ve bölümleme ihtiyacı ölçülmelidir (doğrulanmadı).
+- Denetim tablosu (`core.AuditLog`) tüm tenant'lar için tek tablodur; hareket başına denetim satırı onu hızla büyütür. Toplu işlemde varsayılan özet satırdır (K13). Dizin, toplu yazım ve saklama/arşiv politikası ölçülmedi (doğrulanmadı).
 
 ## 5. Seçenek: SQL Server ledger tablosu
 
 Hareket defteri için SQL Server'ın append-only *ledger table* özelliği kurcalamaya karşı kanıt verebilir. EF Core, RLS ve migration zinciriyle uyumu **bilinmiyor**; karar öncesi kısa bir deneme gerekir. Başarısız olursa `INSTEAD OF UPDATE/DELETE` tetikleyicisi ve ilgili DB izinleriyle append-only zorlanır.
+
+**Zamanlama (öneri):** ADR kabulünden sonra, hareket defteri diliminden (dilim 5) önce bir günlük deneme. ADR yalnızca "append-only veritabanı seviyesinde zorlanır" der; mekanizma denemeye bağlıdır. Bakılacaklar: EF Core, Row-Level Security ve migration zinciriyle uyum; bakiye tablosu güncellenebilir olmalıdır, ledger'a konamaz, ayrı tutulur; ledger tablosunu değiştiren migration kısıtları "geriye uyumlu migration" kuralıyla çakışabilir. Varsayılan plan tetikleyici ve DB izni; ledger ek kanıt katmanıdır.
 
 ## 6. Reddedilen seçenekler
 
@@ -110,15 +124,15 @@ Hareket defteri için SQL Server'ın append-only *ledger table* özelliği kurca
 ## 7. Açık sorular
 
 1. ~~Tek modül mü, iki ayrı proje mi?~~ Karar: tek modül (4 Kasım 2026).
-2. Rejim profilini yalnızca platform yöneticisi mi yayınlar, yoksa tenant kendi profilini sıfırdan da yazabilir mi? (Taslak: yalnızca platform; tenant sıkılaştırır.)
-3. Seçim listesi kategorileri (K18) ilk sürümde hangileriyle başlasın; yeni kategori eklemek kod değişikliği gerektirir.
-4. Müşavir kimliği ilk sürümde kısıtlı kullanıcı olarak kalsın mı, yoksa Ç11/Ç19.8 beklenmeli mi?
-5. Stok kartı ne zaman Core ürün tanımına bağlanacak?
-6. Ledger tablosu denemesi bu ADR'den önce mi, sonra mı yapılsın?
+2. ~~Rejim profilini kim yayınlar?~~ Karar: dinamik; platform paketi, türetilmiş ve özel profil (K16).
+3. ~~Seçim listesi kategorileri.~~ Karar: altı liste (K18).
+4. ~~Müşavir kimliği.~~ Karar (taslak): kanal modeli; ilk sürümde kısıtlı kullanıcı + içeri alma, API/portal sonra (K5).
+5. ~~Stok kartı ↔ Core ürün.~~ Öneri: kart Warehouse'ta başlar, boş bırakılabilir `CoreProductId` taşır. GTİP, kap, parti ve SKT takibi kartta kalır (sektör mantığı Core'a sızmaz). Core'a yalnızca ad, kod, birim ve kategoriyi içeren ortak ürün, ikinci bir modül (Siparişler, CRM teklif kalemi) aynı ürüne ihtiyaç duyunca çıkar; eşleme kod + birimle yapılır. `Core.Contracts`'ta ürün tanımı bulunamadı (yalnızca `UnitConversion`, `AcceptedQuote`); Siparişler modülünün kalem yapısı incelenmedi.
+6. ~~Ledger denemesi zamanı.~~ Öneri: ADR'den sonra, dilim 5'ten önce (bölüm 5).
 
 ## 8. Test beklentileri (özet)
 
-Tenant izolasyonu: A tenant'ı B'nin beyanname/parti/hareketini göremez. Yetki: yetkisiz kullanıcı statü geçişi yapamaz; müşavir vekâlet dışı ithalatçının verisini göremez ve stok hareketi yaratamaz. Doğrulama: net>brüt, yinelenen tescil no, alan türü ihlali reddedilir. Eşzamanlılık: iki eşzamanlı çıkış bakiyeyi eksiye düşüremez. Idempotency: aynı anahtarla tekrar çift hareket üretmez. Dinamiklik: iki tenant farklı lokasyon seviyesi, hareket türü adı ve politikayla çalışır ve birbirinin ayarını görmez; tenant uyarlaması profildeki yasal kuralı gevşetemez; yasal çekirdek alan form düzeninden gizlenemez; profil yayını mevcut kaydın statü geçişini geriye dönük değiştirmez; kapalı `warehouse.customs` uzantılı tenant'ta gümrük alanları zorunlu değildir.
+Tenant izolasyonu: A tenant'ı B'nin beyanname/parti/hareketini göremez. Yetki: yetkisiz kullanıcı statü geçişi yapamaz; müşavir vekâlet dışı ithalatçının verisini göremez ve stok hareketi yaratamaz. Doğrulama: net>brüt, yinelenen tescil no, alan türü ihlali reddedilir. Eşzamanlılık: iki eşzamanlı çıkış bakiyeyi eksiye düşüremez. Idempotency: aynı anahtarla tekrar çift hareket üretmez. Denetim: her hareket (veya toplu işlem özeti) aynı transaction'da denetim girdisi üretir; özet satırında hassas alan sızmaz; işlem geri alınırsa denetim girdisi de kalmaz. Dinamiklik: iki tenant farklı lokasyon seviyesi, hareket türü adı ve politikayla çalışır ve birbirinin ayarını görmez; tenant uyarlaması profildeki yasal kuralı gevşetemez; yasal çekirdek alan form düzeninden gizlenemez; profil yayını mevcut kaydın statü geçişini geriye dönük değiştirmez; kapalı `warehouse.customs` uzantılı tenant'ta gümrük alanları zorunlu değildir.
 
 ## 9. Doğrulanmadı
 
@@ -127,5 +141,7 @@ Tenant izolasyonu: A tenant'ı B'nin beyanname/parti/hareketini göremez. Yetki:
 - Evrim, Solon vb. yazılımların gerçek API'leri.
 - Ticaret Bakanlığı'nın GTİP için makine okunur servisi.
 - Pilot (Makaroğlu) akışı: ASN'yi kimin açtığı, kısmi çıkış, ardiye hesabı.
-- Mevcut denetim kaydı tablosunun hareket izi ihtiyacına uygunluğu okunmadı.
+- Denetim kaydı yapısı okundu (`core.AuditLog`: kullanıcı, kayıt türü ve kimliği, işlem, alan farkı JSON, kaynak, `CorrelationId`; RLS ile değiştirilemez), hareket izi için uygun görünüyor; yük altında, dizin ve toplu yazım açısından ölçülmedi.
+- **Yapılacak (uzmanla teyit):** gümrük denetiminin toplu işlemlerde hareket düzeyinde ayrı denetim satırı isteyip istemediği. Teyide kadar varsayılan özet satırdır ve tenant "hareket başına"yı seçebilir (K13).
+- Kanal önceliği (müşavir ASN'yi kim, hangi yolla açıyor): pilot akışıyla teyit gerekir.
 - Hiçbir kod veya test çalıştırılmadı.
