@@ -36,6 +36,11 @@ public sealed record SelectionPreviewDto(List<Guid> ContextNodeIds, List<string>
 
 public sealed record TenantActivitySelectionResponse(List<Guid> SelectedNodeIds, SelectionPreviewDto Preview);
 
+/// <summary>Firma ilişki rolü kataloğu öğesi (müşteri, tedarikçi, taşıyıcı...); firma kaydı rolü koduyla tutar.</summary>
+public sealed record RelationshipRoleDto(Guid Id, string Code, string Name, bool IsActive);
+
+public sealed record CreateRelationshipRoleRequest(string Code, string Name);
+
 public sealed record StarterPackageDto(string Code, string Name, string? Description, bool Verified, string? VerificationNote, int NodeCount, int CapabilityCount);
 
 public sealed record StarterPackagePlanDto(

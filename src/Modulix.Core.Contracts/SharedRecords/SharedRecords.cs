@@ -70,6 +70,9 @@ public sealed class Party : SharedEntity
     public const int CityMaxLength = 100;
     public const int AddressMaxLength = 500;
 
+    /// <summary>İlişki rolü, müşteri sektörü ve hizmet ihtiyacı sütunlarının uzunluğu (en çok 20 kod × 51 karakter).</summary>
+    public const int CodeListMaxLength = 1020;
+
     public PartyKind Kind { get; set; } = PartyKind.Organization;
 
     /// <summary>Ünvan.</summary>
@@ -89,6 +92,15 @@ public sealed class Party : SharedEntity
     public string? City { get; set; }
 
     public string? Address { get; set; }
+
+    /// <summary>Ticari ilişki rolleri (katalog kodları, virgülle; ADR-0029 K9). Bir taraf aynı anda müşteri ve tedarikçi olabilir.</summary>
+    public string? RelationshipRoles { get; set; }
+
+    /// <summary>Tarafın (müşteri olarak) sektörü: faaliyet ağacından düğüm kodları, virgülle. <c>Industry</c> serbest metni korunur.</summary>
+    public string? CustomerSectors { get; set; }
+
+    /// <summary>Tarafın aldığı/ihtiyaç duyduğu hizmetler: faaliyet ağacından düğüm kodları, virgülle. Rolden bağımsızdır.</summary>
+    public string? ServiceNeeds { get; set; }
 }
 
 /// <summary>

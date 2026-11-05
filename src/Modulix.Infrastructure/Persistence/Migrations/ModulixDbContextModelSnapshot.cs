@@ -812,6 +812,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("CustomerSectors")
+                        .HasMaxLength(1020)
+                        .HasColumnType("nvarchar(1020)");
+
                     b.Property<string>("Email")
                         .HasMaxLength(254)
                         .HasColumnType("nvarchar(254)");
@@ -829,6 +833,14 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("RelationshipRoles")
+                        .HasMaxLength(1020)
+                        .HasColumnType("nvarchar(1020)");
+
+                    b.Property<string>("ServiceNeeds")
+                        .HasMaxLength(1020)
+                        .HasColumnType("nvarchar(1020)");
 
                     b.Property<string>("TaxNumber")
                         .HasMaxLength(20)
@@ -2190,6 +2202,32 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("DependsOnId");
 
                     b.ToTable("CapabilityDependencies", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Sectors.RelationshipRole", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("RelationshipRoles", "platform");
                 });
 
             modelBuilder.Entity("Modulix.Core.Sectors.TenantActivitySelection", b =>

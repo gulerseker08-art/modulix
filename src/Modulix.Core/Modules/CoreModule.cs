@@ -461,6 +461,7 @@ public sealed class CoreModule : IModule
         {
             ["kind"] = "Tür", ["name"] = "Ünvan", ["taxOffice"] = "Vergi dairesi", ["taxNumber"] = "Vergi no", ["phone"] = "Telefon",
             ["email"] = "E-posta", ["website"] = "Web sitesi", ["city"] = "Şehir", ["address"] = "Adres",
+            ["relationshipRoles"] = "İlişki rolleri", ["customerSectors"] = "Müşteri sektörü", ["serviceNeeds"] = "Hizmet ihtiyacı",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>

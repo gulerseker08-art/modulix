@@ -135,6 +135,7 @@ public static class PersistenceSetup
         services.AddScoped<ISectorProfileService, SectorProfileService>();
         services.AddScoped<ISectorCatalog, SectorCatalogService>();
         services.AddScoped<IStarterPackages, StarterPackageInstaller>();
+        services.AddScoped<IRelationshipRoles, RelationshipRoleService>();
         services.AddScoped<ITenantActivitySelection, TenantActivitySelectionService>();
         services.AddScoped<IRulePackageService, RulePackageService>();
         services.AddScoped<ITenantFieldRules, TenantFieldRulesService>();

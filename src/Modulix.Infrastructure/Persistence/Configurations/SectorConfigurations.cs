@@ -59,6 +59,20 @@ internal sealed class ActivityNodeCapabilityConfiguration : IEntityTypeConfigura
     }
 }
 
+internal sealed class RelationshipRoleConfiguration : IEntityTypeConfiguration<RelationshipRole>
+{
+    public void Configure(EntityTypeBuilder<RelationshipRole> builder)
+    {
+        // Platform kataloğu (ADR-0029 K9): TenantId taşımaz, RLS dışıdır.
+        builder.ToTable("RelationshipRoles", DatabaseSchemas.Platform);
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).ValueGeneratedNever();
+        builder.Property(r => r.Code).HasMaxLength(ActivityTreeRules.CodeMaxLength).IsRequired();
+        builder.Property(r => r.Name).HasMaxLength(ActivityTreeRules.NameMaxLength).IsRequired();
+        builder.HasIndex(r => r.Code).IsUnique();
+    }
+}
+
 internal sealed class TenantActivitySelectionConfiguration : IEntityTypeConfiguration<TenantActivitySelection>
 {
     public void Configure(EntityTypeBuilder<TenantActivitySelection> builder)

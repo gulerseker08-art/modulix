@@ -37,6 +37,9 @@ internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
         builder.Property(p => p.Website).HasMaxLength(Party.WebsiteMaxLength);
         builder.Property(p => p.City).HasMaxLength(Party.CityMaxLength);
         builder.Property(p => p.Address).HasMaxLength(Party.AddressMaxLength);
+        builder.Property(p => p.RelationshipRoles).HasMaxLength(Party.CodeListMaxLength);
+        builder.Property(p => p.CustomerSectors).HasMaxLength(Party.CodeListMaxLength);
+        builder.Property(p => p.ServiceNeeds).HasMaxLength(Party.CodeListMaxLength);
         builder.HasIndex(p => new { p.TenantId, p.Name });
 
         // Vergi numarası tenant içinde tekildir; boş bırakılan kayıtlar bu kurala girmez (SQL Server filtreli indeks üretir).

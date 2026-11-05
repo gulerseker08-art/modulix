@@ -7,6 +7,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
+using Modulix.Core.Sectors;
 using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.Infrastructure.Records;
@@ -340,6 +341,9 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
         SharedField.Text<Party>("website", Party.WebsiteMaxLength, p => p.Website, (p, v) => p.Website = v),
         SharedField.Text<Party>("city", Party.CityMaxLength, p => p.City, (p, v) => p.City = v),
         SharedField.Text<Party>("address", Party.AddressMaxLength, p => p.Address, (p, v) => p.Address = v),
+        SharedField.CodeList<Party>("relationshipRoles", p => p.RelationshipRoles, (p, v) => p.RelationshipRoles = v),
+        SharedField.CodeList<Party>("customerSectors", p => p.CustomerSectors, (p, v) => p.CustomerSectors = v),
+        SharedField.CodeList<Party>("serviceNeeds", p => p.ServiceNeeds, (p, v) => p.ServiceNeeds = v),
     ];
 
     /// <summary>"taxNumber": aynı numaralı taraf (oluşturmadan önce mevcut kaydı bulmak için).</summary>
@@ -360,6 +364,30 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
 
     protected override async Task CheckAsync(Party entity, CancellationToken cancellationToken)
     {
+        // İlişki rolü ve faaliyet kodları katalogda bulunmalı (pasife alınmış kod kayıtta kalabilir, yeni bilinmeyen kod girilemez).
+        var unknown = new List<RecordFieldError>();
+        var roles = PartyRelationshipRules.Split(entity.RelationshipRoles);
+        if (roles.Count > 0)
+        {
+            var known = await Db.RelationshipRoles.AsNoTracking().Where(r => roles.Contains(r.Code)).Select(r => r.Code).ToListAsync(cancellationToken);
+            AddUnknown(unknown, "relationshipRoles", roles, known, "Katalogda olmayan ilişki rolü");
+        }
+
+        foreach (var (field, stored) in new[] { ("customerSectors", entity.CustomerSectors), ("serviceNeeds", entity.ServiceNeeds) })
+        {
+            var codes = PartyRelationshipRules.Split(stored);
+            if (codes.Count > 0)
+            {
+                var known = await Db.ActivityNodes.AsNoTracking().Where(n => codes.Contains(n.Code)).Select(n => n.Code).ToListAsync(cancellationToken);
+                AddUnknown(unknown, field, codes, known, "Katalogda olmayan faaliyet");
+            }
+        }
+
+        if (unknown.Count > 0)
+        {
+            throw new RecordValidationException(unknown);
+        }
+
         if (entity.TaxNumber is { } number
             && await Set.AnyAsync(p => p.TaxNumber == number && p.Id != entity.Id, cancellationToken))
         {
@@ -369,7 +397,16 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
         }
     }
 
-    internal const string TaxNumberTaken = "Bu vergi numarasıyla kayıtlı bir firma var.";
+    private static void AddUnknown(List<RecordFieldError> errors, string field, IReadOnlyList<string> wanted, IReadOnlyCollection<string> known, string message)
+    {
+        var missing = wanted.Except(known, StringComparer.Ordinal).ToList();
+        if (missing.Count > 0)
+        {
+            errors.Add(new RecordFieldError(field, $"{message}: {string.Join(", ", missing)}."));
+        }
+    }
+
+    internal const string TaxNumberTaken ="Bu vergi numarasıyla kayıtlı bir firma var.";
 
     /// <summary>Gizleme açıksa kaydı göremeyen kişiye ne yapacağını söyler; kaydın görünür olup olmadığı belli edilmez.</summary>
     private async Task<string> TaxNumberTakenMessageAsync(CancellationToken cancellationToken) =>
@@ -470,6 +507,22 @@ internal static class SharedField
 {
     public static SharedField<T> Text<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set, bool required = false) =>
         new(name, required, node => ParseText(node, maxLength), e => get(e), (e, v) => set(e, (string?)v));
+
+    /// <summary>Kod listesi (JSON metin dizisi): tekrarsız, sıralı, tek sütunda virgülle saklanır (<see cref="PartyRelationshipRules"/>).</summary>
+    public static SharedField<T> CodeList<T>(string name, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false,
+            node =>
+            {
+                if (node is not JsonArray array || array.Any(i => i is not JsonValue v || v.GetValueKind() != JsonValueKind.String))
+                {
+                    return (null, "Metin listesi bekleniyor.");
+                }
+
+                var (codes, error) = PartyRelationshipRules.Normalize(array.Select(i => i!.GetValue<string>()));
+                return error is null ? (PartyRelationshipRules.Join(codes), null) : (null, error);
+            },
+            e => new JsonArray([.. PartyRelationshipRules.Split(get(e)).Select(c => (JsonNode?)JsonValue.Create(c))]),
+            (e, v) => set(e, (string?)v));
 
     public static SharedField<T> Email<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set) =>
         new(name, required: false, node =>
