@@ -77,6 +77,8 @@ public partial class EndpointProtectionTests(ModulixApiFactory factory) : IClass
         "GET /api/choice-lists/",    // seçim listeleri (Y9b): aynı gerekçe
         "GET /api/lookups/",         // lookup ayarları (ADR-0016): formlar davranışı öğrenir; veri değil ayar döner
         "GET /api/form-layouts/",    // form düzenleri (ADR-0021): formlar yerleşimi öğrenir; veri değil düzen döner
+        "GET /api/relationship-roles/", // ilişki rolü kataloğu (ADR-0029 K9): ürün standardı, tenant verisi değil
+        "GET /api/activity-options/",   // aktif faaliyet ağacı (ADR-0029): yalnızca kod/ad/üst kod; firma formu seçeneği
     ];
 
     [Fact]
