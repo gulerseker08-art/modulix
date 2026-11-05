@@ -378,8 +378,16 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
             var codes = PartyRelationshipRules.Split(stored);
             if (codes.Count > 0)
             {
-                var known = await Db.ActivityNodes.AsNoTracking().Where(n => codes.Contains(n.Code)).Select(n => n.Code).ToListAsync(cancellationToken);
-                AddUnknown(unknown, field, codes, known, "Katalogda olmayan faaliyet");
+                var nodes = await Db.ActivityNodes.AsNoTracking().Where(n => codes.Contains(n.Code)).Select(n => new { n.Code, n.Kind }).ToListAsync(cancellationToken);
+                AddUnknown(unknown, field, codes, nodes.Select(n => n.Code).ToList(), "Katalogda olmayan faaliyet");
+
+                // Hizmet ihtiyacı alınan/verilen bir hizmettir: sektör ya da grup değil, yalnızca faaliyet düğümü seçilir.
+                // Müşteri sektörü her düzeyden olabilir (geniş "Lojistik" de, dar bir faaliyet de).
+                var notActivities = field == "serviceNeeds" ? nodes.Where(n => n.Kind != ActivityNodeKind.Activity).Select(n => n.Code).Order().ToList() : [];
+                if (notActivities.Count > 0)
+                {
+                    unknown.Add(new RecordFieldError(field, $"Hizmet ihtiyacı için sektör veya grup değil, faaliyet seçilmeli: {string.Join(", ", notActivities)}."));
+                }
             }
         }
 

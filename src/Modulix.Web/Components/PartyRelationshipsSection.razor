@@ -50,8 +50,8 @@
 
                 <fieldset class="mt-3">
                     <legend class="form-label">Hizmet ihtiyacı</legend>
-                    <p class="text-muted">Firmanın sizden aldığı ya da almak istediği hizmetler; ilişki rolünden bağımsızdır.</p>
-                    @ActivityList(needs)
+                    <p class="text-muted">Firmanın sizden aldığı ya da almak istediği hizmetler (yalnızca faaliyet seçilir); ilişki rolünden bağımsızdır.</p>
+                    @ActivityList(needs, activitiesOnly: true)
                     <FieldError Field="serviceNeeds" Errors="errors" />
                 </fieldset>
 
@@ -199,15 +199,15 @@
     private string ActivityName(string code) => activities.FirstOrDefault(a => a.Code == code)?.Name ?? code;
 
     /// <summary>Faaliyet ağacı; girinti derinliği gösterir. Kayıtta kalmış ama pasifleşmiş kodlar sonda "(pasif)" ile görünür.</summary>
-    private RenderFragment ActivityList(SortedSet<string> selected) => __builder =>
+    private RenderFragment ActivityList(SortedSet<string> selected, bool activitiesOnly = false) => __builder =>
     {
-        <div class="check-list activity-choices">
+        <div class="activity-choices">
             @foreach (var item in ActivityChoicesFor(selected))
             {
-                <label class="form-check">
-                    <input class="form-check-input" type="checkbox" checked="@selected.Contains(item.Code)" @onchange="e => Toggle(selected, item.Code, (bool)e.Value!)" />
-                    <span class="form-check-label">@(item.Depth > 0 ? string.Concat(Enumerable.Repeat("– ", item.Depth)) : null)@item.Name@(item.Active ? null : " (pasif)")</span>
-                </label>
+                <div class="form-check">
+                    <input id="@($"opt-{selected.GetHashCode()}-{item.Code}")" class="form-check-input" type="checkbox" checked="@selected.Contains(item.Code)" disabled="@(activitiesOnly && item.Active && item.Kind != "Activity")" @onchange="e => Toggle(selected, item.Code, (bool)e.Value!)" />
+                    <label class="form-check-label" for="@($"opt-{selected.GetHashCode()}-{item.Code}")">@(item.Depth > 0 ? string.Concat(Enumerable.Repeat("– ", item.Depth)) : null)@item.Name@(item.Active ? null : " (pasif)")</label>
+                </div>
             }
         </div>
     };

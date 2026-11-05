@@ -8,6 +8,7 @@ using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Infrastructure.Identity;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Crm;
 using Modulix.Shared.Records;
 using Modulix.Shared.Sectors;
 using static Modulix.Modules.Crm.CrmModule.Permissions;
@@ -152,6 +153,72 @@ public class PartyRelationshipTests(ModulixApiFactory factory) : IClassFixture<M
         Assert.False((await off.Content.ReadFromJsonAsync<RelationshipRoleDto>())!.IsActive);
         Assert.Equal([code], Strings((await adminClient.GetFromJsonAsync<RecordResponse>($"{Parties}/{withNew.Id}"))!.Values, "relationshipRoles"));
         Assert.Equal(HttpStatusCode.NotFound, (await platform.PutAsJsonAsync("/api/platform/sectors/relationship-roles/yok/active", new SetActiveRequest(true))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Service_need_accepts_only_activities_while_customer_sector_accepts_any_level()
+    {
+        using var platform = await LoginAsync(await CreatePlatformAdministratorAsync());
+        await platform.PostAsJsonAsync("/api/platform/sectors/starter-packages/logistics/install", new { });
+        var (_, admin) = await CreateTenantAdminAsync();
+        using var client = await LoginAsync(admin);
+
+        // Sektör ve grup hizmet ihtiyacı olamaz (doğrulama hatası, yazılmaz); müşteri sektörü olarak ikisi de olur.
+        var rejected = await client.PostAsJsonAsync(Parties, new RecordWriteRequest(new JsonObject
+        {
+            ["name"] = "Kısıt Firması", ["serviceNeeds"] = new JsonArray("lojistik", "depolama", "serbest-depolama"),
+        }));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, rejected.StatusCode);
+        var message = (await rejected.Content.ReadFromJsonAsync<ValidationProblemDetails>())!.Errors["serviceNeeds"][0];
+        Assert.Contains("depolama", message);
+        Assert.Contains("lojistik", message);
+        Assert.DoesNotContain("serbest-depolama", message);
+
+        var ok = await PostPartyAsync(client, new JsonObject
+        {
+            ["name"] = "Kısıt Firması", ["customerSectors"] = new JsonArray("lojistik", "depolama", "serbest-depolama"), ["serviceNeeds"] = new JsonArray("serbest-depolama"),
+        });
+        Assert.Equal(["depolama", "lojistik", "serbest-depolama"], Strings(ok.Values, "customerSectors"));
+    }
+
+    [Fact]
+    public async Task Company_list_filters_by_role_sector_and_need_within_the_tenant_and_ignores_malformed_codes()
+    {
+        using var platform = await LoginAsync(await CreatePlatformAdministratorAsync());
+        await platform.PostAsJsonAsync("/api/platform/sectors/starter-packages/logistics/install", new { });
+        var (_, adminA) = await CreateTenantAdminAsync();
+        var (_, adminB) = await CreateTenantAdminAsync();
+        using var clientA = await LoginAsync(adminA);
+        using var clientB = await LoginAsync(adminB);
+
+        async Task<string> CompanyAsync(HttpClient client, string name, JsonObject values)
+        {
+            values["name"] = name;
+            var party = await PostPartyAsync(client, values);
+            var created = await client.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest(name, PartyId: party.Id));
+            Assert.True(created.StatusCode == HttpStatusCode.Created, await created.Content.ReadAsStringAsync());
+            return name;
+        }
+
+        async Task<string[]> NamesAsync(HttpClient client, string query) =>
+            [.. (await client.GetFromJsonAsync<CrmPage<CompanyDto>>($"/api/crm/companies?pageSize=100&{query}"))!.Items.Select(c => c.Name).Order()];
+
+        var carrier = await CompanyAsync(clientA, "Filtre Taşıyıcı", new JsonObject { ["relationshipRoles"] = new JsonArray("tasiyici", "musteri"), ["customerSectors"] = new JsonArray("lojistik") });
+        var supplier = await CompanyAsync(clientA, "Filtre Tedarikçi", new JsonObject { ["relationshipRoles"] = new JsonArray("tedarikci"), ["serviceNeeds"] = new JsonArray("gumruklu-antrepo") });
+        await CompanyAsync(clientB, "Filtre Başka Tenant", new JsonObject { ["relationshipRoles"] = new JsonArray("tasiyici"), ["serviceNeeds"] = new JsonArray("gumruklu-antrepo") });
+
+        Assert.Equal([carrier], await NamesAsync(clientA, "relationshipRole=tasiyici"));
+        Assert.Equal([supplier], await NamesAsync(clientA, "relationshipRole=tedarikci"));
+        Assert.Equal([carrier], await NamesAsync(clientA, "customerSector=lojistik"));
+        Assert.Equal([supplier], await NamesAsync(clientA, "serviceNeed=gumruklu-antrepo"));
+        Assert.Empty(await NamesAsync(clientA, "relationshipRole=tasi"));
+        Assert.Equal([carrier], await NamesAsync(clientA, "relationshipRole=tasiyici&customerSector=lojistik"));
+        Assert.Empty(await NamesAsync(clientA, "relationshipRole=tasiyici&serviceNeed=gumruklu-antrepo"));
+
+        // Biçimsiz kod geçersiz süzgeçtir (diğer süzgeçler gibi 422); başka tenant'ın firması hiçbir süzgeçte görünmez.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await clientA.GetAsync("/api/crm/companies?relationshipRole=B%C3%BCy%C3%BCk")).StatusCode);
+        Assert.DoesNotContain("Filtre Başka Tenant", await NamesAsync(clientA, "search=Filtre"));
+        Assert.Equal(["Filtre Başka Tenant"], await NamesAsync(clientB, "relationshipRole=tasiyici"));
     }
 
     [Fact]
