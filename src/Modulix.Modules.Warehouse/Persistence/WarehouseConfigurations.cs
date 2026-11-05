@@ -64,6 +64,32 @@ internal sealed class LocationLevelConfiguration : IEntityTypeConfiguration<Loca
     }
 }
 
+internal sealed class LocationConfiguration : IEntityTypeConfiguration<Location>
+{
+    public void Configure(EntityTypeBuilder<Location> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "Locations");
+        builder.Property(l => l.Value).HasMaxLength(Location.ValueMaxLength).IsRequired();
+        builder.Property(l => l.Code).HasMaxLength(Location.CodeMaxLength).IsRequired();
+        builder.Property(l => l.Path).HasMaxLength(Location.PathMaxLength).IsRequired();
+        builder.Property(l => l.Name).HasMaxLength(Location.NameMaxLength);
+        builder.Property(l => l.IsActive).HasDefaultValue(true);
+
+        // Kod tesis içinde benzersizdir (kardeşler arası benzersizlik de buradan gelir).
+        builder.HasIndex(l => new { l.TenantId, l.FacilityId, l.Code }).IsUnique().HasDatabaseName("UX_Locations_Code");
+        builder.HasIndex(l => new { l.TenantId, l.FacilityId, l.ParentId });
+        builder.HasIndex(l => new { l.TenantId, l.ZoneId });
+
+        // Tesis, üst düğüm ve alan aynı tenant'ta olmalıdır; alt düğümü, alanı ya da seviyesi olan kayıt silinemez.
+        builder.HasOne<Facility>().WithMany().HasForeignKey(l => new { l.TenantId, l.FacilityId })
+            .HasPrincipalKey(f => new { f.TenantId, f.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Location>().WithMany().HasForeignKey(l => new { l.TenantId, l.ParentId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Zone>().WithMany().HasForeignKey(l => new { l.TenantId, l.ZoneId })
+            .HasPrincipalKey(z => new { z.TenantId, z.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class ZoneConfiguration : IEntityTypeConfiguration<Zone>
 {
     public void Configure(EntityTypeBuilder<Zone> builder)

@@ -207,7 +207,7 @@ internal abstract class WarehouseRecordStore<TEntity>(WarehouseStoreContext cont
             }
 
             var field = FieldsByName[name];
-            if (field.IsOmitted(node))
+            if (field.IsOmitted(node) || field.SystemOnly)
             {
                 continue;
             }
