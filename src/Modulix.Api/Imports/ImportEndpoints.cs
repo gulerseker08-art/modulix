@@ -9,7 +9,7 @@ using Modulix.Shared.Imports;
 namespace Modulix.Api.Imports;
 
 /// <summary>
-/// İçe aktarma günlüğü (ADR-0030, Dilim 1): /api/imports. Yalnızca okuma. <c>core.imports.read</c> sahibi firmanın bütün
+/// İçe aktarma günlüğü (ADR-0033, Dilim 1): /api/imports. Yalnızca okuma. <c>core.imports.read</c> sahibi firmanın bütün
 /// içe aktarmalarını, yalnızca <c>core.imports.run</c> sahibi kendi içe aktarmalarını görür; başkasının koşusu "bulunamadı"
 /// döner. Tenant oturumdan belirlenir. Satır hatası ham hücre değeri içermez.
 /// </summary>

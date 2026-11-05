@@ -1,6 +1,6 @@
 namespace Modulix.Shared.Imports;
 
-// İçe aktarma günlüğü (ADR-0030, Dilim 1). Satır değeri içermez; yalnızca iş özeti ve satır hatası (satır no, sütun, kod, ileti).
+// İçe aktarma günlüğü (ADR-0033, Dilim 1). Satır değeri içermez; yalnızca iş özeti ve satır hatası (satır no, sütun, kod, ileti).
 public sealed record ImportRunDto(
     Guid Id,
     Guid UserId,
