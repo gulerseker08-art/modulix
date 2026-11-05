@@ -190,7 +190,8 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 2a | Olay yolu (`core.automation` aboneliği), `AutomationRuns/Steps`, tekilleştirme, kira, retry, kuralın kimliği, acil durdurma, tenant limitleri, elle çalıştırma, çalışma geçmişi API'si | Uygulandı (aşağıda "Dilim 2a") |
 | 2b-1 | Tarama tabanlı tetikleyiciler (`Scheduled`, `DateRelative`, `Inactivity`), `AutomationScanCursors`, `IAutomationRecordSource` | Uygulandı (aşağıda "Dilim 2b-1") |
 | 2b-2 | İş olayı tetikleyicisi (`DomainEvent`), çalışma/adım saklama temizliği | Sonra |
-| 3 | CRM yetenek beyanı ve aksiyonları, ilk şablonlar (pasif), demo | Sonra |
+| 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
+| 3b | İlk şablonlar (pasif), demo | Sonra |
 | 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Sonra |
 | 5 | Blazor ekranları | Sonra |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
@@ -305,8 +306,8 @@ CI (GitHub Actions) bu dilim için çalışmadı: hesap faturalandırma/harcama 
 ### Kalan işler (Dilim 2a sonrası)
 
 - Dilim 2b: tarama tabanlı tetikleyiciler, `AutomationScanCursors`, `IAutomationRecordSource`, iş olayı tetikleyicisi, çalışma saklama temizliği.
-- Hâlâ gerçek bir modülde aksiyon yoktur (CRM, Dilim 3); canlı uygulamada yayınlanabilir kural bulunmadığı için yürütme yalnızca testlerde uçtan uca görülmüştür.
-- `IFollowUpActivities` idempotency anahtarı (Dilim 3), özel alan olay farkı biçiminin gerçek outbox yüküyle doğrulanması hâlâ açıktır.
+- (Dilim 3a ile kapandı: CRM aksiyon, kayıt kaynağı ve ilişki beyan eder; gerçek veritabanı testleri CI'da doğrulanır.)
+- `IFollowUpActivities` idempotency anahtarı Dilim 3a ile eklendi; özel alan olay farkı biçiminin (`custom.<anahtar>`) gerçek outbox yüküyle doğrulanması hâlâ açıktır.
 
 ### Dilim 2b-1 (4 Kasım 2026)
 
@@ -336,3 +337,28 @@ Tasarımdan ayrılan / netleşen noktalar:
 
 Çıkan ders: üç otomasyon test sınıfı süreç genelindeki `AutomationProbe` durumunu (davranış, gecikme) paylaşır; sınıflar paralel koşunca yeniden deneme testleri kararsız düşüyordu. Üçü tek bir sıralı xUnit koleksiyonuna alındı (`AutomationTestCollection`). `TableInventoryTests` yerel veritabanında başka dalların tabloları (`platform.LicensePolicies` vb.) yüzünden düşer; CI temiz veritabanında doğrulanmalı.
 
+
+### Dilim 3a: CRM yetenek beyanı (5 Kasım 2026)
+
+Dilim 3'ün ilk parçası: CRM kural altyapısına gerçek bir modül olarak katıldı. **Pasif başlangıç şablonları ve demo 3b'ye bırakıldı** (şablon altyapısı yok; şablon motoru Dilim 4'tür, burada yalnızca metadata şablonları olurdu ve ayrı bir tasarım kararı ister).
+
+- **Beyan** (`Modulix.Modules.Crm/Automation/CrmAutomation.cs`): kayıt türleri `crm.lead` ve `crm.opportunity` (okuma izinleri kural yazma izni gibi davranır), dört olay (oluşturuldu / güncellendi), alanlar, iki "Aktiviteler" ilişkisi, kayıt kaynağı ve `crm.follow-up.create` aksiyonu. `IModule.Automation` ile kaydolur; katalog açılışta doğrular.
+- **Hassas alanlar:** `amount` ve `probability` hem `SensitiveFields` hem `AutomationFieldDefinition.ReadPermission` olarak `crm.opportunity-amounts.read` taşır (Dilim 2 notunun karşılığı); birim/entegrasyon testi iki beyanın uyumunu denetler.
+- **Kayıt kaynağı** (`CrmAutomationRecordSource`, `Records/` altında: mimari kural `IModuleData`'yı yalnızca `Records` klasörüne izin verir): yalnızca kayıt kimliği döndürür; zamanlanmış ve hareketsizlik taramaları açık kayıtlarla sınırlıdır (kapanmış kayıtlar için günlük `NotMatched` satırı yazmamak için), tarihe bağlı tarama durumdan bağımsızdır. Tarih sütunlarının tek kaynağı `CrmAutomation.*DateColumns` tablosudur; beyanla ayrışmaz (birim test).
+- **İlişki çözümleyici** (`CrmActivityRelationResolver`): doğrudan sütun ve `ActivityLink` ile bağlı aktiviteleri tek sorguyla sayar, özel aktiviteleri saymaz. `Where` (bugün yalnızca aktivite durumu) durum kümesine çevrilir: VE kesişim, VEYA birleşim.
+- **İdempotency (Dilim 2 notunun kapanışı):** `FollowUpRequest.IdempotencyKey` (isteğe bağlı, geriye uyumlu) ve `FollowUpResult.AlreadyExisted`. Yeni tablo ya da migration **gerekmedi**: aktivitede zaten `(TenantId, ExternalSource, ExternalId)` filtreli benzersiz indeksi vardı; anahtar `externalSource = "automation"` ile yazılır. Sistem alanları iç çağrı için iş akışı kapısı açılarak yazılır. Eşzamanlı iki çağrıdan kaybeden, kazananın aktivitesini bulur.
+
+Tasarımdan ayrılan / netleşen noktalar:
+
+- **Atanan kullanıcı parametresine alan bağlanamaz** (`AllowFieldBinding = false`): doğrulayıcı lookup alanını parametreyle aynı lookup anahtarında ister; müşteri adayı ve fırsatın sorumlu alanları farklı anahtarlara sahip. Varsayılan zaten kaydın sorumlusudur (işleyici bunu kayıt boru hattından okur), bu yüzden bağlamaya gerek kalmadı. Core doğrulayıcısı değiştirilmedi.
+- **Gün sayısı sınırı yayında değil çalışmada denetlenir:** parametre şemasında aralık yok; `dueInDays` 0-365 dışındaysa adım kalıcı hata verir ve neden yazılır. Şemaya aralık eklemek Core değişikliğidir, sonraya bırakıldı.
+- **Doğrulama dersi:** katalog beyanı açılışta doğruladığı için hatalı bir beyan uygulamayı hiç açtırmaz. İlk denemede lookup parametresi lookup anahtarsız beyan edildiği için bütün entegrasyon testleri `InvalidOperationException` ile düştü. Bu yüzden gerçek katalogla beyanı kuran bir test eklendi (`CrmAutomationDeclarationTests`, veritabanı gerektirmez).
+
+### Test sonuçları (Dilim 3a)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Crm.Tests` | 280 başarılı (aksiyon doğrulaması, dry-run, tarih sütunu / beyan tutarlılığı dahil) |
+| `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationDeclarationTests` | 3 başarılı (gerçek katalog, hassas alan izinleri, aksiyon tanımı) |
+| `dotnet test tests/Modulix.ArchitectureTests` | 52 başarılı |
+| `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | **Yerelde doğrulanamadı.** Yerel paylaşımlı veritabanında `{}` içerikli yayınlanmış kural paketi sürümleri var; kayıt oluşturan **her** test (mevcut `LeadTests` dahil) `FormatException: Kural listesi çözülemedi` ile düşüyor. Testler (hareketsizlik, tarihe kala, ilişki koşulu, tekrar teslimde tek aktivite, doğrulama, tenant izolasyonu, yetki) CI'da temiz veritabanında koşar |
