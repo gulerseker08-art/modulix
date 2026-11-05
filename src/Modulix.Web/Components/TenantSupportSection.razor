@@ -1,0 +1,121 @@
+@inject ApiClient Api
+
+@* Destek erişimi (ADR-0028 Dilim 7, Y1.3): platform hesabına bu firmada gerekçeli, süreli ve salt okunur erişim açar. Erişim firma
+   yöneticilerine e-postayla bildirilir, firmanın ve platformun denetim kaydına yazılır; süresi dolunca kendiliğinden kapanır. *@
+<section class="detail-section">
+    <div class="section-header"><h2>Destek erişimi</h2></div>
+    <p class="text-muted">
+        Firma verisine yalnızca bu bölümden, gerekçeyle ve süreli bakılır. Erişim <strong>salt okunurdur</strong> (dışa aktarma, kullanıcı, denetim ve ayar
+        izinleri yoktur), 15 dakika ile 8 saat sürer, firma yöneticilerine e-postayla bildirilir ve süresi dolunca kendiliğinden kapanır.
+        Açtıktan sonra firmayı "Kuruluş değiştir" ile seçersiniz.
+    </p>
+
+    <Notice Text="@notice" Failed="failed" />
+
+    @if (Operational)
+    {
+        <form class="inline-form" novalidate @onsubmit="GrantAsync" @onsubmit:preventDefault>
+            <h3>Erişim aç</h3>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="supportReason">Gerekçe *</label>
+                    <input id="supportReason" class="form-control" maxlength="500" @bind="reason" @bind:event="oninput" />
+                    <FieldError Field="reason" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="supportMinutes">Süre (dakika)</label>
+                    <input id="supportMinutes" class="form-control" type="number" min="15" max="480" @bind="minutes" />
+                    <FieldError Field="minutes" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(reason))">Erişim aç</button>
+            </div>
+        </form>
+    }
+
+    @if (items is not null && items.Count > 0)
+    {
+        <table class="table record-table">
+            <thead><tr><th>Kişi</th><th>Gerekçe</th><th>Başlangıç</th><th>Bitiş</th><th>Durum</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var item in items)
+                {
+                    <tr>
+                        <td data-label="Kişi" class="primary">@item.UserName</td>
+                        <td data-label="Gerekçe">@item.Reason</td>
+                        <td data-label="Başlangıç">@CrmLabels.Time(item.GrantedAt)</td>
+                        <td data-label="Bitiş">@CrmLabels.Time(item.EndedAt ?? item.ExpiresAt)</td>
+                        <td data-label="Durum">
+                            <span class="badge @(item.State == SupportAccessStateDto.Active ? "user-active" : "user-disabled")">@StateText(item.State)</span>
+                        </td>
+                        <td class="actions">
+                            @if (item.State == SupportAccessStateDto.Active)
+                            {
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RevokeAsync(item.Id)">Kapat</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid TenantId { get; set; }
+
+    /// <summary>Firma açık (Açık ya da Deneme) değilse erişim açılamaz.</summary>
+    [Parameter] public bool Operational { get; set; } = true;
+
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private IReadOnlyList<SupportAccessDto>? items;
+    private string reason = string.Empty;
+    private int minutes = 60;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<SupportAccessDto>>($"/api/platform/support-access?tenantId={TenantId}");
+        items = result.Value;
+    }
+
+    private async Task GrantAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<SupportAccessDto>($"/api/platform/tenants/{TenantId}/support-access", new GrantSupportAccessRequest(reason, minutes));
+        busy = false;
+        errors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+            return;
+        }
+
+        (notice, failed, reason) = ($"Destek erişimi açıldı; {CrmLabels.Time(result.Value!.ExpiresAt)} tarihine kadar salt okunur. Firma yöneticilerine bildirildi.", false, string.Empty);
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private async Task RevokeAsync(Guid grantId)
+    {
+        busy = true;
+        var result = await Api.PostAsync<bool>($"/api/platform/support-access/{grantId}/revoke?reason={Uri.EscapeDataString("Platform ekibi kapattı")}", new { });
+        busy = false;
+        (notice, failed) = result.IsSuccess ? ("Destek erişimi kapatıldı.", false) : (result.Error, true);
+        await LoadAsync();
+    }
+
+    private static string StateText(SupportAccessStateDto state) => state switch
+    {
+        SupportAccessStateDto.Active => "Geçerli",
+        SupportAccessStateDto.Expired => "Süresi doldu",
+        _ => "Kapatıldı",
+    };
+}

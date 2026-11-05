@@ -35,6 +35,7 @@ dotnet run --project src/Modulix.Api -- tenant-delete <slug> --confirm <slug>  #
 - Tenant istemciden gelen başlık/parametreden değil, oturumdan belirlenir ve her istekte doğrulanır.
 - Firmanın erişime açık olup olmadığı `TenantStatusRules.Operational` ile sorulur (Active ve Trial); sorgularda `Status == TenantStatus.Active` yazma (ADR-0028).
 - Uç noktalar `.RequirePermission(...)` / `.RequireModule(...)` ile korunur. Yeni yönetim işlemleri denetim kaydına yazılmalı.
+- Destek erişimi (`MembershipStatus.Support`) "etkin üye" değildir: üye sayan, kayıt sahibi seçen ya da bildirim gönderen yeni sorgular `Status == Active` kullanmaya devam eder, destek üyeliğini dahil etmez (ADR-0028).
 - Platform uçlarının (`/api/platform`) rolü `PlatformAccessRules` tablosunda tanımlanır (okuma her platform rolüne açık, yazma tablodaki rol; tabloda olmayan yazma ucu yalnızca Owner'a). Yeni platform yazma ucu eklenince tabloya da yaz, yoksa test kırılır (ADR-0028).
 - Lisans süresi bitince modül önce ek sürede çalışır, sonra salt okunur olur (`IModuleLicense`, ADR-0028); salt okunurda `RequireModule` altındaki POST/PUT/DELETE 403 döner. Yazmayan POST uçlarının yolu `/preview` ile biter; oturumsuz ve arka plan yollarında modül kontrolü `IModuleLicense.AllowsAsync`/`IsWritableAsync` ile yapılır, `IsModuleEnabledAsync` ile değil.
 - E-posta `IEmailQueue.Enqueue` ile kuyruğa yazılır; HTML'e giren kullanıcı girdisi `WebUtility.HtmlEncode` ile kodlanır.

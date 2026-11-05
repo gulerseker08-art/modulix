@@ -12,7 +12,15 @@ public enum MembershipStatus
     /// bağlantısıyla şifre belirlenince üyelik etkinleşir.
     /// </summary>
     Invited = 3,
+
+    /// <summary>
+    /// Destek erişimi (ADR-0028 Dilim 7): platform hesabının firmadaki süreli ve salt okunur üyeliği. "Etkin" sayılmaz (koltuk,
+    /// kayıt sahibi seçimi, bildirim alıcısı ve kullanıcı listesinin dışındadır); yalnızca geçerli bir
+    /// <see cref="SupportAccessGrant"/> varken bağlam kurar.
+    /// </summary>
+    Support = 4,
 }
+
 
 /// <summary>
 /// Bir kullanıcının bir tenant'taki üyeliği. Bir kullanıcının birden fazla üyeliği olabilir;
@@ -45,7 +53,11 @@ public sealed class Membership
     }
 
     /// <summary>Davetle eklenen üyelik. Hesabın şifresi yoksa davet bekler; varsa (başka tenant'ta kullanılıyor) hemen etkindir.</summary>
-    public static Membership CreateInvited(Guid tenantId, Guid userId, bool awaitsAcceptance, DateTimeOffset invitedAt)
+    /// <summary>Destek erişimi için üyelik (<see cref="MembershipStatus.Support"/>).</summary>
+    public static Membership CreateSupport(Guid tenantId, Guid userId) => new(tenantId, userId) { Status = MembershipStatus.Support };
+
+    public static Membership CreateInvited(
+Guid tenantId, Guid userId, bool awaitsAcceptance, DateTimeOffset invitedAt)
     {
         var membership = new Membership(tenantId, userId)
         {

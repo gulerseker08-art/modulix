@@ -12,27 +12,33 @@ namespace Modulix.Infrastructure.Tenancy;
 /// </summary>
 internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time) : IMembershipDirectory
 {
-    public async Task<IReadOnlyList<MembershipSummary>> GetActiveForUserAsync(Guid userId, CancellationToken cancellationToken) =>
-        await (
+    public async Task<IReadOnlyList<MembershipSummary>> GetActiveForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var now = time.GetUtcNow();
+        return await (
             from membership in db.Memberships.AsNoTracking()
             join tenant in db.Tenants.AsNoTracking() on membership.TenantId equals tenant.Id
             where membership.UserId == userId
-                  && membership.Status == MembershipStatus.Active
+                  && (membership.Status == MembershipStatus.Active || (membership.Status == MembershipStatus.Support && db.SupportAccessGrants.Any(g => g.MembershipId == membership.Id && g.EndedAt == null && g.ExpiresAt > now)))
                   && TenantStatusRules.Operational.Contains(tenant.Status)
             orderby tenant.Name
             select new MembershipSummary(membership.Id, tenant.Id, tenant.Name, tenant.Slug))
             .ToListAsync(cancellationToken);
+    }
 
-    public Task<MembershipSummary?> FindActiveAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken) =>
-        (
+    public Task<MembershipSummary?> FindActiveAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken)
+    {
+        var now = time.GetUtcNow();
+        return (
             from membership in db.Memberships.AsNoTracking()
             join tenant in db.Tenants.AsNoTracking() on membership.TenantId equals tenant.Id
             where membership.UserId == userId
                   && membership.TenantId == tenantId
-                  && membership.Status == MembershipStatus.Active
+                  && (membership.Status == MembershipStatus.Active || (membership.Status == MembershipStatus.Support && db.SupportAccessGrants.Any(g => g.MembershipId == membership.Id && g.EndedAt == null && g.ExpiresAt > now)))
                   && TenantStatusRules.Operational.Contains(tenant.Status)
             select new MembershipSummary(membership.Id, tenant.Id, tenant.Name, tenant.Slug))
             .SingleOrDefaultAsync(cancellationToken);
+    }
 
     public Task RecordSignInAsync(Guid membershipId, CancellationToken cancellationToken) =>
         db.Memberships
@@ -45,6 +51,7 @@ internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time
 
         // Yönetici (sistem rolü, ADR-0008 kararı) tenant'ın bütün şirketlerine erişir. Roller tenant verisidir: RLS yalnızca
         // aktif tenant'ınkileri döndürür.
+        var isSupport = await db.Memberships.AsNoTracking().AnyAsync(m => m.Id == membershipId && m.Status == MembershipStatus.Support, cancellationToken);
         var isAdministrator = await (
             from assignment in db.MembershipRoles.AsNoTracking()
             join role in db.Roles.AsNoTracking() on assignment.RoleId equals role.Id
@@ -56,7 +63,7 @@ internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time
         // görevlendirildikleri şirketleri görür. Geçici vekâlet (ADR-0008, adım 5): yalnızca o an geçerli görevler sayılır,
         // böylece süresi dolan ya da henüz başlamamış vekâlet erişilebilir şirketlerden kendiliğinden düşer.
         var now = time.GetUtcNow();
-        IQueryable<Company> companies = isAdministrator
+        IQueryable<Company> companies = isAdministrator || isSupport
             ? db.Companies.AsNoTracking()
             : from company in db.Companies.AsNoTracking()
               join membershipCompany in db.MembershipCompanies.AsNoTracking() on company.Id equals membershipCompany.CompanyId
