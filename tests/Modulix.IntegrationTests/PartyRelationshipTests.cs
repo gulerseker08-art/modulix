@@ -154,6 +154,35 @@ public class PartyRelationshipTests(ModulixApiFactory factory) : IClassFixture<M
         Assert.Equal(HttpStatusCode.NotFound, (await platform.PutAsJsonAsync("/api/platform/sectors/relationship-roles/yok/active", new SetActiveRequest(true))).StatusCode);
     }
 
+    [Fact]
+    public async Task Any_tenant_user_reads_active_activity_options_but_not_inactive_ones_and_anonymous_cannot()
+    {
+        using var platform = await LoginAsync(await CreatePlatformAdministratorAsync());
+        await platform.PostAsJsonAsync("/api/platform/sectors/starter-packages/logistics/install", new { });
+        var code = $"sek-{Guid.NewGuid():N}"[..20];
+        var created = await platform.PostAsJsonAsync("/api/platform/sectors/nodes", new CreateActivityNodeRequest(code, null, "Sector", "Geçici sektör", null, 999));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var node = (await created.Content.ReadFromJsonAsync<ActivityNodeDto>())!;
+
+        // Yalnızca firma okuma izni olan kullanıcı (özelleştirme yetkisi yok) seçenekleri görür; ad ve konum dışında bilgi dönmez.
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var reader = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [CompaniesRead], Scope.All, reader);
+        using var readerClient = await LoginAsync(reader);
+        var options = (await readerClient.GetFromJsonAsync<List<ActivityOptionDto>>("/api/activity-options"))!;
+        Assert.Contains(options, o => o.Code == code && o.ParentCode is null && o.Kind == "Sector");
+        var logistics = options.Single(o => o.Code == "lojistik");
+        Assert.Contains(options, o => o.ParentCode == logistics.Code);
+
+        // Pasife alınan düğüm seçenek olarak dönmez (kayıtlardaki eski değer korunur, yeni seçim yapılamaz).
+        Assert.Equal(HttpStatusCode.OK, (await platform.PutAsJsonAsync($"/api/platform/sectors/nodes/{node.Id}/active", new SetActiveRequest(false))).StatusCode);
+        Assert.DoesNotContain((await readerClient.GetFromJsonAsync<List<ActivityOptionDto>>("/api/activity-options"))!, o => o.Code == code);
+
+        using var anonymous = factory.CreateBrowserClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/activity-options")).StatusCode);
+    }
+
     private static string[] Strings(JsonObject values, string name) =>
         values[name] is JsonArray array ? [.. array.Select(n => n!.GetValue<string>())] : [];
 

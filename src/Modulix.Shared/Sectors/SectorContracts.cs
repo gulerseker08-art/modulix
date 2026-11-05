@@ -41,6 +41,9 @@ public sealed record RelationshipRoleDto(Guid Id, string Code, string Name, bool
 
 public sealed record CreateRelationshipRoleRequest(string Code, string Name);
 
+/// <summary>Firma formunun seçim listesi için aktif faaliyet düğümü; yalnızca ad ve konum bilgisi taşır (ADR-0029).</summary>
+public sealed record ActivityOptionDto(string Code, string Name, string Kind, string? ParentCode, int SortOrder);
+
 public sealed record StarterPackageDto(string Code, string Name, string? Description, bool Verified, string? VerificationNote, int NodeCount, int CapabilityCount);
 
 public sealed record StarterPackagePlanDto(
