@@ -400,6 +400,6 @@ Tasarımdan ayrılan / netleşen noktalar:
 | --- | --- |
 | `dotnet test tests/Modulix.Core.Tests --filter Automation` | 138 başarılı (yeni: şablon katalog denetimi, anahtar/ad/açıklama/kayıt türü/aksiyon/adım kimliği/tekillik) |
 | `dotnet test tests/Modulix.Modules.Crm.Tests --filter CrmAutomationTemplateTests` | 4 başarılı (şablonlar beyanla tutarlı, yalnızca takip aktivitesi, JSON gidiş-dönüş) |
-| `dotnet test tests/Modulix.ArchitectureTests` | 52 başarılı |
+| `dotnet test tests/Modulix.ArchitectureTests` | 65 başarılı |
 | `dotnet test tests/Modulix.IntegrationTests --filter "CrmAutomationDeclarationTests|CrmAutomationTemplateTests"` (SQL Server) | 9 başarılı. Yeni 4: taslak açılır, çalışmaz, yayınlanınca çalışır; dört şablon gerçek yayın doğrulamasından geçer; bilinmeyen ve modülü kapalı şablon 404; tenant izolasyonu; okuma/yönetim izni ve aksiyon izni olmayanın şablonu kullanamaması |
 | `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | 8 başarılı (3a testleri bozulmadı) |
