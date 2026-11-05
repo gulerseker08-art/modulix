@@ -36,6 +36,10 @@ internal abstract class ContractsRecordStore<TEntity>(ContractsStoreContext cont
 
     protected virtual IReadOnlyDictionary<string, RecordFilter<TEntity>> Filters => NoFilters;
 
+    /// <summary>Süzgeçleri sorgudan önce çözer (ör. firmanın listesinden kategori → tür anahtarları); eşzamansız veri gerektiren süzgeçler içindir. Varsayılan değiştirmez.</summary>
+    protected virtual Task<IReadOnlyDictionary<string, string>?> ResolveFiltersAsync(IReadOnlyDictionary<string, string>? filters, CancellationToken cancellationToken) =>
+        Task.FromResult(filters);
+
     protected ContractsStoreContext Context => context;
 
     private IModuleData Data => context.Data;
@@ -111,7 +115,7 @@ internal abstract class ContractsRecordStore<TEntity>(ContractsStoreContext cont
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
-        var (filters, sort) = SplitSort(query.Filters);
+        var (filters, sort) = SplitSort(await ResolveFiltersAsync(query.Filters, cancellationToken));
         var source = ApplyFilters(Restrict(Data.Set<TEntity>().AsNoTracking()), filters);
         if (query.Owners is { } owners && UsesScope)
         {

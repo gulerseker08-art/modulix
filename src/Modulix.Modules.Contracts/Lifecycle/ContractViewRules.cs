@@ -23,8 +23,8 @@ public static class ContractViewRules
     public const int NameMaxLength = 100;
     public const int FiltersMaxLength = 500;
 
-    /// <summary>Hızlı görünümler: sorumlu benim, imza bekleyen, bitişi 90 gün içinde, bildirim süresi 30 gün içinde, taahhüdü geciken.</summary>
-    public static IReadOnlyList<string> Presets { get; } = ["mine", "signature", "ending", "notice", "overdue"];
+    /// <summary>Hızlı görünümler: sorumlu benim, imza bekleyen, bitişi 90 gün içinde, bildirim süresi 30 gün içinde, taahhüdü geciken, satış sözleşmeleri (satış kategorisindeki türler, <see cref="ContractScopes"/>).</summary>
+    public static IReadOnlyList<string> Presets { get; } = ["mine", "signature", "ending", "notice", "overdue", "sales"];
 
     public static IReadOnlyList<string> Keys { get; } = ["preset", "effectiveStatus", "preparationStatus", "approvalStatus", "signatureStatus", "type", "currency", "renewalMode", "search", "sort"];
 

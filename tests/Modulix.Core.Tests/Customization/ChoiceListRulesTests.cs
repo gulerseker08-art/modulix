@@ -70,6 +70,23 @@ public class ChoiceListRulesTests
     }
 
     [Fact]
+    public void Custom_value_added_before_categories_existed_can_be_categorized_once()
+    {
+        // Kategori tanımlanmadan önce eklenmiş özel değer: kategorisi boştur; bir kez atanabilir, sonra değişmez.
+        var uncategorized = ChoiceListRules.Resolve(Stages, [new("Demo", "Demo yapıldı", null, true)]);
+        Assert.Null(uncategorized.Find("Demo")!.Category);
+
+        var values = ChoiceListRules.Apply(Stages, uncategorized, [new("Lead", "Aday"), new("Won", "Kazanıldı"), new("Lost", "Kaybedildi"), new("Demo", "Demo yapıldı", "open")]);
+        Assert.Equal("open", values.Single(v => v.Key == "Demo").Category);
+
+        var categorized = ChoiceListRules.Resolve(Stages, values);
+        Assert.Throws<ArgumentException>(() => ChoiceListRules.Apply(Stages, categorized, [new("Lead", "Aday"), new("Won", "Kazanıldı"), new("Lost", "Kaybedildi"), new("Demo", "Demo yapıldı", "won")]));
+
+        // Tanımsız kategori atanamaz.
+        Assert.Throws<ArgumentException>(() => ChoiceListRules.Apply(Stages, uncategorized, [new("Lead", "Aday"), new("Won", "Kazanıldı"), new("Lost", "Kaybedildi"), new("Demo", "Demo yapıldı", "uydurma")]));
+    }
+
+    [Fact]
     public void Built_in_category_cannot_change_and_new_value_needs_a_category()
     {
         var current = ChoiceListRules.Resolve(Stages, null);

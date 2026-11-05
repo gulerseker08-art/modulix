@@ -25,5 +25,6 @@
     <Project Path="tests/Modulix.Modules.Marketing.Tests/Modulix.Modules.Marketing.Tests.csproj" />
     <Project Path="tests/Modulix.Modules.Orders.Tests/Modulix.Modules.Orders.Tests.csproj" />
     <Project Path="tests/Modulix.Modules.Support.Tests/Modulix.Modules.Support.Tests.csproj" />
+    <Project Path="tests/Modulix.Web.Tests/Modulix.Web.Tests.csproj" />
   </Folder>
 </Solution>

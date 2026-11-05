@@ -74,12 +74,21 @@ public static class ChoiceListRules
                     throw new ArgumentException("Bilinmeyen değer.", "values");
                 }
 
+                var existingCategory = existing.Category;
                 if (input.Category is { } changed && changed != existing.Category)
                 {
-                    throw new ArgumentException($"'{label}' değerinin kategorisi değiştirilemez.", "values");
+                    // Kategori tanımlanmadan önce eklenmiş özel değere bir kez kategori atanabilir; atandıktan sonra (ve hazır değerde) değişmez.
+                    if (existing.Category is null && !existing.BuiltIn && categories.ContainsKey(changed))
+                    {
+                        existingCategory = changed;
+                    }
+                    else
+                    {
+                        throw new ArgumentException($"'{label}' değerinin kategorisi değiştirilemez.", "values");
+                    }
                 }
 
-                values.Add(new StoredChoiceValue(existing.Key, label, existing.Category, input.Active));
+                values.Add(new StoredChoiceValue(existing.Key, label, existingCategory, input.Active));
                 continue;
             }
 

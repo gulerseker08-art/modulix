@@ -85,6 +85,8 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
         ["number"] = (q, v, _) => v.Trim() is { Length: > 0 } number ? q.Where(c => c.Number == number) : null,
         ["type"] = (q, v, _) => v.Trim() is { Length: > 0 } type ? q.Where(c => c.Type == type) : null,
+        // Virgülle ayrılmış tür anahtarları; boşsa hiçbir kayıt dönmez (kategoride tür yok). "typeCategory" süzgeci buna çevrilir.
+        ["types"] = (q, v, _) => OfTypes(q, v),
         ["preparationStatus"] = (q, v, _) => PreparationStatus.All.Contains(v) ? q.Where(c => c.PreparationStatus == v) : null,
         ["approvalStatus"] = (q, v, _) => ApprovalStatus.All.Contains(v) ? q.Where(c => c.ApprovalStatus == v) : null,
         // Virgülle ayrılmış birden çok durum kabul edilir (ör. imza bekleyen = Pending,PartiallySigned).
@@ -107,6 +109,29 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
             ? q.Where(c => ctx.Data.Set<ContractCommitmentOccurrence>().Any(o => o.ContractId == c.Id && o.Status == OccurrenceStatus.Breached) == flag)
             : null,
     };
+
+    private static IQueryable<Contract> OfTypes(IQueryable<Contract> source, string value)
+    {
+        var keys = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return source.Where(c => keys.Contains(c.Type));
+    }
+
+    /// <summary>
+    /// <c>typeCategory=sales</c> (<see cref="ContractScopes"/>) firmanın sözleşme türü listesinden o kategorideki tür anahtarlarına çevrilir;
+    /// tür kümesi her sorguda firmanın güncel listesinden okunur (firma türleri değiştirince kapsam kendiliğinden değişir). Bilinmeyen kategori "Bilinmeyen filtre" hatası verir.
+    /// </summary>
+    protected override async Task<IReadOnlyDictionary<string, string>?> ResolveFiltersAsync(IReadOnlyDictionary<string, string>? filters, CancellationToken cancellationToken)
+    {
+        if (filters is null || !filters.TryGetValue(ContractScopes.Filter, out var category) || !ContractScopes.IsKnown(category))
+        {
+            return filters;
+        }
+
+        var list = await Context.ChoiceLists.GetAsync(ContractsModule.Lists.ContractType, cancellationToken);
+        var resolved = filters.Where(f => f.Key != ContractScopes.Filter).ToDictionary(f => f.Key, f => f.Value);
+        resolved["types"] = string.Join(',', ContractScopes.TypeKeys(list, category));
+        return resolved;
+    }
 
     protected override IOrderedQueryable<Contract> Order(IQueryable<Contract> source) => source.OrderByDescending(c => c.CreatedAt);
 
