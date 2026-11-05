@@ -92,6 +92,7 @@ public static class CrmForms
             new("currentProblem", "Mevcut sorun", "detay", 6),
             new("expectedBenefit", "Beklenen fayda", "detay", 6),
             new("scope", "Kapsam", "detay", 6),
+            new("serviceScope", "Hizmet kapsamı", "detay", 12),
             new("successCriteria", "Başarı ölçütleri", "detay", 6),
             new("risks", "Riskler ve engeller", "detay", 6),
             new("decisionProcess", "Karar süreci", "detay", 12),

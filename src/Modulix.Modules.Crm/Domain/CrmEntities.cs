@@ -190,6 +190,12 @@ public sealed class Opportunity : CrmEntity, IOwnedEntity
 
     public string? Scope { get; internal set; }
 
+    /// <summary>
+    /// Fırsatın hizmet kapsamı (ADR-0029 Dilim F): faaliyet kataloğundan "Faaliyet" düğümü kodları, virgülle; tekrarsız ve sıralı.
+    /// Serbest metin <see cref="Scope"/> alanından ayrıdır. Teklife kapsam özeti olarak aktarılması sonraki adımdır.
+    /// </summary>
+    public string? ServiceScope { get; internal set; }
+
     public string? SuccessCriteria { get; internal set; }
 
     public string? Risks { get; internal set; }

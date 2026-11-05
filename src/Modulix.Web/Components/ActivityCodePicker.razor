@@ -1,0 +1,71 @@
+@* Faaliyet ağacından kod seçici (ADR-0029): her düğüm ayrı satırda, girinti "– " ile gösterilir. Yalnızca "Faaliyet" seçilebilsin
+   isteniyorsa sektör/grup satırları başlık olarak görünür ve devre dışıdır. Seçili kod katalogdan düşmüş ya da pasifleşmişse sonda
+   "(pasif)" ile görünür ki kaldırılabilsin. Değişiklik Selected listesine yazılır (tekrarsız, sıralı). *@
+@inject ActivityOptions Options
+
+<div class="activity-choices" id="@Id">
+    @foreach (var item in Choices)
+    {
+        var inputId = $"{Id}-{item.Code}";
+        <div class="form-check">
+            <input id="@inputId" class="form-check-input" type="checkbox" checked="@Selected.Contains(item.Code)"
+                   disabled="@(ActivitiesOnly && item.Active && item.Kind != "Activity")" @onchange="e => Toggle(item.Code, (bool)e.Value!)" />
+            <label class="form-check-label" for="@inputId">@(item.Depth > 0 ? string.Concat(Enumerable.Repeat("– ", item.Depth)) : null)@item.Name@(item.Active ? null : " (pasif)")</label>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<ActivityOptionDto> options = [];
+
+    [Parameter, EditorRequired] public string Id { get; set; } = "activity-codes";
+
+    /// <summary>Seçili kodlar (tekrarsız, sıralı).</summary>
+    [Parameter, EditorRequired] public List<string> Selected { get; set; } = [];
+
+    [Parameter] public EventCallback<List<string>> SelectedChanged { get; set; }
+
+    /// <summary>Yalnızca "Faaliyet" düğümleri seçilebilir (hizmet kapsamı, hizmet ihtiyacı).</summary>
+    [Parameter] public bool ActivitiesOnly { get; set; }
+
+    protected override async Task OnInitializedAsync() => options = await Options.LoadAsync();
+
+    private async Task Toggle(string code, bool on)
+    {
+        var next = new SortedSet<string>(Selected, StringComparer.Ordinal);
+        if (on)
+        {
+            next.Add(code);
+        }
+        else
+        {
+            next.Remove(code);
+        }
+
+        Selected = [.. next];
+        await SelectedChanged.InvokeAsync(Selected);
+    }
+
+    private IReadOnlyList<Choice> Choices
+    {
+        get
+        {
+            var byParent = options.ToLookup(a => a.ParentCode);
+            var list = new List<Choice>();
+            void Walk(string? parent, int depth)
+            {
+                foreach (var node in byParent[parent])
+                {
+                    list.Add(new Choice(node.Code, node.Name, depth, node.Kind, Active: true));
+                    Walk(node.Code, depth + 1);
+                }
+            }
+
+            Walk(null, 0);
+            list.AddRange(Selected.Where(c => list.All(i => i.Code != c)).Select(c => new Choice(c, c, 0, "", Active: false)));
+            return list;
+        }
+    }
+
+    private sealed record Choice(string Code, string Name, int Depth, string Kind, bool Active);
+}

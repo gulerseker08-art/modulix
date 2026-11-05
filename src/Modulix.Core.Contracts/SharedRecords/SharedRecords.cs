@@ -13,7 +13,10 @@ public static class SharedEntities
     public const string Party = "core.party";
     public const string Person = "core.person";
 
-    public static IReadOnlyList<string> All { get; } = [Party, Person];
+    /// <summary>Firmanın bir ilişki rolündeki durumu (ADR-0029 K9): firma + rol başına en çok bir kayıt.</summary>
+    public const string PartyRelationship = "core.partyrelationship";
+
+    public static IReadOnlyList<string> All { get; } = [Party, Person, PartyRelationship];
 }
 
 /// <summary>Ortak kayıtların ortak alanları. TenantId kaydederken aktif tenant'tan atanır.</summary>
@@ -101,6 +104,46 @@ public sealed class Party : SharedEntity
 
     /// <summary>Tarafın aldığı/ihtiyaç duyduğu hizmetler: faaliyet ağacından düğüm kodları, virgülle. Rolden bağımsızdır.</summary>
     public string? ServiceNeeds { get; set; }
+}
+
+public enum PartyRelationshipStatus
+{
+    /// <summary>Aday: ilişki henüz başlamadı (teklif, görüşme aşaması).</summary>
+    Prospect = 1,
+
+    /// <summary>Aktif: ilişki sürüyor.</summary>
+    Active = 2,
+
+    /// <summary>Askıda: geçici olarak durduruldu.</summary>
+    Suspended = 3,
+
+    /// <summary>Sona erdi.</summary>
+    Ended = 4,
+}
+
+/// <summary>
+/// Firmanın bir ilişki rolündeki durumu (ADR-0029 K9): ör. "Acme, tedarikçi rolünde aktif, 01.03.2026'dan beri". Rol firmanın
+/// <c>RelationshipRoles</c> listesindeki kodla aynıdır; durum, o rolün ticari ilişkisinin nerede olduğunu söyler. Firma silinince
+/// kayıtları da silinir. Ticari koşul (vade, limit...) bu kayıtta yoktur.
+/// </summary>
+public sealed class PartyRelationship : SharedEntity
+{
+    public const int RoleCodeMaxLength = 50;
+    public const int NotesMaxLength = 1000;
+
+    /// <summary>İlişkinin tarafı; aynı tenant'ta olmak zorundadır.</summary>
+    public Guid PartyId { get; set; }
+
+    /// <summary>İlişki rolü kataloğundaki kod (ör. <c>tedarikci</c>).</summary>
+    public string RoleCode { get; set; } = string.Empty;
+
+    public PartyRelationshipStatus Status { get; set; } = PartyRelationshipStatus.Prospect;
+
+    public DateOnly? StartDate { get; set; }
+
+    public DateOnly? EndDate { get; set; }
+
+    public string? Notes { get; set; }
 }
 
 /// <summary>

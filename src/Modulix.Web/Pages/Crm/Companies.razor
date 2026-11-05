@@ -24,12 +24,39 @@
             <input class="form-control" type="search" aria-label="Firma ara" placeholder="Ad, vergi no, şehir veya etiket ara" @bind="search" />
             <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <ColumnPicker />
         @if (Session.Can(CrmAccess.CompaniesWrite) && !editing)
         {
             <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> Yeni firma</button>
         }
     </div>
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="İlişki rolü" @bind="role" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm ilişki rolleri</option>
+                @foreach (var r in roles.Where(r => r.IsActive || r.Code == role))
+                {
+                    <option value="@r.Code">@r.Name</option>
+                }
+            </select>
+            <select class="form-select" aria-label="Müşteri sektörü" @bind="sector" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm müşteri sektörleri</option>
+                @foreach (var a in activities)
+                {
+                    <option value="@a.Code">@ActivityPath(a)</option>
+                }
+            </select>
+            <select class="form-select" aria-label="Hizmet ihtiyacı" @bind="need" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm hizmet ihtiyaçları</option>
+                @foreach (var a in activities)
+                {
+                    <option value="@a.Code">@ActivityPath(a)</option>
+                }
+            </select>
+        </div>
+    }
 
     @if (page is null)
     {
@@ -82,6 +109,29 @@
     private string? search;
     private string? status;
     private bool mine;
+    private bool filtersOpen;
+    private string role = "";
+    private string sector = "";
+    private string need = "";
+    private List<RelationshipRoleDto> roles = [];
+    private List<ActivityOptionDto> activities = [];
+
+    // Aynı ad farklı sektörlerde tekrarlanabilir (ör. "Diğer"): üst düğümlerle birlikte gösterilir.
+    private string ActivityPath(ActivityOptionDto option)
+    {
+        var names = new List<string> { option.Name };
+        for (var parent = option.ParentCode; parent is not null && names.Count < 6;)
+        {
+            var node = activities.FirstOrDefault(a => a.Code == parent);
+            if (node is null) { break; }
+            names.Insert(0, node.Name);
+            parent = node.ParentCode;
+        }
+
+        return string.Join(" › ", names);
+    }
+
+    private int ActiveFilters => (role.Length > 0 ? 1 : 0) + (sector.Length > 0 ? 1 : 0) + (need.Length > 0 ? 1 : 0);
 
     protected override async Task OnInitializedAsync()
     {
@@ -89,6 +139,8 @@
         if (Session.Can(CrmAccess.CompaniesRead))
         {
             await Lookups.LoadAsync();
+            roles = (await Api.GetAsync<List<RelationshipRoleDto>>("/api/relationship-roles")).Value ?? [];
+            activities = (await Api.GetAsync<List<ActivityOptionDto>>("/api/activity-options")).Value ?? [];
             await LoadAsync(1);
         }
     }
@@ -125,6 +177,14 @@
         if (mine)
         {
             url += "&ownerId=me";
+        }
+
+        foreach (var (name, value) in new[] { ("relationshipRole", role), ("customerSector", sector), ("serviceNeed", need) })
+        {
+            if (value.Length > 0)
+            {
+                url += $"&{name}={Uri.EscapeDataString(value)}";
+            }
         }
 
         var result = await Api.GetAsync<CrmPage<CompanyDto>>(url);
