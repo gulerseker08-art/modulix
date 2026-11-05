@@ -53,6 +53,31 @@ public static class SectorEndpoints
         catalog.MapPost("/starter-packages/{code}/install", (string code, ClaimsPrincipal user, IStarterPackages service, CancellationToken ct) =>
             Run(async () => Results.Ok(ToDto(await service.InstallAsync(UserId(user), code, ct)))));
 
+        // Firma ilişki rolü kataloğu (Dilim E): platform yönetir; rol silinmez, pasife alınır.
+        catalog.MapGet("/relationship-roles", async (IRelationshipRoles service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
+        catalog.MapPost("/relationship-roles", (CreateRelationshipRoleRequest request, ClaimsPrincipal user, IRelationshipRoles service, CancellationToken ct) =>
+            Run(async () =>
+            {
+                var role = await service.CreateAsync(UserId(user), request.Code, request.Name, ct);
+                return Results.Created($"/api/platform/sectors/relationship-roles/{role.Code}", ToDto(role));
+            }));
+        catalog.MapPut("/relationship-roles/{code}/active", (string code, SetActiveRequest request, ClaimsPrincipal user, IRelationshipRoles service, CancellationToken ct) =>
+            Run(async () => Results.Ok(ToDto(await service.SetActiveAsync(UserId(user), code, request.Active, ct)))));
+
+        // Firma formu rolleri seçerken katalogu okur: ürün standardıdır, tenant verisi değildir; her tenant kullanıcısı okuyabilir.
+        app.MapGroup("/api/relationship-roles")
+            .RequireAuthorization()
+            .AddEndpointFilter<RequireTenantFilter>()
+            .WithTags("Sectors")
+            .MapGet("/", async (IRelationshipRoles service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
+
+        // Müşteri sektörü ve hizmet ihtiyacı seçimi aktif faaliyet ağacını okur; yalnızca ad ve konum döner, yetenek/sürüm bilgisi dönmez.
+        app.MapGroup("/api/activity-options")
+            .RequireAuthorization()
+            .AddEndpointFilter<RequireTenantFilter>()
+            .WithTags("Sectors")
+            .MapGet("/", async (ISectorCatalog service, CancellationToken ct) => ActivityOptions(await service.GetAsync(ct)));
+
         var selection = app.MapGroup("/api/sectors")
             .RequireAuthorization()
             .AddEndpointFilter<RequireTenantFilter>()
@@ -114,6 +139,16 @@ public static class SectorEndpoints
 
     private static StarterPackagePlanDto ToDto(StarterPackagePlan p) =>
         new([.. p.CapabilitiesToCreate], [.. p.CapabilitiesExisting], [.. p.NodesToCreate], [.. p.NodesExisting], [.. p.Warnings], [.. p.Completions], p.NothingToDo);
+
+    private static RelationshipRoleDto ToDto(RelationshipRoleView r) => new(r.Id, r.Code, r.Name, r.IsActive);
+
+    private static List<ActivityOptionDto> ActivityOptions(SectorCatalogView view)
+    {
+        var codes = view.Nodes.ToDictionary(n => n.Id, n => n.Code);
+        return [.. view.Nodes.Where(n => n.IsActive)
+            .OrderBy(n => n.SortOrder).ThenBy(n => n.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Select(n => new ActivityOptionDto(n.Code, n.Name, n.Kind.ToString(), n.ParentId is { } p ? codes.GetValueOrDefault(p) : null, n.SortOrder))];
+    }
 
     private static CapabilityDto ToDto(CapabilityView c) => new(c.Id, c.Code, c.Name, c.IsActive, [.. c.DependsOn]);
 

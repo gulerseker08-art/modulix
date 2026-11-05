@@ -163,6 +163,11 @@
                         </dl>
                         </FormSection>
 
+                        @if (company.PartyId is { } partyId)
+                        {
+                            <PartyRelationshipsSection PartyId="partyId" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" />
+                        }
+
                         @* Adresler ve iletişim (ADR-0012): ana kayıtlar yukarıdaki telefon/e-posta/adres alanlarının kaynağıdır. *@
                         <FormSection Title="Adres ve iletişim" Icon="map-pin">
                             <AddressesSection CompanyId="Id" Title="Adresler" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />

@@ -1,0 +1,252 @@
+@* Firma ilişkileri (ADR-0029 K9): ilişki rolleri, müşteri sektörü ve hizmet ihtiyacı. Üç alan ortak firma kaydındadır (core.party),
+   bu yüzden CRM'e özgü değil genel kayıt uç noktasıyla okunur ve yazılır (izin, kapsam ve denetim kaydı kayıt hattından gelir).
+   Seçenekler katalogdan gelir: roller platform kataloğundan, sektör ve ihtiyaç aktif faaliyet ağacından. Sayfa içi küçük eylem formudur. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+
+<FormSection Title="Firma ilişkileri" Icon="layers" Description="Bu firmayla ticari ilişkiniz, hizmet verdiğiniz sektör ve aldığınız hizmetler birbirinden ayrı tutulur.">
+    <Actions>
+        @if (CanWrite && !editing && party is not null)
+        {
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="StartEdit">Düzenle</button>
+        }
+    </Actions>
+    <ChildContent>
+        @if (message is not null)
+        {
+            <div class="alert alert-danger" role="alert">@message</div>
+        }
+
+        @if (party is null)
+        {
+            @if (message is null)
+            {
+                <p class="text-muted">Yükleniyor…</p>
+            }
+        }
+        else if (editing)
+        {
+            <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <fieldset>
+                    <legend class="form-label">İlişki rolleri</legend>
+                    <div class="check-list">
+                        @foreach (var role in RoleChoices)
+                        {
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" checked="@roles.Contains(role.Code)" @onchange="e => Toggle(roles, role.Code, (bool)e.Value!)" />
+                                <span class="form-check-label">@role.Name@(role.IsActive ? null : " (pasif)")</span>
+                            </label>
+                        }
+                    </div>
+                    <FieldError Field="relationshipRoles" Errors="errors" />
+                </fieldset>
+
+                <fieldset class="mt-3">
+                    <legend class="form-label">Müşteri sektörü</legend>
+                    <p class="text-muted">Firmanın faaliyet gösterdiği sektörler. Serbest metin "Sektör" alanı olduğu gibi kalır.</p>
+                    @ActivityList(sectors)
+                    <FieldError Field="customerSectors" Errors="errors" />
+                </fieldset>
+
+                <fieldset class="mt-3">
+                    <legend class="form-label">Hizmet ihtiyacı</legend>
+                    <p class="text-muted">Firmanın sizden aldığı ya da almak istediği hizmetler; ilişki rolünden bağımsızdır.</p>
+                    @ActivityList(needs)
+                    <FieldError Field="serviceNeeds" Errors="errors" />
+                </fieldset>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Kaydet</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Cancel">Vazgeç</button>
+                </div>
+            </form>
+        }
+        else
+        {
+            <dl class="detail-grid">
+                <div class="span-all"><dt>İlişki rolleri</dt><dd>@Pills(roles, RoleName)</dd></div>
+                <div class="span-all"><dt>Müşteri sektörü</dt><dd>@Pills(sectors, ActivityName)</dd></div>
+                <div class="span-all"><dt>Hizmet ihtiyacı</dt><dd>@Pills(needs, ActivityName)</dd></div>
+            </dl>
+        }
+    </ChildContent>
+</FormSection>
+
+@code {
+    /// <summary>Ortak firma kaydının (core.party) kimliği: CRM firmasında <c>PartyId</c>.</summary>
+    [Parameter, EditorRequired] public Guid PartyId { get; set; }
+
+    [Parameter] public bool CanWrite { get; set; }
+
+    private RecordResponse? party;
+    private List<RelationshipRoleDto> catalogRoles = [];
+    private List<ActivityOptionDto> activities = [];
+    private readonly SortedSet<string> roles = new(StringComparer.Ordinal);
+    private readonly SortedSet<string> sectors = new(StringComparer.Ordinal);
+    private readonly SortedSet<string> needs = new(StringComparer.Ordinal);
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool editing;
+    private bool busy;
+    private Guid loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == PartyId)
+        {
+            return;
+        }
+
+        loadedFor = PartyId;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        message = null;
+        var record = await Api.GetAsync<RecordResponse>($"/api/records/core.party/{PartyId}");
+        if (!record.IsSuccess || record.Value is null)
+        {
+            message = record.Error ?? "Firma ilişkileri yüklenemedi.";
+            return;
+        }
+
+        catalogRoles = (await Api.GetAsync<List<RelationshipRoleDto>>("/api/relationship-roles")).Value ?? [];
+        activities = (await Api.GetAsync<List<ActivityOptionDto>>("/api/activity-options")).Value ?? [];
+        Apply(record.Value);
+    }
+
+    private void Apply(RecordResponse record)
+    {
+        party = record;
+        Fill(roles, record.Values["relationshipRoles"]);
+        Fill(sectors, record.Values["customerSectors"]);
+        Fill(needs, record.Values["serviceNeeds"]);
+    }
+
+    private static void Fill(SortedSet<string> target, JsonNode? node)
+    {
+        target.Clear();
+        if (node is JsonArray array)
+        {
+            foreach (var code in array.OfType<JsonValue>().Select(v => v.GetValue<string>()))
+            {
+                target.Add(code);
+            }
+        }
+    }
+
+    private void StartEdit()
+    {
+        errors = null;
+        message = null;
+        editing = true;
+    }
+
+    private async Task Cancel()
+    {
+        editing = false;
+        errors = null;
+        await LoadAsync();
+    }
+
+    private static void Toggle(SortedSet<string> set, string code, bool on)
+    {
+        if (on)
+        {
+            set.Add(code);
+        }
+        else
+        {
+            set.Remove(code);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["relationshipRoles"] = ToArray(roles),
+            ["customerSectors"] = ToArray(sectors),
+            ["serviceNeeds"] = ToArray(needs),
+        };
+        var result = await Api.PutAsync<RecordResponse>($"/api/records/core.party/{PartyId}", new RecordWriteRequest(values, party!.Version));
+        busy = false;
+
+        if (result.IsSuccess && result.Value is { } saved)
+        {
+            Apply(saved);
+            editing = false;
+            errors = null;
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private static JsonArray ToArray(IEnumerable<string> codes) => new([.. codes.Select(c => (JsonNode?)JsonValue.Create(c))]);
+
+    // Pasife alınmış rol kayıtta kalabilir; formda "(pasif)" ile görünür ki kaldırılabilsin.
+    private IEnumerable<RelationshipRoleDto> RoleChoices =>
+        catalogRoles.Where(r => r.IsActive || roles.Contains(r.Code))
+            .Concat(roles.Where(c => catalogRoles.All(r => r.Code != c)).Select(c => new RelationshipRoleDto(Guid.Empty, c, c, false)))
+            .OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase);
+
+    private string RoleName(string code) => catalogRoles.FirstOrDefault(r => r.Code == code)?.Name ?? code;
+
+    private string ActivityName(string code) => activities.FirstOrDefault(a => a.Code == code)?.Name ?? code;
+
+    /// <summary>Faaliyet ağacı; girinti derinliği gösterir. Kayıtta kalmış ama pasifleşmiş kodlar sonda "(pasif)" ile görünür.</summary>
+    private RenderFragment ActivityList(SortedSet<string> selected) => __builder =>
+    {
+        <div class="check-list activity-choices">
+            @foreach (var item in ActivityChoicesFor(selected))
+            {
+                <label class="form-check">
+                    <input class="form-check-input" type="checkbox" checked="@selected.Contains(item.Code)" @onchange="e => Toggle(selected, item.Code, (bool)e.Value!)" />
+                    <span class="form-check-label">@(item.Depth > 0 ? string.Concat(Enumerable.Repeat("– ", item.Depth)) : null)@item.Name@(item.Active ? null : " (pasif)")</span>
+                </label>
+            }
+        </div>
+    };
+
+    private IReadOnlyList<ActivityChoice> ActivityChoicesFor(SortedSet<string> selected)
+    {
+        var byParent = activities.ToLookup(a => a.ParentCode);
+        var list = new List<ActivityChoice>();
+        void Walk(string? parent, int depth)
+        {
+            foreach (var node in byParent[parent])
+            {
+                list.Add(new ActivityChoice(node.Code, node.Name, depth, node.Kind, Active: true));
+                Walk(node.Code, depth + 1);
+            }
+        }
+
+        Walk(null, 0);
+        list.AddRange(selected.Where(c => list.All(i => i.Code != c)).Select(c => new ActivityChoice(c, c, 0, "", Active: false)));
+        return list;
+    }
+
+    private RenderFragment Pills(IEnumerable<string> codes, Func<string, string> name) => builder =>
+    {
+        var any = false;
+        foreach (var code in codes)
+        {
+            any = true;
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "badge tag");
+            builder.AddContent(2, name(code));
+            builder.CloseElement();
+        }
+
+        if (!any)
+        {
+            builder.AddContent(3, "—");
+        }
+    };
+
+    internal sealed record ActivityChoice(string Code, string Name, int Depth, string Kind, bool Active);
+}

@@ -160,6 +160,9 @@ public class ModulixDbContext(
     public DbSet<ActivityNodeCapability> ActivityNodeCapabilities => Set<ActivityNodeCapability>();
 
     public DbSet<TenantActivitySelection> ActivitySelections => Set<TenantActivitySelection>();
+
+    public DbSet<RelationshipRole> RelationshipRoles => Set<RelationshipRole>();
+
     public DbSet<RulePackage> RulePackages => Set<RulePackage>();
     public DbSet<RulePackageVersion> RulePackageVersions => Set<RulePackageVersion>();
     public DbSet<TenantRuleAdaptation> RuleAdaptations => Set<TenantRuleAdaptation>();
