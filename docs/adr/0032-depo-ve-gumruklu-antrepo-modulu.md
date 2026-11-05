@@ -144,4 +144,9 @@ Tenant izolasyonu: A tenant'ı B'nin beyanname/parti/hareketini göremez. Yetki:
 - Denetim kaydı yapısı okundu (`core.AuditLog`: kullanıcı, kayıt türü ve kimliği, işlem, alan farkı JSON, kaynak, `CorrelationId`; RLS ile değiştirilemez), hareket izi için uygun görünüyor; yük altında, dizin ve toplu yazım açısından ölçülmedi.
 - **Yapılacak (uzmanla teyit):** gümrük denetiminin toplu işlemlerde hareket düzeyinde ayrı denetim satırı isteyip istemediği. Teyide kadar varsayılan özet satırdır ve tenant "hareket başına"yı seçebilir (K13).
 - Kanal önceliği (müşavir ASN'yi kim, hangi yolla açıyor): pilot akışıyla teyit gerekir.
-- Hiçbir kod veya test çalıştırılmadı.
+- Mevzuat ve entegrasyon maddeleri için hiçbir doğrulama yapılmadı; yukarıdaki liste uzman ve pilot onayı bekliyor.
+
+## 10. Uygulama durumu
+
+- **Dilim 2a (modül iskeleti, 5 Kasım 2026):** `Modulix.Modules.Warehouse` kaydedildi (anahtar `warehouse`; izinler `warehouse.facilities.*` ve `warehouse.locations.*`; "Depo sorumlusu" rol önerisi). Varlık, ayar, seçim listesi ve form yok; bunlar tesis ve lokasyon varlıklarıyla (dilim 2b) gelir, çünkü seçim listeleri bir kayıt türünün alanına bağlıdır ve kullanılmayan ayar eklenmez. Yerelde çalışan testler: mimari testler (56), Depo birim testleri (4), `ModulesAndRolesTests` (9). Tam entegrasyon seti çalıştırılmadı.
+- Sıradaki: dilim 2b — `Facility`, `Zone` (alan türü seçim listesi), `LocationLevelDefinition`, `Location` ağacı, migration ve RLS.
