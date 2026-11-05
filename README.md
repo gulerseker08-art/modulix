@@ -805,7 +805,7 @@ dotnet run --project src/Modulix.Api
 | `Modulix.Modules.Orders` | Sipariş ve satış devri (tekliften sipariş; devir, operasyon ve teslimat sonraki dilimlerde) | Core.Contracts |
 | `Modulix.Modules.Support` | Destek ve şikâyet yönetimi (talep, kuyruk, kategori, durum makinesi, mesaj/iç not; SLA ve diğerleri sonraki dilimlerde) | Core.Contracts |
 | `Modulix.Modules.Marketing` | Pazarlama: segment ve (sonraki dilimlerde) kampanya yönetimi; başka modüllerin alanları `ISegmentFieldSource` ile | Core.Contracts |
-| `Modulix.Modules.Warehouse` | Depo ve (sonraki dilimlerde) gümrüklü antrepo: şu an yalnızca tesis kaydı (`warehouse.facility`, genel kayıt uçlarından); alan, lokasyon ağacı, stok ve gümrük uzantısı ADR-0032 dilimlerinde | Core.Contracts |
+| `Modulix.Modules.Warehouse` | Depo ve (sonraki dilimlerde) gümrüklü antrepo: şu an tesis (`warehouse.facility`) ve alan (`warehouse.zone`, tür kategorisine bağlı gümrük kuralları) kayıtları, genel kayıt uçlarından; lokasyon ağacı, stok ve gümrük uzantısı ADR-0032 dilimlerinde | Core.Contracts |
 | `Modulix.AI` | LLM katmanı, tool sözleşmesi | Core.Contracts |
 | `Modulix.Shared` | API DTO'ları ve doğrulama kuralları | — |
 | `Modulix.Api` | Host, endpoint'ler | Hepsi |

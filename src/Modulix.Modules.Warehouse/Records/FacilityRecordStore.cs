@@ -26,6 +26,7 @@ internal sealed partial class FacilityRecordStore(WarehouseStoreContext context)
         Field.Text<Facility>("description", Facility.DescriptionMaxLength, f => f.Description, (f, v) => f.Description = v),
         Field.Text<Facility>("countryCode", Facility.CountryCodeLength, f => f.CountryCode, (f, v) => f.CountryCode = v),
         Field.Flag<Facility>("customsEnabled", f => f.CustomsEnabled, (f, v) => f.CustomsEnabled = v),
+        Field.Flag<Facility>("allowMixedZones", f => f.AllowMixedZones, (f, v) => f.AllowMixedZones = v),
         Field.Flag<Facility>("isActive", f => f.IsActive, (f, v) => f.IsActive = v),
     ];
 
@@ -66,9 +67,32 @@ internal sealed partial class FacilityRecordStore(WarehouseStoreContext context)
             }
         }
 
+        // Mevcut alanlarla çelişen tesis ayarı kaydedilemez (K12, K17): kapatılan ayar alanların kuralını geriye dönük bozmaz.
+        if (!isNew && (!entity.CustomsEnabled || !entity.AllowMixedZones))
+        {
+            var inUse = await ZoneRules.CategoriesInUseAsync(Context, entity.Id, null, cancellationToken);
+            if (!entity.CustomsEnabled && inUse.Contains(WarehouseModule.ZoneKindCategories.Controlled))
+            {
+                errors.Add(new RecordFieldError("customsEnabled", "Gümrük denetimli alanı olan tesiste gümrük uzantısı kapatılamaz."));
+            }
+
+            if (!entity.AllowMixedZones && ZoneRules.IsMixed(inUse))
+            {
+                errors.Add(new RecordFieldError("allowMixedZones", "Tesiste serbest ve gümrük denetimli alanlar birlikte duruyor; önce birini kaldırın."));
+            }
+        }
+
         if (errors.Count > 0)
         {
             throw new RecordValidationException(errors);
+        }
+    }
+
+    protected override async Task BeforeDeleteAsync(Facility entity, CancellationToken cancellationToken)
+    {
+        if (await Context.Data.Set<Zone>().AsNoTracking().AnyAsync(z => z.FacilityId == entity.Id, cancellationToken))
+        {
+            throw new RecordConflictException("Tesise bağlı alanlar var; önce alanları silin.");
         }
     }
 

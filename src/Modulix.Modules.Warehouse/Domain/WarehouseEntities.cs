@@ -62,6 +62,39 @@ public sealed class Facility : WarehouseEntity
     /// <summary>Gümrük uzantısı bu tesiste açık mı? Varsayılan kapalı.</summary>
     public bool CustomsEnabled { get; internal set; }
 
+    /// <summary>
+    /// Aynı tesiste serbest ve gümrük denetimli alanlar birlikte bulunabilir mi? Varsayılan kapalı (K12): hukuki doğrulama olmadan
+    /// açılması önerilmez; ileride rejim profilindeki izinle birlikte değerlendirilir.
+    /// </summary>
+    public bool AllowMixedZones { get; internal set; }
+
     /// <summary>Pasif tesis yeni işlem almaz; geçmiş kayıtları korunur.</summary>
+    public bool IsActive { get; internal set; } = true;
+}
+
+/// <summary>
+/// Tesis içindeki alan (K11, K18): gümrük denetimli ya da serbest bölge. Türün <b>kategorisi</b> kodun anladığı anlamdır
+/// (<c>controlled</c>, <c>free</c>); adı ve ek değerleri tenant'ındır. Gümrük denetimindeki mal serbest alana yerleştirilemez
+/// (K17); bu denetim lokasyon ve hareket dilimlerinde bu alan türüne bakar.
+/// </summary>
+public sealed class Zone : WarehouseEntity
+{
+    public const int CodeMaxLength = 30;
+    public const int NameMaxLength = 200;
+    public const int DescriptionMaxLength = 1000;
+
+    public Guid FacilityId { get; internal set; }
+
+    /// <summary>Tesis içinde benzersiz kısa kod.</summary>
+    public string Code { get; internal set; } = string.Empty;
+
+    public string Name { get; internal set; } = string.Empty;
+
+    /// <summary>Alan türü (Y9b listesi <c>warehouse.zone-kind</c>); kategorisi denetim türünü belirler.</summary>
+    public string KindKey { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    /// <summary>Pasif alan yeni yerleştirme almaz; geçmiş kayıtları korunur.</summary>
     public bool IsActive { get; internal set; } = true;
 }

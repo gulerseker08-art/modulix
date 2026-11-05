@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Modulix.Core.Contracts.Customization;
 using Modulix.Modules.Warehouse.Domain;
 
 namespace Modulix.Modules.Warehouse.Persistence;
@@ -37,8 +38,28 @@ internal sealed class FacilityConfiguration : IEntityTypeConfiguration<Facility>
         builder.Property(f => f.Description).HasMaxLength(Facility.DescriptionMaxLength);
         builder.Property(f => f.CountryCode).HasMaxLength(Facility.CountryCodeLength).IsFixedLength().IsUnicode(false);
         builder.Property(f => f.CustomsEnabled).HasDefaultValue(false);
+        builder.Property(f => f.AllowMixedZones).HasDefaultValue(false);
         builder.Property(f => f.IsActive).HasDefaultValue(true);
 
         builder.HasIndex(f => new { f.TenantId, f.Code }).IsUnique().HasDatabaseName("UX_Facilities_Code");
+    }
+}
+
+internal sealed class ZoneConfiguration : IEntityTypeConfiguration<Zone>
+{
+    public void Configure(EntityTypeBuilder<Zone> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "Zones");
+        builder.Property(z => z.Code).HasMaxLength(Zone.CodeMaxLength).IsRequired();
+        builder.Property(z => z.Name).HasMaxLength(Zone.NameMaxLength).IsRequired();
+        builder.Property(z => z.KindKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(z => z.Description).HasMaxLength(Zone.DescriptionMaxLength);
+        builder.Property(z => z.IsActive).HasDefaultValue(true);
+
+        builder.HasIndex(z => new { z.TenantId, z.FacilityId, z.Code }).IsUnique().HasDatabaseName("UX_Zones_Code");
+
+        // Tesis aynı tenant'ta olmalıdır; alanı olan tesis silinemez.
+        builder.HasOne<Facility>().WithMany().HasForeignKey(z => new { z.TenantId, z.FacilityId })
+            .HasPrincipalKey(f => new { f.TenantId, f.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
