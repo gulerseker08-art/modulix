@@ -73,6 +73,54 @@ public sealed class Facility : WarehouseEntity
 }
 
 /// <summary>
+/// Tesisin lokasyon kodundaki bir seviyenin tanımı (K11, ADR'deki <c>LocationLevelDefinition</c>). Seviyeler sabit sütun değildir:
+/// her tesis kendi sırasını, adlarını, uzunluklarını ve ayraçlarını tanımlar (ör. <c>ANT-A-02-04-C</c> için Tesis, Koridor, Raf, Kat,
+/// Göz; başka tesis üç ya da altı seviye kurabilir). Lokasyon kodu bu tanımdan üretilir ve doğrulanır (sonraki dilim). Kullanımdaki
+/// tesiste tanım yalnızca eklenir ve yeniden adlandırılır; bu denetim lokasyonlar gelince eklenir.
+/// </summary>
+public sealed class LocationLevel : WarehouseEntity
+{
+    public const int KeyMaxLength = 30;
+    public const int NameMaxLength = 100;
+    public const int SeparatorMaxLength = 3;
+    public const int MaxPosition = 10;
+    public const int MaxValueLength = 20;
+
+    /// <summary>Seviye değerinde izin verilen karakterler: harf ve rakam, yalnızca harf, yalnızca rakam.</summary>
+    public static class CharacterSets
+    {
+        public const string Alphanumeric = "alphanumeric";
+        public const string Letters = "letters";
+        public const string Digits = "digits";
+
+        public static IReadOnlyList<string> All { get; } = [Alphanumeric, Letters, Digits];
+    }
+
+    /// <summary>Ayraç olarak izin verilen karakterler; kodu çözümlenebilir tutar (harf ve rakam ayraç olamaz).</summary>
+    public const string SeparatorCharacters = "-._/:";
+
+    public Guid FacilityId { get; internal set; }
+
+    /// <summary>Koddaki sıra (1 en dıştaki seviye, ör. tesis); tesis içinde benzersiz.</summary>
+    public int Position { get; internal set; }
+
+    /// <summary>Teknik anahtar (ör. "aisle"); tesis içinde benzersiz, küçük harf.</summary>
+    public string Key { get; internal set; } = string.Empty;
+
+    /// <summary>Görünen ad (ör. "Koridor"); kullanımdaki tesiste de değiştirilebilir.</summary>
+    public string Name { get; internal set; } = string.Empty;
+
+    public string CharacterSet { get; internal set; } = CharacterSets.Alphanumeric;
+
+    public int MinLength { get; internal set; } = 1;
+
+    public int MaxLength { get; internal set; } = 10;
+
+    /// <summary>Bu seviyenin değerinden önce kodda duran ayraç (ilk seviyede yok sayılır); boş olabilir.</summary>
+    public string Separator { get; internal set; } = "-";
+}
+
+/// <summary>
 /// Tesis içindeki alan (K11, K18): gümrük denetimli ya da serbest bölge. Türün <b>kategorisi</b> kodun anladığı anlamdır
 /// (<c>controlled</c>, <c>free</c>); adı ve ek değerleri tenant'ındır. Gümrük denetimindeki mal serbest alana yerleştirilemez
 /// (K17); bu denetim lokasyon ve hareket dilimlerinde bu alan türüne bakar.

@@ -45,6 +45,25 @@ internal sealed class FacilityConfiguration : IEntityTypeConfiguration<Facility>
     }
 }
 
+internal sealed class LocationLevelConfiguration : IEntityTypeConfiguration<LocationLevel>
+{
+    public void Configure(EntityTypeBuilder<LocationLevel> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "LocationLevels");
+        builder.Property(l => l.Key).HasMaxLength(LocationLevel.KeyMaxLength).IsRequired();
+        builder.Property(l => l.Name).HasMaxLength(LocationLevel.NameMaxLength).IsRequired();
+        builder.Property(l => l.CharacterSet).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(l => l.Separator).HasMaxLength(LocationLevel.SeparatorMaxLength).IsRequired();
+
+        builder.HasIndex(l => new { l.TenantId, l.FacilityId, l.Position }).IsUnique().HasDatabaseName("UX_LocationLevels_Position");
+        builder.HasIndex(l => new { l.TenantId, l.FacilityId, l.Key }).IsUnique().HasDatabaseName("UX_LocationLevels_Key");
+
+        // Tesis aynı tenant'ta olmalıdır; seviye tanımı olan tesis silinemez.
+        builder.HasOne<Facility>().WithMany().HasForeignKey(l => new { l.TenantId, l.FacilityId })
+            .HasPrincipalKey(f => new { f.TenantId, f.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class ZoneConfiguration : IEntityTypeConfiguration<Zone>
 {
     public void Configure(EntityTypeBuilder<Zone> builder)
