@@ -74,9 +74,10 @@ internal readonly record struct ParsedValue(object? Value, string? Error)
 /// <summary>Alan türleri. Biçimler: metin, mantıksal true/false, liste değeri anahtarı, kimlik GUID.</summary>
 internal static class Field
 {
+    /// <summary><paramref name="upperCase"/> açıksa değer kırpıldıktan sonra büyük harfe çevrilir (kayıtlı değerle karşılaştırma da büyük harfle yapılır).</summary>
     public static RecordField<T> Text<T>(
-        string name, int maxLength, Func<T, string?> get, Action<T, string?> set, bool required = false, bool createOnly = false) =>
-        new(name, required, nullable: !required, node => ParseText(node, maxLength), e => get(e), (e, v) => set(e, (string?)v))
+        string name, int maxLength, Func<T, string?> get, Action<T, string?> set, bool required = false, bool createOnly = false, bool upperCase = false) =>
+        new(name, required, nullable: !required, node => ParseText(node, maxLength, upperCase), e => get(e), (e, v) => set(e, (string?)v))
         {
             CreateOnly = createOnly,
         };
@@ -136,7 +137,7 @@ internal static class Field
             ? ParsedValue.Of(id)
             : ParsedValue.Fail("Geçerli bir kayıt kimliği olmalıdır.");
 
-    private static ParsedValue ParseText(JsonNode node, int maxLength)
+    private static ParsedValue ParseText(JsonNode node, int maxLength, bool upperCase)
     {
         if (node.GetValueKind() != JsonValueKind.String)
         {
@@ -144,6 +145,11 @@ internal static class Field
         }
 
         var text = node.GetValue<string>().Trim();
+        if (upperCase)
+        {
+            text = text.ToUpperInvariant();
+        }
+
         return text.Length > maxLength
             ? ParsedValue.Fail($"En fazla {maxLength} karakter olabilir.")
             : ParsedValue.Of(text);

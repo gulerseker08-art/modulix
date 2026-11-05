@@ -24,7 +24,7 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
         Field.Reference<Location, Facility>("facilityId", "Tesis bulunamadı.", l => l.FacilityId, (l, v) => l.FacilityId = v!.Value, required: true, createOnly: true),
         Field.Reference<Location, Location>("parentId", "Üst lokasyon bulunamadı.", l => l.ParentId, (l, v) => l.ParentId = v, createOnly: true),
         Field.Reference<Location, Zone>("zoneId", "Alan bulunamadı.", l => l.ZoneId, (l, v) => l.ZoneId = v),
-        Field.Text<Location>("value", Location.ValueMaxLength, l => l.Value, (l, v) => l.Value = v!, required: true, createOnly: true),
+        Field.Text<Location>("value", Location.ValueMaxLength, l => l.Value, (l, v) => l.Value = v!, required: true, createOnly: true, upperCase: true),
         Field.Integer<Location>("depth", l => l.Depth, (l, v) => l.Depth = v ?? l.Depth, 1, LocationLevel.MaxPosition).AsSystem(),
         Field.Text<Location>("code", Location.CodeMaxLength, l => l.Code, (l, v) => l.Code = v!).AsSystem(),
         Field.Text<Location>("name", Location.NameMaxLength, l => l.Name, (l, v) => l.Name = v),
@@ -88,7 +88,6 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
         }
 
         var level = levels[entity.Depth - 1];
-        entity.Value = entity.Value.ToUpperInvariant();
         if (entity.Value.Length < level.MinLength || entity.Value.Length > level.MaxLength)
         {
             errors.Add(new RecordFieldError("value", $"{level.Name} değeri {level.MinLength} ile {level.MaxLength} karakter arasında olmalıdır."));
