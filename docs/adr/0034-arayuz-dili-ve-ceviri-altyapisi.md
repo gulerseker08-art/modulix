@@ -1,4 +1,4 @@
-# ADR-0033: Arayüz dili (kullanıcı ve tenant bazında) ve çeviri altyapısı
+# ADR-0034: Arayüz dili (kullanıcı ve tenant bazında) ve çeviri altyapısı
 
 - **Durum:** Taslak (4 Kasım 2026). Kod yok; ADR-0020 "Ayrı ADR isteyen kurallar" başlığındaki TR/EN çeviri kalemini karşılar.
 - **Karar:** Arayüz dili **kullanıcı başına** tercih edilir, tenant **varsayılan dil** tanımlar, son çare `tr`. Desteklenen diller `tr`, `en`, `az` (Azerbaycan Türkçesi, Latin). Metinler **kültür verisinden bağımsız JSON sözlükleriyle** çevrilir; aynı dosyaları sunucu ve Blazor WebAssembly okur. Dil, tarih/sayı biçimi (`core.regional.format`) ve saat diliminden ayrı bir tercihtir.

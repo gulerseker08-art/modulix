@@ -3,7 +3,7 @@ using Modulix.Core.Settings;
 
 namespace Modulix.Core.Tests.Settings;
 
-/// <summary>ADR-0033: arayüz dili seçenekleri ve çözümleme sırası.</summary>
+/// <summary>ADR-0034: arayüz dili seçenekleri ve çözümleme sırası.</summary>
 public class LanguageOptionsTests
 {
     [Fact]
