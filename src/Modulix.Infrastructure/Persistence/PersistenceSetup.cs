@@ -10,6 +10,7 @@ using Modulix.Core.Contracts.Communication;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
 using Modulix.Core.FieldRules;
@@ -136,6 +137,7 @@ public static class PersistenceSetup
         services.AddScoped<ISectorCatalog, SectorCatalogService>();
         services.AddScoped<IStarterPackages, StarterPackageInstaller>();
         services.AddScoped<IRelationshipRoles, RelationshipRoleService>();
+        services.AddScoped<IActivityCodeCatalog, ActivityCodeCatalog>();
         services.AddScoped<ITenantActivitySelection, TenantActivitySelectionService>();
         services.AddScoped<IRulePackageService, RulePackageService>();
         services.AddScoped<ITenantFieldRules, TenantFieldRulesService>();

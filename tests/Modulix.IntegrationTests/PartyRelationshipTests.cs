@@ -20,6 +20,8 @@ namespace Modulix.IntegrationTests;
 /// ADR-0029 Dilim E: firmanın ilişki rolleri, müşteri sektörü ve hizmet ihtiyacı. Üç alan <c>core.party</c> kaydının parçasıdır ve
 /// kayıt boru hattından geçer (izin, kapsam, denetim); katalog global, değerler tenant verisidir.
 /// </summary>
+// Genel faaliyet kataloğunu (başlangıç paketi kurulumu) kullanan sınıflar sırayla çalışır: eşzamanlı kurulum tekil dizin hatası verir.
+[Collection("SectorCatalog")]
 public class PartyRelationshipTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
     private const string Parties = "/api/records/" + SharedEntities.Party;

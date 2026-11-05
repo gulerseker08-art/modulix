@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Sectors;
+
 namespace Modulix.Core.Sectors;
 
 /// <summary>
@@ -59,39 +61,15 @@ public interface IRelationshipRoles
 /// </summary>
 public static class PartyRelationshipRules
 {
-    public const int MaxItems = 20;
+    public const int MaxItems = ActivityCodeList.MaxItems;
 
     /// <summary>Sütun uzunluğu: en çok <see cref="MaxItems"/> kod, kod başına en çok 50 karakter ve ayraç.</summary>
-    public const int StoredMaxLength = MaxItems * (ActivityTreeRules.CodeMaxLength + 1);
+    public const int StoredMaxLength = ActivityCodeList.StoredMaxLength;
 
-    public static IReadOnlyList<string> Split(string? stored) =>
-        string.IsNullOrWhiteSpace(stored)
-            ? []
-            : [.. stored.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+    public static IReadOnlyList<string> Split(string? stored) => ActivityCodeList.Split(stored);
 
     /// <summary>Tekrarları atar, sıralar; geçersiz kod ya da fazla öğe varsa hata iletisi döner.</summary>
-    public static (IReadOnlyList<string> Codes, string? Error) Normalize(IEnumerable<string?> codes)
-    {
-        ArgumentNullException.ThrowIfNull(codes);
-        var result = new SortedSet<string>(StringComparer.Ordinal);
-        foreach (var raw in codes)
-        {
-            var code = raw?.Trim();
-            if (string.IsNullOrEmpty(code))
-            {
-                continue;
-            }
+    public static (IReadOnlyList<string> Codes, string? Error) Normalize(IEnumerable<string?> codes) => ActivityCodeList.Normalize(codes);
 
-            if (!ActivityTreeRules.IsValidCode(code))
-            {
-                return ([], $"Geçersiz kod: '{code}'.");
-            }
-
-            result.Add(code);
-        }
-
-        return result.Count > MaxItems ? ([], $"En çok {MaxItems} seçim yapılabilir.") : ([.. result], null);
-    }
-
-    public static string? Join(IReadOnlyCollection<string> codes) => codes.Count == 0 ? null : string.Join(',', codes);
+    public static string? Join(IReadOnlyCollection<string> codes) => ActivityCodeList.Join(codes);
 }

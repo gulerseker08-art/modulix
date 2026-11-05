@@ -6282,6 +6282,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<string>("ServiceScope")
+                        .HasMaxLength(1020)
+                        .HasColumnType("nvarchar(1020)");
+
                     b.Property<string>("Source")
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");
