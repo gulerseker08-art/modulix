@@ -24,6 +24,9 @@ public static class ModuleServiceCollectionExtensions
 
         services.AddSingleton(catalog);
 
+        // Arayüz ve ileti metinleri (ADR-0034): sözlükler derlemeye gömülüdür, açılışta bir kez okunur.
+        services.AddSingleton<Modulix.Core.Contracts.Localization.ITextCatalog, Modulix.Core.Localization.TextCatalog>();
+
         // Kural altyapısının saf ve katalogla çalışan parçaları (ADR-0027); kural deposu ve servisi Infrastructure'da.
         services.AddScoped<IAutomationCatalog, AutomationCatalogService>();
         services.AddScoped<AutomationDefinitionValidator>();

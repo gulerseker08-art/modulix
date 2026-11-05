@@ -1,0 +1,8 @@
+{
+  "common.save": "Kaydet",
+  "common.saved": "Kaydedildi.",
+  "account.language.title": "Dil",
+  "account.language.label": "Arayüz dili",
+  "account.language.tenantDefault": "Firmanın varsayılanı",
+  "account.language.help": "Seçiminiz üye olduğunuz bütün kuruluşlarda geçerlidir. Kayıtlı verileriniz değişmez."
+}

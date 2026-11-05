@@ -1,5 +1,6 @@
 using Modulix.Shared.Access;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Localization;
 using Modulix.Shared.Platform;
 using Modulix.Shared.Settings;
 
@@ -162,6 +163,7 @@ public sealed class SessionState(ApiClient api)
         Logo = null;
         Regional.Apply(null);
         UiLanguage.Apply(null, null);
+        await LoadTextsAsync();
         loading = Task.CompletedTask;
         Changed?.Invoke();
     }
@@ -190,7 +192,23 @@ public sealed class SessionState(ApiClient api)
             Logo = null;
         }
 
+        await LoadTextsAsync();
         IsLoaded = true;
         Changed?.Invoke();
+    }
+
+    /// <summary>Etkin dilin metinlerini yükler (ADR-0034); dil değişmediyse yeniden indirmez. Yüklenemezse eski sözlük kalır.</summary>
+    private async Task LoadTextsAsync()
+    {
+        if (Texts.Language == UiLanguage.Code)
+        {
+            return;
+        }
+
+        var bundle = await api.GetAsync<TextBundleResponse>($"/api/i18n/{UiLanguage.Code}");
+        if (bundle.Value is { } loaded)
+        {
+            Texts.Apply(loaded);
+        }
     }
 }

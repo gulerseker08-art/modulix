@@ -1,7 +1,7 @@
 namespace Modulix.Shared.Settings;
 
 /// <summary>
-/// Arayüz dili kodları (ADR-0033). Sunucudaki <c>LanguageOptions</c> ile aynı kümeyi taşır (Shared, Core'a başvuramaz;
+/// Arayüz dili kodları (ADR-0034). Sunucudaki <c>LanguageOptions</c> ile aynı kümeyi taşır (Shared, Core'a başvuramaz;
 /// ikisinin eşitliğini birim test denetler). Çözümleme sırası: kullanıcı tercihi → firma varsayılanı → <see cref="Default"/>.
 /// </summary>
 public static class LanguageCodes

@@ -15,7 +15,7 @@ public class ModulixUser : IdentityUser<Guid>
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
-    /// Arayüz dili tercihi (ADR-0033): <c>tr</c>, <c>en</c>, <c>az</c>. Boşsa aktif firmanın varsayılan dili kullanılır.
+    /// Arayüz dili tercihi (ADR-0034): <c>tr</c>, <c>en</c>, <c>az</c>. Boşsa aktif firmanın varsayılan dili kullanılır.
     /// Kişiye aittir, hangi firmada olursa olsun aynıdır.
     /// </summary>
     public string? PreferredLanguage { get; set; }

@@ -1,4 +1,4 @@
-# ADR-0033: Arayüz dili (kullanıcı ve tenant bazında) ve çeviri altyapısı
+# ADR-0034: Arayüz dili (kullanıcı ve tenant bazında) ve çeviri altyapısı
 
 - **Durum:** Taslak (4 Kasım 2026). Kod yok; ADR-0020 "Ayrı ADR isteyen kurallar" başlığındaki TR/EN çeviri kalemini karşılar.
 - **Karar:** Arayüz dili **kullanıcı başına** tercih edilir, tenant **varsayılan dil** tanımlar, son çare `tr`. Desteklenen diller `tr`, `en`, `az` (Azerbaycan Türkçesi, Latin). Metinler **kültür verisinden bağımsız JSON sözlükleriyle** çevrilir; aynı dosyaları sunucu ve Blazor WebAssembly okur. Dil, tarih/sayı biçimi (`core.regional.format`) ve saat diliminden ayrı bir tercihtir.
@@ -32,7 +32,7 @@ Yeni ayar `core.regional.language` (`SettingType.Choice`, varsayılan `tr`, grup
 
 ### 5. Kaynak biçimi: JSON
 
-Seçilen: `Modulix.Shared/Localization/{tr,en,az}.json` (düz anahtar → metin). `.resx` seçilmedi:
+Seçilen: `Modulix.Core/Localization/Texts/{tr,en,az}.json` (düz anahtar → metin; derlemeye gömülür, `ITextCatalog` okur). Sözlükler Core'dadır, çünkü sunucu kodu ve modüller yalnızca Core/Core.Contracts'a başvurabilir; arayüz (Web yalnızca Shared'a başvurur) aynı sözlüğü `GET /api/i18n/{dil}` ucundan alır, böylece tek kaynak vardır ve dosya kopyalanmaz. Uç oturumsuzdur (giriş ekranı da çevrilir), yalnızca sabit ürün metinlerini döner, bilinmeyen dil 404 verir; yanıt eksik anahtarları Türkçeden tamamlanmış gelir. `.resx` seçilmedi:
 
 - `.resx` uydu derlemeleri `CultureInfo` ile aranır. Tarayıcıda kültür verisi sınırlı yüklendiği için (`Regional.cs`) `az` kültürünün orada bulunması garanti değildir; kültür bulunamazsa metin sessizce Türkçeye düşer. JSON bir kültür nesnesi gerektirmez, yalnızca kod ister.
 - Aynı dosyalar sunucu (API iletileri, e-posta, rapor başlıkları) ve istemci için tek kaynaktır; `.resx` iki ayrı erişim yolu ister.
@@ -62,7 +62,8 @@ Mimari/birim test: (a) üç sözlüğün anahtar kümesi aynıdır, (b) yer tutu
 
 ## Uygulama durumu
 
-- **Aşama 2 (4 Kasım 2026):** `LanguageOptions` (Core) ve `LanguageCodes` (Shared; Shared Core'a başvuramadığı için ikisi ayrı tutulur, eşitliği `LanguagePreferenceTests` denetler), `core.regional.language` ayarı, `ModulixUser.PreferredLanguage` + migration, `PUT /api/account/language`, `MeResponse.PreferredLanguage`, Hesabım → Dil, istemcide `UiLanguage.Code`. Sunucu tarafı çözümleme servisi (e-posta ve arka plan işleri için alıcının dili) ilk tüketicisi olan aşama 3'te eklenir; o zamana kadar yazılacak servisin kullanacağı saf kural `LanguageOptions.Resolve`'dur.
+- **Aşama 2 (4 Kasım 2026):** `LanguageOptions` (Core) ve `LanguageCodes` (Shared; Shared Core'a başvuramadığı için ikisi ayrı tutulur, eşitliği `LanguagePreferenceTests` denetler), `core.regional.language` ayarı, `ModulixUser.PreferredLanguage` + migration, `PUT /api/account/language`, `MeResponse.PreferredLanguage`, Hesabım → Dil, istemcide `UiLanguage.Code`. Sunucu tarafı çözümleme servisi (e-posta ve arka plan işleri için alıcının dili) ilk tüketicisi gelene kadar yazılmadı; kullanacağı saf kural `LanguageOptions.Resolve`'dur.
+- **Aşama 3 (5 Kasım 2026):** `ITextCatalog` (Core.Contracts) ve `TextCatalog` (Core; gömülü `Localization/Texts/{tr,en,az}.json`, eksik anahtar Türkçeye, o da yoksa anahtara düşer), `GET /api/i18n/{dil}` (oturumsuz, `EndpointProtectionTests` listesine gerekçesiyle eklendi), istemcide `Texts.Get(anahtar)` ve oturumla birlikte sözlük yükleme (`SessionState`), `az-AZ` tarih/sayı biçimi. Pilot ekran: Hesabım → Dil (altı anahtar). Test kapısı `LocalizationRulesTests`: üç sözlüğün anahtar kümesi eşit, yer tutucular eşit, anahtarlar biçimli ve boş değil, Web'de `Texts.Get("...")` ile kullanılan her anahtar `tr.json`'da var. `az` metinleri taslaktır, anadili konuşan biri gözden geçirmelidir. Çoğul biçimler ilk çoğullu metin geldiğinde eklenir. Henüz yok: giriş öncesi ekranlarda dilin tarayıcı tercihinden ve `localStorage`'dan başlaması (§4); bugün giriş öncesi Türkçedir (ayrı küçük iş).
 
 ## Açık noktalar
 

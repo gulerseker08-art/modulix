@@ -13,7 +13,7 @@ using static Modulix.Core.Modules.CoreModule.Permissions;
 
 namespace Modulix.IntegrationTests;
 
-/// <summary>ADR-0033: arayüz dili. Kullanıcı tercihi kişiye aittir; firma varsayılanı ayarla yönetilir.</summary>
+/// <summary>ADR-0034: arayüz dili. Kullanıcı tercihi kişiye aittir; firma varsayılanı ayarla yönetilir.</summary>
 public class LanguagePreferenceTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
     [Fact]
