@@ -130,6 +130,9 @@ public sealed class WarehouseModule : IModule
         },
     ];
 
+    /// <summary>Tesis formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>
+    IReadOnlyList<FormDefinition> IModule.Forms => WarehouseForms.All;
+
     IReadOnlyList<RoleTemplate> IModule.RoleTemplates { get; } =
     [
         new(

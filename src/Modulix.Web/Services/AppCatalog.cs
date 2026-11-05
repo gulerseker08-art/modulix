@@ -5,6 +5,7 @@ using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
 using Modulix.Shared.Reporting;
 using Modulix.Shared.Support;
+using Modulix.Shared.Warehouse;
 
 namespace Modulix.Web.Services;
 
@@ -93,12 +94,14 @@ public static class AppCatalog
     public const string Orders = "orders";
     public const string Support = "support";
     public const string Marketing = "marketing";
+    public const string Warehouse = "warehouse";
     public const string Reports = "reports";
     public const string Admin = "admin";
     public const string Platform = "platform";
 
     public const string SalesGroup = "sales";
     public const string ServiceGroup = "service";
+    public const string OperationsGroup = "operations";
     public const string ManagementGroup = "management";
 
     public const string CrmWorkspaceGroup = "crm.workspace";
@@ -115,6 +118,7 @@ public static class AppCatalog
     [
         new(SalesGroup, "Satış ve müşteri", 10),
         new(ServiceGroup, "Müşteri hizmetleri", 20),
+        new(OperationsGroup, "Operasyon", 25),
         new(ManagementGroup, "Yönetim", 30),
 
         new(CrmWorkspaceGroup, "Çalışma Alanım", 10, "home"),
@@ -133,7 +137,6 @@ public static class AppCatalog
     public static IReadOnlyList<PlannedApp> Planned { get; } =
     [
         new("planned.logistics", "Lojistik", "truck"),
-        new("planned.warehouse", "Antrepo", "warehouse"),
         new("planned.hr", "İnsan Kaynakları", "users"),
     ];
 
@@ -208,6 +211,10 @@ public static class AppCatalog
         new("marketing.segments", Marketing, "Segmentler", "list", "pazarlama/segmentler", 10, MarketingAccess.ModuleKey, MarketingAccess.SegmentsRead, Hosted: new(CrmMarketingGroup, null, 10)),
         new("marketing.campaigns", Marketing, "Kampanyalar", "target", "pazarlama/kampanyalar", 20, MarketingAccess.ModuleKey, MarketingAccess.CampaignsRead, Tone: AppTone.Teal, Hosted: new(CrmMarketingGroup, null, 20)),
         new("marketing.report", Marketing, "Kampanya raporu", "dashboard", "pazarlama/rapor", 30, MarketingAccess.ModuleKey, MarketingAccess.ReportsRead, Hosted: new(CrmMarketingGroup, "Kampanya sonuçları", 30)),
+
+        // Depo ve antrepo (ADR-0032): şimdilik yapı tanımı (tesis); alan, lokasyon seviyesi ve lokasyon ekranları sonraki adımlarda eklenir.
+        new(Warehouse, null, "Depo ve Antrepo", "warehouse", null, 40, ModuleKey: WarehouseAccess.ModuleKey, Group: OperationsGroup),
+        new("warehouse.facilities", Warehouse, "Tesisler", "building", "depo/tesisler", 10, WarehouseAccess.ModuleKey, WarehouseAccess.FacilitiesRead),
 
         // Rapor merkezi çekirdeğe aittir (modül anahtarı yok; yönetim girdileri gibi yalnızca izne bağlıdır). Tek ekranlı olduğu için alt uygulaması yoktur,
         // kendi route'u vardır; /raporlar altındaki oluşturucu ve çalıştırma ekranları da bu uygulamanın bağlamında kalır.
