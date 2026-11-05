@@ -30,6 +30,7 @@ public static class ModuleServiceCollectionExtensions
         services.AddScoped<IAutomationRelationCounter, AutomationRelationCounter>();
         services.AddScoped<IAutomationRecordReader, PipelineAutomationRecordReader>();
         services.AddScoped<IAutomationPreview, AutomationPreviewService>();
+        services.AddScoped<Modulix.Core.FieldRules.IFieldRuleGate, Modulix.Core.FieldRules.FieldRuleGate>();
         return services;
     }
 }

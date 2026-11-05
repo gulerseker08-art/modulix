@@ -5,6 +5,7 @@ using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Records;
+using Modulix.Modules.Crm.Reporting;
 
 namespace Modulix.Modules.Crm.Opportunities;
 
@@ -77,6 +78,7 @@ internal sealed class OpportunityWorkflow(
     IChoiceLists choiceLists,
     ICurrentAccess access,
     OpportunityHistoryReader historyReader,
+    ISalesReportingPolicyProvider reportingPolicy,
     TimeProvider time) : IOpportunityWorkflow
 {
     private const string Key = CrmModule.Entities.Opportunity;
@@ -138,7 +140,7 @@ internal sealed class OpportunityWorkflow(
             return Invalid(blocked, "status");
         }
 
-        var today = Today();
+        var today = await TodayAsync(cancellationToken);
         var closeDate = request.ActualCloseDate ?? today;
         if (closeDate > today)
         {
@@ -235,7 +237,7 @@ internal sealed class OpportunityWorkflow(
             }
         }
 
-        var today = Today();
+        var today = await TodayAsync(cancellationToken);
         if (request.RecontactDate is { } recontact && recontact <= today)
         {
             return Invalid("Yeniden iletişim tarihi gelecekte olmalıdır.", "recontactDate");
@@ -311,7 +313,7 @@ internal sealed class OpportunityWorkflow(
         {
             ["status"] = OpportunityStatus.Cancelled,
             ["statusReason"] = reason.Trim(),
-            ["actualCloseDate"] = Today().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["actualCloseDate"] = (await TodayAsync(cancellationToken)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
         }, cancellationToken);
     }
 
@@ -333,7 +335,7 @@ internal sealed class OpportunityWorkflow(
             return Invalid("Beklemeye alma gerekçesi zorunludur.", "statusReason");
         }
 
-        if (reviewDate <= Today())
+        if (reviewDate <= await TodayAsync(cancellationToken))
         {
             return Invalid("Yeniden değerlendirme tarihi gelecekte olmalıdır.", "holdReviewDate");
         }
@@ -388,7 +390,7 @@ internal sealed class OpportunityWorkflow(
             return Invalid("Yeniden açılan fırsat için etkin, açık bir aşama seçin.", "stage");
         }
 
-        if (request.ExpectedCloseDate < Today())
+        if (request.ExpectedCloseDate < await TodayAsync(cancellationToken))
         {
             return Invalid("Tahmini kapanış tarihi geçmişte olamaz.", "expectedCloseDate");
         }
@@ -506,7 +508,9 @@ internal sealed class OpportunityWorkflow(
     private static RecordResult<OpportunityActionResult> Done(RecordData opp) =>
         RecordResult<OpportunityActionResult>.Ok(new OpportunityActionResult(opp));
 
-    private DateOnly Today() => DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+    /// <summary>Bugünün tarihi firmanın saat diliminde (raporlarla aynı politika); UTC günü gece 00:00–03:00 (İstanbul) arasında bir gün geri kalırdı.</summary>
+    private async Task<DateOnly> TodayAsync(CancellationToken cancellationToken) =>
+        ReportPeriods.Today(time.GetUtcNow(), (await reportingPolicy.GetAsync(cancellationToken)).TimeZone);
 
     private static string Status(RecordData opp) => Text(opp, "status") ?? OpportunityStatus.Open;
 

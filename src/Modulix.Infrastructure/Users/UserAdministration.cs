@@ -60,7 +60,7 @@ internal sealed class UserAdministration(
         var members =
             from membership in db.Memberships.AsNoTracking()
             join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
-            where membership.TenantId == tenant.TenantId
+            where membership.TenantId == tenant.TenantId && membership.Status != MembershipStatus.Support
             select new { Membership = membership, User = user };
 
         if (query.Search?.Trim() is { Length: > 0 } search)
@@ -125,7 +125,7 @@ internal sealed class UserAdministration(
         var row = await (
             from membership in db.Memberships.AsNoTracking()
             join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
-            where membership.Id == membershipId && membership.TenantId == tenant.TenantId
+            where membership.Id == membershipId && membership.TenantId == tenant.TenantId && membership.Status != MembershipStatus.Support
             select new { Membership = membership, User = user })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -733,7 +733,7 @@ internal sealed class UserAdministration(
         TenantContext tenant, Guid membershipId, CancellationToken cancellationToken)
     {
         var membership = await db.Memberships
-            .SingleOrDefaultAsync(m => m.Id == membershipId && m.TenantId == tenant.TenantId, cancellationToken)
+            .SingleOrDefaultAsync(m => m.Id == membershipId && m.TenantId == tenant.TenantId && m.Status != MembershipStatus.Support, cancellationToken)
             ?? throw NotFound();
 
         // Kapsam dışı üyelik başka tenant'ınki gibi "bulunamadı" sayılır (ADR-0026).

@@ -110,6 +110,7 @@ public static class AccessEndpoints
             .RequireAnyPermission(CoreModule.Permissions.ManageRoles, CoreModule.Permissions.ManageUsers);
         roles.MapGet("/permissions", ListAssignablePermissionsAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
         roles.MapGet("/templates", ListTemplatesAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
+        roles.MapGet("/scope-types", ListScopeTypesAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
         roles.MapGet("/{roleId:guid}/members", ListMembersAsync)
             .RequireAnyPermission(CoreModule.Permissions.ManageRoles, CoreModule.Permissions.ManageUsers);
         roles.MapPost("/", CreateRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
@@ -217,6 +218,12 @@ public static class AccessEndpoints
         return permissions;
     }
 
+    /// <summary>Kapsamı ayarlanabilen kayıt türleri ve platform tavanları (ADR-0030 K9); rol ekranı seçenekleri buna göre kapatır.</summary>
+    private static async Task<IResult> ListScopeTypesAsync(IRoleService roles, CancellationToken ct) =>
+        Results.Ok((await roles.GetScopeTypesAsync(ct))
+            .Select(t => new RoleScopeTypeDto(t.EntityKey, t.ModuleKey, t.Label, (Shared.Access.RecordScope?)t.MaxScope))
+            .ToList());
+
     /// <summary>Hazır roller (ADR-0005): açık modüllerin şablonları ve "Salt okur".</summary>
     private static async Task<IResult> ListTemplatesAsync(
         ModuleCatalog catalog, IModuleEntitlements entitlements, ITenantContextAccessor tenant, CancellationToken ct)
@@ -249,7 +256,7 @@ public static class AccessEndpoints
         {
             var role = await roles.CreateAsync(
                 request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId, ToScope(request.Scope) ?? Core.Contracts.Authorization.RecordScope.All,
-                ToLevel(request.AssignLevel), request.HideOutOfScopeShared);
+                ToLevel(request.AssignLevel), request.HideOutOfScopeShared, ToOverrides(request.ScopeOverrides));
             return Results.Created($"/api/roles/{role.Id}", ToDto(role));
         }
         catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
@@ -265,7 +272,7 @@ public static class AccessEndpoints
         {
             var role = await roles.UpdateAsync(
                 roleId, request.Name, request.Permissions ?? [], ct, tenant.Current!.MembershipId, ToScope(request.Scope), ToLevel(request.AssignLevel),
-                request.HideOutOfScopeShared);
+                request.HideOutOfScopeShared, ToOverrides(request.ScopeOverrides));
             return role is null ? RoleNotFound() : Results.Ok(ToDto(role));
         }
         catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
@@ -305,7 +312,13 @@ public static class AccessEndpoints
 
     private static RoleDto ToDto(RoleSummary role) =>
         new(role.Id, role.Name, role.Permissions, role.IsSystem, role.MemberCount, (Shared.Access.RecordScope)role.Scope,
-            (Shared.Access.RoleAssignLevel)role.AssignLevel, role.UnitCount, role.HideOutOfScopeShared);
+            (Shared.Access.RoleAssignLevel)role.AssignLevel, role.UnitCount, role.HideOutOfScopeShared,
+            role.ScopeOverrides.ToDictionary(o => o.Key, o => (Shared.Access.RecordScope)o.Value));
+
+    // Tanımsız değer RoleService'te alan hatası olur (scopeOverrides).
+    private static Dictionary<string, Core.Contracts.Authorization.RecordScope>? ToOverrides(
+        IReadOnlyDictionary<string, Shared.Access.RecordScope>? overrides) =>
+        overrides?.ToDictionary(o => o.Key, o => (Core.Contracts.Authorization.RecordScope)o.Value);
 
     // Tanımsız değer Role.SetAssignLevel'da alan hatası olur.
     private static Core.Contracts.Authorization.RoleAssignLevel? ToLevel(Shared.Access.RoleAssignLevel? level) =>

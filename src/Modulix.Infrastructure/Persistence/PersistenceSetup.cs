@@ -85,6 +85,8 @@ public static class PersistenceSetup
         services.AddScoped<IModuleLicense, ModuleLicense>();
         services.AddScoped<IEntitlementResolver, Modulix.Infrastructure.Platform.EntitlementResolver>();
         services.AddScoped<IPlanAdministration, Modulix.Infrastructure.Platform.PlanAdministration>();
+        services.AddScoped<IPlatformHealth, Modulix.Infrastructure.Platform.PlatformHealth>();
+        services.AddScoped<ISupportAccess, Modulix.Infrastructure.Platform.SupportAccessService>();
         services.AddScoped<IPlatformTeam, Modulix.Infrastructure.Platform.PlatformTeam>();
         services.AddScoped<AdministratorGuard>();
         services.AddScoped<IRoleService, RoleService>();
@@ -132,6 +134,7 @@ public static class PersistenceSetup
         services.AddScoped<ILookupSearch>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ISectorProfileService, SectorProfileService>();
         services.AddScoped<ISectorCatalog, SectorCatalogService>();
+        services.AddScoped<IStarterPackages, StarterPackageInstaller>();
         services.AddScoped<ITenantActivitySelection, TenantActivitySelectionService>();
         services.AddScoped<IRulePackageService, RulePackageService>();
         services.AddScoped<ITenantFieldRules, TenantFieldRulesService>();

@@ -38,7 +38,67 @@ public class RecordPipelineTests
         _audit,
         _outbox,
         _unitOfWork,
-        _handling);
+        _handling,
+        fieldRules: _fieldRules);
+
+    private RecordingFieldRules? _fieldRules;
+
+    // Alan kuralları (ADR-0029 K7): kapı yazılacak son hali görür, hata verirse hiçbir şey yazılmaz.
+    [Fact]
+    public async Task Field_rule_errors_reject_create_and_update_and_nothing_is_written()
+    {
+        _fieldRules = new RecordingFieldRules { Errors = [new RecordFieldError("text", "Kural: bu durumda yazılamaz.")] };
+
+        var created = await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default);
+
+        Assert.Equal(RecordErrorCode.ValidationFailed, created.Error!.Code);
+        Assert.Equal("Kural: bu durumda yazılamaz.", Assert.Single(created.Error.FieldErrors!).Message);
+        AssertNothingWritten();
+
+        _fieldRules.Errors = [];
+        var id = (await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default)).Value!.Id;
+        var writes = _unitOfWork.Saves;
+        _fieldRules.Errors = [new RecordFieldError("text", "Kilitli.")];
+
+        var updated = await Pipeline().UpdateAsync(new RecordCommand(Entity, id, new JsonObject { ["text"] = "b" }), default);
+
+        Assert.Equal(RecordErrorCode.ValidationFailed, updated.Error!.Code);
+        Assert.Equal("a", _store.Records[id].Values["text"]!.GetValue<string>());
+        Assert.Equal(writes, _unitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task Field_rules_see_the_merged_final_record_on_update_and_the_current_one_as_before()
+    {
+        _fieldRules = new RecordingFieldRules();
+        var id = (await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a", ["tag"] = "x" }), default)).Value!.Id;
+
+        await Pipeline().UpdateAsync(new RecordCommand(Entity, id, new JsonObject { ["text"] = "b" }), default);
+
+        var seen = _fieldRules.Calls[^1];
+        Assert.Equal(id, seen.RecordId);
+        Assert.Equal("a", seen.Before!["text"]!.GetValue<string>());
+        Assert.Equal("b", seen.After["text"]!.GetValue<string>());
+        Assert.Equal("x", seen.After["tag"]!.GetValue<string>()); // verilmeyen alan mevcut değerini korur
+        Assert.Null(_fieldRules.Calls[0].Before); // oluşturmada önceki hal yok
+    }
+
+    [Fact]
+    public async Task Field_rules_are_not_consulted_when_access_or_values_already_fail_or_on_reads()
+    {
+        _fieldRules = new RecordingFieldRules();
+        var id = (await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }), default)).Value!.Id;
+        var calls = _fieldRules.Calls.Count;
+
+        await Pipeline().CreateAsync(Command(new JsonObject()), default); // depo doğrulaması düşer
+        await Pipeline().GetAsync(new RecordRef(Entity, id), default);
+        await Pipeline().DeleteAsync(new RecordRef(Entity, id), null, default);
+        _permitted = false;
+        var denied = await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "b" }), default);
+
+        Assert.Equal(RecordErrorCode.PermissionDenied, denied.Error!.Code);
+        Assert.Equal(calls, _fieldRules.Calls.Count);
+    }
 
     [Fact]
     public async Task Without_active_tenant_nothing_happens()
@@ -474,6 +534,20 @@ public class RecordPipelineTests
         Assert.Empty(_audit.Entries);
         Assert.Empty(_outbox.Events);
         Assert.Equal(0, _unitOfWork.Saves);
+    }
+
+    private sealed class RecordingFieldRules : Modulix.Core.FieldRules.IFieldRuleGate
+    {
+        public List<(string EntityKey, Guid? RecordId, JsonObject? Before, JsonObject After)> Calls { get; } = [];
+
+        public IReadOnlyList<RecordFieldError> Errors { get; set; } = [];
+
+        public Task<IReadOnlyList<RecordFieldError>> CheckAsync(
+            string entityKey, Guid? recordId, JsonObject? before, JsonObject after, CancellationToken cancellationToken)
+        {
+            Calls.Add((entityKey, recordId, before, after));
+            return Task.FromResult(Errors);
+        }
     }
 
     private sealed class TestTenant : ITenantContextAccessor
