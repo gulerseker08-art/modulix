@@ -464,6 +464,50 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("AutomationRunSteps", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Automation.AutomationScanCursor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AfterRecordId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Completed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PeriodKey")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("RecordsEnqueued")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RuleVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RuleId");
+
+                    b.HasIndex("TenantId", "RuleVersionId", "PeriodKey")
+                        .IsUnique();
+
+                    b.ToTable("AutomationScanCursors", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Communication.CommunicationLinkToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -11617,6 +11661,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Core.Automation.AutomationRun", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "RunId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Automation.AutomationScanCursor", b =>
+                {
+                    b.HasOne("Modulix.Core.Automation.AutomationRuleVersion", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RuleVersionId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

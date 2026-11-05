@@ -7,8 +7,15 @@ namespace Modulix.Core.Contracts.Automation;
 // modül neyi tetikleyebileceğini, hangi alanları okutabileceğini ve hangi aksiyonları sunduğunu burada bildirir. Beyan açılışta
 // ModuleCatalog tarafından doğrulanır.
 
-/// <summary>Kural yazılabilen kayıt türü. <see cref="ReadPermission"/> boş değilse yalnızca bu izne sahip olanlar kural yazabilir.</summary>
-public sealed record AutomationEntityDefinition(string EntityKey, string DisplayName, string? ReadPermission = null);
+/// <summary>
+/// Kural yazılabilen kayıt türü. <see cref="ReadPermission"/> boş değilse yalnızca bu izne sahip olanlar kural yazabilir.
+/// <see cref="RecordSource"/>: tarama tabanlı tetikleyicileri (zamanlanmış, tarihe göre, hareketsizlik) destekleyen modül
+/// <see cref="IAutomationRecordSource"/> uygulayan tipi verir; boşsa bu kayıt türüne yalnızca olay tetikleyicileri konabilir.
+/// </summary>
+public sealed record AutomationEntityDefinition(string EntityKey, string DisplayName, string? ReadPermission = null)
+{
+    public Type? RecordSource { get; init; }
+}
 
 /// <summary>
 /// Modülün tetikleyebildiği olay. <see cref="EventType"/> kayıt olayıysa (<c>RecordCreated</c>, <c>RecordUpdated</c>) kayıt boru hattının

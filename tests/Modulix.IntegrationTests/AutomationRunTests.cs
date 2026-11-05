@@ -31,6 +31,7 @@ namespace Modulix.IntegrationTests;
 /// okuyucusundan gelir (gerçek CRM henüz kural beyan etmez, Dilim 3). Veritabanı, Row-Level Security, tenant izolasyonu, API izinleri
 /// ve çalıştırıcı gerçektir.
 /// </summary>
+[Collection(AutomationTestCollection.Name)]
 public class AutomationRunTests(AutomationFixture fixture) : IClassFixture<AutomationFixture>
 {
     private const string Item = AutomationTestModule.ItemEntity;
@@ -674,12 +675,12 @@ public class AutomationRunTests(AutomationFixture fixture) : IClassFixture<Autom
     }
 
     [Fact]
-    public async Task A_rule_with_a_trigger_that_does_not_run_yet_cannot_be_published_or_opened()
+    public async Task A_rule_with_a_domain_event_trigger_cannot_be_published_yet()
     {
         var setup = await SetUpAsync();
-        var scheduled = new AutomationDefinition(new ScheduledTrigger(), null, [Note()]);
+        var scheduled = new AutomationDefinition(new DomainEventTrigger("autotest.item.escalated"), null, [Note()]);
         var create = await setup.Client.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
-            AutomationTestModule.ModuleKey, Item, "Günlük tarama", null, 100, false, null, null, Json(scheduled)));
+            AutomationTestModule.ModuleKey, Item, "İş olayı kuralı", null, 100, false, null, null, Json(scheduled)));
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
         var created = (await create.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!;
 

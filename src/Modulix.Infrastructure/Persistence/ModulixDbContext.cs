@@ -117,6 +117,8 @@ public class ModulixDbContext(
 
     public DbSet<AutomationRunStep> AutomationRunSteps => Set<AutomationRunStep>();
 
+    public DbSet<AutomationScanCursor> AutomationScanCursors => Set<AutomationScanCursor>();
+
     public DbSet<ImportRun> ImportRuns => Set<ImportRun>();
 
     public DbSet<ImportRowIssue> ImportRowIssues => Set<ImportRowIssue>();

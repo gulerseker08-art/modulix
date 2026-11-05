@@ -77,6 +77,13 @@ public sealed partial class AutomationDefinitionValidator(ModuleCatalog modules,
             return field;
         }
 
+        // Tarama tabanlı tetikleyiciler kayıtları modülün kayıt kaynağından alır; kaynağı olmayan kayıt türünde sessizce hiç tetiklenmezdi.
+        if (trigger is ScheduledTrigger or DateRelativeTrigger or InactivityTrigger
+            && modules.FindAutomationEntity(entityKey)?.Entity.RecordSource is null)
+        {
+            issues.Add(new("trigger", "Bu kayıt türü zamanlanmış ve tarihe bağlı tetikleyicileri desteklemiyor."));
+        }
+
         switch (trigger)
         {
             case RecordCreatedTrigger:

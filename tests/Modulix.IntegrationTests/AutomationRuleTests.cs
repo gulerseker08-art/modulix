@@ -37,6 +37,7 @@ namespace Modulix.IntegrationTests;
 /// modül aksiyon beyan etmediği için testler, yalnızca bu test sürecinde katalogu genişleten bir <c>autotest</c> modülü kullanır;
 /// kural yazılan kayıt türü ise gerçek Lojistik modülünün beyanıdır (CRM'den bağımsız).
 /// </summary>
+[Collection(AutomationTestCollection.Name)]
 public class AutomationRuleTests(AutomationFixture fixture) : IClassFixture<AutomationFixture>
 {
     private const string Shipment = LogisticsModule.AutomationEntityKeys.Shipment;
@@ -545,6 +546,7 @@ public sealed class AutomationTestModule : IModule
     public const string WritePermission = "autotest.notes.write";
     public const string ItemsRead = "autotest.items.read";
     public const string MarginRead = "autotest.margin.read";
+    public const string ActivitiesRelation = "autotest.item.activities";
 
     public string Key => ModuleKey;
 
@@ -559,17 +561,23 @@ public sealed class AutomationTestModule : IModule
 
     public AutomationCapabilities Automation { get; } = new()
     {
-        Entities = [new(ItemEntity, "Test kaydı", ItemsRead)],
+        Entities = [new(ItemEntity, "Test kaydı", ItemsRead) { RecordSource = typeof(Source) }],
         Events =
         [
             new("autotest.item.created", ItemEntity, DomainEventTypes.RecordCreated, "Kayıt oluşturuldu"),
             new("autotest.item.updated", ItemEntity, DomainEventTypes.RecordUpdated, "Kayıt güncellendi"),
+            new("autotest.item.escalated", ItemEntity, "autotest.item.escalated", "Kayıt yükseltildi"),
         ],
         Fields =
         [
             new(ItemEntity, "status", "Durum", AutomationFieldType.Choice) { Options = [new("open", "Açık"), new("hold", "Beklemede"), new("closed", "Kapalı")] },
             new(ItemEntity, "title", "Başlık", AutomationFieldType.Text),
             new(ItemEntity, "margin", "Marj", AutomationFieldType.Number) { ReadPermission = MarginRead },
+            new(ItemEntity, "due", "Vade", AutomationFieldType.Date),
+        ],
+        Relations =
+        [
+            new(ActivitiesRelation, ItemEntity, "autotest.activity", "Aktiviteler", [new("autotest.activity", "kind", "Tür", AutomationFieldType.Text)], typeof(ActivityResolver)),
         ],
         Actions =
         [
@@ -582,7 +590,40 @@ public sealed class AutomationTestModule : IModule
         ],
     };
 
-    public void ConfigureServices(IServiceCollection services) => services.AddScoped<Handler>();
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddScoped<Handler>();
+        services.AddScoped<Source>();
+        services.AddScoped<ActivityResolver>();
+    }
+
+    /// <summary>Test kayıt kaynağı: kayıtları <see cref="AutomationRecords"/>'tan, aktif tenant ile süzerek verir. Çağrılar <see cref="Source.Calls"/>'ta sayılır.</summary>
+    public sealed class Source(ITenantContextAccessor tenantAccessor) : IAutomationRecordSource
+    {
+        public static int Calls;
+
+        public static Exception? Fail;
+
+        public Task<AutomationScanPage> ScanAsync(AutomationScanQuery query, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref Calls);
+            if (Fail is { } failure)
+            {
+                throw failure;
+            }
+
+            var tenant = tenantAccessor.Current!.TenantId;
+            var ids = AutomationRecords.Scan(tenant, query.EntityKey, query)
+                .Where(id => query.AfterRecordId is not { } after || id.CompareTo(after) > 0)
+                .Order().Take(query.PageSize).ToList();
+            return Task.FromResult(new AutomationScanPage(ids));
+        }
+    }
+
+    public sealed class ActivityResolver : IAutomationRelationResolver
+    {
+        public Task<int> CountAsync(AutomationRelationQuery query, CancellationToken cancellationToken) => Task.FromResult(0);
+    }
 
     public sealed class Handler(IServiceProvider services) : IAutomationAction
     {
@@ -650,14 +691,27 @@ public static class AutomationProbe
 /// <summary>Test kayıt türünün kayıtları (tenant'a bağlı). Gerçek bir kayıt deposu yoktur; <see cref="FakeRecordReader"/> bunları okur.</summary>
 public static class AutomationRecords
 {
-    private static readonly ConcurrentDictionary<Guid, (Guid Tenant, string Entity, JsonObject Values)> Store = new();
+    private static readonly ConcurrentDictionary<Guid, (Guid Tenant, string Entity, JsonObject Values, DateTimeOffset? LastActivity)> Store = new();
 
-    public static Guid Add(Guid tenantId, string entity, string status, string? title, decimal? margin = null)
+    public static Guid Add(Guid tenantId, string entity, string status, string? title, decimal? margin = null, DateOnly? due = null, DateTimeOffset? lastActivity = null)
     {
         var id = Guid.NewGuid();
-        Store[id] = (tenantId, entity, new JsonObject { ["status"] = status, ["title"] = title, ["margin"] = margin });
+        Store[id] = (
+            tenantId, entity,
+            new JsonObject { ["status"] = status, ["title"] = title, ["margin"] = margin, ["due"] = due?.ToString("yyyy-MM-dd") },
+            lastActivity);
         return id;
     }
+
+    /// <summary>Kayıt kaynağının sorgusuna uyan kayıt kimlikleri (aktif tenant ve kayıt türü ile).</summary>
+    public static IEnumerable<Guid> Scan(Guid tenantId, string entity, AutomationScanQuery query) =>
+        Store.Where(p => p.Value.Tenant == tenantId && p.Value.Entity == entity && query.Kind switch
+        {
+            AutomationScanKind.Scheduled => true,
+            AutomationScanKind.DateRelative => p.Value.Values["due"]?.ToString() == query.TargetDate?.ToString("yyyy-MM-dd"),
+            AutomationScanKind.Inactivity => p.Value.LastActivity is null || p.Value.LastActivity < query.InactiveBefore,
+            _ => false,
+        }).Select(p => p.Key);
 
     public static RecordData? Find(Guid tenantId, string entity, Guid id) =>
         Store.TryGetValue(id, out var found) && found.Tenant == tenantId && found.Entity == entity
@@ -692,6 +746,8 @@ public sealed class AutomationFixture : IDisposable
                 services.RemoveAll<ModuleCatalog>();
                 services.AddSingleton<IModule>(new AutomationTestModule());
                 services.AddScoped<AutomationTestModule.Handler>();
+                services.AddScoped<AutomationTestModule.Source>();
+                services.AddScoped<AutomationTestModule.ActivityResolver>();
                 services.AddSingleton(sp => new ModuleCatalog(sp.GetServices<IModule>()));
                 services.RemoveAll<IAutomationRecordReader>();
                 services.AddScoped<IAutomationRecordReader, FakeRecordReader>();
@@ -743,4 +799,14 @@ public sealed class AutomationFixture : IDisposable
         Extended.Dispose();
         Factory.Dispose();
     }
+}
+
+/// <summary>
+/// Otomasyon sınıfları süreç genelinde ortak durumu (<see cref="AutomationProbe"/> davranışı ve gecikmesi) kullanır; bu yüzden birbirleriyle
+/// paralel koşmaz (her sınıfın kendi konağı ve saati yine ayrıdır).
+/// </summary>
+[CollectionDefinition(Name)]
+public sealed class AutomationTestCollection
+{
+    public const string Name = "Otomasyon kuralları";
 }

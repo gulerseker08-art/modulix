@@ -188,7 +188,8 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 0 | İnceleme, bu ADR | Bu oturum |
 | 1 | `Core.Contracts` sözleşmeleri, koşul doğrulayıcı/değerlendirici, aksiyon sözleşmesi, `AutomationRules/Versions` + migration + RLS, kural servisi, yan etkisiz önizleme, `core.automation.*` izinleri, denetim, API, Logistics yetenek beyanı, testler | Bu oturum |
 | 2a | Olay yolu (`core.automation` aboneliği), `AutomationRuns/Steps`, tekilleştirme, kira, retry, kuralın kimliği, acil durdurma, tenant limitleri, elle çalıştırma, çalışma geçmişi API'si | Uygulandı (aşağıda "Dilim 2a") |
-| 2b | Tarama tabanlı tetikleyiciler (`Scheduled`, `DateRelative`, `Inactivity`), iş olayı tetikleyicisi, `AutomationScanCursors`, `IAutomationRecordSource`, saklama temizliği | Sonra |
+| 2b-1 | Tarama tabanlı tetikleyiciler (`Scheduled`, `DateRelative`, `Inactivity`), `AutomationScanCursors`, `IAutomationRecordSource` | Uygulandı (aşağıda "Dilim 2b-1") |
+| 2b-2 | İş olayı tetikleyicisi (`DomainEvent`), çalışma/adım saklama temizliği | Sonra |
 | 3 | CRM yetenek beyanı ve aksiyonları, ilk şablonlar (pasif), demo | Sonra |
 | 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Sonra |
 | 5 | Blazor ekranları | Sonra |
@@ -306,3 +307,32 @@ CI (GitHub Actions) bu dilim için çalışmadı: hesap faturalandırma/harcama 
 - Dilim 2b: tarama tabanlı tetikleyiciler, `AutomationScanCursors`, `IAutomationRecordSource`, iş olayı tetikleyicisi, çalışma saklama temizliği.
 - Hâlâ gerçek bir modülde aksiyon yoktur (CRM, Dilim 3); canlı uygulamada yayınlanabilir kural bulunmadığı için yürütme yalnızca testlerde uçtan uca görülmüştür.
 - `IFollowUpActivities` idempotency anahtarı (Dilim 3), özel alan olay farkı biçiminin gerçek outbox yüküyle doğrulanması hâlâ açıktır.
+
+### Dilim 2b-1 (4 Kasım 2026)
+
+Tarama tabanlı tetikleyiciler çalışır (ayrıntı için README "Otomasyon kuralları → Tarama tetikleyicileri"). Yapılanlar:
+
+- **Sözleşme** (`Modulix.Core.Contracts/Automation/AutomationRecordSource.cs`): `IAutomationRecordSource.ScanAsync(AutomationScanQuery)` yalnızca kayıt kimlikleri döndürür (kimliğe göre artan, anahtar tabanlı sayfa); `AutomationEntityDefinition.RecordSource` modülün kaynak tipini bildirir (catalog açılışta tipi doğrular). Core modül tablosu okumaz; koşul, alan yetkisi ve aksiyon yine kuralın kimliğiyle kayıt boru hattından geçer.
+- **Tetikleyiciler:** `Scheduled` (tenant saatinde "SS:dd" sonrası, tüm kayıtlar), `DateRelative` (tarih alanı bugün − OffsetDays gününe düşenler; tenant takvim günüyle), `Inactivity` (ilişkide, tenant gününün başlangıcından `Days` gün öncesinden beri hareketi olmayanlar). Kaynağı olmayan kayıt türünde tarama tetikleyicisi yayınlanamaz.
+- **Veri:** `core.AutomationScanCursors` (migration `AutomationScanCursors`, RLS): (kural sürümü, tenant günü) başına tek imleç, `UNIQUE(TenantId, RuleVersionId, PeriodKey)`; son kayıt kimliği, kuyruğa alınan sayı, tamamlandı. `AutomationRunOrigin.Scan` (metin olarak saklandığı için ek şema değişikliği gerekmez).
+- **Tekilleştirme:** dönem anahtarı tenant takvim günüdür (`scan:yyyy-MM-dd`): aynı gün ikinci tarama aynı kayıtta ikinci çalışma açmaz, ertesi gün açar (tasarım bölümündeki "dönem anahtarı" kararı).
+- **Yürütme:** `AutomationScanner`, `AutomationRunner.RunTenantAsync` içinde tenant kilidi ve acil durdurma kontrollerinden sonra, sıradaki çalışmalardan önce çalışır. Sayfa, imleç ve çalışmalar tek `SaveChanges` ile yazılır. Koruma: tur başına `ScanRecordsPerTenantPerRound` (500) kayıt, bekleyen çalışma `ScanBacklogLimit` (1000) olunca duraklama, sayfa `ScanPageSize` (200); kapalı modül ve etkinlik tarihi dışındaki kural atlanır; bozuk kaynak yalnızca kendi kuralını o turda atlatır (loga yalnızca hata türü).
+
+Tasarımdan ayrılan / netleşen noktalar:
+
+- **Artımlı tarama yapılmadı:** ilk tasarım "artımlı" diyordu; günlük tarama tam taramadır çünkü zamana bağlı koşullar ("X gündür bekliyor") kayıt değişmese de doğru olabilir. Maliyet: `Scheduled` kuralı koşulu sağlamayan kayıtlar için de her gün `NotMatched` çalışma satırı yazar; saklama temizliği (2b-2) ve kural yazarının koşulu `DateRelative`/`Inactivity` ile daraltması bunu sınırlar.
+- **Kaçırılan günler geriye dönük taranmaz** (işçi bir gün kapalıysa o günün taraması yapılmamış olur).
+- Zincirleme: her tarama çalışması yeni bir iz (correlation) ve derinlik 0 ile başlar.
+
+### Test sonuçları (Dilim 2b-1)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter Automation` | başarılı (tarama planı, imleç, kaynak beyanı ve doğrulama testleri dahil) |
+| `dotnet test tests/Modulix.IntegrationTests --filter AutomationScanTests` (SQL Server) | 10 başarılı (mutlu yol, ikinci tarama/ertesi gün, tarihe bağlı, hareketsizlik, sayfalama ve imleç, bekleyen sınırı, tenant izolasyonu, acil durdurma, bozuk kaynak, yayın izni) |
+| Otomasyon, ayarlar ve yönetim entegrasyon testleri (`Automation`, `SettingsTests`, `AdministrationTests`) | 102 başarılı, 1 başarısız: `PlatformAdministrationTests.Every_platform_write_endpoint_has_an_explicit_role_rule` tek başına koşunca `Assert.NotEmpty(endpoints)` satırında düşer (bu dilim platform uçlarına dokunmaz; ana dalda doğrulanmadı) |
+| `dotnet test tests/Modulix.ArchitectureTests` | 52 başarılı |
+| `dotnet test tests/Modulix.Core.Tests` | 640 başarılı |
+
+Çıkan ders: üç otomasyon test sınıfı süreç genelindeki `AutomationProbe` durumunu (davranış, gecikme) paylaşır; sınıflar paralel koşunca yeniden deneme testleri kararsız düşüyordu. Üçü tek bir sıralı xUnit koleksiyonuna alındı (`AutomationTestCollection`). `TableInventoryTests` yerel veritabanında başka dalların tabloları (`platform.LicensePolicies` vb.) yüzünden düşer; CI temiz veritabanında doğrulanmalı.
+
