@@ -440,6 +440,10 @@ internal sealed class PlatformAdministration(
         var enabled = (await services.GetRequiredService<IModuleEntitlements>().GetEnabledAsync(tenantId, cancellationToken)).ToHashSet();
         var allowed = services.GetRequiredService<ScopedRecordTypes>().ForModules(enabled).Select(t => t.EntityKey).ToHashSet(StringComparer.Ordinal);
 
+        // Modülü sonradan kapanan türün mevcut tavanı geçerli kalır: ekran tüm kümeyi yeniden gönderir, tavan sessizce silinmesin.
+        var existing = await tenantDb.TenantScopeLimits.Where(l => l.TenantId == tenantId).ToListAsync(cancellationToken);
+        allowed.UnionWith(existing.Select(l => l.EntityKey));
+
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var limit in limits)
         {
@@ -451,7 +455,7 @@ internal sealed class PlatformAdministration(
             if (!allowed.Contains(limit.EntityKey))
             {
                 throw new ArgumentException(
-                    $"'{limit.EntityKey}' için tavan konamaz: kayıt türü bilinmiyor, kapsamı ayarlanamıyor ya da modülü firmada kapalı.", nameof(limits));
+                    $"'{limit.EntityKey}' için tavan konamaz: kayıt türü bilinmiyor, kapsamı ayarlanamıyor ya da modülü firmada kapalı (kapanmadan önce konmuş tavan korunur).", nameof(limits));
             }
 
             if (!seen.Add(limit.EntityKey))
@@ -460,7 +464,6 @@ internal sealed class PlatformAdministration(
             }
         }
 
-        var existing = await tenantDb.TenantScopeLimits.Where(l => l.TenantId == tenantId).ToListAsync(cancellationToken);
         var beforeList = existing.OrderBy(l => l.EntityKey, StringComparer.Ordinal)
             .Select(l => new PlatformScopeLimit(l.EntityKey, l.MaxScope, l.AppliesToAdministrators)).ToList();
         var afterList = limits.OrderBy(l => l.EntityKey, StringComparer.Ordinal).ToList();

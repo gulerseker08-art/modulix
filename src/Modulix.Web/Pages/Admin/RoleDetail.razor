@@ -45,7 +45,7 @@
         else
         {
             <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-                <TabBar Tabs="FormTabs" State="tabs" Label="Rol formu bölümleri" />
+                <TabBar Tabs="FormTabs" State="tabs" Label="Rol formu bölümleri" Changed="_ => { }" />
                 <TabPanel State="tabs" Key="form-genel">
                 <div class="form-grid">
                     @if (IsNew && templates.Count > 0)
@@ -120,6 +120,61 @@
                     }
                     <FieldError Field="scope" Errors="errors" />
                 </fieldset>
+
+                @* Kayıt türüne göre kapsam (ADR-0030 K10): platformun koyduğu tavanı aşan seçenekler kapalıdır; kesin karar sunucudadır (409). *@
+                @if (scopeTypes.Count > 0)
+                {
+                    <fieldset class="scope-choice">
+                        <legend class="form-label">Kayıt türüne göre farklı kapsam</legend>
+                        <p class="text-muted small">
+                            Yukarıdaki kapsam bütün kayıt türlerine uygulanır. Bir türde farklı görünürlük gerekiyorsa buradan seçin; seçilmeyen
+                            türde varsayılan kapsam geçerlidir. Platform bir tür için sınır koyduysa o sınırdan geniş seçenekler kapalıdır.
+                        </p>
+                        <table class="table record-table">
+                            <thead><tr><th>Kayıt türü</th><th>Bu rolde</th><th>Platform sınırı</th></tr></thead>
+                            <tbody>
+                                @foreach (var type in scopeTypes)
+                                {
+                                    <tr>
+                                        <td data-label="Kayıt türü" class="primary">@type.Label</td>
+                                        <td data-label="Bu rolde">
+                                            <select class="form-select" aria-label="@($"{type.Label} için kapsam")"
+                                                    value="@(overrides.TryGetValue(type.EntityKey, out var chosen) ? ((int)chosen).ToString() : string.Empty)"
+                                                    @onchange="e => ChooseOverride(type.EntityKey, e.Value as string)">
+                                                <option value="">Varsayılan (@RecordScopeLabels.Of(scope))</option>
+                                                @foreach (var option in ScopeOptions)
+                                                {
+                                                    <option value="@((int)option)" disabled="@(!WithinLimit(type, option) || !CanGrantOverride(option))">
+                                                        @RecordScopeLabels.Of(option)@(WithinLimit(type, option) ? null : " (platform sınırını aşar)")
+                                                    </option>
+                                                }
+                                            </select>
+                                            @if (DefaultExceeds(type))
+                                            {
+                                                <small class="text-danger d-block">Varsayılan kapsam platform sınırını aşıyor; bu tür için bir kapsam seçin.</small>
+                                            }
+                                        </td>
+                                        <td data-label="Platform sınırı">
+                                            @if (type.MaxScope is { } max)
+                                            {
+                                                <span class="badge">En fazla: @RecordScopeLabels.Of(max)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">Sınır yok</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        @if (scopeTypes.Any(DefaultExceeds))
+                        {
+                            <button type="button" class="btn btn-tonal" @onclick="LowerToLimits">Sınırı aşan türleri sınıra indir</button>
+                        }
+                        <FieldError Field="scopeOverrides" Errors="errors" />
+                    </fieldset>
+                }
 
                 @* Atanabilir düzey (ADR-0026 K6): bayi gibi departmanlara toplu rol vermek için rol açıkça departmana atanabilir yapılır. *@
                 <fieldset class="scope-choice">
@@ -246,6 +301,11 @@
     private RecordScope scope = RecordScope.All;
     private RoleAssignLevel assignLevel = RoleAssignLevel.User;
     private bool hideOutOfScopeShared;
+
+    // Kayıt türüne göre kapsam (ADR-0030): ekranda yalnızca firmada açık modüllerin türleri görünür; modülü kapalı türün istisnası
+    // sözlükte kalır ve kaydederken birlikte gönderilir (sunucu korur).
+    private IReadOnlyList<RoleScopeTypeDto> scopeTypes = [];
+    private Dictionary<string, RecordScope> overrides = new(StringComparer.Ordinal);
     private Guid? moveTo;
     private bool loaded;
     private bool deleting;
@@ -263,7 +323,7 @@
     [
         new("form-genel", "Genel", Errors: ErrorCount("name")),
         new("form-izin", "İzinler", Errors: ErrorCount("permissions")),
-        new("form-kapsam", "Kapsam ve düzey", Errors: ErrorCount("scope", "assignLevel", "hideOutOfScopeShared")),
+        new("form-kapsam", "Kapsam ve düzey", Errors: ErrorCount("scope", "scopeOverrides", "assignLevel", "hideOutOfScopeShared")),
     ];
 
     private bool IsNew => RoleId is null;
@@ -297,6 +357,7 @@
         permissions = permissionResult.Value ?? [];
         roles = roleResult.Value ?? [];
         message = permissionResult.Error ?? roleResult.Error;
+        scopeTypes = (await Api.GetAsync<List<RoleScopeTypeDto>>("/api/roles/scope-types")).Value ?? [];
 
         if (RoleId is { } id)
         {
@@ -307,6 +368,7 @@
             scope = role?.Scope ?? RecordScope.All;
             assignLevel = role?.AssignLevel ?? RoleAssignLevel.User;
             hideOutOfScopeShared = role?.HideOutOfScopeShared ?? false;
+            overrides = OverridesOf(role);
         }
         else
         {
@@ -317,6 +379,7 @@
             scope = source?.Scope ?? (Session.IsAdministrator ? RecordScope.All : Session.Scope);
             assignLevel = source?.AssignLevel ?? RoleAssignLevel.User;
             hideOutOfScopeShared = source?.HideOutOfScopeShared ?? false;
+            overrides = OverridesOf(source);
             templateKey = null;
             skippedFromTemplate = 0;
             templates = source is null ? (await Api.GetAsync<List<RoleTemplateDto>>("/api/roles/templates")).Value ?? [] : [];
@@ -363,6 +426,39 @@
         Session.IsAdministrator
         || (RecordScopeRules.Covers(Session.Scope, option) && (role is null || RecordScopeRules.Covers(Session.Scope, role.Scope)));
 
+    // İstisna için işlemi yapanın kapsamı yeter (sunucu da denetler); rolün varsayılan kapsamıyla ilgisi yoktur.
+    private bool CanGrantOverride(RecordScope option) => Session.IsAdministrator || RecordScopeRules.Covers(Session.Scope, option);
+
+    // Platform tavanı: tavan seçeneği kapsıyorsa seçenek tavan içindedir (ekip ile departman birbirini kapsamaz).
+    private static bool WithinLimit(RoleScopeTypeDto type, RecordScope option) =>
+        type.MaxScope is not { } max || RecordScopeRules.Covers(max, option);
+
+    // İstisnası olmayan türde varsayılan kapsam tavanı aşıyorsa sunucu rolü reddeder.
+    private bool DefaultExceeds(RoleScopeTypeDto type) => !overrides.ContainsKey(type.EntityKey) && !WithinLimit(type, scope);
+
+    private static Dictionary<string, RecordScope> OverridesOf(RoleDto? source) =>
+        source?.ScopeOverrides is { } items ? new(items, StringComparer.Ordinal) : new(StringComparer.Ordinal);
+
+    private void ChooseOverride(string entityKey, string? value)
+    {
+        if (int.TryParse(value, out var number) && Enum.IsDefined(typeof(RecordScope), number))
+        {
+            overrides[entityKey] = (RecordScope)number;
+        }
+        else
+        {
+            overrides.Remove(entityKey);
+        }
+    }
+
+    private void LowerToLimits()
+    {
+        foreach (var type in scopeTypes.Where(DefaultExceeds))
+        {
+            overrides[type.EntityKey] = type.MaxScope!.Value;
+        }
+    }
+
     // Yönetici rolüne yalnızca yönetici taşıyabilir (sunucu da denetler).
     private IEnumerable<RoleDto> MoveTargets() =>
         roles.Where(r => r.Id != role!.Id && (!r.IsSystem || Session.IsAdministrator)).OrderBy(r => r.Name);
@@ -371,7 +467,7 @@
     {
         busy = true;
         notice = null;
-        var request = new SaveRoleRequest(name, selected.Order(StringComparer.Ordinal).ToList(), scope, assignLevel, hideOutOfScopeShared);
+        var request = new SaveRoleRequest(name, selected.Order(StringComparer.Ordinal).ToList(), scope, assignLevel, hideOutOfScopeShared, overrides);
         var result = IsNew
             ? await Api.PostAsync<RoleDto>("/api/roles", request)
             : await Api.PutAsync<RoleDto>($"/api/roles/{RoleId}", request);
@@ -400,7 +496,9 @@
             Scope = result.Value.Scope,
             AssignLevel = result.Value.AssignLevel,
             HideOutOfScopeShared = result.Value.HideOutOfScopeShared,
+            ScopeOverrides = result.Value.ScopeOverrides,
         };
+        overrides = OverridesOf(role);
         selected = role.Permissions.ToHashSet();
         message = null;
         errors = null;

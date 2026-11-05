@@ -103,6 +103,7 @@ Platform yöneticisi bir firma için kayıt türü başına görünürlük tavan
 - **Kaldırmak/gevşetmek:** türü `PUT` listesinden çıkarın ya da `MaxScope`'u genişletin; eski görünürlük bir sonraki istekte döner. Rol kayıtları hiç değişmediği için ek işlem gerekmez.
 - **Yöneticiyi bağlamak:** `AppliesToAdministrators = true` yalnızca o tür için Yönetici rolünü de tavana indirir. Yönetici kendi kayıtlarının altına inmez; yanlış bir tavan firmayı kilitlerse tavanı gevşetin (kurtarma yolu budur).
 - **Ekip/departman:** ikisi birbirini kapsamaz; tavan "Ekip" iken departman kapsamlı rol "yalnızca kendi kayıtları"na düşer ve tersi. Tavanı koymadan önce firmanın rollerinin kapsamlarına bakın.
+- **Ekran:** Platform → Firmalar → firma detayı → "Kayıt görünürlüğü" bölümü bu `GET`/`PUT`'i kullanır (tür başına seçici, gerekçe zorunlu, kayıtta etkilenen rol sayısı gösterilir). Modülü sonradan kapanan türün mevcut tavanı listede görünmez ama kümeyle birlikte korunur; yeni tür için tavan konamaz. Yetki: Operasyon rolü (`PlatformAccessRules`).
 - **Dışa aktarma ve silme:** tablolar katalogdan okunur; `tenant-export` ve `tenant-delete` `platform.TenantScopeLimits` ve `core.RoleScopeOverrides` satırlarını kendiliğinden kapsar.
 
 ## Arka plan işleri

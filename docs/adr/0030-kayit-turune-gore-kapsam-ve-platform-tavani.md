@@ -139,6 +139,14 @@ Kapsam artık kayıt türüne ve platform tavanına göre hesaplanır; tavanı p
 - **Denetim:** istisnalar `core.role` kaydının `scopeOverrides` alanında ("Kayıt türüne göre kapsam") önce/sonra görünür; rol silinirken son hâli kayda girer, tablo satırları rolle birlikte silinir.
 - **Tavan okuma ucu (K9):** `GET /api/roles/scope-types` (`core.roles.manage`): kapsamı ayarlanabilen türler (firmada açık modüllerden) ve her türün platform tavanı (`maxScope`, yoksa `null`). Yalnızca kendi firmanın tavanlarını döner; yönetici muafiyet bayrağı gösterilmez. Rol ekranı bununla tavanı aşan seçenekleri kapalı gösterecek (dilim 3); sunucu doğrulaması bundan bağımsızdır.
 
+### Dilim 3 sonucu (uygulandı; ekranlar)
+
+- **Platform → Firma detayı → "Kayıt görünürlüğü"** (`TenantScopeLimitsSection`): tür listesi sunucudan gelir (`GET .../scope-limits`; koda sabit liste yok, `OwnedRecords` değil depolar), her tür için en geniş kapsam seçici (varsayılan "Sınır yok"), tavanı olan türde "Yöneticiyi de bağla". Gerekçe zorunlu (sunucu yalnızca isteğe bağlı sayar; ekran daha katıdır çünkü erişimi daraltır). Kayıttan sonra etkilenen rol sayısı gösterilir. Yalnızca değişiklik varken kaydedilebilir.
+- **Rol ekranı → "Kapsam ve düzey" → "Kayıt türüne göre farklı kapsam":** tür başına "Varsayılan (...)" ya da bir kapsam; tavan, `GET /api/roles/scope-types` ile gelir. Tavanı aşan seçenek kapalı ve "(platform sınırını aşar)" yazılıdır; işlemi yapanın kapsamından geniş seçenek de kapalıdır. İstisnası olmayan türde varsayılan kapsam tavanı aşıyorsa satırda uyarı çıkar ve "Sınırı aşan türleri sınıra indir" düğmesi bu türlere tavan değerini istisna olarak yazar. Kaydetmede tüm istisna kümesi gönderilir (modülü kapalı türün istisnası da korunur).
+- **Sunucu değişikliği:** modülü sonradan kapanan türün mevcut tavanı `PUT scope-limits` içinde geçerli kalır (ekran tüm kümeyi yeniden gönderdiği için aksi halde tavan sessizce silinirdi); kapalı modülün yeni türüne tavan konamaz (testli).
+- **Doğrulama:** ekranlar yerelde (Release, demo veri) açık ve koyu temada elle denendi: tavan seçme, "Yöneticiyi de bağla", kaydetme, tavanı aşan seçeneklerin kapalı görünmesi, "sınıra indir". Ekran için otomatik arayüz testi yoktur; kurallar sunucu testleriyle korunur.
+- **Bulgu (bu dilimde düzeltildi):** `RoleDetail`'deki `TabBar` `Changed` geri çağrısı almadığı için sekme değişince paneller yeniden çizilmiyordu (başlık değişiyor, içerik aynı kalıyordu). `Changed="_ => { }"` eklendi; diğer sayfalar (firma, kişi, fırsat, sözleşme detayı) zaten böyle kullanıyor. Aynı eksik `CreateTenantForm`, `ContractFromQuote`, `ContractTemplates`, `PriceLists` ve `Products` içindeki `TabBar` kullanımlarında da görünüyor; **doğrulanmadı** ve bu dilime alınmadı.
+
 ## 6. Test planı (dört test ilkesi)
 
 - **Mutlu yol:** aynı rol firmada `All`, fırsatta `Unit` istisnasıyla kişiyi doğru kümelerle görür; tavan `Unit` iken `Unit` istisnası kaydedilir; liste, sayfalama ve toplam doğru kalır.
@@ -162,7 +170,8 @@ Açık karar kalmadı. Dilim 2'nin başında yeniden doğrulanacak noktalar böl
 
 - Sektör profilinin varsayılan tavan önermesi (ör. "Lojistik" profili fırsatlarda `Unit`); önizleme ve onayla uygulanır, sessizce ezmez.
 - Kapsam dışı ortak firma/kişi için "gizle" seçeneği (ADR-0026 K8, dilim 3).
-- Tavanın platform ekranında "bu daralma kaç kullanıcıyı etkiler" önizlemesi.
+- Tavanın platform ekranında "bu daralma kaç kullanıcıyı etkiler" önizlemesi (şu an yalnızca kayıttan sonra etkilenen rol sayısı gösterilir).
+- `AppliesToAdministrators = true` yazılırken etkilenecek yönetici sayısı (K6): ekran bugün yalnızca uyarı metni gösterir, sayı vermez.
 
 ## 9. Doğrulanmadı
 
