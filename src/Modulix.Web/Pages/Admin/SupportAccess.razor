@@ -1,0 +1,97 @@
+@page "/yonetim/destek-erisimi"
+@inject ApiClient Api
+
+<PageTitle>Destek erişimi · Modulix</PageTitle>
+
+@* Destek erişimi (ADR-0028 Dilim 7, Y1.3) firma tarafı: platform ekibinin bu firmada açtığı gerekçeli, süreli ve salt okunur erişimler
+   listelenir; firma yöneticisi geçerli bir erişimi süresi dolmadan kapatabilir. Kayıtlar silinmez, geçmişte kalır. *@
+<AuthGate Permission="@CoreAccess.ManageUsers">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <h1>Destek erişimi</h1>
+    </div>
+    <p class="text-muted">
+        Platform ekibi verinize yalnızca gerekçeyle ve süreli bakabilir. Erişim <strong>salt okunurdur</strong>: veri değiştirilemez, dışa aktarılamaz;
+        kullanıcı, rol, denetim ve ayar bölümlerine girilemez. Açıldığında firma yöneticilerine e-posta gider; süresi dolunca kendiliğinden kapanır.
+        Gerek görmüyorsanız geçerli bir erişimi buradan hemen kapatabilirsiniz.
+    </p>
+
+    <Notice Text="@notice" Failed="failed" />
+
+    @if (items is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (items.Count == 0)
+    {
+        <p class="text-muted">Bu firmada henüz destek erişimi açılmadı.</p>
+    }
+    else
+    {
+        <div class="card">
+            <table class="table record-table">
+                <thead><tr><th>Kişi</th><th>Gerekçe</th><th>Başlangıç</th><th>Bitiş</th><th>Durum</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var item in items)
+                    {
+                        <tr>
+                            <td data-label="Kişi" class="primary">@item.UserName</td>
+                            <td data-label="Gerekçe">@item.Reason</td>
+                            <td data-label="Başlangıç">@CrmLabels.Time(item.GrantedAt)</td>
+                            <td data-label="Bitiş">@CrmLabels.Time(item.EndedAt ?? item.ExpiresAt)</td>
+                            <td data-label="Durum">
+                                <span class="badge @(item.State == SupportAccessStateDto.Active ? "user-active" : "user-disabled")">@StateText(item.State)</span>
+                            </td>
+                            <td class="actions">
+                                @if (item.State == SupportAccessStateDto.Active)
+                                {
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RevokeAsync(item.Id)">Erişimi kapat</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</AuthGate>
+
+@code {
+    private IReadOnlyList<SupportAccessDto>? items;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<SupportAccessDto>>("/api/tenant/support-access");
+        if (result.IsSuccess)
+        {
+            items = result.Value;
+        }
+        else
+        {
+            items = [];
+            (notice, failed) = (result.Error, true);
+        }
+    }
+
+    private async Task RevokeAsync(Guid grantId)
+    {
+        busy = true;
+        var result = await Api.PostAsync<bool>($"/api/tenant/support-access/{grantId}/revoke", new { });
+        busy = false;
+        (notice, failed) = result.IsSuccess ? ("Destek erişimi kapatıldı.", false) : (result.Error, true);
+        await LoadAsync();
+    }
+
+    private static string StateText(SupportAccessStateDto state) => state switch
+    {
+        SupportAccessStateDto.Active => "Geçerli",
+        SupportAccessStateDto.Expired => "Süresi doldu",
+        _ => "Kapatıldı",
+    };
+}
