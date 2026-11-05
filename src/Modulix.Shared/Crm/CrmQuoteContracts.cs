@@ -45,7 +45,11 @@ public sealed record QuoteDto(
     DateTimeOffset? CalculatedAt,
     DateTimeOffset? PresentedAt,
     DateTimeOffset? DecidedAt,
-    string? CustomerNameSnapshot);
+    string? CustomerNameSnapshot,
+    List<QuoteScopeItemDto>? ServiceScopeSnapshot = null);
+
+/// <summary>Teklifin sunum anında sabitlenen hizmet kapsamı öğesi: faaliyet kodu ve o andaki adı (ADR-0029 Dilim F3).</summary>
+public sealed record QuoteScopeItemDto(string Code, string Name);
 
 public sealed record SaveQuoteRequest(
     string Title,

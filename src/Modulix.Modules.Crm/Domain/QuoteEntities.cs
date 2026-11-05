@@ -113,6 +113,15 @@ public sealed class Quote : CrmEntity, IOwnedEntity
     /// <summary>Sunulduğu anda sabitlenen müşteri ünvanı; sonradan firma kartı değişse de belge aynı kalır.</summary>
     public string? CustomerNameSnapshot { get; internal set; }
 
+    public const int ServiceScopeSnapshotMaxLength = 8000;
+
+    /// <summary>
+    /// Sunulduğu anda sabitlenen hizmet kapsamı (ADR-0029 Dilim F3): bağlı fırsatın o andaki kapsamı, faaliyet adlarıyla birlikte JSON dizi
+    /// (<c>[{"code","name"}]</c>). Katalogda ad değişse ya da faaliyet pasife alınsa da sunulmuş teklif aynı kalır. Fırsat yoksa ya da kapsamı
+    /// boşsa null; yalnızca sunum eylemiyle yazılır, revizyon ve kopyada taşınmaz (yeni taslak sunulurken yeniden sabitlenir).
+    /// </summary>
+    public string? ServiceScopeSnapshot { get; internal set; }
+
     public Guid? CreatedBy { get; internal set; }
 
     public Guid? UpdatedBy { get; internal set; }

@@ -139,6 +139,26 @@ internal static class Field
             e => new JsonArray([.. ActivityCodeList.Split(get(e)).Select(c => (JsonNode?)JsonValue.Create(c))]),
             (e, v) => set(e, (string?)v));
 
+    /// <summary>
+    /// Kod + ad çiftlerinin JSON dizisi (<c>[{"code","name"}]</c>), tek metin sütununda saklanır; sunum anı kapsam özeti gibi sistem alanları
+    /// için. Okunurken dizi olarak döner, boşsa null.
+    /// </summary>
+    public static RecordField<T> CodeNameList<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                if (node is not JsonArray array || array.Any(i => i is not JsonObject item
+                        || item["code"] is not JsonValue code || code.GetValueKind() != JsonValueKind.String
+                        || item["name"] is not JsonValue label || label.GetValueKind() != JsonValueKind.String))
+                {
+                    return ParsedValue.Fail("Kod ve ad çiftlerinden oluşan liste bekleniyor.");
+                }
+
+                var json = array.ToJsonString();
+                return json.Length > maxLength ? ParsedValue.Fail($"En fazla {maxLength} karakter olabilir.") : ParsedValue.Of(array.Count == 0 ? null : json);
+            },
+            e => get(e) is { Length: > 0 } stored ? JsonNode.Parse(stored) : null,
+            (e, v) => set(e, (string?)v));
+
     public static RecordField<T> Email<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set) =>
         new(name, required: false, nullable: true, node =>
             {

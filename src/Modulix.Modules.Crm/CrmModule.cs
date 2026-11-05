@@ -841,6 +841,7 @@ public sealed class CrmModule : IModule
             ["validUntil"] = "Geçerlilik bitişi", ["currency"] = "Para birimi", ["priceIncludesTax"] = "Fiyatlar vergi dahil", ["documentDiscountKind"] = "Genel indirim türü",
             ["documentDiscountValue"] = "Genel indirim", ["paymentTerms"] = "Ödeme koşulları", ["deliveryTerms"] = "Teslimat koşulları",
             ["commercialTerms"] = "Ticari koşullar", ["internalNotes"] = "İç notlar", ["netTotal"] = "Net toplam", ["taxTotal"] = "Vergi", ["grossTotal"] = "Genel toplam",
+            ["serviceScopeSnapshot"] = "Sunumdaki hizmet kapsamı",
         }, "title")
         {
             References = new Dictionary<string, string>

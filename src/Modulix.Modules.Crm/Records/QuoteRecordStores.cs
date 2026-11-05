@@ -96,6 +96,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         Field.Time<Quote>("presentedAt", q => q.PresentedAt, (q, v) => q.PresentedAt = v).AsSystem(),
         Field.Time<Quote>("decidedAt", q => q.DecidedAt, (q, v) => q.DecidedAt = v).AsSystem(),
         Field.Text<Quote>("customerNameSnapshot", 300, q => q.CustomerNameSnapshot, (q, v) => q.CustomerNameSnapshot = v).AsSystem(),
+        Field.CodeNameList<Quote>("serviceScopeSnapshot", Quote.ServiceScopeSnapshotMaxLength, q => q.ServiceScopeSnapshot, (q, v) => q.ServiceScopeSnapshot = v).AsSystem(),
         Field.Id<Quote>("createdBy", q => q.CreatedBy, (q, v) => q.CreatedBy = v).AsSystem(),
         Field.Id<Quote>("updatedBy", q => q.UpdatedBy, (q, v) => q.UpdatedBy = v).AsSystem(),
     ];

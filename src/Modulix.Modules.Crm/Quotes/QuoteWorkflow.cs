@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Records;
 
@@ -79,7 +80,8 @@ internal sealed class QuoteWorkflow(
     QuoteReader reader,
     TimeProvider time,
     ITenantContextAccessor tenant,
-    IQuotePolicyProvider? policyProvider = null) : IQuoteWorkflow
+    IQuotePolicyProvider? policyProvider = null,
+    IActivityCodeCatalog? activityCodes = null) : IQuoteWorkflow
 {
     private const string Key = CrmModule.Entities.Quote;
     private const string RequiredApproval = "Required";
@@ -158,7 +160,9 @@ internal sealed class QuoteWorkflow(
             ["presentedAt"] = now.ToString("O", CultureInfo.InvariantCulture),
             // Sunulan belgenin müşteri ünvanı o anda sabitlenir; firma kartı sonradan değişse de belge aynı kalır.
             ["customerNameSnapshot"] = Text(q, "customerName"),
-        }, "Presented", cancellationToken, enrichWithCompanyName: true);
+            // Bağlı fırsatın hizmet kapsamı da o anda adlarıyla sabitlenir (ADR-0029 Dilim F3); fırsat/katalog sonradan değişse de belge aynı kalır.
+            ["serviceScopeSnapshot"] = q.Values["serviceScopeToFreeze"]?.DeepClone(),
+        }, "Presented", cancellationToken, enrichWithCompanyName: true, enrichWithServiceScope: true);
 
     public Task<RecordResult<RecordData>> RecordAcceptedAsync(Guid id, long version, string? note, CancellationToken cancellationToken) =>
         Transition(id, version, QuoteAction.Accept, CrmModule.Permissions.QuotesRecordDecision, note, (q, now) => new JsonObject
@@ -278,7 +282,8 @@ internal sealed class QuoteWorkflow(
 
     private async Task<RecordResult<RecordData>> Transition(
         Guid id, long version, string action, string permission, string? reason, Func<RecordData, DateTimeOffset, JsonObject> build, string eventKind,
-        CancellationToken cancellationToken, bool reasonRequired = false, bool checkSelfApproval = false, bool enrichWithCompanyName = false, bool checkApprover = false, string? historyReason = null)
+        CancellationToken cancellationToken, bool reasonRequired = false, bool checkSelfApproval = false, bool enrichWithCompanyName = false, bool checkApprover = false, string? historyReason = null,
+        bool enrichWithServiceScope = false)
     {
         var loaded = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         if (!loaded.IsSuccess)
@@ -321,6 +326,11 @@ internal sealed class QuoteWorkflow(
             quote.Values["customerName"] = company.IsSuccess ? company.Value!.Values["name"]?.DeepClone() : null;
         }
 
+        if (enrichWithServiceScope)
+        {
+            quote.Values["serviceScopeToFreeze"] = await ServiceScopeToFreezeAsync(quote, cancellationToken);
+        }
+
         var values = build(quote, now);
         RecordResult<RecordData> result;
         using (gate.Open([permission], eventKind, Trim(historyReason ?? reason)))
@@ -329,6 +339,29 @@ internal sealed class QuoteWorkflow(
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Bağlı fırsatın hizmet kapsamı, faaliyet adlarıyla <c>[{"code","name"}]</c> dizisi olarak; fırsat yoksa ya da kapsamı boşsa null. Katalogda
+    /// bulunamayan kodun adı yerine kodun kendisi yazılır (kayıt bozulmaz).
+    /// </summary>
+    private async Task<JsonNode?> ServiceScopeToFreezeAsync(RecordData quote, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(Text(quote, "opportunityId"), out var opportunityId))
+        {
+            return null;
+        }
+
+        var codes = ActivityCodeList.Split(await reader.OpportunityServiceScopeAsync(opportunityId, cancellationToken));
+        if (codes.Count == 0)
+        {
+            return null;
+        }
+
+        var names = activityCodes is null
+            ? []
+            : (await activityCodes.FindAsync(codes, cancellationToken)).ToDictionary(c => c.Code, c => c.Name, StringComparer.Ordinal);
+        return new JsonArray([.. codes.Select(code => (JsonNode?)new JsonObject { ["code"] = code, ["name"] = names.GetValueOrDefault(code, code) })]);
     }
 
     private async Task<bool> SubmittedByCurrentUserAsync(Guid id, CancellationToken cancellationToken) =>
