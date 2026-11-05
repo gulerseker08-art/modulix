@@ -15,6 +15,23 @@ public enum AppTone
 }
 
 /// <summary>
+/// Bir ekranın başka bir uygulamanın (ev sahibi) menüsünde görünüşü: hangi bölümde, hangi adla ve hangi sırada.
+/// Yalnızca menü yerleşimidir; ekranın modülü, izni ve route'u değişmez.
+/// </summary>
+/// <param name="Group">Ev sahibi uygulamanın bölümü (<see cref="AppCatalog.Groups"/>).</param>
+/// <param name="Name">Ev sahibinin menüsündeki ad; <c>null</c> ise ekranın kendi adı.</param>
+/// <param name="Order">Bölüm içindeki sıra.</param>
+/// <param name="Route">Ev sahibinin menüsündeki bağlantı (ör. hazır bir görünümle açan sorgu); <c>null</c> ise ekranın kendi route'u. Aktif ekran yine route yolundan bulunur.</param>
+/// <param name="ParentEntryId">Verilirse ekran ev sahibinin menüsünde ayrı satır olmaz; bu menü satırının (kimlik) altında sayılır, o ekran aktifken o satır işaretlenir.</param>
+public sealed record HostPlacement(string Group, string? Name, int Order, string? Route = null, string? ParentEntryId = null);
+
+/// <summary>
+/// Henüz ekranı olmayan, gelecekte eklenecek uygulama: panelde pasif ("Yakında") kart olarak görünür, tıklanınca bir şey yapmaz,
+/// menüsü ve route'u yoktur. Gerçek uygulama katalogda tanımlanınca (<see cref="AppCatalog.All"/>) bu listeden çıkarılır.
+/// </summary>
+public sealed record PlannedApp(string Id, string Name, string Icon);
+
+/// <summary>
 /// Uygulama menüsünün (Modulix paneli) ve sol menünün ortak tanımı. <see cref="ParentId"/> boşsa ana uygulama (modül
 /// ya da alan), doluysa onun alt uygulamasıdır. Görünürlük <see cref="AppNavigation"/> ile oturumdan hesaplanır;
 /// menüde gizlemek yetkilendirme değildir, route ve sunucu denetimleri aynen geçerlidir.
@@ -32,6 +49,9 @@ public enum AppTone
 /// <param name="ExactMatch">Aktif sayfa yalnızca route tam eşleşince bu uygulamadır (genel bakış ekranları).</param>
 /// <param name="Tone">Panel ikonunun rengi.</param>
 /// <param name="Group">Uygulamanın panelde altında listelendiği başlık (<see cref="AppCatalog.Groups"/>): ana uygulamada alan başlığı, alt uygulamada kendi uygulamasının içindeki bölüm; <c>null</c> ise gruplanmaz.</param>
+/// <param name="HostId">Ana uygulamada: bu uygulamanın ekranlarını kendi menüsünde gösteren uygulama (ör. CRM). Ev sahibi görünürse bu uygulama panelde ayrı kart olmaz; görünmüyorsa (ör. tenant'ta CRM yok) eskisi gibi ayrı uygulama olarak kalır.</param>
+/// <param name="Hosted">Alt uygulamada: ev sahibinin menüsündeki yeri; <c>null</c> ise ev sahibinin menüsünde görünmez.</param>
+/// <param name="MenuParentId">Alt uygulamada: bu ekran menüde ayrı satır olmaz, belirtilen ekranın (aynı uygulamada) altında sayılır; route'u çalışmaya devam eder.</param>
 public sealed record AppDefinition(
     string Id,
     string? ParentId,
@@ -45,21 +65,26 @@ public sealed record AppDefinition(
     bool PlatformOnly = false,
     bool ExactMatch = false,
     AppTone Tone = AppTone.Indigo,
-    string? Group = null);
+    string? Group = null,
+    string? HostId = null,
+    HostPlacement? Hosted = null,
+    string? MenuParentId = null);
 
 /// <summary>
-/// Panelde ana uygulamaları bir araya getiren başlık. Yalnızca görsel kümelemedir: modül sahipliğini, izinleri ve
-/// route'ları etkilemez; hiçbir uygulaması görünmeyen grup panelde çıkmaz.
+/// Panelde ana uygulamaları ya da sol menüde bir uygulamanın ekranlarını bir araya getiren başlık. Yalnızca görsel
+/// kümelemedir: modül sahipliğini, izinleri ve route'ları etkilemez; hiçbir ekranı görünmeyen grup çıkmaz.
 /// </summary>
 /// <param name="Id">Benzersiz grup kimliği.</param>
 /// <param name="Name">Kullanıcıya görünen başlık.</param>
 /// <param name="Order">Gruplar arası sıralama.</param>
-public sealed record AppGroup(string Id, string Name, int Order);
+/// <param name="Icon">Sol menüde bölüm başlığının ikonu.</param>
+/// <param name="Footer">Sol menüde kaydırma alanının altına sabitlenen bölüm (ör. CRM Ayarları).</param>
+public sealed record AppGroup(string Id, string Name, int Order, string? Icon = null, bool Footer = false);
 
 /// <summary>
 /// Projedeki gerçek modül ve ekranların tanımı. Yeni modül ya da ekran eklemek bu listeye satır eklemektir; panel ve
-/// sol menü başka yerde sabit yazılmaz. Ekranı olmayan uygulama (ör. Lojistik, CRM'in Leadler/Teklifler/Takvim/Raporlar'ı)
-/// buraya eklenmez.
+/// sol menü başka yerde sabit yazılmaz. Ekranı olmayan uygulama (ör. Lojistik; CRM'in Takvim, Kanal ve İş Ortakları,
+/// Müşteri Başlangıç Planları ekranları) buraya eklenmez: boş menü bağlantısı yoktur.
 /// </summary>
 public static class AppCatalog
 {
@@ -76,65 +101,99 @@ public static class AppCatalog
     public const string ServiceGroup = "service";
     public const string ManagementGroup = "management";
 
-    public const string CrmProcessGroup = "crm.process";
-    public const string CrmQuoteGroup = "crm.quote";
+    public const string CrmWorkspaceGroup = "crm.workspace";
+    public const string CrmCustomersGroup = "crm.customers";
+    public const string CrmSalesGroup = "crm.sales";
     public const string CrmCatalogGroup = "crm.catalog";
-    public const string CrmPerformanceGroup = "crm.performance";
+    public const string CrmMarketingGroup = "crm.marketing";
+    public const string CrmAfterSalesGroup = "crm.aftersales";
+    public const string CrmReportsGroup = "crm.reports";
+    public const string CrmSettingsGroup = "crm.settings";
 
-    /// <summary>Hem ana uygulamaların hem de bir uygulamanın alt uygulamalarının başlıkları; bir tanım <c>Group</c> ile birini seçer.</summary>
+    /// <summary>Hem ana uygulamaların hem de bir uygulamanın sol menü bölümlerinin başlıkları; bir tanım <c>Group</c> ile birini seçer.</summary>
     public static IReadOnlyList<AppGroup> Groups { get; } =
     [
         new(SalesGroup, "Satış ve müşteri", 10),
         new(ServiceGroup, "Müşteri hizmetleri", 20),
         new(ManagementGroup, "Yönetim", 30),
 
-        new(CrmProcessGroup, "Müşteri ve satış süreci", 10),
-        new(CrmQuoteGroup, "Teklif", 20),
-        new(CrmCatalogGroup, "Ürün ve fiyat", 30),
-        new(CrmPerformanceGroup, "Satış performansı", 40),
+        new(CrmWorkspaceGroup, "Çalışma Alanım", 10, "home"),
+        new(CrmCustomersGroup, "Müşteriler", 20, "users"),
+        new(CrmSalesGroup, "Satış", 30, "trending-up"),
+        new(CrmCatalogGroup, "Ürün ve Fiyatlandırma", 40, "tag"),
+        new(CrmMarketingGroup, "Pazarlama", 50, "globe"),
+        new(CrmAfterSalesGroup, "Satış Sonrası", 60, "repeat"),
+        new(CrmReportsGroup, "Satış Raporları", 70, "dashboard"),
+        new(CrmSettingsGroup, "CRM Ayarları", 100, "wrench", Footer: true),
+    ];
+
+    /// <summary>
+    /// Yol haritasındaki uygulamalar (panelde pasif kart). Ekranı olan bir uygulama <see cref="All"/>'a eklendiğinde buradan silinir.
+    /// </summary>
+    public static IReadOnlyList<PlannedApp> Planned { get; } =
+    [
+        new("planned.logistics", "Lojistik", "truck"),
+        new("planned.warehouse", "Antrepo", "warehouse"),
+        new("planned.hr", "İnsan Kaynakları", "users"),
     ];
 
     public static IReadOnlyList<AppDefinition> All { get; } =
     [
         new(Crm, null, "CRM", "users", null, 10, ModuleKey: CrmAccess.ModuleKey, Group: SalesGroup),
-        new("crm.leads", Crm, "Müşteri adayları", "inbox", "crm/leadler", 5, CrmAccess.ModuleKey, CrmAccess.LeadsRead, Group: CrmProcessGroup),
-        new("crm.companies", Crm, "Firmalar", "building", "crm/firmalar", 10, CrmAccess.ModuleKey, CrmAccess.CompaniesRead, Group: CrmProcessGroup),
-        new("crm.contacts", Crm, "Kişiler", "user", "crm/kisiler", 20, CrmAccess.ModuleKey, CrmAccess.ContactsRead, Tone: AppTone.Teal, Group: CrmProcessGroup),
-        new("crm.opportunities", Crm, "Fırsatlar", "target", "crm/firsatlar", 30, CrmAccess.ModuleKey, CrmAccess.OpportunitiesRead, Group: CrmProcessGroup),
-        new("crm.products", Crm, "Ürün ve hizmetler", "package", "crm/urunler", 35, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmCatalogGroup),
-        new("crm.product-categories", Crm, "Ürün kategorileri", "layers", "crm/urun-kategorileri", 35, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmCatalogGroup),
-        new("crm.units", Crm, "Ölçü birimleri", "sliders", "crm/birimler", 35, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmCatalogGroup),
-        new("crm.price-lists", Crm, "Fiyat listeleri", "list", "crm/fiyat-listeleri", 36, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal, Group: CrmCatalogGroup),
-        new("crm.tax-rates", Crm, "Vergi ve kur", "landmark", "crm/vergi-kur", 37, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmCatalogGroup),
-        new("crm.discounts", Crm, "İndirimler", "zap", "crm/indirimler", 38, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal, Group: CrmCatalogGroup),
-        new("crm.price-calculator", Crm, "Fiyat hesapla", "search", "crm/fiyat-hesapla", 39, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmCatalogGroup),
-        new("crm.quotes", Crm, "Teklifler", "file-text", "crm/teklifler", 32, CrmAccess.ModuleKey, CrmAccess.QuotesRead, Group: CrmQuoteGroup),
-        new("crm.quote-approvals", Crm, "Teklif onayları", "check-circle", "crm/teklif-onaylari", 33, CrmAccess.ModuleKey, CrmAccess.QuotesApprove, Tone: AppTone.Teal, Group: CrmQuoteGroup),
-        new("crm.quote-rules", Crm, "Teklif kuralları", "shield", "crm/teklif-kurallari", 34, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmQuoteGroup),
-        new("crm.quote-delegations", Crm, "Onay vekâletleri", "users", "crm/onay-vekaletleri", 34, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmQuoteGroup),
-        new("crm.activities", Crm, "Aktiviteler", "activity", "crm/aktiviteler", 40, CrmAccess.ModuleKey, CrmAccess.ActivitiesRead, Tone: AppTone.Teal, Group: CrmProcessGroup),
-        new("crm.sales-overview", Crm, "Satış görünümü", "dashboard", "crm/satis-gorunumu", 41, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmPerformanceGroup),
-        new("crm.sales-targets", Crm, "Satış hedefleri", "target", "crm/satis-hedefleri", 42, CrmAccess.ModuleKey, SalesAccess.TargetsRead, Tone: AppTone.Teal, Group: CrmPerformanceGroup),
-        new("crm.sales-forecasts", Crm, "Satış tahmini", "trending-up", "crm/satis-tahmini", 43, CrmAccess.ModuleKey, SalesAccess.ForecastsRead, Group: CrmPerformanceGroup),
-        new("crm.sales-analysis", Crm, "Satış analizi", "percent", "crm/satis-analizi", 44, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmPerformanceGroup),
-        new("crm.sales-team", Crm, "Ekip performansı", "users", "crm/ekip-performansi", 45, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmPerformanceGroup),
-        new("crm.sales-data-quality", Crm, "Veri kalitesi", "shield", "crm/veri-kalitesi", 46, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmPerformanceGroup),
 
-        new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal, Group: SalesGroup),
-        new("contracts.dashboard", Contracts, "Pano", "dashboard", "sozlesmeler/ozet", 5, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, ExactMatch: true),
-        new("contracts.list", Contracts, "Sözleşmeler", "file-text", "sozlesmeler", 10, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
-        new("contracts.templates", Contracts, "Şablonlar", "layers", "sozlesmeler/sablonlar", 20, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
-        new("contracts.approvals", Contracts, "Onaylar", "check-circle", "sozlesmeler/onaylar", 30, ContractsAccess.ModuleKey, ContractsAccess.ContractsApprove, Tone: AppTone.Teal),
-        new("contracts.signatures", Contracts, "İmzalar", "check-circle", "sozlesmeler/imzalar", 35, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
-        new("contracts.commitments", Contracts, "Taahhütler", "clipboard-list", "sozlesmeler/taahhutler", 36, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Tone: AppTone.Teal),
-        new("contracts.renewals", Contracts, "Yenilemeler", "calendar", "sozlesmeler/yenileme", 37, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead),
-        new("contracts.settings", Contracts, "Sözleşme ayarları", "wrench", "yonetim/ayarlar?grup=S%C3%B6zle%C5%9Fmeler", 90, ContractsAccess.ModuleKey, CoreAccess.ManageSettings),
-        new("contracts.approval-rules", Contracts, "Onay kuralları", "shield", "sozlesmeler/onay-kurallari", 40, ContractsAccess.ModuleKey, ContractsAccess.ApprovalsManage),
+        // Çalışma Alanım: kullanıcının üzerinde işlem bekleyen işler. "Onay bekleyen işlerim" teklif ve sözleşme onaylarını tek listede toplar;
+        // karar ekranları (teklif onayları, sözleşme onayları) menüde ayrı satır değildir, bu satırın altında sayılır.
+        new("crm.activities", Crm, "Aktiviteler", "activity", "crm/aktiviteler", 10, CrmAccess.ModuleKey, CrmAccess.ActivitiesRead, Tone: AppTone.Teal, Group: CrmWorkspaceGroup),
+        new("crm.approvals", Crm, "Onay bekleyen işlerim", "check-circle", "crm/onay-bekleyenler", 20, CrmAccess.ModuleKey, AnyPermission: [CrmAccess.QuotesApprove, ContractsAccess.ContractsApprove], Tone: AppTone.Teal, Group: CrmWorkspaceGroup),
+        new("crm.quote-approvals", Crm, "Teklif onayları", "check-circle", "crm/teklif-onaylari", 21, CrmAccess.ModuleKey, CrmAccess.QuotesApprove, Tone: AppTone.Teal, Group: CrmWorkspaceGroup, MenuParentId: "crm.approvals"),
 
-        new(Orders, null, "Siparişler", "package", null, 25, ModuleKey: OrdersAccess.ModuleKey, Group: SalesGroup),
-        new("orders.dashboard", Orders, "Pano", "dashboard", "siparisler/ozet", 5, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, ExactMatch: true),
-        new("orders.list", Orders, "Siparişler", "package", "siparisler", 10, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead),
-        new("orders.jobs", Orders, "Operasyon işleri", "clipboard-list", "siparisler/isler", 20, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, Tone: AppTone.Teal),
+        // Müşteriler
+        new("crm.companies", Crm, "Firmalar", "building", "crm/firmalar", 10, CrmAccess.ModuleKey, CrmAccess.CompaniesRead, Group: CrmCustomersGroup),
+        new("crm.contacts", Crm, "Kişiler", "user", "crm/kisiler", 20, CrmAccess.ModuleKey, CrmAccess.ContactsRead, Tone: AppTone.Teal, Group: CrmCustomersGroup),
+
+        // Satış
+        new("crm.leads", Crm, "Müşteri adayları", "inbox", "crm/leadler", 10, CrmAccess.ModuleKey, CrmAccess.LeadsRead, Group: CrmSalesGroup),
+        new("crm.opportunities", Crm, "Fırsatlar", "target", "crm/firsatlar", 20, CrmAccess.ModuleKey, CrmAccess.OpportunitiesRead, Group: CrmSalesGroup),
+        new("crm.quotes", Crm, "Teklifler", "file-text", "crm/teklifler", 30, CrmAccess.ModuleKey, CrmAccess.QuotesRead, Group: CrmSalesGroup),
+
+        // Ürün ve Fiyatlandırma
+        new("crm.products", Crm, "Ürün ve hizmetler", "package", "crm/urunler", 10, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmCatalogGroup),
+        new("crm.price-lists", Crm, "Fiyat listeleri", "list", "crm/fiyat-listeleri", 20, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal, Group: CrmCatalogGroup),
+        new("crm.discounts", Crm, "İndirim kuralları", "zap", "crm/indirimler", 30, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal, Group: CrmCatalogGroup),
+        new("crm.price-calculator", Crm, "Fiyat hesaplama", "search", "crm/fiyat-hesapla", 40, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmCatalogGroup),
+
+        // Satış Raporları
+        new("crm.sales-overview", Crm, "Satış aşamaları görünümü", "dashboard", "crm/satis-gorunumu", 10, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmReportsGroup),
+        new("crm.sales-targets", Crm, "Satış hedefleri", "target", "crm/satis-hedefleri", 20, CrmAccess.ModuleKey, SalesAccess.TargetsRead, Tone: AppTone.Teal, Group: CrmReportsGroup),
+        new("crm.sales-forecasts", Crm, "Satış tahmini", "trending-up", "crm/satis-tahmini", 30, CrmAccess.ModuleKey, SalesAccess.ForecastsRead, Group: CrmReportsGroup),
+        new("crm.sales-analysis", Crm, "Satış analizi", "percent", "crm/satis-analizi", 40, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmReportsGroup),
+        new("crm.sales-team", Crm, "Ekip performansı", "users", "crm/ekip-performansi", 50, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmReportsGroup),
+
+        // CRM Ayarları: CRM'e özgü kurallar ve tanımlar, veri kalitesi.
+        new("crm.quote-rules", Crm, "Teklif kuralları", "shield", "crm/teklif-kurallari", 10, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
+        new("crm.quote-delegations", Crm, "Onay vekâletleri", "users", "crm/onay-vekaletleri", 20, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
+        new("crm.sales-data-quality", Crm, "Veri kalitesi", "shield", "crm/veri-kalitesi", 30, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmSettingsGroup),
+        new("crm.product-categories", Crm, "Ürün kategorileri", "layers", "crm/urun-kategorileri", 40, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmSettingsGroup),
+        new("crm.units", Crm, "Ölçü birimleri", "sliders", "crm/birimler", 50, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmSettingsGroup),
+        new("crm.tax-rates", Crm, "Vergi ve kur", "landmark", "crm/vergi-kur", 60, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmSettingsGroup),
+
+        // Sözleşmeler, Siparişler ve Pazarlama kendi modülleri, izinleri ve route'larıyla ayrı uygulamalar olarak kalır;
+        // CRM görünürse ekranları CRM'in menüsünde (Hosted) gösterilir, görünmüyorsa eskisi gibi ayrı uygulamadır.
+        new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal, Group: SalesGroup, HostId: Crm),
+        new("contracts.dashboard", Contracts, "Pano", "dashboard", "sozlesmeler/ozet", 5, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, ExactMatch: true, Hosted: new(CrmReportsGroup, "Sözleşme panosu", 60)),
+        new("contracts.list", Contracts, "Sözleşmeler", "file-text", "sozlesmeler", 10, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmSalesGroup, "Satış sözleşmeleri", 40, Route: "sozlesmeler?gorunum=sales")),
+        new("contracts.templates", Contracts, "Şablonlar", "layers", "sozlesmeler/sablonlar", 20, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmSettingsGroup, "Sözleşme şablonları", 70)),
+        new("contracts.approvals", Contracts, "Onaylar", "check-circle", "sozlesmeler/onaylar", 30, ContractsAccess.ModuleKey, ContractsAccess.ContractsApprove, Tone: AppTone.Teal, Hosted: new(CrmWorkspaceGroup, "Sözleşme onayları", 30, ParentEntryId: "crm.approvals")),
+        new("contracts.signatures", Contracts, "İmzalar", "check-circle", "sozlesmeler/imzalar", 35, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmAfterSalesGroup, "Sözleşme imzaları", 30)),
+        new("contracts.commitments", Contracts, "Taahhütler", "clipboard-list", "sozlesmeler/taahhutler", 36, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Tone: AppTone.Teal, Hosted: new(CrmAfterSalesGroup, null, 20)),
+        new("contracts.renewals", Contracts, "Yenilemeler", "calendar", "sozlesmeler/yenileme", 37, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmAfterSalesGroup, "Yenileme takibi", 10)),
+        new("contracts.settings", Contracts, "Sözleşme ayarları", "wrench", "yonetim/ayarlar?grup=S%C3%B6zle%C5%9Fmeler", 90, ContractsAccess.ModuleKey, CoreAccess.ManageSettings, Hosted: new(CrmSettingsGroup, null, 90)),
+        new("contracts.approval-rules", Contracts, "Onay kuralları", "shield", "sozlesmeler/onay-kurallari", 40, ContractsAccess.ModuleKey, ContractsAccess.ApprovalsManage, Hosted: new(CrmSettingsGroup, "Sözleşme onay kuralları", 80)),
+
+        new(Orders, null, "Siparişler", "package", null, 25, ModuleKey: OrdersAccess.ModuleKey, Group: SalesGroup, HostId: Crm),
+        new("orders.dashboard", Orders, "Pano", "dashboard", "siparisler/ozet", 5, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, ExactMatch: true, Hosted: new(CrmReportsGroup, "Sipariş panosu", 70)),
+        new("orders.list", Orders, "Siparişler", "package", "siparisler", 10, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, Hosted: new(CrmSalesGroup, "Satış siparişleri", 50)),
+        new("orders.jobs", Orders, "Operasyon işleri", "clipboard-list", "siparisler/isler", 20, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, Tone: AppTone.Teal, Hosted: new(CrmAfterSalesGroup, null, 40)),
 
         new(Support, null, "Destek", "message-square", null, 27, ModuleKey: SupportAccess.ModuleKey, Tone: AppTone.Teal, Group: ServiceGroup),
         new("support.tickets", Support, "Talepler", "inbox", "destek/talepler", 10, SupportAccess.ModuleKey, SupportAccess.TicketsRead, ExactMatch: true),
@@ -145,10 +204,10 @@ public static class AppCatalog
         new("support.reports", Support, "Raporlar", "list", "destek/raporlar", 92, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
         new("support.complaints", Support, "Şikâyet inceleme", "shield", "destek/sikayetler", 93, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
 
-        new(Marketing, null, "Pazarlama", "trending-up", null, 28, ModuleKey: MarketingAccess.ModuleKey, Group: SalesGroup),
-        new("marketing.segments", Marketing, "Segmentler", "list", "pazarlama/segmentler", 10, MarketingAccess.ModuleKey, MarketingAccess.SegmentsRead),
-        new("marketing.campaigns", Marketing, "Kampanyalar", "target", "pazarlama/kampanyalar", 20, MarketingAccess.ModuleKey, MarketingAccess.CampaignsRead, Tone: AppTone.Teal),
-        new("marketing.report", Marketing, "Kampanya raporu", "dashboard", "pazarlama/rapor", 30, MarketingAccess.ModuleKey, MarketingAccess.ReportsRead),
+        new(Marketing, null, "Pazarlama", "trending-up", null, 28, ModuleKey: MarketingAccess.ModuleKey, Group: SalesGroup, HostId: Crm),
+        new("marketing.segments", Marketing, "Segmentler", "list", "pazarlama/segmentler", 10, MarketingAccess.ModuleKey, MarketingAccess.SegmentsRead, Hosted: new(CrmMarketingGroup, null, 10)),
+        new("marketing.campaigns", Marketing, "Kampanyalar", "target", "pazarlama/kampanyalar", 20, MarketingAccess.ModuleKey, MarketingAccess.CampaignsRead, Tone: AppTone.Teal, Hosted: new(CrmMarketingGroup, null, 20)),
+        new("marketing.report", Marketing, "Kampanya raporu", "dashboard", "pazarlama/rapor", 30, MarketingAccess.ModuleKey, MarketingAccess.ReportsRead, Hosted: new(CrmMarketingGroup, "Kampanya sonuçları", 30)),
 
         // Rapor merkezi çekirdeğe aittir (modül anahtarı yok; yönetim girdileri gibi yalnızca izne bağlıdır). Tek ekranlı olduğu için alt uygulaması yoktur,
         // kendi route'u vardır; /raporlar altındaki oluşturucu ve çalıştırma ekranları da bu uygulamanın bağlamında kalır.
@@ -163,6 +222,7 @@ public static class AppCatalog
         new("admin.companies", Admin, "Şirketler", "landmark", "yonetim/sirketler", 50, Permission: CoreAccess.ManageCompanies),
         new("admin.settings", Admin, "Firma ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
+        new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),
         new("admin.communication", Admin, "İletişim tercihleri", "mail", "yonetim/iletisim-tercihleri", 75, Permission: CoreAccess.ReadCommunication),
         new("admin.custom-fields", Admin, "Özel alanlar", "square-pen", "yonetim/ozel-alanlar", 80, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
         new("admin.lists", Admin, "Listeler", "list", "yonetim/listeler", 90, Permission: CoreAccess.ManageCustomization),

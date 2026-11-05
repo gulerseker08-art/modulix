@@ -96,6 +96,129 @@
         color: var(--mx-brand-teal);
     }
 
+/* Açılır bölümler (CRM gezintisi): başlık + girintili bağlantılar. Aktif bağlantı açık zemin, kalın yazı ve dolu nokta ile ayırt edilir. */
+.nav-group {
+    padding-bottom: var(--mx-space-1);
+}
+
+.nav-group-header {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-3);
+    width: 100%;
+    height: 2.75rem;
+    padding: 0 var(--mx-space-3);
+    border: 0;
+    border-radius: var(--mx-radius-button);
+    background: transparent;
+    color: var(--mx-text-label);
+    font-size: var(--mx-fs-body);
+    font-weight: 500;
+    text-align: left;
+    white-space: nowrap;
+}
+
+    .nav-group-header ::deep .app-icon {
+        flex: none;
+        color: var(--mx-text-secondary);
+    }
+
+    .nav-group-header .nav-label {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .nav-group-header .nav-chevron {
+        flex: none;
+        display: inline-flex;
+    }
+
+    .nav-group-header:hover {
+        background: var(--mx-surface-hover);
+        color: var(--mx-text-primary);
+    }
+
+    .nav-group-header.has-active {
+        color: var(--mx-text-primary);
+        font-weight: 600;
+    }
+
+    .nav-group-header:focus-visible,
+    .nav-sublink:focus-visible {
+        outline: 2px solid var(--mx-brand-primary);
+        outline-offset: 2px;
+    }
+
+.nav-sub {
+    list-style: none;
+    margin: 0 0 var(--mx-space-1) calc(var(--mx-space-3) + 10px);
+    padding: 0 0 0 var(--mx-space-3);
+    border-left: 1px solid var(--mx-border);
+}
+
+    .nav-sub.nav-sub-flat {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: 0;
+    }
+
+.nav-sublink {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-3);
+    min-height: 2.25rem;
+    padding: var(--mx-space-1) var(--mx-space-3);
+    border-radius: var(--mx-radius-button);
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-body);
+    font-weight: 500;
+    text-decoration: none;
+}
+
+    .nav-sublink .nav-label {
+        min-width: 0;
+        overflow-wrap: anywhere; /* uzun Türkçe etiketler taşmaz, satır kırılır */
+    }
+
+    .nav-sublink:hover:not(.active) {
+        background: var(--mx-surface-hover);
+        color: var(--mx-text-primary);
+    }
+
+    .nav-sublink.active {
+        background: var(--mx-nav-active-bg);
+        color: var(--mx-tone-brand-fg); /* açık zeminde AA kontrast */
+        font-weight: 600;
+    }
+
+.nav-bullet {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid var(--mx-text-secondary);
+    background: transparent;
+}
+
+.nav-sublink.active .nav-bullet {
+    border-color: var(--mx-brand-primary);
+    background: var(--mx-brand-primary);
+}
+
+/* Kaydırma alanının altına sabitlenen bölüm (CRM Ayarları): menü uzasa da erişilebilir kalır. */
+.nav-pinned {
+    position: sticky;
+    bottom: 0;
+    margin-top: var(--mx-space-3);
+    padding-top: var(--mx-space-2);
+    border-top: 1px solid var(--mx-border);
+    background: var(--mx-surface);
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
 /* Menüyü daralt */
 .nav-footer {
     padding-top: var(--mx-space-3);
@@ -152,6 +275,22 @@
     html.sidebar-collapsed .nav-label,
     html.sidebar-collapsed .nav-section {
         display: none;
+    }
+
+    /* Daraltılmış menüde alt bağlantılar gizlenir; bölüm başlığına tıklamak menüyü genişletip bölümü açar. */
+    html.sidebar-collapsed .nav-sub {
+        display: none;
+    }
+
+    html.sidebar-collapsed .nav-group {
+        padding-left: var(--mx-space-3) !important;
+        padding-right: var(--mx-space-3) !important;
+    }
+
+    html.sidebar-collapsed .nav-group-header {
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
     }
 
     html.sidebar-collapsed .nav-item ::deep a,

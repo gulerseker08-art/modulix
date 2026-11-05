@@ -203,6 +203,30 @@ public class ScopeLimitTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         Assert.Equal(1, await factory.ScalarAsync<int>(other.Tenant.Id, overrides, ("@t", other.Tenant.Id)));
     }
 
+    [Fact]
+    public async Task Limit_of_a_closed_module_is_kept_when_the_set_is_resent_but_new_ones_cannot_be_added()
+    {
+        var setup = await SetUpAsync();
+        using var platform = await LoginAsync(await CreatePlatformAdministratorAsync());
+        var url = $"/api/platform/tenants/{setup.Tenant.Id}/scope-limits";
+        Assert.Equal(HttpStatusCode.OK, (await platform.PutAsJsonAsync(url, new SetScopeLimitsRequest([new ScopeLimitDto(Company, SharedScope.Own)]))).StatusCode);
+
+        await factory.SetModuleAsync(setup.Tenant.Id, "crm", enabled: false);
+
+        // Modül kapandı: tür listede yok ama tavan duruyor.
+        var closed = (await platform.GetFromJsonAsync<TenantScopeLimitsResponse>(url))!;
+        Assert.Single(closed.Limits);
+        Assert.DoesNotContain(closed.Types, t => t.ModuleKey == "crm");
+
+        // Ekran tüm kümeyi yeniden gönderir; mevcut tavan korunur (sessizce silinmez).
+        Assert.Equal(HttpStatusCode.OK, (await platform.PutAsJsonAsync(url, new SetScopeLimitsRequest([new ScopeLimitDto(Company, SharedScope.Own)]))).StatusCode);
+        Assert.Single((await platform.GetFromJsonAsync<TenantScopeLimitsResponse>(url))!.Limits);
+
+        // Kapalı modülün yeni bir türüne tavan konamaz.
+        Assert.Equal(HttpStatusCode.BadRequest, (await platform.PutAsJsonAsync(url,
+            new SetScopeLimitsRequest([new ScopeLimitDto(Company, SharedScope.Own), new ScopeLimitDto("crm.contact", SharedScope.Own)]))).StatusCode);
+    }
+
     private async Task<(Core.Platform.Tenant Tenant, ModulixUser Admin, ModulixUser Viewer)> SetUpAsync()
     {
         var tenant = await factory.CreateTenantAsync();

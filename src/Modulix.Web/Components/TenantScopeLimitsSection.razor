@@ -1,0 +1,183 @@
+@inject ApiClient Api
+
+@* Firmanın kayıt görünürlük tavanları (ADR-0030 K10): platform yöneticisi her kayıt türü için firmanın rollerinin verebileceği en geniş
+   kapsamı koyar. Tür listesi sunucudan gelir (firmada açık modüllerin sahipli kayıt türleri). PUT tüm kümeyi değiştirir; gerekçe
+   ve etkilenen rol sayısı platform denetim kaydına yazılır. *@
+<section class="detail-section">
+    <div class="section-header"><h2>Kayıt görünürlüğü</h2></div>
+    <Notice Text="@notice" Failed="failed" />
+
+    @if (state is null)
+    {
+        @if (notice is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else if (state.Types.Count == 0)
+    {
+        <p class="text-muted">Bu firmada kapsamı ayarlanabilen bir kayıt türü yok (sahipli kayıt türü olan modüller kapalı).</p>
+    }
+    else
+    {
+        <p class="text-muted">
+            Firmanın rolleri bir kayıt türünde burada seçtiğiniz kapsamdan geniş görünürlük veremez. Sınır yoksa rol ne verirse o geçerlidir.
+            Değişiklik firmanın bir sonraki isteğinde geçerli olur; rollerin kaydı değişmez, daralan roller okuma sırasında sınıra indirilir.
+        </p>
+
+        <form class="inline-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <table class="table record-table">
+                <thead><tr><th>Kayıt türü</th><th>En geniş kapsam</th><th>Yönetici</th></tr></thead>
+                <tbody>
+                    @foreach (var type in state.Types)
+                    {
+                        var row = rows[type.EntityKey];
+                        <tr>
+                            <td data-label="Kayıt türü" class="primary">@type.Label <small class="text-muted">@type.EntityKey</small></td>
+                            <td data-label="En geniş kapsam">
+                                <select class="form-select" aria-label="@($"{type.Label} için en geniş kapsam")"
+                                        value="@(row.Max is { } max ? ((int)max).ToString() : string.Empty)"
+                                        @onchange="e => Choose(type.EntityKey, e.Value as string)">
+                                    <option value="">Sınır yok</option>
+                                    @foreach (var option in Options)
+                                    {
+                                        <option value="@((int)option)">@RecordScopeLabels.Of(option)</option>
+                                    }
+                                </select>
+                            </td>
+                            <td data-label="Yönetici">
+                                @if (row.Max is not null)
+                                {
+                                    var id = $"admin-{type.EntityKey}";
+                                    <div class="form-check">
+                                        <input id="@id" class="form-check-input" type="checkbox" checked="@row.Admin"
+                                               @onchange="e => row.Admin = e.Value is true" />
+                                        <label class="form-check-label" for="@id">Yöneticiyi de bağla</label>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (rows.Values.Any(r => r is { Max: not null, Admin: true }))
+            {
+                <div class="alert alert-warning">
+                    Yönetici de bağlanırsa en kötü durumda yalnızca kendi kayıtlarını görür ve rol ekranına erişimi sürer. Geri dönüş yolu bu
+                    sınırı gevşetmektir.
+                </div>
+            }
+
+            @if (hidden.Count > 0)
+            {
+                <p class="text-muted">Modülü kapalı @hidden.Count türün sınırı korunur; modül yeniden açılınca burada görünür.</p>
+            }
+
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="limitsReason">Gerekçe *</label>
+                    <input id="limitsReason" class="form-control" maxlength="500" @bind="reason" @bind:event="oninput" />
+                    <FieldError Field="reason" Errors="errors" />
+                    <FieldError Field="limits" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || !Dirty || string.IsNullOrWhiteSpace(reason))">Sınırları kaydet</button>
+            </div>
+        </form>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid TenantId { get; set; }
+
+    private static readonly RecordScope[] Options =
+        [RecordScope.Own, RecordScope.Team, RecordScope.Unit, RecordScope.UnitAndBelow, RecordScope.All];
+
+    private TenantScopeLimitsResponse? state;
+    private readonly Dictionary<string, LimitRow> rows = new(StringComparer.Ordinal);
+    private IReadOnlyList<ScopeLimitDto> hidden = [];
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string reason = string.Empty;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+
+    private string Url => $"/api/platform/tenants/{TenantId}/scope-limits";
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<TenantScopeLimitsResponse>(Url);
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.Error, true);
+            return;
+        }
+
+        state = result.Value!;
+        rows.Clear();
+        foreach (var type in state.Types)
+        {
+            var limit = state.Limits.FirstOrDefault(l => l.EntityKey == type.EntityKey);
+            rows[type.EntityKey] = new LimitRow { Max = limit?.MaxScope, Admin = limit?.AppliesToAdministrators ?? false };
+        }
+
+        // Modülü sonradan kapanan türün tavanı ekranda görünmez ama kümeyle birlikte gönderilir (sunucu korur).
+        hidden = [.. state.Limits.Where(l => !rows.ContainsKey(l.EntityKey))];
+    }
+
+    private void Choose(string entityKey, string? value)
+    {
+        var row = rows[entityKey];
+        row.Max = int.TryParse(value, out var number) && Enum.IsDefined(typeof(RecordScope), number) ? (RecordScope)number : null;
+        if (row.Max is null)
+        {
+            row.Admin = false;
+        }
+    }
+
+    private bool Dirty => state is not null && state.Types.Any(type =>
+    {
+        var saved = state.Limits.FirstOrDefault(l => l.EntityKey == type.EntityKey);
+        var row = rows[type.EntityKey];
+        return saved?.MaxScope != row.Max || (row.Max is not null && saved!.AppliesToAdministrators != row.Admin);
+    });
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var limits = rows
+            .Where(r => r.Value.Max is not null)
+            .Select(r => new ScopeLimitDto(r.Key, r.Value.Max!.Value, r.Value.Admin))
+            .Concat(hidden)
+            .ToList();
+        var result = await Api.PutAsync<SetScopeLimitsResponse>(Url, new SetScopeLimitsRequest(limits, reason));
+        busy = false;
+        errors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+            return;
+        }
+
+        (notice, failed, reason) = (
+            $"Kayıt görünürlüğü sınırları kaydedildi. Etkilenen rol sayısı: {result.Value!.AffectedRoleCount}. Değişiklik firmanın bir sonraki isteğinde geçerli olur.",
+            false,
+            string.Empty);
+        await LoadAsync();
+    }
+
+    private sealed class LimitRow
+    {
+        public RecordScope? Max { get; set; }
+
+        public bool Admin { get; set; }
+    }
+}

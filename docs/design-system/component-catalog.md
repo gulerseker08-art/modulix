@@ -9,7 +9,10 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | AppShell | Var | `Layout/MainLayout.razor`: sol menü + üst çubuk + `main#main-content`; "İçeriğe geç" bağlantısı |
 | AppHeader | Var | MainLayout üst çubuğu: tenant logosu, ortada genel arama, şirket seçici, tema düğmesi, profil menüsü (avatar, ad, kuruluş) |
 | Sidebar | Var | `Layout/NavMenu.razor`: aktif modülün sayfaları (AppCatalog + izin süzgeci), aktif öğede vurgu çizgisi, Menüyü Daralt |
-| ModuleSwitcher | Var | `Components/AppLauncher.razor` (logoya tıklanınca "Tüm Uygulamalar" paneli) |
+| ModuleSwitcher | Var | `Components/AppLauncher.razor` (logoya tıklanınca "Tüm Uygulamalar" paneli; yalnızca mevcut, etkin ve erişilebilir uygulama kartları; kart uygulamanın ilk ekranına gider) |
+| SideNav bölümleri | Var | `Layout/NavMenu.razor`: aktif uygulamanın ekranları `AppCatalog` gruplarına göre açılır/kapanır bölüm başlıkları (`nav-group`, ikon + ad + ok) ve girintili bağlantılar (`nav-sublink`, dolu nokta + açık zemin + `aria-current`); `AppGroup.Footer` bölümü (CRM Ayarları) altta sabit; boş bölüm çıkmaz. Sözleşmeler, Siparişler, Pazarlama CRM'in menüsünde `AppDefinition.Hosted` ile görünür (modül, izin ve route'ları değişmez) |
+| Pasif uygulama kartı | Var | `AppLauncher` "Yakında" bölümü (`app-tile is-planned`): yol haritasındaki uygulama (`AppCatalog.Planned`); tıklanmaz, odak almaz, kesikli kenarlık ve ikincil metin rengi; kontrast AA |
+| Breadcrumb | Var | `Components/Breadcrumb.razor` (`page-breadcrumb`): "CRM / Satış / Teklifler"; `AppCatalog` ve route'tan türer, sayfa başına elle yazılmaz |
 | BrandLogo | Var | `Components/BrandLogo.razor` — `Size`, `ShowTagline` |
 | ThemeToggle | Var | `Components/ThemeToggle.razor` |
 | PageHeader | Var | `Components/PageHeader.razor` — `Title`, `Icon`, `Subtitle`, aksiyonlar `ChildContent` |

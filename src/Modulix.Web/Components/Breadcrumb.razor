@@ -1,0 +1,80 @@
+@implements IDisposable
+@inject AppNavigation Apps
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+@* Konum izi (docs/design-system/component-catalog.md → Breadcrumb): "CRM / Satış / Teklifler". AppCatalog'dan ve route'tan türer, sayfa
+   başına elle yazılmaz; ev sahibinin menüsündeki ad ve bölüm kullanılır. Bölüm başlığı bir sayfa olmadığı için bağlantı değildir.
+   Aktif ekranın detay sayfasında son öğe liste ekranına bağlantı olur. *@
+@if (trail is not null)
+{
+    <nav class="page-breadcrumb" aria-label="Konum">
+        <ol>
+            <li><a href="@trail.RootHref">@trail.Root</a></li>
+            @if (trail.Section is not null)
+            {
+                <li><span>@trail.Section</span></li>
+            }
+            <li>
+                @if (trail.IsCurrentPage)
+                {
+                    <span aria-current="page">@trail.Page</span>
+                }
+                else
+                {
+                    <a href="@trail.PageHref">@trail.Page</a>
+                }
+            </li>
+        </ol>
+    </nav>
+}
+
+@code {
+    private sealed record Trail(string Root, string RootHref, string? Section, string Page, string PageHref, bool IsCurrentPage);
+
+    private Trail? trail;
+
+    protected override void OnInitialized()
+    {
+        Session.Changed += OnChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+        Recompute();
+    }
+
+    private void Recompute()
+    {
+        string path = Navigation.ToBaseRelativePath(Navigation.Uri);
+        MenuContext? menu = Apps.Context(path);
+        MenuEntry? entry = menu?.Sections.SelectMany(s => s.Entries).FirstOrDefault(e => e.App.Id == menu.Active.Id);
+        if (menu is null || entry is null)
+        {
+            trail = null;
+            return;
+        }
+
+        string? section = menu.Sections.FirstOrDefault(s => s.Entries.Contains(entry))?.Group?.Name;
+        string pageHref = entry.Link!;
+        string current = path.Split('?', '#')[0].Trim('/');
+        trail = new Trail(menu.Root.Name, Apps.EntryRoute(menu.Root) ?? "", section, entry.Name, pageHref,
+            string.Equals(current, pageHref.Split('?')[0], StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void OnChanged() =>
+        InvokeAsync(() =>
+        {
+            Recompute();
+            StateHasChanged();
+        });
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        Recompute();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        Session.Changed -= OnChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

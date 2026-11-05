@@ -225,6 +225,23 @@
             if (ContractLabels.Effectives.Any(e => e.Key == QueryEffective)) { effective = QueryEffective; }
             await Lookups.LoadAsync();
             await LoadViewsAsync();
+            appliedQueryView = QueryView;
+            initialized = true;
+            await LoadAsync(1);
+        }
+    }
+
+    private string? appliedQueryView;
+    private bool initialized;
+
+    // Aynı sayfadayken menüden başka bir hızlı görünüme gidilirse (ör. Satış sözleşmeleri) sayfa yeniden kurulmaz; görünümü burada uygularız.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (initialized && QueryView != appliedQueryView && Session.Can(ContractsAccess.ContractsRead))
+        {
+            appliedQueryView = QueryView;
+            selectedViewId = null;
+            view = ViewLabels.Presets.Any(p => p.Key == QueryView) ? QueryView : null;
             await LoadAsync(1);
         }
     }
@@ -242,6 +259,8 @@
             case "ending": filters["effectiveStatus"] = "Active"; filters["endFrom"] = $"{today:yyyy-MM-dd}"; filters["endTo"] = $"{today.AddDays(90):yyyy-MM-dd}"; break;
             case "notice": filters["effectiveStatus"] = "Active"; filters["noticeFrom"] = $"{today:yyyy-MM-dd}"; filters["noticeTo"] = $"{today.AddDays(30):yyyy-MM-dd}"; break;
             case "overdue": filters["commitmentOverdue"] = "true"; break;
+            // Satış kapsamı türün adına değil, firmanın tür listesindeki "Satış / müşteri" kategorisine bağlıdır; kümeyi sunucu çözer.
+            case "sales": filters["typeCategory"] = "sales"; break;
         }
 
         if (!string.IsNullOrEmpty(effective)) { filters["effectiveStatus"] = effective; }

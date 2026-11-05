@@ -6,6 +6,7 @@ using Modulix.Core.Authorization;
 using Modulix.Core.Automation;
 using Modulix.Core.Communication;
 using Modulix.Core.Customization;
+using Modulix.Core.Imports;
 using Modulix.Core.Lookups;
 using Modulix.Core.Teams;
 using Modulix.Core.Contracts.Persistence;
@@ -62,6 +63,8 @@ public class ModulixDbContext(
 
     public DbSet<LimitOverride> LimitOverrides => Set<LimitOverride>();
 
+    public DbSet<SupportAccessGrant> SupportAccessGrants => Set<SupportAccessGrant>();
+
     public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     public DbSet<QueuedEmail> EmailMessages => Set<QueuedEmail>();
@@ -115,6 +118,10 @@ public class ModulixDbContext(
     public DbSet<AutomationRunStep> AutomationRunSteps => Set<AutomationRunStep>();
 
     public DbSet<AutomationScanCursor> AutomationScanCursors => Set<AutomationScanCursor>();
+
+    public DbSet<ImportRun> ImportRuns => Set<ImportRun>();
+
+    public DbSet<ImportRowIssue> ImportRowIssues => Set<ImportRowIssue>();
 
     public DbSet<ReportDefinition> Reports => Set<ReportDefinition>();
 

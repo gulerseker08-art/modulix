@@ -162,19 +162,30 @@ public sealed record RoleDto(
     RecordScope Scope = RecordScope.All,
     RoleAssignLevel AssignLevel = RoleAssignLevel.User,
     int UnitCount = 0,
-    bool HideOutOfScopeShared = false);
+    bool HideOutOfScopeShared = false,
+    IReadOnlyDictionary<string, RecordScope>? ScopeOverrides = null);
+
+/// <summary>
+/// Rolde kapsamı ayarlanabilen kayıt türü; <see cref="MaxScope"/> platformun o tür için koyduğu tavandır (yoksa <c>null</c>).
+/// Rol ekranı tavanı aşan kapsam seçeneklerini kapalı gösterir; sunucu yine de aşan rolü reddeder (409).
+/// </summary>
+public sealed record RoleScopeTypeDto(string EntityKey, string ModuleKey, string Label, RecordScope? MaxScope);
 
 /// <summary>Hazır rol önerisi; "Şablondan başla" ile yeni rol formunu doldurur.</summary>
 public sealed record RoleTemplateDto(
     string Key, string Name, string Description, IReadOnlyList<string> Permissions, RecordScope Scope = RecordScope.All);
 
-/// <summary><see cref="Scope"/> verilmezse yeni rol tüm kayıtları görür, mevcut rolün kapsamı değişmez.</summary>
+/// <summary>
+/// <see cref="Scope"/> verilmezse yeni rol tüm kayıtları görür, mevcut rolün kapsamı değişmez. <see cref="ScopeOverrides"/>
+/// (kayıt türü → kapsam, ADR-0030) verilmezse mevcut istisnalar değişmez; boş küme hepsini kaldırır.
+/// </summary>
 public sealed record SaveRoleRequest(
     string Name,
     IReadOnlyList<string> Permissions,
     RecordScope? Scope = null,
     RoleAssignLevel? AssignLevel = null,
-    bool? HideOutOfScopeShared = null);
+    bool? HideOutOfScopeShared = null,
+    IReadOnlyDictionary<string, RecordScope>? ScopeOverrides = null);
 
 public sealed record SetMembershipRolesRequest(IReadOnlyList<Guid> RoleIds);
 
@@ -218,8 +229,14 @@ public static class CoreAccess
     public const string ExportReports = "core.reports.export";
     public const string ScheduleReports = "core.reports.schedule";
 
+    /// <summary>İçe aktarma ve işlem günlüğü (ADR-0030): başlatma (kendi kayıtları), firmanın tamamını görme, toplu geri alma.</summary>
+    public const string RunImports = "core.imports.run";
+    public const string ReadImports = "core.imports.read";
+    public const string RollbackImports = "core.imports.rollback";
+
     /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
         [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication,
-         ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation];
+         ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation,
+         RunImports, ReadImports, RollbackImports];
 }

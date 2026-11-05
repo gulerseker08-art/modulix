@@ -2,13 +2,18 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Records;
+using Modulix.Core.Settings;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Modules.Crm;
+using Modulix.Modules.Crm.Reporting;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Crm;
 using Modulix.Shared.Records;
@@ -29,7 +34,10 @@ public class OpportunityTests(ModulixApiFactory factory) : IClassFixture<Modulix
         LeadsRead, LeadsCreate, LeadsUpdate, LeadsQualify, LeadsConvert,
     ];
 
-    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+    // Firmanın "bugün"ü varsayılan saat diliminde (sunucu da öyle hesaplar); UTC günü 21:00–24:00 arasında bir gün geride kalırdı.
+    private static readonly TimeZoneInfo CompanyZone = TimeZoneInfo.FindSystemTimeZoneById(RegionalOptions.DefaultTimeZone);
+
+    private static DateOnly Today => ReportPeriods.Today(DateTimeOffset.UtcNow, CompanyZone);
 
     [Fact]
     public async Task New_opportunity_gets_number_open_status_default_stage_probability_and_history()
@@ -151,6 +159,52 @@ public class OpportunityTests(ModulixApiFactory factory) : IClassFixture<Modulix
         var won = await WinAsync(client, moved.Opportunity);
         Assert.Equal(100, won.Opportunity.Probability);
         Assert.False(won.Opportunity.ProbabilityManual);
+    }
+
+    [Fact]
+    public async Task Close_and_hold_dates_use_the_company_time_zone_across_the_utc_midnight_boundary()
+    {
+        // 04.11.2026 21:30 UTC = 05.11.2026 00:30 İstanbul: UTC gününe bakılsaydı "bugün" 04.11 sayılır, kapanış günü bir gün geride kalırdı.
+        var boundary = new DateTimeOffset(2026, 11, 4, 21, 30, 0, TimeSpan.Zero);
+        var istanbulToday = new DateOnly(2026, 11, 5);
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, CrmModule.ModuleKey, enabled: true);
+        var user = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, SalesPermissions, user);
+        using var host = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(new FixedTimeProvider(boundary));
+        }));
+        using var client = host.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            HandleCookies = true,
+            AllowAutoRedirect = false,
+        });
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(user.Email!, ModulixApiFactory.Password))).StatusCode);
+        var company = await CompanyAsync(client);
+
+        // Bekletme: gözden geçirme tarihi İstanbul'un bugününden sonra olmalı (UTC'ye göre 05.11 yarın sayılır ve kabul edilirdi).
+        var held = await PutAsync(client, await OpportunityAsync(client, company.Id, "Bekletilecek"), amount: 1_000m, close: istanbulToday.AddDays(5));
+        Assert.Contains("holdReviewDate", (await ProblemAsync(await client.PostAsJsonAsync($"/api/crm/opportunities/{held.Id}/hold",
+            new HoldOpportunityRequest(held.Version, "Bütçe onayı bekleniyor", istanbulToday)))).Errors.Keys);
+        var onHold = (await ReadAsync<OpportunityActionResultDto>(await client.PostAsJsonAsync($"/api/crm/opportunities/{held.Id}/hold",
+            new HoldOpportunityRequest(held.Version, "Bütçe onayı bekleniyor", istanbulToday.AddDays(1))))).Opportunity;
+        Assert.Equal(istanbulToday.AddDays(1), onHold.HoldReviewDate);
+
+        // Kazanma: kapanış günü İstanbul'un bugünü; yarın gelecekte sayılır, bugün (UTC'ye göre yarın) kabul edilir.
+        var opp = await PutAsync(client, await OpportunityAsync(client, company.Id, "Gece yarısı"), amount: 5_000m, close: istanbulToday.AddDays(5));
+        Assert.Contains("actualCloseDate", (await ProblemAsync(await client.PostAsJsonAsync($"/api/crm/opportunities/{opp.Id}/win",
+            new WinOpportunityRequestDto(opp.Version, ActualCloseDate: istanbulToday.AddDays(1))))).Errors.Keys);
+        var won = (await ReadAsync<OpportunityActionResultDto>(await client.PostAsJsonAsync($"/api/crm/opportunities/{opp.Id}/win",
+            new WinOpportunityRequestDto(opp.Version)))).Opportunity;
+        Assert.Equal(istanbulToday, won.ActualCloseDate);
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     [Fact]

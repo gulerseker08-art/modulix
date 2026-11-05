@@ -84,6 +84,9 @@ jobs:
       - name: Core birim testleri
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Core.Tests/Modulix.Core.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/core-tests.log"
 
+      - name: Arayuz menu testleri
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Web.Tests/Modulix.Web.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/web-tests.log"
+
       - name: CRM birim testleri
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Modules.Crm.Tests/Modulix.Modules.Crm.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/crm-tests.log"
 

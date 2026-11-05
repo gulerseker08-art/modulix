@@ -26,20 +26,7 @@
     {
         <div id="app-launcher-panel" class="app-panel" role="dialog" aria-labelledby="app-panel-title" tabindex="-1" @ref="panel">
             <div class="app-panel-head">
-                @if (openRoot is not null)
-                {
-                    <button type="button" class="app-back" @ref="backButton" @onclick="BackToRoot">
-                        <AppIcon Name="arrow-left" Size="16" /> Tüm Uygulamalar
-                    </button>
-                    <h2 id="app-panel-title" class="app-panel-title">
-                        <span class="app-panel-title-icon tone-@ToneClass(openRoot)"><AppIcon Name="@openRoot.Icon" Size="20" /></span>
-                        @openRoot.Name
-                    </h2>
-                }
-                else
-                {
-                    <h2 id="app-panel-title" class="app-panel-title">Tüm Uygulamalar</h2>
-                }
+                <h2 id="app-panel-title" class="app-panel-title">Tüm Uygulamalar</h2>
             </div>
 
             @if (showSearch)
@@ -68,11 +55,12 @@
                 {
                     <p class="app-state" role="status">Erişebileceğiniz bir uygulama yok.</p>
                 }
-                else if (visible.Count == 0)
+                else if (visible.Count == 0 && plannedVisible.Count == 0)
                 {
                     <p class="app-state" role="status">“@Query” için sonuç bulunamadı.</p>
                 }
-                else
+
+                @if (Session.IsLoaded && !loadFailed && visible.Count > 0)
                 {
                     @if (groups.Count > 0)
                     {
@@ -102,6 +90,25 @@
                         </ul>
                     }
                 }
+
+                @* Yol haritasındaki uygulamalar: pasif kartlar, tıklanınca bir şey olmaz (ekranları henüz yok). *@
+                @if (Session.IsLoaded && !loadFailed && plannedVisible.Count > 0)
+                {
+                    <section class="app-group app-planned" aria-labelledby="app-group-planned">
+                        <h3 id="app-group-planned" class="app-group-title">Yakında</h3>
+                        <ul class="app-grid">
+                            @foreach (PlannedApp planned in plannedVisible)
+                            {
+                                <li>
+                                    <span class="app-tile is-planned" aria-disabled="true">
+                                        <span class="app-tile-icon"><AppIcon Name="@planned.Icon" /></span>
+                                        <span class="app-tile-name">@planned.Name</span>
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
             </div>
         </div>
     }
@@ -113,17 +120,14 @@
         None,
         Brand,
         Search,
-        Back,
     }
 
     private ElementReference brandButton;
     private ElementReference panel;
     private ElementReference searchInput;
-    private ElementReference backButton;
     private DotNetObjectReference<AppLauncher>? self;
     private bool attached;
     private bool isOpen;
-    private string? openRootId;
     private string query = "";
     private Guid? lastTenant;
     private FocusTarget pendingFocus;
@@ -138,15 +142,13 @@
         }
     }
 
-    private AppDefinition? current => AppNavigation.Resolve(Navigation.ToBaseRelativePath(Navigation.Uri));
-
-    // Panelin gösterdiği düzey; seçili uygulama artık görünür değilse (ör. tenant değişti) ilk düzeye döner.
+    // Panelde yalnızca mevcut, etkin, lisans kapsamında ve kullanıcının erişebildiği uygulamalar listelenir (AppNavigation.Roots).
     private IReadOnlyList<AppDefinition> listed = [];
     private IReadOnlyList<AppDefinition> visible = [];
-    private AppDefinition? openRoot;
+    private IReadOnlyList<PlannedApp> plannedVisible = [];
     private bool showSearch;
 
-    // Başlıklı gösterim yalnızca aramasız ve birden çok grup görünürken (ana ve alt düzeyde); aksi halde düz liste.
+    // Başlıklı gösterim yalnızca aramasız ve birden çok grup görünürken; aksi halde düz liste.
     private IReadOnlyList<AppRootGroup> groups = [];
 
     // Erişim bilgisi yüklenemedi: tenant var ama erişim okunamadı (iki adımlı doğrulama beklerken bilerek boştur).
@@ -163,53 +165,39 @@
 
     private void Recompute()
     {
-        IReadOnlyList<AppDefinition> roots = Apps.Roots();
-        openRoot = openRootId is null ? null : roots.FirstOrDefault(r => r.Id == openRootId);
-        if (openRoot is null)
-        {
-            openRootId = null;
-        }
-
-        listed = openRoot is null ? roots : Apps.Children(openRoot.Id);
+        listed = Apps.Roots();
         visible = string.IsNullOrWhiteSpace(query)
             ? listed
             : listed.Where(a => Matches(a.Name, query.Trim())).ToList();
-        showSearch = Session.IsLoaded && !loadFailed && listed.Count > 0;
+        plannedVisible = string.IsNullOrWhiteSpace(query)
+            ? AppCatalog.Planned
+            : AppCatalog.Planned.Where(p => Matches(p.Name, query.Trim())).ToList();
+        showSearch = Session.IsLoaded && !loadFailed && (listed.Count > 0 || AppCatalog.Planned.Count > 0);
 
         IReadOnlyList<AppRootGroup> grouped = string.IsNullOrWhiteSpace(query) ? Apps.Grouped(listed) : [];
         groups = grouped.Count > 1 ? grouped : [];
     }
 
+    // Uygulama kartı doğrudan uygulamanın ilk ekranına gider; uygulamanın ekranları sol menüde bölümler halinde gelir.
     private RenderFragment Tile(AppDefinition app) => @<li>
-        @if (openRoot is null && Apps.Children(app.Id).Count > 0)
-        {
-            <button type="button" class="app-tile tone-@ToneClass(app) @(current?.ParentId == app.Id ? "is-current" : null)"
-                    @onclick="() => OpenRoot(app)" aria-label="@app.Name, alt uygulamalar">
-                <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
-                <span class="app-tile-name">@app.Name</span>
-            </button>
-        }
-        else
-        {
-            <a href="@app.Route" class="app-tile tone-@ToneClass(app) @(IsCurrent(app) ? "is-current" : null)"
-               aria-current="@(IsCurrent(app) ? "page" : null)" @onclick="() => Close(true)">
-                <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
-                <span class="app-tile-name">@app.Name</span>
-            </a>
-        }
+        <a href="@Apps.EntryRoute(app)" class="app-tile tone-@ToneClass(app) @(IsCurrent(app) ? "is-current" : null)"
+           aria-current="@(IsCurrent(app) ? "page" : null)" @onclick="() => Close(true)">
+            <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
+            <span class="app-tile-name">@app.Name</span>
+        </a>
     </li>;
 
     private static bool Matches(string name, string text) =>
         System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo
             .IndexOf(name, text, System.Globalization.CompareOptions.IgnoreCase) >= 0;
 
-    private bool IsCurrent(AppDefinition app) => current?.Id == app.Id;
+    private bool IsCurrent(AppDefinition app) => Apps.Context(Navigation.ToBaseRelativePath(Navigation.Uri))?.Root.Id == app.Id;
 
     private static string ToneClass(AppDefinition app) => app.Tone == AppTone.Teal ? "teal" : "indigo";
 
     private void OnSessionChanged()
     {
-        // Tenant değişince panel kapanır ve önceki tenant'ın seçimi/araması kalmaz.
+        // Tenant değişince panel kapanır ve önceki tenant'ın araması kalmaz.
         Guid? tenant = Session.User?.ActiveTenantId;
         if (tenant != lastTenant)
         {
@@ -239,7 +227,6 @@
     private void ResetPanel()
     {
         isOpen = false;
-        openRootId = null;
         query = "";
     }
 
@@ -252,7 +239,6 @@
         }
 
         isOpen = true;
-        openRootId = null;
         query = "";
         pendingFocus = FocusTarget.Search;
         Recompute();
@@ -262,23 +248,6 @@
     {
         ResetPanel();
         pendingFocus = returnFocus ? FocusTarget.Brand : FocusTarget.None;
-    }
-
-    private void OpenRoot(AppDefinition app)
-    {
-        openRootId = app.Id;
-        query = "";
-        pendingFocus = FocusTarget.Back;
-        Recompute();
-    }
-
-    // Yalnızca panelin ilk düzeyine döner; açık sayfayı değiştirmez.
-    private void BackToRoot()
-    {
-        openRootId = null;
-        query = "";
-        pendingFocus = FocusTarget.Search;
-        Recompute();
     }
 
     private async Task RetryAsync() => await Session.RefreshAsync();
@@ -322,9 +291,6 @@
                 break;
             case FocusTarget.Search:
                 await panel.FocusAsync();
-                break;
-            case FocusTarget.Back:
-                await backButton.FocusAsync();
                 break;
         }
     }

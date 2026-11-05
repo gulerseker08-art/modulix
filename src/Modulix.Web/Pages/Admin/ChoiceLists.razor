@@ -58,7 +58,7 @@
                             <input class="form-control" maxlength="60" aria-label="Değer @(index + 1)" @bind="row.Label" />
                             @if (current.Categories.Count > 0)
                             {
-                                @if (row.Key is null)
+                                @if (row.Key is null || row.CanCategorize)
                                 {
                                     <select class="form-select" aria-label="Kategori" @bind="row.Category">
                                         <option value="">Kategori seçin</option>
@@ -132,7 +132,8 @@
     private void Select(ChoiceListDto list)
     {
         current = list;
-        rows = [.. list.Values.Select(v => new RowForm { Key = v.Key, Label = v.Label, Category = v.Category, Active = v.Active })];
+        // Kategori tanımlanmadan önce eklenmiş özel değer (kategorisi boş): bir kez kategori seçilebilir.
+        rows = [.. list.Values.Select(v => new RowForm { Key = v.Key, Label = v.Label, Category = v.Category, Active = v.Active, CanCategorize = string.IsNullOrEmpty(v.Category) && !v.BuiltIn })];
         errors = null;
         notice = null;
     }
@@ -153,7 +154,7 @@
         var request = new SaveChoiceListRequest([
             .. rows
                 .Where(r => r.Key is not null || !string.IsNullOrWhiteSpace(r.Label))
-                .Select(r => new SaveChoiceValue(r.Key, r.Label, r.Key is null && !string.IsNullOrEmpty(r.Category) ? r.Category : null, r.Active)),
+                .Select(r => new SaveChoiceValue(r.Key, r.Label, (r.Key is null || r.CanCategorize) && !string.IsNullOrEmpty(r.Category) ? r.Category : null, r.Active)),
         ]);
         var result = await Api.PutAsync<ChoiceListDto>($"/api/customization/lists/{Uri.EscapeDataString(current!.Key)}", request);
         busy = false;
@@ -174,6 +175,9 @@
         public string Label { get; set; } = string.Empty;
 
         public string? Category { get; set; }
+
+        /// <summary>Kategorisiz eski özel değer: kategori seçimi açıktır (seçilmezse kategorisiz kalır).</summary>
+        public bool CanCategorize { get; init; }
 
         public bool Active { get; set; } = true;
     }

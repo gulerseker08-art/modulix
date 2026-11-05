@@ -163,7 +163,7 @@ Durum (3 Kasım 2026, [ADR-0027](adr/0027-kural-ve-is-akisi-altyapisi.md) Dilim 
 - Ç6b.3 Geçmiş: Hangi sürüm hangi koşulla ne yaptı, hata ve telafi. Kabul: Hatalı kural kapatılabilir; geçmiş örneklerin devam politikası nettir.
 Ç7 — İçe/dışa aktarma ve veri taşıma [GENİŞLETME / D1]
 Bağımlılık: Ç0, Ç2 minimum, Ç3, Ç4, Ç13.
-- Ç7.1 Import sihirbazı: CSV/XLSX, şablon, encoding, locale, sütun eşleme, özel alanlar, lookup çözümü ve kuru çalışma. Kabul: Ondalık/tarih yanlış yorumlanırsa kullanıcıya açık hata verilir.
+- Ç7.1 Import sihirbazı: CSV/XLSX, şablon, encoding, locale, sütun eşleme, özel alanlar, lookup çözümü ve kuru çalışma. Kabul: Ondalık/tarih yanlış yorumlanırsa kullanıcıya açık hata verilir. İçe aktarma takibi ve işlem günlüğü ekranı: [ADR-0033](adr/0033-import-takibi-ve-islem-gunlugu.md) (taslak).
 - Ç7.2 Uygulama: Satır bazlı domain komutu, batch/checkpoint, idempotency, ilerleme, kısmi hata ve devam. Kabul: Kesinti sonrası başarıyla işlenen satır tekrar yaratılmaz.
 - Ç7.3 Güncelleme ve geri alma: Dış sistem kimliği ve açık anahtar stratejisi; yaratılan/güncellenen ayrımı, önceki değer ve rowversion. Kabul: Sonradan değiştirilmiş veya faturaya bağlanmış kayıt topluca silinmez; telafi raporlanır.
 - Ç7.4 Export: Filtre/görünür alan, yetki, maskeleme, CSV enjeksiyon koruması, büyük işlerde süreli indirme. Kabul: Arka plan export çalışırken yetki kaldırılmışsa veri yeniden yetkilendirilir.
@@ -404,7 +404,7 @@ Amaç: Taşıma talebinden teslim ve maliyet mutabakatına kadar operasyon. Zoru
 - M2.7 Belgeler ve bildirim: CMR/sevk belgeleri, ihtiyaçta e-İrsaliye, gecikme ve teslim bildirimi. Kabul: Entegratör hatası teslimatı başarılı yasal bildirim gibi göstermez; alıcıya asgari veri gider.
 - M2.8 Modül ilişkileri: Depoya varış→kabul önerisi; teslim→fatura taslağı; İK→sürücü yetkinlik okuması. Kabul: Hedef modül yoksa işlem sürer; açık ise tekilleştirilmiş ve izlenebilir köprü çalışır.
 M3 — Depo ve antrepo [DETAYLANDIRMA / D3]
-Amaç: Sektör bağımsız fiziksel stok operasyonu; gümrüklü antrepo seçilebilir uzantı. Zorunlu: Ortak ürün/birim, olay, dosya, numara, yetki, hesap ve stok domain kuralları. Opsiyonel: Lojistik, satış/satın alma, muhasebe.
+Amaç: Sektör bağımsız fiziksel stok operasyonu; gümrüklü antrepo seçilebilir uzantı. Zorunlu: Ortak ürün/birim, olay, dosya, numara, yetki, hesap ve stok domain kuralları. Opsiyonel: Lojistik, satış/satın alma, muhasebe. Tasarım taslağı: [ADR-0032](adr/0032-depo-ve-gumruklu-antrepo-modulu.md) (taslak, kabul edilmedi).
 - M3.1 Tesis ve adresleme: Depo, alan, raf/lokasyon, kapasite, kısıt ve işletici şirket; müşteri malı ile işletmenin kendi stoku ayrılır. Kabul: Aynı ürün farklı malik ve stok statüsüyle ayrı bakiyededir.
 - M3.2 Kabul ve yerleştirme: Beklenen kabul, sayım, eksik/fazla/hasar, kalite karantinası, lot/seri/SKT ve adres önerisi. Kabul: Kabul tekrarı ikinci hareket üretmez; lojistik modülü olmadan manuel kabul çalışır.
 - M3.3 Stok hareket defteri: Giriş, çıkış, transfer, rezervasyon, serbest bırakma ve düzeltme; bakiye defterden türetilir. Kabul: Eşzamanlı çıkış/rezervasyon eksi stok politikasını aşamaz; bakiyeyi doğrudan değiştiren endpoint bulunmaz.

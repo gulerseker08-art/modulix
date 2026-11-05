@@ -1,0 +1,32 @@
+{
+  "code": "logistics",
+  "name": "Lojistik başlangıç paketi",
+  "description": "Taşımacılık, depolama, dağıtım ve taşıma organizasyonu için başlangıç sınıflandırması.",
+  "verified": false,
+  "verificationNote": "Ürün önerisidir; bir lojistik işletmesinin gerçek işleyişiyle doğrulanmadı. Faaliyet adları ve gruplama pilotla gözden geçirilmelidir. Antrepo sınıfı gibi ülkeye bağlı özellikler faaliyet değil tesis özelliğidir ve bu pakette yoktur. Mevzuat zorunlulukları içermez.",
+  "capabilities": [
+    { "code": "logistics.shipments", "name": "Sevkiyat yönetimi", "dependsOn": [] },
+    { "code": "logistics.carriers", "name": "Taşıyıcı ve araç yönetimi", "dependsOn": [] },
+    { "code": "logistics.last-mile", "name": "Dağıtım ve son kilometre teslimat", "dependsOn": ["logistics.shipments"] },
+    { "code": "warehouse.stock", "name": "Depo ve stok yönetimi", "dependsOn": [] },
+    { "code": "warehouse.bonded", "name": "Gümrüklü depo yönetimi", "dependsOn": ["warehouse.stock"] }
+  ],
+  "nodes": [
+    { "code": "lojistik", "parentCode": null, "kind": "Sector", "name": "Lojistik", "description": "Doğrulanmamış başlangıç sınıflandırması.", "sortOrder": 10, "capabilities": [] },
+
+    { "code": "tasimacilik", "parentCode": "lojistik", "kind": "Group", "name": "Taşımacılık", "description": null, "sortOrder": 10, "capabilities": [] },
+    { "code": "karayolu-tasimaciligi", "parentCode": "tasimacilik", "kind": "Activity", "name": "Karayolu taşımacılığı", "description": null, "sortOrder": 10, "capabilities": ["logistics.shipments", "logistics.carriers"] },
+    { "code": "denizyolu-tasimaciligi", "parentCode": "tasimacilik", "kind": "Activity", "name": "Denizyolu taşımacılığı", "description": null, "sortOrder": 20, "capabilities": ["logistics.shipments", "logistics.carriers"] },
+    { "code": "havayolu-tasimaciligi", "parentCode": "tasimacilik", "kind": "Activity", "name": "Havayolu taşımacılığı", "description": null, "sortOrder": 30, "capabilities": ["logistics.shipments", "logistics.carriers"] },
+    { "code": "demiryolu-tasimaciligi", "parentCode": "tasimacilik", "kind": "Activity", "name": "Demiryolu taşımacılığı", "description": null, "sortOrder": 40, "capabilities": ["logistics.shipments", "logistics.carriers"] },
+
+    { "code": "depolama", "parentCode": "lojistik", "kind": "Group", "name": "Depolama", "description": null, "sortOrder": 20, "capabilities": [] },
+    { "code": "gumruklu-antrepo", "parentCode": "depolama", "kind": "Activity", "name": "Gümrüklü antrepo", "description": "Antrepo sınıfı/tipi tesis özelliğidir; ülkeye bağlıdır.", "sortOrder": 10, "capabilities": ["warehouse.bonded"] },
+    { "code": "serbest-depolama", "parentCode": "depolama", "kind": "Activity", "name": "Serbest depolama", "description": null, "sortOrder": 20, "capabilities": ["warehouse.stock"] },
+
+    { "code": "dagitim-son-kilometre", "parentCode": "lojistik", "kind": "Activity", "name": "Dağıtım ve son kilometre", "description": null, "sortOrder": 30, "capabilities": ["logistics.last-mile"] },
+    { "code": "tasima-organizasyonu", "parentCode": "lojistik", "kind": "Activity", "name": "Taşıma organizasyonu", "description": null, "sortOrder": 40, "capabilities": ["logistics.shipments", "logistics.carriers"] },
+    { "code": "transit-aktarma", "parentCode": "lojistik", "kind": "Activity", "name": "Transit aktarma", "description": null, "sortOrder": 50, "capabilities": ["logistics.shipments"] },
+    { "code": "diger-lojistik", "parentCode": "lojistik", "kind": "Activity", "name": "Diğer", "description": null, "sortOrder": 90, "capabilities": [] }
+  ]
+}
