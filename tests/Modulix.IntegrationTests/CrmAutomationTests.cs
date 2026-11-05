@@ -10,9 +10,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Modulix.Core.Automation;
 using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Infrastructure.Automation;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Platform;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Automation;
@@ -123,7 +125,7 @@ public class CrmAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Cr
     {
         var setup = await SetUpAsync();
         var company = await CreateCompanyAsync(setup);
-        var today = DateOnly.FromDateTime(fixture.Time.GetUtcNow().UtcDateTime);
+        var today = await TodayAsync(setup.Tenant.Id);
         var due = await CreateOpportunityAsync(setup, company, "Yaklaşan", today.AddDays(3));
         await CreateOpportunityAsync(setup, company, "Uzak", today.AddDays(10));
         await PublishRuleAsync(setup, CrmModule.Entities.Opportunity,
@@ -344,6 +346,13 @@ public class CrmAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Cr
         var (round, skipped) = await fixture.Extended.Services.GetRequiredService<AutomationRunner>().RunTenantAsync(tenantId, CancellationToken.None);
         Assert.False(skipped);
         return round ?? throw new InvalidOperationException("Tur çalışmadı.");
+    }
+
+    /// <summary>Firmanın yerel günü: tarama UTC'ye değil firma saat dilimine göre çalışır (UTC gün sınırı CI'da kırılma yaratıyordu).</summary>
+    private async Task<DateOnly> TodayAsync(Guid tenantId)
+    {
+        await using var scope = fixture.Extended.Services.GetRequiredService<ITenantScopeFactory>().Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty));
+        return (await scope.ServiceProvider.GetRequiredService<ITenantClock>().GetAsync(CancellationToken.None)).Today;
     }
 
     private async Task<IReadOnlyList<AutomationRun>> RunsAsync(Guid tenantId)
