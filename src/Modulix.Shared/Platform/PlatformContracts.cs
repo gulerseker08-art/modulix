@@ -172,3 +172,19 @@ public sealed record SetScopeLimitsRequest(IReadOnlyList<ScopeLimitDto> Limits, 
 
 /// <summary><c>AffectedRoleCount</c>: yeni tavanların kapsamı aştığı, okuma tarafında kısılacak yönetici olmayan rol sayısı.</summary>
 public sealed record SetScopeLimitsResponse(IReadOnlyList<ScopeLimitDto> Limits, int AffectedRoleCount);
+
+/// <summary>
+/// Bir türde önerilen tavan kümesinin etkisi (kaydetmeden önce). <c>AffectedRoles</c>: önerilen tavanı aşan yönetici olmayan roller.
+/// "Yeni kısılan": bugünkü tavanlarla kısılmayıp önerilenle kısılan etkin üye/yönetici; "serbest kalan": tersi.
+/// </summary>
+public sealed record ScopeImpactDto(
+    string EntityKey, int AffectedRoles, int NewlyRestrictedMembers, int ReleasedMembers, int NewlyRestrictedAdministrators, int ReleasedAdministrators);
+
+/// <summary>Önizleme sonucu; toplamlar farklı kişileri sayar. Hiçbir şey yazılmaz (<c>POST .../scope-limits/preview</c>, gövde <see cref="SetScopeLimitsRequest"/>).</summary>
+public sealed record ScopeLimitsPreviewResponse(
+    IReadOnlyList<ScopeImpactDto> Types,
+    int AffectedRoleCount,
+    int NewlyRestrictedMemberCount,
+    int ReleasedMemberCount,
+    int NewlyRestrictedAdministratorCount,
+    int ReleasedAdministratorCount);
