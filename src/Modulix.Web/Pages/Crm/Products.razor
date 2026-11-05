@@ -21,7 +21,7 @@
     {
         <div class="record-form">
             <h2>@(form.Id is null ? "Yeni ürün/hizmet" : "Ürün/hizmeti düzenle")</h2>
-            <TabBar Tabs="FormTabs" State="tabs" Label="Ürün formu bölümleri" />
+            <TabBar Tabs="FormTabs" State="tabs" Label="Ürün formu bölümleri" Changed="_ => { }" />
             <form novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault hidden="@(tabs.Active == PackageTab)">
                 <TabPanel State="tabs" Key="form-genel">
                     <div class="form-grid">

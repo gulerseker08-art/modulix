@@ -1,13 +1,42 @@
+@implements IDisposable
 @* Sekme paneli (TabBar ile eşleşir): id="tabpanel-{Key}", aria-labelledby="tab-{Key}". Etkin olmayan panel gizlenir ama DOM'da kalır,
-   böylece içindeki kaydedilmemiş girdi sekme değişince kaybolmaz (docs/design-system/form-standards.md → Sekmeler). *@
+   böylece içindeki kaydedilmemiş girdi sekme değişince kaybolmaz (docs/design-system/form-standards.md → Sekmeler).
+   Sekme değişince panel kendini yeniden çizer: TabBar tıklaması yalnızca TabBar'ı çizdirir, sayfa Changed vermezse paneller güncellenmezdi. *@
 <div role="tabpanel" id="tabpanel-@Key" aria-labelledby="tab-@Key" class="record-tabpanel" hidden="@State.Hidden(Key)">
     @ChildContent
 </div>
 
 @code {
+    private TabState? subscribed;
+
     [Parameter, EditorRequired] public TabState State { get; set; } = default!;
 
     [Parameter, EditorRequired] public string Key { get; set; } = string.Empty;
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(subscribed, State))
+        {
+            if (subscribed is not null)
+            {
+                subscribed.Selected -= OnSelected;
+            }
+
+            State.Selected += OnSelected;
+            subscribed = State;
+        }
+    }
+
+    private void OnSelected() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        if (subscribed is not null)
+        {
+            subscribed.Selected -= OnSelected;
+            subscribed = null;
+        }
+    }
 }
