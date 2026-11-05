@@ -1,5 +1,4 @@
 using System.Globalization;
-using Modulix.Shared.Access;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Crm;
 using Modulix.Shared.Customization;
@@ -14,9 +13,9 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
 {
     private const int Size = 200;
 
-    // Atanabilir üye listesi şimdilik CRM genelinde tek listedir; kapsam henüz türe göre değişmediği için (ADR-0030 dilim 1)
-    // hangi tür anahtarının sorulduğu sonucu etkilemez. Türe özel kapsam gelince form türüne göre ayrı istenmelidir (dilim 3).
-    private const string AssignableEntityKey = CrmEntityKeys.Opportunity;
+    // Atanabilir üye listesi aktivitenin "Yeniden ata" eylemi içindir. Kapsam kayıt türüne göre (istisna ve platform tavanı dahil)
+    // çözüldüğü için aktivitenin kendi türüyle sorulur; oturumdaki tek varsayılan kapsamdan çıkarım yapılmaz (ADR-0030).
+    private const string AssignableEntityKey = CrmEntityKeys.Activity;
 
     public IReadOnlyList<CompanyDto> Companies { get; private set; } = [];
 
@@ -74,9 +73,7 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
         CustomFields = (await api.GetAsync<List<CustomFieldDto>>("/api/custom-fields")).Value ?? [];
         ChoiceLists = (await api.GetAsync<List<ChoiceListDto>>("/api/choice-lists")).Value ?? [];
         Members = (await api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members")).Value ?? [];
-        AssignableMembers = session.Scope == RecordScope.All && session.Access is not null
-            ? Members
-            : (await api.GetAsync<List<TenantMemberResponse>>($"/api/tenant/members?assignable=true&entityKey={AssignableEntityKey}")).Value ?? [];
+        AssignableMembers = (await api.GetAsync<List<TenantMemberResponse>>($"/api/tenant/members?assignable=true&entityKey={AssignableEntityKey}")).Value ?? [];
 
         if (session.Can(CrmAccess.CompaniesRead))
         {

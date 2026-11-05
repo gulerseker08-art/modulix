@@ -179,13 +179,13 @@ Açık karar kalmadı. Doğrulanmayan noktalar bölüm 9'dadır.
 - Kapsam dışı ortak firma/kişi için "gizle" seçeneği (ADR-0026 K8, dilim 3).
 - Tavanın platform ekranında "bu daralma kaç kullanıcıyı etkiler" önizlemesi (şu an yalnızca kayıttan sonra etkilenen rol sayısı gösterilir).
 - `AppliesToAdministrators = true` yazılırken etkilenecek yönetici sayısı (K6): ekran bugün yalnızca uyarı metni gösterir, sayı vermez.
-- Atanabilir üye listesi: `CrmLookups.LoadAsync` oturumdaki tek varsayılan kapsam `All` ise bütün üyeleri sunar; bu kapsam kayıt türüne göre istisna ve platform tavanıyla daralmış olabilir. Sunucu kapsamı ayrıca uyguladığı için güvenlik açığı değildir (bölüm 9), ama ekran sunucunun sonradan reddedeceği kişileri önerebilir. Çözüm: kısayolu kaldırıp her zaman `entityKey` ile sormak.
+- ~~Atanabilir üye listesi~~ çözüldü: `CrmLookups.LoadAsync` oturumdaki tek varsayılan kapsam `All` ise bütün üyeleri sunuyordu ve aksi halde `crm.opportunity` ile soruyordu; oysa liste yalnızca aktivitenin "Yeniden ata" eylemini besler. Kısayol kaldırıldı, liste her zaman aktivitenin kendi türüyle (`crm.activity`) sorulur; tür istisnası ve platform tavanı listeye yansır (`AssignableMembersScopeTests`).
 
 ## 9. Doğrulanmadı
 
 - ~~Modül çağrılarının tür anahtarları~~ dilim 1'de belirlendi (bölüm 5); segment motorunun çok türlü koşulları açık karar 3'te kalır.
 - ~~`tenant-export` ve `tenant-delete` kapsamı~~ dilim 2a testiyle doğrulandı (katalogdan okunur).
-- Web tarafındaki `SessionState.Scope` tek, rolün varsayılan kapsamıdır (tür istisnası ve tavan yansımaz). Kodda yalnızca iki yerde okunur: `CrmLookups` (atanabilir üye kısayolu, bölüm 8) ve `RoleDetail` (kişinin hangi kapsamı verebileceği ipucu). Kaydın görünürlüğünü belirlemez; sunucu her istekte türe göre çözer. Sunucunun, kapsam dışı bir üyeyi sorumlu atama denemesini reddettiği bu dilimde ayrıca denenmedi.
+- Web tarafındaki `SessionState.Scope` tek, rolün varsayılan kapsamıdır (tür istisnası ve tavan yansımaz). Kodda artık yalnızca `RoleDetail`'de okunur (kişinin hangi kapsamı verebileceği ipucu; kesin karar sunucuda). Kaydın görünürlüğünü belirlemez; sunucu her istekte türe göre çözer. Sunucunun kapsam dışı sorumlu atamasını reddettiği `AssignableMembersScopeTests` ile doğrulandı (aktivite yeniden atama; tavan kaldırılınca atama geri gelir).
 - Performans etkisi ölçülmedi; vaat edilmez. Beklenti: rol yükleme aynı kalır, yalnızca bir küçük istisna sorgusu eklenir.
 
 ## 10. Maliyet ve dağıtım
