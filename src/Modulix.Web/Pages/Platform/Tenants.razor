@@ -25,13 +25,14 @@
         <CreateTenantForm Modules="modules" Profiles="profiles" Created="CreatedAsync" Cancelled="() => creating = false" />
     }
 
+    @* Platform yöneticisi bir firma bağlamı olmadan çalışır; kişisel görünüm kaydı firma bağlamı ister (ADR-0036), bu yüzden yalnızca sistem görünümleri vardır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Firma görünümleri" />
+
     <div class="list-toolbar">
-        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status?.ToString() ?? "all")" ValueChanged="ChooseStatusAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Firma ara" placeholder="Ad veya kısa ad ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (!creating && modules is not null)
         {
             <button type="button" class="btn btn-primary" @onclick="() => creating = true"><AppIcon Name="plus" Size="16" /> Firma aç</button>
@@ -53,18 +54,27 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ad</th><th>Kısa ad</th><th>Durum</th><th>Etkin üye</th><th>Modüller</th><th>Açılış</th></tr>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var tenant in page.Items)
                 {
                     <tr>
-                        <td data-label="Ad" class="primary"><a href="platform/firmalar/@tenant.Id">@tenant.Name</a></td>
-                        <td data-label="Kısa ad">@tenant.Slug</td>
-                        <td data-label="Durum"><TenantStateBadge State="tenant.Status" /></td>
-                        <td data-label="Etkin üye">@tenant.ActiveMemberCount</td>
-                        <td data-label="Modüller">@ModuleNames(tenant.EnabledModules)</td>
-                        <td data-label="Açılış">@CrmLabels.Time(tenant.CreatedAt)</td>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, tenant)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{tenant.Name} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="platform/firmalar/@tenant.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            </RowMenu>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -74,6 +84,20 @@
 </PlatformGate>
 
 @code {
+    private const string AllViews = "all";
+
+    // Başlık tıklamasıyla sıralanan sütunlar sunucudaki sort anahtarlarıdır (PlatformTenantQuery.SortKeys). Etkin üye ve modüller sayfa dışında hesaplandığı için sıralanamaz.
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("name", "Ad", "type", "name", "-name", Locked: true),
+        new("slug", "Kısa ad", "hash", "slug", "-slug"),
+        new("status", "Durum", "tag", "status", "-status"),
+        new("members", "Etkin üye", "users"),
+        new("modules", "Modüller", "layers"),
+        new("created", "Açılış", "calendar", "createdAt", "-createdAt"),
+    ];
+
+    private readonly GridViewState grid = new("platform.tenants", "name");
     private PlatformTenantPageResponse? page;
     private PlatformModulesResponse? modules;
     private IReadOnlyList<SectorProfileDto> profiles = [];
@@ -82,9 +106,11 @@
     private bool creating;
     private string? message;
     private string? notice;
+    private string view = AllViews;
 
     protected override async Task OnInitializedAsync()
     {
+        grid.Define(Columns);
         var result = await Api.GetAsync<PlatformModulesResponse>("/api/platform/modules");
         modules = result.Value;
         profiles = (await Api.GetAsync<List<SectorProfileDto>>("/api/platform/profiles")).Value ?? [];
@@ -94,20 +120,30 @@
         }
     }
 
-    private IReadOnlyList<ViewOption> StatusOptions =>
-        [new("all", "Tüm firmalar"), .. Enum.GetValues<TenantState>().Select(v => new ViewOption(v.ToString(), TenantStateText.Of(v)))];
+    private IReadOnlyList<ViewOption> ViewOptions =>
+        [new(AllViews, "Tüm firmalar", Icon: "building"), .. Enum.GetValues<TenantState>().Select(v => new ViewOption(v.ToString(), TenantStateText.Of(v), Icon: "tag"))];
 
-    private Task ChooseStatusAsync(string key) => FilterAsync(key == "all" ? null : Enum.Parse<TenantState>(key));
-
-    private async Task FilterAsync(TenantState? value)
+    private async Task ChooseViewAsync(string key)
     {
-        status = value;
+        view = key;
+        status = key == AllViews ? null : Enum.Parse<TenantState>(key);
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
         await LoadAsync(1);
     }
 
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"/api/platform/tenants?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
         if (status is { } s)
         {
             url += $"&status={s}";
@@ -128,6 +164,19 @@
             : $"{tenant.Name} açıldı. {administrator?.Email} adresine yönetici daveti gönderildi.";
         await LoadAsync(1);
     }
+
+    private RenderFragment Cell(GridColumnDef column, PlatformTenantDto tenant) => @<td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, tenant)</td>;
+
+    private RenderFragment CellContent(string key, PlatformTenantDto tenant) => key switch
+    {
+        "name" => @<a href="platform/firmalar/@tenant.Id">@tenant.Name</a>,
+        "slug" => @<text>@tenant.Slug</text>,
+        "status" => @<TenantStateBadge State="tenant.Status" />,
+        "members" => @<text>@tenant.ActiveMemberCount</text>,
+        "modules" => @<text>@ModuleNames(tenant.EnabledModules)</text>,
+        "created" => @<text>@CrmLabels.Time(tenant.CreatedAt)</text>,
+        _ => @<text></text>,
+    };
 
     private string ModuleNames(IReadOnlyList<string> keys) =>
         keys.Count == 0

@@ -183,6 +183,28 @@ internal sealed class PriceListRecordStore(CrmStoreContext context) : CrmRecordS
 
     protected override IOrderedQueryable<PriceList> Order(IQueryable<PriceList> source) => source.OrderBy(l => l.Status).ThenBy(l => l.Name);
 
+    // Liste başlıklarına göre sıralama (sort=name, sort=-validTo ...). Varsayılan sıra durum + ad; "status" anahtarı da aynı sırayı verir.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+    [
+        "name", "-name", "status", "-status", "currency", "-currency", "scope", "-scope", "validFrom", "-validFrom", "validTo", "-validTo",
+    ];
+
+    protected override IOrderedQueryable<PriceList> Order(IQueryable<PriceList> source, string? sort) => sort switch
+    {
+        "name" => source.OrderBy(l => l.Name),
+        "-name" => source.OrderByDescending(l => l.Name),
+        "-status" => source.OrderByDescending(l => l.Status).ThenBy(l => l.Name),
+        "currency" => source.OrderBy(l => l.Currency).ThenBy(l => l.Name),
+        "-currency" => source.OrderByDescending(l => l.Currency).ThenBy(l => l.Name),
+        "scope" => source.OrderBy(l => l.Scope).ThenBy(l => l.Name),
+        "-scope" => source.OrderByDescending(l => l.Scope).ThenBy(l => l.Name),
+        "validFrom" => source.OrderBy(l => l.ValidFrom == null).ThenBy(l => l.ValidFrom).ThenBy(l => l.Name),
+        "-validFrom" => source.OrderBy(l => l.ValidFrom == null).ThenByDescending(l => l.ValidFrom).ThenBy(l => l.Name),
+        "validTo" => source.OrderBy(l => l.ValidTo == null).ThenBy(l => l.ValidTo).ThenBy(l => l.Name),
+        "-validTo" => source.OrderBy(l => l.ValidTo == null).ThenByDescending(l => l.ValidTo).ThenBy(l => l.Name),
+        _ => Order(source),
+    };
+
     protected override IQueryable<PriceList> Search(IQueryable<PriceList> source, string term) =>
         source.Where(l => l.Name.Contains(term) || (l.Segment != null && l.Segment.Contains(term)));
 

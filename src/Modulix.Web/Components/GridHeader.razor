@@ -1,0 +1,24 @@
+@* Liste tablosunun başlık hücresi (<th>): sıralanabilirse SortHeader (tıklayınca sıralar), değilse yalnızca ikon + ad. İkonlu, cümle yazımlı başlık şablonu
+   (component-catalog.md → DataGrid). Sıralama anahtarları GridColumnDef'tedir. *@
+<th scope="col" class="@Class">
+    @if (Column.SortAsc is not null)
+    {
+        <SortHeader Label="@Column.Label" ColumnIcon="@Column.Icon" Asc="@Column.SortAsc" Desc="@Column.SortDesc" Value="@State.Sort" Default="@State.DefaultSort" ValueChanged="SortChanged" />
+    }
+    else
+    {
+        <span class="th-label"><AppIcon Name="@Column.Icon" Size="14" /> @Column.Label</span>
+    }
+</th>
+
+@code {
+    [Parameter, EditorRequired] public GridColumnDef Column { get; set; } = default!;
+
+    [Parameter, EditorRequired] public GridViewState State { get; set; } = default!;
+
+    /// <summary>Yeni sıralama anahtarı seçilince (sayfa listeyi yeniden çeker).</summary>
+    [Parameter] public EventCallback<string> SortChanged { get; set; }
+
+    /// <summary>Ek sınıf (ör. <c>text-end</c> sağa yaslı tutar sütunu).</summary>
+    [Parameter] public string? Class { get; set; }
+}

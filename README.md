@@ -346,6 +346,12 @@ Firma yöneticisi her kayıt formunun düzenini kendine göre kurar: alanları t
 - Firmanın zorunlu kıldığı alan **sunucuda** denetlenir (kayıt boru hattı): oluştururken dolu olmalı, güncellemede boşaltılamaz; eski kayıtlar zorunluluk konmadan önce açılmış olabilir, dokunulmadıkça reddedilmez.
 - `GET /api/form-layouts` (her üye; formlar buradan çizilir), `GET/PUT/DELETE /api/customization/form-layouts/{kayıtTürü}` (PUT gövdesinde düzenin tamamı + `version`; eski sürüm 409, geçersiz düzen 422 alan hatalarıyla, tanımsız form 404; DELETE `?version=` varsayılana döner). Değişiklikler denetim kaydına `Form düzeni` olarak yazılır.
 
+**Kişisel liste görünümleri (ADR-0036):** her üye bir liste ekranı (grid) için kendi sütun seçimini/sırasını, sıralamasını ve süzgecini görünüm olarak kaydeder.
+- `GET /api/grid-views?screen=crm.companies` (üyenin o ekrandaki görünümleri, ada göre), `POST /api/grid-views`, `PUT /api/grid-views/{id}` (gövdede `version`; sürümsüz 428, eski sürüm 409), `DELETE /api/grid-views/{id}?version=`. Gövde: `screenKey`, `name`, `columns` (sıralı sütun anahtarları), `sort` (ör. `-name`), `filters` (sorgu dizgisi, ör. `status=Active`).
+- Yalnızca sahibi görür ve değiştirir (aynı tenant'taki başka üye de "bulunamadı" alır); ek izin istemez, oturum ve aktif tenant yeter. Görünüm yetki vermez: liste uç noktası izni, veri kapsamını ve alan yetkisini her istekte uygular.
+- Ad üyenin aynı ekranında tekildir (422), ekran başına en fazla 20 görünüm; geçersiz sütun/sıralama/süzgeç 422 alan hatalarıyla döner. Denetim kaydı yazılmaz (kişisel tercih).
+- Firma listesi `sort` anahtarlarını kabul eder: `name`, `status`, `city`, `phone`, `industry`, `taxNumber`, `createdAt` (başına `-` azalan). Bilinmeyen anahtar 422.
+
 ### Sektör profilleri (Y9c)
 
 Profil, bir sektör için hazır başlangıç paketidir: modüller, özel alanlar ve liste değerleri. Dört profil kodda tanımlıdır (`Modulix.Api/Customization/SectorProfiles.cs`): Genel, Lojistik firması, Klinik, Üretici. Tanımlar açılışta modül kataloğuna göre doğrulanır; bilinmeyen modül, kayıt türü, liste veya kategori varsa uygulama açılmaz.

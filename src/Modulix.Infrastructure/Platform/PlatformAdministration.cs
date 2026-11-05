@@ -75,7 +75,19 @@ internal sealed class PlatformAdministration(
         }
 
         var total = await tenants.CountAsync(cancellationToken);
-        var rows = await tenants.OrderBy(t => t.Name).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+        // Başlığa göre sıralama (ADR-0036); anahtarlar PlatformTenantQuery.SortKeys'tedir, eşit kayıtlar ada göre sıralanır.
+        var ordered = query.Sort switch
+        {
+            "-name" => tenants.OrderByDescending(t => t.Name),
+            "slug" => tenants.OrderBy(t => t.Slug),
+            "-slug" => tenants.OrderByDescending(t => t.Slug),
+            "status" => tenants.OrderBy(t => t.Status),
+            "-status" => tenants.OrderByDescending(t => t.Status),
+            "createdAt" => tenants.OrderBy(t => t.CreatedAt),
+            "-createdAt" => tenants.OrderByDescending(t => t.CreatedAt),
+            _ => tenants.OrderBy(t => t.Name),
+        };
+        var rows = await ordered.ThenBy(t => t.Name).ThenBy(t => t.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
 
         // Üye sayısı ve açık modüller platform tablolarındandır: sayfadaki bütün firmalar için birer sorguyla okunur.
         // Yönetici sayısı firma verisidir (RLS), firma başına bir kapsam ister; listede okunmaz (yalnızca firma detayında).

@@ -54,6 +54,34 @@ internal sealed partial class SegmentRecordStore(MarketingStoreContext context) 
 
     protected override IOrderedQueryable<Segment> Order(IQueryable<Segment> source) => source.OrderBy(s => s.Name);
 
+    // Liste başlıklarına göre sıralama (sort=name, sort=-name ...); boş değerler her iki yönde de sonda.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+    [
+        "name", "-name", "target", "-target", "kind", "-kind", "status", "-status",
+        "lastMemberCount", "-lastMemberCount", "lastComputedAt", "-lastComputedAt", "publishedVersion", "-publishedVersion",
+        "createdAt", "-createdAt",
+    ];
+
+    protected override IOrderedQueryable<Segment> Order(IQueryable<Segment> source, string? sort) => sort switch
+    {
+        "-name" => source.OrderByDescending(s => s.Name),
+        "target" => source.OrderBy(s => s.Target).ThenBy(s => s.Name),
+        "-target" => source.OrderByDescending(s => s.Target).ThenBy(s => s.Name),
+        "kind" => source.OrderBy(s => s.Kind).ThenBy(s => s.Name),
+        "-kind" => source.OrderByDescending(s => s.Kind).ThenBy(s => s.Name),
+        "status" => source.OrderBy(s => s.Status).ThenBy(s => s.Name),
+        "-status" => source.OrderByDescending(s => s.Status).ThenBy(s => s.Name),
+        "lastMemberCount" => source.OrderBy(s => s.LastMemberCount == null).ThenBy(s => s.LastMemberCount).ThenBy(s => s.Name),
+        "-lastMemberCount" => source.OrderBy(s => s.LastMemberCount == null).ThenByDescending(s => s.LastMemberCount).ThenBy(s => s.Name),
+        "lastComputedAt" => source.OrderBy(s => s.LastComputedAt == null).ThenBy(s => s.LastComputedAt).ThenBy(s => s.Name),
+        "-lastComputedAt" => source.OrderBy(s => s.LastComputedAt == null).ThenByDescending(s => s.LastComputedAt).ThenBy(s => s.Name),
+        "publishedVersion" => source.OrderBy(s => s.PublishedVersion).ThenBy(s => s.Name),
+        "-publishedVersion" => source.OrderByDescending(s => s.PublishedVersion).ThenBy(s => s.Name),
+        "createdAt" => source.OrderBy(s => s.CreatedAt).ThenBy(s => s.Name),
+        "-createdAt" => source.OrderByDescending(s => s.CreatedAt).ThenBy(s => s.Name),
+        _ => Order(source),
+    };
+
     protected override IQueryable<Segment> Search(IQueryable<Segment> source, string term) =>
         source.Where(s => s.Name.Contains(term) || s.Code.Contains(term));
 

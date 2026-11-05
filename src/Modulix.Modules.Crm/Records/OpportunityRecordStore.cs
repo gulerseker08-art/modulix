@@ -152,6 +152,38 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
     protected override IOrderedQueryable<Opportunity> Order(IQueryable<Opportunity> source) =>
         source.OrderByDescending(o => o.CreatedAt);
 
+    // Liste başlıklarına göre sıralama (sort=title, sort=-closeDate ...); boş değerler sonda, eşitlikte en yeni önce. Tutar ve olasılık hassas alandır
+    // (sıralama değeri sezdirir) ve firma/sorumlu adı ilişki ya da üyelik tablosunda olduğundan bunlara göre sıralama yoktur.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+    [
+        "title", "-title", "number", "-number", "stage", "-stage", "status", "-status", "priority", "-priority", "type", "-type", "source", "-source",
+        "closeDate", "-closeDate", "nextActionDate", "-nextActionDate", "created", "-created",
+    ];
+
+    protected override IOrderedQueryable<Opportunity> Order(IQueryable<Opportunity> source, string? sort) => sort switch
+    {
+        "title" => source.OrderBy(o => o.Title).ThenByDescending(o => o.CreatedAt),
+        "-title" => source.OrderByDescending(o => o.Title).ThenByDescending(o => o.CreatedAt),
+        "number" => source.OrderBy(o => o.OpportunityNumber),
+        "-number" => source.OrderByDescending(o => o.OpportunityNumber),
+        "stage" => source.OrderBy(o => o.Stage).ThenByDescending(o => o.CreatedAt),
+        "-stage" => source.OrderByDescending(o => o.Stage).ThenByDescending(o => o.CreatedAt),
+        "status" => source.OrderBy(o => o.Status).ThenByDescending(o => o.CreatedAt),
+        "-status" => source.OrderByDescending(o => o.Status).ThenByDescending(o => o.CreatedAt),
+        "priority" => source.OrderBy(o => o.Priority).ThenByDescending(o => o.CreatedAt),
+        "-priority" => source.OrderByDescending(o => o.Priority).ThenByDescending(o => o.CreatedAt),
+        "type" => source.OrderBy(o => o.Type == null).ThenBy(o => o.Type).ThenByDescending(o => o.CreatedAt),
+        "-type" => source.OrderBy(o => o.Type == null).ThenByDescending(o => o.Type).ThenByDescending(o => o.CreatedAt),
+        "source" => source.OrderBy(o => o.Source == null).ThenBy(o => o.Source).ThenByDescending(o => o.CreatedAt),
+        "-source" => source.OrderBy(o => o.Source == null).ThenByDescending(o => o.Source).ThenByDescending(o => o.CreatedAt),
+        "closeDate" => source.OrderBy(o => o.ExpectedCloseDate == null).ThenBy(o => o.ExpectedCloseDate).ThenByDescending(o => o.CreatedAt),
+        "-closeDate" => source.OrderBy(o => o.ExpectedCloseDate == null).ThenByDescending(o => o.ExpectedCloseDate).ThenByDescending(o => o.CreatedAt),
+        "nextActionDate" => source.OrderBy(o => o.NextActionDate == null).ThenBy(o => o.NextActionDate).ThenByDescending(o => o.CreatedAt),
+        "-nextActionDate" => source.OrderBy(o => o.NextActionDate == null).ThenByDescending(o => o.NextActionDate).ThenByDescending(o => o.CreatedAt),
+        "created" => source.OrderBy(o => o.CreatedAt),
+        _ => Order(source),
+    };
+
     protected override IQueryable<Opportunity> Search(IQueryable<Opportunity> source, string term) =>
         source.Where(o => o.Title.Contains(term) || o.OpportunityNumber.Contains(term));
 
