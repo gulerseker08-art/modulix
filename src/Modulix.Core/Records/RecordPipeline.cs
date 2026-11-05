@@ -32,7 +32,8 @@ public sealed class RecordPipeline(
     EventHandlingScope? handling = null,
     ISharedReferenceMerger? references = null,
     RecordCommandContext? commandContext = null,
-    IFormLayoutProvider? formLayouts = null) : IRecordPipeline
+    IFormLayoutProvider? formLayouts = null,
+    FieldRules.IFieldRuleGate? fieldRules = null) : IRecordPipeline
 {
     public async Task<RecordResult<RecordData>> GetAsync(RecordRef record, CancellationToken cancellationToken)
     {
@@ -143,6 +144,13 @@ public sealed class RecordPipeline(
         }
 
         errors.AddRange(store.Validate(RecordOperation.Create, values));
+
+        // Alan kuralları (ADR-0029 K7): yazılacak son hale karşı; geçersiz veride değerlendirilmez.
+        if (errors.Count == 0 && fieldRules is not null)
+        {
+            errors.AddRange(await fieldRules.CheckAsync(store.EntityKey, null, null, values, cancellationToken));
+        }
+
         if (errors.Count > 0)
         {
             return Invalid<RecordData>(errors);
@@ -213,6 +221,19 @@ public sealed class RecordPipeline(
         }
 
         errors.AddRange(store.Validate(RecordOperation.Update, values));
+
+        // Alan kuralları (ADR-0029 K7): kaydın mevcut değerleriyle birleşmiş son hale karşı.
+        if (errors.Count == 0 && fieldRules is not null)
+        {
+            var after = before.Values.DeepClone().AsObject();
+            foreach (var (name, node) in values)
+            {
+                after[name] = node?.DeepClone();
+            }
+
+            errors.AddRange(await fieldRules.CheckAsync(store.EntityKey, id, before.Values, after, cancellationToken));
+        }
+
         if (errors.Count > 0)
         {
             return Invalid<RecordData>(errors);
