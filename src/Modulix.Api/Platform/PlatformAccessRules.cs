@@ -50,7 +50,7 @@ public static class PlatformAccessRules
         ["POST /api/platform/sectors/capabilities"] = Ops,
         ["PUT /api/platform/sectors/capabilities/{code}/dependencies"] = Ops,
         ["POST /api/platform/sectors/starter-packages/{code}/install"] = Ops, // yalnızca ekler (Dilim D)
-        // Alan kuralı paketleri (ADR-0029 K8): ürün standardı kurallarını Operasyon yönetir.
+        // Kural paketleri (ürün standardı alan kuralları): taslak, yayın ve geri alma; Operasyon yönetir.
         ["POST /api/platform/rule-packages"] = Ops,
         ["PUT /api/platform/rule-packages/{id}/draft"] = Ops,
         ["DELETE /api/platform/rule-packages/{id}/draft"] = Ops,

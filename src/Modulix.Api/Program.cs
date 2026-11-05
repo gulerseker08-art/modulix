@@ -220,6 +220,7 @@ app.MapContractSignatureWebhook();
 app.MapPlatformEndpoints();
 app.MapPlatformEventEndpoints();
 app.MapPlatformPlanEndpoints();
+app.MapPlatformHealthEndpoints();
 app.MapPlatformTeamEndpoints();
 app.MapAuditEndpoints();
 app.MapSettingsEndpoints();
