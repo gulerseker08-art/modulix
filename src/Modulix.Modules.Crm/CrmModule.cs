@@ -929,6 +929,9 @@ public sealed class CrmModule : IModule
     [
         new(SharedEntities.Party, Permissions.CompaniesRead, Permissions.CompaniesWrite),
         new(SharedEntities.Person, Permissions.ContactsRead, Permissions.ContactsWrite),
+
+        // Firmanın ilişki rolündeki durumu (ADR-0029 K9) firmayla aynı izinlerle ve aynı kapsam kuralıyla açılır.
+        new(SharedEntities.PartyRelationship, Permissions.CompaniesRead, Permissions.CompaniesWrite),
     ];
 
     IReadOnlyList<SharedRecordReference> IModule.SharedRecordReferences { get; } =

@@ -250,6 +250,169 @@ public class PartyRelationshipTests(ModulixApiFactory factory) : IClassFixture<M
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/activity-options")).StatusCode);
     }
 
+    private const string Relationships = "/api/records/" + SharedEntities.PartyRelationship;
+
+    private static async Task<HttpResponseMessage> PostRelationshipAsync(HttpClient client, Guid partyId, string role, JsonObject? more = null)
+    {
+        var values = new JsonObject { ["partyId"] = partyId.ToString(), ["roleCode"] = role };
+        foreach (var (name, node) in more ?? [])
+        {
+            values[name] = node?.DeepClone();
+        }
+
+        return await client.PostAsJsonAsync(Relationships, new RecordWriteRequest(values));
+    }
+
+    private static async Task<IDictionary<string, string[]>> ErrorsAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<ValidationProblemDetails>())!.Errors;
+    }
+
+    [Fact]
+    public async Task A_relationship_keeps_status_dates_and_notes_per_party_and_role_and_updates_but_never_moves()
+    {
+        var (_, admin) = await CreateTenantAdminAsync();
+        using var client = await LoginAsync(admin);
+        var party = await PostPartyAsync(client, new JsonObject { ["name"] = "Durum Firması", ["relationshipRoles"] = new JsonArray("tedarikci", "tasiyici") });
+
+        // Durum verilmezse aday başlar; ikinci rol kendi kaydını taşır.
+        var prospect = await PostRelationshipAsync(client, party.Id, "tedarikci");
+        Assert.Equal(HttpStatusCode.Created, prospect.StatusCode);
+        var created = (await prospect.Content.ReadFromJsonAsync<RecordResponse>())!;
+        Assert.Equal("Prospect", created.Values["status"]!.GetValue<string>());
+        var active = await PostRelationshipAsync(client, party.Id, "tasiyici", new JsonObject
+        {
+            ["status"] = "Active", ["startDate"] = "2026-03-01", ["notes"] = "Yıllık sözleşme",
+        });
+        Assert.Equal(HttpStatusCode.Created, active.StatusCode);
+
+        var listed = (await client.GetFromJsonAsync<RecordPageResponse>($"{Relationships}?partyId={party.Id}"))!;
+        Assert.Equal(["tasiyici", "tedarikci"], listed.Items.Select(i => i.Values["roleCode"]!.GetValue<string>()).Order());
+        var carrier = listed.Items.Single(i => i.Values["roleCode"]!.GetValue<string>() == "tasiyici");
+        Assert.Equal("2026-03-01", carrier.Values["startDate"]!.GetValue<string>());
+        Assert.Equal("Yıllık sözleşme", carrier.Values["notes"]!.GetValue<string>());
+        Assert.Single((await client.GetFromJsonAsync<RecordPageResponse>($"{Relationships}?partyId={party.Id}&status=Active"))!.Items);
+
+        // Durum ve tarihler güncellenir, boş tarih temizler; firma ve rol sonradan değişmez.
+        var ended = await client.PutAsJsonAsync($"{Relationships}/{carrier.Id}", new RecordWriteRequest(
+            new JsonObject { ["status"] = "Ended", ["endDate"] = "2026-09-30", ["startDate"] = "" }, carrier.Version));
+        Assert.Equal(HttpStatusCode.OK, ended.StatusCode);
+        var reloaded = (await client.GetFromJsonAsync<RecordResponse>($"{Relationships}/{carrier.Id}"))!;
+        Assert.Equal("Ended", reloaded.Values["status"]!.GetValue<string>());
+        Assert.Equal("2026-09-30", reloaded.Values["endDate"]!.GetValue<string>());
+        Assert.Null(reloaded.Values["startDate"]);
+
+        var otherParty = await PostPartyAsync(client, new JsonObject { ["name"] = "Başka Firma" });
+        var moved = await client.PutAsJsonAsync($"{Relationships}/{carrier.Id}", new RecordWriteRequest(
+            new JsonObject { ["partyId"] = otherParty.Id.ToString() }, reloaded.Version));
+        Assert.Contains("değiştirilemez", (await ErrorsAsync(moved))["partyId"][0]);
+        var renamed = await client.PutAsJsonAsync($"{Relationships}/{carrier.Id}", new RecordWriteRequest(
+            new JsonObject { ["roleCode"] = "tedarikci" }, reloaded.Version));
+        Assert.Contains("değiştirilemez", (await ErrorsAsync(renamed))["roleCode"][0]);
+
+        // Firma silinince ilişki kayıtları da gider (alt veri).
+        var deleted = await client.DeleteAsync($"{Parties}/{party.Id}?version={party.Version}");
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+        Assert.Empty((await client.GetFromJsonAsync<RecordPageResponse>($"{Relationships}?partyId={party.Id}"))!.Items);
+    }
+
+    [Fact]
+    public async Task Relationship_validation_rejects_unknown_roles_bad_values_duplicates_and_missing_parties()
+    {
+        var (_, admin) = await CreateTenantAdminAsync();
+        using var client = await LoginAsync(admin);
+        var party = await PostPartyAsync(client, new JsonObject { ["name"] = "Doğrulama Firması" });
+
+        Assert.Contains("yok-rol", (await ErrorsAsync(await PostRelationshipAsync(client, party.Id, "yok-rol")))["roleCode"][0]);
+        Assert.Contains("Prospect, Active", (await ErrorsAsync(await PostRelationshipAsync(client, party.Id, "musteri", new JsonObject { ["status"] = "Bilinmeyen" })))["status"][0]);
+        Assert.Contains("Prospect, Active", (await ErrorsAsync(await PostRelationshipAsync(client, party.Id, "musteri", new JsonObject { ["status"] = "2" })))["status"][0]);
+        Assert.Contains("yyyy-AA-gg", (await ErrorsAsync(await PostRelationshipAsync(client, party.Id, "musteri", new JsonObject { ["startDate"] = "01.03.2026" })))["startDate"][0]);
+        Assert.Contains("önce olamaz", (await ErrorsAsync(await PostRelationshipAsync(client, party.Id, "musteri", new JsonObject
+        {
+            ["startDate"] = "2026-06-01", ["endDate"] = "2026-05-31",
+        })))["endDate"][0]);
+        Assert.Contains("Firma bulunamadı", (await ErrorsAsync(await PostRelationshipAsync(client, Guid.NewGuid(), "musteri")))["partyId"][0]);
+
+        var missing = await ErrorsAsync(await client.PostAsJsonAsync(Relationships, new RecordWriteRequest(new JsonObject())));
+        Assert.Contains("partyId", missing.Keys);
+        Assert.Contains("roleCode", missing.Keys);
+        Assert.Contains("Bilinmeyen alan", (await ErrorsAsync(await PostRelationshipAsync(client, party.Id, "musteri", new JsonObject { ["terms"] = "30 gün" })))["terms"][0]);
+
+        // Aynı firma ve rol için ikinci kayıt açılamaz; hatalı denemelerin hiçbiri yazılmamıştır.
+        Assert.Equal(HttpStatusCode.Created, (await PostRelationshipAsync(client, party.Id, "musteri")).StatusCode);
+        Assert.Contains("zaten var", (await ErrorsAsync(await PostRelationshipAsync(client, party.Id, "musteri")))["roleCode"][0]);
+        Assert.Single((await client.GetFromJsonAsync<RecordPageResponse>($"{Relationships}?partyId={party.Id}"))!.Items);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await client.GetAsync($"{Relationships}?status=Bilinmeyen")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Relationships_of_another_tenant_are_invisible_and_cannot_be_attached_to_its_parties()
+    {
+        var (_, adminA) = await CreateTenantAdminAsync();
+        var (_, adminB) = await CreateTenantAdminAsync();
+        using var clientA = await LoginAsync(adminA);
+        using var clientB = await LoginAsync(adminB);
+
+        var partyA = await PostPartyAsync(clientA, new JsonObject { ["name"] = "A İlişkili" });
+        var relationA = (await (await PostRelationshipAsync(clientA, partyA.Id, "musteri", new JsonObject { ["status"] = "Active" })).Content.ReadFromJsonAsync<RecordResponse>())!;
+
+        Assert.Equal(HttpStatusCode.NotFound, (await clientB.GetAsync($"{Relationships}/{relationA.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await clientB.PutAsJsonAsync($"{Relationships}/{relationA.Id}", new RecordWriteRequest(new JsonObject { ["status"] = "Ended" }, relationA.Version))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await clientB.DeleteAsync($"{Relationships}/{relationA.Id}?version={relationA.Version}")).StatusCode);
+        Assert.Empty((await clientB.GetFromJsonAsync<RecordPageResponse>($"{Relationships}?partyId={partyA.Id}"))!.Items);
+
+        // B, A'nın firmasına kayıt açamaz (firma yok sayılır); aynı rol kodu iki tenant'ta ayrı ayrı kullanılabilir.
+        Assert.Contains("Firma bulunamadı", (await ErrorsAsync(await PostRelationshipAsync(clientB, partyA.Id, "musteri")))["partyId"][0]);
+        var partyB = await PostPartyAsync(clientB, new JsonObject { ["name"] = "B İlişkili" });
+        Assert.Equal(HttpStatusCode.Created, (await PostRelationshipAsync(clientB, partyB.Id, "musteri")).StatusCode);
+        Assert.Equal("Active", (await clientA.GetFromJsonAsync<RecordResponse>($"{Relationships}/{relationA.Id}"))!.Values["status"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Relationship_writes_need_company_write_permission_and_out_of_scope_companies_show_no_status()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var admin = await factory.CreateUserAsync(tenant);
+        var reader = await factory.CreateUserAsync(tenant);
+        var scoped = await factory.CreateUserAsync(tenant);
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+            var system = await roles.EnsureSystemRoleAsync(CancellationToken.None);
+            Assert.True(await roles.SetMembershipRolesAsync(await factory.GetMembershipIdAsync(admin.Id, tenant.Id), [system.Id], CancellationToken.None));
+        }
+
+        await factory.CreateRoleAsync(tenant.Id, [CompaniesRead], Scope.All, reader);
+        await factory.CreateRoleAsync(tenant.Id, [CompaniesRead], Scope.Own, scoped);
+        using var adminClient = await LoginAsync(admin);
+        using var readerClient = await LoginAsync(reader);
+        using var scopedClient = await LoginAsync(scoped);
+
+        // CRM firması yönetici sorumluluğunda; ilişki kaydı o firmanın kuralına uyar.
+        var party = await PostPartyAsync(adminClient, new JsonObject { ["name"] = "Kapsam Firması", ["relationshipRoles"] = new JsonArray("musteri") });
+        var company = await adminClient.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Kapsam Firması", PartyId: party.Id));
+        Assert.Equal(HttpStatusCode.Created, company.StatusCode);
+        var relation = (await (await PostRelationshipAsync(adminClient, party.Id, "musteri", new JsonObject { ["status"] = "Active", ["notes"] = "Gizli not" })).Content.ReadFromJsonAsync<RecordResponse>())!;
+
+        // Salt okuyan her şeyi görür ama yazamaz; oturumsuz çağıran hiçbir şey göremez.
+        Assert.Equal("Gizli not", (await readerClient.GetFromJsonAsync<RecordResponse>($"{Relationships}/{relation.Id}"))!.Values["notes"]!.GetValue<string>());
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostRelationshipAsync(readerClient, party.Id, "tedarikci")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await readerClient.PutAsJsonAsync($"{Relationships}/{relation.Id}", new RecordWriteRequest(new JsonObject { ["status"] = "Ended" }, relation.Version))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await readerClient.DeleteAsync($"{Relationships}/{relation.Id}?version={relation.Version}")).StatusCode);
+        using var anonymous = factory.CreateBrowserClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(Relationships)).StatusCode);
+
+        // Yalnızca kendi kayıtlarını gören kullanıcı başkasının firmasının durumunu, tarihini ve notunu göremez; firma kimliği kalır.
+        var redacted = (await scopedClient.GetFromJsonAsync<RecordResponse>($"{Relationships}/{relation.Id}"))!;
+        Assert.Equal("musteri", redacted.Values["roleCode"]!.GetValue<string>());
+        Assert.Null(redacted.Values["status"]);
+        Assert.Null(redacted.Values["notes"]);
+        Assert.Equal(HttpStatusCode.Forbidden, (await scopedClient.PutAsJsonAsync($"{Relationships}/{relation.Id}", new RecordWriteRequest(new JsonObject { ["status"] = "Ended" }, relation.Version))).StatusCode);
+        Assert.Equal("Active", (await adminClient.GetFromJsonAsync<RecordResponse>($"{Relationships}/{relation.Id}"))!.Values["status"]!.GetValue<string>());
+    }
+
     private static string[] Strings(JsonObject values, string name) =>
         values[name] is JsonArray array ? [.. array.Select(n => n!.GetValue<string>())] : [];
 

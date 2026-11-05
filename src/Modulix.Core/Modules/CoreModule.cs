@@ -478,6 +478,20 @@ public sealed class CoreModule : IModule
             TitleFields = ["firstName", "lastName"],
             References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party },
         },
+        new(SharedEntities.PartyRelationship, "Firma ilişkisi (ortak kayıt)", null, new Dictionary<string, string>
+        {
+            ["partyId"] = "Firma", ["roleCode"] = "İlişki rolü", ["status"] = "Durum", ["startDate"] = "Başlangıç", ["endDate"] = "Bitiş", ["notes"] = "Not",
+        }, "roleCode")
+        {
+            References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party },
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string>
+                {
+                    ["Prospect"] = "Aday", ["Active"] = "Aktif", ["Suspended"] = "Askıda", ["Ended"] = "Sona erdi",
+                },
+            },
+        },
         new(AuditedEntityKeys.Audit, "Denetim kaydı", null, new Dictionary<string, string>
         {
             ["filters"] = "Filtreler", ["rows"] = "Satır sayısı",

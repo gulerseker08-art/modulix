@@ -23,7 +23,7 @@ internal sealed class CrmSharedRecordVisibility(IModuleData data, IRecordAccess 
     {
         var entityKey = sharedEntityKey switch
         {
-            SharedEntities.Party => CrmModule.Entities.Company,
+            SharedEntities.Party or SharedEntities.PartyRelationship => CrmModule.Entities.Company,
             SharedEntities.Person => CrmModule.Entities.Contact,
             _ => null,
         };
@@ -33,6 +33,14 @@ internal sealed class CrmSharedRecordVisibility(IModuleData data, IRecordAccess 
             || !await access.HidesOutOfScopeSharedRecordsAsync(cancellationToken))
         {
             return null;
+        }
+
+        if (sharedEntityKey == SharedEntities.PartyRelationship)
+        {
+            // İlişki kaydı firmasının kuralına uyar: kapsam dışı firmanın kayıtları gizlenir.
+            var scopeOwners = owners.Select(id => (Guid?)id).ToList();
+            var hiddenParties = data.Set<Company>().AsNoTracking().Where(c => c.OwnerId == null || !scopeOwners.Contains(c.OwnerId)).Select(c => c.PartyId);
+            return data.Set<PartyRelationship>().AsNoTracking().Where(r => hiddenParties.Contains(r.PartyId)).Select(r => r.Id);
         }
 
         if (sharedEntityKey == SharedEntities.Party)
@@ -52,7 +60,7 @@ internal sealed class CrmSharedRecordVisibility(IModuleData data, IRecordAccess 
         var none = new HashSet<Guid>();
         var entityKey = sharedEntityKey switch
         {
-            SharedEntities.Party => CrmModule.Entities.Company,
+            SharedEntities.Party or SharedEntities.PartyRelationship => CrmModule.Entities.Company,
             SharedEntities.Person => CrmModule.Entities.Contact,
             _ => null,
         };
@@ -64,6 +72,15 @@ internal sealed class CrmSharedRecordVisibility(IModuleData data, IRecordAccess 
         }
 
         var idList = ids.ToList();
+        if (sharedEntityKey == SharedEntities.PartyRelationship)
+        {
+            var scopeOwners = owners.Select(id => (Guid?)id).ToList();
+            var restrictedParties = data.Set<Company>().AsNoTracking().Where(c => c.OwnerId == null || !scopeOwners.Contains(c.OwnerId)).Select(c => c.PartyId);
+            none.UnionWith(await data.Set<PartyRelationship>().AsNoTracking()
+                .Where(r => idList.Contains(r.Id) && restrictedParties.Contains(r.PartyId)).Select(r => r.Id).ToListAsync(cancellationToken));
+            return none;
+        }
+
         if (sharedEntityKey == SharedEntities.Party)
         {
             var ownerIds = owners.Select(id => (Guid?)id).ToList();
