@@ -389,6 +389,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TenantId", "CompletedAt");
+
                     b.HasIndex("TenantId", "DedupeKey")
                         .IsUnique();
 
