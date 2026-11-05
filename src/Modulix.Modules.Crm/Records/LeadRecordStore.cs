@@ -59,6 +59,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         Field.Reference<Lead, Company>("companyId", "Firma bulunamadı.", l => l.CompanyId, (l, v) => l.CompanyId = v),
         Field.Reference<Lead, Contact>("contactId", "Kişi bulunamadı.", l => l.ContactId, (l, v) => l.ContactId = v),
         Field.Text<Lead>("productInterest", Lead.ShortMaxLength, l => l.ProductInterest, (l, v) => l.ProductInterest = v),
+        Field.CodeList<Lead>("serviceScope", l => l.ServiceScope, (l, v) => l.ServiceScope = v),
         Field.Text<Lead>("needDescription", Lead.TextMaxLength, l => l.NeedDescription, (l, v) => l.NeedDescription = v),
         Field.Money<Lead>("estimatedBudget", l => l.EstimatedBudget, (l, v) => l.EstimatedBudget = v),
         Field.Currency<Lead>("currency", l => l.Currency, (l, v) => l.Currency = v),
@@ -227,7 +228,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         var companyScope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Company, cancellationToken);
         var contactScope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Contact, cancellationToken);
         var stored = await Context.Data.Set<Lead>().AsNoTracking().Where(l => l.Id == entity.Id)
-            .Select(l => new { l.CompanyId, l.ContactId }).SingleOrDefaultAsync(cancellationToken);
+            .Select(l => new { l.CompanyId, l.ContactId, l.ServiceScope }).SingleOrDefaultAsync(cancellationToken);
 
         if (values.ContainsKey("companyId") && entity.CompanyId is { } companyId && stored?.CompanyId != companyId)
         {
@@ -254,6 +255,12 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
 
         await LookupGuard.AddContactCompanyErrorAsync(
             errors, Context, "contactId", entity.ContactId, entity.CompanyId, stored?.ContactId, stored?.CompanyId, cancellationToken);
+
+        // Hizmet kapsamı: yeni eklenen kodlar katalogda aktif "Faaliyet" olmalı; iş akışı yazımlarında (dönüşüm vb.) denetlenmez.
+        if (!Context.LeadGate.IsOpen && values.ContainsKey("serviceScope"))
+        {
+            await ServiceScopeGuard.AddErrorsAsync(errors, Context, "serviceScope", entity.ServiceScope, stored?.ServiceScope, cancellationToken);
+        }
 
         if (errors.Count > 0)
         {

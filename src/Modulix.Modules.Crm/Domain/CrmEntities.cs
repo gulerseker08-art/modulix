@@ -764,6 +764,12 @@ public sealed class Lead : CrmEntity, IOwnedEntity
     // Talep içeriği
     public string? ProductInterest { get; internal set; }
 
+    /// <summary>
+    /// Talebin hizmet kapsamı (ADR-0029 Dilim F2): faaliyet kataloğundan "Faaliyet" düğümü kodları, virgülle. Serbest metin
+    /// <see cref="ProductInterest"/> alanından ayrıdır; Lead fırsata dönüşünce fırsatın hizmet kapsamına aktarılır.
+    /// </summary>
+    public string? ServiceScope { get; internal set; }
+
     public string? NeedDescription { get; internal set; }
 
     public decimal? EstimatedBudget { get; internal set; }

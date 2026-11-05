@@ -364,7 +364,13 @@ internal sealed class LeadConversion(
             values["ownerId"] = owner;
         }
 
-        var expected = request.ExpectedCloseDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? Text(lead, "targetPurchaseDate");
+        // Hizmet kapsamı (ADR-0029 Dilim F2): talebin kapsamı fırsata olduğu gibi geçer; fırsatta sonradan düzenlenebilir.
+        if (lead.Values["serviceScope"] is JsonArray { Count: > 0 } serviceScope)
+        {
+            values["serviceScope"] = serviceScope.DeepClone();
+        }
+
+        var expected =request.ExpectedCloseDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? Text(lead, "targetPurchaseDate");
         if (expected is not null)
         {
             values["expectedCloseDate"] = expected;

@@ -902,7 +902,7 @@ public sealed class CrmModule : IModule
             ["priority"] = "Öncelik", ["firstName"] = "Ad", ["lastName"] = "Soyad", ["companyName"] = "Firma adı", ["email"] = "E-posta",
             ["phone"] = "Telefon", ["jobTitle"] = "Unvan", ["website"] = "Web sitesi", ["country"] = "Ülke", ["city"] = "Şehir",
             ["companyId"] = "Mevcut firma", ["contactId"] = "Mevcut kişi", ["productInterest"] = "İlgilenilen ürün/hizmet",
-            ["needDescription"] = "İhtiyaç", ["estimatedBudget"] = "Tahmini bütçe", ["currency"] = "Para birimi",
+            ["serviceScope"] = "Hizmet kapsamı", ["needDescription"] = "İhtiyaç", ["estimatedBudget"] = "Tahmini bütçe", ["currency"] = "Para birimi",
             ["targetPurchaseDate"] = "Hedef satın alma tarihi", ["industry"] = "Sektör", ["source"] = "Kaynak", ["sourceDetail"] = "Kaynak ayrıntısı",
             ["referrer"] = "Yönlendiren", ["externalSource"] = "Dış kaynak", ["externalSubmissionId"] = "Dış gönderim no",
             ["utmSource"] = "UTM kaynak", ["utmMedium"] = "UTM ortam", ["utmCampaign"] = "UTM kampanya", ["firstReceivedAt"] = "İlk geliş",

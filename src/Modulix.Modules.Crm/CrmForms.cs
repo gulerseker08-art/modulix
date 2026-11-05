@@ -117,6 +117,7 @@ public static class CrmForms
             new("sourceDetail", "Kaynak ayrıntısı", "talep", 4),
             new("productInterest", "İlgilenilen ürün/hizmet", "talep", 6),
             new("industry", "Sektör", "talep", 6),
+            new("serviceScope", "Hizmet kapsamı", "talep", 12),
             new("firstName", "Ad", "sahip", 4),
             new("lastName", "Soyad", "sahip", 4),
             new("jobTitle", "Unvan", "sahip", 4),
