@@ -20,6 +20,8 @@ internal sealed class RoleService(
     IModuleEntitlements entitlements,
     MembershipPermissions membershipPermissions,
     AdministratorGuard administrators,
+    ScopeLimits scopeLimits,
+    ScopedRecordTypes scopeTypes,
     IAuditWriter audit) : IRoleService
 {
     /// <summary>Denetim kaydındaki kayıt türleri.</summary>
@@ -40,9 +42,23 @@ internal sealed class RoleService(
             .GroupBy(ur => ur.RoleId)
             .Select(g => new { RoleId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.RoleId, g => g.Count, cancellationToken);
+        var overrides = await OverridesByRoleAsync(roles.Select(r => r.Id).ToList(), cancellationToken);
         return roles
-            .Select(r => ToSummary(r) with { MemberCount = counts.GetValueOrDefault(r.Id), UnitCount = unitCounts.GetValueOrDefault(r.Id) })
+            .Select(r => ToSummary(r, overrides.GetValueOrDefault(r.Id)) with
+            {
+                MemberCount = counts.GetValueOrDefault(r.Id),
+                UnitCount = unitCounts.GetValueOrDefault(r.Id),
+            })
             .ToList();
+    }
+
+    public async Task<IReadOnlyList<RoleScopeType>> GetScopeTypesAsync(CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var enabled = (await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken)).ToHashSet();
+        var limits = await scopeLimits.GetAsync(tenant.TenantId, cancellationToken);
+        return [.. scopeTypes.ForModules(enabled)
+            .Select(t => new RoleScopeType(t.EntityKey, t.ModuleKey, t.Label, limits.TryGetValue(t.EntityKey, out var limit) ? limit.MaxScope : null))];
     }
 
     public async Task<RoleSummary> CreateAsync(
@@ -52,7 +68,8 @@ internal sealed class RoleService(
         Guid? actingMembershipId = null,
         RecordScope scope = RecordScope.All,
         RoleAssignLevel? assignLevel = null,
-        bool? hideOutOfScopeShared = null)
+        bool? hideOutOfScopeShared = null,
+        IReadOnlyDictionary<string, RecordScope>? scopeOverrides = null)
     {
         var tenant = RequireTenant();
         var role = new Role(name, permissions, scope);
@@ -66,15 +83,23 @@ internal sealed class RoleService(
             role.SetHideOutOfScopeShared(hide);
         }
 
+        var overrides = NormalizeOverrides(role, scopeOverrides);
         EnsureKnownPermissions(role);
         await EnsureUniqueNameAsync(role.Name, exceptRoleId: null, cancellationToken);
         await EnsureActorMayChangeAsync(actingMembershipId, role.Permissions, cancellationToken);
         await EnsureActorMayGrantScopeAsync(actingMembershipId, role.Scope, cancellationToken);
+        await EnsureActorMayGrantOverridesAsync(actingMembershipId, overrides, previous: null, cancellationToken);
+        await EnsureWithinLimitsAsync(tenant, role, overrides, previousScope: null, previousOverrides: null, cancellationToken);
 
         db.Roles.Add(role);
-        AuditRole(tenant, role.Id, AuditAction.Created, before: null, after: Snapshot(role));
+        foreach (var (entityKey, overrideScope) in overrides)
+        {
+            db.RoleScopeOverrides.Add(new RoleScopeOverride(role.Id, entityKey, overrideScope));
+        }
+
+        AuditRole(tenant, role.Id, AuditAction.Created, before: null, after: Snapshot(role, overrides));
         await db.SaveChangesAsync(cancellationToken);
-        return ToSummary(role);
+        return ToSummary(role, overrides);
     }
 
     public async Task<RoleSummary?> UpdateAsync(
@@ -85,7 +110,8 @@ internal sealed class RoleService(
         Guid? actingMembershipId = null,
         RecordScope? scope = null,
         RoleAssignLevel? assignLevel = null,
-        bool? hideOutOfScopeShared = null)
+        bool? hideOutOfScopeShared = null,
+        IReadOnlyDictionary<string, RecordScope>? scopeOverrides = null)
     {
         var tenant = RequireTenant();
         var role = await db.Roles.SingleOrDefaultAsync(r => r.Id == roleId, cancellationToken);
@@ -94,7 +120,9 @@ internal sealed class RoleService(
             return null;
         }
 
-        var before = Snapshot(role);
+        var existingOverrides = await db.RoleScopeOverrides.Where(o => o.RoleId == role.Id).ToListAsync(cancellationToken);
+        var previousOverrides = existingOverrides.ToDictionary(o => o.EntityKey, o => o.Scope, StringComparer.Ordinal);
+        var before = Snapshot(role, previousOverrides);
         var previous = role.Permissions;
         var previousScope = role.Scope;
         role.Rename(name);
@@ -119,6 +147,7 @@ internal sealed class RoleService(
             }
         }
 
+        var overrides = scopeOverrides is null ? previousOverrides : NormalizeOverrides(role, scopeOverrides);
         EnsureKnownPermissions(role);
         await EnsureUniqueNameAsync(role.Name, role.Id, cancellationToken);
 
@@ -132,14 +161,34 @@ internal sealed class RoleService(
             await EnsureActorMayGrantScopeAsync(actingMembershipId, previousScope, cancellationToken);
         }
 
-        var after = Snapshot(role);
+        await EnsureActorMayGrantOverridesAsync(actingMembershipId, overrides, previousOverrides, cancellationToken);
+        await EnsureWithinLimitsAsync(tenant, role, overrides, previousScope, previousOverrides, cancellationToken);
+
+        foreach (var row in existingOverrides.Where(o => !overrides.ContainsKey(o.EntityKey)))
+        {
+            db.RoleScopeOverrides.Remove(row);
+        }
+
+        foreach (var (entityKey, overrideScope) in overrides)
+        {
+            if (existingOverrides.SingleOrDefault(o => o.EntityKey == entityKey) is { } row)
+            {
+                row.SetScope(overrideScope);
+            }
+            else
+            {
+                db.RoleScopeOverrides.Add(new RoleScopeOverride(role.Id, entityKey, overrideScope));
+            }
+        }
+
+        var after = Snapshot(role, overrides);
         if (!JsonNode.DeepEquals(before, after))
         {
             AuditRole(tenant, role.Id, AuditAction.Updated, before, after);
         }
 
         await db.SaveChangesAsync(cancellationToken);
-        return ToSummary(role);
+        return ToSummary(role, overrides);
     }
 
     public async Task<bool> DeleteAsync(
@@ -179,8 +228,10 @@ internal sealed class RoleService(
             await MoveUnitAssignmentsAsync(tenant, role, target, unitAssignments, cancellationToken);
         }
 
+        // Rolün kapsam istisnaları rolle birlikte silinir (yabancı anahtar zinciri); denetim kaydında son hâli görünür.
+        var removedOverrides = (await OverridesByRoleAsync([role.Id], cancellationToken)).GetValueOrDefault(role.Id);
         db.Roles.Remove(role);
-        AuditRole(tenant, role.Id, AuditAction.Deleted, Snapshot(role), after: null);
+        AuditRole(tenant, role.Id, AuditAction.Deleted, Snapshot(role, removedOverrides), after: null);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -291,7 +342,8 @@ internal sealed class RoleService(
             select role)
             .ToListAsync(cancellationToken);
 
-        return roles.Select(ToSummary).ToList();
+        var overrides = await OverridesByRoleAsync(roles.Select(r => r.Id).ToList(), cancellationToken);
+        return roles.Select(r => ToSummary(r, overrides.GetValueOrDefault(r.Id))).ToList();
     }
 
     public async Task<IReadOnlyList<BusinessUnitRoleAssignment>?> GetBusinessUnitRolesAsync(Guid businessUnitId, CancellationToken cancellationToken)
@@ -365,10 +417,13 @@ internal sealed class RoleService(
         // Yetki yükseltmeye karşı: departman rolü verilen ya da kaldırılan her rolün izinleri ve kapsamı, işlemi yapanın
         // elinde olmalıdır (yönetici hariç).
         var changedRoles = await db.Roles.AsNoTracking().Where(r => changedIds.Contains(r.Id)).ToListAsync(cancellationToken);
+        var changedOverrides = await OverridesByRoleAsync(changedRoles.Select(r => r.Id).ToList(), cancellationToken);
         foreach (var role in changedRoles)
         {
             await EnsureActorMayChangeAsync(actingMembershipId, role.Permissions, cancellationToken);
             await EnsureActorMayGrantScopeAsync(actingMembershipId, role.Scope, cancellationToken);
+            await EnsureActorMayGrantOverridesAsync(
+                actingMembershipId, changedOverrides.GetValueOrDefault(role.Id) ?? new Dictionary<string, RecordScope>(), previous: null, cancellationToken);
         }
 
         var nameIds = wantedIds.Concat(currentByRole.Keys).Distinct().ToList();
@@ -589,6 +644,151 @@ internal sealed class RoleService(
         }
     }
 
+    /// <summary>
+    /// Kayıt türüne göre istisnalar için de aynı kural (ADR-0030 K8): yeni ya da kaldırılan her istisna, işlemi yapanın
+    /// kapsamıyla sınırlıdır (yönetici hariç).
+    /// </summary>
+    private async Task EnsureActorMayGrantOverridesAsync(
+        Guid? actingMembershipId,
+        IReadOnlyDictionary<string, RecordScope> overrides,
+        IReadOnlyDictionary<string, RecordScope>? previous,
+        CancellationToken cancellationToken)
+    {
+        foreach (var entityKey in overrides.Keys.Concat(previous?.Keys ?? []).Distinct(StringComparer.Ordinal))
+        {
+            var hasNew = overrides.TryGetValue(entityKey, out var wanted);
+            var hasOld = previous is not null && previous.TryGetValue(entityKey, out var old);
+            if (hasNew && hasOld && wanted == previous![entityKey])
+            {
+                continue;
+            }
+
+            if (hasNew)
+            {
+                await EnsureActorMayGrantScopeAsync(actingMembershipId, wanted, cancellationToken);
+            }
+
+            if (hasOld)
+            {
+                await EnsureActorMayGrantScopeAsync(actingMembershipId, previous![entityKey], cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// İstisnaları doğrular: bilinen, kapsamı ayarlanabilen kayıt türleri ve tanımlı kapsamlar; sistem rolünde istisna tutulmaz
+    /// (yönetici zaten tüm kayıtları görür). Modülü sonradan kapanan türün istisnası da geçerli sayılır.
+    /// </summary>
+    private Dictionary<string, RecordScope> NormalizeOverrides(Role role, IReadOnlyDictionary<string, RecordScope>? requested)
+    {
+        var result = new Dictionary<string, RecordScope>(StringComparer.Ordinal);
+        if (requested is null || requested.Count == 0)
+        {
+            return result;
+        }
+
+        if (role.IsSystem)
+        {
+            throw new RoleConflictException($"'{role.Name}' sistem rolüdür; kayıt türüne göre kapsam istisnası verilemez.");
+        }
+
+        var known = scopeTypes.All().Select(t => t.EntityKey).ToHashSet(StringComparer.Ordinal);
+        foreach (var (entityKey, scope) in requested)
+        {
+            if (!known.Contains(entityKey))
+            {
+                throw new ArgumentException($"Kapsamı ayarlanamayan ya da bilinmeyen kayıt türü: '{entityKey}'.", "scopeOverrides");
+            }
+
+            if (!Enum.IsDefined(scope))
+            {
+                throw new ArgumentException("Geçersiz kayıt kapsamı.", "scopeOverrides");
+            }
+
+            result[entityKey] = scope;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Platform tavanı (ADR-0030 K5): rolün tavanı olan türdeki etkin kapsamı (istisna ya da varsayılan) tavandan geniş
+    /// olamaz. Güncellemede yalnızca bu istekte değişen etkin kapsamlar denetlenir; sonradan daralan tavan ilgisiz
+    /// düzenlemeleri kilitlemez (o rol okuma tarafında zaten tavana indirilir). Sistem rolü tavana tabi değildir (K6).
+    /// </summary>
+    private async Task EnsureWithinLimitsAsync(
+        TenantContext tenant,
+        Role role,
+        IReadOnlyDictionary<string, RecordScope> overrides,
+        RecordScope? previousScope,
+        IReadOnlyDictionary<string, RecordScope>? previousOverrides,
+        CancellationToken cancellationToken)
+    {
+        if (role.IsSystem)
+        {
+            return;
+        }
+
+        var limits = await scopeLimits.GetAsync(tenant.TenantId, cancellationToken);
+        if (limits.Count == 0)
+        {
+            return;
+        }
+
+        var labels = scopeTypes.All().ToDictionary(t => t.EntityKey, t => t.Label, StringComparer.Ordinal);
+        var exceeded = new List<string>();
+        foreach (var (entityKey, limit) in limits.OrderBy(l => l.Key, StringComparer.Ordinal))
+        {
+            var effective = overrides.TryGetValue(entityKey, out var wanted) ? wanted : role.Scope;
+            if (previousScope is { } scopeBefore && previousOverrides is not null
+                && (previousOverrides.TryGetValue(entityKey, out var old) ? old : scopeBefore) == effective)
+            {
+                continue;
+            }
+
+            if (!RecordScopeRules.Covers(limit.MaxScope, effective))
+            {
+                exceeded.Add($"{labels.GetValueOrDefault(entityKey, entityKey)} (en fazla: {ScopeName(limit.MaxScope)})");
+            }
+        }
+
+        if (exceeded.Count > 0)
+        {
+            throw new RoleConflictException(
+                $"Platform bu firma için kayıt görünürlüğünü sınırlamış; '{role.Name}' rolünün kapsamı şu türlerde sınırı aşıyor: "
+                + $"{string.Join(", ", exceeded)}. Kapsamı daraltın ya da türe özel bir kapsam seçin.");
+        }
+    }
+
+    private static string ScopeName(RecordScope scope) => scope switch
+    {
+        RecordScope.All => "Tüm kayıtlar",
+        RecordScope.UnitAndBelow => "Departmanın ve alt departmanların kayıtları",
+        RecordScope.Unit => "Departmanın kayıtları",
+        RecordScope.Team => "Ekibinin kayıtları",
+        RecordScope.Own => "Yalnızca kendi kayıtları",
+        _ => scope.ToString(),
+    };
+
+    private async Task<Dictionary<Guid, Dictionary<string, RecordScope>>> OverridesByRoleAsync(
+        IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken)
+    {
+        if (roleIds.Count == 0)
+        {
+            return new Dictionary<Guid, Dictionary<string, RecordScope>>();
+        }
+
+        var rows = await db.RoleScopeOverrides.AsNoTracking()
+            .Where(o => roleIds.Contains(o.RoleId))
+            .Select(o => new { o.RoleId, o.EntityKey, o.Scope })
+            .ToListAsync(cancellationToken);
+        return rows
+            .GroupBy(o => o.RoleId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderBy(o => o.EntityKey, StringComparer.Ordinal).ToDictionary(o => o.EntityKey, o => o.Scope, StringComparer.Ordinal));
+    }
+
     private async Task<MembershipAccess> GetActorAccessAsync(Guid actingMembershipId, CancellationToken cancellationToken) =>
         await membershipPermissions.GetAsync(
             actingMembershipId, await entitlements.GetEnabledAsync(RequireTenant().TenantId, cancellationToken), cancellationToken);
@@ -631,7 +831,7 @@ internal sealed class RoleService(
             ExecutionSource.Api,
             Activity.Current?.TraceId.ToString()));
 
-    private static JsonObject Snapshot(Role role) => new()
+    private static JsonObject Snapshot(Role role, IReadOnlyDictionary<string, RecordScope>? overrides = null) => new()
     {
         ["name"] = role.Name,
         ["isSystem"] = role.IsSystem,
@@ -639,16 +839,20 @@ internal sealed class RoleService(
         ["scope"] = role.Scope.ToString(),
         ["assignLevel"] = role.AssignLevel.ToString(),
         ["hideOutOfScopeShared"] = role.HideOutOfScopeShared,
+        ["scopeOverrides"] = new JsonArray([.. (overrides ?? new Dictionary<string, RecordScope>())
+            .OrderBy(o => o.Key, StringComparer.Ordinal)
+            .Select(o => JsonValue.Create($"{o.Key}: {ScopeName(o.Value)}"))]),
     };
 
     private static JsonArray RoleNames(IEnumerable<Guid> roleIds, IReadOnlyDictionary<Guid, string> names) =>
         new([.. roleIds.Select(id => names.GetValueOrDefault(id, id.ToString())).Order(StringComparer.Ordinal).Select(n => JsonValue.Create(n))]);
 
-    private static RoleSummary ToSummary(Role role) =>
+    private static RoleSummary ToSummary(Role role, IReadOnlyDictionary<string, RecordScope>? overrides = null) =>
         new(role.Id, role.Name, role.Permissions, role.IsSystem)
         {
             Scope = role.Scope,
             AssignLevel = role.AssignLevel,
             HideOutOfScopeShared = role.HideOutOfScopeShared,
+            ScopeOverrides = overrides ?? new Dictionary<string, RecordScope>(),
         };
 }
