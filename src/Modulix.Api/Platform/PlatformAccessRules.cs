@@ -49,6 +49,12 @@ public static class PlatformAccessRules
         ["PUT /api/platform/sectors/nodes/{id}/capabilities"] = Ops,
         ["POST /api/platform/sectors/capabilities"] = Ops,
         ["PUT /api/platform/sectors/capabilities/{code}/dependencies"] = Ops,
+        // Alan kuralı paketleri (ADR-0029 K7): ürün standardı kural katalogu; Operasyon yönetir.
+        ["POST /api/platform/rule-packages"] = Ops,
+        ["PUT /api/platform/rule-packages/{id}/draft"] = Ops,
+        ["DELETE /api/platform/rule-packages/{id}/draft"] = Ops,
+        ["POST /api/platform/rule-packages/{id}/publish"] = Ops,
+        ["POST /api/platform/rule-packages/{id}/rollback"] = Ops,
         ["POST /api/platform/plans"] = Fin,
         ["PUT /api/platform/plans/{planId}"] = Fin,
         ["PUT /api/platform/tenants/{tenantId}/plan"] = Fin,
