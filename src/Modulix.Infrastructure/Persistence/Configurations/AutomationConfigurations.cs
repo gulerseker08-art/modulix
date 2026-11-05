@@ -93,6 +93,9 @@ internal sealed class AutomationRunConfiguration : IEntityTypeConfiguration<Auto
         builder.HasIndex(r => new { r.TenantId, r.RuleId, r.RecordId });
         builder.HasIndex(r => new { r.TenantId, r.EntityKey, r.RecordId });
 
+        // Saklama temizliği bitmiş çalışmaları tamamlanma zamanına göre eskiden yeniye seçer (Dilim 2b-2).
+        builder.HasIndex(r => new { r.TenantId, r.CompletedAt });
+
         // Çalışma, bağlı olduğu sürümle aynı tenant'tadır; sürüm silinmez (yayınlanmış sürüm değişmez ve geçmiş ona bağlıdır).
         builder.HasOne<AutomationRuleVersion>()
             .WithMany()

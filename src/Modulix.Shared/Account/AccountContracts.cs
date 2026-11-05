@@ -2,9 +2,13 @@ namespace Modulix.Shared.Account;
 
 // Kişinin kendi hesabı (Y7a): /api/account. Oturum ister, firma ve izin istemez.
 
-public sealed record AccountProfileResponse(string DisplayName, string Email);
+/// <summary><see cref="PreferredLanguage"/>: kişinin seçtiği arayüz dili (ADR-0033); boşsa firmanın varsayılan dili geçerlidir.</summary>
+public sealed record AccountProfileResponse(string DisplayName, string Email, string? PreferredLanguage = null);
 
 public sealed record UpdateProfileRequest(string DisplayName);
+
+/// <summary><see cref="Language"/>: <c>tr</c>, <c>en</c>, <c>az</c>; boş gönderilirse tercih kaldırılır ve firmanın varsayılanı geçerli olur.</summary>
+public sealed record UpdateLanguageRequest(string? Language);
 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 

@@ -389,6 +389,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TenantId", "CompletedAt");
+
                     b.HasIndex("TenantId", "DedupeKey")
                         .IsUnique();
 
@@ -2718,6 +2720,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("PlatformRoles")
                         .HasColumnType("int");
+
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(5)
+                        .HasColumnType("nvarchar(5)");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");

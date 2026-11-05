@@ -46,6 +46,26 @@
             </div>
         </form>
 
+        <form class="record-form settings-group" novalidate @onsubmit="SaveLanguageAsync" @onsubmit:preventDefault>
+            <h2>Dil</h2>
+            <Notice Text="@languageNotice" Failed="languageFailed" />
+            <div class="mb-3">
+                <label class="form-label" for="language">Arayüz dili</label>
+                <select id="language" class="form-select" @bind="language">
+                    <option value="">Firmanın varsayılanı</option>
+                    @foreach (var option in LanguageCodes.All)
+                    {
+                        <option value="@option.Code">@option.Name</option>
+                    }
+                </select>
+                <FieldError Field="language" Errors="languageErrors" />
+                <div class="form-text">Seçiminiz üye olduğunuz bütün kuruluşlarda geçerlidir. Kayıtlı verileriniz değişmez.</div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || language == (profile.PreferredLanguage ?? string.Empty))">Kaydet</button>
+            </div>
+        </form>
+
         <form class="record-form settings-group" novalidate @onsubmit="ChangeEmailAsync" @onsubmit:preventDefault>
             <h2>E-posta</h2>
             <Notice Text="@emailNotice" Failed="emailFailed" />
@@ -138,6 +158,11 @@
     private bool nameFailed;
     private IReadOnlyDictionary<string, string[]>? nameErrors;
 
+    private string language = string.Empty;
+    private string? languageNotice;
+    private bool languageFailed;
+    private IReadOnlyDictionary<string, string[]>? languageErrors;
+
     private string newEmail = string.Empty;
     private string emailPassword = string.Empty;
     private string? emailNotice;
@@ -161,6 +186,7 @@
         {
             profile = loaded;
             displayName = loaded.DisplayName;
+            language = loaded.PreferredLanguage ?? string.Empty;
             await LoadSessionsAsync();
         }
     }
@@ -186,6 +212,27 @@
         else
         {
             (nameNotice, nameFailed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+        }
+    }
+
+    private async Task SaveLanguageAsync()
+    {
+        busy = true;
+        var result = await Api.PutAsync<AccountProfileResponse>("/api/account/language", new UpdateLanguageRequest(language.Length == 0 ? null : language));
+        busy = false;
+        languageErrors = result.FieldErrors;
+        if (result.Value is { } saved)
+        {
+            profile = saved;
+            language = saved.PreferredLanguage ?? string.Empty;
+            (languageNotice, languageFailed) = ("Kaydedildi.", false);
+
+            // Etkin dil oturumdan yeniden hesaplanır.
+            await Session.RefreshAsync();
+        }
+        else
+        {
+            (languageNotice, languageFailed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
         }
     }
 

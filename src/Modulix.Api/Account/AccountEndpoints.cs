@@ -6,6 +6,7 @@ using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Records;
+using Modulix.Core.Settings;
 using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Users;
@@ -25,6 +26,7 @@ public static class AccountEndpoints
 
         account.MapGet("/", GetAsync);
         account.MapPut("/profile", UpdateProfileAsync);
+        account.MapPut("/language", UpdateLanguageAsync);
         account.MapPost("/password", ChangePasswordAsync);
         account.MapPost("/email", ChangeEmailAsync);
         account.MapGet("/sessions", ListSessionsAsync);
@@ -41,9 +43,12 @@ public static class AccountEndpoints
         return app;
     }
 
+    private static AccountProfileResponse Profile(ModulixUser user) =>
+        new(user.DisplayName, user.Email ?? string.Empty, LanguageOptions.Normalize(user.PreferredLanguage));
+
     private static async Task<IResult> GetAsync(ClaimsPrincipal principal, UserManager<ModulixUser> users) =>
         await users.GetUserAsync(principal) is { } user
-            ? Results.Ok(new AccountProfileResponse(user.DisplayName, user.Email ?? string.Empty))
+            ? Results.Ok(Profile(user))
             : Results.Unauthorized();
 
     private static Task<IResult> UpdateProfileAsync(
@@ -52,7 +57,16 @@ public static class AccountEndpoints
         RunAsync(principal, users, async user =>
         {
             await account.UpdateDisplayNameAsync(user, request.DisplayName, AuthEndpoints.Client(http), ct);
-            return Results.Ok(new AccountProfileResponse(user.DisplayName, user.Email ?? string.Empty));
+            return Results.Ok(Profile(user));
+        });
+
+    private static Task<IResult> UpdateLanguageAsync(
+        UpdateLanguageRequest request, ClaimsPrincipal principal, HttpContext http, UserManager<ModulixUser> users, AccountSecurity account,
+        CancellationToken ct) =>
+        RunAsync(principal, users, async user =>
+        {
+            await account.UpdateLanguageAsync(user, request.Language, AuthEndpoints.Client(http), ct);
+            return Results.Ok(Profile(user));
         });
 
     /// <summary>Şifre değişince güvenlik damgası yenilenir; bu oturumun çerezi aynı oturumla yeniden yazılır, diğerleri kapanır.</summary>

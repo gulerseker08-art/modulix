@@ -189,7 +189,8 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 1 | `Core.Contracts` sözleşmeleri, koşul doğrulayıcı/değerlendirici, aksiyon sözleşmesi, `AutomationRules/Versions` + migration + RLS, kural servisi, yan etkisiz önizleme, `core.automation.*` izinleri, denetim, API, Logistics yetenek beyanı, testler | Bu oturum |
 | 2a | Olay yolu (`core.automation` aboneliği), `AutomationRuns/Steps`, tekilleştirme, kira, retry, kuralın kimliği, acil durdurma, tenant limitleri, elle çalıştırma, çalışma geçmişi API'si | Uygulandı (aşağıda "Dilim 2a") |
 | 2b-1 | Tarama tabanlı tetikleyiciler (`Scheduled`, `DateRelative`, `Inactivity`), `AutomationScanCursors`, `IAutomationRecordSource` | Uygulandı (aşağıda "Dilim 2b-1") |
-| 2b-2 | İş olayı tetikleyicisi (`DomainEvent`), çalışma/adım saklama temizliği | Sonra |
+| 2b-2 | Çalışma/adım saklama temizliği | Uygulandı (aşağıda "Dilim 2b-2") |
+| 2b-3 | İş olayı tetikleyicisi (`DomainEvent`); Ç0.4 iş olayı yayınlama sözleşmesine bağlı | Sonra |
 | 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
 | 3b | İlk şablonlar (pasif), demo | Sonra |
 | 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Sonra |
@@ -337,6 +338,25 @@ Tasarımdan ayrılan / netleşen noktalar:
 
 Çıkan ders: üç otomasyon test sınıfı süreç genelindeki `AutomationProbe` durumunu (davranış, gecikme) paylaşır; sınıflar paralel koşunca yeniden deneme testleri kararsız düşüyordu. Üçü tek bir sıralı xUnit koleksiyonuna alındı (`AutomationTestCollection`). `TableInventoryTests` yerel veritabanında başka dalların tabloları (`platform.LicensePolicies` vb.) yüzünden düşer; CI temiz veritabanında doğrulanmalı.
 
+
+### Dilim 2b-2 (5 Kasım 2026)
+
+Planlanan iki işten **saklama temizliği** yapıldı; **iş olayı tetikleyicisi (`DomainEvent`) yapılmadı** ve bilerek Ç0.4'e bağlı bırakıldı.
+
+- **Saklama temizliği** (`AutomationRetention`, `AutomationRunner.CleanTenantAsync`, `AutomationWorker`): bitmiş çalışmalar ve adımları saklama süresinden sonra silinir. Başarılı, iptal ve koşulu sağlanmayan (`NotMatched`) çalışmalar `Automation:RunRetentionDays` (90), başarısız çalışmalar `Automation:FailedRunRetentionDays` (180) gün sonra (tamamlanma zamanına göre). Günlük taramanın yazdığı `NotMatched` satırları da böylece sınırlanır. Bitmemiş (bekleyen, çalışan) çalışmaya hiç dokunulmaz. Eski tarama imleçleri (`UpdatedAt`) aynı süreyle silinir. Önce adımlar, sonra çalışmalar silinir (yabancı anahtar `Restrict`); 500'lük gruplar, tur başına en çok 40 grup, sınır dolarsa sonraki tur devam eder; yarım kalan grup bir sonraki turda tamamlanır.
+- **Çalışma biçimi:** işçi `Automation:RetentionIntervalMinutes` (360) aralığıyla her tenant için temizliği, turla **aynı tenant kilidi** altında çalıştırır. Platform acil durdurma anahtarı ve firma otomasyon ayarı temizliği durdurmaz (kapalı otomasyonun eski kayıtları da süresi dolunca silinir). Denetim kaydı (audit) etkilenmez.
+- **Veri:** migration `AutomationRunRetentionIndex` yalnızca `IX_AutomationRuns_TenantId_CompletedAt` indeksini ekler (geriye uyumlu, tablo/RLS değişikliği yok).
+- **Sınırlama:** temizlik, işçinin turla gezdiği tenant'lar için çalışır (kural yeteneği beyan eden bir modülü açık olanlar); modülü kapatılmış tenant'ın eski çalışmaları modül yeniden açılana kadar kalır.
+
+**`DomainEvent` neden yapılmadı:** iş olayı yayınlama ve olay türü bildirme sözleşmesi (ADR-0007, Ç0.4) yok. Bugün yalnızca beş kayıt olayı üretiliyor, katalog abonelikte `DomainEventTypes.SchemaVersions` dışındaki türü reddediyor ve hiçbir modül iş olayı yayınlamıyor (`crm.opportunity.won` bile `RecordUpdated` durum geçişidir). Yayıncısı olmayan bir tetikleyiciyi açmak, "sessizce hiç tetiklenmeyen kural bırakılmaz" ilkesini bozardı; bu yüzden `DomainEventTrigger` ile yayın 422 vermeye devam eder (taslak saklanabilir). Ç0.4 yayınlama sözleşmesi geldiğinde Dilim 2b-3 şunlarla tamamlanır: aboneliğin olay türlerinin katalogda `AutomationEventDefinition`'lardan genişletilmesi, `AutomationTriggerMatcher`'a iş olayı eşleşmesi, `IsExecutable`'a eklenmesi.
+
+### Test sonuçları (Dilim 2b-2)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.IntegrationTests --filter "AutomationRetentionTests\|AutomationScanTests"` (SQL Server) | 15 başarılı. Yeni 5 test: süresi dolan çalışma ve adımın silinmesi (taze olan kalır, tekrar çalıştırma güvenli), başarısız çalışmanın daha uzun saklanması ve bitmemiş çalışmanın silinmemesi, eski imleçlerin silinmesi, tenant izolasyonu, acil durdurma kapalıyken de temizlik ve bilinmeyen tenant |
+
+Temizliğin API yüzü yoktur (yalnızca arka plan işi); bu yüzden dört test kuralındaki "yetki" ayağı bu dilimde uygulanamaz, yerine "yalnızca bitmiş ve süresi dolmuş satır silinir" sınanır.
 
 ### Dilim 3a: CRM yetenek beyanı (5 Kasım 2026)
 
