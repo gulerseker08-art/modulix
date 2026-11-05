@@ -7,10 +7,10 @@
    Ayrı bir genel arama uç noktası yoktur; yalnızca kullanıcının izni olan kayıt türlerinin mevcut liste uç noktaları
    çağrılır. Tenant, yetki ve kayıt kapsamı süzgeçleri o uç noktalarda, sunucuda uygulanır. *@
 <div class="global-search" @onkeydown="OnKeyDown">
-    <label class="visually-hidden" for="global-search-input">Arama yapın</label>
+    <label class="visually-hidden" for="global-search-input">@Texts.Get("shell.search.label")</label>
     <span class="global-search-icon"><AppIcon Name="search" Size="18" /></span>
     <input id="global-search-input" type="search" class="global-search-input" autocomplete="off" spellcheck="false"
-           placeholder="Arama yapın..." role="combobox" aria-autocomplete="list"
+           placeholder="@Texts.Get("shell.search.placeholder")" role="combobox" aria-autocomplete="list"
            aria-expanded="@(open ? "true" : "false")" aria-controls="global-search-results"
            aria-activedescendant="@(open && active >= 0 ? OptionId(active) : null)"
            value="@query" @oninput="OnInputAsync" @onfocus="OnFocus" />
@@ -18,16 +18,16 @@
     @if (open)
     {
         <div class="global-search-backdrop" @onclick="Close"></div>
-        <div id="global-search-results" class="global-search-panel" role="listbox" aria-label="Arama sonuçları">
+        <div id="global-search-results" class="global-search-panel" role="listbox" aria-label="@Texts.Get("shell.search.results")">
             @if (busy)
             {
                 <p class="global-search-state" role="status">
-                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Aranıyor…
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @Texts.Get("shell.search.busy")
                 </p>
             }
             else if (groups.Count == 0)
             {
-                <p class="global-search-state" role="status">“@query” için sonuç bulunamadı.</p>
+                <p class="global-search-state" role="status">@Texts.Get("common.noResultFor", query)</p>
             }
             else
             {
@@ -55,7 +55,7 @@
                         }
                         @if (group.TotalCount > group.Items.Count)
                         {
-                            <a class="global-search-more" href="@group.ListRoute" @onclick="Close">Tümünü @group.Label listesinde ara →</a>
+                            <a class="global-search-more" href="@group.ListRoute" @onclick="Close">@Texts.Get("shell.search.more", group.Label)</a>
                         }
                     </div>
                 }
@@ -63,7 +63,7 @@
 
             @if (failed.Count > 0)
             {
-                <p class="global-search-state" role="alert">@string.Join(", ", failed) aranamadı; daha sonra yeniden deneyin.</p>
+                <p class="global-search-state" role="alert">@Texts.Get("shell.search.failed", string.Join(", ", failed))</p>
             }
         </div>
     }
@@ -145,31 +145,31 @@
 
         if (crm && Session.Can(CrmAccess.CompaniesRead))
         {
-            tasks.Add(FetchAsync<CompanyDto>("Firmalar", "building", "crm/firmalar", "/api/crm/companies", text, failures,
+            tasks.Add(FetchAsync<CompanyDto>(Texts.Get("crm.companies.title"), "building", "crm/firmalar", "/api/crm/companies", text, failures,
                 c => new SearchItem(c.Name, Join(c.Industry, c.City), $"crm/firmalar/{c.Id}")));
         }
 
         if (crm && Session.Can(CrmAccess.ContactsRead))
         {
-            tasks.Add(FetchAsync<ContactDto>("Kişiler", "user", "crm/kisiler", "/api/crm/contacts", text, failures,
+            tasks.Add(FetchAsync<ContactDto>(Texts.Get("crm.contacts.title"), "user", "crm/kisiler", "/api/crm/contacts", text, failures,
                 c => new SearchItem($"{c.FirstName} {c.LastName}".Trim(), Join(c.Title, c.Email), $"crm/kisiler/{c.Id}")));
         }
 
         if (crm && Session.Can(CrmAccess.OpportunitiesRead))
         {
-            tasks.Add(FetchAsync<OpportunityDto>("Fırsatlar", "target", "crm/firsatlar", "/api/crm/opportunities", text, failures,
+            tasks.Add(FetchAsync<OpportunityDto>(Texts.Get("crm.opportunities.title"), "target", "crm/firsatlar", "/api/crm/opportunities", text, failures,
                 o => new SearchItem(o.Title, o.Amount is { } amount ? $"{amount.ToString("N2", Regional.Numbers)} {o.Currency}" : null, $"crm/firsatlar/{o.Id}")));
         }
 
         if (crm && Session.Can(CrmAccess.LeadsRead))
         {
-            tasks.Add(FetchAsync<LeadDto>("Müşteri adayları", "inbox", "crm/leadler", "/api/crm/leads", text, failures,
+            tasks.Add(FetchAsync<LeadDto>(Texts.Get("crm.leads.title"), "inbox", "crm/leadler", "/api/crm/leads", text, failures,
                 l => new SearchItem(l.Subject, Join(l.LeadNumber, l.CompanyName ?? $"{l.FirstName} {l.LastName}".Trim()), $"crm/leadler/{l.Id}")));
         }
 
         if (crm && Session.Can(CrmAccess.QuotesRead))
         {
-            tasks.Add(FetchAsync<QuoteDto>("Teklifler", "file-text", "crm/teklifler", "/api/crm/quotes", text, failures,
+            tasks.Add(FetchAsync<QuoteDto>(Texts.Get("crm.quotes.title"), "file-text", "crm/teklifler", "/api/crm/quotes", text, failures,
                 q => new SearchItem(q.Title, Join(q.QuoteNumber, $"V{q.RevisionNo}"), $"crm/teklifler/{q.Id}")));
         }
 

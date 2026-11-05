@@ -6,18 +6,18 @@
 
 @if (!Session.IsLoaded)
 {
-    <p class="text-muted">Yükleniyor…</p>
+    <p class="text-muted">@Texts.Get("common.loading")</p>
 }
 else if (Session.IsSignedIn && (Session.HasActiveTenant || AllowWithoutTenant) && (!Session.TwoFactorRequired || AllowWithoutTwoFactor))
 {
     @if (Module is not null && !Session.IsModuleEnabled(Module))
     {
-        <div class="alert alert-warning">Bu modül kuruluşunuz için açık değil.</div>
+        <div class="alert alert-warning">@Texts.Get("auth.gate.moduleOff")</div>
     }
     else if ((Permission is not null && !Session.Can(Permission))
              || (AnyPermission is not null && !Session.CanAny(AnyPermission)))
     {
-        <div class="alert alert-warning">Bu ekranı görüntüleme yetkiniz yok. Yöneticinizden rol isteyin.</div>
+        <div class="alert alert-warning">@Texts.Get("auth.gate.noPermission")</div>
     }
     else
     {
