@@ -7,6 +7,7 @@ using Modulix.Core.Authorization;
 using Modulix.Infrastructure.Identity;
 using Modulix.Shared.Audit;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Customization;
 using Modulix.Shared.Records;
 using static Modulix.Modules.Warehouse.WarehouseModule.Permissions;
 using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
@@ -149,6 +150,25 @@ public class WarehouseFacilityTests(ModulixApiFactory factory) : IClassFixture<M
         Assert.Equal(HttpStatusCode.Forbidden, (await closedClient.GetAsync(Facilities)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,
             (await closedClient.PostAsJsonAsync(Facilities, new RecordWriteRequest(new JsonObject { ["code"] = "KPL", ["name"] = "Kapalı" }))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Facility_form_layout_is_served_to_the_tenant_with_tabs_and_the_identity_fields_on_the_first_tab()
+    {
+        var s = await SetUpAsync();
+        using var admin = await LoginAsync(s.Admin);
+
+        var layouts = (await admin.GetFromJsonAsync<List<FormLayoutDto>>("/api/form-layouts"))!;
+        var layout = Assert.Single(layouts, l => l.EntityKey == "warehouse.facility");
+
+        Assert.True(layout.Tabs.Count >= 2);
+        var firstTabSections = layout.Sections.Where(section => section.Tab == layout.Tabs[0].Key).Select(section => section.Key).ToHashSet();
+        foreach (var key in new[] { "code", "name" })
+        {
+            var field = Assert.Single(layout.Fields, f => f.Key == key);
+            Assert.True(field.Required && field.Visible);
+            Assert.Contains(field.Section, firstTabSections);
+        }
     }
 
     private async Task<(ModulixUser Admin, ModulixUser Reader, ModulixUser Writer, ModulixUser Outsider)> SetUpAsync()

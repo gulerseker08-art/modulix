@@ -5,6 +5,7 @@ using Modulix.Shared.Contracts;
 using Modulix.Shared.Crm;
 using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
+using Modulix.Shared.Warehouse;
 using Modulix.Web.Services;
 
 namespace Modulix.Web.Tests;
@@ -216,9 +217,25 @@ public class AppNavigationTests
     }
 
     [Fact]
+    public void Warehouse_app_shows_the_facilities_screen_only_with_the_module_and_the_permission()
+    {
+        var nav = Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.FacilitiesRead]);
+
+        var root = Assert.Single(nav.Roots());
+        Assert.Equal((AppCatalog.Warehouse, "Depo ve Antrepo"), (root.Id, root.Name));
+        Assert.Equal("depo/tesisler", nav.Find("warehouse.facilities")!.Route);
+        Assert.Equal(AppCatalog.Warehouse, nav.Context("depo/tesisler")!.Root.Id);
+
+        // Modül kapalıysa ya da izin yoksa uygulama görünmez (menüyü gizlemek yetki değildir; sunucu yine denetler).
+        Assert.Empty(Nav([], [WarehouseAccess.FacilitiesRead]).Roots());
+        Assert.Empty(Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.ZonesRead]).Roots());
+    }
+
+    [Fact]
     public void Planned_apps_are_listed_as_inert_cards_and_never_as_real_apps()
     {
-        Assert.Equal(["Lojistik", "Antrepo", "İnsan Kaynakları"], AppCatalog.Planned.Select(p => p.Name));
+        // Antrepo artık gerçek uygulamadır ("Depo ve Antrepo", AppCatalog.All); pasif kart olarak kalmaz.
+        Assert.Equal(["Lojistik", "İnsan Kaynakları"], AppCatalog.Planned.Select(p => p.Name));
 
         // Pasif kart: route'u, menüsü ve yetkisi yoktur; gerçek bir uygulama kataloğa girince çakışmamalı.
         var realNames = AppCatalog.All.Where(a => a.ParentId is null).Select(a => a.Name).ToHashSet();

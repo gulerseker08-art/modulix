@@ -1,0 +1,164 @@
+@page "/depo/tesisler"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Tesisler · Modulix</PageTitle>
+
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.FacilitiesRead">
+    <PageHeader Title="Tesisler" Icon="warehouse" Subtitle="@(page is null ? "Depo ve antrepo işletilen yerleri yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <FacilityEditor Facility="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@CurrentView" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="facility-search">Tesis ara</label>
+            <input id="facility-search" class="form-control" type="search" placeholder="Kod veya ad ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <ColumnPicker />
+        @if (Session.Can(WarehouseAccess.FacilitiesWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni tesis</button>
+        }
+    </div>
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan tesis yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) tesis listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Tesis listesi</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Kod</th><th scope="col">Ad</th><th scope="col">Ülke</th><th scope="col">Gümrük uzantısı</th><th scope="col">Durum</th>
+                    @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.FacilityEntityKey)) { <th scope="col">@field.Label</th> }
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var facility in page.Items)
+                {
+                    <tr>
+                        <td data-label="Kod" class="primary">@Text(facility, "code")</td>
+                        <td data-label="Ad">@Text(facility, "name")</td>
+                        <td data-label="Ülke">@Text(facility, "countryCode")</td>
+                        <td data-label="Gümrük uzantısı">
+                            <span class="badge status-@(Flag(facility, "customsEnabled") ? "success" : "muted")">@(Flag(facility, "customsEnabled") ? "Açık" : "Kapalı")</span>
+                        </td>
+                        <td data-label="Durum">
+                            <span class="badge status-@(Flag(facility, "isActive") ? "success" : "muted")">@(Flag(facility, "isActive") ? "Etkin" : "Pasif")</span>
+                        </td>
+                        @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.FacilityEntityKey))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, facility.Values["custom"] as JsonObject)</td>
+                        }
+                        <td class="actions">
+                            @if (Session.Can(WarehouseAccess.FacilitiesWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(facility)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.FacilityEntityKey;
+
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private string? search;
+    private string view = AllViews;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(WarehouseAccess.FacilitiesRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private const string AllViews = "all";
+    private const string ActiveView = "active";
+    private const string InactiveView = "inactive";
+    private const string CustomsView = "customs";
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Etkin, Pasif, Gümrük uzantılı); yetki ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm tesisler"),
+        new(ActiveView, "Etkin tesisler"),
+        new(InactiveView, "Pasif tesisler"),
+        new(CustomsView, "Gümrük uzantılı"),
+    ];
+
+    private string CurrentView => view;
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        url += view switch
+        {
+            ActiveView => "&isActive=true",
+            InactiveView => "&isActive=false",
+            CustomsView => "&customsEnabled=true",
+            _ => string.Empty,
+        };
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private static string Text(RecordResponse record, string field) => record.Values[field]?.GetValue<string>() ?? string.Empty;
+
+    private static bool Flag(RecordResponse record, string field) => record.Values[field]?.GetValue<bool>() ?? false;
+
+    private void Open(RecordResponse? facility)
+    {
+        selected = facility;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

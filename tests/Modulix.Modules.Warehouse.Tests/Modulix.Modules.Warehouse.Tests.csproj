@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modulix.Modules.Warehouse\Modulix.Modules.Warehouse.csproj" />
     <ProjectReference Include="..\..\src\Modulix.Core\Modulix.Core.csproj" />
+    <ProjectReference Include="..\..\src\Modulix.Shared\Modulix.Shared.csproj" />
   </ItemGroup>
 
 </Project>
