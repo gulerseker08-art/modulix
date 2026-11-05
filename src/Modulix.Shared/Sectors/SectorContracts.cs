@@ -35,3 +35,14 @@ public sealed record CapabilityGapDto(string Capability, List<Guid> RequiredByNo
 public sealed record SelectionPreviewDto(List<Guid> ContextNodeIds, List<string> Errors, List<CapabilityGapDto> Gaps, List<Guid> CatalogOnlyNodeIds, bool IsComplete);
 
 public sealed record TenantActivitySelectionResponse(List<Guid> SelectedNodeIds, SelectionPreviewDto Preview);
+
+public sealed record StarterPackageDto(string Code, string Name, string? Description, bool Verified, string? VerificationNote, int NodeCount, int CapabilityCount);
+
+public sealed record StarterPackagePlanDto(
+    List<string> CapabilitiesToCreate,
+    List<string> CapabilitiesExisting,
+    List<string> NodesToCreate,
+    List<string> NodesExisting,
+    List<string> Warnings,
+    List<string> Completions,
+    bool NothingToDo);

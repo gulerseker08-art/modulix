@@ -167,7 +167,8 @@ internal sealed class SectorCatalogService(ModulixDbContext db) : ISectorCatalog
             .GroupBy(d => codes[d.CapabilityId])
             .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)[.. g.Select(d => codes[d.DependsOnId])]);
         graph[capability.Code] = wanted;
-        var errors = CapabilityGraphRules.ValidateDependencies(graph);
+        // Yalnızca değişen yeteneğin erişebildiği alt graf denetlenir: ilgisiz bir yeteneğin eski bozukluğu bu düzenlemeyi engellemesin.
+        var errors = CapabilityGraphRules.ValidateDependencies(ReachableFrom(graph, capability.Code));
         if (errors.Count > 0)
         {
             throw new ArgumentException(string.Join(" ", errors), nameof(dependsOn));
@@ -185,6 +186,29 @@ internal sealed class SectorCatalogService(ModulixDbContext db) : ISectorCatalog
         });
         await db.SaveChangesAsync(cancellationToken);
         return new CapabilityView(capability.Id, capability.Code, capability.Name, capability.IsActive, [.. wanted.Order(StringComparer.Ordinal)]);
+    }
+
+    private static Dictionary<string, IReadOnlyList<string>> ReachableFrom(IReadOnlyDictionary<string, IReadOnlyList<string>> graph, string start)
+    {
+        var reachable = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        var pending = new Stack<string>();
+        pending.Push(start);
+        while (pending.TryPop(out var code))
+        {
+            if (reachable.ContainsKey(code))
+            {
+                continue;
+            }
+
+            var next = graph.GetValueOrDefault(code) ?? [];
+            reachable[code] = next;
+            foreach (var dependency in next)
+            {
+                pending.Push(dependency);
+            }
+        }
+
+        return reachable;
     }
 
     private async Task<ActivityNode> FindNodeAsync(Guid nodeId, CancellationToken cancellationToken) =>
