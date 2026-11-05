@@ -181,6 +181,7 @@ public class ModulixDbContext(
         {
             user.ToTable("Users", DatabaseSchemas.Platform);
             user.Property(u => u.DisplayName).HasMaxLength(ModulixUser.DisplayNameMaxLength).IsRequired();
+            user.Property(u => u.PreferredLanguage).HasMaxLength(LanguageOptions.MaxLength);
         });
         modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("UserClaims", DatabaseSchemas.Platform);
         modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins", DatabaseSchemas.Platform);

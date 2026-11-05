@@ -161,6 +161,7 @@ public sealed class SessionState(ApiClient api)
         Access = null;
         Logo = null;
         Regional.Apply(null);
+        UiLanguage.Apply(null, null);
         loading = Task.CompletedTask;
         Changed?.Invoke();
     }
@@ -179,11 +180,13 @@ public sealed class SessionState(ApiClient api)
             // Bölgesel ayarlar ve logo: ekranlar saatleri, biçimleri ve para birimini buradan alır.
             var settings = await api.GetAsync<SettingsResponse>("/api/settings");
             Regional.Apply(settings.Value?.Settings);
+            UiLanguage.Apply(User.PreferredLanguage, settings.Value?.Settings);
             Logo = settings.Value?.Logo;
         }
         else
         {
             Regional.Apply(null);
+            UiLanguage.Apply(User?.PreferredLanguage, null);
             Logo = null;
         }
 

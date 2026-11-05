@@ -15,6 +15,12 @@ public class ModulixUser : IdentityUser<Guid>
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
+    /// Arayüz dili tercihi (ADR-0033): <c>tr</c>, <c>en</c>, <c>az</c>. Boşsa aktif firmanın varsayılan dili kullanılır.
+    /// Kişiye aittir, hangi firmada olursa olsun aynıdır.
+    /// </summary>
+    public string? PreferredLanguage { get; set; }
+
+    /// <summary>
     /// Platform yöneticisi (Y4): firmaları ve modül haklarını yönetir; firmalara bağlı değildir. Firma verisini görmez
     /// (RLS atlanmaz). Yalnızca komut satırıyla atanır: <c>-- platform-admin e-posta</c>.
     /// </summary>
