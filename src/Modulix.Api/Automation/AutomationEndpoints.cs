@@ -24,6 +24,19 @@ public static class AutomationEndpoints
             Results.Ok(ToDto(await catalog.GetAsync(ct))))
             .RequirePermission(CoreModule.Permissions.ReadAutomation);
 
+        group.MapGet("/templates", async (IAutomationTemplates templates, CancellationToken ct) =>
+            Results.Ok((await templates.ListAsync(ct)).Select(t => new AutomationTemplateDto(
+                t.Key, t.ModuleKey, t.EntityKey, t.DisplayName, t.Description, t.Available,
+                [.. t.Issues.Select(i => new AutomationIssueDto(i.Path, i.Message))]))))
+            .RequirePermission(CoreModule.Permissions.ReadAutomation);
+
+        // Şablondan her zaman taslak kural açılır; yayın ve açma ayrı izinle (core.automation.publish) yapılır.
+        group.MapPost("/templates/{templateKey}/use", (string templateKey, IAutomationTemplates templates, CancellationToken ct) => RunAsync(async () =>
+            await templates.UseAsync(templateKey, ct) is { } detail
+                ? Results.Created($"/api/automation/rules/{detail.Rule.Id}", ToDto(detail))
+                : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Şablon bulunamadı.")))
+            .RequirePermission(CoreModule.Permissions.ManageAutomation);
+
         group.MapGet("/rules", async (
             string? moduleKey, string? status, string? search, int? page, int? pageSize, IAutomationRuleService service, CancellationToken ct) =>
         {

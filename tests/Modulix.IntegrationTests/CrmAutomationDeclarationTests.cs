@@ -25,6 +25,14 @@ public class CrmAutomationDeclarationTests
     }
 
     [Fact]
+    public void The_real_catalog_registers_every_crm_template_in_declaration_order()
+    {
+        Assert.Equal(CrmAutomationTemplates.All.Select(t => t.Key), Catalog.AutomationTemplates.Select(t => t.Template.Key));
+        Assert.All(Catalog.AutomationTemplates, t => Assert.Equal(CrmModule.ModuleKey, t.ModuleKey));
+        Assert.NotNull(Catalog.FindAutomationTemplate(CrmAutomationTemplates.LeadInactivity));
+    }
+
+    [Fact]
     public void Sensitive_fields_are_declared_with_the_same_read_permission_so_the_rule_engine_hides_them()
     {
         var declared = CrmAutomation.Capabilities.Fields.ToDictionary(f => f.Key);
