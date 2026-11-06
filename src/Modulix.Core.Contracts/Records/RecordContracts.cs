@@ -109,7 +109,18 @@ public static class RecordFields
 
 public sealed record RecordPage(IReadOnlyList<RecordData> Items, int Page, int PageSize, int TotalCount);
 
-public sealed record RecordFieldError(string Field, string Message);
+public sealed record RecordFieldError(string Field, string Message)
+{
+    /// <summary>Hatanın makinece okunan türü; ileti değişse de içe aktarma gibi çağıranlar ayırt edebilsin diye. Çoğu hatada boştur.</summary>
+    public string? Code { get; init; }
+}
+
+/// <summary><see cref="RecordFieldError.Code"/> değerleri.</summary>
+public static class RecordFieldErrorCodes
+{
+    /// <summary>Aynı kesin anahtarla kayıt var (ör. vergi numarası).</summary>
+    public const string Duplicate = "duplicate";
+}
 
 public enum RecordErrorCode
 {

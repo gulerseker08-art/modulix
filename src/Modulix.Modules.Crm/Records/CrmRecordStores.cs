@@ -49,6 +49,8 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
     {
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
         ["partyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PartyId == id) : null,
+        // Ada göre tam eşleşme (içe aktarmada firma bağlantısı ve aynı ad uyarısı); benzerlik mükerrer önerisindedir.
+        ["name"] = (q, v, _) => v.Trim() is { Length: > 0 and <= Party.NameMaxLength } name ? q.Where(c => c.Party.Name == name) : null,
         // Kesin eşleşme (mükerrer önerisi): vergi numarası. İletişim eşleşmesi yalnızca paylaşılmayan (santral/ortak adres olmayan) noktalarla.
         ["taxNumber"] = (q, v, _) => v.Trim() is { Length: > 0 and <= Party.TaxNumberMaxLength } number ? q.Where(c => c.Party.TaxNumber == number) : null,
         ["contactValue"] = (q, v, ctx) => ContactNormalization.IdentityValue(v) is { } value
@@ -144,7 +146,10 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         {
             // Mevcut firma kapsam dışında olabilir (ADR-0026 K9): ileti kaydın adını, sahibini ya da kimliğini içermez.
             throw new RecordValidationException([new RecordFieldError(field, await WithReferralHintAsync(
-                field == "partyId" ? "Bu firma CRM'de zaten kayıtlı." : "Bu vergi numarasıyla kayıtlı bir firma var.", cancellationToken))]);
+                field == "partyId" ? "Bu firma CRM'de zaten kayıtlı." : "Bu vergi numarasıyla kayıtlı bir firma var.", cancellationToken))
+            {
+                Code = RecordFieldErrorCodes.Duplicate,
+            }]);
         }
 
         entity.AttachParty(party);

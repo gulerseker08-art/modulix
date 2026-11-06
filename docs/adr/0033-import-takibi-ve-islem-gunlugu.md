@@ -146,4 +146,17 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 - Hız pilot ölçümü bekliyor: yerel test ortamında (SQL günlüğü açık) kuru çalışma satır başına yaklaşık 0,3 saniye, uygulama 0,7 saniye sürdü. Üretim süresi ölçülmedi.
 - Yalnızca oluşturma vardır; `UpdatedCount` ve `SkippedCount` bu dilimde 0 kalır.
 - Hata raporu tek uygulama örneği varsayar (`IMemoryCache`). Birden çok örnekte rapor başka örneğe düşerse 410 döner.
-- Toplu otomasyon davranışı Dilim 3'tedir: içe aktarılan her kayıt bugün kural ve abonelikleri normal olayla tetikler.
+
+**Dilim 3:** uygulandı (`gseker/import-dilim3`).
+
+- Firma ve Kişi tanımları eklendi. Müşteri adayı da firma bağı ve sorumlu sütunu aldı. Yükleme sırası önce firmalar, sonra kişiler ve müşteri adaylarıdır.
+- **Bağlantı sütunları:** `ImportFieldType.Reference` süzgeçleri sırayla dener (firma: vergi numarası, sonra tam ad) ve tek kayıt ister; bulunamayan ya da birden çok eşleşen değer `lookup-unresolved` olur. Arama kayıt boru hattından geçer, kullanıcının göremediği kayıt bulunamaz. `ImportFieldType.User` e-postayı firmanın etkin üyesine çözer; destek üyeliği sayılmaz (ADR-0028).
+- **Mükerrer (ADR-0013):** `ImportMatchRule`. Vergi numarası kesindir ve `duplicate-exact` satır hatasıdır: kayıtlı olanı depo reddeder (`RecordFieldError.Code`), dosya içi tekrarı motor reddeder, böylece kuru çalışma uygulamayla aynı sonucu verir. Ad, e-posta ve telefon yalnızca `duplicate-possible` uyarısıdır. Bu bölümdeki "hata/atla" seçeneğinden hata seçildi; atlama yoktur.
+- **İçe aktarma tasarımı** (`/yonetim/ice-aktarma-tasarimi`, `meta.ImportDesigns`, `core.customization.manage`): firma türü açar/kapatır, sütun çıkarır ve zorunlu kılar; kodun zorunlu tuttuğu sütun kapatılamaz. Her değişiklik denetim kaydına yazılır. Kapalı tür listelenmez, 404 döner.
+- **Toplu otomasyon:** varsayılan kapalıdır. Olay `EventReasons.Import` nedeniyle yazılır; kural çalışması ve atama e-postası bu olayları atlar, veriyi tutarlı tutan abonelikler çalışır. Gerekçe: geçmiş veri taşınırken yüzlerce kural ve e-posta üretilmemeli. Firma tasarımda tür başına açabilir; açıkken olay nedensiz yazılır ve tek tek kayıt açılmış gibi davranır. Kural kuyruğu için ayrı hız sınırı yoktur.
+
+**Dilim 3 sınırları:**
+
+- Ad benzerliği içe aktarmada tam eşleşmedir ("Acme A.Ş." ile "ACME Anonim Şirketi" uyarı vermez); ünvan anahtarı mükerrer önerisi ucundadır. Kişide ad-soyad eşleşmesi yoktur: e-postası ve telefonu olmayan kişi dosyası yeniden yüklenirse uyarısız çoğalır.
+- Kuru çalışmada dosyadaki yeni firmalar yazılmadığı için aynı dosyanın kişileri sınanamaz; firmalar uygulanmadan kişi kuru çalışması `lookup-unresolved` verir.
+- Kişide firma bağı yalnızca birincil firmadır; rol, departman ve ana irtibat elle girilir (ADR-0011).

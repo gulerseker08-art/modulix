@@ -64,6 +64,11 @@ public static partial class ImportRows
 
     private static ImportRowProblem FromField(RecordFieldError error, JsonObject values)
     {
+        if (error.Code == RecordFieldErrorCodes.Duplicate)
+        {
+            return Error(error.Field, ImportIssueCodes.DuplicateExact, error.Message);
+        }
+
         if (IsCustom(error.Field))
         {
             var key = error.Field[RecordFields.CustomPrefix.Length..];

@@ -1,4 +1,6 @@
 using Modulix.Api.Access;
+using Modulix.Api.Records;
+using Modulix.Api.Tenancy;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Imports;
@@ -13,7 +15,7 @@ namespace Modulix.Api.Imports;
 /// <summary>İçe aktarma uçlarının ortak servisleri ve "bu kullanıcı bu türü içe aktarabilir mi" kuralı.</summary>
 public sealed class ImportContext(
     ModuleCatalog catalog, ImportSchema schema, ImportRunner runner, ImportErrorReports reports, IImportLog log, ICurrentAccess access,
-    IModuleLicense license, ITenantContextAccessor tenant, ICompanyContextAccessor company)
+    IModuleLicense license, ITenantContextAccessor tenant, ICompanyContextAccessor company, IImportDesignStore designs)
 {
     public ModuleCatalog Catalog => catalog;
 
@@ -29,10 +31,11 @@ public sealed class ImportContext(
 
     public ICompanyContextAccessor Company => company;
 
-    /// <summary>Modül yazılabilir olmalı (ADR-0028: salt okunurda tür listelenmez) ve kullanıcının türde oluşturma izni bulunmalı.</summary>
+    /// <summary>Modül yazılabilir (ADR-0028: salt okunurda tür listelenmez), tür firmanın tasarımında açık olmalı ve kullanıcının türde oluşturma izni bulunmalı.</summary>
     public async Task<bool> CanRunAsync(string moduleKey, ImportDefinition definition, CancellationToken cancellationToken) =>
         await license.AllowsAsync(tenant.Current!.TenantId, moduleKey, write: true, cancellationToken)
-        && await access.HasPermissionAsync(definition.CreatePermission, cancellationToken);
+        && await access.HasPermissionAsync(definition.CreatePermission, cancellationToken)
+        && (await designs.GetAsync(definition.EntityKey, cancellationToken)).Enabled;
 }
 
 /// <summary>
@@ -61,6 +64,20 @@ public static class ImportEndpoints
         group.MapPost("/", (string? entityKey, string? fileName, HttpRequest http, ImportContext context, CancellationToken ct) =>
             StartAsync(ImportRunMode.Apply, entityKey, fileName, http, context, ct)).RequirePermission(CoreModule.Permissions.RunImports);
         group.MapGet("/{runId:guid}/error-report", GetErrorReportAsync);
+
+        // İçe aktarma tasarımı: firma yöneticisi türleri açıp kapatır, sütunları seçer (form tasarımıyla aynı izin).
+        var design = app.MapGroup("/api/customization/import-designs")
+            .RequireAuthorization()
+            .AddEndpointFilter<RequireTenantFilter>()
+            .RequirePermission(CoreModule.Permissions.ManageCustomization)
+            .WithTags("Customization");
+        design.MapGet("/", async (IImportDesignService service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
+        design.MapPut("/{entityKey}", async (string entityKey, SaveImportDesignRequest request, IImportDesignService service, CancellationToken ct) =>
+        {
+            var input = new ImportDesignInput(request.Enabled, request.RunAutomation, request.Excluded ?? [], request.Required ?? []);
+            var result = await service.SaveAsync(entityKey, input, request.Version, ct);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        });
         return app;
     }
 
@@ -135,6 +152,14 @@ public static class ImportEndpoints
             ? Results.File(report.Content, "text/csv", report.FileName)
             : Results.Problem(statusCode: StatusCodes.Status410Gone, title: "Hata raporunun süresi doldu; dosyayı yeniden yükleyerek yeni rapor alın.");
     }
+
+    private static ImportDesignDto ToDto(ImportDesignInfo info) => new(
+        info.EntityKey,
+        info.DisplayName,
+        info.Enabled,
+        info.RunAutomation,
+        [.. info.Fields.Select(f => new ImportDesignFieldDto(f.Key, f.Label, f.Included, f.Required, f.Locked))],
+        info.Version);
 
     private static IResult NotImportable() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bu kayıt türü içe aktarılamıyor.");

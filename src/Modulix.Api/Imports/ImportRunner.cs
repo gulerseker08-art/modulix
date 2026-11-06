@@ -6,11 +6,13 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Modulix.Api.Tenancy;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Imports;
 using Modulix.Core.Reporting;
+using Modulix.Core.Platform;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
 
@@ -118,7 +120,8 @@ public sealed class ImportRunner(
 
             await db.SaveChangesAsync(stopping);
 
-            var job = new ImportJob(definition, fields, mode, fileName, file, columns, run, issues, db, tenant, company, correlation);
+            var design = await services.GetRequiredService<IImportDesignStore>().GetAsync(definition.EntityKey, stopping);
+            var job = new ImportJob(definition, fields, mode, fileName, file, columns, run, issues, db, tenant, company, correlation, design.RunAutomation);
             var owned = scope.Value;
             Task task;
 
@@ -307,8 +310,22 @@ public sealed class ImportRunner(
         try
         {
             var pipeline = services.GetRequiredService<IRecordPipeline>();
-            var warnings = await MatchAsync(pipeline, job, values, seen, cancellationToken);
-            var command = new RecordCommand(job.Definition.EntityKey, null, values, Source: ExecutionSource.Import);
+            var unresolved = await ResolveAsync(job, services, pipeline, values, cancellationToken);
+            if (unresolved.Count > 0)
+            {
+                return (unresolved, true);
+            }
+
+            var (warnings, duplicates) = await MatchAsync(pipeline, job, values, seen, cancellationToken);
+            if (duplicates.Count > 0)
+            {
+                return (duplicates, true);
+            }
+
+            var command = new RecordCommand(job.Definition.EntityKey, null, values, Source: ExecutionSource.Import)
+            {
+                Reason = job.RunAutomation ? null : EventReasons.Import,
+            };
             var result = job.Mode == ImportRunMode.Apply
                 ? await pipeline.CreateAsync(command, cancellationToken)
                 : await RehearseAsync(pipeline, command, cancellationToken);
@@ -336,33 +353,117 @@ public sealed class ImportRunner(
         return outcome!;
     }
 
-    /// <summary>Olası mükerrer uyarıları (ADR-0013): engellemez. Sorgu kullanıcının kapsamında çalışır, göremediği kaydın varlığını sezdirmez.</summary>
-    private static async Task<IReadOnlyList<ImportRowProblem>> MatchAsync(
+    /// <summary>
+    /// Mükerrer denetimi (ADR-0013). Olası eşleşme uyarıdır, satırı engellemez; dosya içi kesin tekrar satır hatasıdır (kayıtlı kaydı depo reddeder).
+    /// Sorgu kullanıcının kapsamında çalışır, göremediği kaydın varlığını sezdirmez.
+    /// </summary>
+    private static async Task<(IReadOnlyList<ImportRowProblem> Warnings, IReadOnlyList<ImportRowProblem> Duplicates)> MatchAsync(
         IRecordPipeline pipeline, ImportJob job, JsonObject values, HashSet<string> seen, CancellationToken cancellationToken)
     {
         var warnings = new List<ImportRowProblem>();
-        foreach (var key in job.Definition.MatchFields)
+        var duplicates = new List<ImportRowProblem>();
+        foreach (var rule in job.Definition.MatchRules)
         {
-            if (values[key]?.ToString() is not { Length: > 0 } value || job.Fields.FirstOrDefault(f => f.Key == key) is not { } field)
+            if (values[rule.Field]?.ToString() is not { Length: > 0 } value || job.Fields.FirstOrDefault(f => f.Key == rule.Field) is not { } field)
             {
                 continue;
             }
 
-            if (!seen.Add(key + "\n" + value.ToLowerInvariant()))
+            if (!seen.Add(rule.Field + "\n" + value.ToLowerInvariant()))
             {
-                warnings.Add(Possible(key, $"Aynı {field.Label} dosyada birden çok satırda var."));
+                if (rule.Exact)
+                {
+                    duplicates.Add(new ImportRowProblem(rule.Field, ImportIssueCodes.DuplicateExact, ImportIssueSeverity.Error, $"Aynı {field.Label} dosyada daha önce geçti."));
+                }
+                else
+                {
+                    warnings.Add(Possible(rule.Field, $"Aynı {field.Label} dosyada birden çok satırda var."));
+                }
+
+                continue;
+            }
+
+            if (rule.Filter is not { } filter || rule.Exact)
+            {
                 continue;
             }
 
             var found = await pipeline.QueryAsync(
-                new RecordQuery(job.Definition.EntityKey, PageSize: 1, Filters: new Dictionary<string, string> { [key] = value }), cancellationToken);
+                new RecordQuery(job.Definition.EntityKey, PageSize: 1, Filters: new Dictionary<string, string> { [filter] = value }), cancellationToken);
             if (found.IsSuccess && found.Value!.TotalCount > 0)
             {
-                warnings.Add(Possible(key, $"Aynı {field.Label} ile kayıt var; yine de alınır."));
+                warnings.Add(Possible(rule.Field, $"Aynı {field.Label} ile kayıt var; yine de alınır."));
             }
         }
 
-        return warnings;
+        return (warnings, duplicates);
+    }
+
+    /// <summary>Bağlantı hücrelerini kayıt kimliğine çevirir. Aynı değer koşu boyunca bir kez çözülür; bulunamayan ya da birden çok eşleşen değer satır hatasıdır.</summary>
+    private static async Task<IReadOnlyList<ImportRowProblem>> ResolveAsync(
+        ImportJob job, IServiceProvider services, IRecordPipeline pipeline, JsonObject values, CancellationToken cancellationToken)
+    {
+        var problems = new List<ImportRowProblem>();
+        foreach (var field in job.Fields.Where(f => f.Type is ImportFieldType.Reference or ImportFieldType.User))
+        {
+            if (values[field.Key]?.ToString() is not { Length: > 0 } text)
+            {
+                continue;
+            }
+
+            var cacheKey = field.Key + "\n" + text.ToLowerInvariant();
+            if (!job.Resolved.TryGetValue(cacheKey, out var id))
+            {
+                (id, var error) = field.Type == ImportFieldType.User
+                    ? await FindMemberAsync(services, job.Tenant.TenantId, field, text, cancellationToken)
+                    : await FindRecordAsync(pipeline, field, text, cancellationToken);
+                if (error is not null)
+                {
+                    problems.Add(new ImportRowProblem(field.Key, ImportIssueCodes.LookupUnresolved, ImportIssueSeverity.Error, error));
+                    continue;
+                }
+
+                job.Resolved[cacheKey] = id;
+            }
+
+            values[field.Key] = id.ToString();
+        }
+
+        return problems;
+    }
+
+    private static async Task<(Guid Id, string? Error)> FindRecordAsync(IRecordPipeline pipeline, ImportField field, string text, CancellationToken cancellationToken)
+    {
+        foreach (var filter in field.Reference!.Filters)
+        {
+            var found = await pipeline.QueryAsync(
+                new RecordQuery(field.Reference.EntityKey, PageSize: 2, Filters: new Dictionary<string, string> { [filter] = text }), cancellationToken);
+            if (found.IsSuccess && found.Value!.TotalCount == 1)
+            {
+                return (found.Value.Items[0].Id, null);
+            }
+
+            if (found.IsSuccess && found.Value!.TotalCount > 1)
+            {
+                return (Guid.Empty, $"{field.Label} birden çok kayıtla eşleşti; vergi numarası gibi ayırt edici bir değer yazın.");
+            }
+        }
+
+        return (Guid.Empty, $"{field.Label} bulunamadı.");
+    }
+
+    // Destek erişimi etkin üye değildir (ADR-0028): kayıt sahibi yalnızca etkin üyelerden seçilir.
+    private static async Task<(Guid Id, string? Error)> FindMemberAsync(
+        IServiceProvider services, Guid tenantId, ImportField field, string email, CancellationToken cancellationToken)
+    {
+        var db = services.GetRequiredService<ModulixDbContext>();
+        var user = await db.Memberships.AsNoTracking()
+            .Where(m => m.TenantId == tenantId && m.Status == MembershipStatus.Active)
+            .Join(db.Users.AsNoTracking(), m => m.UserId, u => u.Id, (m, u) => new { u.Id, u.Email })
+            .Where(u => u.Email == email)
+            .Select(u => (Guid?)u.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        return user is { } id ? (id, null) : (Guid.Empty, $"{field.Label} firmanın etkin üyesi değil.");
     }
 
     private static ImportRowProblem Possible(string key, string message) =>
@@ -408,7 +509,10 @@ public sealed class ImportRunner(
 
     private sealed record ImportJob(
         ImportDefinition Definition, IReadOnlyList<ImportField> Fields, ImportRunMode Mode, string FileName, ImportFileContent File, ImportColumnMap Columns,
-        ImportRun Run, IssueList Issues, ModulixDbContext Db, TenantContext Tenant, CompanyContext? Company, string Correlation);
+        ImportRun Run, IssueList Issues, ModulixDbContext Db, TenantContext Tenant, CompanyContext? Company, string Correlation, bool RunAutomation)
+    {
+        public Dictionary<string, Guid> Resolved { get; } = new(StringComparer.Ordinal);
+    }
 
     /// <summary>Koşunun sorunları; üst sınırın ötesi saklanmaz (hatalı satır sayısı yine doğrudur).</summary>
     private sealed class IssueList(Guid tenantId, Guid runId, TimeProvider time)

@@ -11,9 +11,15 @@ namespace Modulix.Core.Imports;
 /// Kullanıcının bu firmada görebileceği içe aktarma sütunları: tanımın alanları, firmanın etkin özel alanları ve firmanın seçim listeleri.
 /// Görme yetkisi olmayan hassas alan şablona girmez; dosyada varsa tanınmayan sütun gibi yok sayılır (ADR-0033 bölüm 7).
 /// </summary>
-public sealed class ImportSchema(ICustomFieldProvider customFields, IFieldAccessService fieldAccess, IChoiceLists choiceLists)
+public sealed class ImportSchema(
+    ICustomFieldProvider customFields, IFieldAccessService fieldAccess, IChoiceLists choiceLists, IImportDesignStore designs)
 {
-    public async Task<IReadOnlyList<ImportField>> FieldsAsync(TenantContext tenant, ImportDefinition definition, CancellationToken cancellationToken)
+    /// <summary>Şablon ve dosya sütunları: firmanın tasarımı uygulanmış hali.</summary>
+    public async Task<IReadOnlyList<ImportField>> FieldsAsync(TenantContext tenant, ImportDefinition definition, CancellationToken cancellationToken) =>
+        ImportDesignRules.Apply(await AllFieldsAsync(tenant, definition, cancellationToken), await designs.GetAsync(definition.EntityKey, cancellationToken));
+
+    /// <summary>Tasarımdan önceki sütunlar (tasarım ekranı bunlardan seçer).</summary>
+    public async Task<IReadOnlyList<ImportField>> AllFieldsAsync(TenantContext tenant, ImportDefinition definition, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
         var hidden = await fieldAccess.GetHiddenFieldsAsync(tenant, definition.EntityKey, cancellationToken);
