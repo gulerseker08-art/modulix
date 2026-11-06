@@ -26,6 +26,21 @@ public sealed class ActivityOptions(ApiClient api)
         return items;
     }
 
+    /// <summary>Aynı ad farklı sektörlerde tekrarlanabilir (ör. "Diğer"): üst düğümlerle birlikte "A › B" yolu.</summary>
+    public string PathOf(ActivityOptionDto option)
+    {
+        var names = new List<string> { option.Name };
+        for (var parent = option.ParentCode; parent is not null && names.Count < 6;)
+        {
+            var node = items?.FirstOrDefault(a => a.Code == parent);
+            if (node is null) { break; }
+            names.Insert(0, node.Name);
+            parent = node.ParentCode;
+        }
+
+        return string.Join(" › ", names);
+    }
+
     /// <summary>Kodun adı; katalogda yoksa (ör. sonradan pasife alınmış) kodun kendisi.</summary>
     public string NameOf(string code) => items?.FirstOrDefault(a => a.Code == code)?.Name ?? code;
 }
