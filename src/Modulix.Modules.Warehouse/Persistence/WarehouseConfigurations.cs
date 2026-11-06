@@ -132,3 +132,21 @@ internal sealed class PowerOfAttorneyConfiguration : IEntityTypeConfiguration<Po
             .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class StockItemConfiguration : IEntityTypeConfiguration<StockItem>
+{
+    public void Configure(EntityTypeBuilder<StockItem> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "StockItems");
+        builder.Property(s => s.Code).HasMaxLength(StockItem.CodeMaxLength).IsRequired();
+        builder.Property(s => s.Name).HasMaxLength(StockItem.NameMaxLength).IsRequired();
+        builder.Property(s => s.UnitKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(s => s.Description).HasMaxLength(StockItem.DescriptionMaxLength);
+        // GTİP metin: baştaki sıfırlar kaybolmasın (K9). Unicode değil, rakamlardan oluşur.
+        builder.Property(s => s.Gtip).HasMaxLength(GtipRules.MaxLength).IsUnicode(false);
+        builder.Property(s => s.IsActive).HasDefaultValue(true);
+
+        builder.HasIndex(s => new { s.TenantId, s.Code }).IsUnique().HasDatabaseName("UX_StockItems_Code");
+        builder.HasIndex(s => new { s.TenantId, s.Gtip });
+    }
+}

@@ -228,3 +228,65 @@ public sealed class PowerOfAttorney : WarehouseEntity
     public static bool IsValid(bool isActive, DateOnly validFrom, DateOnly? validTo, DateOnly day) =>
         isActive && validFrom <= day && (validTo is null || day <= validTo);
 }
+
+/// <summary>
+/// Stok kartı: depoda tutulan malın tanımı (ADR-0032 K19, açık soru 5). Kart Warehouse'tadır; Core'da ortak ürün tanımı olmadığı için
+/// ürün bağı (<c>CoreProductId</c>) kullanılana kadar eklenmez (sonradan eklenmesi geriye uyumlu bir sütundur). Kartın GTİP'i yalnızca
+/// <b>varsayılan önerisidir</b> (K6, K9): yasal gerçek beyanname satırındadır. Parti, SKT ve kap bilgileri ilgili dilimlerle gelir;
+/// firmaya özgü ek bilgiler özel alanlarla tutulur (K19).
+/// </summary>
+public sealed class StockItem : WarehouseEntity
+{
+    public const int CodeMaxLength = 50;
+    public const int NameMaxLength = 200;
+    public const int DescriptionMaxLength = 1000;
+
+    /// <summary>Tenant içinde benzersiz stok kodu (ör. "SKU-001"); harf, rakam ve <c>-_./</c> içerir.</summary>
+    public string Code { get; internal set; } = string.Empty;
+
+    public string Name { get; internal set; } = string.Empty;
+
+    /// <summary>Ölçü birimi (Y9b listesi <c>warehouse.stock-unit</c>); tenant kendi birimlerini yönetir.</summary>
+    public string UnitKey { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    /// <summary>
+    /// Varsayılan GTİP: yalnızca rakamlar, metin olarak saklanır (baştaki sıfırlar kaybolmaz; <see cref="GtipRules"/>). Katalogda
+    /// bulunmayan kod uyarı üretir, engellemez (katalog sonraki adımdadır).
+    /// </summary>
+    public string? Gtip { get; internal set; }
+
+    /// <summary>Pasif kart yeni işlem almaz; geçmiş kayıtları korunur.</summary>
+    public bool IsActive { get; internal set; } = true;
+}
+
+/// <summary>
+/// GTİP biçim kuralları (K9): kod <b>metin</b> saklanır, yalnızca rakamdır; ilk 6 hane HS kodudur, 12–14 hane desteklenir. Ayraçlar (nokta,
+/// boşluk) girişte atılır. Uzunluk sınırı yalnızca yapısaldır (6–14); hangi uzunluğun hangi tarife için geçerli olduğu ve kodun varlığı
+/// katalog işidir ve doğrulanmamıştır (ADR bölüm 9), bu yüzden burada sert bir mevzuat kuralı yoktur.
+/// </summary>
+public static class GtipRules
+{
+    public const int MinLength = 6;
+    public const int MaxLength = 14;
+
+    /// <summary>Girişi normalleştirir; boşsa <c>(null, null)</c>, geçersizse hata iletisi döner.</summary>
+    public static (string? Value, string? Error) Normalize(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return (null, null);
+        }
+
+        var digits = new string([.. input.Where(c => c is not ('.' or ' ' or '\u00A0'))]);
+        if (digits.Length == 0 || !digits.All(char.IsAsciiDigit))
+        {
+            return (null, "GTİP yalnızca rakamlardan oluşmalıdır (nokta ve boşluk atılır).");
+        }
+
+        return digits.Length is < MinLength or > MaxLength
+            ? (null, $"GTİP {MinLength} ile {MaxLength} hane arasında olmalıdır.")
+            : (digits, null);
+    }
+}

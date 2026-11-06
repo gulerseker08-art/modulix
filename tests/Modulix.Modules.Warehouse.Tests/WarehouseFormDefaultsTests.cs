@@ -59,7 +59,7 @@ public class WarehouseFormDefaultsTests
         var entities = new[]
         {
             WarehouseModule.Entities.Facility, WarehouseModule.Entities.Zone, WarehouseModule.Entities.LocationLevel, WarehouseModule.Entities.Location,
-            WarehouseModule.Entities.PowerOfAttorney,
+            WarehouseModule.Entities.PowerOfAttorney, WarehouseModule.Entities.StockItem,
         };
 
         Assert.All(Module.Lookups, lookup =>
@@ -97,12 +97,13 @@ public class WarehouseFormDefaultsTests
                 WarehouseAccess.FacilitiesRead, WarehouseAccess.FacilitiesWrite, WarehouseAccess.ZonesRead, WarehouseAccess.ZonesWrite,
                 WarehouseAccess.LocationLevelsRead, WarehouseAccess.LocationLevelsWrite, WarehouseAccess.LocationsRead, WarehouseAccess.LocationsWrite,
                 WarehouseAccess.AttorneysRead, WarehouseAccess.AttorneysWrite,
+                WarehouseAccess.StockItemsRead, WarehouseAccess.StockItemsWrite,
             },
             key => Assert.Contains(key, permissions));
-        Assert.Equal(10, permissions.Count);
+        Assert.Equal(12, permissions.Count);
         Assert.Equal(
-            [WarehouseModule.Entities.Facility, WarehouseModule.Entities.Zone, WarehouseModule.Entities.LocationLevel, WarehouseModule.Entities.Location, WarehouseModule.Entities.PowerOfAttorney],
-            new[] { WarehouseAccess.FacilityEntityKey, WarehouseAccess.ZoneEntityKey, WarehouseAccess.LocationLevelEntityKey, WarehouseAccess.LocationEntityKey, WarehouseAccess.PowerOfAttorneyEntityKey });
+            [WarehouseModule.Entities.Facility, WarehouseModule.Entities.Zone, WarehouseModule.Entities.LocationLevel, WarehouseModule.Entities.Location, WarehouseModule.Entities.PowerOfAttorney, WarehouseModule.Entities.StockItem],
+            new[] { WarehouseAccess.FacilityEntityKey, WarehouseAccess.ZoneEntityKey, WarehouseAccess.LocationLevelEntityKey, WarehouseAccess.LocationEntityKey, WarehouseAccess.PowerOfAttorneyEntityKey, WarehouseAccess.StockItemEntityKey });
         Assert.Equal(
             Module.Lookups.Select(l => l.Key).Order(),
             new[]
@@ -112,6 +113,7 @@ public class WarehouseFormDefaultsTests
                 WarehouseAccess.AttorneyImporterLookup, WarehouseAccess.AttorneyBrokerLookup,
             }.Order());
         Assert.Equal(WarehouseModule.Lists.ZoneKind, WarehouseAccess.ZoneKindList);
+        Assert.Equal(WarehouseModule.Lists.StockUnit, WarehouseAccess.StockUnitList);
         Assert.Equal(WarehouseModule.ZoneKindCategories.Controlled, WarehouseAccess.ZoneKindControlled);
         Assert.Equal(WarehouseModule.ZoneKindCategories.Free, WarehouseAccess.ZoneKindFree);
     }
