@@ -11,6 +11,11 @@ window.modulixLookup = {
             }
         });
     },
+    // Girdinin kendisine değil dış kaba gönderilir: bileşenin arama işleyicisi çalışmaz, olay forma kabarcıklanır.
+    changed: function (input) {
+        var host = input && input.closest ? input.closest('.lookup') : null;
+        if (host) { host.dispatchEvent(new Event('input', { bubbles: true })); }
+    },
     reveal: function (id) {
         var option = id ? document.getElementById(id) : null;
         if (option && option.scrollIntoView) { option.scrollIntoView({ block: 'nearest' }); }
