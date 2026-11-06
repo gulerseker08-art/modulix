@@ -2,6 +2,7 @@
    uçlarından (/api/records/warehouse.stock-item) yapılır. Kod biçimi ve benzersizliği, GTİP biçimi (yalnızca rakam, 6-14 hane) sunucudadır;
    ileti alanın altında gösterilir. Karttaki GTİP varsayılan önerisidir, yasal gerçek beyanname satırındadır. *@
 @using System.Text.Json.Nodes
+@using Modulix.Shared.Customs
 @inject ApiClient Api
 @inject FormLayouts Layouts
 
@@ -88,9 +89,22 @@
                             break;
                         case "gtip":
                             <label class="@f.LabelClass()" for="stock-gtip">@f.Label</label>
-                            <input id="stock-gtip" class="form-control" inputmode="numeric" maxlength="40" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Gtip" />
+                            <input id="stock-gtip" class="form-control" inputmode="numeric" maxlength="40" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Gtip" @bind:event="onchange" @bind:after="CheckGtipAsync" />
                             <FieldError Field="gtip" Errors="errors" />
                             <small class="text-muted">Yalnızca rakamlar (nokta ve boşluk atılır, 6-14 hane). Varsayılan önerisidir; yasal gerçek beyanname satırındadır.</small>
+                            @* Katalog denetimi yalnızca bilgidir (ADR-0032 K9): bulunamayan kod uyarı üretir, kaydı engellemez. *@
+                            @switch (gtipCheck?.Status)
+                            {
+                                case "Found":
+                                    <small class="text-muted d-block">Katalog (@gtipCheck.VersionName): @gtipCheck.Description</small>
+                                    break;
+                                case "PrefixOnly":
+                                    <div class="alert alert-info mt-2" role="status">Bu kod katalogda yalnızca daha uzun kodların başı olarak var (@gtipCheck.VersionName); tam kodu girmeniz önerilir.</div>
+                                    break;
+                                case "NotFound":
+                                    <div class="alert alert-warning mt-2" role="status">Bu kod yürürlükteki GTİP kataloğunda (@gtipCheck.VersionName) bulunamadı. Kayıt engellenmez; kodu kontrol edin.</div>
+                                    break;
+                            }
                             break;
                         case "description":
                             <label class="@f.LabelClass()" for="stock-description">@f.Label</label>
@@ -125,6 +139,8 @@
     private bool busy;
     private RecordResponse? source;
     private bool initialized;
+    private bool checkGtip;
+    private GtipCheckDto? gtipCheck;
 
     /// <summary>Düzenlenecek stok kartı; null ise yeni kart.</summary>
     [Parameter] public RecordResponse? Item { get; set; }
@@ -165,6 +181,38 @@
             : new ItemForm { UnitKey = Lookups.DefaultOf(WarehouseAccess.StockUnitList) ?? string.Empty };
         errors = null;
         message = null;
+        gtipCheck = null;
+        checkGtip = true;
+    }
+
+    /// <summary>Başka bir kart açıldığında kartın kayıtlı GTİP'i de katalogla karşılaştırılır.</summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        if (checkGtip)
+        {
+            checkGtip = false;
+            await CheckGtipAsync();
+        }
+    }
+
+    /// <summary>
+    /// GTİP'i yürürlükteki katalogla karşılaştırır. Yalnızca bilgi verir: katalog yoksa, kod biçimi geçersizse ya da kullanıcının stok kartı
+    /// okuma izni yoksa sessizce bir şey göstermez (asıl doğrulama kayıtta sunucudadır).
+    /// </summary>
+    private async Task CheckGtipAsync()
+    {
+        var code = form.Gtip;
+        gtipCheck = null;
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        var result = await Api.GetAsync<GtipCheckDto>($"/api/gtip/check?code={Uri.EscapeDataString(code)}");
+        if (code == form.Gtip)
+        {
+            gtipCheck = result.IsSuccess ? result.Value : null;
+        }
     }
 
     private async Task SaveAsync()

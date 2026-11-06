@@ -1,0 +1,370 @@
+@page "/platform/gtip"
+@using Microsoft.AspNetCore.Components.Forms
+@using Modulix.Shared.Customs
+@inject ApiClient Api
+
+<PageTitle>GTİP kataloğu · Platform · Modulix</PageTitle>
+
+@* Global GTİP kataloğu (ADR-0032 K9). Bakanlık tarife cetveli yürürlük tarihli sürümler olarak yüklenir; bir tarihte o günü geçmemiş en yeni
+   sürüm geçerlidir. Katalog yalnızca uyarı içindir: katalogda olmayan kod hiçbir kaydı engellemez. Hatalı dosya kısmen yüklenmez. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>GTİP kataloğu</h1>
+    <p class="text-muted">
+        Gümrük tarife cetvelini Excel (.xlsx) ya da CSV olarak yükleyin. Dosyada <strong>GTİP</strong> (ya da Kod) ve <strong>Tanım</strong> başlıklı
+        sütunlar gerekir; <strong>Birim</strong> isteğe bağlıdır. Fasıl ve pozisyon başlıkları (6 haneden kısa kodlar) atlanır. Firmalar stok kartında
+        yazdıkları kodu yürürlükteki sürümle karşılaştırır; bulunamayan kod uyarıdır, engel değildir.
+    </p>
+
+    <Notice Text="@notice" Failed="@failed" />
+
+    <form class="record-form settings-group" novalidate @onsubmit="ImportAsync" @onsubmit:preventDefault>
+        <h2>Yeni sürüm yükle</h2>
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="gtip-name">Sürüm adı *</label>
+                <input id="gtip-name" class="form-control" maxlength="100" placeholder="ör. 2026 Gümrük Tarife Cetveli" @bind="name" @bind:event="oninput" />
+            </div>
+            <div>
+                <label class="form-label" for="gtip-date">Yürürlük tarihi *</label>
+                <input id="gtip-date" class="form-control" type="date" @bind="effectiveFrom" />
+                <div class="form-text">Bu tarihten itibaren geçerlidir. Aynı tarihli ikinci sürüm yüklenemez.</div>
+            </div>
+            <div>
+                <label class="form-label" for="gtip-file">Dosya *</label>
+                <InputFile @key="inputKey" id="gtip-file" class="form-control" accept=".xlsx,.csv,.txt" OnChange="OnFileChosenAsync" disabled="@busy" />
+                <div class="form-text">En çok @(GtipImportLimits.MaxFileBytes / (1024 * 1024)) MB. Eski .xls biçimi desteklenmez.</div>
+            </div>
+        </div>
+
+        @if (preview is not null)
+        {
+            <div class="mt-3" aria-live="polite">
+                @if (preview.FatalError is not null)
+                {
+                    <div class="alert alert-danger" role="alert">@preview.FatalError</div>
+                }
+                else
+                {
+                    <p>
+                        <strong>@preview.ValidCount</strong> geçerli satır
+                        @if (preview.HeadingRows > 0) { <text> · @preview.HeadingRows başlık satırı atlandı</text> }
+                        @if (preview.PaddedCodes > 0) { <text> · @preview.PaddedCodes kodun baştaki sıfırı tamamlandı (hücre sayı olarak kayıtlıydı)</text> }
+                        @if (preview.ErrorCount > 0) { <text> · <strong>@preview.ErrorCount hatalı satır</strong></text> }
+                    </p>
+                    @if (preview.ErrorCount > 0)
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            Dosya hatalı satırlar içeriyor; eksik katalog yüklenmesin diye hiçbir satır alınmaz. Dosyayı düzeltip yeniden seçin.
+                        </div>
+                        <table class="table record-table">
+                            <caption class="visually-hidden">Hatalı satırlar</caption>
+                            <thead><tr><th scope="col">Satır</th><th scope="col">Hata</th></tr></thead>
+                            <tbody>
+                                @foreach (var error in preview.Errors)
+                                {
+                                    <tr><td data-label="Satır" class="primary">@error.Row</td><td data-label="Hata">@error.Message</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                        @if (preview.ErrorCount > preview.Errors.Count)
+                        {
+                            <p class="text-muted">İlk @preview.Errors.Count hata gösteriliyor.</p>
+                        }
+                    }
+                    else if (preview.Sample.Count > 0)
+                    {
+                        <table class="table record-table">
+                            <caption class="visually-hidden">Dosyadaki ilk satırlar</caption>
+                            <thead><tr><th scope="col">GTİP</th><th scope="col">Tanım</th><th scope="col">Birim</th></tr></thead>
+                            <tbody>
+                                @foreach (var entry in preview.Sample)
+                                {
+                                    <tr>
+                                        <td data-label="GTİP" class="primary">@entry.Code</td>
+                                        <td data-label="Tanım">@entry.Description</td>
+                                        <td data-label="Birim">@(entry.Unit ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <p class="text-muted">İlk @preview.Sample.Count satır gösteriliyor.</p>
+                    }
+                }
+            </div>
+        }
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || bytes is null)" @onclick="PreviewAsync">Önizle</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || preview is not { CanImport: true })">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                İçe aktar
+            </button>
+        </div>
+    </form>
+
+    <h2 class="mt-4">Sürümler</h2>
+    @if (versions is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (versions.Count == 0)
+    {
+        <p class="text-muted" role="status">Henüz katalog sürümü yok; firmalar için GTİP uyarısı üretilmez.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">GTİP katalog sürümleri</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Sürüm</th><th scope="col">Yürürlük</th><th scope="col">Satır</th><th scope="col">Dosya</th><th scope="col">Yüklendi</th><th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var version in versions)
+                {
+                    <tr>
+                        <td data-label="Sürüm" class="primary">
+                            @version.Name
+                            @if (version.Id == InForceId)
+                            {
+                                <span class="badge status-customer">Yürürlükte</span>
+                            }
+                        </td>
+                        <td data-label="Yürürlük">@version.EffectiveFrom.ToString("dd.MM.yyyy")</td>
+                        <td data-label="Satır">@version.EntryCount</td>
+                        <td data-label="Dosya">@(version.SourceFileName ?? "—")</td>
+                        <td data-label="Yüklendi">@CrmLabels.Time(version.CreatedAt)</td>
+                        <td class="actions">
+                            @if (confirmDelete == version.Id)
+                            {
+                                <span class="me-2">Silinsin mi?</span>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(version)">Evet, sil</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => confirmDelete = null">Vazgeç</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => OpenEntriesAsync(version)">Satırlar</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => confirmDelete = version.Id">Sil</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="text-muted">Sürüm silmek tenant verisini etkilemez (kayıtlar koda göre başvurur); yanlış yüklenen sürüm silinip yeniden yüklenir.</p>
+    }
+
+    @if (selected is not null)
+    {
+        <section class="settings-group" aria-label="Sürüm satırları">
+            <h2>@selected.Name · satırlar</h2>
+            <div class="list-toolbar">
+                <form class="search" @onsubmit="() => LoadEntriesAsync(1)" @onsubmit:preventDefault>
+                    <label class="visually-hidden" for="gtip-search">Kod ya da tanım ara</label>
+                    <input id="gtip-search" class="form-control" type="search" placeholder="Kod ön eki ya da tanım ara" @bind="search" />
+                    <button type="submit" class="btn btn-outline-secondary">Ara</button>
+                </form>
+                <button type="button" class="btn btn-ghost" @onclick="CloseEntries">Kapat</button>
+            </div>
+            @if (entries is null)
+            {
+                <p class="text-muted" role="status">Yükleniyor…</p>
+            }
+            else if (entries.Items.Count == 0)
+            {
+                <p class="text-muted" role="status">Aramaya uyan satır yok.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Sürümdeki GTİP satırları</caption>
+                    <thead><tr><th scope="col">GTİP</th><th scope="col">Tanım</th><th scope="col">Birim</th></tr></thead>
+                    <tbody>
+                        @foreach (var entry in entries.Items)
+                        {
+                            <tr>
+                                <td data-label="GTİP" class="primary">@entry.Code</td>
+                                <td data-label="Tanım">@entry.Description</td>
+                                <td data-label="Birim">@(entry.Unit ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <Pager PageSizeChoice="true" Page="entries.Page" PageSize="entries.PageSize" TotalCount="entries.TotalCount" PageChanged="LoadEntriesAsync" />
+            }
+        </section>
+    }
+</PlatformGate>
+
+@code {
+    private List<GtipVersionDto>? versions;
+    private GtipVersionDto? selected;
+    private GtipEntryPageDto? entries;
+    private GtipImportPreviewDto? preview;
+    private Guid? confirmDelete;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+    private int inputKey;
+    private string name = string.Empty;
+    private DateTime? effectiveFrom;
+    private string? search;
+    private string? fileName;
+    private byte[]? bytes;
+
+    /// <summary>Bugün yürürlükte olan sürüm: yürürlük tarihi bugünü geçmemiş en yeni olan.</summary>
+    private Guid? InForceId => versions?.Where(v => v.EffectiveFrom <= DateOnly.FromDateTime(DateTime.Today))
+        .OrderByDescending(v => v.EffectiveFrom).Select(v => (Guid?)v.Id).FirstOrDefault();
+
+    protected override async Task OnInitializedAsync() => await LoadVersionsAsync();
+
+    private async Task LoadVersionsAsync()
+    {
+        var result = await Api.GetAsync<List<GtipVersionDto>>("/api/platform/gtip/versions");
+        versions = result.Value;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+        }
+    }
+
+    private async Task OnFileChosenAsync(InputFileChangeEventArgs e)
+    {
+        preview = null;
+        bytes = null;
+        notice = null;
+        fileName = e.File.Name;
+        try
+        {
+            using var stream = e.File.OpenReadStream(GtipImportLimits.MaxFileBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            bytes = buffer.ToArray();
+        }
+        catch (IOException)
+        {
+            Fail($"Dosya en fazla {GtipImportLimits.MaxFileBytes / (1024 * 1024)} MB olabilir.");
+            return;
+        }
+
+        // Dosya seçilir seçilmez önizlenir: hatalar daha ad ve tarih girilmeden görünür.
+        await PreviewAsync();
+    }
+
+    private async Task PreviewAsync()
+    {
+        if (bytes is null || busy)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.PostBytesAsync<GtipImportPreviewDto>(
+            $"/api/platform/gtip/versions/preview?fileName={Uri.EscapeDataString(fileName ?? string.Empty)}", bytes, "application/octet-stream");
+        busy = false;
+        preview = result.Value;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        if (busy || bytes is null || preview is not { CanImport: true })
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(name) || effectiveFrom is null)
+        {
+            Fail("Sürüm adı ve yürürlük tarihi gerekli.");
+            return;
+        }
+
+        busy = true;
+        var day = DateOnly.FromDateTime(effectiveFrom.Value);
+        var result = await Api.PostBytesAsync<GtipVersionDto>(
+            $"/api/platform/gtip/versions?fileName={Uri.EscapeDataString(fileName ?? string.Empty)}&name={Uri.EscapeDataString(name.Trim())}&effectiveFrom={day:yyyy-MM-dd}",
+            bytes, "application/octet-stream");
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+            return;
+        }
+
+        notice = $"“{result.Value!.Name}” yüklendi: {result.Value.EntryCount} satır, {result.Value.EffectiveFrom:dd.MM.yyyy} tarihinden itibaren yürürlükte.";
+        failed = false;
+        name = string.Empty;
+        effectiveFrom = null;
+        bytes = null;
+        preview = null;
+        fileName = null;
+        inputKey++;
+        await LoadVersionsAsync();
+    }
+
+    private async Task DeleteAsync(GtipVersionDto version)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/platform/gtip/versions/{version.Id}");
+        busy = false;
+        confirmDelete = null;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+            return;
+        }
+
+        notice = $"“{version.Name}” silindi.";
+        failed = false;
+        if (selected?.Id == version.Id)
+        {
+            CloseEntries();
+        }
+
+        await LoadVersionsAsync();
+    }
+
+    private async Task OpenEntriesAsync(GtipVersionDto version)
+    {
+        selected = version;
+        search = null;
+        entries = null;
+        await LoadEntriesAsync(1);
+    }
+
+    private void CloseEntries()
+    {
+        selected = null;
+        entries = null;
+    }
+
+    private async Task LoadEntriesAsync(int page)
+    {
+        if (selected is null)
+        {
+            return;
+        }
+
+        var result = await Api.GetAsync<GtipEntryPageDto>(
+            $"/api/platform/gtip/versions/{selected.Id}/entries?page={page}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}");
+        entries = result.Value;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+        }
+    }
+
+    private void Fail(string? message)
+    {
+        notice = message ?? "İşlem tamamlanamadı.";
+        failed = true;
+    }
+}

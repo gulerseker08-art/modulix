@@ -95,6 +95,9 @@ public class GtipImportTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         {
             using var platform = await LoginAsync(s.PlatformAdmin);
 
+            // Arayüzün gösterdiği dosya sınırı (Shared) ile sunucunun uyguladığı sınır aynı olmalı.
+            Assert.Equal(GtipImportRules.MaxFileBytes, GtipImportLimits.MaxFileBytes);
+
             // Hatalı satırlar önizlemede satır numarasıyla görünür ve içe aktarmayı engeller (kısmi katalog yüklenmez).
             var bad = Workbook(
                 new Dictionary<string, object?> { ["GTİP"] = "09023000", ["Tanım"] = "Siyah çay", ["Birim"] = "kg" },
