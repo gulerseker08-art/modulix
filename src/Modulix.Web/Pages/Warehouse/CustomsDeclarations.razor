@@ -28,15 +28,14 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Beyanname görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="decl-search">Beyanname ara</label>
-            <input id="decl-search" class="form-control" type="search" placeholder="Tescil no, dış referans veya idare ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+            <input class="form-control" type="search" aria-label="Beyanname ara" placeholder="Tescil no, dış referans veya idare ara" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(WarehouseAccess.DeclarationsWrite) && !editing)
         {
             <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni beyanname</button>
@@ -46,16 +45,15 @@
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <label class="visually-hidden" for="decl-importer-filter">İthalatçı</label>
             <LookupPicker Id="decl-importer-filter" LookupKey="@WarehouseAccess.DeclarationImporterLookup" Value="importerId" ValueChanged="ChooseImporterAsync" Placeholder="Tüm ithalatçılar" />
-            <label class="visually-hidden" for="decl-broker-filter">Gümrük müşaviri</label>
             <LookupPicker Id="decl-broker-filter" LookupKey="@WarehouseAccess.DeclarationBrokerLookup" Value="brokerId" ValueChanged="ChooseBrokerAsync" Placeholder="Tüm müşavirler" />
-            <label class="visually-hidden" for="decl-from">Tescil tarihi başlangıç</label>
-            <input id="decl-from" class="form-control form-control-sm" type="date" title="Tescil tarihi (başlangıç)" @bind="from" @bind:after="() => LoadAsync(1)" />
-            <label class="visually-hidden" for="decl-to">Tescil tarihi bitiş</label>
-            <input id="decl-to" class="form-control form-control-sm" type="date" title="Tescil tarihi (bitiş)" @bind="to" @bind:after="() => LoadAsync(1)" />
+            <input class="form-control" type="date" aria-label="Tescil tarihi başlangıç" title="Tescil tarihi (başlangıç)" @bind="from" @bind:after="() => LoadAsync(1)" />
+            <input class="form-control" type="date" aria-label="Tescil tarihi bitiş" title="Tescil tarihi (bitiş)" @bind="to" @bind:after="() => LoadAsync(1)" />
         </div>
     }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (page is null)
     {
@@ -63,7 +61,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu süzgece uyan beyanname yok.</p>
+        <p class="text-muted" role="status">Bu görünüme uyan beyanname yok.</p>
     }
     else
     {
@@ -72,29 +70,27 @@
             <caption class="visually-hidden">Beyanname listesi</caption>
             <thead>
                 <tr>
-                    <th scope="col">Tescil no</th><th scope="col">Tescil tarihi</th><th scope="col">İthalatçı</th><th scope="col">Gümrük müşaviri</th>
-                    <th scope="col">Rejim</th><th scope="col">Durum</th>
-                    @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.CustomsDeclarationEntityKey)) { <th scope="col">@field.Label</th> }
-                    <th scope="col"></th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var declaration in page.Items)
                 {
-                    var statusKey = WarehouseLabels.Text(declaration, "statusKey");
                     <tr>
-                        <td data-label="Tescil no" class="primary">@WarehouseLabels.Text(declaration, "registrationNo")</td>
-                        <td data-label="Tescil tarihi">@Display(WarehouseLabels.Text(declaration, "registrationDate"))</td>
-                        <td data-label="İthalatçı">@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(declaration, "importerPartyId"))</td>
-                        <td data-label="Gümrük müşaviri">@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(declaration, "brokerPartyId"))</td>
-                        <td data-label="Rejim">@Lookups.Label(WarehouseAccess.CustomsRegimeList, WarehouseLabels.Text(declaration, "regimeKey"))</td>
-                        <td data-label="Durum"><span class="badge @WarehouseLabels.DeclarationBadge(Lookups.CategoryOf(WarehouseAccess.DeclarationStatusList, statusKey))">@Lookups.Label(WarehouseAccess.DeclarationStatusList, statusKey)</span></td>
-                        @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.CustomsDeclarationEntityKey))
+                        @foreach (var column in grid.VisibleColumns)
                         {
-                            <td data-label="@field.Label">@CustomFieldText.Format(field, declaration.Values["custom"] as JsonObject)</td>
+                            @Cell(column, declaration)
                         }
-                        <td class="actions">
-                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(declaration)">@(Session.Can(WarehouseAccess.DeclarationsWrite) ? "Düzenle" : "Aç")</button>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(declaration, "registrationNo")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(declaration)">
+                                    <AppIcon Name="@(Session.Can(WarehouseAccess.DeclarationsWrite) ? "pencil" : "eye")" Size="16" /> <span>@(Session.Can(WarehouseAccess.DeclarationsWrite) ? "Düzenle" : "Aç")</span>
+                                </button>
+                            </RowMenu>
                         </td>
                     </tr>
                 }
@@ -109,6 +105,20 @@
     private const string AllViews = "all";
     private const string StatusPrefix = "status:";
 
+    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (WarehouseRecordStore.SortKeys).
+    // Taraflar (firma adı) sunucuda sıralanamaz: firma görünürlüğü sıralamayla dolanılmasın. Varsayılan sıra tescil tarihine göre en yenidir.
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("registrationNo", "Tescil no", "hash", "registrationNo", "-registrationNo", Locked: true),
+        new("registrationDate", "Tescil tarihi", "calendar", "registrationDate", "-registrationDate"),
+        new("importer", "İthalatçı", "building", DefaultVisible: true),
+        new("broker", "Gümrük müşaviri", "user"),
+        new("regimeKey", "Rejim", "landmark", "regimeKey", "-regimeKey"),
+        new("statusKey", "Durum", "tag", "statusKey", "-statusKey"),
+    ];
+
+    private readonly GridViewState grid = new("warehouse.customs-declarations", "-registrationDate");
+    private PersonalGridViews views = default!;
     private RecordPageResponse? page;
     private RecordResponse? selected;
     private readonly Dictionary<Guid, string> partyNames = [];
@@ -118,33 +128,60 @@
     private string? notice;
     private string? search;
     private string view = AllViews;
+    private string? statusKey;
     private Guid? importerId;
     private Guid? brokerId;
     private DateTime? from;
     private DateTime? to;
 
-    // Görünümler yalnızca süzgeçtir (Tümü ve firmanın beyanname durumları); taraf ve tarih süzgeçleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
-    private IReadOnlyList<ViewOption> ViewOptions =>
-    [
-        new(AllViews, "Tüm beyannameler"),
-        .. Lookups.ValuesOf(WarehouseAccess.DeclarationStatusList).Where(v => v.Active).Select(v => new ViewOption(StatusPrefix + v.Key, v.Label)),
-    ];
-
-    private int ActiveFilters => (importerId is null ? 0 : 1) + (brokerId is null ? 0 : 1) + (from is null ? 0 : 1) + (to is null ? 0 : 1);
-
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "warehouse.customs-declarations");
         await Session.EnsureLoadedAsync();
         if (Session.Can(WarehouseAccess.DeclarationsRead))
         {
             await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(WarehouseAccess.CustomsDeclarationEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
 
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Tümü, firmanın beyanname durumları, kişisel); taraf ve tarih süzgeçleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm beyannameler", Icon: "clipboard-list"),
+        .. Lookups.ValuesOf(WarehouseAccess.DeclarationStatusList).Where(v => v.Active).Select(v => new ViewOption(StatusPrefix + v.Key, v.Label, Icon: "tag")),
+        .. views.Options,
+    ];
+
+    private int ActiveFilters => (importerId is null ? 0 : 1) + (brokerId is null ? 0 : 1) + (from is null ? 0 : 1) + (to is null ? 0 : 1);
+
     private async Task ChooseViewAsync(string key)
     {
         view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm: sütunlar, sıralama ve süzgeç birlikte gelir.
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            statusKey = filters.GetValueOrDefault("statusKey");
+            importerId = Guid.TryParse(filters.GetValueOrDefault("importerPartyId"), out var importer) ? importer : null;
+            brokerId = Guid.TryParse(filters.GetValueOrDefault("brokerPartyId"), out var broker) ? broker : null;
+            from = ParseDay(filters.GetValueOrDefault("registeredFrom"));
+            to = ParseDay(filters.GetValueOrDefault("registeredTo"));
+        }
+        else
+        {
+            grid.Reset();
+            statusKey = key.StartsWith(StatusPrefix, StringComparison.Ordinal) ? key[StatusPrefix.Length..] : null;
+            importerId = brokerId = null;
+            from = to = null;
+        }
+
         await LoadAsync(1);
     }
 
@@ -160,12 +197,62 @@
         await LoadAsync(1);
     }
 
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    // Sütun seçimi/sırası değişince veri yeniden çekilmez; olay işleyicisi sayfada olduğu için tablo yeniden çizilir.
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(
+        statusKey is { } s ? ("statusKey", s) : null,
+        importerId is { } i ? ("importerPartyId", i.ToString()) : null, brokerId is { } b ? ("brokerPartyId", b.ToString()) : null,
+        from is { } f ? ("registeredFrom", $"{f:yyyy-MM-dd}") : null, to is { } t ? ("registeredTo", $"{t:yyyy-MM-dd}") : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private static DateTime? ParseDay(string? value) =>
+        DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day) ? day : null;
+
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
-        if (view.StartsWith(StatusPrefix, StringComparison.Ordinal))
+        if (grid.Sort != grid.DefaultSort)
         {
-            url += $"&statusKey={Uri.EscapeDataString(view[StatusPrefix.Length..])}";
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (statusKey is { } status)
+        {
+            url += $"&statusKey={Uri.EscapeDataString(status)}";
         }
 
         if (importerId is { } importer)
@@ -197,6 +284,21 @@
             await WarehouseLabels.ResolveNamesAsync(Api, WarehouseAccess.DeclarationImporterLookup, ids, partyNames);
         }
     }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse declaration) => @<td data-label="@column.Label" class="@(column.Key == "registrationNo" ? "primary" : null)">@CellContent(column.Key, declaration)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse declaration) => key switch
+    {
+        "registrationNo" => @<text>@WarehouseLabels.Text(declaration, "registrationNo")</text>,
+        "registrationDate" => @<text>@Display(WarehouseLabels.Text(declaration, "registrationDate"))</text>,
+        "importer" => @<text>@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(declaration, "importerPartyId"))</text>,
+        "broker" => @<text>@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(declaration, "brokerPartyId"))</text>,
+        "regimeKey" => @<text>@Lookups.Label(WarehouseAccess.CustomsRegimeList, WarehouseLabels.Text(declaration, "regimeKey"))</text>,
+        "statusKey" => @<span class="badge @WarehouseLabels.DeclarationBadge(Lookups.CategoryOf(WarehouseAccess.DeclarationStatusList, WarehouseLabels.Text(declaration, "statusKey")))">@Lookups.Label(WarehouseAccess.DeclarationStatusList, WarehouseLabels.Text(declaration, "statusKey"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(WarehouseAccess.CustomsDeclarationEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, declaration.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
 
     private static string Display(string isoDate) =>
         DateOnly.TryParseExact(isoDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
