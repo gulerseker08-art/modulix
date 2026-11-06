@@ -36,3 +36,38 @@ internal sealed class GtipCatalogEntryConfiguration : IEntityTypeConfiguration<G
         builder.HasOne<GtipCatalogVersion>().WithMany().HasForeignKey(e => e.VersionId).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal sealed class RegimeProfileConfiguration : IEntityTypeConfiguration<RegimeProfile>
+{
+    public void Configure(EntityTypeBuilder<RegimeProfile> builder)
+    {
+        // Platform kataloğu (ADR-0032 K16): TenantId taşımaz, RLS dışıdır.
+        builder.ToTable("RegimeProfiles", DatabaseSchemas.Platform);
+        builder.HasKey(p => p.Id);
+        builder.Property(p => p.Id).ValueGeneratedNever();
+        builder.Property(p => p.Code).HasMaxLength(RegimeProfile.CodeMaxLength).IsRequired();
+        builder.Property(p => p.Name).HasMaxLength(RegimeProfile.NameMaxLength).IsRequired();
+        builder.HasIndex(p => p.Code).IsUnique();
+    }
+}
+
+internal sealed class RegimeProfileVersionConfiguration : IEntityTypeConfiguration<RegimeProfileVersion>
+{
+    public void Configure(EntityTypeBuilder<RegimeProfileVersion> builder)
+    {
+        builder.ToTable("RegimeProfileVersions", DatabaseSchemas.Platform);
+        builder.HasKey(v => v.Id);
+        builder.Property(v => v.Id).ValueGeneratedNever();
+        builder.Property(v => v.ContentJson).IsRequired();
+        builder.Property(v => v.VerificationNote).HasMaxLength(RegimeProfileVersion.NoteMaxLength);
+        builder.HasOne<RegimeProfile>().WithMany().HasForeignKey(v => v.ProfileId).OnDelete(DeleteBehavior.Restrict);
+
+        // Profil başına sürüm numarası benzersizdir; en çok bir taslak ve bir yayın olabilir (filtreli benzersiz dizin).
+        builder.HasIndex(v => new { v.ProfileId, v.Number }).IsUnique();
+        // Aynı sütunda iki dizin olduğundan adlandırılmış dizin kullanılır (EF aksi halde ikisini birleştirir).
+        builder.HasIndex(v => v.ProfileId, "UX_RegimeProfileVersions_Draft").IsUnique()
+            .HasFilter($"[State] = {(int)RegimeProfileVersionState.Draft}");
+        builder.HasIndex(v => v.ProfileId, "UX_RegimeProfileVersions_Published").IsUnique()
+            .HasFilter($"[State] = {(int)RegimeProfileVersionState.Published}");
+    }
+}
