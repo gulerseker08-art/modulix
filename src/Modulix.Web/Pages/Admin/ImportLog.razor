@@ -29,6 +29,10 @@
     <div class="list-toolbar">
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
+        @if (Session.Can(CoreAccess.RunImports))
+        {
+            <a class="btn btn-primary ms-auto" href="yonetim/gunluk/yeni">Yeni içe aktarma</a>
+        }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)

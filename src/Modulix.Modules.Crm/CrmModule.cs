@@ -385,6 +385,9 @@ public sealed class CrmModule : IModule
     /// <summary>Form düzenleri (ADR-0021); varsayılan yerleşimler <see cref="CrmForms"/>'tadır, firma üzerine kendi düzenini kurar.</summary>
     IReadOnlyList<FormDefinition> IModule.Forms => CrmForms.All;
 
+    /// <summary>İçe aktarılabilir kayıt türleri (ADR-0033); sütunlar <see cref="CrmImports"/>'tadır.</summary>
+    IReadOnlyList<ImportDefinition> IModule.Imports => CrmImports.All;
+
     /// <summary>
     /// Seçim listeleri (Y9b). Hazır değerlerin anahtarları eski enum adlarıdır; kayıtlarda ve API'de bunlar durur.
     /// Firma adlarını, sırasını ve etkinliğini değiştirir; yeni değer eklerken kategorisini seçer.

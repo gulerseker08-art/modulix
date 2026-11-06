@@ -123,6 +123,7 @@ public static class PersistenceSetup
         services.AddScoped<AutomationRetention>();
         services.AddSingleton<AutomationRunner>();
         services.AddScoped<IImportLog, ImportLog>();
+        services.AddScoped<ImportSchema>();
 
         // Ortak rapor merkezi (ADR-0026, dilim 3): veri kümeleri modüllerden gelir, okumalar kayıt boru hattından geçer.
         services.AddScoped<ReportColumnResolver>();

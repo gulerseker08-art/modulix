@@ -2,16 +2,43 @@ using Modulix.Api.Access;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Imports;
+using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Modules;
+using Modulix.Core.Reporting;
 using Modulix.Core.Settings;
 using Modulix.Shared.Imports;
 
 namespace Modulix.Api.Imports;
 
+/// <summary>İçe aktarma uçlarının ortak servisleri ve "bu kullanıcı bu türü içe aktarabilir mi" kuralı.</summary>
+public sealed class ImportContext(
+    ModuleCatalog catalog, ImportSchema schema, ImportRunner runner, ImportErrorReports reports, IImportLog log, ICurrentAccess access,
+    IModuleLicense license, ITenantContextAccessor tenant, ICompanyContextAccessor company)
+{
+    public ModuleCatalog Catalog => catalog;
+
+    public ImportSchema Schema => schema;
+
+    public ImportRunner Runner => runner;
+
+    public ImportErrorReports Reports => reports;
+
+    public IImportLog Log => log;
+
+    public ITenantContextAccessor Tenant => tenant;
+
+    public ICompanyContextAccessor Company => company;
+
+    /// <summary>Modül yazılabilir olmalı (ADR-0028: salt okunurda tür listelenmez) ve kullanıcının türde oluşturma izni bulunmalı.</summary>
+    public async Task<bool> CanRunAsync(string moduleKey, ImportDefinition definition, CancellationToken cancellationToken) =>
+        await license.AllowsAsync(tenant.Current!.TenantId, moduleKey, write: true, cancellationToken)
+        && await access.HasPermissionAsync(definition.CreatePermission, cancellationToken);
+}
+
 /// <summary>
-/// İçe aktarma günlüğü (ADR-0033, Dilim 1): /api/imports. Yalnızca okuma. <c>core.imports.read</c> sahibi firmanın bütün
-/// içe aktarmalarını, yalnızca <c>core.imports.run</c> sahibi kendi içe aktarmalarını görür; başkasının koşusu "bulunamadı"
-/// döner. Tenant oturumdan belirlenir. Satır hatası ham hücre değeri içermez.
+/// İçe aktarma (ADR-0033): /api/imports. <c>core.imports.read</c> sahibi firmanın bütün içe aktarmalarını, yalnızca
+/// <c>core.imports.run</c> sahibi kendi içe aktarmalarını görür; başkasının koşusu "bulunamadı" döner. Başlatmak için
+/// <c>core.imports.run</c> ve türün oluşturma izni gerekir. Tenant oturumdan belirlenir. Satır hatası ham hücre değeri içermez.
 /// </summary>
 public static class ImportEndpoints
 {
@@ -24,8 +51,93 @@ public static class ImportEndpoints
 
         group.MapGet("/", ListAsync);
         group.MapGet("/{runId:guid}", GetAsync);
+
+        // Başlatma (Dilim 2): dosya gövdede ham bayttır, tür ve ad sorgudadır. Satırlar arka planda işlenir: 202 döner, koşu GET ile izlenir. Modül hakkı türe göre değiştiği için RequireModule yerine
+        // uçta denetlenir. Kuru çalışma iş kaydı yazmaz; yalnızca günlüğe koşu satırı ekler.
+        group.MapGet("/definitions", ListDefinitionsAsync).RequirePermission(CoreModule.Permissions.RunImports);
+        group.MapGet("/definitions/{entityKey}/template", GetTemplateAsync).RequirePermission(CoreModule.Permissions.RunImports);
+        group.MapPost("/preview", (string? entityKey, string? fileName, HttpRequest http, ImportContext context, CancellationToken ct) =>
+            StartAsync(ImportRunMode.DryRun, entityKey, fileName, http, context, ct)).RequirePermission(CoreModule.Permissions.RunImports);
+        group.MapPost("/", (string? entityKey, string? fileName, HttpRequest http, ImportContext context, CancellationToken ct) =>
+            StartAsync(ImportRunMode.Apply, entityKey, fileName, http, context, ct)).RequirePermission(CoreModule.Permissions.RunImports);
+        group.MapGet("/{runId:guid}/error-report", GetErrorReportAsync);
         return app;
     }
+
+    private static async Task<IResult> ListDefinitionsAsync(ImportContext context, CancellationToken ct)
+    {
+        var result = new List<ImportDefinitionDto>();
+        foreach (var (moduleKey, definition) in context.Catalog.ImportDefinitions)
+        {
+            if (await context.CanRunAsync(moduleKey, definition, ct))
+            {
+                var fields = await context.Schema.FieldsAsync(context.Tenant.Current!, definition, ct);
+                result.Add(new ImportDefinitionDto(
+                    definition.EntityKey, definition.DisplayName, [.. fields.Select(f => new ImportFieldDto(f.Key, f.Label, f.Required))]));
+            }
+        }
+
+        return Results.Ok(result);
+    }
+
+    private static async Task<IResult> GetTemplateAsync(string entityKey, ImportContext context, CancellationToken ct)
+    {
+        if (context.Catalog.FindImport(entityKey) is not { } found || !await context.CanRunAsync(found.ModuleKey, found.Definition, ct))
+        {
+            return NotImportable();
+        }
+
+        var fields = await context.Schema.FieldsAsync(context.Tenant.Current!, found.Definition, ct);
+        return Results.File(ImportErrorReport.Template(fields), "text/csv", ReportCsv.FileSlug(found.Definition.DisplayName) + "-sablon.csv");
+    }
+
+    private static async Task<IResult> StartAsync(
+        ImportRunMode mode, string? entityKey, string? fileName, HttpRequest http, ImportContext context, CancellationToken ct)
+    {
+        // Kapalı ya da salt okunur modülün türü ve izinsiz tür listede yoktur; aynı cevabı alır.
+        if (entityKey is null || context.Catalog.FindImport(entityKey) is not { } found || !await context.CanRunAsync(found.ModuleKey, found.Definition, ct))
+        {
+            return NotImportable();
+        }
+
+        var name = Path.GetFileName(fileName ?? string.Empty);
+        if (Path.GetExtension(name).ToLowerInvariant() is not (".csv" or ".txt"))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Şimdilik yalnızca .csv dosyası yüklenebilir; Excel'de 'CSV' olarak kaydedin.");
+        }
+
+        var (content, problem) = await LimitedBody.ReadAsync(http, ImportLimits.MaxFileBytes, ct);
+        if (content is null)
+        {
+            return problem!;
+        }
+
+        var runId = await context.Runner.StartAsync(found.Definition, mode, name, content, context.Tenant.Current!, context.Company.Current);
+        if (runId is not { } id)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Bu firmada başka bir içe aktarma sürüyor; bitince yeniden deneyin.");
+        }
+
+        var detail = await context.Log.GetAsync(id, new ImportIssueQuery(), context.Tenant.Current!.UserId, ct);
+        return Results.Accepted($"/api/imports/{id}", ToDto(detail!));
+    }
+
+    /// <summary>Rapor yükleyenin dosyasından üretilir ve hassas değer taşıyabilir: firmanın günlüğünü görenlere değil, yalnızca yükleyene verilir.</summary>
+    private static async Task<IResult> GetErrorReportAsync(Guid runId, ImportContext context, CancellationToken ct)
+    {
+        var tenant = context.Tenant.Current!;
+        if (await context.Log.GetAsync(runId, new ImportIssueQuery(PageSize: 1), tenant.UserId, ct) is null)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "İçe aktarma bulunamadı.");
+        }
+
+        return context.Reports.Find(tenant.TenantId, runId) is { } report
+            ? Results.File(report.Content, "text/csv", report.FileName)
+            : Results.Problem(statusCode: StatusCodes.Status410Gone, title: "Hata raporunun süresi doldu; dosyayı yeniden yükleyerek yeni rapor alın.");
+    }
+
+    private static IResult NotImportable() =>
+        Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bu kayıt türü içe aktarılamıyor.");
 
     private static async Task<IResult> ListAsync(
         string? entityKey, string? status, string? mode, Guid? userId, DateOnly? from, DateOnly? to, string? sort, int? page, int? pageSize,

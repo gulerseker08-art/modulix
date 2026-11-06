@@ -1,7 +1,7 @@
 @inject ApiClient Api
 
 @* İçe aktarma ayrıntısı (ADR-0033): en sık hatalar ve satır hataları. Ham hücre değeri yoktur; düzeltme için asıl satır
-   hata raporunda (sonraki dilim) verilir. *@
+   hata raporunda verilir. *@
 @if (message is not null)
 {
     <div class="alert alert-danger" role="alert">@message</div>

@@ -227,6 +227,36 @@ public sealed class ImportRun : ITenantEntity, ICompanyShared
         Finish(note, now);
     }
 
+    /// <summary>Çalışan koşunun o ana kadarki sayıları: ekran ilerlemeyi gösterir, çökmede alınan satır sayısı bilinir.</summary>
+    public void ReportProgress(int created, int failed)
+    {
+        if (Status != ImportRunStatus.Running)
+        {
+            throw new InvalidOperationException("Yalnızca çalışan içe aktarmanın ilerlemesi yazılır.");
+        }
+
+        CreatedCount = created;
+        FailedCount = failed;
+    }
+
+    /// <summary>
+    /// Uygulama kapanırken yarıda kalan koşu: o ana kadar işlenen satırlar kalıcıdır ve sayıları korunur, kalan satırlar işlenmemiştir.
+    /// Aynı dosya yeniden yüklenirse alınmış satırlar tekrar oluşur; bu yüzden not bunu söyler.
+    /// </summary>
+    public void Stop(int created, int failed, string note, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(note);
+        if (Status != ImportRunStatus.Running)
+        {
+            throw new InvalidOperationException("Yalnızca çalışan içe aktarma durdurulabilir.");
+        }
+
+        CreatedCount = created;
+        FailedCount = failed;
+        Status = ImportRunStatus.Cancelled;
+        Finish(note, now);
+    }
+
     public void Cancel(DateTimeOffset now)
     {
         if (IsTerminal)
