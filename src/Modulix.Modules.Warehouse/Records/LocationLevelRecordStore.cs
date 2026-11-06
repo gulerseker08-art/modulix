@@ -37,8 +37,7 @@ internal sealed partial class LocationLevelRecordStore(WarehouseStoreContext con
         ["facilityId"] = (q, v) => FilterValue.Id(v) is { } id ? q.Where(l => l.FacilityId == id) : null,
     };
 
-    protected override IOrderedQueryable<LocationLevel> Order(IQueryable<LocationLevel> source) =>
-        source.OrderBy(l => l.FacilityId).ThenBy(l => l.Position);
+    protected override IOrderedQueryable<LocationLevel> Order(IQueryable<LocationLevel> source) => Order(source, "facility");
 
     // Liste başlıklarına göre sıralama; tesis, tesisin koduna göre sıralanır. Eşit kayıtlar tesise ve sıraya göre sıralanır.
     protected override IReadOnlyCollection<string>? SortKeys { get; } =

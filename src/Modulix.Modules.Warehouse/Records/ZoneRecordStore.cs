@@ -36,7 +36,7 @@ internal sealed partial class ZoneRecordStore(WarehouseStoreContext context) : W
         ["isActive"] = (q, v) => FilterValue.Bool(v) is { } flag ? q.Where(z => z.IsActive == flag) : null,
     };
 
-    protected override IOrderedQueryable<Zone> Order(IQueryable<Zone> source) => source.OrderBy(z => z.FacilityId).ThenBy(z => z.Code);
+    protected override IOrderedQueryable<Zone> Order(IQueryable<Zone> source) => Order(source, "facility");
 
     // Liste başlıklarına göre sıralama; tesis, tesisin koduna göre sıralanır. Eşit kayıtlar alan koduna göre sıralanır.
     protected override IReadOnlyCollection<string>? SortKeys { get; } =

@@ -40,7 +40,7 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
         ["isActive"] = (q, v) => FilterValue.Bool(v) is { } flag ? q.Where(l => l.IsActive == flag) : null,
     };
 
-    protected override IOrderedQueryable<Location> Order(IQueryable<Location> source) => source.OrderBy(l => l.FacilityId).ThenBy(l => l.Code);
+    protected override IOrderedQueryable<Location> Order(IQueryable<Location> source) => Order(source, "facility");
 
     // Liste başlıklarına göre sıralama; tesis ve alan kodlarına göre sıralanır (alanı olmayanlar sonda). Eşit kayıtlar koda göre sıralanır.
     protected override IReadOnlyCollection<string>? SortKeys { get; } =
