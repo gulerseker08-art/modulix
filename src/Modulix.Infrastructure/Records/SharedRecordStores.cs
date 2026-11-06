@@ -351,6 +351,10 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
         new Dictionary<string, Func<IQueryable<Party>, string, IQueryable<Party>?>>
         {
             ["taxNumber"] = (q, v) => v.Trim() is { Length: > 0 and <= Party.TaxNumberMaxLength } number ? q.Where(p => p.TaxNumber == number) : null,
+            // "relationshipRole": o ilişki rolüne sahip taraflar (rol kodları virgülle saklanır; ör. ithalatçı seçimi).
+            ["relationshipRole"] = (q, v) => v.Trim() is { Length: > 0 } role && ActivityTreeRules.IsValidCode(role)
+                ? q.Where(p => p.RelationshipRoles != null && ("," + p.RelationshipRoles + ",").Contains("," + role + ","))
+                : null,
         };
 
     protected override IOrderedQueryable<Party> Order(IQueryable<Party> source) => source.OrderBy(p => p.Name);

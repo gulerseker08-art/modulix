@@ -53,6 +53,15 @@ public sealed record LookupDefinition(
 
     public string? DependsOnFilter { get; init; }
 
+    /// <summary>
+    /// Sabit süzgeç: hedef depoda tanımlı bir süzgeç adı ve değeri; her aramada üst değerden bağımsız uygulanır (ör. firma lookup'ı
+    /// yalnızca belirli ilişki rolündeki firmaları getirir). İkisi birlikte tanımlıdır. Süzgeç yalnızca seçim kolaylığıdır; kaydın
+    /// geçerliliği modülün kendi kayıt denetimindedir.
+    /// </summary>
+    public string? FixedFilterName { get; init; }
+
+    public string? FixedFilterValue { get; init; }
+
     /// <summary>Üst değer yokken alt alanın davranışı (arayüz metni).</summary>
     public string? DependsOnHint { get; init; }
 

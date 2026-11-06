@@ -189,3 +189,42 @@ public sealed class Zone : WarehouseEntity
     /// <summary>Pasif alan yeni yerleştirme almaz; geçmiş kayıtları korunur.</summary>
     public bool IsActive { get; internal set; } = true;
 }
+
+/// <summary>
+/// Vekâlet (K4): ithalatçının gümrük müşavirine verdiği yetki. İthalatçı ve müşavir Core'daki firma kaydıdır (<c>core.party</c>, K2);
+/// vekâlet yalnızca bunlara başvurur. Geçerlilik tarih aralığı ve <see cref="IsActive"/> (iptal edilmemiş) birlikte belirler; kapsam ve
+/// belge bilgisi serbest metindir (belge dosyası yükleme sonraki adımdır). Müşavirin hangi ithalatçının kaydını görebileceği bu
+/// kayıttan türetilir (ASN dilimi); bu kayıt tek başına kimseye erişim vermez.
+/// </summary>
+public sealed class PowerOfAttorney : WarehouseEntity
+{
+    public const int ScopeMaxLength = 500;
+    public const int DocumentMaxLength = 200;
+
+    /// <summary>İthalatçı / malik (firma). Oluşturulduktan sonra değişmez: başka ithalatçı yeni vekâlettir.</summary>
+    public Guid ImporterPartyId { get; internal set; }
+
+    /// <summary>Gümrük müşaviri (firma). Oluşturulduktan sonra değişmez.</summary>
+    public Guid BrokerPartyId { get; internal set; }
+
+    public DateOnly ValidFrom { get; internal set; }
+
+    /// <summary>Bitiş tarihi (dahil); boşsa süresiz.</summary>
+    public DateOnly? ValidTo { get; internal set; }
+
+    /// <summary>Vekâletin kapsamı (serbest metin; ör. "ithalat beyannameleri"). Mevzuat doğrulanana kadar yapılandırılmış değildir.</summary>
+    public string? Scope { get; internal set; }
+
+    /// <summary>Belge referansı (noter yevmiye no, dosya adı vb.). Dosya yükleme sonraki adımdır.</summary>
+    public string? DocumentReference { get; internal set; }
+
+    /// <summary>İptal edilmiş vekâlet false'tur; tarihi geçerli olsa da geçerli sayılmaz.</summary>
+    public bool IsActive { get; internal set; } = true;
+
+    /// <summary>Verilen günde geçerli mi? (etkin ve tarih aralığında)</summary>
+    public bool IsValidOn(DateOnly day) => IsValid(IsActive, ValidFrom, ValidTo, day);
+
+    /// <summary>Saf geçerlilik kuralı: etkin ve [başlangıç, bitiş] aralığında (bitiş boşsa süresiz).</summary>
+    public static bool IsValid(bool isActive, DateOnly validFrom, DateOnly? validTo, DateOnly day) =>
+        isActive && validFrom <= day && (validTo is null || day <= validTo);
+}

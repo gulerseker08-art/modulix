@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Warehouse.Records;
 
 namespace Modulix.Modules.Warehouse;
@@ -24,6 +25,8 @@ public sealed class WarehouseModule : IModule
         public const string LocationLevelsWrite = "warehouse.locationlevels.write";
         public const string LocationsRead = "warehouse.locations.read";
         public const string LocationsWrite = "warehouse.locations.write";
+        public const string AttorneysRead = "warehouse.attorneys.read";
+        public const string AttorneysWrite = "warehouse.attorneys.write";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -33,6 +36,14 @@ public sealed class WarehouseModule : IModule
         public const string Zone = "warehouse.zone";
         public const string LocationLevel = "warehouse.location-level";
         public const string Location = "warehouse.location";
+        public const string PowerOfAttorney = "warehouse.power-of-attorney";
+    }
+
+    /// <summary>Firma ilişki rolü kodları (platform kataloğu, ADR-0029 K9; K2): vekâletin tarafları bu rollere sahip firmalardır.</summary>
+    public static class RelationshipRoles
+    {
+        public const string Importer = "ithalatci-malik";
+        public const string Broker = "gumruk-musaviri";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -62,6 +73,8 @@ public sealed class WarehouseModule : IModule
         new(Permissions.LocationLevelsWrite, "Lokasyon seviye tanımı ekler ve düzenler", "Lokasyon seviyeleri"),
         new(Permissions.LocationsRead, "Lokasyonları görüntüler", "Lokasyonlar"),
         new(Permissions.LocationsWrite, "Lokasyon ekler ve düzenler", "Lokasyonlar"),
+        new(Permissions.AttorneysRead, "Vekâletleri görüntüler", "Vekâletler"),
+        new(Permissions.AttorneysWrite, "Vekâlet ekler, düzenler ve iptal eder", "Vekâletler"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5): tesis değişiklikleri kim, ne zaman, neyi değiştirdi olarak izlenir.</summary>
@@ -98,6 +111,17 @@ public sealed class WarehouseModule : IModule
         {
             References = new Dictionary<string, string> { ["facilityId"] = Entities.Facility },
         },
+        new(Entities.PowerOfAttorney, "Vekâlet", Permissions.AttorneysRead, new Dictionary<string, string>
+        {
+            ["importerPartyId"] = "İthalatçı", ["brokerPartyId"] = "Gümrük müşaviri", ["validFrom"] = "Başlangıç", ["validTo"] = "Bitiş",
+            ["scope"] = "Kapsam", ["documentReference"] = "Belge", ["isActive"] = "Etkin",
+        }, "documentReference")
+        {
+            References = new Dictionary<string, string>
+            {
+                ["importerPartyId"] = SharedEntities.Party, ["brokerPartyId"] = SharedEntities.Party,
+            },
+        },
     ];
 
     /// <summary>Firmanın özel alan ekleyebildiği kayıt türleri (Y9a).</summary>
@@ -106,6 +130,7 @@ public sealed class WarehouseModule : IModule
         new(Entities.Facility, "Tesis"),
         new(Entities.Zone, "Alan"),
         new(Entities.Location, "Lokasyon"),
+        new(Entities.PowerOfAttorney, "Vekâlet"),
     ];
 
     /// <summary>
@@ -132,6 +157,19 @@ public sealed class WarehouseModule : IModule
 
     IReadOnlyList<LookupDefinition> IModule.Lookups => WarehouseLookupDefinitions.All;
 
+    /// <summary>Ortak kayıtlar (ADR-0006): vekâletin tarafları firmadır; vekâlet okuma izniyle okunur. Depo modülü firma oluşturmaz.</summary>
+    IReadOnlyList<SharedRecordAccess> IModule.SharedRecordAccess { get; } =
+    [
+        new(SharedEntities.Party, Permissions.AttorneysRead),
+    ];
+
+    /// <summary>Firmanın nerede kullanıldığı (silme ve birleştirme koruması).</summary>
+    IReadOnlyList<SharedRecordReference> IModule.SharedRecordReferences { get; } =
+    [
+        new(SharedEntities.Party, Entities.PowerOfAttorney, "importerPartyId", "vekâlet (ithalatçı)"),
+        new(SharedEntities.Party, Entities.PowerOfAttorney, "brokerPartyId", "vekâlet (müşavir)"),
+    ];
+
     /// <summary>Tesis formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>
     IReadOnlyList<FormDefinition> IModule.Forms => WarehouseForms.All;
 
@@ -140,12 +178,13 @@ public sealed class WarehouseModule : IModule
         new(
             "warehouse.manager",
             "Depo sorumlusu",
-            "Tesisleri, alanları ve lokasyonları görüntüler ve düzenler.",
+            "Tesisleri, alanları, lokasyonları ve vekâletleri görüntüler ve düzenler.",
             [
                 Permissions.FacilitiesRead, Permissions.FacilitiesWrite,
                 Permissions.ZonesRead, Permissions.ZonesWrite,
                 Permissions.LocationLevelsRead, Permissions.LocationLevelsWrite,
                 Permissions.LocationsRead, Permissions.LocationsWrite,
+                Permissions.AttorneysRead, Permissions.AttorneysWrite,
             ]),
     ];
 
@@ -156,5 +195,6 @@ public sealed class WarehouseModule : IModule
         services.AddScoped<IRecordStore, ZoneRecordStore>();
         services.AddScoped<IRecordStore, LocationLevelRecordStore>();
         services.AddScoped<IRecordStore, LocationRecordStore>();
+        services.AddScoped<IRecordStore, PowerOfAttorneyRecordStore>();
     }
 }

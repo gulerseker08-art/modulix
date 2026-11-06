@@ -311,6 +311,7 @@ public sealed partial class ModuleCatalog
             || lookup.IsMember != (lookup.TargetEntityKey is null)
             || (!lookup.IsMember && lookup.LabelFields.Count == 0)
             || (lookup.DependsOnField is null) != (lookup.DependsOnFilter is null)
+            || (lookup.FixedFilterName is null) != (lookup.FixedFilterValue is null)
             || lookup.PageSize is < 1 or > RecordLookupLimits.MaxPageSize
             || lookup.MinSearchLength is < 1 or > 10)
         {

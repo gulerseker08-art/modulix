@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Warehouse.Domain;
 
 namespace Modulix.Modules.Warehouse.Persistence;
@@ -106,5 +107,28 @@ internal sealed class ZoneConfiguration : IEntityTypeConfiguration<Zone>
         // Tesis aynı tenant'ta olmalıdır; alanı olan tesis silinemez.
         builder.HasOne<Facility>().WithMany().HasForeignKey(z => new { z.TenantId, z.FacilityId })
             .HasPrincipalKey(f => new { f.TenantId, f.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class PowerOfAttorneyConfiguration : IEntityTypeConfiguration<PowerOfAttorney>
+{
+    public void Configure(EntityTypeBuilder<PowerOfAttorney> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "PowersOfAttorney");
+        builder.Property(p => p.ValidFrom).IsRequired();
+        builder.Property(p => p.Scope).HasMaxLength(PowerOfAttorney.ScopeMaxLength);
+        builder.Property(p => p.DocumentReference).HasMaxLength(PowerOfAttorney.DocumentMaxLength);
+        builder.Property(p => p.IsActive).HasDefaultValue(true);
+        builder.ToTable(t => t.HasCheckConstraint("CK_PowersOfAttorney_Dates", "[ValidTo] IS NULL OR [ValidTo] >= [ValidFrom]"));
+
+        // Müşavirin hangi ithalatçılar için geçerli vekâleti olduğunu bulmak için (ASN kapsamı).
+        builder.HasIndex(p => new { p.TenantId, p.BrokerPartyId, p.ImporterPartyId });
+        builder.HasIndex(p => new { p.TenantId, p.ImporterPartyId });
+
+        // Ortak kayıtlar (ADR-0006): ithalatçı ve müşavir aynı tenant'ın firmasıdır; vekâleti olan firma silinemez.
+        builder.HasOne<Party>().WithMany().HasForeignKey(p => new { p.TenantId, p.ImporterPartyId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Party>().WithMany().HasForeignKey(p => new { p.TenantId, p.BrokerPartyId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }

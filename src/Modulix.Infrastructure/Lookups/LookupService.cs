@@ -182,6 +182,11 @@ internal sealed class LookupService(
     {
         var definition = info.Definition;
         var filters = new Dictionary<string, string>();
+        if (definition.FixedFilterName is { } fixedName && definition.FixedFilterValue is { } fixedValue)
+        {
+            filters[fixedName] = fixedValue;
+        }
+
         if (definition.DependsOnFilter is { } filter && parentId is { } parent)
         {
             filters[filter] = parent.ToString();
