@@ -4,7 +4,7 @@ Elle yazılmış formlar ile metadata'dan (özel alanlar, `CustomFieldInputs`) o
 
 ## Düzen: bölüm kartları (referans "Firma kartı" / "Fırsat" ekranları)
 
-Kayıt formu kart çerçevesini kendisi taşımaz (`record-form sectioned`); alanlar ikon başlıklı **bölüm kartlarına** (`FormSection`) bölünür. Üstte başlık ve İptal / Kaydet araç çubuğu, geniş ekranda solda yazdıkça güncellenen özet kartı bulunur.
+Kayıt formu kart çerçevesini kendisi taşımaz (`record-form sectioned`); alanlar ikon başlıklı **bölüm kartlarına** (`FormSection`) bölünür. Üstte yapışkan kayıt çubuğu (`form-toolbar`: başlık, İptal / Kaydet) durur; altında yazdıkça güncellenen özet, geniş ekranda yan yana kutulardan oluşan **gösterge şeridi** olarak görünür ve form tam genişlik kullanır. Üst çubuğu olan formda alttaki `form-actions` içinden yalnızca Sil görünür (Kaydet / İptal yinelenmez); çekmecede üst çubuk gizlidir, alttaki çubuk kullanılır.
 
 ```razor
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
@@ -49,7 +49,7 @@ Kayıt formu kart çerçevesini kendisi taşımaz (`record-form sectioned`); ala
 - **`FormSection`** (`Components/FormSection.razor`): `Title`, `Icon` (AppIcon), isteğe bağlı `Description`, sağda `Actions`, ek sınıf için `Class` (ör. sağ panelde `side-card`). Gövde genellikle `form-grid` ya da salt okunur `detail-grid` taşır; kart içindeki `detail-grid` kendi çerçevesini tekrarlamaz. Aksiyon verilince içerik `<ChildContent>` içine yazılır.
 - **`form-grid`** 12 kolonludur: alan genişliği `span-3`, `span-4`, `span-6`, `span-8`, `span-12` (= `span-all`) ile verilir. Sınıfsız alan 768px üstünde yarım, 1200px üstünde üçte bir satır alır; telefonda her alan tek kolondur. Çekmecede (`Drawer`) en çok iki kolona böler.
 - **`input-icon`**: telefon, e-posta, web sitesi, adres gibi alanlarda input'un solunda ikon (`AppIcon`, 16px).
-- **Özet kartı**: `record-summary > summary-card` (`summary-identity` avatar + ad + durum, `summary-heading`, `summary-facts`); formdaki değerlerden canlı doldurulur, 992px altında gizlenir.
+- **Özet**: `record-summary > summary-card` (`summary-identity` avatar + ad + durum, `summary-heading`, `summary-facts`); formdaki değerlerden canlı doldurulur. Kayıt formunda yalnızca `summary-facts` kutular hâlinde çizilir, 992px altında ve çekmecede gizlenir; detay sayfalarında (Firma, Kişi) solda özet kartı olarak kalır.
 - Çekmecede araç çubuğu gizlenir (çekmecenin kendi başlığı vardır), kartlar çerçevesiz ve çizgiyle ayrılır; Kaydet / İptal alta yapışıktır.
 - Kartlar arası 12px, kart içi 16px; başlık ince çizgiyle gövdeden ayrılır, ikon kutusu 28px ve tonaldir (degrade yok). Kart `overflow` kullanmaz, açılır listeler taşabilir.
 
