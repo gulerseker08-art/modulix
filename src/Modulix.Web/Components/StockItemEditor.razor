@@ -1,0 +1,283 @@
+@* Stok kartı ekleme/düzenleme formu; Stok kartları ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Kayıt genel kayıt
+   uçlarından (/api/records/warehouse.stock-item) yapılır. Kod biçimi ve benzersizliği, GTİP biçimi (yalnızca rakam, 6-14 hane) sunucudadır;
+   ileti alanın altında gösterilir. Karttaki GTİP varsayılan önerisidir, yasal gerçek beyanname satırındadır. *@
+@using System.Text.Json.Nodes
+@using Modulix.Shared.Customs
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Item is null ? "Yeni stok kartı" : "Stok kartı")</h2>
+            @if (Item is not null)
+            {
+                <p>@form.Code · @form.Name</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Stok kartı özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="package" Size="24" /></span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Name) ? "Stok kartı adı" : form.Name)</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.Code) ? "Stok kodu" : form.Code)</span>
+                </div>
+                <h3 class="summary-heading">Kart özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Birim</dt><dd>@(string.IsNullOrEmpty(form.UnitKey) ? "—" : Lookups.Label(WarehouseAccess.StockUnitList, form.UnitKey))</dd></div>
+                    <div><dt>GTİP</dt><dd>@(string.IsNullOrWhiteSpace(form.Gtip) ? "—" : form.Gtip)</dd></div>
+                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "Pasif")</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Stok kartı formu bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "code":
+                            <label class="@f.LabelClass()" for="stock-code">@f.Label</label>
+                            <input id="stock-code" class="form-control" maxlength="50" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Code" />
+                            <FieldError Field="code" Errors="errors" />
+                            <small class="text-muted">Harf, rakam ve - _ . / karakterleri; büyük/küçük harf farkı yok sayılır, firma içinde benzersizdir.</small>
+                            break;
+                        case "name":
+                            <label class="@f.LabelClass()" for="stock-name">@f.Label</label>
+                            <input id="stock-name" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Name" />
+                            <FieldError Field="name" Errors="errors" />
+                            break;
+                        case "unitKey":
+                            <label class="@f.LabelClass()" for="stock-unit">@f.Label</label>
+                            <select id="stock-unit" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.UnitKey">
+                                @foreach (var unit in Lookups.Choices(WarehouseAccess.StockUnitList, form.UnitKey))
+                                {
+                                    <option value="@unit.Key">@unit.Label</option>
+                                }
+                            </select>
+                            <FieldError Field="unitKey" Errors="errors" />
+                            break;
+                        case "isActive":
+                            <label class="@f.LabelClass()" for="stock-active">@f.Label</label>
+                            <select id="stock-active" class="form-select" @bind="form.IsActive">
+                                <option value="True">Etkin</option>
+                                <option value="False">Pasif</option>
+                            </select>
+                            <FieldError Field="isActive" Errors="errors" />
+                            break;
+                        case "gtip":
+                            <label class="@f.LabelClass()" for="stock-gtip">@f.Label</label>
+                            <input id="stock-gtip" class="form-control" inputmode="numeric" maxlength="40" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Gtip" @bind:event="onchange" @bind:after="CheckGtipAsync" />
+                            <FieldError Field="gtip" Errors="errors" />
+                            <small class="text-muted">Yalnızca rakamlar (nokta ve boşluk atılır, 6-14 hane). Varsayılan önerisidir; yasal gerçek beyanname satırındadır.</small>
+                            @* Katalog denetimi yalnızca bilgidir (ADR-0032 K9): bulunamayan kod uyarı üretir, kaydı engellemez. *@
+                            @switch (gtipCheck?.Status)
+                            {
+                                case "Found":
+                                    <small class="text-muted d-block">Katalog (@gtipCheck.VersionName): @gtipCheck.Description</small>
+                                    break;
+                                case "PrefixOnly":
+                                    <div class="alert alert-info mt-2" role="status">Bu kod katalogda yalnızca daha uzun kodların başı olarak var (@gtipCheck.VersionName); tam kodu girmeniz önerilir.</div>
+                                    break;
+                                case "NotFound":
+                                    <div class="alert alert-warning mt-2" role="status">Bu kod yürürlükteki GTİP kataloğunda (@gtipCheck.VersionName) bulunamadı. Kayıt engellenmez; kodu kontrol edin.</div>
+                                    break;
+                            }
+                            break;
+                        case "description":
+                            <label class="@f.LabelClass()" for="stock-description">@f.Label</label>
+                            <textarea id="stock-description" class="form-control" rows="3" maxlength="1000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                            <FieldError Field="description" Errors="errors" />
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private const string EntityKey = WarehouseAccess.StockItemEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private ItemForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+    private bool checkGtip;
+    private GtipCheckDto? gtipCheck;
+
+    /// <summary>Düzenlenecek stok kartı; null ise yeni kart.</summary>
+    [Parameter] public RecordResponse? Item { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir kart verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Item))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Item;
+        form = Item is { } r
+            ? new ItemForm
+            {
+                Id = r.Id, Version = r.Version, Code = WarehouseLabels.Text(r, "code"), Name = WarehouseLabels.Text(r, "name"),
+                UnitKey = WarehouseLabels.Text(r, "unitKey"), Gtip = WarehouseLabels.Text(r, "gtip"), Description = WarehouseLabels.Text(r, "description"),
+                IsActive = WarehouseLabels.Flag(r, "isActive", true), Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new ItemForm { UnitKey = Lookups.DefaultOf(WarehouseAccess.StockUnitList) ?? string.Empty };
+        errors = null;
+        message = null;
+        gtipCheck = null;
+        checkGtip = true;
+    }
+
+    /// <summary>Başka bir kart açıldığında kartın kayıtlı GTİP'i de katalogla karşılaştırılır.</summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        if (checkGtip)
+        {
+            checkGtip = false;
+            await CheckGtipAsync();
+        }
+    }
+
+    /// <summary>
+    /// GTİP'i yürürlükteki katalogla karşılaştırır. Yalnızca bilgi verir: katalog yoksa, kod biçimi geçersizse ya da kullanıcının stok kartı
+    /// okuma izni yoksa sessizce bir şey göstermez (asıl doğrulama kayıtta sunucudadır).
+    /// </summary>
+    private async Task CheckGtipAsync()
+    {
+        var code = form.Gtip;
+        gtipCheck = null;
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        var result = await Api.GetAsync<GtipCheckDto>($"/api/gtip/check?code={Uri.EscapeDataString(code)}");
+        if (code == form.Gtip)
+        {
+            gtipCheck = result.IsSuccess ? result.Value : null;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["code"] = form.Code,
+            ["name"] = form.Name,
+            ["unitKey"] = form.UnitKey,
+            ["gtip"] = form.Gtip,
+            ["description"] = form.Description,
+            ["isActive"] = form.IsActive,
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class ItemForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Code { get; set; } = string.Empty;
+
+        public string Name { get; set; } = string.Empty;
+
+        public string UnitKey { get; set; } = string.Empty;
+
+        public string? Gtip { get; set; }
+
+        public string? Description { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Customs;
 using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Modules.Warehouse.Domain;
@@ -187,5 +188,76 @@ public sealed class Zone : WarehouseEntity
     public string? Description { get; internal set; }
 
     /// <summary>Pasif alan yeni yerleştirme almaz; geçmiş kayıtları korunur.</summary>
+    public bool IsActive { get; internal set; } = true;
+}
+
+/// <summary>
+/// Vekâlet (K4): ithalatçının gümrük müşavirine verdiği yetki. İthalatçı ve müşavir Core'daki firma kaydıdır (<c>core.party</c>, K2);
+/// vekâlet yalnızca bunlara başvurur. Geçerlilik tarih aralığı ve <see cref="IsActive"/> (iptal edilmemiş) birlikte belirler; kapsam ve
+/// belge bilgisi serbest metindir (belge dosyası yükleme sonraki adımdır). Müşavirin hangi ithalatçının kaydını görebileceği bu
+/// kayıttan türetilir (ASN dilimi); bu kayıt tek başına kimseye erişim vermez.
+/// </summary>
+public sealed class PowerOfAttorney : WarehouseEntity
+{
+    public const int ScopeMaxLength = 500;
+    public const int DocumentMaxLength = 200;
+
+    /// <summary>İthalatçı / malik (firma). Oluşturulduktan sonra değişmez: başka ithalatçı yeni vekâlettir.</summary>
+    public Guid ImporterPartyId { get; internal set; }
+
+    /// <summary>Gümrük müşaviri (firma). Oluşturulduktan sonra değişmez.</summary>
+    public Guid BrokerPartyId { get; internal set; }
+
+    public DateOnly ValidFrom { get; internal set; }
+
+    /// <summary>Bitiş tarihi (dahil); boşsa süresiz.</summary>
+    public DateOnly? ValidTo { get; internal set; }
+
+    /// <summary>Vekâletin kapsamı (serbest metin; ör. "ithalat beyannameleri"). Mevzuat doğrulanana kadar yapılandırılmış değildir.</summary>
+    public string? Scope { get; internal set; }
+
+    /// <summary>Belge referansı (noter yevmiye no, dosya adı vb.). Dosya yükleme sonraki adımdır.</summary>
+    public string? DocumentReference { get; internal set; }
+
+    /// <summary>İptal edilmiş vekâlet false'tur; tarihi geçerli olsa da geçerli sayılmaz.</summary>
+    public bool IsActive { get; internal set; } = true;
+
+    /// <summary>Verilen günde geçerli mi? (etkin ve tarih aralığında)</summary>
+    public bool IsValidOn(DateOnly day) => IsValid(IsActive, ValidFrom, ValidTo, day);
+
+    /// <summary>Saf geçerlilik kuralı: etkin ve [başlangıç, bitiş] aralığında (bitiş boşsa süresiz).</summary>
+    public static bool IsValid(bool isActive, DateOnly validFrom, DateOnly? validTo, DateOnly day) =>
+        isActive && validFrom <= day && (validTo is null || day <= validTo);
+}
+
+/// <summary>
+/// Stok kartı: depoda tutulan malın tanımı (ADR-0032 K19, açık soru 5). Kart Warehouse'tadır; Core'da ortak ürün tanımı olmadığı için
+/// ürün bağı (<c>CoreProductId</c>) kullanılana kadar eklenmez (sonradan eklenmesi geriye uyumlu bir sütundur). Kartın GTİP'i yalnızca
+/// <b>varsayılan önerisidir</b> (K6, K9): yasal gerçek beyanname satırındadır. Parti, SKT ve kap bilgileri ilgili dilimlerle gelir;
+/// firmaya özgü ek bilgiler özel alanlarla tutulur (K19).
+/// </summary>
+public sealed class StockItem : WarehouseEntity
+{
+    public const int CodeMaxLength = 50;
+    public const int NameMaxLength = 200;
+    public const int DescriptionMaxLength = 1000;
+
+    /// <summary>Tenant içinde benzersiz stok kodu (ör. "SKU-001"); harf, rakam ve <c>-_./</c> içerir.</summary>
+    public string Code { get; internal set; } = string.Empty;
+
+    public string Name { get; internal set; } = string.Empty;
+
+    /// <summary>Ölçü birimi (Y9b listesi <c>warehouse.stock-unit</c>); tenant kendi birimlerini yönetir.</summary>
+    public string UnitKey { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    /// <summary>
+    /// Varsayılan GTİP: yalnızca rakamlar, metin olarak saklanır (baştaki sıfırlar kaybolmaz; <see cref="GtipRules"/>). Katalogda
+    /// bulunmayan kod uyarı üretir, engellemez (katalog sonraki adımdadır).
+    /// </summary>
+    public string? Gtip { get; internal set; }
+
+    /// <summary>Pasif kart yeni işlem almaz; geçmiş kayıtları korunur.</summary>
     public bool IsActive { get; internal set; } = true;
 }

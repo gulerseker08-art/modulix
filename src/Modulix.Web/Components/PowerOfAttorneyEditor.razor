@@ -1,0 +1,252 @@
+@* Vekâlet ekleme/düzenleme formu; Vekâletler ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Kayıt genel kayıt
+   uçlarından (/api/records/warehouse.power-of-attorney) yapılır. Taraflar firmadır (core.party); seçim kutuları yalnızca ilgili ilişki
+   rolündeki firmaları getirir. Rol, aynı firma, tarih sırası gibi kurallar sunucudadır; ileti alanın altında gösterilir. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Attorney is null ? "Yeni vekâlet" : "Vekâlet kartı")</h2>
+            @if (Attorney is not null)
+            {
+                <p>@(string.IsNullOrWhiteSpace(form.DocumentReference) ? "Belge referansı yok" : form.DocumentReference)</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Vekâlet özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="file-text" Size="24" /></span>
+                    <strong class="summary-name">Vekâlet</strong>
+                    <span class="summary-sub">@(form.ValidTo is not null ? $"{Show(form.ValidFrom)} – {Show(form.ValidTo)}" : $"{Show(form.ValidFrom)} – süresiz")</span>
+                </div>
+                <h3 class="summary-heading">Vekâlet özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "İptal edildi")</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Vekâlet formu bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "importerPartyId":
+                            <label class="@f.LabelClass()" for="attorney-importer">@f.Label</label>
+                            <LookupPicker Id="attorney-importer" LookupKey="@WarehouseAccess.AttorneyImporterLookup" @bind-Value="form.ImporterPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="İthalatçı seçin…" Invalid="@(errors?.ContainsKey("importerPartyId") == true)" />
+                            <FieldError Field="importerPartyId" Errors="errors" />
+                            <small class="text-muted">@(form.Id is null ? "Yalnızca \"İthalatçı / malik\" rolündeki firmalar listelenir; rol firma kaydından verilir." : "Taraflar oluşturulduktan sonra değiştirilemez; başka taraf için yeni vekâlet açın.")</small>
+                            break;
+                        case "brokerPartyId":
+                            <label class="@f.LabelClass()" for="attorney-broker">@f.Label</label>
+                            <LookupPicker Id="attorney-broker" LookupKey="@WarehouseAccess.AttorneyBrokerLookup" @bind-Value="form.BrokerPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Gümrük müşaviri seçin…" Invalid="@(errors?.ContainsKey("brokerPartyId") == true)" />
+                            <FieldError Field="brokerPartyId" Errors="errors" />
+                            <small class="text-muted">Yalnızca "Gümrük müşaviri" rolündeki firmalar listelenir.</small>
+                            break;
+                        case "validFrom":
+                            <label class="@f.LabelClass()" for="attorney-from">@f.Label</label>
+                            <input id="attorney-from" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ValidFrom" />
+                            <FieldError Field="validFrom" Errors="errors" />
+                            break;
+                        case "validTo":
+                            <label class="@f.LabelClass()" for="attorney-to">@f.Label</label>
+                            <input id="attorney-to" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ValidTo" />
+                            <FieldError Field="validTo" Errors="errors" />
+                            <small class="text-muted">Boş bırakılırsa süresiz.</small>
+                            break;
+                        case "isActive":
+                            <label class="@f.LabelClass()" for="attorney-active">@f.Label</label>
+                            <select id="attorney-active" class="form-select" @bind="form.IsActive">
+                                <option value="True">Etkin</option>
+                                <option value="False">İptal edildi</option>
+                            </select>
+                            <FieldError Field="isActive" Errors="errors" />
+                            <small class="text-muted">İptal edilen vekâlet silinmez; tarihi geçerli olsa da geçerli sayılmaz.</small>
+                            break;
+                        case "scope":
+                            <label class="@f.LabelClass()" for="attorney-scope">@f.Label</label>
+                            <textarea id="attorney-scope" class="form-control" rows="3" maxlength="500" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Scope"></textarea>
+                            <FieldError Field="scope" Errors="errors" />
+                            break;
+                        case "documentReference":
+                            <label class="@f.LabelClass()" for="attorney-document">@f.Label</label>
+                            <input id="attorney-document" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.DocumentReference" />
+                            <FieldError Field="documentReference" Errors="errors" />
+                            <small class="text-muted">Noter yevmiye numarası, dosya adı gibi bir referans; belge dosyası yükleme sonraki adımdır.</small>
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private const string EntityKey = WarehouseAccess.PowerOfAttorneyEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private AttorneyForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek vekâlet; null ise yeni vekâlet.</summary>
+    [Parameter] public RecordResponse? Attorney { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir vekâlet verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Attorney))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Attorney;
+        form = Attorney is { } r
+            ? new AttorneyForm
+            {
+                Id = r.Id, Version = r.Version, ImporterPartyId = WarehouseLabels.Id(r, "importerPartyId"), BrokerPartyId = WarehouseLabels.Id(r, "brokerPartyId"),
+                ValidFrom = ParseDate(WarehouseLabels.Text(r, "validFrom")), ValidTo = ParseDate(WarehouseLabels.Text(r, "validTo")), Scope = WarehouseLabels.Text(r, "scope"),
+                DocumentReference = WarehouseLabels.Text(r, "documentReference"), IsActive = WarehouseLabels.Flag(r, "isActive", true),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new AttorneyForm { ValidFrom = DateTime.Today };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["validFrom"] = Iso(form.ValidFrom),
+            ["validTo"] = Iso(form.ValidTo),
+            ["scope"] = form.Scope,
+            ["documentReference"] = form.DocumentReference,
+            ["isActive"] = form.IsActive,
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            // Taraflar yalnızca oluştururken verilir; sonra değiştirilemez.
+            values["importerPartyId"] = form.ImporterPartyId?.ToString();
+            values["brokerPartyId"] = form.BrokerPartyId?.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private static string? Iso(DateTime? date) => date?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static DateTime? ParseDate(string iso) =>
+        DateTime.TryParseExact(iso, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date) ? date : null;
+
+    private static string Show(DateTime? date) => date?.ToString("d", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) ?? "—";
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class AttorneyForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? ImporterPartyId { get; set; }
+
+        public Guid? BrokerPartyId { get; set; }
+
+        /// <summary>Tarih girdileri; sunucuya yyyy-AA-gg olarak gider (boş bitiş: süresiz).</summary>
+        public DateTime? ValidFrom { get; set; }
+
+        public DateTime? ValidTo { get; set; }
+
+        public string? Scope { get; set; }
+
+        public string? DocumentReference { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

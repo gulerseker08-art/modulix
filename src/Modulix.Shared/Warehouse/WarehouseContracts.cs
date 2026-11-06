@@ -16,14 +16,32 @@ public static class WarehouseAccess
     public const string LocationLevelsWrite = "warehouse.locationlevels.write";
     public const string LocationsRead = "warehouse.locations.read";
     public const string LocationsWrite = "warehouse.locations.write";
+    public const string AttorneysRead = "warehouse.attorneys.read";
+    public const string AttorneysWrite = "warehouse.attorneys.write";
+    public const string StockItemsRead = "warehouse.stockitems.read";
+    public const string StockItemsWrite = "warehouse.stockitems.write";
 
     public const string FacilityEntityKey = "warehouse.facility";
     public const string ZoneEntityKey = "warehouse.zone";
     public const string LocationLevelEntityKey = "warehouse.location-level";
     public const string LocationEntityKey = "warehouse.location";
+    public const string PowerOfAttorneyEntityKey = "warehouse.power-of-attorney";
+    public const string StockItemEntityKey = "warehouse.stock-item";
 
     /// <summary>Alan türü listesi; kategorileri kodun anladığı anlamdır, adları tenant'ındır.</summary>
     public const string ZoneKindList = "warehouse.zone-kind";
+
+    /// <summary>Stok birimi listesi; birimin adı tenant'ındır, kategorisi yoktur.</summary>
+    public const string StockUnitList = "warehouse.stock-unit";
+
+    // Lookup alanları (ADR-0016); seçim kutuları bu anahtarlarla çalışır.
+    public const string ZoneFacilityLookup = "warehouse.zone.facility";
+    public const string LocationLevelFacilityLookup = "warehouse.location-level.facility";
+    public const string LocationFacilityLookup = "warehouse.location.facility";
+    public const string LocationParentLookup = "warehouse.location.parent";
+    public const string LocationZoneLookup = "warehouse.location.zone";
+    public const string AttorneyImporterLookup = "warehouse.power-of-attorney.importer";
+    public const string AttorneyBrokerLookup = "warehouse.power-of-attorney.broker";
 
     public const string ZoneKindControlled = "controlled";
     public const string ZoneKindFree = "free";

@@ -20,7 +20,10 @@ namespace Modulix.IntegrationTests;
 /// Y4: platform yöneticisi, firmalar ve modül hakları. Platform uç noktalarının yalnızca platform yöneticisine açık olması, firma
 /// açılışının tek işlem olması, ilk yöneticinin davetle firmaya girmesi, kapatma ve yeniden açma, modül
 /// açıp kapatma ve katalog; platform yöneticisinin firma verisini görmemesi.
+/// Katalogdaki "kaç firma kullanıyor" sayısı bütün veritabanını kapsar; başka sınıfların firma kurup silmesi ya da modül açıp
+/// kapaması sayıyı iki okuma arasında değiştirebilir (CI'da aralıklı kırılma). Bu yüzden sınıf diğer testlerden sonra, tek başına çalışır.
 /// </summary>
+[Collection(PlatformAdministrationTestCollection.Name)]
 public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
     private const string NewPassword = "Yeni.Sifre.2024";
@@ -332,4 +335,11 @@ public partial class PlatformAdministrationTests(ModulixApiFactory factory) : IC
 
     [GeneratedRegex(@"/davet\?uyelik=(?<id>[0-9a-f-]+)&token=(?<token>[^\s""<]+)")]
     private static partial Regex InvitationLink();
+}
+
+/// <summary>Platform yönetimi testleri paralel testlerle aynı anda çalışmaz: genel (tenant'lar arası) sayımları doğrular.</summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class PlatformAdministrationTestCollection
+{
+    public const string Name = "Platform yönetimi";
 }

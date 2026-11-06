@@ -5,7 +5,7 @@ namespace Modulix.Modules.Warehouse;
 /// <summary>
 /// Depo formlarının varsayılan düzeni (ADR-0021 form düzeni). Alan anahtarları kayıt alanlarının teknik adlarıdır; editör her anahtar için
 /// kendi girdisini çizer, yer ve genişlik buradan (ya da firmanın düzeninden) gelir. Kaydın kimliğini taşıyan alanlar sabittir (gizlenemez,
-/// zorunluluğu değişmez). Yalnızca bu adımda arayüzü olan formlar tanımlıdır; alan ve lokasyon formları kendi ekranlarıyla eklenir.
+/// zorunluluğu değişmez). Yalnızca arayüzü olan formlar tanımlıdır.
 /// </summary>
 public static class WarehouseForms
 {
@@ -30,6 +30,73 @@ public static class WarehouseForms
             new("description", "Açıklama", "aciklama", 12),
             new("customsEnabled", "Gümrük uzantısı açık", "gumruk", 6, Fixed: true),
             new("allowMixedZones", "Serbest ve gümrük denetimli alanlar bir arada olabilir", "gumruk", 6, Fixed: true),
+        ]),
+
+        new(WarehouseModule.Entities.Zone, "Alan",
+        [new(General, "Genel bilgiler"), new("ayrintilar", "Açıklama ve ek bilgiler")],
+        [
+            new("temel", "Temel bilgiler", "layers"),
+            new("aciklama", "Açıklama", "message-square", Tab: "ayrintilar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ayrintilar"),
+        ],
+        [
+            new("facilityId", "Tesis", "temel", 6, Required: true, Fixed: true),
+            new("kindKey", "Alan türü", "temel", 6, Required: true, Fixed: true),
+            new("code", "Alan kodu", "temel", 4, Required: true, Fixed: true),
+            new("name", "Alan adı", "temel", 8, Required: true, Fixed: true),
+            new("isActive", "Etkin", "temel", 4, Fixed: true),
+            new("description", "Açıklama", "aciklama", 12),
+        ]),
+
+        new(WarehouseModule.Entities.Location, "Lokasyon",
+        [new(General, "Genel bilgiler"), new("ayrintilar", "Ek bilgiler")],
+        [
+            new("temel", "Yerleşim", "map-pin"),
+            new("tanim", "Tanım", "message-square"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ayrintilar"),
+        ],
+        [
+            new("facilityId", "Tesis", "temel", 6, Required: true, Fixed: true),
+            new("parentId", "Üst lokasyon", "temel", 6, Fixed: true),
+            new("value", "Değer", "temel", 4, Required: true, Fixed: true),
+            new("zoneId", "Alan", "temel", 8),
+            new("name", "Ad", "tanim", 8),
+            new("isActive", "Etkin", "tanim", 4, Fixed: true),
+        ]),
+
+        new(WarehouseModule.Entities.PowerOfAttorney, "Vekâlet",
+        [new(General, "Genel bilgiler"), new("ayrintilar", "Kapsam ve belge")],
+        [
+            new("taraflar", "Taraflar", "users"),
+            new("gecerlilik", "Geçerlilik", "calendar"),
+            new("kapsam", "Kapsam ve belge", "file-text", Tab: "ayrintilar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ayrintilar"),
+        ],
+        [
+            new("importerPartyId", "İthalatçı", "taraflar", 6, Required: true, Fixed: true),
+            new("brokerPartyId", "Gümrük müşaviri", "taraflar", 6, Required: true, Fixed: true),
+            new("validFrom", "Başlangıç", "gecerlilik", 4, Required: true, Fixed: true),
+            new("validTo", "Bitiş", "gecerlilik", 4),
+            new("isActive", "Etkin", "gecerlilik", 4, Fixed: true),
+            new("scope", "Kapsam", "kapsam", 12),
+            new("documentReference", "Belge referansı", "kapsam", 12),
+        ]),
+
+        new(WarehouseModule.Entities.StockItem, "Stok kartı",
+        [new(General, "Genel bilgiler"), new("gumruk", "Gümrük ve ayrıntılar")],
+        [
+            new("temel", "Temel bilgiler", "package"),
+            new("gtip", "Gümrük tarife", "shield", Tab: "gumruk"),
+            new("aciklama", "Açıklama", "message-square", Tab: "gumruk"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "gumruk"),
+        ],
+        [
+            new("code", "Stok kodu", "temel", 4, Required: true, Fixed: true),
+            new("name", "Ad", "temel", 8, Required: true, Fixed: true),
+            new("unitKey", "Birim", "temel", 4, Required: true, Fixed: true),
+            new("isActive", "Etkin", "temel", 4, Fixed: true),
+            new("gtip", "GTİP (varsayılan)", "gtip", 6),
+            new("description", "Açıklama", "aciklama", 12),
         ]),
     ];
 }

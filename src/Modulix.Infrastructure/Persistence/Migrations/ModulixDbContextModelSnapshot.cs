@@ -1147,6 +1147,64 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("FormLayouts", "meta");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Customs.GtipCatalogEntry", b =>
+                {
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(14)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(14)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("VersionId", "Code");
+
+                    b.ToTable("GtipCatalogEntries", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Customs.GtipCatalogVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<int>("EntryCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EffectiveFrom")
+                        .IsUnique();
+
+                    b.ToTable("GtipCatalogVersions", "platform");
+                });
+
             modelBuilder.Entity("Modulix.Core.FieldRules.RulePackage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -11949,6 +12007,129 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("LocationLevels", "warehouse");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.PowerOfAttorney", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BrokerPartyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DocumentReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("ImporterPartyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Scope")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly>("ValidFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("ValidTo")
+                        .HasColumnType("date");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ImporterPartyId");
+
+                    b.HasIndex("TenantId", "BrokerPartyId", "ImporterPartyId");
+
+                    b.ToTable("PowersOfAttorney", "warehouse", t =>
+                        {
+                            t.HasCheckConstraint("CK_PowersOfAttorney_Dates", "[ValidTo] IS NULL OR [ValidTo] >= [ValidFrom]");
+                        });
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.StockItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Gtip")
+                        .HasMaxLength(14)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(14)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UnitKey")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StockItems_Code");
+
+                    b.HasIndex("TenantId", "Gtip");
+
+                    b.ToTable("StockItems", "warehouse");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.Zone", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12127,6 +12308,15 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId", "PartyId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Modulix.Core.Customs.GtipCatalogEntry", b =>
+                {
+                    b.HasOne("Modulix.Core.Customs.GtipCatalogVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Modulix.Core.FieldRules.RulePackage", b =>
@@ -13654,6 +13844,23 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Modules.Warehouse.Domain.Facility", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "FacilityId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.PowerOfAttorney", b =>
+                {
+                    b.HasOne("Modulix.Core.Contracts.SharedRecords.Party", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "BrokerPartyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Core.Contracts.SharedRecords.Party", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ImporterPartyId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

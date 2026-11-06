@@ -12,6 +12,10 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.*" />
   </ItemGroup>
   <ItemGroup>
+    <!-- .xlsx okuma (GTİP kataloğu içe aktarma, ADR-0032 Dilim 3d-2): bağımlılığı yok, satırları akıtarak okur. -->
+    <PackageReference Include="MiniExcel" Version="1.46.*" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.*" />
   </ItemGroup>
   <ItemGroup>

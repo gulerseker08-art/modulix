@@ -1,0 +1,272 @@
+@* Lokasyon ekleme/düzenleme formu; Lokasyonlar ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Kod sunucuda
+   seviye tanımından üretilir (üst kod + ayraç + değer); tesis, üst lokasyon ve değer oluşturulduktan sonra değişmez. Alan üst lokasyondan
+   kalıtılır. Kayıt genel kayıt uçlarından (/api/records/warehouse.location) yapılır; kurallar sunucudadır. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Location is null ? "Yeni lokasyon" : "Lokasyon kartı")</h2>
+            @if (Location is not null)
+            {
+                <p>@form.Code</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Lokasyon özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="map-pin" Size="24" /></span>
+                    <strong class="summary-name">@(Location is null ? (string.IsNullOrWhiteSpace(form.Value) ? "Yeni lokasyon" : form.Value.ToUpperInvariant()) : form.Code)</strong>
+                    @if (!string.IsNullOrWhiteSpace(form.Name))
+                    {
+                        <span class="summary-sub">@form.Name</span>
+                    }
+                </div>
+                <h3 class="summary-heading">Lokasyon özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Derinlik</dt><dd>@(Location is null ? "—" : form.Depth.ToString())</dd></div>
+                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "Pasif")</dd></div>
+                </dl>
+                @if (Location is null)
+                {
+                    <p class="small text-muted">Kod, kaydedilirken üst lokasyonun kodu, seviyenin ayracı ve girdiğiniz değerden üretilir.</p>
+                }
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Lokasyon formu bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "facilityId":
+                            <label class="@f.LabelClass()" for="location-facility">@f.Label</label>
+                            <LookupPicker Id="location-facility" LookupKey="@WarehouseAccess.LocationFacilityLookup" Value="form.FacilityId" ValueChanged="FacilityChangedAsync" Required="f.Required" Disabled="@(Location is not null || locked)" Placeholder="Tesis seçin…" Invalid="@(errors?.ContainsKey("facilityId") == true)" />
+                            <FieldError Field="facilityId" Errors="errors" />
+                            break;
+                        case "parentId":
+                            <label class="@f.LabelClass()" for="location-parent">@f.Label</label>
+                            <LookupPicker Id="location-parent" LookupKey="@WarehouseAccess.LocationParentLookup" ParentId="form.FacilityId" @bind-Value="form.ParentId" Disabled="@(Location is not null || locked)" Placeholder="Yok (kök lokasyon)" Invalid="@(errors?.ContainsKey("parentId") == true)" />
+                            <FieldError Field="parentId" Errors="errors" />
+                            <small class="text-muted">Boş bırakılırsa tesisin ilk seviyesinde (kök) açılır. Üst lokasyon sonradan değiştirilemez.</small>
+                            break;
+                        case "value":
+                            <label class="@f.LabelClass()" for="location-value">@f.Label</label>
+                            <input id="location-value" class="form-control" maxlength="20" required="@f.Required" aria-required="@f.AriaRequired()" disabled="@(Location is not null)" @bind="form.Value" />
+                            <FieldError Field="value" Errors="errors" />
+                            <small class="text-muted">Seviyenin karakter kümesine ve uzunluğuna uymalı; büyük harfe çevrilir.</small>
+                            break;
+                        case "zoneId":
+                            <label class="@f.LabelClass()" for="location-zone">@f.Label</label>
+                            <LookupPicker Id="location-zone" LookupKey="@WarehouseAccess.LocationZoneLookup" ParentId="form.FacilityId" @bind-Value="form.ZoneId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("zoneId") == true)" />
+                            <FieldError Field="zoneId" Errors="errors" />
+                            <small class="text-muted">Üst lokasyonun alanı varsa alt lokasyon aynı alanı taşır.</small>
+                            break;
+                        case "name":
+                            <label class="@f.LabelClass()" for="location-name">@f.Label</label>
+                            <input id="location-name" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Name" />
+                            <FieldError Field="name" Errors="errors" />
+                            break;
+                        case "isActive":
+                            <label class="@f.LabelClass()" for="location-active">@f.Label</label>
+                            <select id="location-active" class="form-select" @bind="form.IsActive">
+                                <option value="True">Etkin</option>
+                                <option value="False">Pasif</option>
+                            </select>
+                            <FieldError Field="isActive" Errors="errors" />
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private const string EntityKey = WarehouseAccess.LocationEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private LocationForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private bool locked;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek lokasyon; null ise yeni lokasyon.</summary>
+    [Parameter] public RecordResponse? Location { get; set; }
+
+    /// <summary>Yeni lokasyonda önceden seçili üst lokasyon ("Alt lokasyon ekle"); tesis ve alan ondan gelir.</summary>
+    [Parameter] public RecordResponse? ParentPreset { get; set; }
+
+    /// <summary>Yeni lokasyonda önceden seçili tesis (liste süzgeci).</summary>
+    [Parameter] public Guid? FacilityPreset { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir kayıt ya da ön ayar verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Location) && locked == (ParentPreset is not null))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Location;
+        locked = Location is null && ParentPreset is not null;
+        form = Location is { } r
+            ? new LocationForm
+            {
+                Id = r.Id, Version = r.Version, FacilityId = WarehouseLabels.Id(r, "facilityId"), ParentId = WarehouseLabels.Id(r, "parentId"),
+                ZoneId = WarehouseLabels.Id(r, "zoneId"), Value = WarehouseLabels.Text(r, "value"), Code = WarehouseLabels.Text(r, "code"),
+                Depth = WarehouseLabels.Number(r, "depth"), Name = WarehouseLabels.Text(r, "name"), IsActive = WarehouseLabels.Flag(r, "isActive", true),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new LocationForm
+            {
+                FacilityId = ParentPreset is { } parent ? WarehouseLabels.Id(parent, "facilityId") : FacilityPreset,
+                ParentId = ParentPreset?.Id,
+                ZoneId = ParentPreset is { } p ? WarehouseLabels.Id(p, "zoneId") : null,
+            };
+        errors = null;
+        message = null;
+    }
+
+    /// <summary>Tesis değişince tesise bağlı seçimler (üst lokasyon, alan) sıfırlanır: başka tesisin kaydı seçili kalmaz.</summary>
+    private Task FacilityChangedAsync(Guid? facilityId)
+    {
+        if (form.FacilityId != facilityId)
+        {
+            form.FacilityId = facilityId;
+            form.ParentId = null;
+            form.ZoneId = null;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["zoneId"] = form.ZoneId?.ToString(),
+            ["name"] = form.Name,
+            ["isActive"] = form.IsActive,
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            // Tesis, üst lokasyon ve değer yalnızca oluştururken verilir; sonra değiştirilemez.
+            values["facilityId"] = form.FacilityId?.ToString();
+            values["parentId"] = form.ParentId?.ToString();
+            values["value"] = form.Value;
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class LocationForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? FacilityId { get; set; }
+
+        public Guid? ParentId { get; set; }
+
+        public Guid? ZoneId { get; set; }
+
+        public string Value { get; set; } = string.Empty;
+
+        public string Code { get; set; } = string.Empty;
+
+        public int Depth { get; set; }
+
+        public string? Name { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

@@ -66,6 +66,29 @@ public class WarehouseLocationTests(ModulixApiFactory factory) : IClassFixture<M
     }
 
     [Fact]
+    public async Task Resending_the_same_value_in_lowercase_on_update_is_not_a_change()
+    {
+        var s = await SetUpAsync();
+        using var admin = await LoginAsync(s.Admin);
+        var facility = await CreateFacilityWithLevelsAsync(admin, "ant", customs: false);
+        var root = await PostLocationAsync(admin, facility.Id, null, "ant");
+        Assert.Equal("ANT", root.Values["value"]!.GetValue<string>());
+
+        // Değer büyük harfe çevrilip kayıtlı değerle karşılaştırılır: küçük harfle gelen aynı değer değişiklik sayılmaz.
+        var update = await admin.PutAsJsonAsync($"{Locations}/{root.Id}",
+            new RecordWriteRequest(new JsonObject { ["value"] = "ant", ["name"] = "Ana koridor" }, root.Version));
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var updated = (await update.Content.ReadFromJsonAsync<RecordResponse>())!;
+        Assert.Equal(("ANT", "ANT", "Ana koridor"),
+            (updated.Values["value"]!.GetValue<string>(), updated.Values["code"]!.GetValue<string>(), updated.Values["name"]!.GetValue<string>()));
+
+        // Gerçekten farklı değer yine reddedilir.
+        var change = await ValidationProblemAsync(await admin.PutAsJsonAsync($"{Locations}/{root.Id}",
+            new RecordWriteRequest(new JsonObject { ["value"] = "dep" }, updated.Version)));
+        Assert.Equal(["Oluşturulduktan sonra değiştirilemez."], change.Errors["value"]);
+    }
+
+    [Fact]
     public async Task Invalid_locations_are_rejected_and_levels_of_a_facility_in_use_only_grow_and_get_renamed()
     {
         var s = await SetUpAsync();

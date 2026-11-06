@@ -121,21 +121,22 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/api/auth").WithTags("Auth");
 
-        group.MapPost("/login", LoginAsync).AllowAnonymous();
-        group.MapPost("/login/two-factor", TwoFactorLoginAsync).AllowAnonymous();
+        // Oturum açmadan erişilen uçlar IP başına hız sınırlıdır (kaba kuvvet ve hesap taraması; Auth:RateLimitPerMinute).
+        group.MapPost("/login", LoginAsync).AllowAnonymous().RequireRateLimiting(Hardening.AuthRateLimitPolicy);
+        group.MapPost("/login/two-factor", TwoFactorLoginAsync).AllowAnonymous().RequireRateLimiting(Hardening.AuthRateLimitPolicy);
         group.MapPost("/logout", LogoutAsync).RequireAuthorization();
         group.MapGet("/me", MeAsync).RequireAuthorization();
         group.MapPost("/active-tenant", SelectTenantAsync).RequireAuthorization();
         group.MapPost("/active-company", SelectCompanyAsync).RequireAuthorization().AddEndpointFilter<RequireTenantFilter>();
 
         // E-postadaki bağlantılar (Y2): oturum gerektirmez; token doğrulanır.
-        group.MapGet("/invitation", GetInvitationAsync).AllowAnonymous();
-        group.MapPost("/accept-invitation", AcceptInvitationAsync).AllowAnonymous();
-        group.MapPost("/reset-password", ResetPasswordAsync).AllowAnonymous();
+        group.MapGet("/invitation", GetInvitationAsync).AllowAnonymous().RequireRateLimiting(Hardening.AuthRateLimitPolicy);
+        group.MapPost("/accept-invitation", AcceptInvitationAsync).AllowAnonymous().RequireRateLimiting(Hardening.AuthRateLimitPolicy);
+        group.MapPost("/reset-password", ResetPasswordAsync).AllowAnonymous().RequireRateLimiting(Hardening.AuthRateLimitPolicy);
 
         // Hesap güvenliği (Y7a): "Şifremi unuttum" ve e-posta değişikliğinin onay bağlantısı.
-        group.MapPost("/forgot-password", ForgotPasswordAsync).AllowAnonymous();
-        group.MapPost("/confirm-email-change", ConfirmEmailChangeAsync).AllowAnonymous();
+        group.MapPost("/forgot-password", ForgotPasswordAsync).AllowAnonymous().RequireRateLimiting(Hardening.AuthRateLimitPolicy);
+        group.MapPost("/confirm-email-change", ConfirmEmailChangeAsync).AllowAnonymous().RequireRateLimiting(Hardening.AuthRateLimitPolicy);
 
         return app;
     }
@@ -160,6 +161,8 @@ public static class AuthEndpoints
         var user = await users.FindByEmailAsync(request.Email.Trim());
         if (user is null)
         {
+            // Hesap olmayan e-posta da şifre doğrulama süresi kadar sürer; yanıt süresinden hesabın varlığı anlaşılmaz.
+            users.PasswordHasher.VerifyHashedPassword(null!, DummyPasswordHash.Value, request.Password);
             audit.UnknownAccount(client);
             return InvalidCredentials();
         }
@@ -484,6 +487,10 @@ public static class AuthEndpoints
             statusCode: StatusCodes.Status423Locked,
             title: "Hesap geçici olarak kilitlendi.",
             detail: "Çok sayıda hatalı deneme yapıldı. 15 dakika sonra tekrar deneyin.");
+
+    /// <summary>Var olmayan hesap için yapılan sahte şifre doğrulamasının karması (zamanlama eşitleme).</summary>
+    private static readonly Lazy<string> DummyPasswordHash = new(() =>
+        new PasswordHasher<ModulixUser>().HashPassword(null!, Guid.NewGuid().ToString("N")));
 
     // Kullanıcının var olup olmadığı belli edilmez.
     private static IResult InvalidCredentials() =>

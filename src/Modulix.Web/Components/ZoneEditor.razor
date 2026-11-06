@@ -1,0 +1,242 @@
+@* Alan ekleme/düzenleme formu; Alanlar ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Kayıt genel kayıt
+   uçlarından (/api/records/warehouse.zone) yapılır. Tür kategorisine bağlı kurallar (gümrük denetimli alan yalnızca gümrük uzantısı
+   açık tesiste; karma alan tesis ayarına bağlı) sunucudadır; ileti alanın altında gösterilir. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Zone is null ? "Yeni alan" : "Alan kartı")</h2>
+            @if (Zone is not null)
+            {
+                <p>@form.Code · @form.Name</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Alan özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="layers" Size="24" /></span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Name) ? "Alan adı" : form.Name)</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.Code) ? "Kod" : form.Code.ToUpperInvariant())</span>
+                </div>
+                <h3 class="summary-heading">Alan özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Tür</dt><dd>@(string.IsNullOrEmpty(form.KindKey) ? "—" : Lookups.Label(WarehouseAccess.ZoneKindList, form.KindKey))</dd></div>
+                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "Pasif")</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Alan formu bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "facilityId":
+                            <label class="@f.LabelClass()" for="zone-facility">@f.Label</label>
+                            <LookupPicker Id="zone-facility" LookupKey="@WarehouseAccess.ZoneFacilityLookup" @bind-Value="form.FacilityId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Tesis seçin…" Invalid="@(errors?.ContainsKey("facilityId") == true)" />
+                            <FieldError Field="facilityId" Errors="errors" />
+                            @if (form.Id is not null)
+                            {
+                                <small class="text-muted">Alanın tesisi oluşturulduktan sonra değiştirilemez.</small>
+                            }
+                            break;
+                        case "kindKey":
+                            <label class="@f.LabelClass()" for="zone-kind">@f.Label</label>
+                            <select id="zone-kind" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.KindKey">
+                                @foreach (var kind in Lookups.Choices(WarehouseAccess.ZoneKindList, form.KindKey))
+                                {
+                                    <option value="@kind.Key">@kind.Label</option>
+                                }
+                            </select>
+                            <FieldError Field="kindKey" Errors="errors" />
+                            <small class="text-muted">Gümrük denetimli alan yalnızca gümrük uzantısı açık tesiste tanımlanabilir.</small>
+                            break;
+                        case "code":
+                            <label class="@f.LabelClass()" for="zone-code">@f.Label</label>
+                            <input id="zone-code" class="form-control" maxlength="30" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Code" />
+                            <FieldError Field="code" Errors="errors" />
+                            <small class="text-muted">Tesis içinde benzersiz; büyük harfe çevrilir.</small>
+                            break;
+                        case "name":
+                            <label class="@f.LabelClass()" for="zone-name">@f.Label</label>
+                            <input id="zone-name" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Name" />
+                            <FieldError Field="name" Errors="errors" />
+                            break;
+                        case "isActive":
+                            <label class="@f.LabelClass()" for="zone-active">@f.Label</label>
+                            <select id="zone-active" class="form-select" @bind="form.IsActive">
+                                <option value="True">Etkin</option>
+                                <option value="False">Pasif</option>
+                            </select>
+                            <FieldError Field="isActive" Errors="errors" />
+                            break;
+                        case "description":
+                            <label class="@f.LabelClass()" for="zone-description">@f.Label</label>
+                            <textarea id="zone-description" class="form-control" rows="3" maxlength="1000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                            <FieldError Field="description" Errors="errors" />
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private const string EntityKey = WarehouseAccess.ZoneEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private ZoneForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek alan; null ise yeni alan.</summary>
+    [Parameter] public RecordResponse? Zone { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir alan verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Zone))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Zone;
+        form = Zone is { } r
+            ? new ZoneForm
+            {
+                Id = r.Id, Version = r.Version, FacilityId = WarehouseLabels.Id(r, "facilityId"), Code = WarehouseLabels.Text(r, "code"),
+                Name = WarehouseLabels.Text(r, "name"), KindKey = WarehouseLabels.Text(r, "kindKey"), Description = WarehouseLabels.Text(r, "description"),
+                IsActive = WarehouseLabels.Flag(r, "isActive", true), Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new ZoneForm { KindKey = Lookups.DefaultOf(WarehouseAccess.ZoneKindList) ?? string.Empty };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["code"] = form.Code,
+            ["name"] = form.Name,
+            ["kindKey"] = form.KindKey,
+            ["description"] = form.Description,
+            ["isActive"] = form.IsActive,
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            // Tesis yalnızca oluştururken verilir; sonra değiştirilemez.
+            values["facilityId"] = form.FacilityId?.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class ZoneForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? FacilityId { get; set; }
+
+        public string Code { get; set; } = string.Empty;
+
+        public string Name { get; set; } = string.Empty;
+
+        public string KindKey { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

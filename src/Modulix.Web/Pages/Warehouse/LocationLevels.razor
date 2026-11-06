@@ -1,0 +1,286 @@
+@page "/depo/lokasyon-seviyeleri"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Lokasyon seviyeleri · Modulix</PageTitle>
+
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.LocationLevelsRead">
+    <PageHeader Title="Lokasyon seviyeleri" Icon="sliders" Subtitle="@(page is null ? "Her tesis lokasyon kodunun yapısını kendisi tanımlar." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        @* Ayar niteliğinde küçük kayıt formu: tek bölümlü, FormTabs ile sekmeli (docs/design-system/form-standards.md). *@
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni seviye" : "Seviyeyi düzenle")</h2>
+            <FormTabs Title="Seviye bilgileri" Label="Lokasyon seviyesi formu bölümleri">
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label required" for="level-facility">Tesis</label>
+                        <LookupPicker Id="level-facility" LookupKey="@WarehouseAccess.LocationLevelFacilityLookup" @bind-Value="form.FacilityId" Required="true" Disabled="@(form.Id is not null)" Placeholder="Tesis seçin…" Invalid="@(errors?.ContainsKey("facilityId") == true)" />
+                        <FieldError Field="facilityId" Errors="errors" />
+                    </div>
+                    <div class="span-3">
+                        <label class="form-label required" for="level-position">Sıra</label>
+                        <input id="level-position" class="form-control" type="number" min="1" max="10" required aria-required="true" @bind="form.Position" />
+                        <FieldError Field="position" Errors="errors" />
+                        <small class="text-muted">1 en dıştaki seviyedir (ör. tesis); 10'a kadar.</small>
+                    </div>
+                    <div class="span-3">
+                        <label class="form-label required" for="level-key">Anahtar</label>
+                        <input id="level-key" class="form-control" maxlength="30" required aria-required="true" @bind="form.Key" />
+                        <FieldError Field="key" Errors="errors" />
+                        <small class="text-muted">Küçük harf, rakam ve alt çizgi (ör. aisle).</small>
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label required" for="level-name">Ad</label>
+                        <input id="level-name" class="form-control" maxlength="100" required aria-required="true" @bind="form.Name" />
+                        <FieldError Field="name" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="level-set">İzinli karakterler</label>
+                        <select id="level-set" class="form-select" @bind="form.CharacterSet">
+                            @foreach (var (key, label) in WarehouseLabels.CharacterSets)
+                            {
+                                <option value="@key">@label</option>
+                            }
+                        </select>
+                        <FieldError Field="characterSet" Errors="errors" />
+                    </div>
+                    <div class="span-3">
+                        <label class="form-label" for="level-min">En az uzunluk</label>
+                        <input id="level-min" class="form-control" type="number" min="1" max="20" @bind="form.MinLength" />
+                        <FieldError Field="minLength" Errors="errors" />
+                    </div>
+                    <div class="span-3">
+                        <label class="form-label" for="level-max">En çok uzunluk</label>
+                        <input id="level-max" class="form-control" type="number" min="1" max="20" @bind="form.MaxLength" />
+                        <FieldError Field="maxLength" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="level-separator">Ayraç</label>
+                        <input id="level-separator" class="form-control" maxlength="3" @bind="form.Separator" />
+                        <FieldError Field="separator" Errors="errors" />
+                        <small class="text-muted">Bu seviyenin değerinden önce kodda durur; boş olabilir. İzinli karakterler: - . _ / :</small>
+                    </div>
+                </div>
+            </FormTabs>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+            @if (form.Id is not null)
+            {
+                <p class="small text-muted">Lokasyonu olan tesiste yalnızca seviye adı değişir; yeni seviye mevcutların sonuna eklenir.</p>
+            }
+        </form>
+    }
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="level-search">Seviye ara</label>
+            <input id="level-search" class="form-control" type="search" placeholder="Anahtar veya ad ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="@(string.IsNullOrEmpty(facilityId) ? 0 : 1)" />
+        <ColumnPicker />
+        @if (Session.Can(WarehouseAccess.LocationLevelsWrite) && form is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="NewLevel"><AppIcon Name="plus" Size="16" /> Yeni seviye</button>
+        }
+    </div>
+
+    @if (filtersOpen || !string.IsNullOrEmpty(facilityId))
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="level-facility-filter">Tesis</label>
+            <select id="level-facility-filter" class="form-select form-select-sm filter-select" @bind="facilityId" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm tesisler</option>
+                @foreach (var (id, name) in facilities.OrderBy(f => f.Value, StringComparer.CurrentCulture))
+                {
+                    <option value="@id">@name</option>
+                }
+            </select>
+        </div>
+    }
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Seviye tanımı yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Lokasyon seviyesi listesi</caption>
+            <thead>
+                <tr><th scope="col">Tesis</th><th scope="col">Sıra</th><th scope="col">Ad</th><th scope="col">Anahtar</th><th scope="col">Karakterler</th><th scope="col">Uzunluk</th><th scope="col">Ayraç</th><th scope="col"></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var level in page.Items)
+                {
+                    <tr>
+                        <td data-label="Tesis" class="primary">@WarehouseLabels.NameOf(facilities, WarehouseLabels.Id(level, "facilityId"))</td>
+                        <td data-label="Sıra">@WarehouseLabels.Number(level, "position")</td>
+                        <td data-label="Ad">@WarehouseLabels.Text(level, "name")</td>
+                        <td data-label="Anahtar">@WarehouseLabels.Text(level, "key")</td>
+                        <td data-label="Karakterler">@WarehouseLabels.CharacterSetLabel(WarehouseLabels.Text(level, "characterSet"))</td>
+                        <td data-label="Uzunluk">@WarehouseLabels.Number(level, "minLength")–@WarehouseLabels.Number(level, "maxLength")</td>
+                        <td data-label="Ayraç">@(WarehouseLabels.Text(level, "separator") is { Length: > 0 } separator ? separator : "—")</td>
+                        <td class="actions">
+                            @if (Session.Can(WarehouseAccess.LocationLevelsWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(level)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.LocationLevelEntityKey;
+
+    private RecordPageResponse? page;
+    private Dictionary<Guid, string> facilities = [];
+    private LevelForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private string? search;
+    private string? facilityId;
+    private bool filtersOpen;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(WarehouseAccess.LocationLevelsRead))
+        {
+            facilities = await WarehouseLabels.NamesAsync(Api, WarehouseAccess.FacilityEntityKey, f => WarehouseLabels.Text(f, "code") + " · " + WarehouseLabels.Text(f, "name"));
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (!string.IsNullOrEmpty(facilityId))
+        {
+            url += $"&facilityId={Uri.EscapeDataString(facilityId)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void NewLevel()
+    {
+        form = new LevelForm { FacilityId = Guid.TryParse(facilityId, out var id) ? id : null };
+        errors = null;
+        message = null;
+    }
+
+    private void Edit(RecordResponse level)
+    {
+        form = new LevelForm
+        {
+            Id = level.Id, Version = level.Version, FacilityId = WarehouseLabels.Id(level, "facilityId"), Position = WarehouseLabels.Number(level, "position"),
+            Key = WarehouseLabels.Text(level, "key"), Name = WarehouseLabels.Text(level, "name"), CharacterSet = WarehouseLabels.Text(level, "characterSet"),
+            MinLength = WarehouseLabels.Number(level, "minLength"), MaxLength = WarehouseLabels.Number(level, "maxLength"), Separator = WarehouseLabels.Text(level, "separator"),
+        };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new System.Text.Json.Nodes.JsonObject
+        {
+            ["position"] = form!.Position,
+            ["key"] = form.Key,
+            ["name"] = form.Name,
+            ["characterSet"] = form.CharacterSet,
+            ["minLength"] = form.MinLength,
+            ["maxLength"] = form.MaxLength,
+            ["separator"] = form.Separator,
+        };
+        if (form.Id is null)
+        {
+            // Tesis yalnızca oluştururken verilir; sonra değiştirilemez.
+            values["facilityId"] = form.FacilityId?.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            errors = null;
+            message = null;
+            await LoadAsync(page?.Page ?? 1);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            form = null;
+            await LoadAsync(page?.Page ?? 1);
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class LevelForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? FacilityId { get; set; }
+
+        public int Position { get; set; } = 1;
+
+        public string Key { get; set; } = string.Empty;
+
+        public string Name { get; set; } = string.Empty;
+
+        public string CharacterSet { get; set; } = "alphanumeric";
+
+        public int MinLength { get; set; } = 1;
+
+        public int MaxLength { get; set; } = 10;
+
+        public string Separator { get; set; } = "-";
+    }
+}

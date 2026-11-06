@@ -19,6 +19,7 @@ using Modulix.Api.Organization;
 using Modulix.Api.Platform;
 using Modulix.Api.Records;
 using Modulix.Api.Settings;
+using Modulix.Api.Customs;
 using Modulix.Api.Sectors;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
@@ -103,6 +104,7 @@ builder.Services.AddHostedService<EmailDispatchWorker>();
 // Olaylar (ADR-0007): outbox'taki olaylar abonelere dağıtılır ve teslim edilir. Ayarlar "Events" bölümünde.
 builder.Services.Configure<EventOptions>(builder.Configuration.GetSection(EventOptions.SectionName));
 builder.Services.AddModulixEvents();
+builder.Services.AddModulixHardening(builder.Configuration);
 builder.Services.AddLeadIntakeRateLimit(builder.Configuration);
 builder.Services.AddQuotePublicRateLimit(builder.Configuration);
 builder.Services.AddSupportSurveyRateLimit(builder.Configuration);
@@ -179,7 +181,16 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+// Ters vekil arkasında gerçek istemci IP'si (hız sınırı, denetim kaydı); yalnızca ForwardedHeaders:Enabled ile ve güvenilen vekillerden.
+app.UseModulixForwardedHeaders();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
 app.UseHttpsRedirection();
+app.UseModulixSecurityHeaders();
 
 // Arayüz (Blazor WebAssembly) API ile aynı adresten sunulur; oturum çerezi SameSite=Strict kalabilir.
 app.UseBlazorFrameworkFiles();
@@ -210,6 +221,7 @@ app.MapFormLayoutEndpoints();
 app.MapGridViewEndpoints();
 app.MapSectorProfileEndpoints();
 app.MapSectorEndpoints();
+app.MapGtipEndpoints();
 app.MapRuleEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();

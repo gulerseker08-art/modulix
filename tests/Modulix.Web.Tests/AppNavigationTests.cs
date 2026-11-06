@@ -141,6 +141,13 @@ public class AppNavigationTests
     }
 
     [Fact]
+    public void Gtip_catalog_screen_is_in_the_platform_menu_for_platform_administrators_only()
+    {
+        Assert.Contains(Nav([], [], platformAdmin: true).Children(AppCatalog.Platform), c => c.Id == "platform.gtip" && c.Route == "platform/gtip");
+        Assert.DoesNotContain(Nav(AllModules, SalesUser).Children(AppCatalog.Platform), c => c.Id == "platform.gtip");
+    }
+
+    [Fact]
     public void Deep_link_to_a_screen_the_user_cannot_see_does_not_expose_that_menu()
     {
         var nav = Nav([CrmAccess.ModuleKey], [CrmAccess.CompaniesRead]);
@@ -226,9 +233,25 @@ public class AppNavigationTests
         Assert.Equal("depo/tesisler", nav.Find("warehouse.facilities")!.Route);
         Assert.Equal(AppCatalog.Warehouse, nav.Context("depo/tesisler")!.Root.Id);
 
-        // Modül kapalıysa ya da izin yoksa uygulama görünmez (menüyü gizlemek yetki değildir; sunucu yine denetler).
+        // Modül kapalıysa ya da hiçbir depo izni yoksa uygulama görünmez (menüyü gizlemek yetki değildir; sunucu yine denetler).
         Assert.Empty(Nav([], [WarehouseAccess.FacilitiesRead]).Roots());
-        Assert.Empty(Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.ZonesRead]).Roots());
+        Assert.Empty(Nav([WarehouseAccess.ModuleKey], []).Roots());
+    }
+
+    [Fact]
+    public void Each_warehouse_screen_follows_its_own_permission()
+    {
+        var all = Nav(
+            [WarehouseAccess.ModuleKey],
+            [WarehouseAccess.FacilitiesRead, WarehouseAccess.ZonesRead, WarehouseAccess.LocationLevelsRead, WarehouseAccess.LocationsRead, WarehouseAccess.AttorneysRead, WarehouseAccess.StockItemsRead]);
+        Assert.Equal(
+            new[] { "depo/tesisler", "depo/alanlar", "depo/lokasyon-seviyeleri", "depo/lokasyonlar" },
+            new[] { "warehouse.facilities", "warehouse.zones", "warehouse.location-levels", "warehouse.locations" }.Select(id => all.Find(id)!.Route));
+
+        // Yalnızca alan izni olan kişi yalnızca alanlar ekranını görür.
+        var zonesOnly = Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.ZonesRead]);
+        Assert.Equal([AppCatalog.Warehouse], zonesOnly.Roots().Select(r => r.Id));
+        Assert.Equal(["Alanlar"], zonesOnly.MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
     }
 
     [Fact]

@@ -1,8 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Warehouse.Domain;
 
 namespace Modulix.Modules.Warehouse.Records;
@@ -74,9 +76,10 @@ internal readonly record struct ParsedValue(object? Value, string? Error)
 /// <summary>Alan türleri. Biçimler: metin, mantıksal true/false, liste değeri anahtarı, kimlik GUID.</summary>
 internal static class Field
 {
+    /// <summary><paramref name="upperCase"/> açıksa değer kırpıldıktan sonra büyük harfe çevrilir (kayıtlı değerle karşılaştırma da büyük harfle yapılır).</summary>
     public static RecordField<T> Text<T>(
-        string name, int maxLength, Func<T, string?> get, Action<T, string?> set, bool required = false, bool createOnly = false) =>
-        new(name, required, nullable: !required, node => ParseText(node, maxLength), e => get(e), (e, v) => set(e, (string?)v))
+        string name, int maxLength, Func<T, string?> get, Action<T, string?> set, bool required = false, bool createOnly = false, bool upperCase = false) =>
+        new(name, required, nullable: !required, node => ParseText(node, maxLength, upperCase), e => get(e), (e, v) => set(e, (string?)v))
         {
             CreateOnly = createOnly,
         };
@@ -131,12 +134,35 @@ internal static class Field
             CreateOnly = createOnly,
         };
 
+    /// <summary>
+    /// Ortak kayda (firma) bağ (ADR-0006: <c>core.party</c>). Tenant filtresi ve RLS sorguya uygulanır; başka tenant'ın ortak kaydı
+    /// "bulunamadı" sayılır. Ortak kaydın okunabilirliği modülün bildirdiği okuma izniyle sağlanır.
+    /// </summary>
+    public static RecordField<T> PartyRef<T>(
+        string name, string notFoundMessage, Func<T, Guid?> get, Action<T, Guid?> set, bool required = false, bool createOnly = false) =>
+        new(name, required, nullable: !required, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v))
+        {
+            Exists = (context, id, ct) => context.Data.Set<Party>().AnyAsync(p => p.Id == id, ct),
+            NotFoundMessage = notFoundMessage,
+            CreateOnly = createOnly,
+        };
+
+    /// <summary>Tarih (yyyy-AA-gg). Zorunlu değilse boş bırakılabilir (boş gönderilirse temizlenir).</summary>
+    public static RecordField<T> Date<T>(string name, Func<T, DateOnly?> get, Action<T, DateOnly?> set, bool required = false) =>
+        new(name, required, nullable: !required, node =>
+                node.GetValueKind() == JsonValueKind.String
+                && DateOnly.TryParseExact(node.GetValue<string>(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+                    ? ParsedValue.Of(date)
+                    : ParsedValue.Fail("Tarih yyyy-AA-gg biçiminde olmalıdır."),
+            e => get(e) is { } value ? value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
+            (e, v) => set(e, (DateOnly?)v));
+
     private static ParsedValue ParseId(JsonNode node) =>
         node.GetValueKind() == JsonValueKind.String && Guid.TryParse(node.GetValue<string>(), out var id) && id != Guid.Empty
             ? ParsedValue.Of(id)
             : ParsedValue.Fail("Geçerli bir kayıt kimliği olmalıdır.");
 
-    private static ParsedValue ParseText(JsonNode node, int maxLength)
+    private static ParsedValue ParseText(JsonNode node, int maxLength, bool upperCase)
     {
         if (node.GetValueKind() != JsonValueKind.String)
         {
@@ -144,6 +170,11 @@ internal static class Field
         }
 
         var text = node.GetValue<string>().Trim();
+        if (upperCase)
+        {
+            text = text.ToUpperInvariant();
+        }
+
         return text.Length > maxLength
             ? ParsedValue.Fail($"En fazla {maxLength} karakter olabilir.")
             : ParsedValue.Of(text);
