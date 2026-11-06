@@ -194,7 +194,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
 | 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
 | 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Sonra |
-| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a uygulandı (aşağıda "Dilim 5a"), 5b-5c sonra |
+| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a ve 5b uygulandı (aşağıda "Dilim 5a", "Dilim 5b"), 5c sonra |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
 
 ## Maliyet (harici ücret yok, iç maliyet var)
@@ -411,7 +411,7 @@ Dilim 5 (Blazor ekranları) üç parçaya bölündü; ilk parça salt okuma ağ�
 | Parça | Kapsam | Durum |
 | --- | --- | --- |
 | 5a | Kural listesi, şablon seçimi, kural ayrıntısı (yayınla / aç-kapat / taslağı at) | Uygulandı |
-| 5b | Çalışma geçmişi ve elle müdahale (çalıştır, yeniden dene, iptal) | Sonra |
+| 5b | Çalışma geçmişi ve elle müdahale (yeniden dene, iptal; elle çalıştırma ertelendi) | Uygulandı ("Dilim 5b") |
 | 5c | Kural düzenleyici (tetikleyici, koşul, aksiyon parametreleri, önizleme) | Sonra |
 
 - **Ekranlar** (Yönetim > Otomasyon, `core.automation.read`): `/yonetim/otomasyon` (liste: durum görünümü, arama, sayfalama; yeni kural yalnızca şablondan), `/yonetim/otomasyon/sablonlar` ("Kullan" taslak açar, `core.automation.manage`), `/yonetim/otomasyon/{id}` (taslak ve yayınlanmış sürüm, sunucunun ürettiği okunabilir özet, doğrulama sorunları; "Yayınla (kapalı kalsın)", "Yayınla ve aç", "Aç / Kapat", "Taslağı at"; yayın ve açma `core.automation.publish`).
@@ -428,3 +428,21 @@ Dilim 5 (Blazor ekranları) üç parçaya bölündü; ilk parça salt okuma ağ�
 | `dotnet build src/Modulix.Web` / Release `src/Modulix.Api` | 0 hata |
 
 Ekranların kullandığı uçların dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 1 ve 3b'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez.
+
+### Dilim 5b: Çalışma geçmişi, yeniden deneme, iptal (6 Kasım 2026)
+
+- **Ekranlar:** `/yonetim/otomasyon/calismalar` (liste: durum görünümü, `?kural=` ile tek kurala süzme, sayfalama; `core.automation-logs.read`) ve `/yonetim/otomasyon/calismalar/{id}` (çalışma bilgisi, adım tablosu: sıra, adım, işlem adı, durum, deneme, sonuç özeti). Girişler kural listesindeki "Çalışma geçmişi" ve kural ayrıntısındaki "Çalışmaları" bağlantılarıdır.
+- **Elle müdahale:** "Yeniden dene" yalnızca `Failed` çalışmada, "İptal et" yalnızca `Pending`/`Running` çalışmada görünür (`AutomationLabels.CanRetry/CanCancel`; geçersiz durumu sunucu zaten reddeder). İptal onay şeridi ister: tamamlanmış adımların etkisi geri alınmaz. İkisi `core.automation.run` ister; düğmeleri gizlemek yetki değildir.
+- **Ertelenen:** "Kural için elle çalıştır" yapılmadı; bir kayıt seçmeyi gerektirir (kayıt kimliği yazdırmak kullanışsız ve hataya açık) ve ortak bir kayıt seçici henüz yok. Kural düzenleyiciyle (5c) birlikte ele alınacak.
+- **Gizlilik:** ekranlar yalnızca sunucunun döndürdüğü durum, özet ve kimlikleri gösterir; çalışma kaydı kayıt değeri ya da parametre taşımaz.
+- **Tasarım:** yeni CSS, token ya da bileşen yok (`PageHeader`, `ViewSelector`, `record-table`, `FormSection`, `Pager`, `chip active`, onay şeridi). Durum tonları: Başarılı yeşil, Başarısız kırmızı, Çalışıyor bilgi, İptal çizgili nötr, Bekliyor ve Koşul sağlanmadı nötr.
+- **Sınırlama:** sol menü girdisi `core.automation.read` ister; yalnızca `core.automation-logs.read` olan kullanıcı menüden değil doğrudan adresten girer.
+- **Doğrulanamayan:** 5a gibi, ekranlar bu oturumda tarayıcıda gözle kontrol edilmedi (açık/koyu tema, telefon).
+
+### Test sonuçları (Dilim 5b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Web.Tests` | Yeni 4: çalışma durumu adları ve tonları, yeniden deneme/iptal yalnızca uygun durumda, kaynak ve adım durumu adları, etiketsiz durum kalmaması |
+
+Uçların dört kural testi Dilim 2'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez.

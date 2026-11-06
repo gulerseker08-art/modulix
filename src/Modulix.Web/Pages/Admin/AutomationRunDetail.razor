@@ -1,0 +1,182 @@
+@page "/yonetim/otomasyon/calismalar/{RunId:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>@(detail?.Run.RuleName ?? "Otomasyon çalışması") · Modulix</PageTitle>
+
+@* Otomasyon çalışması ayrıntısı (ADR-0027, Dilim 5b): adımlar, deneme sayısı, sonuç özeti; başarısızı yeniden dene, bitmemişi iptal et.
+   Okuma core.automation-logs.read, yeniden deneme ve iptal core.automation.run ister. Düğmeleri gizlemek yetki değildir, sunucu uygular. *@
+<AuthGate Permission="@CoreAccess.ReadAutomationLogs">
+    <a class="back-link" href="yonetim/otomasyon/calismalar">← Otomasyon çalışmaları</a>
+
+    @if (detail is null)
+    {
+        @if (message is not null)
+        {
+            <div class="alert alert-danger" role="alert">@message</div>
+        }
+        else
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        var run = detail.Run;
+        <PageHeader Title="@run.RuleName" Icon="zap" Subtitle="@($"v{run.VersionNo} · {AutomationLabels.Origin(run.Origin)} · {CrmLabels.Time(run.CreatedAt)}")">
+            <span class="badge stage-@AutomationLabels.RunStatusBadge(run.Status)">@AutomationLabels.RunStatus(run.Status)</span>
+            @if (CanRun && AutomationLabels.CanCancel(run.Status))
+            {
+                <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => confirmingCancel = true">İptal et</button>
+            }
+            @if (CanRun && AutomationLabels.CanRetry(run.Status))
+            {
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="RetryAsync">Yeniden dene</button>
+            }
+        </PageHeader>
+
+        <Notice Text="@notice" />
+        @if (message is not null)
+        {
+            <div class="alert alert-danger" role="alert">@message</div>
+        }
+
+        @if (confirmingCancel)
+        {
+            <div class="alert alert-warning confirm" role="alertdialog" aria-label="İptal onayı">
+                <p>Çalışmamış adımlar iptal edilir; tamamlanmış adımların etkisi geri alınmaz. İptal edilsin mi?</p>
+                <button type="button" class="btn btn-danger" disabled="@busy" @onclick="CancelAsync">İptal et</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => confirmingCancel = false">Vazgeç</button>
+            </div>
+        }
+
+        <FormSection Title="Çalışma" Icon="clipboard-list">
+            <dl class="detail-list">
+                <dt>Kural</dt>
+                <dd>
+                    @if (Session.Can(CoreAccess.ReadAutomation))
+                    {
+                        <a href="yonetim/otomasyon/@run.RuleId">@run.RuleName</a>
+                    }
+                    else
+                    {
+                        @run.RuleName
+                    }
+                    (v@(run.VersionNo))
+                </dd>
+                <dt>Kayıt türü</dt>
+                <dd>@AutomationLabels.EntityName(entities, run.EntityKey)</dd>
+                <dt>Kaynak</dt>
+                <dd>@AutomationLabels.Origin(run.Origin)</dd>
+                <dt>Başladı</dt>
+                <dd>@CrmLabels.Time(run.CreatedAt)</dd>
+                <dt>Bitti</dt>
+                <dd>@(run.CompletedAt is { } done ? CrmLabels.Time(done) : "—")</dd>
+                @if (run.Status == AutomationLabels.RunRunning)
+                {
+                    <dt>Sonraki deneme</dt>
+                    <dd>@CrmLabels.Time(detail.NextAttemptAt)</dd>
+                }
+                @if (!string.IsNullOrWhiteSpace(run.Note))
+                {
+                    <dt>Not</dt>
+                    <dd>@run.Note</dd>
+                }
+            </dl>
+        </FormSection>
+
+        <FormSection Title="Adımlar" Icon="check"
+                     Description="Adımlar sırayla çalışır; başarısız adım kalanları durdurur.">
+            @if (detail.Steps.Count == 0)
+            {
+                <p class="text-muted" role="status">
+                    @(run.Status == AutomationLabels.RunNotMatched ? "Koşul sağlanmadığı için hiçbir adım çalışmadı." : "Bu çalışmada adım yok.")
+                </p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Çalışma adımları</caption>
+                    <thead>
+                        <tr><th scope="col">Sıra</th><th scope="col">Adım</th><th scope="col">İşlem</th><th scope="col">Durum</th><th scope="col">Deneme</th><th scope="col">Sonuç</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var step in detail.Steps)
+                        {
+                            <tr>
+                                <td data-label="Sıra">@step.StepNo</td>
+                                <td data-label="Adım" class="primary">@step.StepId</td>
+                                <td data-label="İşlem">@ActionName(step.Action)</td>
+                                <td data-label="Durum"><span class="badge stage-@AutomationLabels.StepStatusBadge(step.Status)">@AutomationLabels.StepStatus(step.Status)</span></td>
+                                <td data-label="Deneme">@step.Attempts</td>
+                                <td data-label="Sonuç">@(string.IsNullOrWhiteSpace(step.Summary) ? "—" : step.Summary)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </FormSection>
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid RunId { get; set; }
+
+    private AutomationRunDetailDto? detail;
+    private IReadOnlyList<AutomationEntityDto> entities = [];
+    private IReadOnlyList<AutomationActionDto> actions = [];
+    private string? message;
+    private string? notice;
+    private bool busy;
+    private bool confirmingCancel;
+
+    private bool CanRun => Session.Can(CoreAccess.RunAutomation);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(CoreAccess.ReadAutomationLogs))
+        {
+            return;
+        }
+
+        // Katalog ad çevirisi içindir (core.automation.read ister); alınamazsa teknik anahtar görünür.
+        if (Session.Can(CoreAccess.ReadAutomation))
+        {
+            var catalog = (await Api.GetAsync<AutomationCatalogDto>("/api/automation/catalog")).Value;
+            entities = catalog?.Entities ?? [];
+            actions = catalog?.Actions ?? [];
+        }
+
+        var result = await Api.GetAsync<AutomationRunDetailDto>($"/api/automation/runs/{RunId}");
+        detail = result.Value;
+        message = result.Error;
+    }
+
+    private string ActionName(string key) => actions.FirstOrDefault(a => a.Key == key)?.DisplayName ?? key;
+
+    private Task RetryAsync() => ChangeAsync($"/api/automation/runs/{RunId}/retry", "Çalışma yeniden kuyruğa alındı.");
+
+    private async Task CancelAsync()
+    {
+        await ChangeAsync($"/api/automation/runs/{RunId}/cancel", "Çalışma iptal edildi.");
+    }
+
+    private async Task ChangeAsync(string url, string done)
+    {
+        busy = true;
+        message = null;
+        notice = null;
+        var result = await Api.PostAsync<AutomationRunDetailDto>(url, new { });
+        busy = false;
+        confirmingCancel = false;
+        if (result.Value is { } updated)
+        {
+            detail = updated;
+            notice = done;
+            return;
+        }
+
+        message = result.Error;
+    }
+}
