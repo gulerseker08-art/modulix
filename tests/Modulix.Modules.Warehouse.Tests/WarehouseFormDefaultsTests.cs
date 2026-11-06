@@ -100,9 +100,11 @@ public class WarehouseFormDefaultsTests
                 WarehouseAccess.AttorneysRead, WarehouseAccess.AttorneysWrite,
                 WarehouseAccess.StockItemsRead, WarehouseAccess.StockItemsWrite,
                 WarehouseAccess.DeclarationsRead, WarehouseAccess.DeclarationsWrite,
+                WarehouseAccess.RegimesRead, WarehouseAccess.RegimesWrite,
             },
             key => Assert.Contains(key, permissions));
-        Assert.Equal(14, permissions.Count);
+        Assert.Equal(16, permissions.Count);
+        Assert.Equal(WarehouseModule.Entities.RegimeBinding, WarehouseAccess.RegimeBindingEntityKey);
         Assert.Equal(
             [
                 WarehouseModule.Entities.Facility, WarehouseModule.Entities.Zone, WarehouseModule.Entities.LocationLevel, WarehouseModule.Entities.Location,

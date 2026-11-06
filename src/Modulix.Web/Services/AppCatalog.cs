@@ -221,6 +221,7 @@ public static class AppCatalog
         new("warehouse.power-of-attorneys", Warehouse, "Vekâletler", "file-text", "depo/vekaletler", 50, WarehouseAccess.ModuleKey, WarehouseAccess.AttorneysRead),
         new("warehouse.stock-items", Warehouse, "Stok kartları", "package", "depo/stok-kartlari", 60, WarehouseAccess.ModuleKey, WarehouseAccess.StockItemsRead, Tone: AppTone.Teal),
         new("warehouse.customs-declarations", Warehouse, "Beyannameler", "clipboard-list", "depo/beyannameler", 70, WarehouseAccess.ModuleKey, WarehouseAccess.DeclarationsRead),
+        new("warehouse.regime-bindings", Warehouse, "Rejim profilleri", "shield", "depo/rejim-profilleri", 80, WarehouseAccess.ModuleKey, WarehouseAccess.RegimesRead, Tone: AppTone.Teal),
 
         // Rapor merkezi çekirdeğe aittir (modül anahtarı yok; yönetim girdileri gibi yalnızca izne bağlıdır). Tek ekranlı olduğu için alt uygulaması yoktur,
         // kendi route'u vardır; /raporlar altındaki oluşturucu ve çalıştırma ekranları da bu uygulamanın bağlamında kalır.

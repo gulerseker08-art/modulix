@@ -116,13 +116,25 @@ internal sealed partial class CustomsDeclarationRecordStore(WarehouseStoreContex
             errors.Add(new RecordFieldError("brokerPartyId", "İthalatçı ve gümrük müşaviri aynı firma olamaz."));
         }
 
+        var stored = isNew
+            ? null
+            : await Context.Data.Set<CustomsDeclaration>().AsNoTracking().Where(d => d.Id == entity.Id)
+                .Select(d => new { d.ImporterPartyId, d.BrokerPartyId, d.RegistrationNo, d.RegimeKey }).SingleOrDefaultAsync(cancellationToken);
+
+        // Rejim bir profile bağlıysa tescil no profilin kuralına göre denetlenir (K7, K16). Yalnızca numara ya da rejim değiştiğinde çalışır: sonradan
+        // sıkılaşan kural, eski bir beyannamenin başka alanlarının düzenlenmesini engellemez. Uyarı düzeyi kaydı engellemez (arayüz gösterir).
+        if (errors.All(e => e.Field != "registrationNo") && (stored is null || stored.RegistrationNo != entity.RegistrationNo || stored.RegimeKey != entity.RegimeKey))
+        {
+            var check = await new RegistrationNoCheck(Context).CheckAsync(entity.RegimeKey, entity.RegistrationNo, cancellationToken);
+            if (check.HasRule && check.Violations.Count > 0 && check.Enforcement == nameof(Modulix.Core.Contracts.Customs.RuleEnforcement.Block))
+            {
+                errors.Add(new RecordFieldError("registrationNo", $"{string.Join(" ", check.Violations)} (rejim profili: {check.ProfileName}, sürüm {check.VersionNumber})"));
+            }
+        }
+
         // Rol, taraf ilk seçildiğinde ya da değiştirildiğinde denetlenir; firmadan rol sonradan kalksa da eski beyanname bozulmaz.
         if (errors.Count == 0)
         {
-            var stored = isNew
-                ? null
-                : await Context.Data.Set<CustomsDeclaration>().AsNoTracking().Where(d => d.Id == entity.Id)
-                    .Select(d => new { d.ImporterPartyId, d.BrokerPartyId }).SingleOrDefaultAsync(cancellationToken);
             if (stored is null || stored.ImporterPartyId != entity.ImporterPartyId)
             {
                 await CheckRoleAsync(entity.ImporterPartyId, WarehouseModule.RelationshipRoles.Importer, "importerPartyId",

@@ -15,9 +15,41 @@ namespace Modulix.Infrastructure.Customs;
 /// taslak ve bir yayın vardır (filtreli benzersiz dizin); yayın, önceki yayını "yerini bıraktı" yapar ve geçmiş olarak kalır. Her yazma
 /// değiştiren yönetici ile birlikte <c>PlatformAuditLog</c>'a aynı işlemde yazılır.
 /// </summary>
-internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfileAdmin
+internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfileAdmin, IRegimeProfileCatalog
 {
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+
+    // ---- Okuma (modüller): yalnızca etkin profilin yayındaki sürümü ----
+
+    public async Task<IReadOnlyList<PublishedRegimeProfile>> ListPublishedAsync(CancellationToken cancellationToken)
+    {
+        // Birkaç profil vardır; sıralama bellekte yapılır (EF kayıt projeksiyonundan sonraki sıralamayı çeviremez).
+        var rows = await PublishedQuery(null).ToListAsync(cancellationToken);
+        return [.. rows.OrderBy(r => r.Profile.Name, StringComparer.CurrentCultureIgnoreCase).Select(ToPublished)];
+    }
+
+    public async Task<PublishedRegimeProfile?> GetPublishedAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        var row = await PublishedQuery(profileId).SingleOrDefaultAsync(cancellationToken);
+        return row is null ? null : ToPublished(row);
+    }
+
+    // Süzgeç projeksiyondan önce uygulanır (EF kayıt tipine projeksiyondan sonraki koşulu çeviremez).
+    private IQueryable<PublishedRow> PublishedQuery(Guid? profileId) =>
+        from profile in db.RegimeProfiles.AsNoTracking()
+        join version in db.RegimeProfileVersions.AsNoTracking() on profile.Id equals version.ProfileId
+        where profile.IsActive && version.State == RegimeProfileVersionState.Published && (profileId == null || profile.Id == profileId)
+        select new PublishedRow(profile, version);
+
+    private static PublishedRegimeProfile ToPublished(PublishedRow row)
+    {
+        var view = ToView(row.Version);
+        return new PublishedRegimeProfile(row.Profile.Id, row.Profile.Code, row.Profile.Name, row.Version.Id, row.Version.Number, row.Version.IsVerified, row.Version.VerificationNote, view.Content);
+    }
+
+    private sealed record PublishedRow(RegimeProfile Profile, RegimeProfileVersion Version);
+
+    // ---- Yönetim (platform) ----
 
     public async Task<IReadOnlyList<RegimeProfileSummary>> ListAsync(CancellationToken cancellationToken)
     {

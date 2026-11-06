@@ -227,6 +227,7 @@ app.MapSectorProfileEndpoints();
 app.MapSectorEndpoints();
 app.MapGtipEndpoints();
 app.MapRegimeProfileEndpoints();
+app.MapRegimeCheckEndpoints();
 app.MapRuleEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();

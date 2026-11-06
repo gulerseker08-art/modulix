@@ -103,6 +103,7 @@ public class WarehouseModuleTests
         Assert.Contains(WarehouseModule.Entities.StockItem, audited.Keys);
         Assert.Contains(WarehouseModule.Entities.CustomsDeclaration, audited.Keys);
         Assert.Contains(WarehouseModule.Entities.CustomsDeclarationLine, audited.Keys);
+        Assert.Contains(WarehouseModule.Entities.RegimeBinding, audited.Keys);
         // Başvuru hedefi ya denetlenen bir depo kaydıdır ya da ortak kayıttır (firma, ADR-0006).
         Assert.All(
             Module.AuditedEntities.SelectMany(a => a.References.Values),

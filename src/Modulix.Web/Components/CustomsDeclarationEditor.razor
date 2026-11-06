@@ -59,9 +59,11 @@
                     {
                         case "registrationNo":
                             <label class="@f.LabelClass()" for="decl-no">@f.Label</label>
-                            <input id="decl-no" class="form-control" maxlength="30" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.RegistrationNo" />
+                            <input id="decl-no" class="form-control" maxlength="30" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.RegistrationNo" @bind:event="onchange" />
                             <FieldError Field="registrationNo" Errors="errors" />
                             <small class="text-muted">Harf, rakam ve - _ . / karakterleri; büyük harfe çevrilir, firma içinde benzersizdir.</small>
+                            @* Rejim bir rejim profiline bağlıysa tescil no profilin kuralına göre denetlenir (uyarı kaydı engellemez). *@
+                            <RegistrationNoHint RegimeKey="@form.RegimeKey" RegistrationNo="@form.RegistrationNo" />
                             break;
                         case "registrationDate":
                             <label class="@f.LabelClass()" for="decl-date">@f.Label</label>
