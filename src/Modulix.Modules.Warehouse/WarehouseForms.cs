@@ -5,7 +5,7 @@ namespace Modulix.Modules.Warehouse;
 /// <summary>
 /// Depo formlarının varsayılan düzeni (ADR-0021 form düzeni). Alan anahtarları kayıt alanlarının teknik adlarıdır; editör her anahtar için
 /// kendi girdisini çizer, yer ve genişlik buradan (ya da firmanın düzeninden) gelir. Kaydın kimliğini taşıyan alanlar sabittir (gizlenemez,
-/// zorunluluğu değişmez). Yalnızca bu adımda arayüzü olan formlar tanımlıdır; alan ve lokasyon formları kendi ekranlarıyla eklenir.
+/// zorunluluğu değişmez). Yalnızca arayüzü olan formlar tanımlıdır.
 /// </summary>
 public static class WarehouseForms
 {
@@ -62,6 +62,24 @@ public static class WarehouseForms
             new("zoneId", "Alan", "temel", 8),
             new("name", "Ad", "tanim", 8),
             new("isActive", "Etkin", "tanim", 4, Fixed: true),
+        ]),
+
+        new(WarehouseModule.Entities.PowerOfAttorney, "Vekâlet",
+        [new(General, "Genel bilgiler"), new("ayrintilar", "Kapsam ve belge")],
+        [
+            new("taraflar", "Taraflar", "users"),
+            new("gecerlilik", "Geçerlilik", "calendar"),
+            new("kapsam", "Kapsam ve belge", "file-text", Tab: "ayrintilar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ayrintilar"),
+        ],
+        [
+            new("importerPartyId", "İthalatçı", "taraflar", 6, Required: true, Fixed: true),
+            new("brokerPartyId", "Gümrük müşaviri", "taraflar", 6, Required: true, Fixed: true),
+            new("validFrom", "Başlangıç", "gecerlilik", 4, Required: true, Fixed: true),
+            new("validTo", "Bitiş", "gecerlilik", 4),
+            new("isActive", "Etkin", "gecerlilik", 4, Fixed: true),
+            new("scope", "Kapsam", "kapsam", 12),
+            new("documentReference", "Belge referansı", "kapsam", 12),
         ]),
     ];
 }

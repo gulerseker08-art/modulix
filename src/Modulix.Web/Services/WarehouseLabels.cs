@@ -1,3 +1,4 @@
+using Modulix.Shared.Lookups;
 using Modulix.Shared.Records;
 using Modulix.Shared.Warehouse;
 
@@ -59,6 +60,23 @@ public static class WarehouseLabels
         }
 
         return names;
+    }
+
+    /// <summary>
+    /// Firma kimliklerini seçim kutusunun çözümleme ucundan ada çevirir (en çok 50'şer kimlik). Firmayı okuma izni yoksa ad dönmez ("—").
+    /// Zaten bilinen kimlikler tekrar sorulmaz.
+    /// </summary>
+    public static async Task ResolveNamesAsync(ApiClient api, string lookupKey, IEnumerable<Guid> ids, IDictionary<Guid, string> names)
+    {
+        var missing = ids.Distinct().Where(id => !names.ContainsKey(id)).ToList();
+        foreach (var chunk in missing.Chunk(50))
+        {
+            var resolved = await api.PostAsync<LookupResolveDto>($"/api/lookups/{lookupKey}/resolve", new ResolveLookupRequest(chunk));
+            foreach (var item in resolved.Value?.Items ?? [])
+            {
+                names[item.Id] = item.Label ?? "—";
+            }
+        }
     }
 
     public static string NameOf(IReadOnlyDictionary<Guid, string> names, Guid? id) =>

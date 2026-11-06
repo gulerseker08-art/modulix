@@ -236,7 +236,7 @@ public class AppNavigationTests
     {
         var all = Nav(
             [WarehouseAccess.ModuleKey],
-            [WarehouseAccess.FacilitiesRead, WarehouseAccess.ZonesRead, WarehouseAccess.LocationLevelsRead, WarehouseAccess.LocationsRead]);
+            [WarehouseAccess.FacilitiesRead, WarehouseAccess.ZonesRead, WarehouseAccess.LocationLevelsRead, WarehouseAccess.LocationsRead, WarehouseAccess.AttorneysRead]);
         Assert.Equal(
             new[] { "depo/tesisler", "depo/alanlar", "depo/lokasyon-seviyeleri", "depo/lokasyonlar" },
             new[] { "warehouse.facilities", "warehouse.zones", "warehouse.location-levels", "warehouse.locations" }.Select(id => all.Find(id)!.Route));
