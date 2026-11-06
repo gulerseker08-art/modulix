@@ -248,6 +248,7 @@ public static class AppCatalog
         new("platform.modules", Platform, "Modül hakları", "toggle", "platform/moduller", 30, PlatformOnly: true),
         new("platform.catalog", Platform, "Modül kataloğu", "package", "platform/katalog", 40, PlatformOnly: true, Tone: AppTone.Teal),
         new("platform.sectors", Platform, "Sektörler", "layers", "platform/sektorler", 45, PlatformOnly: true),
+        new("platform.gtip", Platform, "GTİP kataloğu", "clipboard-list", "platform/gtip", 47, PlatformOnly: true),
         new("platform.events", Platform, "Olaylar", "zap", "platform/olaylar", 50, PlatformOnly: true),
     ];
 }

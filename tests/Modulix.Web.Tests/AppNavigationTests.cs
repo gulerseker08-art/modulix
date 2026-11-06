@@ -141,6 +141,13 @@ public class AppNavigationTests
     }
 
     [Fact]
+    public void Gtip_catalog_screen_is_in_the_platform_menu_for_platform_administrators_only()
+    {
+        Assert.Contains(Nav([], [], platformAdmin: true).Children(AppCatalog.Platform), c => c.Id == "platform.gtip" && c.Route == "platform/gtip");
+        Assert.DoesNotContain(Nav(AllModules, SalesUser).Children(AppCatalog.Platform), c => c.Id == "platform.gtip");
+    }
+
+    [Fact]
     public void Deep_link_to_a_screen_the_user_cannot_see_does_not_expose_that_menu()
     {
         var nav = Nav([CrmAccess.ModuleKey], [CrmAccess.CompaniesRead]);

@@ -26,3 +26,9 @@ public sealed record GtipImportPreviewDto(
     List<GtipEntryDto> Sample);
 
 public sealed record GtipImportErrorDto(int Row, string Message);
+
+/// <summary>İstemci ve sunucunun ortak dosya sınırı (sunucudaki <c>GtipImportRules.MaxFileBytes</c> ile aynıdır; testle denetlenir).</summary>
+public static class GtipImportLimits
+{
+    public const int MaxFileBytes = 20 * 1024 * 1024;
+}
