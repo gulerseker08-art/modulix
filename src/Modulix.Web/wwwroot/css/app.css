@@ -1053,7 +1053,7 @@ tr.done td.primary {
         .record-table > tbody > tr:last-child > :last-child { border-bottom-right-radius: calc(var(--mx-radius-card) - 1px); }
 
         .record-table > :not(caption) > * > * {
-            padding: 0.95rem 1rem;
+            padding: var(--mx-space-2) var(--mx-space-4);
             vertical-align: middle;
         }
 
@@ -1065,11 +1065,11 @@ tr.done td.primary {
             border-bottom: 0;
         }
 
-        /* Başlık: dolgulu bant, cümle yazımı, kalın; sütun türü ikonu SortHeader'ın ColumnIcon'uyla gelir. */
+        /* Başlık: dolgulu ince bant, cümle yazımı, kalın, ikincil renk; sütun türü ikonu SortHeader'ın ColumnIcon'uyla gelir. */
         .record-table thead th {
             background: var(--mx-surface-hover);
-            color: var(--mx-text-primary);
-            font-size: var(--mx-fs-table);
+            color: var(--mx-text-secondary);
+            font-size: var(--mx-fs-helper);
             font-weight: 700;
             white-space: nowrap;
         }
@@ -1078,6 +1078,10 @@ tr.done td.primary {
         .record-table thead th .th-label .app-icon:first-child {
             color: var(--mx-text-secondary);
             opacity: 1;
+        }
+
+        .record-table thead th .sort-button.active .app-icon:first-child {
+            color: inherit;
         }
 
         .th-label {
@@ -1095,13 +1099,48 @@ tr.done td.primary {
             text-align: center;
         }
 
+        /* Satır 44 px: yüksekliği düğmeler değil bu kural belirler; düğmeli hücrelerde dikey dolgu azalır. */
         .record-table td {
+            height: 2.75rem;
             font-size: var(--mx-fs-table);
         }
+
+        .record-table > tbody > tr > td.actions,
+        .record-table > tbody > tr > td.row-menu-cell {
+            padding-top: var(--mx-space-1);
+            padding-bottom: var(--mx-space-1);
+        }
+
+        .record-table .avatar {
+            width: 1.5rem;
+            height: 1.5rem;
+            font-size: 0.625rem;
+        }
+
+        .record-table .badge {
+            padding: 0.2em 0.6em;
+        }
+
+        /* Kayıt bağlantısı: alt çizgisiz, yarı kalın; çizgi üzerine gelince görünür. */
+        .record-table td.primary a {
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+            .record-table td.primary a:hover {
+                text-decoration: underline;
+            }
 
     .record-table td.actions {
         text-align: right;
         white-space: nowrap;
+    }
+}
+
+/* Fareyle kullanımda "⋯" düğmesi satırı büyütmez; dokunmatikte 44 px hedef korunur. */
+@media (min-width: 768px) and (not (pointer: coarse)) {
+    .record-table .row-menu-button {
+        min-height: 2rem;
     }
 }
 

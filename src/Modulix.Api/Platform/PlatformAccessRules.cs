@@ -58,6 +58,12 @@ public static class PlatformAccessRules
         ["POST /api/platform/gtip/versions"] = Ops,
         ["POST /api/platform/gtip/versions/preview"] = Ops,
         ["DELETE /api/platform/gtip/versions/{id}"] = Ops,
+        // Rejim profili (ADR-0032 K16): taslak, yayın, pasife alma; Operasyon yönetir.
+        ["POST /api/platform/regime-profiles"] = Ops,
+        ["PUT /api/platform/regime-profiles/{id}/draft"] = Ops,
+        ["DELETE /api/platform/regime-profiles/{id}/draft"] = Ops,
+        ["POST /api/platform/regime-profiles/{id}/publish"] = Ops,
+        ["PUT /api/platform/regime-profiles/{id}/active"] = Ops,
         // Kural paketleri (ürün standardı alan kuralları): taslak, yayın ve geri alma; Operasyon yönetir.
         ["POST /api/platform/rule-packages"] = Ops,
         ["PUT /api/platform/rule-packages/{id}/draft"] = Ops,
