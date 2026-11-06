@@ -51,7 +51,7 @@ Kayıt formu kart çerçevesini kendisi taşımaz (`record-form sectioned`); ala
 - **`input-icon`**: telefon, e-posta, web sitesi, adres gibi alanlarda input'un solunda ikon (`AppIcon`, 16px).
 - **Özet kartı**: `record-summary > summary-card` (`summary-identity` avatar + ad + durum, `summary-heading`, `summary-facts`); formdaki değerlerden canlı doldurulur, 992px altında gizlenir.
 - Çekmecede araç çubuğu gizlenir (çekmecenin kendi başlığı vardır), kartlar çerçevesiz ve çizgiyle ayrılır; Kaydet / İptal alta yapışıktır.
-- Kartlar arası 16px, kart içi 20–24px; ikon kutusu 36px, marka tonunda.
+- Kartlar arası 12px, kart içi 16px; başlık ince çizgiyle gövdeden ayrılır, ikon kutusu 28px ve tonaldir (degrade yok). Kart `overflow` kullanmaz, açılır listeler taşabilir.
 
 Detay sayfalarında da aynı kart kullanılır: Fırsat (Temel bilgiler, Detaylar, Ürün / hizmet kalemleri, Kişiler, Rakipler, Teklifler, tarihçe, sağ panel kartları), Firma / Kişi genel sekmesi, Lead talep bilgileri.
 
@@ -85,13 +85,13 @@ Ekleme/düzenleme formları yerleşimi koddan değil **firmanın form düzeninde
 
 | Durum | Nasıl |
 |---|---|
-| Default | `form-control` / `form-select`, 36px yükseklik, 10px köşe |
+| Default | `form-control` / `form-select`, 36px yükseklik, 9px köşe, 13px yazı; kayıt formu, bölüm kartı ve çekmecede `--mx-surface-hover` dolgulu, sayfa zemininde (arama, süzgeç) `--mx-surface` |
 | Hover | Kenar `--mx-border-strong` |
-| Focus | Kenar `--mx-brand-primary` + `--mx-focus-ring` |
+| Focus | Zemin `--mx-surface`, kenar `--mx-brand-primary` + `--mx-focus-ring` |
 | Disabled | `disabled` — `--mx-surface-muted` zemin, ikincil metin |
-| Read-only | `readonly` — `--mx-surface-hover` zemin |
+| Read-only | `readonly` — `--mx-surface-muted` zemin, metin birincil renkte |
 | Required | Etikete `required` sınıfı (kırmızı `*`) ve inputa `required`/`aria-required="true"` |
-| Invalid | Blazor `invalid` sınıfı ya da `aria-invalid="true"` — kırmızı kenar + iç çizgi; ileti alanın altında (`FieldError`, `validation-message`) |
+| Invalid | Blazor `invalid` sınıfı ya da `aria-invalid="true"` — kırmızı kenar + iç çizgi, `--mx-tone-danger-bg` zemin; ileti alanın altında (`FieldError`, `validation-message`) |
 | Loading | Düğmede `<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>` ve `disabled` |
 | Success | Kaydedildikten sonra `Notice` ile `role="status"` ileti |
 

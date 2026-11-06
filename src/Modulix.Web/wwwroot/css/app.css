@@ -104,9 +104,9 @@
     --mx-space-8: 2rem;
 
     /* Köşe yarıçapları */
-    --mx-radius-input: 10px;
+    --mx-radius-input: 9px;
     --mx-radius-button: 10px;
-    --mx-radius-card: 16px;
+    --mx-radius-card: 12px;
     --mx-radius-drawer: 16px;
     --mx-radius-modal: 16px;
     --mx-radius-badge: 999px;
@@ -480,8 +480,8 @@ a, .btn-link {
 
 /* ---- Form alanları: Default / Hover / Focus / Disabled / Read-only / Required / Invalid ---- */
 .form-label {
-    font-size: var(--mx-fs-label);
-    font-weight: 600;
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
     color: var(--mx-text-label);
     margin-bottom: var(--mx-space-1);
 }
@@ -502,7 +502,21 @@ a, .btn-link {
     color: var(--mx-text-primary);
     border-color: var(--mx-border);
     border-radius: var(--mx-radius-input);
-    font-size: var(--mx-fs-body);
+    font-size: var(--mx-fs-label);
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+/* Kayıt formlarında alanlar dolgulu görünür; odakta yüzey rengine döner. Sayfa zemininde (arama, süzgeç) yüzey rengi kalır. */
+:where(.record-form, .section-card, .drawer) .form-control,
+:where(.record-form, .section-card, .drawer) .form-select {
+    background-color: var(--mx-surface-hover);
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: var(--mx-surface);
+    color: var(--mx-text-primary);
 }
 
     .form-control::placeholder {
@@ -521,8 +535,10 @@ a, .btn-link {
         opacity: 1;
     }
 
-    .form-control[readonly] {
-        background-color: var(--mx-surface-hover);
+    /* Salt okunur alan dolgulu düzenlenebilir alandan ayrılır; metin pasif alandaki gibi soluklaşmaz. */
+    .form-control[readonly],
+    .form-control[readonly]:focus {
+        background-color: var(--mx-surface-muted);
     }
 
 .btn:focus-visible, .btn-link.nav-link:focus, .form-control:focus, .form-select:focus, .form-check-input:focus {
@@ -564,6 +580,11 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
 .invalid, .form-control.invalid, .form-select.invalid, [aria-invalid="true"] {
     border-color: var(--mx-danger) !important;
     box-shadow: inset 0 0 0 1px var(--mx-danger);
+}
+
+.form-control.invalid, .form-select.invalid,
+.form-control[aria-invalid="true"], .form-select[aria-invalid="true"] {
+    background-color: var(--mx-tone-danger-bg);
 }
 
 .validation-message, .invalid-feedback {
@@ -3141,8 +3162,9 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 /* Ortak lookup bileşeni (ADR-0016) */
 .lookup { position: relative; }
 .lookup-field { position: relative; display: flex; align-items: center; gap: .25rem; }
-.lookup-field .form-control { flex: 1; min-width: 0; min-height: 2.5rem; padding-right: 2.25rem; }
-.lookup-field .form-control[readonly]:not(:disabled) { cursor: pointer; background-color: var(--bs-body-bg); }
+.lookup-field .form-control { flex: 1; min-width: 0; min-height: var(--mx-control-height); padding-right: 2.25rem; }
+.lookup-field .form-control[readonly]:not(:disabled) { cursor: pointer; background-color: var(--mx-surface-hover); }
+@media (pointer: coarse) { .lookup-field .form-control { min-height: 44px; } }
 .lookup-clear { position: absolute; right: .35rem; width: 2rem; height: 2rem; border: 0; background: transparent; font-size: 1.25rem; line-height: 1; color: var(--mx-text-secondary); border-radius: .25rem; }
 .lookup-clear:hover, .lookup-clear:focus-visible { background: var(--mx-surface-muted); outline: 2px solid var(--mx-brand-primary); }
 .lookup-view { white-space: nowrap; font-size: .875rem; padding: .5rem; }
@@ -4618,30 +4640,35 @@ button.pipeline-label {
 /* ---- Bölüm kartı (FormSection): ikonlu başlık + form-grid / detail-grid gövde ---- */
 /* Referans "Firma kartı" ve "Fırsat" ekranlarındaki Temel Bilgiler / Detaylar / Genel İletişim Bilgileri kartları. */
 .section-card {
-    margin-bottom: var(--mx-space-4);
-    padding: var(--mx-space-5) var(--mx-space-6);
+    margin-bottom: var(--mx-space-3);
     border: 1px solid var(--mx-border);
     border-radius: var(--mx-radius-card);
     background: var(--mx-surface);
     box-shadow: var(--mx-shadow-card);
 }
 
+/* Başlık ince çizgiyle gövdeden ayrılır; açılır listeler taşabilsin diye kart overflow kullanmaz. */
 .section-card-head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: var(--mx-space-3);
-    margin-bottom: var(--mx-space-4);
+    padding: var(--mx-space-2) var(--mx-space-4);
+    border-bottom: 1px solid var(--mx-border);
+}
+
+.section-card-body {
+    padding: var(--mx-space-4);
 }
 
 .section-card-icon {
     display: grid;
     place-items: center;
     flex: none;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 10px;
-    background: var(--mx-gradient-brand);
-    color: var(--mx-text-on-brand);
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 8px;
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
 }
 
 .section-card-heading {
@@ -4650,7 +4677,7 @@ button.pipeline-label {
     flex-direction: column;
     justify-content: center;
     min-width: 0;
-    min-height: 2.25rem;
+    min-height: 1.75rem;
 }
 
 .section-card .section-card-title {
@@ -4684,7 +4711,7 @@ button.pipeline-label {
 }
 
 .section-card .form-grid {
-    gap: var(--mx-space-4);
+    gap: var(--mx-space-3) var(--mx-space-4);
 }
 
 .section-card > .section-card-body > .record-table,
@@ -4695,6 +4722,10 @@ button.pipeline-label {
 /* Sağ paneldeki kartlar */
 .detail-side .section-card {
     margin-bottom: var(--mx-space-4);
+}
+
+.detail-side .section-card.side-card {
+    padding: 0;
 }
 
 /* ---- Bölümlü kayıt formu: çerçeveyi bölüm kartları taşır; üstte başlık + İptal / Kaydet araç çubuğu ---- */
@@ -4753,9 +4784,17 @@ button.pipeline-label {
     display: none;
 }
 
+.drawer .section-card-head {
+    padding: 0 0 var(--mx-space-3);
+    border-bottom: 0;
+}
+
+.drawer .section-card-body {
+    padding: 0;
+}
+
 .drawer .section-card {
     margin: 0 0 var(--mx-space-5);
-    padding: 0;
     border: 0;
     border-radius: 0;
     box-shadow: none;
@@ -4766,16 +4805,6 @@ button.pipeline-label {
         padding-top: var(--mx-space-5);
         border-top: 1px solid var(--mx-border);
     }
-
-.drawer .section-card-icon {
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: 8px;
-}
-
-.drawer .section-card-heading {
-    min-height: 1.75rem;
-}
 
 /* ---- İkonlu alan: input'un solunda ikon (telefon, e-posta, web, adres) ---- */
 .input-icon {
@@ -4818,6 +4847,10 @@ button.pipeline-label {
         min-width: 16rem;
     }
 
+.designer-tab {
+    padding: var(--mx-space-5) var(--mx-space-6);
+}
+
 .designer-tab-head,
 .designer-section-head {
     display: flex;
@@ -4855,12 +4888,6 @@ button.pipeline-label {
     border-radius: var(--mx-radius-card);
     background: var(--mx-background);
 }
-
-    .designer-section .section-card-icon {
-        width: 1.75rem;
-        height: 1.75rem;
-        border-radius: 8px;
-    }
 
 .designer-icon,
 .designer-move {
