@@ -148,6 +148,17 @@ internal static class Field
         };
 
     /// <summary>
+    /// Platformun yayınladığı bir rejim profiline bağ. Profil yoksa, pasifse ya da yayını yoksa doğrulama hatası olur ("bulunamadı");
+    /// tenant yalnızca yayındaki etkin profilleri seçebilir.
+    /// </summary>
+    public static RecordField<T> ProfileRef<T>(string name, string notFoundMessage, Func<T, Guid?> get, Action<T, Guid?> set, bool required = false) =>
+        new(name, required, nullable: !required, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v))
+        {
+            Exists = async (context, id, ct) => await context.RegimeProfiles.GetPublishedAsync(id, ct) is not null,
+            NotFoundMessage = notFoundMessage,
+        };
+
+    /// <summary>
     /// Ondalık sayı (JSON sayısı): <paramref name="min"/>-<paramref name="max"/> aralığında ve en çok <paramref name="scale"/> ondalık
     /// basamaklı (fazlası sessizce yuvarlanmaz, hata verir). Zorunlu değilse boş bırakılabilir.
     /// </summary>

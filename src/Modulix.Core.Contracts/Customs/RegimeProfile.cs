@@ -27,6 +27,22 @@ public sealed record RegimeProfileContent(int SchemaVersion, string? RegimeCode,
     public const int CurrentSchemaVersion = 1;
 }
 
+/// <summary>Yayındaki bir rejim profili (etkin profilin yayın sürümü); modüllerin okuduğu görünüm.</summary>
+public sealed record PublishedRegimeProfile(
+    Guid ProfileId, string Code, string Name, Guid VersionId, int VersionNumber, bool IsVerified, string? VerificationNote, RegimeProfileContent Content);
+
+/// <summary>
+/// Modüllerin rejim profillerini okuma sözleşmesi (ADR-0032 K16). Profil global ve platformca yönetilir; tenant yalnızca yayındaki, etkin
+/// profilleri görür ve seçer. Taslaklar ve pasif profiller dönmez.
+/// </summary>
+public interface IRegimeProfileCatalog
+{
+    Task<IReadOnlyList<PublishedRegimeProfile>> ListPublishedAsync(CancellationToken cancellationToken);
+
+    /// <summary>Profilin yayındaki sürümü; profil yoksa, pasifse ya da yayını yoksa <c>null</c>.</summary>
+    Task<PublishedRegimeProfile?> GetPublishedAsync(Guid profileId, CancellationToken cancellationToken);
+}
+
 /// <summary>Profil içeriği için saf kurallar (veritabanı gerekmez).</summary>
 public static class RegimeProfileRules
 {

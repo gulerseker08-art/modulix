@@ -19,3 +19,16 @@ public sealed record CreateRegimeProfileRequest(string Code, string Name);
 
 /// <param name="Verified">Kural uzman tarafından doğrulandı; doğrulanmışsa kimin/neye göre doğruladığı <paramref name="Note"/> olarak yazılır.</param>
 public sealed record PublishRegimeProfileRequest(bool Verified, string? Note);
+
+/// <summary>
+/// Tenant'ın seçebildiği yayındaki rejim profili (ADR-0032 K16): etkin profilin yayın sürümü. <c>IsVerified</c> kuralın uzman tarafından doğrulandığını söyler;
+/// doğrulanmamış profil "Doğrulanmadı" etiketiyle gösterilir.
+/// </summary>
+public sealed record PublishedRegimeProfileDto(
+    Guid ProfileId, string Code, string Name, int VersionNumber, bool IsVerified, string? VerificationNote, RegistrationNoRuleDto? RegistrationNo);
+
+/// <summary>
+/// Tescil numarası denetimi. <c>HasRule</c> yoksa rejim bir profile bağlı değildir. <c>Enforcement</c> etkin düzeydir: <c>Warn</c> uyarıdır (kayıt engellenmez),
+/// <c>Block</c> kaydı reddeder. <c>Violations</c> boşsa numara kurala uygundur.
+/// </summary>
+public sealed record RegistrationNoCheckDto(bool HasRule, string Enforcement, List<string> Violations, string? ProfileName, int? VersionNumber, bool Verified);

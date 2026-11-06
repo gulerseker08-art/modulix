@@ -182,6 +182,19 @@ internal sealed class CustomsDeclarationConfiguration : IEntityTypeConfiguration
     }
 }
 
+internal sealed class RegimeBindingConfiguration : IEntityTypeConfiguration<RegimeBinding>
+{
+    public void Configure(EntityTypeBuilder<RegimeBinding> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "RegimeBindings");
+        builder.Property(b => b.RegimeKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(b => b.Enforcement).HasMaxLength(10).IsRequired();
+
+        // Rejim başına tek bağlama. Profil platform tablosundadır; modül Core'a başvurmadığı için yabancı anahtar yoktur (profil silinmez, pasife alınır).
+        builder.HasIndex(b => new { b.TenantId, b.RegimeKey }).IsUnique().HasDatabaseName("UX_RegimeBindings_RegimeKey");
+    }
+}
+
 internal sealed class CustomsDeclarationLineConfiguration : IEntityTypeConfiguration<CustomsDeclarationLine>
 {
     public void Configure(EntityTypeBuilder<CustomsDeclarationLine> builder)

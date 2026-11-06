@@ -1,0 +1,240 @@
+@page "/depo/rejim-profilleri"
+@using System.Text.Json.Nodes
+@using Modulix.Shared.Customs
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Rejim profilleri · Modulix</PageTitle>
+
+@* Rejim–profil bağlaması (ADR-0032 K16). Platformun yayınladığı bir rejim profili, firmanın kendi rejim listesindeki bir değere bağlanır; o rejimdeki
+   beyannamelerde tescil numarası profilin kuralına göre denetlenir. Firma kuralı yalnızca sıkılaştırabilir (uyarıyı engele çevirir), gevşetemez.
+   Profil platformca yönetilir; "Doğrulanmadı" etiketli profilin kuralı uzman teyidi beklemektedir. Ayar ekranıdır (form sekmeleri kuralının dışında). *@
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.RegimesRead">
+    <PageHeader Title="Rejim profilleri" Icon="shield" Subtitle="Rejimlerinizi platformun yayınladığı kural paketlerine bağlayın." />
+
+    <Notice Text="@notice" Failed="@failed" />
+
+    @if (regimes is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Rejim profil bağlamaları</caption>
+            <thead>
+                <tr><th scope="col">Rejim</th><th scope="col">Bağlı profil</th><th scope="col">Tescil no kuralı</th><th scope="col">İhlalde</th><th scope="col"></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var regime in regimes)
+                {
+                    var binding = bindings.GetValueOrDefault(regime.Key);
+                    var profile = binding is null ? null : profiles.FirstOrDefault(p => p.ProfileId == WarehouseLabels.Id(binding, "profileId"));
+                    <tr>
+                        <td data-label="Rejim" class="primary">@regime.Label</td>
+                        <td data-label="Bağlı profil">
+                            @if (binding is null)
+                            {
+                                <span class="text-muted">Bağlı değil</span>
+                            }
+                            else if (profile is null)
+                            {
+                                <span class="text-muted">Profil yayında değil (kural uygulanmaz)</span>
+                            }
+                            else
+                            {
+                                <span>@profile.Name · sürüm @profile.VersionNumber</span>
+                                <span class="badge @(profile.IsVerified ? "status-customer" : "stage-qualified")">@(profile.IsVerified ? "Doğrulandı" : "Doğrulanmadı")</span>
+                            }
+                        </td>
+                        <td data-label="Tescil no kuralı">@(profile is null ? "—" : RuleText(profile.RegistrationNo))</td>
+                        <td data-label="İhlalde">@(binding is null || profile is null ? "—" : LevelText(profile, WarehouseLabels.Text(binding, "enforcement")))</td>
+                        <td class="actions">
+                            @if (Session.Can(WarehouseAccess.RegimesWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(regime.Key)">@(binding is null ? "Bağla" : "Düzenle")</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (profiles.Count == 0)
+        {
+            <p class="text-muted" role="status">Platform henüz yayında bir rejim profili sunmuyor; profil yayınlanınca burada seçilebilir.</p>
+        }
+    }
+
+    @if (editingKey is { } key)
+    {
+        <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@Lookups.Label(WarehouseAccess.CustomsRegimeList, key) · profil bağlaması</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="binding-profile">Rejim profili *</label>
+                    <select id="binding-profile" class="form-select" @bind="profileId">
+                        <option value="">Seçin…</option>
+                        @foreach (var p in profiles)
+                        {
+                            <option value="@p.ProfileId">@p.Name · sürüm @p.VersionNumber@(p.IsVerified ? null : " · Doğrulanmadı")</option>
+                        }
+                    </select>
+                    <FieldError Field="profileId" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="binding-level">İhlalde</label>
+                    <select id="binding-level" class="form-select" @bind="level">
+                        <option value="Inherit">Profilin düzeyi</option>
+                        <option value="Block">Engel (sıkılaştır: kaydı reddet)</option>
+                    </select>
+                    <FieldError Field="enforcement" Errors="errors" />
+                    <div class="form-text">Profil uyarı veriyorsa burada engele çevirebilirsiniz; profilin engelini gevşetemezsiniz.</div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(profileId))">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Close">İptal</button>
+                @if (editingBinding is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="RemoveAsync">Bağlamayı kaldır</button>
+                }
+            </div>
+        </form>
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.RegimeBindingEntityKey;
+
+    private IReadOnlyList<ChoiceValueDto>? regimes;
+    private readonly Dictionary<string, RecordResponse> bindings = new(StringComparer.OrdinalIgnoreCase);
+    private List<PublishedRegimeProfileDto> profiles = [];
+    private string? editingKey;
+    private RecordResponse? editingBinding;
+    private string profileId = string.Empty;
+    private string level = "Inherit";
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(WarehouseAccess.RegimesRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        regimes = Lookups.ValuesOf(WarehouseAccess.CustomsRegimeList);
+        profiles = (await Api.GetAsync<List<PublishedRegimeProfileDto>>("/api/warehouse/regime/profiles")).Value ?? [];
+        var result = await Api.GetAsync<RecordPageResponse>($"{Url}?page=1&pageSize=200");
+        bindings.Clear();
+        foreach (var item in result.Value?.Items ?? [])
+        {
+            bindings[WarehouseLabels.Text(item, "regimeKey")] = item;
+        }
+
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+        }
+    }
+
+    private void Open(string key)
+    {
+        editingKey = key;
+        editingBinding = bindings.GetValueOrDefault(key);
+        profileId = editingBinding is null ? string.Empty : WarehouseLabels.Text(editingBinding, "profileId");
+        level = editingBinding is not null && WarehouseLabels.Text(editingBinding, "enforcement") == "Block" ? "Block" : "Inherit";
+        errors = null;
+        notice = null;
+    }
+
+    private void Close() => editingKey = null;
+
+    private async Task SaveAsync()
+    {
+        if (busy || editingKey is null)
+        {
+            return;
+        }
+
+        busy = true;
+        var values = new JsonObject { ["regimeKey"] = editingKey, ["profileId"] = profileId, ["enforcement"] = level };
+        var request = new RecordWriteRequest(values, editingBinding?.Version);
+        var result = editingBinding is { } existing
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{existing.Id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            Fail(result.Error);
+            return;
+        }
+
+        notice = "Rejim profili bağlaması kaydedildi.";
+        failed = false;
+        editingKey = null;
+        await LoadAsync();
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (busy || editingBinding is null)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{editingBinding.Id}?version={editingBinding.Version}");
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+            return;
+        }
+
+        notice = "Bağlama kaldırıldı; bu rejimde tescil numarası artık profile göre denetlenmez.";
+        failed = false;
+        editingKey = null;
+        await LoadAsync();
+    }
+
+    private static string RuleText(RegistrationNoRuleDto? rule)
+    {
+        if (rule is null)
+        {
+            return "Kural yok";
+        }
+
+        var parts = new List<string>();
+        if (rule.MinLength is not null || rule.MaxLength is not null)
+        {
+            parts.Add($"{rule.MinLength?.ToString() ?? "—"}–{rule.MaxLength?.ToString() ?? "—"} karakter");
+        }
+
+        if (!string.IsNullOrEmpty(rule.Pattern))
+        {
+            parts.Add($"desen {rule.Pattern}");
+        }
+
+        return parts.Count == 0 ? "Kural yok" : string.Join(" · ", parts);
+    }
+
+    // Etkin düzey: profil engelse engel (gevşetilemez); aksi halde firma engel seçtiyse engel, yoksa uyarı.
+    private static string LevelText(PublishedRegimeProfileDto profile, string tenantLevel) =>
+        profile.RegistrationNo?.Enforcement == "Block" || tenantLevel == "Block" ? "Engel" : "Uyarı";
+
+    private void Fail(string? message)
+    {
+        notice = message ?? "İşlem tamamlanamadı.";
+        failed = true;
+    }
+}

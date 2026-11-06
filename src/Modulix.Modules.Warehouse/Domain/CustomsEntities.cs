@@ -76,6 +76,32 @@ public sealed class CustomsDeclarationLine : WarehouseEntity
     public string UnitKey { get; internal set; } = string.Empty;
 }
 
+/// <summary>
+/// Tenant'ın bir rejimi (tenant listesindeki <see cref="CustomsDeclaration.RegimeKey"/>) platformun yayınladığı bir rejim profiline bağlaması
+/// (ADR-0032 K16). Bağlı rejimdeki beyannamede tescil no profilin kuralına göre denetlenir. Tenant profildeki yasal kuralı gevşetemez, yalnızca
+/// sıkılaştırabilir (<see cref="Enforcement"/>). Profil platform tablosundadır; kimliği burada yalnızca değer olarak tutulur (modül Core'a başvurmaz).
+/// </summary>
+public sealed class RegimeBinding : WarehouseEntity
+{
+    /// <summary>Düzey: profilin düzeyi geçerli.</summary>
+    public const string Inherit = "Inherit";
+
+    public const string Warn = "Warn";
+
+    public const string Block = "Block";
+
+    /// <summary>Tenant'ın rejim listesindeki değer anahtarı; tenant içinde en çok bir bağlama.</summary>
+    public string RegimeKey { get; internal set; } = string.Empty;
+
+    public Guid ProfileId { get; internal set; }
+
+    /// <summary>
+    /// <see cref="Inherit"/> (profilin düzeyi), <see cref="Warn"/> ya da <see cref="Block"/>. Profil <c>Block</c> ise tenant gevşetemez; profil
+    /// <c>Warn</c> iken tenant <c>Block</c> seçerek sıkılaştırabilir.
+    /// </summary>
+    public string Enforcement { get; internal set; } = Inherit;
+}
+
 /// <summary>Beyanname satırı için saf kurallar (veritabanı gerekmez).</summary>
 public static class DeclarationLineRules
 {

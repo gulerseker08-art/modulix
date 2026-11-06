@@ -266,6 +266,12 @@ public class AppNavigationTests
         Assert.Equal("depo/beyannameler", declarationsOnly.Find("warehouse.customs-declarations")!.Route);
         Assert.DoesNotContain("Beyannameler", Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.AttorneysRead, WarehouseAccess.StockItemsRead])
             .MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
+
+        // Rejim profilleri (bağlama) ekranı ayrı izne bağlıdır: beyanname izni onu açmaz, bağlama izni beyannameyi açmaz.
+        var regimesOnly = Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.RegimesRead]);
+        Assert.Equal(["Rejim profilleri"], regimesOnly.MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
+        Assert.Equal("depo/rejim-profilleri", regimesOnly.Find("warehouse.regime-bindings")!.Route);
+        Assert.DoesNotContain("Rejim profilleri", declarationsOnly.MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
     }
 
     [Fact]

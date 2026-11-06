@@ -31,6 +31,8 @@ public sealed class WarehouseModule : IModule
         public const string StockItemsWrite = "warehouse.stockitems.write";
         public const string DeclarationsRead = "warehouse.customs.declarations.read";
         public const string DeclarationsWrite = "warehouse.customs.declarations.write";
+        public const string RegimesRead = "warehouse.customs.regimes.read";
+        public const string RegimesWrite = "warehouse.customs.regimes.write";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -44,6 +46,7 @@ public sealed class WarehouseModule : IModule
         public const string StockItem = "warehouse.stock-item";
         public const string CustomsDeclaration = "warehouse.customs-declaration";
         public const string CustomsDeclarationLine = "warehouse.customs-declaration-line";
+        public const string RegimeBinding = "warehouse.regime-binding";
     }
 
     /// <summary>Firma ilişki rolü kodları (platform kataloğu, ADR-0029 K9; K2): vekâletin tarafları bu rollere sahip firmalardır.</summary>
@@ -100,6 +103,8 @@ public sealed class WarehouseModule : IModule
         new(Permissions.StockItemsWrite, "Stok kartı ekler ve düzenler", "Stok kartları"),
         new(Permissions.DeclarationsRead, "Gümrük beyannamelerini ve satırlarını görüntüler", "Gümrük beyannameleri"),
         new(Permissions.DeclarationsWrite, "Gümrük beyannamesi ve satırı ekler, düzenler ve siler", "Gümrük beyannameleri"),
+        new(Permissions.RegimesRead, "Rejim–profil bağlamalarını görüntüler", "Rejim profilleri"),
+        new(Permissions.RegimesWrite, "Rejimi bir rejim profiline bağlar, düzeyi sıkılaştırır ve bağlamayı kaldırır", "Rejim profilleri"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5): tesis değişiklikleri kim, ne zaman, neyi değiştirdi olarak izlenir.</summary>
@@ -172,6 +177,10 @@ public sealed class WarehouseModule : IModule
         {
             References = new Dictionary<string, string> { ["declarationId"] = Entities.CustomsDeclaration },
         },
+        new(Entities.RegimeBinding, "Rejim profili bağlaması", Permissions.RegimesRead, new Dictionary<string, string>
+        {
+            ["regimeKey"] = "Rejim", ["profileId"] = "Rejim profili", ["enforcement"] = "İhlalde düzey",
+        }, "regimeKey"),
     ];
 
     /// <summary>Firmanın özel alan ekleyebildiği kayıt türleri (Y9a).</summary>
@@ -342,6 +351,7 @@ public sealed class WarehouseModule : IModule
             "Gümrük beyannamelerini ve satırlarını yönetir; vekâletleri ve stok kartlarını görüntüler.",
             [
                 Permissions.DeclarationsRead, Permissions.DeclarationsWrite,
+                Permissions.RegimesRead, Permissions.RegimesWrite,
                 Permissions.AttorneysRead,
                 Permissions.StockItemsRead,
             ]),
@@ -358,5 +368,7 @@ public sealed class WarehouseModule : IModule
         services.AddScoped<IRecordStore, StockItemRecordStore>();
         services.AddScoped<IRecordStore, CustomsDeclarationRecordStore>();
         services.AddScoped<IRecordStore, CustomsDeclarationLineRecordStore>();
+        services.AddScoped<IRecordStore, RegimeBindingRecordStore>();
+        services.AddScoped<IRegistrationNoCheck, RegistrationNoCheck>();
     }
 }

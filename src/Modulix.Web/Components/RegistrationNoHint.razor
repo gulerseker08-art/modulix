@@ -1,0 +1,57 @@
+@* Tescil numarası alanının altında rejim profili denetimi (ADR-0032 K7, K16). Rejim bir profile bağlıysa numara profilin kuralına göre denetlenir: uyarı düzeyinde
+   yalnızca bilgi verir (kayıt engellenmez), engel düzeyinde sunucu kaydı reddeder ve ileti burada önceden görünür. Rejim bağlı değilse, numara boşsa ya da
+   kullanıcının beyanname okuma izni yoksa sessiz kalır. Numara ya da rejim değişince (parametre) yeniden sorar. *@
+@using Modulix.Shared.Customs
+@inject ApiClient Api
+
+@if (check is { HasRule: true, Violations.Count: > 0 })
+{
+    <div class="alert @(check.Enforcement == "Block" ? "alert-danger" : "alert-warning") mt-2" role="status">
+        @string.Join(" ", check.Violations)
+        @if (check.Enforcement == "Block")
+        {
+            <strong>Bu rejimde kayıt engellenir.</strong>
+        }
+        else
+        {
+            <span>Kayıt engellenmez; numarayı kontrol edin.</span>
+        }
+        <small class="d-block text-muted">Rejim profili: @check.ProfileName · sürüm @check.VersionNumber@(check.Verified ? null : " · Doğrulanmadı")</small>
+    </div>
+}
+
+@code {
+    private string? checkedKey;
+    private RegistrationNoCheckDto? check;
+
+    [Parameter] public string? RegimeKey { get; set; }
+
+    [Parameter] public string? RegistrationNo { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{RegimeKey}|{RegistrationNo}";
+        if (key == checkedKey)
+        {
+            return;
+        }
+
+        checkedKey = key;
+        check = null;
+        if (string.IsNullOrWhiteSpace(RegimeKey) || string.IsNullOrWhiteSpace(RegistrationNo))
+        {
+            return;
+        }
+
+        var regime = RegimeKey;
+        var number = RegistrationNo;
+        var result = await Api.GetAsync<RegistrationNoCheckDto>(
+            $"/api/warehouse/regime/check?regimeKey={Uri.EscapeDataString(regime)}&registrationNo={Uri.EscapeDataString(number)}");
+
+        // Yanıt gelene kadar değer değiştiyse eski yanıt gösterilmez.
+        if (regime == RegimeKey && number == RegistrationNo)
+        {
+            check = result.IsSuccess ? result.Value : null;
+        }
+    }
+}

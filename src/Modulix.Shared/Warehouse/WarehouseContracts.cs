@@ -22,6 +22,8 @@ public static class WarehouseAccess
     public const string StockItemsWrite = "warehouse.stockitems.write";
     public const string DeclarationsRead = "warehouse.customs.declarations.read";
     public const string DeclarationsWrite = "warehouse.customs.declarations.write";
+    public const string RegimesRead = "warehouse.customs.regimes.read";
+    public const string RegimesWrite = "warehouse.customs.regimes.write";
 
     public const string FacilityEntityKey = "warehouse.facility";
     public const string ZoneEntityKey = "warehouse.zone";
@@ -31,6 +33,7 @@ public static class WarehouseAccess
     public const string StockItemEntityKey = "warehouse.stock-item";
     public const string CustomsDeclarationEntityKey = "warehouse.customs-declaration";
     public const string CustomsDeclarationLineEntityKey = "warehouse.customs-declaration-line";
+    public const string RegimeBindingEntityKey = "warehouse.regime-binding";
 
     /// <summary>Gümrük rejimi, beyanname durumu, kap cinsi, menşe ve satır birimi listeleri; hepsinin değer adları tenant'ındır.</summary>
     public const string CustomsRegimeList = "warehouse.customs-regime";

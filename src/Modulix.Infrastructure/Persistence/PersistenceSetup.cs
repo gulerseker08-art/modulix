@@ -148,7 +148,9 @@ public static class PersistenceSetup
         services.AddScoped<GtipCatalogService>();
         services.AddScoped<IGtipCatalog>(sp => sp.GetRequiredService<GtipCatalogService>());
         services.AddScoped<IGtipCatalogAdmin>(sp => sp.GetRequiredService<GtipCatalogService>());
-        services.AddScoped<IRegimeProfileAdmin, RegimeProfileService>();
+        services.AddScoped<RegimeProfileService>();
+        services.AddScoped<IRegimeProfileAdmin>(sp => sp.GetRequiredService<RegimeProfileService>());
+        services.AddScoped<IRegimeProfileCatalog>(sp => sp.GetRequiredService<RegimeProfileService>());
         services.AddSingleton<IGtipFileReader, GtipFileReader>();
         services.AddScoped<IActivityCodeCatalog, ActivityCodeCatalog>();
         services.AddScoped<ITenantActivitySelection, TenantActivitySelectionService>();
