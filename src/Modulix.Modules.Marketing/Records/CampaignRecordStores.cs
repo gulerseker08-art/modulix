@@ -65,6 +65,31 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
 
     protected override IOrderedQueryable<Campaign> Order(IQueryable<Campaign> source) => source.OrderByDescending(c => c.CreatedAt);
 
+    // Liste başlıklarına göre sıralama (sort=name, sort=-startsOn ...); boş değerler her iki yönde de sonda.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+    [
+        "name", "-name", "target", "-target", "channel", "-channel", "status", "-status",
+        "startsOn", "-startsOn", "budget", "-budget", "createdAt", "-createdAt",
+    ];
+
+    protected override IOrderedQueryable<Campaign> Order(IQueryable<Campaign> source, string? sort) => sort switch
+    {
+        "name" => source.OrderBy(c => c.Name),
+        "-name" => source.OrderByDescending(c => c.Name),
+        "target" => source.OrderBy(c => c.Target).ThenBy(c => c.Name),
+        "-target" => source.OrderByDescending(c => c.Target).ThenBy(c => c.Name),
+        "channel" => source.OrderBy(c => c.Channel).ThenBy(c => c.Name),
+        "-channel" => source.OrderByDescending(c => c.Channel).ThenBy(c => c.Name),
+        "status" => source.OrderBy(c => c.Status).ThenBy(c => c.Name),
+        "-status" => source.OrderByDescending(c => c.Status).ThenBy(c => c.Name),
+        "startsOn" => source.OrderBy(c => c.StartsOn == null).ThenBy(c => c.StartsOn).ThenBy(c => c.Name),
+        "-startsOn" => source.OrderBy(c => c.StartsOn == null).ThenByDescending(c => c.StartsOn).ThenBy(c => c.Name),
+        "budget" => source.OrderBy(c => c.Budget == null).ThenBy(c => c.Budget).ThenBy(c => c.Name),
+        "-budget" => source.OrderBy(c => c.Budget == null).ThenByDescending(c => c.Budget).ThenBy(c => c.Name),
+        "createdAt" => source.OrderBy(c => c.CreatedAt),
+        _ => Order(source),
+    };
+
     protected override IQueryable<Campaign> Search(IQueryable<Campaign> source, string term) =>
         source.Where(c => c.Name.Contains(term) || c.Code.Contains(term));
 

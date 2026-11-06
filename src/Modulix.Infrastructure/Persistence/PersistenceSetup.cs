@@ -148,6 +148,7 @@ public static class PersistenceSetup
         services.AddScoped<ITenantFieldRules, TenantFieldRulesService>();
         services.AddScoped<FormLayoutService>();
         services.AddScoped<IFormLayoutService>(sp => sp.GetRequiredService<FormLayoutService>());
+        services.AddScoped<Modulix.Core.Views.IGridViewService, Modulix.Infrastructure.Views.GridViewService>();
         services.AddScoped<IFormLayoutProvider>(sp => sp.GetRequiredService<FormLayoutService>());
         services.AddScoped<ICurrentAccess, CurrentAccess>();
 

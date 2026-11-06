@@ -123,7 +123,9 @@ public class CrmAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Cr
     {
         var setup = await SetUpAsync();
         var company = await CreateCompanyAsync(setup);
-        var today = DateOnly.FromDateTime(fixture.Time.GetUtcNow().UtcDateTime);
+        // Tarama "bugün"ü firmanın saat diliminde (varsayılan İstanbul, UTC+3) hesaplar; UTC günü kullanmak her gün 21:00-24:00 UTC arasında yanlış gün verirdi.
+        var zone = Modulix.Core.Settings.RegionalTime.Find(null);
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(fixture.Time.GetUtcNow(), zone).DateTime);
         var due = await CreateOpportunityAsync(setup, company, "Yaklaşan", today.AddDays(3));
         await CreateOpportunityAsync(setup, company, "Uzak", today.AddDays(10));
         await PublishRuleAsync(setup, CrmModule.Entities.Opportunity,

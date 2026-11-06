@@ -20,9 +20,7 @@
 
     @if (CanSeeQuotes && CanSeeContracts)
     {
-        <div class="list-toolbar">
-            <ViewSelector Items="ViewOptions" Value="@view" ValueChanged="SelectView" />
-        </div>
+        <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="SelectView" Label="Onay görünümleri" />
     }
 
     @if (loading)
@@ -38,7 +36,13 @@
         <table class="table record-table">
             <caption class="visually-hidden">Onay bekleyen işler</caption>
             <thead>
-                <tr><th scope="col">Tür</th><th scope="col">Kayıt</th><th scope="col">İlgili</th><th scope="col">Bekleme</th><th scope="col">İşlem</th></tr>
+                <tr>
+                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Tür</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="type" Size="14" /> Kayıt</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="building" Size="14" /> İlgili</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="clock" Size="14" /> Bekleme</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var item in Visible)
@@ -53,7 +57,12 @@
                             @item.Waiting
                             @if (item.Overdue) { <span class="badge stage-lost">Gecikti</span> }
                         </td>
-                        <td class="actions"><a class="btn btn-outline-primary btn-sm" href="@item.DecideHref">İncele ve karar ver</a></td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{item.Title} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="@item.RecordHref"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                                <a class="view-menu-item" role="menuitem" href="@item.DecideHref"><AppIcon Name="check-circle" Size="16" /> <span>İncele ve karar ver</span></a>
+                            </RowMenu>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -72,9 +81,9 @@
 
     private static readonly IReadOnlyList<ViewOption> ViewOptions =
     [
-        new("all", "Tümü"),
-        new("quote", "Teklifler"),
-        new("contract", "Sözleşmeler"),
+        new("all", "Tümü", Icon: "clipboard-list"),
+        new("quote", "Teklifler", Icon: "file-text"),
+        new("contract", "Sözleşmeler", Icon: "file-text"),
     ];
 
     private List<Item> items = [];

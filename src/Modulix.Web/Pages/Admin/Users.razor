@@ -26,9 +26,10 @@
         <InviteUserForm Roles="roles" Units="units" CanGrantAdministrator="Session.IsAdministrator" Invited="InvitedAsync" Cancelled="() => inviting = false" />
     }
 
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Kullanıcı görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status?.ToString() ?? "all")" ValueChanged="ChooseStatusAsync" />
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (!inviting)
         {
             <button type="button" class="btn btn-primary" @onclick="() => inviting = true"><AppIcon Name="plus" Size="16" /> Kullanıcı davet et</button>
@@ -36,7 +37,7 @@
     </div>
 
     <form class="search has-select" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Ad veya e-posta ara" @bind="search" />
+        <input class="form-control" type="search" aria-label="Kullanıcı ara" placeholder="Ad veya e-posta ara" @bind="search" />
         <select class="form-select" aria-label="Rol" @bind="roleId" @bind:after="() => LoadAsync(1)">
             <option value="">Tüm roller</option>
             @foreach (var role in roles)
@@ -56,8 +57,10 @@
             <option value="true">İki adımlı açık</option>
             <option value="false">İki adımlı kapalı</option>
         </select>
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
     </form>
+
+    <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (page is null)
     {
@@ -74,25 +77,27 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ad</th><th>E-posta</th><th>Departman</th><th>Roller</th><th>Durum</th><th>İki adımlı</th><th>Son giriş</th></tr>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var user in page.Items)
                 {
                     <tr>
-                        <td data-label="Ad" class="primary">
-                            <a href="yonetim/kullanicilar/@user.MembershipId">@user.DisplayName</a>
-                            @if (user.IsCurrentUser)
-                            {
-                                <small class="text-muted"> (siz)</small>
-                            }
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, user)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{user.DisplayName} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="yonetim/kullanicilar/@user.MembershipId"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            </RowMenu>
                         </td>
-                        <td data-label="E-posta">@user.Email</td>
-                        <td data-label="Departman">@(user.BusinessUnitName ?? "—")</td>
-                        <td data-label="Roller">@RoleNames(user)</td>
-                        <td data-label="Durum"><UserStatusBadge User="user" /></td>
-                        <td data-label="İki adımlı">@(user.TwoFactorEnabled ? "Açık" : "Kapalı")</td>
-                        <td data-label="Son giriş">@(user.LastSignInAt is { } at ? CrmLabels.Time(at) : "—")</td>
                     </tr>
                 }
             </tbody>
@@ -102,6 +107,23 @@
 </AuthGate>
 
 @code {
+    private const string AllViews = "all";
+    private const string StatusPrefix = "status:";
+
+    // Başlık tıklamasıyla sıralanan sütunlar sunucudaki sort anahtarlarıdır (UserSortKeys). Departman ve roller sayfa dışında çözüldüğü için sıralanamaz.
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("name", "Ad", "type", "name", "-name", Locked: true),
+        new("email", "E-posta", "mail", "email", "-email"),
+        new("unit", "Departman", "building"),
+        new("roles", "Roller", "shield"),
+        new("status", "Durum", "tag", "status", "-status"),
+        new("twoFactor", "İki adımlı", "key", "twoFactor", "-twoFactor"),
+        new("lastSignIn", "Son giriş", "clock", "lastSignInAt", "-lastSignInAt"),
+    ];
+
+    private readonly GridViewState grid = new("admin.users", "name");
+    private PersonalGridViews views = default!;
     private UserPageResponse? page;
     private IReadOnlyList<RoleDto> roles = [];
     private string? search;
@@ -113,32 +135,114 @@
     private bool inviting;
     private string? message;
     private string? notice;
+    private string view = AllViews;
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "admin.users");
+        grid.Define(Columns);
         await Session.EnsureLoadedAsync();
         if (Session.Can(CoreAccess.ManageUsers))
         {
             roles = (await Api.GetAsync<List<RoleDto>>("/api/roles")).Value ?? [];
             units = (await Api.GetAsync<List<BusinessUnitDto>>("/api/business-units")).Value ?? [];
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
 
-    private IReadOnlyList<ViewOption> StatusOptions =>
-        [new("all", "Tüm kullanıcılar"), .. Enum.GetValues<UserStatus>().Select(v => new ViewOption(v.ToString(), UserLabels.Of(v)))];
+    private GridViewDto? Active => views.Find(view);
 
-    private Task ChooseStatusAsync(string key) => FilterAsync(key == "all" ? null : Enum.Parse<UserStatus>(key));
+    // Görünümler yalnızca süzgeçtir (Tümü, durum, kişisel); kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm kullanıcılar", Icon: "users"),
+        .. Enum.GetValues<UserStatus>().Select(v => new ViewOption(StatusPrefix + v, UserLabels.Of(v), Icon: "user")),
+        .. views.Options,
+    ];
 
-    private async Task FilterAsync(UserStatus? value)
+    private string? CurrentFilters => GridFilters.Build(
+        status is { } s ? ("status", s.ToString()) : null,
+        roleId is { } r ? ("roleId", r.ToString()) : null,
+        businessUnitId is { } u ? ("businessUnitId", u.ToString()) : null,
+        twoFactor is { } t ? ("twoFactor", t ? "true" : "false") : null);
+
+    // Sistem görünümünün süzgeci: yalnızca durum sekmesi.
+    private string? BaselineFilters => Active?.Filters ?? (view.StartsWith(StatusPrefix, StringComparison.Ordinal) ? "status=" + view[StatusPrefix.Length..] : null);
+
+    // Kaydedilmemiş değişiklik: sütunlar/sıralama ya da süzgeç açık görünümden farklı.
+    private bool Dirty => grid.Differs(Active) || Canon(CurrentFilters) != Canon(BaselineFilters);
+
+    private static string Canon(string? filters) =>
+        string.Join('&', GridFilters.Parse(filters).OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => p.Key + "=" + p.Value));
+
+    private async Task ChooseViewAsync(string key)
     {
-        status = value;
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+        }
+        else
+        {
+            grid.Reset();
+        }
+
+        ApplyFilters(GridFilters.Parse(BaselineFilters));
         await LoadAsync(1);
+    }
+
+    private void ApplyFilters(Dictionary<string, string> filters)
+    {
+        status = Enum.TryParse<UserStatus>(filters.GetValueOrDefault("status"), out var s) ? s : null;
+        roleId = Guid.TryParse(filters.GetValueOrDefault("roleId"), out var r) ? r : null;
+        businessUnitId = Guid.TryParse(filters.GetValueOrDefault("businessUnitId"), out var u) ? u : null;
+        twoFactor = filters.GetValueOrDefault("twoFactor") switch { "true" => true, "false" => false, _ => null };
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"/api/users?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
         if (status is { } s)
         {
             url += $"&status={s}";
@@ -172,6 +276,20 @@
             : $"{response.User.Email} adresine davet gönderildi.";
         await LoadAsync(1);
     }
+
+    private RenderFragment Cell(GridColumnDef column, UserDto user) => @<td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, user)</td>;
+
+    private RenderFragment CellContent(string key, UserDto user) => key switch
+    {
+        "name" => @<text><a href="yonetim/kullanicilar/@user.MembershipId">@user.DisplayName</a>@if (user.IsCurrentUser) { <small class="text-muted"> (siz)</small> }</text>,
+        "email" => @<text>@user.Email</text>,
+        "unit" => @<text>@(user.BusinessUnitName ?? "—")</text>,
+        "roles" => @<text>@RoleNames(user)</text>,
+        "status" => @<UserStatusBadge User="user" />,
+        "twoFactor" => @<text>@(user.TwoFactorEnabled ? "Açık" : "Kapalı")</text>,
+        "lastSignIn" => @<text>@(user.LastSignInAt is { } at ? CrmLabels.Time(at) : "—")</text>,
+        _ => @<text></text>,
+    };
 
     private static string RoleNames(UserDto user) =>
         user.Roles.Count == 0 ? "—" : string.Join(", ", user.Roles.Select(r => r.Name));

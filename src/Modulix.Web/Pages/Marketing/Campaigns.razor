@@ -17,14 +17,15 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Kampanya görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <label class="visually-hidden" for="c-search">Kampanya ara</label>
             <input id="c-search" class="form-control" type="search" placeholder="Ad veya kod ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(MarketingAccess.CampaignsWrite))
         {
             <a class="btn btn-primary" href="pazarlama/kampanyalar/yeni"><AppIcon Name="plus" Size="16" /> Yeni kampanya</a>
@@ -52,6 +53,9 @@
         </div>
     }
 
+    <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
     @if (list is null && message is null)
     {
         <p class="text-muted" role="status">Yükleniyor…</p>
@@ -66,20 +70,27 @@
         <table class="table record-table">
             <caption class="visually-hidden">Kampanya listesi</caption>
             <thead>
-                <tr><th scope="col">Kampanya</th><th scope="col">Hedef</th><th scope="col">Kanal</th><th scope="col">Dönem</th><th scope="col">Durum</th></tr>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var c in list.Items)
                 {
                     <tr>
-                        <td data-label="Kampanya" class="primary">
-                            <a href="pazarlama/kampanyalar/@c.Id">@c.Name</a>
-                            <small class="text-muted">@c.Code@(c.Purpose is null ? null : " · " + c.Purpose)</small>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, c)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{c.Name} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="pazarlama/kampanyalar/@c.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            </RowMenu>
                         </td>
-                        <td data-label="Hedef">@MarketingLabels.Label(MarketingLabels.Targets, c.Target)</td>
-                        <td data-label="Kanal">@MarketingLabels.Label(MarketingLabels.Channels, c.Channel)</td>
-                        <td data-label="Dönem">@Period(c)</td>
-                        <td data-label="Durum"><span class="badge stage-@(c.Status == "Archived" ? "cancelled" : "lead")">@MarketingLabels.Label(MarketingLabels.CampaignStatuses, c.Status)</span></td>
                     </tr>
                 }
             </tbody>
@@ -89,36 +100,158 @@
 </AuthGate>
 
 @code {
+    private const string AllViews = "all";
+    private const string MineView = "mine";
+
+    // Başlık tıklamasıyla sıralanan sütunlar sunucudaki sort anahtarlarıdır (CampaignRecordStore.SortKeys). Varsayılan sıra: en yeni önce.
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("name", "Kampanya", "type", "name", "-name", Locked: true),
+        new("target", "Hedef", "target", "target", "-target"),
+        new("channel", "Kanal", "mail", "channel", "-channel"),
+        new("period", "Dönem", "calendar", "startsOn", "-startsOn"),
+        new("status", "Durum", "tag", "status", "-status"),
+        new("budget", "Bütçe", "coins", "budget", "-budget", DefaultVisible: false),
+    ];
+
+    private readonly GridViewState grid = new("marketing.campaigns", "-createdAt");
+    private PersonalGridViews views = default!;
     private bool filtersOpen;
-
-    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
-    private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (target.Length > 0 ? 1 : 0) + (channel.Length > 0 ? 1 : 0);
-
     private PagedResult<CampaignDto>? list;
     private string? message;
     private string status = string.Empty;
     private string target = string.Empty;
     private string channel = string.Empty;
     private string search = string.Empty;
+    private bool mine;
+    private string view = AllViews;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
+    private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (target.Length > 0 ? 1 : 0) + (channel.Length > 0 ? 1 : 0);
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "marketing.campaigns");
+        grid.Define(Columns);
         await Session.EnsureLoadedAsync();
-        if (Session.Can(MarketingAccess.CampaignsRead)) { await LoadAsync(1); }
+        if (Session.Can(MarketingAccess.CampaignsRead))
+        {
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Benim kampanyalarım, Tümü, kişisel); kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(MineView, "Benim kampanyalarım", Icon: "star"),
+        new(AllViews, "Tüm kampanyalar", Icon: "target"),
+        .. views.Options,
+    ];
+
+    private string? CurrentFilters => GridFilters.Build(
+        mine ? ("ownerId", "me") : null,
+        status.Length > 0 ? ("status", status) : null,
+        target.Length > 0 ? ("target", target) : null,
+        channel.Length > 0 ? ("channel", channel) : null);
+
+    // Kaydedilmemiş değişiklik: sütunlar/sıralama ya da süzgeç açık görünümden farklı.
+    private bool Dirty => grid.Differs(Active) || Canon(CurrentFilters) != Canon(Active?.Filters ?? (view == MineView ? "ownerId=me" : null));
+
+    private static string Canon(string? filters) =>
+        string.Join('&', GridFilters.Parse(filters).OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => p.Key + "=" + p.Value));
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            ApplyFilters(GridFilters.Parse(saved.Filters));
+        }
+        else
+        {
+            grid.Reset();
+            ApplyFilters(key == MineView ? new Dictionary<string, string> { ["ownerId"] = "me" } : new Dictionary<string, string>());
+        }
+
+        await LoadAsync(1);
+    }
+
+    private void ApplyFilters(Dictionary<string, string> filters)
+    {
+        mine = filters.GetValueOrDefault("ownerId") == "me";
+        status = filters.GetValueOrDefault("status") ?? string.Empty;
+        target = filters.GetValueOrDefault("target") ?? string.Empty;
+        channel = filters.GetValueOrDefault("channel") ?? string.Empty;
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
     {
         var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
+        if (grid.Sort != grid.DefaultSort) { parts.Add($"sort={Uri.EscapeDataString(grid.Sort)}"); }
         if (status != string.Empty) { parts.Add($"status={status}"); }
         if (target != string.Empty) { parts.Add($"target={target}"); }
         if (channel != string.Empty) { parts.Add($"channel={channel}"); }
+        if (mine) { parts.Add("ownerId=me"); }
 
         var result = await Api.GetAsync<PagedResult<CampaignDto>>($"/api/marketing/campaigns?{string.Join('&', parts)}");
         list = result.Value;
         message = result.IsSuccess ? null : result.Error;
     }
+
+    private RenderFragment Cell(GridColumnDef column, CampaignDto c) => @<td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, c)</td>;
+
+    private RenderFragment CellContent(string key, CampaignDto c) => key switch
+    {
+        "name" => @<text><a href="pazarlama/kampanyalar/@c.Id">@c.Name</a> <small class="text-muted">@c.Code@(c.Purpose is null ? null : " · " + c.Purpose)</small></text>,
+        "target" => @<text>@MarketingLabels.Label(MarketingLabels.Targets, c.Target)</text>,
+        "channel" => @<text>@MarketingLabels.Label(MarketingLabels.Channels, c.Channel)</text>,
+        "period" => @<text>@Period(c)</text>,
+        "status" => @<span class="badge stage-@(c.Status == "Archived" ? "cancelled" : "lead")">@MarketingLabels.Label(MarketingLabels.CampaignStatuses, c.Status)</span>,
+        "budget" => @<text>@Budget(c)</text>,
+        _ => @<text></text>,
+    };
+
+    private static string Budget(CampaignDto c) => c.Budget is { } budget ? $"{budget:N2} {c.CostCurrency ?? "TRY"}" : "—";
 
     private static string Period(CampaignDto c) => (c.StartsOn, c.EndsOn) switch
     {

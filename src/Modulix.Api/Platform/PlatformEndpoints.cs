@@ -204,9 +204,16 @@ public static class PlatformEndpoints
     }
 
     private static async Task<IResult> ListTenantsAsync(
-        string? search, TenantState? status, int? page, int? pageSize, IPlatformAdministration admin, CancellationToken ct)
+        string? search, TenantState? status, string? sort, int? page, int? pageSize, IPlatformAdministration admin, CancellationToken ct)
     {
-        var result = await admin.ListTenantsAsync(new PlatformTenantQuery(search, (TenantStatus?)status, page ?? 1, pageSize ?? 25), ct);
+        // Başlığa göre sıralama (ADR-0036): yalnızca bilinen anahtarlar kabul edilir.
+        if (!string.IsNullOrEmpty(sort) && !PlatformTenantQuery.SortKeys.Contains(sort))
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]> { ["sort"] = ["Geçersiz sıralama."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+
+        var result = await admin.ListTenantsAsync(new PlatformTenantQuery(search, (TenantStatus?)status, page ?? 1, pageSize ?? 25, string.IsNullOrEmpty(sort) ? null : sort), ct);
         return Results.Ok(new PlatformTenantPageResponse(result.Items.Select(ToDto).ToList(), result.Page, result.PageSize, result.TotalCount));
     }
 

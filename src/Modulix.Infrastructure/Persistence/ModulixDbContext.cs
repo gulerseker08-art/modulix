@@ -151,6 +151,9 @@ public class ModulixDbContext(
 
     public DbSet<TenantFormLayout> FormLayouts => Set<TenantFormLayout>();
 
+    /// <summary>Kullanıcının kişisel liste görünümleri (ADR-0034).</summary>
+    public DbSet<Modulix.Core.Views.GridView> GridViews => Set<Modulix.Core.Views.GridView>();
+
     public DbSet<ActivityNode> ActivityNodes => Set<ActivityNode>();
 
     public DbSet<Capability> Capabilities => Set<Capability>();

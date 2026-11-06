@@ -19,14 +19,15 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
+    @* Görünümler sunucuda süzgeç olarak uygulanır; kapsamı sunucu uygular (kimse yetkisi dışındaki teklifi listeleyemez). *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Teklif görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Items="ViewOptions" Value="@current" ValueChanged="SelectAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <label class="visually-hidden" for="quote-search">Teklif ara</label>
             <input id="quote-search" class="form-control" type="search" placeholder="Başlık veya teklif no ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(CrmAccess.QuotesWrite))
         {
             <a class="btn btn-primary" href="crm/teklifler/yeni"><AppIcon Name="plus" Size="16" /> Yeni teklif</a>
@@ -35,6 +36,9 @@
     <div class="filters" role="group" aria-label="Süzgeçler">
         <button type="button" class="chip @(latestOnly ? "active" : null)" aria-pressed="@(latestOnly ? "true" : "false")" @onclick="ToggleLatestAsync">Yalnızca son revizyonlar</button>
     </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active) || FiltersDiffer" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (page is null)
     {
@@ -50,27 +54,26 @@
             <caption class="visually-hidden">Teklif listesi</caption>
             <thead>
                 <tr>
-                    <th scope="col">Teklif</th><th scope="col">Müşteri</th><th scope="col">Durum</th><th scope="col">Onay</th><th scope="col" class="text-end">Toplam</th><th scope="col">Geçerlilik</th><th scope="col">Sorumlu</th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" Class="@(column.Key == "total" ? "text-end" : null)" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var quote in page.Items)
                 {
                     <tr>
-                        <td data-label="Teklif" class="primary">
-                            <a href="crm/teklifler/@quote.Id">@quote.Title</a>
-                            <small class="text-muted">@quote.QuoteNumber · V@(quote.RevisionNo)</small>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, quote)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{quote.Title} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="crm/teklifler/@quote.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            </RowMenu>
                         </td>
-                        <td data-label="Müşteri"><a href="crm/firmalar/@quote.CompanyId">@Lookups.CompanyName(quote.CompanyId)</a></td>
-                        <td data-label="Durum">
-                            <span class="badge stage-@QuoteLabels.StatusBadge(quote.Status)">@QuoteLabels.Label(QuoteLabels.Statuses, quote.Status)</span>
-                            @if (IsExpiringSoon(quote)) { <span class="badge stage-onhold">Süresi yaklaşıyor</span> }
-                            @if (IsOverdue(quote)) { <span class="badge stage-cancelled">Süresi geçti</span> }
-                        </td>
-                        <td data-label="Onay"><span class="badge stage-@QuoteLabels.ApprovalBadge(quote.ApprovalStatus)">@QuoteLabels.Label(QuoteLabels.Approvals, quote.ApprovalStatus)</span></td>
-                        <td data-label="Toplam" class="text-end">@QuoteLabels.Money(quote.GrossTotal, quote.Currency)</td>
-                        <td data-label="Geçerlilik">@(quote.ValidUntil is { } until ? CrmLabels.Time(until) : "—")</td>
-                        <td data-label="Sorumlu"><OwnerCell Name="@Lookups.MemberName(quote.OwnerId)" /></td>
                     </tr>
                 }
             </tbody>
@@ -80,34 +83,157 @@
 </AuthGate>
 
 @code {
-    // Görünümler yalnızca süzgeçtir; kapsamı sunucu uygular (kimse yetkisi dışındaki teklifi listeleyemez).
-    private static readonly IReadOnlyList<ViewOption> ViewOptions =
+    private const string AllView = "all";
+    private const string MineView = "mine";
+    private const string PendingView = "pending";
+    private const string ExpiringView = "expiring";
+    private const string StatusPrefix = "status:";
+
+    // Varsayılan sıra son oluşturulan teklif ("-createdAt"). Müşteri ve Sorumlu sütunları sunucuda sıralanamaz (adları firma/üyelik tablosundadır).
+    private static readonly GridColumnDef[] Columns =
     [
-        new("all", "Tüm teklifler"),
-        new("mine", "Tekliflerim"),
-        new("pending", "Onay bekleyenler"),
-        new("expiring", "Süresi yaklaşanlar (7 gün)"),
-        new("status:Draft", "Taslaklar", "Duruma göre"),
-        new("status:Presented", "Gönderilenler", "Duruma göre"),
-        new("status:Accepted", "Kabul edilenler", "Duruma göre"),
-        new("status:Rejected", "Reddedilenler", "Duruma göre"),
-        new("status:Expired", "Süresi dolanlar", "Duruma göre"),
-        new("status:Cancelled", "İptal edilenler", "Duruma göre"),
+        new("title", "Teklif", "type", "title", "-title", Locked: true),
+        new("company", "Müşteri", "building"),
+        new("status", "Durum", "tag", "status", "-status"),
+        new("approval", "Onay", "check-circle", "approvalStatus", "-approvalStatus"),
+        new("total", "Toplam", "coins", "grossTotal", "-grossTotal"),
+        new("validUntil", "Geçerlilik", "calendar", "validUntil", "-validUntil"),
+        new("owner", "Sorumlu", "user"),
+        new("number", "Teklif no", "hash", "number", "-number", DefaultVisible: false),
+        new("issueDate", "Düzenleme tarihi", "calendar", "issueDate", "-issueDate", DefaultVisible: false),
     ];
 
+    // Görünüm sekmeleri yalnızca süzgeçtir.
+    private static readonly IReadOnlyList<ViewOption> SystemViews =
+    [
+        new(AllView, "Tüm teklifler", Icon: "file-text"),
+        new(MineView, "Tekliflerim", Icon: "star"),
+        new(PendingView, "Onay bekleyenler", Icon: "hourglass"),
+        new(ExpiringView, "Süresi yaklaşanlar (7 gün)", Icon: "clock"),
+        new(StatusPrefix + "Draft", "Taslaklar", Icon: "tag"),
+        new(StatusPrefix + "Presented", "Gönderilenler", Icon: "tag"),
+        new(StatusPrefix + "Accepted", "Kabul edilenler", Icon: "tag"),
+        new(StatusPrefix + "Rejected", "Reddedilenler", Icon: "tag"),
+        new(StatusPrefix + "Expired", "Süresi dolanlar", Icon: "tag"),
+        new(StatusPrefix + "Cancelled", "İptal edilenler", Icon: "tag"),
+    ];
+
+    private readonly GridViewState grid = new("crm.quotes", "-createdAt");
+    private PersonalGridViews views = default!;
     private CrmPage<QuoteDto>? page;
     private string? message;
-    private string current = "all";
+    private string view = AllView;
     private string search = string.Empty;
+
+    // Süzgeç durumu (görünümle birlikte kaydedilir): sorumlu, onay, durum, "süresi yaklaşan", son revizyonlar.
+    private bool mine;
+    private bool pending;
+    private bool expiring;
+    private string? status;
     private bool latestOnly = true;
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "crm.quotes");
+        grid.Define(Columns);
         await Session.EnsureLoadedAsync();
         if (Session.Can(CrmAccess.QuotesRead))
         {
             await Lookups.LoadAsync();
+            await views.LoadAsync();
             await LoadAsync(1);
+        }
+    }
+
+    private IReadOnlyList<ViewOption> ViewOptions => [.. SystemViews, .. views.Options];
+
+    private GridViewDto? Active => views.Find(view);
+
+    // Süzgeç metni kanonik sıradadır; açık görünümün süzgeciyle karşılaştırılarak kaydedilmemiş değişiklik bulunur.
+    private string? CurrentFilters => GridFilters.Build(
+        mine ? ("ownerId", "me") : null,
+        pending ? ("approvalStatus", "Pending") : null,
+        status is { } s ? ("status", s) : null,
+        expiring ? ("expiring", "7") : null,
+        latestOnly ? ("latestOnly", "true") : null);
+
+    private string? BaselineFilters => Active is { } saved ? saved.Filters : TabFilters(view);
+
+    private bool FiltersDiffer => (CurrentFilters ?? string.Empty) != (BaselineFilters ?? string.Empty);
+
+    // Sistem sekmesinin süzgeci ("Yalnızca son revizyonlar" varsayılan açıktır).
+    private static string? TabFilters(string key) => key switch
+    {
+        MineView => GridFilters.Build(("ownerId", "me"), ("latestOnly", "true")),
+        PendingView => GridFilters.Build(("approvalStatus", "Pending"), ("latestOnly", "true")),
+        ExpiringView => GridFilters.Build(("status", "Presented"), ("expiring", "7"), ("latestOnly", "true")),
+        _ when key.StartsWith(StatusPrefix, StringComparison.Ordinal) => GridFilters.Build(("status", key[StatusPrefix.Length..]), ("latestOnly", "true")),
+        _ => GridFilters.Build(("latestOnly", "true")),
+    };
+
+    private void ApplyFilters(string? filters)
+    {
+        var parsed = GridFilters.Parse(filters);
+        mine = parsed.GetValueOrDefault("ownerId") == "me";
+        pending = parsed.GetValueOrDefault("approvalStatus") == "Pending";
+        status = parsed.GetValueOrDefault("status");
+        expiring = parsed.ContainsKey("expiring");
+        latestOnly = parsed.GetValueOrDefault("latestOnly") == "true";
+    }
+
+    // Görünüm değişince sayfalama başa döner; arama metni korunur.
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            ApplyFilters(saved.Filters);
+        }
+        else
+        {
+            grid.Reset();
+            ApplyFilters(TabFilters(key));
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    // Sütun seçimi/sırası değişince veri yeniden çekilmez; geri çağrı yalnızca sayfanın yeniden çizilmesini sağlar.
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllView);
         }
     }
 
@@ -116,22 +242,16 @@
         var url = $"/api/crm/quotes?page={pageNumber}&pageSize={ListPaging.Size}";
         if (!string.IsNullOrWhiteSpace(search)) { url += $"&search={Uri.EscapeDataString(search.Trim())}"; }
 
-        switch (current)
-        {
-            case "mine":
-                url += "&ownerId=me";
-                break;
-            case "pending":
-                url += "&approvalStatus=Pending";
-                break;
-            case "expiring":
-                // Sunulmuş ve önümüzdeki 7 gün içinde (bugün dahil) sona erenler.
-                url += $"&status=Presented&validFrom={DateTime.UtcNow:yyyy-MM-dd}&validTo={DateTime.UtcNow.AddDays(7):yyyy-MM-dd}";
-                break;
-            case var view when view.StartsWith("status:", StringComparison.Ordinal):
-                url += $"&status={Uri.EscapeDataString(view["status:".Length..])}";
-                break;
-        }
+        if (grid.Sort != grid.DefaultSort) { url += $"&sort={Uri.EscapeDataString(grid.Sort)}"; }
+
+        if (mine) { url += "&ownerId=me"; }
+
+        if (pending) { url += "&approvalStatus=Pending"; }
+
+        if (status is { } s) { url += $"&status={Uri.EscapeDataString(s)}"; }
+
+        // Sunulmuş ve önümüzdeki 7 gün içinde (bugün dahil) sona erenler.
+        if (expiring) { url += $"&validFrom={DateTime.UtcNow:yyyy-MM-dd}&validTo={DateTime.UtcNow.AddDays(7):yyyy-MM-dd}"; }
 
         if (latestOnly) { url += "&latestOnly=true"; }
 
@@ -140,14 +260,34 @@
         message = result.Error;
     }
 
-    // Görünüm değişince sayfalama başa döner; arama metni ve "son revizyonlar" süzgeci korunur.
-    private Task SelectAsync(string view)
-    {
-        current = view;
-        return LoadAsync(1);
-    }
-
     private Task ToggleLatestAsync() { latestOnly = !latestOnly; return LoadAsync(1); }
+
+    private RenderFragment Cell(GridColumnDef column, QuoteDto quote) => @<td data-label="@column.Label" class="@CellClass(column.Key)">@CellContent(column.Key, quote)</td>;
+
+    private static string? CellClass(string key) => key switch
+    {
+        "title" => "primary",
+        "total" => "text-end",
+        _ => null,
+    };
+
+    private RenderFragment CellContent(string key, QuoteDto quote) => key switch
+    {
+        "title" => @<text><a href="crm/teklifler/@quote.Id">@quote.Title</a> <small class="text-muted">@quote.QuoteNumber · V@(quote.RevisionNo)</small></text>,
+        "company" => @<a href="crm/firmalar/@quote.CompanyId">@Lookups.CompanyName(quote.CompanyId)</a>,
+        "status" => @<text><span class="badge stage-@QuoteLabels.StatusBadge(quote.Status)">@QuoteLabels.Label(QuoteLabels.Statuses, quote.Status)</span> @(IsExpiringSoon(quote) ? ExpiringBadge : null) @(IsOverdue(quote) ? OverdueBadge : null)</text>,
+        "approval" => @<span class="badge stage-@QuoteLabels.ApprovalBadge(quote.ApprovalStatus)">@QuoteLabels.Label(QuoteLabels.Approvals, quote.ApprovalStatus)</span>,
+        "total" => @<text>@QuoteLabels.Money(quote.GrossTotal, quote.Currency)</text>,
+        "validUntil" => @<text>@(quote.ValidUntil is { } until ? CrmLabels.Time(until) : "—")</text>,
+        "owner" => @<OwnerCell Name="@Lookups.MemberName(quote.OwnerId)" />,
+        "number" => @<text>@quote.QuoteNumber</text>,
+        "issueDate" => @<text>@quote.IssueDate.ToString("yyyy-MM-dd")</text>,
+        _ => @<text></text>,
+    };
+
+    private static readonly RenderFragment ExpiringBadge = @<span class="badge stage-onhold">Süresi yaklaşıyor</span>;
+
+    private static readonly RenderFragment OverdueBadge = @<span class="badge stage-cancelled">Süresi geçti</span>;
 
     private static bool IsExpiringSoon(QuoteDto q) =>
         q.Status == "Presented" && q.ValidUntil is { } until && until > DateTimeOffset.UtcNow && until <= DateTimeOffset.UtcNow.AddDays(7);

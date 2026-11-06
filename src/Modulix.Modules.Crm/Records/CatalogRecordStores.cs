@@ -189,6 +189,30 @@ internal sealed class ProductRecordStore(CrmStoreContext context) : CrmRecordSto
 
     protected override IOrderedQueryable<Product> Order(IQueryable<Product> source) => source.OrderBy(p => p.Code);
 
+    // Liste başlıklarına göre sıralama (sort=code, sort=-name ...). Kategori adı için kategoriye (Load ile yüklenen ilişki) göre sıralanır.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+    [
+        "code", "-code", "name", "-name", "kind", "-kind", "status", "-status", "category", "-category", "brand", "-brand", "tags", "-tags",
+    ];
+
+    protected override IOrderedQueryable<Product> Order(IQueryable<Product> source, string? sort) => sort switch
+    {
+        "-code" => source.OrderByDescending(p => p.Code),
+        "name" => source.OrderBy(p => p.Name).ThenBy(p => p.Code),
+        "-name" => source.OrderByDescending(p => p.Name).ThenBy(p => p.Code),
+        "kind" => source.OrderBy(p => p.Kind).ThenBy(p => p.Code),
+        "-kind" => source.OrderByDescending(p => p.Kind).ThenBy(p => p.Code),
+        "status" => source.OrderBy(p => p.Status).ThenBy(p => p.Code),
+        "-status" => source.OrderByDescending(p => p.Status).ThenBy(p => p.Code),
+        "category" => source.OrderBy(p => p.Category == null).ThenBy(p => p.Category!.Name).ThenBy(p => p.Code),
+        "-category" => source.OrderBy(p => p.Category == null).ThenByDescending(p => p.Category!.Name).ThenBy(p => p.Code),
+        "brand" => source.OrderBy(p => p.Brand == null).ThenBy(p => p.Brand).ThenBy(p => p.Code),
+        "-brand" => source.OrderBy(p => p.Brand == null).ThenByDescending(p => p.Brand).ThenBy(p => p.Code),
+        "tags" => source.OrderBy(p => p.Tags == null).ThenBy(p => p.Tags).ThenBy(p => p.Code),
+        "-tags" => source.OrderBy(p => p.Tags == null).ThenByDescending(p => p.Tags).ThenBy(p => p.Code),
+        _ => Order(source),
+    };
+
     protected override IQueryable<Product> Search(IQueryable<Product> source, string term) =>
         source.Where(p => p.Code.Contains(term) || p.Name.Contains(term) || (p.Barcode != null && p.Barcode.Contains(term))
             || (p.ExternalCode != null && p.ExternalCode.Contains(term)) || (p.Tags != null && p.Tags.Contains(term)));
