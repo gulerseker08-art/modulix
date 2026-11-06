@@ -1,0 +1,225 @@
+@page "/depo/vekaletler"
+@using System.Globalization
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Vekâletler · Modulix</PageTitle>
+
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.AttorneysRead">
+    <PageHeader Title="Vekâletler" Icon="file-text" Subtitle="@(page is null ? "İthalatçıların gümrük müşavirlerine verdiği vekâletleri yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <PowerOfAttorneyEditor Attorney="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. Geçerlilik bugünün tarihine göre sunucuda hesaplanır. *@
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="attorney-search">Vekâlet ara</label>
+            <input id="attorney-search" class="form-control" type="search" placeholder="Kapsam veya belge ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
+        @if (Session.Can(WarehouseAccess.AttorneysWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni vekâlet</button>
+        }
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="attorney-importer-filter">İthalatçı</label>
+            <LookupPicker Id="attorney-importer-filter" LookupKey="@WarehouseAccess.AttorneyImporterLookup" Value="importerId" ValueChanged="ChooseImporterAsync" Placeholder="Tüm ithalatçılar" />
+            <label class="visually-hidden" for="attorney-broker-filter">Gümrük müşaviri</label>
+            <LookupPicker Id="attorney-broker-filter" LookupKey="@WarehouseAccess.AttorneyBrokerLookup" Value="brokerId" ValueChanged="ChooseBrokerAsync" Placeholder="Tüm müşavirler" />
+        </div>
+    }
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu süzgece uyan vekâlet yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) vekâlet listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Vekâlet listesi</caption>
+            <thead>
+                <tr>
+                    <th scope="col">İthalatçı</th><th scope="col">Gümrük müşaviri</th><th scope="col">Başlangıç</th><th scope="col">Bitiş</th><th scope="col">Durum</th>
+                    @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.PowerOfAttorneyEntityKey)) { <th scope="col">@field.Label</th> }
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var attorney in page.Items)
+                {
+                    var (statusLabel, statusBadge) = Status(attorney);
+                    <tr>
+                        <td data-label="İthalatçı" class="primary">@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "importerPartyId"))</td>
+                        <td data-label="Gümrük müşaviri">@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "brokerPartyId"))</td>
+                        <td data-label="Başlangıç">@Display(WarehouseLabels.Text(attorney, "validFrom"))</td>
+                        <td data-label="Bitiş">@(WarehouseLabels.Text(attorney, "validTo") is { Length: > 0 } to ? Display(to) : "Süresiz")</td>
+                        <td data-label="Durum"><span class="badge @statusBadge">@statusLabel</span></td>
+                        @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.PowerOfAttorneyEntityKey))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, attorney.Values["custom"] as JsonObject)</td>
+                        }
+                        <td class="actions">
+                            @if (Session.Can(WarehouseAccess.AttorneysWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(attorney)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.PowerOfAttorneyEntityKey;
+
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private readonly Dictionary<Guid, string> partyNames = [];
+    private bool editing;
+    private bool filtersOpen;
+    private string? message;
+    private string? search;
+    private string view = AllViews;
+    private Guid? importerId;
+    private Guid? brokerId;
+
+    private const string AllViews = "all";
+    private const string ValidView = "valid";
+    private const string RevokedView = "revoked";
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Bugün geçerli, İptal edilmiş); taraf seçimleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions { get; } =
+    [
+        new(AllViews, "Tüm vekâletler"),
+        new(ValidView, "Bugün geçerli"),
+        new(RevokedView, "İptal edilmiş"),
+    ];
+
+    private int ActiveFilters => (importerId is null ? 0 : 1) + (brokerId is null ? 0 : 1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(WarehouseAccess.AttorneysRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task ChooseImporterAsync(Guid? id)
+    {
+        importerId = id;
+        await LoadAsync(1);
+    }
+
+    private async Task ChooseBrokerAsync(Guid? id)
+    {
+        brokerId = id;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        url += view switch
+        {
+            ValidView => $"&validOn={DateOnly.FromDateTime(DateTime.Today):yyyy-MM-dd}",
+            RevokedView => "&isActive=false",
+            _ => string.Empty,
+        };
+        if (importerId is { } importer)
+        {
+            url += $"&importerPartyId={importer}";
+        }
+
+        if (brokerId is { } broker)
+        {
+            url += $"&brokerPartyId={broker}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            var ids = page.Items.SelectMany(a => new[] { WarehouseLabels.Id(a, "importerPartyId"), WarehouseLabels.Id(a, "brokerPartyId") })
+                .OfType<Guid>();
+            await WarehouseLabels.ResolveNamesAsync(Api, WarehouseAccess.AttorneyImporterLookup, ids, partyNames);
+        }
+    }
+
+    // Durum gösterimi: iptal edilmiş, başlamamış, süresi dolmuş ya da geçerli. Tek doğru kaynak sunucudaki geçerlilik süzgecidir;
+    // burada yalnızca satır rozeti için aynı kural bugünün tarihiyle uygulanır.
+    private static (string Label, string Badge) Status(RecordResponse attorney)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        if (!WarehouseLabels.Flag(attorney, "isActive", true))
+        {
+            return ("İptal edildi", "status-inactive");
+        }
+
+        if (DateOnly.TryParseExact(WarehouseLabels.Text(attorney, "validFrom"), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var from) && from > today)
+        {
+            return ("Başlamadı", "stage-qualified");
+        }
+
+        if (DateOnly.TryParseExact(WarehouseLabels.Text(attorney, "validTo"), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var to) && to < today)
+        {
+            return ("Süresi doldu", "status-inactive");
+        }
+
+        return ("Geçerli", "status-customer");
+    }
+
+    private static string Display(string isoDate) =>
+        DateOnly.TryParseExact(isoDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+            ? date.ToString("d", CultureInfo.GetCultureInfo("tr-TR"))
+            : isoDate;
+
+    private void Open(RecordResponse? attorney)
+    {
+        selected = attorney;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}
