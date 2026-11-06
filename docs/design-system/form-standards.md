@@ -85,7 +85,7 @@ Ekleme/düzenleme formları yerleşimi koddan değil **firmanın form düzeninde
 
 | Durum | Nasıl |
 |---|---|
-| Default | `form-control` / `form-select`, 42px yükseklik, 10px köşe |
+| Default | `form-control` / `form-select`, 36px yükseklik, 10px köşe |
 | Hover | Kenar `--mx-border-strong` |
 | Focus | Kenar `--mx-brand-primary` + `--mx-focus-ring` |
 | Disabled | `disabled` — `--mx-surface-muted` zemin, ikincil metin |

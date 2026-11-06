@@ -39,6 +39,7 @@
     --mx-background: #F5F8FC;
     --mx-surface: #FFFFFF;
     --mx-surface-muted: #EEF5FA;
+    --mx-surface-control: #E6EDF5; /* ikincil düğme dolgusu: sayfa zemininde de seçilir */
     --mx-surface-hover: #F3F7FB;
     --mx-border: #DCE5F0;
     --mx-border-strong: #B9C8DA;
@@ -104,7 +105,7 @@
 
     /* Köşe yarıçapları */
     --mx-radius-input: 10px;
-    --mx-radius-button: 12px;
+    --mx-radius-button: 10px;
     --mx-radius-card: 16px;
     --mx-radius-drawer: 16px;
     --mx-radius-modal: 16px;
@@ -126,7 +127,7 @@
     --mx-header-height: 4rem;
     --mx-sidebar-width: 248px;
     --mx-sidebar-collapsed-width: 72px;
-    --mx-control-height: 42px;
+    --mx-control-height: 36px;
 
     /* Geriye uyumlu takma adlar (eski --mx-* adları; yeni kodda kullanma) */
     --mx-navy: var(--mx-brand-navy);
@@ -177,12 +178,14 @@
     --mx-brand-primary: #3BAEE6;
     --mx-brand-primary-hover: #6CC6F2;
     --mx-brand-primary-rgb: 59, 174, 230;
+    --mx-focus-ring: 0 0 0 3px rgba(var(--mx-brand-primary-rgb), 0.6); /* koyu zeminde en az 3:1 */
     --mx-brand-teal: #2DD4D8;
     --mx-brand-teal-dark: #5EEAEE;
 
     --mx-background: #0B1322;
     --mx-surface: #121D33;
     --mx-surface-muted: #192842;
+    --mx-surface-control: #1E2F4D;
     --mx-surface-hover: #16233B;
     --mx-border: #243654;
     --mx-border-strong: #3A5078;
@@ -286,13 +289,33 @@ a, .btn-link {
 
 /* ---- Button ---- */
 .btn {
+    --bs-btn-padding-y: 0.25rem;
+    --bs-btn-padding-x: 0.8rem;
     font-weight: 700;
-    font-size: var(--mx-fs-body);
+    font-size: var(--mx-fs-label);
     border-radius: var(--mx-radius-button);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--mx-space-2);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn {
+        transition: none;
+    }
+
+        .btn:hover,
+        .btn:active {
+            transform: none !important;
+        }
+}
+
+/* Yalnızca ikonlu düğme: kare, erişilebilir ad aria-label ile verilir. */
+.btn-icon {
+    --bs-btn-padding-x: 0;
+    width: var(--mx-control-height);
 }
 
 .btn-primary {
@@ -313,7 +336,6 @@ a, .btn-link {
     background-image: var(--mx-gradient-brand);
     border-color: transparent;
     box-shadow: var(--mx-shadow-glow);
-    transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
     .btn-primary:hover:not(:disabled):not(.disabled),
@@ -321,6 +343,10 @@ a, .btn-link {
         background-image: var(--mx-gradient-brand-hover);
         border-color: transparent;
         box-shadow: var(--mx-shadow-glow);
+    }
+
+    .btn-primary:hover:not(:disabled):not(.disabled) {
+        transform: translateY(-1px);
     }
 
     .btn-primary:active:not(:disabled):not(.disabled) {
@@ -345,6 +371,9 @@ a, .btn-link {
     --bs-btn-active-color: var(--mx-tone-brand-fg);
     --bs-btn-active-bg: var(--mx-tone-info-bg);
     --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
 }
 
 .btn-ghost {
@@ -357,6 +386,9 @@ a, .btn-link {
     --bs-btn-active-color: var(--mx-text-primary);
     --bs-btn-active-bg: var(--mx-surface-muted);
     --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: transparent;
 }
 
 /* Çerçeveli birincil düğme: yumuşak (tonal) görünüm; çerçeve yok, hover'da bir ton koyulaşır. Bütün sayfalarda ortak. */
@@ -375,22 +407,20 @@ a, .btn-link {
     --bs-btn-disabled-border-color: transparent;
 }
 
-/* İkincil düğmeler (İptal, Ara, sayfalama): yüzey zemin, ince çerçeve */
+/* İkincil düğmeler (İptal, Ara, sayfalama): dolgulu, çerçevesiz; hover'da bir ton koyulaşır. */
 .btn-outline-secondary {
     --bs-btn-color: var(--mx-text-primary);
-    --bs-btn-bg: var(--mx-surface);
-    --bs-btn-border-color: var(--mx-border);
-    --bs-btn-hover-color: var(--mx-brand-primary);
-    --bs-btn-hover-bg: var(--mx-surface-muted);
-    --bs-btn-hover-border-color: var(--mx-border);
-    --bs-btn-active-color: var(--mx-brand-primary);
-    --bs-btn-active-bg: var(--mx-surface-muted);
-    --bs-btn-active-border-color: var(--mx-border-strong);
+    --bs-btn-bg: var(--mx-surface-control);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-text-primary);
+    --bs-btn-hover-bg: var(--mx-border);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-text-primary);
+    --bs-btn-active-bg: var(--mx-border);
+    --bs-btn-active-border-color: transparent;
     --bs-btn-disabled-color: var(--mx-text-secondary);
-    --bs-btn-disabled-bg: var(--mx-surface);
-    --bs-btn-disabled-border-color: var(--mx-border);
-
-    box-shadow: 0 2px 6px rgba(16, 29, 53, 0.06);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
 }
 
 /* Yıkıcı eylem: yumuşak kırmızı; hover'da dolgu koyulaşır (onay gerektiren eylemler zaten ayrı adımda). */
@@ -398,10 +428,10 @@ a, .btn-link {
     --bs-btn-color: var(--mx-tone-danger-fg);
     --bs-btn-bg: var(--mx-tone-danger-bg);
     --bs-btn-border-color: transparent;
-    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-color: var(--mx-surface);
     --bs-btn-hover-bg: var(--mx-danger-text);
     --bs-btn-hover-border-color: transparent;
-    --bs-btn-active-color: #fff;
+    --bs-btn-active-color: var(--mx-surface);
     --bs-btn-active-bg: var(--mx-danger-text);
     --bs-btn-active-border-color: transparent;
     --bs-btn-disabled-color: var(--mx-text-secondary);
@@ -626,14 +656,24 @@ code {
 }
 
 /* Dokunmatik ekranda hedef 44px'e büyür. */
+.btn-sm {
+    --bs-btn-padding-y: 0.125rem;
+    --bs-btn-padding-x: 0.6rem;
+    min-height: 30px;
+}
+
 @media (pointer: coarse) {
     .btn, .form-control, .form-select {
         min-height: 44px;
     }
-}
 
-.btn-sm {
-    min-height: 36px;
+    .btn-sm {
+        min-height: 36px;
+    }
+
+    .btn-icon {
+        width: 44px;
+    }
 }
 
 .narrow {
