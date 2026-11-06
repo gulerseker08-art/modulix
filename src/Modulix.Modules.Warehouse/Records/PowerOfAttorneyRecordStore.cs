@@ -46,6 +46,23 @@ internal sealed class PowerOfAttorneyRecordStore(WarehouseStoreContext context) 
     protected override IOrderedQueryable<PowerOfAttorney> Order(IQueryable<PowerOfAttorney> source) =>
         source.OrderByDescending(p => p.ValidFrom).ThenBy(p => p.ImporterPartyId);
 
+    // Liste başlıklarına göre sıralama. Taraflar firma adına göre sıralanmaz: firma görünürlüğü (CRM kapsamı) sıralamayla dolanılmasın.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        WithDescending("validFrom", "validTo", "isActive", "createdAt");
+
+    protected override IOrderedQueryable<PowerOfAttorney> Order(IQueryable<PowerOfAttorney> source, string? sort)
+    {
+        var desc = sort?.StartsWith('-') == true;
+        return sort?.TrimStart('-') switch
+        {
+            "validFrom" => By(source, p => p.ValidFrom, desc).ThenBy(p => p.ImporterPartyId),
+            "validTo" => ByNullsLast(source, p => p.ValidTo, desc).ThenByDescending(p => p.ValidFrom),
+            "isActive" => By(source, p => p.IsActive, desc).ThenByDescending(p => p.ValidFrom),
+            "createdAt" => By(source, p => p.CreatedAt, desc).ThenByDescending(p => p.ValidFrom),
+            _ => Order(source),
+        };
+    }
+
     // Firma adıyla arama yok: firma görünürlüğü (CRM kapsamı) bu ekrandan dolanılmasın; firma süzgeçleri seçim kutusuyla yapılır.
     protected override IQueryable<PowerOfAttorney> Search(IQueryable<PowerOfAttorney> source, string term) =>
         source.Where(p => (p.Scope != null && p.Scope.Contains(term)) || (p.DocumentReference != null && p.DocumentReference.Contains(term)));
