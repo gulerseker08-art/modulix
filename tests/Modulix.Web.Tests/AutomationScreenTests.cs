@@ -62,4 +62,40 @@ public class AutomationScreenTests
         Assert.Equal("Müşteri adayı", AutomationLabels.EntityName(entities, "crm.lead"));
         Assert.Equal("crm.opportunity", AutomationLabels.EntityName(entities, "crm.opportunity"));
     }
+
+    // Dilim 5b: çalışma geçmişi etiketleri
+
+    [Fact]
+    public void Run_statuses_have_turkish_names_and_the_failed_and_succeeded_tones_differ()
+    {
+        Assert.Equal(
+            ["Bekliyor", "Çalışıyor", "Başarılı", "Başarısız", "İptal edildi", "Koşul sağlanmadı"],
+            AutomationLabels.RunStatuses.Select(AutomationLabels.RunStatus));
+        Assert.NotEqual(AutomationLabels.RunStatusBadge(AutomationLabels.RunSucceeded), AutomationLabels.RunStatusBadge(AutomationLabels.RunFailed));
+        Assert.Equal("Bilinmeyen", AutomationLabels.RunStatus("Bilinmeyen"));
+    }
+
+    [Fact]
+    public void Retry_is_offered_only_for_failed_runs_and_cancel_only_for_unfinished_ones()
+    {
+        Assert.Equal([AutomationLabels.RunFailed], AutomationLabels.RunStatuses.Where(AutomationLabels.CanRetry));
+        Assert.Equal(
+            [AutomationLabels.RunPending, AutomationLabels.RunRunning], AutomationLabels.RunStatuses.Where(AutomationLabels.CanCancel));
+    }
+
+    [Fact]
+    public void Origin_and_step_statuses_have_turkish_names()
+    {
+        Assert.Equal(["Olay", "Elle", "Günlük tarama"], new[] { "Event", "Manual", "Scan" }.Select(AutomationLabels.Origin));
+        Assert.Equal("Atlandı", AutomationLabels.StepStatus("Skipped"));
+        Assert.Equal("Tamamlandı", AutomationLabels.StepStatus("Succeeded"));
+    }
+
+    [Fact]
+    public void Every_run_status_the_server_can_return_has_a_label_that_is_not_the_technical_name()
+    {
+        // Sunucudaki AutomationRunStatus enum'una yeni değer eklenirse etiketsiz kalıp ekranda İngilizce adıyla görünmesin.
+        Assert.All(AutomationLabels.RunStatuses, s => Assert.NotEqual(s, AutomationLabels.RunStatus(s)));
+        Assert.All(["Pending", "Succeeded", "Skipped", "Failed", "Cancelled"], s => Assert.NotEqual(s, AutomationLabels.StepStatus(s)));
+    }
 }

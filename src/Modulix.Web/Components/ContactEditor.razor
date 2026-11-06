@@ -4,7 +4,7 @@
 @inject ApiClient Api
 @inject FormLayouts Layouts
 
-<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
             <h2>@(Contact is null ? "Yeni kişi" : "Kişi kartı")</h2>
@@ -14,6 +14,7 @@
             }
         </div>
         <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
             <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
@@ -134,6 +135,7 @@
 </form>
 
 @code {
+    private bool dirty;
     private FormLayoutDto? layout;
     private string? layoutError;
 
@@ -216,6 +218,7 @@
 
         if (result.IsSuccess)
         {
+            dirty = false;
             await Saved.InvokeAsync(result.Value!);
             return;
         }
@@ -232,6 +235,7 @@
 
         if (result.IsSuccess)
         {
+            dirty = false;
             await Deleted.InvokeAsync();
             return;
         }

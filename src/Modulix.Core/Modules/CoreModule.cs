@@ -82,13 +82,13 @@ public sealed class CoreModule : IModule
         /// <summary>Kendi raporlarını zamanlar; zamanlanmış rapor çalışırken sahibinin yetkisi yeniden denetlenir, yetki kaybında teslim durur.</summary>
         public const string ScheduleReports = "core.reports.schedule";
 
-        /// <summary>İçe aktarma başlatır; işlem günlüğünde yalnızca kendi içe aktarmalarını görür (ADR-0030).</summary>
+        /// <summary>İçe aktarma başlatır; işlem günlüğünde yalnızca kendi içe aktarmalarını görür (ADR-0033).</summary>
         public const string RunImports = "core.imports.run";
 
-        /// <summary>İşlem günlüğünde firmanın bütün içe aktarmalarını ve satır hatalarını görür (ADR-0030).</summary>
+        /// <summary>İşlem günlüğünde firmanın bütün içe aktarmalarını ve satır hatalarını görür (ADR-0033).</summary>
         public const string ReadImports = "core.imports.read";
 
-        /// <summary>İçe aktarılmış kayıtları gerekçeyle toplu geri alır (ADR-0030, Dilim 4).</summary>
+        /// <summary>İçe aktarılmış kayıtları gerekçeyle toplu geri alır (ADR-0033, Dilim 4).</summary>
         public const string RollbackImports = "core.imports.rollback";
     }
 

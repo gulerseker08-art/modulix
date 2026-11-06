@@ -395,7 +395,7 @@ Amaç: Şablon, sürüm, onay, imza, taahhüt ve yenileme/fesih takibiyle sektö
   - **Durum (1 Kasım 2026) — Dilim 10 uygulandı:** teslim raporu [docs/sozlesme-yonetimi-teslim-raporu.md](sozlesme-yonetimi-teslim-raporu.md) (kabul kriterleri, çapraz modül akışları, engelli/kısmen işler, dağıtım ve açık riskler).
   - **Yapılmadı:** toplu işlemler, paylaşılan görünüm, ay ızgarası takvimi, ek protokol türü, gerçek imza sağlayıcısı. Sipariş, müşteri başlangıcı, destek/SLA ve faturalama devri hedef modül olmadığı için yalnızca sözleşme/olay olarak planlıdır (Engelli).
 M2 — Lojistik [DETAYLANDIRMA / D2]
-Amaç: Taşıma talebinden teslim ve maliyet mutabakatına kadar operasyon. Zorunlu: Ç1–Ç4, Ç8, Ç18, Ç21 minimum. Opsiyonel: CRM, depo, İK, muhasebe, web.
+Amaç: Taşıma talebinden teslim ve maliyet mutabakatına kadar operasyon. Zorunlu: Ç1–Ç4, Ç8, Ç18, Ç21 minimum. Opsiyonel: CRM, depo, İK, muhasebe, web. Tasarım taslağı: [ADR-0038](adr/0038-filo-modulu-ve-lojistik-dilim-plani.md) (ortak Filo modülü, Core süreli belge, durak zincirli sefer, dilim sırası; taslak, kabul edilmedi).
 - M2.1 Taşıma talebi/siparişi: Yük, taraf rolleri, taşıma türü, çoklu yükleme/boşaltma, zaman penceresi ve belge. Kabul: CRM kapalıyken manuel/web/API talebinden operasyon açılır.
 - M2.2 Sevkiyat ve sefer ayrımı: Müşteri talebi, sevkiyat, sefer, durak ve yük kalemi ayrı kavramlar; bölme/birleştirme/aktarma açık kurallı. Kabul: Bir sefer birden çok müşterinin sevkiyatını taşıyabilir; müşteri portalı diğer yükleri göstermez.
 - M2.3 Kaynak ve uygunluk: Taşıyıcı, araç, römork, sürücü rolü, kapasite, belge geçerliliği ve atama çakışması. Temel sürücü kartı İK lisansı gerektirmez. Kabul: Geçersiz belge/kapasite aşımı politika uyarınca engel veya gerekçeli istisna üretir.

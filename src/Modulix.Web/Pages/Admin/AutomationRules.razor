@@ -20,6 +20,10 @@
     <div class="list-toolbar">
         <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status ?? AutomationLabels.AllViews)" ValueChanged="ChooseStatusAsync" />
         <ColumnPicker />
+        @if (Session.Can(CoreAccess.ReadAutomationLogs))
+        {
+            <a class="btn btn-ghost" href="yonetim/otomasyon/calismalar">Çalışma geçmişi</a>
+        }
         @if (Session.Can(CoreAccess.ManageAutomation))
         {
             <a class="btn btn-primary" href="yonetim/otomasyon/sablonlar"><AppIcon Name="plus" Size="16" /> Şablondan başlat</a>
