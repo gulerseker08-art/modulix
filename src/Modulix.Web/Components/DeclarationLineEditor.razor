@@ -1,0 +1,274 @@
+@* Beyanname satırı ekleme/düzenleme formu; DeclarationLinesPanel kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Yasal çekirdek alanlar
+   (GTİP, kap cinsi ve adedi, brüt/net kg, menşe, miktar ve birim) zorunludur ve gizlenemez (ADR-0032 K17). Net ≤ brüt, GTİP biçimi, satır no
+   benzersizliği ve iptal edilmiş beyanname kuralları sunucudadır; ileti alanın altında gösterilir. GTİP'in katalogda bulunması uyarıdır, engel değildir. *@
+@using System.Globalization
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Line is null ? "Yeni satır" : $"Satır {form.LineNo}")</h2>
+            @if (Line is not null)
+            {
+                <p>@form.Gtip</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Beyanname satırı formu bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "lineNo":
+                    <label class="@f.LabelClass()" for="line-no">@f.Label</label>
+                    <input id="line-no" class="form-control" type="number" min="1" max="9999" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.LineNo" />
+                    <FieldError Field="lineNo" Errors="errors" />
+                    break;
+                case "gtip":
+                    <label class="@f.LabelClass()" for="line-gtip">@f.Label</label>
+                    <input id="line-gtip" class="form-control" inputmode="numeric" maxlength="40" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Gtip" @bind:event="onchange" />
+                    <FieldError Field="gtip" Errors="errors" />
+                    <small class="text-muted">Yalnızca rakamlar (nokta ve boşluk atılır, 6-14 hane).</small>
+                    <GtipCheckHint Code="@form.Gtip" />
+                    break;
+                case "description":
+                    <label class="@f.LabelClass()" for="line-description">@f.Label</label>
+                    <textarea id="line-description" class="form-control" rows="2" maxlength="500" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                    break;
+                case "containerTypeKey":
+                    <label class="@f.LabelClass()" for="line-container">@f.Label</label>
+                    <select id="line-container" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ContainerTypeKey">
+                        <option value="">Seçin…</option>
+                        @foreach (var kind in Lookups.Choices(WarehouseAccess.ContainerTypeList, form.ContainerTypeKey))
+                        {
+                            <option value="@kind.Key">@kind.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="containerTypeKey" Errors="errors" />
+                    break;
+                case "containerCount":
+                    <label class="@f.LabelClass()" for="line-count">@f.Label</label>
+                    <input id="line-count" class="form-control" type="number" min="1" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ContainerCount" />
+                    <FieldError Field="containerCount" Errors="errors" />
+                    break;
+                case "grossKg":
+                    <label class="@f.LabelClass()" for="line-gross">@f.Label</label>
+                    <input id="line-gross" class="form-control" type="number" step="0.001" min="0" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.GrossKg" @bind:culture="Invariant" />
+                    <FieldError Field="grossKg" Errors="errors" />
+                    break;
+                case "netKg":
+                    <label class="@f.LabelClass()" for="line-net">@f.Label</label>
+                    <input id="line-net" class="form-control" type="number" step="0.001" min="0" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NetKg" @bind:culture="Invariant" />
+                    <FieldError Field="netKg" Errors="errors" />
+                    <small class="text-muted">Brüt kilodan büyük olamaz.</small>
+                    break;
+                case "originCountryKey":
+                    <label class="@f.LabelClass()" for="line-origin">@f.Label</label>
+                    <select id="line-origin" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.OriginCountryKey">
+                        <option value="">Seçin…</option>
+                        @foreach (var country in Lookups.Choices(WarehouseAccess.OriginCountryList, form.OriginCountryKey))
+                        {
+                            <option value="@country.Key">@country.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="originCountryKey" Errors="errors" />
+                    break;
+                case "quantity":
+                    <label class="@f.LabelClass()" for="line-quantity">@f.Label</label>
+                    <input id="line-quantity" class="form-control" type="number" step="0.001" min="0" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Quantity" @bind:culture="Invariant" />
+                    <FieldError Field="quantity" Errors="errors" />
+                    break;
+                case "unitKey":
+                    <label class="@f.LabelClass()" for="line-unit">@f.Label</label>
+                    <select id="line-unit" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.UnitKey">
+                        <option value="">Seçin…</option>
+                        @foreach (var unit in Lookups.Choices(WarehouseAccess.DeclarationLineUnitList, form.UnitKey))
+                        {
+                            <option value="@unit.Key">@unit.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="unitKey" Errors="errors" />
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+        @if (form.Id is not null)
+        {
+            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+        }
+    </div>
+</form>
+
+@code {
+    private const string EntityKey = WarehouseAccess.CustomsDeclarationLineEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+    private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private LineForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Satırın ait olduğu beyanname.</summary>
+    [Parameter, EditorRequired] public Guid DeclarationId { get; set; }
+
+    /// <summary>Düzenlenecek satır; null ise yeni satır.</summary>
+    [Parameter] public RecordResponse? Line { get; set; }
+
+    /// <summary>Yeni satıra önerilen numara (beyannamedeki en büyük numara + 1).</summary>
+    [Parameter] public int NextLineNo { get; set; } = 1;
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir satır verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Line))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Line;
+        form = Line is { } r
+            ? new LineForm
+            {
+                Id = r.Id, Version = r.Version, LineNo = WarehouseLabels.Number(r, "lineNo"), Gtip = WarehouseLabels.Text(r, "gtip"),
+                Description = WarehouseLabels.Text(r, "description"), ContainerTypeKey = WarehouseLabels.Text(r, "containerTypeKey"),
+                ContainerCount = WarehouseLabels.Number(r, "containerCount"), GrossKg = WarehouseLabels.Decimal(r, "grossKg"),
+                NetKg = WarehouseLabels.Decimal(r, "netKg"), OriginCountryKey = WarehouseLabels.Text(r, "originCountryKey"),
+                Quantity = WarehouseLabels.Decimal(r, "quantity"), UnitKey = WarehouseLabels.Text(r, "unitKey"),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new LineForm { LineNo = NextLineNo };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["lineNo"] = form.LineNo,
+            ["gtip"] = form.Gtip,
+            ["description"] = form.Description,
+            ["containerTypeKey"] = form.ContainerTypeKey,
+            ["containerCount"] = form.ContainerCount,
+            ["grossKg"] = form.GrossKg,
+            ["netKg"] = form.NetKg,
+            ["originCountryKey"] = form.OriginCountryKey,
+            ["quantity"] = form.Quantity,
+            ["unitKey"] = form.UnitKey,
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            // Beyanname yalnızca oluştururken verilir; satır başka beyannameye taşınamaz.
+            values["declarationId"] = DeclarationId.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class LineForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public int? LineNo { get; set; }
+
+        public string Gtip { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        public string ContainerTypeKey { get; set; } = string.Empty;
+
+        public int? ContainerCount { get; set; }
+
+        public decimal? GrossKg { get; set; }
+
+        public decimal? NetKg { get; set; }
+
+        public string OriginCountryKey { get; set; } = string.Empty;
+
+        public decimal? Quantity { get; set; }
+
+        public string UnitKey { get; set; } = string.Empty;
+    }
+}
