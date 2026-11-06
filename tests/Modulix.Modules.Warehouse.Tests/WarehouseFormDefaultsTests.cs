@@ -54,6 +54,27 @@ public class WarehouseFormDefaultsTests
     }
 
     [Fact]
+    public void Lookups_point_at_known_record_types_and_dependent_ones_filter_by_facility()
+    {
+        var entities = new[]
+        {
+            WarehouseModule.Entities.Facility, WarehouseModule.Entities.Zone, WarehouseModule.Entities.LocationLevel, WarehouseModule.Entities.Location,
+        };
+
+        Assert.All(Module.Lookups, lookup =>
+        {
+            Assert.Contains(lookup.SourceEntityKey, entities);
+            Assert.Contains(lookup.TargetEntityKey!, entities);
+            Assert.StartsWith(WarehouseModule.ModuleKey + ".", lookup.Key, StringComparison.Ordinal);
+        });
+        foreach (var dependent in Module.Lookups.Where(l => l.DependsOnField is not null))
+        {
+            Assert.Equal("facilityId", dependent.DependsOnField);
+            Assert.Equal("facilityId", dependent.DependsOnFilter);
+        }
+    }
+
+    [Fact]
     public void Client_access_constants_match_the_server_module()
     {
         var permissions = Module.Permissions.Select(p => p.Key).ToHashSet();
@@ -70,6 +91,13 @@ public class WarehouseFormDefaultsTests
         Assert.Equal(
             [WarehouseModule.Entities.Facility, WarehouseModule.Entities.Zone, WarehouseModule.Entities.LocationLevel, WarehouseModule.Entities.Location],
             new[] { WarehouseAccess.FacilityEntityKey, WarehouseAccess.ZoneEntityKey, WarehouseAccess.LocationLevelEntityKey, WarehouseAccess.LocationEntityKey });
+        Assert.Equal(
+            Module.Lookups.Select(l => l.Key).Order(),
+            new[]
+            {
+                WarehouseAccess.ZoneFacilityLookup, WarehouseAccess.LocationLevelFacilityLookup, WarehouseAccess.LocationFacilityLookup,
+                WarehouseAccess.LocationParentLookup, WarehouseAccess.LocationZoneLookup,
+            }.Order());
         Assert.Equal(WarehouseModule.Lists.ZoneKind, WarehouseAccess.ZoneKindList);
         Assert.Equal(WarehouseModule.ZoneKindCategories.Controlled, WarehouseAccess.ZoneKindControlled);
         Assert.Equal(WarehouseModule.ZoneKindCategories.Free, WarehouseAccess.ZoneKindFree);

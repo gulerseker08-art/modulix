@@ -31,5 +31,37 @@ public static class WarehouseForms
             new("customsEnabled", "Gümrük uzantısı açık", "gumruk", 6, Fixed: true),
             new("allowMixedZones", "Serbest ve gümrük denetimli alanlar bir arada olabilir", "gumruk", 6, Fixed: true),
         ]),
+
+        new(WarehouseModule.Entities.Zone, "Alan",
+        [new(General, "Genel bilgiler"), new("ayrintilar", "Açıklama ve ek bilgiler")],
+        [
+            new("temel", "Temel bilgiler", "layers"),
+            new("aciklama", "Açıklama", "message-square", Tab: "ayrintilar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ayrintilar"),
+        ],
+        [
+            new("facilityId", "Tesis", "temel", 6, Required: true, Fixed: true),
+            new("kindKey", "Alan türü", "temel", 6, Required: true, Fixed: true),
+            new("code", "Alan kodu", "temel", 4, Required: true, Fixed: true),
+            new("name", "Alan adı", "temel", 8, Required: true, Fixed: true),
+            new("isActive", "Etkin", "temel", 4, Fixed: true),
+            new("description", "Açıklama", "aciklama", 12),
+        ]),
+
+        new(WarehouseModule.Entities.Location, "Lokasyon",
+        [new(General, "Genel bilgiler"), new("ayrintilar", "Ek bilgiler")],
+        [
+            new("temel", "Yerleşim", "map-pin"),
+            new("tanim", "Tanım", "message-square"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ayrintilar"),
+        ],
+        [
+            new("facilityId", "Tesis", "temel", 6, Required: true, Fixed: true),
+            new("parentId", "Üst lokasyon", "temel", 6, Fixed: true),
+            new("value", "Değer", "temel", 4, Required: true, Fixed: true),
+            new("zoneId", "Alan", "temel", 8),
+            new("name", "Ad", "tanim", 8),
+            new("isActive", "Etkin", "tanim", 4, Fixed: true),
+        ]),
     ];
 }

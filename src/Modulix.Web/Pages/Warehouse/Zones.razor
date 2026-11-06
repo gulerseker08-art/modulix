@@ -1,0 +1,191 @@
+@page "/depo/alanlar"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Alanlar · Modulix</PageTitle>
+
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.ZonesRead">
+    <PageHeader Title="Alanlar" Icon="layers" Subtitle="@(page is null ? "Tesislerdeki gümrük denetimli ve serbest alanları yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <ZoneEditor Zone="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="zone-search">Alan ara</label>
+            <input id="zone-search" class="form-control" type="search" placeholder="Kod veya ad ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
+        @if (Session.Can(WarehouseAccess.ZonesWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni alan</button>
+        }
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="zone-facility-filter">Tesis</label>
+            <select id="zone-facility-filter" class="form-select form-select-sm filter-select" @bind="facilityId" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm tesisler</option>
+                @foreach (var (id, name) in facilities.OrderBy(f => f.Value, StringComparer.CurrentCulture))
+                {
+                    <option value="@id">@name</option>
+                }
+            </select>
+            <label class="visually-hidden" for="zone-kind-filter">Alan türü</label>
+            <select id="zone-kind-filter" class="form-select form-select-sm filter-select" @bind="kindKey" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm türler</option>
+                @foreach (var kind in Lookups.ValuesOf(WarehouseAccess.ZoneKindList))
+                {
+                    <option value="@kind.Key">@kind.Label</option>
+                }
+            </select>
+        </div>
+    }
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu süzgece uyan alan yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) alan listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Alan listesi</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Kod</th><th scope="col">Ad</th><th scope="col">Tesis</th><th scope="col">Tür</th><th scope="col">Durum</th>
+                    @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.ZoneEntityKey)) { <th scope="col">@field.Label</th> }
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var zone in page.Items)
+                {
+                    var kind = WarehouseLabels.Text(zone, "kindKey");
+                    <tr>
+                        <td data-label="Kod" class="primary">@WarehouseLabels.Text(zone, "code")</td>
+                        <td data-label="Ad">@WarehouseLabels.Text(zone, "name")</td>
+                        <td data-label="Tesis">@WarehouseLabels.NameOf(facilities, WarehouseLabels.Id(zone, "facilityId"))</td>
+                        <td data-label="Tür"><span class="badge @WarehouseLabels.KindBadge(Lookups.CategoryOf(WarehouseAccess.ZoneKindList, kind))">@Lookups.Label(WarehouseAccess.ZoneKindList, kind)</span></td>
+                        <td data-label="Durum"><span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(zone, "isActive"))">@(WarehouseLabels.Flag(zone, "isActive") ? "Etkin" : "Pasif")</span></td>
+                        @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.ZoneEntityKey))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, zone.Values["custom"] as JsonObject)</td>
+                        }
+                        <td class="actions">
+                            @if (Session.Can(WarehouseAccess.ZonesWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(zone)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.ZoneEntityKey;
+
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private Dictionary<Guid, string> facilities = [];
+    private bool editing;
+    private bool filtersOpen;
+    private string? message;
+    private string? search;
+    private string view = AllViews;
+    private string? facilityId;
+    private string? kindKey;
+
+    private const string AllViews = "all";
+    private const string ActiveView = "active";
+    private const string InactiveView = "inactive";
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Etkin, Pasif); tesis ve tür seçimleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions { get; } =
+    [
+        new(AllViews, "Tüm alanlar"),
+        new(ActiveView, "Etkin alanlar"),
+        new(InactiveView, "Pasif alanlar"),
+    ];
+
+    private int ActiveFilters => (string.IsNullOrEmpty(facilityId) ? 0 : 1) + (string.IsNullOrEmpty(kindKey) ? 0 : 1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(WarehouseAccess.ZonesRead))
+        {
+            await Lookups.LoadAsync();
+            facilities = await WarehouseLabels.NamesAsync(Api, WarehouseAccess.FacilityEntityKey, f => WarehouseLabels.Text(f, "code") + " · " + WarehouseLabels.Text(f, "name"));
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        url += view switch
+        {
+            ActiveView => "&isActive=true",
+            InactiveView => "&isActive=false",
+            _ => string.Empty,
+        };
+        if (!string.IsNullOrEmpty(facilityId))
+        {
+            url += $"&facilityId={Uri.EscapeDataString(facilityId)}";
+        }
+
+        if (!string.IsNullOrEmpty(kindKey))
+        {
+            url += $"&kindKey={Uri.EscapeDataString(kindKey)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void Open(RecordResponse? zone)
+    {
+        selected = zone;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

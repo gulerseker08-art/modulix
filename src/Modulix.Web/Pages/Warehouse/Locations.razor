@@ -1,0 +1,205 @@
+@page "/depo/lokasyonlar"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Lokasyonlar · Modulix</PageTitle>
+
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.LocationsRead">
+    <PageHeader Title="Lokasyonlar" Icon="map-pin" Subtitle="@(page is null ? "Tesislerdeki raf, kat ve göz gibi yerleşim noktalarını yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        @* Her açılışta yeni bileşen: ön ayar (alt lokasyon ekle) değişince form baştan kurulur. *@
+        <LocationEditor @key="editorKey" Location="selected" ParentPreset="parentPreset" FacilityPreset="FacilityFilter" Lookups="Lookups"
+                        Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="location-search">Lokasyon ara</label>
+            <input id="location-search" class="form-control" type="search" placeholder="Kod veya ad ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
+        @if (Session.Can(WarehouseAccess.LocationsWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null, null)"><AppIcon Name="plus" Size="16" /> Yeni lokasyon</button>
+        }
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="location-facility-filter">Tesis</label>
+            <select id="location-facility-filter" class="form-select form-select-sm filter-select" @bind="facilityId" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm tesisler</option>
+                @foreach (var (id, name) in facilities.OrderBy(f => f.Value, StringComparer.CurrentCulture))
+                {
+                    <option value="@id">@name</option>
+                }
+            </select>
+            <label class="visually-hidden" for="location-zone-filter">Alan</label>
+            <select id="location-zone-filter" class="form-select form-select-sm filter-select" @bind="zoneId" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm alanlar</option>
+                @foreach (var (id, name) in zones.OrderBy(z => z.Value, StringComparer.CurrentCulture))
+                {
+                    <option value="@id">@name</option>
+                }
+            </select>
+        </div>
+    }
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu süzgece uyan lokasyon yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) lokasyon listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Lokasyon listesi</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Kod</th><th scope="col">Ad</th><th scope="col">Tesis</th><th scope="col">Alan</th><th scope="col">Derinlik</th><th scope="col">Durum</th>
+                    @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.LocationEntityKey)) { <th scope="col">@field.Label</th> }
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var location in page.Items)
+                {
+                    <tr>
+                        <td data-label="Kod" class="primary">@WarehouseLabels.Text(location, "code")</td>
+                        <td data-label="Ad">@WarehouseLabels.Text(location, "name")</td>
+                        <td data-label="Tesis">@WarehouseLabels.NameOf(facilities, WarehouseLabels.Id(location, "facilityId"))</td>
+                        <td data-label="Alan">@(WarehouseLabels.Id(location, "zoneId") is { } zone ? WarehouseLabels.NameOf(zones, zone) : "—")</td>
+                        <td data-label="Derinlik">@WarehouseLabels.Number(location, "depth")</td>
+                        <td data-label="Durum"><span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(location, "isActive"))">@(WarehouseLabels.Flag(location, "isActive") ? "Etkin" : "Pasif")</span></td>
+                        @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.LocationEntityKey))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, location.Values["custom"] as JsonObject)</td>
+                        }
+                        <td class="actions">
+                            @if (Session.Can(WarehouseAccess.LocationsWrite))
+                            {
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => Open(null, location)">Alt lokasyon ekle</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(location, null)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.LocationEntityKey;
+
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private RecordResponse? parentPreset;
+    private Dictionary<Guid, string> facilities = [];
+    private Dictionary<Guid, string> zones = [];
+    private bool editing;
+    private bool filtersOpen;
+    private int editorKey;
+    private string? message;
+    private string? search;
+    private string view = AllViews;
+    private string? facilityId;
+    private string? zoneId;
+
+    private const string AllViews = "all";
+    private const string RootView = "root";
+    private const string ActiveView = "active";
+    private const string InactiveView = "inactive";
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Kök, Etkin, Pasif); tesis ve alan seçimleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions { get; } =
+    [
+        new(AllViews, "Tüm lokasyonlar"),
+        new(RootView, "Kök lokasyonlar"),
+        new(ActiveView, "Etkin lokasyonlar"),
+        new(InactiveView, "Pasif lokasyonlar"),
+    ];
+
+    private int ActiveFilters => (string.IsNullOrEmpty(facilityId) ? 0 : 1) + (string.IsNullOrEmpty(zoneId) ? 0 : 1);
+
+    private Guid? FacilityFilter => Guid.TryParse(facilityId, out var id) ? id : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(WarehouseAccess.LocationsRead))
+        {
+            await Lookups.LoadAsync();
+            facilities = await WarehouseLabels.NamesAsync(Api, WarehouseAccess.FacilityEntityKey, f => WarehouseLabels.Text(f, "code") + " · " + WarehouseLabels.Text(f, "name"));
+            zones = await WarehouseLabels.NamesAsync(Api, WarehouseAccess.ZoneEntityKey, z => WarehouseLabels.Text(z, "code") + " · " + WarehouseLabels.Text(z, "name"));
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        url += view switch
+        {
+            RootView => "&root=true",
+            ActiveView => "&isActive=true",
+            InactiveView => "&isActive=false",
+            _ => string.Empty,
+        };
+        if (!string.IsNullOrEmpty(facilityId))
+        {
+            url += $"&facilityId={Uri.EscapeDataString(facilityId)}";
+        }
+
+        if (!string.IsNullOrEmpty(zoneId))
+        {
+            url += $"&zoneId={Uri.EscapeDataString(zoneId)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void Open(RecordResponse? location, RecordResponse? parent)
+    {
+        selected = location;
+        parentPreset = parent;
+        editorKey++;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

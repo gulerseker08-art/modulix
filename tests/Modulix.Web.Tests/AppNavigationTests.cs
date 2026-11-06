@@ -226,9 +226,25 @@ public class AppNavigationTests
         Assert.Equal("depo/tesisler", nav.Find("warehouse.facilities")!.Route);
         Assert.Equal(AppCatalog.Warehouse, nav.Context("depo/tesisler")!.Root.Id);
 
-        // Modül kapalıysa ya da izin yoksa uygulama görünmez (menüyü gizlemek yetki değildir; sunucu yine denetler).
+        // Modül kapalıysa ya da hiçbir depo izni yoksa uygulama görünmez (menüyü gizlemek yetki değildir; sunucu yine denetler).
         Assert.Empty(Nav([], [WarehouseAccess.FacilitiesRead]).Roots());
-        Assert.Empty(Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.ZonesRead]).Roots());
+        Assert.Empty(Nav([WarehouseAccess.ModuleKey], []).Roots());
+    }
+
+    [Fact]
+    public void Each_warehouse_screen_follows_its_own_permission()
+    {
+        var all = Nav(
+            [WarehouseAccess.ModuleKey],
+            [WarehouseAccess.FacilitiesRead, WarehouseAccess.ZonesRead, WarehouseAccess.LocationLevelsRead, WarehouseAccess.LocationsRead]);
+        Assert.Equal(
+            new[] { "depo/tesisler", "depo/alanlar", "depo/lokasyon-seviyeleri", "depo/lokasyonlar" },
+            new[] { "warehouse.facilities", "warehouse.zones", "warehouse.location-levels", "warehouse.locations" }.Select(id => all.Find(id)!.Route));
+
+        // Yalnızca alan izni olan kişi yalnızca alanlar ekranını görür.
+        var zonesOnly = Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.ZonesRead]);
+        Assert.Equal([AppCatalog.Warehouse], zonesOnly.Roots().Select(r => r.Id));
+        Assert.Equal(["Alanlar"], zonesOnly.MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
     }
 
     [Fact]

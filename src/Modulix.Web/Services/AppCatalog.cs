@@ -212,9 +212,12 @@ public static class AppCatalog
         new("marketing.campaigns", Marketing, "Kampanyalar", "target", "pazarlama/kampanyalar", 20, MarketingAccess.ModuleKey, MarketingAccess.CampaignsRead, Tone: AppTone.Teal, Hosted: new(CrmMarketingGroup, null, 20)),
         new("marketing.report", Marketing, "Kampanya raporu", "dashboard", "pazarlama/rapor", 30, MarketingAccess.ModuleKey, MarketingAccess.ReportsRead, Hosted: new(CrmMarketingGroup, "Kampanya sonuçları", 30)),
 
-        // Depo ve antrepo (ADR-0032): şimdilik yapı tanımı (tesis); alan, lokasyon seviyesi ve lokasyon ekranları sonraki adımlarda eklenir.
+        // Depo ve antrepo (ADR-0032): şimdilik yapı tanımı (tesis, alan, lokasyon seviyesi, lokasyon); stok ve gümrük ekranları sonraki dilimlerle gelir.
         new(Warehouse, null, "Depo ve Antrepo", "warehouse", null, 40, ModuleKey: WarehouseAccess.ModuleKey, Group: OperationsGroup),
         new("warehouse.facilities", Warehouse, "Tesisler", "building", "depo/tesisler", 10, WarehouseAccess.ModuleKey, WarehouseAccess.FacilitiesRead),
+        new("warehouse.zones", Warehouse, "Alanlar", "layers", "depo/alanlar", 20, WarehouseAccess.ModuleKey, WarehouseAccess.ZonesRead, Tone: AppTone.Teal),
+        new("warehouse.location-levels", Warehouse, "Lokasyon seviyeleri", "sliders", "depo/lokasyon-seviyeleri", 30, WarehouseAccess.ModuleKey, WarehouseAccess.LocationLevelsRead),
+        new("warehouse.locations", Warehouse, "Lokasyonlar", "map-pin", "depo/lokasyonlar", 40, WarehouseAccess.ModuleKey, WarehouseAccess.LocationsRead, Tone: AppTone.Teal),
 
         // Rapor merkezi çekirdeğe aittir (modül anahtarı yok; yönetim girdileri gibi yalnızca izne bağlıdır). Tek ekranlı olduğu için alt uygulaması yoktur,
         // kendi route'u vardır; /raporlar altındaki oluşturucu ve çalıştırma ekranları da bu uygulamanın bağlamında kalır.
