@@ -1,0 +1,157 @@
+using Modulix.Api.Access;
+using Modulix.Core.Approvals;
+using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Modules;
+using Modulix.Shared.Approvals;
+
+namespace Modulix.Api.Approvals;
+
+/// <summary>
+/// Genel onay (ADR-0027 Dilim 4a). Tanımlar <c>core.approvals.manage</c>, talep açma <c>core.approvals.request</c>, karar
+/// <c>core.approvals.decide</c> ister; karar için izin yetmez, kişi etkin adımın onaycısı da olmalıdır. Kullanıcı yalnızca kendi
+/// taleplerini ve onaycısı olduğu talepleri görür; <c>core.approvals.manage</c> hepsini görür. Başka tenant'ın kaydı "bulunamadı" döner.
+/// </summary>
+public static class ApprovalEndpoints
+{
+    private static readonly string[] AnyApprovalPermission =
+        [CoreModule.Permissions.RequestApprovals, CoreModule.Permissions.DecideApprovals, CoreModule.Permissions.ManageApprovals];
+
+    public static IEndpointRouteBuilder MapApprovalEndpoints(this IEndpointRouteBuilder app)
+    {
+        RouteGroupBuilder group = app.MapGroup("/api/approvals").RequireAuthorization().WithTags("Approvals");
+
+        group.MapGet("/definitions", async (bool? activeOnly, IApprovalService service, CancellationToken ct) =>
+            Results.Ok((await service.ListDefinitionsAsync(activeOnly ?? false, ct)).Select(ToDto)))
+            .RequireAnyPermission(AnyApprovalPermission);
+
+        group.MapPost("/definitions", (SaveApprovalDefinitionRequest request, IApprovalService service, CancellationToken ct) => RunAsync(async () =>
+        {
+            ApprovalDefinition definition = await service.CreateDefinitionAsync(ToInput(request), ct);
+            return Results.Created($"/api/approvals/definitions/{definition.Id}", ToDto(definition));
+        })).RequirePermission(CoreModule.Permissions.ManageApprovals);
+
+        group.MapPut("/definitions/{id:guid}", (Guid id, SaveApprovalDefinitionRequest request, IApprovalService service, CancellationToken ct) => RunAsync(async () =>
+            await service.UpdateDefinitionAsync(id, ToInput(request), request.ExpectedVersion, ct) is { } definition ? Results.Ok(ToDto(definition)) : NotFound()))
+            .RequirePermission(CoreModule.Permissions.ManageApprovals);
+
+        group.MapPut("/definitions/{id:guid}/active", (Guid id, SetApprovalDefinitionActiveRequest request, IApprovalService service, CancellationToken ct) => RunAsync(async () =>
+            await service.SetDefinitionActiveAsync(id, request.IsActive, ct) is { } definition ? Results.Ok(ToDto(definition)) : NotFound()))
+            .RequirePermission(CoreModule.Permissions.ManageApprovals);
+
+        group.MapGet("/approver-options", async (IApprovalService service, CancellationToken ct) =>
+        {
+            ApproverOptions options = await service.ApproverOptionsAsync(ct);
+            return Results.Ok(new ApproverOptionsDto(
+                [.. options.People.Select(p => new ApproverOptionDto(p.Id, p.Name))],
+                [.. options.Roles.Select(r => new ApproverOptionDto(r.Id, r.Name))]));
+        }).RequirePermission(CoreModule.Permissions.ManageApprovals);
+
+        group.MapGet("/overview", async (IApprovalService service, ICurrentAccess access, CancellationToken ct) =>
+        {
+            ApprovalOverview overview = await service.OverviewAsync(await SeeAllAsync(access, ct), ct);
+            return Results.Ok(new ApprovalOverviewDto(
+                overview.WaitingForMe, overview.Overdue, overview.MyOpen, overview.Orphaned, overview.ApprovedLast30Days, overview.RejectedLast30Days,
+                overview.AverageDecisionHours,
+                [.. overview.Trend.Select(d => new ApprovalDayCountDto(d.Day, d.Approved, d.Rejected))],
+                [.. overview.OpenByProcess.Select(p => new ApprovalProcessCountDto(p.Name, p.Open))]));
+        }).RequireAnyPermission(AnyApprovalPermission);
+
+        group.MapGet("/requests", async (
+            string? view, string? status, Guid? definitionId, string? search, string? sort, int? page, int? pageSize,
+            IApprovalService service, ICurrentAccess access, CancellationToken ct) =>
+        {
+            if (!Enum.TryParse(view ?? nameof(ApprovalRequestView.All), ignoreCase: true, out ApprovalRequestView parsedView))
+            {
+                return Invalid("view", "Görünüm Waiting, Mine ya da All olmalı.");
+            }
+
+            ApprovalRequestStatus? parsedStatus = null;
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                if (!Enum.TryParse(status, ignoreCase: true, out ApprovalRequestStatus value))
+                {
+                    return Invalid("status", "Durum Pending, Approved, Rejected ya da Withdrawn olmalı.");
+                }
+
+                parsedStatus = value;
+            }
+
+            ApprovalRequestPage result = await service.ListRequestsAsync(
+                new ApprovalRequestQuery(parsedView, parsedStatus, definitionId, search, sort, page ?? 1, pageSize ?? 25), await SeeAllAsync(access, ct), ct);
+            return Results.Ok(new ApprovalRequestPageDto([.. result.Items.Select(ToDto)], result.Page, result.PageSize, result.TotalCount));
+        }).RequireAnyPermission(AnyApprovalPermission);
+
+        group.MapGet("/requests/{id:guid}", async (Guid id, IApprovalService service, ICurrentAccess access, CancellationToken ct) =>
+            await service.GetRequestAsync(id, await SeeAllAsync(access, ct), ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound())
+            .RequireAnyPermission(AnyApprovalPermission);
+
+        group.MapPost("/requests", (OpenApprovalRequest request, IApprovalService service, CancellationToken ct) => RunAsync(async () =>
+        {
+            ApprovalRequestDetail detail = await service.OpenRequestAsync(
+                new ApprovalRequestInput(request.DefinitionId, request.Title, request.Description, request.Amount, request.Currency), ct);
+            return Results.Created($"/api/approvals/requests/{detail.Id}", ToDto(detail));
+        })).RequirePermission(CoreModule.Permissions.RequestApprovals);
+
+        group.MapPost("/requests/{id:guid}/approve", (Guid id, DecideApprovalRequest request, IApprovalService service, CancellationToken ct) => RunAsync(async () =>
+            await service.DecideAsync(id, approve: true, request.Comment, request.ExpectedVersion, ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound()))
+            .RequirePermission(CoreModule.Permissions.DecideApprovals);
+
+        group.MapPost("/requests/{id:guid}/reject", (Guid id, DecideApprovalRequest request, IApprovalService service, CancellationToken ct) => RunAsync(async () =>
+            await service.DecideAsync(id, approve: false, request.Comment, request.ExpectedVersion, ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound()))
+            .RequirePermission(CoreModule.Permissions.DecideApprovals);
+
+        group.MapPost("/requests/{id:guid}/withdraw", (Guid id, IApprovalService service, CancellationToken ct) => RunAsync(async () =>
+            await service.WithdrawAsync(id, ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound()))
+            .RequirePermission(CoreModule.Permissions.RequestApprovals);
+
+        group.MapPost("/requests/{id:guid}/reassign", (Guid id, ReassignApprovalStepRequest request, IApprovalService service, CancellationToken ct) => RunAsync(async () =>
+            await service.ReassignAsync(id, request.StepId, request.UserId, request.RoleId, request.ExpectedVersion, ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound()))
+            .RequirePermission(CoreModule.Permissions.ManageApprovals);
+
+        return app;
+    }
+
+    private static Task<bool> SeeAllAsync(ICurrentAccess access, CancellationToken ct) =>
+        access.HasPermissionAsync(CoreModule.Permissions.ManageApprovals, ct);
+
+    private static async Task<IResult> RunAsync(Func<Task<IResult>> action)
+    {
+        try
+        {
+            return await action();
+        }
+        catch (ApprovalConflictException ex)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
+        }
+        catch (ApprovalForbiddenException ex)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ex.Message);
+        }
+        catch (ApprovalException ex)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: ex.Message);
+        }
+    }
+
+    private static IResult NotFound() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Kayıt bulunamadı.");
+
+    private static IResult Invalid(string key, string message) =>
+        Results.ValidationProblem(new Dictionary<string, string[]> { [key] = [message] }, statusCode: StatusCodes.Status400BadRequest);
+
+    private static ApprovalDefinitionInput ToInput(SaveApprovalDefinitionRequest request) => new(
+        request.Name, request.Description, request.Currency,
+        [.. (request.Steps ?? []).Select(s => new ApprovalStepDefinition(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours))]);
+
+    private static ApprovalDefinitionDto ToDto(ApprovalDefinition definition) => new(
+        definition.Id, definition.Name, definition.Description, definition.Currency, definition.IsActive, definition.Revision, definition.Version,
+        [.. definition.Steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours))]);
+
+    private static ApprovalRequestDto ToDto(ApprovalRequestDetail detail) => new(
+        detail.Id, detail.DefinitionId, detail.DefinitionName, detail.DefinitionRevision, detail.Title, detail.Description, detail.Amount, detail.Currency,
+        detail.RequesterId, detail.RequesterName, detail.Status.ToString(), detail.SubmittedAt, detail.CompletedAt, detail.Version,
+        [.. detail.Steps.Select(s => new ApprovalStepDto(
+            s.Id, s.Order, s.Name, s.ApproverUserId, s.ApproverRoleId, s.ApproverName, s.Status.ToString(), s.ActivatedAt, s.DueAt, s.IsOverdue, s.IsOrphaned,
+            s.DecidedByName, s.DecidedAt, s.Comment))],
+        detail.CanDecide, detail.CanWithdraw);
+}

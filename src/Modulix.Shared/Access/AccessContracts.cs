@@ -222,6 +222,11 @@ public static class CoreAccess
     public const string ReadAutomationLogs = "core.automation-logs.read";
     public const string ApproveAutomation = "core.automation.approve";
 
+    // Onay merkezi (ADR-0027 Dilim 4a): kullanıcı özelliğidir; yalnızca süreç tanımı "Yönetim" bölümünü açar.
+    public const string RequestApprovals = "core.approvals.request";
+    public const string DecideApprovals = "core.approvals.decide";
+    public const string ManageApprovals = "core.approvals.manage";
+
     // Rapor merkezi (ADR-0026): yönetim değil, kullanıcı özelliğidir; bu izinler "Yönetim" bölümünü açmaz (AdministrationPermissions dışında).
     public const string ReadReports = "core.reports.read";
     public const string ManageReports = "core.reports.manage";
@@ -237,6 +242,6 @@ public static class CoreAccess
     /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
         [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication,
-         ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation,
+         ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation, ManageApprovals,
          RunImports, ReadImports, RollbackImports];
 }

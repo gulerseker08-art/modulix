@@ -86,6 +86,186 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("UserTokens", "platform");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Approvals.ApprovalDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StepsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ApprovalDefinitions", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Approvals.ApprovalRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DefinitionName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("DefinitionRevision")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("RequesterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("SubmittedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "DefinitionId");
+
+                    b.HasIndex("TenantId", "RequesterId", "Status");
+
+                    b.HasIndex("TenantId", "Status", "SubmittedAt");
+
+                    b.ToTable("ApprovalRequests", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Approvals.ApprovalRequestStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ActivatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ApproverRoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ApproverUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DecidedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("DueAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int?>("DueHours")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("StepOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RequestId", "StepOrder");
+
+                    b.HasIndex("TenantId", "Status", "ApproverRoleId");
+
+                    b.HasIndex("TenantId", "Status", "ApproverUserId");
+
+                    b.ToTable("ApprovalRequestSteps", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Authorization.MembershipRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12741,6 +12921,26 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Approvals.ApprovalRequest", b =>
+                {
+                    b.HasOne("Modulix.Core.Approvals.ApprovalDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DefinitionId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Approvals.ApprovalRequestStep", b =>
+                {
+                    b.HasOne("Modulix.Core.Approvals.ApprovalRequest", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RequestId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

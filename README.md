@@ -840,3 +840,7 @@ Bu kurallar `tests/Modulix.ArchitectureTests` ile her test çalışmasında dene
 - **`.env` silindi, SQL Server artık açılmıyor**: Veritabanı eski şifreyle kalır. Yerel veriyi silip baştan kurmak için `docker compose down -v`, ardından `scripts\db-up.ps1`.
 - **Port 14333 dolu**: `.env` içindeki `MSSQL_PORT` değerini değiştirip `scripts\db-up.ps1` çalıştırın.
 - **"Solution zaten var"**: Betik yalnızca boş repoda çalışır. Yeniden denemek için oluşan `src`, `tests`, `Modulix.sln*`, `.gitignore`, `.editorconfig` dosyalarını silin.
+
+## Onay merkezi (Ç6a, [ADR-0027](docs/adr/0027-kural-ve-is-akisi-altyapisi.md) Dilim 4a)
+
+Firma kendi onay süreçlerini `/yonetim/onay-surecleri` ekranından tanımlar; kullanıcılar `/onaylar` ekranından talep açar, kararlarını verir ve ilerlemeyi izler. API `/api/approvals` altındadır (`definitions`, `overview`, `requests`, `requests/{id}/approve|reject|withdraw|reassign`). İzinler `core.approvals.request`, `core.approvals.decide`, `core.approvals.manage`; karar için izin yetmez, kişi etkin adımın onaycısı olmalıdır ve talep sahibi kendi talebine karar veremez. Teklif ve sözleşme onayları kendi ekranlarında kalır.

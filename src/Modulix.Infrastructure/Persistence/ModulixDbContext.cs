@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
+using Modulix.Core.Approvals;
 using Modulix.Core.Automation;
 using Modulix.Core.Communication;
 using Modulix.Core.Customization;
@@ -109,6 +110,12 @@ public class ModulixDbContext(
     public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
 
     public DbSet<BusinessUnitMember> BusinessUnitMembers => Set<BusinessUnitMember>();
+
+    public DbSet<ApprovalDefinition> ApprovalDefinitions => Set<ApprovalDefinition>();
+
+    public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
+
+    public DbSet<ApprovalRequestStep> ApprovalRequestSteps => Set<ApprovalRequestStep>();
 
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
 

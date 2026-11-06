@@ -58,6 +58,15 @@ public sealed class CoreModule : IModule
         /// <summary>Otomasyonun bekleyen onaylarını karara bağlar (ADR-0027 Dilim 4).</summary>
         public const string ApproveAutomation = "core.automation.approve";
 
+        /// <summary>Onay talebi açar, kendi taleplerini görür ve geri çeker (ADR-0027 Dilim 4a).</summary>
+        public const string RequestApprovals = "core.approvals.request";
+
+        /// <summary>Onaycısı olduğu adımlara karar verir; izin tek başına yetmez, kişi adımın onaycısı olmalıdır.</summary>
+        public const string DecideApprovals = "core.approvals.decide";
+
+        /// <summary>Onay süreçlerini tanımlar, bütün talepleri görür ve sahipsiz adımın onaycısını değiştirir.</summary>
+        public const string ManageApprovals = "core.approvals.manage";
+
         /// <summary>Rapor merkezini açar, hazır ve paylaşılan raporları çalıştırır (ADR-0026, dilim 3). Veri erişimi vermez: her rapor çalıştıranın kayıt yetkisiyle çalışır.</summary>
         public const string ReadReports = "core.reports.read";
 
@@ -104,6 +113,9 @@ public sealed class CoreModule : IModule
         new(Permissions.RunAutomation, "Otomasyon kuralını elle çalıştırır", "Otomasyon"),
         new(Permissions.ReadAutomationLogs, "Otomasyon çalışma geçmişini görüntüler", "Otomasyon geçmişi"),
         new(Permissions.ApproveAutomation, "Otomasyonun bekleyen onaylarını karara bağlar", "Otomasyon"),
+        new(Permissions.RequestApprovals, "Onay talebi açar ve kendi taleplerini izler", "Onaylar"),
+        new(Permissions.DecideApprovals, "Onaycısı olduğu adımlara karar verir", "Onaylar"),
+        new(Permissions.ManageApprovals, "Onay süreçlerini tanımlar ve bütün talepleri yönetir", "Onaylar"),
         new(Permissions.ReadReports, "Rapor merkezini açar ve raporları çalıştırır", "Raporlar"),
         new(Permissions.ManageReports, "Kendi raporlarını oluşturur, düzenler ve siler", "Raporlar"),
         new(Permissions.ShareReports, "Kendi raporunu firmayla ya da kullanıcılarla paylaşır", "Raporlar"),
@@ -166,6 +178,12 @@ public sealed class CoreModule : IModule
 
         /// <summary>Otomasyon kuralı (ADR-0027); kaydın kimliği kuralın kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string AutomationRule = "core.automation-rule";
+
+        /// <summary>Onay süreci tanımı (ADR-0027 Dilim 4a); kaydın kimliği tanımın kimliğidir.</summary>
+        public const string ApprovalDefinition = "core.approval-definition";
+
+        /// <summary>Onay talebi (ADR-0027 Dilim 4a); kaydın kimliği talebin kimliğidir. Karar, not ve atama değişikliği yazılır.</summary>
+        public const string ApprovalRequest = "core.approval-request";
 
         /// <summary>Kayıtlı rapor (ADR-0026, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string Report = "core.report";
@@ -423,6 +441,22 @@ public sealed class CoreModule : IModule
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
                 ["status"] = new Dictionary<string, string> { ["Draft"] = "Taslak", ["Active"] = "Açık", ["Inactive"] = "Kapalı" },
+            },
+        },
+        new(AuditedEntityKeys.ApprovalDefinition, "Onay süreci", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["description"] = "Açıklama", ["currency"] = "Para birimi", ["isActive"] = "Açık", ["revision"] = "Sürüm", ["steps"] = "Adımlar",
+        }, "name"),
+        new(AuditedEntityKeys.ApprovalRequest, "Onay talebi", null, new Dictionary<string, string>
+        {
+            ["title"] = "Başlık", ["process"] = "Süreç", ["amount"] = "Tutar", ["currency"] = "Para birimi", ["status"] = "Durum",
+            ["step"] = "Adım", ["decision"] = "Karar", ["comment"] = "Not", ["approver"] = "Onaycı",
+        }, "title")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string> { ["Pending"] = "Bekliyor", ["Approved"] = "Onaylandı", ["Rejected"] = "Reddedildi", ["Withdrawn"] = "Geri çekildi" },
+                ["decision"] = new Dictionary<string, string> { ["Approved"] = "Onay", ["Rejected"] = "Ret" },
             },
         },
         new(AuditedEntityKeys.Report, "Rapor", null, new Dictionary<string, string>
