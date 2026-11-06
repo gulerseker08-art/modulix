@@ -1,0 +1,230 @@
+@page "/depo/beyannameler"
+@using System.Globalization
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Beyannameler · Modulix</PageTitle>
+
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.DeclarationsRead">
+    <PageHeader Title="Beyannameler" Icon="clipboard-list" Subtitle="@(page is null ? "Gümrük beyannamelerini ve satırlarını yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <Notice Text="@notice" Failed="false" />
+
+    @if (editing)
+    {
+        <CustomsDeclarationEditor Declaration="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="DeletedAsync" Cancelled="Close" />
+        @if (selected is not null)
+        {
+            <DeclarationLinesPanel DeclarationId="selected.Id" Lookups="Lookups" CanWrite="@Session.Can(WarehouseAccess.DeclarationsWrite)"
+                                   Locked="@(Lookups.CategoryOf(WarehouseAccess.DeclarationStatusList, WarehouseLabels.Text(selected, "statusKey")) == WarehouseAccess.DeclarationCancelled)" />
+        }
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="decl-search">Beyanname ara</label>
+            <input id="decl-search" class="form-control" type="search" placeholder="Tescil no, dış referans veya idare ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
+        @if (Session.Can(WarehouseAccess.DeclarationsWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni beyanname</button>
+        }
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="decl-importer-filter">İthalatçı</label>
+            <LookupPicker Id="decl-importer-filter" LookupKey="@WarehouseAccess.DeclarationImporterLookup" Value="importerId" ValueChanged="ChooseImporterAsync" Placeholder="Tüm ithalatçılar" />
+            <label class="visually-hidden" for="decl-broker-filter">Gümrük müşaviri</label>
+            <LookupPicker Id="decl-broker-filter" LookupKey="@WarehouseAccess.DeclarationBrokerLookup" Value="brokerId" ValueChanged="ChooseBrokerAsync" Placeholder="Tüm müşavirler" />
+            <label class="visually-hidden" for="decl-from">Tescil tarihi başlangıç</label>
+            <input id="decl-from" class="form-control form-control-sm" type="date" title="Tescil tarihi (başlangıç)" @bind="from" @bind:after="() => LoadAsync(1)" />
+            <label class="visually-hidden" for="decl-to">Tescil tarihi bitiş</label>
+            <input id="decl-to" class="form-control form-control-sm" type="date" title="Tescil tarihi (bitiş)" @bind="to" @bind:after="() => LoadAsync(1)" />
+        </div>
+    }
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu süzgece uyan beyanname yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) beyanname listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Beyanname listesi</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Tescil no</th><th scope="col">Tescil tarihi</th><th scope="col">İthalatçı</th><th scope="col">Gümrük müşaviri</th>
+                    <th scope="col">Rejim</th><th scope="col">Durum</th>
+                    @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.CustomsDeclarationEntityKey)) { <th scope="col">@field.Label</th> }
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var declaration in page.Items)
+                {
+                    var statusKey = WarehouseLabels.Text(declaration, "statusKey");
+                    <tr>
+                        <td data-label="Tescil no" class="primary">@WarehouseLabels.Text(declaration, "registrationNo")</td>
+                        <td data-label="Tescil tarihi">@Display(WarehouseLabels.Text(declaration, "registrationDate"))</td>
+                        <td data-label="İthalatçı">@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(declaration, "importerPartyId"))</td>
+                        <td data-label="Gümrük müşaviri">@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(declaration, "brokerPartyId"))</td>
+                        <td data-label="Rejim">@Lookups.Label(WarehouseAccess.CustomsRegimeList, WarehouseLabels.Text(declaration, "regimeKey"))</td>
+                        <td data-label="Durum"><span class="badge @WarehouseLabels.DeclarationBadge(Lookups.CategoryOf(WarehouseAccess.DeclarationStatusList, statusKey))">@Lookups.Label(WarehouseAccess.DeclarationStatusList, statusKey)</span></td>
+                        @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.CustomsDeclarationEntityKey))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, declaration.Values["custom"] as JsonObject)</td>
+                        }
+                        <td class="actions">
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(declaration)">@(Session.Can(WarehouseAccess.DeclarationsWrite) ? "Düzenle" : "Aç")</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.CustomsDeclarationEntityKey;
+    private const string AllViews = "all";
+    private const string StatusPrefix = "status:";
+
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private readonly Dictionary<Guid, string> partyNames = [];
+    private bool editing;
+    private bool filtersOpen;
+    private string? message;
+    private string? notice;
+    private string? search;
+    private string view = AllViews;
+    private Guid? importerId;
+    private Guid? brokerId;
+    private DateTime? from;
+    private DateTime? to;
+
+    // Görünümler yalnızca süzgeçtir (Tümü ve firmanın beyanname durumları); taraf ve tarih süzgeçleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm beyannameler"),
+        .. Lookups.ValuesOf(WarehouseAccess.DeclarationStatusList).Where(v => v.Active).Select(v => new ViewOption(StatusPrefix + v.Key, v.Label)),
+    ];
+
+    private int ActiveFilters => (importerId is null ? 0 : 1) + (brokerId is null ? 0 : 1) + (from is null ? 0 : 1) + (to is null ? 0 : 1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(WarehouseAccess.DeclarationsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task ChooseImporterAsync(Guid? id)
+    {
+        importerId = id;
+        await LoadAsync(1);
+    }
+
+    private async Task ChooseBrokerAsync(Guid? id)
+    {
+        brokerId = id;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (view.StartsWith(StatusPrefix, StringComparison.Ordinal))
+        {
+            url += $"&statusKey={Uri.EscapeDataString(view[StatusPrefix.Length..])}";
+        }
+
+        if (importerId is { } importer)
+        {
+            url += $"&importerPartyId={importer}";
+        }
+
+        if (brokerId is { } broker)
+        {
+            url += $"&brokerPartyId={broker}";
+        }
+
+        if (from is { } start)
+        {
+            url += $"&registeredFrom={start:yyyy-MM-dd}";
+        }
+
+        if (to is { } end)
+        {
+            url += $"&registeredTo={end:yyyy-MM-dd}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            var ids = page.Items.SelectMany(d => new[] { WarehouseLabels.Id(d, "importerPartyId"), WarehouseLabels.Id(d, "brokerPartyId") }).OfType<Guid>();
+            await WarehouseLabels.ResolveNamesAsync(Api, WarehouseAccess.DeclarationImporterLookup, ids, partyNames);
+        }
+    }
+
+    private static string Display(string isoDate) =>
+        DateOnly.TryParseExact(isoDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+            ? date.ToString("d", CultureInfo.GetCultureInfo("tr-TR"))
+            : isoDate;
+
+    private void Open(RecordResponse? declaration)
+    {
+        selected = declaration;
+        editing = true;
+        message = null;
+        notice = null;
+    }
+
+    private void Close() => editing = false;
+
+    // Kayıttan sonra form açık kalır: yeni beyannamenin satırları hemen eklenebilsin.
+    private async Task SavedAsync(RecordResponse saved)
+    {
+        selected = saved;
+        notice = "Beyanname kaydedildi; satırlarını aşağıdan ekleyip düzenleyebilirsiniz.";
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task DeletedAsync()
+    {
+        editing = false;
+        selected = null;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

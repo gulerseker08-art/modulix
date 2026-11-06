@@ -252,6 +252,13 @@ public class AppNavigationTests
         var zonesOnly = Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.ZonesRead]);
         Assert.Equal([AppCatalog.Warehouse], zonesOnly.Roots().Select(r => r.Id));
         Assert.Equal(["Alanlar"], zonesOnly.MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
+
+        // Beyannameler ekranı yalnızca beyanname okuma iznine bağlıdır (K15: warehouse.customs.*); vekâlet ya da stok izni onu açmaz.
+        var declarationsOnly = Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.DeclarationsRead]);
+        Assert.Equal(["Beyannameler"], declarationsOnly.MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
+        Assert.Equal("depo/beyannameler", declarationsOnly.Find("warehouse.customs-declarations")!.Route);
+        Assert.DoesNotContain("Beyannameler", Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.AttorneysRead, WarehouseAccess.StockItemsRead])
+            .MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
     }
 
     [Fact]

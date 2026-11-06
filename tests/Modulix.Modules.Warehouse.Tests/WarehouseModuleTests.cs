@@ -53,6 +53,46 @@ public class WarehouseModuleTests
     }
 
     [Fact]
+    public void Declaration_status_list_has_the_categories_the_code_understands_and_legal_lists_are_bound_to_their_fields()
+    {
+        var status = Assert.Single(Module.ChoiceLists, l => l.Key == WarehouseModule.Lists.DeclarationStatus);
+
+        Assert.Equal((WarehouseModule.Entities.CustomsDeclaration, "statusKey"), (status.EntityKey, status.Field));
+        Assert.Equal(
+            [WarehouseModule.DeclarationStatusCategories.Cancelled, WarehouseModule.DeclarationStatusCategories.Draft, WarehouseModule.DeclarationStatusCategories.Registered],
+            status.Categories.Select(c => c.Key).Order());
+        Assert.All(status.Values, v => Assert.Contains(v.Category, status.Categories.Select(c => c.Key)));
+        Assert.Contains(status.Default, status.Values.Select(v => v.Key));
+
+        // Yasal çekirdek listeler (K10) kategorisizdir ve satır alanlarına bağlıdır; menşe anahtarları ISO alfa-2'dir.
+        var expected = new Dictionary<string, (string Entity, string Field)>
+        {
+            [WarehouseModule.Lists.CustomsRegime] = (WarehouseModule.Entities.CustomsDeclaration, "regimeKey"),
+            [WarehouseModule.Lists.ContainerType] = (WarehouseModule.Entities.CustomsDeclarationLine, "containerTypeKey"),
+            [WarehouseModule.Lists.OriginCountry] = (WarehouseModule.Entities.CustomsDeclarationLine, "originCountryKey"),
+            [WarehouseModule.Lists.DeclarationLineUnit] = (WarehouseModule.Entities.CustomsDeclarationLine, "unitKey"),
+        };
+        foreach (var (key, binding) in expected)
+        {
+            var list = Assert.Single(Module.ChoiceLists, l => l.Key == key);
+            Assert.Equal(binding, (list.EntityKey, list.Field));
+            Assert.Empty(list.Categories);
+            Assert.NotEmpty(list.Values);
+        }
+
+        var origin = Assert.Single(Module.ChoiceLists, l => l.Key == WarehouseModule.Lists.OriginCountry);
+        Assert.All(origin.Values, v => Assert.Matches("^[A-Z]{2}$", v.Key));
+    }
+
+    [Theory]
+    [InlineData(100, 100, true)]
+    [InlineData(100, 99.999, true)]
+    [InlineData(100, 0, true)]
+    [InlineData(100, 100.001, false)]
+    public void Net_weight_may_not_exceed_gross_weight(double gross, double net, bool expected) =>
+        Assert.Equal(expected, Modulix.Modules.Warehouse.Domain.DeclarationLineRules.NetWithinGross((decimal)gross, (decimal)net));
+
+    [Fact]
     public void Audited_entities_cover_every_record_type_and_references_point_to_known_types()
     {
         var audited = Module.AuditedEntities.ToDictionary(a => a.EntityKey);
@@ -61,6 +101,8 @@ public class WarehouseModuleTests
         Assert.Contains(WarehouseModule.Entities.Zone, audited.Keys);
         Assert.Contains(WarehouseModule.Entities.PowerOfAttorney, audited.Keys);
         Assert.Contains(WarehouseModule.Entities.StockItem, audited.Keys);
+        Assert.Contains(WarehouseModule.Entities.CustomsDeclaration, audited.Keys);
+        Assert.Contains(WarehouseModule.Entities.CustomsDeclarationLine, audited.Keys);
         // Başvuru hedefi ya denetlenen bir depo kaydıdır ya da ortak kayıttır (firma, ADR-0006).
         Assert.All(
             Module.AuditedEntities.SelectMany(a => a.References.Values),

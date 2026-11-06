@@ -23,6 +23,7 @@ public class WarehouseSortTests(ModulixApiFactory factory) : IClassFixture<Modul
     private const string Locations = "/api/records/warehouse.location";
     private const string Attorneys = "/api/records/warehouse.power-of-attorney";
     private const string StockItems = "/api/records/warehouse.stock-item";
+    private const string Declarations = "/api/records/warehouse.customs-declaration";
 
     [Fact]
     public async Task Facilities_and_stock_items_sort_in_both_directions_with_empty_values_last()
@@ -94,6 +95,7 @@ public class WarehouseSortTests(ModulixApiFactory factory) : IClassFixture<Modul
             (Locations, "path"), (StockItems, "description"), (StockItems, "-nope"),
             // Vekâlet tarafları firma adına göre sıralanmaz (firma görünürlüğü sıralamayla dolanılmasın).
             (Attorneys, "importer"), (Attorneys, "importerPartyId"), (Attorneys, "broker"),
+            (Declarations, "importerPartyId"), (Declarations, "description"),
         })
         {
             var response = await admin.GetAsync($"{url}?sort={Uri.EscapeDataString(key)}");
@@ -106,6 +108,11 @@ public class WarehouseSortTests(ModulixApiFactory factory) : IClassFixture<Modul
         foreach (var key in new[] { "validFrom", "-validFrom", "validTo", "-isActive", "createdAt" })
         {
             Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"{Attorneys}?sort={key}")).StatusCode);
+        }
+
+        foreach (var key in new[] { "registrationNo", "-registrationDate", "customsOffice", "-regimeKey", "statusKey", "createdAt" })
+        {
+            Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"{Declarations}?sort={key}")).StatusCode);
         }
     }
 

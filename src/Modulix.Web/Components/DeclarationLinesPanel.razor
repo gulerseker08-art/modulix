@@ -1,0 +1,140 @@
+@* Bir beyannamenin satırları (ADR-0032 K6): yasal gerçek satırdadır. Liste, toplamlar ve satır ekleme/düzenleme/silme. İptal kategorisindeki
+   beyannamenin satırları değiştirilemez (sunucu da reddeder); panel bunu önceden gösterir. Satırlar genel kayıt uçlarından
+   (/api/records/warehouse.customs-declaration-line) okunur ve yazılır. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+
+<section class="settings-group" aria-label="Beyanname satırları">
+    <h2>Satırlar</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (Locked)
+    {
+        <div class="alert alert-info" role="status">Bu beyanname iptal durumunda; satırları değiştirilemez.</div>
+    }
+
+    @if (editing)
+    {
+        <DeclarationLineEditor DeclarationId="DeclarationId" Line="selected" NextLineNo="NextLineNo" Lookups="Lookups"
+                               Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
+    }
+    else if (CanWrite && !Locked)
+    {
+        <div class="form-actions">
+            <button type="button" class="btn btn-tonal" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Satır ekle</button>
+        </div>
+    }
+
+    @if (lines is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (lines.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu beyannamede henüz satır yok.</p>
+    }
+    else
+    {
+        <p class="text-muted" role="status" aria-live="polite">
+            @lines.Count satır · Brüt @WarehouseLabels.Number(lines.Sum(l => WarehouseLabels.Decimal(l, "grossKg"))) kg · Net @WarehouseLabels.Number(lines.Sum(l => WarehouseLabels.Decimal(l, "netKg"))) kg
+        </p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Beyanname satırları</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Satır</th><th scope="col">GTİP</th><th scope="col">Eşya tanımı</th><th scope="col">Kap</th>
+                    <th scope="col">Brüt kg</th><th scope="col">Net kg</th><th scope="col">Menşe</th><th scope="col">Miktar</th>
+                    @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.CustomsDeclarationLineEntityKey)) { <th scope="col">@field.Label</th> }
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var line in lines)
+                {
+                    <tr>
+                        <td data-label="Satır" class="primary">@WarehouseLabels.Number(line, "lineNo")</td>
+                        <td data-label="GTİP">@WarehouseLabels.Text(line, "gtip")</td>
+                        <td data-label="Eşya tanımı">@WarehouseLabels.Text(line, "description")</td>
+                        <td data-label="Kap">@WarehouseLabels.Number(line, "containerCount") × @Lookups.Label(WarehouseAccess.ContainerTypeList, WarehouseLabels.Text(line, "containerTypeKey"))</td>
+                        <td data-label="Brüt kg">@WarehouseLabels.Number(WarehouseLabels.Decimal(line, "grossKg"))</td>
+                        <td data-label="Net kg">@WarehouseLabels.Number(WarehouseLabels.Decimal(line, "netKg"))</td>
+                        <td data-label="Menşe">@Lookups.Label(WarehouseAccess.OriginCountryList, WarehouseLabels.Text(line, "originCountryKey"))</td>
+                        <td data-label="Miktar">@WarehouseLabels.Number(WarehouseLabels.Decimal(line, "quantity")) @Lookups.Label(WarehouseAccess.DeclarationLineUnitList, WarehouseLabels.Text(line, "unitKey"))</td>
+                        @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.CustomsDeclarationLineEntityKey))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, line.Values["custom"] as JsonObject)</td>
+                        }
+                        <td class="actions">
+                            @if (CanWrite && !Locked)
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(line)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.CustomsDeclarationLineEntityKey;
+
+    private List<RecordResponse>? lines;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private Guid loadedFor;
+
+    [Parameter, EditorRequired] public Guid DeclarationId { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    /// <summary>Kullanıcının beyanname yazma izni var mı?</summary>
+    [Parameter] public bool CanWrite { get; set; }
+
+    /// <summary>Beyanname iptal kategorisinde mi? Satırlar değiştirilemez.</summary>
+    [Parameter] public bool Locked { get; set; }
+
+    private int NextLineNo => (lines?.Select(l => WarehouseLabels.Number(l, "lineNo")).DefaultIfEmpty(0).Max() ?? 0) + 1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == DeclarationId)
+        {
+            return;
+        }
+
+        loadedFor = DeclarationId;
+        editing = false;
+        selected = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        lines = null;
+        var result = await Api.GetAsync<RecordPageResponse>($"{Url}?declarationId={DeclarationId}&page=1&pageSize=200");
+        lines = result.Value is { } page ? [.. page.Items.OrderBy(l => WarehouseLabels.Number(l, "lineNo"))] : [];
+        message = result.Error;
+    }
+
+    private void Open(RecordResponse? line)
+    {
+        selected = line;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync();
+    }
+}
