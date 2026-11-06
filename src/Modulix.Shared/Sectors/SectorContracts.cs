@@ -46,6 +46,14 @@ public sealed record ActivityOptionDto(string Code, string Name, string Kind, st
 
 public sealed record StarterPackageDto(string Code, string Name, string? Description, bool Verified, string? VerificationNote, int NodeCount, int CapabilityCount);
 
+public sealed record StarterPackageRetirePlanDto(
+    List<string> NodesToDeactivate,
+    List<string> NodesAlreadyInactive,
+    List<string> NodesMissing,
+    List<string> Skipped,
+    List<string> Warnings,
+    bool NothingToDo);
+
 public sealed record StarterPackagePlanDto(
     List<string> CapabilitiesToCreate,
     List<string> CapabilitiesExisting,

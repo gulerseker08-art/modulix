@@ -60,14 +60,10 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
             ? q.Where(c => c.Party.Kind == kind)
             : null,
         // Kod listesi alanları (ADR-0029 Dilim E): "a,b" biçiminde saklanır; tam kod eşleşir (kısmi eşleşme olmaz).
-        ["relationshipRole"] = (q, v, _) => CodeFilter(v) is { } code ? q.Where(c => ("," + c.Party.RelationshipRoles + ",").Contains("," + code + ",")) : null,
-        ["customerSector"] = (q, v, _) => CodeFilter(v) is { } code ? q.Where(c => ("," + c.Party.CustomerSectors + ",").Contains("," + code + ",")) : null,
-        ["serviceNeed"] = (q, v, _) => CodeFilter(v) is { } code ? q.Where(c => ("," + c.Party.ServiceNeeds + ",").Contains("," + code + ",")) : null,
+        ["relationshipRole"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.RelationshipRoles + ",").Contains("," + code + ",")) : null,
+        ["customerSector"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.CustomerSectors + ",").Contains("," + code + ",")) : null,
+        ["serviceNeed"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.ServiceNeeds + ",").Contains("," + code + ",")) : null,
     };
-
-    /// <summary>Faaliyet/rol kodu: küçük harf, rakam ve tire (en çok 50); başka değer süzgeç sayılmaz.</summary>
-    private static string? CodeFilter(string value) =>
-        value.Trim() is { Length: > 0 and <= 50 } code && code.All(ch => ch is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-') ? code : null;
 
     protected override IReadOnlyDictionary<string, AsyncRecordFilter<Company>> AsyncFilters { get; } =
         new Dictionary<string, AsyncRecordFilter<Company>>

@@ -72,7 +72,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 
 | Bileşen | Durum | Not |
 |---|---|---|
-| DataGrid | Stil | `table record-table` (kart çerçeveli; başlık satırı dolgulu bant, cümle yazımı kalın başlık, ikonlu; son sütun `⋯` satır menüsü) + `ViewTabs` + `Pager`; telefonda kart listesi. Sunucu taraflı sayfalama/süzme/sıralama mevcut uç noktalardan. Şablon örneği: `Crm/Companies.razor` (3.11.2026 sonrası karar, tüm gridler bu şablona taşınır) |
+| DataGrid | Stil | `table record-table` (kart çerçeveli; başlık satırı dolgulu bant, cümle yazımı kalın başlık, ikonlu; son sütun `⋯` satır menüsü) + `ViewTabs` + `Pager`; telefonda kart listesi. Yoğunluk ortak CSS'tedir (6.11.2026 kararı): satır 44 px, ince başlık bandı (12 px, ikincil renk), 24 px avatar, ince rozet, kayıt bağlantısı alt çizgisiz yarı kalın; yeni grid `record-table` kullanır, ekrana özel yükseklik yazılmaz. Sunucu taraflı sayfalama/süzme/sıralama mevcut uç noktalardan. Şablon örneği: `Crm/Companies.razor` (3.11.2026 sonrası karar, tüm gridler bu şablona taşınır) |
 | Kolon gizleme/sıralama/yeniden boyutlandırma, kayıtlı görünüm, toplu işlem | Kısmen/Yok | Toplu işlem yalnız Aktiviteler'de |
 | Satış hunisi | Var | `SalesPipeline.razor` — `Stages`, `Current`, `Status`, `CanChangeStage`, `CanClose`, `OnChoose` |
 | Takvim | Var | `ActivityCalendar.razor`: ay ızgarası, hafta/gün saat çizelgesi (`cal-time-*`, çakışanlar yan yana, şimdiki zaman çizgisi), ajanda; renk `FamilyOf` → `fam-*` |

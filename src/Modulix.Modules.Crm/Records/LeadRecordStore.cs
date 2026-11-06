@@ -91,6 +91,8 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
 
     protected override IReadOnlyDictionary<string, RecordFilter<Lead>> Filters { get; } = new Dictionary<string, RecordFilter<Lead>>
     {
+        // Hizmet kapsamı (ADR-0029 Dilim F): tam kod eşleşir.
+        ["serviceScope"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(l => ("," + l.ServiceScope + ",").Contains("," + code + ",")) : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(l => l.OwnerId == owner) : null,
         // "ownerNot=me": başkalarının (ekibimin) Lead'leri; sorumlusu boş olanlar da dahildir.
         ["ownerNot"] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(l => l.OwnerId == null || l.OwnerId != owner) : null,

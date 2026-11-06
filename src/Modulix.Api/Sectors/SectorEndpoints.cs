@@ -53,6 +53,12 @@ public static class SectorEndpoints
         catalog.MapPost("/starter-packages/{code}/install", (string code, ClaimsPrincipal user, IStarterPackages service, CancellationToken ct) =>
             Run(async () => Results.Ok(ToDto(await service.InstallAsync(UserId(user), code, ct)))));
 
+        // Geri alma (Dilim G): paketin düğümlerini pasife alır, silmez; önizleme yazmaz.
+        catalog.MapGet("/starter-packages/{code}/retire-preview", (string code, IStarterPackages service, CancellationToken ct) =>
+            Run(async () => Results.Ok(ToDto(await service.PreviewRetireAsync(code, ct)))));
+        catalog.MapPost("/starter-packages/{code}/retire", (string code, ClaimsPrincipal user, IStarterPackages service, CancellationToken ct) =>
+            Run(async () => Results.Ok(ToDto(await service.RetireAsync(UserId(user), code, ct)))));
+
         // Firma ilişki rolü kataloğu (Dilim E): platform yönetir; rol silinmez, pasife alınır.
         catalog.MapGet("/relationship-roles", async (IRelationshipRoles service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
         catalog.MapPost("/relationship-roles", (CreateRelationshipRoleRequest request, ClaimsPrincipal user, IRelationshipRoles service, CancellationToken ct) =>
@@ -136,6 +142,9 @@ public static class SectorEndpoints
 
     private static ActivityNodeDto ToDto(ActivityNodeView n) =>
         new(n.Id, n.Code, n.ParentId, n.Kind.ToString(), n.Name, n.Description, n.SortOrder, n.IsActive, n.Readiness.ToString(), n.Version, [.. n.Capabilities]);
+
+    private static StarterPackageRetirePlanDto ToDto(StarterPackageRetirePlan p) =>
+        new([.. p.NodesToDeactivate], [.. p.NodesAlreadyInactive], [.. p.NodesMissing], [.. p.Skipped], [.. p.Warnings], p.NothingToDo);
 
     private static StarterPackagePlanDto ToDto(StarterPackagePlan p) =>
         new([.. p.CapabilitiesToCreate], [.. p.CapabilitiesExisting], [.. p.NodesToCreate], [.. p.NodesExisting], [.. p.Warnings], [.. p.Completions], p.NothingToDo);
