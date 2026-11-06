@@ -1,0 +1,120 @@
+@page "/yonetim/otomasyon/calismalar"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Otomasyon çalışmaları · Modulix</PageTitle>
+
+@* Otomasyon çalışma geçmişi (ADR-0027, Dilim 5b): liste. Okuma core.automation-logs.read ister. Çalışma kaydı kayıt değeri ya da
+   parametre taşımaz; yalnızca durum, özet ve kimlikler görünür. Düğmeleri gizlemek yetki değildir, sunucu uygular. *@
+<AuthGate Permission="@CoreAccess.ReadAutomationLogs">
+    <a class="back-link" href="yonetim/otomasyon">← Otomasyon kuralları</a>
+
+    <PageHeader Title="Otomasyon çalışmaları" Icon="zap"
+                Subtitle="Kuralların kayıtlar üzerinde ne zaman, hangi sonuçla çalıştığı. Başarısız çalışmayı ayrıntıdan yeniden deneyebilir, bitmemiş olanı iptal edebilirsiniz." />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+    }
+
+    <div class="list-toolbar">
+        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status ?? AutomationLabels.AllViews)" ValueChanged="ChooseStatusAsync" />
+        @if (RuleId is not null)
+        {
+            <span class="chip active">Tek kural <a href="yonetim/otomasyon/calismalar" aria-label="Kural süzgecini kaldır">×</a></span>
+        }
+    </div>
+
+    @if (runPage is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+    }
+    else if (runPage.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">
+            @(status is not null || RuleId is not null ? "Bu süzgece uyan çalışma yok." : "Henüz çalışma yok. Açık bir kural tetiklendiğinde burada görünür.")
+        </p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@runPage.TotalCount çalışma listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Otomasyon çalışmaları</caption>
+            <thead>
+                <tr><th scope="col">Kural</th><th scope="col">Kayıt türü</th><th scope="col">Kaynak</th><th scope="col">Durum</th><th scope="col">Başladı</th><th scope="col">Bitti</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var run in runPage.Items)
+                {
+                    <tr>
+                        <td data-label="Kural" class="primary">
+                            <a href="yonetim/otomasyon/calismalar/@run.Id">@run.RuleName</a>
+                            <small class="text-muted d-block">v@(run.VersionNo)@(string.IsNullOrWhiteSpace(run.Note) ? "" : " · " + run.Note)</small>
+                        </td>
+                        <td data-label="Kayıt türü">@AutomationLabels.EntityName(entities, run.EntityKey)</td>
+                        <td data-label="Kaynak">@AutomationLabels.Origin(run.Origin)</td>
+                        <td data-label="Durum"><span class="badge stage-@AutomationLabels.RunStatusBadge(run.Status)">@AutomationLabels.RunStatus(run.Status)</span></td>
+                        <td data-label="Başladı">@CrmLabels.Time(run.CreatedAt)</td>
+                        <td data-label="Bitti">@(run.CompletedAt is { } done ? CrmLabels.Time(done) : "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="runPage.Page" PageSize="runPage.PageSize" TotalCount="runPage.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    /// <summary>Kural ayrıntısındaki "Çalışmaları" bağlantısı tek kurala süzer.</summary>
+    [SupplyParameterFromQuery(Name = "kural")] public Guid? RuleId { get; set; }
+
+    private AutomationRunPageDto? runPage;
+    private IReadOnlyList<AutomationEntityDto> entities = [];
+    private string? status;
+    private string? message;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.ReadAutomationLogs))
+        {
+            // Katalog kayıt türü adları içindir (core.automation.read ister); alınamazsa liste teknik anahtarla yine çalışır.
+            if (entities.Count == 0 && Session.Can(CoreAccess.ReadAutomation))
+            {
+                entities = (await Api.GetAsync<AutomationCatalogDto>("/api/automation/catalog")).Value?.Entities ?? [];
+            }
+
+            await LoadAsync(1);
+        }
+    }
+
+    private static IReadOnlyList<ViewOption> StatusOptions =>
+        [new(AutomationLabels.AllViews, "Tüm çalışmalar"), .. AutomationLabels.RunStatuses.Select(s => new ViewOption(s, AutomationLabels.RunStatus(s)))];
+
+    private Task ChooseStatusAsync(string key)
+    {
+        status = key == AutomationLabels.AllViews ? null : key;
+        return LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"/api/automation/runs?page={pageNumber}&pageSize={ListPaging.Size}";
+        if (status is not null)
+        {
+            url += $"&status={status}";
+        }
+
+        if (RuleId is { } ruleId)
+        {
+            url += $"&ruleId={ruleId}";
+        }
+
+        var result = await Api.GetAsync<AutomationRunPageDto>(url);
+        runPage = result.Value;
+        message = result.Error;
+    }
+}

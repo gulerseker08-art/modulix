@@ -30,6 +30,71 @@ public static class AutomationLabels
         _ => "proposal",
     };
 
+    // Çalışma geçmişi (Dilim 5b): değerler sunucudaki AutomationRunStatus / AutomationStepStatus / AutomationRunOrigin adlarıdır.
+    public const string RunPending = "Pending";
+    public const string RunRunning = "Running";
+    public const string RunSucceeded = "Succeeded";
+    public const string RunFailed = "Failed";
+    public const string RunCancelled = "Cancelled";
+    public const string RunNotMatched = "NotMatched";
+
+    public static IReadOnlyList<string> RunStatuses { get; } =
+        [RunPending, RunRunning, RunSucceeded, RunFailed, RunCancelled, RunNotMatched];
+
+    public static string RunStatus(string status) => status switch
+    {
+        RunPending => "Bekliyor",
+        RunRunning => "Çalışıyor",
+        RunSucceeded => "Başarılı",
+        RunFailed => "Başarısız",
+        RunCancelled => "İptal edildi",
+        RunNotMatched => "Koşul sağlanmadı",
+        _ => status,
+    };
+
+    /// <summary>Çalışma durumu rozet tonu: başarılı yeşil, başarısız kırmızı, süren bilgi, bekleyen ve koşulsuz nötr, iptal çizgili.</summary>
+    public static string RunStatusBadge(string status) => status switch
+    {
+        RunSucceeded => "won",
+        RunFailed => "lost",
+        RunRunning => "proposal",
+        RunCancelled => "cancelled",
+        _ => "lead",
+    };
+
+    public static string StepStatus(string status) => status switch
+    {
+        "Pending" => "Bekliyor",
+        "Succeeded" => "Tamamlandı",
+        "Skipped" => "Atlandı",
+        "Failed" => "Başarısız",
+        "Cancelled" => "İptal edildi",
+        _ => status,
+    };
+
+    public static string StepStatusBadge(string status) => status switch
+    {
+        "Succeeded" => "won",
+        "Failed" => "lost",
+        "Cancelled" => "cancelled",
+        "Skipped" => "proposal",
+        _ => "lead",
+    };
+
+    public static string Origin(string origin) => origin switch
+    {
+        "Event" => "Olay",
+        "Manual" => "Elle",
+        "Scan" => "Günlük tarama",
+        _ => origin,
+    };
+
+    /// <summary>Yeniden deneme yalnızca başarısız çalışmada anlamlıdır (sunucu da bunu uygular).</summary>
+    public static bool CanRetry(string runStatus) => runStatus == RunFailed;
+
+    /// <summary>İptal yalnızca bitmemiş çalışmada anlamlıdır (sunucu da bunu uygular).</summary>
+    public static bool CanCancel(string runStatus) => runStatus is RunPending or RunRunning;
+
     /// <summary>Kural durumu görünüm seçicisinin "Tümü" anahtarı.</summary>
     public const string AllViews = "all";
 
