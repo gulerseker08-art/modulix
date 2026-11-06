@@ -193,8 +193,8 @@ Bağımlılık: Ç2, Ç9, Ç13, Ç22, Ç24. Sınır: Salt okur yol, yetkisiz yol
   - **Raporlama yapılacaklar (4 Kasım 2026, ADR-0026 sonrası; öncelik sırasıyla):**
     1. Raporlama ekranlarının elle görsel doğrulaması: renk, taşma, dar ekran, klavye, kontrast (açık ve koyu tema); rapor merkezi, oluşturucu, çalıştırma, dışa aktarımlar, zamanlama paneli. (Otomasyon yalnızca DOM üzerinden denendi, ekran görüntüsü alınamadı.)
     2. Lead okumasında kalan ≈300 ms/sayfa maliyet: sütun daraltma (kayıt boru hattında alan seçimi) — önce ayrıştırılmalı. Lead `source` süzgeci için dizin yalnız ölçümle gerekirse.
-    3. Dışa aktarma kapsamı: tahmin sürümünün fırsat satırları ve düzeltmeleri, hedef revizyon geçmişi, satış genel görünümü kartları, xlsx çıktısı.
-    4. Zamanlama: dağıtım listesi (yalnız sahibine gider), Failed çalışmanın aynı dönem yeniden denenmesi, çok tenant'ta zamanlama için ayrı dizin/tarama.
+    3. Dışa aktarma kapsamı: tahmin sürümünün fırsat satırları ve düzeltmeleri, hedef revizyon geçmişi, satış genel görünümü kartları, xlsx çıktısı. **Yapıldı (7 Kasım 2026):** tahmin fırsat satırları (`crm.forecast-items`) ve hedef revizyonları (`crm.sales-target-revisions`) salt okunur veri kümesi; düzeltme geçmişi, genel görünüm kartları ve xlsx açık.
+    4. Zamanlama: dağıtım listesi (yalnız sahibine gider), Failed çalışmanın aynı dönem yeniden denenmesi, çok tenant'ta zamanlama için ayrı dizin/tarama. **Yapıldı (7 Kasım 2026):** Failed çalışma 15 dk / 60 dk sonra yeniden denenir (en çok 3 deneme); dağıtım listesi ve çok tenant tarama dizini açık.
     5. Ekip/departman/kanal kırılımı: modüllerin erişebileceği bir ekip/departman sözleşmesi (Core.Contracts) gerektirir.
     6. Ölçülmeyenler: 50 bin üstü hacim, eşzamanlı çok kullanıcı yükü, soğuk veritabanı; sunucu tarafı toplama/özet tablo kararı (ayrı ADR) bu ölçümlere bağlı.
     7. Teknik borç: `docs/adr/` altında iki belge `0026` numaralı (departman hiyerarşisi + raporlama) ve iki belge `0029` numaralı; yeniden numaralandırma.
