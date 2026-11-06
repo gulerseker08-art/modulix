@@ -65,6 +65,25 @@ internal sealed partial class CustomsDeclarationRecordStore(WarehouseStoreContex
     protected override IOrderedQueryable<CustomsDeclaration> Order(IQueryable<CustomsDeclaration> source) =>
         source.OrderByDescending(d => d.RegistrationDate).ThenBy(d => d.RegistrationNo);
 
+    // Liste başlıklarına göre sıralama. Taraflar firma adına göre sıralanmaz: firma görünürlüğü (CRM kapsamı) sıralamayla dolanılmasın.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        WithDescending("registrationNo", "registrationDate", "customsOffice", "regimeKey", "statusKey", "createdAt");
+
+    protected override IOrderedQueryable<CustomsDeclaration> Order(IQueryable<CustomsDeclaration> source, string? sort)
+    {
+        var desc = sort?.StartsWith('-') == true;
+        return sort?.TrimStart('-') switch
+        {
+            "registrationNo" => By(source, d => d.RegistrationNo, desc),
+            "registrationDate" => By(source, d => d.RegistrationDate, desc).ThenBy(d => d.RegistrationNo),
+            "customsOffice" => ByNullsLast(source, d => d.CustomsOffice, desc).ThenBy(d => d.RegistrationNo),
+            "regimeKey" => By(source, d => d.RegimeKey, desc).ThenBy(d => d.RegistrationNo),
+            "statusKey" => By(source, d => d.StatusKey, desc).ThenBy(d => d.RegistrationNo),
+            "createdAt" => By(source, d => d.CreatedAt, desc).ThenBy(d => d.RegistrationNo),
+            _ => Order(source),
+        };
+    }
+
     // Firma adıyla arama yok: firma görünürlüğü (CRM kapsamı) bu ekrandan dolanılmasın; firma süzgeçleri seçim kutusuyla yapılır.
     protected override IQueryable<CustomsDeclaration> Search(IQueryable<CustomsDeclaration> source, string term) =>
         source.Where(d => d.RegistrationNo.Contains(term)

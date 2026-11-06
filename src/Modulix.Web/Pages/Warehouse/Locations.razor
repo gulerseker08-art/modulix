@@ -22,15 +22,14 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Lokasyon görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="location-search">Lokasyon ara</label>
-            <input id="location-search" class="form-control" type="search" placeholder="Kod veya ad ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+            <input class="form-control" type="search" aria-label="Lokasyon ara" placeholder="Kod veya ad ara" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(WarehouseAccess.LocationsWrite) && !editing)
         {
             <button type="button" class="btn btn-primary" @onclick="() => Open(null, null)"><AppIcon Name="plus" Size="16" /> Yeni lokasyon</button>
@@ -40,16 +39,14 @@
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <label class="visually-hidden" for="location-facility-filter">Tesis</label>
-            <select id="location-facility-filter" class="form-select form-select-sm filter-select" @bind="facilityId" @bind:after="() => LoadAsync(1)">
+            <select class="form-select" aria-label="Tesis" @bind="facilityId" @bind:after="() => LoadAsync(1)">
                 <option value="">Tüm tesisler</option>
                 @foreach (var (id, name) in facilities.OrderBy(f => f.Value, StringComparer.CurrentCulture))
                 {
                     <option value="@id">@name</option>
                 }
             </select>
-            <label class="visually-hidden" for="location-zone-filter">Alan</label>
-            <select id="location-zone-filter" class="form-select form-select-sm filter-select" @bind="zoneId" @bind:after="() => LoadAsync(1)">
+            <select class="form-select" aria-label="Alan" @bind="zoneId" @bind:after="() => LoadAsync(1)">
                 <option value="">Tüm alanlar</option>
                 @foreach (var (id, name) in zones.OrderBy(z => z.Value, StringComparer.CurrentCulture))
                 {
@@ -59,13 +56,16 @@
         </div>
     }
 
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
     @if (page is null)
     {
         <p class="text-muted" role="status">Yükleniyor…</p>
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu süzgece uyan lokasyon yok.</p>
+        <p class="text-muted" role="status">Bu görünüme uyan lokasyon yok.</p>
     }
     else
     {
@@ -74,30 +74,28 @@
             <caption class="visually-hidden">Lokasyon listesi</caption>
             <thead>
                 <tr>
-                    <th scope="col">Kod</th><th scope="col">Ad</th><th scope="col">Tesis</th><th scope="col">Alan</th><th scope="col">Derinlik</th><th scope="col">Durum</th>
-                    @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.LocationEntityKey)) { <th scope="col">@field.Label</th> }
-                    <th scope="col"></th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var location in page.Items)
                 {
                     <tr>
-                        <td data-label="Kod" class="primary">@WarehouseLabels.Text(location, "code")</td>
-                        <td data-label="Ad">@WarehouseLabels.Text(location, "name")</td>
-                        <td data-label="Tesis">@WarehouseLabels.NameOf(facilities, WarehouseLabels.Id(location, "facilityId"))</td>
-                        <td data-label="Alan">@(WarehouseLabels.Id(location, "zoneId") is { } zone ? WarehouseLabels.NameOf(zones, zone) : "—")</td>
-                        <td data-label="Derinlik">@WarehouseLabels.Number(location, "depth")</td>
-                        <td data-label="Durum"><span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(location, "isActive"))">@(WarehouseLabels.Flag(location, "isActive") ? "Etkin" : "Pasif")</span></td>
-                        @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.LocationEntityKey))
+                        @foreach (var column in grid.VisibleColumns)
                         {
-                            <td data-label="@field.Label">@CustomFieldText.Format(field, location.Values["custom"] as JsonObject)</td>
+                            @Cell(column, location)
                         }
-                        <td class="actions">
+                        <td class="row-menu-cell">
                             @if (Session.Can(WarehouseAccess.LocationsWrite))
                             {
-                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => Open(null, location)">Alt lokasyon ekle</button>
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(location, null)">Düzenle</button>
+                                <RowMenu Label="@($"{WarehouseLabels.Text(location, "code")} eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(null, location)"><AppIcon Name="plus" Size="16" /> <span>Alt lokasyon ekle</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(location, null)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                </RowMenu>
                             }
                         </td>
                     </tr>
@@ -111,6 +109,25 @@
 @code {
     private static readonly string Url = "/api/records/" + WarehouseAccess.LocationEntityKey;
 
+    private const string AllViews = "all";
+    private const string RootView = "root";
+    private const string ActiveView = "active";
+    private const string InactiveView = "inactive";
+
+    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (WarehouseRecordStore.SortKeys).
+    // Varsayılan sıra tesis koduna, sonra lokasyon koduna göredir.
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("code", "Kod", "hash", "code", "-code", Locked: true),
+        new("name", "Ad", "type", "name", "-name"),
+        new("facility", "Tesis", "warehouse", "facility", "-facility"),
+        new("zone", "Alan", "layers", "zone", "-zone"),
+        new("depth", "Derinlik", "list", "depth", "-depth"),
+        new("isActive", "Durum", "tag", "isActive", "-isActive"),
+    ];
+
+    private readonly GridViewState grid = new("warehouse.locations", "facility");
+    private PersonalGridViews views = default!;
     private RecordPageResponse? page;
     private RecordResponse? selected;
     private RecordResponse? parentPreset;
@@ -122,69 +139,142 @@
     private string? message;
     private string? search;
     private string view = AllViews;
-    private string? facilityId;
-    private string? zoneId;
+    private string? root;
+    private string? isActive;
+    private string facilityId = "";
+    private string zoneId = "";
 
-    private const string AllViews = "all";
-    private const string RootView = "root";
-    private const string ActiveView = "active";
-    private const string InactiveView = "inactive";
-
-    // Görünümler yalnızca süzgeçtir (Tümü, Kök, Etkin, Pasif); tesis ve alan seçimleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
-    private IReadOnlyList<ViewOption> ViewOptions { get; } =
-    [
-        new(AllViews, "Tüm lokasyonlar"),
-        new(RootView, "Kök lokasyonlar"),
-        new(ActiveView, "Etkin lokasyonlar"),
-        new(InactiveView, "Pasif lokasyonlar"),
-    ];
-
-    private int ActiveFilters => (string.IsNullOrEmpty(facilityId) ? 0 : 1) + (string.IsNullOrEmpty(zoneId) ? 0 : 1);
+    private int ActiveFilters => (facilityId.Length > 0 ? 1 : 0) + (zoneId.Length > 0 ? 1 : 0);
 
     private Guid? FacilityFilter => Guid.TryParse(facilityId, out var id) ? id : null;
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "warehouse.locations");
         await Session.EnsureLoadedAsync();
         if (Session.Can(WarehouseAccess.LocationsRead))
         {
             await Lookups.LoadAsync();
             facilities = await WarehouseLabels.NamesAsync(Api, WarehouseAccess.FacilityEntityKey, f => WarehouseLabels.Text(f, "code") + " · " + WarehouseLabels.Text(f, "name"));
             zones = await WarehouseLabels.NamesAsync(Api, WarehouseAccess.ZoneEntityKey, z => WarehouseLabels.Text(z, "code") + " · " + WarehouseLabels.Text(z, "name"));
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(WarehouseAccess.LocationEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
 
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Kök, Etkin, Pasif, kişisel); tesis ve alan seçimleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm lokasyonlar", Icon: "map-pin"),
+        new(RootView, "Kök lokasyonlar", Icon: "landmark"),
+        new(ActiveView, "Etkin lokasyonlar", Icon: "check-circle"),
+        new(InactiveView, "Pasif lokasyonlar", Icon: "clock"),
+        .. views.Options,
+    ];
+
     private async Task ChooseViewAsync(string key)
     {
         view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm: sütunlar, sıralama ve süzgeç birlikte gelir.
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            root = filters.GetValueOrDefault("root");
+            isActive = filters.GetValueOrDefault("isActive");
+            facilityId = filters.GetValueOrDefault("facilityId") ?? "";
+            zoneId = filters.GetValueOrDefault("zoneId") ?? "";
+        }
+        else
+        {
+            grid.Reset();
+            root = key == RootView ? "true" : null;
+            isActive = key switch { ActiveView => "true", InactiveView => "false", _ => null };
+            facilityId = zoneId = "";
+        }
+
         await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    // Sütun seçimi/sırası değişince veri yeniden çekilmez; olay işleyicisi sayfada olduğu için tablo yeniden çizilir.
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(
+        root is { } r ? ("root", r) : null, isActive is { } a ? ("isActive", a) : null, ("facilityId", facilityId), ("zoneId", zoneId));
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
-        url += view switch
+        if (grid.Sort != grid.DefaultSort)
         {
-            RootView => "&root=true",
-            ActiveView => "&isActive=true",
-            InactiveView => "&isActive=false",
-            _ => string.Empty,
-        };
-        if (!string.IsNullOrEmpty(facilityId))
-        {
-            url += $"&facilityId={Uri.EscapeDataString(facilityId)}";
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
         }
 
-        if (!string.IsNullOrEmpty(zoneId))
+        foreach (var (name, value) in new[] { ("root", root ?? ""), ("isActive", isActive ?? ""), ("facilityId", facilityId), ("zoneId", zoneId) })
         {
-            url += $"&zoneId={Uri.EscapeDataString(zoneId)}";
+            if (value.Length > 0)
+            {
+                url += $"&{name}={Uri.EscapeDataString(value)}";
+            }
         }
 
         var result = await Api.GetAsync<RecordPageResponse>(url);
         page = result.Value;
         message = result.Error;
     }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse location) => @<td data-label="@column.Label" class="@(column.Key == "code" ? "primary" : null)">@CellContent(column.Key, location)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse location) => key switch
+    {
+        "code" => @<text>@WarehouseLabels.Text(location, "code")</text>,
+        "name" => @<text>@WarehouseLabels.Text(location, "name")</text>,
+        "facility" => @<text>@WarehouseLabels.NameOf(facilities, WarehouseLabels.Id(location, "facilityId"))</text>,
+        "zone" => @<text>@(WarehouseLabels.Id(location, "zoneId") is { } zone ? WarehouseLabels.NameOf(zones, zone) : "—")</text>,
+        "depth" => @<text>@WarehouseLabels.Number(location, "depth")</text>,
+        "isActive" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(location, "isActive"))">@(WarehouseLabels.Flag(location, "isActive") ? "Etkin" : "Pasif")</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(WarehouseAccess.LocationEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, location.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
 
     private void Open(RecordResponse? location, RecordResponse? parent)
     {
