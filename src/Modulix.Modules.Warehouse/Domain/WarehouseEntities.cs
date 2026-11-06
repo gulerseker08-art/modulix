@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Customs;
 using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Modules.Warehouse.Domain;
@@ -259,34 +260,4 @@ public sealed class StockItem : WarehouseEntity
 
     /// <summary>Pasif kart yeni işlem almaz; geçmiş kayıtları korunur.</summary>
     public bool IsActive { get; internal set; } = true;
-}
-
-/// <summary>
-/// GTİP biçim kuralları (K9): kod <b>metin</b> saklanır, yalnızca rakamdır; ilk 6 hane HS kodudur, 12–14 hane desteklenir. Ayraçlar (nokta,
-/// boşluk) girişte atılır. Uzunluk sınırı yalnızca yapısaldır (6–14); hangi uzunluğun hangi tarife için geçerli olduğu ve kodun varlığı
-/// katalog işidir ve doğrulanmamıştır (ADR bölüm 9), bu yüzden burada sert bir mevzuat kuralı yoktur.
-/// </summary>
-public static class GtipRules
-{
-    public const int MinLength = 6;
-    public const int MaxLength = 14;
-
-    /// <summary>Girişi normalleştirir; boşsa <c>(null, null)</c>, geçersizse hata iletisi döner.</summary>
-    public static (string? Value, string? Error) Normalize(string? input)
-    {
-        if (string.IsNullOrWhiteSpace(input))
-        {
-            return (null, null);
-        }
-
-        var digits = new string([.. input.Where(c => c is not ('.' or ' ' or '\u00A0'))]);
-        if (digits.Length == 0 || !digits.All(char.IsAsciiDigit))
-        {
-            return (null, "GTİP yalnızca rakamlardan oluşmalıdır (nokta ve boşluk atılır).");
-        }
-
-        return digits.Length is < MinLength or > MaxLength
-            ? (null, $"GTİP {MinLength} ile {MaxLength} hane arasında olmalıdır.")
-            : (digits, null);
-    }
 }
