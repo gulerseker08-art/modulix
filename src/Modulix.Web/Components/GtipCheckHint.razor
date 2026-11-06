@@ -1,0 +1,50 @@
+@* GTİP alanının altında katalog denetimi (ADR-0032 K9). Yalnızca bilgi verir: kod katalogdaysa tanımı, yalnızca daha uzun kodların başıysa bilgi notu,
+   hiç yoksa uyarı gösterir; kaydı engellemez. Yürürlükte katalog yoksa, kod biçimi geçersizse ya da kullanıcının stok kartı okuma izni yoksa
+   sessiz kalır (asıl doğrulama kayıtta sunucudadır). Kod değişince (parametre) yeniden sorar. *@
+@using Modulix.Shared.Customs
+@inject ApiClient Api
+
+@switch (check?.Status)
+{
+    case "Found":
+        <small class="text-muted d-block">Katalog (@check.VersionName): @check.Description</small>
+        break;
+    case "PrefixOnly":
+        <div class="alert alert-info mt-2" role="status">Bu kod katalogda yalnızca daha uzun kodların başı olarak var (@check.VersionName); tam kodu girmeniz önerilir.</div>
+        break;
+    case "NotFound":
+        <div class="alert alert-warning mt-2" role="status">Bu kod yürürlükteki GTİP kataloğunda (@check.VersionName) bulunamadı. Kayıt engellenmez; kodu kontrol edin.</div>
+        break;
+}
+
+@code {
+    private string? checkedCode;
+    private GtipCheckDto? check;
+
+    /// <summary>Denetlenecek GTİP (ayraçlı yazım olabilir; sunucu normalleştirir).</summary>
+    [Parameter] public string? Code { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Code == checkedCode)
+        {
+            return;
+        }
+
+        var code = Code;
+        checkedCode = code;
+        check = null;
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        var result = await Api.GetAsync<GtipCheckDto>($"/api/gtip/check?code={Uri.EscapeDataString(code)}");
+
+        // Yanıt gelene kadar kod değiştiyse eski yanıt gösterilmez.
+        if (code == Code)
+        {
+            check = result.IsSuccess ? result.Value : null;
+        }
+    }
+}
