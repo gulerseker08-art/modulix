@@ -38,6 +38,9 @@ public static class EventReasons
 {
     /// <summary>Kayıt devri (ADR-0004): sorumlu toplu değişti. Atama e-postası bunları atlar; devir tek özet gönderir.</summary>
     public const string Transfer = "transfer";
+
+    /// <summary>Toplu içe aktarma (ADR-0033): firmanın tasarımı kapalıysa kural çalışması ve atama e-postası üretilmez.</summary>
+    public const string Import = "import";
 }
 
 /// <summary>

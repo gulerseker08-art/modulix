@@ -19,6 +19,12 @@ public enum ImportFieldType
 
     /// <summary>Birden çok seçenek; değerler "|" ile ayrılır.</summary>
     MultiChoice = 6,
+
+    /// <summary>Başka bir kayda bağlantı: <see cref="ImportField.Reference"/> ile çözülür, kullanıcının göremediği kayıt bulunamaz.</summary>
+    Reference = 7,
+
+    /// <summary>Firmanın etkin üyesi; hücrede kullanıcının e-postası yazılır.</summary>
+    User = 8,
 }
 
 /// <summary>
@@ -30,7 +36,18 @@ public sealed record ImportField(string Key, string Label, ImportFieldType Type 
     public IReadOnlyList<SettingOption> Options { get; init; } = [];
 
     public string? ChoiceListKey { get; init; }
+
+    public ImportReference? Reference { get; init; }
 }
+
+/// <summary>Hücre değerinin hedef kaydı nasıl bulduğu: süzgeçler sırayla denenir, tek kayıt eşleşmelidir. Süzgeçler kayıt deposunda tanımlıdır.</summary>
+public sealed record ImportReference(string EntityKey, IReadOnlyList<string> Filters);
+
+/// <summary>
+/// Mükerrer kuralı (ADR-0013). Olası eşleşme (<paramref name="Exact"/> false) <paramref name="Filter"/> süzgeciyle aranır ve yalnızca uyarıdır.
+/// Kesin eşleşmede kayıtlı kaydı depo reddeder; motor dosya içi tekrarı satır hatası yapar, böylece kuru çalışma uygulamayla aynı sonucu verir.
+/// </summary>
+public sealed record ImportMatchRule(string Field, string? Filter, bool Exact = false);
 
 /// <summary>
 /// İçe aktarılabilir kayıt türü (ADR-0033 bölüm 3). Motor, ekran ve günlük türü bilmez; bir türü içe aktarılabilir yapmak modüle bu tanımı
@@ -43,9 +60,6 @@ public sealed record ImportDefinition(string EntityKey, string DisplayName, stri
     /// <summary>Şablonun sürümü: sütunlar değişince artırılır, koşuda saklanır.</summary>
     public int TemplateVersion { get; init; } = 1;
 
-    /// <summary>
-    /// Olası mükerrer uyarısı üreten alanlar: aynı adlı liste süzgeci kayıt deposunda bulunmalıdır. Eşleşme uyarıdır, satırı engellemez
-    /// ve kayıtlar otomatik birleştirilmez (ADR-0013).
-    /// </summary>
-    public IReadOnlyList<string> MatchFields { get; init; } = [];
+    /// <summary>Mükerrer kuralları; kayıtlar hiçbir zaman otomatik birleştirilmez (ADR-0013).</summary>
+    public IReadOnlyList<ImportMatchRule> MatchRules { get; init; } = [];
 }

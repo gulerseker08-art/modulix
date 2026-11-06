@@ -41,6 +41,12 @@ public sealed class AutomationEventSubscriber(IAutomationRunStore store, TimePro
 {
     public async Task HandleAsync(EventEnvelope envelope, CancellationToken cancellationToken)
     {
+        // Toplu içe aktarma kural çalıştırmaz (ADR-0033); firma tür başına açarsa olayda bu neden bulunmaz.
+        if (envelope.Reason == EventReasons.Import)
+        {
+            return;
+        }
+
         var rules = await store.ActiveRulesAsync(envelope.EntityKey, cancellationToken);
         if (rules.Count == 0)
         {

@@ -150,6 +150,9 @@ public sealed class CoreModule : IModule
         /// <summary>Form düzeni (ADR-0021); kaydın kimliği firmanın düzen satırının kimliğidir.</summary>
         public const string FormLayout = "core.form-layout";
 
+        /// <summary>İçe aktarma tasarımı (ADR-0033); kaydın kimliği firmanın tasarım satırının kimliğidir.</summary>
+        public const string ImportDesign = "core.import-design";
+
         public const string Membership = "core.membership";
 
         /// <summary>İşletici şirket (ADR-0008): ad ve varsayılan olup olmadığı; kaydın kimliği şirketin kimliğidir.</summary>
@@ -292,6 +295,11 @@ public sealed class CoreModule : IModule
 
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
     [
+        new(AuditedEntityKeys.ImportDesign, "İçe aktarma tasarımı", null, new Dictionary<string, string>
+        {
+            ["entityKey"] = "Kayıt türü", ["enabled"] = "Açık", ["runAutomation"] = "Kurallar ve atama e-postaları çalışır",
+            ["excluded"] = "Çıkarılan sütunlar", ["required"] = "Zorunlu sütunlar",
+        }, "entityKey"),
         new(AuditedEntityKeys.Role, "Rol", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["permissions"] = "İzinler", ["isSystem"] = "Sistem rolü", ["scope"] = "Kayıt kapsamı",

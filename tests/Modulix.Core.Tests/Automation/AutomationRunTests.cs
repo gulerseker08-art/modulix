@@ -248,6 +248,17 @@ public class AutomationEventSubscriberTests
     }
 
     [Fact]
+    public async Task A_bulk_import_event_creates_no_run()
+    {
+        var store = new FakeStore(Rule(new RecordCreatedTrigger()));
+        var envelope = Envelope(DomainEventTypes.RecordCreated, new JsonObject()) with { Reason = EventReasons.Import };
+
+        await Subscriber(store).HandleAsync(envelope, CancellationToken.None);
+
+        Assert.Empty(store.Added);
+    }
+
+    [Fact]
     public async Task A_redelivered_event_does_not_create_a_second_run()
     {
         var rule = Rule(new RecordCreatedTrigger());

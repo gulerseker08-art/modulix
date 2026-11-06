@@ -30,7 +30,7 @@ public sealed class AssignmentEmailSubscriber(
 {
     public async Task HandleAsync(EventEnvelope envelope, CancellationToken cancellationToken)
     {
-        if (envelope.Reason == EventReasons.Transfer
+        if (envelope.Reason is EventReasons.Transfer or EventReasons.Import
             || envelope.Payload[OwnedRecordType.OwnerField] is not JsonObject change
             || change["new"] is not JsonValue value
             || !value.TryGetValue<string>(out var text)

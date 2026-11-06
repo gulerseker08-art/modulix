@@ -60,3 +60,21 @@ internal sealed class ImportRowIssueConfiguration : IEntityTypeConfiguration<Imp
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class TenantImportDesignConfiguration : IEntityTypeConfiguration<TenantImportDesign>
+{
+    public void Configure(EntityTypeBuilder<TenantImportDesign> builder)
+    {
+        // Tenant verisi (ADR-0033): yalnızca tasarımını değiştiren firmanın türleri; Row-Level Security ile korunur.
+        builder.ToTable("ImportDesigns", DatabaseSchemas.Meta);
+        builder.HasKey(d => d.Id);
+        builder.Property(d => d.Id).ValueGeneratedNever();
+        builder.Property(d => d.TenantId).IsRequired();
+        builder.Property(d => d.EntityKey).HasMaxLength(TenantImportDesign.EntityKeyMaxLength).IsRequired();
+        builder.Property(d => d.DesignJson).IsRequired();
+        builder.Property(d => d.Version).IsRequired().IsConcurrencyToken();
+        builder.Property(d => d.UpdatedAt).IsRequired();
+        builder.HasIndex(d => new { d.TenantId, d.EntityKey }).IsUnique();
+        builder.HasAlternateKey(d => new { d.TenantId, d.Id });
+    }
+}
