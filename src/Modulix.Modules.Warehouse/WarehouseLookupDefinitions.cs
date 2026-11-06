@@ -1,9 +1,10 @@
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Contracts.SharedRecords;
 
 namespace Modulix.Modules.Warehouse;
 
 /// <summary>
-/// Depo modülünün lookup alanları (ADR-0016): tesis, alan ve üst lokasyon seçimi. Hedef kayıtlara erişim kayıt boru hattının kurallarıyla
+/// Depo modülünün lookup alanları (ADR-0016): tesis, alan, üst lokasyon ve vekâletin tarafları (ithalatçı, gümrük müşaviri). Hedef kayıtlara erişim kayıt boru hattının kurallarıyla
 /// (izin, kapsam) belirlenir; "aranabilir" bir erişim yetkisi değildir. Alan ve üst lokasyon seçimi tesise bağlıdır: tesis seçiliyse
 /// sonuçlar o tesisle sınırlanır ve ilişki kayıt sırasında da doğrulanır.
 /// </summary>
@@ -14,11 +15,15 @@ public static class WarehouseLookupDefinitions
     public const string LocationFacility = "warehouse.location.facility";
     public const string LocationParent = "warehouse.location.parent";
     public const string LocationZone = "warehouse.location.zone";
+    public const string AttorneyImporter = "warehouse.power-of-attorney.importer";
+    public const string AttorneyBroker = "warehouse.power-of-attorney.broker";
 
     private static readonly string[] FacilityLabel = ["code", "name"];
     private static readonly string[] ZoneLabel = ["code", "name"];
     private static readonly string[] LocationLabel = ["code"];
     private static readonly string[] LocationSecondary = ["name"];
+    private static readonly string[] PartyLabel = ["name"];
+    private static readonly string[] PartySecondary = ["city", "taxNumber"];
 
     private static LookupDefinition Facility(string key, string source, string title) =>
         new(key, source, "facilityId", title, LookupTargetKind.Record, WarehouseModule.Entities.Facility)
@@ -48,6 +53,23 @@ public static class WarehouseLookupDefinitions
             DependsOnField = "facilityId",
             DependsOnFilter = "facilityId",
             DependsOnHint = "Önce tesisi seçin; alan o tesisin alanlarıyla sınırlanır.",
+        },
+        // Firma seçimi ilişki rolüne göre süzülür (sabit süzgeç); rol denetimi kayıt sırasında ayrıca yapılır (PowerOfAttorneyRecordStore).
+        new(AttorneyImporter, WarehouseModule.Entities.PowerOfAttorney, "importerPartyId", "İthalatçı", LookupTargetKind.Record, SharedEntities.Party)
+        {
+            LabelFields = PartyLabel,
+            SecondaryFields = PartySecondary,
+            SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir (yalnızca \"İthalatçı / malik\" rolündeki firmalar)",
+            FixedFilterName = "relationshipRole",
+            FixedFilterValue = WarehouseModule.RelationshipRoles.Importer,
+        },
+        new(AttorneyBroker, WarehouseModule.Entities.PowerOfAttorney, "brokerPartyId", "Gümrük müşaviri", LookupTargetKind.Record, SharedEntities.Party)
+        {
+            LabelFields = PartyLabel,
+            SecondaryFields = PartySecondary,
+            SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir (yalnızca \"Gümrük müşaviri\" rolündeki firmalar)",
+            FixedFilterName = "relationshipRole",
+            FixedFilterValue = WarehouseModule.RelationshipRoles.Broker,
         },
     ];
 }

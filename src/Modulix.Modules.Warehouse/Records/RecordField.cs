@@ -1,8 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Warehouse.Domain;
 
 namespace Modulix.Modules.Warehouse.Records;
@@ -130,6 +132,29 @@ internal static class Field
             NotFoundMessage = notFoundMessage,
             CreateOnly = createOnly,
         };
+
+    /// <summary>
+    /// Ortak kayda (firma) bağ (ADR-0006: <c>core.party</c>). Tenant filtresi ve RLS sorguya uygulanır; başka tenant'ın ortak kaydı
+    /// "bulunamadı" sayılır. Ortak kaydın okunabilirliği modülün bildirdiği okuma izniyle sağlanır.
+    /// </summary>
+    public static RecordField<T> PartyRef<T>(
+        string name, string notFoundMessage, Func<T, Guid?> get, Action<T, Guid?> set, bool required = false, bool createOnly = false) =>
+        new(name, required, nullable: !required, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v))
+        {
+            Exists = (context, id, ct) => context.Data.Set<Party>().AnyAsync(p => p.Id == id, ct),
+            NotFoundMessage = notFoundMessage,
+            CreateOnly = createOnly,
+        };
+
+    /// <summary>Tarih (yyyy-AA-gg). Zorunlu değilse boş bırakılabilir (boş gönderilirse temizlenir).</summary>
+    public static RecordField<T> Date<T>(string name, Func<T, DateOnly?> get, Action<T, DateOnly?> set, bool required = false) =>
+        new(name, required, nullable: !required, node =>
+                node.GetValueKind() == JsonValueKind.String
+                && DateOnly.TryParseExact(node.GetValue<string>(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+                    ? ParsedValue.Of(date)
+                    : ParsedValue.Fail("Tarih yyyy-AA-gg biçiminde olmalıdır."),
+            e => get(e) is { } value ? value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
+            (e, v) => set(e, (DateOnly?)v));
 
     private static ParsedValue ParseId(JsonNode node) =>
         node.GetValueKind() == JsonValueKind.String && Guid.TryParse(node.GetValue<string>(), out var id) && id != Guid.Empty
