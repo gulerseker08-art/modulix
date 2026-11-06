@@ -1,0 +1,182 @@
+@page "/depo/stok-kartlari"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Stok kartları · Modulix</PageTitle>
+
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.StockItemsRead">
+    <PageHeader Title="Stok kartları" Icon="package" Subtitle="@(page is null ? "Depoda tutulan malların kodunu, birimini ve varsayılan GTİP'ini yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <StockItemEditor Item="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <div class="list-toolbar">
+        <ViewSelector Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="stock-search">Stok kartı ara</label>
+            <input id="stock-search" class="form-control" type="search" placeholder="Kod, ad veya GTİP ara" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <ColumnPicker />
+        @if (Session.Can(WarehouseAccess.StockItemsWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni stok kartı</button>
+        }
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="stock-unit-filter">Birim</label>
+            <select id="stock-unit-filter" class="form-select form-select-sm filter-select" @bind="unitKey" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm birimler</option>
+                @foreach (var unit in Lookups.ValuesOf(WarehouseAccess.StockUnitList))
+                {
+                    <option value="@unit.Key">@unit.Label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="stock-gtip-filter">GTİP ön eki</label>
+            <input id="stock-gtip-filter" class="form-control form-control-sm" inputmode="numeric" maxlength="14" placeholder="GTİP ön eki (ör. 0902)" @bind="gtipPrefix" @bind:after="() => LoadAsync(1)" @bind:event="onchange" />
+        </div>
+    }
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu süzgece uyan stok kartı yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) stok kartı listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Stok kartı listesi</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Kod</th><th scope="col">Ad</th><th scope="col">Birim</th><th scope="col">GTİP</th><th scope="col">Durum</th>
+                    @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.StockItemEntityKey)) { <th scope="col">@field.Label</th> }
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in page.Items)
+                {
+                    <tr>
+                        <td data-label="Kod" class="primary">@WarehouseLabels.Text(item, "code")</td>
+                        <td data-label="Ad">@WarehouseLabels.Text(item, "name")</td>
+                        <td data-label="Birim">@Lookups.Label(WarehouseAccess.StockUnitList, WarehouseLabels.Text(item, "unitKey"))</td>
+                        <td data-label="GTİP">@(WarehouseLabels.Text(item, "gtip") is { Length: > 0 } gtip ? gtip : "—")</td>
+                        <td data-label="Durum"><span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(item, "isActive"))">@(WarehouseLabels.Flag(item, "isActive") ? "Etkin" : "Pasif")</span></td>
+                        @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.StockItemEntityKey))
+                        {
+                            <td data-label="@field.Label">@CustomFieldText.Format(field, item.Values["custom"] as JsonObject)</td>
+                        }
+                        <td class="actions">
+                            @if (Session.Can(WarehouseAccess.StockItemsWrite))
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(item)">Düzenle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.StockItemEntityKey;
+
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private bool filtersOpen;
+    private string? message;
+    private string? search;
+    private string view = AllViews;
+    private string? unitKey;
+    private string? gtipPrefix;
+
+    private const string AllViews = "all";
+    private const string ActiveView = "active";
+    private const string InactiveView = "inactive";
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Etkin, Pasif); birim ve GTİP ön eki "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions { get; } =
+    [
+        new(AllViews, "Tüm stok kartları"),
+        new(ActiveView, "Etkin kartlar"),
+        new(InactiveView, "Pasif kartlar"),
+    ];
+
+    private int ActiveFilters => (string.IsNullOrEmpty(unitKey) ? 0 : 1) + (string.IsNullOrWhiteSpace(gtipPrefix) ? 0 : 1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(WarehouseAccess.StockItemsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        url += view switch
+        {
+            ActiveView => "&isActive=true",
+            InactiveView => "&isActive=false",
+            _ => string.Empty,
+        };
+        if (!string.IsNullOrEmpty(unitKey))
+        {
+            url += $"&unitKey={Uri.EscapeDataString(unitKey)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(gtipPrefix))
+        {
+            url += $"&gtip={Uri.EscapeDataString(gtipPrefix.Trim())}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void Open(RecordResponse? item)
+    {
+        selected = item;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

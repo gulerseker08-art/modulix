@@ -81,5 +81,22 @@ public static class WarehouseForms
             new("scope", "Kapsam", "kapsam", 12),
             new("documentReference", "Belge referansı", "kapsam", 12),
         ]),
+
+        new(WarehouseModule.Entities.StockItem, "Stok kartı",
+        [new(General, "Genel bilgiler"), new("gumruk", "Gümrük ve ayrıntılar")],
+        [
+            new("temel", "Temel bilgiler", "package"),
+            new("gtip", "Gümrük tarife", "shield", Tab: "gumruk"),
+            new("aciklama", "Açıklama", "message-square", Tab: "gumruk"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "gumruk"),
+        ],
+        [
+            new("code", "Stok kodu", "temel", 4, Required: true, Fixed: true),
+            new("name", "Ad", "temel", 8, Required: true, Fixed: true),
+            new("unitKey", "Birim", "temel", 4, Required: true, Fixed: true),
+            new("isActive", "Etkin", "temel", 4, Fixed: true),
+            new("gtip", "GTİP (varsayılan)", "gtip", 6),
+            new("description", "Açıklama", "aciklama", 12),
+        ]),
     ];
 }

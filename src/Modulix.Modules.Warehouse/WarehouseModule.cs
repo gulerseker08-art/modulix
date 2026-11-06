@@ -27,6 +27,8 @@ public sealed class WarehouseModule : IModule
         public const string LocationsWrite = "warehouse.locations.write";
         public const string AttorneysRead = "warehouse.attorneys.read";
         public const string AttorneysWrite = "warehouse.attorneys.write";
+        public const string StockItemsRead = "warehouse.stockitems.read";
+        public const string StockItemsWrite = "warehouse.stockitems.write";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -37,6 +39,7 @@ public sealed class WarehouseModule : IModule
         public const string LocationLevel = "warehouse.location-level";
         public const string Location = "warehouse.location";
         public const string PowerOfAttorney = "warehouse.power-of-attorney";
+        public const string StockItem = "warehouse.stock-item";
     }
 
     /// <summary>Firma ilişki rolü kodları (platform kataloğu, ADR-0029 K9; K2): vekâletin tarafları bu rollere sahip firmalardır.</summary>
@@ -50,6 +53,7 @@ public sealed class WarehouseModule : IModule
     public static class Lists
     {
         public const string ZoneKind = "warehouse.zone-kind";
+        public const string StockUnit = "warehouse.stock-unit";
     }
 
     /// <summary>Alan türü listesinin kategorileri: kodun anladığı anlam. Tenant türleri adlandırır, kategoriyi seçer.</summary>
@@ -75,6 +79,8 @@ public sealed class WarehouseModule : IModule
         new(Permissions.LocationsWrite, "Lokasyon ekler ve düzenler", "Lokasyonlar"),
         new(Permissions.AttorneysRead, "Vekâletleri görüntüler", "Vekâletler"),
         new(Permissions.AttorneysWrite, "Vekâlet ekler, düzenler ve iptal eder", "Vekâletler"),
+        new(Permissions.StockItemsRead, "Stok kartlarını görüntüler", "Stok kartları"),
+        new(Permissions.StockItemsWrite, "Stok kartı ekler ve düzenler", "Stok kartları"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5): tesis değişiklikleri kim, ne zaman, neyi değiştirdi olarak izlenir.</summary>
@@ -122,6 +128,10 @@ public sealed class WarehouseModule : IModule
                 ["importerPartyId"] = SharedEntities.Party, ["brokerPartyId"] = SharedEntities.Party,
             },
         },
+        new(Entities.StockItem, "Stok kartı", Permissions.StockItemsRead, new Dictionary<string, string>
+        {
+            ["code"] = "Stok kodu", ["name"] = "Ad", ["unitKey"] = "Birim", ["gtip"] = "GTİP", ["description"] = "Açıklama", ["isActive"] = "Etkin",
+        }, "code"),
     ];
 
     /// <summary>Firmanın özel alan ekleyebildiği kayıt türleri (Y9a).</summary>
@@ -131,6 +141,7 @@ public sealed class WarehouseModule : IModule
         new(Entities.Zone, "Alan"),
         new(Entities.Location, "Lokasyon"),
         new(Entities.PowerOfAttorney, "Vekâlet"),
+        new(Entities.StockItem, "Stok kartı"),
     ];
 
     /// <summary>
@@ -152,6 +163,24 @@ public sealed class WarehouseModule : IModule
             ])
         {
             Default = "Free",
+        },
+
+        // Ölçü birimi (Y9b): hazır değerler örnektir, kategorisizdir (kod birimin adına bakmaz); tenant kendi birimlerini yönetir.
+        new(
+            Lists.StockUnit,
+            "Stok birimi",
+            Entities.StockItem,
+            "unitKey",
+            Required: true,
+            [],
+            [
+                new("Piece", "Adet"),
+                new("Kilogram", "Kilogram"),
+                new("Box", "Koli"),
+                new("Pallet", "Palet"),
+            ])
+        {
+            Default = "Piece",
         },
     ];
 
@@ -178,13 +207,14 @@ public sealed class WarehouseModule : IModule
         new(
             "warehouse.manager",
             "Depo sorumlusu",
-            "Tesisleri, alanları, lokasyonları ve vekâletleri görüntüler ve düzenler.",
+            "Tesisleri, alanları, lokasyonları, vekâletleri ve stok kartlarını görüntüler ve düzenler.",
             [
                 Permissions.FacilitiesRead, Permissions.FacilitiesWrite,
                 Permissions.ZonesRead, Permissions.ZonesWrite,
                 Permissions.LocationLevelsRead, Permissions.LocationLevelsWrite,
                 Permissions.LocationsRead, Permissions.LocationsWrite,
                 Permissions.AttorneysRead, Permissions.AttorneysWrite,
+                Permissions.StockItemsRead, Permissions.StockItemsWrite,
             ]),
     ];
 
@@ -196,5 +226,6 @@ public sealed class WarehouseModule : IModule
         services.AddScoped<IRecordStore, LocationLevelRecordStore>();
         services.AddScoped<IRecordStore, LocationRecordStore>();
         services.AddScoped<IRecordStore, PowerOfAttorneyRecordStore>();
+        services.AddScoped<IRecordStore, StockItemRecordStore>();
     }
 }

@@ -18,15 +18,21 @@ public static class WarehouseAccess
     public const string LocationsWrite = "warehouse.locations.write";
     public const string AttorneysRead = "warehouse.attorneys.read";
     public const string AttorneysWrite = "warehouse.attorneys.write";
+    public const string StockItemsRead = "warehouse.stockitems.read";
+    public const string StockItemsWrite = "warehouse.stockitems.write";
 
     public const string FacilityEntityKey = "warehouse.facility";
     public const string ZoneEntityKey = "warehouse.zone";
     public const string LocationLevelEntityKey = "warehouse.location-level";
     public const string LocationEntityKey = "warehouse.location";
     public const string PowerOfAttorneyEntityKey = "warehouse.power-of-attorney";
+    public const string StockItemEntityKey = "warehouse.stock-item";
 
     /// <summary>Alan türü listesi; kategorileri kodun anladığı anlamdır, adları tenant'ındır.</summary>
     public const string ZoneKindList = "warehouse.zone-kind";
+
+    /// <summary>Stok birimi listesi; birimin adı tenant'ındır, kategorisi yoktur.</summary>
+    public const string StockUnitList = "warehouse.stock-unit";
 
     // Lookup alanları (ADR-0016); seçim kutuları bu anahtarlarla çalışır.
     public const string ZoneFacilityLookup = "warehouse.zone.facility";
