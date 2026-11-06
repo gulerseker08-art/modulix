@@ -105,8 +105,22 @@ internal sealed class UserAdministration(
         }
 
         var total = await members.CountAsync(cancellationToken);
-        var rows = await members
-            .OrderBy(m => m.User.DisplayName).ThenBy(m => m.User.Email)
+        // Başlığa göre sıralama (ADR-0036): izin verilen anahtarlar UserSortKeys'tedir; eşit kayıtlar ad ve e-postaya göre sıralanır, sayfalar kararlı kalır.
+        var ordered = query.Sort switch
+        {
+            "-name" => members.OrderByDescending(m => m.User.DisplayName),
+            "email" => members.OrderBy(m => m.User.Email),
+            "-email" => members.OrderByDescending(m => m.User.Email),
+            "status" => members.OrderBy(m => m.Membership.Status),
+            "-status" => members.OrderByDescending(m => m.Membership.Status),
+            "twoFactor" => members.OrderBy(m => m.User.TwoFactorEnabled),
+            "-twoFactor" => members.OrderByDescending(m => m.User.TwoFactorEnabled),
+            "lastSignInAt" => members.OrderBy(m => m.Membership.LastSignInAt == null).ThenBy(m => m.Membership.LastSignInAt),
+            "-lastSignInAt" => members.OrderBy(m => m.Membership.LastSignInAt == null).ThenByDescending(m => m.Membership.LastSignInAt),
+            _ => members.OrderBy(m => m.User.DisplayName),
+        };
+        var rows = await ordered
+            .ThenBy(m => m.User.DisplayName).ThenBy(m => m.User.Email)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

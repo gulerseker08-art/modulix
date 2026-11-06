@@ -19,18 +19,21 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Kişi görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Items="ViewOptions" Value="@CurrentView" ValueChanged="ChooseViewAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Kişi ara" placeholder="Ad, soyad, e-posta veya telefon ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(CrmAccess.ContactsWrite) && !editing)
         {
             <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni kişi</button>
         }
     </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (page is null)
     {
@@ -44,31 +47,30 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ad soyad</th><th>Firma</th><th>Unvan</th><th>Telefon</th><th>E-posta</th>@foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Contact)) { <th>@field.Label</th> }<th></th></tr>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var contact in page.Items)
                 {
                     <tr>
-                        <td data-label="Ad soyad" class="primary"><a href="crm/kisiler/@contact.Id">@contact.FirstName @contact.LastName</a></td>
-                        <td data-label="Firma">
-                            @if (contact.CompanyId is { } companyId)
-                            {
-                                <a href="crm/firmalar/@companyId">@Lookups.CompanyName(companyId)</a>
-                            }
-                        </td>
-                        <td data-label="Unvan">@contact.Title</td>
-                        <td data-label="Telefon">@contact.Phone</td>
-                        <td data-label="E-posta">@contact.Email</td>
-                        @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Contact))
+                        @foreach (var column in grid.VisibleColumns)
                         {
-                            <td data-label="@field.Label">@CustomFieldText.Format(field, contact.Custom)</td>
+                            @Cell(column, contact)
                         }
-                        <td class="actions">
-                            @if (Session.Can(CrmAccess.ContactsWrite))
-                            {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(contact)">Düzenle</button>
-                            }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{contact.FirstName} {contact.LastName} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="crm/kisiler/@contact.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                                @if (Session.Can(CrmAccess.ContactsWrite))
+                                {
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(contact)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                }
+                            </RowMenu>
                         </td>
                     </tr>
                 }
@@ -80,7 +82,24 @@
 
 @code {
     private const string Url = "/api/crm/contacts";
+    private const string AllViews = "all";
+    private const string MineView = "mine";
+    private const string WithoutCompanyView = "no-company";
+    private const string RolePrefix = "role:";
 
+    // Firma sütunu sunucuda sıralanamaz (firma adı ilişki üzerindedir); sorumlu adı üyelik tablosundadır.
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("name", "Ad soyad", "type", "name", "-name", Locked: true),
+        new("company", "Firma", "building"),
+        new("title", "Unvan", "briefcase", "title", "-title"),
+        new("phone", "Telefon", "phone", "phone", "-phone"),
+        new("email", "E-posta", "mail", "email", "-email"),
+        new("owner", "Sorumlu", "user", DefaultVisible: false),
+    ];
+
+    private readonly GridViewState grid = new("crm.contacts", "name");
+    private PersonalGridViews views = default!;
     private CrmPage<ContactDto>? page;
     private ContactDto? selected;
     private bool editing;
@@ -89,44 +108,104 @@
     private string? role;
     private bool withoutCompany;
     private bool mine;
+    private string view = AllViews;
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "crm.contacts");
         await Session.EnsureLoadedAsync();
         if (Session.Can(CrmAccess.ContactsRead))
         {
             await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(CrmEntityKeys.Contact).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
 
-    private const string AllViews = "all";
-    private const string MineView = "mine";
-    private const string WithoutCompanyView = "no-company";
-    private const string RolePrefix = "role:";
+    private GridViewDto? Active => views.Find(view);
 
-    // Görünümler yalnızca süzgeçtir (Tümü, Benim kişilerim, Firmasız, ilişki rolü); kapsamı sunucu uygular.
+    // Görünümler yalnızca süzgeçtir (Benim kişilerim, Tümü, Firmasız, ilişki rolü, kişisel); kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm kişiler"),
-        new(MineView, "Benim kişilerim"),
-        new(WithoutCompanyView, "Firmasız"),
-        .. CrmRelationshipRoles.Labels.Select(r => new ViewOption(RolePrefix + r.Key, r.Value, "İlişki rolüne göre")),
+        new(MineView, "Benim kişilerim", Icon: "star"),
+        new(AllViews, "Tüm kişiler", Icon: "user"),
+        new(WithoutCompanyView, "Firmasız", Icon: "building"),
+        .. CrmRelationshipRoles.Labels.Select(r => new ViewOption(RolePrefix + r.Key, r.Value, Icon: "tag")),
+        .. views.Options,
     ];
-
-    private string CurrentView => mine ? MineView : withoutCompany ? WithoutCompanyView : role is { } r ? RolePrefix + r : AllViews;
 
     private async Task ChooseViewAsync(string key)
     {
-        mine = key == MineView;
-        withoutCompany = key == WithoutCompanyView;
-        role = key.StartsWith(RolePrefix, StringComparison.Ordinal) ? key[RolePrefix.Length..] : null;
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm: sütunlar, sıralama ve süzgeç birlikte gelir.
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            mine = filters.GetValueOrDefault("ownerId") == "me";
+            withoutCompany = filters.GetValueOrDefault("withoutCompany") == "true";
+            role = filters.GetValueOrDefault("role");
+        }
+        else
+        {
+            grid.Reset();
+            mine = key == MineView;
+            withoutCompany = key == WithoutCompanyView;
+            role = key.StartsWith(RolePrefix, StringComparison.Ordinal) ? key[RolePrefix.Length..] : null;
+        }
+
         await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private string? CurrentFilters => GridFilters.Build(
+        mine ? ("ownerId", "me") : null,
+        withoutCompany ? ("withoutCompany", "true") : null,
+        role is { } r ? ("role", r) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
         if (role is { } r)
         {
             url += $"&role={Uri.EscapeDataString(r)}";
@@ -146,6 +225,23 @@
         page = result.Value;
         message = result.Error;
     }
+
+    private RenderFragment Cell(GridColumnDef column, ContactDto contact) => @<td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, contact)</td>;
+
+    private RenderFragment CellContent(string key, ContactDto contact) => key switch
+    {
+        "name" => @<a href="crm/kisiler/@contact.Id">@contact.FirstName @contact.LastName</a>,
+        "company" => CompanyLink(contact),
+        "title" => @<text>@contact.Title</text>,
+        "phone" => @<text>@contact.Phone</text>,
+        "email" => @<text>@contact.Email</text>,
+        "owner" => @<OwnerCell Name="@Lookups.MemberName(contact.OwnerId)" />,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(CrmEntityKeys.Contact).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, contact.Custom)</text>,
+        _ => @<text></text>,
+    };
+
+    private RenderFragment CompanyLink(ContactDto contact) => @<text>@if (contact.CompanyId is { } companyId) { <a href="crm/firmalar/@companyId">@Lookups.CompanyName(companyId)</a> }</text>;
 
     private void Open(ContactDto? contact)
     {

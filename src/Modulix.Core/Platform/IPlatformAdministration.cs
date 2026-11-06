@@ -22,7 +22,12 @@ public sealed record PlatformTenant(
     DateTimeOffset? ProfileAppliedAt = null);
 
 /// <summary>Firma listesi sorgusu. Arama ad ve kısa adda yapılır; sayfa 1'den başlar.</summary>
-public sealed record PlatformTenantQuery(string? Search, TenantStatus? Status, int Page, int PageSize);
+public sealed record PlatformTenantQuery(string? Search, TenantStatus? Status, int Page, int PageSize, string? Sort = null)
+{
+    /// <summary>Sıralama anahtarları (başlık tıklaması, ADR-0036; başına <c>-</c> azalan). Boşsa ada göre. Üye sayısı ve modüller sayfa dışında hesaplandığı için sıralanamaz.</summary>
+    public static readonly IReadOnlyCollection<string> SortKeys =
+        ["name", "-name", "slug", "-slug", "status", "-status", "createdAt", "-createdAt"];
+}
 
 public sealed record PlatformTenantPage(IReadOnlyList<PlatformTenant> Items, int Page, int PageSize, int TotalCount);
 

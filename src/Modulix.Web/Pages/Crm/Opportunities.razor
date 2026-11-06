@@ -21,14 +21,13 @@
         <OpportunityEditor Opportunity="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="SavedAsync" />
     }
 
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Fırsat görünümleri" NewView="StartNamingAsync" NewViewText="Görünüm" />
+
     <div class="filters">
-        <div class="segmented" role="group" aria-label="Görünüm">
+        <div class="segmented" role="group" aria-label="Gösterim">
             <button type="button" class="chip @(board ? "active" : null)" @onclick="() => SwitchAsync(true)">Satış hunisi</button>
             <button type="button" class="chip @(!board ? "active" : null)" @onclick="() => SwitchAsync(false)">Liste</button>
         </div>
-        <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@(mine ? "true" : "false")" @onclick="ToggleMineAsync">Yalnızca benimkiler</button>
-        <button type="button" class="chip @(overdue ? "active" : null)" aria-pressed="@(overdue ? "true" : "false")" @onclick="ToggleOverdueAsync">Kapanışı geçenler</button>
-        <button type="button" class="chip @(noAction ? "active" : null)" aria-pressed="@(noAction ? "true" : "false")" @onclick="ToggleNoActionAsync">Aksiyonsuz</button>
         <label class="visually-hidden" for="status-filter">Durum</label>
         <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
             <option value="">Tüm durumlar</option>
@@ -42,17 +41,22 @@
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Fırsat ara" placeholder="Başlık ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
         @if (!board)
         {
-            <ColumnPicker />
+            <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         }
         @if (Session.Can(CrmAccess.OpportunitiesWrite) && !editing)
         {
             <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni fırsat</button>
         }
     </div>
+
+    @if (!board)
+    {
+        <PersonalViewBar Active="Active" Dirty="IsDirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                         SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+    }
 
     @if (board)
     {
@@ -139,42 +143,29 @@
         <table class="table record-table">
             <thead>
                 <tr>
-                    <th>Başlık</th><th>Firma</th><th>Aşama</th>
-                    @if (ShowAmounts)
+                    @foreach (var column in grid.VisibleColumns)
                     {
-                        <th class="text-end">Tutar</th><th>Olasılık</th>
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" Class="@(column.Key == "amount" ? "text-end" : null)" />
                     }
-                    <th>Sorumlu</th><th>Kapanış</th>@foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Opportunity)) { <th>@field.Label</th> }<th></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var opportunity in page.Items)
                 {
                     <tr>
-                        <td data-label="Başlık" class="primary"><a href="crm/firsatlar/@opportunity.Id">@opportunity.Title</a> <small class="text-muted">@opportunity.OpportunityNumber</small>
-                            @if (opportunity.SourceLeadId is { } sourceLead && Session.Can(CrmAccess.LeadsRead))
-                            {
-                                <a class="small d-block" href="crm/leadler/@sourceLead">Kaynak müşteri adayı</a>
-                            }
-                        </td>
-                        <td data-label="Firma"><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></td>
-                        <td data-label="Aşama"><span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span> @if (opportunity.Status != OpportunityStatus.Open) { <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span> }</td>
-                        @if (ShowAmounts)
+                        @foreach (var column in grid.VisibleColumns)
                         {
-                            <td data-label="Tutar" class="text-end">@FormatAmount(opportunity)</td>
-                            <td data-label="Olasılık">@(opportunity.Probability is { } p ? $"%{p}" : null)</td>
+                            @Cell(column, opportunity)
                         }
-                        <td data-label="Sorumlu"><OwnerCell Name="@Lookups.MemberName(opportunity.OwnerId)" /></td>
-                        <td data-label="Kapanış">@(opportunity.ExpectedCloseDate is { } date ? CrmLabels.Date(date) : null)</td>
-                        @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Opportunity))
-                        {
-                            <td data-label="@field.Label">@CustomFieldText.Format(field, opportunity.Custom)</td>
-                        }
-                        <td class="actions">
-                            @if (Session.Can(CrmAccess.OpportunitiesWrite))
-                            {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(opportunity)">Düzenle</button>
-                            }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{opportunity.Title} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="crm/firsatlar/@opportunity.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                                @if (Session.Can(CrmAccess.OpportunitiesWrite))
+                                {
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(opportunity)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                }
+                            </RowMenu>
                         </td>
                     </tr>
                 }
@@ -186,10 +177,34 @@
 
 @code {
     private const string Url = "/api/crm/opportunities";
+    private const string AllView = "all";
+    private const string MineView = "mine";
+    private const string OverdueView = "overdue";
+    private const string NoActionView = "noAction";
 
     // Panoda her aşamadan en fazla bu kadar kart yüklenir; aşama başlığındaki sayı tüm kayıtları sayar.
     private const int ColumnSize = 50;
 
+    // Başlıklar sunucuda sıralanır (varsayılan: en yeni önce, "default" sunucuya gönderilmeyen belirteçtir). Firma/sorumlu adı ilişki ve üyelik
+    // tablosunda olduğundan, tutar ve olasılık hassas alan olduğundan (sıralama değeri sezdirir) bu sütunlar sıralanamaz.
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("title", "Başlık", "type", "title", "-title", Locked: true),
+        new("company", "Firma", "building"),
+        new("stage", "Aşama", "tag", "stage", "-stage"),
+        new("amount", "Tutar", "coins"),
+        new("probability", "Olasılık", "percent"),
+        new("owner", "Sorumlu", "user"),
+        new("closeDate", "Kapanış", "calendar", "closeDate", "-closeDate"),
+        new("number", "No", "hash", "number", "-number", DefaultVisible: false),
+        new("priority", "Öncelik", "alert-circle", "priority", "-priority", DefaultVisible: false),
+        new("type", "Tür", "tag", "type", "-type", DefaultVisible: false),
+        new("source", "Kaynak", "globe", "source", "-source", DefaultVisible: false),
+        new("nextActionDate", "Sonraki aksiyon", "clock", "nextActionDate", "-nextActionDate", DefaultVisible: false),
+    ];
+
+    private readonly GridViewState grid = new("crm.opportunities", "default");
+    private PersonalGridViews views = default!;
     private CrmPage<OpportunityDto>? page;
     private IReadOnlyList<BoardColumn>? columns;
     private OpportunityDto? selected;
@@ -197,25 +212,52 @@
     private string? dropTarget;
     private bool editing;
     private bool board = true;
-    private bool mine;
-    private bool overdue;
-    private bool noAction;
+    private string view = AllView;
+
+    /// <summary>Etkin sistem görünümü (kişisel görünümde kayıtlı olan): tümü, benim, kapanışı geçenler, aksiyonsuz.</summary>
+    private string current = AllView;
     private string status = string.Empty;
     private string? message;
     private string? search;
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "crm.opportunities");
         await Session.EnsureLoadedAsync();
         if (Session.Can(CrmAccess.OpportunitiesRead))
         {
             await Lookups.LoadAsync(contacts: true);
+            grid.Define([
+                .. BaseColumns.Where(c => ShowAmounts || c.Key is not ("amount" or "probability")),
+                .. Lookups.FieldsOf(CrmEntityKeys.Opportunity).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList)),
+            ]);
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
 
     // Tutar ve olasılık hassas alandır (Y8b); izni olmayan için sunucu göndermez, sütunlar ve toplamlar gösterilmez.
     private bool ShowAmounts => Session.Can(CrmAccess.OpportunityAmountsRead);
+
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Benim, Tümü, Kapanışı geçenler, Aksiyonsuz, kişisel); kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(MineView, "Benim fırsatlarım", Icon: "star"),
+        new(AllView, "Tüm fırsatlar", Icon: "target"),
+        new(OverdueView, "Kapanışı geçenler", Icon: "clock"),
+        new(NoActionView, "Aksiyonsuz", Icon: "alert-circle"),
+        .. views.Options,
+    ];
+
+    // Kayıtlı süzgeç: sistem görünümü + durum. Sayfa içi anahtarlardır, API'ye gitmez.
+    private string? CurrentFilters => GridFilters.Build(
+        current != AllView ? ("view", current) : null,
+        status.Length > 0 ? ("status", status) : null);
+
+    // Kaydedilmemiş değişiklik: sütun/sıralama ya da (kişisel görünümde) süzgeç kayıtlı hâlden farklı.
+    private bool IsDirty => grid.Differs(Active) || (Active is { } saved && CurrentFilters != (string.IsNullOrEmpty(saved.Filters) ? null : saved.Filters));
 
     private static string FormatAmount(OpportunityDto opportunity) =>
         opportunity.Amount is { } amount ? CrmLabels.Amount(amount, opportunity.Currency) : string.Empty;
@@ -229,9 +271,9 @@
     private string Filters()
     {
         var filters = $"&search={Uri.EscapeDataString(search ?? string.Empty)}";
-        if (mine) { filters += "&ownerId=me"; }
-        if (overdue) { filters += $"&closeOverdueBefore={DateOnly.FromDateTime(DateTime.UtcNow):yyyy-MM-dd}"; }
-        if (noAction) { filters += "&noNextAction=true"; }
+        if (current == MineView) { filters += "&ownerId=me"; }
+        if (current == OverdueView) { filters += $"&closeOverdueBefore={DateOnly.FromDateTime(DateTime.UtcNow):yyyy-MM-dd}"; }
+        if (current == NoActionView) { filters += "&noNextAction=true"; }
         if (status.Length > 0) { filters += $"&status={status}"; }
         return filters;
     }
@@ -242,22 +284,69 @@
         await LoadAsync(1);
     }
 
-    private async Task ToggleMineAsync()
+    private async Task ChooseViewAsync(string key)
     {
-        mine = !mine;
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm sütunlu listeye aittir: liste gösterimine geçer; sütunlar, sıralama ve süzgeç birlikte gelir.
+            board = false;
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            current = filters.GetValueOrDefault("view") is { } baseView && baseView is MineView or OverdueView or NoActionView ? baseView : AllView;
+            status = filters.GetValueOrDefault("status") ?? string.Empty;
+        }
+        else
+        {
+            grid.Reset();
+            current = key;
+        }
+
         await LoadAsync(1);
     }
 
-    private async Task ToggleOverdueAsync()
+    private async Task SortAsync(string key)
     {
-        overdue = !overdue;
+        grid.Sort = key;
         await LoadAsync(1);
     }
 
-    private async Task ToggleNoActionAsync()
+    // "+ Görünüm" sütunlu listeyi kaydeder; pano açıkken önce liste gösterimine geçilir.
+    private async Task StartNamingAsync()
     {
-        noAction = !noAction;
-        await LoadAsync(1);
+        if (board)
+        {
+            await SwitchAsync(false);
+        }
+
+        views.StartNaming(true);
+    }
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } saved)
+        {
+            await views.UpdateAsync(saved, grid.ToRequest(saved.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } saved && await views.DeleteAsync(saved))
+        {
+            await ChooseViewAsync(AllView);
+        }
     }
 
     // Aşama değiştirme ve kapatma ayrı izinlerdir (yazma izni de kabul edilir); kural ve yetki sunucuda uygulanır.
@@ -280,10 +369,51 @@
             return;
         }
 
-        var result = await Api.GetAsync<CrmPage<OpportunityDto>>($"{Url}?page={pageNumber}&pageSize={ListPaging.Size}{Filters()}");
+        var sort = grid.Sort != grid.DefaultSort ? $"&sort={Uri.EscapeDataString(grid.Sort)}" : string.Empty;
+        var result = await Api.GetAsync<CrmPage<OpportunityDto>>($"{Url}?page={pageNumber}&pageSize={ListPaging.Size}{Filters()}{sort}");
         page = result.Value;
         message = result.Error;
     }
+
+    private RenderFragment Cell(GridColumnDef column, OpportunityDto opportunity) =>
+        @<td data-label="@column.Label" class="@(column.Key == "title" ? "primary" : column.Key == "amount" ? "text-end" : null)">@CellContent(column.Key, opportunity)</td>;
+
+    private RenderFragment CellContent(string key, OpportunityDto opportunity) => key switch
+    {
+        "title" => TitlePart(opportunity),
+        "company" => @<a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a>,
+        "stage" => StagePart(opportunity),
+        "amount" => @<text>@FormatAmount(opportunity)</text>,
+        "probability" => @<text>@(opportunity.Probability is { } p ? $"%{p}" : null)</text>,
+        "owner" => @<OwnerCell Name="@Lookups.MemberName(opportunity.OwnerId)" />,
+        "closeDate" => @<text>@(opportunity.ExpectedCloseDate is { } date ? CrmLabels.Date(date) : null)</text>,
+        "number" => @<text>@opportunity.OpportunityNumber</text>,
+        "priority" => @<text>@LeadPriority.Label(opportunity.Priority)</text>,
+        "type" => @<text>@Lookups.Label(CrmLists.OpportunityType, opportunity.Type)</text>,
+        "source" => @<text>@Lookups.Label(CrmLeadLists.Source, opportunity.Source)</text>,
+        "nextActionDate" => @<text>@(opportunity.NextActionDate is { } next ? CrmLabels.Date(next) : null)</text>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(CrmEntityKeys.Opportunity).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, opportunity.Custom)</text>,
+        _ => @<text></text>,
+    };
+
+    private RenderFragment TitlePart(OpportunityDto opportunity) =>
+        @<text>
+            <a href="crm/firsatlar/@opportunity.Id">@opportunity.Title</a> <small class="text-muted">@opportunity.OpportunityNumber</small>
+            @if (opportunity.SourceLeadId is { } sourceLead && Session.Can(CrmAccess.LeadsRead))
+            {
+                <a class="small d-block" href="crm/leadler/@sourceLead">Kaynak müşteri adayı</a>
+            }
+        </text>;
+
+    private RenderFragment StagePart(OpportunityDto opportunity) =>
+        @<text>
+            <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span>
+            @if (opportunity.Status != OpportunityStatus.Open)
+            {
+                <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span>
+            }
+        </text>;
 
     private async Task DropAsync(string stage)
     {

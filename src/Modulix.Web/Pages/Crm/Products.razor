@@ -274,19 +274,37 @@
         </div>
     }
 
+    @* Görünümler sunucuda süzgeç olarak uygulanır (tür); durum süzgeci "Filtrele" satırındadır ve görünümle birlikte kaydedilir. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Ürün görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Label="Tür" Items="KindOptions" Value="@(kind ?? AllOption)" ValueChanged="k => FilterAsync(status, k == AllOption ? null : k)" />
-        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status ?? AllOption)" ValueChanged="s => FilterAsync(s == AllOption ? null : s, kind)" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Ürün ara" placeholder="Kod, ad, barkod veya etiket ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
-        <ColumnPicker />
+        <FilterToggle @bind-Open="filtersOpen" Count="status is null ? 0 : 1" />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(CrmAccess.ProductsWrite) && form is null)
         {
             <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> Yeni ürün/hizmet</button>
         }
     </div>
+
+    @if (filtersOpen || status is not null)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="status-filter">Durum</label>
+            <select id="status-filter" class="form-select form-select-sm filter-select" @bind="statusValue" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm durumlar</option>
+                @foreach (var s in CatalogLabels.Statuses)
+                {
+                    <option value="@s.Key">@s.Label</option>
+                }
+            </select>
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active) || FiltersDiffer" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (page is null)
     {
@@ -299,21 +317,29 @@
     else
     {
         <table class="table record-table">
-            <thead><tr><th>Kod</th><th>Ad</th><th>Tür</th><th>Durum</th><th>Kategori</th><th>Birim</th><th></th></tr></thead>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
             <tbody>
                 @foreach (var product in page.Items)
                 {
                     <tr>
-                        <td data-label="Kod" class="primary">@product.Code</td>
-                        <td data-label="Ad">@product.Name</td>
-                        <td data-label="Tür">@CatalogLabels.Label(CatalogLabels.Kinds, product.Kind)</td>
-                        <td data-label="Durum"><span class="badge status-@CatalogLabels.Badge(product.Status)">@CatalogLabels.Label(CatalogLabels.Statuses, product.Status)</span></td>
-                        <td data-label="Kategori">@product.CategoryName</td>
-                        <td data-label="Birim">@product.BaseUnitCode</td>
-                        <td class="actions">
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, product)
+                        }
+                        <td class="row-menu-cell">
                             @if (Session.Can(CrmAccess.ProductsWrite))
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(product)">Düzenle</button>
+                                <RowMenu Label="@($"{product.Name} eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(product)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                </RowMenu>
                             }
                         </td>
                     </tr>
@@ -327,6 +353,24 @@
 @code {
     private const string Url = "/api/crm/products";
 
+    // Sütunların sırası varsayılan sıradır; Birim ve Barkod sunucuda sıralanamaz (ilişkili tablo / sıralama anahtarı yok).
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("code", "Kod", "hash", "code", "-code", Locked: true),
+        new("name", "Ad", "type", "name", "-name"),
+        new("kind", "Tür", "layers", "kind", "-kind"),
+        new("status", "Durum", "tag", "status", "-status"),
+        new("category", "Kategori", "list", "category", "-category"),
+        new("unit", "Birim", "percent"),
+        new("brand", "Marka", "briefcase", "brand", "-brand", DefaultVisible: false),
+        new("tags", "Etiketler", "tag", "tags", "-tags", DefaultVisible: false),
+        new("barcode", "Barkod", "hash", DefaultVisible: false),
+    ];
+
+    private readonly GridViewState grid = new("crm.products", "code");
+    private PersonalGridViews views = default!;
+    private string view = AllView;
+    private bool filtersOpen;
     private CrmPage<ProductDto>? page;
     private List<ProductCategoryDto> categories = [];
     private List<MeasureUnitDto> units = [];
@@ -370,11 +414,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "crm.products");
+        grid.Define(Columns);
         await Session.EnsureLoadedAsync();
         if (Session.Can(CrmAccess.ProductsRead))
         {
             categories = await LoadAllAsync<ProductCategoryDto>("/api/crm/product-categories");
             units = await LoadAllAsync<MeasureUnitDto>("/api/crm/units");
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
@@ -401,22 +448,117 @@
         return items;
     }
 
-    private const string AllOption = "all";
+    private const string AllView = "all";
+    private const string KindPrefix = "kind:";
 
-    private IReadOnlyList<ViewOption> KindOptions => [new(AllOption, "Tüm türler"), .. CatalogLabels.Kinds.Select(k => new ViewOption(k.Key, k.Label))];
+    // Görünümler yalnızca süzgeçtir (tüm kayıtlar, tür, kişisel); kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllView, "Tüm ürün ve hizmetler", Icon: "package"),
+        .. CatalogLabels.Kinds.Select(k => new ViewOption(KindPrefix + k.Key, k.Label, Icon: "layers")),
+        .. views.Options,
+    ];
 
-    private IReadOnlyList<ViewOption> StatusOptions => [new(AllOption, "Tüm durumlar"), .. CatalogLabels.Statuses.Select(s => new ViewOption(s.Key, s.Label))];
+    private GridViewDto? Active => views.Find(view);
 
-    private async Task FilterAsync(string? statusValue, string? kindValue)
+    // Durum süzgeci seçimi; boş = tümü.
+    private string statusValue
     {
-        status = statusValue;
-        kind = kindValue;
+        get => status ?? string.Empty;
+        set => status = string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    private string? CurrentFilters => GridFilters.Build(kind is { } k ? ("kind", k) : null, status is { } s ? ("status", s) : null);
+
+    // Açık görünümün kendi süzgeci (kişisel görünümde kayıtlı, tür sekmesinde türün kendisi); farklıysa kaydedilmemiş değişiklik vardır.
+    private string? BaselineFilters => Active is { } saved
+        ? saved.Filters
+        : view.StartsWith(KindPrefix, StringComparison.Ordinal) ? GridFilters.Build(("kind", view[KindPrefix.Length..])) : null;
+
+    private bool FiltersDiffer => (CurrentFilters ?? string.Empty) != (BaselineFilters ?? string.Empty);
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            kind = filters.GetValueOrDefault("kind");
+            status = filters.GetValueOrDefault("status");
+        }
+        else
+        {
+            grid.Reset();
+            kind = key.StartsWith(KindPrefix, StringComparison.Ordinal) ? key[KindPrefix.Length..] : null;
+            status = null;
+        }
+
         await LoadAsync(1);
     }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    // Sütun seçimi/sırası değişince veri yeniden çekilmez; geri çağrı yalnızca sayfanın yeniden çizilmesini sağlar.
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllView);
+        }
+    }
+
+    private RenderFragment Cell(GridColumnDef column, ProductDto product) => @<td data-label="@column.Label" class="@(column.Key == "code" ? "primary" : null)">@CellContent(column.Key, product)</td>;
+
+    private RenderFragment CellContent(string key, ProductDto product) => key switch
+    {
+        "code" => @<text>@product.Code</text>,
+        "name" => @<text>@product.Name</text>,
+        "kind" => @<text>@CatalogLabels.Label(CatalogLabels.Kinds, product.Kind)</text>,
+        "status" => @<span class="badge status-@CatalogLabels.Badge(product.Status)">@CatalogLabels.Label(CatalogLabels.Statuses, product.Status)</span>,
+        "category" => @<text>@product.CategoryName</text>,
+        "unit" => @<text>@product.BaseUnitCode</text>,
+        "brand" => @<text>@product.Brand</text>,
+        "tags" => @<text>@product.Tags</text>,
+        "barcode" => @<text>@product.Barcode</text>,
+        _ => @<text></text>,
+    };
 
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
         if (status is not null)
         {
             url += $"&status={Uri.EscapeDataString(status)}";

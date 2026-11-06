@@ -41,6 +41,16 @@ public sealed record UserQuery(string? Search, MembershipStatus? Status, Guid? R
 
     /// <summary>Yalnızca bu departmandaki kullanıcılar (ADR-0026).</summary>
     public Guid? BusinessUnitId { get; init; }
+
+    /// <summary>Sıralama anahtarı (<see cref="UserSortKeys.All"/>, başına <c>-</c> azalan); boşsa ada göre. Geçersiz anahtarı uç nokta reddeder.</summary>
+    public string? Sort { get; init; }
+}
+
+/// <summary>Kullanıcı listesinin sıralama anahtarları (başlık tıklaması, ADR-0036).</summary>
+public static class UserSortKeys
+{
+    public static readonly IReadOnlyCollection<string> All =
+        ["name", "-name", "email", "-email", "status", "-status", "twoFactor", "-twoFactor", "lastSignInAt", "-lastSignInAt"];
 }
 
 public sealed record UserPage(IReadOnlyList<TenantUser> Items, int Page, int PageSize, int TotalCount);

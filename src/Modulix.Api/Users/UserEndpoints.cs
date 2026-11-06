@@ -45,13 +45,21 @@ public static class UserEndpoints
     }
 
     private static async Task<IResult> ListAsync(
-        string? search, UserStatus? status, Guid? roleId, bool? twoFactor, Guid? businessUnitId, int? page, int? pageSize, IUserAdministration admin, CancellationToken ct)
+        string? search, UserStatus? status, Guid? roleId, bool? twoFactor, Guid? businessUnitId, string? sort, int? page, int? pageSize, IUserAdministration admin, CancellationToken ct)
     {
+        // Başlığa göre sıralama (ADR-0036): yalnızca bilinen anahtarlar kabul edilir.
+        if (!string.IsNullOrEmpty(sort) && !UserSortKeys.All.Contains(sort))
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]> { ["sort"] = ["Geçersiz sıralama."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+
         var result = await admin.ListAsync(
             new UserQuery(search, (MembershipStatus?)status, roleId, page ?? 1, pageSize ?? 25)
             {
                 TwoFactorEnabled = twoFactor,
                 BusinessUnitId = businessUnitId,
+                Sort = sort,
             }, ct);
         return Results.Ok(new UserPageResponse(result.Items.Select(ToDto).ToList(), result.Page, result.PageSize, result.TotalCount));
     }

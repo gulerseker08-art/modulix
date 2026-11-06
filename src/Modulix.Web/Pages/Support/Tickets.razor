@@ -29,15 +29,15 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
+    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="Talep görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Items="ViewOptions" Value="@(view ?? AllViews)" ValueChanged="ChooseViewAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <label class="visually-hidden" for="ticket-search">Talep ara</label>
             <input id="ticket-search" class="form-control" type="search" placeholder="Konu, talep numarası veya başvuran ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(SupportAccess.TicketsCreate))
         {
             <a class="btn btn-primary" href="destek/talepler/yeni"><AppIcon Name="plus" Size="16" /> Yeni talep</a>
@@ -71,15 +71,11 @@
                     <option value="@t.Key">@t.Label</option>
                 }
             </select>
-            <label class="visually-hidden" for="sort-select">Sıralama</label>
-            <select id="sort-select" class="form-select form-select-sm filter-select" @bind="sort" @bind:after="() => LoadAsync(1)">
-                @foreach (var (key, label) in SupportLabels.Sorts)
-                {
-                    <option value="@key">Sıralama: @label</option>
-                }
-            </select>
         </div>
     }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (page is null && message is null)
     {
@@ -143,8 +139,11 @@
                     {
                         <th scope="col"><span class="visually-hidden">Seç</span></th>
                     }
-                    <th scope="col"><SortHeader Label="Talep" Asc="number" Desc="-number" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Müşteri</th><th scope="col">Tür</th><th scope="col"><SortHeader Label="Öncelik" Asc="priority" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th><th scope="col">Durum</th>
-                    <th scope="col">Sorumlu</th><th scope="col">Yaş</th><th scope="col">SLA hedefleri</th><th scope="col"><SortHeader Label="Son hareket" Desc="-lastActivity" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -157,18 +156,15 @@
                                 <input type="checkbox" class="form-check-input" aria-label="@(t.Number + " numaralı talebi seç")" checked="@selected.Contains(t.Id)" @onchange="e => Toggle(t.Id, (bool)e.Value!)" />
                             </td>
                         }
-                        <td data-label="Talep" class="primary">
-                            <a href="destek/talepler/@t.Id">@t.Subject</a>
-                            <small class="text-muted">@t.Number</small>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, t)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{t.Number} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="destek/talepler/@t.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            </RowMenu>
                         </td>
-                        <td data-label="Müşteri">@(t.CustomerName ?? t.ReporterName ?? "—")@(t.PartyId is null ? " (tanımsız)" : null)</td>
-                        <td data-label="Tür">@Lookups.Label(SupportLabels.TicketTypeList, t.TypeKey)</td>
-                        <td data-label="Öncelik"><span class="badge stage-@SupportLabels.PriorityBadge(t.Priority)">@SupportLabels.Label(SupportLabels.Priorities, t.Priority)</span></td>
-                        <td data-label="Durum"><span class="badge stage-@SupportLabels.StatusBadge(t.Status)">@SupportLabels.Label(SupportLabels.Statuses, t.Status)</span></td>
-                        <td data-label="Sorumlu">@(t.OwnerId is null ? "Atanmamış" : Lookups.MemberName(t.OwnerId))</td>
-                        <td data-label="Yaş">@Age(t.CreatedAt)</td>
-                        <td data-label="SLA hedefleri">@SlaText(t)</td>
-                        <td data-label="Son hareket">@CrmLabels.Time(t.LastActivityAt)</td>
                     </tr>
                 }
             </tbody>
@@ -184,12 +180,29 @@
     private int ActiveFilters => (string.IsNullOrEmpty(status) ? 0 : 1) + (string.IsNullOrEmpty(priority) ? 0 : 1) + (string.IsNullOrEmpty(typeKey) ? 0 : 1);
 
     private const string DefaultSort = "-createdAt";
+    private const string AllViews = "all";
 
     /// <summary>Hızlı görünümler; her biri sunucudaki süzgeçlerden birine karşılık gelir.</summary>
-    private static readonly (string Key, string Label)[] Presets =
+    private static readonly (string Key, string Label, string Icon)[] Presets =
     [
-        ("mine", "Benim taleplerim"), ("unassigned", "Atanmamış"), ("awaiting", "Yanıt bekleyen"), ("waiting", "Müşteri bekleyen"),
-        ("reopened", "Yeniden açılan"), ("resolved", "Çözüldü (teyit bekliyor)"), ("slarisk", "SLA riski"), ("slabreach", "SLA ihlali"), ("open", "Tüm açık talepler"),
+        ("mine", "Benim taleplerim", "star"), ("unassigned", "Atanmamış", "user"), ("awaiting", "Yanıt bekleyen", "clock"), ("waiting", "Müşteri bekleyen", "hourglass"),
+        ("reopened", "Yeniden açılan", "repeat"), ("resolved", "Çözüldü (teyit bekliyor)", "check-circle"), ("slarisk", "SLA riski", "alert-circle"), ("slabreach", "SLA ihlali", "alert-circle"), ("open", "Tüm açık talepler", "inbox"),
+    ];
+
+    // Sıralama sunucudaki sort anahtarlarıdır (TicketSort). Bazı anahtarlar tek yönlüdür: öncelik (yüksek önce), son hareket (yeni önce), SLA (yakın önce),
+    // yaş (eski önce); ikinci tıklama varsayılan sıraya (en yeni önce) döner.
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("ticket", "Talep", "message-square", "number", "-number", Locked: true),
+        new("customer", "Müşteri", "building"),
+        new("type", "Tür", "tag"),
+        new("priority", "Öncelik", "alert-circle", "priority"),
+        new("status", "Durum", "activity"),
+        new("owner", "Sorumlu", "user"),
+        new("age", "Yaş", "clock", "createdAt"),
+        new("sla", "SLA hedefleri", "hourglass", "resolutionDue"),
+        new("activity", "Son hareket", "history", "-lastActivity"),
+        new("reporter", "Başvuran", "user", DefaultVisible: false),
     ];
 
     /// <summary>Pano / başka ekranlardan gelen bağlantılar: <c>?gorunum=unassigned</c>, <c>?musteri={id}</c>.</summary>
@@ -204,17 +217,21 @@
     private TicketSummaryDto? summary;
     private string? message;
     private string? view;
+    private string viewKey = AllViews;
     private string? status;
     private string? priority;
     private string? typeKey;
-    private string sort = DefaultSort;
+    private readonly GridViewState grid = new("support.tickets", DefaultSort);
+    private PersonalGridViews views = default!;
+    private string search = string.Empty;
 
     private Task SortAsync(string key)
     {
-        sort = key;
+        grid.Sort = key;
         return LoadAsync(1);
     }
-    private string search = string.Empty;
+
+    private GridViewDto? Active => views.Find(viewKey);
     private readonly HashSet<Guid> selected = [];
     private string bulkAction = string.Empty;
     private Guid? bulkOwner;
@@ -250,11 +267,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "support.tickets");
+        grid.Define(Columns);
         await Session.EnsureLoadedAsync();
         if (Session.Can(SupportAccess.TicketsRead))
         {
             await Lookups.LoadAsync();
-            if (InitialView is not null && Presets.Any(p => p.Key == InitialView)) { view = InitialView; }
+            await views.LoadAsync();
+            if (InitialView is not null && Presets.Any(p => p.Key == InitialView)) { view = InitialView; viewKey = InitialView; }
             await LoadAsync(1);
         }
     }
@@ -273,19 +293,71 @@
         _ => null,
     };
 
-    private const string AllViews = "all";
-
-    // Her hızlı görünümün yanında özet sayısı gösterilir (varsa).
+    // Her hızlı görünümün yanında özet sayısı gösterilir (varsa); ardından kişisel görünümler.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm talepler"),
-        .. Presets.Select(p => new ViewOption(p.Key, p.Label + (Count(p.Key) is { } n ? $" ({n})" : null))),
+        new(AllViews, "Tüm talepler", Icon: "inbox"),
+        .. Presets.Select(p => new ViewOption(p.Key, p.Label + (Count(p.Key) is { } n ? $" ({n})" : null), Icon: p.Icon)),
+        .. views.Options,
     ];
 
     private async Task ChooseViewAsync(string key)
     {
-        view = key == AllViews ? null : key;
+        viewKey = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm: sütunlar, sıralama ve süzgeç (görünüm + durum + öncelik + tür) birlikte gelir.
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            var preset = filters.GetValueOrDefault("view");
+            view = preset is not null && Presets.Any(p => p.Key == preset) ? preset : null;
+            status = filters.GetValueOrDefault("status");
+            priority = filters.GetValueOrDefault("priority");
+            typeKey = filters.GetValueOrDefault("type");
+        }
+        else
+        {
+            grid.Reset();
+            view = key == AllViews ? null : key;
+        }
+
         await LoadAsync(1);
+    }
+
+    private string? CurrentFilters => GridFilters.Build(
+        view is { Length: > 0 } v ? ("view", v) : null,
+        status is { Length: > 0 } s ? ("status", s) : null,
+        priority is { Length: > 0 } p ? ("priority", p) : null,
+        typeKey is { Length: > 0 } t ? ("type", t) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            viewKey = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(viewKey);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            status = priority = typeKey = null;
+            await ChooseViewAsync(AllViews);
+        }
     }
 
     private string Query(int pageNumber)
@@ -311,7 +383,7 @@
         if (!string.IsNullOrEmpty(typeKey)) { parts.Add($"typeKey={Uri.EscapeDataString(typeKey)}"); }
         if (PartyId is { } party) { parts.Add($"partyId={party}"); }
         if (!string.IsNullOrWhiteSpace(RawFilter)) { parts.Add(RawFilter.Trim().TrimStart('&')); }
-        if (sort != DefaultSort) { parts.Add($"sort={Uri.EscapeDataString(sort)}"); }
+        if (grid.Sort != DefaultSort) { parts.Add($"sort={Uri.EscapeDataString(grid.Sort)}"); }
         return string.Join('&', parts);
     }
 
@@ -322,6 +394,26 @@
         message = result.IsSuccess ? null : result.Error;
         summary = (await Api.GetAsync<TicketSummaryDto>("/api/support/summary")).Value;
     }
+
+    private RenderFragment Cell(GridColumnDef column, TicketDto t) => @<td data-label="@column.Label" class="@(column.Key == "ticket" ? "primary" : null)">@CellContent(column.Key, t)</td>;
+
+    private RenderFragment CellContent(string key, TicketDto t) => key switch
+    {
+        "ticket" => @<text>
+            <a href="destek/talepler/@t.Id">@t.Subject</a>
+            <small class="text-muted">@t.Number</small>
+        </text>,
+        "customer" => @<text>@(t.CustomerName ?? t.ReporterName ?? "—")@(t.PartyId is null ? " (tanımsız)" : null)</text>,
+        "type" => @<text>@Lookups.Label(SupportLabels.TicketTypeList, t.TypeKey)</text>,
+        "priority" => @<span class="badge stage-@SupportLabels.PriorityBadge(t.Priority)">@SupportLabels.Label(SupportLabels.Priorities, t.Priority)</span>,
+        "status" => @<span class="badge stage-@SupportLabels.StatusBadge(t.Status)">@SupportLabels.Label(SupportLabels.Statuses, t.Status)</span>,
+        "owner" => @<text>@(t.OwnerId is null ? "Atanmamış" : Lookups.MemberName(t.OwnerId))</text>,
+        "age" => @<text>@Age(t.CreatedAt)</text>,
+        "sla" => @<text>@SlaText(t)</text>,
+        "activity" => @<text>@CrmLabels.Time(t.LastActivityAt)</text>,
+        "reporter" => @<text>@t.ReporterName</text>,
+        _ => @<text></text>,
+    };
 
     /// <summary>Listedeki hedef anı kopyası (otorite SLA örneğidir): çalışan sayaç yoksa tire.</summary>
     private static string SlaText(TicketDto t) =>

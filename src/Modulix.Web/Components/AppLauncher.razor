@@ -11,13 +11,13 @@
     {
         <button type="button" class="navbar-brand brand-button" @ref="brandButton" @onclick="Toggle"
                 aria-haspopup="dialog" aria-expanded="@(isOpen ? "true" : "false")" aria-controls="app-launcher-panel"
-                aria-label="Modulix uygulama menüsü">
+                aria-label="@Texts.Get("shell.launcher.aria")">
             <BrandLogo Size="36" />
         </button>
     }
     else
     {
-        <a class="navbar-brand" href="" aria-label="Modulix ana sayfa">
+        <a class="navbar-brand" href="" aria-label="@Texts.Get("shell.launcher.home")">
             <BrandLogo Size="36" />
         </a>
     }
@@ -26,38 +26,38 @@
     {
         <div id="app-launcher-panel" class="app-panel" role="dialog" aria-labelledby="app-panel-title" tabindex="-1" @ref="panel">
             <div class="app-panel-head">
-                <h2 id="app-panel-title" class="app-panel-title">Tüm Uygulamalar</h2>
+                <h2 id="app-panel-title" class="app-panel-title">@Texts.Get("shell.launcher.title")</h2>
             </div>
 
             @if (showSearch)
             {
                 <div class="app-search">
-                    <label class="visually-hidden" for="app-search-input">Uygulama ara</label>
+                    <label class="visually-hidden" for="app-search-input">@Texts.Get("shell.launcher.search")</label>
                     <AppIcon Name="search" Size="16" />
                     <input id="app-search-input" type="search" class="form-control" autocomplete="off"
-                           placeholder="Uygulama ara" @ref="searchInput" @bind="Query" @bind:event="oninput" />
+                           placeholder="@Texts.Get("shell.launcher.search")" @ref="searchInput" @bind="Query" @bind:event="oninput" />
                 </div>
             }
 
             <div class="app-panel-body">
                 @if (!Session.IsLoaded)
                 {
-                    <p class="app-state" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Uygulamalar yükleniyor…</p>
+                    <p class="app-state" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @Texts.Get("shell.launcher.loading")</p>
                 }
                 else if (loadFailed)
                 {
                     <div class="app-state" role="alert">
-                        <p class="mb-2">Uygulamalar yüklenemedi.</p>
-                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="RetryAsync">Yeniden dene</button>
+                        <p class="mb-2">@Texts.Get("shell.launcher.failed")</p>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="RetryAsync">@Texts.Get("shell.launcher.retry")</button>
                     </div>
                 }
                 else if (listed.Count == 0 && string.IsNullOrWhiteSpace(Query))
                 {
-                    <p class="app-state" role="status">Erişebileceğiniz bir uygulama yok.</p>
+                    <p class="app-state" role="status">@Texts.Get("shell.launcher.empty")</p>
                 }
                 else if (visible.Count == 0 && plannedVisible.Count == 0)
                 {
-                    <p class="app-state" role="status">“@Query” için sonuç bulunamadı.</p>
+                    <p class="app-state" role="status">@Texts.Get("common.noResultFor", Query)</p>
                 }
 
                 @if (Session.IsLoaded && !loadFailed && visible.Count > 0)
@@ -95,7 +95,7 @@
                 @if (Session.IsLoaded && !loadFailed && plannedVisible.Count > 0)
                 {
                     <section class="app-group app-planned" aria-labelledby="app-group-planned">
-                        <h3 id="app-group-planned" class="app-group-title">Yakında</h3>
+                        <h3 id="app-group-planned" class="app-group-title">@Texts.Get("shell.launcher.planned")</h3>
                         <ul class="app-grid">
                             @foreach (PlannedApp planned in plannedVisible)
                             {

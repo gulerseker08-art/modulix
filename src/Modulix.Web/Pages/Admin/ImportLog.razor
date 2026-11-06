@@ -24,9 +24,11 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="İşlem günlüğü görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
@@ -50,6 +52,9 @@
         </div>
     }
 
+    <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
     @if (list is null && message is null)
     {
         <p class="text-muted" role="status">Yükleniyor…</p>
@@ -65,9 +70,11 @@
             <caption class="visually-hidden">İçe aktarma listesi</caption>
             <thead>
                 <tr>
-                    <th scope="col">Tarih</th><th scope="col">Kullanıcı</th><th scope="col">Kayıt türü</th><th scope="col">Dosya</th>
-                    <th scope="col">Durum</th><th scope="col">Satır</th><th scope="col">Oluşan</th><th scope="col">Güncellenen</th>
-                    <th scope="col">Atlanan</th><th scope="col">Hatalı</th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -75,26 +82,20 @@
                 {
                     var open = openId == run.Id;
                     <tr class="@(open ? "is-open" : null)">
-                        <td data-label="Tarih">
-                            <button type="button" class="link-button" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(run.Id)">@CrmLabels.Time(run.CreatedAt)</button>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, run, open)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{run.FileName} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Toggle(run.Id)"><AppIcon Name="eye" Size="16" /> <span>@(open ? "Ayrıntıyı kapat" : "Ayrıntıyı aç")</span></button>
+                            </RowMenu>
                         </td>
-                        <td data-label="Kullanıcı">@run.UserName</td>
-                        <td data-label="Kayıt türü">@run.EntityName</td>
-                        <td data-label="Dosya" class="primary">
-                            @run.FileName
-                            <small class="text-muted d-block">@FileSize(run.FileSize) · @ImportText.Mode(run.Mode)</small>
-                        </td>
-                        <td data-label="Durum"><span class="badge stage-@ImportText.StatusBadge(run.Status)">@ImportText.Status(run.Status)</span></td>
-                        <td data-label="Satır">@run.TotalRows.ToString("N0")</td>
-                        <td data-label="Oluşan">@run.CreatedCount.ToString("N0")</td>
-                        <td data-label="Güncellenen">@run.UpdatedCount.ToString("N0")</td>
-                        <td data-label="Atlanan">@run.SkippedCount.ToString("N0")</td>
-                        <td data-label="Hatalı">@run.FailedCount.ToString("N0")</td>
                     </tr>
                     @if (open)
                     {
                         <tr class="audit-detail">
-                            <td colspan="10"><ImportRunDetailPanel RunId="run.Id" /></td>
+                            <td colspan="@(grid.VisibleColumns.Count() + 1)"><ImportRunDetailPanel RunId="run.Id" /></td>
                         </tr>
                     }
                 }
@@ -105,6 +106,28 @@
 </AuthGate>
 
 @code {
+    private const string AllViews = "all";
+    private const string ApplyView = "apply";
+    private const string DryRunView = "dryrun";
+
+    // Başlık tıklamasıyla sıralanan sütunlar sunucudaki sort anahtarlarıdır (ImportRunQuery.SortKeys). Kullanıcı adı sayfa dışında çözüldüğü için sıralanamaz.
+    // Varsayılan sıra "en yeni önce" (-createdAt); SortHeader varsayılan azalan sütunda ilk tıklamada artana (en eski önce) geçer.
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("date", "Tarih", "calendar", "createdAt", "-createdAt", Locked: true),
+        new("user", "Kullanıcı", "user"),
+        new("entity", "Kayıt türü", "tag", "entityKey", "-entityKey"),
+        new("file", "Dosya", "file-text", "fileName", "-fileName"),
+        new("status", "Durum", "check-circle", "status", "-status"),
+        new("total", "Satır", "hash", "totalRows", "-totalRows"),
+        new("created", "Oluşan", "hash", "createdCount", "-createdCount"),
+        new("updated", "Güncellenen", "hash", "updatedCount", "-updatedCount"),
+        new("skipped", "Atlanan", "hash", "skippedCount", "-skippedCount"),
+        new("failed", "Hatalı", "alert-circle", "failedCount", "-failedCount"),
+    ];
+
+    private readonly GridViewState grid = new("admin.import-log", "-createdAt");
+    private PersonalGridViews views = default!;
     private bool filtersOpen;
     private PagedResult<ImportRunDto>? list;
     private string? message;
@@ -113,22 +136,111 @@
     private DateOnly? from;
     private DateOnly? to;
     private Guid? openId;
+    private string view = AllViews;
 
     /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti).</summary>
     private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (mode.Length > 0 ? 1 : 0) + (from is null ? 0 : 1) + (to is null ? 0 : 1);
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "admin.import-log");
+        grid.Define(Columns);
         await Session.EnsureLoadedAsync();
-        if (Session.CanAny([CoreAccess.ReadImports, CoreAccess.RunImports])) { await LoadAsync(1); }
+        if (Session.CanAny([CoreAccess.ReadImports, CoreAccess.RunImports]))
+        {
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
     }
 
     private void Toggle(Guid id) => openId = openId == id ? null : id;
+
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Uygulananlar, Kuru çalışmalar, kişisel); kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm işlemler", Icon: "history"),
+        new(ApplyView, "Uygulananlar", Icon: "check-circle"),
+        new(DryRunView, "Kuru çalışmalar", Icon: "clipboard-list"),
+        .. views.Options,
+    ];
+
+    private string? CurrentFilters => GridFilters.Build(
+        status.Length > 0 ? ("status", status) : null,
+        mode.Length > 0 ? ("mode", mode) : null,
+        from is { } f ? ("from", f.ToString("yyyy-MM-dd")) : null,
+        to is { } t ? ("to", t.ToString("yyyy-MM-dd")) : null);
+
+    // Sistem görünümünün süzgeci: yalnızca mod.
+    private string? BaselineFilters => Active?.Filters ?? view switch { ApplyView => "mode=Apply", DryRunView => "mode=DryRun", _ => null };
+
+    // Kaydedilmemiş değişiklik: sütunlar/sıralama ya da süzgeç açık görünümden farklı.
+    private bool Dirty => grid.Differs(Active) || Canon(CurrentFilters) != Canon(BaselineFilters);
+
+    private static string Canon(string? filters) =>
+        string.Join('&', GridFilters.Parse(filters).OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => p.Key + "=" + p.Value));
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+        }
+        else
+        {
+            grid.Reset();
+        }
+
+        var filters = GridFilters.Parse(BaselineFilters);
+        status = filters.GetValueOrDefault("status") ?? string.Empty;
+        mode = filters.GetValueOrDefault("mode") ?? string.Empty;
+        from = DateOnly.TryParse(filters.GetValueOrDefault("from"), out var start) ? start : null;
+        to = DateOnly.TryParse(filters.GetValueOrDefault("to"), out var end) ? end : null;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
 
     private async Task LoadAsync(int pageNumber)
     {
         openId = null;
         var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
+        if (grid.Sort != grid.DefaultSort) { parts.Add($"sort={Uri.EscapeDataString(grid.Sort)}"); }
         if (status.Length > 0) { parts.Add($"status={status}"); }
         if (mode.Length > 0) { parts.Add($"mode={mode}"); }
         if (from is { } f) { parts.Add($"from={f:yyyy-MM-dd}"); }
@@ -138,6 +250,23 @@
         list = result.Value is { } page ? new PagedResult<ImportRunDto>(page.Items, page.Page, page.PageSize, page.TotalCount) : null;
         message = result.IsSuccess ? null : result.Error;
     }
+
+    private RenderFragment Cell(GridColumnDef column, ImportRunDto run, bool open) => @<td data-label="@column.Label" class="@(column.Key == "file" ? "primary" : null)">@CellContent(column.Key, run, open)</td>;
+
+    private RenderFragment CellContent(string key, ImportRunDto run, bool open) => key switch
+    {
+        "date" => @<button type="button" class="link-button" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(run.Id)">@CrmLabels.Time(run.CreatedAt)</button>,
+        "user" => @<text>@run.UserName</text>,
+        "entity" => @<text>@run.EntityName</text>,
+        "file" => @<text>@run.FileName<small class="text-muted d-block">@FileSize(run.FileSize) · @ImportText.Mode(run.Mode)</small></text>,
+        "status" => @<span class="badge stage-@ImportText.StatusBadge(run.Status)">@ImportText.Status(run.Status)</span>,
+        "total" => @<text>@run.TotalRows.ToString("N0")</text>,
+        "created" => @<text>@run.CreatedCount.ToString("N0")</text>,
+        "updated" => @<text>@run.UpdatedCount.ToString("N0")</text>,
+        "skipped" => @<text>@run.SkippedCount.ToString("N0")</text>,
+        "failed" => @<text>@run.FailedCount.ToString("N0")</text>,
+        _ => @<text></text>,
+    };
 
     private static string FileSize(long bytes) => bytes switch
     {

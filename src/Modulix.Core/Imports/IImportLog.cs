@@ -8,9 +8,18 @@ public sealed record ImportRunQuery(
     DateTimeOffset? From = null,
     DateTimeOffset? To = null,
     int Page = 1,
-    int PageSize = 50)
+    int PageSize = 50,
+    string? Sort = null)
 {
     public const int MaxPageSize = 100;
+
+    /// <summary>Sıralama anahtarları (başlık tıklaması, ADR-0036; başına <c>-</c> azalan). Boşsa en yeni önce. Kullanıcı adı ve kayıt türü adı sayfa dışında çözüldüğü için sıralanamaz.</summary>
+    public static readonly IReadOnlyCollection<string> SortKeys =
+    [
+        "createdAt", "-createdAt", "entityKey", "-entityKey", "fileName", "-fileName", "status", "-status",
+        "totalRows", "-totalRows", "createdCount", "-createdCount", "updatedCount", "-updatedCount",
+        "skippedCount", "-skippedCount", "failedCount", "-failedCount",
+    ];
 }
 
 public sealed record ImportRunSummary(

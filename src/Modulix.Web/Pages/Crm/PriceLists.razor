@@ -11,14 +11,21 @@
 
     <p class="text-muted">Fiyatlar ürünün temel birimi başınadır; kademe aralığı [alt, üst) temel birim miktarıdır. Yayımlanan liste değişmez, yalnızca arşive alınır; değişiklik için yeni liste açın.</p>
 
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Fiyat listesi görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <span class="list-toolbar-spacer"></span>
-        <ColumnPicker />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Fiyat listesi ara" placeholder="Ad veya segment ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(CrmAccess.PricesWrite) && form is null)
         {
             <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> Yeni liste</button>
         }
     </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (message is not null)
     {
@@ -208,14 +215,6 @@
         </section>
     }
 
-    <div class="filters" role="group" aria-label="Durum">
-        <button type="button" class="chip @(status is null ? "active" : null)" @onclick="() => FilterAsync(null)">Tümü</button>
-        @foreach (var item in PricingLabels.ListStatuses)
-        {
-            <button type="button" class="chip @(status == item.Key ? "active" : null)" @onclick="() => FilterAsync(item.Key)">@item.Label</button>
-        }
-    </div>
-
     @if (page is null)
     {
         <p class="text-muted">Yükleniyor…</p>
@@ -227,22 +226,31 @@
     else
     {
         <table class="table record-table">
-            <thead><tr><th>Ad</th><th>Durum</th><th>Kapsam</th><th>Para birimi</th><th>Geçerlilik</th><th></th></tr></thead>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
             <tbody>
                 @foreach (var list in page.Items)
                 {
                     <tr>
-                        <td data-label="Ad" class="primary">@list.Name</td>
-                        <td data-label="Durum"><span class="badge status-@PricingLabels.ListBadge(list.Status)">@PricingLabels.Label(PricingLabels.ListStatuses, list.Status)</span></td>
-                        <td data-label="Kapsam">@PricingLabels.Label(PricingLabels.Scopes, list.Scope)@(list.Segment is null ? null : $" · {list.Segment}")@(CompanyName(list.CompanyId))</td>
-                        <td data-label="Para birimi">@list.Currency</td>
-                        <td data-label="Geçerlilik">@Period(list)</td>
-                        <td class="actions">
-                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => OpenItemsAsync(list)">Satırlar</button>
-                            @if (list.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
-                            {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(list)">Düzenle</button>
-                            }
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, list)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{list.Name} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenItemsAsync(list)"><AppIcon Name="list" Size="16" /> <span>Satırlar</span></button>
+                                @if (list.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
+                                {
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(list)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                }
+                            </RowMenu>
                         </td>
                     </tr>
                 }
@@ -256,6 +264,21 @@
     private const string Url = "/api/crm/price-lists";
     private const string ItemsUrl = "/api/crm/price-list-items";
 
+    // Varsayılan sıra durum + ad ("status"); Kapsam sütunu (ad + segment + firma birleşimi) kapsam türüne göre sıralanır.
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("name", "Ad", "type", "name", "-name", Locked: true),
+        new("status", "Durum", "tag", "status", "-status"),
+        new("scope", "Kapsam", "globe", "scope", "-scope"),
+        new("currency", "Para birimi", "coins", "currency", "-currency"),
+        new("period", "Geçerlilik", "calendar", "validFrom", "-validFrom"),
+        new("validTo", "Geçerlilik sonu", "calendar", "validTo", "-validTo", DefaultVisible: false),
+    ];
+
+    private readonly GridViewState grid = new("crm.price-lists", "status");
+    private PersonalGridViews views = default!;
+    private string view = AllView;
+    private string? search;
     private CrmPage<PriceListDto>? page;
     private List<CompanyDto> companies = [];
     private List<ProductDto> products = [];
@@ -283,16 +306,112 @@
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "crm.price-lists");
+        grid.Define(Columns);
         await Session.EnsureLoadedAsync();
         if (Session.Can(CrmAccess.PricesRead))
         {
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
 
+    private const string AllView = "all";
+    private const string StatusPrefix = "status:";
+
+    // Görünümler yalnızca süzgeçtir (tümü, durum, kişisel); kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllView, "Tüm fiyat listeleri", Icon: "coins"),
+        .. PricingLabels.ListStatuses.Select(s => new ViewOption(StatusPrefix + s.Key, s.Label, Icon: "tag")),
+        .. views.Options,
+    ];
+
+    private GridViewDto? Active => views.Find(view);
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            status = GridFilters.Parse(saved.Filters).GetValueOrDefault("status");
+        }
+        else
+        {
+            grid.Reset();
+            status = key.StartsWith(StatusPrefix, StringComparison.Ordinal) ? key[StatusPrefix.Length..] : null;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    // Sütun seçimi/sırası değişince veri yeniden çekilmez; geri çağrı yalnızca sayfanın yeniden çizilmesini sağlar.
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(status is { } s ? ("status", s) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllView);
+        }
+    }
+
+    private RenderFragment Cell(GridColumnDef column, PriceListDto list) => @<td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, list)</td>;
+
+    private RenderFragment CellContent(string key, PriceListDto list) => key switch
+    {
+        "name" => @<text>@list.Name</text>,
+        "status" => @<span class="badge status-@PricingLabels.ListBadge(list.Status)">@PricingLabels.Label(PricingLabels.ListStatuses, list.Status)</span>,
+        "scope" => @<text>@PricingLabels.Label(PricingLabels.Scopes, list.Scope)@(list.Segment is null ? null : $" · {list.Segment}")@(CompanyName(list.CompanyId))</text>,
+        "currency" => @<text>@list.Currency</text>,
+        "period" => @<text>@Period(list)</text>,
+        "validTo" => @<text>@(list.ValidTo is { } to ? to.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "—")</text>,
+        _ => @<text></text>,
+    };
+
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}";
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            url += $"&search={Uri.EscapeDataString(search.Trim())}";
+        }
+
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
         if (status is not null)
         {
             url += $"&status={Uri.EscapeDataString(status)}";
@@ -301,12 +420,6 @@
         var result = await Api.GetAsync<CrmPage<PriceListDto>>(url);
         page = result.Value;
         message = result.Error;
-    }
-
-    private async Task FilterAsync(string? value)
-    {
-        status = value;
-        await LoadAsync(1);
     }
 
     private async Task EnsureLookupsAsync()
