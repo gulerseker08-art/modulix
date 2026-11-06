@@ -151,3 +151,59 @@ internal sealed class StockItemConfiguration : IEntityTypeConfiguration<StockIte
         builder.HasIndex(s => new { s.TenantId, s.Gtip });
     }
 }
+
+internal sealed class CustomsDeclarationConfiguration : IEntityTypeConfiguration<CustomsDeclaration>
+{
+    public void Configure(EntityTypeBuilder<CustomsDeclaration> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "CustomsDeclarations");
+        builder.Property(d => d.RegistrationNo).HasMaxLength(CustomsDeclaration.RegistrationNoMaxLength).IsRequired();
+        builder.Property(d => d.RegistrationDate).HasColumnType("date");
+        builder.Property(d => d.CustomsOffice).HasMaxLength(CustomsDeclaration.OfficeMaxLength);
+        builder.Property(d => d.RegimeKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(d => d.StatusKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(d => d.ExternalReference).HasMaxLength(CustomsDeclaration.ExternalReferenceMaxLength);
+        builder.Property(d => d.Description).HasMaxLength(CustomsDeclaration.DescriptionMaxLength);
+
+        builder.HasIndex(d => new { d.TenantId, d.RegistrationNo }).IsUnique().HasDatabaseName("UX_CustomsDeclarations_RegistrationNo");
+
+        // Dış sistemden gelen aynı kayıt ikinci beyanname üretmez (K8); boş referanslar çakışmaz.
+        builder.HasIndex(d => new { d.TenantId, d.ExternalReference }).IsUnique().HasDatabaseName("UX_CustomsDeclarations_ExternalReference")
+            .HasFilter("[ExternalReference] IS NOT NULL");
+        builder.HasIndex(d => new { d.TenantId, d.ImporterPartyId });
+        builder.HasIndex(d => new { d.TenantId, d.BrokerPartyId });
+        builder.HasIndex(d => new { d.TenantId, d.RegistrationDate });
+
+        // Ortak kayıtlar (ADR-0006): ithalatçı ve müşavir aynı tenant'ın firmasıdır; beyannamesi olan firma silinemez.
+        builder.HasOne<Party>().WithMany().HasForeignKey(d => new { d.TenantId, d.ImporterPartyId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Party>().WithMany().HasForeignKey(d => new { d.TenantId, d.BrokerPartyId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class CustomsDeclarationLineConfiguration : IEntityTypeConfiguration<CustomsDeclarationLine>
+{
+    public void Configure(EntityTypeBuilder<CustomsDeclarationLine> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "CustomsDeclarationLines");
+        // GTİP metin: baştaki sıfırlar kaybolmasın (K9).
+        builder.Property(l => l.Gtip).HasMaxLength(GtipRules.MaxLength).IsUnicode(false).IsRequired();
+        builder.Property(l => l.Description).HasMaxLength(CustomsDeclarationLine.DescriptionMaxLength).IsRequired();
+        builder.Property(l => l.ContainerTypeKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(l => l.OriginCountryKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(l => l.UnitKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(l => l.GrossKg).HasPrecision(18, 3);
+        builder.Property(l => l.NetKg).HasPrecision(18, 3);
+        builder.Property(l => l.Quantity).HasPrecision(18, 3);
+
+        // Net kilo brüt kilodan büyük olamaz (K17 değişmezi) ve satır numarası beyanname içinde benzersizdir.
+        builder.ToTable(t => t.HasCheckConstraint("CK_CustomsDeclarationLines_Weights", "[NetKg] >= 0 AND [NetKg] <= [GrossKg]"));
+        builder.HasIndex(l => new { l.TenantId, l.DeclarationId, l.LineNo }).IsUnique().HasDatabaseName("UX_CustomsDeclarationLines_LineNo");
+        builder.HasIndex(l => new { l.TenantId, l.Gtip });
+
+        // Beyanname aynı tenant'ta olmalıdır; satırı olan beyanname silinemez (önce satırlar silinir).
+        builder.HasOne<CustomsDeclaration>().WithMany().HasForeignKey(l => new { l.TenantId, l.DeclarationId })
+            .HasPrincipalKey(d => new { d.TenantId, d.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}

@@ -147,6 +147,31 @@ internal static class Field
             CreateOnly = createOnly,
         };
 
+    /// <summary>
+    /// Ondalık sayı (JSON sayısı): <paramref name="min"/>-<paramref name="max"/> aralığında ve en çok <paramref name="scale"/> ondalık
+    /// basamaklı (fazlası sessizce yuvarlanmaz, hata verir). Zorunlu değilse boş bırakılabilir.
+    /// </summary>
+    public static RecordField<T> Decimal<T>(
+        string name, Func<T, decimal?> get, Action<T, decimal?> set, int scale, decimal min, decimal max, bool required = false) =>
+        new(name, required, nullable: !required, node =>
+            {
+                if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var value))
+                {
+                    return ParsedValue.Fail("Sayı olmalıdır.");
+                }
+
+                if (value < min || value > max)
+                {
+                    return ParsedValue.Fail($"{min.ToString(CultureInfo.InvariantCulture)} ile {max.ToString(CultureInfo.InvariantCulture)} arasında olmalıdır.");
+                }
+
+                return decimal.Round(value, scale) == value
+                    ? ParsedValue.Of(value)
+                    : ParsedValue.Fail($"En fazla {scale} ondalık basamak girilebilir.");
+            },
+            e => get(e) is { } value ? JsonValue.Create(value) : null,
+            (e, v) => set(e, (decimal?)v));
+
     /// <summary>Tarih (yyyy-AA-gg). Zorunlu değilse boş bırakılabilir (boş gönderilirse temizlenir).</summary>
     public static RecordField<T> Date<T>(string name, Func<T, DateOnly?> get, Action<T, DateOnly?> set, bool required = false) =>
         new(name, required, nullable: !required, node =>
