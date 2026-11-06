@@ -87,6 +87,12 @@ public sealed class RecordPipeline(
             return Invalid<RecordPage>([new RecordFieldError(hiddenFilter, "Bu alana göre süzme yetkiniz yok.")]);
         }
 
+        // Sıralama da değeri sezdirir (sıra, tutarı ele verir); sıralama anahtarı ("-alan" ya da "alan") gizli alansa reddedilir.
+        if (normalized.Filters is not null && normalized.Filters.TryGetValue("sort", out var sortKey) && hidden.Contains(sortKey.TrimStart('-')))
+        {
+            return Invalid<RecordPage>([new RecordFieldError("sort", "Bu alana göre sıralama yetkiniz yok.")]);
+        }
+
         var custom = await CustomFieldsAsync(tenant!, store, cancellationToken);
         if (store.SupportsCustomFields)
         {

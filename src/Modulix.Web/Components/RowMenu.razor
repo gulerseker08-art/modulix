@@ -1,0 +1,39 @@
+@* Satır eylem menüsü ("⋯"): satırın eylemlerini açılır menüde toplar. Yetkisi olmayan eylem ChildContent'e hiç konmaz;
+   menü boşsa düğme de çizilmez. Menü öğeleri düz düğme/bağlantıdır (class="view-menu-item", role="menuitem").
+   Esc, menü dışına tıklama ve menü içindeki bir öğeye tıklama menüyü kapatır. *@
+@if (ChildContent is not null)
+{
+    <div class="row-menu" @onkeydown="OnKeyDown">
+        <button type="button" class="btn btn-ghost row-menu-button" aria-haspopup="menu" aria-expanded="@(open ? "true" : "false")"
+                aria-label="@Label" @onclick="Toggle">
+            <AppIcon Name="more-horizontal" Size="18" />
+        </button>
+        @if (open)
+        {
+            <div class="view-selector-backdrop" aria-hidden="true" @onclick="Close"></div>
+            <div class="view-menu row-menu-list" role="menu" aria-label="@Label" @onclick="Close">
+                @ChildContent
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool open;
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public string Label { get; set; } = "Satır eylemleri";
+
+    private void Toggle() => open = !open;
+
+    private void Close() => open = false;
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (open && e.Key == "Escape")
+        {
+            open = false;
+        }
+    }
+}

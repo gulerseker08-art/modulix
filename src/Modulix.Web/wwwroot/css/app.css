@@ -641,6 +641,43 @@ code {
     margin: 2rem auto;
 }
 
+/* Breadcrumb (konum izi): "CRM / Satış / Teklifler"; ayırıcı CSS ile eklenir, ekran okuyucuya listeyi bozmaz. */
+.page-breadcrumb {
+    margin-bottom: var(--mx-space-3);
+    font-size: var(--mx-fs-body);
+}
+
+    .page-breadcrumb ol {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--mx-space-1) var(--mx-space-2);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: var(--mx-text-secondary);
+    }
+
+    .page-breadcrumb li + li::before {
+        content: "/";
+        margin-right: var(--mx-space-2);
+        color: var(--mx-text-secondary);
+    }
+
+    .page-breadcrumb a {
+        color: var(--mx-text-secondary);
+        text-decoration: none;
+    }
+
+        .page-breadcrumb a:hover {
+            color: var(--mx-text-primary);
+            text-decoration: underline;
+        }
+
+    .page-breadcrumb [aria-current="page"] {
+        color: var(--mx-text-primary);
+        font-weight: 600;
+    }
+
 .page-header {
     display: flex;
     flex-wrap: wrap;
@@ -971,6 +1008,10 @@ tr.done td.primary {
         .record-table td.actions:not(:empty) {
             padding-top: 0.5rem;
         }
+
+        .record-table .row-menu-cell {
+            border-left: 0;
+        }
 }
 
 @media (min-width: 768px) {
@@ -1002,9 +1043,14 @@ tr.done td.primary {
         border-collapse: separate;
         border-spacing: 0;
         border-radius: var(--mx-radius-card);
-        overflow: hidden;
         box-shadow: var(--mx-shadow);
     }
+
+        /* Köşeler hücrelerde yuvarlanır (overflow:hidden yok): satır menüsü ("⋯") tablonun dışına taşabilir. */
+        .record-table > thead > tr:first-child > :first-child { border-top-left-radius: calc(var(--mx-radius-card) - 1px); }
+        .record-table > thead > tr:first-child > :last-child { border-top-right-radius: calc(var(--mx-radius-card) - 1px); }
+        .record-table > tbody > tr:last-child > :first-child { border-bottom-left-radius: calc(var(--mx-radius-card) - 1px); }
+        .record-table > tbody > tr:last-child > :last-child { border-bottom-right-radius: calc(var(--mx-radius-card) - 1px); }
 
         .record-table > :not(caption) > * > * {
             padding: 0.95rem 1rem;
@@ -1019,14 +1065,34 @@ tr.done td.primary {
             border-bottom: 0;
         }
 
+        /* Başlık: dolgulu bant, cümle yazımı, kalın; sütun türü ikonu SortHeader'ın ColumnIcon'uyla gelir. */
         .record-table thead th {
             background: var(--mx-surface-hover);
-            color: var(--mx-text-secondary);
-            font-size: 0.6875rem;
+            color: var(--mx-text-primary);
+            font-size: var(--mx-fs-table);
             font-weight: 700;
-            letter-spacing: 0.07em;
-            text-transform: uppercase;
             white-space: nowrap;
+        }
+
+        .record-table thead th .sort-button .app-icon:first-child,
+        .record-table thead th .th-label .app-icon:first-child {
+            color: var(--mx-text-secondary);
+            opacity: 1;
+        }
+
+        .th-label {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--mx-space-1);
+        }
+
+        /* Satır menüsü ("⋯") sütunu: dar, solunda ayırıcı çizgi (RowMenu). */
+        .record-table .row-menu-cell {
+            width: 3.25rem;
+            padding-left: 0;
+            padding-right: 0;
+            border-left: 1px solid var(--mx-border);
+            text-align: center;
         }
 
         .record-table td {
@@ -1146,12 +1212,42 @@ tr.done td.primary {
         min-width: 0;
     }
 
+/* Görünümler sekmelerdeyse (ViewTabs) araç çubuğu aramayla başlar: arama soldan genişler, eylemler sağda kalır. */
+.list-toolbar > .search:first-child {
+    flex: 1 1 22rem;
+    margin-left: 0;
+}
+
 .list-toolbar-spacer {
     flex: 1 1 auto;
 }
 
-.view-selector {
+.view-selector,
+.row-menu {
     position: relative;
+}
+
+.row-menu {
+    display: inline-block;
+}
+
+.row-menu-button {
+    padding: 0.25rem 0.5rem;
+}
+
+/* Satır menüsü sağa yaslanır (tablonun sağ kenarında taşmaz). */
+.view-menu.row-menu-list {
+    left: auto;
+    right: 0;
+    width: max-content;
+    min-width: 11rem;
+    text-align: left;
+}
+
+.row-menu-list .view-menu-item {
+    justify-content: flex-start;
+    text-decoration: none;
+    white-space: nowrap;
 }
 
 .view-selector-button {
@@ -1290,6 +1386,72 @@ tr.done td.primary {
     .column-item:hover {
         background: var(--mx-surface-hover);
     }
+
+/* Sütun menüsü satırı (GridColumnPicker): onay kutusu + ikon + ad, sağda yukarı/aşağı taşıma. */
+.view-menu.column-menu {
+    right: 0;
+    left: auto;
+    min-width: 18rem;
+}
+
+.column-row {
+    padding-right: var(--mx-space-1);
+}
+
+.column-check {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin: 0;
+    cursor: pointer;
+}
+
+    .column-check .app-icon {
+        color: var(--mx-text-secondary);
+    }
+
+.column-row .btn-sm {
+    padding: 0.15rem 0.35rem;
+}
+
+/* Kişisel görünüm şeridi (PersonalViewBar): kaydedilmemiş değişiklik uyarısı, ad girişi, kişisel görünüm notu. */
+.view-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin: 0 0 var(--mx-space-3);
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-tone-warning-bg);
+    color: var(--mx-tone-warning-fg);
+}
+
+.view-bar-note {
+    padding-left: 0;
+    padding-right: 0;
+    background: transparent;
+    color: var(--mx-text-secondary);
+}
+
+.view-bar-text {
+    font-size: var(--mx-fs-helper);
+    font-weight: 600;
+}
+
+.view-bar-input {
+    width: 14rem;
+}
+
+.view-bar-error {
+    padding: 0 var(--mx-space-2);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-tone-danger-bg);
+    color: var(--mx-tone-danger-fg);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+}
 
 .filter-count {
     display: inline-grid;
@@ -2410,6 +2572,26 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
     .app-tile.is-current {
         border-color: var(--mx-indigo);
         background: var(--mx-lilac);
+    }
+
+/* Pasif kart (yol haritasındaki uygulama): tıklanmaz, odak almaz; kontrastı AA'nın altına inmez, pasifliği "Yakında" başlığı ve imleç anlatır. */
+.app-tile.is-planned {
+    cursor: default;
+    background: var(--mx-surface-muted);
+    border-style: dashed;
+    color: var(--mx-text-secondary);
+}
+
+    .app-tile.is-planned:hover {
+        background: var(--mx-surface-muted);
+        border-color: var(--mx-border);
+        box-shadow: none;
+        color: var(--mx-text-secondary);
+    }
+
+    .app-tile.is-planned .app-tile-icon {
+        background: transparent;
+        color: var(--mx-text-secondary);
     }
 
 .app-tile-name {

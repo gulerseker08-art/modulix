@@ -93,6 +93,9 @@ internal sealed class AutomationRunConfiguration : IEntityTypeConfiguration<Auto
         builder.HasIndex(r => new { r.TenantId, r.RuleId, r.RecordId });
         builder.HasIndex(r => new { r.TenantId, r.EntityKey, r.RecordId });
 
+        // Saklama temizliği bitmiş çalışmaları tamamlanma zamanına göre eskiden yeniye seçer (Dilim 2b-2).
+        builder.HasIndex(r => new { r.TenantId, r.CompletedAt });
+
         // Çalışma, bağlı olduğu sürümle aynı tenant'tadır; sürüm silinmez (yayınlanmış sürüm değişmez ve geçmiş ona bağlıdır).
         builder.HasOne<AutomationRuleVersion>()
             .WithMany()
@@ -123,6 +126,28 @@ internal sealed class AutomationRunStepConfiguration : IEntityTypeConfiguration<
             .WithMany()
             .HasForeignKey(s => new { s.TenantId, s.RunId })
             .HasPrincipalKey(r => new { r.TenantId, r.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class AutomationScanCursorConfiguration : IEntityTypeConfiguration<AutomationScanCursor>
+{
+    public void Configure(EntityTypeBuilder<AutomationScanCursor> builder)
+    {
+        builder.ToTable("AutomationScanCursors", DatabaseSchemas.Core);
+        builder.HasKey(c => c.Id);
+        builder.Property(c => c.Id).ValueGeneratedNever();
+        builder.Property(c => c.TenantId).IsRequired();
+        builder.Property(c => c.PeriodKey).HasMaxLength(AutomationScanCursor.PeriodKeyLength).IsRequired();
+
+        // Bir kural sürümünün bir tenant gününde tek imleci vardır; benzersizlik tenant ile birlikte.
+        builder.HasIndex(c => new { c.TenantId, c.RuleVersionId, c.PeriodKey }).IsUnique();
+        builder.HasIndex(c => new { c.TenantId, c.RuleId });
+
+        builder.HasOne<AutomationRuleVersion>()
+            .WithMany()
+            .HasForeignKey(c => new { c.TenantId, c.RuleVersionId })
+            .HasPrincipalKey(v => new { v.TenantId, v.Id })
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -19,6 +19,7 @@ public sealed record MembershipDto(Guid TenantId, string TenantName, string Tena
 /// Oturumdaki kullanıcı. <see cref="ActiveTenantId"/> sunucuda doğrulanmış aktif tenant'tır.
 /// <see cref="IsPlatformAdministrator"/>: platform ekranlarını gösterir; yetkiyi sunucu her istekte denetler.
 /// <see cref="PlatformRoles"/>: platform hesabının etkin rolleri (Support, Operations, Finance, Owner); ekran yalnızca gizleme içindir.
+/// <see cref="PreferredLanguage"/>: kişinin arayüz dili tercihi (ADR-0034); boşsa firmanın varsayılanı kullanılır.
 /// </summary>
 public sealed record MeResponse(
     Guid UserId,
@@ -29,7 +30,8 @@ public sealed record MeResponse(
     bool IsPlatformAdministrator = false,
     bool TwoFactorEnabled = false,
     bool TwoFactorRequired = false,
-    IReadOnlyList<string>? PlatformRoles = null);
+    IReadOnlyList<string>? PlatformRoles = null,
+    string? PreferredLanguage = null);
 
 /// <summary>
 /// Girişin yanıtı: şifre doğruysa ve iki adımlı doğrulama açıksa 202 ve <see cref="TwoFactorRequired"/> döner; kod

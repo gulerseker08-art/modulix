@@ -5,7 +5,7 @@
 
 @* Ortak uygulama kabuğu (AppShell): sol menü + üst çubuk + içerik. Bütün oturumlu sayfalar bu düzeni kullanır;
    yeni modüller ayrı bir kabuk oluşturmaz (docs/design-system/README.md). *@
-<a class="skip-link" href="@SkipHref">İçeriğe geç</a>
+<a class="skip-link" href="@SkipHref">@Texts.Get("shell.skip")</a>
 
 <div class="page">
     <div class="sidebar">
@@ -32,7 +32,7 @@
                     @if (Session.HasMultipleCompanies)
                     {
                         <label class="company-switcher">
-                            <span class="visually-hidden">Aktif şirket</span>
+                            <span class="visually-hidden">@Texts.Get("shell.company.active")</span>
                             <select class="form-select form-select-sm" disabled="@companyBusy"
                                     @onchange="OnCompanyChanged" value="@Session.ActiveCompanyId">
                                 @foreach (var company in Session.Companies)
@@ -63,23 +63,23 @@
                         {
                             @* Menünün dışına tıklanınca kapanır. *@
                             <div class="menu-backdrop" @onclick="CloseProfile"></div>
-                            <ul id="profile-menu-list" class="menu-list" role="menu" aria-label="Profil menüsü">
+                            <ul id="profile-menu-list" class="menu-list" role="menu" aria-label="@Texts.Get("shell.profile.menu")">
                                 <li role="none">
                                     <a role="menuitem" href="hesabim" @onclick="CloseProfile">
-                                        <AppIcon Name="user" Size="18" /> Hesabım
+                                        <AppIcon Name="user" Size="18" /> @Texts.Get("shell.profile.account")
                                     </a>
                                 </li>
                                 @if (Session.User.Memberships.Count > 1)
                                 {
                                     <li role="none">
                                         <a role="menuitem" href="tenant" @onclick="CloseProfile">
-                                            <AppIcon Name="repeat" Size="18" /> Kuruluş değiştir
+                                            <AppIcon Name="repeat" Size="18" /> @Texts.Get("shell.profile.switchTenant")
                                         </a>
                                     </li>
                                 }
                                 <li role="none">
                                     <button type="button" role="menuitem" @onclick="LogoutAsync">
-                                        <AppIcon Name="log-out" Size="18" /> Çıkış
+                                        <AppIcon Name="log-out" Size="18" /> @Texts.Get("shell.profile.logout")
                                     </button>
                                 </li>
                             </ul>
@@ -91,7 +91,15 @@
 
         <main id="main-content" class="content px-4" tabindex="-1">
             <LicenseBanner />
-            @Body
+            @if (Session.IsSignedIn)
+            {
+                <Breadcrumb />
+            }
+            @* Metinler oturumla birlikte yüklenir (ADR-0034); yüklenmeden çizilen sayfa anahtar adlarını gösterirdi. *@
+            @if (Session.IsLoaded)
+            {
+                @Body
+            }
         </main>
     </div>
 </div>

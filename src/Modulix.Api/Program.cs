@@ -1,16 +1,19 @@
 using Modulix.Api.Access;
 using Modulix.Api.Account;
 using Modulix.Api.Audit;
+using Modulix.Api.Imports;
 using Modulix.Api.Automation;
 using Modulix.Api.Reports;
 using Modulix.Api.Auth;
 using Modulix.Api.Communication;
 using Modulix.Api.Crm;
 using Modulix.Api.Customization;
+using Modulix.Api.Views;
 using Modulix.Api.Development;
 using Modulix.Api.Email;
 using Modulix.Api.Events;
 using Modulix.Api.Lookups;
+using Modulix.Api.Localization;
 using Modulix.Api.Marketing;
 using Modulix.Api.Organization;
 using Modulix.Api.Platform;
@@ -36,6 +39,7 @@ using Modulix.Api.Contracts;
 using Modulix.Api.Orders;
 using Modulix.Api.Support;
 using Modulix.Modules.Marketing;
+using Modulix.Modules.Warehouse;
 using Modulix.Modules.Support;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -203,6 +207,7 @@ app.MapCustomFieldEndpoints();
 app.MapChoiceListEndpoints();
 app.MapLookupEndpoints();
 app.MapFormLayoutEndpoints();
+app.MapGridViewEndpoints();
 app.MapSectorProfileEndpoints();
 app.MapSectorEndpoints();
 app.MapRuleEndpoints();
@@ -224,7 +229,9 @@ app.MapPlatformHealthEndpoints();
 app.MapSupportAccessEndpoints();
 app.MapPlatformTeamEndpoints();
 app.MapAuditEndpoints();
+app.MapImportEndpoints();
 app.MapSettingsEndpoints();
+app.MapTextEndpoints();
 
 // Bilinmeyen API adresi 404 döner; diğer adresler arayüzün sayfalarıdır.
 app.Map("/api/{**path}", () => Results.NotFound());
@@ -247,5 +254,5 @@ public partial class Program;
 /// </summary>
 internal static class ModulixModules
 {
-    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule(), new MarketingModule()];
+    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule(), new MarketingModule(), new WarehouseModule()];
 }

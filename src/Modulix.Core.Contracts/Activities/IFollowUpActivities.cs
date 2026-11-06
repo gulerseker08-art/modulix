@@ -1,10 +1,14 @@
 namespace Modulix.Core.Contracts.Activities;
 
-/// <summary>Takip aktivitesi isteği: konu, açıklama, son tarih, atanan kullanıcı ve aktivitenin bağlanacağı kayıt.</summary>
-public sealed record FollowUpRequest(string Subject, string? Description, DateOnly DueDate, Guid? AssigneeId, string LinkedEntityKey, Guid LinkedRecordId);
+/// <summary>
+/// Takip aktivitesi isteği: konu, açıklama, son tarih, atanan kullanıcı ve aktivitenin bağlanacağı kayıt. <paramref name="IdempotencyKey"/> verilirse
+/// aynı anahtarla ikinci aktivite açılmaz (en az bir kez teslim eden çağıranlar için, ör. kural motoru); mevcut aktivitenin kimliği döner.
+/// </summary>
+public sealed record FollowUpRequest(
+    string Subject, string? Description, DateOnly DueDate, Guid? AssigneeId, string LinkedEntityKey, Guid LinkedRecordId, string? IdempotencyKey = null);
 
-/// <summary>Sonuç: oluştuysa aktivite kimliği, oluşmadıysa nedeni. <see cref="Unavailable"/>: aktivite modülü bu tenant için kapalı (hata değil, yok sayılabilir durum).</summary>
-public sealed record FollowUpResult(Guid? ActivityId, string? Error, bool Unavailable = false)
+/// <summary>Sonuç: oluştuysa aktivite kimliği, oluşmadıysa nedeni. <see cref="Unavailable"/>: aktivite modülü bu tenant için kapalı (hata değil, yok sayılabilir durum). <see cref="AlreadyExisted"/>: aynı idempotency anahtarıyla aktivite zaten vardı, yenisi açılmadı.</summary>
+public sealed record FollowUpResult(Guid? ActivityId, string? Error, bool Unavailable = false, bool AlreadyExisted = false)
 {
     public bool IsCreated => ActivityId is not null;
 }

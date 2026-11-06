@@ -6,18 +6,18 @@
 
 @if (!Session.IsLoaded)
 {
-    <p class="text-muted">Yükleniyor…</p>
+    <p class="text-muted">@Texts.Get("common.loading")</p>
 }
-else if (Session.IsSignedIn && Session.HasActiveTenant && (!Session.TwoFactorRequired || AllowWithoutTwoFactor))
+else if (Session.IsSignedIn && (Session.HasActiveTenant || AllowWithoutTenant) && (!Session.TwoFactorRequired || AllowWithoutTwoFactor))
 {
     @if (Module is not null && !Session.IsModuleEnabled(Module))
     {
-        <div class="alert alert-warning">Bu modül kuruluşunuz için açık değil.</div>
+        <div class="alert alert-warning">@Texts.Get("auth.gate.moduleOff")</div>
     }
     else if ((Permission is not null && !Session.Can(Permission))
              || (AnyPermission is not null && !Session.CanAny(AnyPermission)))
     {
-        <div class="alert alert-warning">Bu ekranı görüntüleme yetkiniz yok. Yöneticinizden rol isteyin.</div>
+        <div class="alert alert-warning">@Texts.Get("auth.gate.noPermission")</div>
     }
     else
     {
@@ -30,6 +30,12 @@ else if (Session.IsSignedIn && Session.HasActiveTenant && (!Session.TwoFactorReq
 
     /// <summary>Firma iki adımlı doğrulama istese de gösterilir (Hesabım: kurulum orada yapılır).</summary>
     [Parameter] public bool AllowWithoutTwoFactor { get; set; }
+
+    /// <summary>
+    /// Aktif firma olmadan da gösterilir (Hesabım: kişiye aittir; firmasız platform yöneticisi de iki adımlı doğrulamayı
+    /// orada açar). Firma gerektiren ekranlarda verilmez.
+    /// </summary>
+    [Parameter] public bool AllowWithoutTenant { get; set; }
 
     /// <summary>Modül anahtarı (ör. "crm"); tenant için kapalıysa içerik gösterilmez.</summary>
     [Parameter] public string? Module { get; set; }
@@ -69,7 +75,7 @@ else if (Session.IsSignedIn && Session.HasActiveTenant && (!Session.TwoFactorReq
                 Navigation.NavigateTo($"giris?donus={Uri.EscapeDataString(current)}");
             }
         }
-        else if (!Session.HasActiveTenant)
+        else if (!Session.HasActiveTenant && !AllowWithoutTenant)
         {
             Navigation.NavigateTo(Session.NoTenantHome);
         }

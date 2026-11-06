@@ -7,36 +7,44 @@
 <div class="top-row ps-3 navbar navbar-light">
     <div class="container-fluid">
         <AppLauncher />
-        <button type="button" title="Menü" aria-label="Menü" aria-expanded="@(!collapseNavMenu ? "true" : "false")"
+        <button type="button" title="@Texts.Get("shell.nav.menu")" aria-label="@Texts.Get("shell.nav.menu")" aria-expanded="@(!collapseNavMenu ? "true" : "false")"
                 class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
     </div>
 </div>
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column" aria-label="Sol menü">
+<div class="@NavMenuCssClass nav-scrollable">
+    <nav class="nav flex-column" aria-label="@Texts.Get("shell.nav.label")">
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" title="Ana sayfa">
-                <AppIcon Name="home" Size="20" /> <span class="nav-label">Ana sayfa</span>
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" title="@Texts.Get("shell.nav.home")" @onclick="CloseMobileMenu">
+                <AppIcon Name="home" Size="20" /> <span class="nav-label">@Texts.Get("shell.nav.home")</span>
             </NavLink>
         </div>
 
-        @* Sol menü yalnızca aktif modülün sayfalarını gösterir; aktif modül route'tan bulunur (yenilemede ve doğrudan bağlantıda da).
-           Liste AppCatalog metadata'sından, tenant'ın açık modüllerine ve kullanıcının izinlerine göre süzülerek gelir. *@
-        @if (activeRoot is not null)
+        @* Sol menü yalnızca aktif uygulamanın ekranlarını gösterir; aktif uygulama route'tan bulunur (yenilemede ve doğrudan bağlantıda da).
+           Bölümler ve bağlantılar AppCatalog metadata'sından, tenant'ın açık modüllerine ve kullanıcının izinlerine göre süzülerek gelir;
+           boş bölüm çıkmaz. Etkin ekranın bölümü açık gelir; "Footer" bölümler (CRM Ayarları) kaydırma alanının altına sabitlenir. *@
+        @if (menu is not null)
         {
-            <div class="nav-section px-3"><span class="nav-label">Aktif modül</span></div>
-            <div class="nav-module mx-3" title="@activeRoot.Name">
-                <AppIcon Name="@activeRoot.Icon" Size="20" />
-                <span class="nav-label">@activeRoot.Name</span>
+            <div class="nav-section px-3"><span class="nav-label">@Texts.Get("shell.nav.activeModule")</span></div>
+            <div class="nav-module mx-3" title="@menu.Root.Name">
+                <AppIcon Name="@menu.Root.Icon" Size="20" />
+                <span class="nav-label">@menu.Root.Name</span>
             </div>
-            @foreach (AppDefinition app in children)
+
+            @foreach (MenuSection section in menu.Sections.Where(s => s.Group is not { Footer: true }))
             {
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="@app.Route" Match="@(app.ExactMatch ? NavLinkMatch.All : NavLinkMatch.Prefix)" title="@app.Name">
-                        <AppIcon Name="@app.Icon" Size="20" /> <span class="nav-label">@app.Name</span>
-                    </NavLink>
+                @Group(section)
+            }
+
+            @if (menu.Sections.Any(s => s.Group is { Footer: true }))
+            {
+                <div class="nav-pinned">
+                    @foreach (MenuSection section in menu.Sections.Where(s => s.Group is { Footer: true }))
+                    {
+                        @Group(section)
+                    }
                 </div>
             }
         }
@@ -46,17 +54,17 @@
 @* Menüyü daralt / genişlet (yalnızca geniş ekranda; telefonda menü açılır panel olarak çalışır). *@
 <div class="nav-footer px-3">
     <button type="button" class="nav-collapse-button" @onclick="ToggleSidebarAsync"
-            aria-pressed="@(sidebarCollapsed ? "true" : "false")" title="@(sidebarCollapsed ? "Menüyü genişlet" : "Menüyü daralt")">
+            aria-pressed="@(sidebarCollapsed ? "true" : "false")" title="@(Texts.Get(sidebarCollapsed ? "shell.nav.expand" : "shell.nav.collapse"))">
         <AppIcon Name="@(sidebarCollapsed ? "panel-left-open" : "panel-left-close")" Size="20" />
-        <span class="nav-label">@(sidebarCollapsed ? "Menüyü Genişlet" : "Menüyü Daralt")</span>
+        <span class="nav-label">@Texts.Get(sidebarCollapsed ? "shell.nav.expand" : "shell.nav.collapse")</span>
     </button>
 </div>
 
 @code {
     private bool collapseNavMenu = true;
     private bool sidebarCollapsed;
-    private AppDefinition? activeRoot;
-    private IReadOnlyList<AppDefinition> children = [];
+    private MenuContext? menu;
+    private readonly HashSet<string> expanded = [];
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
@@ -80,13 +88,63 @@
         }
     }
 
+    // Bölüm başlığı (açılır/kapanır) ve bağlantıları. Başlıksız küme (grubu tanımsız ekranlar) düz bağlantı listesidir.
+    private RenderFragment Group(MenuSection section) => @<div class="nav-group px-3">
+        @if (section.Group is { } group)
+        {
+            bool open = expanded.Contains(group.Id);
+            bool hasActive = section.Entries.Any(e => e.App.Id == menu!.Active.Id);
+            string listId = "nav-group-" + group.Id;
+            <button type="button" class="nav-group-header @(hasActive ? "has-active" : null)" title="@group.Name"
+                    aria-expanded="@(open ? "true" : "false")" aria-controls="@listId" @onclick="() => ToggleGroupAsync(group.Id)">
+                <AppIcon Name="@(group.Icon ?? "list")" Size="20" />
+                <span class="nav-label">@group.Name</span>
+                <span class="nav-chevron nav-label"><AppIcon Name="@(open ? "chevron-down" : "chevron-right")" Size="16" /></span>
+            </button>
+            @if (open)
+            {
+                <ul id="@listId" class="nav-sub">
+                    @foreach (MenuEntry entry in section.Entries)
+                    {
+                        @Link(entry)
+                    }
+                </ul>
+            }
+        }
+        else
+        {
+            <ul class="nav-sub nav-sub-flat">
+                @foreach (MenuEntry entry in section.Entries)
+                {
+                    @Link(entry)
+                }
+            </ul>
+        }
+    </div>;
+
+    private RenderFragment Link(MenuEntry entry) => @<li>
+        <a class="nav-sublink @(IsActive(entry) ? "active" : null)" href="@entry.Link" title="@entry.Name"
+           aria-current="@(IsActive(entry) ? "page" : null)" @onclick="CloseMobileMenu">
+            <span class="nav-bullet" aria-hidden="true"></span>
+            <span class="nav-label">@entry.Name</span>
+        </a>
+    </li>;
+
+    private bool IsActive(MenuEntry entry) => menu?.Active.Id == entry.App.Id;
+
     private void Recompute()
     {
-        AppDefinition? active = AppNavigation.Resolve(Navigation.ToBaseRelativePath(Navigation.Uri));
-        AppDefinition? root = active is null ? null : Apps.RootOf(active);
-        bool visible = root is not null && Apps.Roots().Any(r => r.Id == root.Id);
-        activeRoot = visible ? root : null;
-        children = activeRoot is null ? [] : Apps.Children(activeRoot.Id);
+        menu = Apps.Context(Navigation.ToBaseRelativePath(Navigation.Uri));
+
+        // Etkin ekranın bölümü açık gelir; kullanıcının açtığı bölümler sayfa değişiminde de açık kalır.
+        if (menu is not null)
+        {
+            MenuSection? withActive = menu.Sections.FirstOrDefault(s => s.Group is not null && s.Entries.Any(e => e.App.Id == menu.Active.Id));
+            if (withActive?.Group is { } group)
+            {
+                expanded.Add(group.Id);
+            }
+        }
     }
 
     private void OnChanged() =>
@@ -105,6 +163,28 @@
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    // Telefonda bir bağlantıya tıklanınca açılır panel kapanır; bölüm başlıklarına tıklamak paneli kapatmaz.
+    private void CloseMobileMenu()
+    {
+        collapseNavMenu = true;
+    }
+
+    private async Task ToggleGroupAsync(string groupId)
+    {
+        // Daraltılmış menüde (yalnızca ikonlar) bölüm başlığına tıklamak menüyü genişletir ve o bölümü açar.
+        if (sidebarCollapsed)
+        {
+            await ToggleSidebarAsync();
+            expanded.Add(groupId);
+            return;
+        }
+
+        if (!expanded.Remove(groupId))
+        {
+            expanded.Add(groupId);
+        }
     }
 
     private async Task ToggleSidebarAsync()

@@ -1,6 +1,10 @@
 @* Sıralanabilir tablo başlığı (<th> içine konur): tıklama artan → azalan → varsayılan sırayla döner. Sıralama sunucudadır
    (liste uç noktasının sort anahtarları); bu bileşen yalnızca anahtarı seçer. Desc verilmezse artan ↔ varsayılan döner. *@
 <button type="button" class="sort-button @(Active ? "active" : null)" aria-label="@AriaText" @onclick="ClickAsync">
+    @if (ColumnIcon is not null)
+    {
+        <AppIcon Name="@ColumnIcon" Size="14" />
+    }
     @Label
     <AppIcon Name="@Icon" Size="12" />
 </button>
@@ -8,6 +12,9 @@
 @code {
     /// <summary>Başlık metni.</summary>
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    /// <summary>Sütunun türünü gösteren başlık ikonu (ör. "phone", "map-pin"); verilmezse çizilmez.</summary>
+    [Parameter] public string? ColumnIcon { get; set; }
 
     /// <summary>Artan sıralama anahtarı (ör. "title").</summary>
     [Parameter] public string? Asc { get; set; }
@@ -35,7 +42,8 @@
 
     private Task ClickAsync()
     {
-        var next = Ascending ? (Desc ?? Default) : Descending ? Default : (Asc ?? Desc ?? Default);
+        // Varsayılan sıra bu sütunun azalanıysa (ör. "-createdAt") azalandan "varsayılana" dönmek aynı yerde kalırdı; artana geçilir.
+        var next = Ascending ? (Desc ?? Default) : Descending ? (Default == Desc && Asc is not null ? Asc : Default) : (Asc ?? Desc ?? Default);
         return ValueChanged.InvokeAsync(next);
     }
 }

@@ -1,0 +1,130 @@
+@page "/crm/onay-bekleyenler"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Onay bekleyen işlerim · Modulix</PageTitle>
+
+@* Çalışma Alanım / Onay bekleyen işlerim: teklif ve sözleşme onaylarını tek listede toplar. Veri kaynağı ve yetki kaynak ekranlarınınkidir
+   (teklif onayları, sözleşme onayları); bu sayfa yeni bir onay kuralı ya da karar yolu eklemez, karar kaynak ekranda verilir. *@
+<AuthGate AnyPermission="@(new[] { CrmAccess.QuotesApprove, ContractsAccess.ContractsApprove })">
+    <div class="page-header">
+        <h1>Onay bekleyen işlerim</h1>
+    </div>
+    <p class="text-muted">Karar vermenizi bekleyen teklifler ve sözleşmeler, en uzun bekleyen önce. Karar, kaynak onay ekranında verilir; orada onay gerekçesi ve adımlar da görünür.</p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (CanSeeQuotes && CanSeeContracts)
+    {
+        <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="SelectView" Label="Onay görünümleri" />
+    }
+
+    @if (loading)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (Visible.Count == 0)
+    {
+        <p class="text-muted">Onay bekleyen iş yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Onay bekleyen işler</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Tür</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="type" Size="14" /> Kayıt</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="building" Size="14" /> İlgili</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="clock" Size="14" /> Bekleme</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Visible)
+                {
+                    <tr>
+                        <td data-label="Tür"><span class="badge stage-@(item.Kind == "quote" ? "qualified" : "open")">@(item.Kind == "quote" ? "Teklif" : "Sözleşme")</span></td>
+                        <td data-label="Kayıt" class="primary">
+                            <a href="@item.RecordHref">@item.Title</a> <small class="text-muted">@item.Number</small>
+                        </td>
+                        <td data-label="İlgili">@item.Related</td>
+                        <td data-label="Bekleme">
+                            @item.Waiting
+                            @if (item.Overdue) { <span class="badge stage-lost">Gecikti</span> }
+                        </td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{item.Title} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="@item.RecordHref"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                                <a class="view-menu-item" role="menuitem" href="@item.DecideHref"><AppIcon Name="check-circle" Size="16" /> <span>İncele ve karar ver</span></a>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private sealed record Item(string Kind, string Title, string Number, string RecordHref, string Related, DateTimeOffset? Since, bool Overdue, string DecideHref)
+    {
+        public string Waiting => Since is { } since ? Span(DateTimeOffset.UtcNow - since) : "—";
+
+        private static string Span(TimeSpan span) =>
+            span.TotalHours < 1 ? "1 saatten az" : span.TotalDays < 1 ? $"{(int)span.TotalHours} saat" : $"{(int)span.TotalDays} gün";
+    }
+
+    private static readonly IReadOnlyList<ViewOption> ViewOptions =
+    [
+        new("all", "Tümü", Icon: "clipboard-list"),
+        new("quote", "Teklifler", Icon: "file-text"),
+        new("contract", "Sözleşmeler", Icon: "file-text"),
+    ];
+
+    private List<Item> items = [];
+    private string view = "all";
+    private string? message;
+    private bool loading = true;
+
+    // Kaynak ekranların yetki ve modül koşulları aynen uygulanır; sunucu uç noktaları ayrıca denetler.
+    private bool CanSeeQuotes => Session.IsModuleEnabled(CrmAccess.ModuleKey) && Session.Can(CrmAccess.QuotesApprove);
+
+    private bool CanSeeContracts => Session.IsModuleEnabled(ContractsAccess.ModuleKey) && Session.Can(ContractsAccess.ContractsApprove);
+
+    private IReadOnlyList<Item> Visible => view == "all" ? items : [.. items.Where(i => i.Kind == view)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        await Lookups.LoadAsync();
+        var loaded = new List<Item>();
+        var errors = new List<string>();
+
+        if (CanSeeQuotes)
+        {
+            var (quotes, error) = await Api.GetAllAsync<QuoteDto>("/api/crm/quotes?approvalStatus=Pending&status=Draft");
+            if (error is not null) { errors.Add(error); }
+            loaded.AddRange((quotes ?? []).Select(q => new Item(
+                "quote", q.Title, $"{q.QuoteNumber} · V{q.RevisionNo}", $"crm/teklifler/{q.Id}", Lookups.CompanyName(q.CompanyId), q.CalculatedAt, false, "crm/teklif-onaylari")));
+        }
+
+        if (CanSeeContracts)
+        {
+            var result = await Api.GetAsync<List<ContractApprovalInboxItemDto>>("/api/contracts/approvals/inbox?mine=true");
+            if (!result.IsSuccess && result.Error is not null) { errors.Add(result.Error); }
+            loaded.AddRange((result.Value ?? []).Select(c => new Item(
+                "contract", c.Title, $"{c.Number} · V{c.VersionNo}", $"sozlesmeler/{c.ContractId}", $"Gönderen: {Lookups.MemberName(c.SubmittedBy)}", c.SubmittedAt, c.IsOverdue, "sozlesmeler/onaylar")));
+        }
+
+        items = [.. loaded.OrderBy(i => i.Since is null).ThenBy(i => i.Since)];
+        message = errors.Count > 0 ? string.Join(" ", errors) : null;
+        loading = false;
+    }
+
+    private void SelectView(string key) => view = key;
+}

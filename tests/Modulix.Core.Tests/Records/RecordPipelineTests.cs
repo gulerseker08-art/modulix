@@ -261,6 +261,20 @@ public class RecordPipelineTests
         Assert.Equal("secret", Assert.Single(result.Error.FieldErrors!).Field);
     }
 
+    [Theory]
+    [InlineData("secret")]
+    [InlineData("-secret")]
+    public async Task Sorting_by_hidden_field_is_rejected_because_the_order_leaks_the_value(string sort)
+    {
+        _hidden.Add("secret");
+
+        var result = await Pipeline().QueryAsync(
+            new RecordQuery(Entity, Filters: new Dictionary<string, string> { ["sort"] = sort }), default);
+
+        Assert.Equal(RecordErrorCode.ValidationFailed, result.Error!.Code);
+        Assert.Equal("sort", Assert.Single(result.Error.FieldErrors!).Field);
+    }
+
     [Fact]
     public async Task Custom_fields_are_validated_merged_and_audited_per_field()
     {

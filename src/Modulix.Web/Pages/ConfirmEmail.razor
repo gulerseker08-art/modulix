@@ -2,26 +2,26 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>E-posta onayı · Modulix</PageTitle>
+<PageTitle>@Texts.Get("auth.confirmEmail.title") · Modulix</PageTitle>
 
 @* E-posta değişikliğinin onay bağlantısı (Y7a). Onaylanınca bütün oturumlar kapanır; yeni adresle giriş yapılır. *@
 <div class="narrow">
-    <h1>E-posta onayı</h1>
+    <h1>@Texts.Get("auth.confirmEmail.title")</h1>
 
     @if (linkError is not null)
     {
         <div class="alert alert-danger" role="alert">@linkError</div>
-        <a href="giris">Giriş sayfasına git</a>
+        <a href="giris">@Texts.Get("auth.goToLogin")</a>
     }
     else if (done)
     {
-        <div class="alert alert-success" role="status">E-postanız @Email olarak değişti. Güvenliğiniz için bütün oturumlarınız kapatıldı; yeni adresinizle giriş yapın.</div>
-        <a class="btn btn-primary w-100" href="giris">Giriş yap</a>
+        <div class="alert alert-success" role="status">@Texts.Get("auth.confirmEmail.done", Email)</div>
+        <a class="btn btn-primary w-100" href="giris">@Texts.Get("auth.login.submit")</a>
     }
     else
     {
-        <p>Hesabınızın e-postası <strong>@Email</strong> olarak değişecek. Onayladığınızda bütün oturumlarınız kapanır.</p>
-        <button type="button" class="btn btn-primary w-100" disabled="@busy" @onclick="ConfirmAsync">E-postamı değiştir</button>
+        <p>@Texts.Strong("auth.confirmEmail.intro", Email)</p>
+        <button type="button" class="btn btn-primary w-100" disabled="@busy" @onclick="ConfirmAsync">@Texts.Get("auth.confirmEmail.submit")</button>
     }
 </div>
 
@@ -40,7 +40,7 @@
     {
         if (UserId is null || string.IsNullOrEmpty(Email) || string.IsNullOrEmpty(Token))
         {
-            linkError = "Onay bağlantısı eksik. E-postadaki bağlantıyı açın.";
+            linkError = Texts.Get("auth.confirmEmail.linkMissing");
         }
     }
 

@@ -158,3 +158,13 @@ public sealed record AutomationRunStepDto(
 public sealed record AutomationRunDetailDto(AutomationRunDto Run, DateTimeOffset NextAttemptAt, IReadOnlyList<AutomationRunStepDto> Steps);
 
 public sealed record RunAutomationRuleRequest(Guid RecordId);
+
+// Başlangıç şablonları (ADR-0027, Dilim 3b). Şablon kullanmak taslak kural açar; taslak çalışmaz.
+public sealed record AutomationTemplateDto(
+    string Key,
+    string ModuleKey,
+    string EntityKey,
+    string DisplayName,
+    string Description,
+    bool Available,
+    IReadOnlyList<AutomationIssueDto> Issues);

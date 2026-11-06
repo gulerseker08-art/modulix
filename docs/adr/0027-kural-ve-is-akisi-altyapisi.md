@@ -188,8 +188,11 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 0 | İnceleme, bu ADR | Bu oturum |
 | 1 | `Core.Contracts` sözleşmeleri, koşul doğrulayıcı/değerlendirici, aksiyon sözleşmesi, `AutomationRules/Versions` + migration + RLS, kural servisi, yan etkisiz önizleme, `core.automation.*` izinleri, denetim, API, Logistics yetenek beyanı, testler | Bu oturum |
 | 2a | Olay yolu (`core.automation` aboneliği), `AutomationRuns/Steps`, tekilleştirme, kira, retry, kuralın kimliği, acil durdurma, tenant limitleri, elle çalıştırma, çalışma geçmişi API'si | Uygulandı (aşağıda "Dilim 2a") |
-| 2b | Tarama tabanlı tetikleyiciler (`Scheduled`, `DateRelative`, `Inactivity`), iş olayı tetikleyicisi, `AutomationScanCursors`, `IAutomationRecordSource`, saklama temizliği | Sonra |
-| 3 | CRM yetenek beyanı ve aksiyonları, ilk şablonlar (pasif), demo | Sonra |
+| 2b-1 | Tarama tabanlı tetikleyiciler (`Scheduled`, `DateRelative`, `Inactivity`), `AutomationScanCursors`, `IAutomationRecordSource` | Uygulandı (aşağıda "Dilim 2b-1") |
+| 2b-2 | Çalışma/adım saklama temizliği | Uygulandı (aşağıda "Dilim 2b-2") |
+| 2b-3 | İş olayı tetikleyicisi (`DomainEvent`); Ç0.4 iş olayı yayınlama sözleşmesine bağlı | Sonra |
+| 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
+| 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
 | 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Sonra |
 | 5 | Blazor ekranları | Sonra |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
@@ -304,5 +307,99 @@ CI (GitHub Actions) bu dilim için çalışmadı: hesap faturalandırma/harcama 
 ### Kalan işler (Dilim 2a sonrası)
 
 - Dilim 2b: tarama tabanlı tetikleyiciler, `AutomationScanCursors`, `IAutomationRecordSource`, iş olayı tetikleyicisi, çalışma saklama temizliği.
-- Hâlâ gerçek bir modülde aksiyon yoktur (CRM, Dilim 3); canlı uygulamada yayınlanabilir kural bulunmadığı için yürütme yalnızca testlerde uçtan uca görülmüştür.
-- `IFollowUpActivities` idempotency anahtarı (Dilim 3), özel alan olay farkı biçiminin gerçek outbox yüküyle doğrulanması hâlâ açıktır.
+- (Dilim 3a ile kapandı: CRM aksiyon, kayıt kaynağı ve ilişki beyan eder; gerçek veritabanı testleri CI'da doğrulanır.)
+- `IFollowUpActivities` idempotency anahtarı Dilim 3a ile eklendi; özel alan olay farkı biçiminin (`custom.<anahtar>`) gerçek outbox yüküyle doğrulanması hâlâ açıktır.
+
+### Dilim 2b-1 (4 Kasım 2026)
+
+Tarama tabanlı tetikleyiciler çalışır (ayrıntı için README "Otomasyon kuralları → Tarama tetikleyicileri"). Yapılanlar:
+
+- **Sözleşme** (`Modulix.Core.Contracts/Automation/AutomationRecordSource.cs`): `IAutomationRecordSource.ScanAsync(AutomationScanQuery)` yalnızca kayıt kimlikleri döndürür (kimliğe göre artan, anahtar tabanlı sayfa); `AutomationEntityDefinition.RecordSource` modülün kaynak tipini bildirir (catalog açılışta tipi doğrular). Core modül tablosu okumaz; koşul, alan yetkisi ve aksiyon yine kuralın kimliğiyle kayıt boru hattından geçer.
+- **Tetikleyiciler:** `Scheduled` (tenant saatinde "SS:dd" sonrası, tüm kayıtlar), `DateRelative` (tarih alanı bugün − OffsetDays gününe düşenler; tenant takvim günüyle), `Inactivity` (ilişkide, tenant gününün başlangıcından `Days` gün öncesinden beri hareketi olmayanlar). Kaynağı olmayan kayıt türünde tarama tetikleyicisi yayınlanamaz.
+- **Veri:** `core.AutomationScanCursors` (migration `AutomationScanCursors`, RLS): (kural sürümü, tenant günü) başına tek imleç, `UNIQUE(TenantId, RuleVersionId, PeriodKey)`; son kayıt kimliği, kuyruğa alınan sayı, tamamlandı. `AutomationRunOrigin.Scan` (metin olarak saklandığı için ek şema değişikliği gerekmez).
+- **Tekilleştirme:** dönem anahtarı tenant takvim günüdür (`scan:yyyy-MM-dd`): aynı gün ikinci tarama aynı kayıtta ikinci çalışma açmaz, ertesi gün açar (tasarım bölümündeki "dönem anahtarı" kararı).
+- **Yürütme:** `AutomationScanner`, `AutomationRunner.RunTenantAsync` içinde tenant kilidi ve acil durdurma kontrollerinden sonra, sıradaki çalışmalardan önce çalışır. Sayfa, imleç ve çalışmalar tek `SaveChanges` ile yazılır. Koruma: tur başına `ScanRecordsPerTenantPerRound` (500) kayıt, bekleyen çalışma `ScanBacklogLimit` (1000) olunca duraklama, sayfa `ScanPageSize` (200); kapalı modül ve etkinlik tarihi dışındaki kural atlanır; bozuk kaynak yalnızca kendi kuralını o turda atlatır (loga yalnızca hata türü).
+
+Tasarımdan ayrılan / netleşen noktalar:
+
+- **Artımlı tarama yapılmadı:** ilk tasarım "artımlı" diyordu; günlük tarama tam taramadır çünkü zamana bağlı koşullar ("X gündür bekliyor") kayıt değişmese de doğru olabilir. Maliyet: `Scheduled` kuralı koşulu sağlamayan kayıtlar için de her gün `NotMatched` çalışma satırı yazar; saklama temizliği (2b-2) ve kural yazarının koşulu `DateRelative`/`Inactivity` ile daraltması bunu sınırlar.
+- **Kaçırılan günler geriye dönük taranmaz** (işçi bir gün kapalıysa o günün taraması yapılmamış olur).
+- Zincirleme: her tarama çalışması yeni bir iz (correlation) ve derinlik 0 ile başlar.
+
+### Test sonuçları (Dilim 2b-1)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter Automation` | başarılı (tarama planı, imleç, kaynak beyanı ve doğrulama testleri dahil) |
+| `dotnet test tests/Modulix.IntegrationTests --filter AutomationScanTests` (SQL Server) | 10 başarılı (mutlu yol, ikinci tarama/ertesi gün, tarihe bağlı, hareketsizlik, sayfalama ve imleç, bekleyen sınırı, tenant izolasyonu, acil durdurma, bozuk kaynak, yayın izni) |
+| Otomasyon, ayarlar ve yönetim entegrasyon testleri (`Automation`, `SettingsTests`, `AdministrationTests`) | 102 başarılı, 1 başarısız: `PlatformAdministrationTests.Every_platform_write_endpoint_has_an_explicit_role_rule` tek başına koşunca `Assert.NotEmpty(endpoints)` satırında düşer (bu dilim platform uçlarına dokunmaz; ana dalda doğrulanmadı) |
+| `dotnet test tests/Modulix.ArchitectureTests` | 52 başarılı |
+| `dotnet test tests/Modulix.Core.Tests` | 640 başarılı |
+
+Çıkan ders: üç otomasyon test sınıfı süreç genelindeki `AutomationProbe` durumunu (davranış, gecikme) paylaşır; sınıflar paralel koşunca yeniden deneme testleri kararsız düşüyordu. Üçü tek bir sıralı xUnit koleksiyonuna alındı (`AutomationTestCollection`). `TableInventoryTests` yerel veritabanında başka dalların tabloları (`platform.LicensePolicies` vb.) yüzünden düşer; CI temiz veritabanında doğrulanmalı.
+
+
+### Dilim 2b-2 (5 Kasım 2026)
+
+Planlanan iki işten **saklama temizliği** yapıldı; **iş olayı tetikleyicisi (`DomainEvent`) yapılmadı** ve bilerek Ç0.4'e bağlı bırakıldı.
+
+- **Saklama temizliği** (`AutomationRetention`, `AutomationRunner.CleanTenantAsync`, `AutomationWorker`): bitmiş çalışmalar ve adımları saklama süresinden sonra silinir. Başarılı, iptal ve koşulu sağlanmayan (`NotMatched`) çalışmalar `Automation:RunRetentionDays` (90), başarısız çalışmalar `Automation:FailedRunRetentionDays` (180) gün sonra (tamamlanma zamanına göre). Günlük taramanın yazdığı `NotMatched` satırları da böylece sınırlanır. Bitmemiş (bekleyen, çalışan) çalışmaya hiç dokunulmaz. Eski tarama imleçleri (`UpdatedAt`) aynı süreyle silinir. Önce adımlar, sonra çalışmalar silinir (yabancı anahtar `Restrict`); 500'lük gruplar, tur başına en çok 40 grup, sınır dolarsa sonraki tur devam eder; yarım kalan grup bir sonraki turda tamamlanır.
+- **Çalışma biçimi:** işçi `Automation:RetentionIntervalMinutes` (360) aralığıyla her tenant için temizliği, turla **aynı tenant kilidi** altında çalıştırır. Platform acil durdurma anahtarı ve firma otomasyon ayarı temizliği durdurmaz (kapalı otomasyonun eski kayıtları da süresi dolunca silinir). Denetim kaydı (audit) etkilenmez.
+- **Veri:** migration `AutomationRunRetentionIndex` yalnızca `IX_AutomationRuns_TenantId_CompletedAt` indeksini ekler (geriye uyumlu, tablo/RLS değişikliği yok).
+- **Sınırlama:** temizlik, işçinin turla gezdiği tenant'lar için çalışır (kural yeteneği beyan eden bir modülü açık olanlar); modülü kapatılmış tenant'ın eski çalışmaları modül yeniden açılana kadar kalır.
+
+**`DomainEvent` neden yapılmadı:** iş olayı yayınlama ve olay türü bildirme sözleşmesi (ADR-0007, Ç0.4) yok. Bugün yalnızca beş kayıt olayı üretiliyor, katalog abonelikte `DomainEventTypes.SchemaVersions` dışındaki türü reddediyor ve hiçbir modül iş olayı yayınlamıyor (`crm.opportunity.won` bile `RecordUpdated` durum geçişidir). Yayıncısı olmayan bir tetikleyiciyi açmak, "sessizce hiç tetiklenmeyen kural bırakılmaz" ilkesini bozardı; bu yüzden `DomainEventTrigger` ile yayın 422 vermeye devam eder (taslak saklanabilir). Ç0.4 yayınlama sözleşmesi geldiğinde Dilim 2b-3 şunlarla tamamlanır: aboneliğin olay türlerinin katalogda `AutomationEventDefinition`'lardan genişletilmesi, `AutomationTriggerMatcher`'a iş olayı eşleşmesi, `IsExecutable`'a eklenmesi.
+
+### Test sonuçları (Dilim 2b-2)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.IntegrationTests --filter "AutomationRetentionTests\|AutomationScanTests"` (SQL Server) | 15 başarılı. Yeni 5 test: süresi dolan çalışma ve adımın silinmesi (taze olan kalır, tekrar çalıştırma güvenli), başarısız çalışmanın daha uzun saklanması ve bitmemiş çalışmanın silinmemesi, eski imleçlerin silinmesi, tenant izolasyonu, acil durdurma kapalıyken de temizlik ve bilinmeyen tenant |
+
+Temizliğin API yüzü yoktur (yalnızca arka plan işi); bu yüzden dört test kuralındaki "yetki" ayağı bu dilimde uygulanamaz, yerine "yalnızca bitmiş ve süresi dolmuş satır silinir" sınanır.
+
+### Dilim 3a: CRM yetenek beyanı (5 Kasım 2026)
+
+Dilim 3'ün ilk parçası: CRM kural altyapısına gerçek bir modül olarak katıldı. **Pasif başlangıç şablonları ve demo 3b'ye bırakıldı** (şablon altyapısı yok; şablon motoru Dilim 4'tür, burada yalnızca metadata şablonları olurdu ve ayrı bir tasarım kararı ister).
+
+- **Beyan** (`Modulix.Modules.Crm/Automation/CrmAutomation.cs`): kayıt türleri `crm.lead` ve `crm.opportunity` (okuma izinleri kural yazma izni gibi davranır), dört olay (oluşturuldu / güncellendi), alanlar, iki "Aktiviteler" ilişkisi, kayıt kaynağı ve `crm.follow-up.create` aksiyonu. `IModule.Automation` ile kaydolur; katalog açılışta doğrular.
+- **Hassas alanlar:** `amount` ve `probability` hem `SensitiveFields` hem `AutomationFieldDefinition.ReadPermission` olarak `crm.opportunity-amounts.read` taşır (Dilim 2 notunun karşılığı); birim/entegrasyon testi iki beyanın uyumunu denetler.
+- **Kayıt kaynağı** (`CrmAutomationRecordSource`, `Records/` altında: mimari kural `IModuleData`'yı yalnızca `Records` klasörüne izin verir): yalnızca kayıt kimliği döndürür; zamanlanmış ve hareketsizlik taramaları açık kayıtlarla sınırlıdır (kapanmış kayıtlar için günlük `NotMatched` satırı yazmamak için), tarihe bağlı tarama durumdan bağımsızdır. Tarih sütunlarının tek kaynağı `CrmAutomation.*DateColumns` tablosudur; beyanla ayrışmaz (birim test).
+- **İlişki çözümleyici** (`CrmActivityRelationResolver`): doğrudan sütun ve `ActivityLink` ile bağlı aktiviteleri tek sorguyla sayar, özel aktiviteleri saymaz. `Where` (bugün yalnızca aktivite durumu) durum kümesine çevrilir: VE kesişim, VEYA birleşim.
+- **İdempotency (Dilim 2 notunun kapanışı):** `FollowUpRequest.IdempotencyKey` (isteğe bağlı, geriye uyumlu) ve `FollowUpResult.AlreadyExisted`. Yeni tablo ya da migration **gerekmedi**: aktivitede zaten `(TenantId, ExternalSource, ExternalId)` filtreli benzersiz indeksi vardı; anahtar `externalSource = "automation"` ile yazılır. Sistem alanları iç çağrı için iş akışı kapısı açılarak yazılır. Eşzamanlı iki çağrıdan kaybeden, kazananın aktivitesini bulur.
+
+Tasarımdan ayrılan / netleşen noktalar:
+
+- **Atanan kullanıcı parametresine alan bağlanamaz** (`AllowFieldBinding = false`): doğrulayıcı lookup alanını parametreyle aynı lookup anahtarında ister; müşteri adayı ve fırsatın sorumlu alanları farklı anahtarlara sahip. Varsayılan zaten kaydın sorumlusudur (işleyici bunu kayıt boru hattından okur), bu yüzden bağlamaya gerek kalmadı. Core doğrulayıcısı değiştirilmedi.
+- **Gün sayısı sınırı yayında değil çalışmada denetlenir:** parametre şemasında aralık yok; `dueInDays` 0-365 dışındaysa adım kalıcı hata verir ve neden yazılır. Şemaya aralık eklemek Core değişikliğidir, sonraya bırakıldı.
+- **Doğrulama dersi:** katalog beyanı açılışta doğruladığı için hatalı bir beyan uygulamayı hiç açtırmaz. İlk denemede lookup parametresi lookup anahtarsız beyan edildiği için bütün entegrasyon testleri `InvalidOperationException` ile düştü. Bu yüzden gerçek katalogla beyanı kuran bir test eklendi (`CrmAutomationDeclarationTests`, veritabanı gerektirmez).
+
+### Test sonuçları (Dilim 3a)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Crm.Tests` | 280 başarılı (aksiyon doğrulaması, dry-run, tarih sütunu / beyan tutarlılığı dahil) |
+| `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationDeclarationTests` | 3 başarılı (gerçek katalog, hassas alan izinleri, aksiyon tanımı) |
+| `dotnet test tests/Modulix.ArchitectureTests` | 52 başarılı |
+| `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | **Yerelde doğrulanamadı.** Yerel paylaşımlı veritabanında `{}` içerikli yayınlanmış kural paketi sürümleri var; kayıt oluşturan **her** test (mevcut `LeadTests` dahil) `FormatException: Kural listesi çözülemedi` ile düşüyor. Testler (hareketsizlik, tarihe kala, ilişki koşulu, tekrar teslimde tek aktivite, doğrulama, tenant izolasyonu, yetki) CI'da temiz veritabanında koşar |
+
+### Dilim 3b: Başlangıç şablonları (5 Kasım 2026)
+
+3a'da "ayrı bir tasarım kararı ister" diye bırakılan şablon altyapısı karara bağlandı: **şablon kodda beyan edilir, tabloda saklanmaz.**
+
+- **Karar:** `AutomationCapabilities.Templates` (`AutomationTemplateDefinition`: anahtar, ad, açıklama, kayıt türü, tanım). Şablon tenant'tan bağımsız sabittir (tek imaj, müşteriye özel kod yok); tenant'a ait olan yalnızca onu **kullanınca** oluşan kuraldır. Bu yüzden yeni tablo, migration ya da RLS politikası yoktur. Bu dilimde kararlaştırılan: planlanan `AutomationTemplates` tablosu (firmanın kendi şablonlarını kaydetmesi) **şimdilik yoktur**; "kuralı şablon olarak kaydet" ihtiyacı doğarsa ayrı bir dilimdir ve bu beyan yolunu bozmaz.
+- **Pasiflik güvencesi yapıdadır:** "kullan" yalnızca `IAutomationRuleService.CreateAsync` çağırır, yani **taslak** kural açar. Taslağı hiçbir yol çalıştırmaz (tarayıcı ve olay aboneliği yalnızca yayınlanmış, açık kuralları işler). Yayın ve açma ayrı izinle (`core.automation.publish`) firmanın kararıdır; şablonun kendi başına bir şey açan yolu yoktur. Denetim kaydı kural oluşturma yolundan gelir.
+- **Katalog denetimi açılışta (yapı):** anahtar modül önekli ve tekil, ad ve açıklama dolu, kayıt türü modülün, en az bir aksiyon, adım kimlikleri tekil, aksiyon kayıtlı. Alan/koşul/izin ayrıntısı **kullanan kimliğin yetkisiyle** `AutomationDefinitionValidator` ile doğrulanır; aksiyon izni olmayan için şablon "kullanılamıyor" görünür ve taslağı açılmaz (yetki yükseltme yok).
+- **Uç noktalar:** `GET /api/automation/templates` (`core.automation.read`; modülü bu firmada kapalı şablonlar listede yoktur, kullanılamayanlar `issues` ile gelir) ve `POST /api/automation/templates/{key}/use` (`core.automation.manage`; bilinmeyen / modülü kapalı şablon 404, kullanılamayan 400, başarıda 201 + taslak kural).
+- **CRM şablonları** (`CrmAutomationTemplates`, hepsi yalnızca takip aktivitesi açar; mesaj göndermez, kayıt değiştirmez): hareketsiz müşteri adayı (7 gün), hareketsiz fırsat (14 gün), kapanış tarihine 3 gün kalan açık fırsat, satın alma tarihine 7 gün kalan açık müşteri adayı.
+- **Demo** bu dilimde yoktur: gerçek veride toplu otomasyon kapsam dışıdır, şablon taslak teslim edilir. Demo ancak ekran (Dilim 5) ile birlikte anlamlıdır.
+
+### Test sonuçları (Dilim 3b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter Automation` | 138 başarılı (yeni: şablon katalog denetimi, anahtar/ad/açıklama/kayıt türü/aksiyon/adım kimliği/tekillik) |
+| `dotnet test tests/Modulix.Modules.Crm.Tests --filter CrmAutomationTemplateTests` | 4 başarılı (şablonlar beyanla tutarlı, yalnızca takip aktivitesi, JSON gidiş-dönüş) |
+| `dotnet test tests/Modulix.ArchitectureTests` | 65 başarılı |
+| `dotnet test tests/Modulix.IntegrationTests --filter "CrmAutomationDeclarationTests|CrmAutomationTemplateTests"` (SQL Server) | 9 başarılı. Yeni 4: taslak açılır, çalışmaz, yayınlanınca çalışır; dört şablon gerçek yayın doğrulamasından geçer; bilinmeyen ve modülü kapalı şablon 404; tenant izolasyonu; okuma/yönetim izni ve aksiyon izni olmayanın şablonu kullanamaması |
+| `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | 8 başarılı (3a testleri bozulmadı) |

@@ -13,10 +13,14 @@ public sealed class TabState(string initial)
 
     public string Active { get; private set; } = initial;
 
+    /// <summary>Etkin sekme değişince tetiklenir; <c>TabPanel</c> bununla kendini yeniden çizer (sayfa <c>TabBar.Changed</c> vermese de panel doğru görünür).</summary>
+    public event Action? Selected;
+
     public void Select(string key)
     {
         Active = key;
         visited.Add(key);
+        Selected?.Invoke();
     }
 
     /// <summary>Sekme içeriği çizilsin mi (en az bir kez açıldı).</summary>

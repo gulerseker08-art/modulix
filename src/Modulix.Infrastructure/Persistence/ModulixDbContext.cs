@@ -6,6 +6,7 @@ using Modulix.Core.Authorization;
 using Modulix.Core.Automation;
 using Modulix.Core.Communication;
 using Modulix.Core.Customization;
+using Modulix.Core.Imports;
 using Modulix.Core.Lookups;
 using Modulix.Core.Teams;
 using Modulix.Core.Contracts.Persistence;
@@ -116,6 +117,12 @@ public class ModulixDbContext(
 
     public DbSet<AutomationRunStep> AutomationRunSteps => Set<AutomationRunStep>();
 
+    public DbSet<AutomationScanCursor> AutomationScanCursors => Set<AutomationScanCursor>();
+
+    public DbSet<ImportRun> ImportRuns => Set<ImportRun>();
+
+    public DbSet<ImportRowIssue> ImportRowIssues => Set<ImportRowIssue>();
+
     public DbSet<ReportDefinition> Reports => Set<ReportDefinition>();
 
     public DbSet<ReportShare> ReportShares => Set<ReportShare>();
@@ -143,6 +150,9 @@ public class ModulixDbContext(
     public DbSet<TenantLookupSetting> LookupSettings => Set<TenantLookupSetting>();
 
     public DbSet<TenantFormLayout> FormLayouts => Set<TenantFormLayout>();
+
+    /// <summary>Kullanıcının kişisel liste görünümleri (ADR-0034).</summary>
+    public DbSet<Modulix.Core.Views.GridView> GridViews => Set<Modulix.Core.Views.GridView>();
 
     public DbSet<ActivityNode> ActivityNodes => Set<ActivityNode>();
 
@@ -177,6 +187,7 @@ public class ModulixDbContext(
         {
             user.ToTable("Users", DatabaseSchemas.Platform);
             user.Property(u => u.DisplayName).HasMaxLength(ModulixUser.DisplayNameMaxLength).IsRequired();
+            user.Property(u => u.PreferredLanguage).HasMaxLength(LanguageOptions.MaxLength);
         });
         modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("UserClaims", DatabaseSchemas.Platform);
         modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins", DatabaseSchemas.Platform);

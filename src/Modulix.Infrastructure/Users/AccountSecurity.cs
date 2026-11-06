@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Records;
+using Modulix.Core.Settings;
 using Modulix.Infrastructure.Audit;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
@@ -65,6 +66,31 @@ public sealed class AccountSecurity(
         ThrowIfFailed(await users.UpdateAsync(user));
         await audit.RecordAsync(user, AuditAction.Updated, null, client, cancellationToken,
             before: new JsonObject { ["displayName"] = before }, details: new JsonObject { ["displayName"] = name });
+    }
+
+    /// <summary>
+    /// Arayüz dili tercihini kaydeder (ADR-0034). Boş değer tercihi kaldırır; desteklenmeyen kod reddedilir.
+    /// Dil kişiye aittir: değişiklik üye olunan bütün firmalarda geçerlidir.
+    /// </summary>
+    public async Task UpdateLanguageAsync(ModulixUser user, string? language, AccountClient client, CancellationToken cancellationToken)
+    {
+        string? preferred = null;
+        if (!string.IsNullOrWhiteSpace(language))
+        {
+            preferred = LanguageOptions.Normalize(language)
+                ?? throw new ArgumentException("Desteklenmeyen dil. Türkçe, English veya Azərbaycanca seçin.", "language");
+        }
+
+        var before = LanguageOptions.Normalize(user.PreferredLanguage);
+        if (preferred == before)
+        {
+            return;
+        }
+
+        user.PreferredLanguage = preferred;
+        ThrowIfFailed(await users.UpdateAsync(user));
+        await audit.RecordAsync(user, AuditAction.Updated, null, client, cancellationToken,
+            before: new JsonObject { ["language"] = before }, details: new JsonObject { ["language"] = preferred });
     }
 
     /// <summary>Şifreyi değiştirir ve <paramref name="currentSessionId"/> dışındaki oturumları kapatır.</summary>

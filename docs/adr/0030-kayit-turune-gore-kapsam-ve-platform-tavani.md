@@ -1,8 +1,8 @@
 # ADR-0030 — Kayıt türüne göre kayıt kapsamı ve platform görünürlük tavanı
 
-Durum: **taslak** (3 Kasım 2026; açık kararlar 4 Kasım 2026'da cevaplandı, bölüm 7; dilim 1 uygulandı, dilim 2 bekliyor). Bu belge tek başına hiçbir şeyi uygulamaz. "Doğrulandı" yazılanlar kodda okunmuş, "doğrulanmadı" yazılanlar bölüm 9'da listelenmiştir.
+Durum: **uygulandı** (3 Kasım 2026'da taslak, açık kararlar 4 Kasım 2026'da cevaplandı, bölüm 7; dilim 1, 2a, 2b ve 3 main'de, dilim 4 belge toparlamasıdır). Kalan işler bölüm 8'de, doğrulanmayanlar bölüm 9'dadır; "Doğrulandı" yazılanlar kodda okunmuş ya da testle/elle denenmiştir.
 
-Numara notu: `docs/adr` altında iki belge 0026, `0027` otomasyon, `0028` platform lisans ve tenant yönetimi, `0029` sektör profili genişletme numarasını taşır; bu belge bir sonraki boş numarayı (0030) kullanır. Taslak önce 0028, sonra 0029 olarak açılmış; numaralar başka belgelere verildiği için yeniden numaralandı.
+Numara notu: `docs/adr` altında iki belge 0026, `0027` otomasyon, `0028` platform lisans ve tenant yönetimi, `0029` sektör profili genişletme numarasını taşır; bu belge bir sonraki boş numarayı (0030) kullanır. Taslak önce 0028, sonra 0029 olarak açılmış; numaralar başka belgelere verildiği için yeniden numaralandı. Aynı dönemde açılan içe aktarma günlüğü ADR'si de başta 0030 almıştı; o 0033'e taşındı ([ADR-0033](0033-import-takibi-ve-islem-gunlugu.md)), bu belge 0030 olarak kalır.
 
 ## 1. Bağlam ve amaç
 
@@ -92,7 +92,7 @@ Kapsam dışı: alan seviyesi yetki (Y8b), kayıt bazlı paylaşım, koşullu/if
 1. **Dilim 1 — Tür anahtarlı okuma (davranış değişmez).** K1'in imza değişikliği ve 25 çağrının taşınması; sonuç bugünküyle aynı. Mimari test: türsüz `GetOwnersAsync` çağrısı yok. En riskli mekanik adım önce yapılır ve tek başına incelenebilir.
 2. **Dilim 2 — Veri modeli ve etkin kapsam.** K2–K8: iki tablo, migration, `MembershipDataScope`, `RoleService` doğrulaması, platform ve rol uçları, denetim. Ayrıca bölüm 7 kararları: `AppliesToAdministrators` alanı, `IRecordStore` kapsam türü anahtarı (alt kayıtlar), segment motorunda türe göre kapsam çözümleyicisi. Ekran yok.
 3. **Dilim 3 — Ekranlar.** K10.
-4. **Dilim 4 — Belgeler.** README (Yönetim ve Platform bölümleri), `docs/tenant-isletim.md` (tavan kaldırma/daraltma runbook'u).
+4. **Dilim 4 — Belgeler.** README (Yönetim ve Platform bölümleri), `docs/tenant-isletim.md` (tavan kaldırma/daraltma runbook'u). Sonucu aşağıda.
 
 Her dilim ayrı PR'dır; her biri bu belgenin bölüm 6'sındaki ilgili testlerle teslim edilir.
 
@@ -120,14 +120,47 @@ Dilim 2'ye bırakılanlar (dilim 1'de sonuç değişmediği için güvenli, ama 
 
 ### Dilim 2a sonucu (uygulandı; roller henüz istisna yazamaz)
 
-Kapsam artık kayıt türüne ve platform tavanına göre hesaplanır; tavanı platform yazar. Rol tarafı (istisna alanı, doğrulama, uçlar) dilim 2b'dedir.
+Kapsam artık kayıt türüne ve platform tavanına göre hesaplanır; tavanı platform yazar. Rol tarafı (istisna alanı, doğrulama, uçlar) dilim 2b'dedir (aşağıda).
 
 - **Tablolar** (migration `RoleScopeOverridesAndLimits`, iki boş tablo, geriye uyumlu): `core.RoleScopeOverrides` (tenant verisi, RLS, `(TenantId, RoleId)` bileşik yabancı anahtar, rol silinince silinir, `(TenantId, RoleId, EntityKey)` tekil) ve `platform.TenantScopeLimits` (RLS dışı, `(TenantId, EntityKey)` tekil, `AppliesToAdministrators` varsayılan `false`). Dışa aktarma/silme tabloları katalogdan okuduğu için ikisini de kendiliğinden kapsar (testli).
 - **Etkin kapsam** (`MembershipDataScope`): rolün tür istisnası varsa o, yoksa varsayılanı; kişinin rollerinin kapsamları türe göre ayrı birleştirilir; sonra tavana indirilir (`RecordScopeRules.Clamp`: tavan kapsamı kapsıyorsa aynen, kapsam tavanı kapsıyorsa tavan, karşılaştırılamıyorsa `Own`). Yönetici yalnızca `AppliesToAdministrators` ise bağlanır. Önbellek istek başına `(üyelik, tür)`; istisna yoksa ek sorgu yapılmaz, tavan sorgusu tenant başına bir kez.
 - **Alt kayıtlar:** `IRecordStore.ScopeEntityKey`; 26 alt kayıt deposu sınıfı ana türünü bildirir (firma: kişi bağlantısı, ilişki, iletişim noktası, konum, adres; kişi: kişi iletişim noktası; fırsat: iletişimci, rakip; aktivite alt kayıtları; teklif satırı; sözleşme tarafı, satırı, taahhüt; sipariş alt kayıtları ve operasyon işleri; kampanya ve segment alt kayıtları).
 - **Segment:** her koşul kendi türünün kapsamıyla (`ISegmentFieldSource.ScopeEntityKeys`, `SegmentEvaluationContext.OwnersFor`; CRM: firma, kişi, lead, fırsat). Kapsam bildirilmeyen tür sorulursa istisna fırlar, sessizce atlanmaz.
 - **Platform ucu:** `GET`/`PUT /api/platform/tenants/{id}/scope-limits`; tür listesi kayıt depolarından (`ScopedRecordTypes`: sahip alanı olan, kapsamı kendi anahtarıyla çözülen depolar) ve firmada açık modüllerden gelir, koda sabit liste yoktur (`OwnedRecords` devir amaçlıdır ve kapsam türlerinin tamamını içermez; bu yüzden kullanılmadı). PUT tüm kümeyi değiştirir; geçersiz/kapalı/yinelenen tür ve geçersiz kapsam 400, firma yoksa 404. Denetim: firmanın `core.tenant` kaydı (alan `scopeLimits`, "Kayıt görünürlüğü") ve platform denetimi (`tenant.scope-limits-changed`, gerekçe, önce/sonra, etkilenen rol sayısı); aynı küme yeniden gönderilirse kayıt yazılmaz.
-- **Bilinen sınır:** kişi kaydı firmaya bağlıyken görünürlüğünü bugün `crm.contact` kapsamının sahip kümesi, firmanın sorumlusuna ve kişinin sorumlusuna birlikte uygulanarak belirler. Firma ile kişi için farklı kapsam/tavan verilirse kişi, firmanın kapsamını değil kişi türünün kapsamını izler. "Firmaya bağlı kişi firmanın kapsamıyla görünsün" kuralı ayrı bir karar gerektirir; dilim 2b öncesinde karara bağlanmalıdır.
+- **Bilinen sınır:** kişi kaydı firmaya bağlıyken görünürlüğünü bugün `crm.contact` kapsamının sahip kümesi, firmanın sorumlusuna ve kişinin sorumlusuna birlikte uygulanarak belirler. Firma ile kişi için farklı kapsam/tavan verilirse kişi, firmanın kapsamını değil kişi türünün kapsamını izler.
+  **Karar (4.11.2026): ayrı kalır.** Kişi kendi türünün kapsamıyla görünür; firmanın kapsamını izlemesi, `crm.contact` tavanını firma kapsamı üzerinden delmeye yol açar ve "her tür kendi kapsamıyla" ilkesine (K1, segment kararı) aykırıdır. İhtiyaç çıkarsa firma bazında ayrı bir ayar olarak eklenir.
+
+### Dilim 2b sonucu (uygulandı; rol uçları istisna yazar, ekran yok)
+
+- **Rol sözleşmesi:** `SaveRoleRequest.ScopeOverrides` ve `RoleDto.ScopeOverrides` (kayıt türü → kapsam). İstek alanı verilmezse (`null`) mevcut istisnalar değişmez; boş küme hepsini kaldırır. Aynı alan `IRoleService.CreateAsync/UpdateAsync` ve `RoleSummary`'dedir.
+- **Doğrulama** (`RoleService`): anahtar kapsamı ayarlanabilen bir türün olmalı (`ScopedRecordTypes.All()`: üst düzey, sahip alanlı depolar; alt kayıt türleri ve bilinmeyen anahtar 400). Modülün firmada açık olması aranmaz: sonradan kapanan türün istisnası geçerli kalır ve rol formu onu yeniden gönderebilir (ekran listesi açık modüllerden gelir). Geçersiz kapsam 400; sistem rolünde istisna 409.
+- **Tavan (409):** rolün tavanı olan türdeki etkin kapsamı (istisna, yoksa varsayılan) tavanı `Covers` ile kapsamıyorsa reddedilir. Varsayılan kapsam da denetlenir: tavanlı türde istisnası olmayan geniş rol kaydedilemez. Güncellemede yalnızca bu istekte **değişen** etkin kapsamlar denetlenir; sonradan daralan tavan, rolün ilgisiz düzenlemelerini (ad, izin) kilitlemez, o rol okuma tarafında zaten tavana indirilir.
+- **Yetki yükseltme:** her yeni ya da kaldırılan istisna için `EnsureActorMayGrantScopeAsync`; yönetici olmayan kişi kendi kapsamından geniş istisna veremez (403). Departmana rol atarken rolün istisnaları da denetlenir.
+- **Denetim:** istisnalar `core.role` kaydının `scopeOverrides` alanında ("Kayıt türüne göre kapsam") önce/sonra görünür; rol silinirken son hâli kayda girer, tablo satırları rolle birlikte silinir.
+- **Tavan okuma ucu (K9):** `GET /api/roles/scope-types` (`core.roles.manage`): kapsamı ayarlanabilen türler (firmada açık modüllerden) ve her türün platform tavanı (`maxScope`, yoksa `null`). Yalnızca kendi firmanın tavanlarını döner; yönetici muafiyet bayrağı gösterilmez. Rol ekranı bununla tavanı aşan seçenekleri kapalı gösterir (dilim 3); sunucu doğrulaması bundan bağımsızdır.
+
+### Dilim 3 sonucu (uygulandı; ekranlar)
+
+- **Platform → Firma detayı → "Kayıt görünürlüğü"** (`TenantScopeLimitsSection`): tür listesi sunucudan gelir (`GET .../scope-limits`; koda sabit liste yok, `OwnedRecords` değil depolar), her tür için en geniş kapsam seçici (varsayılan "Sınır yok"), tavanı olan türde "Yöneticiyi de bağla". Gerekçe zorunlu (sunucu yalnızca isteğe bağlı sayar; ekran daha katıdır çünkü erişimi daraltır). Kayıttan sonra etkilenen rol sayısı gösterilir. Yalnızca değişiklik varken kaydedilebilir.
+- **Rol ekranı → "Kapsam ve düzey" → "Kayıt türüne göre farklı kapsam":** tür başına "Varsayılan (...)" ya da bir kapsam; tavan, `GET /api/roles/scope-types` ile gelir. Tavanı aşan seçenek kapalı ve "(platform sınırını aşar)" yazılıdır; işlemi yapanın kapsamından geniş seçenek de kapalıdır. İstisnası olmayan türde varsayılan kapsam tavanı aşıyorsa satırda uyarı çıkar ve "Sınırı aşan türleri sınıra indir" düğmesi bu türlere tavan değerini istisna olarak yazar. Kaydetmede tüm istisna kümesi gönderilir (modülü kapalı türün istisnası da korunur).
+- **Sunucu değişikliği:** modülü sonradan kapanan türün mevcut tavanı `PUT scope-limits` içinde geçerli kalır (ekran tüm kümeyi yeniden gönderdiği için aksi halde tavan sessizce silinirdi); kapalı modülün yeni türüne tavan konamaz (testli).
+- **Doğrulama:** ekranlar yerelde (Release, demo veri) açık ve koyu temada elle denendi: tavan seçme, "Yöneticiyi de bağla", kaydetme, tavanı aşan seçeneklerin kapalı görünmesi, "sınıra indir". Ekran için otomatik arayüz testi yoktur; kurallar sunucu testleriyle korunur.
+- **Bulgu:** `RoleDetail`'deki `TabBar` `Changed` geri çağrısı almadığı için sekme değişince paneller yeniden çizilmiyordu (başlık değişiyor, içerik aynı kalıyordu). Bu dilimde `Changed="_ => { }"` eklendi. Aynı eksik `Changed` vermeyen 12 ekranda daha vardı (TicketNew, SupportSla, OrderHandover, OrderFromQuote, SegmentNew, CampaignNew, ContractTemplates, ContractFromQuote, QuoteDetail, PriceLists, Products, CreateTenantForm); ayrı PR'da (#185) kökünden çözüldü: `TabState.Selected` olayı ve `TabPanel` kendini yeniden çizer, sayfalara `Changed` yazmak gerekmez. `TicketNew` ve `Products` tarayıcıda denendi, diğer on form aynı yolu kullanır ama tek tek denenmedi.
+
+### Dilim 4 sonucu (belgeler)
+
+- `docs/tenant-isletim.md` "Kayıt görünürlük tavanı" bölümüne rol tarafı eklendi: rol kaydında 409 gelince ne yapılır, tavan daraltıldıktan sonra rol ekranında ne görünür, istisnalar nerede denetlenir.
+- README "Ekipler ve kayıt kapsamı" maddesi dilim 2a–3'ü kapsar hâle getirildi.
+- ADR durumu "uygulandı" yapıldı; bölüm 7 ve 9'daki dilim 2 öncesi ifadeler güncellendi.
+- İçe aktarma günlüğü ADR'si 0033'e taşınmıştı ama kodda, testte ve README'de "ADR-0030" olarak kalmıştı; bu başvurular 0033'e çevrildi (yalnızca yorum ve belge metni, davranış değişmedi).
+
+### Önizleme sonucu (uygulandı; tavan kaydedilmeden etki özeti)
+
+- **Uç:** `POST /api/platform/tenants/{id}/scope-limits/preview` (gövde `SetScopeLimitsRequest`, `Reason` yok sayılır). Hiçbir şey yazmaz, denetim kaydı üretmez; doğrulama `PUT` ile aynıdır (geçersiz/kapalı/yinelenen tür 400, firma yok 404). Yolu `/preview` ile bittiği için salt okunur lisansta da çalışır. Rol tablosunda Operasyon (uygulayacak rolle aynı); firma yöneticisi giremez.
+- **Sonuç:** tür başına `AffectedRoles` (önerilen tavanı aşan yönetici olmayan roller), `NewlyRestrictedMembers`/`ReleasedMembers` ve yönetici karşılıkları; toplamlar farklı kişileri sayar. "Yeni kısılan" bugünkü tavanlarla kısılmayıp önerilenle kısılandır, "serbest kalan" tersidir; böylece aynı küme yeniden önizlenince yeni kısılan çıkmaz.
+- **Hesap:** kişi başına çalışma zamanındaki kapsam çözümü (`MembershipPermissions.GetScopesForTypesAsync`: rol istisnası, ekip/departman rolü, yönetici) ve `RecordScopeRules.Covers`; yönetici yalnızca `AppliesToAdministrators` ise sayılır. Yalnızca etkin üyelikler (`Active`), destek erişimi sayılmaz. Roller üyelik başına bir kez okunur (`GetScopesForTypesAsync`, tür sayısıyla çarpılmaz) ama yine üyelik başına birkaç sorgu yapılır; çok kalabalık firmada yavaş olabilir, ekran yalnızca "Etkiyi göster" ile çağırır. Demo firmada (2 üye) ilk çağrı birkaç saniye, sonrakiler yaklaşık 1 sn sürdü; kalabalık firma için ölçülmedi.
+- **Ekran:** Platform → Firma detayı → "Kayıt görünürlüğü" bölümünde "Etkiyi göster" düğmesi (yalnızca değişiklik varken); seçim değişince önizleme silinir, kaydedince de.
+- **Testler:** `ScopeLimitPreviewTests` (3): önizleme yazmaz ve kaydetmenin sonucuyla örtüşür, kaldırınca serbest kalan, yönetici yalnızca bağlanınca sayılır, doğrulama 400/404, firma yöneticisi 403, başka firmanın üyesi sayılmaz.
 
 ## 6. Test planı (dört test ilkesi)
 
@@ -146,19 +179,20 @@ Entegrasyon testleri SQL Server ister; veritabanı yoksa çalıştırılamadığ
 3. **Segment ve rapor sorguları: her koşul kendi türünün kapsamıyla.** Satış görünümü ve tahmin yalnızca fırsatı süzer (sorun yok). Segment motoru tek sahip kümesi yerine türe göre küme veren bir çözümleyici alır (`SegmentEvaluationContext`, `Core.Contracts`; ör. "kazanılan fırsat" koşulu `crm.opportunity` kapsamıyla, firma koşulu `crm.company` kapsamıyla değerlendirilir). Hedef türle sınırlama reddedildi: mevcut segment özelliğini kısıtlar.
 4. **Alt kayıt türleri (karar değil, tasarım):** `IRecordStore` üzerinde varsayılanı kendi `EntityKey`'i olan bir kapsam türü anahtarı; alt kayıt depoları (aktivite notu, fırsat iletişimcisi vb.) ana türünü bildirir. Boru hattı kapsamı bu anahtarla sorar.
 
-Açık karar kalmadı. Dilim 2'nin başında yeniden doğrulanacak noktalar bölüm 9'dadır.
+Açık karar kalmadı. Doğrulanmayan noktalar bölüm 9'dadır.
 
 ## 8. Sonraki işler (bu kararın dışında)
 
 - Sektör profilinin varsayılan tavan önermesi (ör. "Lojistik" profili fırsatlarda `Unit`); önizleme ve onayla uygulanır, sessizce ezmez.
 - Kapsam dışı ortak firma/kişi için "gizle" seçeneği (ADR-0026 K8, dilim 3).
-- Tavanın platform ekranında "bu daralma kaç kullanıcıyı etkiler" önizlemesi.
+- ~~Tavanın platform ekranında "bu daralma kaç kullanıcıyı etkiler" önizlemesi~~ ve ~~`AppliesToAdministrators = true` için etkilenecek yönetici sayısı~~ yapıldı (aşağıda "Önizleme sonucu").
+- ~~Atanabilir üye listesi~~ çözüldü: `CrmLookups.LoadAsync` oturumdaki tek varsayılan kapsam `All` ise bütün üyeleri sunuyordu ve aksi halde `crm.opportunity` ile soruyordu; oysa liste yalnızca aktivitenin "Yeniden ata" eylemini besler. Kısayol kaldırıldı, liste her zaman aktivitenin kendi türüyle (`crm.activity`) sorulur; tür istisnası ve platform tavanı listeye yansır (`AssignableMembersScopeTests`).
 
 ## 9. Doğrulanmadı
 
 - ~~Modül çağrılarının tür anahtarları~~ dilim 1'de belirlendi (bölüm 5); segment motorunun çok türlü koşulları açık karar 3'te kalır.
 - ~~`tenant-export` ve `tenant-delete` kapsamı~~ dilim 2a testiyle doğrulandı (katalogdan okunur).
-- Web tarafındaki `SessionState` kapsam gösterimlerinin tür bazında değişmesi gerekip gerekmediği (şu an tek `Scope` görüntüsü gösteriliyor).
+- Web tarafındaki `SessionState.Scope` tek, rolün varsayılan kapsamıdır (tür istisnası ve tavan yansımaz). Kodda artık yalnızca `RoleDetail`'de okunur (kişinin hangi kapsamı verebileceği ipucu; kesin karar sunucuda). Kaydın görünürlüğünü belirlemez; sunucu her istekte türe göre çözer. Sunucunun kapsam dışı sorumlu atamasını reddettiği `AssignableMembersScopeTests` ile doğrulandı (aktivite yeniden atama; tavan kaldırılınca atama geri gelir).
 - Performans etkisi ölçülmedi; vaat edilmez. Beklenti: rol yükleme aynı kalır, yalnızca bir küçük istisna sorgusu eklenir.
 
 ## 10. Maliyet ve dağıtım

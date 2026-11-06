@@ -30,6 +30,9 @@ public interface IFieldRuleGate
 /// </summary>
 public sealed class FieldRuleGate(ModuleCatalog modules, IServiceProvider services) : IFieldRuleGate
 {
+    /// <summary>Bozuk kural paketi hatasının bağlandığı alan adı (form düzeyinde ileti; gerçek bir kayıt alanı değil).</summary>
+    public const string CorruptRulesField = "fieldRules";
+
     private IReadOnlyList<FieldRule>? effective;
 
     public async Task<IReadOnlyList<RecordFieldError>> CheckAsync(
@@ -40,7 +43,16 @@ public sealed class FieldRuleGate(ModuleCatalog modules, IServiceProvider servic
             return [];
         }
 
-        effective ??= (await services.GetRequiredService<ITenantFieldRules>().GetEffectiveAsync(cancellationToken)).Rules;
+        try
+        {
+            effective ??= (await services.GetRequiredService<ITenantFieldRules>().GetEffectiveAsync(cancellationToken)).Rules;
+        }
+        catch (CorruptRulePackageException exception)
+        {
+            // Kapalı kalma: bozuk yayınlanmış paket engelleme/onay kuralı taşıyor olabilir; kural atlanıp yazma serbest bırakılmaz.
+            return [new RecordFieldError(CorruptRulesField, exception.Message)];
+        }
+
         var forEntity = effective.Where(r => FieldRuleChecker.EntityOf(modules, r.Field) == entityKey).ToList();
         if (forEntity.Count == 0 || await services.GetRequiredService<IAutomationCatalog>().GetFieldSetAsync(entityKey, cancellationToken) is not { } fields)
         {

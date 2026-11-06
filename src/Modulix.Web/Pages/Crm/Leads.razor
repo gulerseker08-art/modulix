@@ -36,14 +36,14 @@
         <LeadReportPanel Lookups="Lookups" />
     }
 
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Müşteri adayı görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Items="ViewOptions" Value="@current" ValueChanged="SelectAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Müşteri adayı ara" placeholder="Konu, no, ad, firma ya da e-posta ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(CrmAccess.LeadsCreate) && !editing)
         {
             <button type="button" class="btn btn-primary" @onclick="() => editing = true"><AppIcon Name="plus" Size="16" /> Yeni müşteri adayı</button>
@@ -85,6 +85,9 @@
         </div>
     }
 
+    <PersonalViewBar Active="Active" Dirty="IsDirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
     @if (target is { } hours && current == "firstContactOverdue")
     {
         <p class="text-muted small">İlk temas hedefi @hours saat (takvim saati; iş saati değildir).</p>
@@ -103,34 +106,25 @@
         <table class="table record-table">
             <thead>
                 <tr>
-                    <th>No</th><th>Konu</th><th>Talep sahibi</th><th>Durum</th><th>Öncelik</th><th>Kaynak</th><th>Sorumlu</th><th>Geliş</th><th>İlk temas</th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var lead in page.Items)
                 {
                     <tr>
-                        <td data-label="No"><a href="crm/leadler/@lead.Id">@lead.LeadNumber</a></td>
-                        <td data-label="Konu" class="primary">@lead.Subject</td>
-                        <td data-label="Talep sahibi">@Requester(lead)</td>
-                        <td data-label="Durum"><span class="badge stage-@lead.Status.ToLowerInvariant()">@LeadStatus.Label(lead.Status)</span></td>
-                        <td data-label="Öncelik">@LeadPriority.Label(lead.Priority)</td>
-                        <td data-label="Kaynak">@Lookups.Label(CrmLeadLists.Source, lead.Source)</td>
-                        <td data-label="Sorumlu">@if (lead.OwnerId is null) { <span class="text-muted">Atanmadı</span> } else { <OwnerCell Name="@Lookups.MemberName(lead.OwnerId)" /> }</td>
-                        <td data-label="Geliş">@CrmLabels.Time(lead.FirstReceivedAt)</td>
-                        <td data-label="İlk temas">
-                            @if (lead.FirstContactAt is { } contact)
-                            {
-                                @CrmLabels.Time(contact)
-                            }
-                            else if (IsOverdue(lead))
-                            {
-                                <span class="badge stage-lost">Gecikti</span>
-                            }
-                            else
-                            {
-                                <span class="text-muted">—</span>
-                            }
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, lead)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{lead.LeadNumber} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="crm/leadler/@lead.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            </RowMenu>
                         </td>
                     </tr>
                 }
@@ -151,18 +145,48 @@
     // Görünümler yalnızca süzgeçtir; kapsamı sunucu uygular (kimse yetkisi dışındaki Lead'i listeleyemez).
     private static readonly ViewDefinition[] Views =
     [
-        new("all", "Tümü", _ => true),
-        new("mine", "Benim müşteri adaylarım", _ => true),
-        new("team", "Ekip müşteri adayları", s => s.Scope != RecordScope.Own),
-        new("unassigned", "Atama bekleyenler", s => s.Can(CrmAccess.LeadsAssign)),
-        new("firstContactOverdue", "İlk temas gecikmiş", _ => true),
-        new("followUpOverdue", "Takibi geciken", _ => true),
-        new("qualified", "Nitelikli, dönüşmemiş", _ => true),
+        new("mine", "Benim müşteri adaylarım", "star", _ => true),
+        new("all", "Tüm müşteri adayları", "inbox", _ => true),
+        new("team", "Ekip müşteri adayları", "users", s => s.Scope != RecordScope.Own),
+        new("unassigned", "Atama bekleyenler", "user-check", s => s.Can(CrmAccess.LeadsAssign)),
+        new("firstContactOverdue", "İlk temas gecikmiş", "clock", _ => true),
+        new("followUpOverdue", "Takibi geciken", "alert-circle", _ => true),
+        new("qualified", "Nitelikli, dönüşmemiş", "check-circle", _ => true),
     ];
 
-    private IReadOnlyList<ViewOption> ViewOptions => [.. Views.Where(v => v.Visible(Session)).Select(v => new ViewOption(v.Key, v.Label))];
+    // Başlıklar sunucuda sıralanır (varsayılan: en yeni geliş önce). Sorumlu adı üyelik tablosundadır, sıralanamaz. "default" varsayılan sıranın
+    // sunucuya gönderilmeyen belirtecidir (varsayılan zaten azalan geliş sırası olduğundan başlık döngüsü Geliş'te artan → azalan → varsayılan işler).
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("number", "No", "hash", "number", "-number"),
+        new("subject", "Konu", "type", "subject", "-subject", Locked: true),
+        new("requester", "Talep sahibi", "user", "requester", "-requester"),
+        new("status", "Durum", "tag", "status", "-status"),
+        new("priority", "Öncelik", "alert-circle", "priority", "-priority"),
+        new("source", "Kaynak", "globe", "source", "-source"),
+        new("owner", "Sorumlu", "user"),
+        new("received", "Geliş", "calendar", "received", "-received"),
+        new("firstContact", "İlk temas", "clock", "firstContact", "-firstContact"),
+        new("company", "Firma", "building", "company", "-company", DefaultVisible: false),
+        new("email", "E-posta", "mail", "email", "-email", DefaultVisible: false),
+        new("phone", "Telefon", "phone", "phone", "-phone", DefaultVisible: false),
+        new("city", "Şehir", "map-pin", "city", "-city", DefaultVisible: false),
+        new("industry", "Sektör", "briefcase", "industry", "-industry", DefaultVisible: false),
+        new("productInterest", "İlgilendiği ürün", "package", "productInterest", "-productInterest", DefaultVisible: false),
+    ];
 
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        .. Views.Where(v => v.Visible(Session)).Select(v => new ViewOption(v.Key, v.Label, Icon: v.Icon)),
+        .. views.Options,
+    ];
+
+    private readonly GridViewState grid = new("crm.leads", "default");
+    private PersonalGridViews views = default!;
     private CrmPage<LeadDto>? page;
+    private string view = "all";
+
+    /// <summary>Etkin sistem görünümünün anahtarı (kişisel görünümde kaydedilen görünüm); sorgu buna göre kurulur.</summary>
     private string current = "all";
     private string? message;
     private string? search;
@@ -178,18 +202,41 @@
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "crm.leads");
         await Session.EnsureLoadedAsync();
         if (Session.Can(CrmAccess.LeadsRead))
         {
             await Lookups.LoadAsync(contacts: true);
+            grid.Define(Columns);
+            await views.LoadAsync();
             target = (await Api.GetAsync<LeadSettingsDto>($"{Url}/settings")).Value?.FirstContactTargetHours;
             await LoadAsync(1);
         }
     }
 
-    private string Query(int pageNumber)
+    private GridViewDto? Active => views.Find(view);
+
+    // Kayıtlı süzgeç: sistem görünümü + açık süzgeç satırı (durum, kaynak, öncelik, sorumlu, geliş aralığı). Sayfa içi anahtarlardır, API'ye gitmez.
+    private string? CurrentFilters => GridFilters.Build(
+        current != "all" ? ("view", current) : null,
+        status.Length > 0 ? ("status", status) : null,
+        source.Length > 0 ? ("source", source) : null,
+        priority.Length > 0 ? ("priority", priority) : null,
+        owner.Length > 0 ? ("owner", owner) : null,
+        from is { } f ? ("from", f.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null,
+        to is { } t ? ("to", t.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null);
+
+    // Kaydedilmemiş değişiklik: sütun/sıralama ya da (kişisel görünümde) süzgeç kayıtlı hâlden farklı.
+    private bool IsDirty => grid.Differs(Active) || (Active is { } saved && CurrentFilters != (string.IsNullOrEmpty(saved.Filters) ? null : saved.Filters));
+
+    private string Query(int pageNumber, bool withSort = true)
     {
         var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}", $"search={Uri.EscapeDataString(search ?? string.Empty)}" };
+        if (withSort && grid.Sort != grid.DefaultSort)
+        {
+            parts.Add($"sort={Uri.EscapeDataString(grid.Sort)}");
+        }
+
         Add(parts, "status", status);
         Add(parts, "source", source);
         Add(parts, "priority", priority);
@@ -241,12 +288,68 @@
         }
     }
 
-    private string ExportUrl() => $"{Url}/export?{Query(1)}";
+    // CSV dışa aktarma sıralama anahtarı kabul etmez; yalnızca süzgeçler gider.
+    private string ExportUrl() => $"{Url}/export?{Query(1, withSort: false)}";
 
-    private async Task SelectAsync(string view)
+    private async Task ChooseViewAsync(string key)
     {
-        current = view;
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm: sütunlar, sıralama ve süzgeç birlikte gelir. Bu kullanıcıya görünmeyen sistem görünümü "tümü"ne düşer.
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            var baseView = filters.GetValueOrDefault("view") ?? "all";
+            current = Views.Any(v => v.Key == baseView && v.Visible(Session)) ? baseView : "all";
+            status = filters.GetValueOrDefault("status") ?? string.Empty;
+            source = filters.GetValueOrDefault("source") ?? string.Empty;
+            priority = filters.GetValueOrDefault("priority") ?? string.Empty;
+            owner = filters.GetValueOrDefault("owner") ?? string.Empty;
+            from = DateOnly.TryParse(filters.GetValueOrDefault("from"), out var f) ? f : null;
+            to = DateOnly.TryParse(filters.GetValueOrDefault("to"), out var t) ? t : null;
+        }
+        else
+        {
+            grid.Reset();
+            current = key;
+        }
+
         await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } saved)
+        {
+            await views.UpdateAsync(saved, grid.ToRequest(saved.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } saved && await views.DeleteAsync(saved))
+        {
+            await ChooseViewAsync("all");
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
@@ -268,6 +371,47 @@
         await LoadAsync(1);
     }
 
+    private RenderFragment Cell(GridColumnDef column, LeadDto lead) => @<td data-label="@column.Label" class="@(column.Key == "subject" ? "primary" : null)">@CellContent(column.Key, lead)</td>;
+
+    private RenderFragment CellContent(string key, LeadDto lead) => key switch
+    {
+        "number" => @<a href="crm/leadler/@lead.Id">@lead.LeadNumber</a>,
+        "subject" => @<text>@lead.Subject</text>,
+        "requester" => @<text>@Requester(lead)</text>,
+        "status" => @<span class="badge stage-@lead.Status.ToLowerInvariant()">@LeadStatus.Label(lead.Status)</span>,
+        "priority" => @<text>@LeadPriority.Label(lead.Priority)</text>,
+        "source" => @<text>@Lookups.Label(CrmLeadLists.Source, lead.Source)</text>,
+        "owner" => OwnerPart(lead),
+        "received" => @<text>@CrmLabels.Time(lead.FirstReceivedAt)</text>,
+        "firstContact" => FirstContactPart(lead),
+        "company" => @<text>@lead.CompanyName</text>,
+        "email" => @<text>@lead.Email</text>,
+        "phone" => @<text>@lead.Phone</text>,
+        "city" => @<text>@lead.City</text>,
+        "industry" => @<text>@lead.Industry</text>,
+        "productInterest" => @<text>@lead.ProductInterest</text>,
+        _ => @<text></text>,
+    };
+
+    private RenderFragment OwnerPart(LeadDto lead) =>
+        @<text>@if (lead.OwnerId is null) { <span class="text-muted">Atanmadı</span> } else { <OwnerCell Name="@Lookups.MemberName(lead.OwnerId)" /> }</text>;
+
+    private RenderFragment FirstContactPart(LeadDto lead) =>
+        @<text>
+            @if (lead.FirstContactAt is { } contact)
+            {
+                @CrmLabels.Time(contact)
+            }
+            else if (IsOverdue(lead))
+            {
+                <span class="badge stage-lost">Gecikti</span>
+            }
+            else
+            {
+                <span class="text-muted">—</span>
+            }
+        </text>;
+
     private bool IsOverdue(LeadDto lead) =>
         target is { } hours && LeadStatus.IsOpen(lead.Status) && lead.Status is LeadStatus.New or LeadStatus.Contacting
         && lead.FirstContactAt is null && DateTimeOffset.UtcNow - lead.FirstReceivedAt > TimeSpan.FromHours(hours);
@@ -278,5 +422,5 @@
         return string.Join(" · ", new[] { name, lead.CompanyName }.Where(n => !string.IsNullOrWhiteSpace(n)));
     }
 
-    private sealed record ViewDefinition(string Key, string Label, Func<SessionState, bool> Visible);
+    private sealed record ViewDefinition(string Key, string Label, string Icon, Func<SessionState, bool> Visible);
 }

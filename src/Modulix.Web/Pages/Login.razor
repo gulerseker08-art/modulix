@@ -2,10 +2,10 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>Giriş · Modulix</PageTitle>
+<PageTitle>@Texts.Get("auth.login.title") · Modulix</PageTitle>
 
 <div class="narrow">
-    <h1>Giriş</h1>
+    <h1>@Texts.Get("auth.login.title")</h1>
 
     @if (error is not null)
     {
@@ -16,29 +16,29 @@
     {
         @* İkinci adım (Y7b): doğrulama uygulamasındaki kod veya bir kurtarma kodu. *@
         <form @onsubmit="VerifyAsync" @onsubmit:preventDefault>
-            <p>Doğrulama uygulamanızdaki 6 haneli kodu girin. Telefonunuz yanınızda değilse kurtarma kodlarınızdan birini kullanabilirsiniz.</p>
+            <p>@Texts.Get("auth.login.twoFactor.help")</p>
             <div class="mb-3">
-                <label class="form-label" for="code">Doğrulama kodu</label>
+                <label class="form-label" for="code">@Texts.Get("auth.login.twoFactor.code")</label>
                 <input id="code" class="form-control" autocomplete="one-time-code" inputmode="text" maxlength="20" required
                        @bind="code" @bind:event="oninput" />
             </div>
-            <button type="submit" class="btn btn-primary w-100" disabled="@(busy || string.IsNullOrWhiteSpace(code))">Doğrula</button>
+            <button type="submit" class="btn btn-primary w-100" disabled="@(busy || string.IsNullOrWhiteSpace(code))">@Texts.Get("auth.login.twoFactor.submit")</button>
         </form>
     }
     else
     {
         <form @onsubmit="LoginAsync" @onsubmit:preventDefault>
             <div class="mb-3">
-                <label class="form-label" for="email">E-posta</label>
+                <label class="form-label" for="email">@Texts.Get("common.email")</label>
                 <input id="email" class="form-control" type="email" autocomplete="username" required @bind="email" />
             </div>
             <div class="mb-3">
-                <label class="form-label" for="password">Şifre</label>
+                <label class="form-label" for="password">@Texts.Get("common.password")</label>
                 <input id="password" class="form-control" type="password" autocomplete="current-password" required @bind="password" />
             </div>
-            <button type="submit" class="btn btn-primary w-100" disabled="@busy">Giriş yap</button>
+            <button type="submit" class="btn btn-primary w-100" disabled="@busy">@Texts.Get("auth.login.submit")</button>
         </form>
-        <p class="mt-3"><a href="sifremi-unuttum">Şifremi unuttum</a></p>
+        <p class="mt-3"><a href="sifremi-unuttum">@Texts.Get("auth.login.forgot")</a></p>
     }
 </div>
 

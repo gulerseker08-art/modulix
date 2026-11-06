@@ -11,6 +11,9 @@ public enum AutomationRunOrigin
 
     /// <summary>Yetkili bir kullanıcı elle çalıştırdı.</summary>
     Manual = 2,
+
+    /// <summary>Günlük tarama (zamanlanmış, tarihe bağlı ya da hareketsizlik tetikleyicisi) kaydı seçti (Dilim 2b).</summary>
+    Scan = 3,
 }
 
 public enum AutomationRunStatus

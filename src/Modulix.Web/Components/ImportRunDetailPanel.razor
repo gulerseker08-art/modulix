@@ -1,0 +1,96 @@
+@inject ApiClient Api
+
+@* İçe aktarma ayrıntısı (ADR-0033): en sık hatalar ve satır hataları. Ham hücre değeri yoktur; düzeltme için asıl satır
+   hata raporunda (sonraki dilim) verilir. *@
+@if (message is not null)
+{
+    <div class="alert alert-danger" role="alert">@message</div>
+}
+else if (detail is null)
+{
+    <p class="text-muted" role="status">Yükleniyor…</p>
+}
+else
+{
+    var run = detail.Run;
+    <p class="text-muted">
+        @ImportText.Mode(run.Mode) · @ImportText.Policy(run.Policy)
+        @if (run.StartedAt is { } started) { <text> · Başladı: @CrmLabels.Time(started)</text> }
+        @if (run.CompletedAt is { } done) { <text> · Bitti: @CrmLabels.Time(done)</text> }
+    </p>
+    @if (run.Note is not null)
+    {
+        <p>@run.Note</p>
+    }
+
+    @if (detail.IssueCodes.Count == 0)
+    {
+        <p class="text-muted">Bu içe aktarmada satır hatası yok.</p>
+    }
+    else
+    {
+        <div class="filters" role="group" aria-label="Hata koduna göre süz">
+            <button type="button" class="chip @(code is null ? "active" : null)" aria-pressed="@(code is null ? "true" : "false")" @onclick="() => FilterCodeAsync(null)">Tümü</button>
+            @foreach (var item in detail.IssueCodes)
+            {
+                <button type="button" class="chip @(code == item.Code ? "active" : null)" aria-pressed="@(code == item.Code ? "true" : "false")"
+                        @onclick="() => FilterCodeAsync(item.Code)">@ImportText.Code(item.Code) (@item.Count)</button>
+            }
+        </div>
+
+        <table class="table record-table">
+            <caption class="visually-hidden">Satır hataları</caption>
+            <thead>
+                <tr><th scope="col">Satır</th><th scope="col">Sütun</th><th scope="col">Hata</th><th scope="col">Önem</th><th scope="col">Açıklama</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var issue in detail.Issues.Items)
+                {
+                    <tr>
+                        <td data-label="Satır">@(issue.RowNo == 0 ? "Dosya" : issue.RowNo.ToString())</td>
+                        <td data-label="Sütun">@(issue.ColumnKey ?? "—")</td>
+                        <td data-label="Hata">@ImportText.Code(issue.Code)</td>
+                        <td data-label="Önem"><span class="badge stage-@ImportText.SeverityBadge(issue.Severity)">@ImportText.Severity(issue.Severity)</span></td>
+                        <td data-label="Açıklama">@issue.Message</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="detail.Issues.Page" PageSize="detail.Issues.PageSize" TotalCount="detail.Issues.TotalCount" PageChanged="LoadAsync" />
+        @if (run.FailedCount > detail.IssueCodes.Sum(c => c.Count))
+        {
+            <p class="text-muted">Hata sayısı saklama sınırını aştı; yalnızca saklanan satır hataları gösteriliyor, kalanı sayıya yansır.</p>
+        }
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid RunId { get; set; }
+
+    private ImportRunDetailDto? detail;
+    private string? message;
+    private string? code;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (detail is null || detail.Run.Id != RunId)
+        {
+            code = null;
+            await LoadAsync(1);
+        }
+    }
+
+    private Task FilterCodeAsync(string? value)
+    {
+        code = value;
+        return LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var query = $"page={pageNumber}" + (code is null ? string.Empty : $"&code={Uri.EscapeDataString(code)}");
+        var result = await Api.GetAsync<ImportRunDetailDto>($"/api/imports/{RunId}?{query}");
+        detail = result.Value;
+        message = result.IsSuccess ? null : result.Error;
+    }
+}

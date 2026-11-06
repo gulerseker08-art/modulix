@@ -7,8 +7,15 @@ namespace Modulix.Core.Contracts.Automation;
 // modül neyi tetikleyebileceğini, hangi alanları okutabileceğini ve hangi aksiyonları sunduğunu burada bildirir. Beyan açılışta
 // ModuleCatalog tarafından doğrulanır.
 
-/// <summary>Kural yazılabilen kayıt türü. <see cref="ReadPermission"/> boş değilse yalnızca bu izne sahip olanlar kural yazabilir.</summary>
-public sealed record AutomationEntityDefinition(string EntityKey, string DisplayName, string? ReadPermission = null);
+/// <summary>
+/// Kural yazılabilen kayıt türü. <see cref="ReadPermission"/> boş değilse yalnızca bu izne sahip olanlar kural yazabilir.
+/// <see cref="RecordSource"/>: tarama tabanlı tetikleyicileri (zamanlanmış, tarihe göre, hareketsizlik) destekleyen modül
+/// <see cref="IAutomationRecordSource"/> uygulayan tipi verir; boşsa bu kayıt türüne yalnızca olay tetikleyicileri konabilir.
+/// </summary>
+public sealed record AutomationEntityDefinition(string EntityKey, string DisplayName, string? ReadPermission = null)
+{
+    public Type? RecordSource { get; init; }
+}
 
 /// <summary>
 /// Modülün tetikleyebildiği olay. <see cref="EventType"/> kayıt olayıysa (<c>RecordCreated</c>, <c>RecordUpdated</c>) kayıt boru hattının
@@ -131,6 +138,15 @@ public sealed record AutomationActionRegistration(AutomationActionDefinition Def
         new(definition, typeof(THandler));
 }
 
+/// <summary>
+/// Modülün sunduğu başlangıç kuralı şablonu (ADR-0027, Dilim 3b). Şablon koddadır ve tenant'a özgü değildir (tek imaj); firma
+/// "kullan" dediğinde <b>taslak</b> kural olarak kopyalanır: taslak hiç çalışmaz, firma gözden geçirip kendisi yayınlar.
+/// <see cref="Key"/> modül önekli ve tekildir (ör. "crm.lead-inactivity-follow-up"); <see cref="EntityKey"/> modülün kural yazılabilen
+/// kayıt türüdür. Tanım katalogla birlikte açılışta kontrol edilir, tam doğrulama kullanan kimliğin yetkisiyle yapılır.
+/// </summary>
+public sealed record AutomationTemplateDefinition(
+    string Key, string DisplayName, string Description, string EntityKey, AutomationDefinition Definition);
+
 /// <summary>Modülün kural altyapısına beyan ettiği tüm yetenekler. Boş beyan geçerlidir.</summary>
 public sealed record AutomationCapabilities
 {
@@ -146,7 +162,10 @@ public sealed record AutomationCapabilities
 
     public IReadOnlyList<AutomationActionRegistration> Actions { get; init; } = [];
 
-    public bool IsEmpty => Entities.Count + Events.Count + Fields.Count + Relations.Count + Actions.Count == 0;
+    /// <summary>Başlangıç şablonları; kullanılınca pasif (taslak) kural olur.</summary>
+    public IReadOnlyList<AutomationTemplateDefinition> Templates { get; init; } = [];
+
+    public bool IsEmpty => Entities.Count + Events.Count + Fields.Count + Relations.Count + Actions.Count + Templates.Count == 0;
 }
 
 /// <summary>Çağıran kimliğin türü. <see cref="Agent"/> ileride yapay zekâ içindir; bugün hiçbir çağrı yolu üretmez.</summary>

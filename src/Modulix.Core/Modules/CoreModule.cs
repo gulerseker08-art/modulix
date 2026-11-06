@@ -72,6 +72,15 @@ public sealed class CoreModule : IModule
 
         /// <summary>Kendi raporlarını zamanlar; zamanlanmış rapor çalışırken sahibinin yetkisi yeniden denetlenir, yetki kaybında teslim durur.</summary>
         public const string ScheduleReports = "core.reports.schedule";
+
+        /// <summary>İçe aktarma başlatır; işlem günlüğünde yalnızca kendi içe aktarmalarını görür (ADR-0030).</summary>
+        public const string RunImports = "core.imports.run";
+
+        /// <summary>İşlem günlüğünde firmanın bütün içe aktarmalarını ve satır hatalarını görür (ADR-0030).</summary>
+        public const string ReadImports = "core.imports.read";
+
+        /// <summary>İçe aktarılmış kayıtları gerekçeyle toplu geri alır (ADR-0030, Dilim 4).</summary>
+        public const string RollbackImports = "core.imports.rollback";
     }
 
     public string Key => ModuleKey;
@@ -100,6 +109,9 @@ public sealed class CoreModule : IModule
         new(Permissions.ShareReports, "Kendi raporunu firmayla ya da kullanıcılarla paylaşır", "Raporlar"),
         new(Permissions.ExportReports, "Rapor sonuçlarını CSV olarak dışa aktarır", "Raporlar"),
         new(Permissions.ScheduleReports, "Kendi raporlarını zamanlar", "Raporlar"),
+        new(Permissions.RunImports, "İçe aktarma başlatır ve kendi içe aktarmalarını görür", "İçe aktarma"),
+        new(Permissions.ReadImports, "Firmanın bütün içe aktarmalarını ve satır hatalarını görüntüler", "İçe aktarma"),
+        new(Permissions.RollbackImports, "İçe aktarılmış kayıtları toplu geri alır", "İçe aktarma"),
     ];
 
     /// <summary>Çekirdeğin olay abonelikleri (ADR-0007).</summary>
@@ -202,6 +214,7 @@ public sealed class CoreModule : IModule
         public const string TimeZone = "core.regional.time-zone";
         public const string Currency = "core.regional.currency";
         public const string Format = "core.regional.format";
+        public const string Language = "core.regional.language";
         public const string RequireTwoFactor = "core.security.require-two-factor";
 
         /// <summary>Acil durdurma (ADR-0027): "Hayır" ise firmanın hiçbir kuralı çalışmaz; kuyruktaki çalışmalar iptal edilir.</summary>
@@ -255,6 +268,11 @@ public sealed class CoreModule : IModule
         {
             Options = RegionalOptions.Formats,
         },
+        new(SettingKeys.Language, "Arayüz dili", RegionalGroup, SettingType.Choice, LanguageOptions.Default)
+        {
+            Description = "Firmanın varsayılan dili. Dilini kendi hesabında seçmiş kullanıcılar kendi dilini görür. Kayıtlı veriler değişmez.",
+            Options = LanguageOptions.Languages,
+        },
 
         // Y7b: açıkken iki adımlı doğrulaması kapalı biri bu firmanın ekranlarına giremez, önce kurulumu yapar.
         new(SettingKeys.RequireTwoFactor, "İki adımlı doğrulama zorunlu", SecurityGroup, SettingType.Choice, SettingValues.No)
@@ -278,6 +296,7 @@ public sealed class CoreModule : IModule
         {
             ["name"] = "Ad", ["permissions"] = "İzinler", ["isSystem"] = "Sistem rolü", ["scope"] = "Kayıt kapsamı",
             ["assignLevel"] = "Atanabilir düzey", ["hideOutOfScopeShared"] = "Kapsam dışı ortak kayıtları gizle",
+            ["scopeOverrides"] = "Kayıt türüne göre kapsam",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
@@ -514,6 +533,7 @@ public sealed class CoreModule : IModule
         {
             ["email"] = "E-posta", ["displayName"] = "Ad soyad", ["ip"] = "IP adresi", ["userAgent"] = "Tarayıcı",
             ["reason"] = "Neden", ["sessions"] = "Kapatılan oturum", ["recoveryCodesLeft"] = "Kalan kurtarma kodu",
+            ["language"] = "Arayüz dili",
         }, "email")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>

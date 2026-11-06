@@ -5,7 +5,7 @@
 <PageTitle>Hesabım · Modulix</PageTitle>
 
 @* Kişinin kendi hesabı (Y7a). Bilgiler kişiye aittir: değişiklik üye olduğu bütün kuruluşlarda geçerlidir. *@
-<AuthGate AllowWithoutTwoFactor="true">
+<AuthGate AllowWithoutTwoFactor="true" AllowWithoutTenant="true">
     <h1>Hesabım</h1>
     <p class="text-muted">Bu bilgiler size aittir; birden fazla kuruluşta çalışıyorsanız hepsinde geçerlidir.</p>
 
@@ -43,6 +43,26 @@
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@(busy || displayName.Trim() == profile.DisplayName)">Kaydet</button>
+            </div>
+        </form>
+
+        <form class="record-form settings-group" novalidate @onsubmit="SaveLanguageAsync" @onsubmit:preventDefault>
+            <h2>@Texts.Get("account.language.title")</h2>
+            <Notice Text="@languageNotice" Failed="languageFailed" />
+            <div class="mb-3">
+                <label class="form-label" for="language">@Texts.Get("account.language.label")</label>
+                <select id="language" class="form-select" @bind="language">
+                    <option value="">@Texts.Get("account.language.tenantDefault")</option>
+                    @foreach (var option in LanguageCodes.All)
+                    {
+                        <option value="@option.Code">@option.Name</option>
+                    }
+                </select>
+                <FieldError Field="language" Errors="languageErrors" />
+                <div class="form-text">@Texts.Get("account.language.help")</div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || language == (profile.PreferredLanguage ?? string.Empty))">@Texts.Get("common.save")</button>
             </div>
         </form>
 
@@ -138,6 +158,11 @@
     private bool nameFailed;
     private IReadOnlyDictionary<string, string[]>? nameErrors;
 
+    private string language = string.Empty;
+    private string? languageNotice;
+    private bool languageFailed;
+    private IReadOnlyDictionary<string, string[]>? languageErrors;
+
     private string newEmail = string.Empty;
     private string emailPassword = string.Empty;
     private string? emailNotice;
@@ -161,6 +186,7 @@
         {
             profile = loaded;
             displayName = loaded.DisplayName;
+            language = loaded.PreferredLanguage ?? string.Empty;
             await LoadSessionsAsync();
         }
     }
@@ -186,6 +212,27 @@
         else
         {
             (nameNotice, nameFailed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+        }
+    }
+
+    private async Task SaveLanguageAsync()
+    {
+        busy = true;
+        var result = await Api.PutAsync<AccountProfileResponse>("/api/account/language", new UpdateLanguageRequest(language.Length == 0 ? null : language));
+        busy = false;
+        languageErrors = result.FieldErrors;
+        if (result.Value is { } saved)
+        {
+            profile = saved;
+            language = saved.PreferredLanguage ?? string.Empty;
+
+            // Etkin dil ve metinler oturumdan yeniden yüklenir; bildirim yeni dilde gösterilir.
+            await Session.RefreshAsync();
+            (languageNotice, languageFailed) = (Texts.Get("common.saved"), false);
+        }
+        else
+        {
+            (languageNotice, languageFailed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
         }
     }
 

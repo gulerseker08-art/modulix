@@ -14,13 +14,16 @@ internal sealed record ScopedRecordType(string EntityKey, string ModuleKey, stri
 internal sealed class ScopedRecordTypes(IRecordStoreRegistry stores, ModuleCatalog catalog)
 {
     /// <summary>Açık modüllerin kapsam türleri, anahtar sırasıyla.</summary>
-    public IReadOnlyList<ScopedRecordType> ForModules(IReadOnlySet<string> enabledModules)
+    public IReadOnlyList<ScopedRecordType> ForModules(IReadOnlySet<string> enabledModules) =>
+        [.. All().Where(t => catalog.IsEnabled(t.ModuleKey, enabledModules))];
+
+    /// <summary>Modülü açık olsun olmasın bütün kapsam türleri; modülü sonradan kapanan türün istisnası geçerli kalır.</summary>
+    public IReadOnlyList<ScopedRecordType> All()
     {
         var labels = catalog.AuditedEntities.ToDictionary(e => e.EntityKey, e => e.DisplayName, StringComparer.OrdinalIgnoreCase);
         return [.. stores.Stores
             .Where(s => s.UsesOwnerScope && string.Equals(s.ScopeEntityKey, s.EntityKey, StringComparison.OrdinalIgnoreCase))
             .Select(s => new ScopedRecordType(s.EntityKey, AccessKeys.ModuleOf(s.EntityKey), labels.GetValueOrDefault(s.EntityKey, s.EntityKey)))
-            .Where(t => catalog.IsEnabled(t.ModuleKey, enabledModules))
             .OrderBy(t => t.EntityKey, StringComparer.Ordinal)];
     }
 }

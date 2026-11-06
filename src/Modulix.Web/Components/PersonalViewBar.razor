@@ -1,0 +1,107 @@
+@using Modulix.Shared.Views
+@* Kişisel görünüm şeridi (ADR-0036): sütun/sıralama değişince "kaydedilmemiş değişiklik" uyarısı ve kaydetme eylemleri; yeni görünüm adı girişi;
+   kişisel görünüm açıkken "yalnızca siz görürsünüz" notu ve silme. Hiçbiri yoksa hiçbir şey çizmez. Kaydetme sayfanın işidir (callback'ler). *@
+@if (Naming)
+{
+    <form class="view-bar" role="group" aria-label="Yeni görünüm" @onsubmit="SaveAsAsync" @onsubmit:preventDefault>
+        <label for="@inputId" class="view-bar-text">Görünüm adı</label>
+        <input id="@inputId" class="form-control form-control-sm view-bar-input" maxlength="60" placeholder="ör. Kocaeli müşterileri" @bind="name" @bind:event="oninput" />
+        <button type="submit" class="btn btn-primary btn-sm">Kaydet</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelAsync">Vazgeç</button>
+        @if (Error is not null)
+        {
+            <span class="view-bar-error" role="alert">@Error</span>
+        }
+    </form>
+}
+else if (Dirty)
+{
+    <div class="view-bar" role="status">
+        <AppIcon Name="pencil" Size="14" />
+        <span class="view-bar-text">Bu görünümde kaydedilmemiş değişiklik var.</span>
+        @if (Active is not null)
+        {
+            <button type="button" class="btn btn-tonal btn-sm" @onclick="Update">Görünümü güncelle</button>
+        }
+        <button type="button" class="btn btn-tonal btn-sm" @onclick="StartNaming">Yeni görünüm olarak kaydet</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Discard">Geri al</button>
+        @if (Error is not null)
+        {
+            <span class="view-bar-error" role="alert">@Error</span>
+        }
+    </div>
+}
+else if (Active is not null)
+{
+    <div class="view-bar view-bar-note">
+        <span class="view-bar-text">Kişisel görünüm · yalnızca siz görürsünüz</span>
+        @if (confirmingDelete)
+        {
+            <span class="view-bar-text">Görünüm silinsin mi?</span>
+            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="DeleteAsync">Evet, sil</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => confirmingDelete = false">Vazgeç</button>
+        }
+        else
+        {
+            <button type="button" class="btn btn-ghost btn-sm" @onclick="() => confirmingDelete = true"><AppIcon Name="x" Size="14" /> Sil</button>
+        }
+        @if (Error is not null)
+        {
+            <span class="view-bar-error" role="alert">@Error</span>
+        }
+    </div>
+}
+
+@code {
+    private readonly string inputId = "view-name-" + Guid.NewGuid().ToString("N")[..8];
+    private string name = string.Empty;
+    private bool confirmingDelete;
+
+    /// <summary>Açık kişisel görünüm; null ise sistem görünümüdür.</summary>
+    [Parameter] public GridViewDto? Active { get; set; }
+
+    /// <summary>Sütun ya da sıralama açık görünümden farklı mı?</summary>
+    [Parameter] public bool Dirty { get; set; }
+
+    /// <summary>Yeni görünüm adı girişi açık mı (sekmedeki "+ Görünüm" ya da "Yeni görünüm olarak kaydet").</summary>
+    [Parameter] public bool Naming { get; set; }
+
+    [Parameter] public EventCallback<bool> NamingChanged { get; set; }
+
+    /// <summary>Sunucunun hatası (ör. "Bu adla bir görünümünüz zaten var.").</summary>
+    [Parameter] public string? Error { get; set; }
+
+    [Parameter] public EventCallback<string> SaveAs { get; set; }
+
+    [Parameter] public EventCallback UpdateView { get; set; }
+
+    [Parameter] public EventCallback DiscardChanges { get; set; }
+
+    [Parameter] public EventCallback DeleteView { get; set; }
+
+    private Task Update() => UpdateView.InvokeAsync();
+
+    private Task Discard() => DiscardChanges.InvokeAsync();
+
+    private Task StartNaming()
+    {
+        name = string.Empty;
+        return NamingChanged.InvokeAsync(true);
+    }
+
+    private Task CancelAsync() => NamingChanged.InvokeAsync(false);
+
+    private async Task SaveAsAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            await SaveAs.InvokeAsync(name.Trim());
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        confirmingDelete = false;
+        await DeleteView.InvokeAsync();
+    }
+}

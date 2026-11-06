@@ -1,0 +1,281 @@
+using System.Reflection;
+using Modulix.Shared.Access;
+using Modulix.Shared.Auth;
+using Modulix.Shared.Contracts;
+using Modulix.Shared.Crm;
+using Modulix.Shared.Marketing;
+using Modulix.Shared.Orders;
+using Modulix.Shared.Warehouse;
+using Modulix.Web.Services;
+
+namespace Modulix.Web.Tests;
+
+/// <summary>
+/// Sol menü ve uygulama paneli görünürlüğü: modül + izin kesişimi, boş grubun gizlenmesi, ev sahipliği (CRM menüsünde
+/// Sözleşme/Sipariş/Pazarlama) ve route çözümü. Menüyü gizlemek yetkilendirme değildir; bunlar yalnızca arayüz görünürlüğü testidir.
+/// </summary>
+public class AppNavigationTests
+{
+    private static AppNavigation Nav(string[] modules, string[] permissions, bool platformAdmin = false)
+    {
+        var session = new SessionState(new ApiClient(new HttpClient()));
+        Set(session, nameof(SessionState.Access), new MyAccessResponse(modules, permissions));
+        Set(session, nameof(SessionState.User), new MeResponse(Guid.NewGuid(), "a@example.com", "Test", Guid.NewGuid(), [], platformAdmin));
+        return new AppNavigation(session);
+    }
+
+    private static void Set(SessionState session, string property, object value) =>
+        typeof(SessionState).GetProperty(property, BindingFlags.Public | BindingFlags.Instance)!.SetValue(session, value);
+
+    private static string[] SalesUser =>
+    [
+        CrmAccess.CompaniesRead, CrmAccess.ContactsRead, CrmAccess.LeadsRead, CrmAccess.OpportunitiesRead, CrmAccess.QuotesRead,
+        CrmAccess.ActivitiesRead, ContractsAccess.ContractsRead, OrdersAccess.OrdersRead, MarketingAccess.CampaignsRead,
+    ];
+
+    private static readonly string[] AllModules = [CrmAccess.ModuleKey, ContractsAccess.ModuleKey, OrdersAccess.ModuleKey, MarketingAccess.ModuleKey];
+
+    private static IEnumerable<string> EntryNames(MenuContext menu, string groupId) =>
+        menu.Sections.Where(s => s.Group?.Id == groupId).SelectMany(s => s.Entries).Select(e => e.Name);
+
+    [Fact]
+    public void Roots_list_only_enabled_apps_the_user_can_reach()
+    {
+        var nav = Nav([CrmAccess.ModuleKey], [CrmAccess.CompaniesRead]);
+
+        Assert.Equal([AppCatalog.Crm], nav.Roots().Select(r => r.Id));
+    }
+
+    [Fact]
+    public void User_without_any_access_sees_no_apps()
+    {
+        Assert.Empty(Nav([], []).Roots());
+    }
+
+    [Fact]
+    public void Module_that_is_not_enabled_for_the_tenant_is_hidden_even_with_permission()
+    {
+        var nav = Nav([CrmAccess.ModuleKey], [CrmAccess.CompaniesRead, ContractsAccess.ContractsRead]);
+
+        Assert.DoesNotContain(nav.Roots(), r => r.Id == AppCatalog.Contracts);
+        Assert.DoesNotContain(nav.MenuEntries(AppCatalog.Crm), e => e.App.Id == "contracts.list");
+    }
+
+    [Fact]
+    public void Contracts_orders_and_marketing_live_inside_crm_menu_when_crm_is_visible()
+    {
+        var nav = Nav(AllModules, SalesUser);
+
+        Assert.Equal([AppCatalog.Crm], nav.Roots().Select(r => r.Id));
+
+        var menu = nav.Context("crm/teklifler")!;
+        Assert.Equal(AppCatalog.Crm, menu.Root.Id);
+        Assert.Equal(["Müşteri adayları", "Fırsatlar", "Teklifler", "Satış sözleşmeleri", "Satış siparişleri"], EntryNames(menu, AppCatalog.CrmSalesGroup));
+        Assert.Contains("Kampanyalar", EntryNames(menu, AppCatalog.CrmMarketingGroup));
+    }
+
+    [Fact]
+    public void Hosted_screens_keep_their_own_routes_and_resolve_to_the_crm_menu()
+    {
+        var nav = Nav(AllModules, SalesUser);
+
+        foreach (var (path, activeId) in new[] { ("sozlesmeler", "contracts.list"), ("sozlesmeler/123", "contracts.list"), ("siparisler", "orders.list"), ("pazarlama/kampanyalar", "marketing.campaigns") })
+        {
+            var menu = nav.Context(path)!;
+            Assert.Equal(AppCatalog.Crm, menu.Root.Id);
+            Assert.Equal(activeId, menu.Active.Id);
+        }
+    }
+
+    [Fact]
+    public void Contracts_stay_a_separate_app_when_the_tenant_has_no_crm()
+    {
+        var nav = Nav([ContractsAccess.ModuleKey], [ContractsAccess.ContractsRead]);
+
+        Assert.Equal([AppCatalog.Contracts], nav.Roots().Select(r => r.Id));
+        Assert.Equal(AppCatalog.Contracts, nav.Context("sozlesmeler")!.Root.Id);
+    }
+
+    [Fact]
+    public void Hosted_screen_without_permission_is_not_listed_in_the_crm_menu()
+    {
+        var nav = Nav(AllModules, [CrmAccess.QuotesRead]);
+
+        var names = nav.MenuEntries(AppCatalog.Crm).Select(e => e.Name).ToList();
+
+        Assert.Contains("Teklifler", names);
+        Assert.DoesNotContain("Satış sözleşmeleri", names);
+        Assert.DoesNotContain("Satış siparişleri", names);
+    }
+
+    [Fact]
+    public void Empty_sections_are_hidden()
+    {
+        var nav = Nav([CrmAccess.ModuleKey], [CrmAccess.CompaniesRead]);
+
+        var menu = nav.Context("crm/firmalar")!;
+
+        Assert.Equal([AppCatalog.CrmCustomersGroup], menu.Sections.Select(s => s.Group?.Id));
+    }
+
+    [Fact]
+    public void Crm_settings_section_is_pinned_and_lists_only_what_the_user_can_open()
+    {
+        var plain = Nav(AllModules, SalesUser).Context("crm/teklifler")!;
+        Assert.Equal(["Sözleşme şablonları"], EntryNames(plain, AppCatalog.CrmSettingsGroup));
+
+        var noContracts = Nav([CrmAccess.ModuleKey], [CrmAccess.QuotesRead]).Context("crm/teklifler")!;
+        Assert.DoesNotContain(noContracts.Sections, s => s.Group?.Id == AppCatalog.CrmSettingsGroup);
+
+        var manager = Nav(AllModules, [.. SalesUser, CrmAccess.QuoteRulesManage]).Context("crm/teklifler")!;
+        var settings = Assert.Single(manager.Sections, s => s.Group?.Id == AppCatalog.CrmSettingsGroup);
+        Assert.True(settings.Group!.Footer);
+        Assert.Contains(settings.Entries, e => e.Name == "Teklif kuralları");
+    }
+
+    [Fact]
+    public void Platform_apps_are_visible_to_platform_administrators_only()
+    {
+        Assert.DoesNotContain(Nav([], []).Roots(), r => r.Id == AppCatalog.Platform);
+        Assert.Contains(Nav([], [], platformAdmin: true).Roots(), r => r.Id == AppCatalog.Platform);
+    }
+
+    [Fact]
+    public void Deep_link_to_a_screen_the_user_cannot_see_does_not_expose_that_menu()
+    {
+        var nav = Nav([CrmAccess.ModuleKey], [CrmAccess.CompaniesRead]);
+
+        Assert.Null(nav.Context("destek/talepler"));
+    }
+
+    [Fact]
+    public void Entry_route_of_an_app_without_own_route_is_its_first_menu_screen()
+    {
+        var nav = Nav(AllModules, SalesUser);
+
+        Assert.Equal("crm/aktiviteler", nav.EntryRoute(nav.Find(AppCatalog.Crm)!));
+    }
+
+    [Fact]
+    public void Detail_pages_keep_the_parent_list_active_and_do_not_activate_sibling_lists()
+    {
+        var nav = Nav(AllModules, SalesUser);
+
+        Assert.Equal("crm.quotes", nav.Context("crm/teklifler/3fa85f64")!.Active.Id);
+        Assert.Equal("contracts.templates", nav.Context("sozlesmeler/sablonlar")!.Active.Id);
+    }
+
+    [Fact]
+    public void Quote_and_contract_approvals_share_one_pending_work_entry()
+    {
+        var nav = Nav(AllModules, [.. SalesUser, CrmAccess.QuotesApprove, ContractsAccess.ContractsApprove]);
+
+        var menu = nav.Context("crm/teklifler")!;
+        var workspace = EntryNames(menu, AppCatalog.CrmWorkspaceGroup).ToList();
+
+        Assert.Equal(["Aktiviteler", "Onay bekleyen işlerim"], workspace);
+
+        // Karar ekranlarına doğrudan bağlantı ya da bildirim e-postası gelirse üst satır işaretlenir; sayfalar ayrı satır olmaz.
+        foreach (var path in new[] { "crm/teklif-onaylari", "sozlesmeler/onaylar", "crm/onay-bekleyenler" })
+        {
+            var onApproval = nav.Context(path)!;
+            Assert.Equal(AppCatalog.Crm, onApproval.Root.Id);
+            Assert.Equal("crm.approvals", onApproval.Active.Id);
+        }
+    }
+
+    [Fact]
+    public void Pending_work_entry_needs_an_approval_permission_from_either_module()
+    {
+        Assert.DoesNotContain(Nav(AllModules, SalesUser).MenuEntries(AppCatalog.Crm), e => e.App.Id == "crm.approvals");
+        Assert.Contains(Nav(AllModules, [CrmAccess.QuotesApprove]).MenuEntries(AppCatalog.Crm), e => e.App.Id == "crm.approvals");
+        Assert.Contains(Nav(AllModules, [ContractsAccess.ContractsApprove]).MenuEntries(AppCatalog.Crm), e => e.App.Id == "crm.approvals");
+    }
+
+    [Fact]
+    public void Contract_approvals_keep_their_own_menu_row_when_the_tenant_has_no_crm()
+    {
+        var nav = Nav([ContractsAccess.ModuleKey], [ContractsAccess.ContractsApprove]);
+
+        var menu = nav.Context("sozlesmeler/onaylar")!;
+
+        Assert.Equal(AppCatalog.Contracts, menu.Root.Id);
+        Assert.Equal("contracts.approvals", menu.Active.Id);
+    }
+
+    [Fact]
+    public void Sales_contracts_entry_opens_the_sales_view_of_the_shared_contracts_list()
+    {
+        var nav = Nav(AllModules, SalesUser);
+
+        var entry = nav.MenuEntries(AppCatalog.Crm).Single(e => e.Name == "Satış sözleşmeleri");
+
+        Assert.Equal("sozlesmeler?gorunum=sales", entry.Link);
+        Assert.Equal("contracts.list", entry.App.Id);
+        // Standalone (CRM'siz) uygulamada liste tüm sözleşmeleri açar: bağlantı kısayolun adresini taşımaz.
+        Assert.Equal("sozlesmeler", nav.Find("contracts.list")!.Route);
+    }
+
+    [Fact]
+    public void Warehouse_app_shows_the_facilities_screen_only_with_the_module_and_the_permission()
+    {
+        var nav = Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.FacilitiesRead]);
+
+        var root = Assert.Single(nav.Roots());
+        Assert.Equal((AppCatalog.Warehouse, "Depo ve Antrepo"), (root.Id, root.Name));
+        Assert.Equal("depo/tesisler", nav.Find("warehouse.facilities")!.Route);
+        Assert.Equal(AppCatalog.Warehouse, nav.Context("depo/tesisler")!.Root.Id);
+
+        // Modül kapalıysa ya da izin yoksa uygulama görünmez (menüyü gizlemek yetki değildir; sunucu yine denetler).
+        Assert.Empty(Nav([], [WarehouseAccess.FacilitiesRead]).Roots());
+        Assert.Empty(Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.ZonesRead]).Roots());
+    }
+
+    [Fact]
+    public void Planned_apps_are_listed_as_inert_cards_and_never_as_real_apps()
+    {
+        // Antrepo artık gerçek uygulamadır ("Depo ve Antrepo", AppCatalog.All); pasif kart olarak kalmaz.
+        Assert.Equal(["Lojistik", "İnsan Kaynakları"], AppCatalog.Planned.Select(p => p.Name));
+
+        // Pasif kart: route'u, menüsü ve yetkisi yoktur; gerçek bir uygulama kataloğa girince çakışmamalı.
+        var realNames = AppCatalog.All.Where(a => a.ParentId is null).Select(a => a.Name).ToHashSet();
+        Assert.All(AppCatalog.Planned, p => Assert.DoesNotContain(p.Name, realNames));
+        Assert.DoesNotContain(Nav(AllModules, SalesUser).Roots(), r => AppCatalog.Planned.Any(p => p.Name == r.Name));
+    }
+
+    [Fact]
+    public void Catalog_is_consistent()
+    {
+        var ids = AppCatalog.All.Select(a => a.Id).ToList();
+        Assert.Equal(ids.Count, ids.Distinct().Count());
+
+        var groupIds = AppCatalog.Groups.Select(g => g.Id).ToHashSet();
+        Assert.Equal(groupIds.Count, AppCatalog.Groups.Count);
+
+        foreach (var app in AppCatalog.All)
+        {
+            Assert.True(app.Group is null || groupIds.Contains(app.Group), $"{app.Id}: tanımsız grup {app.Group}");
+            if (app.MenuParentId is { } parentId)
+            {
+                Assert.Contains(AppCatalog.All, a => a.Id == parentId && a.ParentId == app.ParentId);
+            }
+
+            if (app.Hosted is { } hosted)
+            {
+                Assert.True(groupIds.Contains(hosted.Group), $"{app.Id}: tanımsız ev sahibi grubu {hosted.Group}");
+                Assert.True(hosted.ParentEntryId is null || AppCatalog.All.Any(a => a.Id == hosted.ParentEntryId), $"{app.Id}: tanımsız üst satır {hosted.ParentEntryId}");
+                var root = AppCatalog.All.Single(a => a.Id == app.ParentId);
+                Assert.NotNull(root.HostId);
+            }
+
+            if (app.HostId is not null)
+            {
+                Assert.Contains(AppCatalog.All, a => a.Id == app.HostId && a.ParentId is null);
+            }
+        }
+
+        // Her ekranın route'u tektir: iki menü bağlantısı aynı sayfayı göstermez.
+        var routes = AppCatalog.All.Where(a => a.Route is not null && !a.Route.Contains('?')).Select(a => a.Route!).ToList();
+        Assert.Equal(routes.Count, routes.Distinct().Count());
+    }
+}

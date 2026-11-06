@@ -1,0 +1,277 @@
+@page "/yonetim/gunluk"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>İşlem günlüğü · Modulix</PageTitle>
+
+@* İşlem günlüğü (ADR-0033, Dilim 1): içe aktarmalar. Firmanın tamamını görme izni olmayan kullanıcı yalnızca kendi içe
+   aktarmalarını görür (sunucu uygular). Satır hatalarında ham hücre değeri yoktur. *@
+<AuthGate AnyPermission="@(new[] { CoreAccess.ReadImports, CoreAccess.RunImports })">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <div class="page-header">
+        <div>
+            <h1>İşlem günlüğü</h1>
+            <p class="text-muted mb-0">
+                İçe aktarmalar: hangi dosya, kim tarafından, kaç satırın alındığı ve hatalı satırların nedeni.
+                @if (!Session.Can(CoreAccess.ReadImports)) { <text>Yalnızca kendi içe aktarmalarınız görünür.</text> }
+            </p>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="İşlem günlüğü görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <label class="visually-hidden" for="import-status">Durum</label>
+            <select id="import-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm durumlar</option>
+                @foreach (var s in ImportText.Statuses) { <option value="@s">@ImportText.Status(s)</option> }
+            </select>
+            <label class="visually-hidden" for="import-mode">Mod</label>
+            <select id="import-mode" class="form-select form-select-sm filter-select" @bind="mode" @bind:after="() => LoadAsync(1)">
+                <option value="">Kuru çalışma ve uygulama</option>
+                <option value="DryRun">@ImportText.Mode("DryRun")</option>
+                <option value="Apply">@ImportText.Mode("Apply")</option>
+            </select>
+            <label class="visually-hidden" for="import-from">Başlangıç tarihi</label>
+            <input id="import-from" class="form-control form-control-sm filter-select" type="date" @bind="from" @bind:after="() => LoadAsync(1)" />
+            <label class="visually-hidden" for="import-to">Bitiş tarihi</label>
+            <input id="import-to" class="form-control form-control-sm filter-select" type="date" @bind="to" @bind:after="() => LoadAsync(1)" />
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (list is null && message is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (list is not null && list.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">@(ActiveFilters > 0 ? "Bu süzgece uyan içe aktarma yok." : "Henüz içe aktarma yapılmadı.")</p>
+    }
+    else if (list is not null)
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@list.TotalCount içe aktarma listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">İçe aktarma listesi</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var run in list.Items)
+                {
+                    var open = openId == run.Id;
+                    <tr class="@(open ? "is-open" : null)">
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, run, open)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{run.FileName} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Toggle(run.Id)"><AppIcon Name="eye" Size="16" /> <span>@(open ? "Ayrıntıyı kapat" : "Ayrıntıyı aç")</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                    @if (open)
+                    {
+                        <tr class="audit-detail">
+                            <td colspan="@(grid.VisibleColumns.Count() + 1)"><ImportRunDetailPanel RunId="run.Id" /></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="list.Page" PageSize="list.PageSize" TotalCount="list.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string AllViews = "all";
+    private const string ApplyView = "apply";
+    private const string DryRunView = "dryrun";
+
+    // Başlık tıklamasıyla sıralanan sütunlar sunucudaki sort anahtarlarıdır (ImportRunQuery.SortKeys). Kullanıcı adı sayfa dışında çözüldüğü için sıralanamaz.
+    // Varsayılan sıra "en yeni önce" (-createdAt); SortHeader varsayılan azalan sütunda ilk tıklamada artana (en eski önce) geçer.
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("date", "Tarih", "calendar", "createdAt", "-createdAt", Locked: true),
+        new("user", "Kullanıcı", "user"),
+        new("entity", "Kayıt türü", "tag", "entityKey", "-entityKey"),
+        new("file", "Dosya", "file-text", "fileName", "-fileName"),
+        new("status", "Durum", "check-circle", "status", "-status"),
+        new("total", "Satır", "hash", "totalRows", "-totalRows"),
+        new("created", "Oluşan", "hash", "createdCount", "-createdCount"),
+        new("updated", "Güncellenen", "hash", "updatedCount", "-updatedCount"),
+        new("skipped", "Atlanan", "hash", "skippedCount", "-skippedCount"),
+        new("failed", "Hatalı", "alert-circle", "failedCount", "-failedCount"),
+    ];
+
+    private readonly GridViewState grid = new("admin.import-log", "-createdAt");
+    private PersonalGridViews views = default!;
+    private bool filtersOpen;
+    private PagedResult<ImportRunDto>? list;
+    private string? message;
+    private string status = string.Empty;
+    private string mode = string.Empty;
+    private DateOnly? from;
+    private DateOnly? to;
+    private Guid? openId;
+    private string view = AllViews;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti).</summary>
+    private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (mode.Length > 0 ? 1 : 0) + (from is null ? 0 : 1) + (to is null ? 0 : 1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "admin.import-log");
+        grid.Define(Columns);
+        await Session.EnsureLoadedAsync();
+        if (Session.CanAny([CoreAccess.ReadImports, CoreAccess.RunImports]))
+        {
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private void Toggle(Guid id) => openId = openId == id ? null : id;
+
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Uygulananlar, Kuru çalışmalar, kişisel); kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm işlemler", Icon: "history"),
+        new(ApplyView, "Uygulananlar", Icon: "check-circle"),
+        new(DryRunView, "Kuru çalışmalar", Icon: "clipboard-list"),
+        .. views.Options,
+    ];
+
+    private string? CurrentFilters => GridFilters.Build(
+        status.Length > 0 ? ("status", status) : null,
+        mode.Length > 0 ? ("mode", mode) : null,
+        from is { } f ? ("from", f.ToString("yyyy-MM-dd")) : null,
+        to is { } t ? ("to", t.ToString("yyyy-MM-dd")) : null);
+
+    // Sistem görünümünün süzgeci: yalnızca mod.
+    private string? BaselineFilters => Active?.Filters ?? view switch { ApplyView => "mode=Apply", DryRunView => "mode=DryRun", _ => null };
+
+    // Kaydedilmemiş değişiklik: sütunlar/sıralama ya da süzgeç açık görünümden farklı.
+    private bool Dirty => grid.Differs(Active) || Canon(CurrentFilters) != Canon(BaselineFilters);
+
+    private static string Canon(string? filters) =>
+        string.Join('&', GridFilters.Parse(filters).OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => p.Key + "=" + p.Value));
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+        }
+        else
+        {
+            grid.Reset();
+        }
+
+        var filters = GridFilters.Parse(BaselineFilters);
+        status = filters.GetValueOrDefault("status") ?? string.Empty;
+        mode = filters.GetValueOrDefault("mode") ?? string.Empty;
+        from = DateOnly.TryParse(filters.GetValueOrDefault("from"), out var start) ? start : null;
+        to = DateOnly.TryParse(filters.GetValueOrDefault("to"), out var end) ? end : null;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        openId = null;
+        var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
+        if (grid.Sort != grid.DefaultSort) { parts.Add($"sort={Uri.EscapeDataString(grid.Sort)}"); }
+        if (status.Length > 0) { parts.Add($"status={status}"); }
+        if (mode.Length > 0) { parts.Add($"mode={mode}"); }
+        if (from is { } f) { parts.Add($"from={f:yyyy-MM-dd}"); }
+        if (to is { } t) { parts.Add($"to={t:yyyy-MM-dd}"); }
+
+        var result = await Api.GetAsync<ImportRunPageDto>($"/api/imports?{string.Join('&', parts)}");
+        list = result.Value is { } page ? new PagedResult<ImportRunDto>(page.Items, page.Page, page.PageSize, page.TotalCount) : null;
+        message = result.IsSuccess ? null : result.Error;
+    }
+
+    private RenderFragment Cell(GridColumnDef column, ImportRunDto run, bool open) => @<td data-label="@column.Label" class="@(column.Key == "file" ? "primary" : null)">@CellContent(column.Key, run, open)</td>;
+
+    private RenderFragment CellContent(string key, ImportRunDto run, bool open) => key switch
+    {
+        "date" => @<button type="button" class="link-button" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(run.Id)">@CrmLabels.Time(run.CreatedAt)</button>,
+        "user" => @<text>@run.UserName</text>,
+        "entity" => @<text>@run.EntityName</text>,
+        "file" => @<text>@run.FileName<small class="text-muted d-block">@FileSize(run.FileSize) · @ImportText.Mode(run.Mode)</small></text>,
+        "status" => @<span class="badge stage-@ImportText.StatusBadge(run.Status)">@ImportText.Status(run.Status)</span>,
+        "total" => @<text>@run.TotalRows.ToString("N0")</text>,
+        "created" => @<text>@run.CreatedCount.ToString("N0")</text>,
+        "updated" => @<text>@run.UpdatedCount.ToString("N0")</text>,
+        "skipped" => @<text>@run.SkippedCount.ToString("N0")</text>,
+        "failed" => @<text>@run.FailedCount.ToString("N0")</text>,
+        _ => @<text></text>,
+    };
+
+    private static string FileSize(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:N1} KB",
+        _ => $"{bytes / (1024.0 * 1024.0):N1} MB",
+    };
+}

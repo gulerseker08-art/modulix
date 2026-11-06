@@ -40,5 +40,6 @@ public static class RegionalOptions
         new("tr-TR", "Türkçe (31.12.2026, 1.234,56)"),
         new("en-GB", "İngilizce, Birleşik Krallık (31/12/2026, 1,234.56)"),
         new("en-US", "İngilizce, ABD (12/31/2026, 1,234.56)"),
+        new("az-AZ", "Azerice (31.12.2026, 1.234,56)"),
     ];
 }

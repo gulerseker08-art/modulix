@@ -1,4 +1,4 @@
-# ADR-0030: İçe aktarma takibi ve işlem günlüğü ekranı
+# ADR-0033: İçe aktarma takibi ve işlem günlüğü ekranı
 
 - **Durum:** Taslak, 4 Kasım 2026 (kararlar ürün sahibiyle konuşuldu; "Açık noktalar" bölümüne bakın)
 - **Karar:** Excel/CSV içe aktarma, iş (`ImportRun`) ve satır hatası (`ImportRowIssue`) kayıtlarıyla izlenir. Bu kayıtlar, mevcut hata kaynaklarıyla (e-posta, otomasyon, olay teslimi, rapor zamanlama) birlikte tek bir **işlem günlüğü** ekranında (`/yonetim/gunluk`) sunulur. Ekran üç kademede görünür: kullanıcı kendi içe aktarmasını, tenant yöneticisi firmanın tamamını, platform yöneticisi bütün firmaların özetini görür; kademeler rol izinleriyle verilir. İçe aktarma kayıt boru hattından geçer; kısmi başarı varsayılandır.

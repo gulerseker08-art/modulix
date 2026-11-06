@@ -78,6 +78,27 @@ public static class PlatformEndpoints
                 return problem;
             }
         });
+        // Kaydetmeden önce etki önizlemesi: yazmaz; yolu "/preview" ile biter, bu yüzden salt okunur lisansta da çalışır.
+        platform.MapPost("/tenants/{tenantId:guid}/scope-limits/preview", async (
+            Guid tenantId, SetScopeLimitsRequest request, IPlatformAdministration admin, CancellationToken ct) =>
+        {
+            try
+            {
+                var preview = await admin.PreviewScopeLimitsAsync(
+                    tenantId,
+                    [.. (request.Limits ?? []).Select(l => new PlatformScopeLimit(l.EntityKey, (Core.Contracts.Authorization.RecordScope)l.MaxScope, l.AppliesToAdministrators))],
+                    ct);
+                return Results.Ok(new ScopeLimitsPreviewResponse(
+                    [.. preview.Types.Select(t => new ScopeImpactDto(
+                        t.EntityKey, t.AffectedRoles, t.NewlyRestrictedMembers, t.ReleasedMembers, t.NewlyRestrictedAdministrators, t.ReleasedAdministrators))],
+                    preview.AffectedRoleCount, preview.NewlyRestrictedMemberCount, preview.ReleasedMemberCount,
+                    preview.NewlyRestrictedAdministratorCount, preview.ReleasedAdministratorCount));
+            }
+            catch (Exception ex) when (ToProblem(ex) is { } problem)
+            {
+                return problem;
+            }
+        });
         platform.MapGet("/audit", ListAuditAsync);
         platform.MapGet("/overview", GetOverviewAsync);
         platform.MapGet("/expirations", ListExpirationsAsync);
@@ -183,9 +204,16 @@ public static class PlatformEndpoints
     }
 
     private static async Task<IResult> ListTenantsAsync(
-        string? search, TenantState? status, int? page, int? pageSize, IPlatformAdministration admin, CancellationToken ct)
+        string? search, TenantState? status, string? sort, int? page, int? pageSize, IPlatformAdministration admin, CancellationToken ct)
     {
-        var result = await admin.ListTenantsAsync(new PlatformTenantQuery(search, (TenantStatus?)status, page ?? 1, pageSize ?? 25), ct);
+        // Başlığa göre sıralama (ADR-0036): yalnızca bilinen anahtarlar kabul edilir.
+        if (!string.IsNullOrEmpty(sort) && !PlatformTenantQuery.SortKeys.Contains(sort))
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]> { ["sort"] = ["Geçersiz sıralama."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+
+        var result = await admin.ListTenantsAsync(new PlatformTenantQuery(search, (TenantStatus?)status, page ?? 1, pageSize ?? 25, string.IsNullOrEmpty(sort) ? null : sort), ct);
         return Results.Ok(new PlatformTenantPageResponse(result.Items.Select(ToDto).ToList(), result.Page, result.PageSize, result.TotalCount));
     }
 

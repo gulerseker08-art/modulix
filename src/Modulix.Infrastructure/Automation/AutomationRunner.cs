@@ -40,10 +40,29 @@ public sealed class AutomationOptions
 
     /// <summary>Tenant başına etkin (yayınlanıp açık) kural sınırı; her olay etkin kuralları taradığından bir firma ortak kaynağı şişiremesin.</summary>
     public int MaxActiveRulesPerTenant { get; set; } = AutomationLimits.MaxActiveRulesPerTenant;
+
+    /// <summary>Bir tenant için bir turda taramanın okuyabileceği en çok kayıt (tarama sayfa sayfa, birden çok turda ilerler).</summary>
+    public int ScanRecordsPerTenantPerRound { get; set; } = 500;
+
+    /// <summary>Kayıt kaynağından tek seferde istenen kayıt sayısı.</summary>
+    public int ScanPageSize { get; set; } = 200;
+
+    /// <summary>Bekleyen çalışma sayısı bu sınıra ulaşınca tarama yeni kayıt almaz; işleyici yetişince sürer.</summary>
+    public int ScanBacklogLimit { get; set; } = 1000;
+
+    /// <summary>Bitmiş (başarılı, iptal, koşulu sağlanmayan) çalışmaların ve adımlarının saklanacağı gün sayısı.</summary>
+    public int RunRetentionDays { get; set; } = 90;
+
+    /// <summary>Başarısız çalışmaların saklanacağı gün sayısı (inceleme için daha uzun).</summary>
+    public int FailedRunRetentionDays { get; set; } = 180;
+
+    /// <summary>Saklama temizliği turları arasındaki süre (dakika); varsayılan 6 saat. Acil durdurma anahtarından bağımsızdır.</summary>
+    public int RetentionIntervalMinutes { get; set; } = 360;
 }
 
 /// <summary>Bir tenant için bir turun özeti.</summary>
-public sealed record AutomationRound(int Evaluated, int NotMatched, int StepsRun, int Retrying, int Failed, int Cancelled);
+/// <remarks><c>Scanned</c>: tarama tetikleyicilerinden bu turda kuyruğa alınan çalışma sayısı.</remarks>
+public sealed record AutomationRound(int Evaluated, int NotMatched, int StepsRun, int Retrying, int Failed, int Cancelled, int Scanned = 0);
 
 /// <summary>
 /// Kural çalışmalarını işler (ADR-0027, Dilim 2). Bir tur bir tenant içindir ve tenant başına oturum kilidiyle (<c>sp_getapplock</c>) tek örnekte
@@ -64,7 +83,8 @@ public sealed record AutomationRound(int Evaluated, int NotMatched, int StepsRun
 /// Loglara tenant, çalışma ve kural kimlikleri yazılır; kayıt değeri ve parametre yazılmaz.
 /// </summary>
 public sealed class AutomationRunner(
-    IServiceScopeFactory scopes, ModuleCatalog catalog, IOptions<AutomationOptions> options, TimeProvider time, ILogger<AutomationRunner> logger)
+    IServiceScopeFactory scopes, ModuleCatalog catalog, AutomationScanner scanner, IOptions<AutomationOptions> options, TimeProvider time,
+    ILogger<AutomationRunner> logger)
 {
     public const string LockName = "modulix.automation";
 
@@ -130,6 +150,9 @@ public sealed class AutomationRunner(
                 return (tally.ToRound(), false);
             }
 
+            // Tarama tabanlı tetikleyiciler önce kuyruğa çalışma yazar; aynı turda sıradaki çalışmalar işlenirken bunlar da (sınır dahilinde) işlenir.
+            tally.Scanned = await scanner.ScanAsync(services, db, tenantId, cancellationToken);
+
             var now = time.GetUtcNow();
             var due = await db.AutomationRuns.AsNoTracking()
                 .Where(r => (r.Status == AutomationRunStatus.Pending || r.Status == AutomationRunStatus.Running)
@@ -157,6 +180,40 @@ public sealed class AutomationRunner(
             }
 
             return (tally.ToRound(), false);
+        }
+        finally
+        {
+            await ReleaseLockAsync(lockConnection, tenantId, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Bir tenant için saklama temizliği (<see cref="AutomationRetention"/>). Tur ile aynı oturum kilidini kullanır; kilidi alamayan örnek atlar.
+    /// Platform acil durdurma anahtarından ve firma ayarından bağımsızdır: kapalı otomasyonun eski kayıtları da süresi dolunca silinir.
+    /// </summary>
+    /// <returns>Temizlik sonucu; kilit başka örnekteyse ya da tenant etkin değilse null.</returns>
+    public async Task<AutomationRetentionResult?> CleanTenantAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var tenantScopes = scope.ServiceProvider.GetRequiredService<ITenantScopeFactory>();
+        await using var control = tenantScopes.Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty));
+        var services = control.ServiceProvider;
+        if (!await services.GetRequiredService<ModulixDbContext>().Tenants.AsNoTracking()
+                .AnyAsync(t => t.Id == tenantId && t.Status == TenantStatus.Active, cancellationToken))
+        {
+            return null;
+        }
+
+        await using var lockConnection = new SqlConnection(services.GetRequiredService<ModulixDatabaseOptions>().AppConnectionString);
+        await lockConnection.OpenAsync(cancellationToken);
+        if (!await TryLockAsync(lockConnection, tenantId, cancellationToken))
+        {
+            return null;
+        }
+
+        try
+        {
+            return await services.GetRequiredService<AutomationRetention>().RunAsync(cancellationToken);
         }
         finally
         {
@@ -619,6 +676,8 @@ public sealed class AutomationRunner(
 
         public int Cancelled { get; set; }
 
-        public AutomationRound ToRound() => new(Evaluated, NotMatched, StepsRun, Retrying, Failed, Cancelled);
+        public int Scanned { get; set; }
+
+        public AutomationRound ToRound() => new(Evaluated, NotMatched, StepsRun, Retrying, Failed, Cancelled, Scanned);
     }
 }
