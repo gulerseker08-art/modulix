@@ -104,11 +104,19 @@ public static class ReportCsv
         return DangerousStarts.Contains(value[0]) ? "'" + value : value;
     }
 
+    /// <summary>
+    /// <see cref="Text"/>'in tersi: başına kaçış için kesme işareti konmuş hücrenin asıl değeri. Hata raporu düzeltilip yeniden yüklendiğinde
+    /// "+90…" gibi değerler bozulmasın diye kullanılır; kesme işaretiyle başlayan başka metne dokunulmaz.
+    /// </summary>
+    public static string Unescape(string value) =>
+        value.Length > 1 && value[0] == '\'' && DangerousStarts.Contains(value[1]) ? value[1..] : value;
+
     private static void AppendLine(StringBuilder builder, IEnumerable<string> cells)
     {
-        builder.Append(string.Join(',', cells.Select(Quote))).Append("\r\n");
+        builder.Append(string.Join(',', cells.Select(c => Quote(c, ',')))).Append("\r\n");
     }
 
-    private static string Quote(string value) =>
-        value.IndexOfAny([',', '"', '\r', '\n']) >= 0 ? "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : value;
+    /// <summary>Hücreyi verilen ayraca göre tırnaklar (RFC 4180).</summary>
+    public static string Quote(string value, char delimiter) =>
+        value.IndexOfAny([delimiter, '"', '\r', '\n']) >= 0 ? "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : value;
 }

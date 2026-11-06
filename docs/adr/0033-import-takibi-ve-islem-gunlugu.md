@@ -121,5 +121,29 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 ## Açık noktalar
 
 - `DocumentFormat.OpenXml` sürümünün eklenmeden önce lisans ve NuGet güvenlik taramasıyla doğrulanması.
-- `ImportDefinition` alanlarının tam şekli (anahtar stratejisi, güncelleme/oluşturma ayrımı, Ç7.3 dış sistem kimliği) Dilim 2 başında kesinleşir.
 - Sınırların (10.000 satır, 5.000 hata satırı, dosya boyutu) pilot ölçümüyle doğrulanması.
+- Güncelleme ve dış sistem kimliği (Ç7.3): anahtar stratejisi güncelleme eklenirken kesinleşir.
+
+## Uygulama durumu
+
+**Dilim 1:** uygulandı (günlük okuma, modeller, izinler).
+
+**Dilim 2:** uygulandı (`gseker/import-motoru-dilim2`).
+
+- `ImportDefinition` (`IModule.Imports`): kayıt türü, görünen ad, oluşturma izni, sütunlar, `MatchFields`. Tanım açılışta doğrulanır. İlk tanım müşteri adayıdır (`CrmImports`); sorumlu yükleyene atanır, firma ve kişi bağı lookup gerektirdiği için Dilim 3'tedir.
+- Sütunlar `ImportSchema` ile tanımdan, firmanın özel alanlarından ve seçim listelerinden türetilir. Görme yetkisi olmayan hassas alan şablona girmez; dosyada varsa tanınmayan sütun gibi yok sayılır.
+- Hücre yorumu `ImportRows`'tadır. Sayı Türkçe biçimlidir; "12.5" gibi yanlış okunabilecek yazım reddedilir (Ç7.1).
+- Dosya düzeyi denetim istekte yapılır; satırlar arka planda işlenir. Uç nokta 202 döner, ekran koşuyu sorgulayarak izler; ilerleme 50 satırda bir yazılır.
+- Her satır kayıt boru hattından geçer. Depo varlığı doğrulama bitmeden izlemeye aldığı için **reddedilen satırdan sonra DI kapsamı atılır**: aksi halde reddedilen kayıt sonraki satırla yazılabilirdi. Başarılı satırlar kapsamı en çok 50 satır paylaşır (ölçüm: satır başına kapsamda her satır yaklaşık 29 SQL çalıştırıyordu, çoğu yetki sorgusu).
+- Kuru çalışma aynı yoldan geçer, satırın işlemi geri alınır. Doğrulama birebir aynıdır; yalnızca günlüğe koşu satırı yazılır.
+- Mükerrer yalnızca uyarıdır (`duplicate-possible`): `MatchFields` kullanıcının kapsamında sorgulanır, dosya içi tekrar da uyarılır.
+- Tenant başına tek koşu `sp_getapplock` oturum kilidiyle sağlanır (409). Kilit koşu sonunda açıkça bırakılır: kapanan bağlantı havuza döner ve SQL oturumu kilidi tutmaya devam eder. Kilit alındığında "çalışıyor" görünen koşu çökmüş sayılır ve `Failed` yapılır.
+- Hata raporu bellekte bir saat tutulur, veritabanına yazılmaz ve **yalnızca yükleyene** verilir: dosya, firmanın günlüğünü gören birinin görme yetkisi olmayan değerleri taşıyabilir. Süresi dolunca 410 döner.
+
+**Bu ADR'den bilinçli sapmalar (Dilim 2):**
+
+- Arka plan işi kalıcı kuyruktan değil **uygulama içi görevden** çalışır: dosya yalnızca koşu boyunca bellektedir, checkpoint yoktur ve dosya başına sınır **2.000 satırdır**. Uygulama kapanırken koşu sıradaki satırda durur ve `Cancelled` olur; çökerse sonraki koşu onu `Failed` yapar. Yarıda kalan dosya yeniden yüklenirse alınmış satırlar yinelenir (mükerrer uyarısı çıkar); Ç7.2 kabulü bu yüzden henüz karşılanmıyor. Kalıcı kuyruk geçici dosya deposu ister.
+- Hız pilot ölçümü bekliyor: yerel test ortamında (SQL günlüğü açık) kuru çalışma satır başına yaklaşık 0,3 saniye, uygulama 0,7 saniye sürdü. Üretim süresi ölçülmedi.
+- Yalnızca oluşturma vardır; `UpdatedCount` ve `SkippedCount` bu dilimde 0 kalır.
+- Hata raporu tek uygulama örneği varsayar (`IMemoryCache`). Birden çok örnekte rapor başka örneğe düşerse 410 döner.
+- Toplu otomasyon davranışı Dilim 3'tedir: içe aktarılan her kayıt bugün kural ve abonelikleri normal olayla tetikler.

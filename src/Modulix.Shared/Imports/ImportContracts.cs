@@ -32,6 +32,17 @@ public sealed record ImportIssueCodeCountDto(string Code, int Count);
 
 public sealed record ImportRunDetailDto(ImportRunDto Run, IReadOnlyList<ImportIssueCodeCountDto> IssueCodes, ImportIssuePageDto Issues);
 
+public sealed record ImportFieldDto(string Key, string Label, bool Required);
+
+/// <summary>Kullanıcının içe aktarabildiği kayıt türü ve şablon sütunları (ADR-0033, Dilim 2).</summary>
+public sealed record ImportDefinitionDto(string EntityKey, string DisplayName, IReadOnlyList<ImportFieldDto> Fields);
+
+/// <summary>İstemcinin dosyayı göndermeden önce uyguladığı sınır; sunucu aynı sınırı kendisi de uygular.</summary>
+public static class ImportFileLimits
+{
+    public const int MaxFileBytes = 10 * 1024 * 1024;
+}
+
 /// <summary>Ekran metinleri: durum, mod, politika ve hata kodu adları (arayüzde İngilizce teknik ad görünmez).</summary>
 public static class ImportText
 {

@@ -98,6 +98,12 @@ public interface IModule
     IReadOnlyList<FormDefinition> Forms => [];
 
     /// <summary>
+    /// İçe aktarılabilir kayıt türleri (ADR-0033): sütunlar, oluşturma izni ve mükerrer uyarısı alanları. Tanım açılışta doğrulanır; dosya
+    /// okuma, şablon ve hata raporu ortak motordadır. Anahtar modül anahtarıyla başlar.
+    /// </summary>
+    IReadOnlyList<ImportDefinition> Imports => [];
+
+    /// <summary>
     /// Modülün kural ve iş akışı altyapısına beyan ettiği yetenekler (ADR-0027): kural yazılabilen kayıt türleri, olaylar, okunabilir
     /// alanlar, ilişkiler ve aksiyonlar. Anahtarlar modül anahtarıyla başlar; beyan açılışta doğrulanır. Bildirmeyen modülde kural
     /// yazılamaz; Core modülün kayıt türlerini ve alanlarını bilmez, yalnızca bu beyanı kullanır.
