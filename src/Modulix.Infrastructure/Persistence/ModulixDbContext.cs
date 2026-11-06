@@ -6,6 +6,7 @@ using Modulix.Core.Authorization;
 using Modulix.Core.Automation;
 using Modulix.Core.Communication;
 using Modulix.Core.Customization;
+using Modulix.Core.Customs;
 using Modulix.Core.Imports;
 using Modulix.Core.Lookups;
 using Modulix.Core.Teams;
@@ -162,6 +163,10 @@ public class ModulixDbContext(
     public DbSet<TenantActivitySelection> ActivitySelections => Set<TenantActivitySelection>();
 
     public DbSet<RelationshipRole> RelationshipRoles => Set<RelationshipRole>();
+
+    public DbSet<GtipCatalogVersion> GtipCatalogVersions => Set<GtipCatalogVersion>();
+
+    public DbSet<GtipCatalogEntry> GtipCatalogEntries => Set<GtipCatalogEntry>();
 
     public DbSet<RulePackage> RulePackages => Set<RulePackage>();
     public DbSet<RulePackageVersion> RulePackageVersions => Set<RulePackageVersion>();
