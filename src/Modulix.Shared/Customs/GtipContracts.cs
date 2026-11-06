@@ -12,3 +12,17 @@ public sealed record GtipEntryPageDto(List<GtipEntryDto> Items, int TotalCount, 
 /// (kod katalogdaki daha uzun kodların başı), <c>NotFound</c> (uyarı). Hiçbir durum kaydı engellemez.
 /// </summary>
 public sealed record GtipCheckDto(string Status, string? Description, string? VersionName);
+
+/// <summary>Yüklenen dosyanın önizlemesi (hiçbir şey yazılmaz). <c>CanImport</c> hata yoksa ve satır varsa doğrudur.</summary>
+public sealed record GtipImportPreviewDto(
+    string? FatalError,
+    bool CanImport,
+    int RowsRead,
+    int ValidCount,
+    int HeadingRows,
+    int PaddedCodes,
+    int ErrorCount,
+    List<GtipImportErrorDto> Errors,
+    List<GtipEntryDto> Sample);
+
+public sealed record GtipImportErrorDto(int Row, string Message);
