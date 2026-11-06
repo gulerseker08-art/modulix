@@ -19,7 +19,7 @@ public sealed record MembershipDto(Guid TenantId, string TenantName, string Tena
 /// Oturumdaki kullanıcı. <see cref="ActiveTenantId"/> sunucuda doğrulanmış aktif tenant'tır.
 /// <see cref="IsPlatformAdministrator"/>: platform ekranlarını gösterir; yetkiyi sunucu her istekte denetler.
 /// <see cref="PlatformRoles"/>: platform hesabının etkin rolleri (Support, Operations, Finance, Owner); ekran yalnızca gizleme içindir.
-/// <see cref="PreferredLanguage"/>: kişinin arayüz dili tercihi (ADR-0033); boşsa firmanın varsayılanı kullanılır.
+/// <see cref="PreferredLanguage"/>: kişinin arayüz dili tercihi (ADR-0034); boşsa firmanın varsayılanı kullanılır.
 /// </summary>
 public sealed record MeResponse(
     Guid UserId,

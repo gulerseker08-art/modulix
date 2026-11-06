@@ -69,7 +69,7 @@ public sealed class AccountSecurity(
     }
 
     /// <summary>
-    /// Arayüz dili tercihini kaydeder (ADR-0033). Boş değer tercihi kaldırır; desteklenmeyen kod reddedilir.
+    /// Arayüz dili tercihini kaydeder (ADR-0034). Boş değer tercihi kaldırır; desteklenmeyen kod reddedilir.
     /// Dil kişiye aittir: değişiklik üye olunan bütün firmalarda geçerlidir.
     /// </summary>
     public async Task UpdateLanguageAsync(ModulixUser user, string? language, AccountClient client, CancellationToken cancellationToken)

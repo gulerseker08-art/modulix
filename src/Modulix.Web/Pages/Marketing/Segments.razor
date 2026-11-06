@@ -17,14 +17,15 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Segment görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <label class="visually-hidden" for="segment-search">Segment ara</label>
             <input id="segment-search" class="form-control" type="search" placeholder="Ad veya kod ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(MarketingAccess.SegmentsWrite))
         {
             <a class="btn btn-primary" href="pazarlama/segmentler/yeni"><AppIcon Name="plus" Size="16" /> Yeni segment</a>
@@ -49,9 +50,11 @@
                 <option value="">Statik ve dinamik</option>
                 @foreach (var k in MarketingLabels.Kinds) { <option value="@k.Key">@k.Label</option> }
             </select>
-            <button type="button" class="chip @(mine ? "active" : null)" aria-pressed="@(mine ? "true" : "false")" @onclick="ToggleMineAsync">Benim segmentlerim</button>
         </div>
     }
+
+    <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (list is null && message is null)
     {
@@ -68,27 +71,26 @@
             <caption class="visually-hidden">Segment listesi</caption>
             <thead>
                 <tr>
-                    <th scope="col">Segment</th><th scope="col">Hedef</th><th scope="col">Tür</th><th scope="col">Durum</th>
-                    <th scope="col">Üye sayısı</th><th scope="col">Son hesaplama</th><th scope="col">Sürüm</th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var s in list.Items)
                 {
                     <tr>
-                        <td data-label="Segment" class="primary">
-                            <a href="pazarlama/segmentler/@s.Id">@s.Name</a>
-                            <small class="text-muted">@s.Code</small>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, s)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{s.Name} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="pazarlama/segmentler/@s.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            </RowMenu>
                         </td>
-                        <td data-label="Hedef">@MarketingLabels.Label(MarketingLabels.Targets, s.Target)</td>
-                        <td data-label="Tür">@(s.Kind == "Static" ? "Statik" : "Dinamik")</td>
-                        <td data-label="Durum"><span class="badge stage-@MarketingLabels.StatusBadge(s.Status)">@MarketingLabels.Label(MarketingLabels.Statuses, s.Status)</span></td>
-                        <td data-label="Üye sayısı">@(s.LastMemberCount?.ToString("N0") ?? "—")</td>
-                        <td data-label="Son hesaplama">
-                            @(s.LastComputedAt is { } at ? CrmLabels.Time(at) : "—")
-                            @if (s.LastError is not null) { <small class="text-danger d-block">Hata: @s.LastError</small> }
-                        </td>
-                        <td data-label="Sürüm">@(s.PublishedVersion == 0 ? "—" : "v" + s.PublishedVersion)</td>
                     </tr>
                 }
             </tbody>
@@ -98,11 +100,24 @@
 </AuthGate>
 
 @code {
+    private const string AllViews = "all";
+    private const string MineView = "mine";
+
+    // Başlık tıklamasıyla sıralanan sütunlar sunucudaki sort anahtarlarıdır (SegmentRecordStore.SortKeys).
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("name", "Segment", "type", "name", "-name", Locked: true),
+        new("target", "Hedef", "target", "target", "-target"),
+        new("kind", "Tür", "layers", "kind", "-kind"),
+        new("status", "Durum", "tag", "status", "-status"),
+        new("members", "Üye sayısı", "users", "lastMemberCount", "-lastMemberCount"),
+        new("computed", "Son hesaplama", "clock", "lastComputedAt", "-lastComputedAt"),
+        new("version", "Sürüm", "hash", "publishedVersion", "-publishedVersion"),
+    ];
+
+    private readonly GridViewState grid = new("marketing.segments", "name");
+    private PersonalGridViews views = default!;
     private bool filtersOpen;
-
-    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
-    private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (target.Length > 0 ? 1 : 0) + (kind.Length > 0 ? 1 : 0) + (mine ? 1 : 0);
-
     private PagedResult<SegmentDto>? list;
     private string? message;
     private string status = string.Empty;
@@ -110,23 +125,110 @@
     private string kind = string.Empty;
     private string search = string.Empty;
     private bool mine;
+    private string view = AllViews;
+
+    /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
+    private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (target.Length > 0 ? 1 : 0) + (kind.Length > 0 ? 1 : 0);
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "marketing.segments");
+        grid.Define(Columns);
         await Session.EnsureLoadedAsync();
-        if (Session.Can(MarketingAccess.SegmentsRead)) { await LoadAsync(1); }
+        if (Session.Can(MarketingAccess.SegmentsRead))
+        {
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
     }
 
-    private async Task ToggleMineAsync()
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Benim segmentlerim, Tümü, kişisel); kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(MineView, "Benim segmentlerim", Icon: "star"),
+        new(AllViews, "Tüm segmentler", Icon: "layers"),
+        .. views.Options,
+    ];
+
+    private string? CurrentFilters => GridFilters.Build(
+        mine ? ("ownerId", "me") : null,
+        status.Length > 0 ? ("status", status) : null,
+        target.Length > 0 ? ("target", target) : null,
+        kind.Length > 0 ? ("kind", kind) : null);
+
+    // Kaydedilmemiş değişiklik: sütunlar/sıralama ya da süzgeç açık görünümden farklı.
+    private bool Dirty => grid.Differs(Active) || Canon(CurrentFilters) != Canon(Active?.Filters ?? (view == MineView ? "ownerId=me" : null));
+
+    private static string Canon(string? filters) =>
+        string.Join('&', GridFilters.Parse(filters).OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => p.Key + "=" + p.Value));
+
+    private async Task ChooseViewAsync(string key)
     {
-        mine = !mine;
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            ApplyFilters(GridFilters.Parse(saved.Filters));
+        }
+        else
+        {
+            grid.Reset();
+            ApplyFilters(key == MineView ? new Dictionary<string, string> { ["ownerId"] = "me" } : new Dictionary<string, string>());
+        }
+
         await LoadAsync(1);
+    }
+
+    private void ApplyFilters(Dictionary<string, string> filters)
+    {
+        mine = filters.GetValueOrDefault("ownerId") == "me";
+        status = filters.GetValueOrDefault("status") ?? string.Empty;
+        target = filters.GetValueOrDefault("target") ?? string.Empty;
+        kind = filters.GetValueOrDefault("kind") ?? string.Empty;
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
     {
         var parts = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
         if (!string.IsNullOrWhiteSpace(search)) { parts.Add($"search={Uri.EscapeDataString(search.Trim())}"); }
+        if (grid.Sort != grid.DefaultSort) { parts.Add($"sort={Uri.EscapeDataString(grid.Sort)}"); }
         if (status != string.Empty) { parts.Add($"status={status}"); }
         if (target != string.Empty) { parts.Add($"target={target}"); }
         if (kind != string.Empty) { parts.Add($"kind={kind}"); }
@@ -136,4 +238,18 @@
         list = result.Value;
         message = result.IsSuccess ? null : result.Error;
     }
+
+    private RenderFragment Cell(GridColumnDef column, SegmentDto s) => @<td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, s)</td>;
+
+    private RenderFragment CellContent(string key, SegmentDto s) => key switch
+    {
+        "name" => @<text><a href="pazarlama/segmentler/@s.Id">@s.Name</a> <small class="text-muted">@s.Code</small></text>,
+        "target" => @<text>@MarketingLabels.Label(MarketingLabels.Targets, s.Target)</text>,
+        "kind" => @<text>@(s.Kind == "Static" ? "Statik" : "Dinamik")</text>,
+        "status" => @<span class="badge stage-@MarketingLabels.StatusBadge(s.Status)">@MarketingLabels.Label(MarketingLabels.Statuses, s.Status)</span>,
+        "members" => @<text>@(s.LastMemberCount?.ToString("N0") ?? "—")</text>,
+        "computed" => @<text>@(s.LastComputedAt is { } at ? CrmLabels.Time(at) : "—")@if (s.LastError is not null) { <small class="text-danger d-block">Hata: @s.LastError</small> }</text>,
+        "version" => @<text>@(s.PublishedVersion == 0 ? "—" : "v" + s.PublishedVersion)</text>,
+        _ => @<text></text>,
+    };
 }

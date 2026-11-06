@@ -1,0 +1,80 @@
+@* "Sütunlar" düğmesi + açılır menü: ekranın sütunlarını göster/gizle (ekle/çıkar) ve sırala. Durum GridViewState'tedir; kişisel görünümle kaydedilir (ADR-0036).
+   Sabit sütun (kaydın adı) hep görünür. Esc ya da menü dışına tıklama kapatır. *@
+<div class="view-selector" @onkeydown="OnKeyDown">
+    <button type="button" class="btn btn-ghost" aria-haspopup="true" aria-expanded="@(open ? "true" : "false")" @onclick="Toggle">
+        <AppIcon Name="columns" Size="16" /> Sütunlar
+    </button>
+    @if (open)
+    {
+        <div class="view-selector-backdrop" aria-hidden="true" @onclick="Close"></div>
+        <div class="view-menu column-menu" role="group" aria-label="Görünen sütunlar">
+            <div class="view-menu-group" role="presentation">Göster, gizle ve sırala</div>
+            @for (var i = 0; i < State.Order.Count; i++)
+            {
+                var column = State.Find(State.Order[i]);
+                if (column is null)
+                {
+                    continue;
+                }
+
+                var index = i;
+                <div class="column-item column-row">
+                    <label class="column-check">
+                        <input type="checkbox" class="form-check-input" checked="@State.Visible.Contains(column.Key)" disabled="@column.Locked"
+                               @onchange="() => ToggleAsync(column.Key)" />
+                        <AppIcon Name="@column.Icon" Size="14" />
+                        <span>@column.Label</span>
+                    </label>
+                    <button type="button" class="btn btn-ghost btn-sm" aria-label="@column.Label sütununu yukarı taşı" disabled="@(index == 0)"
+                            @onclick="() => MoveAsync(column.Key, -1)"><AppIcon Name="arrow-up" Size="14" /></button>
+                    <button type="button" class="btn btn-ghost btn-sm" aria-label="@column.Label sütununu aşağı taşı" disabled="@(index == State.Order.Count - 1)"
+                            @onclick="() => MoveAsync(column.Key, 1)"><AppIcon Name="arrow-down" Size="14" /></button>
+                </div>
+            }
+
+            <div class="view-menu-divider" role="separator"></div>
+            <button type="button" class="view-menu-item" @onclick="ResetAsync">Varsayılana dön</button>
+        </div>
+    }
+</div>
+
+@code {
+    private bool open;
+
+    [Parameter, EditorRequired] public GridViewState State { get; set; } = default!;
+
+    /// <summary>Sütun seçimi ya da sırası değişince.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private void Toggle() => open = !open;
+
+    private void Close() => open = false;
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (open && e.Key == "Escape")
+        {
+            open = false;
+        }
+    }
+
+    private Task ToggleAsync(string key)
+    {
+        State.Toggle(key);
+        return Changed.InvokeAsync();
+    }
+
+    private Task MoveAsync(string key, int delta)
+    {
+        State.Move(key, delta);
+        return Changed.InvokeAsync();
+    }
+
+    private async Task ResetAsync()
+    {
+        var sort = State.Sort;
+        State.Reset();
+        State.Sort = sort;
+        await Changed.InvokeAsync();
+    }
+}

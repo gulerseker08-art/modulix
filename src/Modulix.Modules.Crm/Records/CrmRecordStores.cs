@@ -59,7 +59,15 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         ["kind"] = (q, v, _) => Enum.TryParse<PartyKind>(v, ignoreCase: false, out var kind) && Enum.IsDefined(kind) && !char.IsDigit(v[0])
             ? q.Where(c => c.Party.Kind == kind)
             : null,
+        // Kod listesi alanları (ADR-0029 Dilim E): "a,b" biçiminde saklanır; tam kod eşleşir (kısmi eşleşme olmaz).
+        ["relationshipRole"] = (q, v, _) => CodeFilter(v) is { } code ? q.Where(c => ("," + c.Party.RelationshipRoles + ",").Contains("," + code + ",")) : null,
+        ["customerSector"] = (q, v, _) => CodeFilter(v) is { } code ? q.Where(c => ("," + c.Party.CustomerSectors + ",").Contains("," + code + ",")) : null,
+        ["serviceNeed"] = (q, v, _) => CodeFilter(v) is { } code ? q.Where(c => ("," + c.Party.ServiceNeeds + ",").Contains("," + code + ",")) : null,
     };
+
+    /// <summary>Faaliyet/rol kodu: küçük harf, rakam ve tire (en çok 50); başka değer süzgeç sayılmaz.</summary>
+    private static string? CodeFilter(string value) =>
+        value.Trim() is { Length: > 0 and <= 50 } code && code.All(ch => ch is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-') ? code : null;
 
     protected override IReadOnlyDictionary<string, AsyncRecordFilter<Company>> AsyncFilters { get; } =
         new Dictionary<string, AsyncRecordFilter<Company>>
@@ -71,6 +79,28 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
     protected override IQueryable<Company> Load(IQueryable<Company> source) => source.Include(c => c.Party);
 
     protected override IOrderedQueryable<Company> Order(IQueryable<Company> source) => source.OrderBy(c => c.Party.Name);
+
+    // Liste başlıklarına göre sıralama (sort=name, sort=-name ...). Sorumlu adı üyelik tablosunda olduğundan sorumluya göre sıralama yoktur.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        ["name", "-name", "status", "-status", "city", "-city", "phone", "-phone", "industry", "-industry", "taxNumber", "-taxNumber", "createdAt", "-createdAt"];
+
+    protected override IOrderedQueryable<Company> Order(IQueryable<Company> source, string? sort) => sort switch
+    {
+        "-name" => source.OrderByDescending(c => c.Party.Name),
+        "status" => source.OrderBy(c => c.Status).ThenBy(c => c.Party.Name),
+        "-status" => source.OrderByDescending(c => c.Status).ThenBy(c => c.Party.Name),
+        "city" => source.OrderBy(c => c.Party.City == null).ThenBy(c => c.Party.City).ThenBy(c => c.Party.Name),
+        "-city" => source.OrderBy(c => c.Party.City == null).ThenByDescending(c => c.Party.City).ThenBy(c => c.Party.Name),
+        "phone" => source.OrderBy(c => c.Party.Phone == null).ThenBy(c => c.Party.Phone).ThenBy(c => c.Party.Name),
+        "-phone" => source.OrderBy(c => c.Party.Phone == null).ThenByDescending(c => c.Party.Phone).ThenBy(c => c.Party.Name),
+        "industry" => source.OrderBy(c => c.Industry == null).ThenBy(c => c.Industry).ThenBy(c => c.Party.Name),
+        "-industry" => source.OrderBy(c => c.Industry == null).ThenByDescending(c => c.Industry).ThenBy(c => c.Party.Name),
+        "taxNumber" => source.OrderBy(c => c.Party.TaxNumber == null).ThenBy(c => c.Party.TaxNumber).ThenBy(c => c.Party.Name),
+        "-taxNumber" => source.OrderBy(c => c.Party.TaxNumber == null).ThenByDescending(c => c.Party.TaxNumber).ThenBy(c => c.Party.Name),
+        "createdAt" => source.OrderBy(c => c.CreatedAt).ThenBy(c => c.Party.Name),
+        "-createdAt" => source.OrderByDescending(c => c.CreatedAt).ThenBy(c => c.Party.Name),
+        _ => Order(source),
+    };
 
     // Ad, vergi no, şehir ve etiketin yanında tüm iletişim noktalarında (ikinci telefon, lokasyon e-postası...) ve adreslerde aranır;
     // telefon ve adres normalleştirilmiş değerle eşleşir (ADR-0012).
@@ -288,6 +318,22 @@ internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmR
 
     protected override IOrderedQueryable<Contact> Order(IQueryable<Contact> source) =>
         source.OrderBy(c => c.Person.LastName).ThenBy(c => c.Person.FirstName);
+
+    // Liste başlıklarına göre sıralama (sort=name, sort=-title ...). Firma adı ilişki üzerinden olduğundan firmaya göre sıralama yoktur.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        ["name", "-name", "title", "-title", "phone", "-phone", "email", "-email"];
+
+    protected override IOrderedQueryable<Contact> Order(IQueryable<Contact> source, string? sort) => sort switch
+    {
+        "-name" => source.OrderByDescending(c => c.Person.LastName).ThenByDescending(c => c.Person.FirstName),
+        "title" => source.OrderBy(c => c.Person.Title == null).ThenBy(c => c.Person.Title).ThenBy(c => c.Person.LastName).ThenBy(c => c.Person.FirstName),
+        "-title" => source.OrderBy(c => c.Person.Title == null).ThenByDescending(c => c.Person.Title).ThenBy(c => c.Person.LastName).ThenBy(c => c.Person.FirstName),
+        "phone" => source.OrderBy(c => c.Person.Phone == null).ThenBy(c => c.Person.Phone).ThenBy(c => c.Person.LastName).ThenBy(c => c.Person.FirstName),
+        "-phone" => source.OrderBy(c => c.Person.Phone == null).ThenByDescending(c => c.Person.Phone).ThenBy(c => c.Person.LastName).ThenBy(c => c.Person.FirstName),
+        "email" => source.OrderBy(c => c.Person.Email == null).ThenBy(c => c.Person.Email).ThenBy(c => c.Person.LastName).ThenBy(c => c.Person.FirstName),
+        "-email" => source.OrderBy(c => c.Person.Email == null).ThenByDescending(c => c.Person.Email).ThenBy(c => c.Person.LastName).ThenBy(c => c.Person.FirstName),
+        _ => Order(source),
+    };
 
     // Ad, soyad ve tüm iletişim noktalarında (ikinci e-posta, ilişkiye özel telefon...) aranır; telefon normalleştirilmiş değerle eşleşir.
     protected override IQueryable<Contact> Search(IQueryable<Contact> source, string term)

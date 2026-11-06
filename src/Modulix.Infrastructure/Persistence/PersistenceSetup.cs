@@ -11,6 +11,7 @@ using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Customs;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
 using Modulix.Core.Customs;
@@ -147,11 +148,13 @@ public static class PersistenceSetup
         services.AddScoped<GtipCatalogService>();
         services.AddScoped<IGtipCatalog>(sp => sp.GetRequiredService<GtipCatalogService>());
         services.AddScoped<IGtipCatalogAdmin>(sp => sp.GetRequiredService<GtipCatalogService>());
+        services.AddScoped<IActivityCodeCatalog, ActivityCodeCatalog>();
         services.AddScoped<ITenantActivitySelection, TenantActivitySelectionService>();
         services.AddScoped<IRulePackageService, RulePackageService>();
         services.AddScoped<ITenantFieldRules, TenantFieldRulesService>();
         services.AddScoped<FormLayoutService>();
         services.AddScoped<IFormLayoutService>(sp => sp.GetRequiredService<FormLayoutService>());
+        services.AddScoped<Modulix.Core.Views.IGridViewService, Modulix.Infrastructure.Views.GridViewService>();
         services.AddScoped<IFormLayoutProvider>(sp => sp.GetRequiredService<FormLayoutService>());
         services.AddScoped<ICurrentAccess, CurrentAccess>();
 

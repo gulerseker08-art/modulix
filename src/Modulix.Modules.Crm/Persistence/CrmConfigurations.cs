@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
 
@@ -125,6 +126,7 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
         builder.Property(o => o.Type).HasMaxLength(ChoiceValueKeys.MaxLength);
         builder.Property(o => o.Source).HasMaxLength(ChoiceValueKeys.MaxLength);
         builder.Property(o => o.NeedDescription).HasMaxLength(Opportunity.TextMaxLength);
+        builder.Property(o => o.ServiceScope).HasMaxLength(ActivityCodeList.StoredMaxLength);
         builder.Property(o => o.CurrentProblem).HasMaxLength(Opportunity.TextMaxLength);
         builder.Property(o => o.ExpectedBenefit).HasMaxLength(Opportunity.TextMaxLength);
         builder.Property(o => o.Scope).HasMaxLength(Opportunity.TextMaxLength);
@@ -495,6 +497,7 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.Property(l => l.Country).HasMaxLength(Address.CountryLength).IsFixedLength().IsUnicode(false);
         builder.Property(l => l.City).HasMaxLength(Address.PartMaxLength);
         builder.Property(l => l.ProductInterest).HasMaxLength(Lead.ShortMaxLength);
+        builder.Property(l => l.ServiceScope).HasMaxLength(ActivityCodeList.StoredMaxLength);
         builder.Property(l => l.NeedDescription).HasMaxLength(Lead.TextMaxLength);
         builder.Property(l => l.EstimatedBudget).HasPrecision(18, 2);
         builder.Property(l => l.Currency).HasMaxLength(Opportunity.CurrencyLength).IsFixedLength().IsUnicode(false).IsRequired();

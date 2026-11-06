@@ -18,18 +18,48 @@
         <CompanyEditor Company="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
     }
 
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Firma görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Items="ViewOptions" Value="@CurrentView" ValueChanged="ChooseViewAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Firma ara" placeholder="Ad, vergi no, şehir veya etiket ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
         </form>
-        <ColumnPicker />
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(CrmAccess.CompaniesWrite) && !editing)
         {
             <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> Yeni firma</button>
         }
     </div>
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="İlişki rolü" @bind="role" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm ilişki rolleri</option>
+                @foreach (var r in roles.Where(r => r.IsActive || r.Code == role))
+                {
+                    <option value="@r.Code">@r.Name</option>
+                }
+            </select>
+            <select class="form-select" aria-label="Müşteri sektörü" @bind="sector" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm müşteri sektörleri</option>
+                @foreach (var a in activities)
+                {
+                    <option value="@a.Code">@ActivityPath(a)</option>
+                }
+            </select>
+            <select class="form-select" aria-label="Hizmet ihtiyacı" @bind="need" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm hizmet ihtiyaçları</option>
+                @foreach (var a in activities)
+                {
+                    <option value="@a.Code">@ActivityPath(a)</option>
+                }
+            </select>
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (page is null)
     {
@@ -43,26 +73,30 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ad</th><th>Durum</th><th>Şehir</th><th>Sorumlu</th><th>Telefon</th>@foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Company)) { <th>@field.Label</th> }<th></th></tr>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var company in page.Items)
                 {
                     <tr>
-                        <td data-label="Ad" class="primary"><a href="crm/firmalar/@company.Id">@company.Name</a></td>
-                        <td data-label="Durum"><span class="badge status-@Lookups.Badge(CrmLists.CompanyStatus, company.Status)">@Lookups.Label(CrmLists.CompanyStatus, company.Status)</span></td>
-                        <td data-label="Şehir">@company.City</td>
-                        <td data-label="Sorumlu"><OwnerCell Name="@Lookups.MemberName(company.OwnerId)" /></td>
-                        <td data-label="Telefon">@company.Phone</td>
-                        @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Company))
+                        @foreach (var column in grid.VisibleColumns)
                         {
-                            <td data-label="@field.Label">@CustomFieldText.Format(field, company.Custom)</td>
+                            @Cell(column, company)
                         }
-                        <td class="actions">
-                            @if (Session.Can(CrmAccess.CompaniesWrite))
-                            {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(company)">Düzenle</button>
-                            }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{company.Name} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="crm/firmalar/@company.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                                @if (Session.Can(CrmAccess.CompaniesWrite))
+                                {
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(company)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                }
+                            </RowMenu>
                         </td>
                     </tr>
                 }
@@ -74,7 +108,26 @@
 
 @code {
     private const string Url = "/api/crm/companies";
+    private const string AllViews = "all";
+    private const string MineView = "mine";
+    private const string StatusPrefix = "status:";
 
+    // Sütunların sırası varsayılan sıradır; Sorumlu sütunu sunucuda sıralanamaz (adı üyelik tablosundadır).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("name", "Ad", "type", "name", "-name", Locked: true),
+        new("status", "Durum", "tag", "status", "-status"),
+        new("city", "Şehir", "map-pin", "city", "-city"),
+        new("owner", "Sorumlu", "user"),
+        new("phone", "Telefon", "phone", "phone", "-phone"),
+        new("industry", "Sektör", "briefcase", "industry", "-industry", DefaultVisible: false),
+        new("taxNumber", "Vergi no", "hash", "taxNumber", "-taxNumber", DefaultVisible: false),
+        new("email", "E-posta", "mail", DefaultVisible: false),
+        new("tags", "Etiketler", "tag", DefaultVisible: false),
+    ];
+
+    private readonly GridViewState grid = new("crm.companies", "name");
+    private PersonalGridViews views = default!;
     private CrmPage<CompanyDto>? page;
     private CompanyDto? selected;
     private bool editing;
@@ -82,41 +135,132 @@
     private string? search;
     private string? status;
     private bool mine;
+    private string view = AllViews;
+    private bool filtersOpen;
+    private string role = "";
+    private string sector = "";
+    private string need = "";
+    private List<RelationshipRoleDto> roles = [];
+    private List<ActivityOptionDto> activities = [];
+
+    // Aynı ad farklı sektörlerde tekrarlanabilir (ör. "Diğer"): üst düğümlerle birlikte gösterilir.
+    private string ActivityPath(ActivityOptionDto option)
+    {
+        var names = new List<string> { option.Name };
+        for (var parent = option.ParentCode; parent is not null && names.Count < 6;)
+        {
+            var node = activities.FirstOrDefault(a => a.Code == parent);
+            if (node is null) { break; }
+            names.Insert(0, node.Name);
+            parent = node.ParentCode;
+        }
+
+        return string.Join(" › ", names);
+    }
+
+    private int ActiveFilters => (role.Length > 0 ? 1 : 0) + (sector.Length > 0 ? 1 : 0) + (need.Length > 0 ? 1 : 0);
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "crm.companies");
         await Session.EnsureLoadedAsync();
         if (Session.Can(CrmAccess.CompaniesRead))
         {
             await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(CrmEntityKeys.Company).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            roles = (await Api.GetAsync<List<RelationshipRoleDto>>("/api/relationship-roles")).Value ?? [];
+            activities = (await Api.GetAsync<List<ActivityOptionDto>>("/api/activity-options")).Value ?? [];
             await LoadAsync(1);
         }
     }
 
-    private const string AllViews = "all";
-    private const string MineView = "mine";
-    private const string StatusPrefix = "status:";
+    private GridViewDto? Active => views.Find(view);
 
-    // Görünümler yalnızca süzgeçtir (Tümü, Benim firmalarım, durum); kapsamı sunucu uygular.
+    // Görünümler yalnızca süzgeçtir (Benim firmalarım, Tümü, durum, kişisel); kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm firmalar"),
-        new(MineView, "Benim firmalarım"),
-        .. Lookups.Choices(CrmLists.CompanyStatus, status).Select(v => new ViewOption(StatusPrefix + v.Key, v.Label, "Duruma göre")),
+        new(MineView, "Benim firmalarım", Icon: "star"),
+        new(AllViews, "Tüm firmalar", Icon: "building"),
+        .. Lookups.Choices(CrmLists.CompanyStatus, status).Select(v => new ViewOption(StatusPrefix + v.Key, v.Label, Icon: "tag")),
+        .. views.Options,
     ];
-
-    private string CurrentView => mine ? MineView : status is { } s ? StatusPrefix + s : AllViews;
 
     private async Task ChooseViewAsync(string key)
     {
-        mine = key == MineView;
-        status = key.StartsWith(StatusPrefix, StringComparison.Ordinal) ? key[StatusPrefix.Length..] : null;
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm: sütunlar, sıralama ve süzgeç birlikte gelir.
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            mine = filters.GetValueOrDefault("ownerId") == "me";
+            status = filters.GetValueOrDefault("status");
+            role = filters.GetValueOrDefault("relationshipRole") ?? "";
+            sector = filters.GetValueOrDefault("customerSector") ?? "";
+            need = filters.GetValueOrDefault("serviceNeed") ?? "";
+        }
+        else
+        {
+            grid.Reset();
+            mine = key == MineView;
+            status = key.StartsWith(StatusPrefix, StringComparison.Ordinal) ? key[StatusPrefix.Length..] : null;
+            role = sector = need = "";
+        }
+
         await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    // Sütun seçimi/sırası değişince veri yeniden çekilmez; olay işleyicisi sayfada olduğu için tablo yeniden çizilir.
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(
+        mine ? ("ownerId", "me") : null, status is { } s ? ("status", s) : null,
+        ("relationshipRole", role), ("customerSector", sector), ("serviceNeed", need));
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
         if (status is { } s)
         {
             url += $"&status={Uri.EscapeDataString(s)}";
@@ -127,10 +271,36 @@
             url += "&ownerId=me";
         }
 
+        foreach (var (name, value) in new[] { ("relationshipRole", role), ("customerSector", sector), ("serviceNeed", need) })
+        {
+            if (value.Length > 0)
+            {
+                url += $"&{name}={Uri.EscapeDataString(value)}";
+            }
+        }
+
         var result = await Api.GetAsync<CrmPage<CompanyDto>>(url);
         page = result.Value;
         message = result.Error;
     }
+
+    private RenderFragment Cell(GridColumnDef column, CompanyDto company) => @<td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, company)</td>;
+
+    private RenderFragment CellContent(string key, CompanyDto company) => key switch
+    {
+        "name" => @<a href="crm/firmalar/@company.Id">@company.Name</a>,
+        "status" => @<span class="badge status-@Lookups.Badge(CrmLists.CompanyStatus, company.Status)">@Lookups.Label(CrmLists.CompanyStatus, company.Status)</span>,
+        "city" => @<text>@company.City</text>,
+        "owner" => @<OwnerCell Name="@Lookups.MemberName(company.OwnerId)" />,
+        "phone" => @<text>@company.Phone</text>,
+        "industry" => @<text>@company.Industry</text>,
+        "taxNumber" => @<text>@company.TaxNumber</text>,
+        "email" => @<text>@company.Email</text>,
+        "tags" => @<text>@company.Tags</text>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(CrmEntityKeys.Company).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, company.Custom)</text>,
+        _ => @<text></text>,
+    };
 
     private void New() => Open(null);
 

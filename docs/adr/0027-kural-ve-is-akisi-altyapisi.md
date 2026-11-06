@@ -192,7 +192,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 2b-2 | Çalışma/adım saklama temizliği | Uygulandı (aşağıda "Dilim 2b-2") |
 | 2b-3 | İş olayı tetikleyicisi (`DomainEvent`); Ç0.4 iş olayı yayınlama sözleşmesine bağlı | Sonra |
 | 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
-| 3b | İlk şablonlar (pasif), demo | Sonra |
+| 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
 | 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Sonra |
 | 5 | Blazor ekranları | Sonra |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
@@ -382,3 +382,24 @@ Tasarımdan ayrılan / netleşen noktalar:
 | `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationDeclarationTests` | 3 başarılı (gerçek katalog, hassas alan izinleri, aksiyon tanımı) |
 | `dotnet test tests/Modulix.ArchitectureTests` | 52 başarılı |
 | `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | **Yerelde doğrulanamadı.** Yerel paylaşımlı veritabanında `{}` içerikli yayınlanmış kural paketi sürümleri var; kayıt oluşturan **her** test (mevcut `LeadTests` dahil) `FormatException: Kural listesi çözülemedi` ile düşüyor. Testler (hareketsizlik, tarihe kala, ilişki koşulu, tekrar teslimde tek aktivite, doğrulama, tenant izolasyonu, yetki) CI'da temiz veritabanında koşar |
+
+### Dilim 3b: Başlangıç şablonları (5 Kasım 2026)
+
+3a'da "ayrı bir tasarım kararı ister" diye bırakılan şablon altyapısı karara bağlandı: **şablon kodda beyan edilir, tabloda saklanmaz.**
+
+- **Karar:** `AutomationCapabilities.Templates` (`AutomationTemplateDefinition`: anahtar, ad, açıklama, kayıt türü, tanım). Şablon tenant'tan bağımsız sabittir (tek imaj, müşteriye özel kod yok); tenant'a ait olan yalnızca onu **kullanınca** oluşan kuraldır. Bu yüzden yeni tablo, migration ya da RLS politikası yoktur. Bu dilimde kararlaştırılan: planlanan `AutomationTemplates` tablosu (firmanın kendi şablonlarını kaydetmesi) **şimdilik yoktur**; "kuralı şablon olarak kaydet" ihtiyacı doğarsa ayrı bir dilimdir ve bu beyan yolunu bozmaz.
+- **Pasiflik güvencesi yapıdadır:** "kullan" yalnızca `IAutomationRuleService.CreateAsync` çağırır, yani **taslak** kural açar. Taslağı hiçbir yol çalıştırmaz (tarayıcı ve olay aboneliği yalnızca yayınlanmış, açık kuralları işler). Yayın ve açma ayrı izinle (`core.automation.publish`) firmanın kararıdır; şablonun kendi başına bir şey açan yolu yoktur. Denetim kaydı kural oluşturma yolundan gelir.
+- **Katalog denetimi açılışta (yapı):** anahtar modül önekli ve tekil, ad ve açıklama dolu, kayıt türü modülün, en az bir aksiyon, adım kimlikleri tekil, aksiyon kayıtlı. Alan/koşul/izin ayrıntısı **kullanan kimliğin yetkisiyle** `AutomationDefinitionValidator` ile doğrulanır; aksiyon izni olmayan için şablon "kullanılamıyor" görünür ve taslağı açılmaz (yetki yükseltme yok).
+- **Uç noktalar:** `GET /api/automation/templates` (`core.automation.read`; modülü bu firmada kapalı şablonlar listede yoktur, kullanılamayanlar `issues` ile gelir) ve `POST /api/automation/templates/{key}/use` (`core.automation.manage`; bilinmeyen / modülü kapalı şablon 404, kullanılamayan 400, başarıda 201 + taslak kural).
+- **CRM şablonları** (`CrmAutomationTemplates`, hepsi yalnızca takip aktivitesi açar; mesaj göndermez, kayıt değiştirmez): hareketsiz müşteri adayı (7 gün), hareketsiz fırsat (14 gün), kapanış tarihine 3 gün kalan açık fırsat, satın alma tarihine 7 gün kalan açık müşteri adayı.
+- **Demo** bu dilimde yoktur: gerçek veride toplu otomasyon kapsam dışıdır, şablon taslak teslim edilir. Demo ancak ekran (Dilim 5) ile birlikte anlamlıdır.
+
+### Test sonuçları (Dilim 3b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter Automation` | 138 başarılı (yeni: şablon katalog denetimi, anahtar/ad/açıklama/kayıt türü/aksiyon/adım kimliği/tekillik) |
+| `dotnet test tests/Modulix.Modules.Crm.Tests --filter CrmAutomationTemplateTests` | 4 başarılı (şablonlar beyanla tutarlı, yalnızca takip aktivitesi, JSON gidiş-dönüş) |
+| `dotnet test tests/Modulix.ArchitectureTests` | 65 başarılı |
+| `dotnet test tests/Modulix.IntegrationTests --filter "CrmAutomationDeclarationTests|CrmAutomationTemplateTests"` (SQL Server) | 9 başarılı. Yeni 4: taslak açılır, çalışmaz, yayınlanınca çalışır; dört şablon gerçek yayın doğrulamasından geçer; bilinmeyen ve modülü kapalı şablon 404; tenant izolasyonu; okuma/yönetim izni ve aksiyon izni olmayanın şablonu kullanamaması |
+| `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | 8 başarılı (3a testleri bozulmadı) |

@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
 
@@ -122,6 +123,41 @@ internal static class Field
 {
     public static RecordField<T> Text<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set, bool required = false) =>
         new(name, required, nullable: !required, node => ParseText(node, maxLength), e => get(e), (e, v) => set(e, (string?)v));
+
+    /// <summary>Kod listesi (JSON metin dizisi): tekrarsız, sıralı, tek sütunda virgülle saklanır (<see cref="ActivityCodeList"/>).</summary>
+    public static RecordField<T> CodeList<T>(string name, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                if (node is not JsonArray array || array.Any(i => i is not JsonValue v || v.GetValueKind() != JsonValueKind.String))
+                {
+                    return ParsedValue.Fail("Metin listesi bekleniyor.");
+                }
+
+                var (codes, error) = ActivityCodeList.Normalize(array.Select(i => i!.GetValue<string>()));
+                return error is null ? ParsedValue.Of(ActivityCodeList.Join(codes)) : ParsedValue.Fail(error);
+            },
+            e => new JsonArray([.. ActivityCodeList.Split(get(e)).Select(c => (JsonNode?)JsonValue.Create(c))]),
+            (e, v) => set(e, (string?)v));
+
+    /// <summary>
+    /// Kod + ad çiftlerinin JSON dizisi (<c>[{"code","name"}]</c>), tek metin sütununda saklanır; sunum anı kapsam özeti gibi sistem alanları
+    /// için. Okunurken dizi olarak döner, boşsa null.
+    /// </summary>
+    public static RecordField<T> CodeNameList<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                if (node is not JsonArray array || array.Any(i => i is not JsonObject item
+                        || item["code"] is not JsonValue code || code.GetValueKind() != JsonValueKind.String
+                        || item["name"] is not JsonValue label || label.GetValueKind() != JsonValueKind.String))
+                {
+                    return ParsedValue.Fail("Kod ve ad çiftlerinden oluşan liste bekleniyor.");
+                }
+
+                var json = array.ToJsonString();
+                return json.Length > maxLength ? ParsedValue.Fail($"En fazla {maxLength} karakter olabilir.") : ParsedValue.Of(array.Count == 0 ? null : json);
+            },
+            e => get(e) is { Length: > 0 } stored ? JsonNode.Parse(stored) : null,
+            (e, v) => set(e, (string?)v));
 
     public static RecordField<T> Email<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set) =>
         new(name, required: false, nullable: true, node =>

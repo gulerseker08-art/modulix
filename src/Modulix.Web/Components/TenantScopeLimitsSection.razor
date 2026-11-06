@@ -2,7 +2,8 @@
 
 @* Firmanın kayıt görünürlük tavanları (ADR-0030 K10): platform yöneticisi her kayıt türü için firmanın rollerinin verebileceği en geniş
    kapsamı koyar. Tür listesi sunucudan gelir (firmada açık modüllerin sahipli kayıt türleri). PUT tüm kümeyi değiştirir; gerekçe
-   ve etkilenen rol sayısı platform denetim kaydına yazılır. *@
+   ve etkilenen rol sayısı platform denetim kaydına yazılır. "Etkiyi göster" kaydetmeden önce kaç kişinin kısılacağını ya da serbest
+   kalacağını sunucudan hesaplatır (yazmaz). *@
 <section class="detail-section">
     <div class="section-header"><h2>Kayıt görünürlüğü</h2></div>
     <Notice Text="@notice" Failed="failed" />
@@ -37,7 +38,7 @@
                             <td data-label="En geniş kapsam">
                                 <select class="form-select" aria-label="@($"{type.Label} için en geniş kapsam")"
                                         value="@(row.Max is { } max ? ((int)max).ToString() : string.Empty)"
-                                        @onchange="e => Choose(type.EntityKey, e.Value as string)">
+                                        @onchange="e => { Choose(type.EntityKey, e.Value as string); preview = null; }">
                                     <option value="">Sınır yok</option>
                                     @foreach (var option in Options)
                                     {
@@ -51,7 +52,7 @@
                                     var id = $"admin-{type.EntityKey}";
                                     <div class="form-check">
                                         <input id="@id" class="form-check-input" type="checkbox" checked="@row.Admin"
-                                               @onchange="e => row.Admin = e.Value is true" />
+                                               @onchange="e => { row.Admin = e.Value is true; preview = null; }" />
                                         <label class="form-check-label" for="@id">Yöneticiyi de bağla</label>
                                     </div>
                                 }
@@ -78,6 +79,29 @@
                 <p class="text-muted">Modülü kapalı @hidden.Count türün sınırı korunur; modül yeniden açılınca burada görünür.</p>
             }
 
+            @if (preview is not null)
+            {
+                <div class="alert alert-info" role="status" aria-live="polite">
+                    <strong>Etki önizlemesi (henüz kaydedilmedi)</strong>
+                    <ul class="mb-0">
+                        <li>Sınırı aşan rol: @preview.AffectedRoleCount (kaydedilirken rol ekranında düzeltilmesi gerekir, okuma sırasında sınıra indirilir).</li>
+                        <li>Yeni kısılacak kişi: @preview.NewlyRestrictedMemberCount, yönetici: @preview.NewlyRestrictedAdministratorCount.</li>
+                        @if (preview.ReleasedMemberCount + preview.ReleasedAdministratorCount > 0)
+                        {
+                            <li>Serbest kalacak kişi: @preview.ReleasedMemberCount, yönetici: @preview.ReleasedAdministratorCount.</li>
+                        }
+                    </ul>
+                    @foreach (var impact in preview.Types.Where(t => t.NewlyRestrictedMembers + t.ReleasedMembers + t.NewlyRestrictedAdministrators + t.ReleasedAdministrators + t.AffectedRoles > 0))
+                    {
+                        <div class="small">
+                            @LabelOf(impact.EntityKey): rol @impact.AffectedRoles · kısılan @impact.NewlyRestrictedMembers · serbest @impact.ReleasedMembers
+                            · yönetici kısılan @impact.NewlyRestrictedAdministrators · serbest @impact.ReleasedAdministrators
+                        </div>
+                    }
+                    <div class="small text-muted">Kişi sayıları etkin üyeleri sayar (destek erişimi hariç); bir kişi birden çok türde kısılsa da bir kez sayılır.</div>
+                </div>
+            }
+
             <div class="form-grid">
                 <div>
                     <label class="form-label" for="limitsReason">Gerekçe *</label>
@@ -87,6 +111,7 @@
                 </div>
             </div>
             <div class="form-actions">
+                <button type="button" class="btn btn-tonal" disabled="@(busy || !Dirty)" @onclick="PreviewAsync">Etkiyi göster</button>
                 <button type="submit" class="btn btn-primary" disabled="@(busy || !Dirty || string.IsNullOrWhiteSpace(reason))">Sınırları kaydet</button>
             </div>
         </form>
@@ -100,6 +125,7 @@
         [RecordScope.Own, RecordScope.Team, RecordScope.Unit, RecordScope.UnitAndBelow, RecordScope.All];
 
     private TenantScopeLimitsResponse? state;
+    private ScopeLimitsPreviewResponse? preview;
     private readonly Dictionary<string, LimitRow> rows = new(StringComparer.Ordinal);
     private IReadOnlyList<ScopeLimitDto> hidden = [];
     private IReadOnlyDictionary<string, string[]>? errors;
@@ -150,15 +176,35 @@
         return saved?.MaxScope != row.Max || (row.Max is not null && saved!.AppliesToAdministrators != row.Admin);
     });
 
+    // Ekrandaki seçimler ve modülü kapalı türlerin korunan sınırları: PUT ve önizleme aynı kümeyi gönderir.
+    private List<ScopeLimitDto> BuildLimits() => rows
+        .Where(r => r.Value.Max is not null)
+        .Select(r => new ScopeLimitDto(r.Key, r.Value.Max!.Value, r.Value.Admin))
+        .Concat(hidden)
+        .ToList();
+
+    private string LabelOf(string entityKey) => state?.Types.FirstOrDefault(t => t.EntityKey == entityKey)?.Label ?? entityKey;
+
+    private async Task PreviewAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<ScopeLimitsPreviewResponse>($"{Url}/preview", new SetScopeLimitsRequest(BuildLimits()));
+        busy = false;
+        errors = null;
+        if (!result.IsSuccess)
+        {
+            (notice, failed, preview) = (result.Error, true, null);
+            return;
+        }
+
+        (notice, failed, preview) = (null, false, result.Value);
+    }
+
     private async Task SaveAsync()
     {
         busy = true;
-        var limits = rows
-            .Where(r => r.Value.Max is not null)
-            .Select(r => new ScopeLimitDto(r.Key, r.Value.Max!.Value, r.Value.Admin))
-            .Concat(hidden)
-            .ToList();
-        var result = await Api.PutAsync<SetScopeLimitsResponse>(Url, new SetScopeLimitsRequest(limits, reason));
+        preview = null;
+        var result = await Api.PutAsync<SetScopeLimitsResponse>(Url, new SetScopeLimitsRequest(BuildLimits(), reason));
         busy = false;
         errors = result.FieldErrors;
         if (!result.IsSuccess)

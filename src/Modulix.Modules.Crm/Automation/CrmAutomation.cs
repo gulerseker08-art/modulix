@@ -164,5 +164,6 @@ public static class CrmAutomation
                 AutomationSideEffect.Write,
                 SupportsDryRun: true)),
         ],
+        Templates = CrmAutomationTemplates.All,
     };
 }

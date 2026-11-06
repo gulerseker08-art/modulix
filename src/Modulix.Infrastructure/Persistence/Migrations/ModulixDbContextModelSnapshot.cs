@@ -921,6 +921,57 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Parties", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Contracts.SharedRecords.PartyRelationship", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RoleCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateOnly?>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "PartyId", "RoleCode")
+                        .IsUnique();
+
+                    b.ToTable("PartyRelationships", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Contracts.SharedRecords.Person", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2627,6 +2678,60 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("TeamMembers", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Views.GridView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Columns")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Filters")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("MembershipId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("ScreenKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Sort")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "MembershipId", "ScreenKey", "Name")
+                        .IsUnique();
+
+                    b.ToTable("GridViews", "core");
                 });
 
             modelBuilder.Entity("Modulix.Infrastructure.Email.QueuedEmail", b =>
@@ -6037,6 +6142,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<string>("ServiceScope")
+                        .HasMaxLength(1020)
+                        .HasColumnType("nvarchar(1020)");
+
                     b.Property<string>("Source")
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");
@@ -6481,6 +6590,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<string>("Scope")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("ServiceScope")
+                        .HasMaxLength(1020)
+                        .HasColumnType("nvarchar(1020)");
 
                     b.Property<string>("Source")
                         .HasMaxLength(40)
@@ -7263,6 +7376,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("RevisionNo")
                         .HasColumnType("int");
+
+                    b.Property<string>("ServiceScopeSnapshot")
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -12174,6 +12291,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Modulix.Core.Contracts.SharedRecords.PartyRelationship", b =>
+                {
+                    b.HasOne("Modulix.Core.Contracts.SharedRecords.Party", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PartyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Core.Contracts.SharedRecords.Person", b =>
                 {
                     b.HasOne("Modulix.Core.Contracts.SharedRecords.Party", null)
@@ -12455,6 +12582,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId", "TeamId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Views.GridView", b =>
+                {
+                    b.HasOne("Modulix.Core.Platform.Membership", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "MembershipId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

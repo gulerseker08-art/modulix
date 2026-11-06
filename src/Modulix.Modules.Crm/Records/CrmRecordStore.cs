@@ -149,8 +149,9 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
+        var (queryFilters, sort) = SplitSort(query.Filters);
         var source = await ApplyFiltersAsync(
-            await RestrictAsync(Load(Data.Set<TEntity>().AsNoTracking()), cancellationToken), query.Filters, cancellationToken);
+            await RestrictAsync(Load(Data.Set<TEntity>().AsNoTracking()), cancellationToken), queryFilters, cancellationToken);
         if (query.Owners is { } owners && UsesScope)
         {
             source = await ScopeToOwnersAsync(source, owners, cancellationToken);
@@ -168,7 +169,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         }
 
         var total = await source.CountAsync(cancellationToken);
-        var items = await Order(source)
+        var items = await Order(source, sort)
             .ThenBy(e => e.Id)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
@@ -346,6 +347,27 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
     /// <summary>Liste sırası. Eşit kayıtlar kimliğe göre sıralanır; sayfalar kararlı kalır.</summary>
     protected abstract IOrderedQueryable<TEntity> Order(IQueryable<TEntity> source);
+
+    /// <summary>Liste süzgeçleriyle gelen <c>sort</c> anahtarını kabul eden depolar anahtar listesini verir (ör. <c>name</c>, <c>-name</c>); diğerleri için "sort" bilinmeyen süzgeçtir.</summary>
+    protected virtual IReadOnlyCollection<string>? SortKeys => null;
+
+    /// <summary>İstenen sıralama (yalnızca <see cref="SortKeys"/> içindeki anahtarlar gelir); varsayılan sıra için null.</summary>
+    protected virtual IOrderedQueryable<TEntity> Order(IQueryable<TEntity> source, string? sort) => Order(source);
+
+    private (IReadOnlyDictionary<string, string>? Filters, string? Sort) SplitSort(IReadOnlyDictionary<string, string>? filters)
+    {
+        if (filters is null || SortKeys is not { } keys || !filters.TryGetValue("sort", out var sort))
+        {
+            return (filters, null);
+        }
+
+        if (!keys.Contains(sort, StringComparer.Ordinal))
+        {
+            throw new RecordValidationException([new RecordFieldError("sort", "Geçersiz sıralama.")]);
+        }
+
+        return (filters.Where(f => f.Key != "sort").ToDictionary(f => f.Key, f => f.Value), sort);
+    }
 
     protected abstract IQueryable<TEntity> Search(IQueryable<TEntity> source, string term);
 

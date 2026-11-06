@@ -8,10 +8,12 @@ using Modulix.Api.Auth;
 using Modulix.Api.Communication;
 using Modulix.Api.Crm;
 using Modulix.Api.Customization;
+using Modulix.Api.Views;
 using Modulix.Api.Development;
 using Modulix.Api.Email;
 using Modulix.Api.Events;
 using Modulix.Api.Lookups;
+using Modulix.Api.Localization;
 using Modulix.Api.Marketing;
 using Modulix.Api.Organization;
 using Modulix.Api.Platform;
@@ -206,6 +208,7 @@ app.MapCustomFieldEndpoints();
 app.MapChoiceListEndpoints();
 app.MapLookupEndpoints();
 app.MapFormLayoutEndpoints();
+app.MapGridViewEndpoints();
 app.MapSectorProfileEndpoints();
 app.MapSectorEndpoints();
 app.MapGtipEndpoints();
@@ -230,6 +233,7 @@ app.MapPlatformTeamEndpoints();
 app.MapAuditEndpoints();
 app.MapImportEndpoints();
 app.MapSettingsEndpoints();
+app.MapTextEndpoints();
 
 // Bilinmeyen API adresi 404 döner; diğer adresler arayüzün sayfalarıdır.
 app.Map("/api/{**path}", () => Results.NotFound());

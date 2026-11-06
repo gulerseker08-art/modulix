@@ -39,6 +39,48 @@
                         }
                     </div>
                     <FieldError Field="relationshipRoles" Errors="errors" />
+
+                    @* Seçili her rol için ilişkinin durumu: durum seçilirse kayıt açılır; mevcut kayıtta durum zorunludur. *@
+                    @foreach (var code in roles)
+                    {
+                        var rel = RelationOf(code);
+                        var relErrors = relationErrors.GetValueOrDefault(code);
+                        <div class="mt-2">
+                            <strong>@RoleName(code)</strong>
+                            <div class="form-grid">
+                                <div>
+                                    <label class="form-label" for="@($"rel-status-{code}")">Durum</label>
+                                    <select id="@($"rel-status-{code}")" class="form-select" @bind="rel.Status">
+                                        @if (rel.Id is null)
+                                        {
+                                            <option value="">— (kayıt açma)</option>
+                                        }
+                                        @foreach (var (key, label) in StatusLabels)
+                                        {
+                                            <option value="@key">@label</option>
+                                        }
+                                    </select>
+                                    <FieldError Field="status" Errors="relErrors" />
+                                </div>
+                                <div>
+                                    <label class="form-label" for="@($"rel-start-{code}")">Başlangıç</label>
+                                    <input id="@($"rel-start-{code}")" class="form-control" type="date" value="@rel.Start" @onchange="e => rel.Start = e.Value?.ToString() ?? string.Empty" />
+                                    <FieldError Field="startDate" Errors="relErrors" />
+                                </div>
+                                <div>
+                                    <label class="form-label" for="@($"rel-end-{code}")">Bitiş</label>
+                                    <input id="@($"rel-end-{code}")" class="form-control" type="date" value="@rel.End" @onchange="e => rel.End = e.Value?.ToString() ?? string.Empty" />
+                                    <FieldError Field="endDate" Errors="relErrors" />
+                                </div>
+                                <div class="span-all">
+                                    <label class="form-label" for="@($"rel-notes-{code}")">Not</label>
+                                    <input id="@($"rel-notes-{code}")" class="form-control" maxlength="1000" @bind="rel.Notes" />
+                                    <FieldError Field="notes" Errors="relErrors" />
+                                    <FieldError Field="roleCode" Errors="relErrors" />
+                                </div>
+                            </div>
+                        </div>
+                    }
                 </fieldset>
 
                 <fieldset class="mt-3">
@@ -50,8 +92,8 @@
 
                 <fieldset class="mt-3">
                     <legend class="form-label">Hizmet ihtiyacı</legend>
-                    <p class="text-muted">Firmanın sizden aldığı ya da almak istediği hizmetler; ilişki rolünden bağımsızdır.</p>
-                    @ActivityList(needs)
+                    <p class="text-muted">Firmanın sizden aldığı ya da almak istediği hizmetler (yalnızca faaliyet seçilir); ilişki rolünden bağımsızdır.</p>
+                    @ActivityList(needs, activitiesOnly: true)
                     <FieldError Field="serviceNeeds" Errors="errors" />
                 </fieldset>
 
@@ -64,7 +106,19 @@
         else
         {
             <dl class="detail-grid">
-                <div class="span-all"><dt>İlişki rolleri</dt><dd>@Pills(roles, RoleName)</dd></div>
+                <div class="span-all">
+                    <dt>İlişki rolleri</dt>
+                    <dd>
+                        @if (roles.Count == 0)
+                        {
+                            <text>—</text>
+                        }
+                        @foreach (var code in roles)
+                        {
+                            <span class="badge tag">@RoleName(code)@(relations.TryGetValue(code, out var known) && known.Id is not null ? $" · {StatusLabels.GetValueOrDefault(known.Status, known.Status)}" : null)</span>
+                        }
+                    </dd>
+                </div>
                 <div class="span-all"><dt>Müşteri sektörü</dt><dd>@Pills(sectors, ActivityName)</dd></div>
                 <div class="span-all"><dt>Hizmet ihtiyacı</dt><dd>@Pills(needs, ActivityName)</dd></div>
             </dl>
@@ -85,10 +139,43 @@
     private readonly SortedSet<string> sectors = new(StringComparer.Ordinal);
     private readonly SortedSet<string> needs = new(StringComparer.Ordinal);
     private IReadOnlyDictionary<string, string[]>? errors;
+    private readonly Dictionary<string, IReadOnlyDictionary<string, string[]>> relationErrors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Relation> relations = new(StringComparer.Ordinal);
     private string? message;
     private bool editing;
     private bool busy;
     private Guid loadedFor;
+
+    private static readonly Dictionary<string, string> StatusLabels = new()
+    {
+        ["Prospect"] = "Aday", ["Active"] = "Aktif", ["Suspended"] = "Askıda", ["Ended"] = "Sona erdi",
+    };
+
+    /// <summary>Bir rolün ilişki kaydı: <c>Id</c> boşsa henüz kayıt yoktur (durum seçilirse açılır).</summary>
+    private sealed class Relation
+    {
+        public Guid? Id { get; set; }
+
+        public long? Version { get; set; }
+
+        public string Status { get; set; } = "";
+
+        public string Start { get; set; } = "";
+
+        public string End { get; set; } = "";
+
+        public string Notes { get; set; } = "";
+    }
+
+    private Relation RelationOf(string code)
+    {
+        if (!relations.TryGetValue(code, out var relation))
+        {
+            relations[code] = relation = new Relation();
+        }
+
+        return relation;
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -114,6 +201,23 @@
         catalogRoles = (await Api.GetAsync<List<RelationshipRoleDto>>("/api/relationship-roles")).Value ?? [];
         activities = (await Api.GetAsync<List<ActivityOptionDto>>("/api/activity-options")).Value ?? [];
         Apply(record.Value);
+
+        // İlişki durumları yüklenemezse (ör. okuma yetkisi yok) bölüm yine de çalışır; yalnızca durum görünmez.
+        relations.Clear();
+        relationErrors.Clear();
+        var records = await Api.GetAsync<RecordPageResponse>($"/api/records/core.partyrelationship?partyId={PartyId}&pageSize=100");
+        foreach (var item in records.Value?.Items ?? [])
+        {
+            if (item.Values["roleCode"]?.GetValue<string>() is { } code)
+            {
+                relations[code] = new Relation
+                {
+                    Id = item.Id, Version = item.Version, Status = item.Values["status"]?.GetValue<string>() ?? "",
+                    Start = item.Values["startDate"]?.GetValue<string>() ?? "", End = item.Values["endDate"]?.GetValue<string>() ?? "",
+                    Notes = item.Values["notes"]?.GetValue<string>() ?? "",
+                };
+            }
+        }
     }
 
     private void Apply(RecordResponse record)
@@ -174,16 +278,72 @@
         var result = await Api.PutAsync<RecordResponse>($"/api/records/core.party/{PartyId}", new RecordWriteRequest(values, party!.Version));
         busy = false;
 
-        if (result.IsSuccess && result.Value is { } saved)
+        if (!result.IsSuccess || result.Value is not { } saved)
         {
-            Apply(saved);
-            editing = false;
-            errors = null;
+            busy = false;
+            errors = result.FieldErrors;
+            message = result.Error;
             return;
         }
 
-        errors = result.FieldErrors;
-        message = result.Error;
+        Apply(saved);
+        errors = null;
+
+        // Firma kaydı yazıldı; seçili rollerin ilişki kayıtları sırayla yazılır. Hatalı kayıt formda kalır, diğerleri yazılmış olur.
+        relationErrors.Clear();
+        foreach (var code in roles)
+        {
+            if (await SaveRelationAsync(code) is { } failure)
+            {
+                relationErrors[code] = failure;
+            }
+        }
+
+        busy = false;
+        if (relationErrors.Count > 0)
+        {
+            message = "Bazı ilişki kayıtları kaydedilemedi; hataları düzeltip yeniden kaydedin.";
+            return;
+        }
+
+        editing = false;
+        await LoadAsync();
+    }
+
+    /// <summary>Rolün ilişki kaydını yazar (yoksa durum seçilmişse açar); hata varsa alan hatalarını döndürür.</summary>
+    private async Task<IReadOnlyDictionary<string, string[]>?> SaveRelationAsync(string code)
+    {
+        var rel = RelationOf(code);
+        if (rel.Id is null && rel.Status.Length == 0)
+        {
+            return null;
+        }
+
+        var values = new JsonObject
+        {
+            ["roleCode"] = code, ["status"] = rel.Status, ["startDate"] = rel.Start, ["endDate"] = rel.End, ["notes"] = rel.Notes,
+        };
+        ApiResult<RecordResponse> response;
+        if (rel.Id is { } id)
+        {
+            response = await Api.PutAsync<RecordResponse>($"/api/records/core.partyrelationship/{id}", new RecordWriteRequest(values, rel.Version));
+        }
+        else
+        {
+            values["partyId"] = PartyId.ToString();
+            response = await Api.PostAsync<RecordResponse>("/api/records/core.partyrelationship", new RecordWriteRequest(values));
+        }
+
+        if (response.IsSuccess && response.Value is { } written)
+        {
+            rel.Id = written.Id;
+            rel.Version = written.Version;
+            return null;
+        }
+
+        return response.FieldErrors is { Count: > 0 } fieldErrors
+            ? fieldErrors
+            : new Dictionary<string, string[]> { ["notes"] = [response.Error ?? "Kaydedilemedi."] };
     }
 
     private static JsonArray ToArray(IEnumerable<string> codes) => new([.. codes.Select(c => (JsonNode?)JsonValue.Create(c))]);
@@ -199,15 +359,15 @@
     private string ActivityName(string code) => activities.FirstOrDefault(a => a.Code == code)?.Name ?? code;
 
     /// <summary>Faaliyet ağacı; girinti derinliği gösterir. Kayıtta kalmış ama pasifleşmiş kodlar sonda "(pasif)" ile görünür.</summary>
-    private RenderFragment ActivityList(SortedSet<string> selected) => __builder =>
+    private RenderFragment ActivityList(SortedSet<string> selected, bool activitiesOnly = false) => __builder =>
     {
-        <div class="check-list activity-choices">
+        <div class="activity-choices">
             @foreach (var item in ActivityChoicesFor(selected))
             {
-                <label class="form-check">
-                    <input class="form-check-input" type="checkbox" checked="@selected.Contains(item.Code)" @onchange="e => Toggle(selected, item.Code, (bool)e.Value!)" />
-                    <span class="form-check-label">@(item.Depth > 0 ? string.Concat(Enumerable.Repeat("– ", item.Depth)) : null)@item.Name@(item.Active ? null : " (pasif)")</span>
-                </label>
+                <div class="form-check">
+                    <input id="@($"opt-{selected.GetHashCode()}-{item.Code}")" class="form-check-input" type="checkbox" checked="@selected.Contains(item.Code)" disabled="@(activitiesOnly && item.Active && item.Kind != "Activity")" @onchange="e => Toggle(selected, item.Code, (bool)e.Value!)" />
+                    <label class="form-check-label" for="@($"opt-{selected.GetHashCode()}-{item.Code}")">@(item.Depth > 0 ? string.Concat(Enumerable.Repeat("– ", item.Depth)) : null)@item.Name@(item.Active ? null : " (pasif)")</label>
+                </div>
             }
         </div>
     };

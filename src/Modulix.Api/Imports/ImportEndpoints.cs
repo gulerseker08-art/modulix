@@ -28,9 +28,16 @@ public static class ImportEndpoints
     }
 
     private static async Task<IResult> ListAsync(
-        string? entityKey, string? status, string? mode, Guid? userId, DateOnly? from, DateOnly? to, int? page, int? pageSize,
+        string? entityKey, string? status, string? mode, Guid? userId, DateOnly? from, DateOnly? to, string? sort, int? page, int? pageSize,
         IImportLog log, ICurrentAccess access, ITenantContextAccessor tenant, ITenantSettings settings, CancellationToken ct)
     {
+        // Başlığa göre sıralama (ADR-0036): yalnızca bilinen anahtarlar kabul edilir.
+        if (!string.IsNullOrEmpty(sort) && !ImportRunQuery.SortKeys.Contains(sort))
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]> { ["sort"] = ["Geçersiz sıralama."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+
         var errors = new Dictionary<string, string[]>();
         ImportRunStatus? parsedStatus = null;
         if (!string.IsNullOrWhiteSpace(status))
@@ -73,7 +80,8 @@ public static class ImportEndpoints
             from is { } start ? RegionalTime.StartOfDay(start, zone) : null,
             to is { } end ? RegionalTime.StartOfDay(end.AddDays(1), zone) : null,
             page ?? 1,
-            pageSize ?? 50);
+            pageSize ?? 50,
+            string.IsNullOrEmpty(sort) ? null : sort);
 
         var result = await log.ListAsync(query, await OnlyUserAsync(access, tenant, ct), ct);
         return Results.Ok(new ImportRunPageDto([.. result.Items.Select(ToDto)], result.Page, result.PageSize, result.TotalCount));

@@ -59,6 +59,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         Field.Reference<Lead, Company>("companyId", "Firma bulunamadı.", l => l.CompanyId, (l, v) => l.CompanyId = v),
         Field.Reference<Lead, Contact>("contactId", "Kişi bulunamadı.", l => l.ContactId, (l, v) => l.ContactId = v),
         Field.Text<Lead>("productInterest", Lead.ShortMaxLength, l => l.ProductInterest, (l, v) => l.ProductInterest = v),
+        Field.CodeList<Lead>("serviceScope", l => l.ServiceScope, (l, v) => l.ServiceScope = v),
         Field.Text<Lead>("needDescription", Lead.TextMaxLength, l => l.NeedDescription, (l, v) => l.NeedDescription = v),
         Field.Money<Lead>("estimatedBudget", l => l.EstimatedBudget, (l, v) => l.EstimatedBudget = v),
         Field.Currency<Lead>("currency", l => l.Currency, (l, v) => l.Currency = v),
@@ -133,6 +134,47 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
     };
 
     protected override IOrderedQueryable<Lead> Order(IQueryable<Lead> source) => source.OrderByDescending(l => l.FirstReceivedAt);
+
+    // Liste başlıklarına göre sıralama (sort=received, sort=-subject ...); boş değerler sonda, eşitlikte en yeni önce. Sorumlu adı üyelik tablosunda
+    // olduğundan sorumluya göre sıralama yoktur. Bütçe gibi hassas alanlar sıralanamaz (sıralama değeri sezdirir).
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+    [
+        "number", "-number", "subject", "-subject", "requester", "-requester", "status", "-status", "priority", "-priority", "source", "-source",
+        "received", "-received", "firstContact", "-firstContact", "company", "-company", "email", "-email", "phone", "-phone", "city", "-city",
+        "industry", "-industry", "productInterest", "-productInterest",
+    ];
+
+    protected override IOrderedQueryable<Lead> Order(IQueryable<Lead> source, string? sort) => sort switch
+    {
+        "number" => source.OrderBy(l => l.LeadNumber),
+        "-number" => source.OrderByDescending(l => l.LeadNumber),
+        "subject" => source.OrderBy(l => l.Subject).ThenByDescending(l => l.FirstReceivedAt),
+        "-subject" => source.OrderByDescending(l => l.Subject).ThenByDescending(l => l.FirstReceivedAt),
+        "requester" => source.OrderBy(l => l.LastName == null).ThenBy(l => l.LastName).ThenBy(l => l.FirstName).ThenBy(l => l.CompanyName).ThenByDescending(l => l.FirstReceivedAt),
+        "-requester" => source.OrderBy(l => l.LastName == null).ThenByDescending(l => l.LastName).ThenByDescending(l => l.FirstName).ThenByDescending(l => l.CompanyName).ThenByDescending(l => l.FirstReceivedAt),
+        "status" => source.OrderBy(l => l.Status).ThenByDescending(l => l.FirstReceivedAt),
+        "-status" => source.OrderByDescending(l => l.Status).ThenByDescending(l => l.FirstReceivedAt),
+        "priority" => source.OrderBy(l => l.Priority).ThenByDescending(l => l.FirstReceivedAt),
+        "-priority" => source.OrderByDescending(l => l.Priority).ThenByDescending(l => l.FirstReceivedAt),
+        "source" => source.OrderBy(l => l.Source == null).ThenBy(l => l.Source).ThenByDescending(l => l.FirstReceivedAt),
+        "-source" => source.OrderBy(l => l.Source == null).ThenByDescending(l => l.Source).ThenByDescending(l => l.FirstReceivedAt),
+        "received" => source.OrderBy(l => l.FirstReceivedAt),
+        "firstContact" => source.OrderBy(l => l.FirstContactAt == null).ThenBy(l => l.FirstContactAt).ThenByDescending(l => l.FirstReceivedAt),
+        "-firstContact" => source.OrderBy(l => l.FirstContactAt == null).ThenByDescending(l => l.FirstContactAt).ThenByDescending(l => l.FirstReceivedAt),
+        "company" => source.OrderBy(l => l.CompanyName == null).ThenBy(l => l.CompanyName).ThenByDescending(l => l.FirstReceivedAt),
+        "-company" => source.OrderBy(l => l.CompanyName == null).ThenByDescending(l => l.CompanyName).ThenByDescending(l => l.FirstReceivedAt),
+        "email" => source.OrderBy(l => l.Email == null).ThenBy(l => l.Email).ThenByDescending(l => l.FirstReceivedAt),
+        "-email" => source.OrderBy(l => l.Email == null).ThenByDescending(l => l.Email).ThenByDescending(l => l.FirstReceivedAt),
+        "phone" => source.OrderBy(l => l.Phone == null).ThenBy(l => l.Phone).ThenByDescending(l => l.FirstReceivedAt),
+        "-phone" => source.OrderBy(l => l.Phone == null).ThenByDescending(l => l.Phone).ThenByDescending(l => l.FirstReceivedAt),
+        "city" => source.OrderBy(l => l.City == null).ThenBy(l => l.City).ThenByDescending(l => l.FirstReceivedAt),
+        "-city" => source.OrderBy(l => l.City == null).ThenByDescending(l => l.City).ThenByDescending(l => l.FirstReceivedAt),
+        "industry" => source.OrderBy(l => l.Industry == null).ThenBy(l => l.Industry).ThenByDescending(l => l.FirstReceivedAt),
+        "-industry" => source.OrderBy(l => l.Industry == null).ThenByDescending(l => l.Industry).ThenByDescending(l => l.FirstReceivedAt),
+        "productInterest" => source.OrderBy(l => l.ProductInterest == null).ThenBy(l => l.ProductInterest).ThenByDescending(l => l.FirstReceivedAt),
+        "-productInterest" => source.OrderBy(l => l.ProductInterest == null).ThenByDescending(l => l.ProductInterest).ThenByDescending(l => l.FirstReceivedAt),
+        _ => Order(source),
+    };
 
     protected override IQueryable<Lead> Search(IQueryable<Lead> source, string term) =>
         source.Where(l => l.Subject.Contains(term) || l.LeadNumber.Contains(term)
@@ -227,7 +269,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         var companyScope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Company, cancellationToken);
         var contactScope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Contact, cancellationToken);
         var stored = await Context.Data.Set<Lead>().AsNoTracking().Where(l => l.Id == entity.Id)
-            .Select(l => new { l.CompanyId, l.ContactId }).SingleOrDefaultAsync(cancellationToken);
+            .Select(l => new { l.CompanyId, l.ContactId, l.ServiceScope }).SingleOrDefaultAsync(cancellationToken);
 
         if (values.ContainsKey("companyId") && entity.CompanyId is { } companyId && stored?.CompanyId != companyId)
         {
@@ -254,6 +296,12 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
 
         await LookupGuard.AddContactCompanyErrorAsync(
             errors, Context, "contactId", entity.ContactId, entity.CompanyId, stored?.ContactId, stored?.CompanyId, cancellationToken);
+
+        // Hizmet kapsamı: yeni eklenen kodlar katalogda aktif "Faaliyet" olmalı; iş akışı yazımlarında (dönüşüm vb.) denetlenmez.
+        if (!Context.LeadGate.IsOpen && values.ContainsKey("serviceScope"))
+        {
+            await ServiceScopeGuard.AddErrorsAsync(errors, Context, "serviceScope", entity.ServiceScope, stored?.ServiceScope, cancellationToken);
+        }
 
         if (errors.Count > 0)
         {

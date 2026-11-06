@@ -15,6 +15,8 @@ namespace Modulix.IntegrationTests;
 /// ADR-0029 Dilim D: lojistik başlangıç paketi. Katalog global ve kalıcıdır; kurulum yalnızca ekler ve tekrar çalıştırılabilir,
 /// bu yüzden testler "ilk kurulum mu" varsaymaz, sonuç durumunu doğrular.
 /// </summary>
+// Genel faaliyet kataloğunu kullanan sınıflar sırayla çalışır: eşzamanlı kurulum tekil dizin hatası verir.
+[Collection("SectorCatalog")]
 public class StarterPackageTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
     private const string Logistics = "logistics";

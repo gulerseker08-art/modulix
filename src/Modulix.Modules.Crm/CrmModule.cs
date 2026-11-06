@@ -713,7 +713,7 @@ public sealed class CrmModule : IModule
             ["opportunityNumber"] = "Fırsat no", ["description"] = "Açıklama", ["status"] = "Durum", ["statusReason"] = "Durum gerekçesi",
             ["priority"] = "Öncelik", ["type"] = "Tür", ["source"] = "Kaynak", ["customerBudget"] = "Müşteri bütçesi",
             ["budgetStatus"] = "Bütçe durumu", ["needDescription"] = "İhtiyaç", ["currentProblem"] = "Mevcut sorun",
-            ["expectedBenefit"] = "Beklenen fayda", ["scope"] = "Kapsam", ["successCriteria"] = "Başarı ölçütleri", ["risks"] = "Riskler",
+            ["expectedBenefit"] = "Beklenen fayda", ["scope"] = "Kapsam", ["serviceScope"] = "Hizmet kapsamı", ["successCriteria"] = "Başarı ölçütleri", ["risks"] = "Riskler",
             ["decisionProcess"] = "Karar süreci", ["targetDecisionDate"] = "Hedef karar tarihi", ["nextAction"] = "Sonraki aksiyon",
             ["nextActionDate"] = "Aksiyon tarihi", ["lastInteractionAt"] = "Son müşteri etkileşimi", ["stageEnteredAt"] = "Aşamaya giriş",
             ["probabilityManual"] = "Olasılık elle girildi", ["actualCloseDate"] = "Gerçek kapanış", ["wonAmount"] = "Kazanılan tutar", ["primaryQuoteId"] = "Esas teklif",
@@ -845,6 +845,7 @@ public sealed class CrmModule : IModule
             ["validUntil"] = "Geçerlilik bitişi", ["currency"] = "Para birimi", ["priceIncludesTax"] = "Fiyatlar vergi dahil", ["documentDiscountKind"] = "Genel indirim türü",
             ["documentDiscountValue"] = "Genel indirim", ["paymentTerms"] = "Ödeme koşulları", ["deliveryTerms"] = "Teslimat koşulları",
             ["commercialTerms"] = "Ticari koşullar", ["internalNotes"] = "İç notlar", ["netTotal"] = "Net toplam", ["taxTotal"] = "Vergi", ["grossTotal"] = "Genel toplam",
+            ["serviceScopeSnapshot"] = "Sunumdaki hizmet kapsamı",
         }, "title")
         {
             References = new Dictionary<string, string>
@@ -906,7 +907,7 @@ public sealed class CrmModule : IModule
             ["priority"] = "Öncelik", ["firstName"] = "Ad", ["lastName"] = "Soyad", ["companyName"] = "Firma adı", ["email"] = "E-posta",
             ["phone"] = "Telefon", ["jobTitle"] = "Unvan", ["website"] = "Web sitesi", ["country"] = "Ülke", ["city"] = "Şehir",
             ["companyId"] = "Mevcut firma", ["contactId"] = "Mevcut kişi", ["productInterest"] = "İlgilenilen ürün/hizmet",
-            ["needDescription"] = "İhtiyaç", ["estimatedBudget"] = "Tahmini bütçe", ["currency"] = "Para birimi",
+            ["serviceScope"] = "Hizmet kapsamı", ["needDescription"] = "İhtiyaç", ["estimatedBudget"] = "Tahmini bütçe", ["currency"] = "Para birimi",
             ["targetPurchaseDate"] = "Hedef satın alma tarihi", ["industry"] = "Sektör", ["source"] = "Kaynak", ["sourceDetail"] = "Kaynak ayrıntısı",
             ["referrer"] = "Yönlendiren", ["externalSource"] = "Dış kaynak", ["externalSubmissionId"] = "Dış gönderim no",
             ["utmSource"] = "UTM kaynak", ["utmMedium"] = "UTM ortam", ["utmCampaign"] = "UTM kampanya", ["firstReceivedAt"] = "İlk geliş",
@@ -933,6 +934,9 @@ public sealed class CrmModule : IModule
     [
         new(SharedEntities.Party, Permissions.CompaniesRead, Permissions.CompaniesWrite),
         new(SharedEntities.Person, Permissions.ContactsRead, Permissions.ContactsWrite),
+
+        // Firmanın ilişki rolündeki durumu (ADR-0029 K9) firmayla aynı izinlerle ve aynı kapsam kuralıyla açılır.
+        new(SharedEntities.PartyRelationship, Permissions.CompaniesRead, Permissions.CompaniesWrite),
     ];
 
     IReadOnlyList<SharedRecordReference> IModule.SharedRecordReferences { get; } =

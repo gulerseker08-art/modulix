@@ -7,7 +7,7 @@
 <div class="top-row ps-3 navbar navbar-light">
     <div class="container-fluid">
         <AppLauncher />
-        <button type="button" title="Menü" aria-label="Menü" aria-expanded="@(!collapseNavMenu ? "true" : "false")"
+        <button type="button" title="@Texts.Get("shell.nav.menu")" aria-label="@Texts.Get("shell.nav.menu")" aria-expanded="@(!collapseNavMenu ? "true" : "false")"
                 class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -15,10 +15,10 @@
 </div>
 
 <div class="@NavMenuCssClass nav-scrollable">
-    <nav class="nav flex-column" aria-label="Sol menü">
+    <nav class="nav flex-column" aria-label="@Texts.Get("shell.nav.label")">
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" title="Ana sayfa" @onclick="CloseMobileMenu">
-                <AppIcon Name="home" Size="20" /> <span class="nav-label">Ana sayfa</span>
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" title="@Texts.Get("shell.nav.home")" @onclick="CloseMobileMenu">
+                <AppIcon Name="home" Size="20" /> <span class="nav-label">@Texts.Get("shell.nav.home")</span>
             </NavLink>
         </div>
 
@@ -27,7 +27,7 @@
            boş bölüm çıkmaz. Etkin ekranın bölümü açık gelir; "Footer" bölümler (CRM Ayarları) kaydırma alanının altına sabitlenir. *@
         @if (menu is not null)
         {
-            <div class="nav-section px-3"><span class="nav-label">Aktif modül</span></div>
+            <div class="nav-section px-3"><span class="nav-label">@Texts.Get("shell.nav.activeModule")</span></div>
             <div class="nav-module mx-3" title="@menu.Root.Name">
                 <AppIcon Name="@menu.Root.Icon" Size="20" />
                 <span class="nav-label">@menu.Root.Name</span>
@@ -54,9 +54,9 @@
 @* Menüyü daralt / genişlet (yalnızca geniş ekranda; telefonda menü açılır panel olarak çalışır). *@
 <div class="nav-footer px-3">
     <button type="button" class="nav-collapse-button" @onclick="ToggleSidebarAsync"
-            aria-pressed="@(sidebarCollapsed ? "true" : "false")" title="@(sidebarCollapsed ? "Menüyü genişlet" : "Menüyü daralt")">
+            aria-pressed="@(sidebarCollapsed ? "true" : "false")" title="@(Texts.Get(sidebarCollapsed ? "shell.nav.expand" : "shell.nav.collapse"))">
         <AppIcon Name="@(sidebarCollapsed ? "panel-left-open" : "panel-left-close")" Size="20" />
-        <span class="nav-label">@(sidebarCollapsed ? "Menüyü Genişlet" : "Menüyü Daralt")</span>
+        <span class="nav-label">@Texts.Get(sidebarCollapsed ? "shell.nav.expand" : "shell.nav.collapse")</span>
     </button>
 </div>
 

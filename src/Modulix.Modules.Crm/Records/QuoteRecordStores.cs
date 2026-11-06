@@ -96,6 +96,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         Field.Time<Quote>("presentedAt", q => q.PresentedAt, (q, v) => q.PresentedAt = v).AsSystem(),
         Field.Time<Quote>("decidedAt", q => q.DecidedAt, (q, v) => q.DecidedAt = v).AsSystem(),
         Field.Text<Quote>("customerNameSnapshot", 300, q => q.CustomerNameSnapshot, (q, v) => q.CustomerNameSnapshot = v).AsSystem(),
+        Field.CodeNameList<Quote>("serviceScopeSnapshot", Quote.ServiceScopeSnapshotMaxLength, q => q.ServiceScopeSnapshot, (q, v) => q.ServiceScopeSnapshot = v).AsSystem(),
         Field.Id<Quote>("createdBy", q => q.CreatedBy, (q, v) => q.CreatedBy = v).AsSystem(),
         Field.Id<Quote>("updatedBy", q => q.UpdatedBy, (q, v) => q.UpdatedBy = v).AsSystem(),
     ];
@@ -137,6 +138,34 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
 
     protected override IOrderedQueryable<Quote> Order(IQueryable<Quote> source) =>
         source.OrderByDescending(q => q.CreatedAt).ThenByDescending(q => q.RevisionNo);
+
+    // Liste başlıklarına göre sıralama (sort=number, sort=-grossTotal ...). Varsayılan sıra "-createdAt"tir. Müşteri ve sorumlu adı bu tabloda
+    // olmadığından (firma/üyelik tablolarında) onlara göre sıralama yoktur.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+    [
+        "createdAt", "-createdAt", "number", "-number", "title", "-title", "status", "-status", "approvalStatus", "-approvalStatus",
+        "grossTotal", "-grossTotal", "validUntil", "-validUntil", "issueDate", "-issueDate",
+    ];
+
+    protected override IOrderedQueryable<Quote> Order(IQueryable<Quote> source, string? sort) => sort switch
+    {
+        "createdAt" => source.OrderBy(q => q.CreatedAt).ThenBy(q => q.RevisionNo),
+        "number" => source.OrderBy(q => q.QuoteNumber).ThenByDescending(q => q.RevisionNo),
+        "-number" => source.OrderByDescending(q => q.QuoteNumber).ThenByDescending(q => q.RevisionNo),
+        "title" => source.OrderBy(q => q.Title).ThenByDescending(q => q.RevisionNo),
+        "-title" => source.OrderByDescending(q => q.Title).ThenByDescending(q => q.RevisionNo),
+        "status" => source.OrderBy(q => q.Status).ThenByDescending(q => q.CreatedAt),
+        "-status" => source.OrderByDescending(q => q.Status).ThenByDescending(q => q.CreatedAt),
+        "approvalStatus" => source.OrderBy(q => q.ApprovalStatus).ThenByDescending(q => q.CreatedAt),
+        "-approvalStatus" => source.OrderByDescending(q => q.ApprovalStatus).ThenByDescending(q => q.CreatedAt),
+        "grossTotal" => source.OrderBy(q => q.GrossTotal).ThenByDescending(q => q.CreatedAt),
+        "-grossTotal" => source.OrderByDescending(q => q.GrossTotal).ThenByDescending(q => q.CreatedAt),
+        "validUntil" => source.OrderBy(q => q.ValidUntil == null).ThenBy(q => q.ValidUntil).ThenByDescending(q => q.CreatedAt),
+        "-validUntil" => source.OrderBy(q => q.ValidUntil == null).ThenByDescending(q => q.ValidUntil).ThenByDescending(q => q.CreatedAt),
+        "issueDate" => source.OrderBy(q => q.IssueDate).ThenByDescending(q => q.CreatedAt),
+        "-issueDate" => source.OrderByDescending(q => q.IssueDate).ThenByDescending(q => q.CreatedAt),
+        _ => Order(source),
+    };
 
     protected override IQueryable<Quote> Search(IQueryable<Quote> source, string term) =>
         source.Where(q => q.Title.Contains(term) || q.QuoteNumber.Contains(term) || (q.Description != null && q.Description.Contains(term)));

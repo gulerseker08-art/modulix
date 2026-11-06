@@ -47,22 +47,22 @@
         </form>
 
         <form class="record-form settings-group" novalidate @onsubmit="SaveLanguageAsync" @onsubmit:preventDefault>
-            <h2>Dil</h2>
+            <h2>@Texts.Get("account.language.title")</h2>
             <Notice Text="@languageNotice" Failed="languageFailed" />
             <div class="mb-3">
-                <label class="form-label" for="language">Arayüz dili</label>
+                <label class="form-label" for="language">@Texts.Get("account.language.label")</label>
                 <select id="language" class="form-select" @bind="language">
-                    <option value="">Firmanın varsayılanı</option>
+                    <option value="">@Texts.Get("account.language.tenantDefault")</option>
                     @foreach (var option in LanguageCodes.All)
                     {
                         <option value="@option.Code">@option.Name</option>
                     }
                 </select>
                 <FieldError Field="language" Errors="languageErrors" />
-                <div class="form-text">Seçiminiz üye olduğunuz bütün kuruluşlarda geçerlidir. Kayıtlı verileriniz değişmez.</div>
+                <div class="form-text">@Texts.Get("account.language.help")</div>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || language == (profile.PreferredLanguage ?? string.Empty))">Kaydet</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || language == (profile.PreferredLanguage ?? string.Empty))">@Texts.Get("common.save")</button>
             </div>
         </form>
 
@@ -225,10 +225,10 @@
         {
             profile = saved;
             language = saved.PreferredLanguage ?? string.Empty;
-            (languageNotice, languageFailed) = ("Kaydedildi.", false);
 
-            // Etkin dil oturumdan yeniden hesaplanır.
+            // Etkin dil ve metinler oturumdan yeniden yüklenir; bildirim yeni dilde gösterilir.
             await Session.RefreshAsync();
+            (languageNotice, languageFailed) = (Texts.Get("common.saved"), false);
         }
         else
         {

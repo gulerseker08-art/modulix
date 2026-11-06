@@ -382,8 +382,16 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
             var codes = PartyRelationshipRules.Split(stored);
             if (codes.Count > 0)
             {
-                var known = await Db.ActivityNodes.AsNoTracking().Where(n => codes.Contains(n.Code)).Select(n => n.Code).ToListAsync(cancellationToken);
-                AddUnknown(unknown, field, codes, known, "Katalogda olmayan faaliyet");
+                var nodes = await Db.ActivityNodes.AsNoTracking().Where(n => codes.Contains(n.Code)).Select(n => new { n.Code, n.Kind }).ToListAsync(cancellationToken);
+                AddUnknown(unknown, field, codes, nodes.Select(n => n.Code).ToList(), "Katalogda olmayan faaliyet");
+
+                // Hizmet ihtiyacı alınan/verilen bir hizmettir: sektör ya da grup değil, yalnızca faaliyet düğümü seçilir.
+                // Müşteri sektörü her düzeyden olabilir (geniş "Lojistik" de, dar bir faaliyet de).
+                var notActivities = field == "serviceNeeds" ? nodes.Where(n => n.Kind != ActivityNodeKind.Activity).Select(n => n.Code).Order().ToList() : [];
+                if (notActivities.Count > 0)
+                {
+                    unknown.Add(new RecordFieldError(field, $"Hizmet ihtiyacı için sektör veya grup değil, faaliyet seçilmeli: {string.Join(", ", notActivities)}."));
+                }
             }
         }
 
@@ -472,6 +480,72 @@ internal sealed class PersonRecordStore(ModulixDbContext db, ModuleCatalog catal
             || (p.Phone != null && p.Phone.Contains(term)));
 }
 
+/// <summary>
+/// Firmanın ilişki rolündeki durumu (ADR-0029 K9): firma + rol başına tek kayıt. Firma ve rol kayıt açılırken verilir, sonra
+/// değişmez; durum, tarihler ve not güncellenir. Kapsam dışı firmanın kayıtları firmayla aynı kurala uyar (CRM görünürlüğü).
+/// </summary>
+internal sealed class PartyRelationshipRecordStore(ModulixDbContext db, ModuleCatalog catalog, IServiceProvider services)
+    : SharedRecordStore<PartyRelationship>(db, catalog, services)
+{
+    public override string EntityKey => SharedEntities.PartyRelationship;
+
+    protected override IReadOnlySet<string> IdentityFields { get; } = new HashSet<string> { "partyId", "roleCode" };
+
+    protected override IReadOnlyList<SharedField<PartyRelationship>> Fields { get; } =
+    [
+        SharedField.PartyReference<PartyRelationship>("partyId", r => r.PartyId, (r, v) => r.PartyId = v ?? Guid.Empty, required: true),
+        SharedField.Text<PartyRelationship>("roleCode", PartyRelationship.RoleCodeMaxLength, r => r.RoleCode, (r, v) => r.RoleCode = v!, required: true),
+        SharedField.Status<PartyRelationship>("status", r => r.Status, (r, v) => r.Status = v),
+        SharedField.Date<PartyRelationship>("startDate", r => r.StartDate, (r, v) => r.StartDate = v),
+        SharedField.Date<PartyRelationship>("endDate", r => r.EndDate, (r, v) => r.EndDate = v),
+        SharedField.Text<PartyRelationship>("notes", PartyRelationship.NotesMaxLength, r => r.Notes, (r, v) => r.Notes = v),
+    ];
+
+    protected override IReadOnlyDictionary<string, Func<IQueryable<PartyRelationship>, string, IQueryable<PartyRelationship>?>> Filters { get; } =
+        new Dictionary<string, Func<IQueryable<PartyRelationship>, string, IQueryable<PartyRelationship>?>>
+        {
+            ["partyId"] = (q, v) => Guid.TryParse(v, out var id) && id != Guid.Empty ? q.Where(r => r.PartyId == id) : null,
+            ["roleCode"] = (q, v) => v.Trim() is { Length: > 0 and <= PartyRelationship.RoleCodeMaxLength } code ? q.Where(r => r.RoleCode == code) : null,
+            ["status"] = (q, v) => Enum.TryParse<PartyRelationshipStatus>(v, ignoreCase: false, out var status) && Enum.IsDefined(status) && !char.IsDigit(v[0])
+                ? q.Where(r => r.Status == status)
+                : null,
+        };
+
+    protected override IOrderedQueryable<PartyRelationship> Order(IQueryable<PartyRelationship> source) => source.OrderBy(r => r.RoleCode);
+
+    protected override IQueryable<PartyRelationship> Search(IQueryable<PartyRelationship> source, string term) =>
+        source.Where(r => r.RoleCode.Contains(term) || (r.Notes != null && r.Notes.Contains(term)));
+
+    protected override async Task CheckAsync(PartyRelationship entity, CancellationToken cancellationToken)
+    {
+        var errors = new List<RecordFieldError>();
+        var entry = Db.Entry(entity);
+        if (entry.State != EntityState.Added
+            && (entry.Property(r => r.PartyId).IsModified || entry.Property(r => r.RoleCode).IsModified))
+        {
+            errors.Add(new RecordFieldError(entry.Property(r => r.PartyId).IsModified ? "partyId" : "roleCode", "Firma ve rol kayıt açıldıktan sonra değiştirilemez."));
+        }
+        else if (!await Db.RelationshipRoles.AsNoTracking().AnyAsync(r => r.Code == entity.RoleCode, cancellationToken))
+        {
+            errors.Add(new RecordFieldError("roleCode", $"Katalogda olmayan ilişki rolü: {entity.RoleCode}."));
+        }
+        else if (await Set.AnyAsync(r => r.PartyId == entity.PartyId && r.RoleCode == entity.RoleCode && r.Id != entity.Id, cancellationToken))
+        {
+            errors.Add(new RecordFieldError("roleCode", "Bu firma için bu rolün ilişki kaydı zaten var."));
+        }
+
+        if (entity.StartDate is { } start && entity.EndDate is { } end && end < start)
+        {
+            errors.Add(new RecordFieldError("endDate", "Bitiş tarihi başlangıç tarihinden önce olamaz."));
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new RecordValidationException(errors);
+        }
+    }
+}
+
 /// <summary>Ortak kayıt alanı: JSON'daki teknik adı, doğrulaması ve entity'ye nasıl okunup yazıldığı.</summary>
 internal sealed class SharedField<TEntity>(
     string name,
@@ -528,6 +602,28 @@ internal static class SharedField
             e => new JsonArray([.. PartyRelationshipRules.Split(get(e)).Select(c => (JsonNode?)JsonValue.Create(c))]),
             (e, v) => set(e, (string?)v));
 
+    /// <summary>Tarih (yyyy-AA-gg); boş değer tarihi temizler.</summary>
+    public static SharedField<T> Date<T>(string name, Func<T, DateOnly?> get, Action<T, DateOnly?> set) =>
+        new(name, required: false,
+            node => node.GetValueKind() == JsonValueKind.String
+                    && DateOnly.TryParseExact(node.GetValue<string>(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+                ? (date, null)
+                : (null, "Tarih yyyy-AA-gg biçiminde olmalıdır."),
+            e => get(e) is { } value ? value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
+            (e, v) => set(e, (DateOnly?)v));
+
+    /// <summary>İlişki durumu: <see cref="PartyRelationshipStatus"/> adı; boşsa "Prospect".</summary>
+    public static SharedField<T> Status<T>(string name, Func<T, PartyRelationshipStatus> get, Action<T, PartyRelationshipStatus> set) =>
+        new(name, required: false, node =>
+                node.GetValueKind() == JsonValueKind.String
+                && Enum.TryParse<PartyRelationshipStatus>(node.GetValue<string>(), ignoreCase: false, out var status)
+                && Enum.IsDefined(status)
+                && !char.IsDigit(node.GetValue<string>()[0])
+                    ? (status, null)
+                    : (null, "Prospect, Active, Suspended veya Ended olmalıdır."),
+            e => get(e).ToString(),
+            (e, v) => set(e, v is PartyRelationshipStatus status ? status : PartyRelationshipStatus.Prospect));
+
     public static SharedField<T> Email<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set) =>
         new(name, required: false, node =>
             {
@@ -550,8 +646,8 @@ internal static class SharedField
             (e, v) => set(e, v is PartyKind kind ? kind : PartyKind.Organization));
 
     /// <summary>Aynı tenant'taki bir taraf.</summary>
-    public static SharedField<T> PartyReference<T>(string name, Func<T, Guid?> get, Action<T, Guid?> set) =>
-        new(name, required: false, ParseId, e => get(e)?.ToString(), (e, v) => set(e, (Guid?)v))
+    public static SharedField<T> PartyReference<T>(string name, Func<T, Guid?> get, Action<T, Guid?> set, bool required = false) =>
+        new(name, required, ParseId, e => get(e)?.ToString(), (e, v) => set(e, (Guid?)v))
         {
             Exists = (db, id, ct) => db.Set<Party>().AnyAsync(p => p.Id == id, ct),
             NotFoundMessage = "Firma bulunamadı.",

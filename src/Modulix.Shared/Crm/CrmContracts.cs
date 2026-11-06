@@ -282,7 +282,8 @@ public sealed record OpportunityDto(
     DateOnly? HoldReviewDate = null,
     int ClosureCycle = 1,
     int CloseDateChangeCount = 0,
-    Guid? PrimaryQuoteId = null);
+    Guid? PrimaryQuoteId = null,
+    List<string>? ServiceScope = null);
 
 public sealed record SaveOpportunityRequest(
     string Title,
@@ -313,7 +314,8 @@ public sealed record SaveOpportunityRequest(
     string? DecisionProcess = null,
     DateOnly? TargetDecisionDate = null,
     string? NextAction = null,
-    DateOnly? NextActionDate = null);
+    DateOnly? NextActionDate = null,
+    List<string>? ServiceScope = null);
 
 /// <summary>Aktivite tipinin hazır değerleri.</summary>
 public static class ActivityType

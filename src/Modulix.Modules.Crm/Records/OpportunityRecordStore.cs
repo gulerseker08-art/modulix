@@ -60,6 +60,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
         Field.Text<Opportunity>("currentProblem", Opportunity.TextMaxLength, o => o.CurrentProblem, (o, v) => o.CurrentProblem = v),
         Field.Text<Opportunity>("expectedBenefit", Opportunity.TextMaxLength, o => o.ExpectedBenefit, (o, v) => o.ExpectedBenefit = v),
         Field.Text<Opportunity>("scope", Opportunity.TextMaxLength, o => o.Scope, (o, v) => o.Scope = v),
+        Field.CodeList<Opportunity>("serviceScope", o => o.ServiceScope, (o, v) => o.ServiceScope = v),
         Field.Text<Opportunity>("successCriteria", Opportunity.TextMaxLength, o => o.SuccessCriteria, (o, v) => o.SuccessCriteria = v),
         Field.Text<Opportunity>("risks", Opportunity.TextMaxLength, o => o.Risks, (o, v) => o.Risks = v),
         Field.Text<Opportunity>("decisionProcess", Opportunity.TextMaxLength, o => o.DecisionProcess, (o, v) => o.DecisionProcess = v),
@@ -152,6 +153,38 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
     protected override IOrderedQueryable<Opportunity> Order(IQueryable<Opportunity> source) =>
         source.OrderByDescending(o => o.CreatedAt);
 
+    // Liste başlıklarına göre sıralama (sort=title, sort=-closeDate ...); boş değerler sonda, eşitlikte en yeni önce. Tutar ve olasılık hassas alandır
+    // (sıralama değeri sezdirir) ve firma/sorumlu adı ilişki ya da üyelik tablosunda olduğundan bunlara göre sıralama yoktur.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+    [
+        "title", "-title", "number", "-number", "stage", "-stage", "status", "-status", "priority", "-priority", "type", "-type", "source", "-source",
+        "closeDate", "-closeDate", "nextActionDate", "-nextActionDate", "created", "-created",
+    ];
+
+    protected override IOrderedQueryable<Opportunity> Order(IQueryable<Opportunity> source, string? sort) => sort switch
+    {
+        "title" => source.OrderBy(o => o.Title).ThenByDescending(o => o.CreatedAt),
+        "-title" => source.OrderByDescending(o => o.Title).ThenByDescending(o => o.CreatedAt),
+        "number" => source.OrderBy(o => o.OpportunityNumber),
+        "-number" => source.OrderByDescending(o => o.OpportunityNumber),
+        "stage" => source.OrderBy(o => o.Stage).ThenByDescending(o => o.CreatedAt),
+        "-stage" => source.OrderByDescending(o => o.Stage).ThenByDescending(o => o.CreatedAt),
+        "status" => source.OrderBy(o => o.Status).ThenByDescending(o => o.CreatedAt),
+        "-status" => source.OrderByDescending(o => o.Status).ThenByDescending(o => o.CreatedAt),
+        "priority" => source.OrderBy(o => o.Priority).ThenByDescending(o => o.CreatedAt),
+        "-priority" => source.OrderByDescending(o => o.Priority).ThenByDescending(o => o.CreatedAt),
+        "type" => source.OrderBy(o => o.Type == null).ThenBy(o => o.Type).ThenByDescending(o => o.CreatedAt),
+        "-type" => source.OrderBy(o => o.Type == null).ThenByDescending(o => o.Type).ThenByDescending(o => o.CreatedAt),
+        "source" => source.OrderBy(o => o.Source == null).ThenBy(o => o.Source).ThenByDescending(o => o.CreatedAt),
+        "-source" => source.OrderBy(o => o.Source == null).ThenByDescending(o => o.Source).ThenByDescending(o => o.CreatedAt),
+        "closeDate" => source.OrderBy(o => o.ExpectedCloseDate == null).ThenBy(o => o.ExpectedCloseDate).ThenByDescending(o => o.CreatedAt),
+        "-closeDate" => source.OrderBy(o => o.ExpectedCloseDate == null).ThenByDescending(o => o.ExpectedCloseDate).ThenByDescending(o => o.CreatedAt),
+        "nextActionDate" => source.OrderBy(o => o.NextActionDate == null).ThenBy(o => o.NextActionDate).ThenByDescending(o => o.CreatedAt),
+        "-nextActionDate" => source.OrderBy(o => o.NextActionDate == null).ThenByDescending(o => o.NextActionDate).ThenByDescending(o => o.CreatedAt),
+        "created" => source.OrderBy(o => o.CreatedAt),
+        _ => Order(source),
+    };
+
     protected override IQueryable<Opportunity> Search(IQueryable<Opportunity> source, string term) =>
         source.Where(o => o.Title.Contains(term) || o.OpportunityNumber.Contains(term));
 
@@ -193,7 +226,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
     {
         await LoadAsync(cancellationToken);
         var stored = await Context.Data.Set<Opportunity>().AsNoTracking().Where(o => o.Id == entity.Id)
-            .Select(o => new Stored(o.CompanyId, o.ContactId, o.Stage, o.Status, o.ExpectedCloseDate, o.Probability)).SingleOrDefaultAsync(cancellationToken);
+            .Select(o => new Stored(o.CompanyId, o.ContactId, o.Stage, o.Status, o.ExpectedCloseDate, o.Probability, o.ServiceScope)).SingleOrDefaultAsync(cancellationToken);
 
         // Lookup alanlarının sunucu doğrulaması (ADR-0016): bağlanan firma/kişi çağıranın görebildiği kayıt olmalı ve kişi seçili
         // firmayla ilişkili olmalıdır. İş akışı yazımlarında ve değişmeyen bağlarda denetlenmez.
@@ -204,6 +237,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
             await LookupGuard.AddContactErrorAsync(errors, Context, "contactId", entity.ContactId, stored?.ContactId, cancellationToken);
             await LookupGuard.AddContactCompanyErrorAsync(
                 errors, Context, "contactId", entity.ContactId, entity.CompanyId, stored?.ContactId, stored?.CompanyId, cancellationToken);
+            await ServiceScopeGuard.AddErrorsAsync(errors, Context, "serviceScope", entity.ServiceScope, stored?.ServiceScope, cancellationToken);
             if (errors.Count > 0)
             {
                 throw new RecordValidationException(errors);
@@ -317,7 +351,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
     // ---- Yardımcılar
 
     private sealed record Stored(
-        Guid CompanyId, Guid? ContactId, string Stage, string Status, DateOnly? ExpectedCloseDate, int? Probability);
+        Guid CompanyId, Guid? ContactId, string Stage, string Status, DateOnly? ExpectedCloseDate, int? Probability, string? ServiceScope);
 
     private async Task LoadAsync(CancellationToken cancellationToken)
     {

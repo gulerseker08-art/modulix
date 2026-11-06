@@ -1,0 +1,48 @@
+@* Liste ekranı görünüm sekmeleri (sayfa başlığının altında): her görünüm bir sekmedir, etkin sekmede marka çizgisi vardır.
+   Görünümler yalnızca süzgeçtir; kapsamı sunucu uygular, sekme yetki vermez. NewView doluysa sonda "+ Görünüm" eylemi çıkar.
+   Çok sekme telefonda yatay kayar (record-tabs). *@
+<div class="record-tabs view-tabs" role="tablist" aria-label="@Label">
+    @foreach (var item in Items)
+    {
+        var active = item.Key == Value;
+        <button type="button" role="tab" class="record-tab @(active ? "active" : null)" aria-selected="@(active ? "true" : "false")"
+                @onclick="() => SelectAsync(item.Key)">
+            @if (item.Icon is not null)
+            {
+                <AppIcon Name="@item.Icon" Size="16" />
+            }
+            @item.Label
+        </button>
+    }
+    @if (NewView.HasDelegate)
+    {
+        <button type="button" class="record-tab view-tab-new" @onclick="NewView">
+            <AppIcon Name="plus" Size="16" /> @NewViewText
+        </button>
+    }
+</div>
+
+@code {
+    /// <summary>Sekmeler; sırası çizim sırasıdır.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<ViewOption> Items { get; set; } = [];
+
+    /// <summary>Seçili görünümün anahtarı.</summary>
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter] public string Label { get; set; } = "Görünümler";
+
+    /// <summary>Son sekmedeki eylem (ör. kişisel görünüm oluştur); verilmezse eklenmez.</summary>
+    [Parameter] public EventCallback NewView { get; set; }
+
+    [Parameter] public string NewViewText { get; set; } = "Görünüm";
+
+    private async Task SelectAsync(string key)
+    {
+        if (key != Value)
+        {
+            await ValueChanged.InvokeAsync(key);
+        }
+    }
+}

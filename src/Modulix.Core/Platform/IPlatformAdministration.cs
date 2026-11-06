@@ -22,7 +22,12 @@ public sealed record PlatformTenant(
     DateTimeOffset? ProfileAppliedAt = null);
 
 /// <summary>Firma listesi sorgusu. Arama ad ve kısa adda yapılır; sayfa 1'den başlar.</summary>
-public sealed record PlatformTenantQuery(string? Search, TenantStatus? Status, int Page, int PageSize);
+public sealed record PlatformTenantQuery(string? Search, TenantStatus? Status, int Page, int PageSize, string? Sort = null)
+{
+    /// <summary>Sıralama anahtarları (başlık tıklaması, ADR-0036; başına <c>-</c> azalan). Boşsa ada göre. Üye sayısı ve modüller sayfa dışında hesaplandığı için sıralanamaz.</summary>
+    public static readonly IReadOnlyCollection<string> SortKeys =
+        ["name", "-name", "slug", "-slug", "status", "-status", "createdAt", "-createdAt"];
+}
 
 public sealed record PlatformTenantPage(IReadOnlyList<PlatformTenant> Items, int Page, int PageSize, int TotalCount);
 
@@ -117,6 +122,25 @@ public sealed record PlatformScopeLimits(IReadOnlyList<PlatformScopeLimit> Limit
 public sealed record PlatformScopeLimitsChange(IReadOnlyList<PlatformScopeLimit> Limits, int AffectedRoleCount);
 
 /// <summary>
+/// Bir kayıt türünde önerilen tavan kümesinin etkisi. <see cref="AffectedRoles"/>: önerilen tavanı aşan yönetici olmayan rol sayısı
+/// (kaydedilirken 409 alacak ya da okuma tarafında kısılacak). "Yeni kısılan", bugünkü tavanlarla kısılmayıp önerilenle kısılan;
+/// "serbest kalan" tersidir. Üyeler yalnızca etkin üyeliklerdir (destek erişimi sayılmaz); yöneticiler ayrı sayılır.
+/// </summary>
+public sealed record PlatformScopeImpact(
+    string EntityKey, int AffectedRoles, int NewlyRestrictedMembers, int ReleasedMembers, int NewlyRestrictedAdministrators, int ReleasedAdministrators);
+
+/// <summary>
+/// Tavan kümesi önizlemesi (yazmaz). Toplamlar farklı kişileri sayar (iki türde kısılan kişi bir kez sayılır).
+/// </summary>
+public sealed record PlatformScopeLimitsPreview(
+    IReadOnlyList<PlatformScopeImpact> Types,
+    int AffectedRoleCount,
+    int NewlyRestrictedMemberCount,
+    int ReleasedMemberCount,
+    int NewlyRestrictedAdministratorCount,
+    int ReleasedAdministratorCount);
+
+/// <summary>
 /// Platform yönetimi (Y4): firmaları açar, kapatır ve ilk yöneticiyi davet eder. Çağıran platform yöneticisi olmalıdır
 /// (API her istekte <see cref="IsPlatformAdministratorAsync"/> ile denetler).
 ///
@@ -205,6 +229,14 @@ public interface IPlatformAdministration
     /// </summary>
     Task<PlatformScopeLimitsChange> SetScopeLimitsAsync(
         Guid tenantId, IReadOnlyList<PlatformScopeLimit> limits, string? reason, Guid actingUserId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// <see cref="SetScopeLimitsAsync"/> ile aynı doğrulamayla önerilen kümenin etkisini hesaplar, hiçbir şey yazmaz: bugünkü ve önerilen
+    /// tavanlarla kısılan etkin üye ve yönetici sayıları ile tavanı aşan rol sayısı, tür başına. Kapsam, çalışma zamanındaki
+    /// hesapla aynıdır (rol istisnaları, ekip/departman rolleri, yöneticinin <c>AppliesToAdministrators</c> koşulu). Üyelik başına birkaç
+    /// sorgu yapılır; çok büyük firmada yavaşlayabilir, ekran yalnızca kullanıcı isteyince çağırır.
+    /// </summary>
+    Task<PlatformScopeLimitsPreview> PreviewScopeLimitsAsync(Guid tenantId, IReadOnlyList<PlatformScopeLimit> limits, CancellationToken cancellationToken);
 
     /// <summary>Genel bakış: durumlara göre firma sayıları ve süresi dolan/yaklaşan haklar. Yalnızca platform tablolarından okunur.</summary>
     Task<PlatformOverview> GetOverviewAsync(CancellationToken cancellationToken);

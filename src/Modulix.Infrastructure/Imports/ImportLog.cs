@@ -51,7 +51,29 @@ internal sealed class ImportLog(ModulixDbContext db, ModuleCatalog catalog) : II
         }
 
         var total = await runs.CountAsync(cancellationToken);
-        var items = await runs.OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
+        // Başlığa göre sıralama (ADR-0036); anahtarlar ImportRunQuery.SortKeys'tedir, eşit kayıtlar en yeni önce sıralanır.
+        var ordered = query.Sort switch
+        {
+            "createdAt" => runs.OrderBy(r => r.CreatedAt),
+            "entityKey" => runs.OrderBy(r => r.EntityKey),
+            "-entityKey" => runs.OrderByDescending(r => r.EntityKey),
+            "fileName" => runs.OrderBy(r => r.FileName),
+            "-fileName" => runs.OrderByDescending(r => r.FileName),
+            "status" => runs.OrderBy(r => r.Status),
+            "-status" => runs.OrderByDescending(r => r.Status),
+            "totalRows" => runs.OrderBy(r => r.TotalRows),
+            "-totalRows" => runs.OrderByDescending(r => r.TotalRows),
+            "createdCount" => runs.OrderBy(r => r.CreatedCount),
+            "-createdCount" => runs.OrderByDescending(r => r.CreatedCount),
+            "updatedCount" => runs.OrderBy(r => r.UpdatedCount),
+            "-updatedCount" => runs.OrderByDescending(r => r.UpdatedCount),
+            "skippedCount" => runs.OrderBy(r => r.SkippedCount),
+            "-skippedCount" => runs.OrderByDescending(r => r.SkippedCount),
+            "failedCount" => runs.OrderBy(r => r.FailedCount),
+            "-failedCount" => runs.OrderByDescending(r => r.FailedCount),
+            _ => runs.OrderByDescending(r => r.CreatedAt),
+        };
+        var items = await ordered.ThenByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
         return new ImportRunPage(await SummariesAsync(items, cancellationToken), page, pageSize, total);
     }
