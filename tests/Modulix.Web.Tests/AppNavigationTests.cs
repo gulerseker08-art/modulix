@@ -148,6 +148,13 @@ public class AppNavigationTests
     }
 
     [Fact]
+    public void Regime_profiles_screen_is_in_the_platform_menu_for_platform_administrators_only()
+    {
+        Assert.Contains(Nav([], [], platformAdmin: true).Children(AppCatalog.Platform), c => c.Id == "platform.regime-profiles" && c.Route == "platform/rejim-profilleri");
+        Assert.DoesNotContain(Nav(AllModules, SalesUser).Children(AppCatalog.Platform), c => c.Id == "platform.regime-profiles");
+    }
+
+    [Fact]
     public void Deep_link_to_a_screen_the_user_cannot_see_does_not_expose_that_menu()
     {
         var nav = Nav([CrmAccess.ModuleKey], [CrmAccess.CompaniesRead]);
@@ -252,6 +259,13 @@ public class AppNavigationTests
         var zonesOnly = Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.ZonesRead]);
         Assert.Equal([AppCatalog.Warehouse], zonesOnly.Roots().Select(r => r.Id));
         Assert.Equal(["Alanlar"], zonesOnly.MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
+
+        // Beyannameler ekranı yalnızca beyanname okuma iznine bağlıdır (K15: warehouse.customs.*); vekâlet ya da stok izni onu açmaz.
+        var declarationsOnly = Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.DeclarationsRead]);
+        Assert.Equal(["Beyannameler"], declarationsOnly.MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
+        Assert.Equal("depo/beyannameler", declarationsOnly.Find("warehouse.customs-declarations")!.Route);
+        Assert.DoesNotContain("Beyannameler", Nav([WarehouseAccess.ModuleKey], [WarehouseAccess.AttorneysRead, WarehouseAccess.StockItemsRead])
+            .MenuEntries(AppCatalog.Warehouse).Select(e => e.Name));
     }
 
     [Fact]

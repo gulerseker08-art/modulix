@@ -21,15 +21,14 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. Geçerlilik bugünün tarihine göre sunucuda hesaplanır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Vekâlet görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" />
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="attorney-search">Vekâlet ara</label>
-            <input id="attorney-search" class="form-control" type="search" placeholder="Kapsam veya belge ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+            <input class="form-control" type="search" aria-label="Vekâlet ara" placeholder="Kapsam veya belge ara" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(WarehouseAccess.AttorneysWrite) && !editing)
         {
             <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni vekâlet</button>
@@ -39,12 +38,13 @@
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <label class="visually-hidden" for="attorney-importer-filter">İthalatçı</label>
             <LookupPicker Id="attorney-importer-filter" LookupKey="@WarehouseAccess.AttorneyImporterLookup" Value="importerId" ValueChanged="ChooseImporterAsync" Placeholder="Tüm ithalatçılar" />
-            <label class="visually-hidden" for="attorney-broker-filter">Gümrük müşaviri</label>
             <LookupPicker Id="attorney-broker-filter" LookupKey="@WarehouseAccess.AttorneyBrokerLookup" Value="brokerId" ValueChanged="ChooseBrokerAsync" Placeholder="Tüm müşavirler" />
         </div>
     }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (page is null)
     {
@@ -52,7 +52,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu süzgece uyan vekâlet yok.</p>
+        <p class="text-muted" role="status">Bu görünüme uyan vekâlet yok.</p>
     }
     else
     {
@@ -61,29 +61,27 @@
             <caption class="visually-hidden">Vekâlet listesi</caption>
             <thead>
                 <tr>
-                    <th scope="col">İthalatçı</th><th scope="col">Gümrük müşaviri</th><th scope="col">Başlangıç</th><th scope="col">Bitiş</th><th scope="col">Durum</th>
-                    @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.PowerOfAttorneyEntityKey)) { <th scope="col">@field.Label</th> }
-                    <th scope="col"></th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var attorney in page.Items)
                 {
-                    var (statusLabel, statusBadge) = Status(attorney);
                     <tr>
-                        <td data-label="İthalatçı" class="primary">@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "importerPartyId"))</td>
-                        <td data-label="Gümrük müşaviri">@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "brokerPartyId"))</td>
-                        <td data-label="Başlangıç">@Display(WarehouseLabels.Text(attorney, "validFrom"))</td>
-                        <td data-label="Bitiş">@(WarehouseLabels.Text(attorney, "validTo") is { Length: > 0 } to ? Display(to) : "Süresiz")</td>
-                        <td data-label="Durum"><span class="badge @statusBadge">@statusLabel</span></td>
-                        @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.PowerOfAttorneyEntityKey))
+                        @foreach (var column in grid.VisibleColumns)
                         {
-                            <td data-label="@field.Label">@CustomFieldText.Format(field, attorney.Values["custom"] as JsonObject)</td>
+                            @Cell(column, attorney)
                         }
-                        <td class="actions">
+                        <td class="row-menu-cell">
                             @if (Session.Can(WarehouseAccess.AttorneysWrite))
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(attorney)">Düzenle</button>
+                                <RowMenu Label="@($"{WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "importerPartyId"))} vekâleti eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(attorney)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                </RowMenu>
                             }
                         </td>
                     </tr>
@@ -97,6 +95,24 @@
 @code {
     private static readonly string Url = "/api/records/" + WarehouseAccess.PowerOfAttorneyEntityKey;
 
+    private const string AllViews = "all";
+    private const string ValidView = "valid";
+    private const string RevokedView = "revoked";
+
+    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (WarehouseRecordStore.SortKeys).
+    // Taraflar (firma adı) sunucuda sıralanamaz: firma görünürlüğü sıralamayla dolanılmasın. Durum satır içi hesaplanır; sıralanamaz.
+    // Varsayılan sıra başlangıç tarihine göre en yenidir.
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("importer", "İthalatçı", "building", Locked: true),
+        new("broker", "Gümrük müşaviri", "user"),
+        new("validFrom", "Başlangıç", "calendar", "validFrom", "-validFrom"),
+        new("validTo", "Bitiş", "calendar", "validTo", "-validTo"),
+        new("status", "Durum", "tag"),
+    ];
+
+    private readonly GridViewState grid = new("warehouse.power-of-attorneys", "-validFrom");
+    private PersonalGridViews views = default!;
     private RecordPageResponse? page;
     private RecordResponse? selected;
     private readonly Dictionary<Guid, string> partyNames = [];
@@ -105,36 +121,59 @@
     private string? message;
     private string? search;
     private string view = AllViews;
+    private bool validToday;
+    private string? isActive;
     private Guid? importerId;
     private Guid? brokerId;
-
-    private const string AllViews = "all";
-    private const string ValidView = "valid";
-    private const string RevokedView = "revoked";
-
-    // Görünümler yalnızca süzgeçtir (Tümü, Bugün geçerli, İptal edilmiş); taraf seçimleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
-    private IReadOnlyList<ViewOption> ViewOptions { get; } =
-    [
-        new(AllViews, "Tüm vekâletler"),
-        new(ValidView, "Bugün geçerli"),
-        new(RevokedView, "İptal edilmiş"),
-    ];
 
     private int ActiveFilters => (importerId is null ? 0 : 1) + (brokerId is null ? 0 : 1);
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "warehouse.power-of-attorneys");
         await Session.EnsureLoadedAsync();
         if (Session.Can(WarehouseAccess.AttorneysRead))
         {
             await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(WarehouseAccess.PowerOfAttorneyEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
 
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Bugün geçerli, İptal edilmiş, kişisel); taraf seçimleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm vekâletler", Icon: "file-text"),
+        new(ValidView, "Bugün geçerli", Icon: "check-circle"),
+        new(RevokedView, "İptal edilmiş", Icon: "clock"),
+        .. views.Options,
+    ];
+
     private async Task ChooseViewAsync(string key)
     {
         view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm: sütunlar, sıralama ve süzgeç birlikte gelir. "Bugün geçerli" tarihe bağlı olduğundan bayrak olarak saklanır.
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            validToday = filters.GetValueOrDefault("validToday") == "true";
+            isActive = filters.GetValueOrDefault("isActive");
+            importerId = Guid.TryParse(filters.GetValueOrDefault("importerPartyId"), out var importer) ? importer : null;
+            brokerId = Guid.TryParse(filters.GetValueOrDefault("brokerPartyId"), out var broker) ? broker : null;
+        }
+        else
+        {
+            grid.Reset();
+            validToday = key == ValidView;
+            isActive = key == RevokedView ? "false" : null;
+            importerId = brokerId = null;
+        }
+
         await LoadAsync(1);
     }
 
@@ -150,15 +189,65 @@
         await LoadAsync(1);
     }
 
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    // Sütun seçimi/sırası değişince veri yeniden çekilmez; olay işleyicisi sayfada olduğu için tablo yeniden çizilir.
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(
+        validToday ? ("validToday", "true") : null, isActive is { } a ? ("isActive", a) : null,
+        importerId is { } i ? ("importerPartyId", i.ToString()) : null, brokerId is { } b ? ("brokerPartyId", b.ToString()) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
-        url += view switch
+        if (grid.Sort != grid.DefaultSort)
         {
-            ValidView => $"&validOn={DateOnly.FromDateTime(DateTime.Today):yyyy-MM-dd}",
-            RevokedView => "&isActive=false",
-            _ => string.Empty,
-        };
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (validToday)
+        {
+            url += $"&validOn={DateOnly.FromDateTime(DateTime.Today):yyyy-MM-dd}";
+        }
+
+        if (isActive is { } active)
+        {
+            url += $"&isActive={Uri.EscapeDataString(active)}";
+        }
+
         if (importerId is { } importer)
         {
             url += $"&importerPartyId={importer}";
@@ -178,6 +267,26 @@
                 .OfType<Guid>();
             await WarehouseLabels.ResolveNamesAsync(Api, WarehouseAccess.AttorneyImporterLookup, ids, partyNames);
         }
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse attorney) => @<td data-label="@column.Label" class="@(column.Key == "importer" ? "primary" : null)">@CellContent(column.Key, attorney)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse attorney) => key switch
+    {
+        "importer" => @<text>@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "importerPartyId"))</text>,
+        "broker" => @<text>@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "brokerPartyId"))</text>,
+        "validFrom" => @<text>@Display(WarehouseLabels.Text(attorney, "validFrom"))</text>,
+        "validTo" => @<text>@(WarehouseLabels.Text(attorney, "validTo") is { Length: > 0 } to ? Display(to) : "Süresiz")</text>,
+        "status" => StatusBadge(attorney),
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(WarehouseAccess.PowerOfAttorneyEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, attorney.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private static RenderFragment StatusBadge(RecordResponse attorney)
+    {
+        var (label, badge) = Status(attorney);
+        return @<span class="badge @badge">@label</span>;
     }
 
     // Durum gösterimi: iptal edilmiş, başlamamış, süresi dolmuş ya da geçerli. Tek doğru kaynak sunucudaki geçerlilik süzgecidir;

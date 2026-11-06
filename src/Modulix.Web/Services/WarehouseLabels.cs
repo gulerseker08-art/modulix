@@ -14,6 +14,19 @@ public static class WarehouseLabels
     public static string KindBadge(string? category) =>
         category == WarehouseAccess.ZoneKindControlled ? "stage-negotiation" : "stage-qualified";
 
+    /// <summary>Beyanname durumu kategorisinin tonu: tescilli başarı, taslak marka, iptal nötr (kod kategoriye bakar, durumun adına değil).</summary>
+    public static string DeclarationBadge(string? category) => category switch
+    {
+        WarehouseAccess.DeclarationRegistered => "status-customer",
+        WarehouseAccess.DeclarationCancelled => "status-inactive",
+        _ => "stage-qualified",
+    };
+
+    /// <summary>Ondalık sayıyı Türkçe gösterimle yazar (binlik ayraçlı, gereksiz sıfırsız; en çok 3 ondalık).</summary>
+    public static string Number(decimal value) => value.ToString("#,##0.###", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"));
+
+    public static decimal Decimal(RecordResponse record, string field) => record.Values[field]?.GetValue<decimal>() ?? 0m;
+
     /// <summary>Seviye değerinde izin verilen karakter kümeleri (sunucudaki <c>LocationLevel.CharacterSets</c>).</summary>
     public static IReadOnlyList<(string Key, string Label)> CharacterSets { get; } =
     [

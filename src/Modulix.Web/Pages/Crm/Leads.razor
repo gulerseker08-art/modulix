@@ -2,6 +2,7 @@
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
+@inject Modulix.Web.Services.ActivityOptions Activities
 
 <PageTitle>Müşteri adayları · Modulix</PageTitle>
 
@@ -80,7 +81,14 @@
                     <option value="@member.UserId">@member.DisplayName</option>
                 }
             </select>
-            <label class="form-label-inline">Geliş: <input class="form-control" type="date" aria-label="Başlangıç" @bind="from" @bind:after="() => LoadAsync(1)" /></label>
+            <select class="form-select" aria-label="Hizmet kapsamı" @bind="scope" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm hizmet kapsamları</option>
+                @foreach (var a in activities.Where(a => a.Kind == "Activity"))
+                {
+                    <option value="@a.Code">@Activities.PathOf(a)</option>
+                }
+            </select>
+            <label class="form-label-inline">Geliş:<input class="form-control" type="date" aria-label="Başlangıç" @bind="from" @bind:after="() => LoadAsync(1)" /></label>
             <label class="form-label-inline">– <input class="form-control" type="date" aria-label="Bitiş" @bind="to" @bind:after="() => LoadAsync(1)" /></label>
         </div>
     }
@@ -138,7 +146,7 @@
     private bool filtersOpen;
 
     /// <summary>Etkin süzgeç sayısı ("Filtrele" rozeti); süzgeç satırı etkin süzgeç varken açık kalır.</summary>
-    private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (source.Length > 0 ? 1 : 0) + (priority.Length > 0 ? 1 : 0) + (owner.Length > 0 ? 1 : 0) + (from is null ? 0 : 1) + (to is null ? 0 : 1);
+    private int ActiveFilters => (status.Length > 0 ? 1 : 0) + (source.Length > 0 ? 1 : 0) + (priority.Length > 0 ? 1 : 0) + (owner.Length > 0 ? 1 : 0) + (scope.Length > 0 ? 1 : 0) + (from is null ? 0 : 1) + (to is null ? 0 : 1);
 
     private const string Url = "/api/crm/leads";
 
@@ -194,6 +202,8 @@
     private string source = string.Empty;
     private string priority = string.Empty;
     private string owner = string.Empty;
+    private string scope = string.Empty;
+    private IReadOnlyList<ActivityOptionDto> activities = [];
     private DateOnly? from;
     private DateOnly? to;
     private bool editing;
@@ -207,6 +217,7 @@
         if (Session.Can(CrmAccess.LeadsRead))
         {
             await Lookups.LoadAsync(contacts: true);
+            activities = await Activities.LoadAsync();
             grid.Define(Columns);
             await views.LoadAsync();
             target = (await Api.GetAsync<LeadSettingsDto>($"{Url}/settings")).Value?.FirstContactTargetHours;
@@ -223,6 +234,7 @@
         source.Length > 0 ? ("source", source) : null,
         priority.Length > 0 ? ("priority", priority) : null,
         owner.Length > 0 ? ("owner", owner) : null,
+        scope.Length > 0 ? ("serviceScope", scope) : null,
         from is { } f ? ("from", f.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null,
         to is { } t ? ("to", t.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null);
 
@@ -241,6 +253,7 @@
         Add(parts, "source", source);
         Add(parts, "priority", priority);
         Add(parts, "ownerId", owner);
+        Add(parts, "serviceScope", scope);
         if (from is { } f)
         {
             parts.Add($"receivedFrom={Uri.EscapeDataString(Regional.FromTenant(f.ToDateTime(TimeOnly.MinValue)).ToString("O"))}");
@@ -306,6 +319,7 @@
             source = filters.GetValueOrDefault("source") ?? string.Empty;
             priority = filters.GetValueOrDefault("priority") ?? string.Empty;
             owner = filters.GetValueOrDefault("owner") ?? string.Empty;
+            scope = filters.GetValueOrDefault("serviceScope") ?? string.Empty;
             from = DateOnly.TryParse(filters.GetValueOrDefault("from"), out var f) ? f : null;
             to = DateOnly.TryParse(filters.GetValueOrDefault("to"), out var t) ? t : null;
         }

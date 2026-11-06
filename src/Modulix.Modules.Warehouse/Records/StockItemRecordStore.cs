@@ -41,6 +41,25 @@ internal sealed partial class StockItemRecordStore(WarehouseStoreContext context
 
     protected override IOrderedQueryable<StockItem> Order(IQueryable<StockItem> source) => source.OrderBy(s => s.Code);
 
+    // Liste başlıklarına göre sıralama (sort=code, sort=-code ...); eşit kayıtlar koda göre sıralanır.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        WithDescending("code", "name", "unitKey", "gtip", "isActive", "createdAt");
+
+    protected override IOrderedQueryable<StockItem> Order(IQueryable<StockItem> source, string? sort)
+    {
+        var desc = sort?.StartsWith('-') == true;
+        return sort?.TrimStart('-') switch
+        {
+            "code" => By(source, s => s.Code, desc),
+            "name" => By(source, s => s.Name, desc).ThenBy(s => s.Code),
+            "unitKey" => By(source, s => s.UnitKey, desc).ThenBy(s => s.Code),
+            "gtip" => ByNullsLast(source, s => s.Gtip, desc).ThenBy(s => s.Code),
+            "isActive" => By(source, s => s.IsActive, desc).ThenBy(s => s.Code),
+            "createdAt" => By(source, s => s.CreatedAt, desc).ThenBy(s => s.Code),
+            _ => Order(source),
+        };
+    }
+
     protected override IQueryable<StockItem> Search(IQueryable<StockItem> source, string term) =>
         source.Where(s => s.Code.Contains(term) || s.Name.Contains(term) || (s.Gtip != null && s.Gtip.Contains(term)));
 

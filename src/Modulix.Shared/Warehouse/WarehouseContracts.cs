@@ -20,6 +20,8 @@ public static class WarehouseAccess
     public const string AttorneysWrite = "warehouse.attorneys.write";
     public const string StockItemsRead = "warehouse.stockitems.read";
     public const string StockItemsWrite = "warehouse.stockitems.write";
+    public const string DeclarationsRead = "warehouse.customs.declarations.read";
+    public const string DeclarationsWrite = "warehouse.customs.declarations.write";
 
     public const string FacilityEntityKey = "warehouse.facility";
     public const string ZoneEntityKey = "warehouse.zone";
@@ -27,6 +29,20 @@ public static class WarehouseAccess
     public const string LocationEntityKey = "warehouse.location";
     public const string PowerOfAttorneyEntityKey = "warehouse.power-of-attorney";
     public const string StockItemEntityKey = "warehouse.stock-item";
+    public const string CustomsDeclarationEntityKey = "warehouse.customs-declaration";
+    public const string CustomsDeclarationLineEntityKey = "warehouse.customs-declaration-line";
+
+    /// <summary>Gümrük rejimi, beyanname durumu, kap cinsi, menşe ve satır birimi listeleri; hepsinin değer adları tenant'ındır.</summary>
+    public const string CustomsRegimeList = "warehouse.customs-regime";
+    public const string DeclarationStatusList = "warehouse.declaration-status";
+    public const string ContainerTypeList = "warehouse.container-type";
+    public const string OriginCountryList = "warehouse.origin-country";
+    public const string DeclarationLineUnitList = "warehouse.declaration-line-unit";
+
+    /// <summary>Beyanname durumu kategorileri (kodun anladığı anlam).</summary>
+    public const string DeclarationDraft = "draft";
+    public const string DeclarationRegistered = "registered";
+    public const string DeclarationCancelled = "cancelled";
 
     /// <summary>Alan türü listesi; kategorileri kodun anladığı anlamdır, adları tenant'ındır.</summary>
     public const string ZoneKindList = "warehouse.zone-kind";
@@ -42,6 +58,8 @@ public static class WarehouseAccess
     public const string LocationZoneLookup = "warehouse.location.zone";
     public const string AttorneyImporterLookup = "warehouse.power-of-attorney.importer";
     public const string AttorneyBrokerLookup = "warehouse.power-of-attorney.broker";
+    public const string DeclarationImporterLookup = "warehouse.customs-declaration.importer";
+    public const string DeclarationBrokerLookup = "warehouse.customs-declaration.broker";
 
     public const string ZoneKindControlled = "controlled";
     public const string ZoneKindFree = "free";

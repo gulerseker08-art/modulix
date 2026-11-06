@@ -17,6 +17,8 @@ public static class WarehouseLookupDefinitions
     public const string LocationZone = "warehouse.location.zone";
     public const string AttorneyImporter = "warehouse.power-of-attorney.importer";
     public const string AttorneyBroker = "warehouse.power-of-attorney.broker";
+    public const string DeclarationImporter = "warehouse.customs-declaration.importer";
+    public const string DeclarationBroker = "warehouse.customs-declaration.broker";
 
     private static readonly string[] FacilityLabel = ["code", "name"];
     private static readonly string[] ZoneLabel = ["code", "name"];
@@ -64,6 +66,22 @@ public static class WarehouseLookupDefinitions
             FixedFilterValue = WarehouseModule.RelationshipRoles.Importer,
         },
         new(AttorneyBroker, WarehouseModule.Entities.PowerOfAttorney, "brokerPartyId", "Gümrük müşaviri", LookupTargetKind.Record, SharedEntities.Party)
+        {
+            LabelFields = PartyLabel,
+            SecondaryFields = PartySecondary,
+            SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir (yalnızca \"Gümrük müşaviri\" rolündeki firmalar)",
+            FixedFilterName = "relationshipRole",
+            FixedFilterValue = WarehouseModule.RelationshipRoles.Broker,
+        },
+        new(DeclarationImporter, WarehouseModule.Entities.CustomsDeclaration, "importerPartyId", "İthalatçı", LookupTargetKind.Record, SharedEntities.Party)
+        {
+            LabelFields = PartyLabel,
+            SecondaryFields = PartySecondary,
+            SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir (yalnızca \"İthalatçı / malik\" rolündeki firmalar)",
+            FixedFilterName = "relationshipRole",
+            FixedFilterValue = WarehouseModule.RelationshipRoles.Importer,
+        },
+        new(DeclarationBroker, WarehouseModule.Entities.CustomsDeclaration, "brokerPartyId", "Gümrük müşaviri", LookupTargetKind.Record, SharedEntities.Party)
         {
             LabelFields = PartyLabel,
             SecondaryFields = PartySecondary,

@@ -173,6 +173,10 @@ public class ModulixDbContext(
 
     public DbSet<GtipCatalogEntry> GtipCatalogEntries => Set<GtipCatalogEntry>();
 
+    public DbSet<RegimeProfile> RegimeProfiles => Set<RegimeProfile>();
+
+    public DbSet<RegimeProfileVersion> RegimeProfileVersions => Set<RegimeProfileVersion>();
+
     public DbSet<RulePackage> RulePackages => Set<RulePackage>();
     public DbSet<RulePackageVersion> RulePackageVersions => Set<RulePackageVersion>();
     public DbSet<TenantRuleAdaptation> RuleAdaptations => Set<TenantRuleAdaptation>();

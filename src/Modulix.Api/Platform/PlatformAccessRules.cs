@@ -51,12 +51,19 @@ public static class PlatformAccessRules
         ["POST /api/platform/sectors/capabilities"] = Ops,
         ["PUT /api/platform/sectors/capabilities/{code}/dependencies"] = Ops,
         ["POST /api/platform/sectors/starter-packages/{code}/install"] = Ops, // yalnızca ekler (Dilim D)
+        ["POST /api/platform/sectors/starter-packages/{code}/retire"] = Ops, // pasife alır, silmez (Dilim G)
         ["POST /api/platform/sectors/relationship-roles"] = Ops, // firma ilişki rolü kataloğu (Dilim E)
         ["PUT /api/platform/sectors/relationship-roles/{code}/active"] = Ops,
         // GTİP kataloğu (ADR-0032 K9): ürün standardı katalog; Operasyon yönetir.
         ["POST /api/platform/gtip/versions"] = Ops,
         ["POST /api/platform/gtip/versions/preview"] = Ops,
         ["DELETE /api/platform/gtip/versions/{id}"] = Ops,
+        // Rejim profili (ADR-0032 K16): taslak, yayın, pasife alma; Operasyon yönetir.
+        ["POST /api/platform/regime-profiles"] = Ops,
+        ["PUT /api/platform/regime-profiles/{id}/draft"] = Ops,
+        ["DELETE /api/platform/regime-profiles/{id}/draft"] = Ops,
+        ["POST /api/platform/regime-profiles/{id}/publish"] = Ops,
+        ["PUT /api/platform/regime-profiles/{id}/active"] = Ops,
         // Kural paketleri (ürün standardı alan kuralları): taslak, yayın ve geri alma; Operasyon yönetir.
         ["POST /api/platform/rule-packages"] = Ops,
         ["PUT /api/platform/rule-packages/{id}/draft"] = Ops,

@@ -226,6 +226,7 @@ app.MapGridViewEndpoints();
 app.MapSectorProfileEndpoints();
 app.MapSectorEndpoints();
 app.MapGtipEndpoints();
+app.MapRegimeProfileEndpoints();
 app.MapRuleEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
