@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Modules.Warehouse.Domain;
 using Modulix.Modules.Warehouse.Records;
 
 namespace Modulix.Modules.Warehouse;
@@ -33,6 +34,10 @@ public sealed class WarehouseModule : IModule
         public const string DeclarationsWrite = "warehouse.customs.declarations.write";
         public const string RegimesRead = "warehouse.customs.regimes.read";
         public const string RegimesWrite = "warehouse.customs.regimes.write";
+        public const string LotsRead = "warehouse.lots.read";
+        public const string LotsWrite = "warehouse.lots.write";
+        public const string MovementsRead = "warehouse.movements.read";
+        public const string MovementsWrite = "warehouse.movements.write";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -47,6 +52,9 @@ public sealed class WarehouseModule : IModule
         public const string CustomsDeclaration = "warehouse.customs-declaration";
         public const string CustomsDeclarationLine = "warehouse.customs-declaration-line";
         public const string RegimeBinding = "warehouse.regime-binding";
+        public const string Lot = "warehouse.lot";
+        public const string StockMovement = "warehouse.stock-movement";
+        public const string StockBalance = "warehouse.stock-balance";
     }
 
     /// <summary>Firma ilişki rolü kodları (platform kataloğu, ADR-0029 K9; K2): vekâletin tarafları bu rollere sahip firmalardır.</summary>
@@ -66,6 +74,8 @@ public sealed class WarehouseModule : IModule
         public const string ContainerType = "warehouse.container-type";
         public const string OriginCountry = "warehouse.origin-country";
         public const string DeclarationLineUnit = "warehouse.declaration-line-unit";
+        public const string MovementType = "warehouse.movement-type";
+        public const string MovementReason = "warehouse.movement-reason";
     }
 
     /// <summary>Beyanname durumu listesinin kategorileri: kodun anladığı anlam. Tenant durumları adlandırır, kategoriyi seçer (K18).</summary>
@@ -105,6 +115,10 @@ public sealed class WarehouseModule : IModule
         new(Permissions.DeclarationsWrite, "Gümrük beyannamesi ve satırı ekler, düzenler ve siler", "Gümrük beyannameleri"),
         new(Permissions.RegimesRead, "Rejim–profil bağlamalarını görüntüler", "Rejim profilleri"),
         new(Permissions.RegimesWrite, "Rejimi bir rejim profiline bağlar, düzeyi sıkılaştırır ve bağlamayı kaldırır", "Rejim profilleri"),
+        new(Permissions.LotsRead, "Partileri görüntüler", "Partiler"),
+        new(Permissions.LotsWrite, "Parti ekler ve düzenler", "Partiler"),
+        new(Permissions.MovementsRead, "Stok hareketlerini ve bakiyeleri görüntüler", "Stok hareketleri"),
+        new(Permissions.MovementsWrite, "Stok hareketi kaydeder (giriş, çıkış, transfer, düzeltme); defter yalnızca eklenir", "Stok hareketleri"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5): tesis değişiklikleri kim, ne zaman, neyi değiştirdi olarak izlenir.</summary>
@@ -181,6 +195,33 @@ public sealed class WarehouseModule : IModule
         {
             ["regimeKey"] = "Rejim", ["profileId"] = "Rejim profili", ["enforcement"] = "İhlalde düzey",
         }, "regimeKey"),
+        new(Entities.Lot, "Parti", Permissions.LotsRead, new Dictionary<string, string>
+        {
+            ["lotNo"] = "Parti no", ["stockItemId"] = "Stok kartı", ["ownerPartyId"] = "Malik", ["billToPartyId"] = "Faturalanan taraf",
+            ["declarationLineId"] = "Beyanname satırı", ["description"] = "Açıklama", ["isActive"] = "Etkin",
+        }, "lotNo")
+        {
+            References = new Dictionary<string, string>
+            {
+                ["stockItemId"] = Entities.StockItem, ["ownerPartyId"] = SharedEntities.Party, ["billToPartyId"] = SharedEntities.Party,
+                ["declarationLineId"] = Entities.CustomsDeclarationLine,
+            },
+        },
+        // Defter satırı: oluşturma denetim kaydına yazılır (kim, ne zaman, hangi işlem grubuyla); değiştirme ve silme zaten yoktur.
+        new(Entities.StockMovement, "Stok hareketi", Permissions.MovementsRead, new Dictionary<string, string>
+        {
+            ["typeKey"] = "Hareket türü", ["lotId"] = "Parti", ["fromLocationId"] = "Kaynak lokasyon", ["toLocationId"] = "Hedef lokasyon",
+            ["quantity"] = "Miktar", ["reasonKey"] = "Neden", ["documentReference"] = "Belge", ["idempotencyKey"] = "Tekrar anahtarı",
+            ["reversesMovementId"] = "Geri alınan hareket", ["occurredAt"] = "Zaman", ["userId"] = "Kullanıcı", ["membershipId"] = "Üyelik",
+            ["correlationId"] = "İşlem kimliği",
+        }, "typeKey")
+        {
+            References = new Dictionary<string, string>
+            {
+                ["lotId"] = Entities.Lot, ["fromLocationId"] = Entities.Location, ["toLocationId"] = Entities.Location,
+                ["reversesMovementId"] = Entities.StockMovement,
+            },
+        },
     ];
 
     /// <summary>Firmanın özel alan ekleyebildiği kayıt türleri (Y9a).</summary>
@@ -193,6 +234,7 @@ public sealed class WarehouseModule : IModule
         new(Entities.StockItem, "Stok kartı"),
         new(Entities.CustomsDeclaration, "Gümrük beyannamesi"),
         new(Entities.CustomsDeclarationLine, "Beyanname satırı"),
+        new(Entities.Lot, "Parti"),
     ];
 
     /// <summary>
@@ -295,6 +337,44 @@ public sealed class WarehouseModule : IModule
                 new("ES", "İspanya"), new("US", "ABD"), new("GB", "Birleşik Krallık"), new("IN", "Hindistan"), new("JP", "Japonya"),
                 new("KR", "Güney Kore"), new("NL", "Hollanda"), new("RU", "Rusya"), new("EG", "Mısır"), new("BR", "Brezilya"),
             ]),
+        // Hareket türü (K18): kod kategoriye bakar. Giriş, çıkış ve transfer doğrudan; düzeltme önceki bir hareketin ters kaydıdır (özgün hareketten türer).
+        // Tür her harekette açıkça seçilir. Rezervasyon ve serbest bırakma kategorileri ayrı kullanılabilirlik bakiyesi ister, sonraki dilimdedir.
+        new(
+            Lists.MovementType,
+            "Hareket türü",
+            Entities.StockMovement,
+            "typeKey",
+            Required: true,
+            [
+                new(MovementCategories.Inbound, "Giriş"),
+                new(MovementCategories.Outbound, "Çıkış"),
+                new(MovementCategories.Transfer, "Transfer"),
+                new(MovementCategories.Adjustment, "Düzeltme (ters kayıt)"),
+            ],
+            [
+                new("Receipt", "Giriş", MovementCategories.Inbound),
+                new("Issue", "Çıkış", MovementCategories.Outbound),
+                new("Transfer", "Transfer", MovementCategories.Transfer),
+                new("Correction", "Düzeltme", MovementCategories.Adjustment),
+            ])
+        {
+            Default = "Receipt",
+        },
+
+        // Hareket nedeni: isteğe bağlı, kategorisiz; hazır değerler örnektir, tenant yönetir.
+        new(
+            Lists.MovementReason,
+            "Hareket nedeni",
+            Entities.StockMovement,
+            "reasonKey",
+            Required: false,
+            [],
+            [
+                new("Count", "Sayım farkı"),
+                new("Damage", "Hasar"),
+                new("Return", "İade"),
+                new("Other", "Diğer"),
+            ]),
         new(
             Lists.DeclarationLineUnit,
             "Beyanname satırı birimi",
@@ -317,6 +397,7 @@ public sealed class WarehouseModule : IModule
     [
         new(SharedEntities.Party, Permissions.AttorneysRead),
         new(SharedEntities.Party, Permissions.DeclarationsRead),
+        new(SharedEntities.Party, Permissions.LotsRead),
     ];
 
     /// <summary>Firmanın nerede kullanıldığı (silme ve birleştirme koruması).</summary>
@@ -324,6 +405,8 @@ public sealed class WarehouseModule : IModule
     [
         new(SharedEntities.Party, Entities.PowerOfAttorney, "importerPartyId", "vekâlet (ithalatçı)"),
         new(SharedEntities.Party, Entities.PowerOfAttorney, "brokerPartyId", "vekâlet (müşavir)"),
+        new(SharedEntities.Party, Entities.Lot, "ownerPartyId", "parti (malik)"),
+        new(SharedEntities.Party, Entities.Lot, "billToPartyId", "parti (faturalanan taraf)"),
         new(SharedEntities.Party, Entities.CustomsDeclaration, "importerPartyId", "gümrük beyannamesi (ithalatçı)"),
         new(SharedEntities.Party, Entities.CustomsDeclaration, "brokerPartyId", "gümrük beyannamesi (müşavir)"),
     ];
@@ -344,6 +427,8 @@ public sealed class WarehouseModule : IModule
                 Permissions.LocationsRead, Permissions.LocationsWrite,
                 Permissions.AttorneysRead, Permissions.AttorneysWrite,
                 Permissions.StockItemsRead, Permissions.StockItemsWrite,
+                Permissions.LotsRead, Permissions.LotsWrite,
+                Permissions.MovementsRead, Permissions.MovementsWrite,
             ]),
         new(
             "warehouse.customs",
@@ -369,6 +454,9 @@ public sealed class WarehouseModule : IModule
         services.AddScoped<IRecordStore, CustomsDeclarationRecordStore>();
         services.AddScoped<IRecordStore, CustomsDeclarationLineRecordStore>();
         services.AddScoped<IRecordStore, RegimeBindingRecordStore>();
+        services.AddScoped<IRecordStore, LotRecordStore>();
+        services.AddScoped<IRecordStore, StockMovementRecordStore>();
+        services.AddScoped<IRecordStore, StockBalanceRecordStore>();
         services.AddScoped<IRegistrationNoCheck, RegistrationNoCheck>();
     }
 }
