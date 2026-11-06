@@ -42,6 +42,27 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
 
     protected override IOrderedQueryable<Location> Order(IQueryable<Location> source) => source.OrderBy(l => l.FacilityId).ThenBy(l => l.Code);
 
+    // Liste başlıklarına göre sıralama; tesis ve alan kodlarına göre sıralanır (alanı olmayanlar sonda). Eşit kayıtlar koda göre sıralanır.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        WithDescending("code", "name", "facility", "zone", "depth", "isActive");
+
+    protected override IOrderedQueryable<Location> Order(IQueryable<Location> source, string? sort)
+    {
+        var desc = sort?.StartsWith('-') == true;
+        var facilities = Context.Data.Set<Facility>();
+        var zones = Context.Data.Set<Zone>();
+        return sort?.TrimStart('-') switch
+        {
+            "code" => By(source, l => l.Code, desc).ThenBy(l => l.FacilityId),
+            "name" => ByNullsLast(source, l => l.Name, desc).ThenBy(l => l.Code),
+            "facility" => By(source, l => facilities.Where(f => f.Id == l.FacilityId).Select(f => f.Code).FirstOrDefault(), desc).ThenBy(l => l.Code),
+            "zone" => ByNullsLast(source, l => zones.Where(z => z.Id == l.ZoneId).Select(z => z.Code).FirstOrDefault(), desc).ThenBy(l => l.Code),
+            "depth" => By(source, l => l.Depth, desc).ThenBy(l => l.Code),
+            "isActive" => By(source, l => l.IsActive, desc).ThenBy(l => l.Code),
+            _ => Order(source),
+        };
+    }
+
     protected override IQueryable<Location> Search(IQueryable<Location> source, string term) =>
         source.Where(l => l.Code.Contains(term) || (l.Name != null && l.Name.Contains(term)));
 

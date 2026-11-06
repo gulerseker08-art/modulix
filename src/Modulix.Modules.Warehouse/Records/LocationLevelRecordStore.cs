@@ -40,6 +40,27 @@ internal sealed partial class LocationLevelRecordStore(WarehouseStoreContext con
     protected override IOrderedQueryable<LocationLevel> Order(IQueryable<LocationLevel> source) =>
         source.OrderBy(l => l.FacilityId).ThenBy(l => l.Position);
 
+    // Liste başlıklarına göre sıralama; tesis, tesisin koduna göre sıralanır. Eşit kayıtlar tesise ve sıraya göre sıralanır.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        WithDescending("facility", "position", "name", "key", "characterSet", "maxLength", "separator");
+
+    protected override IOrderedQueryable<LocationLevel> Order(IQueryable<LocationLevel> source, string? sort)
+    {
+        var desc = sort?.StartsWith('-') == true;
+        var facilities = Context.Data.Set<Facility>();
+        return sort?.TrimStart('-') switch
+        {
+            "facility" => By(source, l => facilities.Where(f => f.Id == l.FacilityId).Select(f => f.Code).FirstOrDefault(), desc).ThenBy(l => l.Position),
+            "position" => By(source, l => l.Position, desc).ThenBy(l => l.FacilityId),
+            "name" => By(source, l => l.Name, desc).ThenBy(l => l.FacilityId).ThenBy(l => l.Position),
+            "key" => By(source, l => l.Key, desc).ThenBy(l => l.FacilityId).ThenBy(l => l.Position),
+            "characterSet" => By(source, l => l.CharacterSet, desc).ThenBy(l => l.FacilityId).ThenBy(l => l.Position),
+            "maxLength" => By(source, l => l.MaxLength, desc).ThenBy(l => l.FacilityId).ThenBy(l => l.Position),
+            "separator" => By(source, l => l.Separator, desc).ThenBy(l => l.FacilityId).ThenBy(l => l.Position),
+            _ => Order(source),
+        };
+    }
+
     protected override IQueryable<LocationLevel> Search(IQueryable<LocationLevel> source, string term) =>
         source.Where(l => l.Key.Contains(term) || l.Name.Contains(term));
 
