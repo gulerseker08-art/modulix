@@ -2,9 +2,9 @@
 
 @* Açık/koyu tema düğmesi. Tercih tarayıcıda saklanır (js/shell.js); varsayılan açık temadır. *@
 <button type="button" class="icon-button" @onclick="ToggleAsync"
-        aria-pressed="@(dark ? "true" : "false")" title="@(dark ? "Açık temaya geç" : "Koyu temaya geç")">
+        aria-pressed="@(dark ? "true" : "false")" title="@Texts.Get(dark ? "shell.theme.toLight" : "shell.theme.toDark")">
     <AppIcon Name="@(dark ? "sun" : "moon")" Size="20" />
-    <span class="visually-hidden">Koyu tema</span>
+    <span class="visually-hidden">@Texts.Get("shell.theme.label")</span>
 </button>
 
 @code {

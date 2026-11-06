@@ -10,13 +10,13 @@
             @switch (license.Phase)
             {
                 case LicensePhase.ReadOnly:
-                    <strong>@license.DisplayName</strong> <span>lisans süresi @CrmLabels.Time(license.ValidUntil) tarihinde doldu; modül salt okunur. Kayıtlarınız silinmedi, yalnızca görüntülenebilir. Yeniden etkinleştirmek için ürün sahibiyle iletişime geçin.</span>
+                    <strong>@license.DisplayName</strong> <span>@Texts.Get("shell.license.readOnly", CrmLabels.Time(license.ValidUntil))</span>
                     break;
                 case LicensePhase.Grace:
-                    <strong>@license.DisplayName</strong> <span>lisans süresi @CrmLabels.Time(license.ValidUntil) tarihinde doldu. @CrmLabels.Time(license.GraceEndsAt) tarihine kadar kullanmaya devam edebilirsiniz; sonrasında modül salt okunur olur.</span>
+                    <strong>@license.DisplayName</strong> <span>@Texts.Get("shell.license.grace", CrmLabels.Time(license.ValidUntil), CrmLabels.Time(license.GraceEndsAt))</span>
                     break;
                 default:
-                    <strong>@license.DisplayName</strong> <span>lisansı @CrmLabels.Time(license.ValidUntil) tarihinde sona erecek.</span>
+                    <strong>@license.DisplayName</strong> <span>@Texts.Get("shell.license.expiring", CrmLabels.Time(license.ValidUntil))</span>
                     break;
             }
         </div>
