@@ -41,6 +41,17 @@ public sealed record StarterPackagePlan(
     public bool NothingToDo => CapabilitiesToCreate.Count == 0 && NodesToCreate.Count == 0 && Completions.Count == 0;
 }
 
+/// <summary>Geri almanın ne yapacağı (ya da yaptığı). Kullanım sayısı tenant sınırı yüzünden platformdan okunamaz (K3); bu yüzden etki sayısı verilmez.</summary>
+public sealed record StarterPackageRetirePlan(
+    IReadOnlyList<string> NodesToDeactivate,
+    IReadOnlyList<string> NodesAlreadyInactive,
+    IReadOnlyList<string> NodesMissing,
+    IReadOnlyList<string> Skipped,
+    IReadOnlyList<string> Warnings)
+{
+    public bool NothingToDo => NodesToDeactivate.Count == 0;
+}
+
 public sealed record StarterPackageSummary(string Code, string Name, string? Description, bool Verified, string? VerificationNote, int NodeCount, int CapabilityCount);
 
 /// <summary>Bilinmeyen başlangıç paketi.</summary>
@@ -59,6 +70,15 @@ public interface IStarterPackages
     Task<StarterPackagePlan> PreviewAsync(string packageCode, CancellationToken cancellationToken);
 
     Task<StarterPackagePlan> InstallAsync(Guid actingUserId, string packageCode, CancellationToken cancellationToken);
+
+    /// <summary>Geri alma önizlemesi: yazmadan, pasife alınacak, zaten pasif olan, katalogda olmayan ve atlanacak düğümleri gösterir.</summary>
+    Task<StarterPackageRetirePlan> PreviewRetireAsync(string packageCode, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Kurulumu geri alır: paketin düğümlerini <b>pasife alır</b>, hiçbir şeyi silmez (kayıtlardaki ve tenant seçimlerindeki kodlar korunur; yeni seçim
+    /// engellenir). Paket dışı etkin alt düğümü olan düğüm atlanır. Tekrar çalıştırılabilir; geri dönüş düğümü yeniden açmaktır (<see cref="ISectorCatalog.SetNodeActiveAsync"/>).
+    /// </summary>
+    Task<StarterPackageRetirePlan> RetireAsync(Guid actingUserId, string packageCode, CancellationToken cancellationToken);
 }
 
 /// <summary>Başlangıç paketi tanım denetimi: yapı bozuksa kurulumdan önce reddedilir. Saf kurallardır.</summary>

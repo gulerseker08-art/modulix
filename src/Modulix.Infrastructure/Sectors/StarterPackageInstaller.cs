@@ -73,6 +73,67 @@ internal sealed class StarterPackageInstaller(ISectorCatalog catalog) : IStarter
         return plan;
     }
 
+    public async Task<StarterPackageRetirePlan> PreviewRetireAsync(string packageCode, CancellationToken cancellationToken) =>
+        (await RetirePlanAsync(packageCode, cancellationToken)).Plan;
+
+    public async Task<StarterPackageRetirePlan> RetireAsync(Guid actingUserId, string packageCode, CancellationToken cancellationToken)
+    {
+        var (plan, ids) = await RetirePlanAsync(packageCode, cancellationToken);
+        // Plan çocuktan ata doğru sıralıdır: aktif alt düğümü olan düğüm pasife alınamaz.
+        foreach (var code in plan.NodesToDeactivate)
+        {
+            await catalog.SetNodeActiveAsync(actingUserId, ids[code], false, cancellationToken);
+        }
+
+        return plan;
+    }
+
+    private async Task<(StarterPackageRetirePlan Plan, IReadOnlyDictionary<string, Guid> Ids)> RetirePlanAsync(string packageCode, CancellationToken cancellationToken)
+    {
+        if (!Packages.Value.TryGetValue(packageCode ?? string.Empty, out var package))
+        {
+            throw new StarterPackageNotFoundException($"Başlangıç paketi bulunamadı: '{packageCode}'.");
+        }
+
+        var current = await catalog.GetAsync(cancellationToken);
+        var nodesByCode = current.Nodes.ToDictionary(n => n.Code, StringComparer.Ordinal);
+        var childrenOf = current.Nodes.Where(n => n.ParentId is not null).ToLookup(n => n.ParentId!.Value);
+        var deactivating = new HashSet<Guid>();
+        var toDeactivate = new List<string>();
+        var alreadyInactive = new List<string>();
+        var missing = new List<string>();
+        var skipped = new List<string>();
+
+        foreach (var node in StarterPackageRules.InParentOrder(package).Reverse())
+        {
+            if (!nodesByCode.TryGetValue(node.Code, out var existing))
+            {
+                missing.Add(node.Code);
+            }
+            else if (!existing.IsActive)
+            {
+                alreadyInactive.Add(node.Code);
+            }
+            else if (childrenOf[existing.Id].FirstOrDefault(c => c.IsActive && !deactivating.Contains(c.Id)) is { } blocker)
+            {
+                skipped.Add($"'{node.Code}' paket dışı etkin alt düğüm içeriyor ('{blocker.Code}'); pasife alınmadı.");
+            }
+            else
+            {
+                deactivating.Add(existing.Id);
+                toDeactivate.Add(node.Code);
+            }
+        }
+
+        var warnings = new List<string>();
+        if (toDeactivate.Count > 0)
+        {
+            warnings.Add("Düğümler silinmez; tenant seçimleri ve kayıtlardaki kodlar korunur, yalnızca yeni seçim engellenir. Hangi tenant'ın seçtiği platformdan görülemez.");
+        }
+
+        return (new StarterPackageRetirePlan(toDeactivate, alreadyInactive, missing, skipped, warnings), current.Nodes.ToDictionary(n => n.Code, n => n.Id, StringComparer.Ordinal));
+    }
+
     private async Task<(StarterPackage Package, StarterPackagePlan Plan, SectorCatalogView Current)> PlanAsync(string packageCode, CancellationToken cancellationToken)
     {
         if (!Packages.Value.TryGetValue(packageCode ?? string.Empty, out var package))
