@@ -200,13 +200,7 @@ public sealed class EventDispatcher(
 
         var batch = Math.Max(1, options.Value.BatchSize);
         var now = time.GetUtcNow();
-        var due = await db.Database.SqlQueryRaw<Guid>(
-            DueDeliveriesSql,
-            new SqlParameter("@tenant", tenantId),
-            new SqlParameter("@batch", batch),
-            new SqlParameter("@pending", (int)EventDeliveryStatus.Pending),
-            new SqlParameter("@now", now),
-            new SqlParameter("@perTenant", PerTenantLimit)).ToListAsync(cancellationToken);
+        var due = await SelectDueAsync(tenantId, batch, now, cancellationToken);
 
         var attempted = 0;
         foreach (var id in due)
@@ -219,6 +213,32 @@ public sealed class EventDispatcher(
         }
 
         return attempted;
+    }
+
+    /// <summary>
+    /// Zamanı gelmiş teslim kimliklerini seçer. Sorgu salt okunurdur; eşzamanlı işleyicilerin teslim alma güncellemeleriyle
+    /// kilit çakışıp (SQL Server 1205) kurban seçilirse geri alınacak bir şey yoktur, sorgu yeniden denenir.
+    /// </summary>
+    private async Task<List<Guid>> SelectDueAsync(Guid tenantId, int batch, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        const int maxAttempts = 3;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await db.Database.SqlQueryRaw<Guid>(
+                    DueDeliveriesSql,
+                    new SqlParameter("@tenant", tenantId),
+                    new SqlParameter("@batch", batch),
+                    new SqlParameter("@pending", (int)EventDeliveryStatus.Pending),
+                    new SqlParameter("@now", now),
+                    new SqlParameter("@perTenant", PerTenantLimit)).ToListAsync(cancellationToken);
+            }
+            catch (SqlException exception) when (exception.Number == 1205 && attempt < maxAttempts)
+            {
+                logger.LogWarning(exception, "Teslim seçimi kilit çakışmasında kurban seçildi; yeniden deneniyor ({Attempt}/{Max}).", attempt, maxAttempts);
+            }
+        }
     }
 
     /// <summary>
