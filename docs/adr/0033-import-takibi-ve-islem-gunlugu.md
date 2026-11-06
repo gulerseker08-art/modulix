@@ -117,6 +117,7 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 - Platform özeti ayrı tablodur (bölüm 7).
 - "Hepsi ya da hiç": zorunlu hatasız kuru çalışma + 10.000 satır sınırı (bölüm 5).
 - Saklama süreleri firma ayarıdır; platform sınırları seçenek listesindedir (bölüm 8).
+- İçe aktarılan kayıtlar varsayılan olarak kural çalıştırmaz ve atama e-postası göndermez; firma tür başına açar (6 Kasım 2026).
 
 ## Açık noktalar
 
