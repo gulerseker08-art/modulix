@@ -114,7 +114,7 @@ Kayıt sayfalarında bölümler `TabBar` + `TabState` ile sekmelere ayrılır (F
 
 - Sekme listesi yetkiye göre kurulur; görme izni olmayan bölümün sekmesi hiç eklenmez (sunucu yine denetler).
 - Sekme ilk seçildiğinde çizilir ve verisini o an yükler; başka sekmeye geçince DOM'da gizli kalır. Böylece açık bir düzenleme formu sekme değiştirince kaybolmaz.
-- Etkin sekme birincil renk alt çizgi ve koyu metinle gösterilir; sayı rozeti sunucudaki toplamdır.
+- Kayıt ve form sekmeleri düğme grubu görünümündedir: etkin sekme yüzey zeminli, gölgeli ve kalın yazılıdır (renk dışında da ayrılır); sayı rozeti sunucudaki toplamdır. Liste görünümleri (`ViewTabs`) alt çizgili kalır.
 - Telefonda sekme çubuğu yatay kayar.
 ### Her kayıt formu sekmelidir (seçenek 4 kararı, 3.11.2026)
 

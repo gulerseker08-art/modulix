@@ -116,6 +116,7 @@
     --mx-shadow-raised: 0 10px 32px rgba(16, 29, 53, 0.10);
     --mx-shadow-popover: 0 14px 36px rgba(16, 29, 53, 0.16);
     --mx-shadow-glow: 0 8px 20px rgba(31, 95, 203, 0.30);
+    --mx-shadow-control: 0 1px 2px rgba(16, 29, 53, 0.08);
 
     /* Marka degradesi: birincil düğme, etkin sekme çizgisi, sayaç rozeti, bölüm ikonu (beyaz metinle AA: 4.5:1 ve üzeri) */
     --mx-gradient-brand: linear-gradient(135deg, #087DB8 0%, #1F5FCB 100%);
@@ -223,6 +224,7 @@
     --mx-shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.35);
     --mx-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.5);
     --mx-shadow-glow: 0 8px 20px rgba(59, 174, 230, 0.22);
+    --mx-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.35);
 
     /* Koyu zeminde açık degrade + koyu metin (--mx-text-on-brand) */
     --mx-gradient-brand: linear-gradient(135deg, #3BAEE6 0%, #6FA8FA 100%);
@@ -4472,6 +4474,44 @@ button.pipeline-label {
 .record-tab.active .record-tab-count.record-tab-invalid {
     background: var(--mx-tone-danger-bg);
     color: var(--mx-tone-danger-fg);
+}
+
+/* Kayıt ve form sekmeleri düğme grubu görünümündedir; liste görünümleri (ViewTabs) alt çizgili kalır. */
+.record-tabs:not(.view-tabs) {
+    width: fit-content;
+    max-width: 100%;
+    gap: 2px;
+    padding: 3px;
+    margin-bottom: var(--mx-space-3);
+    border-bottom: 0;
+    border-radius: var(--mx-radius-button);
+    background: var(--mx-surface-control);
+}
+
+    .record-tabs:not(.view-tabs) .record-tab {
+        min-height: 30px;
+        padding: 0 var(--mx-space-3);
+        border-radius: 8px;
+        font-size: var(--mx-fs-label);
+    }
+
+        .record-tabs:not(.view-tabs) .record-tab:hover:not(.active) {
+            background: var(--mx-surface-muted);
+        }
+
+        .record-tabs:not(.view-tabs) .record-tab.active {
+            background: var(--mx-surface);
+            box-shadow: var(--mx-shadow-control);
+        }
+
+            .record-tabs:not(.view-tabs) .record-tab.active::after {
+                display: none;
+            }
+
+@media (pointer: coarse) {
+    .record-tabs:not(.view-tabs) .record-tab {
+        min-height: 44px;
+    }
 }
 
 .record-tabpanel[hidden] {
