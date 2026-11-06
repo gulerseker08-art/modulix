@@ -1,0 +1,418 @@
+@page "/platform/rejim-profilleri"
+@using Modulix.Shared.Customs
+@using Modulix.Shared.Sectors
+@inject ApiClient Api
+
+<PageTitle>Rejim profilleri · Platform · Modulix</PageTitle>
+
+@* Rejim profili (ADR-0032 K16): ülke/rejim/antrepo tipine göre değişen kuralların sürümlü paketi. Bugün tescil numarası kuralını (K7) taşır: uzunluk, desen
+   ve uygulama düzeyi. Akış: profil oluştur → taslak kaydet (doğrulanır, örnek numara kurala uymalı) → yayınla. Yayınlanan sürüm değişmez; yenisi yayınlanınca
+   öncekinin yerini alır. Mevzuat doğrulanmadığı için yayın "Doğrulanmadı" olarak işaretli kalabilir; başlangıçta kural uyarıdır, engel değildir. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>Rejim profilleri</h1>
+    <p class="text-muted">
+        Her profil sürümlü bir kural paketidir. Firmalar profili seçince tescil numarası bu kurala göre denetlenir. Kuralı uzman doğrulamadan
+        <strong>Engel</strong> yapmayın: başlangıçta ihlal yalnızca uyarıdır ve yayın "Doğrulanmadı" olarak işaretlenir.
+    </p>
+
+    <Notice Text="@notice" Failed="@failed" />
+
+    <form class="record-form settings-group" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+        <h2>Yeni profil</h2>
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="profile-code">Kod *</label>
+                <input id="profile-code" class="form-control" maxlength="50" placeholder="ör. antrepo-7100" @bind="newCode" @bind:event="oninput" />
+                <div class="form-text">Küçük harf, rakam ve "-". Sonradan değişmez.</div>
+            </div>
+            <div>
+                <label class="form-label" for="profile-name">Ad *</label>
+                <input id="profile-name" class="form-control" maxlength="100" placeholder="ör. Antrepo rejimi (7100)" @bind="newName" @bind:event="oninput" />
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-outline-secondary" disabled="@busy">Profil oluştur</button>
+        </div>
+    </form>
+
+    <h2 class="mt-4">Profiller</h2>
+    @if (profiles is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (profiles.Count == 0)
+    {
+        <p class="text-muted" role="status">Henüz rejim profili yok; firmalar için tescil numarası kuralı uygulanmaz.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Rejim profilleri</caption>
+            <thead>
+                <tr><th scope="col">Profil</th><th scope="col">Kod</th><th scope="col">Yayın</th><th scope="col">Taslak</th><th scope="col">Durum</th><th scope="col"></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var profile in profiles)
+                {
+                    <tr>
+                        <td data-label="Profil" class="primary">@profile.Name</td>
+                        <td data-label="Kod">@profile.Code</td>
+                        <td data-label="Yayın">
+                            @if (profile.PublishedNumber is { } number)
+                            {
+                                <span>Sürüm @number</span>
+                                <span class="badge @(profile.PublishedVerified ? "status-customer" : "stage-qualified")">@(profile.PublishedVerified ? "Doğrulandı" : "Doğrulanmadı")</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Yayında değil</span>
+                            }
+                        </td>
+                        <td data-label="Taslak">@(profile.HasDraft ? "Var" : "—")</td>
+                        <td data-label="Durum"><span class="badge @WarehouseLabels.ActiveBadge(profile.IsActive)">@(profile.IsActive ? "Etkin" : "Pasif")</span></td>
+                        <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => OpenAsync(profile.Id)">Aç</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (detail is not null)
+    {
+        <section class="record-form settings-group" aria-label="Profil ayrıntısı">
+            <h2>@detail.Summary.Name <small class="text-muted">· @detail.Summary.Code</small></h2>
+
+            <form novalidate @onsubmit="SaveDraftAsync" @onsubmit:preventDefault>
+                <h3>@(detail.Summary.HasDraft ? "Taslak" : "Yeni taslak")</h3>
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="rule-regime">Rejim kodu</label>
+                        <input id="rule-regime" class="form-control" maxlength="20" placeholder="ör. 7100" @bind="draft.RegimeCode" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="rule-min">Tescil no en az uzunluk</label>
+                        <input id="rule-min" class="form-control" type="number" min="1" max="30" @bind="draft.MinLength" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="rule-max">Tescil no en çok uzunluk</label>
+                        <input id="rule-max" class="form-control" type="number" min="1" max="30" @bind="draft.MaxLength" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="rule-pattern">Tescil no deseni (düzenli ifade)</label>
+                        <input id="rule-pattern" class="form-control" maxlength="200" placeholder="ör. \d{8}[A-Z]{2}\d{8}" @bind="draft.Pattern" />
+                        <div class="form-text">Numaranın tamamıyla eşleşmelidir. Boş bırakılırsa yalnızca uzunluk denetlenir.</div>
+                    </div>
+                    <div>
+                        <label class="form-label" for="rule-example">Geçerli örnek numara</label>
+                        <input id="rule-example" class="form-control" maxlength="30" @bind="draft.Example" />
+                        <div class="form-text">Kuralın kendisine uymalıdır; yanlış desen yayına çıkmadan yakalanır.</div>
+                    </div>
+                    <div>
+                        <label class="form-label" for="rule-level">İhlalde</label>
+                        <select id="rule-level" class="form-select" @bind="draft.Enforcement">
+                            <option value="Warn">Uyarı (kaydı engellemez)</option>
+                            <option value="Block">Engel (kaydı reddeder)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-outline-secondary" disabled="@busy">Taslağı kaydet</button>
+                    @if (detail.Summary.HasDraft)
+                    {
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DiscardDraftAsync">Taslağı sil</button>
+                    }
+                </div>
+            </form>
+
+            @if (detail.Summary.HasDraft)
+            {
+                <form class="mt-3" novalidate @onsubmit="PublishAsync" @onsubmit:preventDefault>
+                    <h3>Yayınla</h3>
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label" for="publish-verified">Doğrulama</label>
+                            <select id="publish-verified" class="form-select" @bind="verified">
+                                <option value="False">Doğrulanmadı (uzman teyidi bekliyor)</option>
+                                <option value="True">Doğrulandı</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label" for="publish-note">Doğrulama notu@(verified ? " *" : null)</label>
+                            <input id="publish-note" class="form-control" maxlength="500" placeholder="Kim, neye göre doğruladı?" @bind="note" />
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" disabled="@busy">Yayınla</button>
+                    </div>
+                </form>
+            }
+
+            <h3 class="mt-3">Sürümler</h3>
+            @if (detail.Versions.Count == 0)
+            {
+                <p class="text-muted">Henüz sürüm yok.</p>
+            }
+            else
+            {
+                <table class="table record-table">
+                    <caption class="visually-hidden">Profil sürümleri</caption>
+                    <thead><tr><th scope="col">Sürüm</th><th scope="col">Durum</th><th scope="col">Doğrulama</th><th scope="col">Tescil no kuralı</th><th scope="col">Yayın</th></tr></thead>
+                    <tbody>
+                        @foreach (var version in detail.Versions)
+                        {
+                            <tr>
+                                <td data-label="Sürüm" class="primary">@version.Number</td>
+                                <td data-label="Durum"><span class="badge @StateBadge(version.State)">@StateLabel(version.State)</span></td>
+                                <td data-label="Doğrulama">@(version.State == "Draft" ? "—" : version.IsVerified ? $"Doğrulandı · {version.VerificationNote}" : "Doğrulanmadı")</td>
+                                <td data-label="Tescil no kuralı">@RuleText(version.Content.RegistrationNo)</td>
+                                <td data-label="Yayın">@(version.PublishedAt is { } at ? CrmLabels.Time(at) : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ToggleActiveAsync">@(detail.Summary.IsActive ? "Pasife al" : "Etkinleştir")</button>
+                <button type="button" class="btn btn-ghost" @onclick="Close">Kapat</button>
+            </div>
+        </section>
+    }
+</PlatformGate>
+
+@code {
+    private const string Url = "/api/platform/regime-profiles";
+
+    private List<RegimeProfileSummaryDto>? profiles;
+    private RegimeProfileDetailDto? detail;
+    private DraftForm draft = new();
+    private string? notice;
+    private bool failed;
+    private bool busy;
+    private string newCode = string.Empty;
+    private string newName = string.Empty;
+    private bool verified;
+    private string? note;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<RegimeProfileSummaryDto>>(Url);
+        profiles = result.Value;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (busy)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.PostAsync<RegimeProfileSummaryDto>(Url, new CreateRegimeProfileRequest(newCode.Trim(), newName.Trim()));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+            return;
+        }
+
+        Succeed($"“{result.Value!.Name}” profili oluşturuldu; kuralı taslak olarak kaydedin.");
+        newCode = newName = string.Empty;
+        await LoadAsync();
+        await OpenAsync(result.Value.Id);
+    }
+
+    private async Task OpenAsync(Guid id)
+    {
+        var result = await Api.GetAsync<RegimeProfileDetailDto>($"{Url}/{id}");
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+            return;
+        }
+
+        detail = result.Value;
+        verified = false;
+        note = null;
+
+        // Taslak varsa taslak, yoksa yayındaki sürüm düzenleme başlangıcıdır; hiçbiri yoksa boş kural.
+        var source = detail!.Versions.FirstOrDefault(v => v.State == "Draft") ?? detail.Versions.FirstOrDefault(v => v.State == "Published");
+        draft = DraftForm.From(source?.Content);
+    }
+
+    private void Close() => detail = null;
+
+    private async Task SaveDraftAsync()
+    {
+        if (busy || detail is null)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.PutAsync<RegimeProfileVersionDto>($"{Url}/{detail.Summary.Id}/draft", draft.ToDto());
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+            return;
+        }
+
+        Succeed($"Taslak (sürüm {result.Value!.Number}) kaydedildi.");
+        await LoadAsync();
+        await OpenAsync(detail.Summary.Id);
+    }
+
+    private async Task DiscardDraftAsync()
+    {
+        if (busy || detail is null)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{detail.Summary.Id}/draft");
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+            return;
+        }
+
+        Succeed("Taslak silindi.");
+        await LoadAsync();
+        await OpenAsync(detail.Summary.Id);
+    }
+
+    private async Task PublishAsync()
+    {
+        if (busy || detail is null)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.PostAsync<RegimeProfileVersionDto>($"{Url}/{detail.Summary.Id}/publish", new PublishRegimeProfileRequest(verified, note));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+            return;
+        }
+
+        Succeed($"Sürüm {result.Value!.Number} yayınlandı ({(result.Value.IsVerified ? "doğrulandı" : "doğrulanmadı")}). Önceki yayın geçmişte kaldı.");
+        await LoadAsync();
+        await OpenAsync(detail.Summary.Id);
+    }
+
+    private async Task ToggleActiveAsync()
+    {
+        if (busy || detail is null)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.PutAsync<RegimeProfileSummaryDto>($"{Url}/{detail.Summary.Id}/active", new SetActiveRequest(!detail.Summary.IsActive));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Fail(result.Error);
+            return;
+        }
+
+        Succeed(result.Value!.IsActive ? "Profil etkinleştirildi." : "Profil pasife alındı.");
+        await LoadAsync();
+        await OpenAsync(detail.Summary.Id);
+    }
+
+    private static string StateLabel(string state) => state switch
+    {
+        "Draft" => "Taslak",
+        "Published" => "Yayında",
+        _ => "Yerini bıraktı",
+    };
+
+    private static string StateBadge(string state) => state switch
+    {
+        "Published" => "status-customer",
+        "Draft" => "stage-qualified",
+        _ => "status-inactive",
+    };
+
+    private static string RuleText(RegistrationNoRuleDto? rule)
+    {
+        if (rule is null)
+        {
+            return "Kural yok";
+        }
+
+        var parts = new List<string>();
+        if (rule.MinLength is not null || rule.MaxLength is not null)
+        {
+            parts.Add($"{rule.MinLength?.ToString() ?? "—"}–{rule.MaxLength?.ToString() ?? "—"} karakter");
+        }
+
+        if (!string.IsNullOrEmpty(rule.Pattern))
+        {
+            parts.Add($"desen {rule.Pattern}");
+        }
+
+        parts.Add(rule.Enforcement == "Block" ? "engel" : "uyarı");
+        return string.Join(" · ", parts);
+    }
+
+    private void Succeed(string message)
+    {
+        notice = message;
+        failed = false;
+    }
+
+    private void Fail(string? message)
+    {
+        notice = message ?? "İşlem tamamlanamadı.";
+        failed = true;
+    }
+
+    private sealed class DraftForm
+    {
+        public string? RegimeCode { get; set; }
+
+        public int? MinLength { get; set; }
+
+        public int? MaxLength { get; set; }
+
+        public string? Pattern { get; set; }
+
+        public string? Example { get; set; }
+
+        public string Enforcement { get; set; } = "Warn";
+
+        public static DraftForm From(RegimeProfileContentDto? content) => new()
+        {
+            RegimeCode = content?.RegimeCode,
+            MinLength = content?.RegistrationNo?.MinLength,
+            MaxLength = content?.RegistrationNo?.MaxLength,
+            Pattern = content?.RegistrationNo?.Pattern,
+            Example = content?.RegistrationNo?.Example,
+            Enforcement = content?.RegistrationNo?.Enforcement ?? "Warn",
+        };
+
+        /// <summary>Kural alanlarının hepsi boşsa kural bölümü gönderilmez (kural yok); boş metinler null olur.</summary>
+        public RegimeProfileContentDto ToDto()
+        {
+            static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            var hasRule = MinLength is not null || MaxLength is not null || Clean(Pattern) is not null || Clean(Example) is not null;
+            return new RegimeProfileContentDto(1, Clean(RegimeCode), hasRule
+                ? new RegistrationNoRuleDto(Clean(Pattern), MinLength, MaxLength, Clean(Example), Enforcement)
+                : null);
+        }
+    }
+}

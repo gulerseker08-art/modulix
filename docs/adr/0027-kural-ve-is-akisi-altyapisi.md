@@ -194,7 +194,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
 | 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
 | 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Sonra |
-| 5 | Blazor ekranları | Sonra |
+| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a uygulandı (aşağıda "Dilim 5a"), 5b-5c sonra |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
 
 ## Maliyet (harici ücret yok, iç maliyet var)
@@ -403,3 +403,28 @@ Tasarımdan ayrılan / netleşen noktalar:
 | `dotnet test tests/Modulix.ArchitectureTests` | 65 başarılı |
 | `dotnet test tests/Modulix.IntegrationTests --filter "CrmAutomationDeclarationTests|CrmAutomationTemplateTests"` (SQL Server) | 9 başarılı. Yeni 4: taslak açılır, çalışmaz, yayınlanınca çalışır; dört şablon gerçek yayın doğrulamasından geçer; bilinmeyen ve modülü kapalı şablon 404; tenant izolasyonu; okuma/yönetim izni ve aksiyon izni olmayanın şablonu kullanamaması |
 | `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | 8 başarılı (3a testleri bozulmadı) |
+
+### Dilim 5a: Kural listesi, şablonlar, kural ayrıntısı (5 Kasım 2026)
+
+Dilim 5 (Blazor ekranları) üç parçaya bölündü; ilk parça salt okuma ağırlıklı ve yaşam döngüsü işlemlerini kapsar:
+
+| Parça | Kapsam | Durum |
+| --- | --- | --- |
+| 5a | Kural listesi, şablon seçimi, kural ayrıntısı (yayınla / aç-kapat / taslağı at) | Uygulandı |
+| 5b | Çalışma geçmişi ve elle müdahale (çalıştır, yeniden dene, iptal) | Sonra |
+| 5c | Kural düzenleyici (tetikleyici, koşul, aksiyon parametreleri, önizleme) | Sonra |
+
+- **Ekranlar** (Yönetim > Otomasyon, `core.automation.read`): `/yonetim/otomasyon` (liste: durum görünümü, arama, sayfalama; yeni kural yalnızca şablondan), `/yonetim/otomasyon/sablonlar` ("Kullan" taslak açar, `core.automation.manage`), `/yonetim/otomasyon/{id}` (taslak ve yayınlanmış sürüm, sunucunun ürettiği okunabilir özet, doğrulama sorunları; "Yayınla (kapalı kalsın)", "Yayınla ve aç", "Aç / Kapat", "Taslağı at"; yayın ve açma `core.automation.publish`).
+- **Tasarım:** yeni CSS, token ya da bileşen yok; mevcut `PageHeader`, `ViewSelector`, `record-table`, `FormSection`, `Pager`, onay şeridi (`alert confirm`) kullanıldı. Durum rozeti: Açık yeşil, Kapalı nötr, Taslak bilgi tonu. Bu ekranlar kayıt formu değil yönetim ekranı olduğu için sekmeli form kuralının dışındadır.
+- **Güvenlik tutumu:** "Yayınla ve aç" onay şeridi ister (kural açılınca gerçek kayıtlarda işlem yapar); doğrulama sorunu olan taslakta yayın düğmeleri kapalıdır; sürüm çakışmasında (`ExpectedVersion`) güncel hal yeniden yüklenir. Düğmeleri gizlemek yetki değildir; her işlem sunucuda yeniden denetlenir.
+- **Doğrulanamayan:** ekranlar bu oturumda **tarayıcıda gözle kontrol edilemedi** (Browser paneli gizli kaldığı için Blazor sayfası çizilmedi; açık/koyu tema ve telefon düzeni bakılmadı). API uçları gerçek uygulamada oturum açılarak doğrulandı (şablon listesi ve boş kural listesi dönüyor). Birleştirmeden önce açık ve koyu temada bir göz atılmalı.
+
+### Test sonuçları (Dilim 5a)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Web.Tests` | 23 başarılı (yeni 4: menü girdisi okuma iznine bağlı, durum adları ve rozet tonları, davranış metni, kayıt türü adı) |
+| `dotnet test tests/Modulix.ArchitectureTests` | 65 başarılı |
+| `dotnet build src/Modulix.Web` / Release `src/Modulix.Api` | 0 hata |
+
+Ekranların kullandığı uçların dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 1 ve 3b'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez.
