@@ -5,7 +5,7 @@
 @inject ApiClient Api
 @inject FormLayouts Layouts
 
-<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
             <h2>@(Item is null ? "Yeni stok kartı" : "Stok kartı")</h2>
@@ -15,6 +15,7 @@
             }
         </div>
         <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
             <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
@@ -116,6 +117,7 @@
 </form>
 
 @code {
+    private bool dirty;
     private const string EntityKey = WarehouseAccess.StockItemEntityKey;
     private static readonly string Url = "/api/records/" + EntityKey;
 
@@ -191,6 +193,7 @@
 
         if (result.IsSuccess)
         {
+            dirty = false;
             await Saved.InvokeAsync(result.Value!);
             return;
         }
@@ -207,6 +210,7 @@
 
         if (result.IsSuccess)
         {
+            dirty = false;
             await Deleted.InvokeAsync();
             return;
         }
