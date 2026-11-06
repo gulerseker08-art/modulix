@@ -102,7 +102,8 @@ Durum yalnızca renkle anlatılmaz: hata iletisi metin olarak görünür, zorunl
 - Aksiyon sırası: **Kaydet** (birincil), gerekiyorsa **Kaydet ve Kapat / Kaydet ve Yeni**, **İptal**; yıkıcı işlem (**Sil**) en sonda `btn-outline-danger`. Üst araç çubuğunda İptal solda, Kaydet sağda ve en sonda.
 - Kaydetme sürerken düğme `disabled` olur (çift kayıt önlenir) ve spinner gösterilir.
 - Sunucu doğrulama hataları alan anahtarıyla `FieldError`'a, genel hata `Notice`'e yazılır.
-- Kaydedilmemiş değişiklik uyarısı ve merkezi toast bugün **yok**; eklenecek iş kalemi olarak `migration-report.md`'de.
+- Kaydedilmemiş değişiklik: `<form … @oninput="() => dirty = true">` ve `form-toolbar-actions` içinde ilk öğe `<UnsavedChanges IsDirty="() => dirty" />`. Çubukta durum yazısı görünür, sayfadan ayrılırken onay istenir. `await Saved/Deleted.InvokeAsync(…)` satırından hemen önce `dirty = false;` yazılır; yoksa kayıttan sonra yanlış onay çıkar. Sayfa içinde kapanan formda (İptal) onay istenmez.
+- Merkezi toast bugün **yok**; eklenecek iş kalemi olarak `migration-report.md`'de.
 
 ## Lookup
 

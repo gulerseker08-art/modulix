@@ -4810,8 +4810,28 @@ button.pipeline-label {
 .form-toolbar-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--mx-space-2);
 }
+
+/* Kaydedilmemiş değişiklik durumu (UnsavedChanges): renk dışında metinle de anlatılır. */
+.form-dirty-state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin-right: var(--mx-space-2);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+    color: var(--mx-tone-warning-fg);
+}
+
+    .form-dirty-state::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+    }
 
 .record-form.sectioned .form-actions {
     margin-top: var(--mx-space-2);

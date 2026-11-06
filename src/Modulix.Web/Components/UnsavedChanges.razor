@@ -1,0 +1,23 @@
+@* Kaydedilmemiş değişiklik uyarısı: form-toolbar içinde durum yazısı gösterir, sayfadan ayrılırken onay ister.
+   Durum canlı sorulur (IsDirty): kayıt başarılı olunca üst bileşen hemen yönlendirse de gereksiz onay çıkmaz.
+   Çekmecede üst çubuk gizli olduğundan yazı görünmez, onay çalışmaya devam eder. *@
+@inject IJSRuntime Js
+
+<NavigationLock ConfirmExternalNavigation="@IsDirty()" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
+@if (IsDirty())
+{
+    <span class="form-dirty-state" role="status">Kaydedilmemiş değişiklik</span>
+}
+
+@code {
+    /// <summary>Formda kaydedilmemiş değişiklik var mı; her sorulduğunda güncel değeri verir.</summary>
+    [Parameter, EditorRequired] public Func<bool> IsDirty { get; set; } = () => false;
+
+    private async Task ConfirmLeaveAsync(LocationChangingContext context)
+    {
+        if (IsDirty() && !await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş değişiklikler var. Sayfadan ayrılmak istiyor musunuz?"))
+        {
+            context.PreventNavigation();
+        }
+    }
+}
