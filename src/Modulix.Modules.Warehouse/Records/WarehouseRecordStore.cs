@@ -33,6 +33,15 @@ internal abstract class WarehouseRecordStore<TEntity>(WarehouseStoreContext cont
 
     protected WarehouseStoreContext Context => context;
 
+    /// <summary>
+    /// Doluysa kayıt oluşturulduktan sonra <b>değiştirilemez ve silinemez</b>: güncelleme ve silme bu iletiyle çakışma (409) döner. Yalnızca eklenen kayıtlar
+    /// (stok hareket defteri, ADR-0032 K13) ve türetilmiş kayıtlar (bakiye) kullanır.
+    /// </summary>
+    protected virtual string? ImmutableMessage => null;
+
+    /// <summary>Doluysa bu kayıt türü genel uçtan oluşturulamaz (yalnızca okunur; örn. bakiye defterden türetilir).</summary>
+    protected virtual string? CreateBlockedMessage => null;
+
     private IModuleData Data => context.Data;
 
     private Dictionary<string, RecordField<TEntity>> FieldsByName => fieldsByName ??= Fields.ToDictionary(f => f.Name, StringComparer.Ordinal);
@@ -97,6 +106,11 @@ internal abstract class WarehouseRecordStore<TEntity>(WarehouseStoreContext cont
 
     public async Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken)
     {
+        if (CreateBlockedMessage is { } blocked)
+        {
+            throw new RecordConflictException(blocked);
+        }
+
         var entity = new TEntity();
 
         // Verilmeyen zorunlu liste alanı, listenin varsayılan (yoksa ilk etkin) değerini alır; kategoriye bağlı kurallar bunu görür.
@@ -113,6 +127,11 @@ internal abstract class WarehouseRecordStore<TEntity>(WarehouseStoreContext cont
 
     public async Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken)
     {
+        if (ImmutableMessage is { } immutable)
+        {
+            throw new RecordConflictException(immutable);
+        }
+
         var entity = await Data.Set<TEntity>().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         if (entity is null)
         {
@@ -132,6 +151,11 @@ internal abstract class WarehouseRecordStore<TEntity>(WarehouseStoreContext cont
 
     public async Task<bool> DeleteAsync(Guid id, long? expectedVersion, CancellationToken cancellationToken)
     {
+        if (ImmutableMessage is { } immutable)
+        {
+            throw new RecordConflictException(immutable);
+        }
+
         var entity = await Data.Set<TEntity>().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         if (entity is null)
         {

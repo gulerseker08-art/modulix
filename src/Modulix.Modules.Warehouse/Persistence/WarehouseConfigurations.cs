@@ -195,6 +195,90 @@ internal sealed class RegimeBindingConfiguration : IEntityTypeConfiguration<Regi
     }
 }
 
+internal sealed class LotConfiguration : IEntityTypeConfiguration<Lot>
+{
+    public void Configure(EntityTypeBuilder<Lot> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "Lots");
+        builder.Property(l => l.LotNo).HasMaxLength(Lot.LotNoMaxLength).IsRequired();
+        builder.Property(l => l.Description).HasMaxLength(Lot.DescriptionMaxLength);
+        builder.Property(l => l.IsActive).HasDefaultValue(true);
+
+        builder.HasIndex(l => new { l.TenantId, l.LotNo }).IsUnique().HasDatabaseName("UX_Lots_LotNo");
+        builder.HasIndex(l => new { l.TenantId, l.StockItemId });
+        builder.HasIndex(l => new { l.TenantId, l.OwnerPartyId });
+
+        // Ürün, beyanname satırı ve taraflar aynı tenant'tadır; partisi olan ürün/firma/satır silinemez.
+        builder.HasOne<StockItem>().WithMany().HasForeignKey(l => new { l.TenantId, l.StockItemId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CustomsDeclarationLine>().WithMany().HasForeignKey(l => new { l.TenantId, l.DeclarationLineId })
+            .HasPrincipalKey(d => new { d.TenantId, d.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Party>().WithMany().HasForeignKey(l => new { l.TenantId, l.OwnerPartyId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Party>().WithMany().HasForeignKey(l => new { l.TenantId, l.BillToPartyId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement>
+{
+    /// <summary>Yalnızca-ekleme tetikleyicisinin adı (migration'da oluşturulur; EF'e bildirilir ki INSERT'te OUTPUT kullanmasın).</summary>
+    public const string AppendOnlyTrigger = "TR_StockMovements_AppendOnly";
+
+    public void Configure(EntityTypeBuilder<StockMovement> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "StockMovements");
+        builder.Property(m => m.TypeKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(m => m.Quantity).HasPrecision(18, 3);
+        builder.Property(m => m.ReasonKey).HasMaxLength(ChoiceValueKeys.MaxLength);
+        builder.Property(m => m.DocumentReference).HasMaxLength(StockMovement.DocumentMaxLength);
+        builder.Property(m => m.IdempotencyKey).HasMaxLength(StockMovement.IdempotencyKeyMaxLength);
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("CK_StockMovements_Quantity", "[Quantity] > 0");
+            t.HasTrigger(AppendOnlyTrigger);
+        });
+
+        // Aynı anahtarla ikinci hareket yazılamaz (barkod/terminal tekrarı); bir hareket en çok bir kez geri alınır. Boş değerler çakışmaz.
+        builder.HasIndex(m => new { m.TenantId, m.IdempotencyKey }).IsUnique().HasDatabaseName("UX_StockMovements_IdempotencyKey")
+            .HasFilter("[IdempotencyKey] IS NOT NULL");
+        builder.HasIndex(m => new { m.TenantId, m.ReversesMovementId }).IsUnique().HasDatabaseName("UX_StockMovements_Reverses")
+            .HasFilter("[ReversesMovementId] IS NOT NULL");
+        builder.HasIndex(m => new { m.TenantId, m.LotId, m.OccurredAt });
+        builder.HasIndex(m => new { m.TenantId, m.OccurredAt });
+        builder.HasIndex(m => new { m.TenantId, m.CorrelationId });
+
+        builder.HasOne<Lot>().WithMany().HasForeignKey(m => new { m.TenantId, m.LotId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Location>().WithMany().HasForeignKey(m => new { m.TenantId, m.FromLocationId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Location>().WithMany().HasForeignKey(m => new { m.TenantId, m.ToLocationId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<StockMovement>().WithMany().HasForeignKey(m => new { m.TenantId, m.ReversesMovementId })
+            .HasPrincipalKey(m => new { m.TenantId, m.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class StockBalanceConfiguration : IEntityTypeConfiguration<StockBalance>
+{
+    public void Configure(EntityTypeBuilder<StockBalance> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "StockBalances");
+        builder.Property(b => b.Quantity).HasPrecision(18, 3);
+
+        // Bakiye eksiye düşemez: uygulama denetimine ek olarak veritabanı kısıtı (eşzamanlı çıkış yarışının son güvencesi).
+        builder.ToTable(t => t.HasCheckConstraint("CK_StockBalances_NonNegative", "[Quantity] >= 0"));
+        builder.HasIndex(b => new { b.TenantId, b.LotId, b.LocationId }).IsUnique().HasDatabaseName("UX_StockBalances_LotLocation");
+        builder.HasIndex(b => new { b.TenantId, b.LocationId });
+
+        builder.HasOne<Lot>().WithMany().HasForeignKey(b => new { b.TenantId, b.LotId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Location>().WithMany().HasForeignKey(b => new { b.TenantId, b.LocationId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class CustomsDeclarationLineConfiguration : IEntityTypeConfiguration<CustomsDeclarationLine>
 {
     public void Configure(EntityTypeBuilder<CustomsDeclarationLine> builder)

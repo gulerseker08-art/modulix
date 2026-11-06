@@ -12030,8 +12030,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("TenantId", "Id");
-
                     b.HasIndex("TenantId", "Gtip");
 
                     b.HasIndex("TenantId", "DeclarationId", "LineNo")
@@ -12250,6 +12248,70 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("LocationLevels", "warehouse");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.Lot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BillToPartyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("DeclarationLineId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("LotNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("OwnerPartyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StockItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "BillToPartyId");
+
+                    b.HasIndex("TenantId", "DeclarationLineId");
+
+                    b.HasIndex("TenantId", "LotNo")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Lots_LotNo");
+
+                    b.HasIndex("TenantId", "OwnerPartyId");
+
+                    b.HasIndex("TenantId", "StockItemId");
+
+                    b.ToTable("Lots", "warehouse");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.PowerOfAttorney", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12355,6 +12417,53 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("RegimeBindings", "warehouse");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.StockBalance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("LocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LotId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "LocationId");
+
+                    b.HasIndex("TenantId", "LotId", "LocationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StockBalances_LotLocation");
+
+                    b.ToTable("StockBalances", "warehouse", t =>
+                        {
+                            t.HasCheckConstraint("CK_StockBalances_NonNegative", "[Quantity] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.StockItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12407,8 +12516,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("TenantId", "Id");
-
                     b.HasIndex("TenantId", "Code")
                         .IsUnique()
                         .HasDatabaseName("UX_StockItems_Code");
@@ -12416,6 +12523,104 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "Gtip");
 
                     b.ToTable("StockItems", "warehouse");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.StockMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DocumentReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("FromLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("LotId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("MembershipId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<string>("ReasonKey")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<Guid?>("ReversesMovementId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ToLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TypeKey")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CorrelationId");
+
+                    b.HasIndex("TenantId", "FromLocationId");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StockMovements_IdempotencyKey")
+                        .HasFilter("[IdempotencyKey] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "OccurredAt");
+
+                    b.HasIndex("TenantId", "ReversesMovementId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StockMovements_Reverses")
+                        .HasFilter("[ReversesMovementId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ToLocationId");
+
+                    b.HasIndex("TenantId", "LotId", "OccurredAt");
+
+                    b.ToTable("StockMovements", "warehouse", t =>
+                        {
+                            t.HasTrigger("TR_StockMovements_AppendOnly");
+
+                            t.HasCheckConstraint("CK_StockMovements_Quantity", "[Quantity] > 0");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.Zone", b =>
@@ -14172,6 +14377,35 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.Lot", b =>
+                {
+                    b.HasOne("Modulix.Core.Contracts.SharedRecords.Party", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "BillToPartyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Warehouse.Domain.CustomsDeclarationLine", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DeclarationLineId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Core.Contracts.SharedRecords.Party", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OwnerPartyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Warehouse.Domain.StockItem", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "StockItemId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.PowerOfAttorney", b =>
                 {
                     b.HasOne("Modulix.Core.Contracts.SharedRecords.Party", null)
@@ -14187,6 +14421,51 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.StockBalance", b =>
+                {
+                    b.HasOne("Modulix.Modules.Warehouse.Domain.Location", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "LocationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Warehouse.Domain.Lot", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "LotId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.StockMovement", b =>
+                {
+                    b.HasOne("Modulix.Modules.Warehouse.Domain.Location", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "FromLocationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Warehouse.Domain.Lot", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "LotId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Modules.Warehouse.Domain.StockMovement", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ReversesMovementId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modulix.Modules.Warehouse.Domain.Location", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ToLocationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Modulix.Modules.Warehouse.Domain.Zone", b =>

@@ -148,6 +148,13 @@ internal static class Field
         };
 
     /// <summary>
+    /// Yalnızca sunucunun yazdığı (hesapladığı) alan: okunur, genel uçtan gelen değer sessizce yok sayılır. Hareketin zamanı, kullanıcısı ve bakiye miktarı gibi
+    /// istemcinin belirleyemeyeceği değerler içindir.
+    /// </summary>
+    public static RecordField<T> Computed<T>(string name, Func<T, JsonNode?> read) =>
+        new RecordField<T>(name, required: false, nullable: true, _ => ParsedValue.Of(null), read, (_, _) => { }).AsSystem();
+
+    /// <summary>
     /// Platformun yayınladığı bir rejim profiline bağ. Profil yoksa, pasifse ya da yayını yoksa doğrulama hatası olur ("bulunamadı");
     /// tenant yalnızca yayındaki etkin profilleri seçebilir.
     /// </summary>

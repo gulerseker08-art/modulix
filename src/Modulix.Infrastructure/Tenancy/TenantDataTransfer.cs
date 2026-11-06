@@ -108,6 +108,15 @@ internal sealed class TenantDataTransfer(ModulixDbContext db, ModulixDatabaseOpt
 
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
 
+        // Stok hareket defteri yalnızca eklenir (ADR-0032 K13): veritabanı tetikleyicisi silmeyi reddeder. Tenant verisinin tamamen silinmesi tek meşru istisnadır
+        // ve yalnızca bu bağlantı için bayrakla açılır (oturum değeri bağlantı havuzuna dönerken sıfırlanır; uygulamanın normal yazma yolu bayrağı hiç kurmaz).
+        await using (var purge = connection.CreateCommand())
+        {
+            purge.Transaction = transaction;
+            purge.CommandText = "EXEC sp_set_session_context N'AllowLedgerPurge', 1;";
+            await purge.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         // Yabancı anahtar sırası koddan değil hatadan öğrenilir: bir turda silinemeyen (başka tablonun satırları ona bağlı)
         // tablo sonraki turda yeniden denenir; bir turda hiç ilerleme olmazsa döngüsel bağımlılık var demektir ve işlem geri alınır.
         while (remaining.Count > 0)

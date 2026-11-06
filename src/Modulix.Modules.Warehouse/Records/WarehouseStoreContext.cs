@@ -1,12 +1,16 @@
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Customs;
 using Modulix.Core.Contracts.Persistence;
+using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Modules.Warehouse.Records;
 
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler. Tenant filtresi ve RLS <see cref="IModuleData"/> üzerinden uygulanır.</summary>
-internal sealed class WarehouseStoreContext(IModuleData data, IChoiceLists choiceLists, IRegimeProfileCatalog regimeProfiles)
+internal sealed class WarehouseStoreContext(IModuleData data, IChoiceLists choiceLists, IRegimeProfileCatalog regimeProfiles, ITenantContextAccessor tenant)
 {
+    /// <summary>İsteğin doğrulanmış tenant, kullanıcı ve üyelik bilgisi (hareketi kimin yazdığı sunucuca belirlenir).</summary>
+    public ITenantContextAccessor Tenant => tenant;
+
     public IModuleData Data => data;
 
     public IChoiceLists ChoiceLists => choiceLists;

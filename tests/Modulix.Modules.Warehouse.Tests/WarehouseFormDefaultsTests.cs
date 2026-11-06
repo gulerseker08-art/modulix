@@ -1,4 +1,5 @@
 using Modulix.Core.Contracts.Modules;
+using Modulix.Modules.Warehouse.Domain;
 using Modulix.Shared.Warehouse;
 
 namespace Modulix.Modules.Warehouse.Tests;
@@ -101,9 +102,18 @@ public class WarehouseFormDefaultsTests
                 WarehouseAccess.StockItemsRead, WarehouseAccess.StockItemsWrite,
                 WarehouseAccess.DeclarationsRead, WarehouseAccess.DeclarationsWrite,
                 WarehouseAccess.RegimesRead, WarehouseAccess.RegimesWrite,
+                WarehouseAccess.LotsRead, WarehouseAccess.LotsWrite, WarehouseAccess.MovementsRead, WarehouseAccess.MovementsWrite,
             },
             key => Assert.Contains(key, permissions));
-        Assert.Equal(16, permissions.Count);
+        Assert.Equal(20, permissions.Count);
+        Assert.Equal(WarehouseModule.Entities.Lot, WarehouseAccess.LotEntityKey);
+        Assert.Equal(WarehouseModule.Entities.StockMovement, WarehouseAccess.StockMovementEntityKey);
+        Assert.Equal(WarehouseModule.Entities.StockBalance, WarehouseAccess.StockBalanceEntityKey);
+        Assert.Equal(WarehouseModule.Lists.MovementType, WarehouseAccess.MovementTypeList);
+        Assert.Equal(WarehouseModule.Lists.MovementReason, WarehouseAccess.MovementReasonList);
+        Assert.Equal(
+            [MovementCategories.Inbound, MovementCategories.Outbound, MovementCategories.Transfer, MovementCategories.Adjustment],
+            new[] { WarehouseAccess.MovementInbound, WarehouseAccess.MovementOutbound, WarehouseAccess.MovementTransfer, WarehouseAccess.MovementAdjustment });
         Assert.Equal(WarehouseModule.Entities.RegimeBinding, WarehouseAccess.RegimeBindingEntityKey);
         Assert.Equal(
             [
