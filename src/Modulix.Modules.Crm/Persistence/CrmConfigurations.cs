@@ -497,6 +497,7 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.Property(l => l.Country).HasMaxLength(Address.CountryLength).IsFixedLength().IsUnicode(false);
         builder.Property(l => l.City).HasMaxLength(Address.PartMaxLength);
         builder.Property(l => l.ProductInterest).HasMaxLength(Lead.ShortMaxLength);
+        builder.Property(l => l.ServiceScope).HasMaxLength(ActivityCodeList.StoredMaxLength);
         builder.Property(l => l.NeedDescription).HasMaxLength(Lead.TextMaxLength);
         builder.Property(l => l.EstimatedBudget).HasPrecision(18, 2);
         builder.Property(l => l.Currency).HasMaxLength(Opportunity.CurrencyLength).IsFixedLength().IsUnicode(false).IsRequired();

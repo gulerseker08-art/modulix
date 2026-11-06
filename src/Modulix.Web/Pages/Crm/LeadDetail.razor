@@ -2,6 +2,7 @@
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
+@inject ActivityOptions ActivityNames
 
 <PageTitle>@(lead?.LeadNumber ?? "Lead") · Modulix</PageTitle>
 
@@ -88,6 +89,18 @@
                     <div><dt>Mevcut kişi</dt><dd><a href="crm/kisiler/@existingContact">@Lookups.ContactName(existingContact)</a></dd></div>
                 }
                 <div><dt>İlgilenilen ürün/hizmet</dt><dd>@(lead.ProductInterest ?? "—")</dd></div>
+                @if (lead.ServiceScope is { Count: > 0 } serviceScope)
+                {
+                    <div class="span-all">
+                        <dt>Hizmet kapsamı</dt>
+                        <dd>
+                            @foreach (var code in serviceScope)
+                            {
+                                <span class="badge tag">@ActivityNames.NameOf(code)</span>
+                            }
+                        </dd>
+                    </div>
+                }
                 <div><dt>Tahmini bütçe</dt><dd>@(lead.EstimatedBudget is { } budget ? CrmLabels.Amount(budget, lead.Currency) : "Bilinmiyor")</dd></div>
                 <div><dt>Hedef satın alma</dt><dd>@(lead.TargetPurchaseDate is { } target ? CrmLabels.Date(target) : "Bilinmiyor")</dd></div>
                 <div><dt>Sektör</dt><dd>@(lead.Industry ?? "—")</dd></div>
@@ -341,6 +354,7 @@
         }
 
         await Lookups.LoadAsync(contacts: true);
+        await ActivityNames.LoadAsync();
         targetHours = (await Api.GetAsync<LeadSettingsDto>("/api/crm/leads/settings")).Value?.FirstContactTargetHours;
         await LoadAsync();
     }

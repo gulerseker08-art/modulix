@@ -34,6 +34,7 @@ internal sealed class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.Property(q => q.GrossTotal).HasPrecision(18, 2);
         builder.Property(q => q.OptionalNet).HasPrecision(18, 2);
         builder.Property(q => q.CustomerNameSnapshot).HasMaxLength(300);
+        builder.Property(q => q.ServiceScopeSnapshot).HasMaxLength(Quote.ServiceScopeSnapshotMaxLength);
 
         builder.HasIndex(q => new { q.TenantId, q.QuoteNumber, q.RevisionNo }).IsUnique().HasDatabaseName("UX_Quotes_NumberRevision");
         builder.HasIndex(q => new { q.TenantId, q.FamilyId, q.RevisionNo }).IsUnique().HasDatabaseName("UX_Quotes_FamilyRevision");

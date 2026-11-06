@@ -845,6 +845,7 @@ public sealed class CrmModule : IModule
             ["validUntil"] = "Geçerlilik bitişi", ["currency"] = "Para birimi", ["priceIncludesTax"] = "Fiyatlar vergi dahil", ["documentDiscountKind"] = "Genel indirim türü",
             ["documentDiscountValue"] = "Genel indirim", ["paymentTerms"] = "Ödeme koşulları", ["deliveryTerms"] = "Teslimat koşulları",
             ["commercialTerms"] = "Ticari koşullar", ["internalNotes"] = "İç notlar", ["netTotal"] = "Net toplam", ["taxTotal"] = "Vergi", ["grossTotal"] = "Genel toplam",
+            ["serviceScopeSnapshot"] = "Sunumdaki hizmet kapsamı",
         }, "title")
         {
             References = new Dictionary<string, string>
@@ -906,7 +907,7 @@ public sealed class CrmModule : IModule
             ["priority"] = "Öncelik", ["firstName"] = "Ad", ["lastName"] = "Soyad", ["companyName"] = "Firma adı", ["email"] = "E-posta",
             ["phone"] = "Telefon", ["jobTitle"] = "Unvan", ["website"] = "Web sitesi", ["country"] = "Ülke", ["city"] = "Şehir",
             ["companyId"] = "Mevcut firma", ["contactId"] = "Mevcut kişi", ["productInterest"] = "İlgilenilen ürün/hizmet",
-            ["needDescription"] = "İhtiyaç", ["estimatedBudget"] = "Tahmini bütçe", ["currency"] = "Para birimi",
+            ["serviceScope"] = "Hizmet kapsamı", ["needDescription"] = "İhtiyaç", ["estimatedBudget"] = "Tahmini bütçe", ["currency"] = "Para birimi",
             ["targetPurchaseDate"] = "Hedef satın alma tarihi", ["industry"] = "Sektör", ["source"] = "Kaynak", ["sourceDetail"] = "Kaynak ayrıntısı",
             ["referrer"] = "Yönlendiren", ["externalSource"] = "Dış kaynak", ["externalSubmissionId"] = "Dış gönderim no",
             ["utmSource"] = "UTM kaynak", ["utmMedium"] = "UTM ortam", ["utmCampaign"] = "UTM kampanya", ["firstReceivedAt"] = "İlk geliş",

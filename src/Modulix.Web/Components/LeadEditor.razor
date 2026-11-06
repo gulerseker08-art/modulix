@@ -75,6 +75,11 @@
                     <input id="lead-product" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ProductInterest" />
                     <FieldError Field="productInterest" Errors="errors" />
                     break;
+                case "serviceScope":
+                    <label class="@f.LabelClass()" for="lead-service-scope">@f.Label</label>
+                    <ActivityCodePicker Id="lead-service-scope" ActivitiesOnly="true" @bind-Selected="form.ServiceScope" />
+                    <FieldError Field="serviceScope" Errors="errors" />
+                    break;
                 case "industry":
                     <label class="@f.LabelClass()" for="lead-industry">@f.Label</label>
                     <input id="lead-industry" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Industry" />
@@ -261,7 +266,7 @@
                 Version = l.Version, Subject = l.Subject, Description = l.Description, Priority = l.Priority, FirstName = l.FirstName,
                 LastName = l.LastName, CompanyName = l.CompanyName, Email = l.Email, Phone = l.Phone, JobTitle = l.JobTitle, Website = l.Website,
                 Country = l.Country, City = l.City, CompanyId = l.CompanyId, ContactId = l.ContactId, ProductInterest = l.ProductInterest,
-                NeedDescription = l.NeedDescription, EstimatedBudget = l.EstimatedBudget, Currency = l.Currency,
+                ServiceScope = [.. l.ServiceScope ?? []], NeedDescription = l.NeedDescription, EstimatedBudget = l.EstimatedBudget, Currency = l.Currency,
                 TargetPurchaseDate = l.TargetPurchaseDate, Industry = l.Industry, Source = l.Source, SourceDetail = l.SourceDetail,
                 Referrer = l.Referrer, UtmSource = l.UtmSource, UtmMedium = l.UtmMedium, UtmCampaign = l.UtmCampaign,
                 Custom = l.Custom?.DeepClone().AsObject() ?? [],
@@ -308,7 +313,7 @@
             form.CompanyId, form.ContactId, Clean(form.ProductInterest), Clean(form.NeedDescription), form.EstimatedBudget,
             string.IsNullOrWhiteSpace(form.Currency) ? "TRY" : form.Currency.Trim(), form.TargetPurchaseDate, Clean(form.Industry),
             Clean(form.Source), Clean(form.SourceDetail), Clean(form.Referrer), Clean(form.UtmSource), Clean(form.UtmMedium),
-            Clean(form.UtmCampaign), Lead is null ? form.OwnerId : null, form.Version, CustomFieldText.ForSave(CustomFields, form.Custom));
+            Clean(form.UtmCampaign), Lead is null ? form.OwnerId : null, form.Version, CustomFieldText.ForSave(CustomFields, form.Custom), form.ServiceScope);
         var result = Lead is { } existing
             ? await Api.PutAsync<LeadDto>($"{Url}/{existing.Id}", request)
             : await Api.PostAsync<LeadDto>(Url, request);
@@ -376,6 +381,8 @@
         public Guid? ContactId { get; set; }
 
         public string? ProductInterest { get; set; }
+
+        public List<string> ServiceScope { get; set; } = [];
 
         public string? NeedDescription { get; set; }
 

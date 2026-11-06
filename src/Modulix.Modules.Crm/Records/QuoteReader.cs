@@ -38,6 +38,13 @@ internal sealed class QuoteReader(IModuleData data)
             .Select(r => new QuoteApprovalRuleInfo(r.Id, r.Version, r.Name, r.Priority, r.Currency, r.MinDiscountPercent, r.MinGrossTotal, r.ApproverId, r.Step))
             .ToListAsync(cancellationToken);
 
+    /// <summary>
+    /// Fırsatın hizmet kapsamı kodları (virgülle saklanan hâli; sunum anı kapsam özeti için). Çağıran teklifi sunma yetkisini kendisi
+    /// doğrulamıştır; fırsat okuma izni gerekmez, yalnızca teklifin bağlı olduğu fırsatın kapsamı alınır. Fırsat yoksa null.
+    /// </summary>
+    public async Task<string?> OpportunityServiceScopeAsync(Guid opportunityId, CancellationToken cancellationToken) =>
+        await data.Set<Opportunity>().AsNoTracking().Where(o => o.Id == opportunityId).Select(o => o.ServiceScope).SingleOrDefaultAsync(cancellationToken);
+
     /// <summary>Firmanın ortak taraf kaydı (devir sözleşmesi için); firma yoksa null.</summary>
     public async Task<Guid?> PartyOfCompanyAsync(Guid companyId, CancellationToken cancellationToken) =>
         await data.Set<Company>().AsNoTracking().Where(c => c.Id == companyId).Select(c => (Guid?)c.PartyId).SingleOrDefaultAsync(cancellationToken);

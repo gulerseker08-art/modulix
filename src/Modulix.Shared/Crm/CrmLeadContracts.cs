@@ -119,7 +119,8 @@ public sealed record LeadDto(
     Guid? ConvertedCompanyId,
     Guid? ConvertedContactId,
     Guid? ConvertedOpportunityId,
-    JsonObject? Custom = null);
+    JsonObject? Custom = null,
+    List<string>? ServiceScope = null);
 
 /// <summary>
 /// Manuel kayıt/güncelleme. Konu zorunludur; talep sahibini tanıtan en az bir bilgi (ad, firma adı, e-posta, telefon ya da mevcut
@@ -155,7 +156,8 @@ public sealed record SaveLeadRequest(
     string? UtmCampaign = null,
     Guid? OwnerId = null,
     long? Version = null,
-    JsonObject? Custom = null);
+    JsonObject? Custom = null,
+    List<string>? ServiceScope = null);
 
 // ---- Eylemler (hepsi kaydın sürümünü ister; eski sürüm 409)
 

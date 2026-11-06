@@ -382,6 +382,20 @@
                 @if (quote.CalculatedAt is { } calculated) { <small class="text-muted">Son hesap: @CrmLabels.Time(calculated)</small> }
             </section>
 
+            @* Hizmet kapsamı (ADR-0029 Dilim F3): sunum anında bağlı fırsattan, adlarıyla sabitlenir; sonradan fırsat ya da katalog değişse de aynı kalır. *@
+            @if (quote.ServiceScopeSnapshot is { Count: > 0 } scopeSnapshot)
+            {
+                <section aria-labelledby="scope-title">
+                    <h2 id="scope-title">Hizmet kapsamı <small class="text-muted">(sunum anında fırsattan sabitlendi)</small></h2>
+                    <p>
+                        @foreach (var item in scopeSnapshot)
+                        {
+                            <span class="badge tag">@item.Name</span>
+                        }
+                    </p>
+                </section>
+            }
+
             <section aria-labelledby="actions-title">
                 <h2 id="actions-title">İşlemler</h2>
                 @if (requirement is { Required: true })
