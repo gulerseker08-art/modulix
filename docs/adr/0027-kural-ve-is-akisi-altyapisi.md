@@ -193,7 +193,10 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 2b-3 | İş olayı tetikleyicisi (`DomainEvent`); Ç0.4 iş olayı yayınlama sözleşmesine bağlı | Sonra |
 | 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
 | 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
-| 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Parça parça: 4a onay merkezi (PR #248), **4d metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); onay eskalasyonu/bildirim kutusu, kayda bağlı onay, takvim ortaklaştırma, puanlama sonra |
+| 4a | Genel onay: süreç tanımı, talep, Onay merkezi (Ç6a asgari) | Uygulandı (aşağıda "Dilim 4a") |
+| 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Sonra |
+| 4c | Kayda bağlı onay (modül beyanı, kural aksiyonu "onaya gönder"), kalıcı akış | Sonra |
+| 4d | Takvim ortaklaştırma, puanlama, şablon motoru | **Metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); takvim ortaklaştırma ve puanlama sonra |
 | 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
 
@@ -446,6 +449,24 @@ Ekranların kullandığı uçların dört kural testi (mutlu yol, hata, tenant i
 | `dotnet test tests/Modulix.Web.Tests` | Yeni 4: çalışma durumu adları ve tonları, yeniden deneme/iptal yalnızca uygun durumda, kaynak ve adım durumu adları, etiketsiz durum kalmaması |
 
 Uçların dört kural testi Dilim 2'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez.
+
+### Dilim 4a: Genel onay ve Onay merkezi (7 Kasım 2026)
+
+Ç6a'nın asgari hali; lojistik planındaki (ADR-0038 taslağı) masraf onayının ön koşuludur. Mevcut teklif ve sözleşme onayları değişmedi.
+
+- **Veri:** `core.ApprovalDefinitions` (adımlar JSON, `Revision`), `core.ApprovalRequests`, `core.ApprovalRequestSteps`; üçü de `ICompanyShared`, RLS altında. ADR'deki `ApprovalRequests/Steps` adları korundu; ayrı sürüm tablosu kurulmadı, çünkü talep açılırken adımlar satır olarak kopyalanır (Ç6a.2 anlık görüntüsü budur).
+- **Tanım:** firma kendi süreçlerini tanımlar. Adımda kişi ya da rol (rolün doğrudan üyelerinden biri yeter; departmandan gelen rol sayılmaz), tutar eşiği, süre. Aynı sıra numarası paralel çalışır. Eşikler sürecin para birimindedir, kur çevrilmez.
+- **Talep:** başlık ve tutar değişmez; değişecekse geri çekilip yeniden açılır (Ç6a.2 "tutar değişirse onay geçersizleşir" böyle sağlanır). Bütün adımlar eşik altında kalırsa talep kendiliğinden onaylanır.
+- **`ApprovalFlow` kullanılmadı:** o hesap rol onaycıyı ifade edemez ve onayları olay listesinden türetir; burada adım satırı durumu taşır.
+- **Dört göz:** talep sahibi kendi talebine karar veremez; açılışta her adımda talep sahibinden başka etkin onaycı aranır, yoksa talep açılmaz.
+- **Eşzamanlılık:** `Version` belirteci; aynı adıma iki karar gelirse biri 409 alır.
+- **Sahipsiz adım (Ç6a.1):** onaycısı ayrılan etkin adım panoda görünür, `core.approvals.manage` onaycıyı değiştirir. Destek üyeliği etkin onaycı sayılmaz (ADR-0028).
+- **İzinler:** `core.approvals.request`, `.decide`, `.manage`. Karar için izin yetmez, kişi etkin adımın onaycısı olmalıdır. `core.automation.approve` kural kaynaklı onaylar (4c) için ayrılmış kalır. Yeni izinler mevcut rollere otomatik verilmez; yönetici rollere ekler.
+- **Görünürlük:** talep sahibi, onaycı ve karar verenler görür; `manage` hepsini görür. Sorgu seviyesinde uygulanır; görünmeyen talep 404 döner.
+- **Bildirim:** sıradaki onaycılara ve sonuçta talep sahibine e-posta, kayıtla aynı işlemde (`IEmailQueue`).
+- **Arayüz:** `/onaylar` (pano bandı, grafikler, sekmeli liste, çekmecede adım izi ve karar), `/yonetim/onay-surecleri`. Yeni token `--mx-gradient-hero` ve `hero-band`, `step-track` sınıfları tasarım sistemine işlendi.
+
+**Bilerek yapılmadı:** süre aşımında eskalasyon (geciken talep yalnızca görünür), genel vekâlet, uygulama içi bildirim, kayda bağlı onay ve onay sonucunun hedef modül komutuna girdi olması (Ç6a.3), olay yayını (Ç0.4 bekler).
 
 ### Dilim 5c: Kural düzenleyici, ilk sürüm (7 Kasım 2026)
 

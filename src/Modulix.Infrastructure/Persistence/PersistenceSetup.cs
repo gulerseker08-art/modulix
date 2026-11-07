@@ -27,6 +27,8 @@ using Modulix.Core.Reporting;
 using Modulix.Core.Settings;
 using Modulix.Core.Teams;
 using Modulix.Infrastructure.Audit;
+using Modulix.Core.Approvals;
+using Modulix.Infrastructure.Approvals;
 using Modulix.Infrastructure.Automation;
 using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Communication;
@@ -117,6 +119,7 @@ public static class PersistenceSetup
         services.AddScoped<IBusinessUnitService, BusinessUnitService>();
         services.AddScoped<IMembershipScope, MembershipScope>();
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
+        services.AddScoped<IApprovalService, ApprovalService>();
         services.AddScoped<IAutomationRunStore, AutomationRunStore>();
         services.AddScoped<IAutomationRunService, AutomationRunService>();
         services.AddSingleton<AutomationScanner>();
