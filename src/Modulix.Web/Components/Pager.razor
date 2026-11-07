@@ -1,20 +1,20 @@
 @* Sayfalama: "1–8 / 24 kayıt" + sayfa numaraları (ilk, son ve geçerli sayfanın komşuları; arası "…"). *@
 @if (TotalCount > 0)
 {
-    <nav class="pager" aria-label="Sayfalar">
-        <span class="pager-info text-muted" role="status">@First–@Last / @TotalCount kayıt</span>
+    <nav class="pager" aria-label="@Texts.Get("common.pager.label")">
+        <span class="pager-info text-muted" role="status">@Texts.Get("common.pager.info", First, Last, TotalCount)</span>
         @if (PageSizeChoice)
         {
-            <label class="visually-hidden" for="pager-size">Sayfa başına kayıt</label>
+            <label class="visually-hidden" for="pager-size">@Texts.Get("common.pager.sizeLabel")</label>
             <select id="pager-size" class="form-select form-select-sm pager-size" @onchange="SizeChangedAsync">
                 @foreach (var option in ListPaging.Options)
                 {
-                    <option value="@option" selected="@(option == ListPaging.Size)">@option / sayfa</option>
+                    <option value="@option" selected="@(option == ListPaging.Size)">@Texts.Get("common.pager.perPage", option)</option>
                 }
             </select>
         }
         <div class="pager-pages">
-            <button type="button" class="pager-btn" aria-label="Önceki sayfa" disabled="@(Page <= 1)" @onclick="() => Go(Page - 1)">‹</button>
+            <button type="button" class="pager-btn" aria-label="@Texts.Get("common.pager.prev")" disabled="@(Page <= 1)" @onclick="() => Go(Page - 1)">‹</button>
             @foreach (var item in Items())
             {
                 @if (item == 0)
@@ -23,11 +23,11 @@
                 }
                 else
                 {
-                    <button type="button" class="pager-btn @(item == Page ? "active" : null)" aria-label="Sayfa @item" aria-current="@(item == Page ? "page" : null)"
+                    <button type="button" class="pager-btn @(item == Page ? "active" : null)" aria-label="@Texts.Get("common.pager.page", item)" aria-current="@(item == Page ? "page" : null)"
                             disabled="@(item == Page)" @onclick="() => Go(item)">@item</button>
                 }
             }
-            <button type="button" class="pager-btn" aria-label="Sonraki sayfa" disabled="@(Page >= PageCount)" @onclick="() => Go(Page + 1)">›</button>
+            <button type="button" class="pager-btn" aria-label="@Texts.Get("common.pager.next")" disabled="@(Page >= PageCount)" @onclick="() => Go(Page + 1)">›</button>
         </div>
     </nav>
 }

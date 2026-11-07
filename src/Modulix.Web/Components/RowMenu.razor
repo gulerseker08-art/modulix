@@ -5,13 +5,13 @@
 {
     <div class="row-menu" @onkeydown="OnKeyDown">
         <button type="button" class="btn btn-ghost row-menu-button" aria-haspopup="menu" aria-expanded="@(open ? "true" : "false")"
-                aria-label="@Label" @onclick="Toggle">
+                aria-label="@LabelText" @onclick="Toggle">
             <AppIcon Name="more-horizontal" Size="18" />
         </button>
         @if (open)
         {
             <div class="view-selector-backdrop" aria-hidden="true" @onclick="Close"></div>
-            <div class="view-menu row-menu-list" role="menu" aria-label="@Label" @onclick="Close">
+            <div class="view-menu row-menu-list" role="menu" aria-label="@LabelText" @onclick="Close">
                 @ChildContent
             </div>
         }
@@ -23,7 +23,9 @@
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
-    [Parameter] public string Label { get; set; } = "Satır eylemleri";
+    [Parameter] public string? Label { get; set; }
+
+    private string LabelText => Label ?? Texts.Get("common.rowActions");
 
     private void Toggle() => open = !open;
 

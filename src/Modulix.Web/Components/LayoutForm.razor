@@ -5,14 +5,14 @@
    etkin sekmede hata yoksa hatalı ilk sekmeye geçilir. *@
 @if (Layout is null)
 {
-    <p class="text-muted" role="status">Form düzeni yükleniyor…</p>
+    <p class="text-muted" role="status">@Texts.Get("common.form.loading")</p>
 }
 else
 {
     var multi = Layout.Tabs.Count > 0;
     if (multi && tabs is not null)
     {
-        <TabBar Tabs="TabItems" State="tabs" Label="@TabsLabel" Changed="_ => { }" />
+        <TabBar Tabs="TabItems" State="tabs" Label="@(TabsLabel ?? Texts.Get("common.form.sections"))" Changed="_ => { }" />
     }
 
     @foreach (var tab in Layout.Tabs)
@@ -74,7 +74,7 @@ else
 
     [Parameter] public IReadOnlyDictionary<string, string[]>? Errors { get; set; }
 
-    [Parameter] public string TabsLabel { get; set; } = "Form bölümleri";
+    [Parameter] public string? TabsLabel { get; set; }
 
     // Sekme anahtarları "form-" önekiyle: aynı sayfadaki kayıt sekmeleriyle (tabpanel-genel) çakışmaz.
     private static string TabKey(string key) => "form-" + key;

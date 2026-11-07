@@ -4,7 +4,7 @@
    detay ekranları da aynı bileşeni kullanır. Version değişince (kayıt düzenlenince) yeniden yüklenir. *@
 <section class="detail-section record-history">
     <div class="section-header">
-        <h2>Değişiklik geçmişi</h2>
+        <h2>@Texts.Get("common.history.title")</h2>
     </div>
     @if (error is not null)
     {
@@ -12,11 +12,11 @@
     }
     else if (entries is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (entries.Count == 0)
     {
-        <p class="text-muted">Henüz kayıtlı değişiklik yok.</p>
+        <p class="text-muted">@Texts.Get("common.history.none")</p>
     }
     else
     {
@@ -29,7 +29,7 @@
                         <span>@CrmLabels.Time(entry.OccurredAt)@(entry.Source == AuditSource.Api ? null : $" · {AuditText.Of(entry.Source, entry.Subscription)}")</span>
                         @if (entry.Changes.Count == 0 && entry.Action == AuditOperation.Updated)
                         {
-                            <span>Kaydetti, alan değişmedi.</span>
+                            <span>@Texts.Get("common.history.noFieldChange")</span>
                         }
                         else if (entry.Changes.Count > 0)
                         {
@@ -48,7 +48,7 @@
                                                 break;
                                             default:
                                                 <span class="history-old">@Value(change, change.Old)</span>
-                                                <span aria-label="yerine"> → </span>
+                                                <span aria-label="@Texts.Get("common.history.replacedBy")"> → </span>
                                                 <span>@Value(change, change.New)</span>
                                                 break;
                                         }
@@ -62,7 +62,7 @@
         </ul>
         @if (entries.Count < total)
         {
-            <button type="button" class="btn btn-link btn-sm" disabled="@loading" @onclick="MoreAsync">Daha eski değişiklikler</button>
+            <button type="button" class="btn btn-link btn-sm" disabled="@loading" @onclick="MoreAsync">@Texts.Get("common.history.older")</button>
         }
     }
 </section>
@@ -111,5 +111,5 @@
     }
 
     private static string Value(AuditFieldChangeDto change, string? value) =>
-        change.Hidden ? "gizli" : string.IsNullOrEmpty(value) ? "boş" : value;
+        change.Hidden ? Texts.Get("common.history.hidden") : string.IsNullOrEmpty(value) ? Texts.Get("common.history.empty") : value;
 }

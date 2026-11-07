@@ -1,10 +1,10 @@
 @* "Filtrele" düğmesi: sayfanın süzgeç satırını (select alanları) açıp kapatır; etkin süzgeç sayısı rozetle görünür.
    Süzgeç satırını sayfa çizer: @if (open || count > 0) { <div class="filters">…</div> }. *@
 <button type="button" class="btn btn-ghost" aria-expanded="@(Open || Count > 0 ? "true" : "false")" @onclick="ToggleAsync">
-    <AppIcon Name="filter" Size="16" /> Filtrele
+    <AppIcon Name="filter" Size="16" /> @Texts.Get("common.filter")
     @if (Count > 0)
     {
-        <span class="filter-count" aria-label="@Count etkin süzgeç">@Count</span>
+        <span class="filter-count" aria-label="@Texts.Get("common.filter.active", Count)">@Count</span>
     }
 </button>
 

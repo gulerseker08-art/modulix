@@ -1,6 +1,6 @@
 @* Kayıt sayfası sekme çubuğu. Panelleri sayfa çizer: id="tabpanel-{Key}", aria-labelledby="tab-{Key}", hidden="@State.Hidden(Key)".
    Yetkisi olmayan sekme listeye hiç eklenmez. Telefonda çubuk yatay kayar. *@
-<div class="record-tabs" role="tablist" aria-label="@Label">
+<div class="record-tabs" role="tablist" aria-label="@LabelText">
     @foreach (var tab in Tabs)
     {
         var active = tab.Key == State.Active;
@@ -15,7 +15,7 @@
             @if (tab.Errors > 0)
             {
                 @* Hata renk dışında "!" işareti ve gizli metinle de anlatılır. *@
-                <span class="record-tab-count record-tab-invalid"><span aria-hidden="true">!</span><span class="visually-hidden">@tab.Errors hatalı alan</span></span>
+                <span class="record-tab-count record-tab-invalid"><span aria-hidden="true">!</span><span class="visually-hidden">@Texts.Get("common.tab.invalid", tab.Errors)</span></span>
             }
         </button>
     }
@@ -26,7 +26,9 @@
 
     [Parameter, EditorRequired] public TabState State { get; set; } = default!;
 
-    [Parameter] public string Label { get; set; } = "Bölümler";
+    [Parameter] public string? Label { get; set; }
+
+    private string LabelText => Label ?? Texts.Get("common.sections");
 
     [Parameter] public EventCallback<string> Changed { get; set; }
 

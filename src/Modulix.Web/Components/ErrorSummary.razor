@@ -2,7 +2,7 @@
 @if (Errors is { Count: > 0 })
 {
     <div class="alert alert-danger" role="alert">
-        <strong>Kaydetmeden önce şunları düzeltin:</strong>
+        <strong>@Texts.Get("common.errorSummary")</strong>
         <ul class="mb-0">
             @foreach (var (_, messages) in Errors)
             {
