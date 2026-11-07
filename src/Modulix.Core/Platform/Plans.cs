@@ -17,8 +17,8 @@ public sealed record LimitDefinition(string Key, string Name);
 
 /// <summary>
 /// Satış paketi (ADR-0028): modül seti ve limitler. Platform geneli kayıttır; silinmez, <see cref="IsActive"/> kapatılarak
-/// yeni aboneliklere kapatılır. Plan değişikliği mevcut abonelerin modül haklarını kendiliğinden değiştirmez (plan yeniden
-/// atanınca geçerli olur); limitler ise her okumada güncel plandan çözülür.
+/// yeni aboneliklere kapatılır. Modül seti değişince geçerli (süresi dolmamış) abonelerin modül hakları da
+/// güncellenir: eklenen modül açılır, çıkan modül kapanır, veri silinmez; limitler her okumada güncel plandan çözülür.
 /// </summary>
 public sealed class Plan
 {

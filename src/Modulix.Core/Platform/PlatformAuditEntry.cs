@@ -22,6 +22,7 @@ public static class PlatformAuditActions
     public const string TeamChanged = "platform.team-changed";
     public const string SupportAccessGranted = "tenant.support-access-granted";
     public const string SupportAccessRevoked = "tenant.support-access-revoked";
+    public const string LicenseApplied = "tenant.license-applied";
 }
 
 /// <summary>

@@ -148,10 +148,21 @@ public class EmailTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
 
         await Task.WhenAll(DrainAsync(host.Services), DrainAsync(host.Services), DrainAsync(host.Services));
 
+        // Veritabanı testler arasında paylaşıldığı için başka bir sunucunun arka plan işleyicisi bu e-postalardan bazılarını kendi
+        // taşıyıcısıyla gönderebilir; bu yüzden "bu testin taşıyıcısı tam bir kez gönderdi" değil, "her e-posta en çok bir kez
+        // gönderildi ve bir kez denendi" sınanır (çifte gönderim yok).
         foreach (var id in ids)
         {
-            Assert.Single(transport.Sent, e => e.Id == id);
-            Assert.Equal(1, (await LoadAsync(host.Services, id)).AttemptCount);
+            QueuedEmail email;
+            var waited = 0;
+            while ((email = await LoadAsync(host.Services, id)).Status != EmailStatus.Sent && waited++ < 100)
+            {
+                await Task.Delay(100);
+            }
+
+            Assert.Equal(EmailStatus.Sent, email.Status);
+            Assert.True(transport.Sent.Count(e => e.Id == id) <= 1, "E-posta birden fazla kez gönderildi.");
+            Assert.Equal(1, email.AttemptCount);
         }
     }
 
