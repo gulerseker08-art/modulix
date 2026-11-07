@@ -95,7 +95,7 @@ public interface IAutomationAction
 - **Yetki**: çağıran kimliğin izinleri ve tenant'ın modül/lisans durumu hem yayın anında hem çalışma anında denetlenir. Kuralı yayınlayan, sahip olmadığı izni gerektiren aksiyonu yayınlayamaz (yetki yükseltme yok).
 - **Yan etki sınıfı**: `Read` yazmaz; `Draft` taslak üretir ama dış etki ve kesinleşme yoktur; `Write` kayıt değiştirir veya dış etki üretir. Dry-run `Write` aksiyonu çalıştırmaz, parametreleri çözüp planı gösterir.
 - **Idempotency**: motor anahtarı türetir (`tenant + tetikleyici/olay kimliği + kural sürümü + hedef kayıt + adım`); aksiyon bunu hedef sisteme geçirir. `CallerSupplied` modu, anahtarı çağıranın verdiği (manuel/AI) aksiyonlar içindir.
-- Parametre değeri sabit veya kayıttan bağlamadır (`{"$field": "crm.opportunity.ownerId"}`). Serbest SQL, C#, betik veya çalıştırılabilir ifade **yoktur**; metin şablonu değişkenleri Dilim 4'te ortak doğrulayıcıyla gelir.
+- Parametre değeri sabit veya kayıttan bağlamadır (`{"$field": "crm.opportunity.ownerId"}`). Serbest SQL, C#, betik veya çalıştırılabilir ifade **yoktur**; metin şablonu değişkenleri Dilim 4d'de geldi (aşağıda).
 
 ## Koşul modeli
 
@@ -193,7 +193,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 2b-3 | İş olayı tetikleyicisi (`DomainEvent`); Ç0.4 iş olayı yayınlama sözleşmesine bağlı | Sonra |
 | 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
 | 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
-| 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Sonra |
+| 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Parça parça: 4a onay merkezi (PR #248), **4d metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); onay eskalasyonu/bildirim kutusu, kayda bağlı onay, takvim ortaklaştırma, puanlama sonra |
 | 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
 
@@ -464,3 +464,23 @@ Uçların dört kural testi Dilim 2'de entegrasyon testleriyle kapsanmıştır; 
 | `dotnet test tests/Modulix.Core.Tests --filter AutomationEditorJsonShapeTests` | Yeni 7: düzenleyicinin ürettiği biçim ve her tetikleyici türü tipli modele çözülür |
 
 Uçların dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 1'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez.
+
+### Dilim 4d: Metin değişkenleri, ortak şablon doğrulayıcı (7 Kasım 2026)
+
+Dilim 4'ün "şablon motoru" kalemi, onay merkezinden (4a) bağımsız ilk parça olarak uygulandı: kural aksiyonunun metin parametresine kayıt değişkeni.
+
+- **Biçim:** `{{alan.anahtarı}}` (`AutomationTextTemplate`, Core). İfade, işlev, koşul, iç içe şablon ve kaçış yoktur; geçersiz ya da kapanmamış `{{ }}` yayında hata.
+- **Beyaz liste (yayın):** değişken kayıt türünün beyan edilmiş alanı olmalı, yayınlayan alanı görebilmeli (`ReadPermission`), alan kayıt seçimi ya da tarih-saat olmamalı (metne anlamlı çevrilemez). Parametre `AllowFieldBinding = false` ise değişken kabul etmez. Hepsi `AutomationDefinitionValidator.ValidateParameters` içinde, mevcut doğrulama sorunlarıyla aynı biçimde (422 + `issues`).
+- **Çalışma ve önizleme aynı kodu kullanır** (`AutomationParameterResolver.Resolve`, artık aksiyon tanımını da alır): seçim etiketi, Türkçe sayı ve para, Evet/Hayır, `gg.AA.yyyy`; boş ya da görülemeyen değer boş metin + not (değer notta asla görünmez); parametrenin `MaxLength`'ini aşan metin kısaltılır ve not düşer, böylece uzun bir müşteri adı adımı düşürmez; zorunlu metin boş kalırsa mevcut davranışla adım atlanır.
+- **Enjeksiyon yok:** değer tek geçişte yerleştirilir, değerin içindeki `{{…}}` tekrar yorumlanmaz. `Render(..., encodeHtml: true)` yerleştirilen değerleri `WebUtility.HtmlEncode` ile kodlar; bugün HTML'e giren bir aksiyon olmadığı için yalnızca motor seviyesinde vardır ve testlidir (CLAUDE.md: HTML'e giren kullanıcı girdisi kodlanır).
+- **Yetki yükseltme yok:** `AutomationTriggerMatcher` kuralın kimliğinin sahip olması gereken izinleri hesaplarken değişkendeki alanların `ReadPermission`'ını da ekler; yayından sonra kimlik izni kaybederse alan boş kalır ve notta "görülemiyor" yazar.
+- **CRM beyanı:** takip aktivitesinin `subject` ve `description` parametreleri kayıt verisine açıldı (`AllowFieldBinding = false` kaldırıldı); müşteri adayı `subject` ve fırsat `title` metin alanları beyan edildi (koşulda `Contains`/`StartsWith` için de kullanılabilir). Hazır şablonların metinleri değişmedi.
+- **Arayüz:** editörde metin parametresinin altında "Kayıt değişkeni ekle" seçicisi (`AutomationParameterDto.AllowFieldBinding` ile yalnızca uygun parametrede); sunucu API'sine tek alan eklendi (geriye uyumlu, varsayılan `true`).
+- **Bilinen sınır:** daha önce yayınlanmış bir kuralda sabit metin olarak `{{x}}` yazıldıysa artık değişken sayılır (bu davranış yeni; böyle bir kural bilinmiyor, yayınlı kural yeniden yayında doğrulanır). Başka modüller kendi aksiyonlarında `AllowFieldBinding`'i açarak aynı motoru kullanır.
+
+### Test sonuçları (Dilim 4d)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter "AutomationTextTemplateTests"` | Yeni testler: değişken ayrıştırma, hatalı biçimler, alan uygunluğu ve izin, tip bazlı biçimleme, boş/görülemeyen değer ve notta sızıntı yok, enjeksiyon yok, HTML kodlama, çözümleyici (doldurma, bağlanamayan parametre, kısaltma, boş konu), yayın doğrulaması (kabul, ret, yetkisiz alan, bağlanamayan parametre) |
+| `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | Yeni 4: mutlu yol (konu `Takip: Sessiz aday` olarak açılır), hata (bilinmeyen, kapanmayan, kayıt seçimi, başka kayıt türünün alanı), tenant izolasyonu (her firma kendi kaydından doldurur), yetki (tutar izni olmayan tutar değişkeni yayınlayamaz) |
