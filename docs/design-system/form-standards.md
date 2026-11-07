@@ -105,6 +105,12 @@ Durum yalnızca renkle anlatılmaz: hata iletisi metin olarak görünür, zorunl
 - Kaydedilmemiş değişiklik: `<form … @oninput="() => dirty = true">` ve `form-toolbar-actions` içinde ilk öğe `<UnsavedChanges IsDirty="() => dirty" />`. Çubukta durum yazısı görünür, sayfadan ayrılırken onay istenir. `await Saved/Deleted.InvokeAsync(…)` satırından hemen önce `dirty = false;` yazılır; yoksa kayıttan sonra yanlış onay çıkar. `LookupPicker` seçim ve temizlemede de forma `input` olayı yayar. Sayfa içinde kapanan formda (İptal) onay istenmez.
 - Merkezi toast bugün **yok**; eklenecek iş kalemi olarak `migration-report.md`'de.
 
+## Düğme grubu, etiket ve anahtar
+
+- **Düğme grubu (`SegmentedChoice`):** iki-üç seçenekli alanlarda select yerine kullanılır (Firma türü, Etkin/Pasif). Etiketi bileşen çizer, `<label for>` yazılmaz: `<SegmentedChoice Id="facility-active" Label="@f.Label" LabelClass="@f.LabelClass()" Options="SegmentOptions.Active" @bind-Value="form.IsActive" />`. Dört ve üstü seçenek ya da firmanın değiştirebildiği liste `form-select` kalır.
+- **Etiket (`TagInput`):** `<TagInput Id="tags" MaxLength="…" @bind-Value="form.Tags" />`. Değer virgülle ayrılmış metindir, sunucu sözleşmesi değişmez. Virgül, Enter ve alandan çıkış ekler; boş alanda Backspace sonuncuyu siler.
+- **Anahtar:** aç/kapa ayarı `<div class="form-check form-switch">` + `role="switch"` ile çizilir, bileşen gerekmez. Çoklu seçim listeleri (`CustomFieldInputs`) onay kutusu kalır.
+
 ## Lookup
 
 `LookupPicker` kullanılır: yazdıkça sunucu taraflı arama (debounce), klavye ile gezinme, seçimi temizleme, seçili kayda gitme, boş sonuç ve hata durumu. Hangi alanlarda aranacağı yönetici tarafından `Yönetim → Alan ve lookup ayarları` ekranından belirlenir (metadata). Arama her zaman sunucuda tenant ve yetki süzgeciyle yapılır.

@@ -25,6 +25,8 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Bileşen | Durum | Nerede / nasıl |
 |---|---|---|
 | FormTabs | Var | Tek bölümlü kayıt formunun gövdesini tek sekmeli çubukla sarar: `<FormTabs Title="Birim bilgileri" Label="Birim formu bölümleri">…form-grid…</FormTabs>`. Çok bölümlü formlar için TabBar + TabPanel. |
+| SegmentedChoice | Var | İki-üç seçenekli alan için düğme grubu (gerçek radio): `<SegmentedChoice Id="…" Label="…" Options="…" @bind-Value="…" />`; sınıflar `choice-group`, `choice-option`. |
+| TagInput | Var | Virgülle ayrılmış değeri haplarla gösteren etiket girişi; sınıflar `tag-input`, `tag-chip`. |
 | UnsavedChanges | Var | Kaydedilmemiş değişiklik durumu ve sayfadan ayrılma onayı: `<UnsavedChanges IsDirty="() => dirty" />` (`form-toolbar-actions` içinde); kullanım `form-standards.md`. |
 | TabBar + TabPanel | Var | Sekmeler: `<TabBar Tabs="…" State="tabs" />` + `<TabPanel State="tabs" Key="…">…</TabPanel>`; `TabItem(Key, Label, Count?, Errors)`; `Errors > 0` sekmede "!" rozeti gösterir, `TabState.RevealFirstFailing` hatalı ilk sekmeyi açar. Metadata formları `LayoutForm` ile aynısını otomatik yapar. |
 | ColumnPicker | Var | "Sütunlar" düğmesi + açılır menü: sayfadaki `.record-table` sütunlarını göster/gizle (ilk sütun hep görünür). `js/table-columns.js` hücrelere `col-hidden` sınıfı verir; seçim `localStorage`'da sayfa yoluna göre saklanır, tablo yeniden çizilince yeniden uygulanır. Araç çubuğuna `<ColumnPicker />` konur, tablo işaretlemesi değişmez. |
