@@ -231,6 +231,9 @@
     private string? message;
     private string? search;
 
+    /// <summary>Panodaki "Yeni fırsat" bağlantısı formu açık getirir (<c>crm/firsatlar?yeni=true</c>).</summary>
+    [SupplyParameterFromQuery(Name = "yeni")] public bool NewRequested { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         views = new PersonalGridViews(Api, "crm.opportunities");
@@ -245,6 +248,10 @@
             ]);
             await views.LoadAsync();
             await LoadAsync(1);
+            if (NewRequested && Session.Can(CrmAccess.OpportunitiesWrite))
+            {
+                Open(null);
+            }
         }
     }
 

@@ -1,0 +1,32 @@
+@using System.Globalization
+@* Dikey sütun grafik: en büyük değere göre ölçeklenir, tek renktir; son sütun güncel dönemdir ve tam tonda çizilir. Her sütunda değer etiketi vardır. *@
+@{
+    var max = Items.Count == 0 ? 0 : Items.Max(i => i.Value);
+}
+<div class="column-chart" role="img" aria-label="@Title">
+    @for (var i = 0; i < Items.Count; i++)
+    {
+        var item = Items[i];
+        // Üstteki değer etiketine yer kalsın diye en yüksek sütun %82'de biter; değeri olan sütun görünür kalır.
+        var height = max > 0 && item.Value > 0 ? Math.Max(2m, item.Value / max * 82m) : 0m;
+        <div class="column-chart-col @(i == Items.Count - 1 ? "current" : null)" title="@item.Title: @item.Display">
+            <span>@item.Display</span>
+            <i style="height:@height.ToString("0.#", CultureInfo.InvariantCulture)%"></i>
+        </div>
+    }
+</div>
+<div class="column-chart-axis" aria-hidden="true">
+    @foreach (var item in Items)
+    {
+        <span>@item.Label</span>
+    }
+</div>
+
+@code {
+    /// <summary><paramref name="Label"/> eksende kısa ad, <paramref name="Title"/> ipucundaki tam ad.</summary>
+    public sealed record Item(string Label, string Title, decimal Value, string Display);
+
+    [Parameter, EditorRequired] public IReadOnlyList<Item> Items { get; set; } = [];
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+}
