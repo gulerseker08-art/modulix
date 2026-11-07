@@ -467,6 +467,15 @@
                     <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="ValidateAsync">Doğrula</button>
                 </Actions>
                 <ChildContent>
+                    <div class="form-grid">
+                        <div class="span-6">
+                            <label class="form-label" for="sampleRecord">Deneme kaydı (isteğe bağlı)</label>
+                            <RecordPicker Id="sampleRecord" EntityKey="@entityKey" LabelField="@entity.LabelField" AccessibleName="Deneme kaydı"
+                                          @bind-Value="sampleRecordId" />
+                            <small class="text-muted">Seçerseniz kural bu kaydın güncel değerleriyle değerlendirilir; hiçbir şey çalıştırılmaz.</small>
+                        </div>
+                    </div>
+
                     @if (preview is null)
                     {
                         <p class="text-muted" role="status">Henüz doğrulanmadı.</p>
@@ -499,6 +508,39 @@
                                 <dd>@preview.ConditionText</dd>
                             }
                         </dl>
+                        @if (preview.Evaluated)
+                        {
+                            <p role="status">
+                                <span class="badge stage-@(preview.ConditionsPassed ? "won" : "lost")">@(preview.ConditionsPassed ? "Koşullar sağlanıyor" : "Koşullar sağlanmıyor")</span>
+                                @(preview.ConditionsPassed ? "Kural bu kayıt için çalışırdı." : "Kural bu kayıt için çalışmazdı.")
+                            </p>
+                            @if (preview.Explanation is { } explanation)
+                            {
+                                <ul class="mb-2">@Explain(explanation)</ul>
+                            }
+
+                            @if (preview.ConditionsPassed && preview.PlannedActions.Count > 0)
+                            {
+                                <h3 class="h6">Çalışsaydı yapacakları</h3>
+                                <ul>
+                                    @foreach (var planned in preview.PlannedActions)
+                                    {
+                                        <li>
+                                            <strong>@planned.DisplayName</strong>@(planned.Permitted ? null : " (bu işlem için izniniz yok)")
+                                            @foreach (var parameter in ParametersOf(planned.Parameters))
+                                            {
+                                                <small class="d-block text-muted">@ParameterLabel(planned.Action, parameter.Name): @(parameter.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? "(boş)" : parameter.Value.ToString())</small>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(planned.Note))
+                                            {
+                                                <small class="d-block text-muted">@planned.Note</small>
+                                            }
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        }
+
                         @foreach (var warning in preview.Warnings)
                         {
                             <p class="text-muted">@warning</p>
@@ -600,6 +642,7 @@
         entityKey = key ?? string.Empty;
         definition = new EditorDefinition();
         preview = null;
+        sampleRecordId = null;
     }
 
     private AutomationFieldDto? FieldOf(string key) => entity?.Fields.FirstOrDefault(f => f.Key == key);
@@ -777,12 +820,34 @@
 
     private string ModuleKey => entity?.ModuleKey ?? string.Empty;
 
+    private Guid? sampleRecordId;
+
+    /// <summary>Koşul açıklamasının bir düğümü ve çocukları: geçti mi, neden (görülemeyen alanın değeri sunucuda zaten maskelenir).</summary>
+    private RenderFragment Explain(ConditionExplanationDto node) => @<li>
+        <span class="badge stage-@(node.Passed ? "won" : "lost")">@(node.Passed ? "Sağlandı" : "Sağlanmadı")</span> @node.Text
+        @if (node.Children.Count > 0)
+        {
+            <ul>
+                @foreach (var child in node.Children)
+                {
+                    @Explain(child)
+                }
+            </ul>
+        }
+    </li>;
+
+    private static IEnumerable<JsonProperty> ParametersOf(JsonElement parameters) =>
+        parameters.ValueKind == JsonValueKind.Object ? parameters.EnumerateObject() : [];
+
+    private string ParameterLabel(string actionKey, string name) =>
+        catalog?.Actions.FirstOrDefault(a => a.Key == actionKey)?.Parameters.FirstOrDefault(p => p.Name == name)?.Label ?? name;
+
     private async Task ValidateAsync()
     {
         busy = true;
         message = null;
         var result = await Api.PostAsync<AutomationPreviewDto>(
-            "/api/automation/preview", new PreviewAutomationRequest(ModuleKey, entityKey, DefinitionJson(), null, null));
+            "/api/automation/preview", new PreviewAutomationRequest(ModuleKey, entityKey, DefinitionJson(), sampleRecordId, null));
         busy = false;
         preview = result.Value;
         message = result.Value is null ? result.Error : null;
