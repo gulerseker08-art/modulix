@@ -303,8 +303,12 @@ internal sealed class ApprovalService(
 
         List<ApprovalRequestStep> steps = await StepsAsync(id, cancellationToken);
         Me decider = Without(me, request.RequesterId);
-        ApprovalRequestStep step = steps.FirstOrDefault(s => s.Status == ApprovalStepStatus.Active && IsMine(s, decider))
-            ?? throw new ApprovalForbiddenException("Bu talebin bekleyen adımında onaycı değilsiniz.");
+        ApprovalRequestStep? step = steps.FirstOrDefault(s => s.Status == ApprovalStepStatus.Active && IsMine(s, decider));
+        if (step is null)
+        {
+            throw await StaleOrAsync(request, new ApprovalForbiddenException("Bu talebin bekleyen adımında onaycı değilsiniz."), cancellationToken);
+        }
+
         Guid? onBehalfOf = step.ApproverUserId is { } approver && approver != tenant.UserId && decider.Users.Contains(approver) ? approver : null;
 
         if (!approve && string.IsNullOrWhiteSpace(comment))
@@ -380,8 +384,12 @@ internal sealed class ApprovalService(
 
         CheckVersion(request, expectedVersion);
         List<ApprovalRequestStep> steps = await StepsAsync(id, cancellationToken);
-        ApprovalRequestStep step = steps.FirstOrDefault(s => s.Id == stepId && s.Status == ApprovalStepStatus.Active)
-            ?? throw new ApprovalException("Yalnızca bekleyen adımın onaycısı değiştirilebilir.");
+        ApprovalRequestStep? step = steps.FirstOrDefault(s => s.Id == stepId && s.Status == ApprovalStepStatus.Active);
+        if (step is null)
+        {
+            throw await StaleOrAsync(request, new ApprovalException("Yalnızca bekleyen adımın onaycısı değiştirilebilir."), cancellationToken);
+        }
+
         if (userId is null == roleId is null)
         {
             throw new ApprovalException("Bir kişi ya da bir rol seçin.");
@@ -660,6 +668,22 @@ internal sealed class ApprovalService(
         {
             throw new ApprovalConflictException("Talep başkası tarafından değiştirildi; sayfayı yenileyip tekrar deneyin.");
         }
+    }
+
+    /// <summary>
+    /// Talep ve adımları ayrı sorgularla okunur; ikisinin arasında başka bir karar işlenmişse talep eski, adımlar yeni sürümdedir
+    /// ve beklenen etkin adım bulunamaz. Bu bir yetki ya da girdi hatası değil çakışmadır: sürüm veritabanından yeniden okunur,
+    /// değişmişse 409 verilir, değişmemişse çağıranın hatası (<paramref name="otherwise"/>) fırlatılır.
+    /// </summary>
+    private async Task<Exception> StaleOrAsync(ApprovalRequest request, Exception otherwise, CancellationToken cancellationToken)
+    {
+        long current = await db.ApprovalRequests.AsNoTracking()
+            .Where(r => r.Id == request.Id)
+            .Select(r => r.Version)
+            .SingleAsync(cancellationToken);
+        return current != request.Version
+            ? new ApprovalConflictException("Talep başkası tarafından değiştirildi; sayfayı yenileyip tekrar deneyin.")
+            : otherwise;
     }
 
     private static T Guarded<T>(Func<T> action)
