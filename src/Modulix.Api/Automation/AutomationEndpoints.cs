@@ -38,8 +38,15 @@ public static class AutomationEndpoints
             .RequirePermission(CoreModule.Permissions.ManageAutomation);
 
         group.MapGet("/rules", async (
-            string? moduleKey, string? status, string? search, int? page, int? pageSize, IAutomationRuleService service, CancellationToken ct) =>
+            string? moduleKey, string? status, string? search, int? page, int? pageSize, string? sort, IAutomationRuleService service, CancellationToken ct) =>
         {
+            if (!AutomationRuleQuery.IsValidSort(sort))
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]> { ["sort"] = [$"Sıralama anahtarı şunlardan biri olmalı: {string.Join(", ", AutomationRuleQuery.SortKeys)} (başına - azalan)."] },
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
             AutomationRuleStatus? parsed = null;
             if (!string.IsNullOrWhiteSpace(status))
             {
@@ -53,7 +60,7 @@ public static class AutomationEndpoints
                 parsed = value;
             }
 
-            var result = await service.ListAsync(new AutomationRuleQuery(moduleKey, parsed, search, page ?? 1, pageSize ?? 50), ct);
+            var result = await service.ListAsync(new AutomationRuleQuery(moduleKey, parsed, search, page ?? 1, pageSize ?? 50, sort), ct);
             return Results.Ok(new AutomationRulePageDto([.. result.Items.Select(ToDto)], result.Page, result.PageSize, result.TotalCount));
         }).RequirePermission(CoreModule.Permissions.ReadAutomation);
 
@@ -271,5 +278,5 @@ public static class AutomationEndpoints
             a.Available,
             a.UnavailableReason,
             [.. a.Definition.Parameters.Select(p => new AutomationParameterDto(
-                p.Name, p.Label, p.Type.ToString(), p.Required, p.Description, [.. p.Options.Select(o => new AutomationOptionDto(o.Key, o.Label))], p.LookupKey))]))]);
+                p.Name, p.Label, p.Type.ToString(), p.Required, p.Description, [.. p.Options.Select(o => new AutomationOptionDto(o.Key, o.Label))], p.LookupKey, p.AllowFieldBinding))]))]);
 }

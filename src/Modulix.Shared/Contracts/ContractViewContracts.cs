@@ -1,11 +1,6 @@
 namespace Modulix.Shared.Contracts;
 
-// ---- Dilim 9: kaydedilmiş görünümler, pano, dışa aktarma
-
-/// <summary>Kullanıcının kaydettiği liste görünümü; <c>Filters</c> sorgu dizgisi biçiminde süzgeçtir (ör. <c>effectiveStatus=Active&amp;sort=-endDate</c>).</summary>
-public sealed record ContractSavedViewDto(Guid Id, long Version, string Name, string? Filters);
-
-public sealed record SaveContractSavedViewRequest(string Name, string? Filters = null, long? Version = null);
+// ---- Dilim 9: pano ve dışa aktarma (kaydedilmiş görünümler ortak core.GridViews'a taşındı, ADR-0036)
 
 public sealed record DashboardCountDto(string Key, int Count);
 

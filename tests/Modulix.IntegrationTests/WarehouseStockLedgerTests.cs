@@ -194,6 +194,10 @@ public class WarehouseStockLedgerTests(ModulixApiFactory factory) : IClassFixtur
         var result = await scope.ServiceProvider.GetRequiredService<ITenantDataTransfer>().DeleteAsync(s.Tenant.Id, CancellationToken.None);
         Assert.Contains(result.Tables, t => t is { Schema: "warehouse", Table: "StockMovements" });
         Assert.Equal(0, await factory.ScalarAsync<int>(null, "SELECT COUNT(*) FROM [warehouse].[StockMovements] WHERE [TenantId] = @t", ("@t", s.Tenant.Id)));
+
+        // Silme platform denetim kaydına yazılır (ADR-0028); kayıt tenant silindikten sonra da durur.
+        Assert.Equal(1, await factory.ScalarAsync<int>(null,
+            "SELECT COUNT(*) FROM [platform].[PlatformAuditLog] WHERE [TargetTenantId] = @t AND [Action] = N'tenant.deleted'", ("@t", s.Tenant.Id)));
     }
 
     [Fact]

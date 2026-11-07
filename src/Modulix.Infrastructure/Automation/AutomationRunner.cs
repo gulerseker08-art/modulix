@@ -543,7 +543,7 @@ public sealed class AutomationRunner(
                     : new AutomationActionResult(AutomationActionStatus.Failed, failure.Note);
             }
 
-            var resolved = AutomationParameterResolver.Resolve(stepDefinition, loaded.Fields!, loaded.Facts!);
+            var resolved = AutomationParameterResolver.Resolve(stepDefinition, loaded.Fields!, loaded.Facts!, registration.Action.Definition);
             if (AutomationParameterResolver.MissingRequired(registration.Action.Definition, resolved.Values) is { Count: > 0 } missing)
             {
                 return new AutomationActionResult(

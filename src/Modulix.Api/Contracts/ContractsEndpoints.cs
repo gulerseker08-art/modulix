@@ -34,8 +34,6 @@ public static class ContractsEndpoints
             ContractsModule.Permissions.ContractsRead, ContractsModule.Permissions.ContractsWrite);
         ResourceEndpoints.MapResource<ContractLineDto, SaveContractLineRequest>(group, Prefix, "contract-lines", ContractsModule.Entities.ContractLine,
             ContractsModule.Permissions.ContractsRead, ContractsModule.Permissions.ContractsWrite);
-        ResourceEndpoints.MapResource<ContractSavedViewDto, SaveContractSavedViewRequest>(group, Prefix, "saved-views", ContractsModule.Entities.ContractSavedView,
-            ContractsModule.Permissions.ContractsRead, ContractsModule.Permissions.ContractsRead);
 
         var contracts = group.MapGroup("/contracts");
         contracts.MapGet("/{id:guid}/history", async (Guid id, IContractWorkflow workflow, CancellationToken ct) =>
