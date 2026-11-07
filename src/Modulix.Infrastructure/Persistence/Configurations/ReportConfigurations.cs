@@ -116,6 +116,8 @@ internal sealed class ReportScheduleConfiguration : IEntityTypeConfiguration<Rep
         builder.Property(s => s.LastMessage).HasMaxLength(ReportSchedule.MessageMaxLength);
         builder.Property(s => s.StoppedReason).HasMaxLength(ReportSchedule.MessageMaxLength);
         builder.Property(s => s.NextRunAt).IsRequired();
+        // Başarısız çalışmada yeniden deneme sayacı (en çok ReportSchedule.MaxAttempts); başarıyla sıfırlanır.
+        builder.Property(s => s.Attempts).HasDefaultValue(0);
         builder.Property(s => s.CreatedAt).IsRequired();
         builder.Property(s => s.UpdatedAt).IsRequired();
         builder.Property(s => s.Version).IsConcurrencyToken();

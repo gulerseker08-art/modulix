@@ -160,6 +160,15 @@ public sealed class ReportSchedule : ITenantEntity, ICompanyShared
     /// <summary>Zamanlama kendiliğinden durdurulduysa nedeni (yetki kaybı, üyelik kapalı, rapor yok...).</summary>
     public string? StoppedReason { get; private set; }
 
+    /// <summary>Aynı planlı an için art arda başarısız deneme sayısı (teslimde sıfırlanır); bkz. <see cref="MaxAttempts"/>.</summary>
+    public int Attempts { get; private set; }
+
+    /// <summary>Bir planlı an için en çok deneme (ilk deneme + 2 yeniden deneme). Sonra zamanlama bir sonraki döneme geçer.</summary>
+    public const int MaxAttempts = 3;
+
+    /// <summary>Yeniden deneme gecikmesi: 1. denemeden sonra 15 dk, 2.den sonra 60 dk.</summary>
+    public static TimeSpan RetryDelay(int attempts) => attempts <= 1 ? TimeSpan.FromMinutes(15) : TimeSpan.FromMinutes(60);
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -190,8 +199,26 @@ public sealed class ReportSchedule : ITenantEntity, ICompanyShared
         Touch(now);
     }
 
+    /// <summary>Deneme başarısız: sınır dolmadıysa aynı dönem için kısa gecikmeyle yeniden denenir, dolduysa bir sonraki döneme geçilir.</summary>
+    public void RecordFailure(string? message, DateTimeOffset nextPeriodRunAt, DateTimeOffset now)
+    {
+        Attempts++;
+        var retry = Attempts < MaxAttempts;
+        LastRunAt = now;
+        LastStatus = "Failed";
+        LastMessage = Trim(message);
+        NextRunAt = retry ? now + RetryDelay(Attempts) : nextPeriodRunAt;
+        if (!retry)
+        {
+            Attempts = 0;
+        }
+
+        Touch(now);
+    }
+
     public void RecordRun(string status, string? message, DateTimeOffset nextRunAt, DateTimeOffset now)
     {
+        Attempts = 0;
         LastRunAt = now;
         LastStatus = status;
         LastMessage = Trim(message);
