@@ -24,3 +24,6 @@ public sealed record SupportAccessDto(
     DateTimeOffset ExpiresAt,
     DateTimeOffset? EndedAt,
     SupportAccessStateDto State);
+
+/// <summary>Destek oturumunda yapılan bir istek (zaman, yöntem, yol).</summary>
+public sealed record SupportAccessReadDto(DateTimeOffset At, string Method, string Path);

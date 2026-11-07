@@ -23,6 +23,9 @@ public static class PlatformAuditActions
     public const string SupportAccessGranted = "tenant.support-access-granted";
     public const string SupportAccessRevoked = "tenant.support-access-revoked";
     public const string LicenseApplied = "tenant.license-applied";
+    public const string BillingCreated = "tenant.billing-created";
+    public const string BillingPaid = "tenant.billing-paid";
+    public const string BillingCancelled = "tenant.billing-cancelled";
 
     /// <summary>Komut satırından tenant verisinin dışa aktarılması / silinmesi (ADR-0020 Dilim 3); işleten kullanıcı bilinmez, ayrıntıda kaynak "cli"dir.</summary>
     public const string TenantExported = "tenant.exported";

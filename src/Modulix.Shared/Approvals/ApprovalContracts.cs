@@ -1,6 +1,7 @@
 namespace Modulix.Shared.Approvals;
 
-public sealed record ApprovalStepDefinitionDto(string Name, int Order, Guid? ApproverUserId, Guid? ApproverRoleId, decimal? MinAmount, int? DueHours);
+public sealed record ApprovalStepDefinitionDto(
+    string Name, int Order, Guid? ApproverUserId, Guid? ApproverRoleId, decimal? MinAmount, int? DueHours, Guid? EscalateToUserId = null, Guid? EscalateToRoleId = null);
 
 public sealed record ApprovalDefinitionDto(
     Guid Id, string Name, string? Description, string? Currency, bool IsActive, int Revision, long Version, IReadOnlyList<ApprovalStepDefinitionDto> Steps);
@@ -16,7 +17,8 @@ public sealed record ApproverOptionsDto(IReadOnlyList<ApproverOptionDto> People,
 
 public sealed record ApprovalStepDto(
     Guid Id, int Order, string Name, Guid? ApproverUserId, Guid? ApproverRoleId, string ApproverName, string Status, DateTimeOffset? ActivatedAt,
-    DateTimeOffset? DueAt, bool IsOverdue, bool IsOrphaned, string? DecidedByName, DateTimeOffset? DecidedAt, string? Comment);
+    DateTimeOffset? DueAt, bool IsOverdue, bool IsOrphaned, string? DecidedByName, DateTimeOffset? DecidedAt, string? Comment,
+    string? OnBehalfOfName = null, string? EscalationName = null, bool IsEscalated = false);
 
 public sealed record ApprovalRequestDto(
     Guid Id, Guid DefinitionId, string DefinitionName, int DefinitionRevision, string Title, string? Description, decimal? Amount, string? Currency,
@@ -30,6 +32,12 @@ public sealed record OpenApprovalRequest(Guid DefinitionId, string Title, string
 public sealed record DecideApprovalRequest(string? Comment, long ExpectedVersion);
 
 public sealed record ReassignApprovalStepRequest(Guid StepId, Guid? UserId, Guid? RoleId, long ExpectedVersion);
+
+public sealed record ApprovalDelegationDto(
+    Guid Id, Guid PrincipalUserId, string PrincipalName, Guid DelegateUserId, string DelegateName, DateTimeOffset StartsAt, DateTimeOffset EndsAt,
+    string? Reason, bool IsActive, DateTimeOffset? RevokedAt);
+
+public sealed record CreateApprovalDelegationRequest(Guid? PrincipalUserId, Guid DelegateUserId, DateTimeOffset StartsAt, DateTimeOffset EndsAt, string? Reason);
 
 public sealed record ApprovalDayCountDto(DateOnly Day, int Approved, int Rejected);
 

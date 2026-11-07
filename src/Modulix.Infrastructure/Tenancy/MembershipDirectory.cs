@@ -36,7 +36,7 @@ internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time
                   && membership.TenantId == tenantId
                   && (membership.Status == MembershipStatus.Active || (membership.Status == MembershipStatus.Support && db.SupportAccessGrants.Any(g => g.MembershipId == membership.Id && g.EndedAt == null && g.ExpiresAt > now)))
                   && TenantStatusRules.Operational.Contains(tenant.Status)
-            select new MembershipSummary(membership.Id, tenant.Id, tenant.Name, tenant.Slug))
+            select new MembershipSummary(membership.Id, tenant.Id, tenant.Name, tenant.Slug, membership.Status == MembershipStatus.Support))
             .SingleOrDefaultAsync(cancellationToken);
     }
 

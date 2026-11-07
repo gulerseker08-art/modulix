@@ -93,3 +93,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 - `hero-band`: pano ekranlarında `PageHeader` yerine kullanılır; solda `hero-band-text` (üst etiket, tek `h1`, tek cümle), sağda `hero-band-stats` içinde en çok dört `hero-stat`. Tıklanabilen kutu `button.hero-stat` olur. Band yalnızca pano ekranlarındadır; liste ve form ekranlarında `PageHeader` kalır. CRM panosu bu kuralın dışındadır: başlık ve dönem/sorumlu seçimi `PageHeader`'da kalır, altında `dash-hero` çizilir (7.11.2026 kararı).
 - `step-dots` / `step-dot`: liste satırında adım ilerlemesi (`aria-label` ile metni verilir).
 - `step-track` / `step-track-item`: ayrıntıda dikey adım izi; durum sınıfları `is-approved`, `is-rejected`, `is-active`, `is-cancelled`.
+
+## Bildirim kutusu
+
+- `NotificationBell`: üst çubukta zil; `notification-count` okunmamış sayısı, `notification-panel` açılır liste, `notification-item.is-unread` okunmamış satır. Bildirim metni kaydın hassas ayrıntısını taşımaz; bağlantı kaydı açar ve yetki orada denetlenir.

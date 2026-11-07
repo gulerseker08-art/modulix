@@ -82,6 +82,52 @@ public sealed class SupportAccessGrant
     }
 }
 
+/// <summary>
+/// Destek oturumunda yapılan bir istek (ADR-0028, Y1.3 "yapılan işlemler"). Her API isteği işlenmeden <b>önce</b> yazılır; kayıt
+/// yazılamazsa istek reddedilir (okuma izsiz kalmaz). Yalnızca yöntem ve yol tutulur; sorgu değerleri (arama metni gibi kişisel
+/// veri taşıyabilir) ve yanıt içeriği tutulmaz. Ekleme-yalnızdır, silinmez.
+/// </summary>
+public sealed class SupportAccessRead
+{
+    public const int MethodMaxLength = 10;
+    public const int PathMaxLength = 300;
+
+    private SupportAccessRead()
+    {
+        // EF Core için
+    }
+
+    public SupportAccessRead(Guid grantId, Guid tenantId, Guid userId, DateTimeOffset at, string method, string path)
+    {
+        Id = Guid.CreateVersion7();
+        GrantId = grantId;
+        TenantId = tenantId;
+        UserId = userId;
+        At = at;
+        Method = Truncate(method, MethodMaxLength);
+        Path = Truncate(path, PathMaxLength);
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid GrantId { get; private set; }
+
+    public Guid TenantId { get; private set; }
+
+    public Guid UserId { get; private set; }
+
+    public DateTimeOffset At { get; private set; }
+
+    public string Method { get; private set; } = string.Empty;
+
+    public string Path { get; private set; } = string.Empty;
+
+    private static string Truncate(string value, int max) => value.Length <= max ? value : value[..max];
+}
+
+/// <summary>Destek oturumundaki bir istek: ne zaman, hangi yöntem ve yol.</summary>
+public sealed record SupportAccessReadInfo(DateTimeOffset At, string Method, string Path);
+
 public enum SupportAccessState
 {
     Active = 1,
@@ -124,4 +170,15 @@ public interface ISupportAccess
 
     /// <summary>En yeni üstte; <paramref name="tenantId"/> boşsa bütün firmalar (platform görünümü).</summary>
     Task<IReadOnlyList<SupportAccessInfo>> ListAsync(Guid? tenantId, bool activeOnly, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Destek üyeliğinin isteğini kaydeder (istek işlenmeden önce). Üyelik için kayıtlı bir erişim yoksa hata verir; istek durdurulur.
+    /// </summary>
+    Task RecordReadAsync(Guid membershipId, string method, string path, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Erişimin kayıtlı istekleri, en yeni üstte (en çok <paramref name="take"/>). <paramref name="tenantId"/> verilirse erişim o
+    /// firmanınsa döner; başka firmanınki "bulunamadı" sayılır.
+    /// </summary>
+    Task<IReadOnlyList<SupportAccessReadInfo>> ListReadsAsync(Guid grantId, Guid? tenantId, int take, CancellationToken cancellationToken);
 }
