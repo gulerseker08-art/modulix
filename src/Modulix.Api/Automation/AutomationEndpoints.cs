@@ -271,5 +271,5 @@ public static class AutomationEndpoints
             a.Available,
             a.UnavailableReason,
             [.. a.Definition.Parameters.Select(p => new AutomationParameterDto(
-                p.Name, p.Label, p.Type.ToString(), p.Required, p.Description, [.. p.Options.Select(o => new AutomationOptionDto(o.Key, o.Label))], p.LookupKey))]))]);
+                p.Name, p.Label, p.Type.ToString(), p.Required, p.Description, [.. p.Options.Select(o => new AutomationOptionDto(o.Key, o.Label))], p.LookupKey, p.AllowFieldBinding))]))]);
 }
