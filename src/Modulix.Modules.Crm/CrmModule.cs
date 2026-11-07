@@ -357,6 +357,12 @@ public sealed class CrmModule : IModule
     /// Hassas alanlar (Y8b): tutar ve olasılık. Para birimi tek başına bir şey söylemediği için hassas değildir (ekran onu
     /// her zaman gönderir).
     /// </summary>
+    // Fırsat onaya gönderilebilir (ADR-0027 Dilim 4c): tutar ve para birimi kayıttan okunur, değişirse bekleyen talep geçersizleşir.
+    IReadOnlyList<Core.Contracts.Approvals.ApprovalTargetDefinition> IModule.ApprovalTargets { get; } =
+    [
+        new(Entities.Opportunity, "Fırsat", "title", "crm/firsatlar/{id}") { AmountField = "amount", CurrencyField = "currency" },
+    ];
+
     IReadOnlyList<SensitiveFields> IModule.SensitiveFields { get; } =
     [
         new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability", "customerBudget", "wonAmount"]),

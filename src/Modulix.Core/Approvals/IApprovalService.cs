@@ -9,9 +9,11 @@ public sealed class ApprovalConflictException(string message) : Exception(messag
 /// <summary>Kullanıcı bu işlemi yapamaz (403): izni olsa bile bu adımın onaycısı değildir.</summary>
 public sealed class ApprovalForbiddenException(string message) : Exception(message);
 
-public sealed record ApprovalDefinitionInput(string Name, string? Description, string? Currency, IReadOnlyList<ApprovalStepDefinition> Steps);
+public sealed record ApprovalDefinitionInput(
+    string Name, string? Description, string? Currency, IReadOnlyList<ApprovalStepDefinition> Steps, string? TargetEntityKey = null);
 
-public sealed record ApprovalRequestInput(Guid DefinitionId, string Title, string? Description, decimal? Amount, string? Currency);
+/// <summary>Süreç bir kayıt türüne bağlıysa <see cref="RecordId"/> zorunludur; tutar ve para birimi kayıttan okunur, girilen değer yok sayılır.</summary>
+public sealed record ApprovalRequestInput(Guid DefinitionId, string Title, string? Description, decimal? Amount, string? Currency, Guid? RecordId = null);
 
 public enum ApprovalRequestView
 {
@@ -39,7 +41,11 @@ public sealed record ApprovalStepDetail(
 public sealed record ApprovalRequestDetail(
     Guid Id, Guid DefinitionId, string DefinitionName, int DefinitionRevision, string Title, string? Description, decimal? Amount, string? Currency,
     Guid RequesterId, string RequesterName, ApprovalRequestStatus Status, DateTimeOffset SubmittedAt, DateTimeOffset? CompletedAt, long Version,
-    IReadOnlyList<ApprovalStepDetail> Steps, bool CanDecide, bool CanWithdraw);
+    IReadOnlyList<ApprovalStepDetail> Steps, bool CanDecide, bool CanWithdraw,
+    string? TargetEntityKey = null, Guid? TargetRecordId = null, string? TargetLabel = null, string? TargetLink = null);
+
+/// <summary>Kayıt ekranındaki onay paneli: kayıt türüne bağlı açık süreçler ve kaydın son talebi.</summary>
+public sealed record RecordApprovalView(IReadOnlyList<ApproverOption> Processes, Contracts.Approvals.RecordApprovalStatus? Latest);
 
 public sealed record ApprovalRequestPage(IReadOnlyList<ApprovalRequestDetail> Items, int Page, int PageSize, int TotalCount);
 
@@ -101,6 +107,12 @@ public interface IApprovalService
 
     /// <summary>Süresi geçen etkin adımları işler (arka plan): eskalasyon onaycısını açar, ilgilileri bir kez bilgilendirir. İşlenen adım sayısını döner.</summary>
     Task<int> EscalateDueAsync(CancellationToken cancellationToken);
+
+    /// <summary>Kaydın korunan alanı (tutar, para birimi) değiştiyse kayda bağlı bekleyen talepleri geçersiz kılar. Geçersizleşen talep sayısını döner.</summary>
+    Task<int> InvalidateForRecordAsync(Contracts.Records.RecordRef record, IReadOnlyCollection<string> changedFields, CancellationToken cancellationToken);
+
+    /// <summary>Kayıt ekranının onay paneli. Kullanıcı kaydı okuyamıyorsa null.</summary>
+    Task<RecordApprovalView?> RecordViewAsync(Contracts.Records.RecordRef record, CancellationToken cancellationToken);
 
     /// <summary>Kullanıcının verdiği ve aldığı vekâletler; <c>seeAll</c> ise firmanın hepsi.</summary>
     Task<IReadOnlyList<ApprovalDelegationDetail>> ListDelegationsAsync(bool seeAll, CancellationToken cancellationToken);

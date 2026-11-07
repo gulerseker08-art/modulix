@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Approvals;
 using Modulix.Core.Automation;
 using Modulix.Core.Events;
 using Modulix.Core.Settings;
@@ -140,6 +141,9 @@ public sealed class CoreModule : IModule
         /// modüllerin <see cref="IModule.Automation"/> ile bildirdiği türlerdir (katalog doldurur); hiçbiri yoksa abonelik de yoktur.
         /// </summary>
         public const string Automation = "core.automation";
+
+        /// <summary>Kayda bağlı onayın bütünlüğü (ADR-0027 Dilim 4c): korunan alan değişince bekleyen talep geçersizleşir.</summary>
+        public const string Approvals = "core.approvals";
     }
 
     /// <summary>Denetim kayıt türleri (Y5). Yönetim kayıtlarının değerleri her denetim okuruna açıktır.</summary>
@@ -449,16 +453,17 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.ApprovalDefinition, "Onay süreci", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["currency"] = "Para birimi", ["isActive"] = "Açık", ["revision"] = "Sürüm", ["steps"] = "Adımlar",
+            ["target"] = "Kayıt türü",
         }, "name"),
         new(AuditedEntityKeys.ApprovalRequest, "Onay talebi", null, new Dictionary<string, string>
         {
             ["title"] = "Başlık", ["process"] = "Süreç", ["amount"] = "Tutar", ["currency"] = "Para birimi", ["status"] = "Durum",
-            ["step"] = "Adım", ["decision"] = "Karar", ["comment"] = "Not", ["approver"] = "Onaycı", ["onBehalfOf"] = "Adına karar verilen", ["escalated"] = "Süre aşımı",
+            ["step"] = "Adım", ["decision"] = "Karar", ["comment"] = "Not", ["approver"] = "Onaycı", ["record"] = "Kayıt", ["reason"] = "Neden", ["onBehalfOf"] = "Adına karar verilen", ["escalated"] = "Süre aşımı",
         }, "title")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
-                ["status"] = new Dictionary<string, string> { ["Pending"] = "Bekliyor", ["Approved"] = "Onaylandı", ["Rejected"] = "Reddedildi", ["Withdrawn"] = "Geri çekildi" },
+                ["status"] = new Dictionary<string, string> { ["Pending"] = "Bekliyor", ["Approved"] = "Onaylandı", ["Rejected"] = "Reddedildi", ["Withdrawn"] = "Geri çekildi", ["Invalidated"] = "Geçersizleşti" },
                 ["decision"] = new Dictionary<string, string> { ["Approved"] = "Onay", ["Rejected"] = "Ret" },
             },
         },
@@ -605,6 +610,8 @@ public sealed class CoreModule : IModule
     [
         EventSubscription.For<AssignmentEmailSubscriber>(
             Subscriptions.AssignmentEmail, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
+        EventSubscription.For<ApprovalRecordSubscriber>(
+            Subscriptions.Approvals, [DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
         EventSubscription.For<AutomationEventSubscriber>(
             Subscriptions.Automation, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
     ];
@@ -613,6 +620,7 @@ public sealed class CoreModule : IModule
     {
         services.AddScoped<AssignmentEmailSubscriber>();
         services.AddScoped<AutomationEventSubscriber>();
+        services.AddScoped<ApprovalRecordSubscriber>();
     }
 
     /// <summary>Kişinin çalıştığı firma: kişisi olan taraf silinemez.</summary>

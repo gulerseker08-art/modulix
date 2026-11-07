@@ -80,6 +80,14 @@
                         <textarea id="process-description" class="form-control" rows="2" maxlength="500" @bind="description"></textarea>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label" for="process-target">Kayıt türü</label>
+                        <select id="process-target" class="form-select" @bind="target">
+                            <option value="">Kayda bağlı değil (serbest talep)</option>
+                            @foreach (var item in targets) { <option value="@item.EntityKey">@item.DisplayName</option> }
+                        </select>
+                        <small class="text-muted">Seçilirse talep o kayıttan açılır; tutar kayıttan okunur ve kayıtta değişirse bekleyen talep geçersizleşir.</small>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label" for="process-currency">Para birimi</label>
                         <input id="process-currency" class="form-control" maxlength="3" placeholder="TRY" @bind="currency" />
                         <small class="text-muted">Doluysa talepte tutar zorunludur ve adım eşikleri bu para birimindedir.</small>
@@ -190,6 +198,8 @@
     private string view = AllViews;
     private bool? active;
     private List<ApprovalDefinitionDto>? definitions;
+    private List<ApprovalTargetDto> targets = [];
+    private string? target;
     private ApproverOptionsDto? options;
     private List<StepRow> steps = [];
     private Guid? editId;
@@ -207,6 +217,7 @@
         views = new PersonalGridViews(Api, ScreenKey);
         grid.Define(Columns);
         options = (await Api.GetAsync<ApproverOptionsDto>("/api/approvals/approver-options")).Value;
+        targets = (await Api.GetAsync<List<ApprovalTargetDto>>("/api/approvals/targets")).Value ?? [];
         await views.LoadAsync();
         await LoadAsync();
     }
@@ -327,6 +338,7 @@
         name = definition?.Name ?? string.Empty;
         description = definition?.Description;
         currency = definition?.Currency;
+        target = definition?.TargetEntityKey;
         steps = definition is null
             ? [new StepRow()]
             : [.. definition.Steps.Select(s => new StepRow
@@ -349,7 +361,8 @@
         var request = new SaveApprovalDefinitionRequest(
             name, description, currency,
             [.. steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.Id("user"), s.Id("role"), s.MinAmount, s.DueHours, s.EscalationId("user"), s.EscalationId("role")))],
-            editVersion);
+            editVersion,
+            string.IsNullOrEmpty(target) ? null : target);
         var saved = editId is { } id
             ? await Api.PutAsync<ApprovalDefinitionDto>($"/api/approvals/definitions/{id}", request)
             : await Api.PostAsync<ApprovalDefinitionDto>("/api/approvals/definitions", request);

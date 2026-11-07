@@ -131,6 +131,10 @@
                 <div>
                     <h2>@detail.Title</h2>
                     <p class="text-muted">@detail.DefinitionName · @detail.RequesterName · @DateText(detail.SubmittedAt)</p>
+                    @if (detail.TargetLabel is { } recordLabel)
+                    {
+                        <p><AppIcon Name="file-text" Size="14" /> @(detail.TargetLink is { } recordLink ? (MarkupString)$"<a href=\"{System.Net.WebUtility.HtmlEncode(recordLink)}\">{System.Net.WebUtility.HtmlEncode(recordLabel)}</a>" : (MarkupString)System.Net.WebUtility.HtmlEncode(recordLabel))</p>
+                    }
                 </div>
                 <button type="button" class="btn btn-icon btn-ghost" aria-label="Kapat" @onclick="CloseDetail"><AppIcon Name="x" Size="18" /></button>
             </div>
@@ -617,6 +621,7 @@
         "Approved" => "Onaylandı",
         "Rejected" => "Reddedildi",
         "Withdrawn" => "Geri çekildi",
+        "Invalidated" => "Geçersizleşti",
         _ => status,
     };
 
@@ -625,6 +630,7 @@
         "Pending" => "stage-open",
         "Approved" => "stage-won",
         "Rejected" => "stage-lost",
+        "Invalidated" => "stage-onhold",
         _ => "stage-cancelled",
     };
 

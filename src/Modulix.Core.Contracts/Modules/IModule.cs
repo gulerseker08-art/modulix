@@ -110,6 +110,9 @@ public interface IModule
     /// </summary>
     AutomationCapabilities Automation => AutomationCapabilities.None;
 
+    /// <summary>Onaya gönderilebilen kayıt türleri (ADR-0027 Dilim 4c); firma bir onay sürecini bunlardan birine bağlayabilir.</summary>
+    IReadOnlyList<Approvals.ApprovalTargetDefinition> ApprovalTargets => [];
+
     /// <summary>
     /// Modülün ortak rapor merkezine katkısı (ADR-0026, dilim 3): raporlanabilir veri kümeleri ve modülün kendi rapor ekranlarına bağlantılar.
     /// Veri kümesi kayıt boru hattından okunur; izin, kapsam ve hassas alan kuralları kayıt türünündür. Anahtarlar modül anahtarıyla başlar;

@@ -664,6 +664,7 @@
             </div>
 
             <aside class="detail-side" aria-label="Fırsat yan paneli">
+                <RecordApprovalPanel EntityKey="@CrmEntityKeys.Opportunity" RecordId="Id" />
                 <FormSection Title="Aktivite zaman çizelgesi" Icon="calendar" Class="side-card">
                     <Actions>
                         @if (Session.Can(CrmAccess.ActivitiesWrite) && opportunity.Status is OpportunityStatus.Open or OpportunityStatus.OnHold)

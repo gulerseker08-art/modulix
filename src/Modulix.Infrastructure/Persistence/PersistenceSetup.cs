@@ -124,7 +124,9 @@ public static class PersistenceSetup
         services.AddScoped<IBusinessUnitService, BusinessUnitService>();
         services.AddScoped<IMembershipScope, MembershipScope>();
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
-        services.AddScoped<IApprovalService, ApprovalService>();
+        services.AddScoped<ApprovalService>();
+        services.AddScoped<IApprovalService>(sp => sp.GetRequiredService<ApprovalService>());
+        services.AddScoped<Core.Contracts.Approvals.IApprovalStatusReader>(sp => sp.GetRequiredService<ApprovalService>());
         services.AddSingleton<ApprovalEscalationRunner>();
         services.AddScoped<NotificationCenter>();
         services.AddScoped<INotificationInbox>(sp => sp.GetRequiredService<NotificationCenter>());
