@@ -6,15 +6,15 @@
    gizleme CSS sınıfıyla yapılır (js/table-columns.js), seçim tarayıcıda sayfa yoluna göre saklanır. İlk sütun (kayıt adı) hep görünür. *@
 <div class="view-selector">
     <button type="button" class="btn btn-ghost" aria-haspopup="true" aria-expanded="@(open ? "true" : "false")" @onclick="ToggleAsync">
-        <AppIcon Name="columns" Size="16" /> Sütunlar
+        <AppIcon Name="columns" Size="16" /> @Texts.Get("common.columns")
     </button>
     @if (open)
     {
         <div class="view-selector-backdrop" aria-hidden="true" @onclick="Close"></div>
-        <div class="view-menu column-menu" role="group" aria-label="Görünen sütunlar">
+        <div class="view-menu column-menu" role="group" aria-label="@Texts.Get("common.columns.visible")">
             @if (columns.Count == 0)
             {
-                <p class="view-menu-group">Listede sütun yok.</p>
+                <p class="view-menu-group">@Texts.Get("common.columns.none")</p>
             }
 
             @foreach (var column in columns)
@@ -27,7 +27,7 @@
             }
 
             <div class="view-menu-divider" role="separator"></div>
-            <button type="button" class="view-menu-item" @onclick="ResetAsync">Varsayılana dön</button>
+            <button type="button" class="view-menu-item" @onclick="ResetAsync">@Texts.Get("common.columns.reset")</button>
         </div>
     }
 </div>
