@@ -122,8 +122,8 @@ public class ApprovalTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
 
         HttpResponseMessage[] results = await Task.WhenAll(PostDecisionAsync(one, opened, "approve"), PostDecisionAsync(two, opened, "approve"));
 
-        Assert.Equal(1, results.Count(r => r.StatusCode == HttpStatusCode.OK));
-        Assert.Equal(1, results.Count(r => r.StatusCode == HttpStatusCode.Conflict));
+        // Sıralı karşılaştırma: beklenmeyen kod (ör. 403) hata iletisinde görünsün.
+        Assert.Equal([HttpStatusCode.OK, HttpStatusCode.Conflict], results.Select(r => r.StatusCode).Order());
         ApprovalRequestDto reloaded = await GetAsync<ApprovalRequestDto>(requester, $"/api/approvals/requests/{opened.Id}");
         Assert.Equal(["Approved", "Active"], reloaded.Steps.Select(s => s.Status));
     }
