@@ -147,6 +147,7 @@ public static class AppCatalog
 
         // Çalışma Alanım: kullanıcının üzerinde işlem bekleyen işler. "Onay bekleyen işlerim" teklif ve sözleşme onaylarını tek listede toplar;
         // karar ekranları (teklif onayları, sözleşme onayları) menüde ayrı satır değildir, bu satırın altında sayılır.
+        new("crm.dashboard", Crm, "Pano", "dashboard", "crm/pano", 5, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmWorkspaceGroup),
         new("crm.activities", Crm, "Aktiviteler", "activity", "crm/aktiviteler", 10, CrmAccess.ModuleKey, CrmAccess.ActivitiesRead, Tone: AppTone.Teal, Group: CrmWorkspaceGroup),
         new("crm.approvals", Crm, "Onay bekleyen işlerim", "check-circle", "crm/onay-bekleyenler", 20, CrmAccess.ModuleKey, AnyPermission: [CrmAccess.QuotesApprove, ContractsAccess.ContractsApprove], Tone: AppTone.Teal, Group: CrmWorkspaceGroup),
         new("crm.quote-approvals", Crm, "Teklif onayları", "check-circle", "crm/teklif-onaylari", 21, CrmAccess.ModuleKey, CrmAccess.QuotesApprove, Tone: AppTone.Teal, Group: CrmWorkspaceGroup, MenuParentId: "crm.approvals"),

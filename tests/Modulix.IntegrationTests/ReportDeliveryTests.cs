@@ -36,6 +36,42 @@ public class ReportDeliveryTests(ModulixApiFactory factory) : IClassFixture<Modu
     // ---- Dışa aktarma
 
     [Fact]
+    public async Task Xlsx_export_has_the_same_rows_as_the_screen_downloads_with_the_right_type_and_rejects_unknown_formats()
+    {
+        var s = await SetUpAsync();
+        await OpenAsync(s.Admin, s.CompanyId, "Alfa", 100m);
+        await OpenAsync(s.Admin, s.CompanyId, "=Formül", 200m);
+        var report = await SaveAsync(s.Admin, "Excel özeti", new ReportSpecDto { Dataset = Opportunities, Columns = ["title", "amount"] });
+
+        var export = await ReadAsync<ReportExportDto>(await s.Admin.PostAsync($"{Reports}/{report.Summary.Id}/exports?format=xlsx", null), HttpStatusCode.Created);
+        Assert.EndsWith(".xlsx", export.FileName);
+        var response = await s.Admin.GetAsync($"{Reports}/exports/{export.Id}/download");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", response.Content.Headers.ContentType!.MediaType);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal((byte)'P', bytes[0]);   // zip imzası "PK"
+        Assert.Equal((byte)'K', bytes[1]);
+        using var zip = new System.IO.Compression.ZipArchive(new MemoryStream(bytes), System.IO.Compression.ZipArchiveMode.Read);
+        using var reader = new StreamReader(zip.GetEntry("xl/worksheets/sheet1.xml")!.Open());
+        var sheet = await reader.ReadToEndAsync();
+        Assert.Contains("Alfa", sheet);
+        Assert.Contains("=Formül", sheet);
+        Assert.DoesNotContain("<f>", sheet);   // formül yok, metin hücresi
+
+        // Kayıtsız tanım da xlsx verebilir; bilinmeyen biçim reddedilir (400).
+        var adhoc = await s.Admin.PostAsJsonAsync($"{Reports}/exports?format=xlsx", new ExportReportRequest(new ReportSpecDto { Dataset = Opportunities, Columns = ["title"] }, "Kayıtsız"));
+        Assert.EndsWith(".xlsx", (await ReadAsync<ReportExportDto>(adhoc, HttpStatusCode.Created)).FileName);
+        Assert.Equal(HttpStatusCode.BadRequest, (await s.Admin.PostAsync($"{Reports}/{report.Summary.Id}/exports?format=pdf", null)).StatusCode);
+
+        // Varsayılan hâlâ CSV'dir ve başka tenant xlsx dosyasını indiremez.
+        var csv = await ReadAsync<ReportExportDto>(await s.Admin.PostAsync($"{Reports}/{report.Summary.Id}/exports", null), HttpStatusCode.Created);
+        Assert.EndsWith(".csv", csv.FileName);
+        var other = await SetUpAsync();
+        Assert.Equal(HttpStatusCode.NotFound, (await other.Admin.GetAsync($"{Reports}/exports/{export.Id}/download")).StatusCode);
+    }
+
+    [Fact]
     public async Task Export_equals_the_on_screen_result_and_downloads_as_a_safe_csv_attachment()
     {
         var s = await SetUpAsync();

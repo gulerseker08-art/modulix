@@ -93,11 +93,7 @@
                             <FieldError Field="name" Errors="errors" />
                             break;
                         case "isActive":
-                            <label class="@f.LabelClass()" for="location-active">@f.Label</label>
-                            <select id="location-active" class="form-select" @bind="form.IsActive">
-                                <option value="True">Etkin</option>
-                                <option value="False">Pasif</option>
-                            </select>
+                            <SegmentedChoice Id="location-active" Label="@f.Label" LabelClass="@f.LabelClass()" Options="SegmentOptions.Active" @bind-Value="form.IsActive" />
                             <FieldError Field="isActive" Errors="errors" />
                             break;
                     }

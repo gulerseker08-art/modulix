@@ -7,9 +7,12 @@
 @if (Session.Can(ReportAccess.Export))
 {
     <div class="report-export">
-        <button type="button" class="btn btn-outline-secondary" disabled="@(Disabled || busy)" aria-describedby="rx-help" @onclick="ExportAsync">
+        <button type="button" class="btn btn-outline-secondary" disabled="@(Disabled || busy)" aria-describedby="rx-help" @onclick='() => RunExportAsync("csv")'>
             @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
             CSV olarak dışa aktar
+        </button>
+        <button type="button" class="btn btn-outline-secondary ms-2" disabled="@(Disabled || busy)" aria-describedby="rx-help" @onclick='() => RunExportAsync("xlsx")'>
+            Excel olarak dışa aktar
         </button>
         <span id="rx-help" class="form-text ms-2">Ekrandaki sonuçla aynı hesaptan, yalnızca sizin yetkinizle üretilir; yetkiniz olmayan hassas alanlar dosyada yer almaz.</span>
 
@@ -65,7 +68,7 @@
 
     [Parameter] public bool Disabled { get; set; }
 
-    private async Task ExportAsync()
+    private async Task RunExportAsync(string format)
     {
         busy = true;
         error = null;
@@ -73,8 +76,8 @@
         export = null;
         issues = [];
         var result = ReportId is { } id
-            ? await Api.PostAsync<ReportExportDto>($"/api/reports/{id}/exports", new { })
-            : await Api.PostAsync<ReportExportDto>("/api/reports/exports", new ExportReportRequest(Spec, string.IsNullOrWhiteSpace(Name) ? null : Name.Trim()));
+            ? await Api.PostAsync<ReportExportDto>($"/api/reports/{id}/exports?format={format}", new { })
+            : await Api.PostAsync<ReportExportDto>($"/api/reports/exports?format={format}", new ExportReportRequest(Spec, string.IsNullOrWhiteSpace(Name) ? null : Name.Trim()));
         busy = false;
         if (result.IsSuccess)
         {

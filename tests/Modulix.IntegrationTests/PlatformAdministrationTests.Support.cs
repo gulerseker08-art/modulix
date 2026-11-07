@@ -244,4 +244,40 @@ public partial class PlatformAdministrationTests
         var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         Assert.Single(await db.SupportAccessGrants.AsNoTracking().Where(g => g.TenantId == tenant.Id).ToListAsync());
     }
+
+    [Fact]
+    public async Task Support_access_does_not_see_sensitive_fields()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var owner = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [CompaniesRead, CompaniesWrite, OpportunitiesRead, OpportunitiesWrite, OpportunityAmountsRead], owner);
+        using var ownerClient = await LoginAsync(owner);
+        var company = (await (await ownerClient.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Gizli Ltd."))).Content.ReadFromJsonAsync<CompanyDto>())!;
+        var opportunity = (await (await ownerClient.PostAsJsonAsync("/api/crm/opportunities",
+            new SaveOpportunityRequest("Büyük iş", company.Id, Amount: 250_000m, Currency: "EUR", Probability: 60))).Content.ReadFromJsonAsync<OpportunityDto>())!;
+        Assert.Equal(250_000m, (await ownerClient.GetFromJsonAsync<OpportunityDto>($"/api/crm/opportunities/{opportunity.Id}"))!.Amount);
+
+        var (support, _) = await LoginSupportAsync();
+        using var supportClient = support;
+        Assert.Equal(HttpStatusCode.Created, (await supportClient.PostAsJsonAsync(
+            $"/api/platform/tenants/{tenant.Id}/support-access", new GrantSupportAccessRequest("Tutar sorunu", 30))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await supportClient.PostAsJsonAsync("/api/auth/active-tenant", new SelectTenantRequest(tenant.Id))).StatusCode);
+
+        // Kayıt görünür, hassas alanlar (tutar, olasılık) hiçbir okuma yolunda gelmez; para birimi ve başlık gelir.
+        var read = (await supportClient.GetFromJsonAsync<OpportunityDto>($"/api/crm/opportunities/{opportunity.Id}"))!;
+        Assert.Equal("Büyük iş", read.Title);
+        Assert.Null(read.Amount);
+        Assert.Null(read.Probability);
+        Assert.DoesNotContain("250000", await supportClient.GetStringAsync($"/api/records/crm.opportunity/{opportunity.Id}"));
+        Assert.Null(Assert.Single((await supportClient.GetFromJsonAsync<CrmPage<OpportunityDto>>($"/api/crm/opportunities?companyId={company.Id}"))!.Items).Amount);
+        Assert.DoesNotContain("250000", await supportClient.GetStringAsync($"/api/records/crm.opportunity/{opportunity.Id}/history"));
+
+        // Rol da hassas alan iznini taşımaz.
+        using var roleScope = factory.OpenScope(tenant.Id);
+        var role = (await roleScope.ServiceProvider.GetRequiredService<Modulix.Core.Authorization.IRoleService>().ListAsync(CancellationToken.None))
+            .Single(r => r.Name == "Destek erişimi (salt okunur)");
+        Assert.DoesNotContain(OpportunityAmountsRead, role.Permissions);
+        Assert.Contains(OpportunitiesRead, role.Permissions);
+    }
 }

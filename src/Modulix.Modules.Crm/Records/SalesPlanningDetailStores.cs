@@ -118,3 +118,64 @@ internal sealed class SalesTargetRevisionRecordStore(CrmStoreContext context) : 
     protected override IQueryable<SalesTargetRevision> Search(IQueryable<SalesTargetRevision> source, string term) =>
         source.Where(r => r.Reason.Contains(term));
 }
+
+/// <summary>
+/// Tahmin düzeltme geçmişi (eski/yeni değer, gerekçe, yapan, zaman), <b>salt okunur</b> ve değişmez (ADR-0026). Satırlar yalnızca tahmin düzeltme akışıyla
+/// yazılır. Görünürlük fırsatın bugünkü sorumlusuna göre belirlenir (<see cref="ForecastItemRecordStore"/> ile aynı kural). Eski/yeni değer tutar ya da
+/// olasılık taşıyabildiği için fırsat tutarı iznine bağlı hassas alandır.
+/// </summary>
+internal sealed class ForecastAdjustmentRecordStore(CrmStoreContext context) : CrmRecordStore<ForecastAdjustment>(context), IRecordStore
+{
+    public override string EntityKey => CrmModule.Entities.ForecastAdjustment;
+
+    protected override string ReadPermission => CrmModule.Permissions.ForecastsRead;
+
+    protected override string WritePermission => CrmModule.Permissions.ForecastsWrite;
+
+    protected override bool DefaultsOwnerToCurrentUser => false;
+
+    IReadOnlyList<string>? IRecordStore.AnyPermissionFor(RecordOperation operation) => operation == RecordOperation.Read ? null : [];
+
+    protected override string ScopeEntityKey => CrmModule.Entities.Opportunity;
+
+    protected override bool UsesScope => true;
+
+    protected override IQueryable<ForecastAdjustment> ScopeToOwners(IQueryable<ForecastAdjustment> source, IReadOnlySet<Guid> owners) =>
+        source.Where(a => Context.Data.Set<Opportunity>().Any(o => o.Id == a.OpportunityId && o.OwnerId != null && owners.Contains(o.OwnerId.Value)));
+
+    protected override async Task<bool> IsInScopeAsync(RecordData record, IReadOnlySet<Guid> owners, CancellationToken cancellationToken)
+    {
+        if (record.Values["opportunityId"] is not JsonValue value || !value.TryGetValue<string>(out var text) || !Guid.TryParse(text, out var opportunityId))
+        {
+            return false;
+        }
+
+        var current = await Context.Data.Set<Opportunity>().AsNoTracking().Where(o => o.Id == opportunityId).Select(o => o.OwnerId).SingleOrDefaultAsync(cancellationToken);
+        return current is { } owner && owners.Contains(owner);
+    }
+
+    protected override IReadOnlyList<RecordField<ForecastAdjustment>> Fields { get; } =
+    [
+        Field.Id<ForecastAdjustment>("submissionId", a => a.SubmissionId, (_, _) => { }).AsSystem(),
+        Field.Id<ForecastAdjustment>("opportunityId", a => a.OpportunityId, (_, _) => { }).AsSystem(),
+        Field.Choice<ForecastAdjustment>("kind", ForecastAdjustmentKind.All, a => a.Kind, (_, _) => { }).AsSystem(),
+        Field.Text<ForecastAdjustment>("fromValue", ForecastAdjustment.ValueMaxLength, a => a.FromValue, (_, _) => { }).AsSystem(),
+        Field.Text<ForecastAdjustment>("toValue", ForecastAdjustment.ValueMaxLength, a => a.ToValue, (_, _) => { }).AsSystem(),
+        Field.Text<ForecastAdjustment>("reason", ForecastRules.ReasonMaxLength, a => a.Reason, (_, _) => { }).AsSystem(),
+        Field.Id<ForecastAdjustment>("changedBy", a => a.ChangedBy, (_, _) => { }).AsSystem(),
+        Field.Time<ForecastAdjustment>("changedAt", a => a.CreatedAt, (_, _) => { }).AsSystem(),
+    ];
+
+    protected override IReadOnlyDictionary<string, RecordFilter<ForecastAdjustment>> Filters { get; } = new Dictionary<string, RecordFilter<ForecastAdjustment>>
+    {
+        ["submissionId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(a => a.SubmissionId == id) : null,
+        ["opportunityId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(a => a.OpportunityId == id) : null,
+        ["kind"] = (q, v, _) => ForecastAdjustmentKind.All.Contains(v) ? q.Where(a => a.Kind == v) : null,
+    };
+
+    protected override IOrderedQueryable<ForecastAdjustment> Order(IQueryable<ForecastAdjustment> source) =>
+        source.OrderByDescending(a => a.CreatedAt).ThenBy(a => a.Id);
+
+    protected override IQueryable<ForecastAdjustment> Search(IQueryable<ForecastAdjustment> source, string term) =>
+        source.Where(a => a.Reason.Contains(term));
+}
