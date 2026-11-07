@@ -1,0 +1,799 @@
+@page "/yonetim/otomasyon/yeni"
+@page "/yonetim/otomasyon/{RuleId:guid}/duzenle"
+@using System.Text.Json
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsNew ? "Yeni otomasyon kuralı" : "Kuralı düzenle") · Modulix</PageTitle>
+
+@* Otomasyon kural düzenleyicisi (ADR-0027, Dilim 5c): genel bilgi, tetikleyici, koşul listesi ve aksiyon adımları. Kayıt yalnızca
+   taslak yazar (core.automation.manage); taslak yayınlanana kadar hiçbir şey çalıştırmaz. Alan, operatör ve izin doğrulaması
+   sunucudadır: "Doğrula" yan etkisiz önizlemeyi çağırır. Düzenleyicinin gösteremediği parçalar silinmeden korunur. *@
+<AuthGate Permission="@CoreAccess.ManageAutomation">
+    <a class="back-link" href="@(IsNew ? "yonetim/otomasyon" : $"yonetim/otomasyon/{RuleId}")">← @(IsNew ? "Otomasyon kuralları" : "Kural ayrıntısı")</a>
+
+    @if (catalog is null)
+    {
+        @if (loadError is not null)
+        {
+            <div class="alert alert-danger" role="alert">@loadError</div>
+        }
+        else
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        <PageHeader Title="@(IsNew ? "Yeni otomasyon kuralı" : "Kuralı düzenle")" Icon="zap"
+                    Subtitle="@(IsNew ? "Kural taslak olarak kaydedilir; yayınlanıp açılana kadar hiçbir şey çalıştırmaz." : "Kaydettiğinizde taslak güncellenir. Yayınlanmış sürüm, yeni taslak yayınlanana kadar çalışmaya devam eder.")" />
+
+        <Notice Text="@notice" />
+        @if (message is not null)
+        {
+            <div class="alert alert-danger" role="alert">@message</div>
+        }
+
+        <FormSection Title="Genel" Icon="clipboard-list">
+            <div class="form-grid">
+                <div class="span-6">
+                    <label class="form-label" for="ruleName">Kural adı *</label>
+                    <input id="ruleName" class="form-control" maxlength="200" placeholder="ör. Hareketsiz adaylar için takip" @bind="name" @bind:event="oninput" />
+                </div>
+                <div class="span-6">
+                    <label class="form-label" for="ruleEntity">Kayıt türü *</label>
+                    @if (IsNew)
+                    {
+                        <select id="ruleEntity" class="form-select" value="@entityKey" @onchange="e => ChooseEntity(e.Value?.ToString())">
+                            <option value="">Seçin…</option>
+                            @foreach (var candidate in catalog.Entities)
+                            {
+                                <option value="@candidate.EntityKey">@candidate.DisplayName</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input id="ruleEntity" class="form-control" readonly value="@(entity?.DisplayName ?? entityKey)" />
+                    }
+                </div>
+                <div class="span-12">
+                    <label class="form-label" for="ruleDescription">Açıklama</label>
+                    <input id="ruleDescription" class="form-control" maxlength="1000" @bind="description" />
+                </div>
+                <div class="span-6">
+                    <label class="form-label" for="rulePriority">Öncelik</label>
+                    <input id="rulePriority" class="form-control" type="number" min="0" max="1000" @bind="priority" />
+                    <small class="text-muted">Küçük sayı önce çalışır.</small>
+                </div>
+                <div class="span-6">
+                    <label class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="stopProcessing" />
+                        Bu kural çalışınca aynı kayıt için başka kural çalışmasın
+                    </label>
+                </div>
+            </div>
+        </FormSection>
+
+        @if (entity is not null)
+        {
+            <FormSection Title="Ne zaman" Icon="zap" Description="Kuralı başlatan olay ya da zamanlama.">
+                @if (definition.Trigger.IsLocked)
+                {
+                    <p class="text-muted" role="status">
+                        Bu kuralın tetikleyicisi (@AutomationLabels.TriggerType(definition.Trigger.Type)) bu ekranda düzenlenemez; olduğu gibi korunur.
+                    </p>
+                }
+                else
+                {
+                    <div class="form-grid">
+                        <div class="span-6">
+                            <label class="form-label" for="triggerType">Tetikleyici</label>
+                            <select id="triggerType" class="form-select" value="@definition.Trigger.Type" @onchange="e => ChooseTrigger(e.Value?.ToString())">
+                                @foreach (var type in EditorTrigger.Types)
+                                {
+                                    <option value="@type">@AutomationLabels.TriggerType(type)</option>
+                                }
+                            </select>
+                        </div>
+                        @switch (definition.Trigger.Type)
+                        {
+                            case EditorTrigger.FieldChanged:
+                                <div class="span-12">
+                                    <span class="form-label">İzlenen alanlar (en az bir)</span>
+                                    <div class="chip-group">
+                                        @foreach (var field in entity.Fields)
+                                        {
+                                            var key = field.Key;
+                                            <label class="form-check">
+                                                <input class="form-check-input" type="checkbox" checked="@definition.Trigger.Fields.Contains(key)"
+                                                       @onchange="e => ToggleWatched(key, (bool)(e.Value ?? false))" />
+                                                @field.Label
+                                            </label>
+                                        }
+                                    </div>
+                                </div>
+                                break;
+
+                            case EditorTrigger.StatusTransition:
+                                <div class="span-6">
+                                    <label class="form-label" for="statusField">Durum alanı</label>
+                                    <select id="statusField" class="form-select" value="@definition.Trigger.Field" @onchange="e => ChooseStatusField(e.Value?.ToString())">
+                                        <option value="">Seçin…</option>
+                                        @foreach (var field in entity.Fields.Where(f => f.Type == "Choice"))
+                                        {
+                                            <option value="@field.Key">@field.Label</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="span-6">
+                                    <label class="form-label" for="statusFrom">Önceki değer</label>
+                                    @if (StatusOptions().Count > 0)
+                                    {
+                                        <select id="statusFrom" class="form-select" value="@(definition.Trigger.From ?? "")" @onchange="e => definition.Trigger.From = Empty(e.Value?.ToString())">
+                                            <option value="">Herhangi bir değer</option>
+                                            @foreach (var o in StatusOptions())
+                                            {
+                                                <option value="@o.Key">@o.Label</option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <input id="statusFrom" class="form-control" placeholder="Boşsa herhangi bir değer" value="@(definition.Trigger.From ?? "")" @onchange="e => definition.Trigger.From = Empty(e.Value?.ToString())" />
+                                    }
+                                </div>
+                                <div class="span-6">
+                                    <label class="form-label" for="statusTo">Yeni değer *</label>
+                                    @if (StatusOptions().Count > 0)
+                                    {
+                                        <select id="statusTo" class="form-select" value="@definition.Trigger.To" @onchange="e => definition.Trigger.To = e.Value?.ToString() ?? string.Empty">
+                                            <option value="">Seçin…</option>
+                                            @foreach (var o in StatusOptions())
+                                            {
+                                                <option value="@o.Key">@o.Label</option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <input id="statusTo" class="form-control" @bind="definition.Trigger.To" />
+                                    }
+                                </div>
+                                break;
+
+                            case EditorTrigger.Scheduled:
+                                <div class="span-6">
+                                    <label class="form-label" for="timeOfDay">Saat (firma saat dilimi)</label>
+                                    <input id="timeOfDay" class="form-control" type="time" value="@definition.Trigger.TimeOfDay" @onchange="e => definition.Trigger.TimeOfDay = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                break;
+
+                            case EditorTrigger.DateRelative:
+                                <div class="span-6">
+                                    <label class="form-label" for="dateField">Tarih alanı</label>
+                                    <select id="dateField" class="form-select" value="@definition.Trigger.Field" @onchange="e => definition.Trigger.Field = e.Value?.ToString() ?? string.Empty">
+                                        <option value="">Seçin…</option>
+                                        @foreach (var field in entity.Fields.Where(f => f.Type is "Date" or "DateTime"))
+                                        {
+                                            <option value="@field.Key">@field.Label</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="span-3">
+                                    <label class="form-label" for="offsetDays">Kaç gün</label>
+                                    <input id="offsetDays" class="form-control" type="number" min="0" max="3650" value="@Math.Abs(definition.Trigger.OffsetDays)"
+                                           @onchange="e => SetOffset(e.Value?.ToString(), OffsetIsBefore)" />
+                                </div>
+                                <div class="span-3">
+                                    <label class="form-label" for="offsetDirection">Tarihten</label>
+                                    <select id="offsetDirection" class="form-select" value="@(OffsetIsBefore ? "before" : "after")"
+                                            @onchange="e => ChooseOffsetDirection(e.Value?.ToString())">
+                                        <option value="before">önce</option>
+                                        <option value="after">sonra</option>
+                                    </select>
+                                </div>
+                                break;
+
+                            case EditorTrigger.Inactivity:
+                                <div class="span-6">
+                                    <label class="form-label" for="inactivityRelation">Hareket kaynağı</label>
+                                    <select id="inactivityRelation" class="form-select" value="@definition.Trigger.Relation" @onchange="e => definition.Trigger.Relation = e.Value?.ToString() ?? string.Empty">
+                                        <option value="">Seçin…</option>
+                                        @foreach (var relation in entity.Relations)
+                                        {
+                                            <option value="@relation.Key">@relation.Label</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="span-6">
+                                    <label class="form-label" for="inactivityDays">Kaç gündür hareket yoksa</label>
+                                    <input id="inactivityDays" class="form-control" type="number" min="1" max="3650" @bind="definition.Trigger.Days" />
+                                </div>
+                                break;
+                        }
+                    </div>
+                }
+            </FormSection>
+
+            <FormSection Title="Hangi koşulda" Icon="filter" Description="Boş bırakılırsa tetikleyici olan her kayıtta çalışır.">
+                <Actions>
+                    @if (!definition.Condition.IsLocked)
+                    {
+                        <button type="button" class="btn btn-tonal" @onclick="AddLeaf">Koşul ekle</button>
+                    }
+                </Actions>
+                <ChildContent>
+                    @if (definition.Condition.IsLocked)
+                    {
+                        <div class="alert alert-warning" role="status">
+                            Bu kuralın koşulu iç içe gruplar ya da ilişki sorgusu içeriyor; bu ekranda düzenlenemez ve olduğu gibi korunur.
+                            <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="ClearLockedCondition">Koşulu kaldırıp yeniden kur</button>
+                        </div>
+                    }
+                    else if (definition.Condition.Leaves.Count == 0)
+                    {
+                        <p class="text-muted" role="status">Koşul yok.</p>
+                    }
+                    else
+                    {
+                        @if (definition.Condition.Leaves.Count > 1)
+                        {
+                            <div class="form-grid">
+                                <div class="span-6">
+                                    <label class="form-label" for="conditionLogic">Koşulların birleşimi</label>
+                                    <select id="conditionLogic" class="form-select" @bind="definition.Condition.Logic">
+                                        <option value="@EditorCondition.And">@AutomationLabels.Logic(EditorCondition.And)</option>
+                                        <option value="@EditorCondition.Or">@AutomationLabels.Logic(EditorCondition.Or)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        }
+
+                        @for (var i = 0; i < definition.Condition.Leaves.Count; i++)
+                        {
+                            var leaf = definition.Condition.Leaves[i];
+                            var leafField = FieldOf(leaf.Field);
+                            var count = EditorLeaf.ValueCount(leaf.Operator);
+                            var number = i + 1;
+                            <div class="form-grid" role="group" aria-label="@($"Koşul {number}")">
+                                <div class="span-4">
+                                    <label class="form-label" for="@($"leafField{number}")">Alan</label>
+                                    <select id="@($"leafField{number}")" class="form-select" value="@leaf.Field" @onchange="e => ChooseLeafField(leaf, e.Value?.ToString())">
+                                        <option value="">Seçin…</option>
+                                        @foreach (var field in entity.Fields)
+                                        {
+                                            <option value="@field.Key">@field.Label</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="span-4">
+                                    <label class="form-label" for="@($"leafOp{number}")">Koşul</label>
+                                    <select id="@($"leafOp{number}")" class="form-select" value="@leaf.Operator" @onchange="e => ChooseOperator(leaf, e.Value?.ToString())" disabled="@(leafField is null)">
+                                        @if (leafField is not null)
+                                        {
+                                            @foreach (var op in OperatorsFor(leafField))
+                                            {
+                                                <option value="@EditorLeaf.OperatorKey(op)">@AutomationLabels.Operator(op)</option>
+                                            }
+                                        }
+                                    </select>
+                                </div>
+                                <div class="span-4">
+                                    @if (leafField is not null && count.Max > 0)
+                                    {
+                                        <span class="form-label">Değer</span>
+                                        @if (count.Max == 2)
+                                        {
+                                            <div class="d-flex gap-2">
+                                                <input class="form-control" type="@InputType(leafField)" aria-label="İlk değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())" />
+                                                <input class="form-control" type="@InputType(leafField)" aria-label="İkinci değer" value="@ValueAt(leaf, 1)" @onchange="e => SetValueAt(leaf, 1, e.Value?.ToString())" />
+                                            </div>
+                                        }
+                                        else if (count.Max > 2 && leafField.Options.Count > 0)
+                                        {
+                                            <div class="chip-group">
+                                                @foreach (var o in leafField.Options)
+                                                {
+                                                    var optionKey = o.Key;
+                                                    <label class="form-check">
+                                                        <input class="form-check-input" type="checkbox" checked="@leaf.Values.Contains(optionKey)"
+                                                               @onchange="e => ToggleValue(leaf, optionKey, (bool)(e.Value ?? false))" />
+                                                        @o.Label
+                                                    </label>
+                                                }
+                                            </div>
+                                        }
+                                        else if (count.Max > 2)
+                                        {
+                                            <input class="form-control" aria-label="Değerler" placeholder="Virgülle ayırın" value="@string.Join(", ", leaf.Values)"
+                                                   @onchange="e => SetList(leaf, e.Value?.ToString())" />
+                                        }
+                                        else if (leafField.Options.Count > 0)
+                                        {
+                                            <select class="form-select" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())">
+                                                <option value="">Seçin…</option>
+                                                @foreach (var o in leafField.Options)
+                                                {
+                                                    <option value="@o.Key">@o.Label</option>
+                                                }
+                                            </select>
+                                        }
+                                        else if (leafField.Type == "Boolean")
+                                        {
+                                            <select class="form-select" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())">
+                                                <option value="">Seçin…</option>
+                                                <option value="true">Evet</option>
+                                                <option value="false">Hayır</option>
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <input class="form-control" type="@InputType(leafField)" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())" />
+                                        }
+
+                                        @if (leafField.Type == "Money")
+                                        {
+                                            <input class="form-control mt-2" maxlength="3" aria-label="Para birimi" placeholder="Para birimi (ör. TRY)" value="@leaf.Currency" @onchange="e => leaf.Currency = Empty(e.Value?.ToString()?.ToUpperInvariant())" />
+                                        }
+                                    }
+                                    @if (definition.Trigger.HasChanges)
+                                    {
+                                        <select class="form-select mt-2" aria-label="Hangi değere bakılsın" @bind="leaf.Source">
+                                            <option value="new">Yeni değere bak</option>
+                                            <option value="old">Eski değere bak</option>
+                                        </select>
+                                    }
+                                    <button type="button" class="btn btn-sm btn-outline-danger mt-2" @onclick="() => RemoveLeaf(leaf)">Koşulu kaldır</button>
+                                </div>
+                            </div>
+                        }
+                    }
+                </ChildContent>
+            </FormSection>
+
+            <FormSection Title="Ne yapar" Icon="check" Description="Adımlar sırayla çalışır; başarısız bir adım kalanları durdurur.">
+                <Actions>
+                    <button type="button" class="btn btn-tonal" @onclick="AddAction">Aksiyon ekle</button>
+                </Actions>
+                <ChildContent>
+                    @if (definition.Actions.Count == 0)
+                    {
+                        <p class="text-muted" role="status">Henüz aksiyon yok. Kuralın bir şey yapması için en az bir aksiyon ekleyin.</p>
+                    }
+
+                    @for (var i = 0; i < definition.Actions.Count; i++)
+                    {
+                        var step = definition.Actions[i];
+                        var def = catalog.Actions.FirstOrDefault(a => a.Key == step.Action);
+                        var number = i + 1;
+                        <div class="section-card" role="group" aria-label="@($"Adım {number}")">
+                            <div class="section-card-head">
+                                <div class="section-card-heading"><h3 class="section-card-title">Adım @number</h3>
+                                    @if (def is not null)
+                                    {
+                                        <p class="section-card-description">@def.Description</p>
+                                    }
+                                </div>
+                                <div class="section-card-actions">
+                                    <button type="button" class="btn btn-ghost" disabled="@(i == 0)" @onclick="() => MoveAction(step, -1)">Yukarı</button>
+                                    <button type="button" class="btn btn-ghost" disabled="@(i == definition.Actions.Count - 1)" @onclick="() => MoveAction(step, 1)">Aşağı</button>
+                                    <button type="button" class="btn btn-outline-danger" @onclick="() => RemoveAction(step)">Kaldır</button>
+                                </div>
+                            </div>
+                            <div class="section-card-body">
+                                <div class="form-grid">
+                                    <div class="span-6">
+                                        <label class="form-label" for="@($"action{number}")">Aksiyon</label>
+                                        <select id="@($"action{number}")" class="form-select" value="@step.Action" @onchange="e => ChooseAction(step, e.Value?.ToString())">
+                                            <option value="">Seçin…</option>
+                                            @foreach (var a in catalog.Actions)
+                                            {
+                                                <option value="@a.Key" disabled="@(!a.Available && a.Key != step.Action)">@a.DisplayName@(a.Available ? "" : " (kullanılamıyor)")</option>
+                                            }
+                                        </select>
+                                        @if (def is { Available: false })
+                                        {
+                                            <small class="text-muted">@(def.UnavailableReason ?? "Bu aksiyon şu an kullanılamıyor.")</small>
+                                        }
+                                    </div>
+                                    @if (def is not null)
+                                    {
+                                        @foreach (var parameter in def.Parameters)
+                                        {
+                                            var p = parameter;
+                                            <div class="span-6">
+                                                <label class="form-label">@p.Label@(p.Required ? " *" : "")</label>
+                                                @if (step.BoundField(p.Name) is { } bound)
+                                                {
+                                                    <div class="d-flex gap-2 align-items-center">
+                                                        <span>Kayıttan: @(FieldOf(bound)?.Label ?? bound)</span>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => step.Parameters.Remove(p.Name)">Sabit değere çevir</button>
+                                                    </div>
+                                                }
+                                                else if (p.Options.Count > 0)
+                                                {
+                                                    <select class="form-select" aria-label="@p.Label" value="@step.ValueText(p.Name)" @onchange="e => step.SetValue(p.Name, p.Type, e.Value?.ToString())">
+                                                        <option value="">Seçin…</option>
+                                                        @foreach (var o in p.Options)
+                                                        {
+                                                            <option value="@o.Key">@o.Label</option>
+                                                        }
+                                                    </select>
+                                                }
+                                                else if (p.Type == "Boolean")
+                                                {
+                                                    <select class="form-select" aria-label="@p.Label" value="@step.ValueText(p.Name).ToLowerInvariant()" @onchange="e => step.SetValue(p.Name, p.Type, e.Value?.ToString())">
+                                                        <option value="">Seçin…</option>
+                                                        <option value="true">Evet</option>
+                                                        <option value="false">Hayır</option>
+                                                    </select>
+                                                }
+                                                else
+                                                {
+                                                    <input class="form-control" type="@ParameterInputType(p.Type)" aria-label="@p.Label" value="@step.ValueText(p.Name)"
+                                                           @onchange="e => step.SetValue(p.Name, p.Type, e.Value?.ToString())" />
+                                                }
+
+                                                @if (!string.IsNullOrWhiteSpace(p.Description))
+                                                {
+                                                    <small class="text-muted">@p.Description</small>
+                                                }
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </ChildContent>
+            </FormSection>
+
+            <FormSection Title="Doğrulama" Icon="check" Description="Kaydetmeden önce kuralı sunucuda yan etkisiz denetler; hiçbir şey çalıştırmaz.">
+                <Actions>
+                    <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="ValidateAsync">Doğrula</button>
+                </Actions>
+                <ChildContent>
+                    @if (preview is null)
+                    {
+                        <p class="text-muted" role="status">Henüz doğrulanmadı.</p>
+                    }
+                    else
+                    {
+                        @if (preview.Issues.Count > 0)
+                        {
+                            <div class="alert alert-warning" role="alert">
+                                <strong>Düzeltilmesi gerekenler</strong>
+                                <ul class="mb-0">
+                                    @foreach (var issue in preview.Issues)
+                                    {
+                                        <li>@issue.Message</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                        else
+                        {
+                            <p role="status">Sorun bulunmadı.</p>
+                        }
+
+                        <dl class="detail-grid">
+                            <dt>Ne zaman</dt>
+                            <dd>@preview.TriggerText</dd>
+                            @if (!string.IsNullOrWhiteSpace(preview.ConditionText))
+                            {
+                                <dt>Koşul</dt>
+                                <dd>@preview.ConditionText</dd>
+                            }
+                        </dl>
+                        @foreach (var warning in preview.Warnings)
+                        {
+                            <p class="text-muted">@warning</p>
+                        }
+                    }
+                </ChildContent>
+            </FormSection>
+
+            <div class="form-actions">
+                <a class="btn btn-outline-secondary" href="@(IsNew ? "yonetim/otomasyon" : $"yonetim/otomasyon/{RuleId}")">Vazgeç</a>
+                <button type="button" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name))" @onclick="SaveAsync">Taslağı kaydet</button>
+            </div>
+        }
+    }
+</AuthGate>
+
+@code {
+    private const int DefaultPriority = 100;
+
+    [Parameter] public Guid? RuleId { get; set; }
+
+    private bool IsNew => RuleId is null;
+
+    private AutomationCatalogDto? catalog;
+    private string? loadError;
+    private string? message;
+    private string? notice;
+    private bool busy;
+    private bool loaded;
+
+    private string entityKey = string.Empty;
+    private string name = string.Empty;
+    private string? description;
+    private int priority = DefaultPriority;
+    private bool stopProcessing;
+    private DateTimeOffset? activeFrom;
+    private DateTimeOffset? activeUntil;
+    private long? expectedVersion;
+    private EditorDefinition definition = new();
+    private AutomationPreviewDto? preview;
+
+    private AutomationEntityDto? entity => catalog?.Entities.FirstOrDefault(e => e.EntityKey == entityKey);
+
+    private bool OffsetIsBefore => definition.Trigger.OffsetDays <= 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (loaded || !Session.Can(CoreAccess.ManageAutomation))
+        {
+            return;
+        }
+
+        loaded = true;
+        var catalogResult = await Api.GetAsync<AutomationCatalogDto>("/api/automation/catalog");
+        if (catalogResult.Value is null)
+        {
+            loadError = catalogResult.Error ?? "Kural kataloğu alınamadı.";
+            return;
+        }
+
+        if (RuleId is { } id)
+        {
+            var result = await Api.GetAsync<AutomationRuleDetailDto>($"/api/automation/rules/{id}");
+            if (result.Value is not { } detail)
+            {
+                loadError = result.Error ?? "Kural bulunamadı.";
+                return;
+            }
+
+            // Düzenleme taslak üzerindedir; taslak yoksa yayınlanmış sürümden yeni taslak açılır.
+            var version = detail.Draft ?? detail.Published;
+            if (version is null)
+            {
+                loadError = "Kuralın düzenlenecek bir sürümü yok.";
+                return;
+            }
+
+            entityKey = detail.Rule.EntityKey;
+            name = version.Name;
+            description = version.Description;
+            priority = version.Priority;
+            stopProcessing = version.StopProcessing;
+            activeFrom = version.ActiveFrom;
+            activeUntil = version.ActiveUntil;
+            expectedVersion = detail.Rule.Version;
+            definition = EditorDefinition.Parse(version.Definition);
+            if (detail.Draft is null)
+            {
+                notice = "Yayınlanmış sürümden yeni bir taslak hazırlanıyor; kaydedene kadar hiçbir şey değişmez.";
+            }
+        }
+
+        catalog = catalogResult.Value;
+    }
+
+    private void ChooseEntity(string? key)
+    {
+        entityKey = key ?? string.Empty;
+        definition = new EditorDefinition();
+        preview = null;
+    }
+
+    private AutomationFieldDto? FieldOf(string key) => entity?.Fields.FirstOrDefault(f => f.Key == key);
+
+    private static string? Empty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private IReadOnlyList<AutomationOptionDto> StatusOptions() => FieldOf(definition.Trigger.Field)?.Options ?? [];
+
+    // Tetikleyici
+
+    private void ChooseTrigger(string? type)
+    {
+        definition.Trigger.ChangeType(type ?? EditorTrigger.Manual);
+
+        // Değişiklik operatörleri ve eski değer yalnızca güncelleme tetikleyicilerinde geçerlidir; yanlış kalmasın.
+        if (!definition.Trigger.HasChanges)
+        {
+            foreach (var leaf in definition.Condition.Leaves.Where(l => EditorLeaf.IsChange(l.Operator) || l.Source == "old"))
+            {
+                leaf.Source = "new";
+                if (EditorLeaf.IsChange(leaf.Operator))
+                {
+                    leaf.Operator = FirstOperator(FieldOf(leaf.Field));
+                    leaf.Values = [];
+                }
+            }
+        }
+    }
+
+    private void ToggleWatched(string key, bool on)
+    {
+        var fields = definition.Trigger.Fields;
+        if (on && !fields.Contains(key))
+        {
+            fields.Add(key);
+        }
+        else if (!on)
+        {
+            fields.Remove(key);
+        }
+    }
+
+    private void ChooseStatusField(string? key)
+    {
+        definition.Trigger.Field = key ?? string.Empty;
+        definition.Trigger.From = null;
+        definition.Trigger.To = string.Empty;
+    }
+
+    private void SetOffset(string? days, bool before)
+    {
+        var amount = int.TryParse(days, out var parsed) ? Math.Abs(parsed) : 0;
+        definition.Trigger.OffsetDays = before ? -amount : amount;
+    }
+
+    private void ChooseOffsetDirection(string? direction) =>
+        SetOffset(Math.Abs(definition.Trigger.OffsetDays).ToString(), direction == "before");
+
+    // Koşullar
+
+    private IEnumerable<string> OperatorsFor(AutomationFieldDto field) =>
+        field.Operators.Where(o => definition.Trigger.HasChanges || !EditorLeaf.IsChange(EditorLeaf.OperatorKey(o)));
+
+    private string FirstOperator(AutomationFieldDto? field) =>
+        field is null ? "eq" : EditorLeaf.OperatorKey(OperatorsFor(field).FirstOrDefault() ?? "Eq");
+
+    private void AddLeaf() => definition.Condition.Leaves.Add(new EditorLeaf());
+
+    private void RemoveLeaf(EditorLeaf leaf) => definition.Condition.Leaves.Remove(leaf);
+
+    private void ClearLockedCondition() => definition.Condition = new EditorCondition();
+
+    private void ChooseLeafField(EditorLeaf leaf, string? key)
+    {
+        leaf.Field = key ?? string.Empty;
+        leaf.Operator = FirstOperator(FieldOf(leaf.Field));
+        leaf.Values = [];
+        leaf.Currency = null;
+    }
+
+    private void ChooseOperator(EditorLeaf leaf, string? op)
+    {
+        var before = EditorLeaf.ValueCount(leaf.Operator);
+        leaf.Operator = op ?? "eq";
+        if (EditorLeaf.ValueCount(leaf.Operator) != before)
+        {
+            leaf.Values = [];
+        }
+    }
+
+    private static string ValueAt(EditorLeaf leaf, int index) => index < leaf.Values.Count ? leaf.Values[index] : string.Empty;
+
+    private static void SetValueAt(EditorLeaf leaf, int index, string? value)
+    {
+        while (leaf.Values.Count <= index)
+        {
+            leaf.Values.Add(string.Empty);
+        }
+
+        leaf.Values[index] = value ?? string.Empty;
+    }
+
+    private static void SetList(EditorLeaf leaf, string? text) =>
+        leaf.Values = [.. (text ?? string.Empty).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)];
+
+    private static void ToggleValue(EditorLeaf leaf, string key, bool on)
+    {
+        if (on && !leaf.Values.Contains(key))
+        {
+            leaf.Values.Add(key);
+        }
+        else if (!on)
+        {
+            leaf.Values.Remove(key);
+        }
+    }
+
+    /// <summary>Alan tipine göre giriş türü: tarih ve sayı için tarayıcı denetimi; kalanı metin.</summary>
+    private static string InputType(AutomationFieldDto field) => field.Type switch
+    {
+        "Date" => "date",
+        "Number" or "Money" => "text",
+        _ => "text",
+    };
+
+    private static string ParameterInputType(string type) => type == "Date" ? "date" : "text";
+
+    // Aksiyonlar
+
+    private void AddAction() =>
+        definition.Actions.Add(new EditorAction { Id = definition.NextStepId() });
+
+    private void RemoveAction(EditorAction step) => definition.Actions.Remove(step);
+
+    private void MoveAction(EditorAction step, int direction)
+    {
+        var index = definition.Actions.IndexOf(step);
+        var target = index + direction;
+        if (index < 0 || target < 0 || target >= definition.Actions.Count)
+        {
+            return;
+        }
+
+        definition.Actions.RemoveAt(index);
+        definition.Actions.Insert(target, step);
+    }
+
+    private static void ChooseAction(EditorAction step, string? key)
+    {
+        step.Action = key ?? string.Empty;
+        step.Parameters = [];
+    }
+
+    // Doğrulama ve kayıt
+
+    private JsonElement DefinitionJson() => JsonSerializer.SerializeToElement(definition.Build());
+
+    private string ModuleKey => entity?.ModuleKey ?? string.Empty;
+
+    private async Task ValidateAsync()
+    {
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<AutomationPreviewDto>(
+            "/api/automation/preview", new PreviewAutomationRequest(ModuleKey, entityKey, DefinitionJson(), null, null));
+        busy = false;
+        preview = result.Value;
+        message = result.Value is null ? result.Error : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        notice = null;
+        ApiResult<AutomationRuleDetailDto> result;
+        if (RuleId is { } id)
+        {
+            result = await Api.PutAsync<AutomationRuleDetailDto>(
+                $"/api/automation/rules/{id}",
+                new UpdateAutomationRuleRequest(name.Trim(), description, priority, stopProcessing, activeFrom, activeUntil, DefinitionJson(), expectedVersion));
+        }
+        else
+        {
+            if (entity is null)
+            {
+                busy = false;
+                message = "Önce kayıt türünü seçin.";
+                return;
+            }
+
+            result = await Api.PostAsync<AutomationRuleDetailDto>(
+                "/api/automation/rules",
+                new CreateAutomationRuleRequest(ModuleKey, entityKey, name.Trim(), description, priority, stopProcessing, activeFrom, activeUntil, DefinitionJson()));
+        }
+
+        busy = false;
+        if (result.Value is { } saved)
+        {
+            Navigation.NavigateTo($"yonetim/otomasyon/{saved.Rule.Id}");
+            return;
+        }
+
+        // Sürüm çakışmasında (başkası değiştirdi) ve diğer hatalarda sunucunun iletisi gösterilir; yazdıklarınız kaybolmaz.
+        message = result.Status == System.Net.HttpStatusCode.Conflict
+            ? "Kural siz düzenlerken başkası tarafından değiştirildi. Yazdıklarınızı not alıp sayfayı yeniden açın."
+            : result.Error;
+    }
+}

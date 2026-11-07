@@ -89,6 +89,49 @@ public static class AutomationLabels
         _ => origin,
     };
 
+    // Kural düzenleyicisi (Dilim 5c): tetikleyici ve operatör adları.
+    public static string TriggerType(string type) => type switch
+    {
+        EditorTrigger.RecordCreated => "Kayıt oluşturulunca",
+        EditorTrigger.FieldChanged => "Alan değişince",
+        EditorTrigger.StatusTransition => "Durum değişince",
+        EditorTrigger.Scheduled => "Her gün belirli saatte",
+        EditorTrigger.DateRelative => "Tarihe göre (önce / sonra)",
+        EditorTrigger.Inactivity => "Hareketsizlik",
+        EditorTrigger.Manual => "Elle çalıştırılınca",
+        EditorTrigger.DomainEvent => "İş olayı",
+        _ => type,
+    };
+
+    /// <summary>Operatör adı (sunucu sözleşmesindeki ad: <c>Eq</c>, <c>WithinNextDays</c>…).</summary>
+    public static string Operator(string serverName) => EditorLeaf.OperatorKey(serverName) switch
+    {
+        "eq" => "eşittir",
+        "ne" => "eşit değildir",
+        "gt" => "büyüktür",
+        "gte" => "büyük ya da eşittir",
+        "lt" => "küçüktür",
+        "lte" => "küçük ya da eşittir",
+        "between" => "arasındadır",
+        "contains" => "içerir",
+        "startsWith" => "ile başlar",
+        "in" => "şunlardan biridir",
+        "notIn" => "şunlardan biri değildir",
+        "isEmpty" => "boştur",
+        "isNotEmpty" => "doludur",
+        "before" => "şu tarihten önce",
+        "after" => "şu tarihten sonra",
+        "withinNextDays" => "önümüzdeki … gün içindedir",
+        "withinLastDays" => "son … gün içindedir",
+        "olderThanDays" => "en az … gün önceye aittir",
+        "changed" => "değişti",
+        "changedTo" => "şuna değişti",
+        "changedFrom" => "şundan değişti",
+        _ => serverName,
+    };
+
+    public static string Logic(string logic) => logic == EditorCondition.Or ? "Herhangi biri sağlanırsa" : "Hepsi sağlanırsa";
+
     /// <summary>Yeniden deneme yalnızca başarısız çalışmada anlamlıdır (sunucu da bunu uygular).</summary>
     public static bool CanRetry(string runStatus) => runStatus == RunFailed;
 
