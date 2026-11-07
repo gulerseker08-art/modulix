@@ -173,6 +173,14 @@ if (TenantDataCommand.Matches(args))
     return;
 }
 
+// "license-apply" / "license-keygen" / "license-sign" komutları: on-prem imzalı lisans dosyası (ADR-0028 Dilim 7b).
+//   dotnet run --project src/Modulix.Api -- license-apply lisans.json
+if (LicenseCommand.Matches(args))
+{
+    Console.WriteLine(await LicenseCommand.RunAsync(app.Services, args));
+    return;
+}
+
 // "test-email" komutu: verilen adrese deneme e-postası gönderir ve sonucu yazar; SMTP ayarlarını sınamak içindir.
 //   dotnet run --project src/Modulix.Api -- test-email adres@ornek.com
 if (args.Contains("test-email", StringComparer.OrdinalIgnoreCase))

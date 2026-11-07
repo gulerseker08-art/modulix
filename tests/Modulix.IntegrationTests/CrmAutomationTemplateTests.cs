@@ -57,7 +57,8 @@ public class CrmAutomationTemplateTests(CrmAutomationFixture fixture) : IClassFi
         Assert.Equal(HttpStatusCode.OK, publish.StatusCode);
         Assert.Equal(1, (await RunRoundAsync(setup.Tenant.Id)).Scanned);
         Assert.Equal(lead, Assert.Single(await RunsAsync(setup.Tenant.Id)).RecordId);
-        Assert.Single(await ActivitiesAsync(setup.Tenant.Id));
+        // Şablonun konusundaki {{crm.lead.subject}} değişkeni kayıttan doldurulur (Dilim 4d).
+        Assert.Equal("Müşteri adayıyla yeniden iletişime geçin: Sessiz aday", Assert.Single(await ActivitiesAsync(setup.Tenant.Id)).Subject);
     }
 
     [Fact]

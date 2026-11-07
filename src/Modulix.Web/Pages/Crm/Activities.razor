@@ -37,22 +37,19 @@
         </button>
     </div>
 
+    @* Görünüm sekmeleri: hızlı süzgeçler sistem görünümleridir, kişisel görünümler (ADR-0036) ardına eklenir; takvim/liste kipi ayrı seçicidir. *@
+    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="Aktivite görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="activity-toolbar">
-        <div class="segmented" role="group" aria-label="Görünüm">
+        <div class="segmented" role="group" aria-label="Görünüm kipi">
             @foreach (var (value, label) in Modes)
             {
                 <button type="button" class="chip @(mode == value ? "active" : null)" aria-pressed="@((mode == value) ? "true" : "false")" @onclick="() => SwitchModeAsync(value)">@label</button>
             }
         </div>
-    </div>
-
-    <div class="filters" role="group" aria-label="Hızlı filtre">
-        @foreach (var (value, label) in Quick)
+        @if (mode == Mode.List)
         {
-            @if (value != QuickFilter.Team || Session.Can(CrmAccess.ActivitiesManageCalendar))
-            {
-                <button type="button" class="chip @(quick == value ? "active" : null)" aria-pressed="@((quick == value) ? "true" : "false")" @onclick="() => SwitchQuickAsync(value)">@label</button>
-            }
+            <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         }
     </div>
 
@@ -80,21 +77,10 @@
             }
         </select>
         <button type="submit" class="btn btn-outline-secondary">Uygula</button>
-        <button type="button" class="btn btn-link" @onclick="SaveViewAsync">Görünümü kaydet</button>
     </form>
 
-    @if (savedViews.Count > 0)
-    {
-        <div class="filters" role="group" aria-label="Kayıtlı görünümler">
-            @foreach (var saved in savedViews)
-            {
-                <span class="chip-group">
-                    <button type="button" class="chip" @onclick="() => ApplyViewAsync(saved)">@saved.Name</button>
-                    <button type="button" class="chip" aria-label="@(saved.Name) görünümünü sil" @onclick="() => DeleteViewAsync(saved)">×</button>
-                </span>
-            }
-        </div>
-    }
+    <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     <div class="activity-layout @(mode != Mode.List ? "with-panel" : null)">
         <div class="activity-main">
@@ -133,7 +119,13 @@
                     }
                     <table class="table record-table">
                         <thead>
-                            <tr><th><span class="visually-hidden">Seç</span></th><th>Konu</th><th>Tür</th><th>Durum</th><th>Zaman</th><th>Öncelik</th><th>Firma</th><th>Sorumlu</th>@foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Activity)) { <th>@field.Label</th> }</tr>
+                            <tr>
+                                <th scope="col"><span class="visually-hidden">Seç</span></th>
+                                @foreach (var column in grid.VisibleColumns)
+                                {
+                                    <GridHeader Column="column" State="grid" />
+                                }
+                            </tr>
                         </thead>
                         <tbody>
                             @foreach (var activity in items)
@@ -145,21 +137,9 @@
                                             <input type="checkbox" aria-label="@activity.Subject seç" checked="@picked.Contains(activity.Id)" @onchange="e => Pick(activity, e)" />
                                         }
                                     </td>
-                                    <td data-label="Konu" class="primary"><button type="button" class="btn btn-link" @onclick="() => Select(activity)">@activity.Subject</button></td>
-                                    <td data-label="Tür">@(activity.Masked ? null : Lookups.Label(CrmLists.ActivityType, activity.Type))</td>
-                                    <td data-label="Durum">@ActivityLabels.Status(ActivityLabels.Family(Lookups, activity.Type), activity.Status)@(ActivityLabels.IsOverdue(activity) ? " · gecikti" : null)</td>
-                                    <td data-label="Zaman">@WhenText(activity)</td>
-                                    <td data-label="Öncelik">@(activity.Masked ? null : ActivityLabels.Priority(activity.Priority))</td>
-                                    <td data-label="Firma">
-                                        @if (activity.CompanyId is { } companyId)
-                                        {
-                                            <a href="crm/firmalar/@companyId">@Lookups.CompanyName(companyId)</a>
-                                        }
-                                    </td>
-                                    <td data-label="Sorumlu">@Lookups.MemberName(activity.OwnerId)</td>
-                                    @foreach (var field in Lookups.ListFieldsOf(CrmEntityKeys.Activity))
+                                    @foreach (var column in grid.VisibleColumns)
                                     {
-                                        <td data-label="@field.Label">@(activity.Masked ? null : CustomFieldText.Format(field, activity.Custom))</td>
+                                        <td data-label="@column.Label" class="@(column.Key == "subject" ? "primary" : null)">@CellContent(column.Key, activity)</td>
                                     }
                                 </tr>
                             }
@@ -208,7 +188,7 @@
 
 @code {
     private const string Url = "/api/crm/activities";
-    private const string ViewsKey = "modulix.activity-views";
+    private const string ScreenKey = "crm.activities";
     private const int PageSize = 50;
     private const int CalendarSize = 200;
 
@@ -231,7 +211,23 @@
         All,
     }
 
-    private sealed record SavedView(string Name, Mode Mode, QuickFilter Quick, string? Status, string? Type, string? Priority);
+    // Aktivite listesi sunucuda sıralanmaz (takvim kipleri tarih penceresiyle çalışır); sütunlar seçilir ve sırası görünümle saklanır.
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("subject", "Konu", "type", Locked: true),
+        new("type", "Tür", "tag"),
+        new("status", "Durum", "activity"),
+        new("when", "Zaman", "calendar"),
+        new("priority", "Öncelik", "alert-circle"),
+        new("company", "Firma", "building"),
+        new("owner", "Sorumlu", "user"),
+    ];
+
+    private static readonly (QuickFilter Value, string Icon)[] QuickIcons =
+    [
+        (QuickFilter.Today, "calendar"), (QuickFilter.Overdue, "alert-circle"), (QuickFilter.Mine, "user"),
+        (QuickFilter.Team, "users"), (QuickFilter.AllOpen, "activity"), (QuickFilter.All, "layers"),
+    ];
 
     private static readonly (Mode Value, string Label)[] Modes =
     [
@@ -266,7 +262,9 @@
     private readonly HashSet<Guid> picked = [];
     private int bulkDays = 1;
     private string? bulkReason;
-    private List<SavedView> savedViews = [];
+    private readonly GridViewState grid = new(ScreenKey, string.Empty);
+    private PersonalGridViews views = default!;
+    private string viewKey = QuickFilter.Mine.ToString();
     private (ActivityDto Activity, DateOnly Day)? conflictMove;
     private int? kpiToday;
     private int? kpiOverdue;
@@ -278,11 +276,13 @@
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, ScreenKey);
         await Session.EnsureLoadedAsync();
         if (Session.Can(CrmAccess.ActivitiesRead))
         {
             await Lookups.LoadAsync(contacts: true, opportunities: true);
-            await LoadViewsAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(CrmEntityKeys.Activity).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
             // Telefonda yedi günlük saat çizelgesi sığmaz (bugün ekran dışında kalır); varsayılan görünüm Gün olur.
             if (await Js.InvokeAsync<bool>("modulixShell.isNarrow"))
             {
@@ -359,16 +359,118 @@
         if (mode != Mode.List && quick is QuickFilter.AllOpen or QuickFilter.All)
         {
             quick = QuickFilter.Mine;
+            if (Active is null)
+            {
+                viewKey = quick.ToString();
+            }
         }
 
         await ReloadAsync();
     }
 
-    private async Task SwitchQuickAsync(QuickFilter value)
+    // ---- Görünümler: hızlı süzgeçler sistem görünümü, kişisel görünümler sunucuda (ADR-0036; süzgeç metni quick, mode, status, type, priority)
+
+    private GridViewDto? Active => views.Find(viewKey);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        .. Quick.Where(q => q.Value != QuickFilter.Team || Session.Can(CrmAccess.ActivitiesManageCalendar))
+            .Select(q => new ViewOption(q.Value.ToString(), q.Label, Icon: QuickIcons.First(i => i.Value == q.Value).Icon)),
+        .. views.Options,
+    ];
+
+    private string? CurrentFilters => GridFilters.Build(
+        ("quick", quick.ToString()),
+        ("mode", mode.ToString()),
+        status is { Length: > 0 } s ? ("status", s) : null,
+        type is { Length: > 0 } t ? ("type", t) : null,
+        priority is { Length: > 0 } p ? ("priority", p) : null);
+
+    // Sistem görünümünün süzgeci yalnızca hızlı süzgeçtir; kip görünümle saklanmaz, sekme değişince de korunur.
+    private string? BaselineFilters => Active?.Filters ?? GridFilters.Build(("quick", viewKey), ("mode", mode.ToString()));
+
+    private bool Dirty => grid.Differs(Active) || Canon(CurrentFilters) != Canon(BaselineFilters);
+
+    private static string Canon(string? filters) =>
+        string.Join('&', GridFilters.Parse(filters).OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => p.Key + "=" + p.Value));
+
+    private async Task ChooseViewAsync(string key)
     {
-        quick = value;
+        viewKey = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+        }
+        else
+        {
+            grid.Reset();
+        }
+
+        var filters = GridFilters.Parse(BaselineFilters);
+        quick = Enum.TryParse<QuickFilter>(filters.GetValueOrDefault("quick"), out var q) ? q : QuickFilter.Mine;
+        if (quick == QuickFilter.Team && !Session.Can(CrmAccess.ActivitiesManageCalendar))
+        {
+            quick = QuickFilter.Mine;
+        }
+
+        if (Active is not null)
+        {
+            mode = Enum.TryParse<Mode>(filters.GetValueOrDefault("mode"), out var m) ? m : mode;
+            status = filters.GetValueOrDefault("status");
+            type = filters.GetValueOrDefault("type");
+            priority = filters.GetValueOrDefault("priority");
+        }
+
+        if (mode != Mode.List && quick is QuickFilter.AllOpen or QuickFilter.All)
+        {
+            mode = Mode.List;
+        }
+
         await ReloadAsync();
     }
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            viewKey = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(viewKey);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(QuickFilter.Mine.ToString());
+        }
+    }
+
+    private RenderFragment CellContent(string key, ActivityDto activity) => key switch
+    {
+        "subject" => @<button type="button" class="btn btn-link" @onclick="() => Select(activity)">@activity.Subject</button>,
+        "type" => @<text>@(activity.Masked ? null : Lookups.Label(CrmLists.ActivityType, activity.Type))</text>,
+        "status" => @<text>@ActivityLabels.Status(ActivityLabels.Family(Lookups, activity.Type), activity.Status)@(ActivityLabels.IsOverdue(activity) ? " · gecikti" : null)</text>,
+        "when" => @<text>@WhenText(activity)</text>,
+        "priority" => @<text>@(activity.Masked ? null : ActivityLabels.Priority(activity.Priority))</text>,
+        "company" => @<text>@if (activity.CompanyId is { } companyId) { <a href="crm/firmalar/@companyId">@Lookups.CompanyName(companyId)</a> }</text>,
+        "owner" => @<text>@Lookups.MemberName(activity.OwnerId)</text>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(CrmEntityKeys.Activity).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@(activity.Masked ? null : CustomFieldText.Format(field, activity.Custom))</text>,
+        _ => @<text></text>,
+    };
 
     private async Task MoveAsync(int direction)
     {
@@ -482,6 +584,7 @@
     private async Task ApplyKpiAsync(Mode targetMode, QuickFilter targetQuick, string? targetStatus)
     {
         (mode, quick, status) = (targetMode, targetQuick, targetStatus);
+        viewKey = quick.ToString();
         anchor = TodayDate;
         await ReloadAsync();
     }
@@ -562,50 +665,4 @@
         await RefreshAsync();
     }
 
-    // ---- Kişisel kayıtlı görünümler (bu tarayıcıda saklanır; sunucuya gitmez)
-
-    private async Task LoadViewsAsync()
-    {
-        try
-        {
-            var json = await Js.InvokeAsync<string?>("localStorage.getItem", ViewsKey);
-            savedViews = json is null ? [] : System.Text.Json.JsonSerializer.Deserialize<List<SavedView>>(json) ?? [];
-        }
-        catch (Exception)
-        {
-            savedViews = [];
-        }
-    }
-
-    private async Task PersistViewsAsync()
-    {
-        try
-        {
-            await Js.InvokeVoidAsync("localStorage.setItem", ViewsKey, System.Text.Json.JsonSerializer.Serialize(savedViews));
-        }
-        catch (Exception)
-        {
-            // Tarayıcı depolama kapalıysa görünüm yalnızca bu oturumda kalır.
-        }
-    }
-
-    private async Task SaveViewAsync()
-    {
-        var name = $"{Modes.First(m => m.Value == mode).Label} · {Quick.First(q => q.Value == quick).Label}";
-        savedViews.RemoveAll(v => v.Name == name);
-        savedViews.Add(new SavedView(name, mode, quick, status, type, priority));
-        await PersistViewsAsync();
-    }
-
-    private async Task ApplyViewAsync(SavedView view)
-    {
-        (mode, quick, status, type, priority) = (view.Mode, view.Quick, view.Status, view.Type, view.Priority);
-        await ReloadAsync();
-    }
-
-    private async Task DeleteViewAsync(SavedView view)
-    {
-        savedViews.Remove(view);
-        await PersistViewsAsync();
-    }
 }

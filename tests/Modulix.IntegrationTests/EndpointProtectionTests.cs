@@ -82,6 +82,9 @@ public partial class EndpointProtectionTests(ModulixApiFactory factory) : IClass
         "GET /api/form-layouts/",    // form düzenleri (ADR-0021): formlar yerleşimi öğrenir; veri değil düzen döner
         "GET /api/relationship-roles/", // ilişki rolü kataloğu (ADR-0029 K9): ürün standardı, tenant verisi değil
         "GET /api/activity-options/",   // aktif faaliyet ağacı (ADR-0029): yalnızca kod/ad/üst kod; firma formu seçeneği
+        "GET /api/notifications/",      // bildirim kutusu (ADR-0027 Dilim 4b): yalnızca kişinin kendi bildirimleri
+        "GET /api/notifications/unread-count", // aynı gerekçe
+        "POST /api/notifications/read-all",    // kişinin kendi bildirimlerini okundu yapar; firma kaydı değişmez
     ];
 
     [Fact]

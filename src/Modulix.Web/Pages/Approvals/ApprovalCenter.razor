@@ -63,13 +63,13 @@
         </div>
     }
 
-    <ViewTabs Items="Views" Value="@view" ValueChanged="SelectViewAsync" Label="Onay görünümleri" />
+    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="SelectViewAsync" Label="Onay görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Talep ara" placeholder="Başlık ya da süreç ara" @bind="search" />
         </form>
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(CoreAccess.DecideApprovals) || Session.Can(CoreAccess.ManageApprovals))
         {
             <button type="button" class="btn btn-tonal" @onclick="OpenDelegationsAsync"><AppIcon Name="repeat" Size="16" /> Vekâlet</button>
@@ -79,6 +79,9 @@
             <button type="button" class="btn btn-primary" @onclick="OpenNewAsync"><AppIcon Name="plus" Size="16" /> Yeni talep</button>
         }
     </div>
+
+    <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (result is null)
     {
@@ -94,13 +97,10 @@
             <caption class="visually-hidden">Onay talepleri</caption>
             <thead>
                 <tr>
-                    <th scope="col"><SortHeader Label="Talep" ColumnIcon="type" Asc="title" Desc="-title" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="Süreç" ColumnIcon="layers" Asc="process" Desc="-process" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="Tutar" ColumnIcon="coins" Asc="amount" Desc="-amount" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="user" Size="14" /> Talep eden</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="activity" Size="14" /> İlerleme</span></th>
-                    <th scope="col"><SortHeader Label="Tarih" ColumnIcon="calendar" Asc="submitted" Desc="-submitted" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Durum</span></th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
                     <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
@@ -108,16 +108,10 @@
                 @foreach (var item in result.Items)
                 {
                     <tr>
-                        <td data-label="Talep" class="primary"><a href="onaylar?talep=@item.Id" @onclick:preventDefault @onclick="() => OpenDetailAsync(item.Id)">@item.Title</a></td>
-                        <td data-label="Süreç">@item.DefinitionName</td>
-                        <td data-label="Tutar">@AmountText(item)</td>
-                        <td data-label="Talep eden">@item.RequesterName</td>
-                        <td data-label="İlerleme"><span class="step-dots" aria-label="@ProgressText(item)">@foreach (var step in item.Steps) { <span class="step-dot @StepClass(step)"></span> }</span></td>
-                        <td data-label="Tarih">@DateText(item.SubmittedAt)</td>
-                        <td data-label="Durum">
-                            <span class="badge @StatusClass(item.Status)">@StatusText(item.Status)</span>
-                            @if (item.Steps.Any(s => s.IsOverdue)) { <span class="badge stage-lost">Gecikti</span> }
-                        </td>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            <td data-label="@column.Label" class="@(column.Key == "title" ? "primary" : null)">@CellContent(column.Key, item)</td>
+                        }
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{item.Title} eylemleri")">
                                 <button type="button" class="dropdown-item" role="menuitem" @onclick="() => OpenDetailAsync(item.Id)">Aç</button>
@@ -298,24 +292,41 @@
 </AuthGate>
 
 @code {
+    private const string ScreenKey = "core.approvals";
     private const string DefaultSort = "-submitted";
+    private const string DefaultView = "waiting";
 
-    private static readonly IReadOnlyList<ViewOption> Views =
+    // Sistem görünümleri sunucunun view süzgecidir (Waiting, Mine, All); kişisel görünümler ardına eklenir ve süzgeci view=… ile saklar (ADR-0036).
+    private static readonly IReadOnlyList<ViewOption> SystemViews =
     [
-        new("waiting", "Kararımı bekleyenler", Icon: "hourglass"),
+        new(DefaultView, "Kararımı bekleyenler", Icon: "hourglass"),
         new("mine", "Taleplerim", Icon: "user"),
         new("all", "Tümü", Icon: "clipboard-list"),
     ];
 
+    // Sıralanabilir sütunlar sunucudaki sort anahtarlarıdır (title, process, amount, submitted).
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("title", "Talep", "type", "title", "-title", Locked: true),
+        new("process", "Süreç", "layers", "process", "-process"),
+        new("amount", "Tutar", "coins", "amount", "-amount"),
+        new("requester", "Talep eden", "user"),
+        new("progress", "İlerleme", "activity"),
+        new("submitted", "Tarih", "calendar", "submitted", "-submitted"),
+        new("status", "Durum", "tag"),
+    ];
+
     [SupplyParameterFromQuery(Name = "talep")] public Guid? RequestId { get; set; }
 
+    private readonly GridViewState grid = new(ScreenKey, DefaultSort);
+    private PersonalGridViews views = default!;
     private ApprovalOverviewDto? overview;
     private ApprovalRequestPageDto? result;
     private ApprovalRequestDto? detail;
     private ApproverOptionsDto? options;
     private List<ApprovalDefinitionDto> definitions = [];
-    private string view = "waiting";
-    private string sort = DefaultSort;
+    private string viewKey = DefaultView;
+    private string view = DefaultView;
     private string? search;
     private string? message;
     private string? actionError;
@@ -373,7 +384,10 @@
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, ScreenKey);
+        grid.Define(Columns);
         await Session.EnsureLoadedAsync();
+        await views.LoadAsync();
         await RefreshAsync();
         if (Session.Can(CoreAccess.ManageApprovals))
         {
@@ -396,7 +410,7 @@
 
     private async Task LoadAsync(int page)
     {
-        var url = $"/api/approvals/requests?view={view}&sort={sort}&page={page}&pageSize={ListPaging.Size}";
+        var url = $"/api/approvals/requests?view={view}&sort={Uri.EscapeDataString(grid.Sort)}&page={page}&pageSize={ListPaging.Size}";
         if (!string.IsNullOrWhiteSpace(search))
         {
             url += $"&search={Uri.EscapeDataString(search)}";
@@ -407,17 +421,79 @@
         message = loaded.IsSuccess ? message : loaded.Error;
     }
 
+    private GridViewDto? Active => views.Find(viewKey);
+
+    private IReadOnlyList<ViewOption> ViewOptions => [.. SystemViews, .. views.Options];
+
+    private string? CurrentFilters => GridFilters.Build(("view", view));
+
+    private string? BaselineFilters => Active?.Filters ?? "view=" + viewKey;
+
+    private bool Dirty => grid.Differs(Active) || (CurrentFilters ?? string.Empty) != (BaselineFilters ?? string.Empty);
+
     private async Task SelectViewAsync(string key)
     {
-        view = key;
+        viewKey = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+        }
+        else
+        {
+            grid.Reset();
+        }
+
+        var wanted = GridFilters.Parse(BaselineFilters).GetValueOrDefault("view");
+        view = SystemViews.Any(v => v.Key == wanted) ? wanted! : DefaultView;
         await LoadAsync(1);
     }
 
     private async Task SortAsync(string key)
     {
-        sort = key;
+        grid.Sort = key;
         await LoadAsync(1);
     }
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            viewKey = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await SelectViewAsync(viewKey);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await SelectViewAsync(DefaultView);
+        }
+    }
+
+    private RenderFragment CellContent(string key, ApprovalRequestDto item) => key switch
+    {
+        "title" => @<a href="onaylar?talep=@item.Id" @onclick:preventDefault @onclick="() => OpenDetailAsync(item.Id)">@item.Title</a>,
+        "process" => @<text>@item.DefinitionName</text>,
+        "amount" => @<text>@AmountText(item)</text>,
+        "requester" => @<text>@item.RequesterName</text>,
+        "progress" => @<span class="step-dots" aria-label="@ProgressText(item)">@foreach (var step in item.Steps) { <span class="step-dot @StepClass(step)"></span> }</span>,
+        "status" => @<text><span class="badge @StatusClass(item.Status)">@StatusText(item.Status)</span>@if (item.Steps.Any(s => s.IsOverdue)) { <span class="badge stage-lost">Gecikti</span> }</text>,
+        "submitted" => @<text>@DateText(item.SubmittedAt)</text>,
+        _ => @<text></text>,
+    };
 
     private async Task OpenDetailAsync(Guid id)
     {
@@ -485,7 +561,7 @@
         if (done.IsSuccess)
         {
             creating = false;
-            view = "mine";
+            viewKey = view = "mine";
             await RefreshAsync();
         }
     }

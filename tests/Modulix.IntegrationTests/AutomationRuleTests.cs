@@ -440,6 +440,11 @@ public class AutomationRuleTests(AutomationFixture fixture) : IClassFixture<Auto
         Assert.Single(page.Items);
         Assert.Equal(2, page.TotalCount);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/automation/rules?status=Bilinmeyen")).StatusCode);
+
+        // Liste ekranı başlık tıklamasıyla sunucuda sıralar (ADR-0036); bilinmeyen anahtar reddedilir.
+        Assert.Equal(["Alfa kuralı", "Beta kuralı"], (await client.GetFromJsonAsync<AutomationRulePageDto>("/api/automation/rules?sort=name"))!.Items.Select(r => r.Name));
+        Assert.Equal(["Beta kuralı", "Alfa kuralı"], (await client.GetFromJsonAsync<AutomationRulePageDto>("/api/automation/rules?sort=-name"))!.Items.Select(r => r.Name));
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/automation/rules?sort=priority")).StatusCode);
     }
 
     [Fact]

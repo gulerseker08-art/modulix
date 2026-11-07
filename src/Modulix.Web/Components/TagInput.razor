@@ -1,0 +1,113 @@
+@* Etiket girişi (docs/design-system/form-standards.md): değer virgülle ayrılmış metindir, sunucu sözleşmesi değişmez; arayüzde haplar görünür.
+   Virgül, Enter ve alandan çıkış etiketi ekler; boş alanda Backspace sonuncuyu kaldırır. Yinelenen etiket eklenmez, üst sınır aşılmaz. *@
+@inject IJSRuntime Js
+
+<div class="tag-input">
+    @foreach (var tag in Tags)
+    {
+        <span class="tag-chip">
+            @tag
+            <button type="button" aria-label="Etiketi kaldır: @tag" @onclick="() => RemoveAsync(tag)">×</button>
+        </span>
+    }
+    <input @ref="input" id="@Id" value="@draft" autocomplete="off" placeholder="@(Tags.Count == 0 ? Placeholder : "Ekle…")"
+           aria-required="@(Required ? "true" : null)" @oninput="OnInputAsync" @onkeydown="OnKeyDownAsync" @onblur="CommitAsync" />
+</div>
+
+@code {
+    private ElementReference input;
+    private string draft = string.Empty;
+
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+
+    /// <summary>Virgülle ayrılmış etiketler.</summary>
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter] public int MaxLength { get; set; } = 200;
+
+    [Parameter] public string? Placeholder { get; set; }
+
+    [Parameter] public bool Required { get; set; }
+
+    private List<string> Tags => [.. (Value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Js.InvokeVoidAsync("modulixLookup.guardEnter", input);
+        }
+    }
+
+    private async Task OnInputAsync(ChangeEventArgs e)
+    {
+        string text = e.Value?.ToString() ?? string.Empty;
+        int comma = text.LastIndexOf(',');
+        if (comma < 0)
+        {
+            draft = text;
+            return;
+        }
+
+        foreach (string part in text[..comma].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            await AddAsync(part);
+        }
+
+        draft = text[(comma + 1)..].TrimStart();
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await CommitAsync();
+        }
+        else if (e.Key == "Backspace" && draft.Length == 0 && Tags.Count > 0)
+        {
+            await RemoveAsync(Tags[^1]);
+        }
+    }
+
+    private async Task CommitAsync()
+    {
+        if (await AddAsync(draft))
+        {
+            draft = string.Empty;
+        }
+    }
+
+    private async Task<bool> AddAsync(string text)
+    {
+        string tag = text.Trim();
+        List<string> tags = Tags;
+        if (tag.Length == 0 || tags.Contains(tag, StringComparer.CurrentCultureIgnoreCase))
+        {
+            return true;
+        }
+
+        tags.Add(tag);
+        string joined = string.Join(", ", tags);
+        if (joined.Length > MaxLength)
+        {
+            return false;
+        }
+
+        await SetAsync(joined);
+        return true;
+    }
+
+    private async Task RemoveAsync(string tag)
+    {
+        await SetAsync(string.Join(", ", Tags.Where(t => t != tag)));
+        await Js.InvokeVoidAsync("modulixLookup.changed", input);
+    }
+
+    private async Task SetAsync(string joined)
+    {
+        Value = joined.Length == 0 ? null : joined;
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

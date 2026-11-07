@@ -28,13 +28,12 @@ public class ContractViewTests(ModulixApiFactory factory) : IClassFixture<Moduli
 {
     private const string Parties = "/api/records/" + SharedEntities.Party;
     private const string Contracts = "/api/contracts/contracts";
-    private const string Views = "/api/contracts/saved-views";
     private const string Commitments = "/api/contracts/commitments";
 
     private sealed record Setup(Tenant Tenant, ModulixUser Admin, ModulixUser Exporter, ModulixUser MoneyExporter, ModulixUser Reader, ModulixUser Other, Guid PartyId);
 
     [Fact]
-    public async Task List_sorts_by_the_requested_key_overdue_commitments_and_saved_views_round_trip_and_the_dashboard_counts_match_the_list()
+    public async Task List_sorts_by_the_requested_key_overdue_commitments_and_the_dashboard_counts_match_the_list()
     {
         var s = await SetUpAsync();
         using var admin = await LoginAsync(s.Admin);
@@ -56,14 +55,8 @@ public class ContractViewTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Equal([soon.Id], (await ListAsync(admin, "?commitmentOverdue=true")).Select(c => c.Id));
         Assert.Equal(2, (await ListAsync(admin, "?commitmentOverdue=false&effectiveStatus=Active")).Count);
 
-        // Kaydedilmiş görünüm: oluştur, listele, güncelle, sil. Süzgeç metni liste uç noktasına aynen uygulanabilir.
-        var view = await PostAsync<ContractSavedViewDto>(admin, Views, new SaveContractSavedViewRequest("Bitişi yaklaşan", "preset=ending&sort=endDate"));
-        Assert.Equal("preset=ending&sort=endDate", view.Filters);
-        Assert.Equal([view.Id], (await admin.GetFromJsonAsync<PagedResult<ContractSavedViewDto>>(Views))!.Items.Select(v => v.Id));
-        var renamed = await ReadAsync<ContractSavedViewDto>(await admin.PutAsJsonAsync($"{Views}/{view.Id}", new SaveContractSavedViewRequest("Yaklaşan bitişler", "effectiveStatus=Active&sort=-endDate", view.Version)));
-        Assert.Equal(("Yaklaşan bitişler", "effectiveStatus=Active&sort=-endDate"), (renamed.Name, renamed.Filters));
-        Assert.Equal(HttpStatusCode.NoContent, (await admin.DeleteAsync($"{Views}/{view.Id}?version={renamed.Version}")).StatusCode);
-        Assert.Empty((await admin.GetFromJsonAsync<PagedResult<ContractSavedViewDto>>(Views))!.Items);
+        // Eski modüle özel görünüm ucu kaldırıldı; kişisel görünümler ortak /api/grid-views'tadır (ADR-0036, GridViewTests).
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync("/api/contracts/saved-views")).StatusCode);
 
         // Pano: sayaçlar liste süzgeçleriyle aynı sonucu verir; tutarlar para birimine göre ayrıdır.
         var dashboard = (await admin.GetFromJsonAsync<ContractDashboardDto>("/api/contracts/dashboard"))!;
@@ -110,7 +103,7 @@ public class ContractViewTests(ModulixApiFactory factory) : IClassFixture<Moduli
     }
 
     [Fact]
-    public async Task Invalid_sort_filters_and_saved_view_input_are_rejected_names_are_unique_per_user_and_the_view_count_is_limited()
+    public async Task Invalid_sort_and_filters_are_rejected()
     {
         var s = await SetUpAsync();
         using var admin = await LoginAsync(s.Admin);
@@ -123,35 +116,10 @@ public class ContractViewTests(ModulixApiFactory factory) : IClassFixture<Moduli
         }
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await admin.GetAsync("/api/contracts/contract-parties?sort=title")).StatusCode);
-
-        // Görünüm: ad zorunlu, bilinmeyen süzgeç / geçersiz değer / tekrar / aşırı uzun metin reddedilir.
-        async Task<ValidationProblemDetails> ErrorsAsync(string name, string? filters) =>
-            await ValidationProblemAsync(await admin.PostAsJsonAsync(Views, new SaveContractSavedViewRequest(name, filters)));
-
-        Assert.Contains("name", (await ErrorsAsync(" ", null)).Errors.Keys);
-        Assert.Contains("filters", (await ErrorsAsync("A", "ownerId=me")).Errors.Keys);
-        Assert.Contains("filters", (await ErrorsAsync("A", "effectiveStatus=Bilinmeyen")).Errors.Keys);
-        Assert.Contains("filters", (await ErrorsAsync("A", "preset=ending&preset=notice")).Errors.Keys);
-        Assert.Contains("filters", (await ErrorsAsync("A", "sort=grossTotal")).Errors.Keys);
-        Assert.Contains("filters", (await ErrorsAsync("A", "currency=try")).Errors.Keys);
-        Assert.Contains("filters", (await ErrorsAsync("A", "search=" + new string('x', 200))).Errors.Keys);
-        Assert.Contains("filters", (await ErrorsAsync("A", new string('a', 501))).Errors.Keys);
-
-        await PostAsync<ContractSavedViewDto>(admin, Views, new SaveContractSavedViewRequest("Benim görünümüm", "effectiveStatus=Active"));
-        Assert.Contains("name", (await ErrorsAsync("Benim görünümüm", "effectiveStatus=Active")).Errors.Keys);
-        Assert.Contains("name", (await ErrorsAsync(" Benim görünümüm ", null)).Errors.Keys);
-
-        // Kullanıcı başına en fazla 25 görünüm.
-        for (var i = 2; i <= 25; i++)
-        {
-            await PostAsync<ContractSavedViewDto>(admin, Views, new SaveContractSavedViewRequest($"Görünüm {i}", "preset=mine"));
-        }
-
-        Assert.Contains("name", (await ErrorsAsync("Fazla görünüm", null)).Errors.Keys);
     }
 
     [Fact]
-    public async Task Views_dashboard_and_export_are_isolated_per_tenant_and_a_view_cannot_widen_what_a_user_sees()
+    public async Task Dashboard_and_export_are_isolated_per_tenant_and_a_filter_cannot_widen_what_a_user_sees()
     {
         var a = await SetUpAsync();
         var b = await SetUpAsync();
@@ -159,26 +127,15 @@ public class ContractViewTests(ModulixApiFactory factory) : IClassFixture<Moduli
         using var adminB = await LoginAsync(b.Admin);
         var contractA = await NewContractAsync(adminA, a, "A tenant sözleşmesi", endIn: 20, notice: 10);
         await ActivateAsync(a, contractA.Id);
-        await PostAsync<ContractSavedViewDto>(adminA, Views, new SaveContractSavedViewRequest("A görünümü", "effectiveStatus=Active"));
 
-        // B tenant'ı A'nın görünümünü, sözleşmesini, panoda sayılarını ve dışa aktarmada satırlarını görmez.
-        Assert.Empty((await adminB.GetFromJsonAsync<PagedResult<ContractSavedViewDto>>(Views))!.Items);
+        // B tenant'ı A'nın sözleşmesini, panoda sayılarını ve dışa aktarmada satırlarını görmez.
         Assert.Empty(await ListAsync(adminB, string.Empty));
         var dashboard = (await adminB.GetFromJsonAsync<ContractDashboardDto>("/api/contracts/dashboard"))!;
         Assert.All(dashboard.Counts, c => Assert.Equal(0, c.Count));
         Assert.Empty(dashboard.Upcoming);
         Assert.Single(ParseCsv(await ExportAsync(adminB)));
 
-        // Aynı kişi başka tenant'ta da üye olsa bile (farklı kullanıcı kimliği gibi) görünüm yalnızca sahibine görünür: A tenant'ında başka bir yönetici görmez.
-        using var otherA = await LoginAsync(a.Other);
-        Assert.Empty((await otherA.GetFromJsonAsync<PagedResult<ContractSavedViewDto>>(Views))!.Items);
-        var mine = (await adminA.GetFromJsonAsync<PagedResult<ContractSavedViewDto>>(Views))!.Items.Single();
-        Assert.Equal(HttpStatusCode.NotFound, (await otherA.GetAsync($"{Views}/{mine.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await otherA.PutAsJsonAsync($"{Views}/{mine.Id}", new SaveContractSavedViewRequest("Ele geçirildi", null, mine.Version))).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await otherA.DeleteAsync($"{Views}/{mine.Id}?version={mine.Version}")).StatusCode);
-        Assert.Equal("A görünümü", (await adminA.GetFromJsonAsync<ContractSavedViewDto>($"{Views}/{mine.Id}"))!.Name);
-
-        // Görünüm yetki taşımaz: kapsamı kendi kayıtlarıyla sınırlı kullanıcı, tümünü gösteren bir görünümü açsa da yalnızca kendi sözleşmelerini görür.
+        // Süzgeç yetki taşımaz: kapsamı kendi kayıtlarıyla sınırlı kullanıcı, tümünü gösteren bir süzgeci açsa da yalnızca kendi sözleşmelerini görür.
         using var scopedClient = await LoginAsync(a.Reader);
         Assert.Empty(await ListAsync(scopedClient, "?effectiveStatus=Active"));
         Assert.Equal(0, (await scopedClient.GetFromJsonAsync<ContractDashboardDto>("/api/contracts/dashboard"))!.Counts.Single(c => c.Key == "total").Count);
@@ -212,13 +169,13 @@ public class ContractViewTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.NotNull((await admin.GetFromJsonAsync<ContractDashboardDto>("/api/contracts/dashboard"))!.Money);
         Assert.Equal(1, (await exporter.GetFromJsonAsync<ContractDashboardDto>("/api/contracts/dashboard"))!.Counts.Single(c => c.Key == "total").Count);
 
-        // Dışa aktarma da oturum açmayı ister; görünüm uçları sözleşme görüntüleme iznine bağlıdır.
+        // Dışa aktarma da oturum açmayı ister; pano sözleşme görüntüleme iznine bağlıdır.
         using var anonymous = factory.CreateBrowserClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"{Contracts}/export")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/contracts/dashboard")).StatusCode);
         var nobody = await factory.CreateUserAsync(s.Tenant);
         using var noRole = await LoginAsync(nobody);
-        Assert.Equal(HttpStatusCode.Forbidden, (await noRole.GetAsync(Views)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await noRole.GetAsync(Contracts)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await noRole.GetAsync("/api/contracts/dashboard")).StatusCode);
     }
 

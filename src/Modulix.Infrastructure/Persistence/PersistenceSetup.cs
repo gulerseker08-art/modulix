@@ -96,6 +96,7 @@ public static class PersistenceSetup
         services.AddScoped<IModuleLicense, ModuleLicense>();
         services.AddScoped<IEntitlementResolver, Modulix.Infrastructure.Platform.EntitlementResolver>();
         services.AddScoped<IPlanAdministration, Modulix.Infrastructure.Platform.PlanAdministration>();
+        services.AddScoped<ILicenseApplier, Modulix.Infrastructure.Platform.LicenseApplier>();
         services.AddScoped<IPlatformHealth, Modulix.Infrastructure.Platform.PlatformHealth>();
         services.AddScoped<ISupportAccess, Modulix.Infrastructure.Platform.SupportAccessService>();
         services.AddScoped<IPlatformTeam, Modulix.Infrastructure.Platform.PlatformTeam>();

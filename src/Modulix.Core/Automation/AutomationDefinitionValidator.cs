@@ -262,9 +262,42 @@ public sealed partial class AutomationDefinitionValidator(ModuleCatalog modules,
                 continue;
             }
 
-            if (!TryLiteral(parameter, value, out _, out var error))
+            if (!TryLiteral(parameter, value, out var parsed, out var error))
             {
                 issues.Add(new(parameterPath, $"'{parameter.Label}': {error}"));
+            }
+            else if (parameter.Type == AutomationFieldType.Text && parsed is string text)
+            {
+                ValidateTemplate(parameter, text, fields, parameterPath, issues);
+            }
+        }
+    }
+
+    /// <summary>Metin parametresindeki <c>{{alan}}</c> değişkenleri (Dilim 4d): biçim, beyaz liste, alan yetkisi, tip.</summary>
+    private static void ValidateTemplate(AutomationParameter parameter, string text, AutomationFieldSet fields, string path, List<AutomationIssue> issues)
+    {
+        foreach (var error in AutomationTextTemplate.Errors(text))
+        {
+            issues.Add(new(path, $"'{parameter.Label}': {error}"));
+        }
+
+        var variables = AutomationTextTemplate.Variables(text);
+        if (variables.Count == 0)
+        {
+            return;
+        }
+
+        if (!parameter.AllowFieldBinding)
+        {
+            issues.Add(new(path, $"'{parameter.Label}' kayıt değişkeni ({{{{alan}}}}) kabul etmez; metni doğrudan yazın."));
+            return;
+        }
+
+        foreach (var variable in variables)
+        {
+            if (AutomationTextTemplate.CheckVariable(fields, variable) is { } problem)
+            {
+                issues.Add(new(path, $"'{parameter.Label}': {problem}"));
             }
         }
     }

@@ -252,4 +252,42 @@ public partial class PlatformAdministrationTests
     }
 
     private static string Email() => $"koltuk-{Guid.NewGuid():N}@test.modulix";
+
+    [Fact]
+    public async Task Changing_the_modules_of_a_plan_updates_its_current_subscribers_only_and_deletes_no_data()
+    {
+        var subscriber = await factory.CreateTenantAsync();
+        var bystander = await factory.CreateTenantAsync();
+        var user = await factory.CreateUserAsync(subscriber);
+        await factory.CreateRoleAsync(subscriber.Id, [CompaniesRead, CompaniesWrite], user);
+        using var client = await LoginAsync(user);
+        using var platform = await LoginAsync(await CreatePlatformAdministratorAsync());
+        var shared = await CreatePlanAsync(platform, NewPlanKey(), ["crm"]);
+        var other = await CreatePlanAsync(platform, NewPlanKey(), ["crm"]);
+        foreach (var (tenantId, plan) in new[] { (subscriber.Id, shared), (bystander.Id, other) })
+        {
+            Assert.Equal(HttpStatusCode.NoContent, (await platform.PutAsJsonAsync(
+                $"/api/platform/tenants/{tenantId}/plan", new AssignPlanRequest(plan.Key, "Sözleşme", DateTimeOffset.UtcNow.AddDays(60)))).StatusCode);
+        }
+
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Yerinde Kalır Ltd."))).StatusCode);
+
+        // Plandan CRM çıkıp Destek eklenir: abone için CRM kapanır, Destek açılır; veri yerinde; başka plandaki firma etkilenmez.
+        Assert.Equal(HttpStatusCode.OK, (await platform.PutAsJsonAsync(
+            $"/api/platform/plans/{shared.Id}", new SavePlanRequest(shared.Key, shared.Name, ["support"], null, true))).StatusCode);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/crm/companies")).StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var subscriberRights = await db.ModuleEntitlements.AsNoTracking().Where(e => e.TenantId == subscriber.Id).ToListAsync();
+        Assert.False(Assert.Single(subscriberRights, e => e.ModuleKey == "crm").IsEnabled);
+        Assert.True(Assert.Single(subscriberRights, e => e.ModuleKey == "support").IsEnabled);
+        var bystanderRights = await db.ModuleEntitlements.AsNoTracking().Where(e => e.TenantId == bystander.Id).ToListAsync();
+        Assert.True(Assert.Single(bystanderRights, e => e.ModuleKey == "crm").IsEnabled);
+        Assert.DoesNotContain(bystanderRights, e => e.ModuleKey == "support");
+        using (var tenantScope = factory.OpenScope(subscriber.Id))
+        {
+            Assert.Equal(1, await tenantScope.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Modulix.Modules.Crm.Domain.Company>().AsNoTracking().CountAsync());
+        }
+    }
 }

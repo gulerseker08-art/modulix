@@ -1,0 +1,42 @@
+@* İki-üç seçenekli alan için düğme grubu (docs/design-system/form-standards.md). Gerçek radio girdileri kullanır: yön tuşları çalışır,
+   ekran okuyucu grubu tanır ve seçim forma input olayı yayar (kaydedilmemiş değişiklik). Çok seçenekli alanlar select kalır. *@
+@typeparam TValue
+
+<span id="@LabelId" class="@LabelClass d-inline-block">@Label</span>
+<div class="choice-group" role="radiogroup" aria-labelledby="@LabelId">
+    @foreach (var option in Options)
+    {
+        <label class="choice-option">
+            <input type="radio" class="visually-hidden" name="@Id" disabled="@Disabled"
+                   checked="@IsSelected(option.Value)" @onchange="() => ChooseAsync(option.Value)" />
+            <span>@option.Label</span>
+        </label>
+    }
+</div>
+
+@code {
+    /// <summary>Radio grubunun adı; sayfada tekil olmalıdır.</summary>
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    [Parameter] public string LabelClass { get; set; } = "form-label";
+
+    [Parameter, EditorRequired] public IReadOnlyList<SegmentOption<TValue>> Options { get; set; } = [];
+
+    [Parameter] public TValue Value { get; set; } = default!;
+
+    [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    private string LabelId => Id + "-label";
+
+    private bool IsSelected(TValue value) => EqualityComparer<TValue>.Default.Equals(value, Value);
+
+    private async Task ChooseAsync(TValue value)
+    {
+        Value = value;
+        await ValueChanged.InvokeAsync(value);
+    }
+}

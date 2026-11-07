@@ -72,11 +72,7 @@
                             <FieldError Field="name" Errors="errors" />
                             break;
                         case "kind":
-                            <label class="@f.LabelClass()" for="kind">@f.Label</label>
-                            <select id="kind" class="form-select" @bind="form.Kind">
-                                <option value="Organization">Tüzel kişi (şirket)</option>
-                                <option value="Individual">Gerçek kişi (şahıs firması)</option>
-                            </select>
+                            <SegmentedChoice Id="kind" Label="@f.Label" LabelClass="@f.LabelClass()" Options="KindOptions" @bind-Value="form.Kind" />
                             <FieldError Field="kind" Errors="errors" />
                             break;
                         case "status":
@@ -122,10 +118,7 @@
                             break;
                         case "tags":
                             <label class="@f.LabelClass()" for="tags">@f.Label</label>
-                            <div class="input-icon">
-                                <AppIcon Name="tag" Size="16" />
-                                <input id="tags" class="form-control" maxlength="@CrmLimits.TagsMaxLength" placeholder="Virgülle ayırın: öncelikli, ihracat" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Tags" />
-                            </div>
+                            <TagInput Id="tags" MaxLength="@CrmLimits.TagsMaxLength" Placeholder="Etiket yazıp Enter'a basın" Required="@f.Required" @bind-Value="form.Tags" />
                             <FieldError Field="tags" Errors="errors" />
                             break;
                         case "address":
@@ -196,6 +189,8 @@
 </form>
 
 @code {
+    private static readonly IReadOnlyList<SegmentOption<string>> KindOptions = [new("Organization", "Tüzel kişi"), new("Individual", "Gerçek kişi")];
+
     private bool dirty;
     private FormLayoutDto? layout;
     private string? layoutError;
