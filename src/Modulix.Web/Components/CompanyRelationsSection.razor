@@ -4,10 +4,10 @@
 
 <section class="detail-section">
     <div class="section-header">
-        <h2>İlişkili firmalar</h2>
+        <h2>@Texts.Get("crm.relation.title")</h2>
         @if (CanWrite && form is null)
         {
-            <button type="button" class="btn btn-primary btn-sm" @onclick="Open">Firma bağla</button>
+            <button type="button" class="btn btn-primary btn-sm" @onclick="Open">@Texts.Get("crm.relation.add")</button>
         }
     </div>
 
@@ -19,39 +19,39 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <FormTabs Title="İlişki bilgileri" Label="Firma ilişkisi formu bölümleri">
+            <FormTabs Title="@Texts.Get("crm.link.editor.info")" Label="@Texts.Get("crm.relation.tabs")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label">Bu firma, seçilen firmanın…</label>
+                    <label class="form-label">@Texts.Get("crm.relation.direction")</label>
                     <select class="form-select" @bind="form.ThisIsParent">
-                        <option value="@false">bağlı firması (iştiraki)</option>
-                        <option value="@true">ana firmasıdır</option>
+                        <option value="@false">@Texts.Get("crm.relation.child")</option>
+                        <option value="@true">@Texts.Get("crm.relation.parent")</option>
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="relation-other">Diğer firma *</label>
-                    <LookupPicker Id="relation-other" LookupKey="crm.company-relation.child" @bind-Value="form.OtherId" Required="true" Placeholder="Seçin…" Invalid="@(errors?.ContainsKey(form.ThisIsParent ? "childCompanyId" : "parentCompanyId") == true)" />
+                    <label class="form-label" for="relation-other">@Texts.Get("crm.relation.other")</label>
+                    <LookupPicker Id="relation-other" LookupKey="crm.company-relation.child" @bind-Value="form.OtherId" Required="true" Placeholder="@Texts.Get("common.choose")" Invalid="@(errors?.ContainsKey(form.ThisIsParent ? "childCompanyId" : "parentCompanyId") == true)" />
                     <FieldError Field="@(form.ThisIsParent ? "childCompanyId" : "parentCompanyId")" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label">Tür</label>
+                    <label class="form-label">@Texts.Get("crm.company.editor.kind")</label>
                     <select class="form-select" @bind="form.Type">
-                        @foreach (var (key, label) in CrmCompanyRelationTypes.Labels)
+                        @foreach (var (key, label) in SharedLabels.All(SharedLabels.CompanyRelationType, CrmCompanyRelationTypes.Labels))
                         {
                             <option value="@key">@label</option>
                         }
                     </select>
                 </div>
                 <div>
-                    <label class="form-label">Başlangıç</label>
+                    <label class="form-label">@Texts.Get("crm.link.editor.start")</label>
                     <input class="form-control" type="date" @bind="form.StartDate" />
                     <FieldError Field="startDate" Errors="errors" />
                 </div>
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
             </div>
         </form>
     }
@@ -67,14 +67,14 @@
                     <div class="item-main">
                         <strong><a href="crm/firmalar/@otherId">@(thisIsParent ? item.ChildCompanyName : item.ParentCompanyName)</a></strong>
                         <span>
-                            @(thisIsParent ? "Bağlı firma" : "Ana firma") · @CrmCompanyRelationTypes.Labels.GetValueOrDefault(item.Type, item.Type)
+                            @Texts.Get(thisIsParent ? "crm.relation.childLabel" : "crm.relation.parentLabel") · @SharedLabels.Of(SharedLabels.CompanyRelationType, item.Type, CrmCompanyRelationTypes.Labels)
                             @if (item.StartDate is { } start) { <text> · @CrmLabels.Date(start)</text> }
-                            @if (!item.IsActive && item.EndDate is { } end) { <text> – Sona erdi: @CrmLabels.Date(end)</text> }
+                            @if (!item.IsActive && item.EndDate is { } end) { <text> – @Texts.Get("crm.company.people.ended", CrmLabels.Date(end))</text> }
                         </span>
                     </div>
                     @if (CanWrite && item.IsActive)
                     {
-                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => EndAsync(item)">Sonlandır</button>
+                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => EndAsync(item)">@Texts.Get("crm.company.people.end")</button>
                     }
                 </li>
             }
@@ -83,7 +83,7 @@
     }
     else if (items is not null)
     {
-        <p class="text-muted">Henüz ilişkili firma yok.</p>
+        <p class="text-muted">@Texts.Get("crm.relation.none")</p>
     }
 </section>
 
@@ -141,7 +141,7 @@
     {
         if (form!.OtherId is not { } other)
         {
-            errors = new Dictionary<string, string[]> { [form.ThisIsParent ? "childCompanyId" : "parentCompanyId"] = ["Firma seçin."] };
+            errors = new Dictionary<string, string[]> { [form.ThisIsParent ? "childCompanyId" : "parentCompanyId"] = [Texts.Get("crm.relation.chooseCompany")] };
             return;
         }
 

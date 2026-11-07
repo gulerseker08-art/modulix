@@ -2,20 +2,20 @@
 @inject ApiClient Api
 
 <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-    <h2>@(Link is null ? "Kişi ilişkilendir" : "İlişkiyi düzenle")</h2>
+    <h2>@Texts.Get(Link is null ? "crm.company.people.link" : "crm.link.editor.edit")</h2>
 
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <FormTabs Title="İlişki bilgileri" Label="Kişi ilişkisi formu bölümleri">
+    <FormTabs Title="@Texts.Get("crm.link.editor.info")" Label="@Texts.Get("crm.link.editor.tabs")">
     <div class="form-grid">
         <div class="span-all">
-            <label class="form-label" for="link-contact">Kişi *</label>
+            <label class="form-label" for="link-contact">@Texts.Get("crm.link.editor.contact")</label>
             @if (Link is null)
             {
-                <LookupPicker Id="link-contact" LookupKey="crm.company-contact.contact" @bind-Value="form.ContactId" Required="true" Placeholder="Seçin…" Invalid="@(errors?.ContainsKey("contactId") == true)" />
+                <LookupPicker Id="link-contact" LookupKey="crm.company-contact.contact" @bind-Value="form.ContactId" Required="true" Placeholder="@Texts.Get("common.choose")" Invalid="@(errors?.ContainsKey("contactId") == true)" />
             }
             else
             {
@@ -24,19 +24,19 @@
             <FieldError Field="contactId" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="link-title">Bu firmadaki unvan</label>
+            <label class="form-label" for="link-title">@Texts.Get("crm.link.editor.jobTitle")</label>
             <input id="link-title" class="form-control" maxlength="@CrmRelationshipLimits.JobTitleMaxLength" @bind="form.JobTitle" />
             <FieldError Field="jobTitle" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="link-department">Departman</label>
+            <label class="form-label" for="link-department">@Texts.Get("crm.link.editor.department")</label>
             <input id="link-department" class="form-control" maxlength="@CrmRelationshipLimits.DepartmentMaxLength" @bind="form.Department" />
             <FieldError Field="department" Errors="errors" />
         </div>
         <div class="span-all">
-            <span class="form-label">İlişki rolleri</span>
+            <span class="form-label">@Texts.Get("crm.link.editor.roles")</span>
             <div class="role-options">
-                @foreach (var (key, label) in CrmRelationshipRoles.Labels)
+                @foreach (var (key, label) in RelationshipRoleNames.All())
                 {
                     <label class="form-check-inline">
                         <input type="checkbox" checked="@form.Roles.Contains(key)" @onchange="e => ToggleRole(key, (bool)e.Value!)" /> @label
@@ -47,30 +47,30 @@
         </div>
         <div>
             <label class="form-check-inline">
-                <input type="checkbox" @bind="form.IsPrimary" /> Ana irtibat
+                <input type="checkbox" @bind="form.IsPrimary" /> @Texts.Get("crm.company.people.primary")
             </label>
             <FieldError Field="isPrimary" Errors="errors" />
         </div>
         <div>
             <label class="form-check-inline">
-                <input type="checkbox" @bind="form.IsDecisionMaker" /> Karar verici
+                <input type="checkbox" @bind="form.IsDecisionMaker" /> @Texts.Get("crm.company.people.decisionMaker")
             </label>
         </div>
         <div>
-            <label class="form-label" for="link-start">Başlangıç</label>
+            <label class="form-label" for="link-start">@Texts.Get("crm.link.editor.start")</label>
             <input id="link-start" class="form-control" type="date" @bind="form.StartDate" />
             <FieldError Field="startDate" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="link-end">Bitiş (ilişkiyi sonlandırır)</label>
+            <label class="form-label" for="link-end">@Texts.Get("crm.link.editor.end")</label>
             <input id="link-end" class="form-control" type="date" @bind="form.EndDate" />
             <FieldError Field="endDate" Errors="errors" />
         </div>
     </div>
     </FormTabs>
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.dismiss")</button>
     </div>
 </form>
 
@@ -129,7 +129,7 @@
     {
         if (form.ContactId is not { } contactId)
         {
-            errors = new Dictionary<string, string[]> { ["contactId"] = ["Kişi seçin."] };
+            errors = new Dictionary<string, string[]> { ["contactId"] = [Texts.Get("crm.link.editor.chooseContact")] };
             return;
         }
 

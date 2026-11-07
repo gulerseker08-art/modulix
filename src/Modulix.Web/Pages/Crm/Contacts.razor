@@ -131,7 +131,7 @@
         new(MineView, Texts.Get("crm.contacts.view.mine"), Icon: "star"),
         new(AllViews, Texts.Get("crm.contacts.view.all"), Icon: "user"),
         new(WithoutCompanyView, Texts.Get("crm.contacts.view.withoutCompany"), Icon: "building"),
-        .. CrmRelationshipRoles.Labels.Select(r => new ViewOption(RolePrefix + r.Key, r.Value, Icon: "tag")),
+        .. RelationshipRoleNames.All().Select(r => new ViewOption(RolePrefix + r.Key, r.Value, Icon: "tag")),
         .. views.Options,
     ];
 

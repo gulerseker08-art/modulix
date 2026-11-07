@@ -4,13 +4,13 @@
 
 <section class="detail-section">
     <div class="section-header">
-        <h2>Lokasyonlar</h2>
+        <h2>@Texts.Get("crm.location.title")</h2>
         @if (CanWrite && form is null)
         {
-            <button type="button" class="btn btn-primary btn-sm" @onclick="() => Open(null)">Lokasyon ekle</button>
+            <button type="button" class="btn btn-primary btn-sm" @onclick="() => Open(null)">@Texts.Get("crm.location.add")</button>
         }
     </div>
-    <p class="text-muted small">Aynı vergi numarasını paylaşan şube, depo veya teslimat noktaları. Ayrı bir tüzel kişilik için ayrı firma açın ve "İlişkili firmalar"dan bağlayın.</p>
+    <p class="text-muted small">@Texts.Get("crm.location.help")</p>
 
     @if (message is not null)
     {
@@ -20,7 +20,7 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <FormTabs Title="Lokasyon bilgileri" Label="Lokasyon formu bölümleri">
+            <FormTabs Title="@Texts.Get("crm.location.info")" Label="@Texts.Get("crm.location.tabs")">
             <div class="form-grid">
                 <div>
                     <label class="form-label">Ad *</label>
@@ -28,14 +28,14 @@
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label">Kod</label>
+                    <label class="form-label">@Texts.Get("crm.location.code")</label>
                     <input class="form-control" maxlength="@CrmDirectoryLimits.LocationCodeMaxLength" @bind="form.Code" />
                     <FieldError Field="code" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label">Tür</label>
+                    <label class="form-label">@Texts.Get("crm.company.editor.kind")</label>
                     <select class="form-select" @bind="form.Type">
-                        @foreach (var (key, label) in CrmLocationTypes.Labels)
+                        @foreach (var (key, label) in SharedLabels.All(SharedLabels.LocationType, CrmLocationTypes.Labels))
                         {
                             <option value="@key">@label</option>
                         }
@@ -43,28 +43,28 @@
                     <FieldError Field="type" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="location-contact">Yetkili kişi</label>
+                    <label class="form-label" for="location-contact">@Texts.Get("crm.location.contact")</label>
                     <LookupPicker Id="location-contact" LookupKey="crm.location.contact" @bind-Value="form.ContactId" ParentId="CompanyId" Placeholder="—" Invalid="@(errors?.ContainsKey("contactId") == true)" />
                     <FieldError Field="contactId" Errors="errors" />
                 </div>
                 <div class="span-all">
-                    <label class="form-label">Notlar</label>
+                    <label class="form-label">@Texts.Get("common.field.notes")</label>
                     <textarea class="form-control" rows="2" maxlength="@CrmLimits.NotesMaxLength" @bind="form.Notes"></textarea>
                 </div>
                 @if (form.Id is not null)
                 {
                     <div>
-                        <label class="form-check-inline"><input type="checkbox" @bind="form.IsActive" /> Aktif</label>
+                        <label class="form-check-inline"><input type="checkbox" @bind="form.IsActive" /> @Texts.Get("common.active")</label>
                     </div>
                 }
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger btn-sm ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </form>
@@ -79,21 +79,21 @@
                     <div class="item-main">
                         <strong>@item.Name@(item.Code is { Length: > 0 } ? $" ({item.Code})" : null)</strong>
                         <span>
-                            @CrmLocationTypes.Labels.GetValueOrDefault(item.Type, item.Type)
-                            @if (!item.IsActive) { <text> · Pasif</text> }
-                            @if (item.ContactId is { } contactId) { <text> · Yetkili: @Lookups.ContactName(contactId)</text> }
+                            @SharedLabels.Of(SharedLabels.LocationType, item.Type, CrmLocationTypes.Labels)
+                            @if (!item.IsActive) { <text> · @Texts.Get("common.inactive")</text> }
+                            @if (item.ContactId is { } contactId) { <text> · @Texts.Get("crm.location.contactNote", Lookups.ContactName(contactId))</text> }
                         </span>
                         @if (expanded == item.Id)
                         {
-                            <AddressesSection CompanyId="CompanyId" LocationId="item.Id" Title="Lokasyon adresleri" CanWrite="CanWrite" />
-                            <ContactPointsSection CompanyId="CompanyId" LocationId="item.Id" Title="Lokasyon iletişimi" CanWrite="CanWrite" />
+                            <AddressesSection CompanyId="CompanyId" LocationId="item.Id" Title="@Texts.Get("crm.location.addresses")" CanWrite="CanWrite" />
+                            <ContactPointsSection CompanyId="CompanyId" LocationId="item.Id" Title="@Texts.Get("crm.location.contactPoints")" CanWrite="CanWrite" />
                         }
                     </div>
                     <button type="button" class="btn btn-link btn-sm" aria-expanded="@(expanded == item.Id)"
-                            @onclick="() => expanded = expanded == item.Id ? null : item.Id">@(expanded == item.Id ? "Gizle" : "Adres / iletişim")</button>
+                            @onclick="() => expanded = expanded == item.Id ? null : item.Id">@Texts.Get(expanded == item.Id ? "crm.location.hide" : "crm.location.addressContact")</button>
                     @if (CanWrite)
                     {
-                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">Düzenle</button>
+                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">@Texts.Get("common.edit")</button>
                     }
                 </li>
             }
@@ -102,7 +102,7 @@
     }
     else if (items is not null)
     {
-        <p class="text-muted">Henüz lokasyon yok.</p>
+        <p class="text-muted">@Texts.Get("crm.location.none")</p>
     }
 </section>
 

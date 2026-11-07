@@ -7,7 +7,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Contact is null ? "Yeni kişi" : "Kişi kartı")</h2>
+            <h2>@Texts.Get(Contact is null ? "crm.contacts.new" : "crm.contact.editor.card")</h2>
             @if (Contact is not null)
             {
                 <p>@Contact.FirstName @Contact.LastName</p>
@@ -15,13 +15,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -37,11 +37,11 @@
 
     @if (Contact is not null)
     {
-        <p class="shared-note text-muted">Ad, soyad, telefon ve e-posta bu kişiyi kullanan diğer modüllerde de görünür; burada yaptığınız değişiklik onlara da yansır. Unvan, departman ve rol firma ilişkisine özgüdür ve kişi detayındaki ilişkilerden düzenlenir.</p>
+        <p class="shared-note text-muted">@Texts.Get("crm.contact.editor.sharedNote")</p>
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Kişi özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("crm.contact.summary.aria")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true">@Initials</span>
@@ -51,18 +51,18 @@
                         <span class="summary-sub">@form.Title</span>
                     }
                 </div>
-                <h3 class="summary-heading">Kişi özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("crm.contact.summary.aria")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Firma</dt><dd>@(form.CompanyId is { } company ? Lookups.CompanyName(company) : "—")</dd></div>
-                    <div><dt>Sorumlu</dt><dd>@(form.OwnerId is { } owner ? Lookups.MemberName(owner) : (form.Id is null ? "Ben" : "—"))</dd></div>
-                    <div><dt>E-posta</dt><dd>@(string.IsNullOrWhiteSpace(form.Email) ? "—" : form.Email)</dd></div>
-                    <div><dt>Telefon</dt><dd>@(string.IsNullOrWhiteSpace(form.Phone) ? "—" : form.Phone)</dd></div>
+                    <div><dt>@Texts.Get("crm.contacts.col.company")</dt><dd>@(form.CompanyId is { } company ? Lookups.CompanyName(company) : "—")</dd></div>
+                    <div><dt>@Texts.Get("common.field.owner")</dt><dd>@(form.OwnerId is { } owner ? Lookups.MemberName(owner) : (form.Id is null ? Texts.Get("common.me") : "—"))</dd></div>
+                    <div><dt>@Texts.Get("common.field.email")</dt><dd>@(string.IsNullOrWhiteSpace(form.Email) ? "—" : form.Email)</dd></div>
+                    <div><dt>@Texts.Get("common.field.phone")</dt><dd>@(string.IsNullOrWhiteSpace(form.Phone) ? "—" : form.Phone)</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Kişi formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("crm.contact.editor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -85,19 +85,19 @@
                             <label class="@f.LabelClass()" for="companyId">@f.Label</label>
                             <LookupPicker Id="companyId" LookupKey="crm.contact.company" @bind-Value="form.CompanyId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("companyId") == true)" />
                             <FieldError Field="companyId" Errors="errors" />
-                            <small class="text-muted">Birden fazla firma için kişiyi kaydedip firma ilişkilerini kişi detayından yönetin.</small>
+                            <small class="text-muted">@Texts.Get("crm.contact.editor.companyHint")</small>
                             break;
                         case "ownerId":
                             <label class="@f.LabelClass()" for="ownerId">@f.Label</label>
-                            <LookupPicker Id="ownerId" LookupKey="crm.contact.owner" @bind-Value="form.OwnerId" Required="f.Required" Placeholder="@(form.Id is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
+                            <LookupPicker Id="ownerId" LookupKey="crm.contact.owner" @bind-Value="form.OwnerId" Required="f.Required" Placeholder="@(form.Id is null ? Texts.Get("common.me") : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
                             <FieldError Field="ownerId" Errors="errors" />
-                            <small class="text-muted">Firmaya bağlı kişi firmanın erişim kapsamına göre görünür; sorumlu yalnızca firmasız kişide kapsamı belirler.</small>
+                            <small class="text-muted">@Texts.Get("crm.contact.editor.ownerHint")</small>
                             break;
                         case "email":
                             <label class="@f.LabelClass()" for="email">@f.Label</label>
                             <div class="input-icon">
                                 <AppIcon Name="mail" Size="16" />
-                                <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" placeholder="E-posta adresi" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Email" />
+                                <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" placeholder="@Texts.Get("crm.company.editor.emailPlaceholder")" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Email" />
                             </div>
                             <FieldError Field="email" Errors="errors" />
                             break;
@@ -123,11 +123,11 @@
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </div>
@@ -143,7 +143,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(CrmEntityKeys.Contact);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     private const string Url = "/api/crm/contacts";
@@ -156,7 +156,7 @@
     private bool initialized;
 
     /// <summary>Özet kartı: ad soyad ve baş harfler formdaki değerlerden gelir.</summary>
-    private string FullName => string.Join(" ", new[] { form.FirstName, form.LastName }.Where(p => !string.IsNullOrWhiteSpace(p))) is { Length: > 0 } name ? name : "Ad Soyad";
+    private string FullName => string.Join(" ", new[] { form.FirstName, form.LastName }.Where(p => !string.IsNullOrWhiteSpace(p))) is { Length: > 0 } name ? name : Texts.Get("crm.contact.editor.nameFallback");
 
     private string Initials
     {
