@@ -570,6 +570,125 @@ a, .btn-link {
     border-color: var(--mx-brand-primary);
 }
 
+/* Satır düzenindeki anahtar (form-check-row): Bootstrap'ın negatif girintisi flex satırında gerekmez. */
+.form-check-row.form-switch {
+    padding-left: 0;
+}
+
+    .form-check-row.form-switch .form-check-input {
+        margin-left: 0;
+    }
+
+/* Düğme grubu (SegmentedChoice): iki-üç seçenekli alan. Seçim renk dışında zemin, gölge ve kalın yazıyla da ayrılır. */
+.choice-group {
+    display: flex;
+    gap: 2px;
+    min-height: var(--mx-control-height);
+    padding: 2px;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface-control);
+}
+
+.choice-option {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+    .choice-option span {
+        display: grid;
+        place-items: center;
+        height: 100%;
+        padding: 0 var(--mx-space-2);
+        border-radius: 7px;
+        color: var(--mx-text-secondary);
+        font-size: var(--mx-fs-label);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .choice-option input:checked + span {
+        background: var(--mx-surface);
+        box-shadow: var(--mx-shadow-control);
+        color: var(--mx-tone-brand-fg);
+        font-weight: 700;
+    }
+
+    .choice-option input:focus-visible + span {
+        box-shadow: var(--mx-focus-ring);
+    }
+
+    .choice-option input:disabled + span {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+/* Etiket girişi (TagInput): form alanı gibi görünür, etiketler hap biçimindedir. */
+.tag-input {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-1);
+    min-height: var(--mx-control-height);
+    padding: 2px var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface-hover);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+    .tag-input:focus-within {
+        border-color: var(--mx-brand-primary);
+        background: var(--mx-surface);
+        box-shadow: var(--mx-focus-ring);
+    }
+
+    .tag-input input {
+        flex: 1;
+        min-width: 6rem;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--mx-text-primary);
+        font-size: var(--mx-fs-label);
+    }
+
+        .tag-input input::placeholder {
+            color: var(--mx-text-secondary);
+            opacity: 0.85;
+        }
+
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px var(--mx-space-1) 1px var(--mx-space-2);
+    border-radius: var(--mx-radius-badge);
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+}
+
+    .tag-chip button {
+        display: grid;
+        place-items: center;
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: inherit;
+        line-height: 1;
+    }
+
+        .tag-chip button:hover {
+            background: var(--mx-tone-info-bg);
+        }
+
 /* Erişilebilir, görünür klavye odağı (WCAG 2.2 — 2.4.7 / 2.4.11) */
 a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-visible {
     outline: 2px solid var(--mx-brand-primary);
