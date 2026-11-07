@@ -83,7 +83,7 @@ public sealed class SupportModule : IModule
         public const string SlaRecalculate = "support.sla.recalculate";
     }
 
-    /// <summary>Firma ayarları.</summary>
+    /// <summary>Modül ayarları (/modul-ayarlari/…).</summary>
     public static class SettingKeys
     {
         public const string ReopenWindowDays = "support.reopen.window-days";
