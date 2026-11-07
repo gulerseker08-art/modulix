@@ -17,16 +17,16 @@
                    role="combobox" aria-haspopup="listbox" aria-expanded="@(open ? "true" : "false")" aria-controls="@ListId"
                    aria-autocomplete="@(Searchable ? "list" : "none")" aria-activedescendant="@ActiveOptionId"
                    aria-required="@(Required ? "true" : null)" aria-invalid="@(Invalid ? "true" : null)" aria-label="@AccessibleName"
-                   autocomplete="off" placeholder="@Placeholder" readonly="@(!Searchable)"
+                   autocomplete="off" placeholder="@(Placeholder ?? Texts.Get("common.choose"))" readonly="@(!Searchable)"
                    value="@(open && Searchable ? query : SelectedText)"
                    @onfocus="OpenAsync" @onclick="OpenAsync" @oninput="OnInputAsync" @onkeydown="OnKeyDownAsync" @onfocusout="Close" />
             @if (current is not null && !Required)
             {
-                <button type="button" class="lookup-clear" aria-label="Seçimi temizle: @AccessibleName" @onclick="ClearAsync">×</button>
+                <button type="button" class="lookup-clear" aria-label="@Texts.Get("lookup.clear", AccessibleName)" @onclick="ClearAsync">×</button>
             }
             @if (current is not null && canView && selected is { Unavailable: false } && info?.ViewPath is { } path)
             {
-                <a class="lookup-view" href="@path.Replace("{id}", current.ToString())" aria-label="Seçili kaydı aç: @AccessibleName">Aç</a>
+                <a class="lookup-view" href="@path.Replace("{id}", current.ToString())" aria-label="@Texts.Get("lookup.openSelected", AccessibleName)">@Texts.Get("common.open")</a>
             }
         </div>
 
@@ -47,13 +47,13 @@
             }
             @if (open && loading)
             {
-                <li class="lookup-note" role="presentation">Yükleniyor…</li>
+                <li class="lookup-note" role="presentation">@Texts.Get("common.loading")</li>
             }
             else if (open && error is not null)
             {
                 <li class="lookup-note text-danger" role="presentation">
                     @error
-                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onmousedown="RetryAsync" @onmousedown:preventDefault>Tekrar dene</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onmousedown="RetryAsync" @onmousedown:preventDefault>@Texts.Get("lookup.retry")</button>
                 </li>
             }
             else if (open && hint is not null)
@@ -62,13 +62,13 @@
             }
             else if (open && items.Count == 0)
             {
-                <li class="lookup-note text-muted" role="presentation">Sonuç bulunamadı.</li>
+                <li class="lookup-note text-muted" role="presentation">@Texts.Get("lookup.noResults")</li>
             }
             @if (open && !loading && error is null && items.Count < total)
             {
                 <li class="lookup-note" role="presentation">
                     <button type="button" class="btn btn-sm btn-outline-secondary" @onmousedown="MoreAsync" @onmousedown:preventDefault>
-                        Daha fazla göster (@items.Count / @total)
+                        @Texts.Get("lookup.showMore", items.Count, total)
                     </button>
                 </li>
             }
@@ -132,13 +132,13 @@
 
     [Parameter] public bool Invalid { get; set; }
 
-    [Parameter] public string? Placeholder { get; set; } = "Seçin…";
+    [Parameter] public string? Placeholder { get; set; }
 
     private bool Searchable => info?.Searchable ?? true;
 
     private int MinLength => info?.MinSearchLength ?? 2;
 
-    private string AccessibleName => info?.Title ?? "Seçim";
+    private string AccessibleName => info?.Title ?? Texts.Get("lookup.selection");
 
     private string ListId => $"{Id}-list";
 
@@ -148,7 +148,7 @@
 
     private string SelectedText => selected is null
         ? string.Empty
-        : selected.Unavailable ? "Erişilemeyen kayıt" : selected.Label ?? string.Empty;
+        : selected.Unavailable ? Texts.Get("lookup.unavailable") : selected.Label ?? string.Empty;
 
     protected override async Task OnInitializedAsync() => info = await Catalog.GetAsync(LookupKey);
 
@@ -158,7 +158,7 @@
         {
             // Üst alan değişti: seçim yeni üst kayıtla ilişkili olmayabilir. Sessizce saklanmaz; temizlenir ve söylenir (sunucu da kayıtta doğrular).
             var title = AccessibleName;
-            notice = $"{title} seçimi, bağlı alan değiştiği için temizlendi.";
+            notice = Texts.Get("lookup.cleared", title);
             current = null;
             await ValueChanged.InvokeAsync(null);
         }
@@ -280,7 +280,7 @@
             items.Clear();
             total = 0;
             loading = false;
-            hint = $"Aramak için en az {MinLength} karakter yazın.";
+            hint = Texts.Get("lookup.minLength", MinLength);
             return;
         }
 
@@ -310,7 +310,7 @@
         loading = false;
         if (!result.IsSuccess)
         {
-            error = result.Error ?? "Liste yüklenemedi.";
+            error = result.Error ?? Texts.Get("lookup.loadFailed");
             if (append)
             {
                 page--;
@@ -329,7 +329,7 @@
         items.AddRange(result.Value!.Items);
         total = result.Value.TotalCount;
         canView = result.Value.CanView;
-        announcement = items.Count == 0 ? "Sonuç bulunamadı." : $"{total} sonuçtan {items.Count} tanesi listelendi.";
+        announcement = items.Count == 0 ? Texts.Get("lookup.noResults") : Texts.Get("lookup.listed", total, items.Count);
     }
 
     private async Task SelectAsync(LookupItemDto item)
