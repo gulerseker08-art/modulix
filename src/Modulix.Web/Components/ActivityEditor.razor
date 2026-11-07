@@ -169,8 +169,8 @@
                                 <div class="span-6">
                                     <label class="form-label" for="outcome">Sonuç</label>
                                     <select id="outcome" class="form-select" @bind="form.Outcome">
-                                        <option value="@ActivityOutcome.Reached">@ActivityOutcome.Label(ActivityOutcome.Reached)</option>
-                                        <option value="@ActivityOutcome.NoAnswer">@ActivityOutcome.Label(ActivityOutcome.NoAnswer)</option>
+                                        <option value="@ActivityOutcome.Reached">@CrmText.ActivityOutcomeName(ActivityOutcome.Reached)</option>
+                                        <option value="@ActivityOutcome.NoAnswer">@CrmText.ActivityOutcomeName(ActivityOutcome.NoAnswer)</option>
                                     </select>
                                     <small class="text-muted">İlk temas yalnızca gerçekleşen temastan (ulaşılan arama, yapılan toplantı) sayılır.</small>
                                     <FieldError Field="outcome" Errors="errors" />
