@@ -1,9 +1,17 @@
 namespace Modulix.Core.Automation;
 
 public sealed record AutomationRuleQuery(
-    string? ModuleKey = null, AutomationRuleStatus? Status = null, string? Search = null, int Page = 1, int PageSize = 50)
+    string? ModuleKey = null, AutomationRuleStatus? Status = null, string? Search = null, int Page = 1, int PageSize = 50, string? Sort = null)
 {
     public const int MaxPageSize = 200;
+
+    public const string DefaultSort = "-updatedAt";
+
+    /// <summary>Liste ekranının sıralama anahtarları (başına "-" azalan). Öncelik sürümde durduğu için sıralanamaz.</summary>
+    public static IReadOnlyList<string> SortKeys { get; } = ["name", "status", "updatedAt"];
+
+    public static bool IsValidSort(string? sort) =>
+        string.IsNullOrWhiteSpace(sort) || SortKeys.Contains(sort.TrimStart('-'), StringComparer.Ordinal);
 }
 
 public sealed record AutomationRuleSummary(

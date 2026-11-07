@@ -48,7 +48,7 @@ internal sealed class AutomationRuleService(
         }
 
         var total = await rules.CountAsync(cancellationToken);
-        var items = await rules.OrderByDescending(r => r.UpdatedAt).ThenBy(r => r.Id)
+        var items = await Sorted(rules, query.Sort).ThenBy(r => r.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
         var ids = items.Select(r => r.Id).ToList();
         var versions = await db.AutomationRuleVersions.AsNoTracking()
@@ -66,6 +66,21 @@ internal sealed class AutomationRuleService(
                 (published ?? draft)?.Priority ?? AutomationRuleVersion.DefaultPriority, rule.UpdatedAt, rule.Version);
         }).ToList();
         return new AutomationRulePage(summaries, page, pageSize, total);
+    }
+
+    // Sıralama anahtarı uç noktada doğrulanır; bilinmeyen anahtar varsayılan sıraya düşer (son güncellenen önce).
+    private static IOrderedQueryable<AutomationRule> Sorted(IQueryable<AutomationRule> rules, string? sort)
+    {
+        var descending = sort is { Length: > 1 } && sort[0] == '-';
+        return (sort?.TrimStart('-'), descending) switch
+        {
+            ("name", false) => rules.OrderBy(r => r.Name),
+            ("name", true) => rules.OrderByDescending(r => r.Name),
+            ("status", false) => rules.OrderBy(r => r.Status),
+            ("status", true) => rules.OrderByDescending(r => r.Status),
+            ("updatedAt", false) => rules.OrderBy(r => r.UpdatedAt),
+            _ => rules.OrderByDescending(r => r.UpdatedAt),
+        };
     }
 
     public async Task<AutomationRuleDetail?> GetAsync(Guid ruleId, CancellationToken cancellationToken)

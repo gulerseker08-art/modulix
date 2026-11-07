@@ -1478,7 +1478,7 @@ tr.done td.primary {
     color: var(--mx-text-secondary);
 }
 
-/* Sütunlar menüsü (ColumnPicker) ve etkin süzgeç sayısı rozeti */
+/* Sütunlar menüsü (GridColumnPicker) ve etkin süzgeç sayısı rozeti */
 .column-menu {
     min-width: 14rem;
 }
@@ -1633,11 +1633,6 @@ tr.done td.primary {
 .avatar-tone-2 { background: var(--mx-tone-violet-bg); color: var(--mx-tone-violet-fg); }
 .avatar-tone-3 { background: var(--mx-tone-warning-bg); color: var(--mx-tone-warning-fg); }
 .avatar-tone-4 { background: var(--mx-tone-success-bg); color: var(--mx-tone-success-fg); }
-
-/* Gizlenen sütun (ColumnPicker): başlık ve bütün hücreler; telefonda kart satırlarında da gizlenir. */
-.record-table .col-hidden {
-    display: none !important;
-}
 
 /* Satır eylemleri: ikincil (beyaz çerçeveli) düğme tabloda yumuşak görünür; birincil/yıkıcı zaten global yumuşaktır. */
 .record-table td.actions .btn-outline-secondary {

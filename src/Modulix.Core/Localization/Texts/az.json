@@ -186,6 +186,7 @@
   "nav.app.admin.audit": "Audit jurnalı",
   "nav.app.admin.import-log": "Əməliyyat jurnalı",
   "nav.app.admin.automation": "Avtomatlaşdırma",
+  "nav.app.admin.automation-logs": "İcra tarixçəsi",
   "nav.app.admin.approvals": "Təsdiq prosesləri",
   "nav.app.approvals": "Təsdiq mərkəzi",
   "nav.app.admin.communication": "Ünsiyyət seçimləri",

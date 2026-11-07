@@ -186,6 +186,7 @@
   "nav.app.admin.audit": "Denetim kaydı",
   "nav.app.admin.import-log": "İşlem günlüğü",
   "nav.app.admin.automation": "Otomasyon",
+  "nav.app.admin.automation-logs": "Çalışma geçmişi",
   "nav.app.admin.approvals": "Onay süreçleri",
   "nav.app.approvals": "Onay merkezi",
   "nav.app.admin.communication": "İletişim tercihleri",

@@ -242,6 +242,8 @@ public static class AppCatalog
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
         new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),
         new("admin.automation", Admin, "Otomasyon", "zap", "yonetim/otomasyon", 74, Permission: CoreAccess.ReadAutomation, Tone: AppTone.Teal),
+        // Yalnızca çalışma günlüğü izni olan kullanıcı (core.automation-logs.read) kural listesini açamaz; geçmişe kendi girdisinden ulaşır.
+        new("admin.automation-logs", Admin, "Çalışma geçmişi", "history", "yonetim/otomasyon/calismalar", 74, Permission: CoreAccess.ReadAutomationLogs),
         new("admin.approvals", Admin, "Onay süreçleri", "check-circle", "yonetim/onay-surecleri", 74, Permission: CoreAccess.ManageApprovals),
         new("admin.communication", Admin, "İletişim tercihleri", "mail", "yonetim/iletisim-tercihleri", 75, Permission: CoreAccess.ReadCommunication),
         new("admin.custom-fields", Admin, "Özel alanlar", "square-pen", "yonetim/ozel-alanlar", 80, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
