@@ -186,6 +186,8 @@
   "nav.app.admin.audit": "Audit jurnalı",
   "nav.app.admin.import-log": "Əməliyyat jurnalı",
   "nav.app.admin.automation": "Avtomatlaşdırma",
+  "nav.app.admin.approvals": "Təsdiq prosesləri",
+  "nav.app.approvals": "Təsdiq mərkəzi",
   "nav.app.admin.communication": "Ünsiyyət seçimləri",
   "nav.app.admin.custom-fields": "Xüsusi sahələr",
   "nav.app.admin.lists": "Siyahılar",

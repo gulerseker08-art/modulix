@@ -96,6 +96,7 @@ public static class AppCatalog
     public const string Marketing = "marketing";
     public const string Warehouse = "warehouse";
     public const string Reports = "reports";
+    public const string Approvals = "approvals";
     public const string Admin = "admin";
     public const string Platform = "platform";
 
@@ -227,6 +228,9 @@ public static class AppCatalog
         // kendi route'u vardır; /raporlar altındaki oluşturucu ve çalıştırma ekranları da bu uygulamanın bağlamında kalır.
         new(Reports, null, "Raporlar", "file-text", "raporlar", 85, Permission: ReportAccess.Read, Tone: AppTone.Teal),
 
+        // Onay merkezi çekirdeğe aittir (ADR-0027 Dilim 4a): modül anahtarı yoktur, yalnızca izne bağlıdır.
+        new(Approvals, null, "Onay merkezi", "check-circle", "onaylar", 84, AnyPermission: [CoreAccess.RequestApprovals, CoreAccess.DecideApprovals, CoreAccess.ManageApprovals], Tone: AppTone.Teal),
+
         new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal, Group: ManagementGroup),
         new("admin.home", Admin, "Genel bakış", "dashboard", "yonetim", 10, AnyPermission: CoreAccess.AdministrationPermissions, ExactMatch: true),
         new("admin.users", Admin, "Kullanıcılar", "user-check", "yonetim/kullanicilar", 20, Permission: CoreAccess.ManageUsers, Tone: AppTone.Teal),
@@ -238,6 +242,7 @@ public static class AppCatalog
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
         new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),
         new("admin.automation", Admin, "Otomasyon", "zap", "yonetim/otomasyon", 74, Permission: CoreAccess.ReadAutomation, Tone: AppTone.Teal),
+        new("admin.approvals", Admin, "Onay süreçleri", "check-circle", "yonetim/onay-surecleri", 74, Permission: CoreAccess.ManageApprovals),
         new("admin.communication", Admin, "İletişim tercihleri", "mail", "yonetim/iletisim-tercihleri", 75, Permission: CoreAccess.ReadCommunication),
         new("admin.custom-fields", Admin, "Özel alanlar", "square-pen", "yonetim/ozel-alanlar", 80, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
         new("admin.lists", Admin, "Listeler", "list", "yonetim/listeler", 90, Permission: CoreAccess.ManageCustomization),

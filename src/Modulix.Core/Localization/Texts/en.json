@@ -186,6 +186,8 @@
   "nav.app.admin.audit": "Audit log",
   "nav.app.admin.import-log": "Operations log",
   "nav.app.admin.automation": "Automation",
+  "nav.app.admin.approvals": "Approval processes",
+  "nav.app.approvals": "Approval center",
   "nav.app.admin.communication": "Communication preferences",
   "nav.app.admin.custom-fields": "Custom fields",
   "nav.app.admin.lists": "Lists",
