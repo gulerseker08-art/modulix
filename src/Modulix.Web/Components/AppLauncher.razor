@@ -69,7 +69,7 @@
                             <section class="app-group" aria-labelledby="@(section.Group is null ? null : $"app-group-{section.Group.Id}")">
                                 @if (section.Group is not null)
                                 {
-                                    <h3 id="app-group-@section.Group.Id" class="app-group-title">@section.Group.Name</h3>
+                                    <h3 id="app-group-@section.Group.Id" class="app-group-title">@AppNames.Of(section.Group)</h3>
                                 }
                                 <ul class="app-grid">
                                     @foreach (AppDefinition app in section.Apps)
@@ -102,7 +102,7 @@
                                 <li>
                                     <span class="app-tile is-planned" aria-disabled="true">
                                         <span class="app-tile-icon"><AppIcon Name="@planned.Icon" /></span>
-                                        <span class="app-tile-name">@planned.Name</span>
+                                        <span class="app-tile-name">@AppNames.Of(planned)</span>
                                     </span>
                                 </li>
                             }
@@ -168,10 +168,10 @@
         listed = Apps.Roots();
         visible = string.IsNullOrWhiteSpace(query)
             ? listed
-            : listed.Where(a => Matches(a.Name, query.Trim())).ToList();
+            : listed.Where(a => Matches(AppNames.Of(a), query.Trim())).ToList();
         plannedVisible = string.IsNullOrWhiteSpace(query)
             ? AppCatalog.Planned
-            : AppCatalog.Planned.Where(p => Matches(p.Name, query.Trim())).ToList();
+            : AppCatalog.Planned.Where(p => Matches(AppNames.Of(p), query.Trim())).ToList();
         showSearch = Session.IsLoaded && !loadFailed && (listed.Count > 0 || AppCatalog.Planned.Count > 0);
 
         IReadOnlyList<AppRootGroup> grouped = string.IsNullOrWhiteSpace(query) ? Apps.Grouped(listed) : [];
@@ -183,7 +183,7 @@
         <a href="@Apps.EntryRoute(app)" class="app-tile tone-@ToneClass(app) @(IsCurrent(app) ? "is-current" : null)"
            aria-current="@(IsCurrent(app) ? "page" : null)" @onclick="() => Close(true)">
             <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
-            <span class="app-tile-name">@app.Name</span>
+            <span class="app-tile-name">@AppNames.Of(app)</span>
         </a>
     </li>;
 

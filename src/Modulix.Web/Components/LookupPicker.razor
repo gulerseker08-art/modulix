@@ -340,6 +340,7 @@
         notice = null;
         Close();
         await ValueChanged.InvokeAsync(item.Id);
+        await NotifyFormAsync();
     }
 
     private async Task ClearAsync()
@@ -350,8 +351,12 @@
         notice = null;
         Close();
         await ValueChanged.InvokeAsync(null);
+        await NotifyFormAsync();
         await input.FocusAsync();
     }
+
+    // Seçim tarayıcıda input olayı üretmez; formun @oninput işaretlemesi (kaydedilmemiş değişiklik) değişikliği buradan öğrenir.
+    private async Task NotifyFormAsync() => await Js.InvokeVoidAsync("modulixLookup.changed", input);
 
     private async Task OnKeyDownAsync(KeyboardEventArgs e)
     {

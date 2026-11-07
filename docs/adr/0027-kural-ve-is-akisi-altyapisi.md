@@ -193,8 +193,11 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 2b-3 | İş olayı tetikleyicisi (`DomainEvent`); Ç0.4 iş olayı yayınlama sözleşmesine bağlı | Sonra |
 | 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
 | 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
-| 4 | Kalıcı akış ve onay örneği, takvim ortaklaştırma, puanlama, şablon motoru, uygulama içi bildirim kutusu | Sonra |
-| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a uygulandı (aşağıda "Dilim 5a"), 5b-5c sonra |
+| 4a | Genel onay: süreç tanımı, talep, Onay merkezi (Ç6a asgari) | Uygulandı (aşağıda "Dilim 4a") |
+| 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Sonra |
+| 4c | Kayda bağlı onay (modül beyanı, kural aksiyonu "onaya gönder"), kalıcı akış | Sonra |
+| 4d | Takvim ortaklaştırma, puanlama, şablon motoru | Sonra |
+| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
 
 ## Maliyet (harici ücret yok, iç maliyet var)
@@ -411,8 +414,8 @@ Dilim 5 (Blazor ekranları) üç parçaya bölündü; ilk parça salt okuma ağ�
 | Parça | Kapsam | Durum |
 | --- | --- | --- |
 | 5a | Kural listesi, şablon seçimi, kural ayrıntısı (yayınla / aç-kapat / taslağı at) | Uygulandı |
-| 5b | Çalışma geçmişi ve elle müdahale (çalıştır, yeniden dene, iptal) | Sonra |
-| 5c | Kural düzenleyici (tetikleyici, koşul, aksiyon parametreleri, önizleme) | Sonra |
+| 5b | Çalışma geçmişi ve elle müdahale (yeniden dene, iptal; elle çalıştırma ertelendi) | Uygulandı ("Dilim 5b") |
+| 5c | Kural düzenleyici (tetikleyici, koşul, aksiyon parametreleri, önizleme) | İlk sürüm uygulandı ("Dilim 5c") |
 
 - **Ekranlar** (Yönetim > Otomasyon, `core.automation.read`): `/yonetim/otomasyon` (liste: durum görünümü, arama, sayfalama; yeni kural yalnızca şablondan), `/yonetim/otomasyon/sablonlar` ("Kullan" taslak açar, `core.automation.manage`), `/yonetim/otomasyon/{id}` (taslak ve yayınlanmış sürüm, sunucunun ürettiği okunabilir özet, doğrulama sorunları; "Yayınla (kapalı kalsın)", "Yayınla ve aç", "Aç / Kapat", "Taslağı at"; yayın ve açma `core.automation.publish`).
 - **Tasarım:** yeni CSS, token ya da bileşen yok; mevcut `PageHeader`, `ViewSelector`, `record-table`, `FormSection`, `Pager`, onay şeridi (`alert confirm`) kullanıldı. Durum rozeti: Açık yeşil, Kapalı nötr, Taslak bilgi tonu. Bu ekranlar kayıt formu değil yönetim ekranı olduğu için sekmeli form kuralının dışındadır.
@@ -428,3 +431,57 @@ Dilim 5 (Blazor ekranları) üç parçaya bölündü; ilk parça salt okuma ağ�
 | `dotnet build src/Modulix.Web` / Release `src/Modulix.Api` | 0 hata |
 
 Ekranların kullandığı uçların dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 1 ve 3b'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez.
+
+### Dilim 5b: Çalışma geçmişi, yeniden deneme, iptal (6 Kasım 2026)
+
+- **Ekranlar:** `/yonetim/otomasyon/calismalar` (liste: durum görünümü, `?kural=` ile tek kurala süzme, sayfalama; `core.automation-logs.read`) ve `/yonetim/otomasyon/calismalar/{id}` (çalışma bilgisi, adım tablosu: sıra, adım, işlem adı, durum, deneme, sonuç özeti). Girişler kural listesindeki "Çalışma geçmişi" ve kural ayrıntısındaki "Çalışmaları" bağlantılarıdır.
+- **Elle müdahale:** "Yeniden dene" yalnızca `Failed` çalışmada, "İptal et" yalnızca `Pending`/`Running` çalışmada görünür (`AutomationLabels.CanRetry/CanCancel`; geçersiz durumu sunucu zaten reddeder). İptal onay şeridi ister: tamamlanmış adımların etkisi geri alınmaz. İkisi `core.automation.run` ister; düğmeleri gizlemek yetki değildir.
+- **Ertelenen:** "Kural için elle çalıştır" yapılmadı; bir kayıt seçmeyi gerektirir (kayıt kimliği yazdırmak kullanışsız ve hataya açık) ve ortak bir kayıt seçici henüz yok. Kural düzenleyiciyle (5c) birlikte ele alınacak.
+- **Gizlilik:** ekranlar yalnızca sunucunun döndürdüğü durum, özet ve kimlikleri gösterir; çalışma kaydı kayıt değeri ya da parametre taşımaz.
+- **Tasarım:** yeni CSS, token ya da bileşen yok (`PageHeader`, `ViewSelector`, `record-table`, `FormSection`, `Pager`, `chip active`, onay şeridi). Durum tonları: Başarılı yeşil, Başarısız kırmızı, Çalışıyor bilgi, İptal çizgili nötr, Bekliyor ve Koşul sağlanmadı nötr.
+- **Sınırlama:** sol menü girdisi `core.automation.read` ister; yalnızca `core.automation-logs.read` olan kullanıcı menüden değil doğrudan adresten girer.
+- **Doğrulanamayan:** 5a gibi, ekranlar bu oturumda tarayıcıda gözle kontrol edilmedi (açık/koyu tema, telefon).
+
+### Test sonuçları (Dilim 5b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Web.Tests` | Yeni 4: çalışma durumu adları ve tonları, yeniden deneme/iptal yalnızca uygun durumda, kaynak ve adım durumu adları, etiketsiz durum kalmaması |
+
+Uçların dört kural testi Dilim 2'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez.
+
+### Dilim 4a: Genel onay ve Onay merkezi (7 Kasım 2026)
+
+Ç6a'nın asgari hali; lojistik planındaki (ADR-0038 taslağı) masraf onayının ön koşuludur. Mevcut teklif ve sözleşme onayları değişmedi.
+
+- **Veri:** `core.ApprovalDefinitions` (adımlar JSON, `Revision`), `core.ApprovalRequests`, `core.ApprovalRequestSteps`; üçü de `ICompanyShared`, RLS altında. ADR'deki `ApprovalRequests/Steps` adları korundu; ayrı sürüm tablosu kurulmadı, çünkü talep açılırken adımlar satır olarak kopyalanır (Ç6a.2 anlık görüntüsü budur).
+- **Tanım:** firma kendi süreçlerini tanımlar. Adımda kişi ya da rol (rolün doğrudan üyelerinden biri yeter; departmandan gelen rol sayılmaz), tutar eşiği, süre. Aynı sıra numarası paralel çalışır. Eşikler sürecin para birimindedir, kur çevrilmez.
+- **Talep:** başlık ve tutar değişmez; değişecekse geri çekilip yeniden açılır (Ç6a.2 "tutar değişirse onay geçersizleşir" böyle sağlanır). Bütün adımlar eşik altında kalırsa talep kendiliğinden onaylanır.
+- **`ApprovalFlow` kullanılmadı:** o hesap rol onaycıyı ifade edemez ve onayları olay listesinden türetir; burada adım satırı durumu taşır.
+- **Dört göz:** talep sahibi kendi talebine karar veremez; açılışta her adımda talep sahibinden başka etkin onaycı aranır, yoksa talep açılmaz.
+- **Eşzamanlılık:** `Version` belirteci; aynı adıma iki karar gelirse biri 409 alır.
+- **Sahipsiz adım (Ç6a.1):** onaycısı ayrılan etkin adım panoda görünür, `core.approvals.manage` onaycıyı değiştirir. Destek üyeliği etkin onaycı sayılmaz (ADR-0028).
+- **İzinler:** `core.approvals.request`, `.decide`, `.manage`. Karar için izin yetmez, kişi etkin adımın onaycısı olmalıdır. `core.automation.approve` kural kaynaklı onaylar (4c) için ayrılmış kalır. Yeni izinler mevcut rollere otomatik verilmez; yönetici rollere ekler.
+- **Görünürlük:** talep sahibi, onaycı ve karar verenler görür; `manage` hepsini görür. Sorgu seviyesinde uygulanır; görünmeyen talep 404 döner.
+- **Bildirim:** sıradaki onaycılara ve sonuçta talep sahibine e-posta, kayıtla aynı işlemde (`IEmailQueue`).
+- **Arayüz:** `/onaylar` (pano bandı, grafikler, sekmeli liste, çekmecede adım izi ve karar), `/yonetim/onay-surecleri`. Yeni token `--mx-gradient-hero` ve `hero-band`, `step-track` sınıfları tasarım sistemine işlendi.
+
+**Bilerek yapılmadı:** süre aşımında eskalasyon (geciken talep yalnızca görünür), genel vekâlet, uygulama içi bildirim, kayda bağlı onay ve onay sonucunun hedef modül komutuna girdi olması (Ç6a.3), olay yayını (Ç0.4 bekler).
+
+### Dilim 5c: Kural düzenleyici, ilk sürüm (7 Kasım 2026)
+
+- **Ekranlar** (`core.automation.manage`): `/yonetim/otomasyon/yeni` ("Sıfırdan kural") ve `/yonetim/otomasyon/{id}/duzenle` ("Düzenle"). Bölümler: Genel (ad, açıklama, öncelik, "başka kural çalışmasın"), Ne zaman (tetikleyici türü ve parametreleri), Hangi koşulda (düz koşul listesi, hepsi / herhangi biri), Ne yapar (sıralı aksiyon adımları; yukarı/aşağı), Doğrulama.
+- **Sunucu tek doğruluk kaynağıdır:** düzenleyici alan, operatör ve izin kurallarını yeniden yazmaz. Seçenekler katalogdan gelir (alanın operatörleri, seçim seçenekleri, aksiyon parametre tipleri); "Doğrula" `POST /api/automation/preview` ile tanımı yan etkisiz denetler. Kayıt `POST /rules` / `PUT /rules/{id}` ile **yalnızca taslak** yazar, eksik taslak kaydedilebilir (tam doğrulama yayında). Yayınlanmış kuralı düzenlemek yeni taslak açar; sürüm çakışmasında kullanıcıya iletilir.
+- **Düzenleyicinin gösteremediği parçalar silinmez:** iç içe grup ve ilişki koşulu, iş olayı tetikleyicisi ve `{"$field": …}` alan bağlamalı parametre ham haliyle korunur (koşul için "kaldırıp yeniden kur", bağlama için "sabit değere çevir" bilinçli eylemi vardır). Tek yaprak koşul kayıtta tek öğeli grup olarak yazılır (anlamı aynı).
+- **Web tarafı:** Web yalnızca `Modulix.Shared`'e başvurduğu için tanım `JsonNode` ile okunur ve yazılır (`AutomationEditorModel.cs`). Biçimin sunucunun tipli modeline çözüldüğü `AutomationEditorJsonShapeTests` (Core.Tests) ile, düzenleyicinin tam bu metni ürettiği `AutomationEditorModelTests` (Web.Tests) ile birlikte sabitlenir.
+- **Bu sürümde yok (sonraki parçalar):** kayıt üzerinde deneme (kayıt seçici gerekir; elle çalıştırma ile birlikte), iç içe grup ve ilişki koşulu kurma, parametreye kayıt alanı bağlama, geçerlilik tarihleri (var olan değer korunur, değiştirilemez), lookup parametreleri için seçici (kimlik elle girilir), iş olayı tetikleyicisi (Ç0.4 bekler). Tarama tetikleyicilerini desteklemeyen kayıt türünde seçim engellenmez; sunucu "Doğrula"da bildirir.
+- **Doğrulanamayan:** ekranlar tarayıcıda gözle kontrol edilmedi (açık/koyu tema, telefon); gerçek API ile uçtan uca kayıt denenmedi, biçim uyumu yukarıdaki iki testle sabitlendi.
+
+### Test sonuçları (Dilim 5c)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Web.Tests` | Yeni 12 (`AutomationEditorModelTests`): gidiş-dönüş, tek yaprak, düz OR grubu ve eski değer, iç içe/ilişki koşulunun korunması, iş olayı tetikleyicisinin korunması, tetikleyici parametreleri, aksiyon parametre tipleri, bağlama ve bilinmeyen parametrenin korunması, adım kimliği, operatör adları, tetikleyici adları, sıfırdan kurulan kuralın sunucu biçimi |
+| `dotnet test tests/Modulix.Core.Tests --filter AutomationEditorJsonShapeTests` | Yeni 7: düzenleyicinin ürettiği biçim ve her tetikleyici türü tipli modele çözülür |
+
+Uçların dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 1'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez.

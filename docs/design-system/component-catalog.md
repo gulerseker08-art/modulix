@@ -25,6 +25,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Bileşen | Durum | Nerede / nasıl |
 |---|---|---|
 | FormTabs | Var | Tek bölümlü kayıt formunun gövdesini tek sekmeli çubukla sarar: `<FormTabs Title="Birim bilgileri" Label="Birim formu bölümleri">…form-grid…</FormTabs>`. Çok bölümlü formlar için TabBar + TabPanel. |
+| UnsavedChanges | Var | Kaydedilmemiş değişiklik durumu ve sayfadan ayrılma onayı: `<UnsavedChanges IsDirty="() => dirty" />` (`form-toolbar-actions` içinde); kullanım `form-standards.md`. |
 | TabBar + TabPanel | Var | Sekmeler: `<TabBar Tabs="…" State="tabs" />` + `<TabPanel State="tabs" Key="…">…</TabPanel>`; `TabItem(Key, Label, Count?, Errors)`; `Errors > 0` sekmede "!" rozeti gösterir, `TabState.RevealFirstFailing` hatalı ilk sekmeyi açar. Metadata formları `LayoutForm` ile aynısını otomatik yapar. |
 | ColumnPicker | Var | "Sütunlar" düğmesi + açılır menü: sayfadaki `.record-table` sütunlarını göster/gizle (ilk sütun hep görünür). `js/table-columns.js` hücrelere `col-hidden` sınıfı verir; seçim `localStorage`'da sayfa yoluna göre saklanır, tablo yeniden çizilince yeniden uygulanır. Araç çubuğuna `<ColumnPicker />` konur, tablo işaretlemesi değişmez. |
 | FilterToggle | Var | "Filtrele" düğmesi: `@bind-Open` + `Count` (etkin süzgeç sayısı rozeti). Sayfa süzgeç satırını `@if (filtersOpen || ActiveFilters > 0)` ile çizer. |
@@ -84,3 +85,9 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Takvim | Var | `ActivityCalendar.razor`: ay ızgarası, hafta/gün saat çizelgesi (`cal-time-*`, çakışanlar yan yana, şimdiki zaman çizgisi), ajanda; renk `FamilyOf` → `fam-*` |
 | Günün ajandası | Var | `TodayActivities.razor` |
 | Grafikler | Var | `BarChart.razor`, `DonutChart.razor` (`--chart-c*`) |
+
+## Pano bandı ve adım izi
+
+- `hero-band`: pano ekranlarında `PageHeader` yerine kullanılır; solda `hero-band-text` (üst etiket, tek `h1`, tek cümle), sağda `hero-band-stats` içinde en çok dört `hero-stat`. Tıklanabilen kutu `button.hero-stat` olur. Band yalnızca pano ekranlarındadır; liste ve form ekranlarında `PageHeader` kalır.
+- `step-dots` / `step-dot`: liste satırında adım ilerlemesi (`aria-label` ile metni verilir).
+- `step-track` / `step-track-item`: ayrıntıda dikey adım izi; durum sınıfları `is-approved`, `is-rejected`, `is-active`, `is-cancelled`.

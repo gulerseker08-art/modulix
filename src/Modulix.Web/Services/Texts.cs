@@ -29,6 +29,9 @@ public static class Texts
         return args.Length == 0 ? text : string.Format(CultureInfo.InvariantCulture, text, args);
     }
 
+    /// <summary>Anahtar sözlükte yoksa (ya da sözlük hiç yüklenmediyse) verilen metni döner; anahtar adını göstermez.</summary>
+    public static string GetOr(string key, string fallback) => current.TryGetValue(key, out var found) ? found : fallback;
+
     /// <summary>
     /// Yer tutucuların kalın gösterildiği metin (ör. "{0} sizi davet etti"). Değerler HTML'e kodlanır; sözlük metni ürüne aittir,
     /// kullanıcı girdisi yalnızca değer olarak girer.

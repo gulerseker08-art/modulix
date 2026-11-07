@@ -152,6 +152,8 @@ public sealed class CrmModule : IModule
         public const string QuoteApprovalDelegation = "crm.quote-approval-delegation";
         public const string SalesTarget = "crm.sales-target";
         public const string ForecastSubmission = "crm.forecast-submission";
+        public const string ForecastItem = "crm.forecast-item";
+        public const string SalesTargetRevision = "crm.sales-target-revision";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -359,6 +361,8 @@ public sealed class CrmModule : IModule
         new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability", "customerBudget", "wonAmount"]),
         // Tahmin sürümünün kilit anındaki gerçekleşen tutarı fırsat tutarlarından türer; tutar izni olmayan göremez (rapor veri kümesi dahil).
         new(Entities.ForecastSubmission, Permissions.OpportunityAmountsRead, ["realizedAtLock"]),
+        // Tahmin satırındaki tutar, olasılık ve kur fırsat tutarından türer; tutar izni olmayan göremez.
+        new(Entities.ForecastItem, Permissions.OpportunityAmountsRead, ["sourceAmount", "probability", "rateUsed", "baseAmount", "adjustmentAmount", "probabilityOverride"]),
         new(Entities.Product, Permissions.ProductCostsRead, ["cost", "costCurrency"]),
         new(Entities.QuoteLine, Permissions.QuoteCostsRead, ["unitCost"]),
     ];
@@ -1064,6 +1068,8 @@ public sealed class CrmModule : IModule
         services.AddScoped<IPriceCalculator, PriceCalculator>();
         services.AddScoped<IRecordStore, SalesTargetRecordStore>();
         services.AddScoped<IRecordStore, ForecastSubmissionRecordStore>();
+        services.AddScoped<IRecordStore, ForecastItemRecordStore>();
+        services.AddScoped<IRecordStore, SalesTargetRevisionRecordStore>();
         services.AddScoped<ForecastWorkflowGate>();
         services.AddScoped<SalesOpportunityReader>();
         services.AddScoped<SalesPlanningData>();

@@ -52,10 +52,10 @@
             return;
         }
 
-        string? section = menu.Sections.FirstOrDefault(s => s.Entries.Contains(entry))?.Group?.Name;
+        string? section = menu.Sections.FirstOrDefault(s => s.Entries.Contains(entry))?.Group is { } sectionGroup ? AppNames.Of(sectionGroup) : null;
         string pageHref = entry.Link!;
         string current = path.Split('?', '#')[0].Trim('/');
-        trail = new Trail(menu.Root.Name, Apps.EntryRoute(menu.Root) ?? "", section, entry.Name, pageHref,
+        trail = new Trail(AppNames.Of(menu.Root), Apps.EntryRoute(menu.Root) ?? "", section, entry.Name, pageHref,
             string.Equals(current, pageHref.Split('?')[0], StringComparison.OrdinalIgnoreCase));
     }
 
