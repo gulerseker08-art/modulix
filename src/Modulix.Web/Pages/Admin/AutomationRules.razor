@@ -5,7 +5,8 @@
 <PageTitle>Otomasyon kuralları · Modulix</PageTitle>
 
 @* Otomasyon kuralları (ADR-0027, Dilim 5a): liste. Okuma core.automation.read ister; yeni kural yalnızca şablondan başlar
-   (core.automation.manage). Düğmeleri gizlemek yetki değildir, sunucu uygular. *@
+   (core.automation.manage). Düğmeleri gizlemek yetki değildir, sunucu uygular. Liste şablonu: durum sekmeleri + kişisel görünümler
+   (ADR-0036), tıklanınca sıralanan başlıklar (sunucu sort anahtarı), sütun seçici. *@
 <AuthGate Permission="@CoreAccess.ReadAutomation">
     <a class="back-link" href="yonetim">← Yönetim</a>
 
@@ -17,9 +18,13 @@
         <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
     }
 
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Kural görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status ?? AutomationLabels.AllViews)" ValueChanged="ChooseStatusAsync" />
-        <ColumnPicker />
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Kural ara" placeholder="Kural adı ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(CoreAccess.ReadAutomationLogs))
         {
             <a class="btn btn-ghost" href="yonetim/otomasyon/calismalar">Çalışma geçmişi</a>
@@ -31,10 +36,8 @@
         }
     </div>
 
-    <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" aria-label="Kural ara" placeholder="Kural adı ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
-    </form>
+    <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (rulePage is null)
     {
@@ -66,27 +69,27 @@
         <table class="table record-table">
             <caption class="visually-hidden">Otomasyon kuralları</caption>
             <thead>
-                <tr><th scope="col">Kural</th><th scope="col">Kayıt türü</th><th scope="col">Durum</th><th scope="col">Sürüm</th><th scope="col">Öncelik</th><th scope="col">Güncelleme</th></tr>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var rule in rulePage.Items)
                 {
                     <tr>
-                        <td data-label="Kural" class="primary">
-                            <a href="yonetim/otomasyon/@rule.Id">@rule.Name</a>
-                            <small class="text-muted d-block">@AutomationLabels.Behaviour(rule)</small>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            <td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, rule)</td>
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{rule.Name} eylemleri")">
+                                <a class="view-menu-item" role="menuitem" href="yonetim/otomasyon/@rule.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            </RowMenu>
                         </td>
-                        <td data-label="Kayıt türü">@AutomationLabels.EntityName(entities, rule.EntityKey)</td>
-                        <td data-label="Durum">
-                            <span class="badge stage-@AutomationLabels.StatusBadge(rule.Status)">@AutomationLabels.Status(rule.Status)</span>
-                            @if (rule.HasDraft && rule.Status != AutomationLabels.Draft)
-                            {
-                                <span class="badge tag">Taslak var</span>
-                            }
-                        </td>
-                        <td data-label="Sürüm">@(rule.PublishedVersionNo is { } v ? $"v{v}" : "—")</td>
-                        <td data-label="Öncelik">@rule.Priority</td>
-                        <td data-label="Güncelleme">@CrmLabels.Time(rule.UpdatedAt)</td>
                     </tr>
                 }
             </tbody>
@@ -96,35 +99,120 @@
 </AuthGate>
 
 @code {
+    private const string ScreenKey = "admin.automation-rules";
+    private const string DefaultSort = "-updatedAt";
+    private const string StatusPrefix = "status:";
+
+    // Sıralanabilir sütunlar sunucudaki sort anahtarlarıdır (AutomationRuleQuery.SortKeys); öncelik sürümde durduğu için sıralanamaz.
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("name", "Kural", "type", "name", "-name", Locked: true),
+        new("entity", "Kayıt türü", "layers"),
+        new("status", "Durum", "tag", "status", "-status"),
+        new("version", "Sürüm", "hash"),
+        new("priority", "Öncelik", "arrow-up"),
+        new("updatedAt", "Güncelleme", "clock", "updatedAt", "-updatedAt"),
+    ];
+
+    private readonly GridViewState grid = new(ScreenKey, DefaultSort);
+    private PersonalGridViews views = default!;
     private AutomationRulePageDto? rulePage;
     private IReadOnlyList<AutomationEntityDto> entities = [];
+    private string view = AutomationLabels.AllViews;
     private string? status;
     private string? search;
     private string? message;
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, ScreenKey);
+        grid.Define(Columns);
         await Session.EnsureLoadedAsync();
         if (Session.Can(CoreAccess.ReadAutomation))
         {
             // Katalog kayıt türü adları içindir; alınamazsa liste teknik anahtarla yine çalışır.
             entities = (await Api.GetAsync<AutomationCatalogDto>("/api/automation/catalog")).Value?.Entities ?? [];
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
 
-    private static IReadOnlyList<ViewOption> StatusOptions =>
-        [new(AutomationLabels.AllViews, "Tüm kurallar"), .. AutomationLabels.Statuses.Select(s => new ViewOption(s, AutomationLabels.Status(s)))];
+    private GridViewDto? Active => views.Find(view);
 
-    private Task ChooseStatusAsync(string key)
+    // Sistem görünümleri yalnızca durum süzgecidir; kişisel görünümler ardına eklenir.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AutomationLabels.AllViews, "Tüm kurallar", Icon: "zap"),
+        .. AutomationLabels.Statuses.Select(s => new ViewOption(StatusPrefix + s, AutomationLabels.Status(s), Icon: "tag")),
+        .. views.Options,
+    ];
+
+    private string? CurrentFilters => GridFilters.Build(status is { Length: > 0 } s ? ("status", s) : null);
+
+    private string? BaselineFilters => Active?.Filters ?? (view.StartsWith(StatusPrefix, StringComparison.Ordinal) ? "status=" + view[StatusPrefix.Length..] : null);
+
+    private bool Dirty => grid.Differs(Active) || (CurrentFilters ?? string.Empty) != (BaselineFilters ?? string.Empty);
+
+    private async Task ChooseViewAsync(string key)
     {
-        status = key == AutomationLabels.AllViews ? null : key;
-        return LoadAsync(1);
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+        }
+        else
+        {
+            grid.Reset();
+        }
+
+        var filters = GridFilters.Parse(BaselineFilters);
+        status = filters.TryGetValue("status", out var s) && AutomationLabels.Statuses.Contains(s) ? s : null;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AutomationLabels.AllViews);
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"/api/automation/rules?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
         if (status is not null)
         {
             url += $"&status={status}";
@@ -134,4 +222,15 @@
         rulePage = result.Value;
         message = result.Error;
     }
+
+    private RenderFragment CellContent(string key, AutomationRuleSummaryDto rule) => key switch
+    {
+        "name" => @<text><a href="yonetim/otomasyon/@rule.Id">@rule.Name</a><small class="text-muted d-block">@AutomationLabels.Behaviour(rule)</small></text>,
+        "entity" => @<text>@AutomationLabels.EntityName(entities, rule.EntityKey)</text>,
+        "status" => @<text><span class="badge stage-@AutomationLabels.StatusBadge(rule.Status)">@AutomationLabels.Status(rule.Status)</span>@if (rule.HasDraft && rule.Status != AutomationLabels.Draft) { <span class="badge tag">Taslak var</span> }</text>,
+        "version" => @<text>@(rule.PublishedVersionNo is { } v ? $"v{v}" : "—")</text>,
+        "priority" => @<text>@rule.Priority</text>,
+        "updatedAt" => @<text>@CrmLabels.Time(rule.UpdatedAt)</text>,
+        _ => @<text></text>,
+    };
 }

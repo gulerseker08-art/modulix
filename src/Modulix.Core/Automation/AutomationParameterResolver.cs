@@ -14,7 +14,8 @@ public sealed record ResolvedParameters(JsonObject Values, IReadOnlyList<string>
 /// </summary>
 public static class AutomationParameterResolver
 {
-    public static ResolvedParameters Resolve(AutomationActionStep step, AutomationFieldSet fields, IAutomationFacts facts)
+    public static ResolvedParameters Resolve(
+        AutomationActionStep step, AutomationFieldSet fields, IAutomationFacts facts, AutomationActionDefinition? definition = null)
     {
         ArgumentNullException.ThrowIfNull(step);
         ArgumentNullException.ThrowIfNull(fields);
@@ -33,6 +34,11 @@ public static class AutomationParameterResolver
                     notes.Add($"'{fields.Find(fieldKey)?.Label ?? fieldKey}' bu kayıtta {(fact.State == AutomationFactState.Hidden ? "görülemiyor" : "boş")}.");
                 }
             }
+            else if (value is JsonValue json && json.TryGetValue<string>(out var text) && AutomationTextTemplate.HasVariables(text)
+                && Accepts(definition, name))
+            {
+                values[name] = RenderText(text, fields, facts, notes, definition?.Parameters.FirstOrDefault(p => p.Name == name));
+            }
             else
             {
                 values[name] = value?.DeepClone();
@@ -40,6 +46,28 @@ public static class AutomationParameterResolver
         }
 
         return new ResolvedParameters(values, notes);
+    }
+
+    /// <summary>
+    /// Metin değişkeni yalnızca kayıttan bağlanabilen metin parametresinde yorumlanır; tanım verilmemişse (yalnızca testler) her metinde.
+    /// Doğrulayıcı da aynı kuralı yayında uygular, böylece yayınlanmış bir kuralda bu iki yol ayrışmaz.
+    /// </summary>
+    private static bool Accepts(AutomationActionDefinition? definition, string name) =>
+        definition is null
+        || definition.Parameters.FirstOrDefault(p => p.Name == name) is { Type: AutomationFieldType.Text, AllowFieldBinding: true };
+
+    private static string RenderText(
+        string text, AutomationFieldSet fields, IAutomationFacts facts, List<string> notes, AutomationParameter? parameter)
+    {
+        var rendered = AutomationTextTemplate.Render(text, fields, facts, notes);
+        if (parameter is not null && rendered.Length > parameter.MaxLength)
+        {
+            // Uzun bir müşteri adı adımı düşürmesin: kısalt ve not düş.
+            notes.Add($"'{parameter.Label}' en çok {parameter.MaxLength} karakter olabilir; metin kısaltıldı.");
+            return rendered[..(parameter.MaxLength - 1)] + "…";
+        }
+
+        return rendered;
     }
 
     /// <summary>Şemada zorunlu olup değeri boş kalan parametrelerin etiketleri.</summary>

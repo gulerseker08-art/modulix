@@ -63,6 +63,37 @@ public class CrmAutomationTemplateTests
     }
 
     [Fact]
+    public void Template_text_variables_point_at_readable_fields_of_their_own_entity()
+    {
+        // Core'a başvurulamaz (CRM testleri): {{alan}} biçimi burada aynı kuralla ayıklanır; doğrulama gerçek katalogla entegrasyon testinde.
+        var variable = new System.Text.RegularExpressions.Regex(@"\{\{\s*([A-Za-z0-9_.\-]+)\s*\}\}");
+        var used = 0;
+
+        foreach (var template in CrmAutomationTemplates.All)
+        {
+            var step = Assert.Single(template.Definition.Actions);
+            foreach (var text in step.Parameters.Select(p => p.Value?.ToString() ?? string.Empty))
+            {
+                foreach (System.Text.RegularExpressions.Match match in variable.Matches(text))
+                {
+                    var field = Assert.Single(Declared.Fields, f => f.Key == match.Groups[1].Value);
+                    Assert.Equal(template.EntityKey, field.EntityKey);
+
+                    // Şablonu kullanan herkes yayınlayabilsin: özel okuma izni isteyen alan, kayıt seçimi ve tarih-saat metne girmez.
+                    Assert.Null(field.ReadPermission);
+                    Assert.DoesNotContain(field.Type, new[] { AutomationFieldType.Lookup, AutomationFieldType.DateTime });
+                    used++;
+                }
+
+                // Açılmış ama kapanmamış değişken kalmamalı.
+                Assert.DoesNotContain("{{", variable.Replace(text, string.Empty));
+            }
+        }
+
+        Assert.True(used >= 4, "Şablonlar kayıt değişkenini gerçekten kullanmalı.");
+    }
+
+    [Fact]
     public void Template_definitions_survive_the_stored_json_form_unchanged()
     {
         foreach (var template in CrmAutomationTemplates.All)

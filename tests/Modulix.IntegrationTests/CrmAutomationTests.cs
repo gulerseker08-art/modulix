@@ -253,6 +253,89 @@ public class CrmAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Cr
         Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
     }
 
+    // --- Dilim 4d: metin değişkenleri ({{alan}}) ---
+
+    private static string LeadSubjectVariable => "{{" + CrmModule.Entities.Lead + ".subject}}";
+
+    private static AutomationDefinition InactiveWithSubject(string subject) =>
+        new(new InactivityTrigger(CrmAutomation.LeadActivities, 7), null, [FollowUp(subject)]);
+
+    [Fact]
+    public async Task A_follow_up_subject_carries_record_variables_and_the_run_fills_them_in()
+    {
+        var setup = await SetUpAsync();
+        await CreateLeadAsync(setup, "Sessiz aday");
+        await PublishRuleAsync(setup, CrmModule.Entities.Lead, InactiveWithSubject($"Takip: {LeadSubjectVariable}"));
+
+        await RunRoundAsync(setup.Tenant.Id);
+
+        var run = Assert.Single(await RunsAsync(setup.Tenant.Id));
+        Assert.Equal(AutomationRunStatus.Succeeded, run.Status);
+        Assert.Equal("Takip: Sessiz aday", Assert.Single(await ActivitiesAsync(setup.Tenant.Id)).Subject);
+    }
+
+    [Fact]
+    public async Task Unknown_malformed_and_unfit_variables_are_refused_at_publish()
+    {
+        var setup = await SetUpAsync();
+
+        foreach (var subject in new[] { "{{crm.lead.nope}}", "Kapanmayan {{crm.lead.subject", "{{crm.lead.ownerId}}" })
+        {
+            var response = await TryPublishAsync(setup, CrmModule.Entities.Lead, InactiveWithSubject(subject));
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        }
+
+        // Başka kayıt türünün alanı da bilinmeyen sayılır (değişken kayıt türüne bağlıdır).
+        var otherEntity = await TryPublishAsync(setup, CrmModule.Entities.Lead, InactiveWithSubject("{{crm.opportunity.title}}"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, otherEntity.StatusCode);
+
+        var valid = await TryPublishAsync(setup, CrmModule.Entities.Lead, InactiveWithSubject($"Takip: {LeadSubjectVariable}"));
+        Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
+    }
+
+    [Fact]
+    public async Task Variables_are_filled_from_each_tenants_own_records_only()
+    {
+        var first = await SetUpAsync();
+        var second = await SetUpAsync();
+        await CreateLeadAsync(first, "Birinci aday");
+        await CreateLeadAsync(second, "İkinci aday");
+        await PublishRuleAsync(first, CrmModule.Entities.Lead, InactiveWithSubject($"Takip: {LeadSubjectVariable}"));
+        await PublishRuleAsync(second, CrmModule.Entities.Lead, InactiveWithSubject($"Takip: {LeadSubjectVariable}"));
+
+        await RunRoundAsync(first.Tenant.Id);
+        await RunRoundAsync(second.Tenant.Id);
+
+        Assert.Equal("Takip: Birinci aday", Assert.Single(await ActivitiesAsync(first.Tenant.Id)).Subject);
+        Assert.Equal("Takip: İkinci aday", Assert.Single(await ActivitiesAsync(second.Tenant.Id)).Subject);
+    }
+
+    [Fact]
+    public async Task A_variable_for_a_field_the_publisher_may_not_read_is_refused()
+    {
+        var setup = await SetUpAsync();
+        var member = await fixture.Factory.CreateUserAsync(setup.Tenant);
+        await fixture.Factory.CreateRoleAsync(setup.Tenant.Id,
+        [
+            Modulix.Core.Modules.CoreModule.Permissions.ReadAutomation, Modulix.Core.Modules.CoreModule.Permissions.ManageAutomation,
+            Modulix.Core.Modules.CoreModule.Permissions.PublishAutomation, CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.ActivitiesWrite,
+        ], RecordScope.All, member);
+        var client = await LoginAsync(member);
+        var amountText = new AutomationDefinition(
+            new ScheduledTrigger("00:00"), null, [FollowUp("Tutar {{" + CrmModule.Entities.Opportunity + ".amount}}")]);
+        var titleText = new AutomationDefinition(
+            new ScheduledTrigger("00:00"), null, [FollowUp("Fırsat {{" + CrmModule.Entities.Opportunity + ".title}}")]);
+
+        // Tutar izni olmayan, tutarı metne de ekleyemez (koşuldaki kuralla aynı); yetkisi olan alan serbesttir.
+        var denied = await TryPublishAsync(client, CrmModule.Entities.Opportunity, amountText);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, denied.StatusCode);
+        Assert.Contains("izniniz yok", await denied.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, (await TryPublishAsync(client, CrmModule.Entities.Opportunity, titleText)).StatusCode);
+
+        // Tutar iznine sahip yönetici aynı metni yayınlayabilir.
+        Assert.Equal(HttpStatusCode.OK, (await TryPublishAsync(setup.Client, CrmModule.Entities.Opportunity, amountText)).StatusCode);
+    }
+
     // --- yardımcılar ---
 
     private const string CrmFollowUpActivities_AutomationSource = "automation";

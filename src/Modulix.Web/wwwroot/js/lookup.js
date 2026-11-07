@@ -13,8 +13,15 @@ window.modulixLookup = {
     },
     // Girdinin kendisine değil dış kaba gönderilir: bileşenin arama işleyicisi çalışmaz, olay forma kabarcıklanır.
     changed: function (input) {
-        var host = input && input.closest ? input.closest('.lookup') : null;
+        var host = input && input.closest ? input.closest('.lookup, .tag-input') : null;
         if (host) { host.dispatchEvent(new Event('input', { bubbles: true })); }
+    },
+    // Etiket girişinde Enter formu göndermez, etiketi ekler.
+    guardEnter: function (input) {
+        if (!input) { return; }
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') { event.preventDefault(); }
+        });
     },
     reveal: function (id) {
         var option = id ? document.getElementById(id) : null;

@@ -103,6 +103,40 @@ public static class SalesLabels
 
     public static string Count(int value) => value.ToString("N0", Regional.Numbers);
 
+    /// <summary>Panoda kısa sayı: 6,84 Mn, 10,0 Mn, 640 B. Küçük değerler olduğu gibi yazılır; tam tutar rapor ekranlarındadır.</summary>
+    public static string Short(decimal value)
+    {
+        decimal size = Math.Abs(value);
+        return size switch
+        {
+            >= 1_000_000_000m => $"{Scaled(value / 1_000_000_000m)} Mr",
+            >= 1_000_000m => $"{Scaled(value / 1_000_000m)} Mn",
+            >= 1_000m => $"{(value / 1_000m).ToString("N0", Regional.Numbers)} B",
+            _ => value.ToString("N0", Regional.Numbers),
+        };
+    }
+
+    /// <summary>Para birimli kısa tutar: TRY için ₺6,84 Mn, diğerlerinde 6,84 Mn USD.</summary>
+    public static string Compact(decimal amount, string currency) =>
+        currency == "TRY" ? $"₺{Short(amount)}" : $"{Short(amount)} {currency}";
+
+    /// <summary>Dönemin bugüne kadar geçen yüzdesi (bugün dahil). Bugün dönemin dışındaysa tempo yoktur.</summary>
+    public static decimal? PeriodElapsedPercent(DateOnly start, DateOnly end, DateOnly today)
+    {
+        if (today < start || today > end)
+        {
+            return null;
+        }
+
+        return (today.DayNumber - start.DayNumber + 1) * 100m / (end.DayNumber - start.DayNumber + 1);
+    }
+
+    /// <summary>Dar eksen için dönem adı: FY2026-Q4 → 26-Q4, 2026-11 → 26-11.</summary>
+    public static string ShortPeriod(string label) =>
+        label.StartsWith("FY20", StringComparison.Ordinal) ? label[4..] : label.StartsWith("20", StringComparison.Ordinal) ? label[2..] : label;
+
+    private static string Scaled(decimal value) => value.ToString(Math.Abs(value) >= 10m ? "0.0" : "0.0#", Regional.Numbers);
+
     /// <summary>Tutar kutusunun kısmi veri açıklaması (rozetin başlığı ve ekran okuyucu metni).</summary>
     public static string PartialHint(MoneyTotalDto total)
     {

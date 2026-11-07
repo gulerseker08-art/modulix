@@ -75,6 +75,23 @@ public class AppNavigationTests
     }
 
     [Fact]
+    public void Crm_dashboard_is_first_in_the_workspace_for_users_with_sales_reports()
+    {
+        MenuContext menu = Nav(AllModules, [.. SalesUser, SalesAccess.ReportsRead]).Context("crm/pano")!;
+
+        Assert.Equal(AppCatalog.Crm, menu.Root.Id);
+        Assert.Equal("Pano", EntryNames(menu, AppCatalog.CrmWorkspaceGroup).First());
+    }
+
+    [Fact]
+    public void Crm_dashboard_is_hidden_without_sales_reports_permission()
+    {
+        MenuContext menu = Nav(AllModules, SalesUser).Context("crm/firmalar")!;
+
+        Assert.DoesNotContain("Pano", EntryNames(menu, AppCatalog.CrmWorkspaceGroup));
+    }
+
+    [Fact]
     public void Hosted_screens_keep_their_own_routes_and_resolve_to_the_crm_menu()
     {
         var nav = Nav(AllModules, SalesUser);

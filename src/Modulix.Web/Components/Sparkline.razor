@@ -1,0 +1,34 @@
+@using System.Globalization
+@* Eksensiz küçük eğilim çizgisi; son nokta işaretlidir. İki farklı değer yoksa çizilmez (düz çizgi bilgi vermez). *@
+@if (Values.Count >= 2 && Values.Min() != Values.Max())
+{
+    var points = Points();
+    var last = points[^1];
+    <svg class="sparkline" width="@Width" height="@Height" viewBox="0 0 @Width @Height" role="img" aria-label="@Label">
+        <polyline points="@string.Join(' ', points.Select(p => $"{Css(p.X)},{Css(p.Y)}"))" />
+        <circle cx="@Css(last.X)" cy="@Css(last.Y)" r="4" />
+    </svg>
+}
+
+@code {
+    private const int Width = 92;
+    private const int Height = 34;
+    private const int Inset = 5;
+
+    [Parameter, EditorRequired] public IReadOnlyList<decimal> Values { get; set; } = [];
+
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    private List<(double X, double Y)> Points()
+    {
+        double low = (double)Values.Min();
+        double range = (double)Values.Max() - low;
+        double stepX = (Width - (2.0 * Inset)) / (Values.Count - 1);
+        double spanY = Height - (2.0 * Inset);
+        return [.. Values.Select((value, i) => (
+            Inset + (i * stepX),
+            range == 0 ? Height / 2.0 : Height - Inset - (((double)value - low) / range * spanY)))];
+    }
+
+    private static string Css(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+}

@@ -8,7 +8,7 @@
     {
         <div class="view-selector-backdrop" aria-hidden="true" @onclick="Close"></div>
         <div class="view-menu column-menu" role="group" aria-label="@Texts.Get("common.columns.visible")">
-            <div class="view-menu-group" role="presentation">@Texts.Get("common.columns.arrange")</div>
+            <div class="view-menu-group" role="presentation">@Texts.Get("common.columns.manage")</div>
             @for (var i = 0; i < State.Order.Count; i++)
             {
                 var column = State.Find(State.Order[i]);

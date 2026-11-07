@@ -39,8 +39,9 @@ public interface IPlanAdministration
     Task<PlanInfo> CreatePlanAsync(PlanInput input, Guid actingUserId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Plan tanımını günceller (anahtar değişmez). Mevcut abonelerin modül hakları kendiliğinden değişmez; limitler hemen
-    /// güncel plandan çözülür. Plan yoksa NotFound.
+    /// Plan tanımını günceller (anahtar değişmez). Modül seti değişirse geçerli (süresi dolmamış) abonelerin modül hakları da güncellenir
+    /// (eklenen açılır, çıkan kapanır, veri silinmez; her firma için ayrı platform kaydı); süresi dolmuş abonelikler yenilenene kadar değişmez.
+    /// Limitler hemen güncel plandan çözülür. Plan yoksa NotFound.
     /// </summary>
     Task<PlanInfo> UpdatePlanAsync(Guid planId, PlanInput input, Guid actingUserId, CancellationToken cancellationToken);
 

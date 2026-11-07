@@ -3,14 +3,14 @@
 
 <PageTitle>Planlar · Platform · Modulix</PageTitle>
 
-@* Satış paketleri (ADR-0028 Dilim 4): modül seti ve limitler. Plan silinmez, kapatılır; plan değişikliği mevcut abonelerin modül
-   haklarını kendiliğinden değiştirmez (plan firmaya yeniden atanınca geçerli olur), limitler ise hemen güncel plandan çözülür. *@
+@* Satış paketleri (ADR-0028 Dilim 4): modül seti ve limitler. Plan silinmez, kapatılır; modül seti değişince geçerli abonelerin
+   modül hakları da güncellenir (eklenen açılır, çıkan kapanır; veri silinmez), limitler hemen güncel plandan çözülür. *@
 <PlatformGate>
     <a class="back-link" href="platform">← Platform</a>
     <h1>Planlar</h1>
     <p class="text-muted">
         Plan, bir firmaya atanan modül seti ve limitlerdir. Planlar silinmez; kapatılan plan yeni firmalara atanamaz, mevcut aboneler etkilenmez.
-        Plandaki modül değişikliği, plan firmaya yeniden atanınca uygulanır; limit değişikliği hemen geçerlidir.
+        Plandaki modül değişikliği geçerli abonelere hemen yansır (eklenen modül açılır, çıkan kapanır; veri silinmez); süresi dolmuş abonelikler yenilenene kadar değişmez. Limit değişikliği de hemen geçerlidir.
     </p>
 
     <Notice Text="@notice" Failed="failed" />

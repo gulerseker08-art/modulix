@@ -25,9 +25,11 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Bileşen | Durum | Nerede / nasıl |
 |---|---|---|
 | FormTabs | Var | Tek bölümlü kayıt formunun gövdesini tek sekmeli çubukla sarar: `<FormTabs Title="Birim bilgileri" Label="Birim formu bölümleri">…form-grid…</FormTabs>`. Çok bölümlü formlar için TabBar + TabPanel. |
+| SegmentedChoice | Var | İki-üç seçenekli alan için düğme grubu (gerçek radio): `<SegmentedChoice Id="…" Label="…" Options="…" @bind-Value="…" />`; sınıflar `choice-group`, `choice-option`. |
+| TagInput | Var | Virgülle ayrılmış değeri haplarla gösteren etiket girişi; sınıflar `tag-input`, `tag-chip`. |
 | UnsavedChanges | Var | Kaydedilmemiş değişiklik durumu ve sayfadan ayrılma onayı: `<UnsavedChanges IsDirty="() => dirty" />` (`form-toolbar-actions` içinde); kullanım `form-standards.md`. |
 | TabBar + TabPanel | Var | Sekmeler: `<TabBar Tabs="…" State="tabs" />` + `<TabPanel State="tabs" Key="…">…</TabPanel>`; `TabItem(Key, Label, Count?, Errors)`; `Errors > 0` sekmede "!" rozeti gösterir, `TabState.RevealFirstFailing` hatalı ilk sekmeyi açar. Metadata formları `LayoutForm` ile aynısını otomatik yapar. |
-| ColumnPicker | Var | "Sütunlar" düğmesi + açılır menü: sayfadaki `.record-table` sütunlarını göster/gizle (ilk sütun hep görünür). `js/table-columns.js` hücrelere `col-hidden` sınıfı verir; seçim `localStorage`'da sayfa yoluna göre saklanır, tablo yeniden çizilince yeniden uygulanır. Araç çubuğuna `<ColumnPicker />` konur, tablo işaretlemesi değişmez. |
+| GridColumnPicker | Var | "Sütunlar" düğmesi + açılır menü: ekranın `GridViewState` sütunlarını göster/gizle ve sırala (sabit sütun hep görünür). Seçim kişisel görünümle sunucuda saklanır (`core.GridViews`, ADR-0036); tablo başlıkları `GridHeader`, hücreler `grid.VisibleColumns` ile çizilir, kaydetme şeridi `PersonalViewBar`. Eski DOM tabanlı `ColumnPicker` (tarayıcıda saklanan) kaldırıldı. |
 | FilterToggle | Var | "Filtrele" düğmesi: `@bind-Open` + `Count` (etkin süzgeç sayısı rozeti). Sayfa süzgeç satırını `@if (filtersOpen || ActiveFilters > 0)` ile çizer. |
 | Pager | Var | "1–8 / 24 kayıt" + sayfa numaraları (ilk, son, geçerli ±1; arası "…"), `PageChanged`. `PageSizeChoice="true"` "25 / sayfa" seçicisini açar: liste sorgusuna `&pageSize={ListPaging.Size}` eklenmiş olmalı (oturum boyunca ortak; 10/25/50/100). |
 | SortHeader | Var | Sıralanabilir sütun başlığı (`<th>` içinde): `<SortHeader Label="Başlık" ColumnIcon="phone" Asc="title" Desc="-title" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" />`. `ColumnIcon` sütun türü ikonudur (başlıkta metnin önünde). Tıklama artan → azalan → varsayılan; sıralama sunucudadır, yalnızca listenin `sort` anahtarları kullanılır (Firmalar, Sözleşmeler, Siparişler, Operasyon işleri, Destek talepleri). Sıralanamayan sütun başlığı `<span class="th-label"><AppIcon … /> Ad</span>` ile aynı görünür. |
@@ -42,6 +44,12 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Kayıt düzeni + özet kartı | Stil | `record-layout` (solda `record-summary` > `summary-card`: `summary-identity`, `summary-facts`, `summary-numbers`, `summary-contact`; sağda `record-main`) — Firma ve Kişi detayı |
 | Detay düzeni + sağ panel | Stil | `detail-layout` (`detail-main` + yapışkan `detail-side` > `side-card`) — Fırsat detayı |
 | SummaryCard / KPIStatCard | Stil | `summary` + `summary-item`, `stat-grid` + `stat-card` (+ `stat-icon`); tıklanabilir KPI: `kpi-grid` + `button.stat-card.kpi-card.tone-*` |
+| DashboardHero | Stil | `dash-hero` (+ `dash-hero-solo`: hedef yoksa tek sütun): pano özet bandı; `dash-hero-kicker`, `dash-hero-value`, `dash-hero-note`, `dash-hero-legend`, `dash-hero-stats`. Ekranda en çok bir tane. Örnek: `Crm/CrmDashboard.razor` |
+| GoalMeter | Var | `<GoalMeter Realized="…" Weighted="…" Tempo="…" Label="…" />`: hedef göstergesi; yüzdeler hedefe oranla, tempo dikey işaret; yalnızca `dash-hero` içinde |
+| DashKpi | Var | Pano KPI kutusu: `<DashKpi Label Icon Tone Value Detail Partial Trend />`; `dash-kpis` ızgarasında (telefonda 2×2). `Trend` verilirse `Sparkline` çizer (telefonda gizli) |
+| Sparkline | Var | `<Sparkline Values="…" Label="…" />`: eksensiz küçük eğilim çizgisi (`--chart-c0`), son nokta işaretli |
+| ColumnChart | Var | `<ColumnChart Items="…" Title="…" />`: dikey sütun grafik, tek renk, son sütun (güncel dönem) tam tonda, her sütunda değer etiketi |
+| DashCard | Stil | `dash-grid` + `dash-card` (+ `dash-card-head`): pano kutusu; `dash-stage` aşama satırları, `dash-list` kayıt listesi |
 | Tabs (kayıt sekmeleri) | Var | `Components/TabBar.razor` + `TabState` (`TabItem(Key, Label, Count)`): sekme ilk seçilişte çizilir, sonra gizli kalır (kaydedilmemiş form kaybolmaz); paneller `role="tabpanel"`, `hidden` |
 | Segmented / chip | Stil | `filters` + `chip` (`aria-pressed`), `segmented` |
 | Accordion | Stil | `sub-section` + `section-toggle` |
@@ -82,6 +90,6 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 
 ## Pano bandı ve adım izi
 
-- `hero-band`: pano ekranlarında `PageHeader` yerine kullanılır; solda `hero-band-text` (üst etiket, tek `h1`, tek cümle), sağda `hero-band-stats` içinde en çok dört `hero-stat`. Tıklanabilen kutu `button.hero-stat` olur. Band yalnızca pano ekranlarındadır; liste ve form ekranlarında `PageHeader` kalır.
+- `hero-band`: pano ekranlarında `PageHeader` yerine kullanılır; solda `hero-band-text` (üst etiket, tek `h1`, tek cümle), sağda `hero-band-stats` içinde en çok dört `hero-stat`. Tıklanabilen kutu `button.hero-stat` olur. Band yalnızca pano ekranlarındadır; liste ve form ekranlarında `PageHeader` kalır. CRM panosu bu kuralın dışındadır: başlık ve dönem/sorumlu seçimi `PageHeader`'da kalır, altında `dash-hero` çizilir (7.11.2026 kararı).
 - `step-dots` / `step-dot`: liste satırında adım ilerlemesi (`aria-label` ile metni verilir).
 - `step-track` / `step-track-item`: ayrıntıda dikey adım izi; durum sınıfları `is-approved`, `is-rejected`, `is-active`, `is-cancelled`.

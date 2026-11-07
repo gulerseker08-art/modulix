@@ -28,18 +28,18 @@ internal sealed class ReportExports(
     ICurrentAccess access,
     TimeProvider time) : IReportExports
 {
-    public async Task<ReportExportInfo?> CreateAsync(Guid reportId, CancellationToken cancellationToken)
+    public async Task<ReportExportInfo?> CreateAsync(Guid reportId, CancellationToken cancellationToken, ReportFileFormat format = ReportFileFormat.Csv)
     {
         if (await center.GetAsync(reportId, cancellationToken) is not { } report)
         {
             return null;
         }
 
-        return await CreateCoreAsync(reportId, report.Summary.Name, report.Spec, ReportExportSource.Manual, cancellationToken);
+        return await CreateCoreAsync(reportId, report.Summary.Name, report.Spec, ReportExportSource.Manual, cancellationToken, format);
     }
 
-    public Task<ReportExportInfo> CreateAsync(ReportSpec spec, string? name, CancellationToken cancellationToken) =>
-        CreateCoreAsync(null, string.IsNullOrWhiteSpace(name) ? "Rapor" : name.Trim(), ReportSpecJson.Defaulted(spec), ReportExportSource.Manual, cancellationToken);
+    public Task<ReportExportInfo> CreateAsync(ReportSpec spec, string? name, CancellationToken cancellationToken, ReportFileFormat format = ReportFileFormat.Csv) =>
+        CreateCoreAsync(null, string.IsNullOrWhiteSpace(name) ? "Rapor" : name.Trim(), ReportSpecJson.Defaulted(spec), ReportExportSource.Manual, cancellationToken, format);
 
     public async Task<ReportExportInfo?> CreateScheduledAsync(Guid reportId, CancellationToken cancellationToken) =>
         await center.GetAsync(reportId, cancellationToken) is { } report
@@ -47,7 +47,7 @@ internal sealed class ReportExports(
             : null;
 
     private async Task<ReportExportInfo> CreateCoreAsync(
-        Guid? reportId, string name, ReportSpec spec, ReportExportSource source, CancellationToken cancellationToken)
+        Guid? reportId, string name, ReportSpec spec, ReportExportSource source, CancellationToken cancellationToken, ReportFileFormat format = ReportFileFormat.Csv)
     {
         var tenant = tenantAccessor.Current ?? throw new InvalidOperationException("Aktif tenant olmadan dışa aktarılamaz.");
         var now = time.GetUtcNow();
@@ -76,17 +76,17 @@ internal sealed class ReportExports(
             throw result.Status == ReportRunStatus.Forbidden ? new ReportForbiddenException(message) : new ReportException(message, result.Issues);
         }
 
-        var bytes = ReportCsv.Build(result);
+        var bytes = format == ReportFileFormat.Xlsx ? ReportXlsx.Build(result) : ReportCsv.Build(result);
         if (bytes.Length > ReportExport.MaxBytes)
         {
             throw new ReportException($"Dosya çok büyük ({bytes.Length / 1024 / 1024} MB; sınır {ReportExport.MaxBytes / 1024 / 1024} MB). Süzgeçlerle daraltın.");
         }
 
         var rows = result.IsSummary ? result.Rows.Count : result.RowsMatched;
-        var fileName = $"{ReportCsv.FileSlug(name)}-{now:yyyyMMdd-HHmm}.csv";
+        var fileName = $"{ReportCsv.FileSlug(name)}-{now:yyyyMMdd-HHmm}.{(format == ReportFileFormat.Xlsx ? "xlsx" : "csv")}";
         var export = new ReportExport(
             tenant.UserId, reportId, name.Length > ReportDefinition.NameMaxLength ? name[..ReportDefinition.NameMaxLength] : name, resolved.Dataset.Key, fileName,
-            bytes, rows, result.Truncated || result.RowsLimited, await stamps.ComputeAsync(resolved.Dataset, cancellationToken), source, now);
+            bytes, rows, result.Truncated || result.RowsLimited, await stamps.ComputeAsync(resolved.Dataset, cancellationToken), source, now, format);
         db.ReportExports.Add(export);
         audit.Add(new AuditEntry(
             tenant.TenantId, tenant.UserId, CoreModule.AuditedEntityKeys.Report, reportId ?? export.Id, AuditAction.Exported,

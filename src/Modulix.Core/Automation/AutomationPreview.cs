@@ -121,7 +121,7 @@ public sealed class AutomationPreviewService(
                 continue;
             }
 
-            var resolved = AutomationParameterResolver.Resolve(step, fields, facts);
+            var resolved = AutomationParameterResolver.Resolve(step, fields, facts, view.Definition);
             var parameters = resolved.Values;
             var notes = resolved.Notes.ToList();
 

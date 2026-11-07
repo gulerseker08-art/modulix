@@ -77,9 +77,25 @@ internal sealed class PlanAdministration(
         var plan = await db.Plans.SingleOrDefaultAsync(p => p.Id == planId, cancellationToken)
             ?? throw new UserAdministrationException(UserAdministrationError.NotFound, "Plan bulunamadı.");
         var before = Describe(plan);
+        var modulesBefore = plan.Modules.Select(m => m.ModuleKey).ToHashSet(StringComparer.Ordinal);
         plan.Update(input.Name, ValidateModules(input.Modules), input.Limits, input.IsActive);
         Audit(actingUserId, PlatformAuditActions.PlanUpdated, null, null, new JsonObject { ["before"] = before, ["after"] = Describe(plan) });
         await db.SaveChangesAsync(cancellationToken);
+
+        // Modül seti değiştiyse geçerli aboneler de güncellenir: eklenen modül açılır, çıkan modül kapanır (veri silinmez). Süresi
+        // dolmuş (ek süre/salt okunur evresindeki) abonelikler yenilenene kadar olduğu gibi kalır.
+        if (!modulesBefore.SetEquals(plan.Modules.Select(m => m.ModuleKey)))
+        {
+            var now = time.GetUtcNow();
+            var subscriptions = await db.TenantSubscriptions.AsNoTracking()
+                .Where(s => s.PlanId == plan.Id && s.EndedAt == null && (s.ValidUntil == null || s.ValidUntil > now))
+                .ToListAsync(cancellationToken);
+            foreach (var subscription in subscriptions)
+            {
+                await ApplyModulesAsync(subscription.TenantId, plan, subscription.ValidUntil, $"Plan güncellendi: {plan.Name}", actingUserId, cancellationToken);
+            }
+        }
+
         var count = await db.TenantSubscriptions.CountAsync(s => s.PlanId == plan.Id && s.EndedAt == null, cancellationToken);
         return ToInfo(plan, count);
     }
@@ -124,29 +140,7 @@ internal sealed class PlanAdministration(
             throw new UserAdministrationException(UserAdministrationError.Conflict, "Etkin olmayan plan atanamaz.");
         }
 
-        // Modül hakları plana göre ayarlanır (her biri kendi platform kaydı ve firma denetimiyle). Elle ya da istisna olarak verilmiş
-        // haklara dokunulmaz; önceki plandan gelip yeni planda olmayan modüller kapatılır ama veri silinmez.
-        var current = await db.ModuleEntitlements.AsNoTracking().Where(e => e.TenantId == tenantId).ToListAsync(cancellationToken);
-        var planModules = plan.Modules.Select(m => m.ModuleKey).ToHashSet(StringComparer.Ordinal);
-        var terms = new EntitlementTerms(EntitlementSource.Plan, validUntil, $"Plan: {plan.Name}");
-        var changed = new JsonArray();
-        foreach (var module in catalog.Modules.Select(m => m.Key).Where(planModules.Contains))
-        {
-            var existing = current.FirstOrDefault(e => e.ModuleKey == module);
-            if (existing is { IsEnabled: true, Source: not EntitlementSource.Plan })
-            {
-                continue;
-            }
-
-            await platform.SetModuleAsync(tenantId, module, true, actingUserId, cancellationToken, terms, trimmedReason);
-            changed.Add($"+{module}");
-        }
-
-        foreach (var stale in current.Where(e => e is { IsEnabled: true, Source: EntitlementSource.Plan } && !planModules.Contains(e.ModuleKey)))
-        {
-            await platform.SetModuleAsync(tenantId, stale.ModuleKey, false, actingUserId, cancellationToken, reason: trimmedReason);
-            changed.Add($"-{stale.ModuleKey}");
-        }
+        var changed = await ApplyModulesAsync(tenantId, plan, validUntil, trimmedReason, actingUserId, cancellationToken);
 
         var previous = await db.TenantSubscriptions.Where(s => s.TenantId == tenantId && s.EndedAt == null).ToListAsync(cancellationToken);
         foreach (var subscription in previous)
@@ -163,6 +157,36 @@ internal sealed class PlanAdministration(
             ["modules"] = changed,
         });
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // Modül hakları plana göre ayarlanır (her biri kendi platform kaydı ve firma denetimiyle). Elle ya da istisna olarak verilmiş
+    // haklara dokunulmaz; önceki plandan gelip planda olmayan modüller kapatılır ama veri silinmez.
+    private async Task<JsonArray> ApplyModulesAsync(
+        Guid tenantId, Plan plan, DateTimeOffset? validUntil, string reason, Guid actingUserId, CancellationToken cancellationToken)
+    {
+        var current = await db.ModuleEntitlements.AsNoTracking().Where(e => e.TenantId == tenantId).ToListAsync(cancellationToken);
+        var planModules = plan.Modules.Select(m => m.ModuleKey).ToHashSet(StringComparer.Ordinal);
+        var terms = new EntitlementTerms(EntitlementSource.Plan, validUntil, $"Plan: {plan.Name}");
+        var changed = new JsonArray();
+        foreach (var module in catalog.Modules.Select(m => m.Key).Where(planModules.Contains))
+        {
+            var existing = current.FirstOrDefault(e => e.ModuleKey == module);
+            if (existing is { IsEnabled: true, Source: not EntitlementSource.Plan })
+            {
+                continue;
+            }
+
+            await platform.SetModuleAsync(tenantId, module, true, actingUserId, cancellationToken, terms, reason);
+            changed.Add($"+{module}");
+        }
+
+        foreach (var stale in current.Where(e => e is { IsEnabled: true, Source: EntitlementSource.Plan } && !planModules.Contains(e.ModuleKey)))
+        {
+            await platform.SetModuleAsync(tenantId, stale.ModuleKey, false, actingUserId, cancellationToken, reason: reason);
+            changed.Add($"-{stale.ModuleKey}");
+        }
+
+        return changed;
     }
 
     public async Task SetLimitOverrideAsync(
