@@ -118,6 +118,18 @@
                                     <label class="form-label" for="@($"due-{step.Key}")">Süre (saat)</label>
                                     <input id="@($"due-{step.Key}")" class="form-control" type="number" min="1" @bind="step.DueHours" />
                                 </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="@($"escalate-{step.Key}")">Süre aşılınca</label>
+                                    <select id="@($"escalate-{step.Key}")" class="form-select" @bind="step.Escalate">
+                                        <option value="">Yalnızca hatırlat</option>
+                                        <optgroup label="Roller">
+                                            @foreach (var role in options?.Roles ?? []) { <option value="@($"role:{role.Id}")">@role.Name</option> }
+                                        </optgroup>
+                                        <optgroup label="Kişiler">
+                                            @foreach (var person in options?.People ?? []) { <option value="@($"user:{person.Id}")">@person.Name</option> }
+                                        </optgroup>
+                                    </select>
+                                </div>
                             </div>
                             <button type="button" class="btn btn-ghost" disabled="@(steps.Count == 1)" @onclick="() => steps.Remove(step)">Adımı kaldır</button>
                         </div>
@@ -149,8 +161,14 @@
 
         public int? DueHours { get; set; }
 
-        public Guid? Id(string prefix) =>
-            Approver.StartsWith(prefix + ":", StringComparison.Ordinal) ? Guid.Parse(Approver[(prefix.Length + 1)..]) : null;
+        public string Escalate { get; set; } = string.Empty;
+
+        public Guid? Id(string prefix) => Parse(Approver, prefix);
+
+        public Guid? EscalationId(string prefix) => Parse(Escalate, prefix);
+
+        private static Guid? Parse(string value, string prefix) =>
+            value.StartsWith(prefix + ":", StringComparison.Ordinal) ? Guid.Parse(value[(prefix.Length + 1)..]) : null;
     }
 
     private const string ScreenKey = "admin.approval-processes";
@@ -318,6 +336,7 @@
                 Approver = s.ApproverUserId is { } user ? $"user:{user}" : $"role:{s.ApproverRoleId}",
                 MinAmount = s.MinAmount,
                 DueHours = s.DueHours,
+                Escalate = s.EscalateToUserId is { } target ? $"user:{target}" : s.EscalateToRoleId is { } role ? $"role:{role}" : string.Empty,
             })];
         editing = true;
     }
@@ -329,7 +348,7 @@
         busy = true;
         var request = new SaveApprovalDefinitionRequest(
             name, description, currency,
-            [.. steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.Id("user"), s.Id("role"), s.MinAmount, s.DueHours))],
+            [.. steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.Id("user"), s.Id("role"), s.MinAmount, s.DueHours, s.EscalationId("user"), s.EscalationId("role")))],
             editVersion);
         var saved = editId is { } id
             ? await Api.PutAsync<ApprovalDefinitionDto>($"/api/approvals/definitions/{id}", request)

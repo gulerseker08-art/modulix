@@ -1,3 +1,4 @@
+@using Modulix.Shared.Auth
 @page "/onaylar"
 @inject ApiClient Api
 @inject SessionState Session
@@ -69,6 +70,10 @@
             <input class="form-control" type="search" aria-label="Talep ara" placeholder="Başlık ya da süreç ara" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
+        @if (Session.Can(CoreAccess.DecideApprovals) || Session.Can(CoreAccess.ManageApprovals))
+        {
+            <button type="button" class="btn btn-tonal" @onclick="OpenDelegationsAsync"><AppIcon Name="repeat" Size="16" /> Vekâlet</button>
+        }
         @if (Session.Can(CoreAccess.RequestApprovals))
         {
             <button type="button" class="btn btn-primary" @onclick="OpenNewAsync"><AppIcon Name="plus" Size="16" /> Yeni talep</button>
@@ -143,6 +148,8 @@
                                 <strong>@step.Name</strong>
                                 <small>@step.ApproverName @StepNote(step)</small>
                                 @if (step.IsOrphaned) { <span class="badge stage-lost">Etkin onaycı yok</span> }
+                                @if (step.IsEscalated && step.Status == "Active") { <span class="badge stage-onhold">Süresi geçti@(step.EscalationName is { } target ? $" · {target}" : null)</span> }
+                                @if (step.OnBehalfOfName is { } principal) { <small>@principal adına vekâleten</small> }
                                 @if (!string.IsNullOrWhiteSpace(step.Comment)) { <p>@step.Comment</p> }
                                 @if (step.Status == "Active" && Session.Can(CoreAccess.ManageApprovals) && options is not null)
                                 {
@@ -179,6 +186,58 @@
                 }
             </div>
         }
+    </Drawer>
+
+    <Drawer Open="delegating" Label="Onay vekâleti" OnClose="() => delegating = false">
+        <div class="section-header">
+            <h2>Onay vekâleti</h2>
+            <button type="button" class="btn btn-icon btn-ghost" aria-label="Kapat" @onclick="() => delegating = false"><AppIcon Name="x" Size="18" /></button>
+        </div>
+        <div>
+            <p class="text-muted">İzinliyken size atanan adımlara vekiliniz karar versin. Role atanmış adımlar vekâlete girmez; vekil, talep sahibi olduğu talebe karar veremez.</p>
+            @foreach (var delegation in delegations)
+            {
+                <div class="step-editor">
+                    <strong>@delegation.PrincipalName → @delegation.DelegateName</strong>
+                    <small class="d-block text-muted">@DateText(delegation.StartsAt) – @DateText(delegation.EndsAt)</small>
+                    <span class="badge @(delegation.IsActive ? "stage-won" : "stage-cancelled")">@(delegation.RevokedAt is not null ? "Geri alındı" : delegation.IsActive ? "Etkin" : "Etkin değil")</span>
+                    @if (delegation.RevokedAt is null && delegation.EndsAt > DateTimeOffset.UtcNow && (delegation.PrincipalUserId == Session.User?.UserId || Session.Can(CoreAccess.ManageApprovals)))
+                    {
+                        <button type="button" class="btn btn-ghost btn-sm" disabled="@busy" @onclick="() => RevokeDelegationAsync(delegation)">Geri al</button>
+                    }
+                </div>
+            }
+            <FormTabs Title="Yeni vekâlet">
+                <FormSection Title="Vekil" Icon="user">
+                    <div class="mb-3">
+                        <label class="form-label" for="delegate-user">Vekil</label>
+                        <select id="delegate-user" class="form-select" @bind="delegateId">
+                            <option value="">Seçin…</option>
+                            @foreach (var member in members.Where(m => m.UserId != Session.User?.UserId)) { <option value="@member.UserId">@member.DisplayName</option> }
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label" for="delegate-from">Başlangıç</label>
+                            <input id="delegate-from" class="form-control" type="date" @bind="delegateFrom" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label" for="delegate-to">Bitiş</label>
+                            <input id="delegate-to" class="form-control" type="date" @bind="delegateTo" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="delegate-reason">Gerekçe</label>
+                        <input id="delegate-reason" class="form-control" maxlength="300" @bind="delegateReason" />
+                    </div>
+                </FormSection>
+            </FormTabs>
+            <Notice Text="@actionError" Failed="true" />
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => delegating = false">Kapat</button>
+            <button type="button" class="btn btn-primary" disabled="@(busy || delegateId is null)" @onclick="SaveDelegationAsync">Vekâleti aç</button>
+        </div>
     </Drawer>
 
     <Drawer Open="creating" Label="Yeni onay talebi" OnClose="() => creating = false">
@@ -280,6 +339,14 @@
     private string? newDescription;
     private decimal? newAmount;
     private string? newCurrency;
+
+    private List<ApprovalDelegationDto> delegations = [];
+    private List<TenantMemberResponse> members = [];
+    private bool delegating;
+    private Guid? delegateId;
+    private DateOnly delegateFrom = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly delegateTo = DateOnly.FromDateTime(DateTime.Today.AddDays(7));
+    private string? delegateReason;
 
     private ApprovalDefinitionDto? SelectedDefinition => definitions.FirstOrDefault(d => d.Id == newDefinitionId);
 
@@ -497,6 +564,44 @@
             viewKey = view = "mine";
             await RefreshAsync();
         }
+    }
+
+    private async Task OpenDelegationsAsync()
+    {
+        actionError = null;
+        delegateId = null;
+        delegateReason = null;
+        members = (await Api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members")).Value ?? [];
+        await LoadDelegationsAsync();
+        delegating = true;
+    }
+
+    private async Task LoadDelegationsAsync() =>
+        delegations = (await Api.GetAsync<List<ApprovalDelegationDto>>("/api/approvals/delegations")).Value ?? [];
+
+    private async Task SaveDelegationAsync()
+    {
+        busy = true;
+        var starts = new DateTimeOffset(delegateFrom.ToDateTime(TimeOnly.MinValue), Regional.ToTenant(DateTimeOffset.UtcNow).Offset);
+        var ends = new DateTimeOffset(delegateTo.ToDateTime(TimeOnly.MaxValue), Regional.ToTenant(DateTimeOffset.UtcNow).Offset);
+        var done = await Api.PostAsync<ApprovalDelegationDto>("/api/approvals/delegations", new CreateApprovalDelegationRequest(null, delegateId!.Value, starts, ends, delegateReason));
+        busy = false;
+        actionError = done.IsSuccess ? null : done.Error;
+        if (done.IsSuccess)
+        {
+            delegateId = null;
+            delegateReason = null;
+            await LoadDelegationsAsync();
+        }
+    }
+
+    private async Task RevokeDelegationAsync(ApprovalDelegationDto delegation)
+    {
+        busy = true;
+        var done = await Api.PostAsync<ApprovalDelegationDto>($"/api/approvals/delegations/{delegation.Id}/revoke", new { });
+        busy = false;
+        actionError = done.IsSuccess ? null : done.Error;
+        await LoadDelegationsAsync();
     }
 
     private static string Count(int value) => value.ToString("N0", Regional.Numbers);

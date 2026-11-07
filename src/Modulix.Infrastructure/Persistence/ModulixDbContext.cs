@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
 using Modulix.Core.Approvals;
+using Modulix.Core.Notifications;
 using Modulix.Core.Automation;
 using Modulix.Core.Communication;
 using Modulix.Core.Customization;
@@ -116,6 +117,10 @@ public class ModulixDbContext(
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
 
     public DbSet<ApprovalRequestStep> ApprovalRequestSteps => Set<ApprovalRequestStep>();
+
+    public DbSet<ApprovalDelegation> ApprovalDelegations => Set<ApprovalDelegation>();
+
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
 
