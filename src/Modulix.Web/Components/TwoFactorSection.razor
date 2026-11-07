@@ -3,84 +3,84 @@
 
 @* İki adımlı doğrulama (Y7b): kurulum (QR kod, doğrulama), kurtarma kodları ve kapatma. Hesabım sayfasındadır. *@
 <section id="iki-adim" class="record-form settings-group">
-    <h2>İki adımlı doğrulama</h2>
+    <h2>@Texts.Get("two-factor.title")</h2>
     <Notice Text="@notice" Failed="failed" />
 
     @if (status is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (codes is not null)
     {
         <div class="alert alert-warning" role="status">
-            Bu kurtarma kodlarını şimdi bir yere kaydedin; bir daha gösterilmez. Telefonunuz yanınızda değilken her biriyle bir kez giriş yapabilirsiniz.
+            @Texts.Get("two-factor.codesWarning")
         </div>
         <pre class="recovery-codes">@string.Join("\n", codes)</pre>
         <div class="form-actions">
-            <a class="btn btn-outline-primary" download="modulix-kurtarma-kodlari.txt"
-               href="@($"data:text/plain;charset=utf-8,{Uri.EscapeDataString(string.Join("\r\n", codes))}")">Kodları indir</a>
-            <button type="button" class="btn btn-primary" @onclick="() => codes = null">Kaydettim</button>
+            <a class="btn btn-outline-primary" download="@Texts.Get("two-factor.codesFile")"
+               href="@($"data:text/plain;charset=utf-8,{Uri.EscapeDataString(string.Join("\r\n", codes))}")">@Texts.Get("two-factor.download")</a>
+            <button type="button" class="btn btn-primary" @onclick="() => codes = null">@Texts.Get("two-factor.saved")</button>
         </div>
     }
     else if (status.Enabled)
     {
-        <p><span class="badge user-active">Açık</span> Girişte doğrulama uygulamanızdaki kod istenir. @status.RecoveryCodesLeft kurtarma kodunuz kaldı.</p>
+        <p><span class="badge user-active">@Texts.Get("two-factor.on")</span> @Texts.Get("two-factor.onText", status.RecoveryCodesLeft)</p>
         @if (status.RequiredBy.Count > 0)
         {
-            <p class="text-muted">@string.Join(", ", status.RequiredBy) iki adımlı doğrulamayı zorunlu kılıyor; kapatamazsınız.</p>
+            <p class="text-muted">@Texts.Get("two-factor.requiredBy", string.Join(", ", status.RequiredBy))</p>
         }
 
         <div class="form-grid">
             <div class="mb-3">
-                <label class="form-label" for="tfPassword">Mevcut şifre</label>
+                <label class="form-label" for="tfPassword">@Texts.Get("account.currentPassword")</label>
                 <input id="tfPassword" class="form-control" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput" />
                 <FieldError Field="currentPassword" Errors="errors" />
             </div>
             @if (status.RequiredBy.Count == 0)
             {
                 <div class="mb-3">
-                    <label class="form-label" for="tfDisableCode">Kod (kapatmak için)</label>
+                    <label class="form-label" for="tfDisableCode">@Texts.Get("two-factor.disableCode")</label>
                     <input id="tfDisableCode" class="form-control" autocomplete="one-time-code" @bind="code" @bind:event="oninput" />
                     <FieldError Field="code" Errors="errors" />
                 </div>
             }
         </div>
         <div class="form-actions">
-            <button type="button" class="btn btn-outline-primary" disabled="@(busy || password.Length == 0)" @onclick="RegenerateAsync">Kurtarma kodlarını yenile</button>
+            <button type="button" class="btn btn-outline-primary" disabled="@(busy || password.Length == 0)" @onclick="RegenerateAsync">@Texts.Get("two-factor.regenerate")</button>
             @if (status.RequiredBy.Count == 0)
             {
-                <button type="button" class="btn btn-outline-danger" disabled="@(busy || password.Length == 0 || code.Length == 0)" @onclick="DisableAsync">Kapat</button>
+                <button type="button" class="btn btn-outline-danger" disabled="@(busy || password.Length == 0 || code.Length == 0)" @onclick="DisableAsync">@Texts.Get("two-factor.disable")</button>
             }
         </div>
     }
     else if (setup is not null)
     {
         <ol class="setup-steps">
-            <li>Telefonunuza bir doğrulama uygulaması kurun (Google Authenticator, Microsoft Authenticator vb.).</li>
-            <li>Uygulamada QR kodu okutun. Okutamıyorsanız anahtarı elle girin: <code class="shared-key">@setup.SharedKey</code></li>
-            <li>Uygulamanın gösterdiği 6 haneli kodu girin.</li>
+            <li>@Texts.Get("two-factor.step1")</li>
+            <li>@Texts.Get("two-factor.step2") <code class="shared-key">@setup.SharedKey</code></li>
+            <li>@Texts.Get("two-factor.step3")</li>
         </ol>
-        <p><img class="qr-code" src="@setup.QrCode" alt="Doğrulama uygulaması için QR kod" /></p>
+        <p><img class="qr-code" src="@setup.QrCode" alt="@Texts.Get("two-factor.qrAlt")" /></p>
         <div class="mb-3">
-            <label class="form-label" for="tfCode">Kod</label>
+            <label class="form-label" for="tfCode">@Texts.Get("two-factor.code")</label>
             <input id="tfCode" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="7" @bind="code" @bind:event="oninput" />
             <FieldError Field="code" Errors="errors" />
         </div>
         <div class="form-actions">
-            <button type="button" class="btn btn-primary" disabled="@(busy || code.Length == 0)" @onclick="EnableAsync">Doğrula ve aç</button>
-            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => setup = null">Vazgeç</button>
+            <button type="button" class="btn btn-primary" disabled="@(busy || code.Length == 0)" @onclick="EnableAsync">@Texts.Get("two-factor.enable")</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => setup = null">@Texts.Get("two-factor.cancel")</button>
         </div>
     }
     else
     {
-        <p><span class="badge user-disabled">Kapalı</span> Açarsanız girişte şifrenin yanında telefonunuzdaki doğrulama uygulamasının kodu da istenir.</p>
+        <p><span class="badge user-disabled">@Texts.Get("two-factor.off")</span> @Texts.Get("two-factor.offText")</p>
         <div class="mb-3">
-            <label class="form-label" for="tfStartPassword">Mevcut şifre</label>
+            <label class="form-label" for="tfStartPassword">@Texts.Get("account.currentPassword")</label>
             <input id="tfStartPassword" class="form-control" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput" />
             <FieldError Field="currentPassword" Errors="errors" />
         </div>
         <div class="form-actions">
-            <button type="button" class="btn btn-primary" disabled="@(busy || password.Length == 0)" @onclick="StartAsync">Kurulumu başlat</button>
+            <button type="button" class="btn btn-primary" disabled="@(busy || password.Length == 0)" @onclick="StartAsync">@Texts.Get("two-factor.start")</button>
         </div>
     }
 </section>
@@ -115,7 +115,7 @@
         if (result.Value is { } enabled)
         {
             (codes, setup, code) = (enabled.Codes, null, string.Empty);
-            (notice, failed) = ("İki adımlı doğrulama açıldı.", false);
+            (notice, failed) = (Texts.Get("two-factor.enabledNotice"), false);
             await LoadAsync();
 
             // Firma zorunlu kılıyorsa ekranlar artık açılır.
@@ -129,7 +129,7 @@
         if (result.Value is { } regenerated)
         {
             (codes, password) = (regenerated.Codes, string.Empty);
-            (notice, failed) = ("Yeni kurtarma kodları oluşturuldu; eskiler artık geçersiz.", false);
+            (notice, failed) = (Texts.Get("two-factor.regeneratedNotice"), false);
             await LoadAsync();
         }
     }
@@ -140,7 +140,7 @@
         if (result.IsSuccess)
         {
             (password, code) = (string.Empty, string.Empty);
-            (notice, failed) = ("İki adımlı doğrulama kapatıldı.", false);
+            (notice, failed) = (Texts.Get("two-factor.disabledNotice"), false);
             await LoadAsync();
             await Session.RefreshAsync();
         }

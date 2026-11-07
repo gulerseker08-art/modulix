@@ -1,0 +1,310 @@
+@page "/crm/pano"
+@using System.Globalization
+@using System.Net
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>CRM panosu · Modulix</PageTitle>
+
+@* Hedef merkezi: veri Satış görünümüyle aynı uçtan gelir, yeni hesap yoktur. Kapsam ve tutar izni sunucuda uygulanır; tutar izni yoksa adetler gösterilir. *@
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ReportsRead">
+    <div class="page-header">
+        <div>
+            <h1>CRM panosu</h1>
+            <p class="page-subtitle">@Subtitle</p>
+        </div>
+        <div class="header-actions">
+            <div class="segmented" role="group" aria-label="Dönem türü">
+                @foreach (var (key, label) in SalesLabels.PeriodKinds)
+                {
+                    <button type="button" class="chip @(kind == key ? "active" : null)" aria-pressed="@(kind == key ? "true" : "false")" disabled="@loading" @onclick="() => ChooseKindAsync(key)">@label</button>
+                }
+            </div>
+            <select class="form-select dash-filter" aria-label="Sorumlu" @bind="owner" @bind:after="LoadAsync">
+                <option value="">Tüm ekip</option>
+                @foreach (var member in Lookups.Members)
+                {
+                    <option value="@member.UserId">@member.DisplayName</option>
+                }
+            </select>
+            @if (Session.Can(CrmAccess.OpportunitiesWrite))
+            {
+                <a class="btn btn-primary" href="crm/firsatlar?yeni=true"><AppIcon Name="plus" Size="16" /> Yeni fırsat</a>
+            }
+        </div>
+    </div>
+
+    @if (loading && report is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+
+    @if (error is not null)
+    {
+        <div class="alert @(forbidden ? "alert-warning" : "alert-danger")" role="alert">
+            @(forbidden ? "Bu panoyu açma yetkiniz yok. " : null)@error
+            @if (!forbidden)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">Tekrar dene</button>
+            }
+        </div>
+    }
+
+    @if (report is not null)
+    {
+        var r = report;
+        var amounts = r.AmountsVisible;
+        var progress = (amounts ? r.AmountTarget : r.CountTarget)?.Progress;
+        var tempo = SalesLabels.PeriodElapsedPercent(r.PeriodStart, r.PeriodEnd, r.Today);
+
+        <section class="dash-hero @(progress is null ? "dash-hero-solo" : null)" aria-label="Dönem öngörüsü">
+            <div>
+                <p class="dash-hero-kicker">@(amounts ? "Dönem öngörüsü · gerçekleşen + ağırlıklı tahmin" : "Kazanılan fırsat")</p>
+                <div class="dash-hero-headline">
+                    <span class="dash-hero-value">@(amounts ? SalesLabels.Compact(r.Outlook, r.Currency) : SalesLabels.Count(r.WonCount))</span>
+                    @if (progress is not null)
+                    {
+                        <span class="dash-hero-note">Hedef @Figure(progress.Target, r) · @SalesLabels.Percent(Math.Round(Share(amounts ? r.Outlook : progress.Realized, progress)))</span>
+                    }
+                    else if (Session.Can(SalesAccess.TargetsRead))
+                    {
+                        <span class="dash-hero-note">Bu dönem için hedef yok. <a href="crm/satis-hedefleri">Hedef tanımla</a></span>
+                    }
+                </div>
+                @if (progress is not null)
+                {
+                    <GoalMeter Realized="Share(progress.Realized, progress)" Weighted="@(amounts ? Share(r.WeightedOpen.Amount, progress) : 0m)" Tempo="tempo" Label="@MeterLabel(r, progress, tempo)" />
+                }
+                <div class="dash-hero-legend">
+                    @if (amounts)
+                    {
+                        <span><i class="fill-realized"></i>Gerçekleşen @SalesLabels.Compact(r.Realized.Amount, r.Currency)</span>
+                        <span><i class="fill-weighted"></i>Ağırlıklı tahmin @SalesLabels.Compact(r.WeightedOpen.Amount, r.Currency)</span>
+                    }
+                    @if (progress is not null && tempo is { } elapsed)
+                    {
+                        <span><i class="fill-tempo"></i>Bugünkü tempo @SalesLabels.Percent(Math.Round(elapsed))</span>
+                    }
+                </div>
+            </div>
+            @if (progress is not null)
+            {
+                <dl class="dash-hero-stats">
+                    <div>
+                        <dd>@(progress.TargetMet ? "Karşılandı" : Figure(progress.Remaining, r))</dd>
+                        <dt>Kalan hedef</dt>
+                    </div>
+                    <div>
+                        <dd>@(progress.Coverage is { } coverage ? $"{coverage.ToString("0.0", Regional.Numbers)}×" : "—")</dd>
+                        <dt>Pipeline kapsama</dt>
+                    </div>
+                    @if (tempo is { } pace)
+                    {
+                        var gap = Math.Round(Share(progress.Realized, progress) - pace);
+                        <div>
+                            <dd>@(gap > 0 ? "+" : null)@gap.ToString("0", Regional.Numbers) puan</dd>
+                            <dt>Tempoya göre @(gap < 0 ? "geride" : "önde")</dt>
+                        </div>
+                    }
+                </dl>
+            }
+        </section>
+
+        <div class="dash-kpis" role="group" aria-label="Satış özeti">
+            <DashKpi Label="Gerçekleşen" Icon="check-circle" Tone="success" Value="@(amounts ? SalesLabels.Compact(r.Realized.Amount, r.Currency) : SalesLabels.Count(r.WonCount))"
+                     Detail="@($"{r.Realized.Count} kazanılan fırsat")" Partial="@(amounts && r.Realized.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.Realized)"
+                     Trend="@(r.Trend.Select(t => amounts ? t.Realized : t.WonCount).ToList())" />
+            <DashKpi Label="Açık pipeline" Icon="layers" Value="@(amounts ? SalesLabels.Compact(r.OpenPipeline.Amount, r.Currency) : SalesLabels.Count(r.OpenPipeline.Count))"
+                     Detail="@($"{r.OpenPipeline.Count} açık fırsat")" Partial="@(amounts && r.OpenPipeline.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.OpenPipeline)" />
+            <DashKpi Label="Kazanma oranı" Icon="target" Tone="teal" Value="@(r.WinRatePercent is { } rate ? SalesLabels.Percent(Math.Round(rate)) : "Veri yok")"
+                     Detail="@(r.WinRatePercent is null ? "Bu dönemde sonuçlanan fırsat yok" : $"{r.WonCount} kazanılan · {r.LostCount} kayıp")" />
+            <DashKpi Label="Gecikmiş fırsat" Icon="alert-circle" Tone="warning" Value="@SalesLabels.Count(r.OverdueOpenCount)" Detail="Beklenen kapanışı geçmiş" />
+        </div>
+
+        <div class="dash-grid">
+            <section class="dash-card" aria-labelledby="dash-trend">
+                <div class="dash-card-head"><h2 id="dash-trend">Son @r.Trend.Count dönemin gerçekleşeni</h2></div>
+                @if (r.Trend.All(t => t.Realized == 0 && t.WonCount == 0))
+                {
+                    <p class="text-muted mb-0">Bu dönemlerde kazanılan fırsat yok.</p>
+                }
+                else
+                {
+                    <ColumnChart Title="@($"Dönemlere göre gerçekleşen {(amounts ? $"tutar ({r.Currency})" : "adet")}")"
+                                 Items="@(r.Trend.Select(t => new ColumnChart.Item(SalesLabels.ShortPeriod(t.Label), t.Label, amounts ? t.Realized : t.WonCount, amounts ? SalesLabels.Short(t.Realized) : SalesLabels.Count(t.WonCount))).ToList())" />
+                }
+            </section>
+
+            <section class="dash-card" aria-labelledby="dash-stage">
+                <div class="dash-card-head">
+                    <h2 id="dash-stage">Pipeline aşamaları</h2>
+                    @if (Session.Can(CrmAccess.OpportunitiesRead))
+                    {
+                        <a href="crm/firsatlar">Fırsatlara git</a>
+                    }
+                </div>
+                @if (r.ByStage.Count == 0)
+                {
+                    <p class="text-muted mb-0">Açık fırsat yok.</p>
+                }
+                else
+                {
+                    var stages = OrderedStages(r);
+                    var largest = stages.Max(s => amounts ? s.Amount : s.Count);
+                    @foreach (var stage in stages)
+                    {
+                        var size = amounts ? stage.Amount : stage.Count;
+                        var width = largest > 0 ? size / largest * 100m : 0m;
+                        <div class="dash-stage">
+                            <span class="dash-stage-label" title="@Lookups.Label(CrmLists.OpportunityStage, stage.Stage)">@Lookups.Label(CrmLists.OpportunityStage, stage.Stage)</span>
+                            <div><div class="dash-stage-bar" style="width:@width.ToString("0.#", CultureInfo.InvariantCulture)%">@stage.Count</div></div>
+                            @if (amounts)
+                            {
+                                <span class="dash-num">@SalesLabels.Compact(stage.Amount, r.Currency)</span>
+                            }
+                        </div>
+                    }
+                }
+            </section>
+
+            <section class="dash-card" aria-labelledby="dash-risk">
+                <div class="dash-card-head">
+                    <h2 id="dash-risk">Dikkat isteyenler</h2>
+                    @if (r.OverdueOpenCount > AttentionLimit)
+                    {
+                        <a href="crm/satis-gorunumu">@r.OverdueOpenCount fırsatın tümü</a>
+                    }
+                </div>
+                @if (r.Overdue.Count == 0)
+                {
+                    <p class="text-muted mb-0">Beklenen kapanışı geçmiş açık fırsat yok.</p>
+                }
+                else
+                {
+                    <ul class="dash-list">
+                        @foreach (var risk in r.Overdue.Take(AttentionLimit))
+                        {
+                            var owner = Lookups.MemberName(risk.OwnerId);
+                            <li>
+                                @if (!string.IsNullOrEmpty(owner))
+                                {
+                                    <OwnerCell Name="@owner" AvatarOnly="true" />
+                                }
+                                <div class="dash-list-main">
+                                    <a href="crm/firsatlar/@risk.Id" title="@risk.Title">@risk.Title</a>
+                                    <small>@LateText(risk, r.Today)@(string.IsNullOrEmpty(owner) ? " · Atanmadı" : $" · {owner}")</small>
+                                </div>
+                                @if (risk.Amount is { } value)
+                                {
+                                    <span class="dash-num">@SalesLabels.Compact(value, risk.Currency)</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+        </div>
+
+        @if (r.Warnings.Count > 0)
+        {
+            <details class="detail-section">
+                <summary><strong>Verilerle ilgili uyarılar (@r.Warnings.Count)</strong></summary>
+                <ul class="small text-muted mt-2 mb-0">
+                    @foreach (var warning in r.Warnings)
+                    {
+                        <li>@warning</li>
+                    }
+                </ul>
+            </details>
+        }
+    }
+</AuthGate>
+
+@code {
+    private const int AttentionLimit = 4;
+
+    private string kind = SalesPeriodKinds.Quarter;
+    private string owner = string.Empty;
+    private SalesOverviewDto? report;
+    private string? error;
+    private bool forbidden;
+    private bool loading;
+    private int requestId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(SalesAccess.ReportsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync();
+        }
+    }
+
+    private string Subtitle
+    {
+        get
+        {
+            if (report is not { } r)
+            {
+                return "Hedef, pipeline ve dikkat isteyen fırsatlar";
+            }
+
+            var total = r.PeriodEnd.DayNumber - r.PeriodStart.DayNumber + 1;
+            var passed = r.Today.DayNumber - r.PeriodStart.DayNumber + 1;
+            return passed >= 1 && passed <= total
+                ? $"{CrmLabels.Date(r.Today)} · {r.PeriodLabel} · {passed} / {total} gün geçti"
+                : $"{r.PeriodLabel} · {SalesLabels.Period(r.PeriodStart, r.PeriodEnd)}";
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var id = ++requestId;
+        loading = true;
+        error = null;
+        forbidden = false;
+
+        var query = $"kind={kind}" + (owner.Length > 0 ? $"&ownerId={Uri.EscapeDataString(owner)}" : null);
+        var result = await Api.GetAsync<SalesOverviewDto>($"/api/crm/sales/overview?{query}");
+        if (id != requestId)
+        {
+            return;
+        }
+
+        loading = false;
+        if (result.IsSuccess)
+        {
+            report = result.Value;
+            return;
+        }
+
+        report = null;
+        error = result.Error;
+        forbidden = result.Status == HttpStatusCode.Forbidden;
+    }
+
+    private async Task ChooseKindAsync(string key)
+    {
+        kind = key;
+        await LoadAsync();
+    }
+
+    private static decimal Share(decimal value, TargetProgressDto progress) => progress.Target > 0 ? value / progress.Target * 100m : 0m;
+
+    private static string Figure(decimal value, SalesOverviewDto r) => r.AmountsVisible ? SalesLabels.Compact(value, r.Currency) : value.ToString("N0", Regional.Numbers);
+
+    private static string MeterLabel(SalesOverviewDto r, TargetProgressDto progress, decimal? tempo) =>
+        $"Hedefin {SalesLabels.Percent(Math.Round(Share(progress.Realized, progress)))} gerçekleşti" + (tempo is { } value ? $", dönemin {SalesLabels.Percent(Math.Round(value))} geçti" : null);
+
+    private static string LateText(OverviewRiskDto risk, DateOnly today) =>
+        risk.ExpectedCloseDate is { } due ? $"{today.DayNumber - due.DayNumber} gün gecikti" : "Gecikti";
+
+    // Aşamalar firmanın tanımladığı sırayla çizilir; listede olmayan (eski) aşama sona gelir.
+    private List<StageSliceDto> OrderedStages(SalesOverviewDto r)
+    {
+        List<string> order = [.. Lookups.ValuesOf(CrmLists.OpportunityStage).Select(v => v.Key)];
+        return [.. r.ByStage.OrderBy(s => order.IndexOf(s.Stage) is var at && at >= 0 ? at : int.MaxValue)];
+    }
+}

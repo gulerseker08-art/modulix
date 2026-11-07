@@ -3,6 +3,10 @@
 {
     <span class="text-muted">—</span>
 }
+else if (AvatarOnly)
+{
+    <span class="avatar avatar-tone-@Tone" title="@Name">@Initials</span>
+}
 else
 {
     <span class="owner-cell">
@@ -13,6 +17,9 @@ else
 
 @code {
     [Parameter] public string? Name { get; set; }
+
+    /// <summary>Yalnızca rozet (ad yanındaki metinde yazılıysa).</summary>
+    [Parameter] public bool AvatarOnly { get; set; }
 
     private string Initials => string.Concat((Name ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpperInvariant(p[0])));
 
