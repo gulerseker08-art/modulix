@@ -219,27 +219,44 @@ public sealed class EventDispatcher(
     /// Zamanı gelmiş teslim kimliklerini seçer. Sorgu salt okunurdur; eşzamanlı işleyicilerin teslim alma güncellemeleriyle
     /// kilit çakışıp (SQL Server 1205) kurban seçilirse geri alınacak bir şey yoktur, sorgu yeniden denenir.
     /// </summary>
-    private async Task<List<Guid>> SelectDueAsync(Guid tenantId, int batch, DateTimeOffset now, CancellationToken cancellationToken)
+    private Task<List<Guid>> SelectDueAsync(Guid tenantId, int batch, DateTimeOffset now, CancellationToken cancellationToken)
+        => RetryOnDeadlockAsync(
+            "Teslim seçimi",
+            () => db.Database.SqlQueryRaw<Guid>(
+                DueDeliveriesSql,
+                new SqlParameter("@tenant", tenantId),
+                new SqlParameter("@batch", batch),
+                new SqlParameter("@pending", (int)EventDeliveryStatus.Pending),
+                new SqlParameter("@now", now),
+                new SqlParameter("@perTenant", PerTenantLimit)).ToListAsync(cancellationToken));
+
+    /// <summary>
+    /// Tek deyimlik bir sorguyu kilit çakışmasında (SQL Server 1205, kurban seçilme) en fazla 3 kez yeniden dener.
+    /// Tek deyim kendi işlemi içinde geri alındığından yeniden denemek güvenlidir. EF'nin varsayılan yürütme stratejisi
+    /// geçici hataları <see cref="InvalidOperationException"/> içine sardığı için iç hata da denetlenir.
+    /// </summary>
+    private async Task<T> RetryOnDeadlockAsync<T>(string operation, Func<Task<T>> query)
     {
         const int maxAttempts = 3;
         for (var attempt = 1; ; attempt++)
         {
             try
             {
-                return await db.Database.SqlQueryRaw<Guid>(
-                    DueDeliveriesSql,
-                    new SqlParameter("@tenant", tenantId),
-                    new SqlParameter("@batch", batch),
-                    new SqlParameter("@pending", (int)EventDeliveryStatus.Pending),
-                    new SqlParameter("@now", now),
-                    new SqlParameter("@perTenant", PerTenantLimit)).ToListAsync(cancellationToken);
+                return await query();
             }
-            catch (SqlException exception) when (exception.Number == 1205 && attempt < maxAttempts)
+            catch (Exception exception) when (IsDeadlockVictim(exception) && attempt < maxAttempts)
             {
-                logger.LogWarning(exception, "Teslim seçimi kilit çakışmasında kurban seçildi; yeniden deneniyor ({Attempt}/{Max}).", attempt, maxAttempts);
+                logger.LogWarning(exception, "{Operation} kilit çakışmasında kurban seçildi; yeniden deneniyor ({Attempt}/{Max}).", operation, attempt, maxAttempts);
             }
         }
     }
+
+    private static bool IsDeadlockVictim(Exception exception) => exception switch
+    {
+        SqlException sql => sql.Number == 1205,
+        InvalidOperationException { InnerException: SqlException inner } => inner.Number == 1205,
+        _ => false,
+    };
 
     /// <summary>
     /// Saklama süresi dolan teslimleri ve olayları siler (1000'erlik parçalarla): başarılı ve atlanmış teslimler ile
@@ -318,11 +335,12 @@ public sealed class EventDispatcher(
     }
 
     // Kira: süre ileri atılır, deneme sayısı artar, yeni belirteç yazılır. Etkilenen satır 1 değilse teslim başka işleyicide.
+    // Tek deyimlik güncelleme kilit çakışmasında kurban seçilirse yeniden denenir; teslimi bu arada başkası aldıysa 0 satır döner.
     private async Task<Guid?> TryClaimAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var token = Guid.NewGuid();
         var leaseUntil = now + Lease;
-        var claimed = await db.EventDeliveries
+        var claimed = await RetryOnDeadlockAsync("Teslim alma", () => db.EventDeliveries
             .Where(d => d.Id == id && d.Status == EventDeliveryStatus.Pending && d.NextAttemptAt <= now)
             .Where(d => !(d.Ordered && db.EventDeliveries.Any(p =>
                 p.TenantId == d.TenantId && p.Subscription == d.Subscription && p.EntityKey == d.EntityKey && p.RecordId == d.RecordId
@@ -332,7 +350,7 @@ public sealed class EventDispatcher(
                     .SetProperty(d => d.NextAttemptAt, leaseUntil)
                     .SetProperty(d => d.AttemptCount, d => d.AttemptCount + 1)
                     .SetProperty(d => d.LeaseToken, token),
-                cancellationToken);
+                cancellationToken));
         return claimed == 1 ? token : null;
     }
 
