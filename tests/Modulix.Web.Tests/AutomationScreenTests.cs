@@ -35,6 +35,12 @@ public class AutomationScreenTests
         Assert.DoesNotContain(manageOnly.MenuEntries(AppCatalog.Admin), e => e.App.Id == "admin.automation");
 
         Assert.DoesNotContain(Nav(CoreAccess.ReadAudit).MenuEntries(AppCatalog.Admin), e => e.App.Id == "admin.automation");
+
+        // Yalnızca çalışma günlüğü izni olan kural listesini göremez ama geçmişe kendi girdisinden ulaşır (ADR-0027 kalan madde).
+        var logsOnly = Nav(CoreAccess.ReadAutomationLogs);
+        Assert.DoesNotContain(logsOnly.MenuEntries(AppCatalog.Admin), e => e.App.Id == "admin.automation");
+        Assert.Contains(logsOnly.MenuEntries(AppCatalog.Admin), e => e.App.Id == "admin.automation-logs" && e.App.Route == "yonetim/otomasyon/calismalar");
+        Assert.DoesNotContain(manageOnly.MenuEntries(AppCatalog.Admin), e => e.App.Id == "admin.automation-logs");
     }
 
     [Fact]

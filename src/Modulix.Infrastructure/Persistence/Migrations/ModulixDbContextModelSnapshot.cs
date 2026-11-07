@@ -4552,50 +4552,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("ContractRenewals", "contracts");
                 });
 
-            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSavedView", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("CustomFields")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Filters")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasAlternateKey("TenantId", "Id");
-
-                    b.HasIndex("TenantId", "OwnerUserId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("ContractSavedViews", "contracts");
-                });
-
             modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSignatory", b =>
                 {
                     b.Property<Guid>("Id")
