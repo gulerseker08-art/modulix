@@ -410,7 +410,7 @@
         "owner" => @<OwnerCell Name="@Lookups.MemberName(opportunity.OwnerId)" />,
         "closeDate" => @<text>@(opportunity.ExpectedCloseDate is { } date ? CrmLabels.Date(date) : null)</text>,
         "number" => @<text>@opportunity.OpportunityNumber</text>,
-        "priority" => @<text>@LeadPriority.Label(opportunity.Priority)</text>,
+        "priority" => @<text>@CrmText.LeadPriorityName(opportunity.Priority)</text>,
         "type" => @<text>@Lookups.Label(CrmLists.OpportunityType, opportunity.Type)</text>,
         "source" => @<text>@Lookups.Label(CrmLeadLists.Source, opportunity.Source)</text>,
         "nextActionDate" => @<text>@(opportunity.NextActionDate is { } next ? CrmLabels.Date(next) : null)</text>,
