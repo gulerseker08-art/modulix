@@ -70,6 +70,7 @@ Yazı tipi **Manrope** (OFL lisanslı, değişken ağırlık 400–800). Dosyala
 | `--mx-fs-helper` | 12px | yardım metni, doğrulama, rozet, tablo başlığı |
 | `--mx-fs-table` | 14px | tablo hücresi |
 | `--mx-fs-kpi` | 24px / 700 | KPI/özet değerleri |
+| `--mx-fs-hero` | 44px / 800 | pano bandının ana rakamı (telefonda 34px) |
 
 ## Boşluk, köşe, gölge
 
@@ -77,6 +78,7 @@ Yazı tipi **Manrope** (OFL lisanslı, değişken ağırlık 400–800). Dosyala
 - Köşe: input 10px, button 10px, card 16px, drawer 16px, modal 16px, badge hap (999px) (`--mx-radius-*`).
 - Gölge: `--mx-shadow-card` (kart), `--mx-shadow-raised` (hover), `--mx-shadow-popover` (açılır menü/panel): lacivert tabanlı, yumuşak. `--mx-shadow-glow` marka renginde parlama gölgesidir ve yalnızca birincil düğmede kullanılır; başka öğeye eklenmez.
 - Marka degradesi: `--mx-gradient-brand` (`#087DB8` → `#1F5FCB`; koyu temada `#3BAEE6` → `#6FA8FA` + koyu metin) birincil düğme, etkin sekme çizgisi ve sayaç rozeti, etkin çip, bölüm kartı ikonu için; `--mx-gradient-brand-hover` hover durumu; `--mx-nav-active-bg` seçili menü öğesi. Beyaz metinle en düşük kontrast 4.5:1'dir (AA); bu yüzden açık uç `#087DB8`'den açık tutulmaz.
+- Pano bandı: `--mx-gradient-hero` (`#101D35` → `#173B68` → `#0A5F8F`; koyu temada `#0F2547` → `#123A63` → `#125580`) yalnızca panonun özet bandı (`dash-hero`) içindir. Üzerindeki metin `--mx-on-hero` (beyaz), ikincil metin `--mx-on-hero-muted`; degradenin her noktasında en düşük kontrast 4.9:1'dir, bu yüzden sağ uç `#087DB8`'e açılmaz (ikincil metin 3,25:1'e düşer). `--mx-hero-track` gösterge zemini, `--mx-hero-line` ayırıcı, `--mx-hero-fill-realized` ve `--mx-hero-fill-weighted` gösterge dolguları (zeminle en az 3:1). Bant parlama gölgesi almaz.
 - Odak: `--mx-focus-ring` (3px, birincil rengin %28'i).
 - Kabuk: `--mx-header-height` 64px, `--mx-sidebar-width` 248px, `--mx-sidebar-collapsed-width` 72px, `--mx-control-height` 36px (dokunmatik ekranda 44px; `btn-sm` 30px, dokunmatikte 36px).
 
