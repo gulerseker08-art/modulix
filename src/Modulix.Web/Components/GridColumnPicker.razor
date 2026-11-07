@@ -2,13 +2,13 @@
    Sabit sütun (kaydın adı) hep görünür. Esc ya da menü dışına tıklama kapatır. *@
 <div class="view-selector" @onkeydown="OnKeyDown">
     <button type="button" class="btn btn-ghost" aria-haspopup="true" aria-expanded="@(open ? "true" : "false")" @onclick="Toggle">
-        <AppIcon Name="columns" Size="16" /> Sütunlar
+        <AppIcon Name="columns" Size="16" /> @Texts.Get("common.columns")
     </button>
     @if (open)
     {
         <div class="view-selector-backdrop" aria-hidden="true" @onclick="Close"></div>
-        <div class="view-menu column-menu" role="group" aria-label="Görünen sütunlar">
-            <div class="view-menu-group" role="presentation">Göster, gizle ve sırala</div>
+        <div class="view-menu column-menu" role="group" aria-label="@Texts.Get("common.columns.visible")">
+            <div class="view-menu-group" role="presentation">@Texts.Get("common.columns.arrange")</div>
             @for (var i = 0; i < State.Order.Count; i++)
             {
                 var column = State.Find(State.Order[i]);
@@ -25,15 +25,15 @@
                         <AppIcon Name="@column.Icon" Size="14" />
                         <span>@column.Label</span>
                     </label>
-                    <button type="button" class="btn btn-ghost btn-sm" aria-label="@column.Label sütununu yukarı taşı" disabled="@(index == 0)"
+                    <button type="button" class="btn btn-ghost btn-sm" aria-label="@Texts.Get("common.columns.moveUp", column.Label)" disabled="@(index == 0)"
                             @onclick="() => MoveAsync(column.Key, -1)"><AppIcon Name="arrow-up" Size="14" /></button>
-                    <button type="button" class="btn btn-ghost btn-sm" aria-label="@column.Label sütununu aşağı taşı" disabled="@(index == State.Order.Count - 1)"
+                    <button type="button" class="btn btn-ghost btn-sm" aria-label="@Texts.Get("common.columns.moveDown", column.Label)" disabled="@(index == State.Order.Count - 1)"
                             @onclick="() => MoveAsync(column.Key, 1)"><AppIcon Name="arrow-down" Size="14" /></button>
                 </div>
             }
 
             <div class="view-menu-divider" role="separator"></div>
-            <button type="button" class="view-menu-item" @onclick="ResetAsync">Varsayılana dön</button>
+            <button type="button" class="view-menu-item" @onclick="ResetAsync">@Texts.Get("common.columns.reset")</button>
         </div>
     }
 </div>

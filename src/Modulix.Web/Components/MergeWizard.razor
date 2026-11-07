@@ -7,7 +7,7 @@
 <a class="back-link" href="@($"{DetailPath}/{TargetId}")">← @Title</a>
 
 <div class="page-header">
-    <h1>Mükerrer @Label birleştir</h1>
+    <h1>@Texts.Get("crm.merge.heading", Label)</h1>
 </div>
 
 @if (message is not null)
@@ -19,26 +19,26 @@
 {
     @if (message is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
 }
 else
 {
     <p>
-        <strong>Hedef (kalacak kayıt):</strong> @targetName.
-        Kaynak @Label hedefe katılır: bağlı kayıtları hedefe taşınır, kaynak kayıt <strong>kaldırılır</strong> ve bu geri alınamaz.
-        Eski kimlikle gelen bağlantılar hedefe yönlendirilir.
+        <strong>@Texts.Get("crm.merge.target")</strong> @targetName.
+        @Texts.Get("crm.merge.intro1", Label) <strong>@Texts.Get("crm.merge.intro.removed")</strong> @Texts.Get("crm.merge.intro2")
+        @Texts.Get("crm.merge.redirect")
     </p>
 
     @if (SourceId is null)
     {
         <form class="search" @onsubmit="SearchAsync" @onsubmit:preventDefault>
-            <input class="form-control" type="search" placeholder="Birleştirilecek (kaldırılacak) @Label — ad ara" @bind="search" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+            <input class="form-control" type="search" placeholder="@Texts.Get("crm.merge.searchPlaceholder", Label)" @bind="search" />
+            <button type="submit" class="btn btn-outline-secondary">@Texts.Get("common.search")</button>
         </form>
         @if (found is { Count: 0 })
         {
-            <p class="text-muted">Kayıt bulunamadı.</p>
+            <p class="text-muted">@Texts.Get("common.noneFound")</p>
         }
         else if (found is not null)
         {
@@ -47,7 +47,7 @@ else
                 {
                     <li>
                         <div class="item-main"><strong>@record.Name</strong></div>
-                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Choose(record.Id)">Kaynak olarak seç</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Choose(record.Id)">@Texts.Get("crm.merge.chooseSource")</button>
                     </li>
                 }
             </ul>
@@ -57,44 +57,44 @@ else
     {
         @if (message is null)
         {
-            <p class="text-muted">Önizleme hazırlanıyor…</p>
+            <p class="text-muted">@Texts.Get("crm.merge.previewing")</p>
         }
     }
     else
     {
         <p>
-            <strong>Kaynak (kaldırılacak kayıt):</strong> @preview.SourceName
-            <a class="ms-2" href="@($"{DetailPath}/{SourceId}/birlestir?kaynak={TargetId}")">Yönü değiştir</a>
+            <strong>@Texts.Get("crm.merge.source")</strong> @preview.SourceName
+            <a class="ms-2" href="@($"{DetailPath}/{SourceId}/birlestir?kaynak={TargetId}")">@Texts.Get("crm.merge.swap")</a>
         </p>
 
         @if (preview.Blockers.Count > 0)
         {
             <div class="alert alert-danger" role="alert">
-                <strong>Birleştirme yapılamaz:</strong>
+                <strong>@Texts.Get("crm.merge.blocked")</strong>
                 <ul>@foreach (var blocker in preview.Blockers) { <li>@blocker</li> }</ul>
             </div>
         }
 
         <section class="detail-section">
-            <h2>Alanlar</h2>
+            <h2>@Texts.Get("crm.merge.fields")</h2>
             @if (preview.Fields.Count == 0)
             {
-                <p class="text-muted">İki kayıt aynı değerlere sahip; seçilecek alan yok.</p>
+                <p class="text-muted">@Texts.Get("crm.merge.fieldsNone")</p>
             }
             else
             {
-                <p class="text-muted small">Farklı olan her alan için hangi değerin kalacağını seçin. Seçilmeyen alan hedefte olduğu gibi kalır.</p>
+                <p class="text-muted small">@Texts.Get("crm.merge.fieldsHelp")</p>
                 <table class="table record-table">
-                    <thead><tr><th>Alan</th><th>Hedefteki değer</th><th>Kaynaktaki değer</th></tr></thead>
+                    <thead><tr><th>@Texts.Get("crm.merge.col.field")</th><th>@Texts.Get("crm.merge.col.target")</th><th>@Texts.Get("crm.merge.col.source")</th></tr></thead>
                     <tbody>
                         @foreach (var field in preview.Fields)
                         {
                             <tr>
-                                <td data-label="Alan" class="primary">@FieldLabel(field.Field)</td>
-                                <td data-label="Hedefteki değer">
+                                <td data-label="@Texts.Get("crm.merge.col.field")" class="primary">@FieldLabel(field.Field)</td>
+                                <td data-label="@Texts.Get("crm.merge.col.target")">
                                     <label><input type="radio" name="@("f_" + field.Field)" checked="@(Choice(field) == MergeSide.Target)" @onchange="() => choices[field.Field] = MergeSide.Target" /> @Show(field.Target)</label>
                                 </td>
-                                <td data-label="Kaynaktaki değer">
+                                <td data-label="@Texts.Get("crm.merge.col.source")">
                                     <label><input type="radio" name="@("f_" + field.Field)" checked="@(Choice(field) == MergeSide.Source)" @onchange="() => choices[field.Field] = MergeSide.Source" /> @Show(field.Source)</label>
                                 </td>
                             </tr>
@@ -105,7 +105,7 @@ else
         </section>
 
         <section class="detail-section">
-            <h2>Etkilenen kayıtlar</h2>
+            <h2>@Texts.Get("crm.merge.impacts")</h2>
             <ul>
                 @foreach (var impact in preview.Impacts)
                 {
@@ -115,9 +115,9 @@ else
         </section>
 
         <div class="form-actions">
-            <label class="me-3"><input type="checkbox" @bind="confirmed" /> Kaynak kaydın kaldırılacağını ve bunun geri alınamayacağını anladım.</label>
-            <button type="button" class="btn btn-danger" disabled="@(busy || !confirmed || preview.Blockers.Count > 0)" @onclick="MergeAsync">Birleştir</button>
-            <a class="btn btn-outline-secondary" href="@($"{DetailPath}/{TargetId}")">Vazgeç</a>
+            <label class="me-3"><input type="checkbox" @bind="confirmed" /> @Texts.Get("crm.merge.confirm")</label>
+            <button type="button" class="btn btn-danger" disabled="@(busy || !confirmed || preview.Blockers.Count > 0)" @onclick="MergeAsync">@Texts.Get("crm.merge.submit")</button>
+            <a class="btn btn-outline-secondary" href="@($"{DetailPath}/{TargetId}")">@Texts.Get("common.cancel")</a>
         </div>
     }
 }
@@ -147,9 +147,9 @@ else
     /// <summary>Kaldırılacak kayıt; boşsa kullanıcı arayarak seçer.</summary>
     [Parameter] public Guid? SourceId { get; set; }
 
-    private string Label => Resource == "companies" ? "firma" : "kişi";
+    private string Label => Texts.Get(Resource == "companies" ? "crm.merge.noun.companies" : "crm.merge.noun.contacts");
 
-    private string Title => Resource == "companies" ? "Firma" : "Kişi";
+    private string Title => Texts.Get(Resource == "companies" ? "crm.company.fallbackTitle" : "crm.contact.fallbackTitle");
 
     private string DetailPath => Resource == "companies" ? "crm/firmalar" : "crm/kisiler";
 
@@ -222,8 +222,8 @@ else
         }
 
         message = result.Status == System.Net.HttpStatusCode.Conflict
-            ? $"{result.Error} Sayfayı yenileyip önizlemeyi yeniden hazırlayın."
-            : string.Join(" ", result.FieldErrors.SelectMany(e => e.Value).DefaultIfEmpty(result.Error ?? "Birleştirilemedi."));
+            ? Texts.Get("crm.merge.conflict", result.Error)
+            : string.Join(" ", result.FieldErrors.SelectMany(e => e.Value).DefaultIfEmpty(result.Error ?? Texts.Get("crm.merge.failed")));
     }
 
     private static string Show(JsonNode? node) => node switch
@@ -236,9 +236,9 @@ else
 
     private static string FieldLabel(string field) => field switch
     {
-        "name" => "Ad", "kind" => "Tür", "taxOffice" => "Vergi dairesi", "taxNumber" => "Vergi / T.C. kimlik no", "phone" => "Telefon",
-        "email" => "E-posta", "website" => "Web sitesi", "city" => "Şehir", "address" => "Adres", "industry" => "Sektör", "status" => "Durum",
-        "source" => "Kaynak", "tags" => "Etiketler", "ownerId" => "Sorumlu", "notes" => "Notlar", "firstName" => "Ad", "lastName" => "Soyad",
-        "title" => "Unvan", _ when field.StartsWith("custom.", StringComparison.Ordinal) => field["custom.".Length..], _ => field,
+        "name" => Texts.Get("crm.merge.field.name"), "kind" => Texts.Get("crm.merge.field.kind"), "taxOffice" => Texts.Get("crm.merge.field.taxOffice"), "taxNumber" => Texts.Get("crm.merge.field.taxNumber"), "phone" => Texts.Get("common.field.phone"),
+        "email" => Texts.Get("common.field.email"), "website" => Texts.Get("crm.merge.field.website"), "city" => Texts.Get("common.field.city"), "address" => Texts.Get("crm.company.address"), "industry" => Texts.Get("crm.companies.col.industry"), "status" => Texts.Get("common.field.status"),
+        "source" => Texts.Get("crm.company.source"), "tags" => Texts.Get("common.field.tags"), "ownerId" => Texts.Get("common.field.owner"), "notes" => Texts.Get("common.field.notes"), "firstName" => Texts.Get("crm.merge.field.name"), "lastName" => Texts.Get("crm.merge.field.lastName"),
+        "title" => Texts.Get("crm.contacts.col.title"), _ when field.StartsWith("custom.", StringComparison.Ordinal) => field["custom.".Length..], _ => field,
     };
 }
