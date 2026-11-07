@@ -49,6 +49,14 @@
         </div>
     </form>
 
+    @if (items is not null && items.Any(i => i.Status == BillingStatusDto.Pending))
+    {
+        <div class="inline-form">
+            <label class="form-label" for="billCancelReason">İptal gerekçesi (bekleyen bir kaydı iptal etmek için doldurun)</label>
+            <input id="billCancelReason" class="form-control" maxlength="500" @bind="cancelReason" @bind:event="oninput" />
+        </div>
+    }
+
     @if (items is not null && items.Count > 0)
     {
         <table class="table record-table">
@@ -68,7 +76,7 @@
                             @if (item.Status == BillingStatusDto.Pending)
                             {
                                 <button type="button" class="btn btn-tonal btn-sm" disabled="@busy" @onclick="() => PaidAsync(item.Id)">Ödendi</button>
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => CancelAsync(item.Id)">İptal</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(busy || string.IsNullOrWhiteSpace(cancelReason))" @onclick="() => CancelAsync(item.Id)">İptal</button>
                             }
                         </td>
                     </tr>
@@ -88,6 +96,7 @@
     private decimal amount;
     private string currency = "TRY";
     private string reference = string.Empty;
+    private string cancelReason = string.Empty;
     private IReadOnlyDictionary<string, string[]>? errors;
     private string? notice;
     private bool failed;
@@ -132,9 +141,14 @@
     private async Task CancelAsync(Guid id)
     {
         busy = true;
-        var result = await Api.PostAsync<BillingRecordDto>($"/api/platform/billing/{id}/cancel", new CancelBillingRequest("Finans iptal etti"));
+        var result = await Api.PostAsync<BillingRecordDto>($"/api/platform/billing/{id}/cancel", new CancelBillingRequest(cancelReason));
         busy = false;
         (notice, failed) = result.IsSuccess ? ("Ödeme kaydı iptal edildi (kayıt silinmez).", false) : (result.Error, true);
+        if (result.IsSuccess)
+        {
+            cancelReason = string.Empty;
+        }
+
         await LoadAsync();
     }
 
