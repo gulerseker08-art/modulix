@@ -138,9 +138,10 @@
     // Boşsa Kuruluş ayarları (çekirdek); doluysa yalnızca o modülün ayarları.
     [Parameter] public string? ModuleKey { get; set; }
 
-    private string Title => ModuleKey is null
-        ? "Kuruluş ayarları"
-        : AppNavigation.Resolve(AppCatalog.ModuleSettingsRoute(ModuleKey))?.Name ?? "Modül ayarları";
+    // Başlık menüdeki adla aynıdır (etkin dildeki karşılığı, ADR-0034).
+    private string Title => AppNavigation.Resolve(ModuleKey is null ? "yonetim/ayarlar" : AppCatalog.ModuleSettingsRoute(ModuleKey)) is { } screen
+        ? AppNames.Of(screen)
+        : "Modül ayarları";
 
     private bool InScope(SettingDto setting) => setting.ModuleKey == (ModuleKey ?? CoreAccess.ModuleKey);
 

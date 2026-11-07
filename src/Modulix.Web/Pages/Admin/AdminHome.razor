@@ -32,7 +32,7 @@
         <div class="tiles">
             @foreach (AppDefinition screen in moduleSettings)
             {
-                <a class="tile" href="@screen.Route"><strong>@screen.Name</strong><span>@Navigation.RootOf(screen)?.Name modülüne özgü kurallar ve varsayılanlar</span></a>
+                <a class="tile" href="@screen.Route"><strong>@AppNames.Of(screen)</strong><span>@(Navigation.RootOf(screen) is { } root ? AppNames.Of(root) : null) modülüne özgü kurallar ve varsayılanlar</span></a>
             }
         </div>
     }

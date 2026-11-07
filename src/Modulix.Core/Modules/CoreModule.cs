@@ -20,7 +20,7 @@ public sealed class CoreModule : IModule
 
         public const string ManageRoles = "core.roles.manage";
 
-        /// <summary>Firma ayarlarını yazar; okumak için izin gerekmez.</summary>
+        /// <summary>Kuruluş ve modül ayarlarını yazar; okumak için izin gerekmez.</summary>
         public const string ManageSettings = "core.settings.manage";
 
         public const string ReadAudit = "core.audit.read";

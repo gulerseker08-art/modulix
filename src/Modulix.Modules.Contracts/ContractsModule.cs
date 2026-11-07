@@ -71,7 +71,7 @@ public sealed class ContractsModule : IModule
         public const string ContractsExport = "contracts.contracts.export";
     }
 
-    /// <summary>Firma ayarları (Y6).</summary>
+    /// <summary>Modül ayarları (Y6) (/modul-ayarlari/…).</summary>
     public static class SettingKeys
     {
         public const string AllowSelfApproval = "contracts.approval.allow-self";

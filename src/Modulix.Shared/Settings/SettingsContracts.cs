@@ -1,6 +1,6 @@
 namespace Modulix.Shared.Settings;
 
-// Firma ayarları (Y6) sözleşmeleri: /api/settings. Okuma her üyeye açıktır; yazma core.settings.manage ister.
+// Kuruluş ve modül ayarları (Y6) sözleşmeleri: /api/settings. Okuma her üyeye açıktır; yazma core.settings.manage ister.
 
 public enum SettingKind
 {
