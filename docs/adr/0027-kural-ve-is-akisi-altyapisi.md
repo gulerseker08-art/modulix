@@ -197,7 +197,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Sonra |
 | 4c | Kayda bağlı onay (modül beyanı, kural aksiyonu "onaya gönder"), kalıcı akış | Sonra |
 | 4d | Takvim ortaklaştırma, puanlama, şablon motoru | Sonra |
-| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a ve 5b uygulandı (aşağıda "Dilim 5a", "Dilim 5b"), 5c sonra |
+| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
 
 ## Maliyet (harici ücret yok, iç maliyet var)
@@ -415,7 +415,7 @@ Dilim 5 (Blazor ekranları) üç parçaya bölündü; ilk parça salt okuma ağ�
 | --- | --- | --- |
 | 5a | Kural listesi, şablon seçimi, kural ayrıntısı (yayınla / aç-kapat / taslağı at) | Uygulandı |
 | 5b | Çalışma geçmişi ve elle müdahale (yeniden dene, iptal; elle çalıştırma ertelendi) | Uygulandı ("Dilim 5b") |
-| 5c | Kural düzenleyici (tetikleyici, koşul, aksiyon parametreleri, önizleme) | Sonra |
+| 5c | Kural düzenleyici (tetikleyici, koşul, aksiyon parametreleri, önizleme) | İlk sürüm uygulandı ("Dilim 5c") |
 
 - **Ekranlar** (Yönetim > Otomasyon, `core.automation.read`): `/yonetim/otomasyon` (liste: durum görünümü, arama, sayfalama; yeni kural yalnızca şablondan), `/yonetim/otomasyon/sablonlar` ("Kullan" taslak açar, `core.automation.manage`), `/yonetim/otomasyon/{id}` (taslak ve yayınlanmış sürüm, sunucunun ürettiği okunabilir özet, doğrulama sorunları; "Yayınla (kapalı kalsın)", "Yayınla ve aç", "Aç / Kapat", "Taslağı at"; yayın ve açma `core.automation.publish`).
 - **Tasarım:** yeni CSS, token ya da bileşen yok; mevcut `PageHeader`, `ViewSelector`, `record-table`, `FormSection`, `Pager`, onay şeridi (`alert confirm`) kullanıldı. Durum rozeti: Açık yeşil, Kapalı nötr, Taslak bilgi tonu. Bu ekranlar kayıt formu değil yönetim ekranı olduğu için sekmeli form kuralının dışındadır.
@@ -467,3 +467,21 @@ Uçların dört kural testi Dilim 2'de entegrasyon testleriyle kapsanmıştır; 
 - **Arayüz:** `/onaylar` (pano bandı, grafikler, sekmeli liste, çekmecede adım izi ve karar), `/yonetim/onay-surecleri`. Yeni token `--mx-gradient-hero` ve `hero-band`, `step-track` sınıfları tasarım sistemine işlendi.
 
 **Bilerek yapılmadı:** süre aşımında eskalasyon (geciken talep yalnızca görünür), genel vekâlet, uygulama içi bildirim, kayda bağlı onay ve onay sonucunun hedef modül komutuna girdi olması (Ç6a.3), olay yayını (Ç0.4 bekler).
+
+### Dilim 5c: Kural düzenleyici, ilk sürüm (7 Kasım 2026)
+
+- **Ekranlar** (`core.automation.manage`): `/yonetim/otomasyon/yeni` ("Sıfırdan kural") ve `/yonetim/otomasyon/{id}/duzenle` ("Düzenle"). Bölümler: Genel (ad, açıklama, öncelik, "başka kural çalışmasın"), Ne zaman (tetikleyici türü ve parametreleri), Hangi koşulda (düz koşul listesi, hepsi / herhangi biri), Ne yapar (sıralı aksiyon adımları; yukarı/aşağı), Doğrulama.
+- **Sunucu tek doğruluk kaynağıdır:** düzenleyici alan, operatör ve izin kurallarını yeniden yazmaz. Seçenekler katalogdan gelir (alanın operatörleri, seçim seçenekleri, aksiyon parametre tipleri); "Doğrula" `POST /api/automation/preview` ile tanımı yan etkisiz denetler. Kayıt `POST /rules` / `PUT /rules/{id}` ile **yalnızca taslak** yazar, eksik taslak kaydedilebilir (tam doğrulama yayında). Yayınlanmış kuralı düzenlemek yeni taslak açar; sürüm çakışmasında kullanıcıya iletilir.
+- **Düzenleyicinin gösteremediği parçalar silinmez:** iç içe grup ve ilişki koşulu, iş olayı tetikleyicisi ve `{"$field": …}` alan bağlamalı parametre ham haliyle korunur (koşul için "kaldırıp yeniden kur", bağlama için "sabit değere çevir" bilinçli eylemi vardır). Tek yaprak koşul kayıtta tek öğeli grup olarak yazılır (anlamı aynı).
+- **Web tarafı:** Web yalnızca `Modulix.Shared`'e başvurduğu için tanım `JsonNode` ile okunur ve yazılır (`AutomationEditorModel.cs`). Biçimin sunucunun tipli modeline çözüldüğü `AutomationEditorJsonShapeTests` (Core.Tests) ile, düzenleyicinin tam bu metni ürettiği `AutomationEditorModelTests` (Web.Tests) ile birlikte sabitlenir.
+- **Bu sürümde yok (sonraki parçalar):** kayıt üzerinde deneme (kayıt seçici gerekir; elle çalıştırma ile birlikte), iç içe grup ve ilişki koşulu kurma, parametreye kayıt alanı bağlama, geçerlilik tarihleri (var olan değer korunur, değiştirilemez), lookup parametreleri için seçici (kimlik elle girilir), iş olayı tetikleyicisi (Ç0.4 bekler). Tarama tetikleyicilerini desteklemeyen kayıt türünde seçim engellenmez; sunucu "Doğrula"da bildirir.
+- **Doğrulanamayan:** ekranlar tarayıcıda gözle kontrol edilmedi (açık/koyu tema, telefon); gerçek API ile uçtan uca kayıt denenmedi, biçim uyumu yukarıdaki iki testle sabitlendi.
+
+### Test sonuçları (Dilim 5c)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Web.Tests` | Yeni 12 (`AutomationEditorModelTests`): gidiş-dönüş, tek yaprak, düz OR grubu ve eski değer, iç içe/ilişki koşulunun korunması, iş olayı tetikleyicisinin korunması, tetikleyici parametreleri, aksiyon parametre tipleri, bağlama ve bilinmeyen parametrenin korunması, adım kimliği, operatör adları, tetikleyici adları, sıfırdan kurulan kuralın sunucu biçimi |
+| `dotnet test tests/Modulix.Core.Tests --filter AutomationEditorJsonShapeTests` | Yeni 7: düzenleyicinin ürettiği biçim ve her tetikleyici türü tipli modele çözülür |
+
+Uçların dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 1'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez.

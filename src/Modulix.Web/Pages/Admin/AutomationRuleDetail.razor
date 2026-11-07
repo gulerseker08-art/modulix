@@ -30,6 +30,10 @@
             {
                 <a class="btn btn-ghost" href="yonetim/otomasyon/calismalar?kural=@rule.Id">Çalışmaları</a>
             }
+            @if (Session.Can(CoreAccess.ManageAutomation))
+            {
+                <a class="btn btn-outline-secondary" href="yonetim/otomasyon/@rule.Id/duzenle">Düzenle</a>
+            }
             @if (CanPublish && detail.Published is not null)
             {
                 <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => SetActiveAsync(rule.Status != AutomationLabels.Active)">

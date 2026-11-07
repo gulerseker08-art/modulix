@@ -256,7 +256,16 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
             else
             {
                 var day = await services.GetRequiredService<ITenantClock>().GetAsync(cancellationToken);
-                schedule.RecordRun(status, message, ReportScheduleRules.NextRun(schedule.Frequency, schedule.Hour, schedule.DayOfWeek, schedule.DayOfMonth, day.UtcNow, day.Zone), now);
+                var nextPeriod = ReportScheduleRules.NextRun(schedule.Frequency, schedule.Hour, schedule.DayOfWeek, schedule.DayOfMonth, day.UtcNow, day.Zone);
+                if (outcome == Outcome.Failed)
+                {
+                    // Geçici hata: aynı dönem için kısa gecikmeyle yeniden denenir (en çok ReportSchedule.MaxAttempts deneme), sonra bir sonraki döneme geçilir.
+                    schedule.RecordFailure(message, nextPeriod, now);
+                }
+                else
+                {
+                    schedule.RecordRun(status, message, nextPeriod, now);
+                }
             }
         }
 

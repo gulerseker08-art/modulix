@@ -454,7 +454,7 @@ public class ReportDeliveryTests(ModulixApiFactory factory) : IClassFixture<Modu
         var failed = schedules.Single(x => x.Id == brokenSchedule.Id);
         Assert.Equal(("Failed", true), (failed.LastStatus, failed.Enabled));
         Assert.Contains("arşivlendi", failed.LastMessage);
-        Assert.True(failed.NextRunAt > DateTimeOffset.UtcNow);   // bir sonraki planlı anda yeniden dener
+        Assert.InRange(failed.NextRunAt, DateTimeOffset.UtcNow.AddMinutes(10), DateTimeOffset.UtcNow.AddMinutes(20));   // ilk başarısızlıktan 15 dk sonra yeniden dener
         Assert.Equal("Delivered", schedules.Single(x => x.Id == goodSchedule.Id).LastStatus);
     }
 
