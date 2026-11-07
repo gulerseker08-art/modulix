@@ -12,18 +12,23 @@
 
     <Notice Text="@message" Failed="true" />
 
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Süreç görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
     <div class="list-toolbar">
-        <ColumnPicker />
+        <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         <button type="button" class="btn btn-primary" @onclick="() => Edit(null)"><AppIcon Name="plus" Size="16" /> Yeni süreç</button>
     </div>
+
+    <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (definitions is null)
     {
         <p class="text-muted" role="status">Yükleniyor…</p>
     }
-    else if (definitions.Count == 0)
+    else if (Shown.Count == 0)
     {
-        <p class="text-muted">Henüz onay süreci yok.</p>
+        <p class="text-muted">@(definitions.Count == 0 ? "Henüz onay süreci yok." : "Bu görünümde onay süreci yok.")</p>
     }
     else
     {
@@ -31,23 +36,21 @@
             <caption class="visually-hidden">Onay süreçleri</caption>
             <thead>
                 <tr>
-                    <th scope="col"><span class="th-label"><AppIcon Name="type" Size="14" /> Süreç</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="layers" Size="14" /> Adımlar</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="coins" Size="14" /> Para birimi</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="hash" Size="14" /> Sürüm</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Durum</span></th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
                     <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var definition in definitions)
+                @foreach (var definition in Shown)
                 {
                     <tr>
-                        <td data-label="Süreç" class="primary"><a href="yonetim/onay-surecleri" @onclick:preventDefault @onclick="() => Edit(definition)">@definition.Name</a></td>
-                        <td data-label="Adımlar">@string.Join(" → ", definition.Steps.Select(s => s.Name))</td>
-                        <td data-label="Para birimi">@(definition.Currency ?? "—")</td>
-                        <td data-label="Sürüm">@definition.Revision</td>
-                        <td data-label="Durum"><span class="badge @(definition.IsActive ? "stage-won" : "stage-cancelled")">@(definition.IsActive ? "Açık" : "Kapalı")</span></td>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            <td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, definition)</td>
+                        }
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{definition.Name} eylemleri")">
                                 <button type="button" class="dropdown-item" role="menuitem" @onclick="() => Edit(definition)">Düzenle</button>
@@ -115,6 +118,18 @@
                                     <label class="form-label" for="@($"due-{step.Key}")">Süre (saat)</label>
                                     <input id="@($"due-{step.Key}")" class="form-control" type="number" min="1" @bind="step.DueHours" />
                                 </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="@($"escalate-{step.Key}")">Süre aşılınca</label>
+                                    <select id="@($"escalate-{step.Key}")" class="form-select" @bind="step.Escalate">
+                                        <option value="">Yalnızca hatırlat</option>
+                                        <optgroup label="Roller">
+                                            @foreach (var role in options?.Roles ?? []) { <option value="@($"role:{role.Id}")">@role.Name</option> }
+                                        </optgroup>
+                                        <optgroup label="Kişiler">
+                                            @foreach (var person in options?.People ?? []) { <option value="@($"user:{person.Id}")">@person.Name</option> }
+                                        </optgroup>
+                                    </select>
+                                </div>
                             </div>
                             <button type="button" class="btn btn-ghost" disabled="@(steps.Count == 1)" @onclick="() => steps.Remove(step)">Adımı kaldır</button>
                         </div>
@@ -146,10 +161,34 @@
 
         public int? DueHours { get; set; }
 
-        public Guid? Id(string prefix) =>
-            Approver.StartsWith(prefix + ":", StringComparison.Ordinal) ? Guid.Parse(Approver[(prefix.Length + 1)..]) : null;
+        public string Escalate { get; set; } = string.Empty;
+
+        public Guid? Id(string prefix) => Parse(Approver, prefix);
+
+        public Guid? EscalationId(string prefix) => Parse(Escalate, prefix);
+
+        private static Guid? Parse(string value, string prefix) =>
+            value.StartsWith(prefix + ":", StringComparison.Ordinal) ? Guid.Parse(value[(prefix.Length + 1)..]) : null;
     }
 
+    private const string ScreenKey = "admin.approval-processes";
+    private const string AllViews = "all";
+    private const string DefaultSort = "name";
+
+    // Liste tek seferde gelir (sayfalama yok); sıralama bu küçük listede istemcide yapılır, anahtarlar görünümle birlikte saklanır (ADR-0036).
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("name", "Süreç", "type", "name", "-name", Locked: true),
+        new("steps", "Adımlar", "layers"),
+        new("currency", "Para birimi", "coins"),
+        new("revision", "Sürüm", "hash", "revision", "-revision"),
+        new("status", "Durum", "tag", "status", "-status"),
+    ];
+
+    private readonly GridViewState grid = new(ScreenKey, DefaultSort);
+    private PersonalGridViews views = default!;
+    private string view = AllViews;
+    private bool? active;
     private List<ApprovalDefinitionDto>? definitions;
     private ApproverOptionsDto? options;
     private List<StepRow> steps = [];
@@ -165,9 +204,113 @@
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, ScreenKey);
+        grid.Define(Columns);
         options = (await Api.GetAsync<ApproverOptionsDto>("/api/approvals/approver-options")).Value;
+        await views.LoadAsync();
         await LoadAsync();
     }
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm süreçler", Icon: "check-circle"),
+        new("active:true", "Açık", Icon: "play"),
+        new("active:false", "Kapalı", Icon: "pause"),
+        .. views.Options,
+    ];
+
+    private string? CurrentFilters => GridFilters.Build(active is { } a ? ("active", a ? "true" : "false") : null);
+
+    private string? BaselineFilters => Active?.Filters ?? (view.StartsWith("active:", StringComparison.Ordinal) ? "active=" + view["active:".Length..] : null);
+
+    private bool Dirty => grid.Differs(Active) || (CurrentFilters ?? string.Empty) != (BaselineFilters ?? string.Empty);
+
+    // Görünümün süzgeci ve sıralaması uygulanmış liste.
+    private IReadOnlyList<ApprovalDefinitionDto> Shown
+    {
+        get
+        {
+            IEnumerable<ApprovalDefinitionDto> items = definitions ?? [];
+            if (active is { } a)
+            {
+                items = items.Where(d => d.IsActive == a);
+            }
+
+            var descending = grid.Sort.StartsWith('-');
+            var sorted = grid.Sort.TrimStart('-') switch
+            {
+                "revision" => descending ? items.OrderByDescending(d => d.Revision) : items.OrderBy(d => d.Revision),
+                "status" => descending ? items.OrderByDescending(d => d.IsActive) : items.OrderBy(d => d.IsActive),
+                _ => descending
+                    ? items.OrderByDescending(d => d.Name, StringComparer.CurrentCultureIgnoreCase)
+                    : items.OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase),
+            };
+            return [.. sorted.ThenBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase)];
+        }
+    }
+
+    private Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+        }
+        else
+        {
+            grid.Reset();
+        }
+
+        active = GridFilters.Parse(BaselineFilters).GetValueOrDefault("active") switch { "true" => true, "false" => false, _ => null };
+        return Task.CompletedTask;
+    }
+
+    private Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        return Task.CompletedTask;
+    }
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private Task DiscardAsync() => ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private RenderFragment CellContent(string key, ApprovalDefinitionDto definition) => key switch
+    {
+        "name" => @<a href="yonetim/onay-surecleri" @onclick:preventDefault @onclick="() => Edit(definition)">@definition.Name</a>,
+        "steps" => @<text>@string.Join(" → ", definition.Steps.Select(s => s.Name))</text>,
+        "currency" => @<text>@(definition.Currency ?? "—")</text>,
+        "revision" => @<text>@definition.Revision</text>,
+        "status" => @<span class="badge @(definition.IsActive ? "stage-won" : "stage-cancelled")">@(definition.IsActive ? "Açık" : "Kapalı")</span>,
+        _ => @<text></text>,
+    };
 
     private async Task LoadAsync()
     {
@@ -193,6 +336,7 @@
                 Approver = s.ApproverUserId is { } user ? $"user:{user}" : $"role:{s.ApproverRoleId}",
                 MinAmount = s.MinAmount,
                 DueHours = s.DueHours,
+                Escalate = s.EscalateToUserId is { } target ? $"user:{target}" : s.EscalateToRoleId is { } role ? $"role:{role}" : string.Empty,
             })];
         editing = true;
     }
@@ -204,7 +348,7 @@
         busy = true;
         var request = new SaveApprovalDefinitionRequest(
             name, description, currency,
-            [.. steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.Id("user"), s.Id("role"), s.MinAmount, s.DueHours))],
+            [.. steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.Id("user"), s.Id("role"), s.MinAmount, s.DueHours, s.EscalationId("user"), s.EscalationId("role")))],
             editVersion);
         var saved = editId is { } id
             ? await Api.PutAsync<ApprovalDefinitionDto>($"/api/approvals/definitions/{id}", request)

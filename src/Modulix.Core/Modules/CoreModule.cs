@@ -185,6 +185,9 @@ public sealed class CoreModule : IModule
         /// <summary>Onay talebi (ADR-0027 Dilim 4a); kaydın kimliği talebin kimliğidir. Karar, not ve atama değişikliği yazılır.</summary>
         public const string ApprovalRequest = "core.approval-request";
 
+        /// <summary>Onay vekâleti (ADR-0027 Dilim 4b); kaydın kimliği vekâletin kimliğidir.</summary>
+        public const string ApprovalDelegation = "core.approval-delegation";
+
         /// <summary>Kayıtlı rapor (ADR-0026, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string Report = "core.report";
 
@@ -450,7 +453,7 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.ApprovalRequest, "Onay talebi", null, new Dictionary<string, string>
         {
             ["title"] = "Başlık", ["process"] = "Süreç", ["amount"] = "Tutar", ["currency"] = "Para birimi", ["status"] = "Durum",
-            ["step"] = "Adım", ["decision"] = "Karar", ["comment"] = "Not", ["approver"] = "Onaycı",
+            ["step"] = "Adım", ["decision"] = "Karar", ["comment"] = "Not", ["approver"] = "Onaycı", ["onBehalfOf"] = "Adına karar verilen", ["escalated"] = "Süre aşımı",
         }, "title")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
@@ -459,6 +462,10 @@ public sealed class CoreModule : IModule
                 ["decision"] = new Dictionary<string, string> { ["Approved"] = "Onay", ["Rejected"] = "Ret" },
             },
         },
+        new(AuditedEntityKeys.ApprovalDelegation, "Onay vekâleti", null, new Dictionary<string, string>
+        {
+            ["principal"] = "Vekâlet veren", ["delegate"] = "Vekil", ["startsAt"] = "Başlangıç", ["endsAt"] = "Bitiş", ["reason"] = "Gerekçe", ["revokedAt"] = "Geri alındı",
+        }, "delegate"),
         new(AuditedEntityKeys.Report, "Rapor", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["dataset"] = "Veri kümesi", ["visibility"] = "Paylaşım", ["sharedWith"] = "Paylaşılan kullanıcılar",

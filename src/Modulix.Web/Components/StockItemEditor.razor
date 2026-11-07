@@ -80,11 +80,7 @@
                             <FieldError Field="unitKey" Errors="errors" />
                             break;
                         case "isActive":
-                            <label class="@f.LabelClass()" for="stock-active">@f.Label</label>
-                            <select id="stock-active" class="form-select" @bind="form.IsActive">
-                                <option value="True">Etkin</option>
-                                <option value="False">Pasif</option>
-                            </select>
+                            <SegmentedChoice Id="stock-active" Label="@f.Label" LabelClass="@f.LabelClass()" Options="SegmentOptions.Active" @bind-Value="form.IsActive" />
                             <FieldError Field="isActive" Errors="errors" />
                             break;
                         case "gtip":

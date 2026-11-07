@@ -129,9 +129,9 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
     }
 
     /// <summary>Etkin adımı onaylar: aynı sıradaki etkin adımlar bitince sonraki sıra açılır, adım kalmadıysa talep onaylanır.</summary>
-    public void Approve(ApprovalRequestStep step, IReadOnlyList<ApprovalRequestStep> steps, Guid actorId, string? comment, DateTimeOffset now)
+    public void Approve(ApprovalRequestStep step, IReadOnlyList<ApprovalRequestStep> steps, Guid actorId, string? comment, DateTimeOffset now, Guid? onBehalfOf = null)
     {
-        step.Decide(ApprovalStepStatus.Approved, actorId, comment, now);
+        step.Decide(ApprovalStepStatus.Approved, actorId, comment, now, onBehalfOf);
         if (!steps.Any(s => s.Status == ApprovalStepStatus.Active))
         {
             ActivateNext(steps, now);
@@ -141,9 +141,9 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
     }
 
     /// <summary>Reddetme bütün talebi kapatır; kalan adımlar iptal olur.</summary>
-    public void Reject(ApprovalRequestStep step, IReadOnlyList<ApprovalRequestStep> steps, Guid actorId, string comment, DateTimeOffset now)
+    public void Reject(ApprovalRequestStep step, IReadOnlyList<ApprovalRequestStep> steps, Guid actorId, string comment, DateTimeOffset now, Guid? onBehalfOf = null)
     {
-        step.Decide(ApprovalStepStatus.Rejected, actorId, comment, now);
+        step.Decide(ApprovalStepStatus.Rejected, actorId, comment, now, onBehalfOf);
         Close(ApprovalRequestStatus.Rejected, steps, now);
     }
 
@@ -219,6 +219,17 @@ public sealed class ApprovalRequestStep : ITenantEntity, ICompanyShared
 
     public string? Comment { get; private set; }
 
+    /// <summary>Süre aşılınca karar verebilecek kişi (açılış anının kopyası).</summary>
+    public Guid? EscalationUserId { get; private set; }
+
+    public Guid? EscalationRoleId { get; private set; }
+
+    /// <summary>Süre aşımı işlendiği an; doluysa adım bir daha işlenmez ve eskalasyon onaycısı karar verebilir.</summary>
+    public DateTimeOffset? EscalatedAt { get; private set; }
+
+    /// <summary>Karar vekâleten verildiyse adına karar verilen kişi.</summary>
+    public Guid? OnBehalfOf { get; private set; }
+
     internal static ApprovalRequestStep Create(Guid requestId, ApprovalStepDefinition definition) => new()
     {
         Id = Guid.CreateVersion7(),
@@ -228,6 +239,8 @@ public sealed class ApprovalRequestStep : ITenantEntity, ICompanyShared
         ApproverUserId = definition.ApproverUserId,
         ApproverRoleId = definition.ApproverRoleId,
         DueHours = definition.DueHours,
+        EscalationUserId = definition.EscalateToUserId,
+        EscalationRoleId = definition.EscalateToRoleId,
         Status = ApprovalStepStatus.Waiting,
     };
 
@@ -238,6 +251,8 @@ public sealed class ApprovalRequestStep : ITenantEntity, ICompanyShared
         ApproverRoleId = roleId;
     }
 
+    public void Escalate(DateTimeOffset now) => EscalatedAt ??= now;
+
     internal void Activate(DateTimeOffset now)
     {
         Status = ApprovalStepStatus.Active;
@@ -245,7 +260,7 @@ public sealed class ApprovalRequestStep : ITenantEntity, ICompanyShared
         DueAt = DueHours is { } hours ? now.AddHours(hours) : null;
     }
 
-    internal void Decide(ApprovalStepStatus status, Guid actorId, string? comment, DateTimeOffset now)
+    internal void Decide(ApprovalStepStatus status, Guid actorId, string? comment, DateTimeOffset now, Guid? onBehalfOf)
     {
         string? trimmed = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
         if (trimmed?.Length > ApprovalRequest.CommentMaxLength)
@@ -257,6 +272,7 @@ public sealed class ApprovalRequestStep : ITenantEntity, ICompanyShared
         DecidedBy = actorId;
         DecidedAt = now;
         Comment = trimmed;
+        OnBehalfOf = onBehalfOf;
     }
 
     internal void Cancel() => Status = ApprovalStepStatus.Cancelled;

@@ -1,7 +1,7 @@
 @page "/crm/kisiler/{TargetId:guid}/birlestir"
 @inject SessionState Session
 
-<PageTitle>Kişi birleştir · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.contact.mergeTitle") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ContactsMerge">
     <MergeWizard Resource="contacts" TargetId="TargetId" SourceId="SourceId" />

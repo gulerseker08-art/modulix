@@ -18,6 +18,14 @@ public static class CrmAutomationTemplates
 
     public const string LeadPurchaseDate = "crm.lead-purchase-date-reminder";
 
+    // Metin değişkenleri (Dilim 4d): kayıt türünün beyan edilmiş, okuma izni gerektirmeyen alanları.
+    private static readonly string LeadSubject = $"{CrmModule.Entities.Lead}.subject";
+    private static readonly string LeadPurchaseDateField = $"{CrmModule.Entities.Lead}.targetPurchaseDate";
+    private static readonly string OpportunityTitle = $"{CrmModule.Entities.Opportunity}.title";
+    private static readonly string OpportunityCloseDateField = $"{CrmModule.Entities.Opportunity}.expectedCloseDate";
+
+    private static string Var(string fieldKey) => "{{" + fieldKey + "}}";
+
     public static IReadOnlyList<AutomationTemplateDefinition> All { get; } =
     [
         new(
@@ -28,7 +36,7 @@ public static class CrmAutomationTemplates
             new AutomationDefinition(
                 new InactivityTrigger(CrmAutomation.LeadActivities, 7),
                 null,
-                [FollowUp("Müşteri adayıyla yeniden iletişime geçin", "Bu aday son 7 gündür hareketsiz.", 1)])),
+                [FollowUp($"Müşteri adayıyla yeniden iletişime geçin: {Var(LeadSubject)}", "Bu aday son 7 gündür hareketsiz.", 1)])),
         new(
             OpportunityInactivity,
             "Hareketsiz fırsat için takip",
@@ -37,7 +45,7 @@ public static class CrmAutomationTemplates
             new AutomationDefinition(
                 new InactivityTrigger(CrmAutomation.OpportunityActivities, 14),
                 null,
-                [FollowUp("Fırsatı gözden geçirin", "Bu fırsat son 14 gündür hareketsiz.", 1)])),
+                [FollowUp($"Fırsatı gözden geçirin: {Var(OpportunityTitle)}", "Bu fırsat son 14 gündür hareketsiz.", 1)])),
         new(
             OpportunityCloseDate,
             "Kapanış tarihi yaklaşan fırsat için hatırlatma",
@@ -46,7 +54,10 @@ public static class CrmAutomationTemplates
             new AutomationDefinition(
                 new DateRelativeTrigger($"{CrmModule.Entities.Opportunity}.expectedCloseDate", -3),
                 new ConditionLeaf($"{CrmModule.Entities.Opportunity}.status", AutomationOperator.In, [OpportunityStatus.Open, OpportunityStatus.OnHold]),
-                [FollowUp("Kapanış tarihi yaklaşıyor", "Fırsatın beklenen kapanış tarihine 3 gün kaldı.", 0)])),
+                [FollowUp(
+                    $"Kapanış tarihi yaklaşıyor: {Var(OpportunityTitle)}",
+                    $"Fırsatın beklenen kapanış tarihi {Var(OpportunityCloseDateField)}; 3 gün kaldı.",
+                    0)])),
         new(
             LeadPurchaseDate,
             "Satın alma tarihi yaklaşan müşteri adayı için hatırlatma",
@@ -55,7 +66,10 @@ public static class CrmAutomationTemplates
             new AutomationDefinition(
                 new DateRelativeTrigger($"{CrmModule.Entities.Lead}.targetPurchaseDate", -7),
                 new ConditionLeaf($"{CrmModule.Entities.Lead}.status", AutomationOperator.In, [.. LeadStatus.Open]),
-                [FollowUp("Satın alma tarihi yaklaşıyor", "Adayın hedef satın alma tarihine 7 gün kaldı.", 1)])),
+                [FollowUp(
+                    $"Satın alma tarihi yaklaşıyor: {Var(LeadSubject)}",
+                    $"Adayın hedef satın alma tarihi {Var(LeadPurchaseDateField)}; 7 gün kaldı.",
+                    1)])),
     ];
 
     private static AutomationActionStep FollowUp(string subject, string description, int dueInDays) =>

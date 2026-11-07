@@ -50,12 +50,38 @@
                             <span class="badge @(item.State == SupportAccessStateDto.Active ? "user-active" : "user-disabled")">@StateText(item.State)</span>
                         </td>
                         <td class="actions">
+                            <button type="button" class="btn btn-ghost btn-sm" @onclick="() => ToggleReadsAsync(item.Id)">İşlemler</button>
                             @if (item.State == SupportAccessStateDto.Active)
                             {
                                 <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RevokeAsync(item.Id)">Kapat</button>
                             }
                         </td>
                     </tr>
+                    @if (openGrant == item.Id)
+                    {
+                        <tr>
+                            <td colspan="6">
+                                @if (reads is null)
+                                {
+                                    <span class="text-muted">Yükleniyor…</span>
+                                }
+                                else if (reads.Count == 0)
+                                {
+                                    <span class="text-muted">Bu erişimde henüz istek yapılmadı.</span>
+                                }
+                                else
+                                {
+                                    <ul class="list-unstyled">
+                                        @foreach (var read in reads)
+                                        {
+                                            <li><span class="text-muted">@CrmLabels.Time(read.At)</span> <strong>@read.Method</strong> @read.Path</li>
+                                        }
+                                    </ul>
+                                    <p class="text-muted">En yeni 200 istek. Yalnızca yöntem ve yol kaydedilir; arama metni ve yanıt içeriği saklanmaz.</p>
+                                }
+                            </td>
+                        </tr>
+                    }
                 }
             </tbody>
         </table>
@@ -77,6 +103,8 @@
     private string? notice;
     private bool failed;
     private bool busy;
+    private Guid? openGrant;
+    private IReadOnlyList<SupportAccessReadDto>? reads;
 
     protected override Task OnParametersSetAsync() => LoadAsync();
 
@@ -110,6 +138,23 @@
         busy = false;
         (notice, failed) = result.IsSuccess ? ("Destek erişimi kapatıldı.", false) : (result.Error, true);
         await LoadAsync();
+    }
+
+    private async Task ToggleReadsAsync(Guid grantId)
+    {
+        if (openGrant == grantId)
+        {
+            openGrant = null;
+            return;
+        }
+
+        (openGrant, reads) = (grantId, null);
+        var result = await Api.GetAsync<List<SupportAccessReadDto>>($"/api/platform/support-access/{grantId}/reads");
+        reads = result.IsSuccess ? result.Value : [];
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.Error, true);
+        }
     }
 
     private static string StateText(SupportAccessStateDto state) => state switch

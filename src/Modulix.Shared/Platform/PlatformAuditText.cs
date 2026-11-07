@@ -18,6 +18,11 @@ public static class PlatformAuditText
         ("user.two-factor-reset", "İki adımlı doğrulama sıfırlandı"),
         ("tenant.support-access-granted", "Destek erişimi açıldı"),
         ("tenant.support-access-revoked", "Destek erişimi kapatıldı"),
+        ("tenant.plan-assigned", "Plan atandı"),
+        ("tenant.license-applied", "Lisans dosyası uygulandı"),
+        ("tenant.billing-created", "Ödeme kaydı açıldı"),
+        ("tenant.billing-paid", "Ödeme alındı"),
+        ("tenant.billing-cancelled", "Ödeme kaydı iptal edildi"),
     ];
 
     public static string Of(string action) => All.FirstOrDefault(a => a.Action == action).Text ?? action;

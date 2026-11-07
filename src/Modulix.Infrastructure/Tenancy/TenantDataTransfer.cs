@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -95,6 +97,7 @@ internal sealed class TenantDataTransfer(ModulixDbContext db, ModulixDatabaseOpt
 
         logger.LogInformation("Tenant {Slug} ({TenantId}) dışa aktarıldı: {Tables} tablo, {Rows} satır, dizin {Directory}.",
             tenant.Slug, tenant.Id, counts.Count, counts.Sum(c => c.Rows), directory);
+        await AuditAsync(PlatformAuditActions.TenantExported, tenant, counts, directory, cancellationToken);
         return new TenantExportResult(tenant.Id, tenant.Slug, directory, counts);
     }
 
@@ -167,7 +170,31 @@ internal sealed class TenantDataTransfer(ModulixDbContext db, ModulixDatabaseOpt
         await transaction.CommitAsync(cancellationToken);
         logger.LogWarning("Tenant {Slug} ({TenantId}) silindi: {Tables} tablodan {Rows} satır.",
             tenant.Slug, tenant.Id, counts.Count, counts.Sum(c => c.Rows));
+        await AuditAsync(PlatformAuditActions.TenantDeleted, tenant, counts, null, cancellationToken);
         return new TenantDeleteResult(tenant.Id, tenant.Slug, counts);
+    }
+
+    /// <summary>
+    /// Platform denetim kaydı (ADR-0028): dışa aktarma ve silme komut satırından çalışır, oturum açmış kullanıcı yoktur; aktör boş kimliktir ve
+    /// kaynak ayrıntıda "cli" olarak yazılır. Kayıt tenant silindikten sonra da kalır (<c>TargetTenantId</c> yabancı anahtar değildir).
+    /// </summary>
+    private async Task AuditAsync(string action, Tenant tenant, IReadOnlyList<TenantTableCount> counts, string? directory, CancellationToken cancellationToken)
+    {
+        var details = new JsonObject
+        {
+            ["source"] = "cli",
+            ["slug"] = tenant.Slug,
+            ["name"] = tenant.Name,
+            ["tables"] = counts.Count,
+            ["rows"] = counts.Sum(c => c.Rows),
+        };
+        if (directory is not null)
+        {
+            details["directory"] = directory;
+        }
+
+        db.PlatformAuditLog.Add(new PlatformAuditEntry(Guid.Empty, action, tenant.Id, null, details.ToJsonString(), Activity.Current?.TraceId.ToString()));
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<Tenant> FindAsync(Guid tenantId, CancellationToken cancellationToken) =>

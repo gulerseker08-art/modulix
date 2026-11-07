@@ -75,11 +75,7 @@
                             <FieldError Field="countryCode" Errors="errors" />
                             break;
                         case "isActive":
-                            <label class="@f.LabelClass()" for="facility-active">@f.Label</label>
-                            <select id="facility-active" class="form-select" @bind="form.IsActive">
-                                <option value="True">Etkin</option>
-                                <option value="False">Pasif</option>
-                            </select>
+                            <SegmentedChoice Id="facility-active" Label="@f.Label" LabelClass="@f.LabelClass()" Options="SegmentOptions.Active" @bind-Value="form.IsActive" />
                             <FieldError Field="isActive" Errors="errors" />
                             break;
                         case "description":
@@ -88,16 +84,16 @@
                             <FieldError Field="description" Errors="errors" />
                             break;
                         case "customsEnabled":
-                            <div class="form-check">
-                                <input id="facility-customs" class="form-check-input" type="checkbox" @bind="form.CustomsEnabled" />
+                            <div class="form-check form-switch">
+                                <input id="facility-customs" class="form-check-input" type="checkbox" role="switch" @bind="form.CustomsEnabled" />
                                 <label class="form-check-label" for="facility-customs">@f.Label</label>
                             </div>
                             <FieldError Field="customsEnabled" Errors="errors" />
                             <small class="text-muted">Kapalı tesiste gümrük denetimli alan tanımlanamaz. Gümrük denetimli alanı olan tesiste kapatılamaz.</small>
                             break;
                         case "allowMixedZones":
-                            <div class="form-check">
-                                <input id="facility-mixed" class="form-check-input" type="checkbox" @bind="form.AllowMixedZones" />
+                            <div class="form-check form-switch">
+                                <input id="facility-mixed" class="form-check-input" type="checkbox" role="switch" @bind="form.AllowMixedZones" />
                                 <label class="form-check-label" for="facility-mixed">@f.Label</label>
                             </div>
                             <FieldError Field="allowMixedZones" Errors="errors" />

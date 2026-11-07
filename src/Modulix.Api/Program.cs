@@ -3,6 +3,7 @@ using Modulix.Api.Account;
 using Modulix.Api.Audit;
 using Modulix.Api.Imports;
 using Modulix.Api.Approvals;
+using Modulix.Api.Notifications;
 using Modulix.Api.Automation;
 using Modulix.Api.Reports;
 using Modulix.Api.Auth;
@@ -97,6 +98,7 @@ builder.Services.AddSingleton<Modulix.Api.Support.SupportJobsRunner>();
 builder.Services.AddHostedService<Modulix.Api.Support.SupportJobsWorker>();
 builder.Services.Configure<Modulix.Infrastructure.Automation.AutomationOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Automation.AutomationOptions.SectionName));
 builder.Services.AddHostedService<Modulix.Api.Automation.AutomationWorker>();
+builder.Services.AddHostedService<ApprovalEscalationWorker>();
 builder.Services.AddSingleton<Modulix.Modules.Contracts.Lifecycle.IContractPdfRenderer, Modulix.Api.Contracts.ContractPdfRenderer>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDocumentService>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDelivery>();
@@ -171,6 +173,14 @@ if (TenantDataCommand.Matches(args))
     return;
 }
 
+// "license-apply" / "license-keygen" / "license-sign" komutları: on-prem imzalı lisans dosyası (ADR-0028 Dilim 7b).
+//   dotnet run --project src/Modulix.Api -- license-apply lisans.json
+if (LicenseCommand.Matches(args))
+{
+    Console.WriteLine(await LicenseCommand.RunAsync(app.Services, args));
+    return;
+}
+
 // "test-email" komutu: verilen adrese deneme e-postası gönderir ve sonucu yazar; SMTP ayarlarını sınamak içindir.
 //   dotnet run --project src/Modulix.Api -- test-email adres@ornek.com
 if (args.Contains("test-email", StringComparer.OrdinalIgnoreCase))
@@ -218,6 +228,7 @@ app.MapTeamEndpoints();
 app.MapBusinessUnitEndpoints();
 app.MapAutomationEndpoints();
 app.MapApprovalEndpoints();
+app.MapNotificationEndpoints();
 app.MapReportEndpoints();
 app.MapCommunicationEndpoints();
 app.MapCustomFieldEndpoints();
@@ -247,6 +258,7 @@ app.MapPlatformEventEndpoints();
 app.MapPlatformPlanEndpoints();
 app.MapPlatformHealthEndpoints();
 app.MapSupportAccessEndpoints();
+app.MapPlatformBillingEndpoints();
 app.MapPlatformTeamEndpoints();
 app.MapAuditEndpoints();
 app.MapImportEndpoints();

@@ -34,7 +34,7 @@ public sealed record ApprovalRequestQuery(
 public sealed record ApprovalStepDetail(
     Guid Id, int Order, string Name, Guid? ApproverUserId, Guid? ApproverRoleId, string ApproverName, ApprovalStepStatus Status,
     DateTimeOffset? ActivatedAt, DateTimeOffset? DueAt, bool IsOverdue, bool IsOrphaned, Guid? DecidedBy, string? DecidedByName,
-    DateTimeOffset? DecidedAt, string? Comment);
+    DateTimeOffset? DecidedAt, string? Comment, string? OnBehalfOfName = null, string? EscalationName = null, bool IsEscalated = false);
 
 public sealed record ApprovalRequestDetail(
     Guid Id, Guid DefinitionId, string DefinitionName, int DefinitionRevision, string Title, string? Description, decimal? Amount, string? Currency,
@@ -51,6 +51,12 @@ public sealed record ApprovalProcessCount(string Name, int Open);
 public sealed record ApprovalOverview(
     int WaitingForMe, int Overdue, int MyOpen, int Orphaned, int ApprovedLast30Days, int RejectedLast30Days, decimal? AverageDecisionHours,
     IReadOnlyList<ApprovalDayCount> Trend, IReadOnlyList<ApprovalProcessCount> OpenByProcess);
+
+public sealed record ApprovalDelegationInput(Guid? PrincipalUserId, Guid DelegateUserId, DateTimeOffset StartsAt, DateTimeOffset EndsAt, string? Reason);
+
+public sealed record ApprovalDelegationDetail(
+    Guid Id, Guid PrincipalUserId, string PrincipalName, Guid DelegateUserId, string DelegateName, DateTimeOffset StartsAt, DateTimeOffset EndsAt,
+    string? Reason, bool IsActive, DateTimeOffset? RevokedAt);
 
 public sealed record ApproverOption(Guid Id, string Name);
 
@@ -92,4 +98,16 @@ public interface IApprovalService
 
     /// <summary>Etkin adımın onaycısını değiştirir (yönetici). Talep yoksa null.</summary>
     Task<ApprovalRequestDetail?> ReassignAsync(Guid id, Guid stepId, Guid? userId, Guid? roleId, long expectedVersion, CancellationToken cancellationToken);
+
+    /// <summary>Süresi geçen etkin adımları işler (arka plan): eskalasyon onaycısını açar, ilgilileri bir kez bilgilendirir. İşlenen adım sayısını döner.</summary>
+    Task<int> EscalateDueAsync(CancellationToken cancellationToken);
+
+    /// <summary>Kullanıcının verdiği ve aldığı vekâletler; <c>seeAll</c> ise firmanın hepsi.</summary>
+    Task<IReadOnlyList<ApprovalDelegationDetail>> ListDelegationsAsync(bool seeAll, CancellationToken cancellationToken);
+
+    /// <summary>Vekâlet açar. Başkası adına yalnızca yönetici açabilir (<c>seeAll</c>).</summary>
+    Task<ApprovalDelegationDetail> CreateDelegationAsync(ApprovalDelegationInput input, bool seeAll, CancellationToken cancellationToken);
+
+    /// <summary>Vekâleti geri alır. Vekâlet yoksa ya da kullanıcının değilse null.</summary>
+    Task<ApprovalDelegationDetail?> RevokeDelegationAsync(Guid id, bool seeAll, CancellationToken cancellationToken);
 }

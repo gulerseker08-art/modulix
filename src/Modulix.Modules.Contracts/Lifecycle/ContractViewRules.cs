@@ -13,14 +13,13 @@ public static class ContractSort
 }
 
 /// <summary>
-/// Kaydedilmiş görünümün süzgeç metni kuralları. Görünüm yalnızca kullanıcının kendi liste tercihidir: sorgu dizgisi biçiminde (<c>effectiveStatus=Active&amp;sort=-endDate</c>)
-/// tutulur, yalnızca bilinen anahtarlar ve geçerli değerler kabul edilir; böylece görünüm yetki ya da tenant sınırı taşıyamaz (liste uç noktası her açılışta yetkiyi yeniden uygular).
-/// Göreli tarihli hızlı görünümler (bitişi yaklaşan vb.) tarih yerine <c>preset</c> anahtarıyla saklanır; bayatlamazlar.
+/// Sözleşme listesinin süzgeç sözlüğü: sorgu dizgisi biçiminde (<c>effectiveStatus=Active&amp;sort=-endDate</c>) yalnızca bilinen anahtarlar ve geçerli
+/// değerler kabul edilir; böylece saklanan bir süzgeç yetki ya da tenant sınırı taşıyamaz (liste uç noktası her açılışta yetkiyi yeniden uygular).
+/// Göreli tarihli hızlı görünümler (bitişi yaklaşan vb.) tarih yerine <c>preset</c> anahtarıyla saklanır; bayatlamazlar. Kullanıcının kişisel görünümleri
+/// ortak <c>core.GridViews</c> tablosundadır (ADR-0036); modüle özel görünüm tablosu kaldırıldı.
 /// </summary>
 public static class ContractViewRules
 {
-    public const int MaxViewsPerUser = 25;
-    public const int NameMaxLength = 100;
     public const int FiltersMaxLength = 500;
 
     /// <summary>Hızlı görünümler: sorumlu benim, imza bekleyen, bitişi 90 gün içinde, bildirim süresi 30 gün içinde, taahhüdü geciken, satış sözleşmeleri (satış kategorisindeki türler, <see cref="ContractScopes"/>).</summary>

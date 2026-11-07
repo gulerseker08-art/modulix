@@ -32,6 +32,8 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["platform.PlanLimits"] = "Planın limitleri (ADR-0028): TenantId yok.",
         ["platform.TenantSubscriptions"] = "TenantId: firmanın plan aboneliği; platform yöneticisi yönetir, firma yazamaz. Geçmiş korunur (EndedAt).",
         ["platform.SupportAccessGrants"] = "TenantId: destek erişimi kaydı (ADR-0028 Dilim 7); platform yöneticisi yönetir, firma yazamaz. Süresi dolan/kapatılan kayıt silinmez.",
+        ["platform.SupportAccessReads"] = "TenantId: destek oturumunda yapılan istekler (ADR-0028); ekleme-yalnız, platform ve firma yöneticisi okur, firma yazamaz.",
+        ["platform.BillingRecords"] = "TenantId: firmanın ödeme kaydı (ADR-0028 Dilim 7c); yalnızca platform (Finans) yönetir, firma görmez. Silinmez, iptal edilir.",
         ["platform.LimitOverrides"] = "TenantId: limit istisnası; platform yöneticisi yönetir, gerekçe ve bitiş zorunlu. Geri alınır (RevokedAt), silinmez.",
 
         ["platform.TenantScopeLimits"] = "TenantId: kayıt görünürlük tavanını (ADR-0030) platform yöneticisi yazar; firma yalnızca okur.",

@@ -577,6 +577,125 @@ a, .btn-link {
     border-color: var(--mx-brand-primary);
 }
 
+/* Satır düzenindeki anahtar (form-check-row): Bootstrap'ın negatif girintisi flex satırında gerekmez. */
+.form-check-row.form-switch {
+    padding-left: 0;
+}
+
+    .form-check-row.form-switch .form-check-input {
+        margin-left: 0;
+    }
+
+/* Düğme grubu (SegmentedChoice): iki-üç seçenekli alan. Seçim renk dışında zemin, gölge ve kalın yazıyla da ayrılır. */
+.choice-group {
+    display: flex;
+    gap: 2px;
+    min-height: var(--mx-control-height);
+    padding: 2px;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface-control);
+}
+
+.choice-option {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+    .choice-option span {
+        display: grid;
+        place-items: center;
+        height: 100%;
+        padding: 0 var(--mx-space-2);
+        border-radius: 7px;
+        color: var(--mx-text-secondary);
+        font-size: var(--mx-fs-label);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .choice-option input:checked + span {
+        background: var(--mx-surface);
+        box-shadow: var(--mx-shadow-control);
+        color: var(--mx-tone-brand-fg);
+        font-weight: 700;
+    }
+
+    .choice-option input:focus-visible + span {
+        box-shadow: var(--mx-focus-ring);
+    }
+
+    .choice-option input:disabled + span {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+/* Etiket girişi (TagInput): form alanı gibi görünür, etiketler hap biçimindedir. */
+.tag-input {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-1);
+    min-height: var(--mx-control-height);
+    padding: 2px var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface-hover);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+    .tag-input:focus-within {
+        border-color: var(--mx-brand-primary);
+        background: var(--mx-surface);
+        box-shadow: var(--mx-focus-ring);
+    }
+
+    .tag-input input {
+        flex: 1;
+        min-width: 6rem;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--mx-text-primary);
+        font-size: var(--mx-fs-label);
+    }
+
+        .tag-input input::placeholder {
+            color: var(--mx-text-secondary);
+            opacity: 0.85;
+        }
+
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px var(--mx-space-1) 1px var(--mx-space-2);
+    border-radius: var(--mx-radius-badge);
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+}
+
+    .tag-chip button {
+        display: grid;
+        place-items: center;
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: inherit;
+        line-height: 1;
+    }
+
+        .tag-chip button:hover {
+            background: var(--mx-tone-info-bg);
+        }
+
 /* Erişilebilir, görünür klavye odağı (WCAG 2.2 — 2.4.7 / 2.4.11) */
 a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-visible {
     outline: 2px solid var(--mx-brand-primary);
@@ -1485,7 +1604,7 @@ tr.done td.primary {
     color: var(--mx-text-secondary);
 }
 
-/* Sütunlar menüsü (ColumnPicker) ve etkin süzgeç sayısı rozeti */
+/* Sütunlar menüsü (GridColumnPicker) ve etkin süzgeç sayısı rozeti */
 .column-menu {
     min-width: 14rem;
 }
@@ -1640,11 +1759,6 @@ tr.done td.primary {
 .avatar-tone-2 { background: var(--mx-tone-violet-bg); color: var(--mx-tone-violet-fg); }
 .avatar-tone-3 { background: var(--mx-tone-warning-bg); color: var(--mx-tone-warning-fg); }
 .avatar-tone-4 { background: var(--mx-tone-success-bg); color: var(--mx-tone-success-fg); }
-
-/* Gizlenen sütun (ColumnPicker): başlık ve bütün hücreler; telefonda kart satırlarında da gizlenir. */
-.record-table .col-hidden {
-    display: none !important;
-}
 
 /* Satır eylemleri: ikincil (beyaz çerçeveli) düğme tabloda yumuşak görünür; birincil/yıkıcı zaten global yumuşaktır. */
 .record-table td.actions .btn-outline-secondary {
@@ -6048,3 +6162,98 @@ button.hero-stat {
         display: none;
     }
 }
+
+/* ---- Bildirim kutusu: üst çubukta zil ve açılır liste (docs/design-system/component-catalog.md) ---- */
+.notification-menu {
+    position: relative;
+}
+
+.notification-button {
+    position: relative;
+}
+
+.notification-count {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 1.125rem;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--mx-gradient-brand);
+    color: var(--mx-text-on-brand);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1.125rem;
+    text-align: center;
+}
+
+.notification-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+}
+
+.notification-panel {
+    position: absolute;
+    top: calc(100% + var(--mx-space-2));
+    right: 0;
+    z-index: 1050;
+    width: min(22rem, calc(100vw - 2rem));
+    max-height: 26rem;
+    overflow-y: auto;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow-popover);
+}
+
+.notification-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mx-space-2);
+    padding: var(--mx-space-3);
+    border-bottom: 1px solid var(--mx-border);
+}
+
+.notification-empty {
+    margin: 0;
+    padding: var(--mx-space-4);
+    color: var(--mx-text-secondary);
+}
+
+.notification-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.notification-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: var(--mx-space-3);
+    border: 0;
+    border-left: 3px solid transparent;
+    background: transparent;
+    color: var(--mx-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+    .notification-item:hover {
+        background: var(--mx-surface-muted);
+    }
+
+    .notification-item.is-unread {
+        border-left-color: var(--mx-tone-brand-fg);
+        background: var(--mx-tone-brand-bg);
+        font-weight: 600;
+    }
+
+    .notification-item small {
+        color: var(--mx-text-secondary);
+        font-weight: 400;
+    }
