@@ -1,0 +1,476 @@
+@page "/onaylar"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>Onay merkezi · Modulix</PageTitle>
+
+@* Onay merkezi (ADR-0027 Dilim 4a): firmanın tanımladığı süreçlerdeki talepler. Pano sayıları ve liste sunucuda kişinin görebildiği taleplerle
+   sınırlıdır; düğmeleri gizlemek yetki değildir, karar sunucuda yeniden denetlenir. Teklif ve sözleşme onayları kendi ekranlarındadır. *@
+<AuthGate AnyPermission="@(new[] { CoreAccess.RequestApprovals, CoreAccess.DecideApprovals, CoreAccess.ManageApprovals })">
+    <section class="hero-band" aria-labelledby="approvals-title">
+        <div class="hero-band-text">
+            <span class="hero-band-eyebrow"><AppIcon Name="check-circle" Size="16" /> Onay merkezi</span>
+            <h1 id="approvals-title">@HeroTitle</h1>
+            <p>@HeroText</p>
+        </div>
+        @if (overview is not null)
+        {
+            <div class="hero-band-stats">
+                <button type="button" class="hero-stat" @onclick="@(() => SelectViewAsync("waiting"))"><strong>@Count(overview.WaitingForMe)</strong><span>Kararınızı bekliyor</span></button>
+                <button type="button" class="hero-stat" @onclick="@(() => SelectViewAsync("mine"))"><strong>@Count(overview.MyOpen)</strong><span>Açık talebiniz</span></button>
+                <div class="hero-stat"><strong>@Count(overview.Overdue)</strong><span>Süresi geçen</span></div>
+                <div class="hero-stat"><strong>@AverageText</strong><span>Ortalama karar süresi</span></div>
+            </div>
+        }
+    </section>
+
+    <Notice Text="@message" Failed="true" />
+
+    @if (overview is not null)
+    {
+        @if (overview.Orphaned > 0)
+        {
+            <div class="alert alert-warning" role="alert">
+                <AppIcon Name="alert-circle" Size="16" /> @Count(overview.Orphaned) talebin bekleyen adımında etkin onaycı yok. Talebi açıp onaycıyı değiştirin; yoksa süreç ilerlemez.
+            </div>
+        }
+
+        <div class="chart-grid">
+            <section class="chart-card" aria-labelledby="trend-title">
+                <h2 id="trend-title">Son 14 günün kararları</h2>
+                @if (overview.ApprovedLast30Days + overview.RejectedLast30Days == 0)
+                {
+                    <p class="text-muted">Henüz sonuçlanan talep yok.</p>
+                }
+                else
+                {
+                    <LineChart Categories="TrendDays" Series="TrendSeries" Title="Son 14 günde onaylanan ve reddedilen talepler" />
+                }
+            </section>
+            <section class="chart-card" aria-labelledby="process-title">
+                <h2 id="process-title">Açık talepler · sürece göre</h2>
+                @if (overview.OpenByProcess.Count == 0)
+                {
+                    <p class="text-muted">Açık talep yok.</p>
+                }
+                else
+                {
+                    <DonutChart Slices="ProcessSlices" Title="Açık taleplerin sürece göre dağılımı" Caption="açık talep" />
+                }
+            </section>
+        </div>
+    }
+
+    <ViewTabs Items="Views" Value="@view" ValueChanged="SelectViewAsync" Label="Onay görünümleri" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Talep ara" placeholder="Başlık ya da süreç ara" @bind="search" />
+        </form>
+        <ColumnPicker />
+        @if (Session.Can(CoreAccess.RequestApprovals))
+        {
+            <button type="button" class="btn btn-primary" @onclick="OpenNewAsync"><AppIcon Name="plus" Size="16" /> Yeni talep</button>
+        }
+    </div>
+
+    @if (result is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (result.Items.Count == 0)
+    {
+        <p class="text-muted">@EmptyText</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Onay talepleri</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><SortHeader Label="Talep" ColumnIcon="type" Asc="title" Desc="-title" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Süreç" ColumnIcon="layers" Asc="process" Desc="-process" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Tutar" ColumnIcon="coins" Asc="amount" Desc="-amount" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="user" Size="14" /> Talep eden</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="activity" Size="14" /> İlerleme</span></th>
+                    <th scope="col"><SortHeader Label="Tarih" ColumnIcon="calendar" Asc="submitted" Desc="-submitted" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Durum</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in result.Items)
+                {
+                    <tr>
+                        <td data-label="Talep" class="primary"><a href="onaylar?talep=@item.Id" @onclick:preventDefault @onclick="() => OpenDetailAsync(item.Id)">@item.Title</a></td>
+                        <td data-label="Süreç">@item.DefinitionName</td>
+                        <td data-label="Tutar">@AmountText(item)</td>
+                        <td data-label="Talep eden">@item.RequesterName</td>
+                        <td data-label="İlerleme"><span class="step-dots" aria-label="@ProgressText(item)">@foreach (var step in item.Steps) { <span class="step-dot @StepClass(step)"></span> }</span></td>
+                        <td data-label="Tarih">@DateText(item.SubmittedAt)</td>
+                        <td data-label="Durum">
+                            <span class="badge @StatusClass(item.Status)">@StatusText(item.Status)</span>
+                            @if (item.Steps.Any(s => s.IsOverdue)) { <span class="badge stage-lost">Gecikti</span> }
+                        </td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{item.Title} eylemleri")">
+                                <button type="button" class="dropdown-item" role="menuitem" @onclick="() => OpenDetailAsync(item.Id)">Aç</button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="result.Page" PageSize="result.PageSize" TotalCount="result.TotalCount" PageChanged="LoadAsync" />
+    }
+
+    <Drawer Open="detail is not null" Label="Onay talebi" OnClose="CloseDetail">
+        @if (detail is not null)
+        {
+            <div class="section-header">
+                <div>
+                    <h2>@detail.Title</h2>
+                    <p class="text-muted">@detail.DefinitionName · @detail.RequesterName · @DateText(detail.SubmittedAt)</p>
+                </div>
+                <button type="button" class="btn btn-icon btn-ghost" aria-label="Kapat" @onclick="CloseDetail"><AppIcon Name="x" Size="18" /></button>
+            </div>
+            <div>
+                <p><span class="badge @StatusClass(detail.Status)">@StatusText(detail.Status)</span> <strong>@AmountText(detail)</strong></p>
+                @if (!string.IsNullOrWhiteSpace(detail.Description)) { <p>@detail.Description</p> }
+
+                <h3 class="h6">Adımlar</h3>
+                <ol class="step-track">
+                    @foreach (var step in detail.Steps)
+                    {
+                        <li class="step-track-item @StepClass(step)">
+                            <span class="step-track-dot"><AppIcon Name="@StepIcon(step)" Size="14" /></span>
+                            <div>
+                                <strong>@step.Name</strong>
+                                <small>@step.ApproverName @StepNote(step)</small>
+                                @if (step.IsOrphaned) { <span class="badge stage-lost">Etkin onaycı yok</span> }
+                                @if (!string.IsNullOrWhiteSpace(step.Comment)) { <p>@step.Comment</p> }
+                                @if (step.Status == "Active" && Session.Can(CoreAccess.ManageApprovals) && options is not null)
+                                {
+                                    <div class="inline-form">
+                                        <select class="form-select" aria-label="Yeni onaycı" @bind="reassignTo">
+                                            <option value="">Onaycıyı değiştir…</option>
+                                            @foreach (var person in options.People.Where(p => p.Id != detail.RequesterId)) { <option value="@person.Id">@person.Name</option> }
+                                        </select>
+                                        <button type="button" class="btn btn-tonal" disabled="@(busy || reassignTo is null)" @onclick="() => ReassignAsync(step)">Değiştir</button>
+                                    </div>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ol>
+
+                <Notice Text="@actionError" Failed="true" />
+
+                @if (detail.CanDecide)
+                {
+                    <label class="form-label" for="decision-note">Not (ret için zorunlu)</label>
+                    <textarea id="decision-note" class="form-control" rows="3" maxlength="1000" @bind="comment"></textarea>
+                }
+            </div>
+            <div class="form-actions">
+                @if (detail.CanWithdraw)
+                {
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="WithdrawAsync">Geri çek</button>
+                }
+                @if (detail.CanDecide)
+                {
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => DecideAsync(false)">Reddet</button>
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => DecideAsync(true)">Onayla</button>
+                }
+            </div>
+        }
+    </Drawer>
+
+    <Drawer Open="creating" Label="Yeni onay talebi" OnClose="() => creating = false">
+        <div class="section-header">
+            <h2>Yeni onay talebi</h2>
+            <button type="button" class="btn btn-icon btn-ghost" aria-label="Kapat" @onclick="() => creating = false"><AppIcon Name="x" Size="18" /></button>
+        </div>
+        <div>
+            @if (definitions.Count == 0)
+            {
+                <p class="text-muted">Açık onay süreci yok. Yöneticiniz Yönetim → Onay süreçleri ekranından süreç tanımlayabilir.</p>
+            }
+            else
+            {
+                <FormTabs Title="Talep bilgileri">
+                    <FormSection Title="Talep" Icon="file-text">
+                        <div class="mb-3">
+                            <label class="form-label" for="new-process">Süreç</label>
+                            <select id="new-process" class="form-select" @bind="newDefinitionId">
+                                @foreach (var definition in definitions) { <option value="@definition.Id">@definition.Name</option> }
+                            </select>
+                            @if (SelectedDefinition?.Description is { } about) { <small class="text-muted">@about</small> }
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="new-title">Başlık</label>
+                            <input id="new-title" class="form-control" maxlength="200" @bind="newTitle" />
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-8">
+                                <label class="form-label" for="new-amount">Tutar</label>
+                                <input id="new-amount" class="form-control" type="number" min="0" step="0.01" @bind="newAmount" />
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label" for="new-currency">Para birimi</label>
+                                <input id="new-currency" class="form-control" maxlength="3" disabled="@(SelectedDefinition?.Currency is not null)" @bind="newCurrency" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="new-description">Açıklama</label>
+                            <textarea id="new-description" class="form-control" rows="4" maxlength="2000" @bind="newDescription"></textarea>
+                        </div>
+                    </FormSection>
+                </FormTabs>
+            }
+            <Notice Text="@actionError" Failed="true" />
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => creating = false">İptal</button>
+            <button type="button" class="btn btn-primary" disabled="@(busy || definitions.Count == 0)" @onclick="SubmitNewAsync">Onaya gönder</button>
+        </div>
+    </Drawer>
+</AuthGate>
+
+@code {
+    private const string DefaultSort = "-submitted";
+
+    private static readonly IReadOnlyList<ViewOption> Views =
+    [
+        new("waiting", "Kararımı bekleyenler", Icon: "hourglass"),
+        new("mine", "Taleplerim", Icon: "user"),
+        new("all", "Tümü", Icon: "clipboard-list"),
+    ];
+
+    [SupplyParameterFromQuery(Name = "talep")] public Guid? RequestId { get; set; }
+
+    private ApprovalOverviewDto? overview;
+    private ApprovalRequestPageDto? result;
+    private ApprovalRequestDto? detail;
+    private ApproverOptionsDto? options;
+    private List<ApprovalDefinitionDto> definitions = [];
+    private string view = "waiting";
+    private string sort = DefaultSort;
+    private string? search;
+    private string? message;
+    private string? actionError;
+    private string? comment;
+    private Guid? reassignTo;
+    private bool busy;
+    private bool creating;
+    private Guid newDefinitionId;
+    private string? newTitle;
+    private string? newDescription;
+    private decimal? newAmount;
+    private string? newCurrency;
+
+    private ApprovalDefinitionDto? SelectedDefinition => definitions.FirstOrDefault(d => d.Id == newDefinitionId);
+
+    private string HeroTitle => overview switch
+    {
+        null => "Onay merkezi",
+        { WaitingForMe: 0 } => "Masanız temiz",
+        var o => $"{Count(o.WaitingForMe)} talep kararınızı bekliyor",
+    };
+
+    private string HeroText => overview is { Overdue: > 0 } o
+        ? $"{Count(o.Overdue)} talebin süresi geçti; önce onlara bakın."
+        : "Talepler adım adım ilerler, her karar kim verdi ve neden diye kayıt altına alınır.";
+
+    private string AverageText => overview?.AverageDecisionHours is { } hours
+        ? hours < 24 ? $"{hours.ToString("N1", Regional.Numbers)} sa" : $"{(hours / 24).ToString("N1", Regional.Numbers)} gün"
+        : "—";
+
+    private string EmptyText => view switch
+    {
+        "waiting" => "Kararınızı bekleyen talep yok.",
+        "mine" => "Henüz talep açmadınız.",
+        _ => "Görebildiğiniz talep yok.",
+    };
+
+    private IReadOnlyList<string> TrendDays => [.. overview!.Trend.Select(d => d.Day.ToString("dd.MM"))];
+
+    private IReadOnlyList<LineSeries> TrendSeries =>
+    [
+        new("Onaylanan", [.. overview!.Trend.Select(d => (decimal?)d.Approved)]),
+        new("Reddedilen", [.. overview!.Trend.Select(d => (decimal?)d.Rejected)]),
+    ];
+
+    private IReadOnlyList<ChartSlice> ProcessSlices => [.. overview!.OpenByProcess.Select(p => new ChartSlice(p.Name, p.Open))];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        await RefreshAsync();
+        if (Session.Can(CoreAccess.ManageApprovals))
+        {
+            options = (await Api.GetAsync<ApproverOptionsDto>("/api/approvals/approver-options")).Value;
+        }
+
+        if (RequestId is { } id)
+        {
+            await OpenDetailAsync(id);
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        var loaded = await Api.GetAsync<ApprovalOverviewDto>("/api/approvals/overview");
+        overview = loaded.Value;
+        message = loaded.IsSuccess ? null : loaded.Error;
+        await LoadAsync(result?.Page ?? 1);
+    }
+
+    private async Task LoadAsync(int page)
+    {
+        var url = $"/api/approvals/requests?view={view}&sort={sort}&page={page}&pageSize={ListPaging.Size}";
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            url += $"&search={Uri.EscapeDataString(search)}";
+        }
+
+        var loaded = await Api.GetAsync<ApprovalRequestPageDto>(url);
+        result = loaded.Value ?? new ApprovalRequestPageDto([], page, ListPaging.Size, 0);
+        message = loaded.IsSuccess ? message : loaded.Error;
+    }
+
+    private async Task SelectViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        sort = key;
+        await LoadAsync(1);
+    }
+
+    private async Task OpenDetailAsync(Guid id)
+    {
+        actionError = null;
+        comment = null;
+        reassignTo = null;
+        var loaded = await Api.GetAsync<ApprovalRequestDto>($"/api/approvals/requests/{id}");
+        detail = loaded.Value;
+        message = loaded.IsSuccess ? null : loaded.Error;
+    }
+
+    private void CloseDetail()
+    {
+        detail = null;
+        if (RequestId is not null)
+        {
+            Navigation.NavigateTo("onaylar", replace: true);
+        }
+    }
+
+    private async Task DecideAsync(bool approve)
+    {
+        var action = approve ? "approve" : "reject";
+        await ActAsync(() => Api.PostAsync<ApprovalRequestDto>($"/api/approvals/requests/{detail!.Id}/{action}", new DecideApprovalRequest(comment, detail.Version)));
+    }
+
+    private Task WithdrawAsync() =>
+        ActAsync(() => Api.PostAsync<ApprovalRequestDto>($"/api/approvals/requests/{detail!.Id}/withdraw", new { }));
+
+    private Task ReassignAsync(ApprovalStepDto step) =>
+        ActAsync(() => Api.PostAsync<ApprovalRequestDto>($"/api/approvals/requests/{detail!.Id}/reassign", new ReassignApprovalStepRequest(step.Id, reassignTo, null, detail.Version)));
+
+    private async Task ActAsync(Func<Task<ApiResult<ApprovalRequestDto>>> action)
+    {
+        busy = true;
+        var done = await action();
+        busy = false;
+        actionError = done.IsSuccess ? null : done.Error;
+        if (done.IsSuccess)
+        {
+            detail = done.Value;
+            comment = null;
+            reassignTo = null;
+            await RefreshAsync();
+        }
+    }
+
+    private async Task OpenNewAsync()
+    {
+        actionError = null;
+        definitions = (await Api.GetAsync<List<ApprovalDefinitionDto>>("/api/approvals/definitions?activeOnly=true")).Value ?? [];
+        newDefinitionId = definitions.FirstOrDefault()?.Id ?? Guid.Empty;
+        newTitle = newDescription = newCurrency = null;
+        newAmount = null;
+        creating = true;
+    }
+
+    private async Task SubmitNewAsync()
+    {
+        busy = true;
+        var currency = SelectedDefinition?.Currency ?? newCurrency;
+        var done = await Api.PostAsync<ApprovalRequestDto>("/api/approvals/requests", new OpenApprovalRequest(newDefinitionId, newTitle ?? string.Empty, newDescription, newAmount, newAmount is null ? null : currency));
+        busy = false;
+        actionError = done.IsSuccess ? null : done.Error;
+        if (done.IsSuccess)
+        {
+            creating = false;
+            view = "mine";
+            await RefreshAsync();
+        }
+    }
+
+    private static string Count(int value) => value.ToString("N0", Regional.Numbers);
+
+    private static string DateText(DateTimeOffset value) => Regional.ToTenant(value).ToString("dd.MM.yyyy HH:mm");
+
+    private static string AmountText(ApprovalRequestDto item) =>
+        item.Amount is { } amount ? $"{amount.ToString("N2", Regional.Numbers)} {item.Currency}" : "—";
+
+    private static string StatusText(string status) => status switch
+    {
+        "Pending" => "Bekliyor",
+        "Approved" => "Onaylandı",
+        "Rejected" => "Reddedildi",
+        "Withdrawn" => "Geri çekildi",
+        _ => status,
+    };
+
+    private static string StatusClass(string status) => status switch
+    {
+        "Pending" => "stage-open",
+        "Approved" => "stage-won",
+        "Rejected" => "stage-lost",
+        _ => "stage-cancelled",
+    };
+
+    private static string StepClass(ApprovalStepDto step) => step.Status switch
+    {
+        "Approved" => "is-approved",
+        "Rejected" => "is-rejected",
+        "Active" => "is-active",
+        "Cancelled" => "is-cancelled",
+        _ => string.Empty,
+    };
+
+    private static string StepIcon(ApprovalStepDto step) => step.Status switch
+    {
+        "Approved" => "check",
+        "Rejected" => "x",
+        "Active" => "hourglass",
+        _ => "clock",
+    };
+
+    private static string StepNote(ApprovalStepDto step) => step switch
+    {
+        { DecidedAt: { } at } => $"· {step.DecidedByName} · {DateText(at)}",
+        { Status: "Active", DueAt: { } due } => $"· son tarih {DateText(due)}",
+        _ => string.Empty,
+    };
+
+    private static string ProgressText(ApprovalRequestDto item) =>
+        $"{item.Steps.Count} adımdan {item.Steps.Count(s => s.Status == "Approved")} tanesi onaylandı";
+}
