@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Modulix.Core.Approvals;
+using Modulix.Core.Notifications;
 
 namespace Modulix.Infrastructure.Persistence.Configurations;
 
@@ -22,6 +23,40 @@ internal sealed class ApprovalDefinitionConfiguration : IEntityTypeConfiguration
 
         builder.HasAlternateKey(d => new { d.TenantId, d.Id });
         builder.HasIndex(d => new { d.TenantId, d.Name }).IsUnique();
+    }
+}
+
+internal sealed class ApprovalDelegationConfiguration : IEntityTypeConfiguration<ApprovalDelegation>
+{
+    public void Configure(EntityTypeBuilder<ApprovalDelegation> builder)
+    {
+        builder.ToTable("ApprovalDelegations", DatabaseSchemas.Core);
+        builder.HasKey(d => d.Id);
+        builder.Property(d => d.Id).ValueGeneratedNever();
+        builder.Property(d => d.TenantId).IsRequired();
+        builder.Property(d => d.Reason).HasMaxLength(ApprovalDelegation.ReasonMaxLength);
+
+        builder.HasIndex(d => new { d.TenantId, d.DelegateUserId, d.RevokedAt });
+        builder.HasIndex(d => new { d.TenantId, d.PrincipalUserId, d.RevokedAt });
+    }
+}
+
+internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notification>
+{
+    public void Configure(EntityTypeBuilder<Notification> builder)
+    {
+        builder.ToTable("Notifications", DatabaseSchemas.Core);
+        builder.HasKey(n => n.Id);
+        builder.Property(n => n.Id).ValueGeneratedNever();
+        builder.Property(n => n.TenantId).IsRequired();
+        builder.Property(n => n.Kind).HasMaxLength(Notification.KindMaxLength).IsRequired();
+        builder.Property(n => n.Title).HasMaxLength(Notification.TitleMaxLength).IsRequired();
+        builder.Property(n => n.Link).HasMaxLength(Notification.LinkMaxLength);
+        builder.Property(n => n.DedupeKey).HasMaxLength(Notification.DedupeKeyMaxLength).IsRequired();
+
+        // Aynı olay aynı kişiye iki kez düşmez (Ç5a).
+        builder.HasIndex(n => new { n.TenantId, n.UserId, n.DedupeKey }).IsUnique();
+        builder.HasIndex(n => new { n.TenantId, n.UserId, n.ReadAt, n.CreatedAt });
     }
 }
 

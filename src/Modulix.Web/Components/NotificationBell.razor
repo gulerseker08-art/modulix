@@ -1,0 +1,123 @@
+@implements IDisposable
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+@* Bildirim kutusu (Ç5a): üst çubukta zil, okunmamış sayısı ve açılır liste. Sayı dakikada bir yenilenir; liste açılınca yüklenir. *@
+<div class="notification-menu">
+    <button type="button" class="btn btn-icon btn-ghost notification-button" aria-haspopup="true" aria-expanded="@(open ? "true" : "false")"
+            aria-label="@(unread > 0 ? $"{Texts.Get("shell.notifications.title")}: {unread}" : Texts.Get("shell.notifications.title"))" @onclick="ToggleAsync">
+        <AppIcon Name="bell" Size="18" />
+        @if (unread > 0)
+        {
+            <span class="notification-count" aria-hidden="true">@(unread > 99 ? "99+" : unread.ToString())</span>
+        }
+    </button>
+
+    @if (open)
+    {
+        <div class="notification-backdrop" @onclick="() => open = false"></div>
+        <section class="notification-panel" aria-label="@Texts.Get("shell.notifications.title")">
+            <div class="notification-panel-header">
+                <strong>@Texts.Get("shell.notifications.title")</strong>
+                @if (unread > 0)
+                {
+                    <button type="button" class="btn btn-ghost btn-sm" @onclick="MarkAllAsync">@Texts.Get("shell.notifications.markAll")</button>
+                }
+            </div>
+            @if (items.Count == 0)
+            {
+                <p class="notification-empty">@Texts.Get("shell.notifications.empty")</p>
+            }
+            else
+            {
+                <ul class="notification-list">
+                    @foreach (var item in items)
+                    {
+                        <li>
+                            <button type="button" class="notification-item @(item.IsRead ? null : "is-unread")" @onclick="() => OpenAsync(item)">
+                                <span>@item.Title</span>
+                                <small>@Regional.ToTenant(item.CreatedAt).ToString("dd.MM.yyyy HH:mm")</small>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private readonly CancellationTokenSource stop = new();
+    private IReadOnlyList<NotificationDto> items = [];
+    private int unread;
+    private bool open;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshCountAsync();
+        _ = PollAsync();
+    }
+
+    private async Task PollAsync()
+    {
+        using PeriodicTimer timer = new(TimeSpan.FromMinutes(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stop.Token))
+            {
+                await RefreshCountAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Bileşen kapandı.
+        }
+    }
+
+    private async Task RefreshCountAsync() =>
+        unread = (await Api.GetAsync<UnreadNotificationCountDto>("/api/notifications/unread-count")).Value?.Count ?? unread;
+
+    private async Task ToggleAsync()
+    {
+        open = !open;
+        if (open)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var page = (await Api.GetAsync<NotificationPageDto>("/api/notifications")).Value;
+        items = page?.Items ?? [];
+        unread = page?.UnreadCount ?? unread;
+    }
+
+    private async Task OpenAsync(NotificationDto item)
+    {
+        open = false;
+        if (!item.IsRead)
+        {
+            await Api.PostAsync<bool>($"/api/notifications/{item.Id}/read", new { });
+            await RefreshCountAsync();
+        }
+
+        if (item.Link is { } link)
+        {
+            Navigation.NavigateTo(link);
+        }
+    }
+
+    private async Task MarkAllAsync()
+    {
+        await Api.PostAsync<bool>("/api/notifications/read-all", new { });
+        await LoadAsync();
+    }
+
+    public void Dispose()
+    {
+        stop.Cancel();
+        stop.Dispose();
+    }
+}

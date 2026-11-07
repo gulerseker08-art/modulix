@@ -108,8 +108,26 @@ public static class ApprovalEndpoints
             await service.ReassignAsync(id, request.StepId, request.UserId, request.RoleId, request.ExpectedVersion, ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound()))
             .RequirePermission(CoreModule.Permissions.ManageApprovals);
 
+        group.MapGet("/delegations", async (IApprovalService service, ICurrentAccess access, CancellationToken ct) =>
+            Results.Ok((await service.ListDelegationsAsync(await SeeAllAsync(access, ct), ct)).Select(ToDto)))
+            .RequireAnyPermission(AnyApprovalPermission);
+
+        group.MapPost("/delegations", (CreateApprovalDelegationRequest request, IApprovalService service, ICurrentAccess access, CancellationToken ct) => RunAsync(async () =>
+        {
+            ApprovalDelegationDetail detail = await service.CreateDelegationAsync(
+                new ApprovalDelegationInput(request.PrincipalUserId, request.DelegateUserId, request.StartsAt, request.EndsAt, request.Reason), await SeeAllAsync(access, ct), ct);
+            return Results.Created($"/api/approvals/delegations/{detail.Id}", ToDto(detail));
+        })).RequireAnyPermission(CoreModule.Permissions.DecideApprovals, CoreModule.Permissions.ManageApprovals);
+
+        group.MapPost("/delegations/{id:guid}/revoke", (Guid id, IApprovalService service, ICurrentAccess access, CancellationToken ct) => RunAsync(async () =>
+            await service.RevokeDelegationAsync(id, await SeeAllAsync(access, ct), ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound()))
+            .RequireAnyPermission(CoreModule.Permissions.DecideApprovals, CoreModule.Permissions.ManageApprovals);
+
         return app;
     }
+
+    private static ApprovalDelegationDto ToDto(ApprovalDelegationDetail d) => new(
+        d.Id, d.PrincipalUserId, d.PrincipalName, d.DelegateUserId, d.DelegateName, d.StartsAt, d.EndsAt, d.Reason, d.IsActive, d.RevokedAt);
 
     private static Task<bool> SeeAllAsync(ICurrentAccess access, CancellationToken ct) =>
         access.HasPermissionAsync(CoreModule.Permissions.ManageApprovals, ct);
@@ -141,17 +159,17 @@ public static class ApprovalEndpoints
 
     private static ApprovalDefinitionInput ToInput(SaveApprovalDefinitionRequest request) => new(
         request.Name, request.Description, request.Currency,
-        [.. (request.Steps ?? []).Select(s => new ApprovalStepDefinition(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours))]);
+        [.. (request.Steps ?? []).Select(s => new ApprovalStepDefinition(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours, s.EscalateToUserId, s.EscalateToRoleId))]);
 
     private static ApprovalDefinitionDto ToDto(ApprovalDefinition definition) => new(
         definition.Id, definition.Name, definition.Description, definition.Currency, definition.IsActive, definition.Revision, definition.Version,
-        [.. definition.Steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours))]);
+        [.. definition.Steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours, s.EscalateToUserId, s.EscalateToRoleId))]);
 
     private static ApprovalRequestDto ToDto(ApprovalRequestDetail detail) => new(
         detail.Id, detail.DefinitionId, detail.DefinitionName, detail.DefinitionRevision, detail.Title, detail.Description, detail.Amount, detail.Currency,
         detail.RequesterId, detail.RequesterName, detail.Status.ToString(), detail.SubmittedAt, detail.CompletedAt, detail.Version,
         [.. detail.Steps.Select(s => new ApprovalStepDto(
             s.Id, s.Order, s.Name, s.ApproverUserId, s.ApproverRoleId, s.ApproverName, s.Status.ToString(), s.ActivatedAt, s.DueAt, s.IsOverdue, s.IsOrphaned,
-            s.DecidedByName, s.DecidedAt, s.Comment))],
+            s.DecidedByName, s.DecidedAt, s.Comment, s.OnBehalfOfName, s.EscalationName, s.IsEscalated))],
         detail.CanDecide, detail.CanWithdraw);
 }

@@ -194,7 +194,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
 | 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
 | 4a | Genel onay: süreç tanımı, talep, Onay merkezi (Ç6a asgari) | Uygulandı (aşağıda "Dilim 4a") |
-| 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Sonra |
+| 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Uygulandı (aşağıda "Dilim 4b") |
 | 4c | Kayda bağlı onay (modül beyanı, kural aksiyonu "onaya gönder"), kalıcı akış | Sonra |
 | 4d | Takvim ortaklaştırma, puanlama, şablon motoru | Sonra |
 | 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c") |
@@ -485,3 +485,11 @@ Uçların dört kural testi Dilim 2'de entegrasyon testleriyle kapsanmıştır; 
 | `dotnet test tests/Modulix.Core.Tests --filter AutomationEditorJsonShapeTests` | Yeni 7: düzenleyicinin ürettiği biçim ve her tetikleyici türü tipli modele çözülür |
 
 Uçların dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 1'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez.
+
+### Dilim 4b: Bildirim kutusu, süre aşımı, vekâlet (7 Kasım 2026)
+
+- **Bildirim kutusu (Ç5a):** `core.Notifications`, `INotificationInbox` (Core.Contracts; kayıtla aynı işlemde yazar), `/api/notifications`, üst çubukta `NotificationBell`. `UNIQUE(TenantId, UserId, DedupeKey)` aynı olayın ikinci bildirimini engeller. Metin kaydın ayrıntısını taşımaz (süreç adı var, talep başlığı ve tutarı yok); bağlantı açılınca yetki denetlenir, böylece erişimi kalkan kişi hassas metin görmez. İzin gerekmez, herkes yalnızca kendi bildirimini görür.
+- **Süre aşımı:** adımda "Süre aşılınca" kişi ya da rol seçilir. `ApprovalEscalationWorker` 5 dakikada bir `DueAt` geçen etkin adımları işler (`Approvals:WorkerEnabled`). Eskalasyon onaycısı devralmaz, ek onaycı olur; ilk onaycı karar vermeye devam eder. Hedef yoksa onaycılara yalnızca hatırlatma gider. `EscalatedAt` adımı bir kez işletir. Denetimde `core.approval-escalation` kaynağıyla görünür. Süre takvim saatidir; iş günü hesabı 4d ile gelir.
+- **Vekâlet:** `core.ApprovalDelegations`; kişi kendi vekâletini açar ve geri alır, yönetici başkası adına da yapabilir. Tarihler çakışamaz, en çok 365 gün, zincirlenmez. Vekil kişiye atanmış adımlara karar verir, karar `OnBehalfOf` ile yazılır. Role atanmış adımlar vekâlete girmez. Dört göz vekâletle aşılamaz: talep sahibi vekil olsa da kendi talebine karar veremez, talep sahibinin vekili de onun adına karar veremez. CRM teklif vekâleti (`QuoteDelegation`) ayrı kalır.
+
+**Bilerek yapılmadı:** bildirim saklama temizliği, modüllerin kutuya bağlanması (yalnızca onay yazıyor), kişisel bildirim tercihi (Ç5b), iş günü takvimi.

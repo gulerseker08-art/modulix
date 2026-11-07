@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Core.Approvals;
@@ -6,9 +7,18 @@ namespace Modulix.Core.Approvals;
 /// <summary>
 /// Onay sürecinin bir adımı. Aynı <see cref="Order"/> değerine sahip adımlar paralel çalışır; küçükten büyüğe sırayla ilerlenir.
 /// Onaycı ya kişidir (<see cref="ApproverUserId"/>) ya roldür (<see cref="ApproverRoleId"/>; rolün doğrudan üyelerinden biri yeter).
-/// <see cref="MinAmount"/> doluysa adım yalnızca talep tutarı bu değere ulaşınca talebe eklenir.
+/// <see cref="MinAmount"/> doluysa adım yalnızca talep tutarı bu değere ulaşınca talebe eklenir. Süre aşılınca eskalasyon kişisi ya da rolü
+/// de karar verebilir hale gelir (ADR-0027 Dilim 4b); ikisi de boşsa onaycılara yalnızca hatırlatma gider.
 /// </summary>
-public sealed record ApprovalStepDefinition(string Name, int Order, Guid? ApproverUserId, Guid? ApproverRoleId, decimal? MinAmount, int? DueHours);
+public sealed record ApprovalStepDefinition(
+    string Name,
+    int Order,
+    Guid? ApproverUserId,
+    Guid? ApproverRoleId,
+    decimal? MinAmount,
+    int? DueHours,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? EscalateToUserId = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? EscalateToRoleId = null);
 
 /// <summary>
 /// Onay süreci tanımı (ADR-0027 Dilim 4a, Ç6a.1). Firma kendi süreçlerini tanımlar (satın alma, masraf, iskonto istisnası…); kodda
@@ -162,6 +172,16 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
             if (step.DueHours is { } hours && hours is < 1 or > MaxDueHours)
             {
                 throw new ArgumentException($"\"{stepName}\" adımının süresi 1-{MaxDueHours} saat olmalı.");
+            }
+
+            if (step.EscalateToUserId is not null && step.EscalateToRoleId is not null)
+            {
+                throw new ArgumentException($"\"{stepName}\" adımında eskalasyon için tek bir kişi ya da rol seçin.");
+            }
+
+            if ((step.EscalateToUserId ?? step.EscalateToRoleId) is not null && step.DueHours is null)
+            {
+                throw new ArgumentException($"\"{stepName}\" adımında eskalasyon için süre girin.");
             }
 
             normalized.Add(step with { Name = stepName });
