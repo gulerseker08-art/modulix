@@ -49,6 +49,8 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
     {
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
         ["partyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PartyId == id) : null,
+        // Ada göre tam eşleşme (içe aktarmada firma bağlantısı ve aynı ad uyarısı); benzerlik mükerrer önerisindedir.
+        ["name"] = (q, v, _) => v.Trim() is { Length: > 0 and <= Party.NameMaxLength } name ? q.Where(c => c.Party.Name == name) : null,
         // Kesin eşleşme (mükerrer önerisi): vergi numarası. İletişim eşleşmesi yalnızca paylaşılmayan (santral/ortak adres olmayan) noktalarla.
         ["taxNumber"] = (q, v, _) => v.Trim() is { Length: > 0 and <= Party.TaxNumberMaxLength } number ? q.Where(c => c.Party.TaxNumber == number) : null,
         ["contactValue"] = (q, v, ctx) => ContactNormalization.IdentityValue(v) is { } value
@@ -60,14 +62,10 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
             ? q.Where(c => c.Party.Kind == kind)
             : null,
         // Kod listesi alanları (ADR-0029 Dilim E): "a,b" biçiminde saklanır; tam kod eşleşir (kısmi eşleşme olmaz).
-        ["relationshipRole"] = (q, v, _) => CodeFilter(v) is { } code ? q.Where(c => ("," + c.Party.RelationshipRoles + ",").Contains("," + code + ",")) : null,
-        ["customerSector"] = (q, v, _) => CodeFilter(v) is { } code ? q.Where(c => ("," + c.Party.CustomerSectors + ",").Contains("," + code + ",")) : null,
-        ["serviceNeed"] = (q, v, _) => CodeFilter(v) is { } code ? q.Where(c => ("," + c.Party.ServiceNeeds + ",").Contains("," + code + ",")) : null,
+        ["relationshipRole"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.RelationshipRoles + ",").Contains("," + code + ",")) : null,
+        ["customerSector"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.CustomerSectors + ",").Contains("," + code + ",")) : null,
+        ["serviceNeed"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.ServiceNeeds + ",").Contains("," + code + ",")) : null,
     };
-
-    /// <summary>Faaliyet/rol kodu: küçük harf, rakam ve tire (en çok 50); başka değer süzgeç sayılmaz.</summary>
-    private static string? CodeFilter(string value) =>
-        value.Trim() is { Length: > 0 and <= 50 } code && code.All(ch => ch is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-') ? code : null;
 
     protected override IReadOnlyDictionary<string, AsyncRecordFilter<Company>> AsyncFilters { get; } =
         new Dictionary<string, AsyncRecordFilter<Company>>
@@ -144,7 +142,10 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         {
             // Mevcut firma kapsam dışında olabilir (ADR-0026 K9): ileti kaydın adını, sahibini ya da kimliğini içermez.
             throw new RecordValidationException([new RecordFieldError(field, await WithReferralHintAsync(
-                field == "partyId" ? "Bu firma CRM'de zaten kayıtlı." : "Bu vergi numarasıyla kayıtlı bir firma var.", cancellationToken))]);
+                field == "partyId" ? "Bu firma CRM'de zaten kayıtlı." : "Bu vergi numarasıyla kayıtlı bir firma var.", cancellationToken))
+            {
+                Code = RecordFieldErrorCodes.Duplicate,
+            }]);
         }
 
         entity.AttachParty(party);

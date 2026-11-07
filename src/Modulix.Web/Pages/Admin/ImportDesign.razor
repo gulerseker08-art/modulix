@@ -1,0 +1,160 @@
+@page "/yonetim/ice-aktarma-tasarimi"
+@inject ApiClient Api
+
+<PageTitle>İçe aktarma tasarımı · Modulix</PageTitle>
+
+@* İçe aktarma tasarımı (ADR-0033): firma yöneticisi kayıt türlerini açıp kapatır, şablona girecek ve zorunlu olacak sütunları seçer.
+   Kodun zorunlu tuttuğu sütunlar kapatılamaz; kural sunucuda da denetlenir. Ayar ekranıdır, sekmeli form kuralının dışındadır. *@
+<AuthGate Permission="@CoreAccess.ManageCustomization">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+
+    <PageHeader Title="İçe aktarma tasarımı" Icon="clipboard-list" Subtitle="Hangi kayıtların içe aktarılabileceğini ve şablonun sütunlarını belirleyin.">
+        @if (current is not null)
+        {
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveAsync">Kaydet</button>
+        }
+    </PageHeader>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (designs is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (current is null)
+    {
+        <p class="text-muted" role="status">İçe aktarılabilen kayıt türü yok.</p>
+    }
+    else
+    {
+        <div class="card p-3 mb-3">
+            <div class="mb-3">
+                <label class="form-label" for="design-entity">Kayıt türü</label>
+                <select id="design-entity" class="form-select" value="@current.EntityKey" @onchange="Choose">
+                    @foreach (var design in designs)
+                    {
+                        <option value="@design.EntityKey">@design.DisplayName</option>
+                    }
+                </select>
+            </div>
+            <div class="form-check">
+                <input id="design-enabled" class="form-check-input" type="checkbox" @bind="enabled" />
+                <label class="form-check-label" for="design-enabled">Bu tür içe aktarılabilir</label>
+            </div>
+            <div class="form-check">
+                <input id="design-automation" class="form-check-input" type="checkbox" @bind="runAutomation" />
+                <label class="form-check-label" for="design-automation">Kurallar ve atama e-postaları çalışsın</label>
+                <div class="form-text">Kapalıyken içe aktarılan kayıtlar kural çalıştırmaz ve sorumlulara e-posta gitmez. Geçmiş veri taşırken kapalı bırakın.</div>
+            </div>
+        </div>
+
+        <table class="table record-table">
+            <caption class="visually-hidden">@current.DisplayName içe aktarma sütunları</caption>
+            <thead>
+                <tr><th scope="col">Sütun</th><th scope="col">Şablonda</th><th scope="col">Zorunlu</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var field in rows)
+                {
+                    <tr>
+                        <td data-label="Sütun" class="primary">@field.Label</td>
+                        <td data-label="Şablonda">
+                            <input class="form-check-input" type="checkbox" aria-label="@($"{field.Label} şablonda")" checked="@field.Included" disabled="@field.Locked"
+                                   @onchange="e => SetIncluded(field, e)" />
+                        </td>
+                        <td data-label="Zorunlu">
+                            <input class="form-check-input" type="checkbox" aria-label="@($"{field.Label} zorunlu")" checked="@field.Required" disabled="@(field.Locked || !field.Included)"
+                                   @onchange="e => field.Required = e.Value is true" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private sealed class Row(ImportDesignFieldDto field)
+    {
+        public string Key { get; } = field.Key;
+
+        public string Label { get; } = field.Label;
+
+        public bool Locked { get; } = field.Locked;
+
+        public bool Included { get; set; } = field.Included;
+
+        public bool Required { get; set; } = field.Required;
+    }
+
+    private List<ImportDesignDto>? designs;
+    private ImportDesignDto? current;
+    private List<Row> rows = [];
+    private bool enabled;
+    private bool runAutomation;
+    private bool busy;
+    private string? message;
+    private string? notice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var loaded = await Api.GetAsync<List<ImportDesignDto>>("/api/customization/import-designs");
+        designs = loaded.Value;
+        message = loaded.IsSuccess ? null : loaded.Error;
+        Show(designs?.FirstOrDefault());
+    }
+
+    private void Show(ImportDesignDto? design)
+    {
+        current = design;
+        rows = design is null ? [] : [.. design.Fields.Select(f => new Row(f))];
+        enabled = design?.Enabled ?? false;
+        runAutomation = design?.RunAutomation ?? false;
+    }
+
+    private void Choose(ChangeEventArgs e)
+    {
+        notice = null;
+        Show(designs?.FirstOrDefault(d => d.EntityKey == e.Value?.ToString()));
+    }
+
+    private static void SetIncluded(Row row, ChangeEventArgs e)
+    {
+        row.Included = e.Value is true;
+        if (!row.Included)
+        {
+            row.Required = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        notice = null;
+        var request = new SaveImportDesignRequest(
+            enabled,
+            runAutomation,
+            [.. rows.Where(r => !r.Included).Select(r => r.Key)],
+            [.. rows.Where(r => r.Required && !r.Locked).Select(r => r.Key)],
+            current!.Version);
+        var saved = await Api.PutAsync<ImportDesignDto>($"/api/customization/import-designs/{Uri.EscapeDataString(current.EntityKey)}", request);
+        busy = false;
+        if (saved.Value is not { } design)
+        {
+            message = saved.Error;
+            return;
+        }
+
+        designs![designs.FindIndex(d => d.EntityKey == design.EntityKey)] = design;
+        Show(design);
+        notice = "Tasarım kaydedildi.";
+    }
+}

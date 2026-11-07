@@ -28,9 +28,9 @@
         @if (menu is not null)
         {
             <div class="nav-section px-3"><span class="nav-label">@Texts.Get("shell.nav.activeModule")</span></div>
-            <div class="nav-module mx-3" title="@menu.Root.Name">
+            <div class="nav-module mx-3" title="@AppNames.Of(menu.Root)">
                 <AppIcon Name="@menu.Root.Icon" Size="20" />
-                <span class="nav-label">@menu.Root.Name</span>
+                <span class="nav-label">@AppNames.Of(menu.Root)</span>
             </div>
 
             @foreach (MenuSection section in menu.Sections.Where(s => s.Group is not { Footer: true }))
@@ -95,10 +95,10 @@
             bool open = expanded.Contains(group.Id);
             bool hasActive = section.Entries.Any(e => e.App.Id == menu!.Active.Id);
             string listId = "nav-group-" + group.Id;
-            <button type="button" class="nav-group-header @(hasActive ? "has-active" : null)" title="@group.Name"
+            <button type="button" class="nav-group-header @(hasActive ? "has-active" : null)" title="@AppNames.Of(group)"
                     aria-expanded="@(open ? "true" : "false")" aria-controls="@listId" @onclick="() => ToggleGroupAsync(group.Id)">
                 <AppIcon Name="@(group.Icon ?? "list")" Size="20" />
-                <span class="nav-label">@group.Name</span>
+                <span class="nav-label">@AppNames.Of(group)</span>
                 <span class="nav-chevron nav-label"><AppIcon Name="@(open ? "chevron-down" : "chevron-right")" Size="16" /></span>
             </button>
             @if (open)

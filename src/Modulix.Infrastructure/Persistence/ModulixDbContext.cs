@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Authorization;
+using Modulix.Core.Approvals;
 using Modulix.Core.Automation;
 using Modulix.Core.Communication;
 using Modulix.Core.Customization;
@@ -110,6 +111,12 @@ public class ModulixDbContext(
 
     public DbSet<BusinessUnitMember> BusinessUnitMembers => Set<BusinessUnitMember>();
 
+    public DbSet<ApprovalDefinition> ApprovalDefinitions => Set<ApprovalDefinition>();
+
+    public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
+
+    public DbSet<ApprovalRequestStep> ApprovalRequestSteps => Set<ApprovalRequestStep>();
+
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
 
     public DbSet<AutomationRuleVersion> AutomationRuleVersions => Set<AutomationRuleVersion>();
@@ -152,6 +159,8 @@ public class ModulixDbContext(
 
     public DbSet<TenantFormLayout> FormLayouts => Set<TenantFormLayout>();
 
+    public DbSet<TenantImportDesign> ImportDesigns => Set<TenantImportDesign>();
+
     /// <summary>Kullanıcının kişisel liste görünümleri (ADR-0034).</summary>
     public DbSet<Modulix.Core.Views.GridView> GridViews => Set<Modulix.Core.Views.GridView>();
 
@@ -170,6 +179,10 @@ public class ModulixDbContext(
     public DbSet<GtipCatalogVersion> GtipCatalogVersions => Set<GtipCatalogVersion>();
 
     public DbSet<GtipCatalogEntry> GtipCatalogEntries => Set<GtipCatalogEntry>();
+
+    public DbSet<RegimeProfile> RegimeProfiles => Set<RegimeProfile>();
+
+    public DbSet<RegimeProfileVersion> RegimeProfileVersions => Set<RegimeProfileVersion>();
 
     public DbSet<RulePackage> RulePackages => Set<RulePackage>();
     public DbSet<RulePackageVersion> RulePackageVersions => Set<RulePackageVersion>();

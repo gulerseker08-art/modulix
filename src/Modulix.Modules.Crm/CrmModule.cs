@@ -152,6 +152,9 @@ public sealed class CrmModule : IModule
         public const string QuoteApprovalDelegation = "crm.quote-approval-delegation";
         public const string SalesTarget = "crm.sales-target";
         public const string ForecastSubmission = "crm.forecast-submission";
+        public const string ForecastItem = "crm.forecast-item";
+        public const string SalesTargetRevision = "crm.sales-target-revision";
+        public const string ForecastAdjustment = "crm.forecast-adjustment";
     }
 
     /// <summary>Düzenlenebilir seçim listeleri (Y9b).</summary>
@@ -359,6 +362,10 @@ public sealed class CrmModule : IModule
         new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability", "customerBudget", "wonAmount"]),
         // Tahmin sürümünün kilit anındaki gerçekleşen tutarı fırsat tutarlarından türer; tutar izni olmayan göremez (rapor veri kümesi dahil).
         new(Entities.ForecastSubmission, Permissions.OpportunityAmountsRead, ["realizedAtLock"]),
+        // Tahmin satırındaki tutar, olasılık ve kur fırsat tutarından türer; tutar izni olmayan göremez.
+        new(Entities.ForecastItem, Permissions.OpportunityAmountsRead, ["sourceAmount", "probability", "rateUsed", "baseAmount", "adjustmentAmount", "probabilityOverride"]),
+        // Düzeltme geçmişindeki eski/yeni değer tutar, olasılık ya da kategori olabilir; tutar izni olmayan hiçbirini görmez.
+        new(Entities.ForecastAdjustment, Permissions.OpportunityAmountsRead, ["fromValue", "toValue"]),
         new(Entities.Product, Permissions.ProductCostsRead, ["cost", "costCurrency"]),
         new(Entities.QuoteLine, Permissions.QuoteCostsRead, ["unitCost"]),
     ];
@@ -384,6 +391,9 @@ public sealed class CrmModule : IModule
 
     /// <summary>Form düzenleri (ADR-0021); varsayılan yerleşimler <see cref="CrmForms"/>'tadır, firma üzerine kendi düzenini kurar.</summary>
     IReadOnlyList<FormDefinition> IModule.Forms => CrmForms.All;
+
+    /// <summary>İçe aktarılabilir kayıt türleri (ADR-0033); sütunlar <see cref="CrmImports"/>'tadır.</summary>
+    IReadOnlyList<ImportDefinition> IModule.Imports => CrmImports.All;
 
     /// <summary>
     /// Seçim listeleri (Y9b). Hazır değerlerin anahtarları eski enum adlarıdır; kayıtlarda ve API'de bunlar durur.
@@ -1061,6 +1071,9 @@ public sealed class CrmModule : IModule
         services.AddScoped<IPriceCalculator, PriceCalculator>();
         services.AddScoped<IRecordStore, SalesTargetRecordStore>();
         services.AddScoped<IRecordStore, ForecastSubmissionRecordStore>();
+        services.AddScoped<IRecordStore, ForecastItemRecordStore>();
+        services.AddScoped<IRecordStore, SalesTargetRevisionRecordStore>();
+        services.AddScoped<IRecordStore, ForecastAdjustmentRecordStore>();
         services.AddScoped<ForecastWorkflowGate>();
         services.AddScoped<SalesOpportunityReader>();
         services.AddScoped<SalesPlanningData>();

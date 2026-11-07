@@ -1,0 +1,225 @@
+@page "/yonetim/otomasyon/{RuleId:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(detail?.Rule.Name ?? "Otomasyon kuralı") · Modulix</PageTitle>
+
+@* Otomasyon kuralı ayrıntısı (ADR-0027, Dilim 5a): yayınlanmış sürüm ve taslak, doğrulama sorunları; yayınla, aç/kapat, taslağı at.
+   Yayın ve açma core.automation.publish, taslağı atma core.automation.manage ister. Düğmeleri gizlemek yetki değildir. *@
+<AuthGate Permission="@CoreAccess.ReadAutomation">
+    <a class="back-link" href="yonetim/otomasyon">← Otomasyon kuralları</a>
+
+    @if (detail is null)
+    {
+        @if (message is not null)
+        {
+            <div class="alert alert-danger" role="alert">@message</div>
+        }
+        else
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        var rule = detail.Rule;
+        <PageHeader Title="@rule.Name" Icon="zap" Subtitle="@AutomationLabels.Behaviour(rule)">
+            <span class="badge stage-@AutomationLabels.StatusBadge(rule.Status)">@AutomationLabels.Status(rule.Status)</span>
+            @if (Session.Can(CoreAccess.ReadAutomationLogs) && detail.Published is not null)
+            {
+                <a class="btn btn-ghost" href="yonetim/otomasyon/calismalar?kural=@rule.Id">Çalışmaları</a>
+            }
+            @if (Session.Can(CoreAccess.ManageAutomation))
+            {
+                <a class="btn btn-outline-secondary" href="yonetim/otomasyon/@rule.Id/duzenle">Düzenle</a>
+            }
+            @if (CanPublish && detail.Published is not null)
+            {
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => SetActiveAsync(rule.Status != AutomationLabels.Active)">
+                    @(rule.Status == AutomationLabels.Active ? "Kapat" : "Aç")
+                </button>
+            }
+            @if (CanPublish && detail.Draft is not null)
+            {
+                <button type="button" class="btn btn-outline-secondary" disabled="@(busy || detail.DraftIssues.Count > 0)" @onclick="() => PublishAsync(false)">Yayınla (kapalı kalsın)</button>
+                <button type="button" class="btn btn-primary" disabled="@(busy || detail.DraftIssues.Count > 0)" @onclick="() => confirming = Confirm.PublishAndOpen">Yayınla ve aç</button>
+            }
+        </PageHeader>
+
+        <Notice Text="@notice" />
+        @if (message is not null)
+        {
+            <div class="alert alert-danger" role="alert">@message</div>
+            @if (problems.Count > 0)
+            {
+                <ul>
+                    @foreach (var problem in problems)
+                    {
+                        <li>@problem</li>
+                    }
+                </ul>
+            }
+        }
+
+        @if (confirming == Confirm.PublishAndOpen)
+        {
+            <div class="alert alert-warning confirm" role="alertdialog" aria-label="Yayın onayı">
+                <p>
+                    Kural yayınlanıp açılınca koşula uyan kayıtlarda işini kendisi yapar (ör. takip aktivitesi açar).
+                    Yayından önce özeti ve sorunları kontrol ettiniz mi?
+                </p>
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => PublishAsync(true)">Yayınla ve aç</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = Confirm.None">Vazgeç</button>
+            </div>
+        }
+
+        @if (detail.Draft is { } draft)
+        {
+            <FormSection Title="Taslak" Icon="clipboard-list"
+                         Description="Henüz yayınlanmadı; yayınlanana kadar hiçbir şey çalıştırmaz.">
+                <Actions>
+                    @if (Session.Can(CoreAccess.ManageAutomation))
+                    {
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => confirming = Confirm.Discard">Taslağı at</button>
+                    }
+                </Actions>
+                <ChildContent>
+                    @if (confirming == Confirm.Discard)
+                    {
+                        <div class="alert alert-warning confirm" role="alertdialog" aria-label="Taslağı atma onayı">
+                            <p>
+                                @(detail.Published is null
+                                    ? "Bu kural hiç yayınlanmadı; taslağı atarsanız kural da silinir."
+                                    : "Taslak atılır, yayınlanmış sürüm olduğu gibi kalır.")
+                            </p>
+                            <button type="button" class="btn btn-danger" disabled="@busy" @onclick="DiscardAsync">Taslağı at</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = Confirm.None">Vazgeç</button>
+                        </div>
+                    }
+                    <VersionView Version="draft" Issues="detail.DraftIssues" />
+                </ChildContent>
+            </FormSection>
+        }
+
+        @if (detail.Published is { } published)
+        {
+            <FormSection Title="@($"Yayınlanmış sürüm (v{published.VersionNo})")" Icon="check"
+                         Description="@(rule.Status == AutomationLabels.Active ? "Şu an çalışan sürüm." : "Kapalı; çalışmıyor.")">
+                <VersionView Version="published" Issues="detail.PublishedIssues" />
+            </FormSection>
+        }
+    }
+</AuthGate>
+
+@code {
+    private enum Confirm
+    {
+        None,
+        PublishAndOpen,
+        Discard,
+    }
+
+    [Parameter] public Guid RuleId { get; set; }
+
+    private AutomationRuleDetailDto? detail;
+    private IReadOnlyList<AutomationEntityDto> entities = [];
+    private IReadOnlyList<string> problems = [];
+    private string? message;
+    private string? notice;
+    private bool busy;
+    private Confirm confirming;
+
+    private bool CanPublish => Session.Can(CoreAccess.PublishAutomation);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(CoreAccess.ReadAutomation))
+        {
+            return;
+        }
+
+        entities = (await Api.GetAsync<AutomationCatalogDto>("/api/automation/catalog")).Value?.Entities ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<AutomationRuleDetailDto>($"/api/automation/rules/{RuleId}");
+        detail = result.Value;
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+        }
+    }
+
+    private async Task PublishAsync(bool activate)
+    {
+        if (detail is null)
+        {
+            return;
+        }
+
+        await RunAsync(
+            () => Api.PostAsync<AutomationRuleDetailDto>(
+                $"/api/automation/rules/{RuleId}/publish", new PublishAutomationRuleRequest(activate, detail.Rule.Version)),
+            activate ? "Kural yayınlandı ve açıldı." : "Kural yayınlandı; kapalı.");
+    }
+
+    private Task SetActiveAsync(bool active) =>
+        RunAsync(
+            () => Api.PutAsync<AutomationRuleDetailDto>($"/api/automation/rules/{RuleId}/active", new SetAutomationRuleActiveRequest(active)),
+            active ? "Kural açıldı." : "Kural kapatıldı.");
+
+    private async Task DiscardAsync()
+    {
+        busy = true;
+        var neverPublished = detail?.Published is null;
+        var result = await Api.DeleteAsync($"/api/automation/rules/{RuleId}/draft");
+        busy = false;
+        confirming = Confirm.None;
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            problems = [];
+            return;
+        }
+
+        if (neverPublished)
+        {
+            Navigation.NavigateTo("yonetim/otomasyon");
+            return;
+        }
+
+        notice = "Taslak atıldı.";
+        message = null;
+        await LoadAsync();
+    }
+
+    private async Task RunAsync(Func<Task<ApiResult<AutomationRuleDetailDto>>> call, string done)
+    {
+        busy = true;
+        message = null;
+        notice = null;
+        problems = [];
+        var result = await call();
+        busy = false;
+        confirming = Confirm.None;
+        if (result.Value is { } updated)
+        {
+            detail = updated;
+            notice = done;
+            return;
+        }
+
+        message = result.Error;
+        problems = [.. result.Issues.Select(i => i.Message)];
+
+        // Sürüm çakışmasında (başkası değiştirdi) güncel hali göster.
+        if (result.Status == System.Net.HttpStatusCode.Conflict)
+        {
+            await LoadAsync();
+        }
+    }
+}

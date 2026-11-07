@@ -114,6 +114,7 @@ public sealed partial class ModuleCatalog
             }
 
             RegisterForms(module);
+            RegisterImports(module);
 
             foreach (var access in module.SharedRecordAccess)
             {

@@ -60,7 +60,7 @@ public sealed class AppNavigation(SessionState session)
         // MenuParentId dolu ekranlar (ör. teklif onayları) ayrı satır olmaz; üst satırın altında sayılır.
         List<MenuEntry> entries = Children(rootId)
             .Where(a => a.MenuParentId is null)
-            .Select(a => new MenuEntry(a, a.Name, a.Group, a.Order))
+            .Select(a => new MenuEntry(a, AppNames.Of(a), a.Group, a.Order))
             .ToList();
 
         foreach (AppDefinition hosted in AppCatalog.All.Where(a => a.ParentId is null && a.HostId == rootId && IsVisible(a)))
@@ -68,7 +68,7 @@ public sealed class AppNavigation(SessionState session)
             foreach (AppDefinition child in Children(hosted.Id).Where(c => c.Hosted is { ParentEntryId: null }))
             {
                 HostPlacement place = child.Hosted!;
-                entries.Add(new MenuEntry(child, place.Name ?? child.Name, place.Group, place.Order, place.Route));
+                entries.Add(new MenuEntry(child, AppNames.MenuNameOf(child), place.Group, place.Order, place.Route));
             }
         }
 

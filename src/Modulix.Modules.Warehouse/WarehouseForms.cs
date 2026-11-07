@@ -98,5 +98,46 @@ public static class WarehouseForms
             new("gtip", "GTİP (varsayılan)", "gtip", 6),
             new("description", "Açıklama", "aciklama", 12),
         ]),
+
+        new(WarehouseModule.Entities.CustomsDeclaration, "Gümrük beyannamesi",
+        [new(General, "Genel bilgiler"), new("ayrintilar", "Açıklama ve ek bilgiler")],
+        [
+            new("kimlik", "Beyanname", "file-text"),
+            new("taraflar", "Taraflar", "users"),
+            new("aciklama", "Açıklama ve dış referans", "message-square", Tab: "ayrintilar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ayrintilar"),
+        ],
+        [
+            new("registrationNo", "Tescil no", "kimlik", 4, Required: true, Fixed: true),
+            new("registrationDate", "Tescil tarihi", "kimlik", 4, Required: true, Fixed: true),
+            new("statusKey", "Durum", "kimlik", 4, Required: true, Fixed: true),
+            new("regimeKey", "Rejim", "kimlik", 6, Required: true, Fixed: true),
+            new("customsOffice", "Gümrük idaresi", "kimlik", 6),
+            new("importerPartyId", "İthalatçı", "taraflar", 6, Required: true, Fixed: true),
+            new("brokerPartyId", "Gümrük müşaviri", "taraflar", 6),
+            new("externalReference", "Dış referans", "aciklama", 6),
+            new("description", "Açıklama", "aciklama", 12),
+        ]),
+
+        new(WarehouseModule.Entities.CustomsDeclarationLine, "Beyanname satırı",
+        [new(General, "Eşya ve miktar"), new("ayrintilar", "Ek bilgiler")],
+        [
+            new("esya", "Eşya", "file-text"),
+            new("kap", "Kap ve ağırlık", "package"),
+            new("miktar", "Menşe ve miktar", "globe"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ayrintilar"),
+        ],
+        [
+            new("lineNo", "Satır no", "esya", 4, Required: true, Fixed: true),
+            new("gtip", "GTİP", "esya", 8, Required: true, Fixed: true),
+            new("description", "Eşya tanımı", "esya", 12, Required: true, Fixed: true),
+            new("containerTypeKey", "Kap cinsi", "kap", 4, Required: true, Fixed: true),
+            new("containerCount", "Kap adedi", "kap", 4, Required: true, Fixed: true),
+            new("grossKg", "Brüt kg", "kap", 4, Required: true, Fixed: true),
+            new("netKg", "Net kg", "kap", 4, Required: true, Fixed: true),
+            new("originCountryKey", "Menşe ülke", "miktar", 4, Required: true, Fixed: true),
+            new("quantity", "Miktar", "miktar", 4, Required: true, Fixed: true),
+            new("unitKey", "Birim", "miktar", 4, Required: true, Fixed: true),
+        ]),
     ];
 }

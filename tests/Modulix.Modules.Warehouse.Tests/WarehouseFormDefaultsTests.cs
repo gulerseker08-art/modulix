@@ -1,4 +1,5 @@
 using Modulix.Core.Contracts.Modules;
+using Modulix.Modules.Warehouse.Domain;
 using Modulix.Shared.Warehouse;
 
 namespace Modulix.Modules.Warehouse.Tests;
@@ -59,7 +60,8 @@ public class WarehouseFormDefaultsTests
         var entities = new[]
         {
             WarehouseModule.Entities.Facility, WarehouseModule.Entities.Zone, WarehouseModule.Entities.LocationLevel, WarehouseModule.Entities.Location,
-            WarehouseModule.Entities.PowerOfAttorney, WarehouseModule.Entities.StockItem,
+            WarehouseModule.Entities.PowerOfAttorney, WarehouseModule.Entities.StockItem, WarehouseModule.Entities.CustomsDeclaration,
+            WarehouseModule.Entities.CustomsDeclarationLine,
         };
 
         Assert.All(Module.Lookups, lookup =>
@@ -98,12 +100,33 @@ public class WarehouseFormDefaultsTests
                 WarehouseAccess.LocationLevelsRead, WarehouseAccess.LocationLevelsWrite, WarehouseAccess.LocationsRead, WarehouseAccess.LocationsWrite,
                 WarehouseAccess.AttorneysRead, WarehouseAccess.AttorneysWrite,
                 WarehouseAccess.StockItemsRead, WarehouseAccess.StockItemsWrite,
+                WarehouseAccess.DeclarationsRead, WarehouseAccess.DeclarationsWrite,
+                WarehouseAccess.RegimesRead, WarehouseAccess.RegimesWrite,
+                WarehouseAccess.LotsRead, WarehouseAccess.LotsWrite, WarehouseAccess.MovementsRead, WarehouseAccess.MovementsWrite,
             },
             key => Assert.Contains(key, permissions));
-        Assert.Equal(12, permissions.Count);
+        Assert.Equal(20, permissions.Count);
+        Assert.Equal(WarehouseModule.Entities.Lot, WarehouseAccess.LotEntityKey);
+        Assert.Equal(WarehouseModule.Entities.StockMovement, WarehouseAccess.StockMovementEntityKey);
+        Assert.Equal(WarehouseModule.Entities.StockBalance, WarehouseAccess.StockBalanceEntityKey);
+        Assert.Equal(WarehouseModule.Lists.MovementType, WarehouseAccess.MovementTypeList);
+        Assert.Equal(WarehouseModule.Lists.MovementReason, WarehouseAccess.MovementReasonList);
         Assert.Equal(
-            [WarehouseModule.Entities.Facility, WarehouseModule.Entities.Zone, WarehouseModule.Entities.LocationLevel, WarehouseModule.Entities.Location, WarehouseModule.Entities.PowerOfAttorney, WarehouseModule.Entities.StockItem],
-            new[] { WarehouseAccess.FacilityEntityKey, WarehouseAccess.ZoneEntityKey, WarehouseAccess.LocationLevelEntityKey, WarehouseAccess.LocationEntityKey, WarehouseAccess.PowerOfAttorneyEntityKey, WarehouseAccess.StockItemEntityKey });
+            [MovementCategories.Inbound, MovementCategories.Outbound, MovementCategories.Transfer, MovementCategories.Adjustment],
+            new[] { WarehouseAccess.MovementInbound, WarehouseAccess.MovementOutbound, WarehouseAccess.MovementTransfer, WarehouseAccess.MovementAdjustment });
+        Assert.Equal(WarehouseModule.Entities.RegimeBinding, WarehouseAccess.RegimeBindingEntityKey);
+        Assert.Equal(
+            [
+                WarehouseModule.Entities.Facility, WarehouseModule.Entities.Zone, WarehouseModule.Entities.LocationLevel, WarehouseModule.Entities.Location,
+                WarehouseModule.Entities.PowerOfAttorney, WarehouseModule.Entities.StockItem,
+                WarehouseModule.Entities.CustomsDeclaration, WarehouseModule.Entities.CustomsDeclarationLine,
+            ],
+            new[]
+            {
+                WarehouseAccess.FacilityEntityKey, WarehouseAccess.ZoneEntityKey, WarehouseAccess.LocationLevelEntityKey, WarehouseAccess.LocationEntityKey,
+                WarehouseAccess.PowerOfAttorneyEntityKey, WarehouseAccess.StockItemEntityKey,
+                WarehouseAccess.CustomsDeclarationEntityKey, WarehouseAccess.CustomsDeclarationLineEntityKey,
+            });
         Assert.Equal(
             Module.Lookups.Select(l => l.Key).Order(),
             new[]
@@ -111,9 +134,18 @@ public class WarehouseFormDefaultsTests
                 WarehouseAccess.ZoneFacilityLookup, WarehouseAccess.LocationLevelFacilityLookup, WarehouseAccess.LocationFacilityLookup,
                 WarehouseAccess.LocationParentLookup, WarehouseAccess.LocationZoneLookup,
                 WarehouseAccess.AttorneyImporterLookup, WarehouseAccess.AttorneyBrokerLookup,
+                WarehouseAccess.DeclarationImporterLookup, WarehouseAccess.DeclarationBrokerLookup,
             }.Order());
         Assert.Equal(WarehouseModule.Lists.ZoneKind, WarehouseAccess.ZoneKindList);
         Assert.Equal(WarehouseModule.Lists.StockUnit, WarehouseAccess.StockUnitList);
+        Assert.Equal(WarehouseModule.Lists.CustomsRegime, WarehouseAccess.CustomsRegimeList);
+        Assert.Equal(WarehouseModule.Lists.DeclarationStatus, WarehouseAccess.DeclarationStatusList);
+        Assert.Equal(WarehouseModule.Lists.ContainerType, WarehouseAccess.ContainerTypeList);
+        Assert.Equal(WarehouseModule.Lists.OriginCountry, WarehouseAccess.OriginCountryList);
+        Assert.Equal(WarehouseModule.Lists.DeclarationLineUnit, WarehouseAccess.DeclarationLineUnitList);
+        Assert.Equal(WarehouseModule.DeclarationStatusCategories.Draft, WarehouseAccess.DeclarationDraft);
+        Assert.Equal(WarehouseModule.DeclarationStatusCategories.Registered, WarehouseAccess.DeclarationRegistered);
+        Assert.Equal(WarehouseModule.DeclarationStatusCategories.Cancelled, WarehouseAccess.DeclarationCancelled);
         Assert.Equal(WarehouseModule.ZoneKindCategories.Controlled, WarehouseAccess.ZoneKindControlled);
         Assert.Equal(WarehouseModule.ZoneKindCategories.Free, WarehouseAccess.ZoneKindFree);
     }

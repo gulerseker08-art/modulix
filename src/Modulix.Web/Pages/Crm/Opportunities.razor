@@ -2,6 +2,7 @@
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
+@inject Modulix.Web.Services.ActivityOptions Activities
 @inject NavigationManager Navigation
 
 <PageTitle>Fırsatlar · Modulix</PageTitle>
@@ -34,6 +35,14 @@
             @foreach (var s in OpportunityStatus.All)
             {
                 <option value="@s">@OpportunityStatus.Label(s)</option>
+            }
+        </select>
+        <label class="visually-hidden" for="scope-filter">Hizmet kapsamı</label>
+        <select id="scope-filter" class="form-select form-select-sm filter-select" @bind="scope" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm hizmet kapsamları</option>
+            @foreach (var a in activities.Where(a => a.Kind == "Activity"))
+            {
+                <option value="@a.Code">@Activities.PathOf(a)</option>
             }
         </select>
     </div>
@@ -217,8 +226,13 @@
     /// <summary>Etkin sistem görünümü (kişisel görünümde kayıtlı olan): tümü, benim, kapanışı geçenler, aksiyonsuz.</summary>
     private string current = AllView;
     private string status = string.Empty;
+    private string scope = string.Empty;
+    private IReadOnlyList<ActivityOptionDto> activities = [];
     private string? message;
     private string? search;
+
+    /// <summary>Panodaki "Yeni fırsat" bağlantısı formu açık getirir (<c>crm/firsatlar?yeni=true</c>).</summary>
+    [SupplyParameterFromQuery(Name = "yeni")] public bool NewRequested { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -227,12 +241,17 @@
         if (Session.Can(CrmAccess.OpportunitiesRead))
         {
             await Lookups.LoadAsync(contacts: true);
+            activities = await Activities.LoadAsync();
             grid.Define([
                 .. BaseColumns.Where(c => ShowAmounts || c.Key is not ("amount" or "probability")),
                 .. Lookups.FieldsOf(CrmEntityKeys.Opportunity).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList)),
             ]);
             await views.LoadAsync();
             await LoadAsync(1);
+            if (NewRequested && Session.Can(CrmAccess.OpportunitiesWrite))
+            {
+                Open(null);
+            }
         }
     }
 
@@ -254,7 +273,8 @@
     // Kayıtlı süzgeç: sistem görünümü + durum. Sayfa içi anahtarlardır, API'ye gitmez.
     private string? CurrentFilters => GridFilters.Build(
         current != AllView ? ("view", current) : null,
-        status.Length > 0 ? ("status", status) : null);
+        status.Length > 0 ? ("status", status) : null,
+        scope.Length > 0 ? ("serviceScope", scope) : null);
 
     // Kaydedilmemiş değişiklik: sütun/sıralama ya da (kişisel görünümde) süzgeç kayıtlı hâlden farklı.
     private bool IsDirty => grid.Differs(Active) || (Active is { } saved && CurrentFilters != (string.IsNullOrEmpty(saved.Filters) ? null : saved.Filters));
@@ -275,6 +295,7 @@
         if (current == OverdueView) { filters += $"&closeOverdueBefore={DateOnly.FromDateTime(DateTime.UtcNow):yyyy-MM-dd}"; }
         if (current == NoActionView) { filters += "&noNextAction=true"; }
         if (status.Length > 0) { filters += $"&status={status}"; }
+        if (scope.Length > 0) { filters += $"&serviceScope={Uri.EscapeDataString(scope)}"; }
         return filters;
     }
 
@@ -296,6 +317,7 @@
             var filters = GridFilters.Parse(saved.Filters);
             current = filters.GetValueOrDefault("view") is { } baseView && baseView is MineView or OverdueView or NoActionView ? baseView : AllView;
             status = filters.GetValueOrDefault("status") ?? string.Empty;
+            scope = filters.GetValueOrDefault("serviceScope") ?? string.Empty;
         }
         else
         {

@@ -2,24 +2,24 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Hesabım · Modulix</PageTitle>
+<PageTitle>@Texts.Get("account.title") · Modulix</PageTitle>
 
 @* Kişinin kendi hesabı (Y7a). Bilgiler kişiye aittir: değişiklik üye olduğu bütün kuruluşlarda geçerlidir. *@
 <AuthGate AllowWithoutTwoFactor="true" AllowWithoutTenant="true">
-    <h1>Hesabım</h1>
-    <p class="text-muted">Bu bilgiler size aittir; birden fazla kuruluşta çalışıyorsanız hepsinde geçerlidir.</p>
+    <h1>@Texts.Get("account.title")</h1>
+    <p class="text-muted">@Texts.Get("account.intro")</p>
 
     @if (Session.TwoFactorRequired)
     {
         <div class="alert alert-warning" role="alert">
-            <strong>@Session.ActiveTenantName</strong> iki adımlı doğrulama istiyor. Firmanın ekranlarına geçmeden önce
-            <a href="hesabim#iki-adim">doğrulama uygulamanızı kurun</a>.
+            <strong>@Session.ActiveTenantName</strong> @Texts.Get("account.twoFactorRequired.text")
+            <a href="hesabim#iki-adim">@Texts.Get("account.twoFactorRequired.link")</a>.
         </div>
     }
     else if (RecoveryCodeUsed)
     {
         <div class="alert alert-warning" role="status">
-            Kurtarma koduyla giriş yaptınız. Telefonunuza erişemiyorsanız iki adımlı doğrulamayı kapatıp yeniden kurun ya da kurtarma kodlarınızı yenileyin.
+            @Texts.Get("account.recoveryUsed")
         </div>
     }
 
@@ -29,20 +29,20 @@
     }
     else if (profile is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else
     {
         <form class="record-form settings-group" novalidate @onsubmit="SaveNameAsync" @onsubmit:preventDefault>
-            <h2>Profil</h2>
+            <h2>@Texts.Get("account.profile.title")</h2>
             <Notice Text="@nameNotice" Failed="nameFailed" />
             <div class="mb-3">
-                <label class="form-label" for="displayName">Ad soyad</label>
+                <label class="form-label" for="displayName">@Texts.Get("account.profile.name")</label>
                 <input id="displayName" class="form-control" maxlength="200" autocomplete="name" @bind="displayName" @bind:event="oninput" />
                 <FieldError Field="displayName" Errors="nameErrors" />
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || displayName.Trim() == profile.DisplayName)">Kaydet</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || displayName.Trim() == profile.DisplayName)">@Texts.Get("common.save")</button>
             </div>
         </form>
 
@@ -67,47 +67,47 @@
         </form>
 
         <form class="record-form settings-group" novalidate @onsubmit="ChangeEmailAsync" @onsubmit:preventDefault>
-            <h2>E-posta</h2>
+            <h2>@Texts.Get("account.email.title")</h2>
             <Notice Text="@emailNotice" Failed="emailFailed" />
-            <p>Giriş e-postanız: <strong>@profile.Email</strong></p>
+            <p>@Texts.Strong("account.email.current", profile.Email)</p>
             <div class="form-grid">
                 <div class="mb-3">
-                    <label class="form-label" for="newEmail">Yeni e-posta</label>
+                    <label class="form-label" for="newEmail">@Texts.Get("account.email.new")</label>
                     <input id="newEmail" class="form-control" type="email" autocomplete="email" @bind="newEmail" @bind:event="oninput" />
                     <FieldError Field="email" Errors="emailErrors" />
                 </div>
                 <div class="mb-3">
-                    <label class="form-label" for="emailPassword">Mevcut şifre</label>
+                    <label class="form-label" for="emailPassword">@Texts.Get("account.currentPassword")</label>
                     <input id="emailPassword" class="form-control" type="password" autocomplete="current-password" @bind="emailPassword" />
                     <FieldError Field="currentPassword" Errors="emailErrors" />
                 </div>
             </div>
-            <div class="form-text mb-3">Yeni adrese bir onay bağlantısı gönderilir. E-postanız bağlantıyı açtığınızda değişir; eski adresinize de bilgi verilir.</div>
+            <div class="form-text mb-3">@Texts.Get("account.email.help")</div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(newEmail))">Onay bağlantısı gönder</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(newEmail))">@Texts.Get("account.email.send")</button>
             </div>
         </form>
 
         <section class="record-form settings-group">
-            <h2>Şifre</h2>
+            <h2>@Texts.Get("account.password.title")</h2>
             <Notice Text="@passwordNotice" Failed="passwordFailed" />
             <div class="mb-3">
-                <label class="form-label" for="currentPassword">Mevcut şifre</label>
+                <label class="form-label" for="currentPassword">@Texts.Get("account.currentPassword")</label>
                 <input id="currentPassword" class="form-control" type="password" autocomplete="current-password" @bind="currentPassword" />
                 <FieldError Field="currentPassword" Errors="passwordErrors" />
             </div>
-            <PasswordForm @key="passwordFormKey" Email="@profile.Email" Errors="passwordErrors" Busy="busy" Submit="ChangePasswordAsync" ButtonText="Şifremi değiştir" />
-            <div class="form-text">Şifre değişince bu oturum açık kalır, diğer cihazlardaki oturumlarınız kapanır.</div>
+            <PasswordForm @key="passwordFormKey" Email="@profile.Email" Errors="passwordErrors" Busy="busy" Submit="ChangePasswordAsync" ButtonText="@Texts.Get("account.password.submit")" />
+            <div class="form-text">@Texts.Get("account.password.help")</div>
         </section>
 
         <TwoFactorSection />
 
         <section class="record-form settings-group">
-            <h2>Açık oturumlar</h2>
+            <h2>@Texts.Get("account.sessions.title")</h2>
             <Notice Text="@sessionNotice" Failed="sessionFailed" />
             @if (sessions is null)
             {
-                <p class="text-muted">Yükleniyor…</p>
+                <p class="text-muted">@Texts.Get("common.loading")</p>
             }
             else
             {
@@ -119,15 +119,15 @@
                                 <strong>@session.Device</strong>
                                 @if (session.IsCurrent)
                                 {
-                                    <span class="badge user-active ms-1">Bu oturum</span>
+                                    <span class="badge user-active ms-1">@Texts.Get("account.sessions.current")</span>
                                 }
                                 <div class="text-muted small">
-                                    @(session.IpAddress ?? "IP bilinmiyor") · Son etkinlik @CrmLabels.Time(session.LastSeenAt) · Giriş @CrmLabels.Time(session.CreatedAt)
+                                    @Texts.Get("account.sessions.meta", session.IpAddress ?? Texts.Get("account.sessions.unknownIp"), CrmLabels.Time(session.LastSeenAt), CrmLabels.Time(session.CreatedAt))
                                 </div>
                             </div>
                             @if (!session.IsCurrent)
                             {
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => CloseAsync(session)">Kapat</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => CloseAsync(session)">@Texts.Get("account.sessions.close")</button>
                             }
                         </li>
                     }
@@ -135,7 +135,7 @@
                 @if (sessions.Count > 1)
                 {
                     <div class="form-actions">
-                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="CloseOthersAsync">Diğer tüm oturumları kapat</button>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="CloseOthersAsync">@Texts.Get("account.sessions.closeOthers")</button>
                     </div>
                 }
             }
@@ -204,7 +204,7 @@
         {
             profile = saved;
             displayName = saved.DisplayName;
-            (nameNotice, nameFailed) = ("Kaydedildi.", false);
+            (nameNotice, nameFailed) = (Texts.Get("common.saved"), false);
 
             // Üst çubuktaki ad yenilenir.
             await Session.RefreshAsync();
@@ -245,7 +245,7 @@
         emailErrors = result.FieldErrors;
         if (result.IsSuccess)
         {
-            (emailNotice, emailFailed) = ($"Onay bağlantısı {email} adresine gönderildi. Bağlantıyı açtığınızda e-postanız değişir.", false);
+            (emailNotice, emailFailed) = (Texts.Get("account.email.sent", email), false);
             (newEmail, emailPassword) = (string.Empty, string.Empty);
         }
         else
@@ -262,7 +262,7 @@
         passwordErrors = result.FieldErrors;
         if (result.IsSuccess)
         {
-            (passwordNotice, passwordFailed) = ("Şifreniz değişti. Diğer cihazlardaki oturumlarınız kapatıldı.", false);
+            (passwordNotice, passwordFailed) = (Texts.Get("account.password.changed"), false);
             currentPassword = string.Empty;
             passwordFormKey++;
             await LoadSessionsAsync();
@@ -278,7 +278,7 @@
         busy = true;
         var result = await Api.DeleteAsync($"/api/account/sessions/{session.Id}");
         busy = false;
-        (sessionNotice, sessionFailed) = result.IsSuccess ? ($"{session.Device} oturumu kapatıldı.", false) : (result.Error, true);
+        (sessionNotice, sessionFailed) = result.IsSuccess ? (Texts.Get("account.sessions.closed", session.Device), false) : (result.Error, true);
         await LoadSessionsAsync();
     }
 
@@ -288,7 +288,7 @@
         var result = await Api.PostAsync<CloseSessionsResponse>("/api/account/sessions/close-others", new { });
         busy = false;
         (sessionNotice, sessionFailed) = result.Value is { } closed
-            ? ($"{closed.Closed} oturum kapatıldı.", false)
+            ? (Texts.Get("account.sessions.closedCount", closed.Closed), false)
             : (result.Error, true);
         await LoadSessionsAsync();
     }

@@ -322,6 +322,57 @@ public class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Empty((await RunAsync(other.Admin, new ReportSpecDto { Dataset = "crm.forecasts", Columns = ["status"] })).Rows);
     }
 
+    [Fact]
+    public async Task Forecast_item_and_target_revision_datasets_are_read_only_hide_amounts_without_permission_and_stay_inside_the_tenant()
+    {
+        var s = await SetUpAsync();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        // Tahmin satırı: bugün kapanması beklenen açık fırsat sürümün satırı olur.
+        await PostAsync<OpportunityDto>(s.Admin, "/api/crm/opportunities",
+            new SaveOpportunityRequest("Satırlı fırsat", s.CompanyId, Amount: 70_000m, Currency: "TRY", ExpectedCloseDate: today));
+        var forecast = await PostAsync<ForecastDetailDto>(s.Admin, "/api/crm/sales/forecasts", new CreateForecastRequestDto("Year", today, "Tenant", null, "TRY"));
+
+        // Hedef revizyonu: değer değişince eski/yeni değer ve gerekçe revizyon olarak okunur.
+        var target = await PostAsync<SalesTargetDto>(s.Admin, "/api/crm/sales-targets",
+            new SaveSalesTargetRequest("WonAmount", "Tenant", null, "TRY", new DateOnly(today.Year, 1, 1), new DateOnly(today.Year, 12, 31), 1_000m));
+        Assert.True((await s.Admin.PutAsJsonAsync($"/api/crm/sales-targets/{target.Id}",
+            new SaveSalesTargetRequest("WonAmount", "Tenant", null, "TRY", new DateOnly(today.Year, 1, 1), new DateOnly(today.Year, 12, 31), 1_500m,
+                ChangeReason: "Kampanya geldi", Version: target.Version))).IsSuccessStatusCode);
+
+        var items = await RunAsync(s.Admin, new ReportSpecDto { Dataset = "crm.forecast-items", Columns = ["title", "sourceAmount"] });
+        Assert.Equal("Satırlı fırsat", Assert.Single(items.Rows).Cells[0].GetString());
+
+        // Düzeltme geçmişi: kategori düzeltmesi gerekçesiyle okunur.
+        var adjusted = await s.Admin.PostAsJsonAsync($"/api/crm/sales/forecasts/{forecast.Header.Id}/adjust", new AdjustForecastRequestDto(forecast.Items.Single().Id, "Category", "Commit", "Müşteri onayladı"));
+        Assert.True(adjusted.IsSuccessStatusCode, await adjusted.Content.ReadAsStringAsync());
+        var adjustments = await RunAsync(s.Admin, new ReportSpecDto { Dataset = "crm.forecast-adjustments", Columns = ["kind", "toValue", "reason"] });
+        var adjustment = Assert.Single(adjustments.Rows);
+        Assert.Equal(("Kategori", "Commit", "Müşteri onayladı"), (adjustment.Cells[0].GetString(), adjustment.Cells[1].GetString(), adjustment.Cells[2].GetString()));
+        var revisions = await RunAsync(s.Admin, new ReportSpecDto { Dataset = "crm.sales-target-revisions", Columns = ["revisionNo", "oldValue", "newValue", "reason"] });
+        var revision = Assert.Single(revisions.Rows);
+        Assert.Equal(("Kampanya geldi", 1_000m, 1_500m), (revision.Cells[3].GetString(), Cell(revision, 1), Cell(revision, 2)));
+
+        // Tutar izni olmayan çağıran tahmin satırının tutar/olasılık sütunlarını katalogda görmez ve kullanamaz; satır başlığını görür.
+        var planner = await UserAsync(s, [ForecastsRead, SalesTargetsRead, OpportunitiesRead, .. CoreRead], Scope.All);
+        var catalog = await ReadAsync<ReportCatalogDto>(await planner.GetAsync($"{Reports}/catalog"));
+        Assert.DoesNotContain(catalog.Datasets.Single(d => d.Key == "crm.forecast-items").Columns, c => c.Field == "sourceAmount");
+        Assert.DoesNotContain(catalog.Datasets.Single(d => d.Key == "crm.forecast-adjustments").Columns, c => c.Field is "fromValue" or "toValue");
+        Assert.Equal("forbidden", (await RunAsync(planner, new ReportSpecDto { Dataset = "crm.forecast-items", Measures = [new() { Field = "sourceAmount", Aggregation = "sum" }] })).Status);
+
+        // Yetkisiz çağıran (tahmin/hedef okuma izni yok) iki veri kümesini de okuyamaz.
+        var outsider = await UserAsync(s, [CompaniesRead, .. CoreRead], Scope.All);
+        Assert.Equal("forbidden", (await RunAsync(outsider, new ReportSpecDto { Dataset = "crm.forecast-items", Columns = ["title"] })).Status);
+        Assert.Equal("forbidden", (await RunAsync(outsider, new ReportSpecDto { Dataset = "crm.forecast-adjustments", Columns = ["reason"] })).Status);
+        Assert.Equal("forbidden", (await RunAsync(outsider, new ReportSpecDto { Dataset = "crm.sales-target-revisions", Columns = ["reason"] })).Status);
+
+        // Başka tenant hiçbirini görmez.
+        var other = await SetUpAsync();
+        Assert.Empty((await RunAsync(other.Admin, new ReportSpecDto { Dataset = "crm.forecast-items", Columns = ["title"] })).Rows);
+        Assert.Empty((await RunAsync(other.Admin, new ReportSpecDto { Dataset = "crm.forecast-adjustments", Columns = ["reason"] })).Rows);
+        Assert.Empty((await RunAsync(other.Admin, new ReportSpecDto { Dataset = "crm.sales-target-revisions", Columns = ["reason"] })).Rows);
+    }
+
     // ---- Doğrulama
 
     [Fact]

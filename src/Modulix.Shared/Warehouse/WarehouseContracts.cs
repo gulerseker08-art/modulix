@@ -20,6 +20,14 @@ public static class WarehouseAccess
     public const string AttorneysWrite = "warehouse.attorneys.write";
     public const string StockItemsRead = "warehouse.stockitems.read";
     public const string StockItemsWrite = "warehouse.stockitems.write";
+    public const string DeclarationsRead = "warehouse.customs.declarations.read";
+    public const string DeclarationsWrite = "warehouse.customs.declarations.write";
+    public const string RegimesRead = "warehouse.customs.regimes.read";
+    public const string RegimesWrite = "warehouse.customs.regimes.write";
+    public const string LotsRead = "warehouse.lots.read";
+    public const string LotsWrite = "warehouse.lots.write";
+    public const string MovementsRead = "warehouse.movements.read";
+    public const string MovementsWrite = "warehouse.movements.write";
 
     public const string FacilityEntityKey = "warehouse.facility";
     public const string ZoneEntityKey = "warehouse.zone";
@@ -27,6 +35,33 @@ public static class WarehouseAccess
     public const string LocationEntityKey = "warehouse.location";
     public const string PowerOfAttorneyEntityKey = "warehouse.power-of-attorney";
     public const string StockItemEntityKey = "warehouse.stock-item";
+    public const string CustomsDeclarationEntityKey = "warehouse.customs-declaration";
+    public const string CustomsDeclarationLineEntityKey = "warehouse.customs-declaration-line";
+    public const string RegimeBindingEntityKey = "warehouse.regime-binding";
+    public const string LotEntityKey = "warehouse.lot";
+    public const string StockMovementEntityKey = "warehouse.stock-movement";
+    public const string StockBalanceEntityKey = "warehouse.stock-balance";
+
+    /// <summary>Hareket türü ve nedeni listeleri; tür kategorileri kodun anladığı anlamdır, adları tenant'ındır.</summary>
+    public const string MovementTypeList = "warehouse.movement-type";
+    public const string MovementReasonList = "warehouse.movement-reason";
+
+    public const string MovementInbound = "in";
+    public const string MovementOutbound = "out";
+    public const string MovementTransfer = "transfer";
+    public const string MovementAdjustment = "adjustment";
+
+    /// <summary>Gümrük rejimi, beyanname durumu, kap cinsi, menşe ve satır birimi listeleri; hepsinin değer adları tenant'ındır.</summary>
+    public const string CustomsRegimeList = "warehouse.customs-regime";
+    public const string DeclarationStatusList = "warehouse.declaration-status";
+    public const string ContainerTypeList = "warehouse.container-type";
+    public const string OriginCountryList = "warehouse.origin-country";
+    public const string DeclarationLineUnitList = "warehouse.declaration-line-unit";
+
+    /// <summary>Beyanname durumu kategorileri (kodun anladığı anlam).</summary>
+    public const string DeclarationDraft = "draft";
+    public const string DeclarationRegistered = "registered";
+    public const string DeclarationCancelled = "cancelled";
 
     /// <summary>Alan türü listesi; kategorileri kodun anladığı anlamdır, adları tenant'ındır.</summary>
     public const string ZoneKindList = "warehouse.zone-kind";
@@ -42,6 +77,8 @@ public static class WarehouseAccess
     public const string LocationZoneLookup = "warehouse.location.zone";
     public const string AttorneyImporterLookup = "warehouse.power-of-attorney.importer";
     public const string AttorneyBrokerLookup = "warehouse.power-of-attorney.broker";
+    public const string DeclarationImporterLookup = "warehouse.customs-declaration.importer";
+    public const string DeclarationBrokerLookup = "warehouse.customs-declaration.broker";
 
     public const string ZoneKindControlled = "controlled";
     public const string ZoneKindFree = "free";

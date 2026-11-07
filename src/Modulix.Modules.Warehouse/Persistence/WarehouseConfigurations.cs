@@ -151,3 +151,156 @@ internal sealed class StockItemConfiguration : IEntityTypeConfiguration<StockIte
         builder.HasIndex(s => new { s.TenantId, s.Gtip });
     }
 }
+
+internal sealed class CustomsDeclarationConfiguration : IEntityTypeConfiguration<CustomsDeclaration>
+{
+    public void Configure(EntityTypeBuilder<CustomsDeclaration> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "CustomsDeclarations");
+        builder.Property(d => d.RegistrationNo).HasMaxLength(CustomsDeclaration.RegistrationNoMaxLength).IsRequired();
+        builder.Property(d => d.RegistrationDate).HasColumnType("date");
+        builder.Property(d => d.CustomsOffice).HasMaxLength(CustomsDeclaration.OfficeMaxLength);
+        builder.Property(d => d.RegimeKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(d => d.StatusKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(d => d.ExternalReference).HasMaxLength(CustomsDeclaration.ExternalReferenceMaxLength);
+        builder.Property(d => d.Description).HasMaxLength(CustomsDeclaration.DescriptionMaxLength);
+
+        builder.HasIndex(d => new { d.TenantId, d.RegistrationNo }).IsUnique().HasDatabaseName("UX_CustomsDeclarations_RegistrationNo");
+
+        // Dış sistemden gelen aynı kayıt ikinci beyanname üretmez (K8); boş referanslar çakışmaz.
+        builder.HasIndex(d => new { d.TenantId, d.ExternalReference }).IsUnique().HasDatabaseName("UX_CustomsDeclarations_ExternalReference")
+            .HasFilter("[ExternalReference] IS NOT NULL");
+        builder.HasIndex(d => new { d.TenantId, d.ImporterPartyId });
+        builder.HasIndex(d => new { d.TenantId, d.BrokerPartyId });
+        builder.HasIndex(d => new { d.TenantId, d.RegistrationDate });
+
+        // Ortak kayıtlar (ADR-0006): ithalatçı ve müşavir aynı tenant'ın firmasıdır; beyannamesi olan firma silinemez.
+        builder.HasOne<Party>().WithMany().HasForeignKey(d => new { d.TenantId, d.ImporterPartyId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Party>().WithMany().HasForeignKey(d => new { d.TenantId, d.BrokerPartyId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class RegimeBindingConfiguration : IEntityTypeConfiguration<RegimeBinding>
+{
+    public void Configure(EntityTypeBuilder<RegimeBinding> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "RegimeBindings");
+        builder.Property(b => b.RegimeKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(b => b.Enforcement).HasMaxLength(10).IsRequired();
+
+        // Rejim başına tek bağlama. Profil platform tablosundadır; modül Core'a başvurmadığı için yabancı anahtar yoktur (profil silinmez, pasife alınır).
+        builder.HasIndex(b => new { b.TenantId, b.RegimeKey }).IsUnique().HasDatabaseName("UX_RegimeBindings_RegimeKey");
+    }
+}
+
+internal sealed class LotConfiguration : IEntityTypeConfiguration<Lot>
+{
+    public void Configure(EntityTypeBuilder<Lot> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "Lots");
+        builder.Property(l => l.LotNo).HasMaxLength(Lot.LotNoMaxLength).IsRequired();
+        builder.Property(l => l.Description).HasMaxLength(Lot.DescriptionMaxLength);
+        builder.Property(l => l.IsActive).HasDefaultValue(true);
+
+        builder.HasIndex(l => new { l.TenantId, l.LotNo }).IsUnique().HasDatabaseName("UX_Lots_LotNo");
+        builder.HasIndex(l => new { l.TenantId, l.StockItemId });
+        builder.HasIndex(l => new { l.TenantId, l.OwnerPartyId });
+
+        // Ürün, beyanname satırı ve taraflar aynı tenant'tadır; partisi olan ürün/firma/satır silinemez.
+        builder.HasOne<StockItem>().WithMany().HasForeignKey(l => new { l.TenantId, l.StockItemId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CustomsDeclarationLine>().WithMany().HasForeignKey(l => new { l.TenantId, l.DeclarationLineId })
+            .HasPrincipalKey(d => new { d.TenantId, d.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Party>().WithMany().HasForeignKey(l => new { l.TenantId, l.OwnerPartyId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Party>().WithMany().HasForeignKey(l => new { l.TenantId, l.BillToPartyId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement>
+{
+    /// <summary>Yalnızca-ekleme tetikleyicisinin adı (migration'da oluşturulur; EF'e bildirilir ki INSERT'te OUTPUT kullanmasın).</summary>
+    public const string AppendOnlyTrigger = "TR_StockMovements_AppendOnly";
+
+    public void Configure(EntityTypeBuilder<StockMovement> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "StockMovements");
+        builder.Property(m => m.TypeKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(m => m.Quantity).HasPrecision(18, 3);
+        builder.Property(m => m.ReasonKey).HasMaxLength(ChoiceValueKeys.MaxLength);
+        builder.Property(m => m.DocumentReference).HasMaxLength(StockMovement.DocumentMaxLength);
+        builder.Property(m => m.IdempotencyKey).HasMaxLength(StockMovement.IdempotencyKeyMaxLength);
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("CK_StockMovements_Quantity", "[Quantity] > 0");
+            t.HasTrigger(AppendOnlyTrigger);
+        });
+
+        // Aynı anahtarla ikinci hareket yazılamaz (barkod/terminal tekrarı); bir hareket en çok bir kez geri alınır. Boş değerler çakışmaz.
+        builder.HasIndex(m => new { m.TenantId, m.IdempotencyKey }).IsUnique().HasDatabaseName("UX_StockMovements_IdempotencyKey")
+            .HasFilter("[IdempotencyKey] IS NOT NULL");
+        builder.HasIndex(m => new { m.TenantId, m.ReversesMovementId }).IsUnique().HasDatabaseName("UX_StockMovements_Reverses")
+            .HasFilter("[ReversesMovementId] IS NOT NULL");
+        builder.HasIndex(m => new { m.TenantId, m.LotId, m.OccurredAt });
+        builder.HasIndex(m => new { m.TenantId, m.OccurredAt });
+        builder.HasIndex(m => new { m.TenantId, m.CorrelationId });
+
+        builder.HasOne<Lot>().WithMany().HasForeignKey(m => new { m.TenantId, m.LotId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Location>().WithMany().HasForeignKey(m => new { m.TenantId, m.FromLocationId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Location>().WithMany().HasForeignKey(m => new { m.TenantId, m.ToLocationId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<StockMovement>().WithMany().HasForeignKey(m => new { m.TenantId, m.ReversesMovementId })
+            .HasPrincipalKey(m => new { m.TenantId, m.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class StockBalanceConfiguration : IEntityTypeConfiguration<StockBalance>
+{
+    public void Configure(EntityTypeBuilder<StockBalance> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "StockBalances");
+        builder.Property(b => b.Quantity).HasPrecision(18, 3);
+
+        // Bakiye eksiye düşemez: uygulama denetimine ek olarak veritabanı kısıtı (eşzamanlı çıkış yarışının son güvencesi).
+        builder.ToTable(t => t.HasCheckConstraint("CK_StockBalances_NonNegative", "[Quantity] >= 0"));
+        builder.HasIndex(b => new { b.TenantId, b.LotId, b.LocationId }).IsUnique().HasDatabaseName("UX_StockBalances_LotLocation");
+        builder.HasIndex(b => new { b.TenantId, b.LocationId });
+
+        builder.HasOne<Lot>().WithMany().HasForeignKey(b => new { b.TenantId, b.LotId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Location>().WithMany().HasForeignKey(b => new { b.TenantId, b.LocationId })
+            .HasPrincipalKey(l => new { l.TenantId, l.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class CustomsDeclarationLineConfiguration : IEntityTypeConfiguration<CustomsDeclarationLine>
+{
+    public void Configure(EntityTypeBuilder<CustomsDeclarationLine> builder)
+    {
+        WarehouseTables.ConfigureCommon(builder, "CustomsDeclarationLines");
+        // GTİP metin: baştaki sıfırlar kaybolmasın (K9).
+        builder.Property(l => l.Gtip).HasMaxLength(GtipRules.MaxLength).IsUnicode(false).IsRequired();
+        builder.Property(l => l.Description).HasMaxLength(CustomsDeclarationLine.DescriptionMaxLength).IsRequired();
+        builder.Property(l => l.ContainerTypeKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(l => l.OriginCountryKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(l => l.UnitKey).HasMaxLength(ChoiceValueKeys.MaxLength).IsRequired();
+        builder.Property(l => l.GrossKg).HasPrecision(18, 3);
+        builder.Property(l => l.NetKg).HasPrecision(18, 3);
+        builder.Property(l => l.Quantity).HasPrecision(18, 3);
+
+        // Net kilo brüt kilodan büyük olamaz (K17 değişmezi) ve satır numarası beyanname içinde benzersizdir.
+        builder.ToTable(t => t.HasCheckConstraint("CK_CustomsDeclarationLines_Weights", "[NetKg] >= 0 AND [NetKg] <= [GrossKg]"));
+        builder.HasIndex(l => new { l.TenantId, l.DeclarationId, l.LineNo }).IsUnique().HasDatabaseName("UX_CustomsDeclarationLines_LineNo");
+        builder.HasIndex(l => new { l.TenantId, l.Gtip });
+
+        // Beyanname aynı tenant'ta olmalıdır; satırı olan beyanname silinemez (önce satırlar silinir).
+        builder.HasOne<CustomsDeclaration>().WithMany().HasForeignKey(l => new { l.TenantId, l.DeclarationId })
+            .HasPrincipalKey(d => new { d.TenantId, d.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}

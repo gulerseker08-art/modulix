@@ -1,0 +1,30 @@
+@using System.Globalization
+@* Hedef göstergesi (dash-hero içinde): yüzdeler hedefe oranladır; toplam %100'ü aşarsa dolgu kırpılır, tempo dikey işarettir. *@
+<div class="goal-meter" role="img" aria-label="@Label">
+    <span class="goal-meter-fill fill-realized" style="width:@Css(RealizedWidth)%"></span>
+    @if (WeightedWidth > 0)
+    {
+        <span class="goal-meter-fill fill-weighted" style="width:@Css(WeightedWidth)%"></span>
+    }
+    @if (Tempo is { } tempo)
+    {
+        <span class="goal-meter-mark" style="left:@Css(Math.Clamp(tempo, 0m, 100m))%"></span>
+    }
+</div>
+
+@code {
+    [Parameter] public decimal Realized { get; set; }
+
+    [Parameter] public decimal Weighted { get; set; }
+
+    /// <summary>Dönemin geçen yüzdesi; dönem bugünü içermiyorsa boş.</summary>
+    [Parameter] public decimal? Tempo { get; set; }
+
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    private decimal RealizedWidth => Math.Clamp(Realized, 0m, 100m);
+
+    private decimal WeightedWidth => Math.Clamp(Weighted, 0m, 100m - RealizedWidth);
+
+    private static string Css(decimal value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+}

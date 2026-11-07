@@ -16,6 +16,9 @@ internal static class CrmReportDatasets
     public const string Companies = "crm.companies";
     public const string Targets = "crm.sales-targets";
     public const string Forecasts = "crm.forecasts";
+    public const string ForecastItems = "crm.forecast-items";
+    public const string TargetRevisions = "crm.sales-target-revisions";
+    public const string ForecastAdjustments = "crm.forecast-adjustments";
 
     private static readonly IReadOnlyList<DatasetOption> OpportunityStatuses =
     [
@@ -57,11 +60,16 @@ internal static class CrmReportDatasets
 
     private static readonly IReadOnlyList<DatasetOption> PeriodKinds = [new("Month", "Ay"), new("Quarter", "Çeyrek"), new("Year", "Yıl")];
 
+    private static readonly IReadOnlyList<DatasetOption> AdjustmentKinds = [new("Category", "Kategori"), new("Amount", "Tutar"), new("Probability", "Olasılık")];
+
+    private static readonly IReadOnlyList<DatasetOption> ForecastCategories =
+        [new("Omitted", "Dışarıda"), new("Pipeline", "Pipeline"), new("BestCase", "En iyi durum"), new("Commit", "Taahhüt")];
+
     private const ColumnUse All = ColumnUse.Group | ColumnUse.Filter | ColumnUse.Show;
     private const ColumnUse FilterShow = ColumnUse.Filter | ColumnUse.Show;
 
     public static ModuleReporting Reporting { get; } = new(
-        [OpportunityDataset(), LeadDataset(), QuoteDataset(), CompanyDataset(), TargetDataset(), ForecastDataset()],
+        [OpportunityDataset(), LeadDataset(), QuoteDataset(), CompanyDataset(), TargetDataset(), ForecastDataset(), ForecastItemDataset(), ForecastAdjustmentDataset(), TargetRevisionDataset()],
         [
             new("crm.reports.sales-overview", "Satış görünümü",
                 "Gerçekleşen, açık pipeline, ağırlıklı tahmin ve hedefe göre durum; kart toplamları detay listesiyle eşleşir.", "crm/satis-gorunumu", CrmModule.Permissions.SalesReportsRead),
@@ -267,6 +275,86 @@ internal static class CrmReportDatasets
                     [new("status", FilterOperator.Equals, "Locked")], [], [], new("periodStart", SortDirection.Descending))),
             new("crm.forecasts.by-status", "Duruma göre tahmin sürümleri", "Tahmin sürümlerinin durum dağılımı.",
                 new(Forecasts, [], [], [new("status")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Pie)),
+        ],
+    };
+
+    // Tahmin fırsat satırları (salt okunur): sürüm başına fırsat anlık görüntüsü. Görünürlük fırsatın BUGÜNKÜ sorumlusuna göre (kapsam fırsat türünündür);
+    // tutar/olasılık/kur sütunları fırsat tutarı iznine bağlıdır. Raporlama para birimi satırda değil sürüm başlığındadır; bu yüzden yalnızca kaynak
+    // tutar para birimine göre toplanır, çevrilmiş tutar ve düzeltme sütunları gösterilir ama toplanmaz.
+    private static DatasetDefinition ForecastItemDataset() => new(
+        ForecastItems, "Tahmin fırsat satırları", CrmModule.Entities.ForecastItem, 1,
+        [
+            new("submissionId", "Sürüm", DatasetColumnKind.Text, ColumnUse.Filter | ColumnUse.Show) { StoreFilter = "submissionId" },
+            new("opportunityNumber", "Fırsat no", DatasetColumnKind.Text, FilterShow),
+            new("title", "Başlık", DatasetColumnKind.Text, FilterShow),
+            new("ownerId", "Anlık görüntüdeki sorumlu", DatasetColumnKind.User, All),
+            new("stage", "Aşama", DatasetColumnKind.Text, All),
+            new("sourceAmount", "Kaynak tutar", DatasetColumnKind.Money, ColumnUse.Measure | FilterShow) { CurrencyField = "sourceCurrency" },
+            new("sourceCurrency", "Kaynak para birimi", DatasetColumnKind.Text, All),
+            new("probability", "Olasılık (%)", DatasetColumnKind.Number, FilterShow),
+            new("probabilityManual", "Olasılık elle girildi", DatasetColumnKind.Flag, All),
+            new("expectedCloseDate", "Beklenen kapanış", DatasetColumnKind.Date, All),
+            new("rateUsed", "Kullanılan kur", DatasetColumnKind.Number, FilterShow),
+            new("rateDate", "Kur günü", DatasetColumnKind.Date, All),
+            new("rateMissing", "Kur bulunamadı", DatasetColumnKind.Flag, All),
+            new("baseAmount", "Raporlama tutarı", DatasetColumnKind.Number, FilterShow),
+            new("baseCategory", "Önerilen kategori", DatasetColumnKind.Choice, All) { Options = ForecastCategories },
+            new("category", "Kategori", DatasetColumnKind.Choice, All) { Options = ForecastCategories, StoreFilter = "category" },
+            new("adjustmentAmount", "Düzeltilmiş tutar", DatasetColumnKind.Number, FilterShow),
+            new("probabilityOverride", "Düzeltilmiş olasılık (%)", DatasetColumnKind.Number, FilterShow),
+        ])
+    {
+        DefaultColumns = ["submissionId", "opportunityNumber", "title", "ownerId", "category", "sourceAmount", "sourceCurrency", "probability"],
+        ReadyReports =
+        [
+            new("crm.forecast-items.by-category", "Kategoriye göre tahmin satırları", "Tahmin satırlarının kategori dağılımı (kaynak tutar, para birimine göre ayrı).",
+                new(ForecastItems, [], [], [new("category")], [new(null, Aggregation.Count), new("sourceAmount", Aggregation.Sum)],
+                    new("count", SortDirection.Descending), ChartKind.Bar)),
+        ],
+    };
+
+    // Tahmin düzeltme geçmişi (salt okunur, değişmez): her kategori/tutar/olasılık düzeltmesi, eski ve yeni değer, gerekçe, yapan, zaman. Eski/yeni değer
+    // metin olarak saklanır (kategori, tutar ya da olasılık olabilir) ve tutar iznine bağlıdır; bu yüzden toplanmaz, yalnızca gösterilir.
+    private static DatasetDefinition ForecastAdjustmentDataset() => new(
+        ForecastAdjustments, "Tahmin düzeltme geçmişi", CrmModule.Entities.ForecastAdjustment, 1,
+        [
+            new("submissionId", "Sürüm", DatasetColumnKind.Text, ColumnUse.Filter | ColumnUse.Show) { StoreFilter = "submissionId" },
+            new("opportunityId", "Fırsat", DatasetColumnKind.Text, ColumnUse.Filter | ColumnUse.Show) { StoreFilter = "opportunityId" },
+            new("kind", "Düzeltme türü", DatasetColumnKind.Choice, All) { Options = AdjustmentKinds, StoreFilter = "kind" },
+            new("fromValue", "Eski değer", DatasetColumnKind.Text, FilterShow),
+            new("toValue", "Yeni değer", DatasetColumnKind.Text, FilterShow),
+            new("reason", "Gerekçe", DatasetColumnKind.Text, FilterShow),
+            new("changedBy", "Değiştiren", DatasetColumnKind.User, All),
+            new("changedAt", "Değişiklik zamanı", DatasetColumnKind.DateTime, All),
+        ])
+    {
+        DefaultColumns = ["submissionId", "opportunityId", "kind", "fromValue", "toValue", "reason", "changedBy", "changedAt"],
+        ReadyReports =
+        [
+            new("crm.forecast-adjustments.by-kind", "Türe göre tahmin düzeltmeleri", "Düzeltme sayısı tür bazında.",
+                new(ForecastAdjustments, [], [], [new("kind")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Pie)),
+        ],
+    };
+
+    // Hedef revizyonları (salt okunur, değişmez): eski/yeni değer, gerekçe, yapan ve zaman. Para birimi hedefin başlığındadır; bu yüzden değerler gösterilir
+    // ama toplanmaz.
+    private static DatasetDefinition TargetRevisionDataset() => new(
+        TargetRevisions, "Satış hedefi revizyonları", CrmModule.Entities.SalesTargetRevision, 1,
+        [
+            new("targetId", "Hedef", DatasetColumnKind.Text, ColumnUse.Filter | ColumnUse.Show) { StoreFilter = "targetId" },
+            new("revisionNo", "Sürüm", DatasetColumnKind.Number, FilterShow),
+            new("oldValue", "Eski değer", DatasetColumnKind.Number, FilterShow),
+            new("newValue", "Yeni değer", DatasetColumnKind.Number, FilterShow),
+            new("reason", "Gerekçe", DatasetColumnKind.Text, FilterShow),
+            new("changedBy", "Değiştiren", DatasetColumnKind.User, All),
+            new("changedAt", "Değişiklik zamanı", DatasetColumnKind.DateTime, All),
+        ])
+    {
+        DefaultColumns = ["targetId", "revisionNo", "oldValue", "newValue", "reason", "changedBy", "changedAt"],
+        ReadyReports =
+        [
+            new("crm.sales-target-revisions.list", "Hedef revizyon geçmişi", "Tüm hedef değer değişiklikleri, en yeniden eskiye.",
+                new(TargetRevisions, ["targetId", "revisionNo", "oldValue", "newValue", "reason", "changedBy", "changedAt"], [], [], [], new("changedAt", SortDirection.Descending))),
         ],
     };
 }

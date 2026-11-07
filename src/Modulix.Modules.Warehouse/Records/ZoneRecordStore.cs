@@ -36,7 +36,27 @@ internal sealed partial class ZoneRecordStore(WarehouseStoreContext context) : W
         ["isActive"] = (q, v) => FilterValue.Bool(v) is { } flag ? q.Where(z => z.IsActive == flag) : null,
     };
 
-    protected override IOrderedQueryable<Zone> Order(IQueryable<Zone> source) => source.OrderBy(z => z.FacilityId).ThenBy(z => z.Code);
+    protected override IOrderedQueryable<Zone> Order(IQueryable<Zone> source) => Order(source, "facility");
+
+    // Liste başlıklarına göre sıralama; tesis, tesisin koduna göre sıralanır. Eşit kayıtlar alan koduna göre sıralanır.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        WithDescending("code", "name", "facility", "kindKey", "isActive", "createdAt");
+
+    protected override IOrderedQueryable<Zone> Order(IQueryable<Zone> source, string? sort)
+    {
+        var desc = sort?.StartsWith('-') == true;
+        var facilities = Context.Data.Set<Facility>();
+        return sort?.TrimStart('-') switch
+        {
+            "code" => By(source, z => z.Code, desc).ThenBy(z => z.FacilityId),
+            "name" => By(source, z => z.Name, desc).ThenBy(z => z.Code),
+            "facility" => By(source, z => facilities.Where(f => f.Id == z.FacilityId).Select(f => f.Code).FirstOrDefault(), desc).ThenBy(z => z.Code),
+            "kindKey" => By(source, z => z.KindKey, desc).ThenBy(z => z.Code),
+            "isActive" => By(source, z => z.IsActive, desc).ThenBy(z => z.Code),
+            "createdAt" => By(source, z => z.CreatedAt, desc).ThenBy(z => z.Code),
+            _ => Order(source),
+        };
+    }
 
     protected override IQueryable<Zone> Search(IQueryable<Zone> source, string term) =>
         source.Where(z => z.Code.Contains(term) || z.Name.Contains(term));

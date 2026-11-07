@@ -96,6 +96,7 @@ public static class AppCatalog
     public const string Marketing = "marketing";
     public const string Warehouse = "warehouse";
     public const string Reports = "reports";
+    public const string Approvals = "approvals";
     public const string Admin = "admin";
     public const string Platform = "platform";
 
@@ -149,6 +150,7 @@ public static class AppCatalog
 
         // Çalışma Alanım: kullanıcının üzerinde işlem bekleyen işler. "Onay bekleyen işlerim" teklif ve sözleşme onaylarını tek listede toplar;
         // karar ekranları (teklif onayları, sözleşme onayları) menüde ayrı satır değildir, bu satırın altında sayılır.
+        new("crm.dashboard", Crm, "Pano", "dashboard", "crm/pano", 5, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmWorkspaceGroup),
         new("crm.activities", Crm, "Aktiviteler", "activity", "crm/aktiviteler", 10, CrmAccess.ModuleKey, CrmAccess.ActivitiesRead, Tone: AppTone.Teal, Group: CrmWorkspaceGroup),
         new("crm.approvals", Crm, "Onay bekleyen işlerim", "check-circle", "crm/onay-bekleyenler", 20, CrmAccess.ModuleKey, AnyPermission: [CrmAccess.QuotesApprove, ContractsAccess.ContractsApprove], Tone: AppTone.Teal, Group: CrmWorkspaceGroup),
         new("crm.quote-approvals", Crm, "Teklif onayları", "check-circle", "crm/teklif-onaylari", 21, CrmAccess.ModuleKey, CrmAccess.QuotesApprove, Tone: AppTone.Teal, Group: CrmWorkspaceGroup, MenuParentId: "crm.approvals"),
@@ -227,10 +229,15 @@ public static class AppCatalog
         new("warehouse.locations", Warehouse, "Lokasyonlar", "map-pin", "depo/lokasyonlar", 40, WarehouseAccess.ModuleKey, WarehouseAccess.LocationsRead, Tone: AppTone.Teal),
         new("warehouse.power-of-attorneys", Warehouse, "Vekâletler", "file-text", "depo/vekaletler", 50, WarehouseAccess.ModuleKey, WarehouseAccess.AttorneysRead),
         new("warehouse.stock-items", Warehouse, "Stok kartları", "package", "depo/stok-kartlari", 60, WarehouseAccess.ModuleKey, WarehouseAccess.StockItemsRead, Tone: AppTone.Teal),
+        new("warehouse.customs-declarations", Warehouse, "Beyannameler", "clipboard-list", "depo/beyannameler", 70, WarehouseAccess.ModuleKey, WarehouseAccess.DeclarationsRead),
+        new("warehouse.regime-bindings", Warehouse, "Rejim profilleri", "shield", "depo/rejim-profilleri", 80, WarehouseAccess.ModuleKey, WarehouseAccess.RegimesRead, Tone: AppTone.Teal),
 
         // Rapor merkezi çekirdeğe aittir (modül anahtarı yok; yönetim girdileri gibi yalnızca izne bağlıdır). Tek ekranlı olduğu için alt uygulaması yoktur,
         // kendi route'u vardır; /raporlar altındaki oluşturucu ve çalıştırma ekranları da bu uygulamanın bağlamında kalır.
         new(Reports, null, "Raporlar", "file-text", "raporlar", 85, Permission: ReportAccess.Read, Tone: AppTone.Teal),
+
+        // Onay merkezi çekirdeğe aittir (ADR-0027 Dilim 4a): modül anahtarı yoktur, yalnızca izne bağlıdır.
+        new(Approvals, null, "Onay merkezi", "check-circle", "onaylar", 84, AnyPermission: [CoreAccess.RequestApprovals, CoreAccess.DecideApprovals, CoreAccess.ManageApprovals], Tone: AppTone.Teal),
 
         new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal, Group: ManagementGroup),
         new("admin.home", Admin, "Genel bakış", "dashboard", "yonetim", 10, AnyPermission: CoreAccess.AdministrationPermissions, ExactMatch: true),
@@ -242,12 +249,15 @@ public static class AppCatalog
         new("admin.settings", Admin, "Kuruluş ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
         new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),
+        new("admin.automation", Admin, "Otomasyon", "zap", "yonetim/otomasyon", 74, Permission: CoreAccess.ReadAutomation, Tone: AppTone.Teal),
+        new("admin.approvals", Admin, "Onay süreçleri", "check-circle", "yonetim/onay-surecleri", 74, Permission: CoreAccess.ManageApprovals),
         new("admin.communication", Admin, "İletişim tercihleri", "mail", "yonetim/iletisim-tercihleri", 75, Permission: CoreAccess.ReadCommunication),
         new("admin.custom-fields", Admin, "Özel alanlar", "square-pen", "yonetim/ozel-alanlar", 80, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
         new("admin.lists", Admin, "Listeler", "list", "yonetim/listeler", 90, Permission: CoreAccess.ManageCustomization),
         new("admin.sector-profile", Admin, "Sektör profili", "layers", "yonetim/sektor-profili", 100, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
         new("admin.activities", Admin, "Faaliyetlerim", "layers", "yonetim/faaliyetler", 105, Permission: CoreAccess.ManageCustomization),
         new("admin.form-designer", Admin, "Form tasarımı", "clipboard-list", "yonetim/form-tasarimi", 85, Permission: CoreAccess.ManageCustomization),
+        new("admin.import-design", Admin, "İçe aktarma tasarımı", "clipboard-list", "yonetim/ice-aktarma-tasarimi", 86, Permission: CoreAccess.ManageCustomization),
 
         new(Platform, null, "Platform", "shield", null, 100, PlatformOnly: true, Group: ManagementGroup),
         new("platform.home", Platform, "Genel bakış", "dashboard", "platform", 10, PlatformOnly: true, ExactMatch: true),
@@ -256,6 +266,7 @@ public static class AppCatalog
         new("platform.catalog", Platform, "Modül kataloğu", "package", "platform/katalog", 40, PlatformOnly: true, Tone: AppTone.Teal),
         new("platform.sectors", Platform, "Sektörler", "layers", "platform/sektorler", 45, PlatformOnly: true),
         new("platform.gtip", Platform, "GTİP kataloğu", "clipboard-list", "platform/gtip", 47, PlatformOnly: true),
+        new("platform.regime-profiles", Platform, "Rejim profilleri", "shield", "platform/rejim-profilleri", 48, PlatformOnly: true),
         new("platform.events", Platform, "Olaylar", "zap", "platform/olaylar", 50, PlatformOnly: true),
     ];
 }

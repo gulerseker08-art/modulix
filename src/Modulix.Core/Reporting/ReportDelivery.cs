@@ -9,6 +9,13 @@ public enum ReportExportSource
     Schedule = 2,
 }
 
+/// <summary>Dışa aktarma dosya biçimi. Zamanlanmış çalışma yalnızca CSV üretir.</summary>
+public enum ReportFileFormat
+{
+    Csv = 1,
+    Xlsx = 2,
+}
+
 /// <summary>
 /// Hazırlanmış dışa aktarma (ADR-0026, dilim 4): rapor sonucunun CSV dosyası. Dosya yalnızca sahibi tarafından, indirme anında yetki yeniden
 /// denetlenerek indirilir; <see cref="AccessStamp"/> oluşturulduğu andaki erişim parmak izidir (izinler, veri kapsamı, kayıt sahipleri): kişinin
@@ -32,7 +39,7 @@ public sealed class ReportExport : ITenantEntity, ICompanyShared
 
     public ReportExport(
         Guid ownerUserId, Guid? reportId, string reportName, string datasetKey, string fileName, byte[] content, int rowCount, bool truncated,
-        string accessStamp, ReportExportSource source, DateTimeOffset now)
+        string accessStamp, ReportExportSource source, DateTimeOffset now, ReportFileFormat format = ReportFileFormat.Csv)
     {
         Id = Guid.CreateVersion7();
         OwnerUserId = ownerUserId;
@@ -40,7 +47,7 @@ public sealed class ReportExport : ITenantEntity, ICompanyShared
         ReportName = reportName;
         DatasetKey = datasetKey;
         FileName = fileName;
-        ContentType = "text/csv; charset=utf-8";
+        ContentType = format == ReportFileFormat.Xlsx ? ReportXlsx.ContentType : "text/csv; charset=utf-8";
         Content = content;
         SizeBytes = content.Length;
         RowCount = rowCount;
@@ -160,6 +167,15 @@ public sealed class ReportSchedule : ITenantEntity, ICompanyShared
     /// <summary>Zamanlama kendiliğinden durdurulduysa nedeni (yetki kaybı, üyelik kapalı, rapor yok...).</summary>
     public string? StoppedReason { get; private set; }
 
+    /// <summary>Aynı planlı an için art arda başarısız deneme sayısı (teslimde sıfırlanır); bkz. <see cref="MaxAttempts"/>.</summary>
+    public int Attempts { get; private set; }
+
+    /// <summary>Bir planlı an için en çok deneme (ilk deneme + 2 yeniden deneme). Sonra zamanlama bir sonraki döneme geçer.</summary>
+    public const int MaxAttempts = 3;
+
+    /// <summary>Yeniden deneme gecikmesi: 1. denemeden sonra 15 dk, 2.den sonra 60 dk.</summary>
+    public static TimeSpan RetryDelay(int attempts) => attempts <= 1 ? TimeSpan.FromMinutes(15) : TimeSpan.FromMinutes(60);
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -190,8 +206,26 @@ public sealed class ReportSchedule : ITenantEntity, ICompanyShared
         Touch(now);
     }
 
+    /// <summary>Deneme başarısız: sınır dolmadıysa aynı dönem için kısa gecikmeyle yeniden denenir, dolduysa bir sonraki döneme geçilir.</summary>
+    public void RecordFailure(string? message, DateTimeOffset nextPeriodRunAt, DateTimeOffset now)
+    {
+        Attempts++;
+        var retry = Attempts < MaxAttempts;
+        LastRunAt = now;
+        LastStatus = "Failed";
+        LastMessage = Trim(message);
+        NextRunAt = retry ? now + RetryDelay(Attempts) : nextPeriodRunAt;
+        if (!retry)
+        {
+            Attempts = 0;
+        }
+
+        Touch(now);
+    }
+
     public void RecordRun(string status, string? message, DateTimeOffset nextRunAt, DateTimeOffset now)
     {
+        Attempts = 0;
         LastRunAt = now;
         LastStatus = status;
         LastMessage = Trim(message);
@@ -308,10 +342,10 @@ public sealed record ReportDownload(ReportDownloadStatus Status, string? Message
 public interface IReportExports
 {
     /// <summary>Kayıtlı raporu (çağıranın görebildiği) dışa aktarır. Rapor görünmüyorsa null.</summary>
-    Task<ReportExportInfo?> CreateAsync(Guid reportId, CancellationToken cancellationToken);
+    Task<ReportExportInfo?> CreateAsync(Guid reportId, CancellationToken cancellationToken, ReportFileFormat format = ReportFileFormat.Csv);
 
     /// <summary>Kayıtsız tanımı (oluşturucudaki önizleme) dışa aktarır.</summary>
-    Task<ReportExportInfo> CreateAsync(ReportSpec spec, string? name, CancellationToken cancellationToken);
+    Task<ReportExportInfo> CreateAsync(ReportSpec spec, string? name, CancellationToken cancellationToken, ReportFileFormat format = ReportFileFormat.Csv);
 
     /// <summary>
     /// Zamanlanmış çalışma için: kayıtlı raporu çağıranın (zamanlama sahibinin) bağlamında dışa aktarır, kaynak <see cref="ReportExportSource.Schedule"/>.

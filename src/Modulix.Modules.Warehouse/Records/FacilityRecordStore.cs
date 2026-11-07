@@ -38,6 +38,25 @@ internal sealed partial class FacilityRecordStore(WarehouseStoreContext context)
 
     protected override IOrderedQueryable<Facility> Order(IQueryable<Facility> source) => source.OrderBy(f => f.Code);
 
+    // Liste başlıklarına göre sıralama (sort=code, sort=-code ...); eşit kayıtlar koda göre sıralanır.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        WithDescending("code", "name", "countryCode", "customsEnabled", "isActive", "createdAt");
+
+    protected override IOrderedQueryable<Facility> Order(IQueryable<Facility> source, string? sort)
+    {
+        var desc = sort?.StartsWith('-') == true;
+        return sort?.TrimStart('-') switch
+        {
+            "code" => By(source, f => f.Code, desc),
+            "name" => By(source, f => f.Name, desc).ThenBy(f => f.Code),
+            "countryCode" => ByNullsLast(source, f => f.CountryCode, desc).ThenBy(f => f.Code),
+            "customsEnabled" => By(source, f => f.CustomsEnabled, desc).ThenBy(f => f.Code),
+            "isActive" => By(source, f => f.IsActive, desc).ThenBy(f => f.Code),
+            "createdAt" => By(source, f => f.CreatedAt, desc).ThenBy(f => f.Code),
+            _ => Order(source),
+        };
+    }
+
     protected override IQueryable<Facility> Search(IQueryable<Facility> source, string term) =>
         source.Where(f => f.Code.Contains(term) || f.Name.Contains(term));
 

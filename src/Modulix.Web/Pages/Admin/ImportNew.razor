@@ -1,0 +1,214 @@
+@page "/yonetim/gunluk/yeni"
+@inject ApiClient Api
+@inject SessionState Session
+@inject IJSRuntime Js
+
+<PageTitle>Yeni içe aktarma · Modulix</PageTitle>
+
+@* İçe aktarma (ADR-0033, Dilim 2): tür seç, şablonu indir, dosyayı kuru çalışmayla dene, sonra uygula. Sayfa içi eylem formudur.
+   Sonuç sunucudan gelir; hatalı satırlar için rapor yalnızca yükleyene ve kısa süreliğine verilir. *@
+<AuthGate AnyPermission="@(new[] { CoreAccess.RunImports })">
+    <a class="back-link" href="yonetim/gunluk">← İşlem günlüğü</a>
+
+    <div class="page-header">
+        <div>
+            <h1>Yeni içe aktarma</h1>
+            <p class="text-muted mb-0">Excel'de hazırladığınız listeyi CSV olarak kaydedip yükleyin. Önce kuru çalışmayla deneyin; kuru çalışma kayıt oluşturmaz.</p>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (definitions is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (definitions.Count == 0)
+    {
+        <p class="text-muted" role="status">İçe aktarabileceğiniz kayıt türü yok. Modül kapalı ya da oluşturma yetkiniz yok olabilir.</p>
+    }
+    else
+    {
+        <div class="card p-3">
+            <div class="mb-3">
+                <label class="form-label" for="import-entity">Kayıt türü *</label>
+                <select id="import-entity" class="form-select" @bind="entityKey" @bind:after="Reset" disabled="@busy">
+                    @foreach (var definition in definitions)
+                    {
+                        <option value="@definition.EntityKey">@definition.DisplayName</option>
+                    }
+                </select>
+                @if (Current is { } current)
+                {
+                    <div class="form-text">
+                        Sütunlar: @string.Join(", ", current.Fields.Select(f => f.Required ? f.Label + " *" : f.Label)).
+                        Tarihler gg.aa.yyyy, ondalıklar virgülle yazılır. Sorumlu boşsa kayıt size atanır. Firmaya bağlı kayıtlardan önce firmaları yükleyin.
+                    </div>
+                    <button type="button" class="btn btn-tonal btn-sm mt-2" disabled="@busy" @onclick="DownloadTemplateAsync">Şablonu indir</button>
+                }
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="import-file">Dosya *</label>
+                <InputFile @key="inputKey" id="import-file" class="form-control" accept=".csv,.txt" OnChange="OnFileChosenAsync" disabled="@busy" />
+                <div class="form-text">Yalnızca CSV; en çok @(ImportFileLimits.MaxFileBytes / (1024 * 1024)) MB ve 2.000 satır.</div>
+            </div>
+            <div class="d-flex gap-2 justify-content-end">
+                <button type="button" class="btn btn-outline-secondary" disabled="@(busy || bytes is null)" @onclick="() => RunAsync(dryRun: true)">Kuru çalışma</button>
+                <button type="button" class="btn btn-primary" disabled="@(busy || bytes is null)" @onclick="() => RunAsync(dryRun: false)">Kayıtları oluştur</button>
+            </div>
+        </div>
+
+        @if (busy)
+        {
+            <p class="text-muted mt-3" role="status">
+                Dosya işleniyor@(progress is { } p ? $": {p.CreatedCount + p.FailedCount:N0} / {p.TotalRows:N0} satır" : string.Empty).
+                Sayfayı kapatırsanız işlem sürer, sonucu İşlem günlüğünde görürsünüz.
+            </p>
+        }
+
+        @if (result is not null)
+        {
+            <div class="card p-3 mt-3" aria-live="polite">
+                <h2 class="h5">
+                    Sonuç <span class="badge stage-@ImportText.StatusBadge(result.Run.Status)">@ImportText.Status(result.Run.Status)</span>
+                </h2>
+                @if (result.Run.FailedCount > 0)
+                {
+                    <p>
+                        <button type="button" class="btn btn-tonal btn-sm" @onclick="DownloadReportAsync">Hata raporunu indir</button>
+                        <small class="text-muted d-block mt-1">Rapor hatalı satırları ve nedenlerini içerir; bir saat indirilebilir. Düzeltip aynı dosyayı yeniden yükleyebilirsiniz.</small>
+                    </p>
+                }
+                <ImportRunDetailPanel @key="result.Run.Id" RunId="result.Run.Id" />
+            </div>
+        }
+    }
+</AuthGate>
+
+@code {
+    private const int PollMilliseconds = 2000;
+
+    private List<ImportDefinitionDto>? definitions;
+    private ImportRunDto? progress;
+    private string entityKey = string.Empty;
+    private string fileName = string.Empty;
+    private byte[]? bytes;
+    private ImportRunDetailDto? result;
+    private string? message;
+    private bool busy;
+    private int inputKey;
+
+    private ImportDefinitionDto? Current => definitions?.FirstOrDefault(d => d.EntityKey == entityKey);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CoreAccess.RunImports))
+        {
+            var loaded = await Api.GetAsync<List<ImportDefinitionDto>>("/api/imports/definitions");
+            definitions = loaded.Value;
+            message = loaded.IsSuccess ? null : loaded.Error;
+            entityKey = definitions?.FirstOrDefault()?.EntityKey ?? string.Empty;
+        }
+    }
+
+    private void Reset()
+    {
+        bytes = null;
+        result = null;
+        message = null;
+        inputKey++;
+    }
+
+    private async Task OnFileChosenAsync(InputFileChangeEventArgs e)
+    {
+        result = null;
+        message = null;
+        bytes = null;
+        fileName = e.File.Name;
+        try
+        {
+            using var stream = e.File.OpenReadStream(ImportFileLimits.MaxFileBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            bytes = buffer.ToArray();
+        }
+        catch (IOException)
+        {
+            message = $"Dosya en fazla {ImportFileLimits.MaxFileBytes / (1024 * 1024)} MB olabilir.";
+        }
+    }
+
+    private async Task RunAsync(bool dryRun)
+    {
+        if (bytes is null || busy)
+        {
+            return;
+        }
+
+        busy = true;
+        message = null;
+        result = null;
+        var query = $"entityKey={Uri.EscapeDataString(entityKey)}&fileName={Uri.EscapeDataString(fileName)}";
+        var response = await Api.PostBytesAsync<ImportRunDetailDto>($"/api/imports{(dryRun ? "/preview" : string.Empty)}?{query}", bytes, "text/csv");
+        message = response.IsSuccess ? null : response.Error;
+        if (response.Value is { } started)
+        {
+            if (!dryRun)
+            {
+                // Aynı dosyanın yanlışlıkla ikinci kez uygulanması kayıtları çoğaltır; yeniden seçilmesi gerekir.
+                bytes = null;
+                inputKey++;
+            }
+
+            await FollowAsync(started);
+        }
+
+        busy = false;
+    }
+
+    // Satırlar sunucuda arka planda işlenir: koşu bitene kadar ilerleme okunur. Sayfa kapanırsa koşu sürer, sonucu günlüktedir.
+    private async Task FollowAsync(ImportRunDetailDto current)
+    {
+        progress = current.Run;
+        while (current.Run.Status is "Pending" or "Running")
+        {
+            StateHasChanged();
+            await Task.Delay(PollMilliseconds);
+            var next = await Api.GetAsync<ImportRunDetailDto>($"/api/imports/{current.Run.Id}");
+            if (next.Value is null)
+            {
+                message = next.Error;
+                progress = null;
+                return;
+            }
+
+            current = next.Value;
+            progress = current.Run;
+        }
+
+        progress = null;
+        result = current;
+    }
+
+    private Task DownloadTemplateAsync() =>
+        DownloadAsync($"/api/imports/definitions/{Uri.EscapeDataString(entityKey)}/template", "sablon.csv");
+
+    private Task DownloadReportAsync() =>
+        DownloadAsync($"/api/imports/{result!.Run.Id}/error-report", "hata-raporu.csv");
+
+    private async Task DownloadAsync(string url, string name)
+    {
+        var file = await Api.GetAsync<byte[]>(url);
+        if (file.Value is not { } content)
+        {
+            message = file.Error;
+            return;
+        }
+
+        await Js.InvokeVoidAsync("modulixDownload", name, "text/csv", Convert.ToBase64String(content));
+    }
+}

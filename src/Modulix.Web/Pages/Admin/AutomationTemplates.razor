@@ -1,0 +1,102 @@
+@page "/yonetim/otomasyon/sablonlar"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>Otomasyon şablonları · Modulix</PageTitle>
+
+@* Başlangıç şablonları (ADR-0027, Dilim 3b/5a): "Kullan" yalnızca taslak kural açar; taslak yayınlanıp açılana kadar hiçbir şey çalıştırmaz.
+   Şablonu kullanmak core.automation.manage ister; listeyi görmek core.automation.read. *@
+<AuthGate Permission="@CoreAccess.ReadAutomation">
+    <a class="back-link" href="yonetim/otomasyon">← Otomasyon kuralları</a>
+
+    <PageHeader Title="Otomasyon şablonları" Icon="zap"
+                Subtitle="Hazır bir şablonu kullanınca kural taslak olarak açılır. Hiçbir şey çalışmaz; gözden geçirip yayınlamak size kalır." />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (templates is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+    }
+    else if (templates.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu firmada kullanılabilir şablon yok. Şablonlar, açık modüllere göre listelenir.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Otomasyon şablonları</caption>
+            <thead>
+                <tr><th scope="col">Şablon</th><th scope="col">Kayıt türü</th><th scope="col"><span class="visually-hidden">Eylem</span></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var template in templates)
+                {
+                    <tr>
+                        <td data-label="Şablon" class="primary">
+                            @template.DisplayName
+                            <small class="text-muted d-block">@template.Description</small>
+                            @if (!template.Available)
+                            {
+                                <small class="text-danger d-block">Kullanılamıyor: @(template.Issues.FirstOrDefault()?.Message ?? "Gerekli izin ya da modül yok.")</small>
+                            }
+                        </td>
+                        <td data-label="Kayıt türü">@AutomationLabels.EntityName(entities, template.EntityKey)</td>
+                        <td data-label="Eylem" class="actions">
+                            @if (Session.Can(CoreAccess.ManageAutomation))
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(!template.Available || busy is not null)"
+                                        @onclick="() => UseAsync(template)">
+                                    @(busy == template.Key ? "Açılıyor…" : "Kullan")
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private IReadOnlyList<AutomationTemplateDto>? templates;
+    private IReadOnlyList<AutomationEntityDto> entities = [];
+    private string? message;
+    private string? busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(CoreAccess.ReadAutomation))
+        {
+            return;
+        }
+
+        entities = (await Api.GetAsync<AutomationCatalogDto>("/api/automation/catalog")).Value?.Entities ?? [];
+        var result = await Api.GetAsync<List<AutomationTemplateDto>>("/api/automation/templates");
+        templates = result.Value;
+        message = result.Error;
+    }
+
+    private async Task UseAsync(AutomationTemplateDto template)
+    {
+        busy = template.Key;
+        message = null;
+        var result = await Api.PostAsync<AutomationRuleDetailDto>($"/api/automation/templates/{Uri.EscapeDataString(template.Key)}/use", new { });
+        busy = null;
+        if (result.Value is { } detail)
+        {
+            Navigation.NavigateTo($"yonetim/otomasyon/{detail.Rule.Id}");
+            return;
+        }
+
+        message = result.Error;
+    }
+}
