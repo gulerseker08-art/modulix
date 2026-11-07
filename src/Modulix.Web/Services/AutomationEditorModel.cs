@@ -68,9 +68,9 @@ public sealed class EditorTrigger
     public const string Manual = "manual";
     public const string DomainEvent = "domainEvent";
 
-    /// <summary>Düzenleyicinin sunduğu tetikleyici türleri (iş olayı tetikleyicisi henüz yayınlanamaz, sunulmaz).</summary>
+    /// <summary>Düzenleyicinin sunduğu tetikleyici türleri (iş olayı ADR-0039 ile yayınlanabilir hâle geldi).</summary>
     public static IReadOnlyList<string> Types { get; } =
-        [RecordCreated, FieldChanged, StatusTransition, Scheduled, DateRelative, Inactivity, Manual];
+        [RecordCreated, FieldChanged, StatusTransition, DomainEvent, Scheduled, DateRelative, Inactivity, Manual];
 
     public string Type { get; set; } = Manual;
 
@@ -93,7 +93,10 @@ public sealed class EditorTrigger
 
     public int Days { get; set; } = 7;
 
-    /// <summary>Düzenleyicinin tanımadığı tetikleyici (ör. iş olayı): ham olarak korunur ve değiştirilemez.</summary>
+    /// <summary><see cref="DomainEvent"/>: modülün beyan ettiği iş olayının anahtarı (ör. "crm.opportunity.won").</summary>
+    public string EventKey { get; set; } = string.Empty;
+
+    /// <summary>Düzenleyicinin tanımadığı tetikleyici: ham olarak korunur ve değiştirilemez.</summary>
     public JsonObject? Raw { get; set; }
 
     public bool IsLocked => Raw is not null;
@@ -136,6 +139,9 @@ public sealed class EditorTrigger
                 trigger.Relation = node["relation"]?.GetValue<string>() ?? string.Empty;
                 trigger.Days = node["days"]?.GetValue<int>() ?? 7;
                 break;
+            case DomainEvent:
+                trigger.EventKey = node["eventKey"]?.GetValue<string>() ?? string.Empty;
+                break;
             default:
                 trigger.Raw = (JsonObject)node.DeepClone();
                 break;
@@ -177,6 +183,9 @@ public sealed class EditorTrigger
                 node["relation"] = Relation;
                 node["days"] = Days;
                 break;
+            case DomainEvent:
+                node["eventKey"] = EventKey;
+                break;
         }
 
         return node;
@@ -195,6 +204,7 @@ public sealed class EditorTrigger
         OffsetDays = 0;
         Relation = string.Empty;
         Days = 7;
+        EventKey = string.Empty;
     }
 }
 

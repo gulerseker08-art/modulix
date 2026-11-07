@@ -9,17 +9,26 @@ namespace Modulix.Core.Automation;
 /// Olayın kuralın tetikleyicisine uyup uymadığına <b>yalnızca olayın farkından</b> karar verir (ADR-0027); kayıt okunmaz, koşul
 /// değerlendirilmez. Bu ucuz süzgeç, her olayın her kural için çalışma satırı üretmesini engeller. Zamanlama tetikleyicileri
 /// (<see cref="ScheduledTrigger"/>, <see cref="DateRelativeTrigger"/>, <see cref="InactivityTrigger"/>) olay yoluyla eşleşmez, günlük
-/// taramayla çalışır (<c>AutomationScanner</c>); iş olayı (<see cref="DomainEventTrigger"/>) henüz çalışmaz.
+/// taramayla çalışır (<c>AutomationScanner</c>). İş olayı (<see cref="DomainEventTrigger"/>, ADR-0039) modülün beyan ettiği olay
+/// anahtarını katalogdan türe çevirip olayın türü ve kayıt türüyle eşler; <paramref name="events"/> bu çözümlemeyi verir.
 /// </summary>
 public static class AutomationTriggerMatcher
 {
-    public static bool Matches(AutomationTrigger trigger, string entityKey, string eventType, JsonObject payload)
+    public static bool Matches(
+        AutomationTrigger trigger, string entityKey, string eventType, JsonObject payload, Func<string, AutomationEventDefinition?>? events = null)
     {
         ArgumentNullException.ThrowIfNull(trigger);
         ArgumentNullException.ThrowIfNull(payload);
 
         switch (trigger)
         {
+            case DomainEventTrigger domainEvent:
+                // Yalnızca modül önekli iş olayı; kayıt olayı anahtarı (RecordCreated/RecordUpdated) bu tetikleyiciyle eşleşmez.
+                return events?.Invoke(domainEvent.EventKey) is { } declared
+                    && declared.EntityKey == entityKey
+                    && declared.EventType == eventType
+                    && eventType is not (DomainEventTypes.RecordCreated or DomainEventTypes.RecordUpdated);
+
             case RecordCreatedTrigger:
                 return eventType == DomainEventTypes.RecordCreated;
 
@@ -43,13 +52,13 @@ public static class AutomationTriggerMatcher
     }
 
     /// <summary>
-    /// Tetikleyici bu sürümde çalışır mı? Kayıt olayı tetikleyicileri, elle çalıştırma ve tarama tabanlı tetikleyiciler çalışır
-    /// (tarama için kayıt türünün kayıt kaynağı ayrıca doğrulanır); iş olayı henüz çalışmaz (ADR-0027 Dilim 2b-3; iş olayı yayınlama sözleşmesi Ç0.4 yok). Çalışmayan
-    /// tetikleyiciyle yayın reddedilir: sessizce hiç tetiklenmeyen kural bırakılmaz.
+    /// Tetikleyici bu sürümde çalışır mı? Kayıt olayı tetikleyicileri, elle çalıştırma, tarama tabanlı tetikleyiciler (kayıt türünün
+    /// kayıt kaynağı ayrıca doğrulanır) ve iş olayı (ADR-0027 Dilim 2b-3, ADR-0039; beyanlı olay anahtarı ayrıca doğrulanır) çalışır.
+    /// Bilinmeyen tetikleyiciyle yayın reddedilir: sessizce hiç tetiklenmeyen kural bırakılmaz.
     /// </summary>
     public static bool IsExecutable(AutomationTrigger trigger) =>
         trigger is RecordCreatedTrigger or FieldChangedTrigger or StatusTransitionTrigger or ManualTrigger
-            or ScheduledTrigger or DateRelativeTrigger or InactivityTrigger;
+            or ScheduledTrigger or DateRelativeTrigger or InactivityTrigger or DomainEventTrigger;
 
     /// <summary>Tetikleyici bir günlük taramayla mı çalışır (olay yoluyla değil)?</summary>
     public static bool IsScan(AutomationTrigger trigger) => trigger is ScheduledTrigger or DateRelativeTrigger or InactivityTrigger;

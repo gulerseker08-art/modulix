@@ -293,6 +293,7 @@ public static class RecordsSetup
         services.AddScoped<RecordCommandContext>();
         services.AddScoped<IRecordCommandContext>(sp => sp.GetRequiredService<RecordCommandContext>());
         services.AddScoped<IRecordPipeline, RecordPipeline>();
+        services.AddScoped<Modulix.Core.Contracts.Events.IBusinessEventPublisher, Modulix.Core.Events.BusinessEventPublisher>();
 
         services.AddScoped<IRecordStore, TenantSettingRecordStore>();
         services.AddScoped<IRecordStore, PartyRecordStore>();

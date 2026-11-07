@@ -43,7 +43,7 @@ internal sealed class EventAdministration(
             await Events().Where(o => o.DispatchedAt == null).MinAsync(o => (DateTimeOffset?)o.OccurredAt, cancellationToken),
             await Deliveries().Where(d => d.Status == EventDeliveryStatus.Pending).MinAsync(d => (DateTimeOffset?)d.CreatedAt, cancellationToken),
             [.. catalog.EventSubscriptions.Select(s => s.Subscription.Key)],
-            [.. DomainEventTypes.SchemaVersions.Keys.Order(StringComparer.Ordinal)]);
+            [.. catalog.EventSchemaVersions.Keys.Order(StringComparer.Ordinal)]);
     }
 
     public async Task<EventDeliveryPage> ListAsync(EventDeliveryQuery query, CancellationToken cancellationToken)

@@ -164,6 +164,11 @@ internal static class AutomationKit
             ? [new LookupDefinition("sales.owner", Entity, "ownerId", "Sorumlu", LookupTargetKind.Member)]
             : [];
 
+        /// <summary>İş olayı beyanı (ADR-0039): otomasyondaki "sales.deal.won" olayının yayıncısı.</summary>
+        public IReadOnlyList<BusinessEventDefinition> BusinessEvents { get; init; } = key == "sales"
+            ? [new BusinessEventDefinition("sales.deal.won", 1, Entity, "Fırsat kazanıldı", ["amount", "stage"])]
+            : [];
+
         public AutomationCapabilities Automation => capabilities;
     }
 

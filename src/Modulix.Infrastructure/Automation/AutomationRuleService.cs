@@ -255,8 +255,7 @@ internal sealed class AutomationRuleService(
         var issues = (await validator.ValidateAsync(rule.ModuleKey, rule.EntityKey, definition, cancellationToken)).ToList();
         if (!AutomationTriggerMatcher.IsExecutable(definition.Trigger))
         {
-            issues.Add(new AutomationIssue(
-                "trigger", "Bu tetikleyici türü henüz çalışmıyor; kayıt oluşturma, alan değişimi, durum geçişi ya da elle çalıştırma kullanın."));
+            issues.Add(new AutomationIssue("trigger", "Bu tetikleyici türü bu sürümde çalışmıyor; bilinen bir tetikleyici seçin."));
         }
 
         return issues;

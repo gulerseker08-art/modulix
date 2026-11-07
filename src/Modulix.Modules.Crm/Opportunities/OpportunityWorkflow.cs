@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Records;
@@ -31,7 +32,8 @@ public sealed record OpportunityHistoryItem(
 /// Fırsat yaşam döngüsü eylemleri (ADR-0017). Tek yazma yolu: eylemin izinlerine bağlı iş akışı kapısı açılır ve kayıt boru hattı
 /// üzerinden güncelleme yapılır; kapsam, hassas alan, audit, olay, aşama–durum tutarlılığı ve tarihçe depoda uygulanır. Genel
 /// kayıt uçları durumu, kapanış alanlarını ya da aşamayı (oluşturma sonrası) yazamaz. API, Kanban ve ileride yapay zekâ araçları
-/// aynı servisi kullanır. Her eylem kaydın sürümünü ister (eşzamanlılık).
+/// aynı servisi kullanır. Her eylem kaydın sürümünü ister (eşzamanlılık). Kazanma ve kaybetme açık iş komutudur ve iş olayını
+/// (<c>crm.opportunity.won</c> / <c>crm.opportunity.lost</c>, ADR-0039) kayıt değişikliğiyle aynı işlemde yayınlar.
 /// </summary>
 public interface IOpportunityWorkflow
 {
@@ -79,6 +81,7 @@ internal sealed class OpportunityWorkflow(
     ICurrentAccess access,
     OpportunityHistoryReader historyReader,
     ISalesReportingPolicyProvider reportingPolicy,
+    IBusinessEventPublisher events,
     TimeProvider time) : IOpportunityWorkflow
 {
     private const string Key = CrmModule.Entities.Opportunity;
@@ -187,7 +190,7 @@ internal sealed class OpportunityWorkflow(
             values["wonCurrency"] = currency.Trim().ToUpperInvariant();
         }
 
-        return await CloseAsync(opp, version, ClosePermissions, null, OpportunityEventReasons.Won, values, cancellationToken);
+        return await CloseAsync(opp, version, ClosePermissions, null, OpportunityEventReasons.Won, values, CrmModule.Events.OpportunityWon, cancellationToken);
     }
 
     public async Task<RecordResult<OpportunityActionResult>> LoseAsync(
@@ -270,7 +273,7 @@ internal sealed class OpportunityWorkflow(
             ["winningCompetitorId"] = request.WinningCompetitorId?.ToString(),
             ["recontactDate"] = request.RecontactDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             ["statusReason"] = null,
-        }, cancellationToken);
+        }, CrmModule.Events.OpportunityLost, cancellationToken);
         if (!result.IsSuccess || !request.CreateFollowUp || request.RecontactDate is not { } due)
         {
             return result;
@@ -314,7 +317,7 @@ internal sealed class OpportunityWorkflow(
             ["status"] = OpportunityStatus.Cancelled,
             ["statusReason"] = reason.Trim(),
             ["actualCloseDate"] = (await TodayAsync(cancellationToken)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        }, cancellationToken);
+        }, null, cancellationToken);
     }
 
     public async Task<RecordResult<OpportunityActionResult>> HoldAsync(
@@ -490,11 +493,23 @@ internal sealed class OpportunityWorkflow(
             : RecordResult<OpportunityActionResult>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
     }
 
-    // Kapanış: kayıt kapanır; açık aktiviteler silinmez (açık kalır) ve sayıları sonuçta bildirilir.
+    // Kapanış: kayıt kapanır; açık aktiviteler silinmez (açık kalır) ve sayıları sonuçta bildirilir. Kazanma ve kaybetme iş olayını
+    // (ADR-0039) kayıt değişikliğiyle aynı işlemde yayınlar: ikisi birlikte yazılır ya da hiçbiri; iptalin iş olayı yoktur.
     private async Task<RecordResult<OpportunityActionResult>> CloseAsync(
-        RecordData opp, long version, string[] permissions, string? reason, string eventReason, JsonObject values, CancellationToken cancellationToken)
+        RecordData opp, long version, string[] permissions, string? reason, string eventReason, JsonObject values, string? businessEvent,
+        CancellationToken cancellationToken)
     {
-        var result = await UpdateAsync(opp, version, permissions, reason, eventReason, values, cancellationToken);
+        var result = await pipeline.RunAtomicAsync(async ct =>
+        {
+            var updated = await UpdateAsync(opp, version, permissions, reason, eventReason, values, ct);
+            if (updated.IsSuccess && businessEvent is not null)
+            {
+                var closed = updated.Value!.Opportunity;
+                await events.PublishAsync(new BusinessEvent(businessEvent, closed.Id, Payload(closed, businessEvent)) { RecordVersion = closed.Version }, ct);
+            }
+
+            return updated;
+        }, cancellationToken);
         if (!result.IsSuccess)
         {
             return result;
@@ -503,6 +518,23 @@ internal sealed class OpportunityWorkflow(
         var open = await pipeline.QueryAsync(new RecordQuery(CrmModule.Entities.Activity, 1, 1, null,
             new Dictionary<string, string> { ["opportunityId"] = opp.Id.ToString(), ["open"] = "true" }), cancellationToken);
         return RecordResult<OpportunityActionResult>.Ok(result.Value! with { OpenActivities = open.IsSuccess ? open.Value!.TotalCount : 0 });
+    }
+
+    // İş olayının payload'u: beyan edilmiş alanlar, komutun döndürdüğü (çağıranın görebildiği) değerlerle. Tutar iznine sahip olmayan
+    // çağıranın kazandırdığı fırsatta wonAmount zaten gizlidir; olayda da yoktur.
+    private static JsonObject Payload(RecordData closed, string businessEvent)
+    {
+        var fields = businessEvent == CrmModule.Events.OpportunityWon ? CrmModule.Events.OpportunityWonFields : CrmModule.Events.OpportunityLostFields;
+        var payload = new JsonObject();
+        foreach (var field in fields)
+        {
+            if (closed.Values.TryGetPropertyValue(field, out var value) && value is not null)
+            {
+                payload[field] = value.DeepClone();
+            }
+        }
+
+        return payload;
     }
 
     private static RecordResult<OpportunityActionResult> Done(RecordData opp) =>

@@ -224,7 +224,7 @@ public class AutomationEventSubscriberTests
     private static EventEnvelope Envelope(string type, JsonObject payload, int depth = 0, string? correlation = "trace-1") =>
         new(Guid.NewGuid(), Tenant, type, 1, Entity, Guid.NewGuid(), 1, Guid.NewGuid(), ExecutionSource.Api, correlation, null, depth, payload, Now);
 
-    private static AutomationEventSubscriber Subscriber(FakeStore store) => new(store, new FixedTime(Now));
+    private static AutomationEventSubscriber Subscriber(FakeStore store) => new(store, Catalog(), new FixedTime(Now));
 
     [Fact]
     public async Task A_matching_event_creates_one_pending_run_pinned_to_the_published_version()

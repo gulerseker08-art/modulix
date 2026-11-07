@@ -559,6 +559,10 @@ public sealed class AutomationTestModule : IModule
         new(MarginRead, "Marj alanını görür", "Notlar"),
     ];
 
+    /// <summary>İş olayı beyanı (ADR-0039): otomasyona sunulan modül önekli olayın yayıncısı olmalı.</summary>
+    public IReadOnlyList<BusinessEventDefinition> BusinessEvents { get; } =
+        [new("autotest.item.escalated", 1, ItemEntity, "Kayıt yükseltildi", ["status", "title"])];
+
     public AutomationCapabilities Automation { get; } = new()
     {
         Entities = [new(ItemEntity, "Test kaydı", ItemsRead) { RecordSource = typeof(Source) }],
