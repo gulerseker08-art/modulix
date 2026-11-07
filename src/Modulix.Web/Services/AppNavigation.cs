@@ -149,6 +149,12 @@ public sealed class AppNavigation(SessionState session)
 
     public AppDefinition? Find(string id) => AppCatalog.All.FirstOrDefault(a => a.Id == id);
 
+    /// <summary>Kullanıcının açabildiği modül ayar ekranları (Yönetim girişindeki bağlantılar); modülü kapalı ya da izni olmayan yer almaz.</summary>
+    public IReadOnlyList<AppDefinition> ModuleSettings() =>
+        AppCatalog.All
+            .Where(a => a.ModuleKey is not null && a.Route == AppCatalog.ModuleSettingsRoute(a.ModuleKey) && IsVisible(a))
+            .ToList();
+
     /// <summary>
     /// Sayfanın menü bağlamı: aktif ekran, menüsü gösterilecek uygulama (ev sahibi görünürse o) ve bölümleri. Aktif ekran
     /// ya da uygulaması görünmüyorsa <c>null</c>. Aktif ekran, tanımın tamamından bulunur; yetkisiz sayfaya doğrudan gidilse de

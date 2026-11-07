@@ -1,5 +1,6 @@
 @page "/yonetim"
 @inject SessionState Session
+@inject AppNavigation Navigation
 
 <PageTitle>Yönetim - Modulix</PageTitle>
 
@@ -23,6 +24,18 @@
             }
         }
     </div>
+
+    @* Modül ayarları kendi modülünde yaşar; buradan yalnızca bağlantı verilir. *@
+    @if (Navigation.ModuleSettings() is { Count: > 0 } moduleSettings)
+    {
+        <h2 class="mt-4">Modül ayarları</h2>
+        <div class="tiles">
+            @foreach (AppDefinition screen in moduleSettings)
+            {
+                <a class="tile" href="@screen.Route"><strong>@screen.Name</strong><span>@Navigation.RootOf(screen)?.Name modülüne özgü kurallar ve varsayılanlar</span></a>
+            }
+        </div>
+    }
 </AuthGate>
 
 @code {
@@ -35,7 +48,7 @@
         ("Destek erişimi", "Platform ekibinin firmanızda açtığı süreli, salt okunur erişimler; erken kapatma", CoreAccess.ManageUsers, "yonetim/destek-erisimi"),
         ("Roller", "Roller, izinleri ve kayıt kapsamı", CoreAccess.ManageRoles, "yonetim/roller"),
         ("Şirketler", "İşletici şirketler ve kullanıcıların şirket erişimi", CoreAccess.ManageCompanies, "yonetim/sirketler"),
-        ("Firma ayarları", "Firma profili, saat dilimi, para birimi", CoreAccess.ManageSettings, "yonetim/ayarlar"),
+        ("Kuruluş ayarları", "Kuruluş profili, logo, saat dilimi, para birimi, güvenlik", CoreAccess.ManageSettings, "yonetim/ayarlar"),
         ("Denetim kaydı", "Kim, neyi, ne zaman değiştirdi", CoreAccess.ReadAudit, "yonetim/denetim"),
         ("İşlem günlüğü", "İçe aktarmalar: hangi dosya, kaç satır alındı, hatalar", CoreAccess.ReadImports, "yonetim/gunluk"),
         ("Özel alanlar", "Kayıtlara firmanıza özgü alanlar ekleyin", CoreAccess.ManageCustomization, "yonetim/ozel-alanlar"),

@@ -91,7 +91,7 @@ public sealed class CoreModule : IModule
     [
         new(Permissions.ManageUsers, "Kullanıcıları ve kullanıcıların rollerini yönetir", "Kullanıcılar"),
         new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir", "Roller"),
-        new(Permissions.ManageSettings, "Firma ayarlarını değiştirir", "Firma ayarları"),
+        new(Permissions.ManageSettings, "Kuruluş ve modül ayarlarını değiştirir", "Kuruluş ayarları"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
         new(Permissions.ManageCompanies, "İşletici şirketleri ve kullanıcıların şirket görevlerini yönetir", "Şirketler"),
@@ -231,7 +231,7 @@ public sealed class CoreModule : IModule
     /// <summary>İletişim tercihi denetim değerlerini (maskeli adres, kanıt) yalnızca bu izni olan denetim okuru görür.</summary>
     private const string ReadCommunicationKey = Permissions.ReadCommunication;
 
-    private const string ProfileGroup = "Firma profili";
+    private const string ProfileGroup = "Kuruluş profili";
     private const string RegionalGroup = "Bölgesel ayarlar";
     private const string SecurityGroup = "Güvenlik";
     private const string AutomationGroup = "Otomasyon";

@@ -5,6 +5,7 @@ using Modulix.Shared.Contracts;
 using Modulix.Shared.Crm;
 using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
+using Modulix.Shared.Support;
 using Modulix.Shared.Warehouse;
 using Modulix.Web.Services;
 
@@ -131,6 +132,47 @@ public class AppNavigationTests
         var settings = Assert.Single(manager.Sections, s => s.Group?.Id == AppCatalog.CrmSettingsGroup);
         Assert.True(settings.Group!.Footer);
         Assert.Contains(settings.Entries, e => e.Name == "Teklif kuralları");
+    }
+
+    [Fact]
+    public void Module_settings_open_in_their_own_module_and_core_settings_stay_in_administration()
+    {
+        var nav = Nav(AllModules, [.. SalesUser, CoreAccess.ManageSettings]);
+
+        var crm = nav.Context(AppCatalog.ModuleSettingsRoute(CrmAccess.ModuleKey))!;
+        Assert.Equal((AppCatalog.Crm, "crm.settings"), (crm.Root.Id, crm.Active.Id));
+        Assert.Contains("Genel CRM ayarları", EntryNames(crm, AppCatalog.CrmSettingsGroup));
+
+        var contracts = nav.Context(AppCatalog.ModuleSettingsRoute(ContractsAccess.ModuleKey))!;
+        Assert.Equal((AppCatalog.Crm, "contracts.settings"), (contracts.Root.Id, contracts.Active.Id));
+
+        var core = nav.Context("yonetim/ayarlar")!;
+        Assert.Equal((AppCatalog.Admin, "admin.settings"), (core.Root.Id, core.Active.Id));
+        Assert.Equal("Kuruluş ayarları", core.Active.Name);
+    }
+
+    [Fact]
+    public void Administration_links_only_the_settings_of_enabled_modules_for_users_who_can_change_them()
+    {
+        var crmOnly = Nav([CrmAccess.ModuleKey], [CoreAccess.ManageSettings]);
+        Assert.Equal(["crm.settings"], crmOnly.ModuleSettings().Select(s => s.Id));
+
+        var all = Nav([.. AllModules, SupportAccess.ModuleKey], [CoreAccess.ManageSettings]);
+        Assert.Equal(5, all.ModuleSettings().Count);
+
+        Assert.Empty(Nav(AllModules, SalesUser).ModuleSettings());
+    }
+
+    [Fact]
+    public void Every_module_with_settings_has_a_settings_screen_keyed_by_its_module()
+    {
+        // Ekran ayarları modül anahtarıyla süzer: route'taki anahtar modülünkiyle aynı olmazsa ekran boş açılır.
+        var screens = AppCatalog.All.Where(a => a.Route?.StartsWith("modul-ayarlari/", StringComparison.Ordinal) == true).ToList();
+
+        Assert.Equal(
+            new[] { CrmAccess.ModuleKey, ContractsAccess.ModuleKey, OrdersAccess.ModuleKey, SupportAccess.ModuleKey, MarketingAccess.ModuleKey }.Order(),
+            screens.Select(s => s.ModuleKey!).Order());
+        Assert.All(screens, s => Assert.Equal(AppCatalog.ModuleSettingsRoute(s.ModuleKey!), s.Route));
     }
 
     [Fact]
