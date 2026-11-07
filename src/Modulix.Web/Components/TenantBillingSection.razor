@@ -1,0 +1,149 @@
+@inject ApiClient Api
+
+@* Ödeme kayıtları (ADR-0028 Dilim 7c): sağlayıcıdan bağımsız defter. Tahsilat/fatura buraya elle işlenir (Finans rolü); kayıt erişimi
+   değiştirmez, hiçbir kayıt silinmez (iptal gerekçesiyle kalır). *@
+<section class="detail-section">
+    <div class="section-header"><h2>Ödemeler</h2></div>
+    <p class="text-muted">
+        Dönem bazlı ödeme kaydı. Fatura kesmez ve tahsilat yapmaz; tahsilatı ya da fatura numarasını siz işlersiniz. Vadesi geçen kayıt
+        yalnızca uyarı gösterir, <strong>erişimi kendiliğinden kapatmaz</strong> (lisans bitişi plan bölümünden yönetilir). Kayıtlar silinmez.
+    </p>
+
+    <Notice Text="@notice" Failed="failed" />
+
+    <form class="inline-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+        <h3>Ödeme kaydı aç</h3>
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="billStart">Dönem başı *</label>
+                <input id="billStart" class="form-control" type="date" @bind="periodStart" />
+                <FieldError Field="periodStart" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="billEnd">Dönem sonu *</label>
+                <input id="billEnd" class="form-control" type="date" @bind="periodEnd" />
+                <FieldError Field="periodEnd" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="billAmount">Tutar *</label>
+                <input id="billAmount" class="form-control" type="number" min="0" step="0.01" @bind="amount" />
+                <FieldError Field="amount" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="billCurrency">Para birimi</label>
+                <input id="billCurrency" class="form-control" maxlength="3" @bind="currency" />
+                <FieldError Field="currency" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="billDue">Vade</label>
+                <input id="billDue" class="form-control" type="date" @bind="dueDate" />
+            </div>
+            <div>
+                <label class="form-label" for="billRef">Fatura no / referans</label>
+                <input id="billRef" class="form-control" maxlength="100" @bind="reference" />
+                <FieldError Field="reference" Errors="errors" />
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" disabled="@(busy || amount <= 0)">Kayıt aç</button>
+        </div>
+    </form>
+
+    @if (items is not null && items.Count > 0)
+    {
+        <table class="table record-table">
+            <thead><tr><th>Dönem</th><th>Tutar</th><th>Vade</th><th>Referans</th><th>Durum</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var item in items)
+                {
+                    <tr>
+                        <td data-label="Dönem" class="primary">@item.PeriodStart.ToString("dd.MM.yyyy") – @item.PeriodEnd.ToString("dd.MM.yyyy")</td>
+                        <td data-label="Tutar">@item.Amount.ToString("N2") @item.Currency</td>
+                        <td data-label="Vade">@(item.DueDate?.ToString("dd.MM.yyyy") ?? "—")</td>
+                        <td data-label="Referans">@(item.Reference ?? "—")</td>
+                        <td data-label="Durum">
+                            <span class="badge @StateClass(item)">@StateText(item)</span>
+                        </td>
+                        <td class="actions">
+                            @if (item.Status == BillingStatusDto.Pending)
+                            {
+                                <button type="button" class="btn btn-tonal btn-sm" disabled="@busy" @onclick="() => PaidAsync(item.Id)">Ödendi</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => CancelAsync(item.Id)">İptal</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid TenantId { get; set; }
+
+    private IReadOnlyList<BillingRecordDto>? items;
+    private DateTime periodStart = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime periodEnd = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(1).AddDays(-1);
+    private DateTime? dueDate;
+    private decimal amount;
+    private string currency = "TRY";
+    private string reference = string.Empty;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<BillingRecordDto>>($"/api/platform/billing?tenantId={TenantId}");
+        items = result.Value;
+    }
+
+    private async Task CreateAsync()
+    {
+        busy = true;
+        var request = new CreateBillingRequest(
+            DateOnly.FromDateTime(periodStart), DateOnly.FromDateTime(periodEnd), amount, currency,
+            dueDate is { } due ? DateOnly.FromDateTime(due) : null, reference);
+        var result = await Api.PostAsync<BillingRecordDto>($"/api/platform/tenants/{TenantId}/billing", request);
+        busy = false;
+        errors = result.FieldErrors;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.FieldErrors.Count > 0 ? null : result.Error, true);
+            return;
+        }
+
+        (notice, failed, amount, reference) = ("Ödeme kaydı açıldı.", false, 0m, string.Empty);
+        await LoadAsync();
+    }
+
+    private async Task PaidAsync(Guid id)
+    {
+        busy = true;
+        var result = await Api.PostAsync<BillingRecordDto>($"/api/platform/billing/{id}/paid", new MarkBillingPaidRequest());
+        busy = false;
+        (notice, failed) = result.IsSuccess ? ("Ödeme alındı olarak işaretlendi.", false) : (result.Error, true);
+        await LoadAsync();
+    }
+
+    private async Task CancelAsync(Guid id)
+    {
+        busy = true;
+        var result = await Api.PostAsync<BillingRecordDto>($"/api/platform/billing/{id}/cancel", new CancelBillingRequest("Finans iptal etti"));
+        busy = false;
+        (notice, failed) = result.IsSuccess ? ("Ödeme kaydı iptal edildi (kayıt silinmez).", false) : (result.Error, true);
+        await LoadAsync();
+    }
+
+    private static string StateText(BillingRecordDto item) => item.Status switch
+    {
+        BillingStatusDto.Paid => "Ödendi",
+        BillingStatusDto.Cancelled => "İptal",
+        _ => item.IsOverdue ? "Vadesi geçti" : "Bekliyor",
+    };
+
+    private static string StateClass(BillingRecordDto item) => item.Status == BillingStatusDto.Paid ? "user-active" : "user-disabled";
+}

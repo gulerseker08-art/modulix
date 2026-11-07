@@ -1,7 +1,8 @@
 namespace Modulix.Core.Platform;
 
 /// <summary>Bir kullanıcının etkin üyeliği; tenant da etkin olmalıdır.</summary>
-public sealed record MembershipSummary(Guid MembershipId, Guid TenantId, string TenantName, string TenantSlug);
+/// <summary><see cref="IsSupport"/>: üyelik bir destek erişimidir (ADR-0028); istekleri okuma günlüğüne yazılır.</summary>
+public sealed record MembershipSummary(Guid MembershipId, Guid TenantId, string TenantName, string TenantSlug, bool IsSupport = false);
 
 /// <summary>Aktif tenant'ın bir işletici şirketi (ADR-0008).</summary>
 public sealed record CompanySummary(Guid Id, string Name, bool IsDefault);

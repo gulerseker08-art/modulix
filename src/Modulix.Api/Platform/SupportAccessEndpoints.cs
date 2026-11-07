@@ -36,6 +36,9 @@ public static class SupportAccessEndpoints
                 return Results.NoContent();
             }));
 
+        platform.MapGet("/support-access/{grantId:guid}/reads", (Guid grantId, ISupportAccess access, CancellationToken ct) =>
+            RunAsync(async () => Results.Ok((await access.ListReadsAsync(grantId, null, 200, ct)).Select(ToDto).ToList())));
+
         // Firma tarafı: firma yöneticisi (kullanıcı yönetimi izni) kendi firmasının erişimlerini görür ve kapatır; başka firmanınki "yok" sayılır.
         var tenant = app.MapGroup("/api/tenant/support-access")
             .RequireAuthorization()
@@ -52,6 +55,9 @@ public static class SupportAccessEndpoints
                 return Results.NoContent();
             }));
 
+        tenant.MapGet("/{grantId:guid}/reads", (Guid grantId, Modulix.Core.Contracts.Tenancy.ITenantContextAccessor current, ISupportAccess access, CancellationToken ct) =>
+            RunAsync(async () => Results.Ok((await access.ListReadsAsync(grantId, current.Current!.TenantId, 200, ct)).Select(ToDto).ToList())));
+
         return app;
     }
 
@@ -66,6 +72,8 @@ public static class SupportAccessEndpoints
             return problem;
         }
     }
+
+    private static SupportAccessReadDto ToDto(SupportAccessReadInfo info) => new(info.At, info.Method, info.Path);
 
     private static SupportAccessDto ToDto(SupportAccessInfo info) => new(
         info.Id, info.TenantId, info.TenantName, info.UserId, info.UserName, info.Reason, info.GrantedAt, info.ExpiresAt, info.EndedAt, (SupportAccessStateDto)info.State);

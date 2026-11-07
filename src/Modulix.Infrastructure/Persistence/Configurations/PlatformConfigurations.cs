@@ -197,3 +197,37 @@ internal sealed class SupportAccessGrantConfiguration : IEntityTypeConfiguration
         builder.HasIndex(g => new { g.TenantId, g.GrantedAt });
     }
 }
+
+internal sealed class SupportAccessReadConfiguration : IEntityTypeConfiguration<SupportAccessRead>
+{
+    public void Configure(EntityTypeBuilder<SupportAccessRead> builder)
+    {
+        // Platform tablosu (RLS dışı), ekleme-yalnız. Erişim kaydına yabancı anahtar yok (silme sırası sade kalır); GrantId indekslidir.
+        builder.ToTable("SupportAccessReads", DatabaseSchemas.Platform);
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).ValueGeneratedNever();
+        builder.Property(r => r.At).IsRequired();
+        builder.Property(r => r.Method).HasMaxLength(SupportAccessRead.MethodMaxLength).IsRequired();
+        builder.Property(r => r.Path).HasMaxLength(SupportAccessRead.PathMaxLength).IsRequired();
+        builder.HasIndex(r => new { r.GrantId, r.At });
+    }
+}
+
+internal sealed class BillingRecordConfiguration : IEntityTypeConfiguration<BillingRecord>
+{
+    public void Configure(EntityTypeBuilder<BillingRecord> builder)
+    {
+        // Platform tablosu (RLS dışı): ödeme kaydını platform (Finans) yönetir, firma görmez ve yazamaz. Hiçbir kayıt silinmez; iptal gerekçesiyle kalır.
+        builder.ToTable("BillingRecords", DatabaseSchemas.Platform);
+        builder.HasKey(b => b.Id);
+        builder.Property(b => b.Id).ValueGeneratedNever();
+        builder.Property(b => b.Amount).HasPrecision(18, 2).IsRequired();
+        builder.Property(b => b.Currency).HasMaxLength(3).IsRequired();
+        builder.Property(b => b.Reference).HasMaxLength(BillingRecord.ReferenceMaxLength);
+        builder.Property(b => b.Note).HasMaxLength(BillingRecord.NoteMaxLength);
+        builder.Property(b => b.CancelReason).HasMaxLength(BillingRecord.ReasonMaxLength);
+        builder.Property(b => b.Status).IsRequired();
+        builder.HasIndex(b => new { b.TenantId, b.CreatedAt });
+        builder.HasIndex(b => new { b.Status, b.DueDate });
+    }
+}

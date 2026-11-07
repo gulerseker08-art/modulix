@@ -66,6 +66,13 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             {
                 accessor.Current = new TenantContext(membership.TenantId, userId, membership.MembershipId);
 
+                // Destek oturumunda her API isteği, işlenmeden önce okuma günlüğüne yazılır (ADR-0028, Y1.3); yazılamazsa istek durur.
+                if (membership.IsSupport && context.Request.Path.StartsWithSegments("/api"))
+                {
+                    await context.RequestServices.GetRequiredService<ISupportAccess>()
+                        .RecordReadAsync(membership.MembershipId, context.Request.Method, context.Request.Path.Value ?? string.Empty, context.RequestAborted);
+                }
+
                 // ITenantSettings tenant DbContext'ine bağlıdır (ADR-0020); yalnızca aktif tenant kurulduktan SONRA çözülür.
                 var settings = context.RequestServices.GetRequiredService<ITenantSettings>();
 

@@ -255,6 +255,7 @@ app.MapPlatformEventEndpoints();
 app.MapPlatformPlanEndpoints();
 app.MapPlatformHealthEndpoints();
 app.MapSupportAccessEndpoints();
+app.MapPlatformBillingEndpoints();
 app.MapPlatformTeamEndpoints();
 app.MapAuditEndpoints();
 app.MapImportEndpoints();

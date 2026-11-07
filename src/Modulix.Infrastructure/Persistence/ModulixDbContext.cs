@@ -67,6 +67,10 @@ public class ModulixDbContext(
 
     public DbSet<SupportAccessGrant> SupportAccessGrants => Set<SupportAccessGrant>();
 
+    public DbSet<SupportAccessRead> SupportAccessReads => Set<SupportAccessRead>();
+
+    public DbSet<BillingRecord> BillingRecords => Set<BillingRecord>();
+
     public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     public DbSet<QueuedEmail> EmailMessages => Set<QueuedEmail>();
