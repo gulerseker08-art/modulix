@@ -97,19 +97,25 @@ public static class ReportEndpoints
             Results.Ok((await exports.ListAsync(ct)).Select(ToDto).ToList()))
             .RequirePermission(CoreModule.Permissions.ExportReports);
 
-        group.MapPost("/exports", (ExportReportRequest request, IReportExports exports, CancellationToken ct) => RunAsync(async () =>
+        group.MapPost("/exports", (ExportReportRequest request, string? format, IReportExports exports, CancellationToken ct) => RunAsync(async () =>
         {
             if (request.Spec is null)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["spec"] = ["Rapor tanımı gerekli."] }, statusCode: StatusCodes.Status400BadRequest);
             }
 
-            var export = await exports.CreateAsync(ToSpec(request.Spec), request.Name, ct);
+            if (!TryFormat(format, out var fileFormat))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["format"] = ["Biçim csv ya da xlsx olmalıdır."] }, statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var export = await exports.CreateAsync(ToSpec(request.Spec), request.Name, ct, fileFormat);
             return Results.Created($"/api/reports/exports/{export.Id}", ToDto(export));
         })).RequirePermission(CoreModule.Permissions.ExportReports);
 
-        group.MapPost("/{id:guid}/exports", (Guid id, IReportExports exports, CancellationToken ct) => RunAsync(async () =>
-            await exports.CreateAsync(id, ct) is { } export ? Results.Created($"/api/reports/exports/{export.Id}", ToDto(export)) : NotFound()))
+        group.MapPost("/{id:guid}/exports", (Guid id, string? format, IReportExports exports, CancellationToken ct) => RunAsync(async () =>
+            !TryFormat(format, out var fileFormat) ? Results.ValidationProblem(new Dictionary<string, string[]> { ["format"] = ["Biçim csv ya da xlsx olmalıdır."] }, statusCode: StatusCodes.Status400BadRequest)
+            : await exports.CreateAsync(id, ct, fileFormat) is { } export ? Results.Created($"/api/reports/exports/{export.Id}", ToDto(export)) : NotFound()))
             .RequirePermission(CoreModule.Permissions.ExportReports);
 
         group.MapGet("/exports/{id:guid}/download", async (Guid id, HttpContext http, IReportExports exports, CancellationToken ct) =>
@@ -183,6 +189,24 @@ public static class ReportEndpoints
         }
 
         return new ReportScheduleInput(frequency, request.Hour, day, request.DayOfMonth);
+    }
+
+    /// <summary>Biçim sorgu değeri: boş csv'dir; yalnızca csv ve xlsx kabul edilir.</summary>
+    private static bool TryFormat(string? value, out ReportFileFormat format)
+    {
+        format = ReportFileFormat.Csv;
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "csv", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(value, "xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            format = ReportFileFormat.Xlsx;
+            return true;
+        }
+
+        return false;
     }
 
     private static ReportExportDto ToDto(ReportExportInfo e) => new(
