@@ -1,7 +1,7 @@
 @* Liste ekranı görünüm sekmeleri (sayfa başlığının altında): her görünüm bir sekmedir, etkin sekmede marka çizgisi vardır.
    Görünümler yalnızca süzgeçtir; kapsamı sunucu uygular, sekme yetki vermez. NewView doluysa sonda "+ Görünüm" eylemi çıkar.
    Çok sekme telefonda yatay kayar (record-tabs). *@
-<div class="record-tabs view-tabs" role="tablist" aria-label="@Label">
+<div class="record-tabs view-tabs" role="tablist" aria-label="@LabelText">
     @foreach (var item in Items)
     {
         var active = item.Key == Value;
@@ -17,7 +17,7 @@
     @if (NewView.HasDelegate)
     {
         <button type="button" class="record-tab view-tab-new" @onclick="NewView">
-            <AppIcon Name="plus" Size="16" /> @NewViewText
+            <AppIcon Name="plus" Size="16" /> @NewViewTextOrDefault
         </button>
     }
 </div>
@@ -31,12 +31,16 @@
 
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
 
-    [Parameter] public string Label { get; set; } = "Görünümler";
+    [Parameter] public string? Label { get; set; }
 
     /// <summary>Son sekmedeki eylem (ör. kişisel görünüm oluştur); verilmezse eklenmez.</summary>
     [Parameter] public EventCallback NewView { get; set; }
 
-    [Parameter] public string NewViewText { get; set; } = "Görünüm";
+    [Parameter] public string? NewViewText { get; set; }
+
+    private string LabelText => Label ?? Texts.Get("common.views");
+
+    private string NewViewTextOrDefault => NewViewText ?? Texts.Get("common.view.add");
 
     private async Task SelectAsync(string key)
     {

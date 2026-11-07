@@ -3,11 +3,11 @@
    kişisel görünüm açıkken "yalnızca siz görürsünüz" notu ve silme. Hiçbiri yoksa hiçbir şey çizmez. Kaydetme sayfanın işidir (callback'ler). *@
 @if (Naming)
 {
-    <form class="view-bar" role="group" aria-label="Yeni görünüm" @onsubmit="SaveAsAsync" @onsubmit:preventDefault>
-        <label for="@inputId" class="view-bar-text">Görünüm adı</label>
-        <input id="@inputId" class="form-control form-control-sm view-bar-input" maxlength="60" placeholder="ör. Kocaeli müşterileri" @bind="name" @bind:event="oninput" />
-        <button type="submit" class="btn btn-primary btn-sm">Kaydet</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelAsync">Vazgeç</button>
+    <form class="view-bar" role="group" aria-label="@Texts.Get("common.view.new")" @onsubmit="SaveAsAsync" @onsubmit:preventDefault>
+        <label for="@inputId" class="view-bar-text">@Texts.Get("common.view.name")</label>
+        <input id="@inputId" class="form-control form-control-sm view-bar-input" maxlength="60" placeholder="@Texts.Get("common.view.namePlaceholder")" @bind="name" @bind:event="oninput" />
+        <button type="submit" class="btn btn-primary btn-sm">@Texts.Get("common.save")</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelAsync">@Texts.Get("common.view.cancel")</button>
         @if (Error is not null)
         {
             <span class="view-bar-error" role="alert">@Error</span>
@@ -18,13 +18,13 @@ else if (Dirty)
 {
     <div class="view-bar" role="status">
         <AppIcon Name="pencil" Size="14" />
-        <span class="view-bar-text">Bu görünümde kaydedilmemiş değişiklik var.</span>
+        <span class="view-bar-text">@Texts.Get("common.view.dirty")</span>
         @if (Active is not null)
         {
-            <button type="button" class="btn btn-tonal btn-sm" @onclick="Update">Görünümü güncelle</button>
+            <button type="button" class="btn btn-tonal btn-sm" @onclick="Update">@Texts.Get("common.view.update")</button>
         }
-        <button type="button" class="btn btn-tonal btn-sm" @onclick="StartNaming">Yeni görünüm olarak kaydet</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Discard">Geri al</button>
+        <button type="button" class="btn btn-tonal btn-sm" @onclick="StartNaming">@Texts.Get("common.view.saveAsNew")</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Discard">@Texts.Get("common.view.discard")</button>
         @if (Error is not null)
         {
             <span class="view-bar-error" role="alert">@Error</span>
@@ -34,16 +34,16 @@ else if (Dirty)
 else if (Active is not null)
 {
     <div class="view-bar view-bar-note">
-        <span class="view-bar-text">Kişisel görünüm · yalnızca siz görürsünüz</span>
+        <span class="view-bar-text">@Texts.Get("common.view.personalNote")</span>
         @if (confirmingDelete)
         {
-            <span class="view-bar-text">Görünüm silinsin mi?</span>
-            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="DeleteAsync">Evet, sil</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => confirmingDelete = false">Vazgeç</button>
+            <span class="view-bar-text">@Texts.Get("common.view.deleteConfirm")</span>
+            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="DeleteAsync">@Texts.Get("common.view.deleteYes")</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => confirmingDelete = false">@Texts.Get("common.view.cancel")</button>
         }
         else
         {
-            <button type="button" class="btn btn-ghost btn-sm" @onclick="() => confirmingDelete = true"><AppIcon Name="x" Size="14" /> Sil</button>
+            <button type="button" class="btn btn-ghost btn-sm" @onclick="() => confirmingDelete = true"><AppIcon Name="x" Size="14" /> @Texts.Get("common.delete")</button>
         }
         @if (Error is not null)
         {

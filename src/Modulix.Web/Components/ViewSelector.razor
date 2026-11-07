@@ -4,14 +4,14 @@
 <div class="view-selector" @onkeydown="OnKeyDown">
     <button type="button" class="btn btn-outline-secondary view-selector-button" aria-haspopup="menu"
             aria-expanded="@(open ? "true" : "false")" aria-controls="@menuId" @onclick="Toggle">
-        <span class="view-selector-prefix">@Label:</span>
+        <span class="view-selector-prefix">@LabelText:</span>
         <span class="view-selector-current">@CurrentLabel</span>
         <AppIcon Name="chevron-down" Size="16" />
     </button>
     @if (open)
     {
         <div class="view-selector-backdrop" aria-hidden="true" @onclick="Close"></div>
-        <div id="@menuId" class="view-menu" role="menu" aria-label="@Label">
+        <div id="@menuId" class="view-menu" role="menu" aria-label="@LabelText">
             @foreach (var group in Items.GroupBy(i => i.Group))
             {
                 @if (group.Key is not null)
@@ -36,7 +36,7 @@
             {
                 <div class="view-menu-divider" role="separator"></div>
                 <button type="button" role="menuitem" class="view-menu-item view-menu-new" @onclick="NewAsync">
-                    <AppIcon Name="plus" Size="16" /> <span>@NewViewText</span>
+                    <AppIcon Name="plus" Size="16" /> <span>@NewViewTextOrDefault</span>
                 </button>
             }
         </div>
@@ -56,12 +56,16 @@
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
 
     /// <summary>Düğmedeki ve menüdeki ad ön eki.</summary>
-    [Parameter] public string Label { get; set; } = "Görünüm";
+    [Parameter] public string? Label { get; set; }
 
     /// <summary>Menünün sonundaki eylem (ör. kayıtlı görünüm oluştur); verilmezse eklenmez.</summary>
     [Parameter] public EventCallback NewView { get; set; }
 
-    [Parameter] public string NewViewText { get; set; } = "Yeni görünüm";
+    [Parameter] public string? NewViewText { get; set; }
+
+    private string LabelText => Label ?? Texts.Get("common.view");
+
+    private string NewViewTextOrDefault => NewViewText ?? Texts.Get("common.view.new");
 
     private string CurrentLabel => Items.FirstOrDefault(i => i.Key == Value)?.Label ?? Items.FirstOrDefault()?.Label ?? "—";
 
