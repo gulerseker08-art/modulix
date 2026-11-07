@@ -84,6 +84,7 @@ public static class CrmAutomation
         Fields =
         [
             // Müşteri adayı
+            new(CrmModule.Entities.Lead, "subject", "Konu", AutomationFieldType.Text),
             new(CrmModule.Entities.Lead, "status", "Durum", AutomationFieldType.Choice)
             {
                 Options =
@@ -98,6 +99,7 @@ public static class CrmAutomation
             Date(CrmModule.Entities.Lead, "targetPurchaseDate", "Hedef satın alma tarihi", "Satın alma tarihi yaklaşan müşteri adayları için (tarihe kala tetikleyicisi)."),
 
             // Fırsat
+            new(CrmModule.Entities.Opportunity, "title", "Başlık", AutomationFieldType.Text),
             new(CrmModule.Entities.Opportunity, "status", "Durum", AutomationFieldType.Choice)
             {
                 Options =
@@ -145,8 +147,16 @@ public static class CrmAutomation
                 "Takip aktivitesi oluştur",
                 "Kayda bağlı bir takip aktivitesi açar. Atanan verilmezse kaydın sorumlusuna atanır. Aynı kural aynı kayıt için bir kez açar.",
                 [
-                    new AutomationParameter("subject", "Konu", AutomationFieldType.Text) { MaxLength = 200, AllowFieldBinding = false },
-                    new AutomationParameter("description", "Açıklama", AutomationFieldType.Text, Required: false) { MaxLength = 2000, AllowFieldBinding = false },
+                    new AutomationParameter("subject", "Konu", AutomationFieldType.Text)
+                    {
+                        MaxLength = 200,
+                        Description = "Kayıt değişkeni için {{alan}} yazılabilir (ör. {{crm.lead.subject}}).",
+                    },
+                    new AutomationParameter("description", "Açıklama", AutomationFieldType.Text, Required: false)
+                    {
+                        MaxLength = 2000,
+                        Description = "Kayıt değişkeni için {{alan}} yazılabilir.",
+                    },
                     new AutomationParameter("dueInDays", "Kaç gün sonra (bugünden)", AutomationFieldType.Number, Required: false)
                     {
                         Description = "Boşsa 1 gün sonra. 0-365.",

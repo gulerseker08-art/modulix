@@ -26,6 +26,10 @@ public static class PlatformAuditActions
     public const string BillingCreated = "tenant.billing-created";
     public const string BillingPaid = "tenant.billing-paid";
     public const string BillingCancelled = "tenant.billing-cancelled";
+
+    /// <summary>Komut satırından tenant verisinin dışa aktarılması / silinmesi (ADR-0020 Dilim 3); işleten kullanıcı bilinmez, ayrıntıda kaynak "cli"dir.</summary>
+    public const string TenantExported = "tenant.exported";
+    public const string TenantDeleted = "tenant.deleted";
 }
 
 /// <summary>

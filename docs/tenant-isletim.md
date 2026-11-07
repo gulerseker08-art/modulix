@@ -122,7 +122,7 @@ RLS altındadır, çapraz tenant okunamaz). Teklif süre dolumu kilidi tenant ba
 bir tenant'ın verisi aşağıdaki dışa aktarma ile alınır. Geri yüklemede bütün tenant'lar aynı ana döner; tek tenant'ı geri almak
 gerekirse yedek ayrı bir sunucuya yüklenir ve o tenant oradan dışa aktarılır.
 
-**Sözleşme verisi (dilim 9):** kullanıcıların kaydettiği liste görünümleri (`contracts.ContractSavedViews`) `TenantId` taşır; tenant dışa aktarma ve silme kapsamındadır. Sözleşme listesi CSV çıkışı (`contracts.contracts.export` izni) uygulama içinden yapılır ve her çıkış denetim kaydına (`Exported`: kim, kaç satır, hangi süzgeç) yazılır; tenant verisinin bütünüyle alınması için `tenant-export` kullanılır.
+**Sözleşme verisi (dilim 9):** kullanıcıların kaydettiği liste görünümleri ortak `core.GridViews` tablosundadır (ADR-0036; eski `contracts.ContractSavedViews` tablosu `ContractSavedViewsToGridViews` migration'ıyla taşınıp kaldırıldı), `TenantId` taşır; tenant dışa aktarma ve silme kapsamındadır. Sözleşme listesi CSV çıkışı (`contracts.contracts.export` izni) uygulama içinden yapılır ve her çıkış denetim kaydına (`Exported`: kim, kaç satır, hangi süzgeç) yazılır; tenant verisinin bütünüyle alınması için `tenant-export` kullanılır.
 
 **Dışa aktarma (`tenant-export`):** bir tenant'ın bütün satırlarını `TenantId` ile tablo başına bir JSON dosyasına yazar.
 Tablolar koddan değil veritabanı kataloğundan bulunur (`TenantId` kolonu taşıyan her tablo: tenant şemaları ve platform

@@ -31,6 +31,10 @@ yoktu; kayıtlı görünüm yalnızca Sözleşmeler modülünde (`ContractSavedV
 
 - Tenant dışa aktarma ve silme tabloyu veritabanı kataloğundan otomatik bulur (ek iş yok); RLS ve tablo envanteri testleri tabloyu kapsar.
 - `ColumnPicker` (tarayıcıya kayıtlı, DOM tabanlı) yerine, kişisel görünümü olan ekranlar sütunlarını `GridColumnPicker` ile sunucu görünümüne bağlar.
-  Henüz taşınmayan ekranlar eski `ColumnPicker`'ı kullanmaya devam eder.
-- Sözleşmelerdeki `ContractSavedView` bu kararla kaldırılmadı; ilerideki bir adımda ortak tabloya taşınabilir.
+  **7 Kasım 2026:** son üç ekran (Otomasyon kuralları, Onay süreçleri, Onay merkezi) ve Aktiviteler (tarayıcıda saklanan görünümleri) taşındı;
+  eski `ColumnPicker` ve `js/table-columns.js` silindi. Otomasyon kural listesi sunucuda `sort` aldı; Onay süreçleri sayfasız tek liste
+  olduğundan sıralama istemcidedir. Aktiviteler sunucuda sıralanmaz (takvim kipleri tarih penceresiyle çalışır); görünüm sütun, kip ve süzgeçleri saklar.
+- Sözleşmelerdeki `ContractSavedView` **7 Kasım 2026**'da ortak tabloya taşındı: `ContractSavedViewsToGridViews` migration'ı eski satırları
+  `core.GridViews`'a (ekran `contracts.contracts`, varsayılan sütunlar, süzgeçteki `sort` ayrı sütuna, `search` atılır, ad 60 karaktere kısaltılır,
+  üye başına 20 sınırı) kopyalar ve tabloyu kaldırır; `/api/contracts/saved-views` ucu yoktur.
 - Her ekran kendi `ScreenKey`'ini ve sütun tanımını verir; yeni ekran bu mekanizmayı bedelsiz kullanır.
