@@ -48,6 +48,32 @@ public class SalesPlanningTests(ModulixApiFactory factory) : IClassFixture<Modul
     }
 
     [Fact]
+    public async Task Overview_compares_with_the_same_point_of_the_previous_period_and_reports_days_in_stage()
+    {
+        var s = await SetUpAsync();
+        var anchor = await WinAsync(s.Admin, s.CompanyId, "Bu ay kazanıldı", 150_000m);
+        await OpenAsync(s.Admin, s.CompanyId, "Açık", 100_000m, 40, ThisMonth(anchor));
+        var monthStart = new DateOnly(anchor.Year, anchor.Month, 1);
+        var previousStart = monthStart.AddMonths(-1);
+
+        var overview = await OverviewAsync(s.Admin, anchor);
+
+        var previous = overview.PreviousToDate!;
+        Assert.Equal(previousStart, previous.Start);
+        var sameDay = previousStart.AddDays(anchor.Day - 1);
+        Assert.Equal(sameDay < monthStart ? sameDay : monthStart.AddDays(-1), previous.LastDay);
+        Assert.Equal(0m, previous.Realized.Amount);
+        Assert.Equal(0, previous.WonCount);
+        Assert.Null(previous.WinRatePercent);
+        Assert.Equal(0m, Assert.Single(overview.ByStage).AverageDaysInStage);
+
+        var finished = (await OverviewAsync(s.Admin, previousStart)).PreviousToDate!;
+        Assert.Equal(previousStart.AddMonths(-1), finished.Start);
+        Assert.Equal(previousStart.AddDays(-1), finished.LastDay);
+        Assert.Null((await OverviewAsync(s.Admin, monthStart.AddMonths(1))).PreviousToDate);
+    }
+
+    [Fact]
     public async Task Overview_reports_target_progress_remaining_and_coverage()
     {
         var s = await SetUpAsync();

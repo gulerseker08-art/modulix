@@ -11,7 +11,11 @@ public sealed record SalesOverviewQuery(PeriodKind Kind, DateOnly? Anchor, Guid?
 public sealed record TargetBlock(
     string Metric, string Source, decimal? Value, TargetProgress? Progress, string? Problem, decimal? ChildExcess, string? Currency);
 
-public sealed record StageSlice(string Stage, int Count, decimal Amount, decimal Weighted, int MissingAmountCount, int MissingRateCount);
+/// <summary>Aşama dilimi. <see cref="AverageDaysInStage"/>: açık fırsatların bu aşamada ortalama bekleme günü (aşamaya giriş anından).</summary>
+public sealed record StageSlice(string Stage, int Count, decimal Amount, decimal Weighted, int MissingAmountCount, int MissingRateCount, decimal? AverageDaysInStage = null);
+
+/// <summary>Önceki dönemin karşılaştırma penceresindeki sonuç (<see cref="SalesMetrics.ComparisonWindow"/>); tutar izni yoksa tutar sıfırdır.</summary>
+public sealed record PeriodComparison(string Label, DateOnly Start, DateOnly LastDay, MoneyTotal Realized, int WonCount, int LostCount, decimal? WinRatePercent);
 
 public sealed record TrendPoint(string Label, DateOnly Start, DateOnly End, decimal Realized, int WonCount, bool Partial);
 
@@ -48,7 +52,8 @@ public sealed record SalesOverviewResult(
     IReadOnlyList<TrendPoint> Trend,
     IReadOnlyList<OverviewRisk> Overdue,
     IReadOnlyList<string> Warnings,
-    IReadOnlyList<string> Definitions);
+    IReadOnlyList<string> Definitions,
+    PeriodComparison? PreviousToDate = null);
 
 public sealed record SalesDetailRow(
     Guid Id, string OpportunityNumber, string Title, Guid? OwnerId, string Status, string Stage, decimal? SourceAmount, string SourceCurrency,
@@ -91,6 +96,8 @@ internal sealed class SalesOverview(
         "Hedef gerçekleşme: gerçekleşen / hedef. Kalan hedef: hedef − gerçekleşen. Pipeline kapsama: dönemde kapanması beklenen açık tutar / kalan hedef; kalan hedef sıfır ya da altındaysa \"hedef karşılandı\".",
         "Hedef, dönemi tam kaplayan hedef dilimlerinin toplamıdır. Tenant hedefi varken kullanıcı hedefleri ona eklenmez; yalnızca üst hedefi aşıp aşmadıkları kontrol edilir.",
         "Dönemler firmanın saat diliminde ve mali takvimde, başlangıç dahil sonraki dönem başlangıcı hariç hesaplanır.",
+        "Önceki dönemle karşılaştırma: dönem sürüyorsa önceki dönemin başından aynı gün sayısıdır (ör. çeyreğin 38. günü, önceki çeyreğin ilk 38 günüyle); dönem bittiyse önceki dönemin tamamıdır.",
+        "Aşamada bekleme: açık fırsatların bulunduğu aşamaya girdiği günden bugüne geçen gün sayısının ortalaması.",
         "Para birimi dönüşümü kayıtlı kurlarla yapılır: açık fırsatlar hesap gününün, kazanılmışlar kazanım gününün kuruyla. Kuru bulunamayan tutar toplama girmez ve ayrıca bildirilir (1 varsayılmaz).",
     ];
 
@@ -108,9 +115,10 @@ internal sealed class SalesOverview(
         var visible = load.AmountsVisible;
 
         var stageOf = load.Rows.ToDictionary(r => r.Id, r => r.Stage);
+        var enteredOf = load.Rows.ToDictionary(r => r.Id, r => r.StageEnteredAt);
         var stages = SalesMetrics.Select(facts, SalesCard.OpenPipeline, period)
             .GroupBy(f => stageOf[f.Id])
-            .Select(g => StageOf(g.Key, g.ToList(), period, load))
+            .Select(g => StageOf(g.Key, g.ToList(), period, load, enteredOf))
             .OrderBy(s => s.Stage, StringComparer.Ordinal).ToList();
 
         var trend = TrendOf(facts, period, load);
@@ -119,6 +127,7 @@ internal sealed class SalesOverview(
             .Select(r => new OverviewRisk(r.Id, r.Number, r.Title, r.OwnerId, r.ExpectedCloseDate, visible ? r.Amount : null, r.Currency)).ToList();
 
         var (amountTarget, countTarget, targetWarnings) = await TargetsAsync(query, load, metrics, cancellationToken);
+        var comparison = Comparison(facts, load);
 
         var warnings = Warnings(load, metrics, targetWarnings);
         return RecordResult<SalesOverviewResult>.Ok(new SalesOverviewResult(
@@ -126,8 +135,9 @@ internal sealed class SalesOverview(
             Shown(metrics.OpenPipeline, visible), Shown(metrics.ExpectedOpen, visible), Shown(metrics.WeightedOpen, visible), visible ? metrics.WeightedMissingProbabilityCount : 0,
             Shown(metrics.Realized, visible), visible ? metrics.Outlook : 0m, metrics.WonCount, metrics.LostCount, metrics.WinRatePercent,
             metrics.OpenWithoutCloseDateCount, metrics.OverdueOpenCount,
-            visible ? amountTarget : null, countTarget, visible ? stages : [.. stages.Select(s => new StageSlice(s.Stage, s.Count, 0m, 0m, 0, 0))],
-            visible ? trend : [.. trend.Select(t => t with { Realized = 0m, Partial = false })], overdue, warnings, Definitions));
+            visible ? amountTarget : null, countTarget, visible ? stages : [.. stages.Select(s => s with { Amount = 0m, Weighted = 0m, MissingAmountCount = 0, MissingRateCount = 0 })],
+            visible ? trend : [.. trend.Select(t => t with { Realized = 0m, Partial = false })], overdue, warnings, Definitions,
+            comparison is null ? null : comparison with { Realized = Shown(comparison.Realized, visible) }));
     }
 
     public async Task<RecordResult<SalesCardDetail>> DetailAsync(SalesCard card, SalesOverviewQuery query, CancellationToken cancellationToken)
@@ -196,13 +206,29 @@ internal sealed class SalesOverview(
 
     private static MoneyTotal Shown(MoneyTotal total, bool visible) => visible ? total : new MoneyTotal(0m, total.Count, 0, 0);
 
-    private static StageSlice StageOf(string stage, List<OpportunityFact> facts, ReportPeriod period, Loaded load)
+    private static StageSlice StageOf(
+        string stage, List<OpportunityFact> facts, ReportPeriod period, Loaded load, Dictionary<Guid, DateTimeOffset?> enteredOf)
     {
         var all = SalesMetrics.Total(facts, SalesCard.OpenPipeline, period, load.Currency, load.Rates, load.Today);
         // Aşamadaki açık fırsatların ağırlıklı tutarı kapanış tarihinden bağımsızdır; olasılığı bilinmeyen girmez.
         var weighted = facts.Where(f => f.Probability is not null)
             .Sum(f => SalesMetrics.Amount(f, SalesCard.WeightedOpen, load.Currency, load.Rates, load.Today).Value ?? 0m);
-        return new StageSlice(stage, all.Count, all.Amount, weighted, all.MissingAmountCount, all.MissingRateCount);
+        var waiting = SalesMetrics.AverageDays(
+            facts.Select(f => enteredOf[f.Id]).OfType<DateTimeOffset>().Select(at => ReportPeriods.Today(at, load.Policy.TimeZone)), load.Today);
+        return new StageSlice(stage, all.Count, all.Amount, weighted, all.MissingAmountCount, all.MissingRateCount, waiting);
+    }
+
+    /// <summary>Önceki dönemin aynı noktasına kadarki sonuç; kapanmış fırsatlar trend penceresiyle zaten okunmuştur.</summary>
+    private static PeriodComparison? Comparison(List<OpportunityFact> facts, Loaded load)
+    {
+        var previous = ReportPeriods.Shift(load.Period, -1, load.Policy.FiscalStartMonth);
+        if (SalesMetrics.ComparisonWindow(load.Period, previous, load.Today) is not { } window)
+        {
+            return null;
+        }
+
+        var metrics = SalesMetrics.Compute(facts, window, load.Currency, load.Rates, load.Today);
+        return new PeriodComparison(previous.Label, window.Start, window.LastDay, metrics.Realized, metrics.WonCount, metrics.LostCount, metrics.WinRatePercent);
     }
 
     private static List<TrendPoint> TrendOf(List<OpportunityFact> facts, ReportPeriod period, Loaded load)
