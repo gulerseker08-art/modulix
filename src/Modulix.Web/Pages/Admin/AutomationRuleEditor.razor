@@ -212,6 +212,20 @@
                                     <input id="inactivityDays" class="form-control" type="number" min="1" max="3650" @bind="definition.Trigger.Days" />
                                 </div>
                                 break;
+
+                            case EditorTrigger.DomainEvent:
+                                <div class="span-12">
+                                    <label class="form-label" for="domainEvent">İş olayı</label>
+                                    <select id="domainEvent" class="form-select" value="@definition.Trigger.EventKey" @onchange="e => definition.Trigger.EventKey = e.Value?.ToString() ?? string.Empty">
+                                        <option value="">Seçin…</option>
+                                        @foreach (var businessEvent in BusinessEvents())
+                                        {
+                                            <option value="@businessEvent.Key">@businessEvent.DisplayName</option>
+                                        }
+                                    </select>
+                                    <div class="form-text">Modülün açık iş komutlarının yayınladığı olaylar (ör. fırsat kazanıldı); kayıt oluşturma ve güncelleme ayrı tetikleyicilerdir.</div>
+                                </div>
+                                break;
                         }
                     </div>
                 }
@@ -650,6 +664,10 @@
     private static string? Empty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     private IReadOnlyList<AutomationOptionDto> StatusOptions() => FieldOf(definition.Trigger.Field)?.Options ?? [];
+
+    // İş olayı tetikleyicisi yalnızca modül önekli (beyanlı) olayları sunar; kayıt olayları ("RecordCreated"/"RecordUpdated") ayrı tetikleyicidir.
+    private IEnumerable<AutomationEventDto> BusinessEvents() =>
+        entity?.Events.Where(e => e.EventType is not ("RecordCreated" or "RecordUpdated")) ?? [];
 
     // Tetikleyici
 

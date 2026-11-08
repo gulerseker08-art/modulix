@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Modules.Crm.Domain;
@@ -77,6 +78,7 @@ internal sealed class LeadConversion(
     IEnumerable<ILeadQualificationRule> rules,
     ITenantContextAccessor tenant,
     IChoiceLists choiceLists,
+    IBusinessEventPublisher events,
     TimeProvider time) : ILeadConversion
 {
     /// <summary>Dönüşümle açılan fırsatın başlangıç aşaması (firmanın listesinde etkinse); Lead zaten nitelikli olduğu için.</summary>
@@ -283,10 +285,25 @@ internal sealed class LeadConversion(
             }, request.Version) { Reason = LeadEventReasons.Converted }, cancellationToken);
         }
 
-        return converted.IsSuccess
-            ? RecordResult<LeadConversionResult>.Ok(new LeadConversionResult(
-                converted.Value!, companyId, contactId, opportunity.Value!.Id, companyCreated, contactCreated))
-            : Fail<LeadConversionResult>(converted.Error!, "lead");
+        if (!converted.IsSuccess)
+        {
+            return Fail<LeadConversionResult>(converted.Error!, "lead");
+        }
+
+        // 5) İş olayı (ADR-0039): dönüşümle aynı işlemde yazılır (ConvertAsync RunAtomicAsync içindedir).
+        var ownerId = converted.Value!.Values["ownerId"]?.DeepClone();
+        await events.PublishAsync(new BusinessEvent(CrmModule.Events.LeadConverted, lead.Id, new JsonObject
+        {
+            ["ownerId"] = ownerId,
+            ["convertedCompanyId"] = companyId.ToString(),
+            ["convertedContactId"] = contactId?.ToString(),
+            ["convertedOpportunityId"] = opportunity.Value!.Id.ToString(),
+            ["companyCreated"] = companyCreated,
+            ["contactCreated"] = contactCreated,
+        }) { RecordVersion = converted.Value.Version }, cancellationToken);
+
+        return RecordResult<LeadConversionResult>.Ok(new LeadConversionResult(
+            converted.Value, companyId, contactId, opportunity.Value.Id, companyCreated, contactCreated));
     }
 
     private static JsonObject CompanyValues(RecordData lead, LeadConversionRequest request)

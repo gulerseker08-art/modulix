@@ -86,6 +86,12 @@ public interface IModule
     IReadOnlyList<Events.EventSubscription> EventSubscriptions => [];
 
     /// <summary>
+    /// Modülün yayınladığı iş olayları (ADR-0039, Ç0.4): tür (modül önekli), sürüm, kayıt türü ve payload alanları. Açık iş komutları
+    /// bunları <see cref="Events.IBusinessEventPublisher"/> ile yayınlar; beyan edilmemiş olay yayınlanamaz, beyansız türe abone olunamaz.
+    /// </summary>
+    IReadOnlyList<Events.BusinessEventDefinition> BusinessEvents => [];
+
+    /// <summary>
     /// Modülün lookup alanları (ADR-0016): kullanıcının seçtiği N→1 referanslar. Tanım kodda sabittir; firma yalnızca
     /// "aranabilir" ayarını değiştirir. Anahtar modül anahtarıyla başlar.
     /// </summary>
