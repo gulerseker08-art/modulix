@@ -4,17 +4,31 @@
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
+@inject NavigationManager Nav
 
 <PageTitle>CRM panosu · Modulix</PageTitle>
 
-@* Hedef merkezi: veri Satış görünümüyle aynı uçtan gelir, yeni hesap yoktur. Kapsam ve tutar izni sunucuda uygulanır; tutar izni yoksa adetler gösterilir. *@
+@* İki sekme (ViewTabs): Hedef merkezi ve Benim günüm (MyDayPanel). Hedef merkezi: veri Satış görünümüyle aynı uçtan gelir, yeni hesap yoktur. Kapsam ve tutar izni sunucuda uygulanır; tutar izni yoksa adetler gösterilir. *@
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ReportsRead">
     <div class="page-header">
         <div>
             <h1>CRM panosu</h1>
-            <p class="page-subtitle">@Subtitle</p>
+            <p class="page-subtitle">@(view == DayView ? Greeting : Subtitle)</p>
         </div>
         <div class="header-actions">
+            @if (view == DayView)
+            {
+                @if (Session.Can(CrmAccess.ActivitiesRead))
+                {
+                    <a class="btn btn-outline-secondary" href="crm/aktiviteler"><AppIcon Name="calendar" Size="16" /> Takvim</a>
+                }
+                @if (Session.Can(CrmAccess.ActivitiesWrite))
+                {
+                    <button type="button" class="btn btn-primary" @onclick="() => myDay?.NewActivity()"><AppIcon Name="plus" Size="16" /> Yeni aktivite</button>
+                }
+            }
+            else
+            {
             <div class="segmented" role="group" aria-label="Dönem türü">
                 @foreach (var (key, label) in SalesLabels.PeriodKinds)
                 {
@@ -32,8 +46,18 @@
             {
                 <a class="btn btn-primary" href="crm/firsatlar?yeni=true"><AppIcon Name="plus" Size="16" /> Yeni fırsat</a>
             }
+            }
         </div>
     </div>
+
+    <ViewTabs Items="Views" Value="@view" ValueChanged="ChooseViewAsync" Label="Pano görünümleri" />
+
+    @if (view == DayView)
+    {
+        <MyDayPanel @ref="myDay" Lookups="Lookups" SummaryChanged="s => summary = s" />
+    }
+    else
+    {
 
     @if (loading && report is null)
     {
@@ -229,10 +253,26 @@
             </details>
         }
     }
+    }
 </AuthGate>
 
 @code {
     private const int AttentionLimit = 4;
+    private const string GoalView = "hedef";
+    private const string DayView = "gunum";
+
+    private static readonly IReadOnlyList<ViewOption> Views =
+    [
+        new(GoalView, "Hedef merkezi", Icon: "target"),
+        new(DayView, "Benim günüm", Icon: "calendar"),
+    ];
+
+    /// <summary>Açılacak sekme: <c>?gorunum=gunum</c> Benim günüm'ü açar; yoksa Hedef merkezi.</summary>
+    [SupplyParameterFromQuery(Name = "gorunum")] public string? ViewParameter { get; set; }
+
+    private string view = GoalView;
+    private MyDayPanel? myDay;
+    private MyDaySummary? summary;
 
     private string kind = SalesPeriodKinds.Quarter;
     private string owner = string.Empty;
@@ -245,10 +285,47 @@
     protected override async Task OnInitializedAsync()
     {
         await Session.EnsureLoadedAsync();
+        view = ViewParameter == DayView ? DayView : GoalView;
         if (Session.Can(SalesAccess.ReportsRead))
         {
             await Lookups.LoadAsync();
+            if (view == GoalView)
+            {
+                await LoadAsync();
+            }
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        Nav.NavigateTo(Nav.GetUriWithQueryParameter("gorunum", key == DayView ? DayView : null), replace: true);
+        if (view == GoalView && report is null && !loading)
+        {
             await LoadAsync();
+        }
+    }
+
+    // Selamlama: kullanıcının adı ve bugünün iki sayısı (bugünkü açık iş, kapanış tarihi geçmiş fırsat); sayı bilinmiyorsa yazılmaz.
+    private string Greeting
+    {
+        get
+        {
+            var hour = Regional.Now.Hour;
+            var hello = hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar";
+            var name = Session.User?.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            var parts = new List<string>();
+            if (summary?.OpenToday is { } open)
+            {
+                parts.Add(open == 0 ? "Bugün planlı işiniz yok" : $"Bugün {open} işiniz var");
+            }
+
+            if (summary?.OverdueOpportunities is { } late && late > 0)
+            {
+                parts.Add($"{late} fırsatınızın kapanış tarihi geçti");
+            }
+
+            return $"{hello}{(name is null ? null : " " + name)}." + (parts.Count > 0 ? " " + string.Join(", ", parts) + "." : null);
         }
     }
 

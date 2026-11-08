@@ -1,0 +1,305 @@
+@using System.Globalization
+@inject ApiClient Api
+@inject SessionState Session
+
+@* CRM panosu "Benim günüm" sekmesi: yalnızca oturumdaki kullanıcının kendi kayıtları. Öneriler kurallarla sunucuda üretilir (yapay zekâ değil, /api/crm/my-day);
+   bugünün akışı ve haftalık tamamlanan aktivite Aktiviteler ekranıyla aynı sorgulardır; kişisel hedef Satış görünümü ucundan gelir. *@
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">
+        @error
+        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadAsync">Tekrar dene</button>
+    </div>
+}
+
+<div class="dash-day">
+    <div class="dash-day-col">
+        <section class="dash-card" aria-labelledby="day-steps">
+            <div class="dash-card-head">
+                <h2 id="day-steps" class="dash-card-title"><span class="dash-kpi-icon" aria-hidden="true"><AppIcon Name="zap" Size="18" /></span>Sıradaki en iyi adımlar</h2>
+                <span class="badge tag" title="@RulesHint">Otomatik öneri</span>
+            </div>
+            @if (day is null)
+            {
+                <p class="text-muted mb-0" role="status">Yükleniyor…</p>
+            }
+            else if (day.Suggestions.Count == 0)
+            {
+                <p class="text-muted mb-0">Şu an öneri yok: bekleyen aday, gecikmiş fırsat ya da yanıtsız teklif görünmüyor.</p>
+            }
+            else
+            {
+                <ul class="dash-list dash-steps">
+                    @foreach (var step in day.Suggestions)
+                    {
+                        var (icon, tone, cta, href) = StepAction(step);
+                        <li>
+                            <span class="dash-kpi-icon tone-@tone" aria-hidden="true"><AppIcon Name="@icon" Size="18" /></span>
+                            <div class="dash-list-main">
+                                <a href="@href" title="@StepTitle(step)">@StepTitle(step)</a>
+                                <small>@StepDetail(step)</small>
+                            </div>
+                            <a class="btn btn-tonal btn-sm" href="@href">@cta</a>
+                        </li>
+                    }
+                </ul>
+            }
+            <p class="small text-muted mb-0 mt-2">@RulesHint</p>
+        </section>
+
+        @if (Session.Can(CrmAccess.ActivitiesRead))
+        {
+            <TodayActivities Items="todayItems" Error="@todayError" Lookups="Lookups" OnSelect="a => selected = a" />
+        }
+    </div>
+
+    <div class="dash-day-col">
+        @if (target is { } t)
+        {
+            var amounts = t.AmountsVisible;
+            var progress = (amounts ? t.AmountTarget : t.CountTarget)?.Progress;
+            var tempo = SalesLabels.PeriodElapsedPercent(t.PeriodStart, t.PeriodEnd, t.Today);
+            <section class="dash-hero dash-hero-solo dash-hero-compact" aria-label="Kişisel hedef">
+                <div>
+                    <p class="dash-hero-kicker">Bu çeyrekteki hedefim · @t.PeriodLabel</p>
+                    <div class="dash-hero-headline">
+                        <span class="dash-hero-value">@(amounts ? SalesLabels.Compact(t.Realized.Amount, t.Currency) : SalesLabels.Count(t.WonCount))</span>
+                        @if (progress is not null)
+                        {
+                            <span class="dash-hero-note">/ @(amounts ? SalesLabels.Compact(progress.Target, t.Currency) : progress.Target.ToString("N0", Regional.Numbers))</span>
+                        }
+                    </div>
+                    @if (progress is not null)
+                    {
+                        var share = Share(progress.Realized, progress);
+                        <GoalMeter Realized="share" Weighted="0m" Tempo="tempo" Label="@($"Hedefin {SalesLabels.Percent(Math.Round(share))} gerçekleşti")" />
+                        <div class="dash-hero-legend dash-hero-split">
+                            <span>@SalesLabels.Percent(Math.Round(share)) gerçekleşti</span>
+                            @if (tempo is { } pace)
+                            {
+                                var gap = Math.Round(share - pace);
+                                <span>Tempo @SalesLabels.Percent(Math.Round(pace)) · @Math.Abs(gap).ToString("0", Regional.Numbers) puan @(gap < 0 ? "geride" : "önde")</span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="dash-hero-note mb-0">Bu çeyrek için kişisel hedef tanımlı değil; gerçekleşen kazanılan fırsatlarınızdır.</p>
+                    }
+                </div>
+            </section>
+        }
+
+        @if (day?.OpportunitiesAvailable == true)
+        {
+            <section class="dash-card" aria-labelledby="day-closing">
+                <div class="dash-card-head">
+                    <h2 id="day-closing" class="dash-card-title"><span class="dash-kpi-icon tone-warning" aria-hidden="true"><AppIcon Name="trending-up" Size="18" /></span>Bu ay kapanabilecekler</h2>
+                    <a href="crm/firsatlar">Fırsatlarım</a>
+                </div>
+                @if (day.ClosingThisMonth.Count == 0)
+                {
+                    <p class="text-muted mb-0">Beklenen kapanışı bu ay olan açık fırsatınız yok.</p>
+                }
+                else
+                {
+                    <ul class="dash-list">
+                        @foreach (var item in day.ClosingThisMonth)
+                        {
+                            <li class="dash-closing">
+                                <div class="dash-list-main">
+                                    <div class="dash-closing-head">
+                                        <a href="crm/firsatlar/@item.Id" title="@item.Title">@item.Title</a>
+                                        @if (item.Amount is { } amount)
+                                        {
+                                            <span class="dash-num">@SalesLabels.Compact(amount, item.Currency)</span>
+                                        }
+                                    </div>
+                                    @if (item.Probability is { } probability)
+                                    {
+                                        <div class="dash-closing-track" role="img" aria-label="@($"Olasılık {SalesLabels.Percent(probability)}")">
+                                            <i style="width:@Math.Clamp(probability, 0, 100).ToString(CultureInfo.InvariantCulture)%"></i>
+                                        </div>
+                                    }
+                                    <small>@ClosingDetail(item)</small>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+        }
+
+        <section class="dash-card" aria-labelledby="day-week">
+            <div class="dash-card-head"><h2 id="day-week">Bu hafta</h2></div>
+            <dl class="dash-week">
+                @if (Session.Can(CrmAccess.ActivitiesRead))
+                {
+                    <div><dd>@Number(weekDone)</dd><dt>Tamamlanan aktivite</dt></div>
+                }
+                @if (day?.QuotesAvailable != false)
+                {
+                    <div><dd>@Number(day?.QuotesPresentedThisWeek)</dd><dt>Sunulan teklif</dt></div>
+                }
+                @if (day?.OpportunitiesAvailable != false)
+                {
+                    <div><dd>@Number(day?.WonThisWeek)</dd><dt>Kazanılan fırsat</dt></div>
+                }
+            </dl>
+        </section>
+    </div>
+</div>
+
+@* Aktivite ayrıntısı ve yeni aktivite, Aktiviteler ekranındaki çekmecelerle aynıdır. *@
+<Drawer Open="@(selected is not null && !editing)" Label="Aktivite detayı" OnClose="() => selected = null">
+    @if (selected is not null)
+    {
+        <ActivityActions Activity="selected" Lookups="Lookups" Changed="ChangedAsync" Closed="() => selected = null" EditRequested="Edit" />
+    }
+</Drawer>
+
+<Drawer Open="editing" Label="@(editTarget is null ? "Yeni aktivite" : "Aktiviteyi düzenle")" OnClose="() => editing = false">
+    <ActivityEditor Activity="editTarget" InitialDay="TodayDate" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="() => editing = false" />
+</Drawer>
+
+@code {
+    private const string ActivitiesUrl = "/api/crm/activities";
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    /// <summary>Selamlama satırındaki sayılar değişince (bugünkü açık iş, gecikmiş fırsat) çağrılır.</summary>
+    [Parameter] public EventCallback<MyDaySummary> SummaryChanged { get; set; }
+
+    private MyDayDto? day;
+    private SalesOverviewDto? target;
+    private IReadOnlyList<ActivityDto>? todayItems;
+    private string? todayError;
+    private int? weekDone;
+    private string? error;
+    private ActivityDto? selected;
+    private ActivityDto? editTarget;
+    private bool editing;
+
+    private string RulesHint => day is null
+        ? "Öneriler kurallarla üretilir."
+        : $"Öneriler kurallarla üretilir (yapay zekâ değil): ilk teması bekleyen müşteri adayları, kapanış tarihi geçen fırsatlar, {day.QuoteReminderDays} gündür yanıtsız teklifler ve {day.StaleDays} gündür temas olmayan fırsatlar.";
+
+    private static DateOnly TodayDate => DateOnly.FromDateTime(Regional.Now.DateTime);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Lookups.LoadAsync(contacts: Session.Can(CrmAccess.ContactsRead));
+        await LoadAsync();
+    }
+
+    /// <summary>Sayfa başlığındaki "Yeni aktivite" düğmesi.</summary>
+    public void NewActivity()
+    {
+        editTarget = null;
+        editing = true;
+        selected = null;
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var range = Uri.EscapeDataString(ActivityLabels.Range(TodayDate, TodayDate));
+        var (weekFrom, weekTo) = ActivityCalendar.Window(CalendarMode.Week, TodayDate);
+        var week = Uri.EscapeDataString(ActivityLabels.Range(weekFrom, weekTo));
+
+        var dayTask = Api.GetAsync<MyDayDto>("/api/crm/my-day");
+        var targetTask = Session.User is { } user
+            ? Api.GetAsync<SalesOverviewDto>($"/api/crm/sales/overview?kind={SalesPeriodKinds.Quarter}&ownerId={user.UserId}")
+            : null;
+        if (Session.Can(CrmAccess.ActivitiesRead))
+        {
+            var todayTask = Api.GetAsync<CrmPage<ActivityDto>>($"{ActivitiesUrl}?page=1&pageSize=50&range={range}&ownerId=me");
+            var doneTask = Api.GetAsync<CrmPage<ActivityDto>>($"{ActivitiesUrl}?page=1&pageSize=1&range={week}&ownerId=me&status={ActivityStatus.Completed}");
+            var today = await todayTask;
+            todayItems = today.Value?.Items.OrderBy(a => a.IsAllDay ? 0 : 1).ThenBy(a => a.StartAt ?? a.DueAt).ToList() ?? [];
+            todayError = today.Error;
+            weekDone = (await doneTask).Value?.TotalCount;
+        }
+
+        var result = await dayTask;
+        day = result.Value;
+        error = result.IsSuccess ? null : result.Error;
+        target = targetTask is null ? null : (await targetTask).Value;
+        await SummaryChanged.InvokeAsync(new MyDaySummary(
+            todayItems?.Count(a => ActivityStatus.IsOpen(a.Status)), day?.OverdueOpportunityCount));
+    }
+
+    private void Edit(ActivityDto activity)
+    {
+        editTarget = activity;
+        editing = true;
+    }
+
+    private async Task ChangedAsync(ActivityDto updated)
+    {
+        selected = updated;
+        await LoadAsync();
+    }
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        selected = null;
+        await LoadAsync();
+    }
+
+    private static decimal Share(decimal value, TargetProgressDto progress) => progress.Target > 0 ? value / progress.Target * 100m : 0m;
+
+    private static string Number(int? value) => value?.ToString("N0", Regional.Numbers) ?? "–";
+
+    // ---- Öneri metinleri: tür başına başlık, gerekçe ve eylem. Kayıt adına ek getirilmez (Türkçe ek uyumu kayıt adına bağlı olmasın).
+
+    private static string StepTitle(MyDaySuggestionDto step) => step.Kind switch
+    {
+        MyDayKinds.NewLead => $"Yeni müşteri adayına ilk temas: {step.Title}",
+        MyDayKinds.OverdueOpportunity => $"Kapanış tarihi geçti, müşteriyi arayın: {step.Title}",
+        MyDayKinds.QuoteFollowUp => $"Teklifi hatırlatın: {(string.IsNullOrWhiteSpace(step.Title) ? step.Number : step.Title)}",
+        _ => $"Yeniden temas kurun: {step.Title}",
+    };
+
+    private string StepDetail(MyDaySuggestionDto step)
+    {
+        var parts = new List<string?>();
+        if (step.Kind == MyDayKinds.NewLead)
+        {
+            parts.Add(step.Subtitle);
+            parts.Add(step.Since is { } since ? $"{Ago(since)} geldi" : null);
+            return Join(parts);
+        }
+
+        parts.Add(step.Kind == MyDayKinds.QuoteFollowUp ? step.Subtitle : null);
+        parts.Add(step.Amount is { } amount ? SalesLabels.Compact(amount, step.Currency) : null);
+        parts.Add(step.Stage is { Length: > 0 } stage ? Lookups.Label(CrmLists.OpportunityStage, stage) : null);
+        parts.Add(step.DaysWaiting is { } waiting ? $"{waiting} gün önce sunuldu, yanıt yok" : null);
+        parts.Add(step.DaysSinceContact is { } quiet ? $"{quiet} gündür temas yok" : null);
+        parts.Add(step.DaysOverdue is { } late ? (late == 0 ? "kapanış tarihi bugün" : $"kapanış tarihi {late} gün önce geçti") : null);
+        return Join(parts);
+    }
+
+    private static (string Icon, string Tone, string Cta, string Href) StepAction(MyDaySuggestionDto step) => step.Kind switch
+    {
+        MyDayKinds.NewLead => ("inbox", "teal", "Adayı aç", $"crm/leadler/{step.RecordId}"),
+        MyDayKinds.OverdueOpportunity => ("phone", "danger", "Fırsatı aç", $"crm/firsatlar/{step.RecordId}"),
+        MyDayKinds.QuoteFollowUp => ("file-text", "warning", "Teklifi aç", $"crm/teklifler/{step.RecordId}"),
+        _ => ("hourglass", "brand", "Fırsatı aç", $"crm/firsatlar/{step.RecordId}"),
+    };
+
+    private static string Ago(DateTimeOffset at)
+    {
+        var span = DateTimeOffset.UtcNow - at;
+        return span.TotalMinutes < 60 ? $"{Math.Max(1, (int)span.TotalMinutes)} dk önce"
+            : span.TotalHours < 24 ? $"{(int)span.TotalHours} saat önce"
+            : $"{(int)span.TotalDays} gün önce";
+    }
+
+    private static string ClosingDetail(MyDayClosingDto item) =>
+        Join([item.Probability is { } p ? $"Olasılık {SalesLabels.Percent(p)}" : null, item.Overdue ? $"{CrmLabels.Date(item.ExpectedCloseDate)} · gecikti" : CrmLabels.Date(item.ExpectedCloseDate)]);
+
+    private static string Join(IEnumerable<string?> parts) => string.Join(" · ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+}

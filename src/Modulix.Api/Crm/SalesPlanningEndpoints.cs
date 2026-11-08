@@ -29,6 +29,8 @@ internal static class SalesPlanningEndpoints
         var sales = crm.MapGroup("/sales");
         sales.MapGet("/overview", OverviewAsync).RequirePermission(CrmModule.Permissions.SalesReportsRead);
         sales.MapGet("/overview/cards/{card}", CardAsync).RequirePermission(CrmModule.Permissions.SalesReportsRead);
+        // Benim günüm: yalnızca kullanıcının kendi kayıtları; bölümler ayrıca kendi okuma iznine bağlıdır.
+        crm.MapGet("/my-day", MyDayAsync).RequirePermission(CrmModule.Permissions.SalesReportsRead);
 
         var analytics = sales.MapGroup("/analytics");
         analytics.MapGet("/quotes", (string? kind, DateOnly? date, DateOnly? asOf, Guid? ownerId, string? currency, ISalesAnalytics analysis, CancellationToken ct) =>
@@ -68,6 +70,12 @@ internal static class SalesPlanningEndpoints
 
         var result = await overview.BuildAsync(new SalesOverviewQuery(periodKind, date, ownerId, currency), ct);
         return result.IsSuccess ? Results.Ok(Map<SalesOverviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+    }
+
+    private static async Task<IResult> MyDayAsync(IMyDay myDay, CancellationToken ct)
+    {
+        var result = await myDay.BuildAsync(ct);
+        return result.IsSuccess ? Results.Ok(Map<MyDayDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> CardAsync(string card, string? kind, DateOnly? date, Guid? ownerId, string? currency, ISalesOverview overview, CancellationToken ct)
