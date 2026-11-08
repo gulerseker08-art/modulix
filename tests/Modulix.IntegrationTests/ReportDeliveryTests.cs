@@ -348,6 +348,37 @@ public class ReportDeliveryTests(ModulixApiFactory factory) : IClassFixture<Modu
     // ---- Zamanlama: çalışma
 
     [Fact]
+    public async Task A_schedule_keeps_its_file_format_and_delivers_an_xlsx_file_when_asked()
+    {
+        var s = await SetUpAsync();
+        await OpenAsync(s.Admin, s.CompanyId, "Excel müşterisi", 777m);
+        var report = await SaveAsync(s.Admin, "Excel zamanlaması", new ReportSpecDto { Dataset = Opportunities, Columns = ["title", "amount"] });
+
+        // Varsayılan csv; xlsx seçilebilir, güncellemede değişir, bilinmeyen biçim reddedilir.
+        Assert.Equal("csv", (await ScheduleAsync(s.Admin, report.Summary.Id)).Format);
+        var bad = await s.Admin.PostAsJsonAsync($"{Reports}/{report.Summary.Id}/schedules", new SaveReportScheduleRequest("daily", 9, Format: "pdf"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, bad.StatusCode);
+        var xlsx = await ReadAsync<ReportScheduleDto>(
+            await s.Admin.PostAsJsonAsync($"{Reports}/{report.Summary.Id}/schedules", new SaveReportScheduleRequest("weekly", 8, "monday", Format: "xlsx")), HttpStatusCode.Created);
+        Assert.Equal("xlsx", xlsx.Format);
+        var updated = await ReadAsync<ReportScheduleDto>(
+            await s.Admin.PutAsJsonAsync($"{Reports}/schedules/{xlsx.Id}", new SaveReportScheduleRequest("weekly", 8, "monday", ExpectedVersion: xlsx.Version, Format: "csv")));
+        Assert.Equal("csv", updated.Format);
+        var back = await ReadAsync<ReportScheduleDto>(
+            await s.Admin.PutAsJsonAsync($"{Reports}/schedules/{xlsx.Id}", new SaveReportScheduleRequest("weekly", 8, "monday", ExpectedVersion: updated.Version, Format: "xlsx")));
+        Assert.Equal("xlsx", back.Format);
+
+        // Vakti gelince dosya xlsx olarak hazırlanır.
+        await MakeDueAsync(s.TenantId, back.Id);
+        var (run, _) = await factory.Services.GetRequiredService<ReportScheduleRunner>().RunTenantAsync(s.TenantId, CancellationToken.None);
+        Assert.Equal(1, run!.Delivered);
+        var export = Assert.Single(await ListExportsAsync(s.Admin));
+        Assert.EndsWith(".xlsx", export.FileName);
+        var response = await s.Admin.GetAsync($"{Reports}/exports/{export.Id}/download");
+        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", response.Content.Headers.ContentType!.MediaType);
+    }
+
+    [Fact]
     public async Task A_due_schedule_exports_as_its_owner_emails_a_link_without_data_and_runs_only_once_per_slot()
     {
         var s = await SetUpAsync();

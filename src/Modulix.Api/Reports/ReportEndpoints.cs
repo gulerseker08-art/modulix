@@ -188,7 +188,12 @@ public static class ReportEndpoints
                 : throw new ReportException("Haftanın günü sunday..saturday olmalı.");
         }
 
-        return new ReportScheduleInput(frequency, request.Hour, day, request.DayOfMonth);
+        if (!TryFormat(request.Format, out var format))
+        {
+            throw new ReportException("Biçim csv ya da xlsx olmalı.");
+        }
+
+        return new ReportScheduleInput(frequency, request.Hour, day, request.DayOfMonth, format);
     }
 
     /// <summary>Biçim sorgu değeri: boş csv'dir; yalnızca csv ve xlsx kabul edilir.</summary>
@@ -214,7 +219,7 @@ public static class ReportEndpoints
 
     private static ReportScheduleDto ToDto(ReportScheduleInfo s) => new(
         s.Id, s.ReportId, s.ReportName, Name(s.Frequency), s.Hour, s.DayOfWeek is { } day ? Name(day) : null, s.DayOfMonth, s.Enabled, s.NextRunAt, s.LastRunAt,
-        s.LastStatus, s.LastMessage, s.StoppedReason, s.Version);
+        s.LastStatus, s.LastMessage, s.StoppedReason, s.Version, s.Format == ReportFileFormat.Xlsx ? "xlsx" : "csv");
 
     private static async Task<IResult> RunAsync(Func<Task<IResult>> action)
     {

@@ -2762,6 +2762,13 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Format")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasDefaultValue("Csv");
+
                     b.Property<string>("Frequency")
                         .IsRequired()
                         .HasMaxLength(20)
