@@ -12,7 +12,8 @@ public sealed record AutomationEntityView(
     string DisplayName,
     IReadOnlyList<AutomationFieldDefinition> Fields,
     IReadOnlyList<AutomationEventDefinition> Events,
-    IReadOnlyList<AutomationRelationDefinition> Relations);
+    IReadOnlyList<AutomationRelationDefinition> Relations,
+    string? LabelField = null);
 
 /// <summary>Kural editörüne sunulan aksiyon. <see cref="Available"/> yanlışsa neden <see cref="UnavailableReason"/>'dadır.</summary>
 public sealed record AutomationActionView(
@@ -121,13 +122,21 @@ public sealed class AutomationCatalogService(
             fields.AddRange(await CustomFieldDefinitionsAsync(entity.EntityKey, cancellationToken));
         }
 
+        // Etiket alanı kullanıcı için okunamıyorsa seçici kaydı alanla tanıtmaz (alan yetkisi atlanmaz).
+        var label = entity.LabelField is { } name
+            && modules.FindAutomationField($"{entity.EntityKey}.{name}") is { } labelField
+            && (labelField.ReadPermission is null || permissions.Contains(labelField.ReadPermission))
+                ? name
+                : null;
+
         return new AutomationEntityView(
             moduleKey,
             entity.EntityKey,
             entity.DisplayName,
             fields,
             [.. modules.AutomationEventsOf(entity.EntityKey)],
-            [.. modules.AutomationRelationsOf(entity.EntityKey)]);
+            [.. modules.AutomationRelationsOf(entity.EntityKey)],
+            label);
     }
 
     // Özel alanlar kayıt değerlerinde "custom" nesnesi altındadır; çoklu seçim ilk sürümde koşulda yoktur.

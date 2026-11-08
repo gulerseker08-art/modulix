@@ -108,6 +108,34 @@
                          Description="@(rule.Status == AutomationLabels.Active ? "Şu an çalışan sürüm." : "Kapalı; çalışmıyor.")">
                 <VersionView Version="published" Issues="detail.PublishedIssues" />
             </FormSection>
+
+            @if (CanRun && rule.Status == AutomationLabels.Active && IsManual(published))
+            {
+                <FormSection Title="Elle çalıştır" Icon="zap"
+                             Description="Bu kuralın tetikleyicisi elle çalıştırmadır. Seçtiğiniz kayıt için gerçekten çalışır; yalnızca okuma yetkinizin kapsadığı kayıtlar seçilebilir.">
+                    <div class="form-grid">
+                        <div class="span-6">
+                            <label class="form-label" for="manualRecord">Kayıt</label>
+                            <RecordPicker Id="manualRecord" EntityKey="@rule.EntityKey" LabelField="@LabelFieldOf(rule.EntityKey)"
+                                          AccessibleName="Çalıştırılacak kayıt" @bind-Value="manualRecordId" />
+                        </div>
+                    </div>
+                    @if (confirming == Confirm.Run)
+                    {
+                        <div class="alert alert-warning confirm" role="alertdialog" aria-label="Elle çalıştırma onayı">
+                            <p>Kural seçilen kayıt için hemen çalışır ve etkisi (ör. aktivite açılması) geri alınmaz. Devam edilsin mi?</p>
+                            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="RunManuallyAsync">Çalıştır</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = Confirm.None">Vazgeç</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" disabled="@(busy || manualRecordId is null)" @onclick="() => confirming = Confirm.Run">Bu kayıt için çalıştır</button>
+                        </div>
+                    }
+                </FormSection>
+            }
         }
     }
 </AuthGate>
@@ -118,6 +146,7 @@
         None,
         PublishAndOpen,
         Discard,
+        Run,
     }
 
     [Parameter] public Guid RuleId { get; set; }
@@ -131,6 +160,45 @@
     private Confirm confirming;
 
     private bool CanPublish => Session.Can(CoreAccess.PublishAutomation);
+
+    private bool CanRun => Session.Can(CoreAccess.RunAutomation);
+
+    private Guid? manualRecordId;
+
+    /// <summary>Yayınlanmış sürümün tetikleyicisi "elle" mi? Yalnızca öyle kurallar elle çalıştırılabilir (sunucu da denetler).</summary>
+    private static bool IsManual(AutomationVersionDto version) =>
+        version.Definition.ValueKind == System.Text.Json.JsonValueKind.Object
+        && version.Definition.TryGetProperty("trigger", out var trigger)
+        && trigger.ValueKind == System.Text.Json.JsonValueKind.Object
+        && trigger.TryGetProperty("type", out var type)
+        && type.ValueKind == System.Text.Json.JsonValueKind.String
+        && type.GetString() == "manual";
+
+    private string? LabelFieldOf(string entityKey) => entities.FirstOrDefault(e => e.EntityKey == entityKey)?.LabelField;
+
+    private async Task RunManuallyAsync()
+    {
+        if (manualRecordId is not { } recordId)
+        {
+            return;
+        }
+
+        busy = true;
+        message = null;
+        notice = null;
+        problems = [];
+        var result = await Api.PostAsync<AutomationRunDetailDto>($"/api/automation/rules/{RuleId}/run", new RunAutomationRuleRequest(recordId));
+        busy = false;
+        confirming = Confirm.None;
+        if (result.Value is { } run)
+        {
+            Navigation.NavigateTo($"yonetim/otomasyon/calismalar/{run.Run.Id}");
+            return;
+        }
+
+        // Aynı kayıt için bugün zaten çalıştırıldıysa (409) ve diğer hatalarda sunucunun iletisi gösterilir.
+        message = result.Error;
+    }
 
     protected override async Task OnParametersSetAsync()
     {

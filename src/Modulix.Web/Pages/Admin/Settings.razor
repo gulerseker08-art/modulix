@@ -1,14 +1,19 @@
 @page "/yonetim/ayarlar"
+@page "/modul-ayarlari/{ModuleKey}"
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Firma ayarları · Modulix</PageTitle>
+<PageTitle>@Title · Modulix</PageTitle>
 
-@* Firma ayarları (Y6): ayarlar modüllerin tanımından gelir, her bölüm ayrı kaydedilir. Ayarları her üye okur;
-   core.settings.manage izni olmayan için ekran salt okunurdur. *@
-<AuthGate AnyPermission="CoreAccess.AdministrationPermissions">
-    <a class="back-link" href="yonetim">← Yönetim</a>
-    <h1>Firma ayarları</h1>
+@* Ayarlar (Y6) modüllerin tanımından gelir, her bölüm ayrı kaydedilir. /yonetim/ayarlar yalnızca çekirdeğin (Kuruluş ayarları),
+   /modul-ayarlari/{modül} yalnızca o modülün ayarlarını gösterir. Ayarları her üye okur; core.settings.manage izni olmayan
+   için ekran salt okunurdur. *@
+<AuthGate Module="@ModuleKey" AnyPermission="CoreAccess.AdministrationPermissions">
+    @if (ModuleKey is null)
+    {
+        <a class="back-link" href="yonetim">← Yönetim</a>
+    }
+    <h1>@Title</h1>
 
     @if (message is not null)
     {
@@ -17,7 +22,7 @@
 
     @if (!canEdit)
     {
-        <p class="text-muted">Ayarları değiştirmek için "Firma ayarlarını değiştirir" izni gerekir.</p>
+        <p class="text-muted">Ayarları değiştirmek için "Kuruluş ve modül ayarlarını değiştirir" izni gerekir.</p>
     }
 
     @if (settings is null)
@@ -29,12 +34,12 @@
     }
     else
     {
-        @if (Group is not null)
+        @if (ModuleKey is not null && !settings.Any(InScope))
         {
-            <p class="text-muted">Yalnızca “@Group” ayarları gösteriliyor. <a href="yonetim/ayarlar">Tüm ayarlar</a></p>
+            <p class="text-muted">Bu modülün ayarı yok.</p>
         }
 
-        <section class="record-form settings-group" hidden="@(Group is not null)">
+        <section class="record-form settings-group" hidden="@(ModuleKey is not null)">
             <h2>Logo</h2>
             @if (logoMessage is not null)
             {
@@ -64,7 +69,7 @@
             }
         </section>
 
-        @foreach (var group in settings.Where(s => Group is null || s.Group == Group).GroupBy(s => s.Group))
+        @foreach (var group in settings.Where(InScope).GroupBy(s => s.Group))
         {
             <form class="record-form settings-group" novalidate @onsubmit="() => SaveAsync(group.Key)" @onsubmit:preventDefault>
                 <h2>@group.Key</h2>
@@ -130,8 +135,15 @@
 </AuthGate>
 
 @code {
-    // Modül sayfalarından gelen bağlantı (ör. Sözleşmeler): yalnızca o grubu gösterir.
-    [SupplyParameterFromQuery(Name = "grup")] public string? Group { get; set; }
+    // Boşsa Kuruluş ayarları (çekirdek); doluysa yalnızca o modülün ayarları.
+    [Parameter] public string? ModuleKey { get; set; }
+
+    // Başlık menüdeki adla aynıdır (etkin dildeki karşılığı, ADR-0034).
+    private string Title => AppNavigation.Resolve(ModuleKey is null ? "yonetim/ayarlar" : AppCatalog.ModuleSettingsRoute(ModuleKey)) is { } screen
+        ? AppNames.Of(screen)
+        : "Modül ayarları";
+
+    private bool InScope(SettingDto setting) => setting.ModuleKey == (ModuleKey ?? CoreAccess.ModuleKey);
 
     private IReadOnlyList<SettingDto>? settings;
     private readonly Dictionary<string, string> values = new(StringComparer.Ordinal);

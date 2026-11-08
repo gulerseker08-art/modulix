@@ -94,6 +94,18 @@ public class CrmAutomationTemplateTests
     }
 
     [Fact]
+    public void Every_rule_entity_names_a_declared_text_label_field_for_the_record_picker()
+    {
+        foreach (var entity in Declared.Entities)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(entity.LabelField), $"{entity.EntityKey} etiket alanı beyan etmeli.");
+            var field = Assert.Single(Declared.Fields, f => f.EntityKey == entity.EntityKey && f.Name == entity.LabelField);
+            Assert.Equal(AutomationFieldType.Text, field.Type);
+            Assert.Null(field.ReadPermission); // seçici herkesin okuyabildiği alanla tanıtır
+        }
+    }
+
+    [Fact]
     public void Template_definitions_survive_the_stored_json_form_unchanged()
     {
         foreach (var template in CrmAutomationTemplates.All)

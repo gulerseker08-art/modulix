@@ -722,7 +722,7 @@ internal sealed class CampaignRuns(
     {
         if (!policy.HasProvider)
         {
-            return "Gönderim sağlayıcısı yapılandırılmamış; gerçek gönderim bloklu. Firma ayarlarında bir sağlayıcı seçilene kadar çalıştırma başlatılamaz.";
+            return "Gönderim sağlayıcısı yapılandırılmamış; gerçek gönderim bloklu. Pazarlama ayarlarında bir sağlayıcı seçilene kadar çalıştırma başlatılamaz.";
         }
 
         var provider = providers.FirstOrDefault(p => p.Key == policy.Provider);

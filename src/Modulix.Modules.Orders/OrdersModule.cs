@@ -61,7 +61,7 @@ public sealed class OrdersModule : IModule
         public const string FulfillmentRecord = "orders.fulfillment.record";
     }
 
-    /// <summary>Firma ayarları.</summary>
+    /// <summary>Modül ayarları (/modul-ayarlari/…).</summary>
     public static class SettingKeys
     {
         public const string AllowSelfApproval = "orders.approval.allow-self";

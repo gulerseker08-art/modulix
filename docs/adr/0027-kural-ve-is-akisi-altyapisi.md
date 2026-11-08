@@ -197,7 +197,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Uygulandı (aşağıda "Dilim 4b") |
 | 4c | Kayda bağlı onay (modül beyanı, kural aksiyonu "onaya gönder"), kalıcı akış | Sonra |
 | 4d | Takvim ortaklaştırma, puanlama, şablon motoru | **Metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); takvim ortaklaştırma ve puanlama sonra |
-| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c") |
+| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c"); 5d kayıt seçici, kayıt üzerinde deneme ve elle çalıştırma uygulandı ("Dilim 5d") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
 
 ## Maliyet (harici ücret yok, iç maliyet var)
@@ -513,3 +513,24 @@ Dilim 4'ün "şablon motoru" kalemi, onay merkezinden (4a) bağımsız ilk parç
 | --- | --- |
 | `dotnet test tests/Modulix.Core.Tests --filter "AutomationTextTemplateTests"` | Yeni testler: değişken ayrıştırma, hatalı biçimler, alan uygunluğu ve izin, tip bazlı biçimleme, boş/görülemeyen değer ve notta sızıntı yok, enjeksiyon yok, HTML kodlama, çözümleyici (doldurma, bağlanamayan parametre, kısaltma, boş konu), yayın doğrulaması (kabul, ret, yetkisiz alan, bağlanamayan parametre) |
 | `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | Yeni 4: mutlu yol (konu `Takip: Sessiz aday` olarak açılır), hata (bilinmeyen, kapanmayan, kayıt seçimi, başka kayıt türünün alanı), tenant izolasyonu (her firma kendi kaydından doldurur), yetki (tutar izni olmayan tutar değişkeni yayınlayamaz) |
+
+### Dilim 5d: Kayıt seçici, kayıt üzerinde deneme, elle çalıştırma (7 Kasım 2026)
+
+Dilim 5b'de ertelenen "elle çalıştırma" ve 5c'de eksik kalan "kayıt üzerinde deneme" için ortak bir kayıt seçici kuruldu.
+
+- **`RecordPicker` (Web bileşeni):** bir kayıt türünden tek kayıt seçer. Arama, sayfalama, izin ve veri kapsamı **sunucudadır**: genel kayıt API'si (`GET /api/records/{tür}?search=&page=&pageSize=`) ve kayıt boru hattı kullanılır; kullanıcının göremediği kayıt listede çıkmaz, yeni uç nokta yoktur. ADR-0016 lookup'ından farkı: bir alanın referansı değil kaydın kendisi seçilir; lookup tanımı (kaynak alan, firma ayarı, yönetim ekranı) gerekmez, böylece "Alan ve lookup ayarları" ekranı kirlenmez. Görünüm ve klavye (ok tuşları, Enter, Esc, `aria-activedescendant`) mevcut `lookup-*` sınıflarıyla; yeni CSS yok. Eski aramanın yanıtı yeni aramayı ezmez (sıra numarası), yazarken 300 ms bekler.
+- **Etiket alanı:** kayıt türü beyanına `AutomationEntityDefinition.LabelField` eklendi (CRM: müşteri adayı `subject`, fırsat `title`). Beyan edilmiş bir **metin** alanı olmalı (açılışta doğrulanır); katalog (`AutomationEntityDto.LabelField`, geriye uyumlu, varsayılan `null`) alanı, kullanıcı onu okuyabiliyorsa verir (alan yetkisi atlanmaz). Etiket yoksa ya da bu kayıtta boşsa seçici kısa kimliği (`Kayıt 3f9a1c2e`) gösterir.
+- **Kayıt üzerinde deneme:** kural düzenleyicinin "Doğrulama" bölümünde isteğe bağlı kayıt seçilir; `POST /api/automation/preview` kayıtla çağrılır. Gösterilenler: koşulların sağlanıp sağlanmadığı, koşul ağacının neden açıklaması, kural çalışsaydı yapacakları (parametreler çözülmüş: `Takip: Anka Lojistik`). Hiçbir şey çalıştırılmaz.
+- **Elle çalıştırma:** kural ayrıntısında, **açık** ve tetikleyicisi **elle** olan kuralda ("Elle çalıştır", `core.automation.run`) kayıt seçilir, onay şeridinden sonra `POST /rules/{id}/run` çağrılır ve çalışma ayrıntısına gidilir. Kural elle değilse, kapalıysa ya da kayıt okunamıyorsa sunucu reddeder (düğmenin gizlenmesi yetki değildir); aynı kayıt için bugün zaten çalıştırıldıysa 409 iletisi gösterilir.
+- **Bilinen sınırlar:** seçici yalnızca etiket alanı ve kısa kimlikle tanıtır (ikincil bilgi, ör. durum, yok); kayıt türüne özel arama alanı kayıt deposunun `search` davranışına bağlıdır; tek kayıt seçilir (çoklu seçim, toplu çalıştırma yok); ekran tarayıcıda gözle kontrol edilmedi.
+
+### Test sonuçları (Dilim 5d)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter AutomationLabelFieldTests` | Yeni 4: metin alanı etiket olur, etiketsiz tür, geçersiz etiket (bilinmeyen/metin olmayan/başka türün alanı) açılışta reddedilir, okunamayan etiket alanı katalogda verilmez |
+| `dotnet test tests/Modulix.Modules.Crm.Tests --filter CrmAutomationTemplateTests` | Yeni: her kural yazılabilen CRM türü beyan edilmiş, izin gerektirmeyen bir metin alanını etiket olarak adlandırır |
+| `dotnet test tests/Modulix.Web.Tests` | Yeni 4 (`RecordPickerLabelsTests`): etiket alanı metni, eksik/boş/metin olmayan alanda kısa kimlik, etiketsiz tür, eski katalog yanıtı |
+| `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | Yeni 3: mutlu yol (katalog etiket alanı, aramayla bulma, daraltma), tenant izolasyonu (başka firmanın kaydı çıkmaz), yetki (müşteri adayı okuma izni olmayan türü ve kayıtları göremez, liste 403) |
+
+Elle çalıştırmanın kendi dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 2'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez (yalnızca katalogda etiket alanı).
