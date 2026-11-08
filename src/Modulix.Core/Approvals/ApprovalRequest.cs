@@ -34,6 +34,8 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
     public const int TitleMaxLength = 200;
     public const int DescriptionMaxLength = 2000;
     public const int CommentMaxLength = 1000;
+    public const int EntityKeyMaxLength = 100;
+    public const int SourceKeyMaxLength = 200;
 
     private ApprovalRequest()
     {
@@ -59,6 +61,17 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
     public string? Currency { get; private set; }
 
     public Guid RequesterId { get; private set; }
+
+    /// <summary>Kayda bağlı onayda (Dilim 4c) bağlandığı kaydın türü; elle açılan talepte boş.</summary>
+    public string? EntityKey { get; private set; }
+
+    public Guid? RecordId { get; private set; }
+
+    /// <summary>
+    /// Talebi açan kural adımının tekilleştirme anahtarı (Dilim 4c). Aynı anahtarla ikinci talep açılmaz: kural motorunun en az bir kez
+    /// teslimi ikinci talep üretmez. Elle açılan talepte boş.
+    /// </summary>
+    public string? SourceKey { get; private set; }
 
     public ApprovalRequestStatus Status { get; private set; }
 
@@ -126,6 +139,20 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
             .ToList();
         request.ActivateNext(steps, now);
         return (request, steps);
+    }
+
+    /// <summary>Talebi bir kayda ve (kural kaynaklıysa) açan adımın tekilleştirme anahtarına bağlar. <see cref="Open"/>'dan hemen sonra çağrılır.</summary>
+    public void LinkToRecord(string entityKey, Guid recordId, string? sourceKey)
+    {
+        if (string.IsNullOrWhiteSpace(entityKey) || entityKey.Length > EntityKeyMaxLength || recordId == Guid.Empty
+            || (sourceKey is not null && (sourceKey.Length is 0 || sourceKey.Length > SourceKeyMaxLength)))
+        {
+            throw new ArgumentException("Kayıt bağlantısı geçersiz.");
+        }
+
+        EntityKey = entityKey;
+        RecordId = recordId;
+        SourceKey = sourceKey;
     }
 
     /// <summary>Etkin adımı onaylar: aynı sıradaki etkin adımlar bitince sonraki sıra açılır, adım kalmadıysa talep onaylanır.</summary>

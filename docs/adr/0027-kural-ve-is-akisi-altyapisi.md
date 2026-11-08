@@ -195,7 +195,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
 | 4a | Genel onay: süreç tanımı, talep, Onay merkezi (Ç6a asgari) | Uygulandı (aşağıda "Dilim 4a") |
 | 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Uygulandı (aşağıda "Dilim 4b") |
-| 4c | Kayda bağlı onay (modül beyanı, kural aksiyonu "onaya gönder"), kalıcı akış | Sonra |
+| 4c | Kayda bağlı onay (modül beyanı, kural aksiyonu "onaya gönder"), kalıcı akış | **İlk parça uygulandı** ("Dilim 4c": kural aksiyonu "Onaya gönder", kayda bağlı talep); onay sonucunun hedef modüle komutu (Ç6a.3) ve kalıcı akış sonra |
 | 4d | Takvim ortaklaştırma, puanlama, şablon motoru | **Metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); takvim ortaklaştırma ve puanlama sonra |
 | 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
@@ -493,6 +493,25 @@ Uçların dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 1'
 - **Vekâlet:** `core.ApprovalDelegations`; kişi kendi vekâletini açar ve geri alır, yönetici başkası adına da yapabilir. Tarihler çakışamaz, en çok 365 gün, zincirlenmez. Vekil kişiye atanmış adımlara karar verir, karar `OnBehalfOf` ile yazılır. Role atanmış adımlar vekâlete girmez. Dört göz vekâletle aşılamaz: talep sahibi vekil olsa da kendi talebine karar veremez, talep sahibinin vekili de onun adına karar veremez. CRM teklif vekâleti (`QuoteDelegation`) ayrı kalır.
 
 **Bilerek yapılmadı:** bildirim saklama temizliği, modüllerin kutuya bağlanması (yalnızca onay yazıyor), kişisel bildirim tercihi (Ç5b), iş günü takvimi.
+
+### Dilim 4c: Kural aksiyonu "Onaya gönder", kayda bağlı onay (8 Kasım 2026)
+
+Kural motoru ile genel onay (4a/4b) birbirine bağlandı: bir kural, tetiklendiği kayıt için onay talebi açar.
+
+- **Karar 1, talep sahibi kaydın sorumlusudur** (kuralın kimliği değil). Kayıt türü beyanına `AutomationEntityDefinition.OwnerField` eklendi (CRM: müşteri adayı ve fırsat için `ownerId`; beyan edilmiş bir **lookup** alanı olmalı, açılışta doğrulanır). Dört göz sorumlu için geçerlidir: sorumlu kendi talebine karar veremez ve sürecin her adımında sorumludan başka etkin onaycı aranır, yoksa talep açılmaz. Sorumlu boşsa ya da türde `OwnerField` yoksa adım açıkça başarısız olur (sahipsiz talep üretilmez).
+- **Karar 2, süreç adla seçilir, yayında doğrulanır.** Aksiyon parametresi sürecin adıdır (firma içinde tekil); yayın sırasında `ApprovalProcessCheck` (`IAutomationStepCheck`) o adla **etkin** bir süreç olup olmadığına bakar (yoksa 422). Süreç yayından sonra kapanır ya da silinirse kural çalışırken adım açık bir iletiyle başarısız olur; sessizce atlanmaz. Süreç kimliği (GUID) seçilmedi: kullanıcı dostu değil ve süreç yeniden açılınca kural kırılırdı.
+- **Aksiyon** (`core.approval.request`, "Onaya gönder"): Core'un tek aksiyonu; sektörden bağımsızdır, kayıt türünü kuralın kendisinden alır. Parametreler: süreç adı (sabit), başlık (kayıt değişkeni kabul eder, Dilim 4d), açıklama, tutar, para birimi. Tutar bir sayı ya da **para alanından bağlanır** (para alanı sayı parametresine bağlanabilir; para birimi ayrı yazılır). Gereken izin `core.approvals.request` (yayınlayan sahip olmalı, yetki yükseltme yok). `core.automation.approve` bu iş için kullanılmadı; karar yine sürecin onaycısındadır.
+- **Kayda bağlantı ve tekilleştirme:** `core.ApprovalRequests`'e `EntityKey`, `RecordId`, `SourceKey` eklendi (migration `ApprovalRecordLink`, yalnızca null'lanabilir kolonlar ve indeksler, geriye uyumlu; yeni tablo yok, RLS değişmedi). `UNIQUE(TenantId, SourceKey)` (dolu olanlar) kural adımının yeniden teslimini ikinci talepten korur; ayrıca aynı kayıt ve süreç için **bekleyen** talep varsa yenisi açılmaz (karar verildikten sonra yeni talep açılabilir). Talep detayı `EntityKey`/`RecordId` taşır (API'de geriye uyumlu, varsayılan `null`).
+- **Sunucu içi servis:** `IApprovalService.OpenForRecordAsync` yalnızca aksiyondan çağrılır (uç nokta yok), çünkü talep sahibi çağıran değil kayıt sorumlusudur; denetim, e-posta ve bildirim kutusu elle açılışla aynı işlemde.
+- **Dry-run** hiçbir şey yazmaz ("Onay talebi açılacak (süreç: X)"). Özet kişisel veri taşımaz (başlık ve kişi adı yazılmaz).
+- **Bilerek yapılmadı:** onay sonucunun hedef modüle komutu (örn. fırsatta indirimi uygula; Ç6a.3), kalıcı akış, talep detayında bağlı kaydın bağlantısı (API alanı var, arayüz göstermiyor), sorumlunun etkin üye olup olmadığının denetimi (pasif sorumlu için talep açılır, sorumlu göremez; sonraki iş).
+
+### Test sonuçları (Dilim 4c)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter ApprovalAutomationTests` | Yeni 5: Core aksiyonu ve izni beyanı, `OwnerField` doğrulaması, talebin kayıt bağlantısı ve geçersiz bağlantı, para alanının sayı parametresine bağlanması (diğer tip uyuşmazlıkları reddedilir), aksiyona özgü denetim yalnızca kendi aksiyonunda çalışır |
+| `dotnet test tests/Modulix.IntegrationTests --filter ApprovalAutomationTests` (SQL Server) | Yeni 4: mutlu yol (bağlı talep, sorumlu talep sahibi, başlık ve tutar kayıttan, tekrar turda ikinci talep yok, onaycı bekleyenlerde görür), hata (bilinmeyen süreç 422, süreç sonradan kapanınca ve dört göz sağlanamayınca adım başarısız), tenant izolasyonu (aynı adlı süreçler, her firma kendi kaydından kendi talebini açar), yetki (`core.approvals.request` olmayan aksiyonu yayınlayamaz) |
 
 ### Dilim 4d: Metin değişkenleri, ortak şablon doğrulayıcı (7 Kasım 2026)
 

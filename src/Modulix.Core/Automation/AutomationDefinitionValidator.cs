@@ -21,7 +21,8 @@ public static class ActionParameterBinding
 /// (şema, izin, modül/lisans). Yayın ve önizleme bunu kullanır. Yayınlayan, sahip olmadığı izni gerektiren aksiyonu ya da göremediği
 /// alanı kullanamaz (yetki yükseltme yok).
 /// </summary>
-public sealed partial class AutomationDefinitionValidator(ModuleCatalog modules, IAutomationCatalog catalog, ICurrentAccess access)
+public sealed partial class AutomationDefinitionValidator(
+    ModuleCatalog modules, IAutomationCatalog catalog, ICurrentAccess access, IEnumerable<IAutomationStepCheck>? stepChecks = null)
 {
     public const int MaxActions = 20;
 
@@ -229,6 +230,12 @@ public sealed partial class AutomationDefinitionValidator(ModuleCatalog modules,
             }
 
             ValidateParameters(view.Definition, step.Parameters ?? new JsonObject(), fields, path, issues);
+
+            // Aksiyona özgü denetim: parametrenin tenant verisine karşı geçerliliği (ör. onay süreci adı) - Dilim 4c.
+            foreach (var check in stepChecks?.Where(c => c.ActionKey == step.Action) ?? [])
+            {
+                issues.AddRange(await check.CheckAsync(step, path, cancellationToken));
+            }
         }
     }
 
@@ -317,11 +324,15 @@ public sealed partial class AutomationDefinitionValidator(ModuleCatalog modules,
         {
             issues.Add(new(path, $"'{field.Label}' alanını görme izniniz yok; parametreye bağlanamaz."));
         }
-        else if (field.Type != parameter.Type || field.LookupKey != parameter.LookupKey)
+        else if (!(field.Type == parameter.Type || IsAmountToNumber(field, parameter)) || field.LookupKey != parameter.LookupKey)
         {
             issues.Add(new(path, $"'{field.Label}' alanının tipi '{parameter.Label}' parametresiyle uyuşmuyor."));
         }
     }
+
+    // Para alanının tutarı sayı parametresine bağlanabilir (para birimi bağlanmaz; ayrı parametre ile verilir) - Dilim 4c, onay tutarı.
+    private static bool IsAmountToNumber(AutomationFieldDefinition field, AutomationParameter parameter) =>
+        field.Type == AutomationFieldType.Money && parameter.Type == AutomationFieldType.Number;
 
     /// <summary>Sabit parametre değerini tipine çözer (JSON değeri → tipli değer). Hata iletisi kullanıcıya gösterilir.</summary>
     public static bool TryLiteral(AutomationParameter parameter, JsonNode value, out object? parsed, out string? error)

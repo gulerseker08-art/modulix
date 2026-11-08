@@ -71,8 +71,8 @@ public static class CrmAutomation
     {
         Entities =
         [
-            new(CrmModule.Entities.Lead, "Müşteri adayı", CrmModule.Permissions.LeadsRead) { RecordSource = typeof(CrmAutomationRecordSource) },
-            new(CrmModule.Entities.Opportunity, "Fırsat", CrmModule.Permissions.OpportunitiesRead) { RecordSource = typeof(CrmAutomationRecordSource) },
+            new(CrmModule.Entities.Lead, "Müşteri adayı", CrmModule.Permissions.LeadsRead) { RecordSource = typeof(CrmAutomationRecordSource), OwnerField = "ownerId" },
+            new(CrmModule.Entities.Opportunity, "Fırsat", CrmModule.Permissions.OpportunitiesRead) { RecordSource = typeof(CrmAutomationRecordSource), OwnerField = "ownerId" },
         ],
         Events =
         [

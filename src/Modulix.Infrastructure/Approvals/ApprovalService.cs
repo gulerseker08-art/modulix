@@ -227,18 +227,54 @@ internal sealed class ApprovalService(
     public async Task<ApprovalRequestDetail> OpenRequestAsync(ApprovalRequestInput input, CancellationToken cancellationToken)
     {
         TenantContext tenant = RequireTenant();
+        return await OpenAsync(tenant, input, tenant.UserId, link: null, cancellationToken);
+    }
+
+    public async Task<ApprovalOpenResult> OpenForRecordAsync(ApprovalRecordRequest record, CancellationToken cancellationToken)
+    {
+        TenantContext tenant = RequireTenant();
+
+        // İdempotency: aynı kural adımının yeniden teslimi ya da aynı kayıt ve süreç için hâlâ bekleyen talep ikinci talep açmaz.
+        ApprovalRequest? existing = await db.ApprovalRequests.AsNoTracking().FirstOrDefaultAsync(
+            r => r.SourceKey == record.SourceKey
+                || (r.EntityKey == record.EntityKey && r.RecordId == record.RecordId && r.DefinitionId == record.Input.DefinitionId
+                    && r.Status == ApprovalRequestStatus.Pending),
+            cancellationToken);
+        if (existing is not null)
+        {
+            Me me = await MeAsync(tenant, cancellationToken);
+            return new ApprovalOpenResult((await DetailsAsync(tenant, me, [existing], cancellationToken))[0], AlreadyExisted: true);
+        }
+
+        ApprovalRequestDetail opened = await OpenAsync(tenant, record.Input, record.RequesterId, record, cancellationToken);
+        return new ApprovalOpenResult(opened, AlreadyExisted: false);
+    }
+
+    // Ortak açılış: talep sahibi çağıran (elle) ya da kayıt sahibi (kural kaynaklı); dört göz hangisi için geçerliyse ona uygulanır.
+    private async Task<ApprovalRequestDetail> OpenAsync(
+        TenantContext tenant, ApprovalRequestInput input, Guid requesterId, ApprovalRecordRequest? link, CancellationToken cancellationToken)
+    {
         ApprovalDefinition definition = await db.ApprovalDefinitions.AsNoTracking()
             .SingleOrDefaultAsync(d => d.Id == input.DefinitionId && d.IsActive, cancellationToken)
             ?? throw new ApprovalException("Onay süreci bulunamadı ya da kapalı.");
 
         DateTimeOffset now = time.GetUtcNow();
         (ApprovalRequest request, List<ApprovalRequestStep> steps) = Guarded(() =>
-            ApprovalRequest.Open(definition, input.Title, input.Description, input.Amount, input.Currency, tenant.UserId, now));
+        {
+            (ApprovalRequest opened, List<ApprovalRequestStep> openedSteps) =
+                ApprovalRequest.Open(definition, input.Title, input.Description, input.Amount, input.Currency, requesterId, now);
+            if (link is not null)
+            {
+                opened.LinkToRecord(link.EntityKey, link.RecordId, link.SourceKey);
+            }
+
+            return (opened, openedSteps);
+        });
 
         // Süreç açılışta sahipsiz kalmasın: her adımda talep sahibinden başka etkin bir onaycı olmalı (dört göz).
         foreach (ApprovalRequestStep step in steps)
         {
-            if ((await ApproversAsync(tenant, step, withDelegates: false, cancellationToken)).All(id => id == tenant.UserId))
+            if ((await ApproversAsync(tenant, step, withDelegates: false, cancellationToken)).All(id => id == requesterId))
             {
                 throw new ApprovalException($"\"{step.Name}\" adımında talep sahibinden başka etkin onaycı yok; yöneticinize başvurun.");
             }
@@ -665,7 +701,8 @@ internal sealed class ApprovalService(
                 request.Amount, request.Currency, request.RequesterId, users.GetValueOrDefault(request.RequesterId, "—"), request.Status,
                 request.SubmittedAt, request.CompletedAt, request.Version, details,
                 pending && request.RequesterId != tenant.UserId && own.Any(s => s.Status == ApprovalStepStatus.Active && IsMine(s, Without(me, request.RequesterId))),
-                pending && request.RequesterId == tenant.UserId);
+                pending && request.RequesterId == tenant.UserId,
+                request.EntityKey, request.RecordId);
         })];
     }
 

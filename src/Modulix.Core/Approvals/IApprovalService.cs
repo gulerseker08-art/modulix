@@ -39,7 +39,17 @@ public sealed record ApprovalStepDetail(
 public sealed record ApprovalRequestDetail(
     Guid Id, Guid DefinitionId, string DefinitionName, int DefinitionRevision, string Title, string? Description, decimal? Amount, string? Currency,
     Guid RequesterId, string RequesterName, ApprovalRequestStatus Status, DateTimeOffset SubmittedAt, DateTimeOffset? CompletedAt, long Version,
-    IReadOnlyList<ApprovalStepDetail> Steps, bool CanDecide, bool CanWithdraw);
+    IReadOnlyList<ApprovalStepDetail> Steps, bool CanDecide, bool CanWithdraw, string? EntityKey = null, Guid? RecordId = null);
+
+/// <summary>
+/// Kural kaynaklı, kayda bağlı talep (Dilim 4c). <see cref="RequesterId"/> talebi "açmış sayılan" kişidir (kaydın sorumlusu); dört göz
+/// onun için geçerlidir. <see cref="SourceKey"/> açan kural adımının tekilleştirme anahtarıdır.
+/// </summary>
+public sealed record ApprovalRecordRequest(
+    ApprovalRequestInput Input, Guid RequesterId, string EntityKey, Guid RecordId, string SourceKey);
+
+/// <summary>Kayda bağlı talep açma sonucu. <see cref="AlreadyExisted"/>: aynı adım ya da aynı kayıt-süreç için açık talep zaten vardı.</summary>
+public sealed record ApprovalOpenResult(ApprovalRequestDetail Request, bool AlreadyExisted);
 
 public sealed record ApprovalRequestPage(IReadOnlyList<ApprovalRequestDetail> Items, int Page, int PageSize, int TotalCount);
 
@@ -89,6 +99,14 @@ public interface IApprovalService
     Task<ApprovalRequestDetail?> GetRequestAsync(Guid id, bool seeAll, CancellationToken cancellationToken);
 
     Task<ApprovalRequestDetail> OpenRequestAsync(ApprovalRequestInput input, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Kural aksiyonunun kayda bağlı talebi (Dilim 4c). Talep sahibi çağıran değil <see cref="ApprovalRecordRequest.RequesterId"/>'dir;
+    /// bu yüzden yalnızca sunucu içi çağrılır (uç nokta yoktur). İdempotent: aynı <see cref="ApprovalRecordRequest.SourceKey"/> ya da aynı
+    /// kayıt ve süreç için bekleyen talep varsa yenisi açılmaz, mevcut döner. Süreç yok/kapalıysa ya da dört göz sağlanamıyorsa
+    /// <see cref="ApprovalException"/>.
+    /// </summary>
+    Task<ApprovalOpenResult> OpenForRecordAsync(ApprovalRecordRequest request, CancellationToken cancellationToken);
 
     /// <summary>Kullanıcının karar verebildiği etkin adımı onaylar ya da reddeder (ret notu zorunlu). Talep yoksa ya da göremiyorsa null.</summary>
     Task<ApprovalRequestDetail?> DecideAsync(Guid id, bool approve, string? comment, long expectedVersion, CancellationToken cancellationToken);

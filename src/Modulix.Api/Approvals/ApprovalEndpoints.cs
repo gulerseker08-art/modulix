@@ -171,5 +171,5 @@ public static class ApprovalEndpoints
         [.. detail.Steps.Select(s => new ApprovalStepDto(
             s.Id, s.Order, s.Name, s.ApproverUserId, s.ApproverRoleId, s.ApproverName, s.Status.ToString(), s.ActivatedAt, s.DueAt, s.IsOverdue, s.IsOrphaned,
             s.DecidedByName, s.DecidedAt, s.Comment, s.OnBehalfOfName, s.EscalationName, s.IsEscalated))],
-        detail.CanDecide, detail.CanWithdraw);
+        detail.CanDecide, detail.CanWithdraw, detail.EntityKey, detail.RecordId);
 }

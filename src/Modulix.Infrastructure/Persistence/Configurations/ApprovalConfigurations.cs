@@ -74,6 +74,8 @@ internal sealed class ApprovalRequestConfiguration : IEntityTypeConfiguration<Ap
         builder.Property(r => r.Amount).HasPrecision(18, 2);
         builder.Property(r => r.Currency).HasMaxLength(3);
         builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(r => r.EntityKey).HasMaxLength(ApprovalRequest.EntityKeyMaxLength);
+        builder.Property(r => r.SourceKey).HasMaxLength(ApprovalRequest.SourceKeyMaxLength);
         builder.Property(r => r.Version).IsConcurrencyToken();
 
         builder.HasAlternateKey(r => new { r.TenantId, r.Id });
@@ -84,6 +86,10 @@ internal sealed class ApprovalRequestConfiguration : IEntityTypeConfiguration<Ap
 
         builder.HasIndex(r => new { r.TenantId, r.Status, r.SubmittedAt });
         builder.HasIndex(r => new { r.TenantId, r.RequesterId, r.Status });
+
+        // Kayda bağlı onay (Dilim 4c): kayda göre arama ve kural adımının tekilleştirme anahtarı (aynı anahtarla ikinci talep açılmaz).
+        builder.HasIndex(r => new { r.TenantId, r.EntityKey, r.RecordId });
+        builder.HasIndex(r => new { r.TenantId, r.SourceKey }).IsUnique().HasFilter("[SourceKey] IS NOT NULL");
     }
 }
 

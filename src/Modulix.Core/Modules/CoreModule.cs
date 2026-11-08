@@ -609,10 +609,17 @@ public sealed class CoreModule : IModule
             Subscriptions.Automation, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
     ];
 
+    /// <summary>Core'un kural yeteneği (Dilim 4c): sektörden bağımsız tek aksiyon, "Onaya gönder". Kayıt türü beyan etmez.</summary>
+    Modulix.Core.Contracts.Automation.AutomationCapabilities IModule.Automation => Modulix.Core.Approvals.ApprovalAutomation.Capabilities;
+
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<AssignmentEmailSubscriber>();
         services.AddScoped<AutomationEventSubscriber>();
+
+        // "Onaya gönder" aksiyonu ve yayındaki süreç adı denetimi (Dilim 4c).
+        services.AddScoped<Modulix.Core.Approvals.RequestApprovalAction>();
+        services.AddScoped<IAutomationStepCheck, Modulix.Core.Approvals.ApprovalProcessCheck>();
     }
 
     /// <summary>Kişinin çalıştığı firma: kişisi olan taraf silinemez.</summary>

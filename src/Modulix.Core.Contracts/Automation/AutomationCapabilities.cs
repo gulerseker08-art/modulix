@@ -15,6 +15,12 @@ namespace Modulix.Core.Contracts.Automation;
 public sealed record AutomationEntityDefinition(string EntityKey, string DisplayName, string? ReadPermission = null)
 {
     public Type? RecordSource { get; init; }
+
+    /// <summary>
+    /// Kaydın sorumlusunu tutan alanın adı (ör. "ownerId"); kural kaynaklı onayda talep sahibi budur (Dilim 4c). Kayıt türünün beyan
+    /// edilmiş bir <b>lookup</b> alanı olmalıdır; boşsa bu kayıt türü için "onaya gönder" aksiyonu talep sahibi bulamaz ve adım başarısız olur.
+    /// </summary>
+    public string? OwnerField { get; init; }
 }
 
 /// <summary>
