@@ -53,6 +53,21 @@ public class CrmTextTests
             Check(CrmText.LeadPriorityGroup, priority, LeadPriority.Label(priority));
         }
 
+        foreach (var status in OpportunityStatus.All)
+        {
+            Check(CrmText.OpportunityStatusGroup, status, OpportunityStatus.Label(status));
+        }
+
+        foreach (var status in OpportunityBudgetStatus.All)
+        {
+            Check(CrmText.OpportunityBudgetStatusGroup, status, OpportunityBudgetStatus.Label(status));
+        }
+
+        foreach (var role in OpportunityContactRoles.All)
+        {
+            Check(CrmText.OpportunityContactRoleGroup, role, OpportunityContactRoles.Label(role));
+        }
+
         foreach (var outcome in new[] { ActivityOutcome.Reached, ActivityOutcome.NoAnswer, ActivityOutcome.Sent })
         {
             Check(CrmText.ActivityOutcomeGroup, outcome, ActivityOutcome.Label(outcome));

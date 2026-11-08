@@ -5,11 +5,11 @@
 @inject Modulix.Web.Services.ActivityOptions Activities
 @inject NavigationManager Navigation
 
-<PageTitle>Fırsatlar · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.opportunities.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.OpportunitiesRead">
-    <PageHeader Title="Fırsatlar" Icon="target" Subtitle="Satış fırsatlarınızı aşama aşama takip edin.">
-        <a class="btn btn-outline-secondary" href="crm/firsat-raporu">Rapor</a>
+    <PageHeader Title="@Texts.Get("crm.opportunities.title")" Icon="target" Subtitle="@Texts.Get("crm.opportunities.subtitle")">
+        <a class="btn btn-outline-secondary" href="crm/firsat-raporu">@Texts.Get("crm.leads.report.show")</a>
     </PageHeader>
 
     @if (message is not null)
@@ -22,24 +22,24 @@
         <OpportunityEditor Opportunity="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="SavedAsync" />
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Fırsat görünümleri" NewView="StartNamingAsync" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("crm.opportunities.views")" NewView="StartNamingAsync" />
 
     <div class="filters">
-        <div class="segmented" role="group" aria-label="Gösterim">
-            <button type="button" class="chip @(board ? "active" : null)" @onclick="() => SwitchAsync(true)">Satış hunisi</button>
-            <button type="button" class="chip @(!board ? "active" : null)" @onclick="() => SwitchAsync(false)">Liste</button>
+        <div class="segmented" role="group" aria-label="@Texts.Get("crm.opportunities.display")">
+            <button type="button" class="chip @(board ? "active" : null)" @onclick="() => SwitchAsync(true)">@Texts.Get("home.funnel.title")</button>
+            <button type="button" class="chip @(!board ? "active" : null)" @onclick="() => SwitchAsync(false)">@Texts.Get("crm.opportunities.list")</button>
         </div>
-        <label class="visually-hidden" for="status-filter">Durum</label>
+        <label class="visually-hidden" for="status-filter">@Texts.Get("common.field.status")</label>
         <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm durumlar</option>
+            <option value="">@Texts.Get("common.allStatuses")</option>
             @foreach (var s in OpportunityStatus.All)
             {
-                <option value="@s">@OpportunityStatus.Label(s)</option>
+                <option value="@s">@CrmText.OpportunityStatusName(s)</option>
             }
         </select>
-        <label class="visually-hidden" for="scope-filter">Hizmet kapsamı</label>
+        <label class="visually-hidden" for="scope-filter">@Texts.Get("crm.leads.filter.scope")</label>
         <select id="scope-filter" class="form-select form-select-sm filter-select" @bind="scope" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm hizmet kapsamları</option>
+            <option value="">@Texts.Get("crm.leads.filter.scopeAll")</option>
             @foreach (var a in activities.Where(a => a.Kind == "Activity"))
             {
                 <option value="@a.Code">@Activities.PathOf(a)</option>
@@ -49,7 +49,7 @@
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Fırsat ara" placeholder="Başlık ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("crm.opportunities.search.aria")" placeholder="@Texts.Get("crm.opportunities.search.placeholder")" @bind="search" />
         </form>
         @if (!board)
         {
@@ -57,7 +57,7 @@
         }
         @if (Session.Can(CrmAccess.OpportunitiesWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni fırsat</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("crm.opportunities.new")</button>
         }
     </div>
 
@@ -71,12 +71,12 @@
     {
         @if (columns is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <p class="text-muted">@Texts.Get("common.loading")</p>
         }
         else
         {
             <p class="text-muted small board-hint">
-                @(CanMove ? "Kartı sürükleyerek veya kartın altındaki listeden aşamasını değiştirin. Kazanıldı/Kaybedildi sütununa bırakmak fırsat sayfasını açar (kapanış bilgisi istenir)." : null)
+                @(CanMove ? Texts.Get("crm.opportunities.boardHint") : null)
             </p>
             <div class="board">
                 @foreach (var column in columns)
@@ -100,9 +100,9 @@
                                 <a href="crm/firsatlar/@opportunity.Id"><strong>@opportunity.Title</strong></a>
                                 @if (opportunity.Status != OpportunityStatus.Open)
                                 {
-                                    <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span>
+                                    <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@CrmText.OpportunityStatusName(opportunity.Status)</span>
                                 }
-                                @if (opportunity.SourceLeadId is { } cardLead && Session.Can(CrmAccess.LeadsRead)) { <a class="small" href="crm/leadler/@cardLead">Kaynak müşteri adayı</a> }
+                                @if (opportunity.SourceLeadId is { } cardLead && Session.Can(CrmAccess.LeadsRead)) { <a class="small" href="crm/leadler/@cardLead">@Texts.Get("crm.opportunities.sourceLead")</a> }
                                 <a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a>
                                 @if (ShowAmounts)
                                 {
@@ -118,21 +118,21 @@
                                 @if (CanMove && opportunity.Status == OpportunityStatus.Open)
                                 {
                                     <div class="card-actions">
-                                        <select class="form-select form-select-sm" aria-label="Aşama" value="@opportunity.Stage"
+                                        <select class="form-select form-select-sm" aria-label="@Texts.Get("crm.opportunities.col.stage")" value="@opportunity.Stage"
                                                 @onchange="e => MoveAsync(opportunity, (string)e.Value!)">
                                             @foreach (var stage in Lookups.Choices(CrmLists.OpportunityStage, opportunity.Stage))
                                             {
                                                 <option value="@stage.Key">@stage.Label</option>
                                             }
                                         </select>
-                                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(opportunity)">Düzenle</button>
+                                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(opportunity)">@Texts.Get("common.edit")</button>
                                     </div>
                                 }
                             </article>
                         }
                         @if (column.Page.TotalCount > column.Page.Items.Count)
                         {
-                            <p class="text-muted small">İlk @column.Page.Items.Count kayıt gösteriliyor; listeyi kullanın.</p>
+                            <p class="text-muted small">@Texts.Get("crm.opportunities.firstN", column.Page.Items.Count)</p>
                         }
                     </section>
                 }
@@ -141,11 +141,11 @@
     }
     else if (page is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Kayıt yok.</p>
+        <p class="text-muted">@Texts.Get("common.noRecords")</p>
     }
     else
     {
@@ -156,7 +156,7 @@
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" Class="@(column.Key == "amount" ? "text-end" : null)" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -168,11 +168,11 @@
                             @Cell(column, opportunity)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{opportunity.Title} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="crm/firsatlar/@opportunity.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", opportunity.Title)">
+                                <a class="view-menu-item" role="menuitem" href="crm/firsatlar/@opportunity.Id"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></a>
                                 @if (Session.Can(CrmAccess.OpportunitiesWrite))
                                 {
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(opportunity)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(opportunity)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 }
                             </RowMenu>
                         </td>
@@ -196,20 +196,20 @@
 
     // Başlıklar sunucuda sıralanır (varsayılan: en yeni önce, "default" sunucuya gönderilmeyen belirteçtir). Firma/sorumlu adı ilişki ve üyelik
     // tablosunda olduğundan, tutar ve olasılık hassas alan olduğundan (sıralama değeri sezdirir) bu sütunlar sıralanamaz.
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("title", "Başlık", "type", "title", "-title", Locked: true),
-        new("company", "Firma", "building"),
-        new("stage", "Aşama", "tag", "stage", "-stage"),
-        new("amount", "Tutar", "coins"),
-        new("probability", "Olasılık", "percent"),
-        new("owner", "Sorumlu", "user"),
-        new("closeDate", "Kapanış", "calendar", "closeDate", "-closeDate"),
-        new("number", "No", "hash", "number", "-number", DefaultVisible: false),
-        new("priority", "Öncelik", "alert-circle", "priority", "-priority", DefaultVisible: false),
-        new("type", "Tür", "tag", "type", "-type", DefaultVisible: false),
-        new("source", "Kaynak", "globe", "source", "-source", DefaultVisible: false),
-        new("nextActionDate", "Sonraki aksiyon", "clock", "nextActionDate", "-nextActionDate", DefaultVisible: false),
+        new("title", Texts.Get("crm.opportunities.col.title"), "type", "title", "-title", Locked: true),
+        new("company", Texts.Get("crm.contacts.col.company"), "building"),
+        new("stage", Texts.Get("crm.opportunities.col.stage"), "tag", "stage", "-stage"),
+        new("amount", Texts.Get("crm.lead.convertPanel.amount"), "coins"),
+        new("probability", Texts.Get("crm.opportunities.col.probability"), "percent"),
+        new("owner", Texts.Get("common.field.owner"), "user"),
+        new("closeDate", Texts.Get("crm.opportunities.col.closeDate"), "calendar", "closeDate", "-closeDate"),
+        new("number", Texts.Get("crm.leads.col.number"), "hash", "number", "-number", DefaultVisible: false),
+        new("priority", Texts.Get("crm.leads.col.priority"), "alert-circle", "priority", "-priority", DefaultVisible: false),
+        new("type", Texts.Get("crm.company.editor.kind"), "tag", "type", "-type", DefaultVisible: false),
+        new("source", Texts.Get("crm.company.source"), "globe", "source", "-source", DefaultVisible: false),
+        new("nextActionDate", Texts.Get("crm.opportunities.col.nextAction"), "clock", "nextActionDate", "-nextActionDate", DefaultVisible: false),
     ];
 
     private readonly GridViewState grid = new("crm.opportunities", "default");
@@ -263,10 +263,10 @@
     // Görünümler yalnızca süzgeçtir (Benim, Tümü, Kapanışı geçenler, Aksiyonsuz, kişisel); kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(MineView, "Benim fırsatlarım", Icon: "star"),
-        new(AllView, "Tüm fırsatlar", Icon: "target"),
-        new(OverdueView, "Kapanışı geçenler", Icon: "clock"),
-        new(NoActionView, "Aksiyonsuz", Icon: "alert-circle"),
+        new(MineView, Texts.Get("crm.opportunities.view.mine"), Icon: "star"),
+        new(AllView, Texts.Get("crm.opportunities.view.all"), Icon: "target"),
+        new(OverdueView, Texts.Get("crm.opportunities.view.overdue"), Icon: "clock"),
+        new(NoActionView, Texts.Get("crm.opportunities.view.noAction"), Icon: "alert-circle"),
         .. views.Options,
     ];
 
@@ -424,7 +424,7 @@
             <a href="crm/firsatlar/@opportunity.Id">@opportunity.Title</a> <small class="text-muted">@opportunity.OpportunityNumber</small>
             @if (opportunity.SourceLeadId is { } sourceLead && Session.Can(CrmAccess.LeadsRead))
             {
-                <a class="small d-block" href="crm/leadler/@sourceLead">Kaynak müşteri adayı</a>
+                <a class="small d-block" href="crm/leadler/@sourceLead">@Texts.Get("crm.opportunities.sourceLead")</a>
             }
         </text>;
 
@@ -433,7 +433,7 @@
             <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span>
             @if (opportunity.Status != OpportunityStatus.Open)
             {
-                <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span>
+                <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@CrmText.OpportunityStatusName(opportunity.Status)</span>
             }
         </text>;
 
