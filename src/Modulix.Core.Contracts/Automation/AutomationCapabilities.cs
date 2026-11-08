@@ -15,6 +15,13 @@ namespace Modulix.Core.Contracts.Automation;
 public sealed record AutomationEntityDefinition(string EntityKey, string DisplayName, string? ReadPermission = null)
 {
     public Type? RecordSource { get; init; }
+
+    /// <summary>
+    /// Kayıt seçicide (kuralı bir kayıt üzerinde denemek, elle çalıştırmak) kaydı tanıtan alanın adı (ör. "title"). Kayıt türünün beyan
+    /// edilmiş bir <b>metin</b> alanı olmalıdır; boşsa seçici kaydı yalnızca kısa kimliğiyle gösterir. Kullanıcı alanı göremiyorsa
+    /// (<see cref="AutomationFieldDefinition.ReadPermission"/>) katalog etiket alanını vermez.
+    /// </summary>
+    public string? LabelField { get; init; }
 }
 
 /// <summary>

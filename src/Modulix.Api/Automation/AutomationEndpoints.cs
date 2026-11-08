@@ -267,7 +267,8 @@ public static class AutomationEndpoints
             e.DisplayName,
             [.. e.Fields.Select(ToDto)],
             [.. e.Events.Select(ev => new AutomationEventDto(ev.Key, ev.EventType, ev.DisplayName))],
-            [.. e.Relations.Select(r => new AutomationRelationDto(r.Key, r.Label, r.TargetEntityKey, [.. r.TargetFields.Select(ToDto)]))]))],
+            [.. e.Relations.Select(r => new AutomationRelationDto(r.Key, r.Label, r.TargetEntityKey, [.. r.TargetFields.Select(ToDto)]))],
+            e.LabelField))],
         [.. catalog.Actions.Select(a => new AutomationActionDto(
             a.Definition.Key,
             a.ModuleKey,

@@ -114,6 +114,9 @@ public static class AppCatalog
     public const string CrmReportsGroup = "crm.reports";
     public const string CrmSettingsGroup = "crm.settings";
 
+    /// <summary>Bir modülün ayar ekranı. Çekirdeğin ayarları burada değil, Yönetim'de "Kuruluş ayarları"ndadır.</summary>
+    public static string ModuleSettingsRoute(string moduleKey) => $"modul-ayarlari/{moduleKey}";
+
     /// <summary>Hem ana uygulamaların hem de bir uygulamanın sol menü bölümlerinin başlıkları; bir tanım <c>Group</c> ile birini seçer.</summary>
     public static IReadOnlyList<AppGroup> Groups { get; } =
     [
@@ -175,6 +178,7 @@ public static class AppCatalog
         new("crm.sales-team", Crm, "Ekip performansı", "users", "crm/ekip-performansi", 50, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmReportsGroup),
 
         // CRM Ayarları: CRM'e özgü kurallar ve tanımlar, veri kalitesi.
+        new("crm.settings", Crm, "Genel CRM ayarları", "wrench", ModuleSettingsRoute(CrmAccess.ModuleKey), 5, CrmAccess.ModuleKey, CoreAccess.ManageSettings, Group: CrmSettingsGroup),
         new("crm.quote-rules", Crm, "Teklif kuralları", "shield", "crm/teklif-kurallari", 10, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
         new("crm.quote-delegations", Crm, "Onay vekâletleri", "users", "crm/onay-vekaletleri", 20, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
         new("crm.sales-data-quality", Crm, "Veri kalitesi", "shield", "crm/veri-kalitesi", 30, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmSettingsGroup),
@@ -192,13 +196,14 @@ public static class AppCatalog
         new("contracts.signatures", Contracts, "İmzalar", "check-circle", "sozlesmeler/imzalar", 35, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmAfterSalesGroup, "Sözleşme imzaları", 30)),
         new("contracts.commitments", Contracts, "Taahhütler", "clipboard-list", "sozlesmeler/taahhutler", 36, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Tone: AppTone.Teal, Hosted: new(CrmAfterSalesGroup, null, 20)),
         new("contracts.renewals", Contracts, "Yenilemeler", "calendar", "sozlesmeler/yenileme", 37, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmAfterSalesGroup, "Yenileme takibi", 10)),
-        new("contracts.settings", Contracts, "Sözleşme ayarları", "wrench", "yonetim/ayarlar?grup=S%C3%B6zle%C5%9Fmeler", 90, ContractsAccess.ModuleKey, CoreAccess.ManageSettings, Hosted: new(CrmSettingsGroup, null, 90)),
+        new("contracts.settings", Contracts, "Sözleşme ayarları", "wrench", ModuleSettingsRoute(ContractsAccess.ModuleKey), 90, ContractsAccess.ModuleKey, CoreAccess.ManageSettings, Hosted: new(CrmSettingsGroup, null, 90)),
         new("contracts.approval-rules", Contracts, "Onay kuralları", "shield", "sozlesmeler/onay-kurallari", 40, ContractsAccess.ModuleKey, ContractsAccess.ApprovalsManage, Hosted: new(CrmSettingsGroup, "Sözleşme onay kuralları", 80)),
 
         new(Orders, null, "Siparişler", "package", null, 25, ModuleKey: OrdersAccess.ModuleKey, Group: SalesGroup, HostId: Crm),
         new("orders.dashboard", Orders, "Pano", "dashboard", "siparisler/ozet", 5, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, ExactMatch: true, Hosted: new(CrmReportsGroup, "Sipariş panosu", 70)),
         new("orders.list", Orders, "Siparişler", "package", "siparisler", 10, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, Hosted: new(CrmSalesGroup, "Satış siparişleri", 50)),
         new("orders.jobs", Orders, "Operasyon işleri", "clipboard-list", "siparisler/isler", 20, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, Tone: AppTone.Teal, Hosted: new(CrmAfterSalesGroup, null, 40)),
+        new("orders.settings", Orders, "Sipariş ayarları", "wrench", ModuleSettingsRoute(OrdersAccess.ModuleKey), 90, OrdersAccess.ModuleKey, CoreAccess.ManageSettings, Hosted: new(CrmSettingsGroup, null, 95)),
 
         new(Support, null, "Destek", "message-square", null, 27, ModuleKey: SupportAccess.ModuleKey, Tone: AppTone.Teal, Group: ServiceGroup),
         new("support.tickets", Support, "Talepler", "inbox", "destek/talepler", 10, SupportAccess.ModuleKey, SupportAccess.TicketsRead, ExactMatch: true),
@@ -208,11 +213,13 @@ public static class AppCatalog
         new("support.sla", Support, "SLA ve eskalasyon", "shield", "destek/sla", 91, SupportAccess.ModuleKey, SupportAccess.SlaManage),
         new("support.reports", Support, "Raporlar", "list", "destek/raporlar", 92, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
         new("support.complaints", Support, "Şikâyet inceleme", "shield", "destek/sikayetler", 93, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
+        new("support.policy-settings", Support, "Politika ayarları", "wrench", ModuleSettingsRoute(SupportAccess.ModuleKey), 94, SupportAccess.ModuleKey, CoreAccess.ManageSettings),
 
         new(Marketing, null, "Pazarlama", "trending-up", null, 28, ModuleKey: MarketingAccess.ModuleKey, Group: SalesGroup, HostId: Crm),
         new("marketing.segments", Marketing, "Segmentler", "list", "pazarlama/segmentler", 10, MarketingAccess.ModuleKey, MarketingAccess.SegmentsRead, Hosted: new(CrmMarketingGroup, null, 10)),
         new("marketing.campaigns", Marketing, "Kampanyalar", "target", "pazarlama/kampanyalar", 20, MarketingAccess.ModuleKey, MarketingAccess.CampaignsRead, Tone: AppTone.Teal, Hosted: new(CrmMarketingGroup, null, 20)),
         new("marketing.report", Marketing, "Kampanya raporu", "dashboard", "pazarlama/rapor", 30, MarketingAccess.ModuleKey, MarketingAccess.ReportsRead, Hosted: new(CrmMarketingGroup, "Kampanya sonuçları", 30)),
+        new("marketing.settings", Marketing, "Pazarlama ayarları", "wrench", ModuleSettingsRoute(MarketingAccess.ModuleKey), 90, MarketingAccess.ModuleKey, CoreAccess.ManageSettings, Hosted: new(CrmSettingsGroup, null, 96)),
 
         // Depo ve antrepo (ADR-0032): şimdilik yapı tanımı (tesis, alan, lokasyon seviyesi, lokasyon); stok ve gümrük ekranları sonraki dilimlerle gelir.
         new(Warehouse, null, "Depo ve Antrepo", "warehouse", null, 40, ModuleKey: WarehouseAccess.ModuleKey, Group: OperationsGroup),
@@ -239,7 +246,7 @@ public static class AppCatalog
         new("admin.business-units", Admin, "Departmanlar", "building", "yonetim/departmanlar", 35, Permission: CoreAccess.ManageUsers),
         new("admin.roles", Admin, "Roller", "key", "yonetim/roller", 40, Permission: CoreAccess.ManageRoles, Tone: AppTone.Teal),
         new("admin.companies", Admin, "Şirketler", "landmark", "yonetim/sirketler", 50, Permission: CoreAccess.ManageCompanies),
-        new("admin.settings", Admin, "Firma ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
+        new("admin.settings", Admin, "Kuruluş ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
         new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),
         new("admin.automation", Admin, "Otomasyon", "zap", "yonetim/otomasyon", 74, Permission: CoreAccess.ReadAutomation, Tone: AppTone.Teal),
