@@ -190,7 +190,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 2a | Olay yolu (`core.automation` aboneliği), `AutomationRuns/Steps`, tekilleştirme, kira, retry, kuralın kimliği, acil durdurma, tenant limitleri, elle çalıştırma, çalışma geçmişi API'si | Uygulandı (aşağıda "Dilim 2a") |
 | 2b-1 | Tarama tabanlı tetikleyiciler (`Scheduled`, `DateRelative`, `Inactivity`), `AutomationScanCursors`, `IAutomationRecordSource` | Uygulandı (aşağıda "Dilim 2b-1") |
 | 2b-2 | Çalışma/adım saklama temizliği | Uygulandı (aşağıda "Dilim 2b-2") |
-| 2b-3 | İş olayı tetikleyicisi (`DomainEvent`); Ç0.4 iş olayı yayınlama sözleşmesine bağlı | Sonra |
+| 2b-3 | İş olayı tetikleyicisi (`DomainEvent`); Ç0.4 iş olayı yayınlama sözleşmesine bağlı | Uygulandı (aşağıda "Dilim 2b-3"; sözleşme [ADR-0039](0039-modul-is-olaylari.md)) |
 | 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
 | 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
 | 4a | Genel onay: süreç tanımı, talep, Onay merkezi (Ç6a asgari) | Uygulandı (aşağıda "Dilim 4a") |
@@ -284,7 +284,7 @@ Kurallar artık olay yolundan çalışır (ayrıntı için README "Otomasyon kur
 - **Kuralın kimliği:** `EventHandlingScope.Begin(zarf, "core.automation", GrantedPermissions)`. İzinler tanımdan türetilir (varlık okuma, kullanılan hassas alan okumaları, aksiyonların gerekli izinleri); kapsam Tümü. Kural, kendi tanımının gerektirdiğinden fazlasını göremez ve değiştiremez.
 - **Acil durdurma:** platform `Automation:Enabled`, firma ayarı `core.automation.enabled` (varsayılan Evet), kural kapatma. Bir tenant'ın yürütmesi diğerlerini durdurmaz.
 - **Limitler:** firma başına etkin kural (varsayılan 200, `AutomationOptions.MaxActiveRulesPerTenant`), olay başına 50 aday kural, tur başına tenant başına 25 çalışma.
-- **Çalışan tetikleyiciler:** `RecordCreated`, `FieldChanged`, `StatusTransition`, `Manual`. `Scheduled`, `DateRelative`, `Inactivity` ve `DomainEvent` yayın/etkinleştirmede 422 ("henüz çalışmıyor") ile reddedilir (`AutomationTriggerMatcher.IsExecutable`); Dilim 2b işidir.
+- **Çalışan tetikleyiciler:** `RecordCreated`, `FieldChanged`, `StatusTransition`, `Manual`. `Scheduled`, `DateRelative`, `Inactivity` ve `DomainEvent` bu dilimde yayın/etkinleştirmede 422 ("henüz çalışmıyor") ile reddediliyordu (`AutomationTriggerMatcher.IsExecutable`); 2b-1 tarama tetikleyicilerini, 2b-3 iş olayı tetikleyicisini açtı.
 - **Elle çalıştırma:** yalnızca etkin `ManualTrigger` kurallar; çağıran kaydı kendi izniyle okuyabilmeli; sürüm + kayıt + tenant günü başına bir elle çalışma (ikincisi 409 + `existingRunId`); `core.automation-rule` denetim kaydında "run" alanı.
 - **Geçmiş API'si:** çalışma listesi/ayrıntısı ve elle çalıştırma uç noktaları (`/api/automation`), `core.automation-logs.read` izniyle.
 - **Test dikişi:** `IAutomationRecordReader` (varsayılan `PipelineAutomationRecordReader`, kayıt boru hattı üzerinden); entegrasyon testleri `FakeRecordReader` ile değiştirir. `AutomationWorker` (BackgroundService) test fabrikasında kapalıdır (`Automation:WorkerEnabled=false`).
@@ -352,6 +352,17 @@ Planlanan iki işten **saklama temizliği** yapıldı; **iş olayı tetikleyicis
 - **Sınırlama:** temizlik, işçinin turla gezdiği tenant'lar için çalışır (kural yeteneği beyan eden bir modülü açık olanlar); modülü kapatılmış tenant'ın eski çalışmaları modül yeniden açılana kadar kalır.
 
 **`DomainEvent` neden yapılmadı:** iş olayı yayınlama ve olay türü bildirme sözleşmesi (ADR-0007, Ç0.4) yok. Bugün yalnızca beş kayıt olayı üretiliyor, katalog abonelikte `DomainEventTypes.SchemaVersions` dışındaki türü reddediyor ve hiçbir modül iş olayı yayınlamıyor (`crm.opportunity.won` bile `RecordUpdated` durum geçişidir). Yayıncısı olmayan bir tetikleyiciyi açmak, "sessizce hiç tetiklenmeyen kural bırakılmaz" ilkesini bozardı; bu yüzden `DomainEventTrigger` ile yayın 422 vermeye devam eder (taslak saklanabilir). Ç0.4 yayınlama sözleşmesi geldiğinde Dilim 2b-3 şunlarla tamamlanır: aboneliğin olay türlerinin katalogda `AutomationEventDefinition`'lardan genişletilmesi, `AutomationTriggerMatcher`'a iş olayı eşleşmesi, `IsExecutable`'a eklenmesi.
+
+### Dilim 2b-3 (7 Kasım 2026)
+
+Ç0.4 iş olayı yayınlama sözleşmesi [ADR-0039](0039-modul-is-olaylari.md) ile geldi; 2b-2'de sayılan üç iş bununla tamamlandı:
+
+- **Abonelik olay türleri:** katalog `core.automation` aboneliğinin türlerini `RecordCreated`/`RecordUpdated` + otomasyona beyan edilmiş iş olaylarıyla doldurur (`ModuleCatalog.RegisterAutomation`). Bir modülün `AutomationEventDefinition`'ı modül önekli türse, tür modülün `IModule.BusinessEvents` beyanında aynı kayıt türüyle bulunmalıdır; yoksa uygulama açılmaz.
+- **Eşleşme:** `AutomationTriggerMatcher.Matches` iş olayı anahtarını katalogdan türe çevirir (`FindAutomationEvent`) ve olayın türü ile kayıt türünü eşler; kayıt olayı anahtarı bu tetikleyiciyle eşleşmez. `AutomationEventSubscriber` kataloğu alır.
+- **Yayın:** `IsExecutable` `DomainEventTrigger`'ı kabul eder; kayıt olayı anahtarı ya da bilinmeyen anahtar doğrulayıcıda 422 kalır. Editöre "İş olayı" tetikleyicisi eklendi (seçenekler kayıt türünün beyanlı iş olayları).
+- **CRM:** `crm.opportunity.won`, `crm.opportunity.lost`, `crm.lead.converted` otomasyona açık.
+
+Uçtan uca kanıt: `BusinessEventTests` (entegrasyon) — fırsat kazanılınca outbox'taki iş olayı `core.automation` ile teslim edilir, `DomainEvent` kuralı bir çalışma açar, takip aktivitesi bir kez oluşur; yeniden teslimde ikinci çalışma olmaz.
 
 ### Test sonuçları (Dilim 2b-2)
 

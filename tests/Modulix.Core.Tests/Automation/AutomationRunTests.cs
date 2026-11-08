@@ -94,9 +94,10 @@ public class AutomationExecutableTriggerTests
     }
 
     [Fact]
-    public void Domain_event_trigger_is_not_executable_yet()
+    public void Domain_event_trigger_is_executable_and_not_a_scan()
     {
-        Assert.False(AutomationTriggerMatcher.IsExecutable(new DomainEventTrigger("sales.deal.won")));
+        Assert.True(AutomationTriggerMatcher.IsExecutable(new DomainEventTrigger("sales.deal.won")));
+        Assert.False(AutomationTriggerMatcher.IsScan(new DomainEventTrigger("sales.deal.won")));
     }
 }
 

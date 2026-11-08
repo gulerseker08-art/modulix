@@ -169,6 +169,13 @@ internal static class AutomationKit
             ? [new BusinessEventDefinition("sales.deal.won", 1, Entity, "Fırsat kazanıldı", ["amount", "stage"])]
             : [];
 
+        public IReadOnlyList<EventSubscription> EventSubscriptions { get; init; } = [];
+
+        /// <summary>Abonelik kayıt türü denetimi için; "sales" kayıt türleri denetim kaydında tanımlıdır.</summary>
+        public IReadOnlyList<AuditedEntity> AuditedEntities { get; } = key == "sales"
+            ? [new AuditedEntity(Entity, "Fırsat", null, new Dictionary<string, string>()), new AuditedEntity(Activity, "Aktivite", null, new Dictionary<string, string>())]
+            : [];
+
         public AutomationCapabilities Automation => capabilities;
     }
 
