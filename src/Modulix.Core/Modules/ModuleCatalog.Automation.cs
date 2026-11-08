@@ -205,6 +205,20 @@ public sealed partial class ModuleCatalog
                     (automation.ModuleKey, automation.Subscription with { EntityKeys = entityKeys, EventTypes = eventTypes });
             }
         }
+
+        // Kayda bağlı onay aboneliği (ADR-0027 Dilim 4c) de yalnızca onaya açık kayıt türlerinin olaylarını alır; beyan yoksa abonelik yoktur.
+        if (subscriptions.TryGetValue(CoreModule.Subscriptions.Approvals, out var approvals))
+        {
+            var entityKeys = Modules.SelectMany(m => m.ApprovalTargets).Select(t => t.EntityKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+            if (entityKeys.Count == 0)
+            {
+                subscriptions.Remove(approvals.Subscription.Key);
+            }
+            else
+            {
+                subscriptions[approvals.Subscription.Key] = (approvals.ModuleKey, approvals.Subscription with { EntityKeys = entityKeys });
+            }
+        }
     }
 
     private static InvalidOperationException TemplateFail(IModule module, AutomationTemplateDefinition template, string what) =>

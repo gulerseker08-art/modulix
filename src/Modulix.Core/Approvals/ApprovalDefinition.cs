@@ -51,6 +51,9 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
     /// <summary>Doluysa talepte tutar zorunludur ve bu para biriminde olmalıdır; adım eşikleri bu para birimindedir (kur çevrilmez).</summary>
     public string? Currency { get; private set; }
 
+    /// <summary>Doluysa süreç bu kayıt türüne bağlıdır (ADR-0027 Dilim 4c): talep bir kayıt için açılır, tutar kayıttan okunur.</summary>
+    public string? TargetEntityKey { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public string StepsJson { get; private set; } = "[]";
@@ -73,7 +76,8 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
         JsonSerializer.Deserialize<List<ApprovalStepDefinition>>(StepsJson, Json) ?? [];
 
     public static ApprovalDefinition Create(
-        string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now)
+        string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now,
+        string? targetEntityKey = null)
     {
         ApprovalDefinition definition = new()
         {
@@ -84,15 +88,17 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
             CreatedBy = userId,
             Version = 1,
         };
-        definition.Assign(name, description, currency, steps, userId, now);
+        definition.Assign(name, description, currency, steps, userId, now, targetEntityKey);
         return definition;
     }
 
-    public void Update(string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now)
+    public void Update(
+        string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now,
+        string? targetEntityKey = null)
     {
-        (string StepsJson, string? Currency) before = (StepsJson, Currency);
-        Assign(name, description, currency, steps, userId, now);
-        if (before != (StepsJson, Currency))
+        (string StepsJson, string? Currency, string? Target) before = (StepsJson, Currency, TargetEntityKey);
+        Assign(name, description, currency, steps, userId, now, targetEntityKey);
+        if (before != (StepsJson, Currency, TargetEntityKey))
         {
             Revision++;
         }
@@ -108,8 +114,11 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
         Version++;
     }
 
-    private void Assign(string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now)
+    private void Assign(
+        string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now,
+        string? targetEntityKey)
     {
+        TargetEntityKey = string.IsNullOrWhiteSpace(targetEntityKey) ? null : targetEntityKey.Trim();
         string trimmedName = (name ?? string.Empty).Trim();
         if (trimmedName.Length is 0 or > NameMaxLength)
         {

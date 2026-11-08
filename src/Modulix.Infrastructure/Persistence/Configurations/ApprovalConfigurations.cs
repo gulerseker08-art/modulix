@@ -18,6 +18,7 @@ internal sealed class ApprovalDefinitionConfiguration : IEntityTypeConfiguration
         builder.Property(d => d.Description).HasMaxLength(ApprovalDefinition.DescriptionMaxLength);
         builder.Property(d => d.Currency).HasMaxLength(3);
         builder.Property(d => d.StepsJson).IsRequired();
+        builder.Property(d => d.TargetEntityKey).HasMaxLength(100);
         builder.Property(d => d.Version).IsConcurrencyToken();
         builder.Ignore(d => d.Steps);
 
@@ -75,6 +76,8 @@ internal sealed class ApprovalRequestConfiguration : IEntityTypeConfiguration<Ap
         builder.Property(r => r.Currency).HasMaxLength(3);
         builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(r => r.Version).IsConcurrencyToken();
+        builder.Property(r => r.TargetEntityKey).HasMaxLength(100);
+        builder.Property(r => r.TargetLabel).HasMaxLength(ApprovalRequest.TitleMaxLength);
 
         builder.HasAlternateKey(r => new { r.TenantId, r.Id });
         builder.HasOne<ApprovalDefinition>().WithMany()
@@ -84,6 +87,9 @@ internal sealed class ApprovalRequestConfiguration : IEntityTypeConfiguration<Ap
 
         builder.HasIndex(r => new { r.TenantId, r.Status, r.SubmittedAt });
         builder.HasIndex(r => new { r.TenantId, r.RequesterId, r.Status });
+
+        // Kayıt ekranı ve geçersizleştirme kaydın taleplerini arar.
+        builder.HasIndex(r => new { r.TenantId, r.TargetEntityKey, r.TargetRecordId, r.Status });
     }
 }
 

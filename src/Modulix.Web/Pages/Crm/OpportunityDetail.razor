@@ -664,6 +664,7 @@
             </div>
 
             <aside class="detail-side" aria-label="@Texts.Get("crm.opp.side.aria")">
+                <RecordApprovalPanel EntityKey="@CrmEntityKeys.Opportunity" RecordId="Id" />
                 <FormSection Title="@Texts.Get("crm.opp.timeline")" Icon="calendar" Class="side-card">
                     <Actions>
                         @if (Session.Can(CrmAccess.ActivitiesWrite) && opportunity.Status is OpportunityStatus.Open or OpportunityStatus.OnHold)

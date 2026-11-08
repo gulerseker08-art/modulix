@@ -1,0 +1,78 @@
+@inject ApiClient Api
+@inject SessionState Session
+
+@* Kayda bağlı onay (ADR-0027 Dilim 4c): kaydın son onay talebi ve "Onaya gönder". Kayıt türüne bağlı açık süreç yoksa ve talep de yoksa
+   hiçbir şey çizilmez. Durum sunucuda kaydı okuma yetkisiyle döner; tutar kayıttan alınır, burada girilmez. *@
+@if (view is not null && (view.Processes.Count > 0 || view.Latest is not null))
+{
+    <FormSection Title="Onay" Icon="check-circle" Class="side-card">
+        <span id="@($"approval-{RecordId}")" hidden></span>
+
+        @if (view.Latest is { } latest)
+        {
+            <p>
+                <span class="badge @ApprovalLabels.StatusClass(latest.Status)">@ApprovalLabels.StatusText(latest.Status)</span>
+                <a href="onaylar?talep=@latest.RequestId">@latest.Process</a>
+                @if (latest.CurrentStep is { } step && latest.Status == "Pending") { <small class="text-muted"> · bekleyen adım: @step</small> }
+            </p>
+        }
+
+        <Notice Text="@error" Failed="true" />
+
+        @if (CanSend)
+        {
+            <div class="inline-form">
+                @if (view.Processes.Count > 1)
+                {
+                    <select class="form-select" aria-label="Onay süreci" @bind="processId">
+                        @foreach (var process in view.Processes) { <option value="@process.Id">@process.Name</option> }
+                    </select>
+                }
+                <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="SendAsync"><AppIcon Name="check-circle" Size="16" /> Onaya gönder</button>
+            </div>
+        }
+    </FormSection>
+}
+
+@code {
+    private RecordApprovalViewDto? view;
+    private Guid processId;
+    private string? error;
+    private bool busy;
+
+    /// <summary>Kayıt türü (ör. "crm.opportunity").</summary>
+    [Parameter, EditorRequired] public string EntityKey { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public Guid RecordId { get; set; }
+
+    private bool CanSend => Session.Can(CoreAccess.RequestApprovals) && view!.Processes.Count > 0 && view.Latest?.Status != "Pending";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(CoreAccess.RequestApprovals) && !Session.Can(CoreAccess.DecideApprovals) && !Session.Can(CoreAccess.ManageApprovals))
+        {
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        view = (await Api.GetAsync<RecordApprovalViewDto>($"/api/approvals/records/{Uri.EscapeDataString(EntityKey)}/{RecordId}")).Value;
+        processId = view?.Processes.FirstOrDefault()?.Id ?? Guid.Empty;
+    }
+
+    private async Task SendAsync()
+    {
+        busy = true;
+        var done = await Api.PostAsync<ApprovalRequestDto>("/api/approvals/requests", new OpenApprovalRequest(processId, string.Empty, null, null, null, RecordId));
+        busy = false;
+        error = done.IsSuccess ? null : done.Error;
+        if (done.IsSuccess)
+        {
+            await LoadAsync();
+        }
+    }
+}

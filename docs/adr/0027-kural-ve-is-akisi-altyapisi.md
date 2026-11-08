@@ -195,7 +195,8 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
 | 4a | Genel onay: süreç tanımı, talep, Onay merkezi (Ç6a asgari) | Uygulandı (aşağıda "Dilim 4a") |
 | 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Uygulandı (aşağıda "Dilim 4b") |
-| 4c | Kayda bağlı onay (modül beyanı, kural aksiyonu "onaya gönder"), kalıcı akış | Sonra |
+| 4c | Kayda bağlı onay (modül beyanı, geçersizleşme, kayıt paneli) | Uygulandı (aşağıda "Dilim 4c") |
+| 4c-2 | Kural aksiyonu "onaya gönder", onay sonucunun modül komutuna bağlanması, kalıcı akış | Sonra |
 | 4d | Takvim ortaklaştırma, puanlama, şablon motoru | **Metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); takvim ortaklaştırma ve puanlama sonra |
 | 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c"); 5d kayıt seçici, kayıt üzerinde deneme ve elle çalıştırma uygulandı ("Dilim 5d") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
@@ -545,3 +546,14 @@ Dilim 5b'de ertelenen "elle çalıştırma" ve 5c'de eksik kalan "kayıt üzerin
 | `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | Yeni 3: mutlu yol (katalog etiket alanı, aramayla bulma, daraltma), tenant izolasyonu (başka firmanın kaydı çıkmaz), yetki (müşteri adayı okuma izni olmayan türü ve kayıtları göremez, liste 403) |
 
 Elle çalıştırmanın kendi dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 2'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez (yalnızca katalogda etiket alanı).
+
+### Dilim 4c: Kayda bağlı onay (7 Kasım 2026)
+
+- **Modül beyanı:** `IModule.ApprovalTargets` (`ApprovalTargetDefinition`: kayıt türü, görünen ad alanı, tutar ve para birimi alanı, arayüz yolu). İlk tüketici CRM fırsatıdır (`crm.opportunity`). Core sektör ya da modül adı bilmez; katalogdan okur.
+- **Süreç bağlama:** onay süreci isteğe bağlı olarak bir kayıt türüne bağlanır (`TargetEntityKey`; değişiklik sürüm artırır). Bağlı süreçte talep bir kayıt için açılır; kayıt, talep sahibinin kendi yetkisiyle (izin, veri kapsamı, hassas alan) kayıt boru hattından okunur. Göremediği kayıt gönderilemez. Tutarı göremeyen kişi tutar isteyen sürece gönderemez.
+- **Tutar kayıttan gelir:** kullanıcının girdiği tutar yok sayılır. Kaydın görünen adı talebe anlık görüntü olarak yazılır. Aynı kayıt için tek bekleyen talep olur.
+- **Geçersizleşme (Ç6a.2 kabulü):** `core.approvals` aboneliği (`RecordUpdated`) korunan alanlar (tutar, para birimi) değişince kayda bağlı bekleyen talebi `Invalidated` yapar; adımlar iptal olur, talep sahibine bildirim gider, denetimde `core.approvals` kaynağıyla görünür. Hassas alanın değeri aboneye gizli gelse de adı `HiddenFields` içinde olduğu için değişiklik yakalanır. Yeni tutarla yeniden gönderilebilir.
+- **Modül kapısı (Ç6a.3):** `IApprovalStatusReader.LatestAsync` (Core.Contracts) kaydın son talebini verir; modül kendi komutunda kullanabilir. Bu dilimde hiçbir modül komutu onaya bağlanmadı.
+- **Arayüz:** süreç formunda "Kayıt türü", fırsat ekranında `RecordApprovalPanel` (son talep durumu, "Onaya gönder"), Onay merkezinde kayıt bağlantısı.
+
+**Bilerek yapılmadı:** kural aksiyonu "onaya gönder" (süreç seçimi için tenant'a özgü lookup gerekir), onay sonucunun modül komutunu açması ya da kilitlemesi, kalıcı çok adımlı iş akışı.

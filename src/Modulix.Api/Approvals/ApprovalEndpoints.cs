@@ -1,6 +1,7 @@
 using Modulix.Api.Access;
 using Modulix.Core.Approvals;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Records;
 using Modulix.Core.Modules;
 using Modulix.Shared.Approvals;
 
@@ -37,6 +38,18 @@ public static class ApprovalEndpoints
         group.MapPut("/definitions/{id:guid}/active", (Guid id, SetApprovalDefinitionActiveRequest request, IApprovalService service, CancellationToken ct) => RunAsync(async () =>
             await service.SetDefinitionActiveAsync(id, request.IsActive, ct) is { } definition ? Results.Ok(ToDto(definition)) : NotFound()))
             .RequirePermission(CoreModule.Permissions.ManageApprovals);
+
+        group.MapGet("/targets", (ModuleCatalog modules) =>
+            Results.Ok(modules.ApprovalTargets.Select(t => new ApprovalTargetDto(t.Target.EntityKey, t.Target.DisplayName))))
+            .RequirePermission(CoreModule.Permissions.ManageApprovals);
+
+        group.MapGet("/records/{entityKey}/{recordId:guid}", async (string entityKey, Guid recordId, IApprovalService service, CancellationToken ct) =>
+            await service.RecordViewAsync(new RecordRef(entityKey, recordId), ct) is { } view
+                ? Results.Ok(new RecordApprovalViewDto(
+                    [.. view.Processes.Select(p => new ApproverOptionDto(p.Id, p.Name))],
+                    view.Latest is { } l ? new RecordApprovalStatusDto(l.RequestId, l.Process, l.Status, l.SubmittedAt, l.CompletedAt, l.CurrentStep) : null))
+                : NotFound())
+            .RequireAnyPermission(AnyApprovalPermission);
 
         group.MapGet("/approver-options", async (IApprovalService service, CancellationToken ct) =>
         {
@@ -88,7 +101,7 @@ public static class ApprovalEndpoints
         group.MapPost("/requests", (OpenApprovalRequest request, IApprovalService service, CancellationToken ct) => RunAsync(async () =>
         {
             ApprovalRequestDetail detail = await service.OpenRequestAsync(
-                new ApprovalRequestInput(request.DefinitionId, request.Title, request.Description, request.Amount, request.Currency), ct);
+                new ApprovalRequestInput(request.DefinitionId, request.Title ?? string.Empty, request.Description, request.Amount, request.Currency, request.RecordId), ct);
             return Results.Created($"/api/approvals/requests/{detail.Id}", ToDto(detail));
         })).RequirePermission(CoreModule.Permissions.RequestApprovals);
 
@@ -158,11 +171,11 @@ public static class ApprovalEndpoints
         Results.ValidationProblem(new Dictionary<string, string[]> { [key] = [message] }, statusCode: StatusCodes.Status400BadRequest);
 
     private static ApprovalDefinitionInput ToInput(SaveApprovalDefinitionRequest request) => new(
-        request.Name, request.Description, request.Currency,
+        request.Name, request.Description, request.Currency, TargetEntityKey: request.TargetEntityKey, Steps:
         [.. (request.Steps ?? []).Select(s => new ApprovalStepDefinition(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours, s.EscalateToUserId, s.EscalateToRoleId))]);
 
     private static ApprovalDefinitionDto ToDto(ApprovalDefinition definition) => new(
-        definition.Id, definition.Name, definition.Description, definition.Currency, definition.IsActive, definition.Revision, definition.Version,
+        definition.Id, definition.Name, definition.Description, definition.Currency, definition.IsActive, definition.Revision, definition.Version, TargetEntityKey: definition.TargetEntityKey, Steps:
         [.. definition.Steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours, s.EscalateToUserId, s.EscalateToRoleId))]);
 
     private static ApprovalRequestDto ToDto(ApprovalRequestDetail detail) => new(
@@ -171,5 +184,5 @@ public static class ApprovalEndpoints
         [.. detail.Steps.Select(s => new ApprovalStepDto(
             s.Id, s.Order, s.Name, s.ApproverUserId, s.ApproverRoleId, s.ApproverName, s.Status.ToString(), s.ActivatedAt, s.DueAt, s.IsOverdue, s.IsOrphaned,
             s.DecidedByName, s.DecidedAt, s.Comment, s.OnBehalfOfName, s.EscalationName, s.IsEscalated))],
-        detail.CanDecide, detail.CanWithdraw);
+        detail.CanDecide, detail.CanWithdraw, detail.TargetEntityKey, detail.TargetRecordId, detail.TargetLabel, detail.TargetLink);
 }

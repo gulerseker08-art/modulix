@@ -4,10 +4,18 @@ public sealed record ApprovalStepDefinitionDto(
     string Name, int Order, Guid? ApproverUserId, Guid? ApproverRoleId, decimal? MinAmount, int? DueHours, Guid? EscalateToUserId = null, Guid? EscalateToRoleId = null);
 
 public sealed record ApprovalDefinitionDto(
-    Guid Id, string Name, string? Description, string? Currency, bool IsActive, int Revision, long Version, IReadOnlyList<ApprovalStepDefinitionDto> Steps);
+    Guid Id, string Name, string? Description, string? Currency, bool IsActive, int Revision, long Version, IReadOnlyList<ApprovalStepDefinitionDto> Steps,
+    string? TargetEntityKey = null);
 
 public sealed record SaveApprovalDefinitionRequest(
-    string Name, string? Description, string? Currency, IReadOnlyList<ApprovalStepDefinitionDto> Steps, long? ExpectedVersion = null);
+    string Name, string? Description, string? Currency, IReadOnlyList<ApprovalStepDefinitionDto> Steps, long? ExpectedVersion = null,
+    string? TargetEntityKey = null);
+
+public sealed record ApprovalTargetDto(string EntityKey, string DisplayName);
+
+public sealed record RecordApprovalStatusDto(Guid RequestId, string Process, string Status, DateTimeOffset SubmittedAt, DateTimeOffset? CompletedAt, string? CurrentStep);
+
+public sealed record RecordApprovalViewDto(IReadOnlyList<ApproverOptionDto> Processes, RecordApprovalStatusDto? Latest);
 
 public sealed record SetApprovalDefinitionActiveRequest(bool IsActive);
 
@@ -23,11 +31,12 @@ public sealed record ApprovalStepDto(
 public sealed record ApprovalRequestDto(
     Guid Id, Guid DefinitionId, string DefinitionName, int DefinitionRevision, string Title, string? Description, decimal? Amount, string? Currency,
     Guid RequesterId, string RequesterName, string Status, DateTimeOffset SubmittedAt, DateTimeOffset? CompletedAt, long Version,
-    IReadOnlyList<ApprovalStepDto> Steps, bool CanDecide, bool CanWithdraw);
+    IReadOnlyList<ApprovalStepDto> Steps, bool CanDecide, bool CanWithdraw,
+    string? TargetEntityKey = null, Guid? TargetRecordId = null, string? TargetLabel = null, string? TargetLink = null);
 
 public sealed record ApprovalRequestPageDto(IReadOnlyList<ApprovalRequestDto> Items, int Page, int PageSize, int TotalCount);
 
-public sealed record OpenApprovalRequest(Guid DefinitionId, string Title, string? Description, decimal? Amount, string? Currency);
+public sealed record OpenApprovalRequest(Guid DefinitionId, string? Title, string? Description, decimal? Amount, string? Currency, Guid? RecordId = null);
 
 public sealed record DecideApprovalRequest(string? Comment, long ExpectedVersion);
 

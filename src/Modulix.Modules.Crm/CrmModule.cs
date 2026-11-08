@@ -354,10 +354,6 @@ public sealed class CrmModule : IModule
     ];
 
     /// <summary>
-    /// Hassas alanlar (Y8b): tutar ve olasılık. Para birimi tek başına bir şey söylemediği için hassas değildir (ekran onu
-    /// her zaman gönderir).
-    /// </summary>
-    /// <summary>
     /// CRM'in yayınladığı iş olayları (ADR-0039). Tür adı sürüm taşımaz; sürüm beyandadır. Açık iş komutları yayınlar:
     /// kazan/kaybet (<c>IOpportunityWorkflow</c>), müşteri adayı dönüşümü (<c>ILeadConversion</c>).
     /// </summary>
@@ -386,6 +382,16 @@ public sealed class CrmModule : IModule
         new(Events.LeadConverted, 1, Entities.Lead, "Müşteri adayı dönüştürüldü", Events.LeadConvertedFields),
     ];
 
+    // Fırsat onaya gönderilebilir (ADR-0027 Dilim 4c): tutar ve para birimi kayıttan okunur, değişirse bekleyen talep geçersizleşir.
+    IReadOnlyList<Core.Contracts.Approvals.ApprovalTargetDefinition> IModule.ApprovalTargets { get; } =
+    [
+        new(Entities.Opportunity, "Fırsat", "title", "crm/firsatlar/{id}") { AmountField = "amount", CurrencyField = "currency" },
+    ];
+
+    /// <summary>
+    /// Hassas alanlar (Y8b): tutar ve olasılık. Para birimi tek başına bir şey söylemediği için hassas değildir (ekran onu
+    /// her zaman gönderir).
+    /// </summary>
     IReadOnlyList<SensitiveFields> IModule.SensitiveFields { get; } =
     [
         new(Entities.Opportunity, Permissions.OpportunityAmountsRead, ["amount", "probability", "customerBudget", "wonAmount"]),
