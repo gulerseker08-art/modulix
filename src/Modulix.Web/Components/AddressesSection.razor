@@ -6,7 +6,7 @@
         <h3>
             <button type="button" class="section-toggle" aria-expanded="@(open ? "true" : "false")"@onclick="() => open = !open">
                 <span class="section-icon"><AppIcon Name="map-pin" Size="18" /></span>
-                <span class="section-title">@Title</span>
+                <span class="section-title">@(Title ?? Texts.Get("crm.company.addresses"))</span>
                 @if (items is not null)
                 {
                     <span class="count-pill">@items.Count</span>
@@ -16,7 +16,7 @@
         </h3>
         @if (CanWrite && form is null)
         {
-            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="OpenNew">Adres ekle</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="OpenNew">@Texts.Get("crm.address.add")</button>
         }
     </div>
 
@@ -31,12 +31,12 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <FormTabs Title="Adres bilgileri" Label="Adres formu bölümleri">
+            <FormTabs Title="@Texts.Get("crm.address.info")" Label="@Texts.Get("crm.address.tabs")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label">Tür</label>
+                    <label class="form-label">@Texts.Get("crm.company.editor.kind")</label>
                     <select class="form-select" @bind="form.Type">
-                        @foreach (var (key, label) in CrmAddressTypes.Labels)
+                        @foreach (var (key, label) in SharedLabels.Addresses())
                         {
                             <option value="@key">@label</option>
                         }
@@ -44,50 +44,50 @@
                     <FieldError Field="type" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label">Ülke (ISO kodu)</label>
+                    <label class="form-label">@Texts.Get("crm.address.country")</label>
                     <input class="form-control" maxlength="2" @bind="form.Country" />
                     <FieldError Field="country" Errors="errors" />
                 </div>
                 <div class="span-all">
-                    <label class="form-label">Adres satırı 1 *</label>
+                    <label class="form-label">@Texts.Get("crm.address.line1")</label>
                     <input class="form-control" maxlength="@CrmDirectoryLimits.AddressLineMaxLength" @bind="form.Line1" />
                     <FieldError Field="line1" Errors="errors" />
                 </div>
                 <div class="span-all">
-                    <label class="form-label">Adres satırı 2</label>
+                    <label class="form-label">@Texts.Get("crm.address.line2")</label>
                     <input class="form-control" maxlength="@CrmDirectoryLimits.AddressLineMaxLength" @bind="form.Line2" />
                     <FieldError Field="line2" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label">İlçe</label>
+                    <label class="form-label">@Texts.Get("crm.address.district")</label>
                     <input class="form-control" maxlength="@CrmDirectoryLimits.AddressPartMaxLength" @bind="form.District" />
                     <FieldError Field="district" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label">Şehir</label>
+                    <label class="form-label">@Texts.Get("common.field.city")</label>
                     <input class="form-control" maxlength="@CrmDirectoryLimits.AddressPartMaxLength" @bind="form.City" />
                     <FieldError Field="city" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label">Posta kodu</label>
+                    <label class="form-label">@Texts.Get("crm.address.postalCode")</label>
                     <input class="form-control" maxlength="@CrmDirectoryLimits.PostalCodeMaxLength" @bind="form.PostalCode" />
                     <FieldError Field="postalCode" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-check-inline"><input type="checkbox" @bind="form.IsPrimary" /> Ana adres</label>
+                    <label class="form-check-inline"><input type="checkbox" @bind="form.IsPrimary" /> @Texts.Get("crm.address.primary")</label>
                     <FieldError Field="isPrimary" Errors="errors" />
                 </div>
                 @if (form.Id is not null)
                 {
                     <div>
-                        <label class="form-check-inline"><input type="checkbox" @bind="form.IsActive" /> Aktif</label>
+                        <label class="form-check-inline"><input type="checkbox" @bind="form.IsActive" /> @Texts.Get("common.active")</label>
                     </div>
                 }
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
             </div>
         </form>
     }
@@ -102,15 +102,15 @@
                         <strong>@item.Line1@(item.Line2 is { Length: > 0 } ? $", {item.Line2}" : null)</strong>
                         <span>
                             @string.Join(", ", new[] { item.PostalCode, item.District, item.City, item.Country }.Where(s => !string.IsNullOrWhiteSpace(s)))
-                            · @CrmAddressTypes.Labels.GetValueOrDefault(item.Type, item.Type)
-                            @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">Ana</span> }
-                            @if (!item.IsActive) { <text> · Pasif</text> }
+                            · @SharedLabels.Address(item.Type)
+                            @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">@Texts.Get("common.primaryBadge")</span> }
+                            @if (!item.IsActive) { <text> · @Texts.Get("common.inactive")</text> }
                         </span>
                     </div>
                     @if (CanWrite)
                     {
-                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">Düzenle</button>
-                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">Sil</button>
+                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">@Texts.Get("common.edit")</button>
+                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">@Texts.Get("common.delete")</button>
                     }
                 </li>
             }
@@ -118,7 +118,7 @@
     }
     else if (items is not null)
     {
-        <p class="text-muted">Kayıtlı adres yok.</p>
+        <p class="text-muted">@Texts.Get("crm.address.none")</p>
     }
     </div>
     }
@@ -140,7 +140,7 @@
 
     [Parameter] public Guid? LocationId { get; set; }
 
-    [Parameter] public string Title { get; set; } = "Adresler";
+    [Parameter] public string? Title { get; set; }
 
     [Parameter] public bool CanWrite { get; set; }
 

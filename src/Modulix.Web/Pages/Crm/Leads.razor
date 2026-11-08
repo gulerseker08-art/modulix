@@ -4,21 +4,21 @@
 @inject CrmLookups Lookups
 @inject Modulix.Web.Services.ActivityOptions Activities
 
-<PageTitle>Müşteri adayları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.leads.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.LeadsRead">
     <div class="page-header">
-        <h1>Müşteri adayları</h1>
+        <h1>@Texts.Get("crm.leads.title")</h1>
         <div class="header-actions">
             @if (Session.Can(CrmAccess.LeadFormsManage))
             {
-                <a class="btn btn-outline-secondary" href="crm/lead-formlari">Formlar</a>
+                <a class="btn btn-outline-secondary" href="crm/lead-formlari">@Texts.Get("crm.leads.forms")</a>
             }
             @if (Session.Can(CrmAccess.LeadsExport))
             {
-                <a class="btn btn-outline-secondary" href="@ExportUrl()" download="leadler.csv">CSV indir</a>
+                <a class="btn btn-outline-secondary" href="@ExportUrl()" download="leadler.csv">@Texts.Get("crm.leads.csv")</a>
             }
-            <button type="button" class="btn btn-outline-secondary" @onclick="ToggleReportAsync">@(showReport ? "Raporu gizle" : "Rapor")</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="ToggleReportAsync">@Texts.Get(showReport ? "crm.leads.report.hide" : "crm.leads.report.show")</button>
         </div>
     </div>
 
@@ -37,59 +37,59 @@
         <LeadReportPanel Lookups="Lookups" />
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Müşteri adayı görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("crm.leads.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Müşteri adayı ara" placeholder="Konu, no, ad, firma ya da e-posta ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("crm.leads.search.aria")" placeholder="@Texts.Get("crm.leads.search.placeholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(CrmAccess.LeadsCreate) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => editing = true"><AppIcon Name="plus" Size="16" /> Yeni müşteri adayı</button>
+            <button type="button" class="btn btn-primary" @onclick="() => editing = true"><AppIcon Name="plus" Size="16" /> @Texts.Get("crm.leads.new")</button>
         }
     </div>
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <select class="form-select" aria-label="Durum" @bind="status" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm durumlar</option>
+            <select class="form-select" aria-label="@Texts.Get("common.field.status")" @bind="status" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("common.allStatuses")</option>
                 @foreach (var s in LeadStatus.All)
                 {
-                    <option value="@s">@LeadStatus.Label(s)</option>
+                    <option value="@s">@CrmText.LeadStatusName(s)</option>
                 }
             </select>
-            <select class="form-select" aria-label="Kaynak" @bind="source" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm kaynaklar</option>
+            <select class="form-select" aria-label="@Texts.Get("crm.company.source")" @bind="source" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("crm.leads.filter.sourceAll")</option>
                 @foreach (var s in Lookups.ValuesOf(CrmLeadLists.Source))
                 {
                     <option value="@s.Key">@s.Label</option>
                 }
             </select>
-            <select class="form-select" aria-label="Öncelik" @bind="priority" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm öncelikler</option>
+            <select class="form-select" aria-label="@Texts.Get("crm.leads.col.priority")" @bind="priority" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("crm.leads.filter.priorityAll")</option>
                 @foreach (var p in LeadPriority.All)
                 {
-                    <option value="@p">@LeadPriority.Label(p)</option>
+                    <option value="@p">@CrmText.LeadPriorityName(p)</option>
                 }
             </select>
-            <select class="form-select" aria-label="Sorumlu" @bind="owner" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm sorumlular</option>
+            <select class="form-select" aria-label="@Texts.Get("common.field.owner")" @bind="owner" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("crm.leads.filter.ownerAll")</option>
                 @foreach (var member in Lookups.Members)
                 {
                     <option value="@member.UserId">@member.DisplayName</option>
                 }
             </select>
-            <select class="form-select" aria-label="Hizmet kapsamı" @bind="scope" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm hizmet kapsamları</option>
+            <select class="form-select" aria-label="@Texts.Get("crm.leads.filter.scope")" @bind="scope" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("crm.leads.filter.scopeAll")</option>
                 @foreach (var a in activities.Where(a => a.Kind == "Activity"))
                 {
                     <option value="@a.Code">@Activities.PathOf(a)</option>
                 }
             </select>
-            <label class="form-label-inline">Geliş:<input class="form-control" type="date" aria-label="Başlangıç" @bind="from" @bind:after="() => LoadAsync(1)" /></label>
-            <label class="form-label-inline">– <input class="form-control" type="date" aria-label="Bitiş" @bind="to" @bind:after="() => LoadAsync(1)" /></label>
+            <label class="form-label-inline">@Texts.Get("crm.leads.filter.received")<input class="form-control" type="date" aria-label="@Texts.Get("crm.link.editor.start")" @bind="from" @bind:after="() => LoadAsync(1)" /></label>
+            <label class="form-label-inline">– <input class="form-control" type="date" aria-label="@Texts.Get("crm.party.end")" @bind="to" @bind:after="() => LoadAsync(1)" /></label>
         </div>
     }
 
@@ -98,16 +98,16 @@
 
     @if (target is { } hours && current == "firstContactOverdue")
     {
-        <p class="text-muted small">İlk temas hedefi @hours saat (takvim saati; iş saati değildir).</p>
+        <p class="text-muted small">@Texts.Get("crm.leads.firstContactTarget", hours)</p>
     }
 
     @if (page is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Bu görünümde müşteri adayı yok.</p>
+        <p class="text-muted">@Texts.Get("crm.leads.none")</p>
     }
     else
     {
@@ -118,7 +118,7 @@
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -130,8 +130,8 @@
                             @Cell(column, lead)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{lead.LeadNumber} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="crm/leadler/@lead.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", lead.LeadNumber)">
+                                <a class="view-menu-item" role="menuitem" href="crm/leadler/@lead.Id"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></a>
                             </RowMenu>
                         </td>
                     </tr>
@@ -151,36 +151,36 @@
     private const string Url = "/api/crm/leads";
 
     // Görünümler yalnızca süzgeçtir; kapsamı sunucu uygular (kimse yetkisi dışındaki Lead'i listeleyemez).
-    private static readonly ViewDefinition[] Views =
+    private static ViewDefinition[] Views =>
     [
-        new("mine", "Benim müşteri adaylarım", "star", _ => true),
-        new("all", "Tüm müşteri adayları", "inbox", _ => true),
-        new("team", "Ekip müşteri adayları", "users", s => s.Scope != RecordScope.Own),
-        new("unassigned", "Atama bekleyenler", "user-check", s => s.Can(CrmAccess.LeadsAssign)),
-        new("firstContactOverdue", "İlk temas gecikmiş", "clock", _ => true),
-        new("followUpOverdue", "Takibi geciken", "alert-circle", _ => true),
-        new("qualified", "Nitelikli, dönüşmemiş", "check-circle", _ => true),
+        new("mine", Texts.Get("crm.leads.view.mine"), "star", _ => true),
+        new("all", Texts.Get("crm.leads.view.all"), "inbox", _ => true),
+        new("team", Texts.Get("crm.leads.view.team"), "users", s => s.Scope != RecordScope.Own),
+        new("unassigned", Texts.Get("crm.leads.view.unassigned"), "user-check", s => s.Can(CrmAccess.LeadsAssign)),
+        new("firstContactOverdue", Texts.Get("crm.leads.view.firstContactOverdue"), "clock", _ => true),
+        new("followUpOverdue", Texts.Get("crm.leads.view.followUpOverdue"), "alert-circle", _ => true),
+        new("qualified", Texts.Get("crm.leads.view.qualified"), "check-circle", _ => true),
     ];
 
     // Başlıklar sunucuda sıralanır (varsayılan: en yeni geliş önce). Sorumlu adı üyelik tablosundadır, sıralanamaz. "default" varsayılan sıranın
     // sunucuya gönderilmeyen belirtecidir (varsayılan zaten azalan geliş sırası olduğundan başlık döngüsü Geliş'te artan → azalan → varsayılan işler).
-    private static readonly GridColumnDef[] Columns =
+    private static GridColumnDef[] Columns =>
     [
-        new("number", "No", "hash", "number", "-number"),
-        new("subject", "Konu", "type", "subject", "-subject", Locked: true),
-        new("requester", "Talep sahibi", "user", "requester", "-requester"),
-        new("status", "Durum", "tag", "status", "-status"),
-        new("priority", "Öncelik", "alert-circle", "priority", "-priority"),
-        new("source", "Kaynak", "globe", "source", "-source"),
-        new("owner", "Sorumlu", "user"),
-        new("received", "Geliş", "calendar", "received", "-received"),
-        new("firstContact", "İlk temas", "clock", "firstContact", "-firstContact"),
-        new("company", "Firma", "building", "company", "-company", DefaultVisible: false),
-        new("email", "E-posta", "mail", "email", "-email", DefaultVisible: false),
-        new("phone", "Telefon", "phone", "phone", "-phone", DefaultVisible: false),
-        new("city", "Şehir", "map-pin", "city", "-city", DefaultVisible: false),
-        new("industry", "Sektör", "briefcase", "industry", "-industry", DefaultVisible: false),
-        new("productInterest", "İlgilendiği ürün", "package", "productInterest", "-productInterest", DefaultVisible: false),
+        new("number", Texts.Get("crm.leads.col.number"), "hash", "number", "-number"),
+        new("subject", Texts.Get("crm.leads.col.subject"), "type", "subject", "-subject", Locked: true),
+        new("requester", Texts.Get("crm.leads.col.requester"), "user", "requester", "-requester"),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
+        new("priority", Texts.Get("crm.leads.col.priority"), "alert-circle", "priority", "-priority"),
+        new("source", Texts.Get("crm.company.source"), "globe", "source", "-source"),
+        new("owner", Texts.Get("common.field.owner"), "user"),
+        new("received", Texts.Get("crm.leads.col.received"), "calendar", "received", "-received"),
+        new("firstContact", Texts.Get("crm.leads.col.firstContact"), "clock", "firstContact", "-firstContact"),
+        new("company", Texts.Get("crm.contacts.col.company"), "building", "company", "-company", DefaultVisible: false),
+        new("email", Texts.Get("common.field.email"), "mail", "email", "-email", DefaultVisible: false),
+        new("phone", Texts.Get("common.field.phone"), "phone", "phone", "-phone", DefaultVisible: false),
+        new("city", Texts.Get("common.field.city"), "map-pin", "city", "-city", DefaultVisible: false),
+        new("industry", Texts.Get("crm.companies.col.industry"), "briefcase", "industry", "-industry", DefaultVisible: false),
+        new("productInterest", Texts.Get("crm.leads.col.productInterest"), "package", "productInterest", "-productInterest", DefaultVisible: false),
     ];
 
     private IReadOnlyList<ViewOption> ViewOptions =>
@@ -392,8 +392,8 @@
         "number" => @<a href="crm/leadler/@lead.Id">@lead.LeadNumber</a>,
         "subject" => @<text>@lead.Subject</text>,
         "requester" => @<text>@Requester(lead)</text>,
-        "status" => @<span class="badge stage-@lead.Status.ToLowerInvariant()">@LeadStatus.Label(lead.Status)</span>,
-        "priority" => @<text>@LeadPriority.Label(lead.Priority)</text>,
+        "status" => @<span class="badge stage-@lead.Status.ToLowerInvariant()">@CrmText.LeadStatusName(lead.Status)</span>,
+        "priority" => @<text>@CrmText.LeadPriorityName(lead.Priority)</text>,
         "source" => @<text>@Lookups.Label(CrmLeadLists.Source, lead.Source)</text>,
         "owner" => OwnerPart(lead),
         "received" => @<text>@CrmLabels.Time(lead.FirstReceivedAt)</text>,
@@ -408,7 +408,7 @@
     };
 
     private RenderFragment OwnerPart(LeadDto lead) =>
-        @<text>@if (lead.OwnerId is null) { <span class="text-muted">Atanmadı</span> } else { <OwnerCell Name="@Lookups.MemberName(lead.OwnerId)" /> }</text>;
+        @<text>@if (lead.OwnerId is null) { <span class="text-muted">@Texts.Get("crm.leads.unassigned")</span> } else { <OwnerCell Name="@Lookups.MemberName(lead.OwnerId)" /> }</text>;
 
     private RenderFragment FirstContactPart(LeadDto lead) =>
         @<text>
