@@ -214,7 +214,7 @@
                                                         @if (link.IsDecisionMaker) { <span class="badge tag">@Texts.Get("crm.company.people.decisionMaker")</span><text> </text> }
                                                         @link.JobTitle
                                                         @if (link.Department is { } department) { <text> · @department</text> }
-                                                        @foreach (var role in link.Roles) { <span class="badge tag">@CrmRelationshipRoles.Labels.GetValueOrDefault(role, role)</span><text> </text> }
+                                                        @foreach (var role in link.Roles) { <span class="badge tag">@RelationshipRoleNames.Of(role)</span><text> </text> }
                                                         @if (!link.IsActive) { <text> · @Texts.Get("crm.company.people.ended", link.EndDate)</text> }
                                                     </span>
                                                 </div>

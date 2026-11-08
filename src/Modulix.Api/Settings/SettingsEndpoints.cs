@@ -9,7 +9,7 @@ using Modulix.Shared.Settings;
 namespace Modulix.Api.Settings;
 
 /// <summary>
-/// Firma ayarları (Y6): /api/settings. Okuma her üyeye açıktır (ekranlar saat dilimine, para birimine bakar); yazma
+/// Kuruluş ve modül ayarları (Y6): /api/settings. Okuma her üyeye açıktır (ekranlar saat dilimine, para birimine bakar); yazma
 /// <c>core.settings.manage</c> ister. Kurallar <see cref="ITenantSettings"/>'tadır.
 /// </summary>
 public static class SettingsEndpoints

@@ -4,48 +4,48 @@
 @inject ApiClient Api
 
 <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-    <h2>Yeni kişi oluştur ve bağla</h2>
+    <h2>@Texts.Get("crm.person.title")</h2>
 
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <FormTabs Title="Kişi bilgileri" Label="Yeni kişi formu bölümleri">
+    <FormTabs Title="@Texts.Get("crm.person.info")" Label="@Texts.Get("crm.person.tabs")">
     <div class="form-grid">
         <div>
-            <label class="form-label" for="np-first">Ad *</label>
+            <label class="form-label" for="np-first">@Texts.Get("crm.person.firstName")</label>
             <input id="np-first" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.FirstName" />
             <FieldError Field="firstName" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="np-last">Soyad *</label>
+            <label class="form-label" for="np-last">@Texts.Get("crm.person.lastName")</label>
             <input id="np-last" class="form-control" maxlength="@CrmLimits.PersonNameMaxLength" @bind="form.LastName" />
             <FieldError Field="lastName" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="np-title">Bu firmadaki unvan</label>
+            <label class="form-label" for="np-title">@Texts.Get("crm.link.editor.jobTitle")</label>
             <input id="np-title" class="form-control" maxlength="@CrmRelationshipLimits.JobTitleMaxLength" @bind="form.Title" />
             <FieldError Field="title" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="np-dept">Departman</label>
+            <label class="form-label" for="np-dept">@Texts.Get("crm.link.editor.department")</label>
             <input id="np-dept" class="form-control" maxlength="@CrmRelationshipLimits.DepartmentMaxLength" @bind="form.Department" />
         </div>
         <div>
-            <label class="form-label" for="np-email">E-posta</label>
+            <label class="form-label" for="np-email">@Texts.Get("common.field.email")</label>
             <input id="np-email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" @bind="form.Email" />
             <FieldError Field="email" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="np-phone">Telefon</label>
+            <label class="form-label" for="np-phone">@Texts.Get("common.field.phone")</label>
             <input id="np-phone" class="form-control" type="tel" maxlength="@CrmLimits.PhoneMaxLength" @bind="form.Phone" />
             <FieldError Field="phone" Errors="errors" />
         </div>
         <div class="span-all">
-            <span class="form-label">İlişki rolleri</span>
+            <span class="form-label">@Texts.Get("crm.link.editor.roles")</span>
             <div class="role-options">
-                @foreach (var (key, label) in CrmRelationshipRoles.Labels)
+                @foreach (var (key, label) in RelationshipRoleNames.All())
                 {
                     <label class="form-check-inline">
                         <input type="checkbox" checked="@form.Roles.Contains(key)" @onchange="e => Toggle(key, (bool)e.Value!)" /> @label
@@ -54,17 +54,17 @@
             </div>
         </div>
         <div>
-            <label class="form-check-inline"><input type="checkbox" @bind="form.IsPrimary" /> Ana irtibat</label>
+            <label class="form-check-inline"><input type="checkbox" @bind="form.IsPrimary" /> @Texts.Get("crm.company.people.primary")</label>
         </div>
         <div>
-            <label class="form-check-inline"><input type="checkbox" @bind="form.IsDecisionMaker" /> Karar verici</label>
+            <label class="form-check-inline"><input type="checkbox" @bind="form.IsDecisionMaker" /> @Texts.Get("crm.company.people.decisionMaker")</label>
         </div>
     </div>
     </FormTabs>
-    <small class="text-muted">Kişi diğer firmalarla da ilişkilendirilebilir; zaten kayıtlı bir kişiyse "Kişi ilişkilendir"i kullanın.</small>
+    <small class="text-muted">@Texts.Get("crm.person.hint")</small>
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@busy">Oluştur ve bağla</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.person.submit")</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.dismiss")</button>
     </div>
 </form>
 
@@ -120,8 +120,7 @@
             if (updated is null || !updated.IsSuccess)
             {
                 busy = false;
-                await Saved.InvokeAsync($"Kişi oluşturuldu ve firmaya bağlandı; ancak ilişki ayrıntıları kaydedilemedi ({updated?.Error ?? "ilişki bulunamadı"}). "
-                    + "Ayrıntıları listedeki \"Düzenle\" ile tamamlayın.");
+                await Saved.InvokeAsync(Texts.Get("crm.person.partialFailure", updated?.Error ?? Texts.Get("crm.person.linkNotFound")));
                 return;
             }
         }

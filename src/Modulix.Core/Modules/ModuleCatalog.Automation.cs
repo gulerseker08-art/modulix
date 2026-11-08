@@ -113,6 +113,14 @@ public sealed partial class ModuleCatalog
                 }
             }
 
+            foreach (var labeled in capabilities.Entities.Where(e => e.LabelField is not null))
+            {
+                if (!capabilities.Fields.Any(f => f.EntityKey == labeled.EntityKey && f.Name == labeled.LabelField && f.Type == AutomationFieldType.Text))
+                {
+                    throw Fail($"kayıt türü '{labeled.EntityKey}' etiket alanı '{labeled.LabelField}' kayıt türünün beyan edilmiş bir metin alanı olmalı");
+                }
+            }
+
             foreach (var relation in capabilities.Relations)
             {
                 if (!AutomationKeyPattern().IsMatch(relation.Key)

@@ -3,16 +3,15 @@
 
 <section class="detail-section lead-report">
     <div class="section-header">
-        <h2>Müşteri adayı raporu</h2>
+        <h2>@Texts.Get("crm.lead.report.title")</h2>
         <div class="filters">
-            <label class="form-label-inline">Başlangıç <input class="form-control" type="date" @bind="from" @bind:after="LoadAsync" /></label>
-            <label class="form-label-inline">Bitiş <input class="form-control" type="date" @bind="to" @bind:after="LoadAsync" /></label>
+            <label class="form-label-inline">@Texts.Get("crm.link.editor.start") <input class="form-control" type="date" @bind="from" @bind:after="LoadAsync" /></label>
+            <label class="form-label-inline">@Texts.Get("crm.party.end") <input class="form-control" type="date" @bind="to" @bind:after="LoadAsync" /></label>
         </div>
     </div>
     <p class="text-muted small">
-        Dönem kohortu: seçilen tarihler arasında <strong>gelen</strong> müşteri adayları. Dağılımlar, ilk temas ve dönüşüm oranı bu kohorta aittir;
-        dönemde yapılan ama önceki dönemde gelmiş müşteri adaylarının dönüşümü ayrıca "Dönemde yapılan dönüşüm" olarak gösterilir ve orana katılmaz.
-        Süreler takvim saati cinsindendir (iş saati değildir). Payda sıfırsa oran gösterilmez.
+        @Texts.Get("crm.lead.report.help1") <strong>@Texts.Get("crm.lead.report.helpIncoming")</strong> @Texts.Get("crm.lead.report.help2", Texts.Get("crm.lead.report.convertedInPeriod"))
+        @Texts.Get("crm.lead.report.help3")
     </p>
 
     @if (error is not null)
@@ -21,46 +20,46 @@
     }
     else if (report is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else
     {
         @if (report.Truncated)
         {
-            <div class="alert alert-warning" role="alert">Kayıt sayısı rapor sınırını aştı; sayılar eksik olabilir. Tarih aralığını daraltın.</div>
+            <div class="alert alert-warning" role="alert">@Texts.Get("crm.lead.report.truncated")</div>
         }
         <dl class="summary-grid">
-            <div><dt>Kohorttaki müşteri adayı</dt><dd>@report.CohortCount</dd></div>
-            <div><dt>İlk teması olan</dt><dd>@report.WithFirstContact</dd></div>
-            <div><dt>Ort. ilk temas süresi</dt><dd>@Hours(report.AverageFirstContactHours)</dd></div>
-            <div><dt>Medyan ilk temas süresi</dt><dd>@Hours(report.MedianFirstContactHours)</dd></div>
+            <div><dt>@Texts.Get("crm.lead.report.cohort")</dt><dd>@report.CohortCount</dd></div>
+            <div><dt>@Texts.Get("crm.lead.report.withFirstContact")</dt><dd>@report.WithFirstContact</dd></div>
+            <div><dt>@Texts.Get("crm.lead.report.avgFirstContact")</dt><dd>@Hours(report.AverageFirstContactHours)</dd></div>
+            <div><dt>@Texts.Get("crm.lead.report.medianFirstContact")</dt><dd>@Hours(report.MedianFirstContactHours)</dd></div>
             <div>
-                <dt>İlk temas hedefi aşımı</dt>
-                <dd>@(report.FirstContactTargetBreaches is { } breaches ? $"{breaches} (hedef {report.FirstContactTargetHours} saat)" : "Hedef tanımlı değil")</dd>
+                <dt>@Texts.Get("crm.lead.report.breaches")</dt>
+                <dd>@(report.FirstContactTargetBreaches is { } breaches ? Texts.Get("crm.lead.report.breachesValue", breaches, report.FirstContactTargetHours) : Texts.Get("crm.lead.report.noTarget"))</dd>
             </div>
-            <div><dt>Fırsata dönüşen (kohort)</dt><dd>@report.ConvertedFromCohort</dd></div>
-            <div><dt>Dönüşüm oranı</dt><dd>@(report.ConversionRate is { } rate ? $"%{rate * 100:0.#}" : "—")</dd></div>
-            <div><dt>Dönüşüme kadar ort. süre</dt><dd>@Hours(report.AverageHoursToConvert)</dd></div>
-            <div><dt>Dönemde yapılan dönüşüm</dt><dd>@report.ConvertedInPeriod</dd></div>
+            <div><dt>@Texts.Get("crm.lead.report.convertedCohort")</dt><dd>@report.ConvertedFromCohort</dd></div>
+            <div><dt>@Texts.Get("crm.lead.report.conversionRate")</dt><dd>@(report.ConversionRate is { } rate ? $"%{rate * 100:0.#}" : "—")</dd></div>
+            <div><dt>@Texts.Get("crm.lead.report.avgToConvert")</dt><dd>@Hours(report.AverageHoursToConvert)</dd></div>
+            <div><dt>@Texts.Get("crm.lead.report.convertedInPeriod")</dt><dd>@report.ConvertedInPeriod</dd></div>
         </dl>
         <div class="report-tables">
             <div>
-                <h3>Kaynağa göre</h3>
-                @Table(report.BySource, k => k.Length == 0 ? "(belirtilmemiş)" : Lookups.Label(CrmLeadLists.Source, k))
+                <h3>@Texts.Get("crm.lead.report.bySource")</h3>
+                @Table(report.BySource, k => k.Length == 0 ? Texts.Get("crm.lead.report.unspecified") : Lookups.Label(CrmLeadLists.Source, k))
             </div>
             <div>
-                <h3>Duruma göre</h3>
-                @Table(report.ByStatus, LeadStatus.Label)
+                <h3>@Texts.Get("crm.lead.report.byStatus")</h3>
+                @Table(report.ByStatus, CrmText.LeadStatusName)
             </div>
             <div>
-                <h3>Eleme nedenleri</h3>
-                @Table(report.DisqualificationReasons, k => k.Length == 0 ? "(belirtilmemiş)" : Lookups.Label(CrmLeadLists.DisqualificationReason, k))
+                <h3>@Texts.Get("crm.lead.report.reasons")</h3>
+                @Table(report.DisqualificationReasons, k => k.Length == 0 ? Texts.Get("crm.lead.report.unspecified") : Lookups.Label(CrmLeadLists.DisqualificationReason, k))
             </div>
             <div>
-                <h3>Sorumluya göre açık müşteri adayı (şu an)</h3>
+                <h3>@Texts.Get("crm.lead.report.openByOwner")</h3>
                 @if (report.OpenByOwner.Count == 0)
                 {
-                    <p class="text-muted">Açık müşteri adayı yok.</p>
+                    <p class="text-muted">@Texts.Get("crm.lead.report.noOpen")</p>
                 }
                 else
                 {
@@ -68,7 +67,7 @@
                         <tbody>
                             @foreach (var row in report.OpenByOwner)
                             {
-                                <tr><td>@(row.OwnerId is null ? "Atanmadı" : Lookups.MemberName(row.OwnerId))</td><td class="text-end">@row.Count</td></tr>
+                                <tr><td>@(row.OwnerId is null ? Texts.Get("crm.leads.unassigned") : Lookups.MemberName(row.OwnerId))</td><td class="text-end">@row.Count</td></tr>
                             }
                         </tbody>
                     </table>
@@ -100,7 +99,7 @@
     }
 
     private static string Hours(double? hours) =>
-        hours is not { } value ? "—" : value < 48 ? $"{value:0.#} saat" : $"{value / 24:0.#} gün";
+        hours is not { } value ? "—" : value < 48 ? Texts.Get("crm.lead.report.hoursValue", value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)) : Texts.Get("crm.lead.report.daysValue", (value / 24).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture));
 
     private RenderFragment Table(IReadOnlyList<LeadCount> rows, Func<string, string> label) => builder =>
     {
@@ -108,7 +107,7 @@
         {
             builder.OpenElement(0, "p");
             builder.AddAttribute(1, "class", "text-muted");
-            builder.AddContent(2, "Kayıt yok.");
+            builder.AddContent(2, Texts.Get("common.noRecords"));
             builder.CloseElement();
             return;
         }

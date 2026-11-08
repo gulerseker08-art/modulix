@@ -63,7 +63,7 @@
                         <span>@opportunity.OpportunityNumber</span>
                         <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span>
                         <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span>
-                        <span>Öncelik: @LeadPriority.Label(opportunity.Priority)</span>
+                        <span>Öncelik: @CrmText.LeadPriorityName(opportunity.Priority)</span>
                         @if (opportunity.Status == OpportunityStatus.Open && opportunity.ExpectedCloseDate is { } due && due < Today)
                         {
                             <span class="badge stage-lost">Kapanış tarihi geçti</span>

@@ -7,7 +7,7 @@
 @if (Session.Can(CrmAccess.LeadsRead) && leads is { Count: > 0 })
 {
     <section class="detail-section">
-        <div class="section-header"><h2>İlişkili müşteri adayları</h2></div>
+        <div class="section-header"><h2>@Texts.Get("crm.lead.related")</h2></div>
         <ul class="item-list">
             @foreach (var lead in leads)
             {
@@ -15,8 +15,8 @@
                     <div class="item-main">
                         <a href="crm/leadler/@lead.Id">@lead.LeadNumber · @lead.Subject</a>
                         <span class="text-muted">
-                            <span class="badge stage-@lead.Status.ToLowerInvariant()">@LeadStatus.Label(lead.Status)</span>
-                            @(IsConvertedHere(lead) ? " · bu kayda dönüştü" : " · talep bu müşteriden geldi") · @CrmLabels.Time(lead.FirstReceivedAt)
+                            <span class="badge stage-@lead.Status.ToLowerInvariant()">@CrmText.LeadStatusName(lead.Status)</span>
+                            @Texts.Get(IsConvertedHere(lead) ? "crm.lead.related.converted" : "crm.lead.related.from") · @CrmLabels.Time(lead.FirstReceivedAt)
                         </span>
                     </div>
                 </li>

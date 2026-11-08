@@ -78,7 +78,7 @@
                     <select id="priority" class="form-select" @bind="form.Priority">
                         @foreach (var priority in LeadPriority.All)
                         {
-                            <option value="@priority">@LeadPriority.Label(priority)</option>
+                            <option value="@priority">@CrmText.LeadPriorityName(priority)</option>
                         }
                     </select>
                     break;

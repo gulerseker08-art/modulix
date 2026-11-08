@@ -4,7 +4,7 @@
 @inject SessionState Session
 
 <div class="duplicate-box">
-    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="CheckAsync">Benzer kayıt var mı?</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="CheckAsync">@Texts.Get("crm.duplicates.check")</button>
 
     @if (message is not null)
     {
@@ -13,7 +13,7 @@
 
     @if (candidates is { Count: 0 })
     {
-        <p class="text-muted small mt-2">Eşleşen kayıt bulunamadı.</p>
+        <p class="text-muted small mt-2">@Texts.Get("crm.duplicates.none")</p>
     }
     else if (candidates is not null)
     {
@@ -35,11 +35,11 @@
                         <span>
                             @if (candidate.Match == CrmMatchKinds.Exact)
                             {
-                                <span class="badge status-customer">Kesin eşleşme</span><text> </text>
+                                <span class="badge status-customer">@Texts.Get("crm.duplicates.exact")</span><text> </text>
                             }
                             else
                             {
-                                <span class="badge tag">Olası eşleşme</span><text> </text>
+                                <span class="badge tag">@Texts.Get("crm.duplicates.possible")</span><text> </text>
                             }
                             @string.Join(" · ", candidate.Reasons)
                             @if (candidate.TaxNumber is { } tax) { <text> · @tax</text> }
@@ -48,21 +48,21 @@
                         </span>
                         @if (candidate.Id is null)
                         {
-                            <small class="text-muted">Bu kayıt başka bir modülde ya da erişiminiz dışında kayıtlı; ayrıntıları görünmez.</small>
+                            <small class="text-muted">@Texts.Get("crm.duplicates.hidden")</small>
                         }
                     </div>
                     @if (ExcludeId is null && candidate.Id is null && candidate.SharedId is { } sharedId && CanUse)
                     {
-                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Use.InvokeAsync(sharedId)">Bu kaydı kullan</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Use.InvokeAsync(sharedId)">@Texts.Get("crm.duplicates.use")</button>
                     }
                     @if (ExcludeId is { } self && candidate.Id is { } other && CanMerge)
                     {
-                        <a class="btn btn-outline-secondary btn-sm" href="@($"{DetailPath}/{self}/birlestir?kaynak={other}")">Birleştir…</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="@($"{DetailPath}/{self}/birlestir?kaynak={other}")">@Texts.Get("crm.duplicates.merge")</a>
                     }
                 </li>
             }
         </ul>
-        <p class="text-muted small">Olası eşleşmeler otomatik birleştirilmez. Aynı kişi/firma olduğundan eminseniz mevcut kaydı kullanın ya da birleştirin.</p>
+        <p class="text-muted small">@Texts.Get("crm.duplicates.note")</p>
     }
 </div>
 
