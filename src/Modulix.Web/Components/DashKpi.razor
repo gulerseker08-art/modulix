@@ -7,6 +7,11 @@
     <strong class="dash-kpi-value">@Value</strong>
     <div class="dash-kpi-foot">
         <span>
+            @if (Delta is not null)
+            {
+                <span class="dash-delta @DeltaClass">@if (DeltaTrend != 0) { <AppIcon Name="@(DeltaTrend < 0 ? "arrow-down" : "arrow-up")" Size="12" /> }@Delta</span>
+                <br />
+            }
             @Detail
             @if (Partial)
             {
@@ -35,6 +40,14 @@
     [Parameter] public bool Partial { get; set; }
 
     [Parameter] public string? PartialHint { get; set; }
+
+    /// <summary>Önceki döneme göre değişim metni (ör. "+%12", "+4 puan"); işaret metinde de yazılır, renk tek başına anlam taşımaz.</summary>
+    [Parameter] public string? Delta { get; set; }
+
+    /// <summary>Değişimin yönü: artı iyi, eksi kötü, sıfır nötr.</summary>
+    [Parameter] public int DeltaTrend { get; set; }
+
+    private string? DeltaClass => DeltaTrend switch { < 0 => "is-down", 0 => "is-flat", _ => null };
 
     /// <summary>Dönemlere göre değerler; verilmezse çizgi çizilmez.</summary>
     [Parameter] public IReadOnlyList<decimal>? Trend { get; set; }

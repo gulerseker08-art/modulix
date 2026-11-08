@@ -77,7 +77,10 @@ public sealed record TargetProgressDto(decimal Target, decimal Realized, decimal
 
 public sealed record TargetBlockDto(string Metric, string Source, decimal? Value, TargetProgressDto? Progress, string? Problem, decimal? ChildExcess, string? Currency);
 
-public sealed record StageSliceDto(string Stage, int Count, decimal Amount, decimal Weighted, int MissingAmountCount, int MissingRateCount);
+public sealed record StageSliceDto(string Stage, int Count, decimal Amount, decimal Weighted, int MissingAmountCount, int MissingRateCount, decimal? AverageDaysInStage = null);
+
+/// <summary>Önceki dönemin karşılaştırma penceresi: dönem sürüyorsa aynı gün sayısı, bittiyse tamamı.</summary>
+public sealed record PeriodComparisonDto(string Label, DateOnly Start, DateOnly LastDay, MoneyTotalDto Realized, int WonCount, int LostCount, decimal? WinRatePercent);
 
 public sealed record TrendPointDto(string Label, DateOnly Start, DateOnly End, decimal Realized, int WonCount, bool Partial);
 
@@ -110,7 +113,8 @@ public sealed record SalesOverviewDto(
     IReadOnlyList<TrendPointDto> Trend,
     IReadOnlyList<OverviewRiskDto> Overdue,
     IReadOnlyList<string> Warnings,
-    IReadOnlyList<string> Definitions);
+    IReadOnlyList<string> Definitions,
+    PeriodComparisonDto? PreviousToDate = null);
 
 public sealed record SalesDetailRowDto(
     Guid Id, string OpportunityNumber, string Title, Guid? OwnerId, string Status, string Stage, decimal? SourceAmount, string SourceCurrency,

@@ -40,6 +40,46 @@ public class SalesMetricsTests
     }
 
     [Fact]
+    public void Comparison_window_takes_the_same_number_of_days_from_the_previous_period()
+    {
+        var quarter = ReportPeriods.Containing(PeriodKind.Quarter, new DateOnly(2026, 11, 7));
+        var previous = ReportPeriods.Shift(quarter, -1);
+
+        var window = SalesMetrics.ComparisonWindow(quarter, previous, new DateOnly(2026, 11, 7))!;
+
+        Assert.Equal(new DateOnly(2026, 7, 1), window.Start);
+        Assert.Equal(new DateOnly(2026, 8, 7), window.LastDay);
+    }
+
+    [Fact]
+    public void Comparison_window_is_the_whole_previous_period_once_the_period_is_over_and_absent_before_it_starts()
+    {
+        var previous = ReportPeriods.Shift(November, -1);
+
+        Assert.Equal(previous, SalesMetrics.ComparisonWindow(November, previous, new DateOnly(2026, 12, 3)));
+        Assert.Null(SalesMetrics.ComparisonWindow(November, previous, new DateOnly(2026, 10, 30)));
+    }
+
+    [Fact]
+    public void Comparison_window_does_not_run_past_a_shorter_previous_period()
+    {
+        var march = ReportPeriods.Containing(PeriodKind.Month, new DateOnly(2026, 3, 31));
+        var february = ReportPeriods.Shift(march, -1);
+
+        var window = SalesMetrics.ComparisonWindow(march, february, new DateOnly(2026, 3, 31))!;
+
+        Assert.Equal(new DateOnly(2026, 2, 28), window.LastDay);
+    }
+
+    [Fact]
+    public void Average_days_in_stage_counts_from_the_entry_day_and_is_empty_without_entries()
+    {
+        Assert.Equal(7.5m, SalesMetrics.AverageDays([Today.AddDays(-5), Today.AddDays(-10)], Today));
+        Assert.Equal(0m, SalesMetrics.AverageDays([Today.AddDays(2)], Today));
+        Assert.Null(SalesMetrics.AverageDays([], Today));
+    }
+
+    [Fact]
     public void Scenario_two_target_progress_remaining_and_coverage()
     {
         var progress = SalesMetrics.Progress(500_000m, 150_000m, 300_000m);

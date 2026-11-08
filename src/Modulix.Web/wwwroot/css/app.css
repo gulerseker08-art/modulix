@@ -5944,6 +5944,28 @@ button.hero-stat {
     font-size: var(--mx-fs-helper);
 }
 
+.dash-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: var(--mx-space-1);
+    padding: 1px var(--mx-space-2);
+    border-radius: var(--mx-radius-badge);
+    background: var(--mx-tone-success-bg);
+    color: var(--mx-tone-success-fg);
+    font-weight: 700;
+}
+
+    .dash-delta.is-down {
+        background: var(--mx-tone-danger-bg);
+        color: var(--mx-tone-danger-fg);
+    }
+
+    .dash-delta.is-flat {
+        background: var(--mx-tone-neutral-bg);
+        color: var(--mx-tone-neutral-fg);
+    }
+
 .sparkline {
     flex: none;
     overflow: visible;

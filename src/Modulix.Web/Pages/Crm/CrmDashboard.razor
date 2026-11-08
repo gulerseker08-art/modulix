@@ -113,14 +113,20 @@
 
         <div class="dash-kpis" role="group" aria-label="Satış özeti">
             <DashKpi Label="Gerçekleşen" Icon="check-circle" Tone="success" Value="@(amounts ? SalesLabels.Compact(r.Realized.Amount, r.Currency) : SalesLabels.Count(r.WonCount))"
-                     Detail="@($"{r.Realized.Count} kazanılan fırsat")" Partial="@(amounts && r.Realized.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.Realized)"
+                     Detail="@($"{r.Realized.Count} kazanılan fırsat")" Delta="@RealizedDelta(r).Text" DeltaTrend="@RealizedDelta(r).Trend" Partial="@(amounts && r.Realized.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.Realized)"
                      Trend="@(r.Trend.Select(t => amounts ? t.Realized : t.WonCount).ToList())" />
             <DashKpi Label="Açık pipeline" Icon="layers" Value="@(amounts ? SalesLabels.Compact(r.OpenPipeline.Amount, r.Currency) : SalesLabels.Count(r.OpenPipeline.Count))"
                      Detail="@($"{r.OpenPipeline.Count} açık fırsat")" Partial="@(amounts && r.OpenPipeline.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.OpenPipeline)" />
             <DashKpi Label="Kazanma oranı" Icon="target" Tone="teal" Value="@(r.WinRatePercent is { } rate ? SalesLabels.Percent(Math.Round(rate)) : "Veri yok")"
-                     Detail="@(r.WinRatePercent is null ? "Bu dönemde sonuçlanan fırsat yok" : $"{r.WonCount} kazanılan · {r.LostCount} kayıp")" />
+                     Detail="@(r.WinRatePercent is null ? "Bu dönemde sonuçlanan fırsat yok" : $"{r.WonCount} kazanılan · {r.LostCount} kayıp")"
+                     Delta="@WinRateDelta(r).Text" DeltaTrend="@WinRateDelta(r).Trend" />
             <DashKpi Label="Gecikmiş fırsat" Icon="alert-circle" Tone="warning" Value="@SalesLabels.Count(r.OverdueOpenCount)" Detail="Beklenen kapanışı geçmiş" />
         </div>
+
+        @if (r.PreviousToDate is { } previous && (RealizedDelta(r).Text is not null || WinRateDelta(r).Text is not null))
+        {
+            <p class="small text-muted">Değişimler önceki dönemin aynı noktasına göredir: @previous.Label, @SalesLabels.Period(previous.Start, previous.LastDay).</p>
+        }
 
         <div class="dash-grid">
             <section class="dash-card" aria-labelledby="dash-trend">
@@ -157,13 +163,17 @@
                         var size = amounts ? stage.Amount : stage.Count;
                         var width = largest > 0 ? size / largest * 100m : 0m;
                         <div class="dash-stage">
-                            <span class="dash-stage-label" title="@Lookups.Label(CrmLists.OpportunityStage, stage.Stage)">@Lookups.Label(CrmLists.OpportunityStage, stage.Stage)</span>
+                            <span class="dash-stage-label" title="@StageTitle(stage)">@Lookups.Label(CrmLists.OpportunityStage, stage.Stage)</span>
                             <div><div class="dash-stage-bar" style="width:@width.ToString("0.#", CultureInfo.InvariantCulture)%">@stage.Count</div></div>
                             @if (amounts)
                             {
                                 <span class="dash-num">@SalesLabels.Compact(stage.Amount, r.Currency)</span>
                             }
                         </div>
+                    }
+                    @if (stages.Where(s => s.AverageDaysInStage is not null).MaxBy(s => s.AverageDaysInStage) is { } slowest)
+                    {
+                        <p class="small text-muted mb-0 mt-3"><AppIcon Name="clock" Size="14" /> En uzun bekleyen aşama: @Lookups.Label(CrmLists.OpportunityStage, slowest.Stage) (ort. @Days(slowest.AverageDaysInStage!.Value) gün)</p>
                     }
                 }
             </section>
@@ -300,6 +310,46 @@
 
     private static string LateText(OverviewRiskDto risk, DateOnly today) =>
         risk.ExpectedCloseDate is { } due ? $"{today.DayNumber - due.DayNumber} gün gecikti" : "Gecikti";
+
+    // Gerçekleşen: tutar izni varsa yüzde değişim, yoksa kazanılan adet farkı. Önceki dönemde hiç yoksa oran yazılmaz.
+    private static (string? Text, int Trend) RealizedDelta(SalesOverviewDto r)
+    {
+        if (r.PreviousToDate is not { } previous)
+        {
+            return (null, 0);
+        }
+
+        if (!r.AmountsVisible)
+        {
+            var gap = r.WonCount - previous.WonCount;
+            return ($"{(gap > 0 ? "+" : null)}{gap} adet", Math.Sign(gap));
+        }
+
+        if (previous.Realized.Amount <= 0)
+        {
+            return (null, 0);
+        }
+
+        var change = Math.Round((r.Realized.Amount - previous.Realized.Amount) / previous.Realized.Amount * 100m);
+        return ($"{(change > 0 ? "+" : change < 0 ? "−" : null)}%{Math.Abs(change).ToString("0", Regional.Numbers)}", Math.Sign(change));
+    }
+
+    // Kazanma oranı: iki dönemde de sonuçlanan fırsat varsa yüzde puan farkı.
+    private static (string? Text, int Trend) WinRateDelta(SalesOverviewDto r)
+    {
+        if (r.WinRatePercent is not { } now || r.PreviousToDate?.WinRatePercent is not { } before)
+        {
+            return (null, 0);
+        }
+
+        var gap = Math.Round(now - before);
+        return ($"{(gap > 0 ? "+" : gap < 0 ? "−" : null)}{Math.Abs(gap).ToString("0", Regional.Numbers)} puan", Math.Sign(gap));
+    }
+
+    private static string Days(decimal days) => days.ToString("0.#", Regional.Numbers);
+
+    private string StageTitle(StageSliceDto stage) =>
+        Lookups.Label(CrmLists.OpportunityStage, stage.Stage) + (stage.AverageDaysInStage is { } days ? $" · ort. {Days(days)} gündür bu aşamada" : null);
 
     // Aşamalar firmanın tanımladığı sırayla çizilir; listede olmayan (eski) aşama sona gelir.
     private List<StageSliceDto> OrderedStages(SalesOverviewDto r)

@@ -178,6 +178,33 @@ public static class SalesMetrics
             met);
     }
 
+    /// <summary>
+    /// Önceki dönemle karşılaştırma penceresi. Bugün dönemin içindeyse önceki dönemin başından aynı gün sayısı (yarım dönem tam dönemle
+    /// karşılaştırılmaz); dönem geçmişteyse önceki dönemin tamamı; dönem henüz başlamadıysa karşılaştırma yoktur.
+    /// </summary>
+    public static ReportPeriod? ComparisonWindow(ReportPeriod period, ReportPeriod previous, DateOnly today)
+    {
+        if (today < period.Start)
+        {
+            return null;
+        }
+
+        if (!period.Contains(today))
+        {
+            return previous;
+        }
+
+        var end = previous.Start.AddDays(today.DayNumber - period.Start.DayNumber + 1);
+        return previous with { EndExclusive = end < previous.EndExclusive ? end : previous.EndExclusive };
+    }
+
+    /// <summary>Aşamada ortalama bekleme (gün, bir ondalık): bugün − aşamaya giriş günü. Giriş günü bilinmeyen fırsat yoksa boş.</summary>
+    public static decimal? AverageDays(IEnumerable<DateOnly> enteredDays, DateOnly today)
+    {
+        List<int> days = [.. enteredDays.Select(d => Math.Max(0, today.DayNumber - d.DayNumber))];
+        return days.Count == 0 ? null : Math.Round((decimal)days.Sum() / days.Count, 1);
+    }
+
     public static ForecastVariance Variance(decimal forecast, decimal actual) =>
         new(forecast, actual, forecast - actual, Math.Abs(forecast - actual), actual == 0 ? null : Math.Round(100m * (forecast - actual) / actual, 2));
 }
