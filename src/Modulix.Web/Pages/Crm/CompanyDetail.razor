@@ -265,7 +265,7 @@
                                                     <a href="crm/firsatlar/@opportunity.Id"><strong>@opportunity.Title</strong></a>
                                                     <span>
                                                         <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span>
-                                                        @if (opportunity.Status != OpportunityStatus.Open) { <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span> }
+                                                        @if (opportunity.Status != OpportunityStatus.Open) { <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@CrmText.OpportunityStatusName(opportunity.Status)</span> }
                                                         @if (opportunity.Amount is { } amount) { <text> @CrmLabels.Amount(amount, opportunity.Currency)</text> }
                                                         @if (opportunity.Probability is { } probability) { <text> · %@probability</text> }
                                                         @if (opportunity.OwnerId is not null) { <text> · @Lookups.MemberName(opportunity.OwnerId)</text> }
