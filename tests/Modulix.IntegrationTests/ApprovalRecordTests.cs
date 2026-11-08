@@ -80,8 +80,7 @@ public class ApprovalRecordTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Equal("Pending", (await GetAsync<ApprovalRequestDto>(rep, $"/api/approvals/requests/{opened.Id}")).Status);
 
         await UpdateAsync(rep, renamed, "Depo projesi (revize)", 400_000m);
-        await DrainAsync(team.Tenant.Id);
-        ApprovalRequestDto invalidated = await GetAsync<ApprovalRequestDto>(rep, $"/api/approvals/requests/{opened.Id}");
+        ApprovalRequestDto invalidated = await WaitForStatusAsync(rep, team.Tenant.Id, opened.Id, "Invalidated");
         Assert.Equal("Invalidated", invalidated.Status);
         Assert.All(invalidated.Steps, s => Assert.Equal("Cancelled", s.Status));
 
@@ -173,6 +172,19 @@ public class ApprovalRecordTests(ModulixApiFactory factory) : IClassFixture<Modu
     private static async Task<OpportunityDto> UpdateAsync(HttpClient client, OpportunityDto opportunity, string title, decimal amount) =>
         await ReadAsync<OpportunityDto>(await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
             new SaveOpportunityRequest(title, opportunity.CompanyId, Amount: amount, Version: opportunity.Version)), HttpStatusCode.OK);
+
+    // Paylaşımlı yerel veritabanında başka testlerin teslim kuyruğu birikebilir; dağıtıcı turları durum değişene kadar sürer.
+    private async Task<ApprovalRequestDto> WaitForStatusAsync(HttpClient client, Guid tenantId, Guid requestId, string status)
+    {
+        ApprovalRequestDto current = await GetAsync<ApprovalRequestDto>(client, $"/api/approvals/requests/{requestId}");
+        for (int i = 0; i < 10 && current.Status != status; i++)
+        {
+            await DrainAsync(tenantId);
+            current = await GetAsync<ApprovalRequestDto>(client, $"/api/approvals/requests/{requestId}");
+        }
+
+        return current;
+    }
 
     private async Task DrainAsync(Guid tenantId)
     {
