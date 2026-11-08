@@ -4,13 +4,13 @@
 @inject CrmLookups Lookups
 @inject IJSRuntime Js
 
-<PageTitle>Aktiviteler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.activities.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ActivitiesRead">
-    <PageHeader Title="Aktiviteler" Icon="activity" Subtitle="Tüm görev, arama, e-posta, toplantı ve ziyaretlerinizi yönetin.">
+    <PageHeader Title="@Texts.Get("crm.activities.title")" Icon="activity" Subtitle="@Texts.Get("crm.act.subtitle")">
         @if (Session.Can(CrmAccess.ActivitiesWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null, null)"><span aria-hidden="true">+</span> Yeni aktivite</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null, null)"><span aria-hidden="true">+</span> @Texts.Get("crm.activities.new")</button>
         }
     </PageHeader>
 
@@ -18,30 +18,30 @@
     <Notice Text="@bulkMessage" Failed="@bulkFailed" />
 
     @* Özet kartları: her kart, sayısını verdiği görünümü açar (sayı ile açılan liste aynı süzgeçtir). *@
-    <div class="kpi-grid" role="group" aria-label="Aktivite özeti">
+    <div class="kpi-grid" role="group" aria-label="@Texts.Get("crm.act.kpi.summary")">
         <button type="button" class="stat-card kpi-card tone-brand" @onclick="() => ApplyKpiAsync(Mode.List, QuickFilter.Today, null)">
             <span class="stat-icon" aria-hidden="true"><AppIcon Name="calendar" Size="22" /></span>
-            <span class="kpi-text"><span class="kpi-label">Bugün</span><strong>@KpiText(kpiToday)</strong><small>açık aktivite</small></span>
+            <span class="kpi-text"><span class="kpi-label">@Texts.Get("crm.act.kpi.today")</span><strong>@KpiText(kpiToday)</strong><small>@Texts.Get("crm.act.kpi.todayHint")</small></span>
         </button>
         <button type="button" class="stat-card kpi-card tone-danger" @onclick="() => ApplyKpiAsync(Mode.List, QuickFilter.Overdue, null)">
             <span class="stat-icon" aria-hidden="true"><AppIcon Name="alert-circle" Size="22" /></span>
-            <span class="kpi-text"><span class="kpi-label">Geciken</span><strong>@KpiText(kpiOverdue)</strong><small>aktivite</small></span>
+            <span class="kpi-text"><span class="kpi-label">@Texts.Get("crm.act.kpi.overdue")</span><strong>@KpiText(kpiOverdue)</strong><small>@Texts.Get("crm.act.kpi.overdueHint")</small></span>
         </button>
         <button type="button" class="stat-card kpi-card tone-success" @onclick="() => ApplyKpiAsync(Mode.Week, QuickFilter.Mine, null)">
             <span class="stat-icon" aria-hidden="true"><AppIcon Name="check-circle" Size="22" /></span>
-            <span class="kpi-text"><span class="kpi-label">Bu hafta</span><strong>@KpiText(kpiWeek)</strong><small>aktivite</small></span>
+            <span class="kpi-text"><span class="kpi-label">@Texts.Get("crm.act.kpi.week")</span><strong>@KpiText(kpiWeek)</strong><small>@Texts.Get("crm.act.kpi.weekHint")</small></span>
         </button>
         <button type="button" class="stat-card kpi-card tone-info" @onclick="() => ApplyKpiAsync(Mode.Week, QuickFilter.Mine, ActivityStatus.Completed)">
             <span class="stat-icon" aria-hidden="true"><AppIcon Name="layers" Size="22" /></span>
-            <span class="kpi-text"><span class="kpi-label">Tamamlanan</span><strong>@KpiText(kpiDone)</strong><small>bu hafta</small></span>
+            <span class="kpi-text"><span class="kpi-label">@Texts.Get("crm.act.kpi.done")</span><strong>@KpiText(kpiDone)</strong><small>@Texts.Get("crm.act.kpi.doneHint")</small></span>
         </button>
     </div>
 
     @* Görünüm sekmeleri: hızlı süzgeçler sistem görünümleridir, kişisel görünümler (ADR-0036) ardına eklenir; takvim/liste kipi ayrı seçicidir. *@
-    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="Aktivite görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="@Texts.Get("crm.act.views")" NewView="StartNaming" />
 
     <div class="activity-toolbar">
-        <div class="segmented" role="group" aria-label="Görünüm kipi">
+        <div class="segmented" role="group" aria-label="@Texts.Get("crm.act.mode.label")">
             @foreach (var (value, label) in Modes)
             {
                 <button type="button" class="chip @(mode == value ? "active" : null)" aria-pressed="@((mode == value) ? "true" : "false")" @onclick="() => SwitchModeAsync(value)">@label</button>
@@ -54,29 +54,29 @@
     </div>
 
     <form class="filters" @onsubmit="() => ReloadAsync()" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Konu ara" aria-label="Konu ara" @bind="search" />
-        <select class="form-select" aria-label="Durum" @bind="status">
-            <option value="">Tüm durumlar</option>
+        <input class="form-control" type="search" placeholder="@Texts.Get("crm.act.search")" aria-label="@Texts.Get("crm.act.search")" @bind="search" />
+        <select class="form-select" aria-label="@Texts.Get("crm.act.col.status")" @bind="status">
+            <option value="">@Texts.Get("common.allStatuses")</option>
             @foreach (var s in new[] { ActivityStatus.Open, ActivityStatus.InProgress, ActivityStatus.Blocked, ActivityStatus.Completed, ActivityStatus.NoAnswer, ActivityStatus.NoShow, ActivityStatus.Cancelled })
             {
                 <option value="@s">@ActivityLabels.Status(ActivityFamily.Task, s)</option>
             }
         </select>
-        <select class="form-select" aria-label="Tür" @bind="type">
-            <option value="">Tüm türler</option>
+        <select class="form-select" aria-label="@Texts.Get("crm.act.col.type")" @bind="type">
+            <option value="">@Texts.Get("crm.act.allTypes")</option>
             @foreach (var t in Lookups.Choices(CrmLists.ActivityType))
             {
                 <option value="@t.Key">@t.Label</option>
             }
         </select>
-        <select class="form-select" aria-label="Öncelik" @bind="priority">
-            <option value="">Tüm öncelikler</option>
+        <select class="form-select" aria-label="@Texts.Get("crm.act.col.priority")" @bind="priority">
+            <option value="">@Texts.Get("crm.act.allPriorities")</option>
             @foreach (var p in new[] { ActivityPriority.Low, ActivityPriority.Normal, ActivityPriority.High, ActivityPriority.Urgent })
             {
                 <option value="@p">@ActivityLabels.Priority(p)</option>
             }
         </select>
-        <button type="submit" class="btn btn-outline-secondary">Uygula</button>
+        <button type="submit" class="btn btn-outline-secondary">@Texts.Get("crm.act.apply")</button>
     </form>
 
     <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
@@ -86,41 +86,41 @@
         <div class="activity-main">
             @if (mode != Mode.List)
             {
-                <div class="cal-nav" role="group" aria-label="Tarih gezintisi">
-                    <button type="button" class="btn btn-outline-secondary btn-sm cal-nav-step" aria-label="Önceki" title="Önceki" @onclick="() => MoveAsync(-1)"><AppIcon Name="chevron-left" Size="18" /></button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm cal-nav-step" aria-label="Sonraki" title="Sonraki" @onclick="() => MoveAsync(1)"><AppIcon Name="chevron-right" Size="18" /></button>
+                <div class="cal-nav" role="group" aria-label="@Texts.Get("crm.act.nav.label")">
+                    <button type="button" class="btn btn-outline-secondary btn-sm cal-nav-step" aria-label="@Texts.Get("crm.act.nav.prev")" title="@Texts.Get("crm.act.nav.prev")" @onclick="() => MoveAsync(-1)"><AppIcon Name="chevron-left" Size="18" /></button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm cal-nav-step" aria-label="@Texts.Get("crm.act.nav.next")" title="@Texts.Get("crm.act.nav.next")" @onclick="() => MoveAsync(1)"><AppIcon Name="chevron-right" Size="18" /></button>
                     <strong class="cal-nav-title" aria-live="polite">@Title()</strong>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="TodayAsync">Bugün</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="TodayAsync">@Texts.Get("crm.act.nav.today")</button>
                 </div>
             }
 
             @if (items is null)
             {
-                <p class="text-muted">Yükleniyor…</p>
+                <p class="text-muted">@Texts.Get("common.loading")</p>
             }
             else if (mode == Mode.List)
             {
                 @if (items.Count == 0)
                 {
-                    <p class="text-muted">Bu listede aktivite yok.</p>
+                    <p class="text-muted">@Texts.Get("crm.act.emptyList")</p>
                 }
                 else
                 {
                     @if (picked.Count > 0 && Session.Can(CrmAccess.ActivitiesWrite))
                     {
-                        <div class="filters" role="group" aria-label="Toplu işlem">
-                            <strong>@picked.Count seçili</strong>
-                            <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick='() => BulkAsync("complete")'>Tamamla</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => BulkAsync("reschedule-by-days")'>@bulkDays gün ertele</button>
-                            <input class="form-control" type="number" min="1" max="366" aria-label="Ertelenecek gün" @bind="bulkDays" style="width:6rem" />
-                            <input class="form-control" placeholder="Gerekçe (iptal / erteleme)" aria-label="Toplu işlem gerekçesi" @bind="bulkReason" />
-                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick='() => BulkAsync("cancel")'>İptal et</button>
+                        <div class="filters" role="group" aria-label="@Texts.Get("crm.act.bulk.label")">
+                            <strong>@Texts.Get("crm.act.bulk.picked", picked.Count)</strong>
+                            <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick='() => BulkAsync("complete")'>@Texts.Get("crm.act.bulk.complete")</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => BulkAsync("reschedule-by-days")'>@Texts.Get("crm.act.bulk.postpone", bulkDays)</button>
+                            <input class="form-control" type="number" min="1" max="366" aria-label="@Texts.Get("crm.act.bulk.daysLabel")" @bind="bulkDays" style="width:6rem" />
+                            <input class="form-control" placeholder="@Texts.Get("crm.act.bulk.reasonPlaceholder")" aria-label="@Texts.Get("crm.act.bulk.reasonLabel")" @bind="bulkReason" />
+                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick='() => BulkAsync("cancel")'>@Texts.Get("crm.act.cancel")</button>
                         </div>
                     }
                     <table class="table record-table">
                         <thead>
                             <tr>
-                                <th scope="col"><span class="visually-hidden">Seç</span></th>
+                                <th scope="col"><span class="visually-hidden">@Texts.Get("crm.act.select")</span></th>
                                 @foreach (var column in grid.VisibleColumns)
                                 {
                                     <GridHeader Column="column" State="grid" />
@@ -134,7 +134,7 @@
                                     <td class="check-cell">
                                         @if (!activity.Masked && ActivityStatus.IsOpen(activity.Status) && Session.Can(CrmAccess.ActivitiesWrite))
                                         {
-                                            <input type="checkbox" aria-label="@activity.Subject seç" checked="@picked.Contains(activity.Id)" @onchange="e => Pick(activity, e)" />
+                                            <input type="checkbox" aria-label="@Texts.Get("crm.act.selectRow", activity.Subject)" checked="@picked.Contains(activity.Id)" @onchange="e => Pick(activity, e)" />
                                         }
                                     </td>
                                     @foreach (var column in grid.VisibleColumns)
@@ -152,7 +152,7 @@
             {
                 @if (total > items.Count)
                 {
-                    <Notice Text="@($"Bu aralıkta {total} aktivite var, ilk {items.Count} tanesi gösteriliyor. Filtreleri daraltın veya aralığı küçültün.")" Failed="true" />
+                    <Notice Text="@Texts.Get("crm.act.rangeCapped", total, items.Count)" Failed="true" />
                 }
                 <ActivityCalendar Mode="CalendarModeOf(mode)" Anchor="anchor" Items="items" CanMove="CanMove" FamilyOf="FamilyOf"
                                   OnSelect="Select" OnCreate="day => Open(null, day)" OnDayChosen="ChooseDayAsync" OnMove="MoveActivityAsync" />
@@ -168,20 +168,20 @@
     {
         <div class="alert alert-danger" role="alert">
             @conflictMessage
-            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ForceMoveAsync">Çakışmaya rağmen taşı</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => conflictMove = null">Vazgeç</button>
+            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ForceMoveAsync">@Texts.Get("crm.act.conflict.move")</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => conflictMove = null">@Texts.Get("common.dismiss")</button>
         </div>
     }
 
     @* Detay ve düzenleme sağdan açılan çekmecede; arkadaki takvim/liste yerinde kalır. *@
-    <Drawer Open="@(selected is not null && !editing)" Label="Aktivite detayı" OnClose="() => selected = null">
+    <Drawer Open="@(selected is not null && !editing)" Label="@Texts.Get("crm.act.detail")" OnClose="() => selected = null">
         @if (selected is not null)
         {
             <ActivityActions Activity="selected" Lookups="Lookups" Changed="ChangedAsync" Closed="() => selected = null" EditRequested="a => Open(a, null)" />
         }
     </Drawer>
 
-    <Drawer Open="editing" Label="@(editTarget is null ? "Yeni aktivite" : "Aktiviteyi düzenle")" OnClose="() => editing = false">
+    <Drawer Open="editing" Label="@Texts.Get(editTarget is null ? "crm.activities.new" : "crm.activities.edit")" OnClose="() => editing = false">
         <ActivityEditor Activity="editTarget" InitialDay="initialDay" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="() => editing = false" />
     </Drawer>
 </AuthGate>
@@ -212,15 +212,15 @@
     }
 
     // Aktivite listesi sunucuda sıralanmaz (takvim kipleri tarih penceresiyle çalışır); sütunlar seçilir ve sırası görünümle saklanır.
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("subject", "Konu", "type", Locked: true),
-        new("type", "Tür", "tag"),
-        new("status", "Durum", "activity"),
-        new("when", "Zaman", "calendar"),
-        new("priority", "Öncelik", "alert-circle"),
-        new("company", "Firma", "building"),
-        new("owner", "Sorumlu", "user"),
+        new("subject", Texts.Get("crm.act.col.subject"), "type", Locked: true),
+        new("type", Texts.Get("crm.act.col.type"), "tag"),
+        new("status", Texts.Get("crm.act.col.status"), "activity"),
+        new("when", Texts.Get("crm.act.col.when"), "calendar"),
+        new("priority", Texts.Get("crm.act.col.priority"), "alert-circle"),
+        new("company", Texts.Get("crm.act.col.company"), "building"),
+        new("owner", Texts.Get("crm.act.col.owner"), "user"),
     ];
 
     private static readonly (QuickFilter Value, string Icon)[] QuickIcons =
@@ -229,15 +229,17 @@
         (QuickFilter.Team, "users"), (QuickFilter.AllOpen, "activity"), (QuickFilter.All, "layers"),
     ];
 
-    private static readonly (Mode Value, string Label)[] Modes =
+    private static (Mode Value, string Label)[] Modes =>
     [
-        (Mode.List, "Liste"), (Mode.Day, "Gün"), (Mode.Week, "Hafta"), (Mode.Month, "Ay"), (Mode.Agenda, "Ajanda"),
+        (Mode.List, Texts.Get("crm.act.mode.list")), (Mode.Day, Texts.Get("crm.act.mode.day")), (Mode.Week, Texts.Get("crm.act.mode.week")),
+        (Mode.Month, Texts.Get("crm.act.mode.month")), (Mode.Agenda, Texts.Get("crm.act.mode.agenda")),
     ];
 
-    private static readonly (QuickFilter Value, string Label)[] Quick =
+    private static (QuickFilter Value, string Label)[] Quick =>
     [
-        (QuickFilter.Today, "Bugün"), (QuickFilter.Overdue, "Gecikenler"), (QuickFilter.Mine, "Bana atananlar"),
-        (QuickFilter.Team, "Ekip"), (QuickFilter.AllOpen, "Tüm açıklar"), (QuickFilter.All, "Tümü"),
+        (QuickFilter.Today, Texts.Get("crm.act.quick.today")), (QuickFilter.Overdue, Texts.Get("crm.act.quick.overdue")),
+        (QuickFilter.Mine, Texts.Get("crm.act.quick.mine")), (QuickFilter.Team, Texts.Get("crm.act.quick.team")),
+        (QuickFilter.AllOpen, Texts.Get("crm.act.quick.allOpen")), (QuickFilter.All, Texts.Get("crm.act.quick.all")),
     ];
 
     private List<ActivityDto>? itemsBacking;
@@ -462,7 +464,7 @@
     {
         "subject" => @<button type="button" class="btn btn-link" @onclick="() => Select(activity)">@activity.Subject</button>,
         "type" => @<text>@(activity.Masked ? null : Lookups.Label(CrmLists.ActivityType, activity.Type))</text>,
-        "status" => @<text>@ActivityLabels.Status(ActivityLabels.Family(Lookups, activity.Type), activity.Status)@(ActivityLabels.IsOverdue(activity) ? " · gecikti" : null)</text>,
+        "status" => @<text>@ActivityLabels.Status(ActivityLabels.Family(Lookups, activity.Type), activity.Status)@(ActivityLabels.IsOverdue(activity) ? ActivityLabels.OverdueSuffix : null)</text>,
         "when" => @<text>@WhenText(activity)</text>,
         "priority" => @<text>@(activity.Masked ? null : ActivityLabels.Priority(activity.Priority))</text>,
         "company" => @<text>@if (activity.CompanyId is { } companyId) { <a href="crm/firmalar/@companyId">@Lookups.CompanyName(companyId)</a> }</text>,
@@ -499,19 +501,19 @@
 
     private string Title()
     {
-        var tr = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+        var culture = UiLanguage.Culture;
         var (from, to) = ActivityCalendar.Window(CalendarModeOf(mode), anchor);
         return mode switch
         {
-            Mode.Day => from.ToString("d MMMM yyyy dddd", tr),
-            Mode.Month => anchor.ToString("MMMM yyyy", tr),
-            _ => $"{from.ToString("d MMM", tr)} – {to.ToString("d MMM yyyy", tr)}",
+            Mode.Day => from.ToString("d MMMM yyyy dddd", culture),
+            Mode.Month => anchor.ToString("MMMM yyyy", culture),
+            _ => $"{from.ToString("d MMM", culture)} – {to.ToString("d MMM yyyy", culture)}",
         };
     }
 
     private static string WhenText(ActivityDto a) =>
         a.StartAt is not null || a.IsAllDay
-            ? $"{ActivityLabels.Days(a).FirstOrDefault().ToString("d MMM", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))} {ActivityLabels.TimeText(a)}"
+            ? $"{ActivityLabels.Days(a).FirstOrDefault().ToString("d MMM", UiLanguage.Culture)} {ActivityLabels.TimeText(a)}"
             : a.DueAt is { } due ? CrmLabels.Time(due) : string.Empty;
 
     // ---- Seçim, düzenleme
@@ -615,7 +617,7 @@
             value is { } v ? Regional.FromTenant(Regional.ToTenant(v).DateTime.AddDays(delta)) : null;
 
         var body = new RescheduleActivityRequest(
-            activity.Version, "Takvimde taşındı", Shift(activity.DueAt), activity.IsAllDay ? null : Shift(activity.StartAt),
+            activity.Version, Texts.Get("crm.act.movedInCalendar"), Shift(activity.DueAt), activity.IsAllDay ? null : Shift(activity.StartAt),
             activity.IsAllDay ? null : Shift(activity.EndAt), activity.IsAllDay, activity.StartDate?.AddDays(delta), activity.EndDate?.AddDays(delta), allowConflict);
         var result = await Api.PostAsync<ActivityDto>($"{Url}/{activity.Id}/reschedule", body);
         if (result.IsSuccess)
@@ -660,7 +662,9 @@
 
         bulkFailed = result.Error is not null || result.Value?.Failed > 0;
         bulkMessage = result.Value is { } r
-            ? $"{r.Succeeded} kayıt işlendi" + (r.Failed > 0 ? $", {r.Failed} kayıt işlenemedi: {string.Join("; ", r.Failures.Select(f => $"{items!.FirstOrDefault(a => a.Id == f.Id)?.Subject ?? "kayıt"} ({f.Message})"))}" : ".")
+            ? r.Failed > 0
+                ? Texts.Get("crm.act.bulk.resultFailed", r.Succeeded, r.Failed, string.Join("; ", r.Failures.Select(f => $"{items!.FirstOrDefault(a => a.Id == f.Id)?.Subject ?? Texts.Get("crm.act.record")} ({f.Message})")))
+                : Texts.Get("crm.act.bulk.result", r.Succeeded)
             : result.Error;
         await RefreshAsync();
     }
