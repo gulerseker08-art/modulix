@@ -353,6 +353,12 @@ public sealed class CrmModule : IModule
         },
     ];
 
+    /// <summary>Onaya bağlanabilen işlemlerin kalıcı anahtarları (ADR-0027 Ç6a.3); firma süreç tanımında bunlara bağlar.</summary>
+    public static class ApprovalCommands
+    {
+        public const string Win = "win";
+    }
+
     /// <summary>
     /// CRM'in yayınladığı iş olayları (ADR-0039). Tür adı sürüm taşımaz; sürüm beyandadır. Açık iş komutları yayınlar:
     /// kazan/kaybet (<c>IOpportunityWorkflow</c>), müşteri adayı dönüşümü (<c>ILeadConversion</c>).
@@ -382,10 +388,16 @@ public sealed class CrmModule : IModule
         new(Events.LeadConverted, 1, Entities.Lead, "Müşteri adayı dönüştürüldü", Events.LeadConvertedFields),
     ];
 
-    // Fırsat onaya gönderilebilir (ADR-0027 Dilim 4c): tutar ve para birimi kayıttan okunur, değişirse bekleyen talep geçersizleşir.
+    // Fırsat onaya gönderilebilir (ADR-0027 Dilim 4c): tutar ve para birimi kayıttan okunur, değişirse bekleyen talep ve verilmiş onay geçersizleşir.
+    // Firma kazanıldı olarak kapatmayı bir onay sürecine bağlayabilir (Ç6a.3); iş akışı kapatmadan önce onay kapısına sorar.
     IReadOnlyList<Core.Contracts.Approvals.ApprovalTargetDefinition> IModule.ApprovalTargets { get; } =
     [
-        new(Entities.Opportunity, "Fırsat", "title", "crm/firsatlar/{id}") { AmountField = "amount", CurrencyField = "currency" },
+        new(Entities.Opportunity, "Fırsat", "title", "crm/firsatlar/{id}")
+        {
+            AmountField = "amount",
+            CurrencyField = "currency",
+            Commands = [new(ApprovalCommands.Win, "Kazanıldı olarak kapatma")],
+        },
     ];
 
     /// <summary>

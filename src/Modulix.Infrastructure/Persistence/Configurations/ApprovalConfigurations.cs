@@ -19,6 +19,7 @@ internal sealed class ApprovalDefinitionConfiguration : IEntityTypeConfiguration
         builder.Property(d => d.Currency).HasMaxLength(3);
         builder.Property(d => d.StepsJson).IsRequired();
         builder.Property(d => d.TargetEntityKey).HasMaxLength(100);
+        builder.Property(d => d.GatedCommands).HasMaxLength(ApprovalDefinition.GatedCommandsMaxLength);
         builder.Property(d => d.Version).IsConcurrencyToken();
         builder.Ignore(d => d.Steps);
 

@@ -27,7 +27,7 @@ internal sealed class ApprovalService(
     INotificationRecipients recipients,
     IRecordPipeline pipeline,
     ModuleCatalog modules,
-    TimeProvider time) : IApprovalService, IApprovalStatusReader
+    TimeProvider time) : IApprovalService, IApprovalStatusReader, IApprovalGate
 {
     private const int TrendDays = 14;
     private const int SummaryDays = 30;
@@ -53,9 +53,10 @@ internal sealed class ApprovalService(
     {
         TenantContext tenant = RequireTenant();
         await RequireApproversAsync(input.Steps, cancellationToken);
-        RequireTarget(input.TargetEntityKey);
+        RequireTarget(input.TargetEntityKey, input.GatedCommands);
         ApprovalDefinition definition = Guarded(() =>
-            ApprovalDefinition.Create(input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey));
+            ApprovalDefinition.Create(
+                input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey, input.GatedCommands));
         db.ApprovalDefinitions.Add(definition);
         Audit(tenant, CoreModule.AuditedEntityKeys.ApprovalDefinition, definition.Id, AuditAction.Created, null, Snapshot(definition));
         await SaveAsync(cancellationToken);
@@ -77,11 +78,11 @@ internal sealed class ApprovalService(
         }
 
         await RequireApproversAsync(input.Steps, cancellationToken);
-        RequireTarget(input.TargetEntityKey);
+        RequireTarget(input.TargetEntityKey, input.GatedCommands);
         JsonObject before = Snapshot(definition);
         Guarded(() =>
         {
-            definition.Update(input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey);
+            definition.Update(input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey, input.GatedCommands);
             return definition;
         });
         Audit(tenant, CoreModule.AuditedEntityKeys.ApprovalDefinition, id, AuditAction.Updated, before, Snapshot(definition));
@@ -480,9 +481,11 @@ internal sealed class ApprovalService(
             return 0;
         }
 
+        // Bekleyen talep de verilmiş onay da açılış anındaki tutara bağlıdır (Ç6a.3): tutar değişince onay kapıyı artık açmaz.
         TenantContext tenant = RequireTenant();
         List<ApprovalRequest> pending = await db.ApprovalRequests.AsTracking()
-            .Where(r => r.TargetEntityKey == record.EntityKey && r.TargetRecordId == record.Id && r.Status == ApprovalRequestStatus.Pending)
+            .Where(r => r.TargetEntityKey == record.EntityKey && r.TargetRecordId == record.Id
+                && (r.Status == ApprovalRequestStatus.Pending || r.Status == ApprovalRequestStatus.Approved))
             .ToListAsync(cancellationToken);
         DateTimeOffset now = time.GetUtcNow();
         foreach (ApprovalRequest request in pending)
@@ -516,7 +519,12 @@ internal sealed class ApprovalService(
         List<ApproverOption> processes = await db.ApprovalDefinitions.AsNoTracking()
             .Where(d => d.IsActive && d.TargetEntityKey == record.EntityKey)
             .OrderBy(d => d.Name).Select(d => new ApproverOption(d.Id, d.Name)).ToListAsync(cancellationToken);
-        return new RecordApprovalView(processes, await LatestAsync(record, cancellationToken));
+        List<string> gated = await db.ApprovalDefinitions.AsNoTracking()
+            .Where(d => d.IsActive && d.TargetEntityKey == record.EntityKey && d.GatedCommands != null)
+            .Select(d => d.GatedCommands!).ToListAsync(cancellationToken);
+        List<string> requiredFor = [.. gated.SelectMany(g => g.Split(',', StringSplitOptions.RemoveEmptyEntries)).Distinct(StringComparer.Ordinal)
+            .Select(c => CommandName(record.EntityKey, c)).Order(StringComparer.CurrentCulture)];
+        return new RecordApprovalView(processes, await LatestAsync(record, cancellationToken), requiredFor);
     }
 
     public async Task<RecordApprovalStatus?> LatestAsync(RecordRef record, CancellationToken cancellationToken)
@@ -567,12 +575,53 @@ internal sealed class ApprovalService(
         return (new ApprovalRecordTarget(entityKey, recordId.Value, label), amount, currency);
     }
 
-    private void RequireTarget(string? entityKey)
+    // Kayıt türü onaya açık olmalı; onaysız yapılamayacak işlemler o türün beyan ettiği işlemlerden seçilir.
+    private void RequireTarget(string? entityKey, IReadOnlyList<string>? commands)
     {
-        if (!string.IsNullOrWhiteSpace(entityKey) && modules.FindApprovalTarget(entityKey.Trim()) is null)
+        ApprovalTargetDefinition? target = string.IsNullOrWhiteSpace(entityKey) ? null : modules.FindApprovalTarget(entityKey.Trim())?.Target;
+        if (!string.IsNullOrWhiteSpace(entityKey) && target is null)
         {
             throw new ApprovalException("Seçilen kayıt türü onaya açık değil.");
         }
+
+        List<string> chosen = [.. (commands ?? []).Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim())];
+        if (chosen.Count > 0 && (target is null || chosen.Any(c => target.Commands.All(d => d.Key != c))))
+        {
+            throw new ApprovalException(target is null
+                ? "Onaysız yapılamayacak işlem seçmek için süreci bir kayıt türüne bağlayın."
+                : $"Seçilen işlem {target.DisplayName} kaydında onaya bağlanamaz.");
+        }
+    }
+
+    private string CommandName(string? entityKey, string command) =>
+        (entityKey is null ? null : modules.FindApprovalTarget(entityKey)?.Target.Commands.FirstOrDefault(c => c.Key == command)?.DisplayName) ?? command;
+
+    public async Task<string?> BlockReasonAsync(RecordRef record, string command, CancellationToken cancellationToken)
+    {
+        // Kapı yalnızca firmanın bu işleme bağladığı etkin süreçlere bakar; bağlı süreç yoksa işlem serbesttir.
+        List<ApprovalDefinition> gating = [.. (await db.ApprovalDefinitions.AsNoTracking()
+                .Where(d => d.IsActive && d.TargetEntityKey == record.EntityKey && d.GatedCommands != null)
+                .ToListAsync(cancellationToken))
+            .Where(d => d.Commands.Contains(command, StringComparer.Ordinal))];
+        if (gating.Count == 0)
+        {
+            return null;
+        }
+
+        List<Guid> ids = [.. gating.Select(d => d.Id)];
+        ApprovalRequest? latest = await db.ApprovalRequests.AsNoTracking()
+            .Where(r => r.TargetEntityKey == record.EntityKey && r.TargetRecordId == record.Id && ids.Contains(r.DefinitionId))
+            .OrderByDescending(r => r.SubmittedAt).ThenByDescending(r => r.Id).FirstOrDefaultAsync(cancellationToken);
+        string action = CommandName(record.EntityKey, command);
+        string processes = string.Join(" ya da ", gating.Select(d => $"\"{d.Name}\"").Order(StringComparer.CurrentCulture));
+        return latest?.Status switch
+        {
+            ApprovalRequestStatus.Approved => null,
+            ApprovalRequestStatus.Pending => $"{action} için onay bekleniyor ({latest.DefinitionName}).",
+            ApprovalRequestStatus.Invalidated => $"{action} için verilen onay, tutar değiştiği için geçersizleşti; kaydı yeniden onaya gönderin.",
+            ApprovalRequestStatus.Rejected => $"{action} için onay talebi reddedildi; kaydı yeniden onaya gönderin.",
+            _ => $"{action} için {processes} sürecinde onay gerekiyor; önce kaydı onaya gönderin.",
+        };
     }
 
     private string? TargetLink(ApprovalRequest request) =>
@@ -707,6 +756,7 @@ internal sealed class ApprovalService(
         ["isActive"] = definition.IsActive,
         ["revision"] = definition.Revision,
         ["steps"] = string.Join(" → ", definition.Steps.Select(s => s.Name)),
+        ["gatedCommands"] = definition.Commands.Count == 0 ? null : string.Join(", ", definition.Commands.Select(c => CommandName(definition.TargetEntityKey, c))),
     };
 
     private static JsonObject Snapshot(ApprovalRequest request) => new()

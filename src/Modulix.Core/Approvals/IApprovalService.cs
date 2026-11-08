@@ -10,7 +10,8 @@ public sealed class ApprovalConflictException(string message) : Exception(messag
 public sealed class ApprovalForbiddenException(string message) : Exception(message);
 
 public sealed record ApprovalDefinitionInput(
-    string Name, string? Description, string? Currency, IReadOnlyList<ApprovalStepDefinition> Steps, string? TargetEntityKey = null);
+    string Name, string? Description, string? Currency, IReadOnlyList<ApprovalStepDefinition> Steps, string? TargetEntityKey = null,
+    IReadOnlyList<string>? GatedCommands = null);
 
 /// <summary>Süreç bir kayıt türüne bağlıysa <see cref="RecordId"/> zorunludur; tutar ve para birimi kayıttan okunur, girilen değer yok sayılır.</summary>
 public sealed record ApprovalRequestInput(Guid DefinitionId, string Title, string? Description, decimal? Amount, string? Currency, Guid? RecordId = null);
@@ -45,7 +46,9 @@ public sealed record ApprovalRequestDetail(
     string? TargetEntityKey = null, Guid? TargetRecordId = null, string? TargetLabel = null, string? TargetLink = null);
 
 /// <summary>Kayıt ekranındaki onay paneli: kayıt türüne bağlı açık süreçler ve kaydın son talebi.</summary>
-public sealed record RecordApprovalView(IReadOnlyList<ApproverOption> Processes, Contracts.Approvals.RecordApprovalStatus? Latest);
+/// <summary>Kayıt ekranının onay kartı. <see cref="RequiredFor"/>: firmanın bu kayıt türünde onaya bağladığı işlemlerin adları (Ç6a.3).</summary>
+public sealed record RecordApprovalView(
+    IReadOnlyList<ApproverOption> Processes, Contracts.Approvals.RecordApprovalStatus? Latest, IReadOnlyList<string> RequiredFor);
 
 public sealed record ApprovalRequestPage(IReadOnlyList<ApprovalRequestDetail> Items, int Page, int PageSize, int TotalCount);
 
