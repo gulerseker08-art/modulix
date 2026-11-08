@@ -3,9 +3,11 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Api.Access;
 using Modulix.Api.Records;
+using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
+using Modulix.Core.Reporting;
 using Modulix.Core.Settings;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Reporting;
@@ -29,6 +31,13 @@ internal static class SalesPlanningEndpoints
         var sales = crm.MapGroup("/sales");
         sales.MapGet("/overview", OverviewAsync).RequirePermission(CrmModule.Permissions.SalesReportsRead);
         sales.MapGet("/overview/cards/{card}", CardAsync).RequirePermission(CrmModule.Permissions.SalesReportsRead);
+
+        // Kart ayrıntısını dosyaya çevirir (rapor merkezinin dışa aktarma dosyası: sahibine özel, 24 saat, denetimli). İki izin de gerekir:
+        // kartı görmek (satış raporları) ve dışa aktarmak (rapor merkezi); indirme rapor merkezinin /api/reports/exports/{id}/download ucundandır.
+        sales.MapPost("/overview/cards/{card}/exports", ExportCardAsync)
+            .RequirePermission(CrmModule.Permissions.SalesReportsRead)
+            .RequirePermission(CoreModule.Permissions.ReadReports)
+            .RequirePermission(CoreModule.Permissions.ExportReports);
 
         var analytics = sales.MapGroup("/analytics");
         analytics.MapGet("/quotes", (string? kind, DateOnly? date, DateOnly? asOf, Guid? ownerId, string? currency, ISalesAnalytics analysis, CancellationToken ct) =>
@@ -85,6 +94,42 @@ internal static class SalesPlanningEndpoints
         var result = await overview.DetailAsync(parsed, new SalesOverviewQuery(periodKind, date, ownerId, currency), ct);
         return result.IsSuccess ? Results.Ok(Map<SalesCardDetailDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
     }
+
+    private static Task<IResult> ExportCardAsync(
+        string card, string? kind, DateOnly? date, Guid? ownerId, string? currency, string? format,
+        ISalesOverview overview, IReportExports exports, ITenantMembers members, IChoiceLists choiceLists, TimeProvider time, CancellationToken ct) =>
+        Reports.ReportEndpoints.RunAsync(async () =>
+        {
+            if (!Enum.TryParse<SalesCard>(card, ignoreCase: true, out var parsed) || !Enum.IsDefined(parsed) || char.IsDigit(card[0]))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["card"] = [$"Şunlardan biri olmalıdır: {string.Join(", ", Enum.GetNames<SalesCard>())}."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+
+            if (!TryKind(kind, out var periodKind))
+            {
+                return InvalidKind();
+            }
+
+            if (!Reports.ReportEndpoints.TryFormat(format, out var fileFormat))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["format"] = ["Biçim csv ya da xlsx olmalıdır."] }, statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            // Ayrıntı, ekrandaki kartla aynı hesaptan ve çağıranın yetkisiyle gelir (izin, veri kapsamı, tutar izni).
+            var detail = await overview.DetailAsync(parsed, new SalesOverviewQuery(periodKind, date, ownerId, currency), ct);
+            if (!detail.IsSuccess)
+            {
+                return RecordEndpoints.ToProblem(detail.Error!);
+            }
+
+            var dto = Map<SalesCardDetailDto>(detail.Value!);
+            var owners = (await members.ListActiveAsync(ct)).ToDictionary(m => m.UserId, m => m.DisplayName);
+            var stages = await choiceLists.GetAsync(CrmLists.OpportunityStage, ct);
+            var label = SalesCardExport.Label(parsed);
+            var result = SalesCardExport.Build(dto, owners, stages, label, time.GetUtcNow());
+            var export = await exports.CreateFromResultAsync($"Satış kartı - {label} - {dto.PeriodLabel}", SalesCardExport.DatasetKey, result, fileFormat, ct);
+            return Results.Created($"/api/reports/exports/{export.Id}", Reports.ReportEndpoints.ToDto(export));
+        });
 
     // ---- Analizler
 

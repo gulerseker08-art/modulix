@@ -180,6 +180,10 @@
                             <text> · tutarları görme yetkiniz yok</text>
                         }
                     </p>
+                    @if (d.Rows.Count > 0)
+                    {
+                        <SalesCardExportButtons Card="@d.Card" Query="@appliedQuery" />
+                    }
                     @if (d.Truncated || d.RowCount > d.Rows.Count)
                     {
                         <div class="alert alert-warning" role="status">Liste kısaltıldı: @d.Rows.Count satır gösteriliyor, toplam @d.RowCount fırsat. Kullanıcı ya da dönem seçerek daraltın.</div>

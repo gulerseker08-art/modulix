@@ -62,12 +62,7 @@ internal sealed class ReportExports(
             throw resolved.Access == ReportRunStatus.Forbidden ? new ReportForbiddenException(message) : new ReportException(message, resolved.Issues);
         }
 
-        // Süresi geçmiş dosyalar önce silinir; sonra kullanıcının etkin dosya sayısı sınırlanır (depolama sınırsız büyümez).
-        await db.ReportExports.Where(e => e.OwnerUserId == tenant.UserId && e.ExpiresAt <= now).ExecuteDeleteAsync(cancellationToken);
-        if (await db.ReportExports.CountAsync(e => e.OwnerUserId == tenant.UserId, cancellationToken) >= ReportExport.MaxActivePerUser)
-        {
-            throw new ReportException($"En fazla {ReportExport.MaxActivePerUser} hazır dosyanız olabilir; eskilerini silin ya da süresinin dolmasını bekleyin.");
-        }
+        await PruneAndCheckLimitAsync(tenant, now, cancellationToken);
 
         var result = await runner.RunAsync(new ReportRunRequest(spec, null, 1, ReportLimits.MaxRowsRead, null, ForExport: true), cancellationToken);
         if (result.Status != ReportRunStatus.Ok)
@@ -76,6 +71,45 @@ internal sealed class ReportExports(
             throw result.Status == ReportRunStatus.Forbidden ? new ReportForbiddenException(message) : new ReportException(message, result.Issues);
         }
 
+        return await StoreAsync(tenant, now, reportId, name, resolved.Dataset, result, source, format, cancellationToken);
+    }
+
+    public async Task<ReportExportInfo> CreateFromResultAsync(
+        string name, string datasetKey, ReportResult result, ReportFileFormat format, CancellationToken cancellationToken)
+    {
+        var tenant = tenantAccessor.Current ?? throw new InvalidOperationException("Aktif tenant olmadan dışa aktarılamaz.");
+        var now = time.GetUtcNow();
+
+        // Dosya, kaynak veri kümesinin erişim kurallarına bağlanır: kullanıcı o kümeyi okuyamıyorsa dosya hazırlanmaz ve indirme anında da yeniden denetlenir.
+        if (await resolver.ResolveAsync(datasetKey, cancellationToken) is not { } resolved)
+        {
+            throw new ReportException("Rapor veri kümesi bulunamadı.");
+        }
+
+        if (resolved.Columns is null)
+        {
+            var message = resolved.Issues.FirstOrDefault()?.Message ?? "Bu veriyi dışa aktaramazsınız.";
+            throw resolved.Access == ReportRunStatus.Forbidden ? new ReportForbiddenException(message) : new ReportException(message, resolved.Issues);
+        }
+
+        await PruneAndCheckLimitAsync(tenant, now, cancellationToken);
+        return await StoreAsync(tenant, now, null, string.IsNullOrWhiteSpace(name) ? "Rapor" : name.Trim(), resolved.Dataset, result, ReportExportSource.Manual, format, cancellationToken);
+    }
+
+    /// <summary>Süresi geçmiş dosyalar önce silinir; sonra kullanıcının etkin dosya sayısı sınırlanır (depolama sınırsız büyümez).</summary>
+    private async Task PruneAndCheckLimitAsync(TenantContext tenant, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await db.ReportExports.Where(e => e.OwnerUserId == tenant.UserId && e.ExpiresAt <= now).ExecuteDeleteAsync(cancellationToken);
+        if (await db.ReportExports.CountAsync(e => e.OwnerUserId == tenant.UserId, cancellationToken) >= ReportExport.MaxActivePerUser)
+        {
+            throw new ReportException($"En fazla {ReportExport.MaxActivePerUser} hazır dosyanız olabilir; eskilerini silin ya da süresinin dolmasını bekleyin.");
+        }
+    }
+
+    private async Task<ReportExportInfo> StoreAsync(
+        TenantContext tenant, DateTimeOffset now, Guid? reportId, string name, DatasetDefinition dataset, ReportResult result,
+        ReportExportSource source, ReportFileFormat format, CancellationToken cancellationToken)
+    {
         var bytes = format == ReportFileFormat.Xlsx ? ReportXlsx.Build(result) : ReportCsv.Build(result);
         if (bytes.Length > ReportExport.MaxBytes)
         {
@@ -85,12 +119,12 @@ internal sealed class ReportExports(
         var rows = result.IsSummary ? result.Rows.Count : result.RowsMatched;
         var fileName = $"{ReportCsv.FileSlug(name)}-{now:yyyyMMdd-HHmm}.{(format == ReportFileFormat.Xlsx ? "xlsx" : "csv")}";
         var export = new ReportExport(
-            tenant.UserId, reportId, name.Length > ReportDefinition.NameMaxLength ? name[..ReportDefinition.NameMaxLength] : name, resolved.Dataset.Key, fileName,
-            bytes, rows, result.Truncated || result.RowsLimited, await stamps.ComputeAsync(resolved.Dataset, cancellationToken), source, now, format);
+            tenant.UserId, reportId, name.Length > ReportDefinition.NameMaxLength ? name[..ReportDefinition.NameMaxLength] : name, dataset.Key, fileName,
+            bytes, rows, result.Truncated || result.RowsLimited, await stamps.ComputeAsync(dataset, cancellationToken), source, now, format);
         db.ReportExports.Add(export);
         audit.Add(new AuditEntry(
             tenant.TenantId, tenant.UserId, CoreModule.AuditedEntityKeys.Report, reportId ?? export.Id, AuditAction.Exported,
-            new JsonObject { ["export"] = export.Id.ToString(), ["dataset"] = resolved.Dataset.Key, ["rows"] = rows, ["bytes"] = bytes.Length, ["source"] = source.ToString() },
+            new JsonObject { ["export"] = export.Id.ToString(), ["dataset"] = dataset.Key, ["rows"] = rows, ["bytes"] = bytes.Length, ["source"] = source.ToString() },
             ExecutionSource.Api, null));
         await db.SaveChangesAsync(cancellationToken);
         return ToInfo(export, now);

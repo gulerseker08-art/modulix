@@ -193,11 +193,11 @@ public static class ReportEndpoints
             throw new ReportException("Biçim csv ya da xlsx olmalı.");
         }
 
-        return new ReportScheduleInput(frequency, request.Hour, day, request.DayOfMonth, format);
+        return new ReportScheduleInput(frequency, request.Hour, day, request.DayOfMonth, format, request.RecipientIds);
     }
 
     /// <summary>Biçim sorgu değeri: boş csv'dir; yalnızca csv ve xlsx kabul edilir.</summary>
-    private static bool TryFormat(string? value, out ReportFileFormat format)
+    internal static bool TryFormat(string? value, out ReportFileFormat format)
     {
         format = ReportFileFormat.Csv;
         if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "csv", StringComparison.OrdinalIgnoreCase))
@@ -214,14 +214,15 @@ public static class ReportEndpoints
         return false;
     }
 
-    private static ReportExportDto ToDto(ReportExportInfo e) => new(
+    internal static ReportExportDto ToDto(ReportExportInfo e) => new(
         e.Id, e.ReportId, e.ReportName, e.DatasetKey, e.FileName, e.SizeBytes, e.RowCount, e.Truncated, Name(e.Source), e.CreatedAt, e.ExpiresAt, e.DownloadCount, e.Expired);
 
     private static ReportScheduleDto ToDto(ReportScheduleInfo s) => new(
         s.Id, s.ReportId, s.ReportName, Name(s.Frequency), s.Hour, s.DayOfWeek is { } day ? Name(day) : null, s.DayOfMonth, s.Enabled, s.NextRunAt, s.LastRunAt,
-        s.LastStatus, s.LastMessage, s.StoppedReason, s.Version, s.Format == ReportFileFormat.Xlsx ? "xlsx" : "csv");
+        s.LastStatus, s.LastMessage, s.StoppedReason, s.Version, s.Format == ReportFileFormat.Xlsx ? "xlsx" : "csv",
+        [.. (s.Recipients ?? []).Select(r => new ReportScheduleRecipientDto(r.UserId, r.DisplayName))]);
 
-    private static async Task<IResult> RunAsync(Func<Task<IResult>> action)
+    internal static async Task<IResult> RunAsync(Func<Task<IResult>> action)
     {
         try
         {

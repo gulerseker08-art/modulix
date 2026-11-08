@@ -310,6 +310,36 @@ public sealed class ReportScheduleRun : ITenantEntity, ICompanyShared
     }
 }
 
+/// <summary>
+/// Zamanlanmış raporun dağıtım listesindeki bir alıcı. Alıcı sahibin dosyasını değil, <b>kendi yetkisiyle üretilmiş</b> kendi dosyasını alır: raporu göremiyorsa,
+/// rapor merkezi ya da dışa aktarma izni yoksa ya da firmanın etkin üyesi değilse o çalışmada atlanır (veri başkasının kapsamıyla gitmez).
+/// </summary>
+public sealed class ReportScheduleRecipient : ITenantEntity, ICompanyShared
+{
+    private ReportScheduleRecipient()
+    {
+        // EF Core için
+    }
+
+    public ReportScheduleRecipient(Guid scheduleId, Guid userId, DateTimeOffset now)
+    {
+        Id = Guid.CreateVersion7();
+        ScheduleId = scheduleId;
+        UserId = userId;
+        CreatedAt = now;
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid TenantId { get; private set; }
+
+    public Guid ScheduleId { get; private set; }
+
+    public Guid UserId { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; private set; }
+}
+
 /// <summary>Dışa aktarma dosyasının üst bilgisi (içerik yok).</summary>
 public sealed record ReportExportInfo(
     Guid Id,
@@ -360,6 +390,13 @@ public interface IReportExports
     /// </summary>
     Task<ReportExportInfo?> CreateScheduledAsync(Guid reportId, CancellationToken cancellationToken, ReportFileFormat format = ReportFileFormat.Csv);
 
+    /// <summary>
+    /// Modülün kendi hesapladığı hazır sonucu (ör. satış genel görünümü kart ayrıntısı) dosyaya çevirir; aynı dosya kuralları geçerlidir (sahibine özel,
+    /// 24 saat, sınır, denetim). <paramref name="datasetKey"/> erişim kuralını taşır: çağıran o veri kümesini okuyamıyorsa dosya hazırlanmaz ve indirme
+    /// anında da yeniden denetlenir. Sonucun içeriği çağıranın yetkisiyle üretilmiş olmalıdır (burada yeniden hesap yoktur).
+    /// </summary>
+    Task<ReportExportInfo> CreateFromResultAsync(string name, string datasetKey, ReportResult result, ReportFileFormat format, CancellationToken cancellationToken);
+
     /// <summary>Çağıranın kendi dosyaları, en yeni üstte (süresi geçmişler henüz silinmediyse işaretli).</summary>
     Task<IReadOnlyList<ReportExportInfo>> ListAsync(CancellationToken cancellationToken);
 
@@ -387,9 +424,18 @@ public sealed record ReportScheduleInfo(
     string? LastMessage,
     string? StoppedReason,
     long Version,
-    ReportFileFormat Format = ReportFileFormat.Csv);
+    ReportFileFormat Format = ReportFileFormat.Csv,
+    IReadOnlyList<ReportScheduleRecipientInfo>? Recipients = null);
 
-public sealed record ReportScheduleInput(ScheduleFrequency Frequency, int Hour, DayOfWeek? DayOfWeek, int? DayOfMonth, ReportFileFormat Format = ReportFileFormat.Csv);
+/// <summary>Dağıtım listesindeki alıcı; <see cref="DisplayName"/> etkin üye değilse null (eski üye).</summary>
+public sealed record ReportScheduleRecipientInfo(Guid UserId, string? DisplayName);
+
+/// <param name="RecipientIds">
+/// Sahibi dışındaki alıcılar (en çok <see cref="ReportScheduleRules.MaxRecipients"/>, hepsi firmanın etkin üyesi). <c>null</c> güncellemede listeye dokunmaz,
+/// boş liste listeyi temizler; sahibin kendisi listeye yazılmaz (zaten alır).
+/// </param>
+public sealed record ReportScheduleInput(
+    ScheduleFrequency Frequency, int Hour, DayOfWeek? DayOfWeek, int? DayOfMonth, ReportFileFormat Format = ReportFileFormat.Csv, IReadOnlyList<Guid>? RecipientIds = null);
 
 /// <summary>
 /// Kullanıcının zamanlanmış raporları (ADR-0026, dilim 4); yalnızca kendi zamanlamalarını görür ve yönetir. İzin (<c>core.reports.schedule</c>) uç
