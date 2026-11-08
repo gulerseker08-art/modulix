@@ -8,7 +8,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Opportunity is null ? "Yeni fırsat" : "Fırsat kartı")</h2>
+            <h2>@Texts.Get(Opportunity is null ? "crm.opportunities.new" : "crm.opportunities.editor.card")</h2>
             @if (Opportunity is not null)
             {
                 <p>@Opportunity.Title</p>
@@ -16,13 +16,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -36,7 +36,7 @@
         <div class="alert alert-danger" role="alert">@layoutError</div>
     }
 
-    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Fırsat formu bölümleri">
+    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("crm.opportunities.editor.tabs")">
         <Field Context="f">
             @switch (f.Key)
             {
@@ -144,7 +144,7 @@
                     <select id="budgetStatus" class="form-select" @bind="form.BudgetStatus">
                         @foreach (var status in OpportunityBudgetStatus.All)
                         {
-                            <option value="@status">@OpportunityBudgetStatus.Label(status)</option>
+                            <option value="@status">@CrmText.OpportunityBudgetStatusName(status)</option>
                         }
                     </select>
                     break;
@@ -213,11 +213,11 @@
     </LayoutForm>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
         @if (Opportunity is not null)
         {
-            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
         }
     </div>
 </form>
@@ -231,7 +231,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(CrmEntityKeys.Opportunity);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     // Düzen alanı çizilsin mi: firma sabitse (firma detayı) seçilmez; tutar alanları hassastır (Y8b), izni olmayan görmez.
@@ -297,7 +297,7 @@
     {
         if (form.CompanyId is not { } companyId)
         {
-            errors = new Dictionary<string, string[]> { ["companyId"] = ["Bu alan zorunludur."] };
+            errors = new Dictionary<string, string[]> { ["companyId"] = [Texts.Get("common.required")] };
             return;
         }
 

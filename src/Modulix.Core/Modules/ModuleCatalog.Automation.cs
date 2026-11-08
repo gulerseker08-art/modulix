@@ -102,6 +102,16 @@ public sealed partial class ModuleCatalog
                 {
                     throw Fail($"olay '{automationEvent.Key}': anahtar modül önekli ve tekil, kayıt türü modülün, tür kayıt olayı ya da modül önekli olmalı");
                 }
+
+                // İş olayı (ADR-0039): modülün beyan ettiği ve aynı kayıt türüne ait bir olay olmalı; yayıncısı olmayan tetikleyici
+                // sessizce hiç tetiklenmeyen kural bırakırdı.
+                if (!knownRecordEvent
+                    && (FindBusinessEvent(automationEvent.EventType) is not { } declared
+                        || declared.ModuleKey != module.Key
+                        || declared.Definition.EntityKey != automationEvent.EntityKey))
+                {
+                    throw Fail($"olay '{automationEvent.Key}': '{automationEvent.EventType}' modülün BusinessEvents beyanında aynı kayıt türüyle tanımlı olmalı");
+                }
             }
 
             foreach (var field in capabilities.Fields)
@@ -176,7 +186,8 @@ public sealed partial class ModuleCatalog
         }
 
         // Kural aboneliği yalnızca kural yazılabilen kayıt türlerinin olaylarını alır (atama e-postasındaki gibi katalog doldurur):
-        // hiçbir modül kural yeteneği beyan etmediyse abonelik de yoktur ve olay teslimine ek yük binmez.
+        // hiçbir modül kural yeteneği beyan etmediyse abonelik de yoktur ve olay teslimine ek yük binmez. Olay türleri kayıt
+        // olayları + otomasyona beyan edilmiş iş olaylarıdır (ADR-0039); beyan edilmeyen iş olayı kural tetiklemez.
         if (subscriptions.TryGetValue(CoreModule.Subscriptions.Automation, out var automation))
         {
             var entityKeys = automationEntities.Keys.Order(StringComparer.Ordinal).ToList();
@@ -186,7 +197,12 @@ public sealed partial class ModuleCatalog
             }
             else
             {
-                subscriptions[automation.Subscription.Key] = (automation.ModuleKey, automation.Subscription with { EntityKeys = entityKeys });
+                var eventTypes = automation.Subscription.EventTypes
+                    .Concat(automationEvents.Values.Select(e => e.Event.EventType).Where(businessEvents.ContainsKey))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+                subscriptions[automation.Subscription.Key] =
+                    (automation.ModuleKey, automation.Subscription with { EntityKeys = entityKeys, EventTypes = eventTypes });
             }
         }
 

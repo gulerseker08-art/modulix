@@ -120,9 +120,11 @@ public sealed class ReportSchedule : ITenantEntity, ICompanyShared
     }
 
     public ReportSchedule(
-        Guid reportId, Guid ownerUserId, ScheduleFrequency frequency, int hour, DayOfWeek? dayOfWeek, int? dayOfMonth, DateTimeOffset nextRunAt, DateTimeOffset now)
+        Guid reportId, Guid ownerUserId, ScheduleFrequency frequency, int hour, DayOfWeek? dayOfWeek, int? dayOfMonth, DateTimeOffset nextRunAt, DateTimeOffset now,
+        ReportFileFormat format = ReportFileFormat.Csv)
     {
         Id = Guid.CreateVersion7();
+        Format = format;
         ReportId = reportId;
         OwnerUserId = ownerUserId;
         Frequency = frequency;
@@ -148,6 +150,9 @@ public sealed class ReportSchedule : ITenantEntity, ICompanyShared
 
     /// <summary>Firmanın saat diliminde yerel saat (0-23).</summary>
     public int Hour { get; private set; }
+
+    /// <summary>Zamanlanmış dosyanın biçimi (varsayılan CSV).</summary>
+    public ReportFileFormat Format { get; private set; } = ReportFileFormat.Csv;
 
     public DayOfWeek? DayOfWeek { get; private set; }
 
@@ -182,9 +187,11 @@ public sealed class ReportSchedule : ITenantEntity, ICompanyShared
 
     public long Version { get; private set; }
 
-    public void Reschedule(ScheduleFrequency frequency, int hour, DayOfWeek? dayOfWeek, int? dayOfMonth, DateTimeOffset nextRunAt, DateTimeOffset now)
+    public void Reschedule(
+        ScheduleFrequency frequency, int hour, DayOfWeek? dayOfWeek, int? dayOfMonth, DateTimeOffset nextRunAt, DateTimeOffset now, ReportFileFormat format = ReportFileFormat.Csv)
     {
         Frequency = frequency;
+        Format = format;
         Hour = hour;
         DayOfWeek = dayOfWeek;
         DayOfMonth = dayOfMonth;
@@ -351,7 +358,7 @@ public interface IReportExports
     /// Zamanlanmış çalışma için: kayıtlı raporu çağıranın (zamanlama sahibinin) bağlamında dışa aktarır, kaynak <see cref="ReportExportSource.Schedule"/>.
     /// Rapor görünmüyorsa null.
     /// </summary>
-    Task<ReportExportInfo?> CreateScheduledAsync(Guid reportId, CancellationToken cancellationToken);
+    Task<ReportExportInfo?> CreateScheduledAsync(Guid reportId, CancellationToken cancellationToken, ReportFileFormat format = ReportFileFormat.Csv);
 
     /// <summary>Çağıranın kendi dosyaları, en yeni üstte (süresi geçmişler henüz silinmediyse işaretli).</summary>
     Task<IReadOnlyList<ReportExportInfo>> ListAsync(CancellationToken cancellationToken);
@@ -379,9 +386,10 @@ public sealed record ReportScheduleInfo(
     string? LastStatus,
     string? LastMessage,
     string? StoppedReason,
-    long Version);
+    long Version,
+    ReportFileFormat Format = ReportFileFormat.Csv);
 
-public sealed record ReportScheduleInput(ScheduleFrequency Frequency, int Hour, DayOfWeek? DayOfWeek, int? DayOfMonth);
+public sealed record ReportScheduleInput(ScheduleFrequency Frequency, int Hour, DayOfWeek? DayOfWeek, int? DayOfMonth, ReportFileFormat Format = ReportFileFormat.Csv);
 
 /// <summary>
 /// Kullanıcının zamanlanmış raporları (ADR-0026, dilim 4); yalnızca kendi zamanlamalarını görür ve yönetir. İzin (<c>core.reports.schedule</c>) uç

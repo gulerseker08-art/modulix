@@ -26,6 +26,8 @@ public sealed partial class ModuleCatalog
     private readonly Dictionary<string, (string ModuleKey, LookupDefinition Lookup)> lookups = new(StringComparer.Ordinal);
     private readonly List<SharedRecordAccess> sharedAccess = [];
     private readonly Dictionary<string, (string ModuleKey, EventSubscription Subscription)> subscriptions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string ModuleKey, BusinessEventDefinition Definition)> businessEvents = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> eventSchemaVersions = new(DomainEventTypes.SchemaVersions, StringComparer.Ordinal);
 
     public ModuleCatalog(IEnumerable<IModule> modules)
     {
@@ -140,6 +142,17 @@ public sealed partial class ModuleCatalog
                 }
             }
 
+            foreach (var businessEvent in module.BusinessEvents)
+            {
+                ValidateBusinessEvent(module, businessEvent);
+                if (!businessEvents.TryAdd(businessEvent.EventType, (module.Key, businessEvent)))
+                {
+                    throw new InvalidOperationException($"İş olayı iki kez tanımlı: '{businessEvent.EventType}'.");
+                }
+
+                eventSchemaVersions[businessEvent.EventType] = businessEvent.SchemaVersion;
+            }
+
             foreach (var subscription in module.EventSubscriptions)
             {
                 ValidateSubscription(module, subscription);
@@ -191,7 +204,8 @@ public sealed partial class ModuleCatalog
             }
         }
 
-        // Abonelikler başka modüllerin kayıt türlerine bağlanabilir; türler bütün modüller okunduktan sonra denetlenir.
+        // Abonelikler başka modüllerin kayıt türlerine ve iş olaylarına bağlanabilir (ADR-0039); türler bütün modüller okunduktan
+        // sonra denetlenir.
         foreach (var (moduleKey, subscription) in subscriptions.Values)
         {
             var unknown = subscription.EntityKeys.Where(k => !auditedEntities.ContainsKey(k)).ToList();
@@ -199,6 +213,20 @@ public sealed partial class ModuleCatalog
             {
                 throw new InvalidOperationException(
                     $"'{subscription.Key}' aboneliğinde bilinmeyen kayıt türü: {string.Join(", ", unknown)} ({moduleKey}).");
+            }
+
+            foreach (var eventType in subscription.EventTypes)
+            {
+                if (!eventSchemaVersions.TryGetValue(eventType, out var version))
+                {
+                    throw new InvalidOperationException($"'{subscription.Key}' aboneliğinde bilinmeyen olay türü: '{eventType}'.");
+                }
+
+                if (subscription.MaxSchemaVersion < version)
+                {
+                    throw new InvalidOperationException(
+                        $"'{subscription.Key}' aboneliği '{eventType}' olayının {version}. sürümünü okuyamıyor (en fazla {subscription.MaxSchemaVersion}).");
+                }
             }
         }
 
@@ -393,8 +421,8 @@ public sealed partial class ModuleCatalog
     public bool IsEnabled(string moduleKey, IReadOnlySet<string> enabledModules) =>
         ContainsModule(moduleKey) && (IsAlwaysEnabled(moduleKey) || enabledModules.Contains(moduleKey));
 
-    // Anahtar modülle başlar; olay türleri bilinir ve abone en güncel sürümü okuyabilir; izinler modülün kendi izinleridir;
-    // abone sınıfı IEventSubscriber uygular. Kayıt türleri kurucunun sonunda, bütün modüller okununca denetlenir.
+    // Anahtar modülle başlar; izinler modülün kendi izinleridir; abone sınıfı IEventSubscriber uygular. Olay ve kayıt türleri
+    // (başka modülün iş olayı olabilir) kurucunun sonunda, bütün modüller okununca denetlenir.
     private static void ValidateSubscription(IModule module, EventSubscription subscription)
     {
         var key = subscription.Key;
@@ -407,20 +435,6 @@ public sealed partial class ModuleCatalog
         if (subscription.EventTypes.Count == 0)
         {
             throw new InvalidOperationException($"'{key}' aboneliğinde olay türü yok.");
-        }
-
-        foreach (var eventType in subscription.EventTypes)
-        {
-            if (!DomainEventTypes.SchemaVersions.TryGetValue(eventType, out var version))
-            {
-                throw new InvalidOperationException($"'{key}' aboneliğinde bilinmeyen olay türü: '{eventType}'.");
-            }
-
-            if (subscription.MaxSchemaVersion < version)
-            {
-                throw new InvalidOperationException(
-                    $"'{key}' aboneliği '{eventType}' olayının {version}. sürümünü okuyamıyor (en fazla {subscription.MaxSchemaVersion}).");
-            }
         }
 
         var foreign = subscription.Permissions.Where(p => module.Permissions.All(d => d.Key != p)).ToList();
@@ -437,6 +451,56 @@ public sealed partial class ModuleCatalog
 
     [GeneratedRegex("^[a-z][a-z0-9]*(\\.[a-z0-9]+(-[a-z0-9]+)*)+$")]
     private static partial Regex SubscriptionKeyPattern();
+
+    // İş olayı (ADR-0039): tür modül önekli ve "modül.kayıt.fiil" biçiminde, kayıt olayı adıyla çakışmaz, sürüm 1 ya da üstü,
+    // kayıt türü modülün, alan adları dolu ve tekil.
+    private static void ValidateBusinessEvent(IModule module, BusinessEventDefinition definition)
+    {
+        var type = definition.EventType;
+        if (!type.StartsWith(module.Key + ".", StringComparison.Ordinal)
+            || type.Length > BusinessEventTypeMaxLength
+            || !BusinessEventTypePattern().IsMatch(type))
+        {
+            throw new InvalidOperationException(
+                $"Geçersiz iş olayı türü: '{type}' ({module.Key}). Biçim: '{module.Key}.kayıt.fiil' (küçük harf, rakam, tire).");
+        }
+
+        if (definition.SchemaVersion < 1)
+        {
+            throw new InvalidOperationException($"'{type}' iş olayının sürümü 1 ya da üstü olmalı.");
+        }
+
+        if (!definition.EntityKey.StartsWith(module.Key + ".", StringComparison.Ordinal) || string.IsNullOrWhiteSpace(definition.DisplayName))
+        {
+            throw new InvalidOperationException($"'{type}' iş olayının kayıt türü modülün olmalı ve görünen adı dolu olmalı.");
+        }
+
+        if (definition.Fields.Any(string.IsNullOrWhiteSpace)
+            || definition.Fields.Distinct(StringComparer.Ordinal).Count() != definition.Fields.Count)
+        {
+            throw new InvalidOperationException($"'{type}' iş olayının alan adları dolu ve tekil olmalı.");
+        }
+    }
+
+    /// <summary>Olay türünün en fazla uzunluğu (outbox satırında saklanır; <c>OutboxMessage.EventTypeMaxLength</c> ile aynı).</summary>
+    public const int BusinessEventTypeMaxLength = 100;
+
+    [GeneratedRegex("^[a-z][a-z0-9]*\\.[a-z0-9]+(-[a-z0-9]+)*\\.[a-z0-9]+(-[a-z0-9]+)*$")]
+    private static partial Regex BusinessEventTypePattern();
+
+    /// <summary>
+    /// Üretilen bütün olay türleri ve güncel sürümleri: kayıt olayları (<see cref="DomainEventTypes.SchemaVersions"/>) ve modüllerin
+    /// beyan ettiği iş olayları (ADR-0039). Abonelik doğrulaması ve platform "Olaylar" ekranı bunu kullanır.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> EventSchemaVersions => eventSchemaVersions;
+
+    /// <summary>İş olayı beyanı ve modülü (ADR-0039); tanımlı değilse null.</summary>
+    public (string ModuleKey, BusinessEventDefinition Definition)? FindBusinessEvent(string eventType) =>
+        businessEvents.TryGetValue(eventType, out var found) ? found : null;
+
+    /// <summary>İş olayı beyanları, modül ve tanım sırasıyla.</summary>
+    public IEnumerable<(string ModuleKey, BusinessEventDefinition Definition)> BusinessEvents =>
+        Modules.SelectMany(m => m.BusinessEvents).Select(d => businessEvents[d.EventType]);
 
     // Ayar anahtarı modülle başlar ve kayıtlı anahtar biçimindedir; varsayılan değer tanıma uyar.
     private static void ValidateSetting(string moduleKey, SettingDefinition setting)

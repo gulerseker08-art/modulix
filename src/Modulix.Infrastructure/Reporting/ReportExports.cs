@@ -41,9 +41,9 @@ internal sealed class ReportExports(
     public Task<ReportExportInfo> CreateAsync(ReportSpec spec, string? name, CancellationToken cancellationToken, ReportFileFormat format = ReportFileFormat.Csv) =>
         CreateCoreAsync(null, string.IsNullOrWhiteSpace(name) ? "Rapor" : name.Trim(), ReportSpecJson.Defaulted(spec), ReportExportSource.Manual, cancellationToken, format);
 
-    public async Task<ReportExportInfo?> CreateScheduledAsync(Guid reportId, CancellationToken cancellationToken) =>
+    public async Task<ReportExportInfo?> CreateScheduledAsync(Guid reportId, CancellationToken cancellationToken, ReportFileFormat format = ReportFileFormat.Csv) =>
         await center.GetAsync(reportId, cancellationToken) is { } report
-            ? await CreateCoreAsync(reportId, report.Summary.Name, report.Spec, ReportExportSource.Schedule, cancellationToken)
+            ? await CreateCoreAsync(reportId, report.Summary.Name, report.Spec, ReportExportSource.Schedule, cancellationToken, format)
             : null;
 
     private async Task<ReportExportInfo> CreateCoreAsync(

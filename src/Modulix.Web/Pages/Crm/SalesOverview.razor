@@ -213,7 +213,7 @@
                                             <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, row.Stage)">@Lookups.Label(CrmLists.OpportunityStage, row.Stage)</span>
                                             @if (row.Status != OpportunityStatus.Open)
                                             {
-                                                <span class="badge stage-@row.Status.ToLowerInvariant()">@OpportunityStatus.Label(row.Status)</span>
+                                                <span class="badge stage-@row.Status.ToLowerInvariant()">@CrmText.OpportunityStatusName(row.Status)</span>
                                             }
                                         </td>
                                         @if (d.AmountsVisible)

@@ -94,9 +94,10 @@ public class AutomationExecutableTriggerTests
     }
 
     [Fact]
-    public void Domain_event_trigger_is_not_executable_yet()
+    public void Domain_event_trigger_is_executable_and_not_a_scan()
     {
-        Assert.False(AutomationTriggerMatcher.IsExecutable(new DomainEventTrigger("sales.deal.won")));
+        Assert.True(AutomationTriggerMatcher.IsExecutable(new DomainEventTrigger("sales.deal.won")));
+        Assert.False(AutomationTriggerMatcher.IsScan(new DomainEventTrigger("sales.deal.won")));
     }
 }
 
@@ -224,7 +225,7 @@ public class AutomationEventSubscriberTests
     private static EventEnvelope Envelope(string type, JsonObject payload, int depth = 0, string? correlation = "trace-1") =>
         new(Guid.NewGuid(), Tenant, type, 1, Entity, Guid.NewGuid(), 1, Guid.NewGuid(), ExecutionSource.Api, correlation, null, depth, payload, Now);
 
-    private static AutomationEventSubscriber Subscriber(FakeStore store) => new(store, new FixedTime(Now));
+    private static AutomationEventSubscriber Subscriber(FakeStore store) => new(store, Catalog(), new FixedTime(Now));
 
     [Fact]
     public async Task A_matching_event_creates_one_pending_run_pinned_to_the_published_version()

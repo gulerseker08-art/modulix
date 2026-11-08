@@ -49,7 +49,7 @@ internal sealed class ReportSchedules(
 
         var day = await clock.GetAsync(cancellationToken);
         var next = ReportScheduleRules.NextRun(input.Frequency, input.Hour, input.DayOfWeek, input.DayOfMonth, day.UtcNow, day.Zone);
-        var schedule = new ReportSchedule(reportId, tenant.UserId, input.Frequency, input.Hour, input.DayOfWeek, input.DayOfMonth, next, time.GetUtcNow());
+        var schedule = new ReportSchedule(reportId, tenant.UserId, input.Frequency, input.Hour, input.DayOfWeek, input.DayOfMonth, next, time.GetUtcNow(), input.Format);
         db.ReportSchedules.Add(schedule);
         Audit(tenant, schedule.Id, AuditAction.Created, null, Snapshot(schedule, report.Summary.Name));
         await db.SaveChangesAsync(cancellationToken);
@@ -72,7 +72,7 @@ internal sealed class ReportSchedules(
         var day = await clock.GetAsync(cancellationToken);
         schedule.Reschedule(
             input.Frequency, input.Hour, input.DayOfWeek, input.DayOfMonth,
-            ReportScheduleRules.NextRun(input.Frequency, input.Hour, input.DayOfWeek, input.DayOfMonth, day.UtcNow, day.Zone), time.GetUtcNow());
+            ReportScheduleRules.NextRun(input.Frequency, input.Hour, input.DayOfWeek, input.DayOfMonth, day.UtcNow, day.Zone), time.GetUtcNow(), input.Format);
         Audit(tenant, schedule.Id, AuditAction.Updated, before, Snapshot(schedule, name));
         await SaveAsync(cancellationToken);
         return ToInfo(schedule, name);
@@ -149,7 +149,7 @@ internal sealed class ReportSchedules(
 
     private static ReportScheduleInfo ToInfo(ReportSchedule s, string? reportName) => new(
         s.Id, s.ReportId, reportName, s.Frequency, s.Hour, s.DayOfWeek, s.DayOfMonth, s.Enabled, s.NextRunAt, s.LastRunAt, s.LastStatus, s.LastMessage, s.StoppedReason,
-        s.Version);
+        s.Version, s.Format);
 
     private static JsonObject Snapshot(ReportSchedule s, string? reportName) => new()
     {
@@ -158,6 +158,7 @@ internal sealed class ReportSchedules(
         ["hour"] = s.Hour,
         ["dayOfWeek"] = s.DayOfWeek?.ToString(),
         ["dayOfMonth"] = s.DayOfMonth,
+        ["format"] = s.Format.ToString(),
         ["enabled"] = s.Enabled,
         ["stoppedReason"] = s.StoppedReason,
     };

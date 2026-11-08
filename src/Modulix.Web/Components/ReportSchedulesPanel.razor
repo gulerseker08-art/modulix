@@ -77,6 +77,13 @@
                         }
                     </select>
                 </div>
+                <div class="span-3">
+                    <label class="form-label" for="rsp-format">Dosya biçimi</label>
+                    <select id="rsp-format" class="form-select" @bind="format">
+                        <option value="csv">CSV</option>
+                        <option value="xlsx">Excel (xlsx)</option>
+                    </select>
+                </div>
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">
@@ -110,6 +117,7 @@
 
                     <div class="report-row-meta">
                         <span class="badge @(item.Enabled ? "status-customer" : "status-inactive")">@(item.Enabled ? "Açık" : "Kapalı")</span>
+                        <span class="badge tag">@(item.Format == "xlsx" ? "Excel" : "CSV")</span>
                         @if (item.Enabled)
                         {
                             <span class="badge tag">Sonraki çalışma: @CrmLabels.Time(item.NextRunAt)</span>
@@ -180,6 +188,7 @@
     private string weekday = "monday";
     private int monthDay = 1;
     private int hour = 9;
+    private string format = "csv";
 
     /// <summary>Verilirse yalnızca bu raporun zamanlamaları; boşsa kullanıcının tüm zamanlamaları.</summary>
     [Parameter] public Guid? ReportId { get; set; }
@@ -227,6 +236,7 @@
         weekday = "monday";
         monthDay = 1;
         hour = 9;
+        format = "csv";
         message = null;
         conflict = false;
         formOpen = true;
@@ -240,6 +250,7 @@
         weekday = item.DayOfWeek ?? "monday";
         monthDay = item.DayOfMonth ?? 1;
         hour = item.Hour;
+        format = item.Format;
         message = null;
         conflict = false;
         formOpen = true;
@@ -258,7 +269,7 @@
         message = null;
         conflict = false;
         var body = new SaveReportScheduleRequest(
-            frequency, hour, frequency == "weekly" ? weekday : null, frequency == "monthly" ? monthDay : null, editingId is null ? null : editingVersion);
+            frequency, hour, frequency == "weekly" ? weekday : null, frequency == "monthly" ? monthDay : null, editingId is null ? null : editingVersion, format);
         var result = editingId is { } id
             ? await Api.PutAsync<ReportScheduleDto>($"/api/reports/schedules/{id}", body)
             : await Api.PostAsync<ReportScheduleDto>($"/api/reports/{reportId}/schedules", body);

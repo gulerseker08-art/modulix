@@ -112,6 +112,7 @@ internal sealed class ReportScheduleConfiguration : IEntityTypeConfiguration<Rep
         builder.Property(s => s.TenantId).IsRequired();
         builder.Property(s => s.Frequency).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(s => s.DayOfWeek).HasConversion<int?>();
+        builder.Property(s => s.Format).HasConversion<string>().HasMaxLength(10).HasDefaultValue(ReportFileFormat.Csv);
         builder.Property(s => s.LastStatus).HasMaxLength(20);
         builder.Property(s => s.LastMessage).HasMaxLength(ReportSchedule.MessageMaxLength);
         builder.Property(s => s.StoppedReason).HasMaxLength(ReportSchedule.MessageMaxLength);
