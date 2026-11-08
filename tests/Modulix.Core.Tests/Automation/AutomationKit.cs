@@ -177,6 +177,9 @@ internal static class AutomationKit
             : [];
 
         public AutomationCapabilities Automation => capabilities;
+
+        /// <summary>Onaya açık kayıt türleri (Dilim 4c); varsayılan yok.</summary>
+        public IReadOnlyList<Modulix.Core.Contracts.Approvals.ApprovalTargetDefinition> ApprovalTargets { get; init; } = [];
     }
 
     public sealed class FakeAccess(IEnumerable<string> permissions, IEnumerable<string> enabledModules) : ICurrentAccess

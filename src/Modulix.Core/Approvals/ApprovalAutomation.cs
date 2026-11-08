@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Modulix.Core.Automation;
+using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Modules;
@@ -14,6 +15,22 @@ namespace Modulix.Core.Approvals;
 public static class ApprovalAutomation
 {
     public const string RequestAction = "core.approval.request";
+
+    /// <summary>
+    /// Aksiyonun kayıttan okuduğu onay hedefi alanları (tutar, para birimi; <see cref="Contracts.Approvals.ApprovalTargetDefinition.GuardedFields"/>)
+    /// kural altyapısındaki alan tanımlarıyla: kural kimliği ve yayınlayan bu alanların okuma iznine sahip olmalıdır. Kayıt türü onaya açık
+    /// değilse ya da alan kural altyapısına beyan edilmemişse boş.
+    /// </summary>
+    public static IEnumerable<AutomationFieldDefinition> GuardedFields(string entityKey, ModuleCatalog modules)
+    {
+        if (modules.FindApprovalTarget(entityKey) is not { } found)
+        {
+            return [];
+        }
+
+        var fields = modules.AutomationFieldsOf(entityKey).ToList();
+        return found.Target.GuardedFields.Select(name => fields.FirstOrDefault(f => f.Name == name)).OfType<AutomationFieldDefinition>();
+    }
 
     public static AutomationCapabilities Capabilities { get; } = new()
     {
@@ -50,10 +67,11 @@ public static class ApprovalAutomation
 }
 
 /// <summary>
-/// Yayında onay sürecinin adını denetler (sabit metin): firmada o adla <b>etkin</b> ve kuralın kayıt türüne <b>bağlı</b> bir süreç olmalı.
-/// Süreç sonradan kapanır, silinir ya da başka türe bağlanırsa kural çalışırken adım açıkça başarısız olur (<see cref="RequestApprovalAction"/>).
+/// Yayında onay sürecinin adını denetler (sabit metin): firmada o adla <b>etkin</b> ve kuralın kayıt türüne <b>bağlı</b> bir süreç olmalı;
+/// yayınlayan, sürecin kayıttan okuduğu tutar alanını görebilmeli (kural kimliği o izni alır; yetki yükseltme yok). Süreç sonradan
+/// kapanır, silinir ya da başka türe bağlanırsa kural çalışırken adım açıkça başarısız olur (<see cref="RequestApprovalAction"/>).
 /// </summary>
-internal sealed class ApprovalProcessCheck(IApprovalService approvals) : IAutomationStepCheck
+internal sealed class ApprovalProcessCheck(IApprovalService approvals, ModuleCatalog modules, ICurrentAccess access) : IAutomationStepCheck
 {
     public string ActionKey => ApprovalAutomation.RequestAction;
 
@@ -72,9 +90,16 @@ internal sealed class ApprovalProcessCheck(IApprovalService approvals) : IAutoma
             return [new AutomationIssue($"{path}.parameters.process", $"'Onay süreci': \"{name.Trim()}\" adında etkin bir onay süreci yok.")];
         }
 
-        return definition.TargetEntityKey == entityKey
-            ? []
-            : [new AutomationIssue($"{path}.parameters.process", $"'Onay süreci': \"{definition.Name}\" süreci bu kayıt türüne bağlı değil; Yönetim > Onay süreçlerinde kayıt türünü seçin.")];
+        if (definition.TargetEntityKey != entityKey)
+        {
+            return [new AutomationIssue($"{path}.parameters.process", $"'Onay süreci': \"{definition.Name}\" süreci bu kayıt türüne bağlı değil; Yönetim > Onay süreçlerinde kayıt türünü seçin.")];
+        }
+
+        // Tutar kayıttan okunur: yayınlayan göremiyorsa kural da göremez (kimlik yayınlayanın görebildiklerini alır).
+        var granted = await access.GetPermissionsAsync(cancellationToken);
+        return [.. ApprovalAutomation.GuardedFields(entityKey, modules)
+            .Where(field => field.ReadPermission is { } read && !granted.Contains(read))
+            .Select(field => new AutomationIssue($"{path}.parameters.process", $"'Onay süreci': süreç tutarı kaydın '{field.Label}' alanından okur; bu alanı görme izniniz yok."))];
     }
 }
 

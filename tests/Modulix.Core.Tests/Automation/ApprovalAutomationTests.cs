@@ -40,6 +40,29 @@ public class ApprovalAutomationTests
     }
 
     [Fact]
+    public void The_rule_identity_gets_the_read_permission_of_the_approval_targets_amount_field()
+    {
+        // Tutar kayıttan okunur (kayda bağlı onay): "Onaya gönder" adımı olan kural, hedefin tutar alanı hassas olsa da onu okuyabilmeli.
+        var target = new Modulix.Core.Contracts.Approvals.ApprovalTargetDefinition(Entity, "Fırsat", "title", "sales/{id}") { AmountField = "margin" };
+        var catalog = new ModuleCatalog([
+            new CoreModule(),
+            new TestModule("sales", Capabilities, "sales.deals.read", WritePermission, SecretPermission) { ApprovalTargets = [target] },
+            new TestModule("billing", AutomationCapabilities.None, "billing.invoices.read"),
+        ]);
+        var step = new AutomationActionStep("onay", ApprovalAutomation.RequestAction, new JsonObject { ["process"] = "İndirim" });
+        var definition = new AutomationDefinition(new ManualTrigger(), null, [step]);
+
+        var permissions = AutomationRuleIdentity.Permissions(Entity, definition, catalog);
+
+        Assert.Contains(SecretPermission, permissions);
+        Assert.Contains(CoreModule.Permissions.RequestApprovals, permissions);
+
+        // Onaya açık olmayan kayıt türünde ya da başka aksiyonda hassas alan izni eklenmez.
+        Assert.DoesNotContain(SecretPermission, AutomationRuleIdentity.Permissions(Entity, definition, Catalog()));
+        Assert.DoesNotContain(SecretPermission, AutomationRuleIdentity.Permissions(Entity, ValidDefinition(), catalog));
+    }
+
+    [Fact]
     public void The_owner_field_must_be_a_declared_lookup_field_of_the_entity()
     {
         // Geçerli: beyan edilmiş lookup alanı.
