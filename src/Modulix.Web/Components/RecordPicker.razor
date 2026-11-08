@@ -1,0 +1,231 @@
+@using Modulix.Shared.Records
+@inject ApiClient Api
+@implements IDisposable
+
+@* Genel kayıt seçici (ADR-0027, Dilim 5d): bir kayıt türünden tek kayıt seçer (kuralı kayıt üzerinde denemek, elle çalıştırmak).
+   Arama, sayfalama, izin ve veri kapsamı sunucudadır (GET /api/records/{tür}); burası yalnızca sunucunun verdiği sayfayı gösterir,
+   kullanıcının göremediği kayıt listede çıkmaz. Lookup'tan (ADR-0016) farkı: bir alanın referansı değil, kaydın kendisi seçilir.
+   Görünüm mevcut lookup-* sınıflarını kullanır. *@
+<div class="lookup">
+    <div class="lookup-field">
+        <input id="@Id" class="form-control" role="combobox" aria-haspopup="listbox" aria-expanded="@(open ? "true" : "false")"
+               aria-controls="@ListId" aria-autocomplete="list" aria-activedescendant="@ActiveOptionId" aria-label="@AccessibleName"
+               autocomplete="off" placeholder="@Placeholder" value="@(open ? query : SelectedText)"
+               @onfocus="OpenAsync" @onclick="OpenAsync" @oninput="OnInputAsync" @onkeydown="OnKeyDownAsync" @onfocusout="Close" />
+        @if (selected is not null)
+        {
+            <button type="button" class="lookup-clear" aria-label="Seçimi temizle: @AccessibleName" @onclick="ClearAsync">×</button>
+        }
+    </div>
+
+    <ul id="@ListId" class="lookup-list" role="listbox" aria-label="@AccessibleName" hidden="@(!open)">
+        @for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            var index = i;
+            <li id="@OptionId(index)" role="option" class="lookup-option @(index == active ? "is-active" : null)"
+                aria-selected="@(item.Id == selected?.Id ? "true" : "false")"
+                @onmousedown="() => SelectAsync(item)" @onmousedown:preventDefault>
+                <span>@RecordPickerLabels.Label(item, LabelField)</span>
+            </li>
+        }
+        @if (open && loading)
+        {
+            <li class="lookup-note" role="presentation">Yükleniyor…</li>
+        }
+        else if (open && error is not null)
+        {
+            <li class="lookup-note text-danger" role="presentation">
+                @error
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onmousedown="() => LoadAsync(1)" @onmousedown:preventDefault>Tekrar dene</button>
+            </li>
+        }
+        else if (open && items.Count == 0)
+        {
+            <li class="lookup-note text-muted" role="presentation">Sonuç bulunamadı.</li>
+        }
+        @if (open && !loading && error is null && items.Count < total)
+        {
+            <li class="lookup-note" role="presentation">
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onmousedown="() => LoadAsync(page + 1)" @onmousedown:preventDefault>
+                    Daha fazla göster (@items.Count / @total)
+                </button>
+            </li>
+        }
+    </ul>
+
+    <div class="visually-hidden" role="status" aria-live="polite">@announcement</div>
+</div>
+
+@code {
+    private const int PageSize = 10;
+    private const int DebounceMilliseconds = 300;
+
+    private readonly List<RecordResponse> items = [];
+    private RecordResponse? selected;
+    private bool open;
+    private bool loading;
+    private string query = string.Empty;
+    private string? error;
+    private string? announcement;
+    private int total;
+    private int page = 1;
+    private int active = -1;
+    private int sequence;
+    private CancellationTokenSource? debounce;
+
+    [Parameter, EditorRequired] public string EntityKey { get; set; } = string.Empty;
+
+    /// <summary>Girdinin kimliği; formdaki &lt;label for&gt; buna bağlanır.</summary>
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+
+    /// <summary>Kaydı tanıtan alanın adı (kayıt türü beyanından; boşsa kısa kimlik).</summary>
+    [Parameter] public string? LabelField { get; set; }
+
+    [Parameter] public Guid? Value { get; set; }
+
+    [Parameter] public EventCallback<Guid?> ValueChanged { get; set; }
+
+    [Parameter] public string AccessibleName { get; set; } = "Kayıt";
+
+    [Parameter] public string? Placeholder { get; set; } = "Kayıt arayın…";
+
+    private string ListId => $"{Id}-list";
+
+    private string OptionId(int index) => $"{Id}-opt-{index}";
+
+    private string? ActiveOptionId => open && active >= 0 && active < items.Count ? OptionId(active) : null;
+
+    private string SelectedText => selected is null ? string.Empty : RecordPickerLabels.Label(selected, LabelField);
+
+    protected override void OnParametersSet()
+    {
+        // Üst bileşen değeri temizlediyse ya da kayıt türünü değiştirdiyse seçim ve liste sıfırlanır.
+        if (Value is null && selected is not null)
+        {
+            selected = null;
+        }
+
+        if (selected is not null && selected.EntityKey != EntityKey)
+        {
+            selected = null;
+            items.Clear();
+        }
+    }
+
+    private async Task OpenAsync()
+    {
+        if (open)
+        {
+            return;
+        }
+
+        open = true;
+        query = string.Empty;
+        await LoadAsync(1);
+    }
+
+    private void Close()
+    {
+        open = false;
+        active = -1;
+        debounce?.Cancel();
+    }
+
+    private async Task OnInputAsync(ChangeEventArgs e)
+    {
+        query = e.Value?.ToString() ?? string.Empty;
+        open = true;
+        debounce?.Cancel();
+        debounce = new CancellationTokenSource();
+        var token = debounce.Token;
+        try
+        {
+            await Task.Delay(DebounceMilliseconds, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        await LoadAsync(1);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var mine = ++sequence;
+        loading = true;
+        error = null;
+        var url = $"/api/records/{Uri.EscapeDataString(EntityKey)}?page={pageNumber}&pageSize={PageSize}";
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            url += $"&search={Uri.EscapeDataString(query.Trim())}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        if (mine != sequence)
+        {
+            return; // daha yeni bir arama başladı; eski yanıt listeyi ezmesin
+        }
+
+        loading = false;
+        if (result.Value is not { } found)
+        {
+            error = result.Error ?? "Kayıtlar alınamadı.";
+            return;
+        }
+
+        if (pageNumber == 1)
+        {
+            items.Clear();
+            active = -1;
+        }
+
+        items.AddRange(found.Items);
+        total = found.TotalCount;
+        page = found.Page;
+        announcement = $"{total} kayıt bulundu.";
+    }
+
+    private async Task SelectAsync(RecordResponse item)
+    {
+        selected = item;
+        open = false;
+        active = -1;
+        await ValueChanged.InvokeAsync(item.Id);
+    }
+
+    private async Task ClearAsync()
+    {
+        selected = null;
+        await ValueChanged.InvokeAsync(null);
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown" when items.Count > 0:
+                open = true;
+                active = (active + 1) % items.Count;
+                break;
+            case "ArrowUp" when items.Count > 0:
+                open = true;
+                active = active <= 0 ? items.Count - 1 : active - 1;
+                break;
+            case "Enter" when open && active >= 0 && active < items.Count:
+                await SelectAsync(items[active]);
+                break;
+            case "Escape":
+                Close();
+                break;
+        }
+    }
+
+    public void Dispose()
+    {
+        debounce?.Cancel();
+        debounce?.Dispose();
+    }
+}

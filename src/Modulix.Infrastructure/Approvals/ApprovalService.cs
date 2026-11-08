@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Approvals;
+using Modulix.Core.Contracts.Approvals;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -24,12 +25,15 @@ internal sealed class ApprovalService(
     IEmailQueue emails,
     INotificationInbox inbox,
     INotificationRecipients recipients,
-    TimeProvider time) : IApprovalService
+    IRecordPipeline pipeline,
+    ModuleCatalog modules,
+    TimeProvider time) : IApprovalService, IApprovalStatusReader
 {
     private const int TrendDays = 14;
     private const int SummaryDays = 30;
     private const int EscalationBatch = 200;
     private const string EscalationSource = "core.approval-escalation";
+    private const string InvalidationSource = "core.approvals";
 
     // Kişinin karar verebildiği kimlikler; Users kendisi ve o an vekili olduğu kişilerdir.
     private sealed record Me(List<Guid> Users, List<Guid> Roles);
@@ -49,8 +53,9 @@ internal sealed class ApprovalService(
     {
         TenantContext tenant = RequireTenant();
         await RequireApproversAsync(input.Steps, cancellationToken);
+        RequireTarget(input.TargetEntityKey);
         ApprovalDefinition definition = Guarded(() =>
-            ApprovalDefinition.Create(input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow()));
+            ApprovalDefinition.Create(input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey));
         db.ApprovalDefinitions.Add(definition);
         Audit(tenant, CoreModule.AuditedEntityKeys.ApprovalDefinition, definition.Id, AuditAction.Created, null, Snapshot(definition));
         await SaveAsync(cancellationToken);
@@ -72,10 +77,11 @@ internal sealed class ApprovalService(
         }
 
         await RequireApproversAsync(input.Steps, cancellationToken);
+        RequireTarget(input.TargetEntityKey);
         JsonObject before = Snapshot(definition);
         Guarded(() =>
         {
-            definition.Update(input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow());
+            definition.Update(input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey);
             return definition;
         });
         Audit(tenant, CoreModule.AuditedEntityKeys.ApprovalDefinition, id, AuditAction.Updated, before, Snapshot(definition));
@@ -227,49 +233,69 @@ internal sealed class ApprovalService(
     public async Task<ApprovalRequestDetail> OpenRequestAsync(ApprovalRequestInput input, CancellationToken cancellationToken)
     {
         TenantContext tenant = RequireTenant();
-        return await OpenAsync(tenant, input, tenant.UserId, link: null, cancellationToken);
+        ApprovalDefinition definition = await ActiveDefinitionAsync(input.DefinitionId, cancellationToken);
+        return await OpenAsync(tenant, definition, input, tenant.UserId, sourceKey: null, cancellationToken);
     }
 
     public async Task<ApprovalOpenResult> OpenForRecordAsync(ApprovalRecordRequest record, CancellationToken cancellationToken)
     {
         TenantContext tenant = RequireTenant();
 
-        // İdempotency: aynı kural adımının yeniden teslimi ya da aynı kayıt ve süreç için hâlâ bekleyen talep ikinci talep açmaz.
-        ApprovalRequest? existing = await db.ApprovalRequests.AsNoTracking().FirstOrDefaultAsync(
-            r => r.SourceKey == record.SourceKey
-                || (r.EntityKey == record.EntityKey && r.RecordId == record.RecordId && r.DefinitionId == record.Input.DefinitionId
-                    && r.Status == ApprovalRequestStatus.Pending),
-            cancellationToken);
-        if (existing is not null)
+        // İdempotency 1: aynı kural adımının yeniden teslimi ikinci talep açmaz.
+        ApprovalRequest? existing = await db.ApprovalRequests.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.SourceKey == record.SourceKey, cancellationToken);
+        if (existing is null)
         {
-            Me me = await MeAsync(tenant, cancellationToken);
-            return new ApprovalOpenResult((await DetailsAsync(tenant, me, [existing], cancellationToken))[0], AlreadyExisted: true);
-        }
-
-        ApprovalRequestDetail opened = await OpenAsync(tenant, record.Input, record.RequesterId, record, cancellationToken);
-        return new ApprovalOpenResult(opened, AlreadyExisted: false);
-    }
-
-    // Ortak açılış: talep sahibi çağıran (elle) ya da kayıt sahibi (kural kaynaklı); dört göz hangisi için geçerliyse ona uygulanır.
-    private async Task<ApprovalRequestDetail> OpenAsync(
-        TenantContext tenant, ApprovalRequestInput input, Guid requesterId, ApprovalRecordRequest? link, CancellationToken cancellationToken)
-    {
-        ApprovalDefinition definition = await db.ApprovalDefinitions.AsNoTracking()
-            .SingleOrDefaultAsync(d => d.Id == input.DefinitionId && d.IsActive, cancellationToken)
-            ?? throw new ApprovalException("Onay süreci bulunamadı ya da kapalı.");
-
-        DateTimeOffset now = time.GetUtcNow();
-        (ApprovalRequest request, List<ApprovalRequestStep> steps) = Guarded(() =>
-        {
-            (ApprovalRequest opened, List<ApprovalRequestStep> openedSteps) =
-                ApprovalRequest.Open(definition, input.Title, input.Description, input.Amount, input.Currency, requesterId, now);
-            if (link is not null)
+            ApprovalDefinition definition = await ActiveDefinitionAsync(record.Input.DefinitionId, cancellationToken);
+            if (definition.TargetEntityKey is not { } entityKey || record.Input.RecordId is not { } recordId)
             {
-                opened.LinkToRecord(link.EntityKey, link.RecordId, link.SourceKey);
+                throw new ApprovalException("Bu süreç bir kayda bağlanmaz; kural aksiyonu yalnızca kayda bağlı süreçle çalışır.");
             }
 
-            return (opened, openedSteps);
-        });
+            // İdempotency 2: aynı kayıt için hâlâ bekleyen talep varsa yenisi açılmaz (elle açılış bu durumda hata verir, kural adımı atlanır).
+            existing = await db.ApprovalRequests.AsNoTracking().FirstOrDefaultAsync(
+                r => r.TargetEntityKey == entityKey && r.TargetRecordId == recordId && r.Status == ApprovalRequestStatus.Pending, cancellationToken);
+            if (existing is null)
+            {
+                ApprovalRequestDetail opened = await OpenAsync(tenant, definition, record.Input, record.RequesterId, record.SourceKey, cancellationToken);
+                return new ApprovalOpenResult(opened, AlreadyExisted: false);
+            }
+        }
+
+        Me me = await MeAsync(tenant, cancellationToken);
+        return new ApprovalOpenResult((await DetailsAsync(tenant, me, [existing], cancellationToken))[0], AlreadyExisted: true);
+    }
+
+    private async Task<ApprovalDefinition> ActiveDefinitionAsync(Guid definitionId, CancellationToken cancellationToken) =>
+        await db.ApprovalDefinitions.AsNoTracking().SingleOrDefaultAsync(d => d.Id == definitionId && d.IsActive, cancellationToken)
+            ?? throw new ApprovalException("Onay süreci bulunamadı ya da kapalı.");
+
+    // Ortak açılış: talep sahibi çağıran (elle) ya da kaydın sorumlusu (kural kaynaklı); dört göz hangisi için geçerliyse ona uygulanır.
+    private async Task<ApprovalRequestDetail> OpenAsync(
+        TenantContext tenant, ApprovalDefinition definition, ApprovalRequestInput input, Guid requesterId, string? sourceKey, CancellationToken cancellationToken)
+    {
+        DateTimeOffset now = time.GetUtcNow();
+        ApprovalRecordTarget? target = null;
+        decimal? amount = input.Amount;
+        string? currency = input.Currency;
+        string title = input.Title;
+        if (definition.TargetEntityKey is { } entityKey)
+        {
+            (target, amount, currency) = await ReadTargetAsync(definition, entityKey, input.RecordId, cancellationToken);
+            title = string.IsNullOrWhiteSpace(title) ? target.Label : title;
+            if (await db.ApprovalRequests.AsNoTracking().AnyAsync(
+                r => r.TargetEntityKey == entityKey && r.TargetRecordId == target.RecordId && r.Status == ApprovalRequestStatus.Pending, cancellationToken))
+            {
+                throw new ApprovalException("Bu kayıt için bekleyen bir onay talebi var.");
+            }
+        }
+        else if (input.RecordId is not null)
+        {
+            throw new ApprovalException("Bu süreç bir kayda bağlanmaz.");
+        }
+
+        (ApprovalRequest request, List<ApprovalRequestStep> steps) = Guarded(() =>
+            ApprovalRequest.Open(definition, title, input.Description, amount, currency, requesterId, now, target, sourceKey));
 
         // Süreç açılışta sahipsiz kalmasın: her adımda talep sahibinden başka etkin bir onaycı olmalı (dört göz).
         foreach (ApprovalRequestStep step in steps)
@@ -484,6 +510,113 @@ internal sealed class ApprovalService(
         return due.Count;
     }
 
+    public async Task<int> InvalidateForRecordAsync(RecordRef record, IReadOnlyCollection<string> changedFields, CancellationToken cancellationToken)
+    {
+        if (modules.FindApprovalTarget(record.EntityKey) is not { } found || !found.Target.GuardedFields.Any(changedFields.Contains))
+        {
+            return 0;
+        }
+
+        TenantContext tenant = RequireTenant();
+        List<ApprovalRequest> pending = await db.ApprovalRequests.AsTracking()
+            .Where(r => r.TargetEntityKey == record.EntityKey && r.TargetRecordId == record.Id && r.Status == ApprovalRequestStatus.Pending)
+            .ToListAsync(cancellationToken);
+        DateTimeOffset now = time.GetUtcNow();
+        foreach (ApprovalRequest request in pending)
+        {
+            JsonObject before = Snapshot(request);
+            request.Invalidate(await StepsAsync(request.Id, cancellationToken), now);
+            JsonObject after = Snapshot(request);
+            after["reason"] = "Kaydın tutarı ya da para birimi değişti";
+            Audit(tenant, CoreModule.AuditedEntityKeys.ApprovalRequest, request.Id, AuditAction.Updated, before, after, background: true, source: InvalidationSource);
+            await inbox.PostAsync(new InboxMessage(
+                request.RequesterId, "approval.invalidated", $"{request.DefinitionName} talebiniz kayıt değiştiği için geçersizleşti", CenterPath(request),
+                $"approval:{request.Id}:invalidated"), cancellationToken);
+        }
+
+        if (pending.Count > 0)
+        {
+            await SaveAsync(cancellationToken);
+        }
+
+        return pending.Count;
+    }
+
+    public async Task<RecordApprovalView?> RecordViewAsync(RecordRef record, CancellationToken cancellationToken)
+    {
+        RecordResult<RecordData> read = await pipeline.GetAsync(record, cancellationToken);
+        if (!read.IsSuccess)
+        {
+            return null;
+        }
+
+        List<ApproverOption> processes = await db.ApprovalDefinitions.AsNoTracking()
+            .Where(d => d.IsActive && d.TargetEntityKey == record.EntityKey)
+            .OrderBy(d => d.Name).Select(d => new ApproverOption(d.Id, d.Name)).ToListAsync(cancellationToken);
+        return new RecordApprovalView(processes, await LatestAsync(record, cancellationToken));
+    }
+
+    public async Task<RecordApprovalStatus?> LatestAsync(RecordRef record, CancellationToken cancellationToken)
+    {
+        ApprovalRequest? latest = await db.ApprovalRequests.AsNoTracking()
+            .Where(r => r.TargetEntityKey == record.EntityKey && r.TargetRecordId == record.Id)
+            .OrderByDescending(r => r.SubmittedAt).ThenByDescending(r => r.Id).FirstOrDefaultAsync(cancellationToken);
+        if (latest is null)
+        {
+            return null;
+        }
+
+        string? step = await db.ApprovalRequestSteps.AsNoTracking()
+            .Where(s => s.RequestId == latest.Id && s.Status == ApprovalStepStatus.Active)
+            .OrderBy(s => s.StepOrder).Select(s => s.Name).FirstOrDefaultAsync(cancellationToken);
+        return new RecordApprovalStatus(latest.Id, latest.DefinitionName, latest.Status.ToString(), latest.SubmittedAt, latest.CompletedAt, step);
+    }
+
+    // Kayıt, talep sahibinin kendi yetkisiyle (izin, veri kapsamı, hassas alan) okunur; göremediği kayıt onaya gönderilemez.
+    private async Task<(ApprovalRecordTarget Target, decimal? Amount, string? Currency)> ReadTargetAsync(
+        ApprovalDefinition definition, string entityKey, Guid? recordId, CancellationToken cancellationToken)
+    {
+        if (recordId is null)
+        {
+            throw new ApprovalException("Bu süreç için kayıt seçin.");
+        }
+
+        ApprovalTargetDefinition target = modules.FindApprovalTarget(entityKey)?.Target
+            ?? throw new ApprovalException("Bu kayıt türü artık onaya açık değil.");
+        RecordResult<RecordData> read = await pipeline.GetAsync(new RecordRef(entityKey, recordId.Value), cancellationToken);
+        if (!read.IsSuccess || read.Value is null)
+        {
+            throw new ApprovalException("Kayıt bulunamadı ya da görme yetkiniz yok.");
+        }
+
+        JsonObject values = read.Value.Values;
+        string label = values[target.LabelField]?.ToString() is { Length: > 0 } text ? text : "—";
+        decimal? amount = target.AmountField is { } amountField && values[amountField] is JsonValue raw
+            && decimal.TryParse(raw.ToString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal parsed)
+            ? parsed
+            : null;
+        string? currency = amount is not null && target.CurrencyField is { } currencyField ? values[currencyField]?.ToString() : null;
+        if (definition.Currency is not null && amount is null)
+        {
+            throw new ApprovalException("Tutarı boş ya da görme yetkinizin olmadığı kayıt bu sürece gönderilemez.");
+        }
+
+        return (new ApprovalRecordTarget(entityKey, recordId.Value, label), amount, currency);
+    }
+
+    private void RequireTarget(string? entityKey)
+    {
+        if (!string.IsNullOrWhiteSpace(entityKey) && modules.FindApprovalTarget(entityKey.Trim()) is null)
+        {
+            throw new ApprovalException("Seçilen kayıt türü onaya açık değil.");
+        }
+    }
+
+    private string? TargetLink(ApprovalRequest request) =>
+        request.TargetEntityKey is { } entityKey && request.TargetRecordId is { } id && modules.FindApprovalTarget(entityKey) is { } found
+            ? found.Target.LinkTemplate.Replace("{id}", id.ToString(), StringComparison.Ordinal)
+            : null;
+
     public async Task<IReadOnlyList<ApprovalDelegationDetail>> ListDelegationsAsync(bool seeAll, CancellationToken cancellationToken)
     {
         TenantContext tenant = RequireTenant();
@@ -602,11 +735,12 @@ internal sealed class ApprovalService(
         }
     }
 
-    private static JsonObject Snapshot(ApprovalDefinition definition) => new()
+    private JsonObject Snapshot(ApprovalDefinition definition) => new()
     {
         ["name"] = definition.Name,
         ["description"] = definition.Description,
         ["currency"] = definition.Currency,
+        ["target"] = definition.TargetEntityKey is { } target ? modules.FindApprovalTarget(target)?.Target.DisplayName ?? target : null,
         ["isActive"] = definition.IsActive,
         ["revision"] = definition.Revision,
         ["steps"] = string.Join(" → ", definition.Steps.Select(s => s.Name)),
@@ -619,6 +753,7 @@ internal sealed class ApprovalService(
         ["amount"] = request.Amount,
         ["currency"] = request.Currency,
         ["status"] = request.Status.ToString(),
+        ["record"] = request.TargetLabel,
     };
 
     private TenantContext RequireTenant() =>
@@ -702,7 +837,7 @@ internal sealed class ApprovalService(
                 request.SubmittedAt, request.CompletedAt, request.Version, details,
                 pending && request.RequesterId != tenant.UserId && own.Any(s => s.Status == ApprovalStepStatus.Active && IsMine(s, Without(me, request.RequesterId))),
                 pending && request.RequesterId == tenant.UserId,
-                request.EntityKey, request.RecordId);
+                request.TargetEntityKey, request.TargetRecordId, request.TargetLabel, TargetLink(request));
         })];
     }
 
@@ -825,7 +960,9 @@ internal sealed class ApprovalService(
 
     private static string Encode(string text) => WebUtility.HtmlEncode(text);
 
-    private void Audit(TenantContext tenant, string entityKey, Guid recordId, AuditAction action, JsonObject? before, JsonObject? after, bool background = false)
+    private void Audit(
+        TenantContext tenant, string entityKey, Guid recordId, AuditAction action, JsonObject? before, JsonObject? after, bool background = false,
+        string? source = null)
     {
         JsonObject changes = RecordDiff.Compute(before, after);
         if (action == AuditAction.Updated && changes.Count == 0)
@@ -837,7 +974,7 @@ internal sealed class ApprovalService(
             tenant.TenantId, tenant.UserId, entityKey, recordId, action, changes,
             background ? ExecutionSource.BackgroundJob : ExecutionSource.Api, Activity.Current?.TraceId.ToString())
         {
-            Subscription = background ? EscalationSource : null,
+            Subscription = background ? source ?? EscalationSource : null,
         });
     }
 

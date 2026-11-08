@@ -17,7 +17,14 @@ public sealed record AutomationEntityDefinition(string EntityKey, string Display
     public Type? RecordSource { get; init; }
 
     /// <summary>
-    /// Kaydın sorumlusunu tutan alanın adı (ör. "ownerId"); kural kaynaklı onayda talep sahibi budur (Dilim 4c). Kayıt türünün beyan
+    /// Kayıt seçicide (kuralı bir kayıt üzerinde denemek, elle çalıştırmak) kaydı tanıtan alanın adı (ör. "title"). Kayıt türünün beyan
+    /// edilmiş bir <b>metin</b> alanı olmalıdır; boşsa seçici kaydı yalnızca kısa kimliğiyle gösterir. Kullanıcı alanı göremiyorsa
+    /// (<see cref="AutomationFieldDefinition.ReadPermission"/>) katalog etiket alanını vermez.
+    /// </summary>
+    public string? LabelField { get; init; }
+
+    /// <summary>
+    /// Kaydın sorumlusunu tutan alanın adı (ör. "ownerId"); kural kaynaklı onayda talep sahibi budur (Dilim 4c-2). Kayıt türünün beyan
     /// edilmiş bir <b>lookup</b> alanı olmalıdır; boşsa bu kayıt türü için "onaya gönder" aksiyonu talep sahibi bulamaz ve adım başarısız olur.
     /// </summary>
     public string? OwnerField { get; init; }

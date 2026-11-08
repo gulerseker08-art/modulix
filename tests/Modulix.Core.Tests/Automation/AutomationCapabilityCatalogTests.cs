@@ -24,7 +24,7 @@ public class AutomationCapabilityCatalogTests
         Assert.Equal(3, catalog.AutomationEventsOf(Entity).Count());
         Assert.Equal(2, catalog.AutomationActions.Count(a => a.ModuleKey == "sales"));
 
-        // Core'un tek aksiyonu "Onaya gönder"dir (Dilim 4c); kayıt türü, alan ya da olay beyan etmez.
+        // Core'un tek aksiyonu "Onaya gönder"dir (Dilim 4c-2); kayıt türü, alan ya da olay beyan etmez.
         Assert.Equal(ApprovalAutomation.RequestAction, Assert.Single(catalog.AutomationActions, a => a.ModuleKey == "core").Action.Definition.Key);
     }
 

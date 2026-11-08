@@ -51,7 +51,7 @@ public sealed partial class AutomationDefinitionValidator(
 
         ValidateTrigger(definition.Trigger, entityKey, fields, issues);
         issues.AddRange(ConditionValidator.Validate(definition.Condition, fields, OptionsFor(definition.Trigger)));
-        await ValidateActionsAsync(definition.Actions, fields, issues, cancellationToken);
+        await ValidateActionsAsync(entityKey, definition.Actions, fields, issues, cancellationToken);
         return issues;
     }
 
@@ -193,7 +193,7 @@ public sealed partial class AutomationDefinitionValidator(
     }
 
     private async Task ValidateActionsAsync(
-        IReadOnlyList<AutomationActionStep> actions, AutomationFieldSet fields, List<AutomationIssue> issues, CancellationToken cancellationToken)
+        string entityKey, IReadOnlyList<AutomationActionStep> actions, AutomationFieldSet fields, List<AutomationIssue> issues, CancellationToken cancellationToken)
     {
         if (actions.Count == 0)
         {
@@ -231,10 +231,10 @@ public sealed partial class AutomationDefinitionValidator(
 
             ValidateParameters(view.Definition, step.Parameters ?? new JsonObject(), fields, path, issues);
 
-            // Aksiyona özgü denetim: parametrenin tenant verisine karşı geçerliliği (ör. onay süreci adı) - Dilim 4c.
+            // Aksiyona özgü denetim: parametrenin tenant verisine karşı geçerliliği (ör. onay süreci adı) - Dilim 4c-2.
             foreach (var check in stepChecks?.Where(c => c.ActionKey == step.Action) ?? [])
             {
-                issues.AddRange(await check.CheckAsync(step, path, cancellationToken));
+                issues.AddRange(await check.CheckAsync(entityKey, step, path, cancellationToken));
             }
         }
     }
@@ -324,15 +324,11 @@ public sealed partial class AutomationDefinitionValidator(
         {
             issues.Add(new(path, $"'{field.Label}' alanını görme izniniz yok; parametreye bağlanamaz."));
         }
-        else if (!(field.Type == parameter.Type || IsAmountToNumber(field, parameter)) || field.LookupKey != parameter.LookupKey)
+        else if (field.Type != parameter.Type || field.LookupKey != parameter.LookupKey)
         {
             issues.Add(new(path, $"'{field.Label}' alanının tipi '{parameter.Label}' parametresiyle uyuşmuyor."));
         }
     }
-
-    // Para alanının tutarı sayı parametresine bağlanabilir (para birimi bağlanmaz; ayrı parametre ile verilir) - Dilim 4c, onay tutarı.
-    private static bool IsAmountToNumber(AutomationFieldDefinition field, AutomationParameter parameter) =>
-        field.Type == AutomationFieldType.Money && parameter.Type == AutomationFieldType.Number;
 
     /// <summary>Sabit parametre değerini tipine çözer (JSON değeri → tipli değer). Hata iletisi kullanıcıya gösterilir.</summary>
     public static bool TryLiteral(AutomationParameter parameter, JsonNode value, out object? parsed, out string? error)

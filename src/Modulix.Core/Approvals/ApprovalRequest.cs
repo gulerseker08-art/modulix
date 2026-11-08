@@ -8,7 +8,13 @@ public enum ApprovalRequestStatus
     Approved = 2,
     Rejected = 3,
     Withdrawn = 4,
+
+    /// <summary>Bağlı kaydın tutarı ya da para birimi değişti; verilmiş onaylar geçersiz (Ç6a.2).</summary>
+    Invalidated = 5,
 }
+
+/// <summary>Talebin bağlandığı kayıt: tür, kimlik ve açılış anındaki görünen adı.</summary>
+public sealed record ApprovalRecordTarget(string EntityKey, Guid RecordId, string Label);
 
 public enum ApprovalStepStatus
 {
@@ -34,7 +40,6 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
     public const int TitleMaxLength = 200;
     public const int DescriptionMaxLength = 2000;
     public const int CommentMaxLength = 1000;
-    public const int EntityKeyMaxLength = 100;
     public const int SourceKeyMaxLength = 200;
 
     private ApprovalRequest()
@@ -62,13 +67,15 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
 
     public Guid RequesterId { get; private set; }
 
-    /// <summary>Kayda bağlı onayda (Dilim 4c) bağlandığı kaydın türü; elle açılan talepte boş.</summary>
-    public string? EntityKey { get; private set; }
+    public string? TargetEntityKey { get; private set; }
 
-    public Guid? RecordId { get; private set; }
+    public Guid? TargetRecordId { get; private set; }
+
+    /// <summary>Kaydın açılış anındaki görünen adı (anlık görüntü).</summary>
+    public string? TargetLabel { get; private set; }
 
     /// <summary>
-    /// Talebi açan kural adımının tekilleştirme anahtarı (Dilim 4c). Aynı anahtarla ikinci talep açılmaz: kural motorunun en az bir kez
+    /// Talebi açan kural adımının tekilleştirme anahtarı (Dilim 4c-2). Aynı anahtarla ikinci talep açılmaz: kural motorunun en az bir kez
     /// teslimi ikinci talep üretmez. Elle açılan talepte boş.
     /// </summary>
     public string? SourceKey { get; private set; }
@@ -87,8 +94,19 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
     /// (süreç sahibi eşik altını onaysız bırakmıştır).
     /// </summary>
     public static (ApprovalRequest Request, List<ApprovalRequestStep> Steps) Open(
-        ApprovalDefinition definition, string title, string? description, decimal? amount, string? currency, Guid requesterId, DateTimeOffset now)
+        ApprovalDefinition definition, string title, string? description, decimal? amount, string? currency, Guid requesterId, DateTimeOffset now,
+        ApprovalRecordTarget? target = null, string? sourceKey = null)
     {
+        if (sourceKey is not null && (sourceKey.Length is 0 || sourceKey.Length > SourceKeyMaxLength))
+        {
+            throw new ArgumentException("Kural adımı anahtarı geçersiz.");
+        }
+
+        if ((definition.TargetEntityKey is null) != (target is null) || (target is not null && target.EntityKey != definition.TargetEntityKey))
+        {
+            throw new ArgumentException(definition.TargetEntityKey is null ? "Bu süreç bir kayda bağlanmaz." : "Bu süreç için kayıt seçin.");
+        }
+
         string trimmedTitle = (title ?? string.Empty).Trim();
         if (trimmedTitle.Length is 0 or > TitleMaxLength)
         {
@@ -128,6 +146,10 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
             Amount = amount,
             Currency = code,
             RequesterId = requesterId,
+            TargetEntityKey = target?.EntityKey,
+            TargetRecordId = target?.RecordId,
+            TargetLabel = target is null ? null : target.Label.Length > TitleMaxLength ? target.Label[..TitleMaxLength] : target.Label,
+            SourceKey = sourceKey,
             Status = ApprovalRequestStatus.Pending,
             SubmittedAt = now,
             Version = 1,
@@ -139,20 +161,6 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
             .ToList();
         request.ActivateNext(steps, now);
         return (request, steps);
-    }
-
-    /// <summary>Talebi bir kayda ve (kural kaynaklıysa) açan adımın tekilleştirme anahtarına bağlar. <see cref="Open"/>'dan hemen sonra çağrılır.</summary>
-    public void LinkToRecord(string entityKey, Guid recordId, string? sourceKey)
-    {
-        if (string.IsNullOrWhiteSpace(entityKey) || entityKey.Length > EntityKeyMaxLength || recordId == Guid.Empty
-            || (sourceKey is not null && (sourceKey.Length is 0 || sourceKey.Length > SourceKeyMaxLength)))
-        {
-            throw new ArgumentException("Kayıt bağlantısı geçersiz.");
-        }
-
-        EntityKey = entityKey;
-        RecordId = recordId;
-        SourceKey = sourceKey;
     }
 
     /// <summary>Etkin adımı onaylar: aynı sıradaki etkin adımlar bitince sonraki sıra açılır, adım kalmadıysa talep onaylanır.</summary>
@@ -176,6 +184,9 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
 
     public void Withdraw(IReadOnlyList<ApprovalRequestStep> steps, DateTimeOffset now) =>
         Close(ApprovalRequestStatus.Withdrawn, steps, now);
+
+    public void Invalidate(IReadOnlyList<ApprovalRequestStep> steps, DateTimeOffset now) =>
+        Close(ApprovalRequestStatus.Invalidated, steps, now);
 
     /// <summary>Atama değişikliği talebin sürümünü artırır: aynı anda verilen karar çakışma alır.</summary>
     public void Touch() => Version++;

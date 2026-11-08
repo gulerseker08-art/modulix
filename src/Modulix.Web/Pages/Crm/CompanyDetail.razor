@@ -214,7 +214,7 @@
                                                         @if (link.IsDecisionMaker) { <span class="badge tag">@Texts.Get("crm.company.people.decisionMaker")</span><text> </text> }
                                                         @link.JobTitle
                                                         @if (link.Department is { } department) { <text> · @department</text> }
-                                                        @foreach (var role in link.Roles) { <span class="badge tag">@CrmRelationshipRoles.Labels.GetValueOrDefault(role, role)</span><text> </text> }
+                                                        @foreach (var role in link.Roles) { <span class="badge tag">@RelationshipRoleNames.Of(role)</span><text> </text> }
                                                         @if (!link.IsActive) { <text> · @Texts.Get("crm.company.people.ended", link.EndDate)</text> }
                                                     </span>
                                                 </div>
@@ -265,7 +265,7 @@
                                                     <a href="crm/firsatlar/@opportunity.Id"><strong>@opportunity.Title</strong></a>
                                                     <span>
                                                         <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span>
-                                                        @if (opportunity.Status != OpportunityStatus.Open) { <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span> }
+                                                        @if (opportunity.Status != OpportunityStatus.Open) { <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@CrmText.OpportunityStatusName(opportunity.Status)</span> }
                                                         @if (opportunity.Amount is { } amount) { <text> @CrmLabels.Amount(amount, opportunity.Currency)</text> }
                                                         @if (opportunity.Probability is { } probability) { <text> · %@probability</text> }
                                                         @if (opportunity.OwnerId is not null) { <text> · @Lookups.MemberName(opportunity.OwnerId)</text> }

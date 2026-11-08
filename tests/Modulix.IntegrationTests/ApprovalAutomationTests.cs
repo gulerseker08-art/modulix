@@ -19,8 +19,9 @@ using Modulix.Shared.Records;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0027 Dilim 4c: kural aksiyonu "Onaya gönder" ve kayda bağlı onay uçtan uca. Talep sahibi kaydın sorumlusudur (dört göz onun için),
-/// aynı adım ya da aynı kayıt-süreç ikinci talep açmaz, süreç adı yayında doğrulanır. Gerçek veritabanı, kayıt boru hattı ve RLS altında.
+/// ADR-0027 Dilim 4c-2: kural aksiyonu "Onaya gönder" uçtan uca. Süreç kayda bağlıdır (Dilim 4c): tutar kayıttan okunur. Talep sahibi
+/// kaydın sorumlusudur (dört göz onun için), aynı adım ya da aynı kayıt ikinci talep açmaz, süreç adı ve kayıt türü yayında doğrulanır.
+/// Gerçek veritabanı, kayıt boru hattı ve RLS altında.
 /// </summary>
 public class ApprovalAutomationTests(CrmAutomationFixture fixture) : IClassFixture<CrmAutomationFixture>
 {
@@ -37,8 +38,6 @@ public class ApprovalAutomationTests(CrmAutomationFixture fixture) : IClassFixtu
                 {
                     ["process"] = process,
                     ["title"] = title,
-                    ["amount"] = new JsonObject { ["$field"] = $"{CrmModule.Entities.Opportunity}.amount" },
-                    ["currency"] = "TRY",
                 }),
             ]);
 
@@ -56,10 +55,11 @@ public class ApprovalAutomationTests(CrmAutomationFixture fixture) : IClassFixtu
         Assert.Equal(AutomationRunStatus.Succeeded, run.Status);
         var request = Assert.Single((await ListRequestsAsync(setup.Client)).Items);
         Assert.Equal("İndirim onayı: Anka Lojistik anlaşması", request.Title);
-        Assert.Equal(CrmModule.Entities.Opportunity, request.EntityKey);
-        Assert.Equal(opportunity, request.RecordId);
+        Assert.Equal(CrmModule.Entities.Opportunity, request.TargetEntityKey);
+        Assert.Equal(opportunity, request.TargetRecordId);
+        Assert.Equal("Anka Lojistik anlaşması", request.TargetLabel);
         Assert.Equal(setup.Admin.Id, request.RequesterId); // kaydın sorumlusu (oluşturan)
-        Assert.Equal((5000m, "TRY"), (request.Amount, request.Currency));
+        Assert.Equal((5000m, "TRY"), (request.Amount, request.Currency)); // kayıttan okundu
         Assert.Equal("Pending", request.Status);
 
         // Onaycı kendi kararını bekleyen talebi görür.
@@ -72,7 +72,7 @@ public class ApprovalAutomationTests(CrmAutomationFixture fixture) : IClassFixtu
     }
 
     [Fact]
-    public async Task Unknown_or_closed_processes_are_refused_at_publish_and_fail_clearly_when_they_close_later_or_leave_no_other_approver()
+    public async Task Unknown_unbound_or_closed_processes_are_refused_at_publish_and_fail_clearly_when_they_close_later_or_leave_no_other_approver()
     {
         var setup = await SetUpAsync();
 
@@ -80,6 +80,12 @@ public class ApprovalAutomationTests(CrmAutomationFixture fixture) : IClassFixtu
         var unknown = await TryPublishAsync(setup.Client, ApprovalRule("Olmayan süreç"));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, unknown.StatusCode);
         Assert.Contains("etkin bir onay süreci yok", await unknown.Content.ReadAsStringAsync());
+
+        // Yayın: süreç var ama kuralın kayıt türüne bağlı değil (serbest süreç).
+        var unbound = await CreateProcessAsync(setup, approver: setup.Approver, targetEntityKey: null);
+        var notBound = await TryPublishAsync(setup.Client, ApprovalRule(unbound.Name));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, notBound.StatusCode);
+        Assert.Contains("bu kayıt türüne bağlı değil", await notBound.Content.ReadAsStringAsync());
 
         // Süreç yayından sonra kapanırsa kural açıkça başarısız olur, sessizce atlamaz.
         var process = await CreateProcessAsync(setup, approver: setup.Approver);
@@ -164,10 +170,13 @@ public class ApprovalAutomationTests(CrmAutomationFixture fixture) : IClassFixtu
         return client;
     }
 
-    private async Task<ApprovalDefinitionDto> CreateProcessAsync(Setup setup, ModulixUser approver, string? name = null)
+    // Süreç varsayılan olarak fırsata bağlıdır (Dilim 4c): tutar kayıttan okunur, kural aksiyonu yalnızca kayda bağlı süreçle çalışır.
+    private async Task<ApprovalDefinitionDto> CreateProcessAsync(
+        Setup setup, ModulixUser approver, string? name = null, string? targetEntityKey = CrmModule.Entities.Opportunity)
     {
         var response = await setup.Client.PostAsJsonAsync("/api/approvals/definitions", new SaveApprovalDefinitionRequest(
-            name ?? $"İndirim {Guid.NewGuid():N}"[..24], "Fırsat indirimleri", "TRY", [new ApprovalStepDefinitionDto("Yönetici", 1, approver.Id, null, null, null)]));
+            name ?? $"İndirim {Guid.NewGuid():N}"[..24], "Fırsat indirimleri", "TRY", [new ApprovalStepDefinitionDto("Yönetici", 1, approver.Id, null, null, null)],
+            null, targetEntityKey));
         Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<ApprovalDefinitionDto>())!;
     }

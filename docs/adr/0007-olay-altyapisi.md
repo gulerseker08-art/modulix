@@ -1,6 +1,6 @@
 # ADR-0007: Olay altyapısı
 
-- **Durum:** Kabul edildi, 25 Ekim 2026
+- **Durum:** Kabul edildi, 25 Ekim 2026. Modül iş olayları (Ç0.4) 7 Kasım 2026'da [ADR-0039](0039-modul-is-olaylari.md) ile eklendi: aynı outbox ve zarf, `IModule.BusinessEvents` beyanı, `IBusinessEventPublisher`; ilk olaylar CRM'den (`crm.opportunity.won`, `crm.opportunity.lost`, `crm.lead.converted`). Kalan: webhook (Ç11a.4), işleyicinin Ç2 çerçevesine taşınması ve ayrı süreçte çalışması (K11)
 - **Karar:** Outbox olayları iki adımda işlenir: tek bir dağıtıcı her olayı ilgili abonelere "teslim" satırı olarak dağıtır, teslimler abone başına ayrı ayrı, olayın tenant'ı bağlamında, en az bir kez ve aynı kaydın olayları sırayla işlenir. Abonelik `IModule` üzerinden tek satırla bildirilir, abone sözleşmesi `Modulix.Core.Contracts`'tadır
 
 ## Problem
@@ -57,7 +57,7 @@ Yol haritasındaki K3 kararı, modüller arası her yeni sözleşme için ADR is
 | `Payload` | Değişen alanların `{ alan: { old, new } }` farkı (bugünkü biçim, sürüm 1) |
 | `OccurredAt`, `DispatchedAt` | Yazılma ve abonelere dağıtılma zamanı (`ProcessedAt` yeniden adlandırılır) |
 
-- `StatusChanged` kaldırılır: durum değişikliği `RecordUpdated` içindeki alan farkından anlaşılır. Anlamı olan iş olayları (fırsat kazanıldı, sevkiyat teslim edildi) Ç0.4'ün açık iş komutlarıyla modül olayı olarak gelir; tür adı modül anahtarıyla başlar (`crm.opportunity.won`). Modülün olay yayınlama ve olay türü bildirme sözleşmesi o adımda eklenir; zarf ve işleyici değişmez.
+- `StatusChanged` kaldırılır: durum değişikliği `RecordUpdated` içindeki alan farkından anlaşılır. Anlamı olan iş olayları (fırsat kazanıldı, sevkiyat teslim edildi) Ç0.4'ün açık iş komutlarıyla modül olayı olarak gelir; tür adı modül anahtarıyla başlar (`crm.opportunity.won`). Modülün olay yayınlama ve olay türü bildirme sözleşmesi o adımda eklenir; zarf ve işleyici değişmez. *(Eklendi: ADR-0039, 7 Kasım 2026.)*
 - `DomainEventTypes` ve zarf (`EventEnvelope`) `Modulix.Core.Contracts`'a taşınır; aboneler bunları kullanır.
 - Kayıt silme bugün kaynağı sabit `Api` yazıyor; silme de kaynağı komuttan almalı (abonenin yaptığı silme "Arka plan işi" görünmeli).
 

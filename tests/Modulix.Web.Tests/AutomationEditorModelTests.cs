@@ -118,18 +118,26 @@ public class AutomationEditorModelTests
     }
 
     [Fact]
-    public void A_domain_event_trigger_is_locked_and_preserved_and_can_be_replaced()
+    public void A_domain_event_trigger_is_edited_by_its_event_key_and_an_unknown_trigger_stays_locked()
     {
+        // İş olayı (ADR-0039) düzenlenebilir: olay anahtarı okunur ve yazılır.
         var definition = EditorDefinition.Parse(Json("""{ "trigger": { "type": "domainEvent", "eventKey": "crm.opportunity.won" }, "actions": [] }"""));
 
-        Assert.True(definition.Trigger.IsLocked);
+        Assert.False(definition.Trigger.IsLocked);
+        Assert.Equal("crm.opportunity.won", definition.Trigger.EventKey);
         Assert.Equal("crm.opportunity.won", definition.Build()["trigger"]!["eventKey"]!.GetValue<string>());
 
-        // Kullanıcı bilerek başka bir tetikleyici seçerse kilit kalkar ve eski değerler taşınmaz.
+        // Tür değişince olay anahtarı taşınmaz.
         definition.Trigger.ChangeType(EditorTrigger.Manual);
-        Assert.False(definition.Trigger.IsLocked);
         Assert.Equal("manual", definition.Build()["trigger"]!["type"]!.GetValue<string>());
         Assert.Null(definition.Build()["trigger"]!["eventKey"]);
+
+        // Düzenleyicinin tanımadığı tetikleyici ham olarak korunur; kullanıcı bilerek başka tür seçerse kilit kalkar.
+        var unknown = EditorDefinition.Parse(Json("""{ "trigger": { "type": "futureTrigger", "x": 1 }, "actions": [] }"""));
+        Assert.True(unknown.Trigger.IsLocked);
+        Assert.Equal(1, unknown.Build()["trigger"]!["x"]!.GetValue<int>());
+        unknown.Trigger.ChangeType(EditorTrigger.Manual);
+        Assert.False(unknown.Trigger.IsLocked);
     }
 
     [Fact]
@@ -232,6 +240,6 @@ public class AutomationEditorModelTests
     public void Every_trigger_type_the_editor_offers_has_a_turkish_name()
     {
         Assert.All(EditorTrigger.Types, t => Assert.NotEqual(t, AutomationLabels.TriggerType(t)));
-        Assert.DoesNotContain(EditorTrigger.DomainEvent, EditorTrigger.Types); // iş olayı tetikleyicisi henüz yayınlanamaz
+        Assert.Contains(EditorTrigger.DomainEvent, EditorTrigger.Types); // iş olayı tetikleyicisi ADR-0039 ile yayınlanabilir
     }
 }

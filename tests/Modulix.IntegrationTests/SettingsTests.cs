@@ -31,7 +31,7 @@ public class SettingsTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         Assert.Equal(0, defaults[SettingKeys.Currency].Version);
         Assert.Equal(SettingKind.Choice, defaults[SettingKeys.Currency].Kind);
         Assert.Contains(defaults[SettingKeys.Currency].Options, o => o.Value == "EUR");
-        Assert.Equal("Firma profili", defaults[SettingKeys.DisplayName].Group);
+        Assert.Equal("Kuruluş profili", defaults[SettingKeys.DisplayName].Group);
         Assert.Equal("", defaults[SettingKeys.DisplayName].Value);
 
         var request = Save((SettingKeys.Currency, "USD", 0), (SettingKeys.DisplayName, "Anka", 0));

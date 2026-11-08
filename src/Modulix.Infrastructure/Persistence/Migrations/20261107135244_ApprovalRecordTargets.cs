@@ -6,76 +6,76 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Modulix.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class ApprovalRecordLink : Migration
+    public partial class ApprovalRecordTargets : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "EntityKey",
+                name: "TargetEntityKey",
                 schema: "core",
                 table: "ApprovalRequests",
                 type: "nvarchar(100)",
                 maxLength: 100,
                 nullable: true);
 
-            migrationBuilder.AddColumn<Guid>(
-                name: "RecordId",
-                schema: "core",
-                table: "ApprovalRequests",
-                type: "uniqueidentifier",
-                nullable: true);
-
             migrationBuilder.AddColumn<string>(
-                name: "SourceKey",
+                name: "TargetLabel",
                 schema: "core",
                 table: "ApprovalRequests",
                 type: "nvarchar(200)",
                 maxLength: 200,
                 nullable: true);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_ApprovalRequests_TenantId_EntityKey_RecordId",
+            migrationBuilder.AddColumn<Guid>(
+                name: "TargetRecordId",
                 schema: "core",
                 table: "ApprovalRequests",
-                columns: new[] { "TenantId", "EntityKey", "RecordId" });
+                type: "uniqueidentifier",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "TargetEntityKey",
+                schema: "core",
+                table: "ApprovalDefinitions",
+                type: "nvarchar(100)",
+                maxLength: 100,
+                nullable: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_ApprovalRequests_TenantId_SourceKey",
+                name: "IX_ApprovalRequests_TenantId_TargetEntityKey_TargetRecordId_Status",
                 schema: "core",
                 table: "ApprovalRequests",
-                columns: new[] { "TenantId", "SourceKey" },
-                unique: true,
-                filter: "[SourceKey] IS NOT NULL");
+                columns: new[] { "TenantId", "TargetEntityKey", "TargetRecordId", "Status" });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
-                name: "IX_ApprovalRequests_TenantId_EntityKey_RecordId",
-                schema: "core",
-                table: "ApprovalRequests");
-
-            migrationBuilder.DropIndex(
-                name: "IX_ApprovalRequests_TenantId_SourceKey",
+                name: "IX_ApprovalRequests_TenantId_TargetEntityKey_TargetRecordId_Status",
                 schema: "core",
                 table: "ApprovalRequests");
 
             migrationBuilder.DropColumn(
-                name: "EntityKey",
+                name: "TargetEntityKey",
                 schema: "core",
                 table: "ApprovalRequests");
 
             migrationBuilder.DropColumn(
-                name: "RecordId",
+                name: "TargetLabel",
                 schema: "core",
                 table: "ApprovalRequests");
 
             migrationBuilder.DropColumn(
-                name: "SourceKey",
+                name: "TargetRecordId",
                 schema: "core",
                 table: "ApprovalRequests");
+
+            migrationBuilder.DropColumn(
+                name: "TargetEntityKey",
+                schema: "core",
+                table: "ApprovalDefinitions");
         }
     }
 }

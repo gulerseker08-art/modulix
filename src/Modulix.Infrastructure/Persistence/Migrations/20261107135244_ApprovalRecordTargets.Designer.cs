@@ -12,8 +12,8 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ModulixDbContext))]
-    [Migration("20261108140351_ApprovalRecordLink")]
-    partial class ApprovalRecordLink
+    [Migration("20261107135244_ApprovalRecordTargets")]
+    partial class ApprovalRecordTargets
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -123,6 +123,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("TargetEntityKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -217,19 +221,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
-                    b.Property<string>("EntityKey")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<Guid?>("RecordId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<Guid>("RequesterId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("SourceKey")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -238,6 +231,17 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("SubmittedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("TargetEntityKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TargetLabel")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("TargetRecordId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
@@ -255,15 +259,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "DefinitionId");
 
-                    b.HasIndex("TenantId", "SourceKey")
-                        .IsUnique()
-                        .HasFilter("[SourceKey] IS NOT NULL");
-
-                    b.HasIndex("TenantId", "EntityKey", "RecordId");
-
                     b.HasIndex("TenantId", "RequesterId", "Status");
 
                     b.HasIndex("TenantId", "Status", "SubmittedAt");
+
+                    b.HasIndex("TenantId", "TargetEntityKey", "TargetRecordId", "Status");
 
                     b.ToTable("ApprovalRequests", "core");
                 });

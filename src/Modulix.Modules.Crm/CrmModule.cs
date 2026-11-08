@@ -354,6 +354,41 @@ public sealed class CrmModule : IModule
     ];
 
     /// <summary>
+    /// CRM'in yayınladığı iş olayları (ADR-0039). Tür adı sürüm taşımaz; sürüm beyandadır. Açık iş komutları yayınlar:
+    /// kazan/kaybet (<c>IOpportunityWorkflow</c>), müşteri adayı dönüşümü (<c>ILeadConversion</c>).
+    /// </summary>
+    public static class Events
+    {
+        public const string OpportunityWon = "crm.opportunity.won";
+        public const string OpportunityLost = "crm.opportunity.lost";
+        public const string LeadConverted = "crm.lead.converted";
+
+        /// <summary>Payload alanları kaydın alan adlarıdır; <c>wonAmount</c> fırsatın hassas alanıdır, tutar iznini bildirmeyen aboneye gitmez.</summary>
+        public static IReadOnlyList<string> OpportunityWonFields { get; } = ["companyId", "ownerId", "stage", "actualCloseDate", "wonAmount", "wonCurrency"];
+
+        public static IReadOnlyList<string> OpportunityLostFields { get; } =
+            ["companyId", "ownerId", "stage", "actualCloseDate", "lossReason", "winningCompetitorId", "recontactDate"];
+
+        /// <summary><c>companyCreated</c> / <c>contactCreated</c> dönüşümün türettiği alanlardır (kayıtta karşılığı yok).</summary>
+        public static IReadOnlyList<string> LeadConvertedFields { get; } =
+            ["ownerId", "convertedCompanyId", "convertedContactId", "convertedOpportunityId", "companyCreated", "contactCreated"];
+    }
+
+    /// <summary>İş olayı beyanları (ADR-0039); alanlar <see cref="Events"/> altındadır ve yayıncılar aynı listeyi kullanır.</summary>
+    IReadOnlyList<BusinessEventDefinition> IModule.BusinessEvents { get; } =
+    [
+        new(Events.OpportunityWon, 1, Entities.Opportunity, "Fırsat kazanıldı", Events.OpportunityWonFields),
+        new(Events.OpportunityLost, 1, Entities.Opportunity, "Fırsat kaybedildi", Events.OpportunityLostFields),
+        new(Events.LeadConverted, 1, Entities.Lead, "Müşteri adayı dönüştürüldü", Events.LeadConvertedFields),
+    ];
+
+    // Fırsat onaya gönderilebilir (ADR-0027 Dilim 4c): tutar ve para birimi kayıttan okunur, değişirse bekleyen talep geçersizleşir.
+    IReadOnlyList<Core.Contracts.Approvals.ApprovalTargetDefinition> IModule.ApprovalTargets { get; } =
+    [
+        new(Entities.Opportunity, "Fırsat", "title", "crm/firsatlar/{id}") { AmountField = "amount", CurrencyField = "currency" },
+    ];
+
+    /// <summary>
     /// Hassas alanlar (Y8b): tutar ve olasılık. Para birimi tek başına bir şey söylemediği için hassas değildir (ekran onu
     /// her zaman gönderir).
     /// </summary>

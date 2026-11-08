@@ -190,14 +190,15 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 2a | Olay yolu (`core.automation` aboneliği), `AutomationRuns/Steps`, tekilleştirme, kira, retry, kuralın kimliği, acil durdurma, tenant limitleri, elle çalıştırma, çalışma geçmişi API'si | Uygulandı (aşağıda "Dilim 2a") |
 | 2b-1 | Tarama tabanlı tetikleyiciler (`Scheduled`, `DateRelative`, `Inactivity`), `AutomationScanCursors`, `IAutomationRecordSource` | Uygulandı (aşağıda "Dilim 2b-1") |
 | 2b-2 | Çalışma/adım saklama temizliği | Uygulandı (aşağıda "Dilim 2b-2") |
-| 2b-3 | İş olayı tetikleyicisi (`DomainEvent`); Ç0.4 iş olayı yayınlama sözleşmesine bağlı | Sonra |
+| 2b-3 | İş olayı tetikleyicisi (`DomainEvent`); Ç0.4 iş olayı yayınlama sözleşmesine bağlı | Uygulandı (aşağıda "Dilim 2b-3"; sözleşme [ADR-0039](0039-modul-is-olaylari.md)) |
 | 3a | CRM yetenek beyanı ve aksiyonu (takip aktivitesi), kayıt kaynağı, aktivite ilişkisi, `IFollowUpActivities` idempotency | Uygulandı (aşağıda "Dilim 3a") |
 | 3b | İlk şablonlar (pasif, kodda beyan, kullanınca taslak kural) | Uygulandı (aşağıda "Dilim 3b"); demo Dilim 5 ile |
 | 4a | Genel onay: süreç tanımı, talep, Onay merkezi (Ç6a asgari) | Uygulandı (aşağıda "Dilim 4a") |
 | 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Uygulandı (aşağıda "Dilim 4b") |
-| 4c | Kayda bağlı onay (modül beyanı, kural aksiyonu "onaya gönder"), kalıcı akış | **İlk parça uygulandı** ("Dilim 4c": kural aksiyonu "Onaya gönder", kayda bağlı talep); onay sonucunun hedef modüle komutu (Ç6a.3) ve kalıcı akış sonra |
+| 4c | Kayda bağlı onay (modül beyanı, geçersizleşme, kayıt paneli) | Uygulandı (aşağıda "Dilim 4c") |
+| 4c-2 | Kural aksiyonu "onaya gönder", onay sonucunun modül komutuna bağlanması, kalıcı akış | **Kural aksiyonu uygulandı** (aşağıda "Dilim 4c-2"); onay sonucunun modül komutuna bağlanması (Ç6a.3) ve kalıcı akış sonra |
 | 4d | Takvim ortaklaştırma, puanlama, şablon motoru | **Metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); takvim ortaklaştırma ve puanlama sonra |
-| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c") |
+| 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c"); 5d kayıt seçici, kayıt üzerinde deneme ve elle çalıştırma uygulandı ("Dilim 5d") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
 
 ## Maliyet (harici ücret yok, iç maliyet var)
@@ -284,7 +285,7 @@ Kurallar artık olay yolundan çalışır (ayrıntı için README "Otomasyon kur
 - **Kuralın kimliği:** `EventHandlingScope.Begin(zarf, "core.automation", GrantedPermissions)`. İzinler tanımdan türetilir (varlık okuma, kullanılan hassas alan okumaları, aksiyonların gerekli izinleri); kapsam Tümü. Kural, kendi tanımının gerektirdiğinden fazlasını göremez ve değiştiremez.
 - **Acil durdurma:** platform `Automation:Enabled`, firma ayarı `core.automation.enabled` (varsayılan Evet), kural kapatma. Bir tenant'ın yürütmesi diğerlerini durdurmaz.
 - **Limitler:** firma başına etkin kural (varsayılan 200, `AutomationOptions.MaxActiveRulesPerTenant`), olay başına 50 aday kural, tur başına tenant başına 25 çalışma.
-- **Çalışan tetikleyiciler:** `RecordCreated`, `FieldChanged`, `StatusTransition`, `Manual`. `Scheduled`, `DateRelative`, `Inactivity` ve `DomainEvent` yayın/etkinleştirmede 422 ("henüz çalışmıyor") ile reddedilir (`AutomationTriggerMatcher.IsExecutable`); Dilim 2b işidir.
+- **Çalışan tetikleyiciler:** `RecordCreated`, `FieldChanged`, `StatusTransition`, `Manual`. `Scheduled`, `DateRelative`, `Inactivity` ve `DomainEvent` bu dilimde yayın/etkinleştirmede 422 ("henüz çalışmıyor") ile reddediliyordu (`AutomationTriggerMatcher.IsExecutable`); 2b-1 tarama tetikleyicilerini, 2b-3 iş olayı tetikleyicisini açtı.
 - **Elle çalıştırma:** yalnızca etkin `ManualTrigger` kurallar; çağıran kaydı kendi izniyle okuyabilmeli; sürüm + kayıt + tenant günü başına bir elle çalışma (ikincisi 409 + `existingRunId`); `core.automation-rule` denetim kaydında "run" alanı.
 - **Geçmiş API'si:** çalışma listesi/ayrıntısı ve elle çalıştırma uç noktaları (`/api/automation`), `core.automation-logs.read` izniyle.
 - **Test dikişi:** `IAutomationRecordReader` (varsayılan `PipelineAutomationRecordReader`, kayıt boru hattı üzerinden); entegrasyon testleri `FakeRecordReader` ile değiştirir. `AutomationWorker` (BackgroundService) test fabrikasında kapalıdır (`Automation:WorkerEnabled=false`).
@@ -352,6 +353,17 @@ Planlanan iki işten **saklama temizliği** yapıldı; **iş olayı tetikleyicis
 - **Sınırlama:** temizlik, işçinin turla gezdiği tenant'lar için çalışır (kural yeteneği beyan eden bir modülü açık olanlar); modülü kapatılmış tenant'ın eski çalışmaları modül yeniden açılana kadar kalır.
 
 **`DomainEvent` neden yapılmadı:** iş olayı yayınlama ve olay türü bildirme sözleşmesi (ADR-0007, Ç0.4) yok. Bugün yalnızca beş kayıt olayı üretiliyor, katalog abonelikte `DomainEventTypes.SchemaVersions` dışındaki türü reddediyor ve hiçbir modül iş olayı yayınlamıyor (`crm.opportunity.won` bile `RecordUpdated` durum geçişidir). Yayıncısı olmayan bir tetikleyiciyi açmak, "sessizce hiç tetiklenmeyen kural bırakılmaz" ilkesini bozardı; bu yüzden `DomainEventTrigger` ile yayın 422 vermeye devam eder (taslak saklanabilir). Ç0.4 yayınlama sözleşmesi geldiğinde Dilim 2b-3 şunlarla tamamlanır: aboneliğin olay türlerinin katalogda `AutomationEventDefinition`'lardan genişletilmesi, `AutomationTriggerMatcher`'a iş olayı eşleşmesi, `IsExecutable`'a eklenmesi.
+
+### Dilim 2b-3 (7 Kasım 2026)
+
+Ç0.4 iş olayı yayınlama sözleşmesi [ADR-0039](0039-modul-is-olaylari.md) ile geldi; 2b-2'de sayılan üç iş bununla tamamlandı:
+
+- **Abonelik olay türleri:** katalog `core.automation` aboneliğinin türlerini `RecordCreated`/`RecordUpdated` + otomasyona beyan edilmiş iş olaylarıyla doldurur (`ModuleCatalog.RegisterAutomation`). Bir modülün `AutomationEventDefinition`'ı modül önekli türse, tür modülün `IModule.BusinessEvents` beyanında aynı kayıt türüyle bulunmalıdır; yoksa uygulama açılmaz.
+- **Eşleşme:** `AutomationTriggerMatcher.Matches` iş olayı anahtarını katalogdan türe çevirir (`FindAutomationEvent`) ve olayın türü ile kayıt türünü eşler; kayıt olayı anahtarı bu tetikleyiciyle eşleşmez. `AutomationEventSubscriber` kataloğu alır.
+- **Yayın:** `IsExecutable` `DomainEventTrigger`'ı kabul eder; kayıt olayı anahtarı ya da bilinmeyen anahtar doğrulayıcıda 422 kalır. Editöre "İş olayı" tetikleyicisi eklendi (seçenekler kayıt türünün beyanlı iş olayları).
+- **CRM:** `crm.opportunity.won`, `crm.opportunity.lost`, `crm.lead.converted` otomasyona açık.
+
+Uçtan uca kanıt: `BusinessEventTests` (entegrasyon) — fırsat kazanılınca outbox'taki iş olayı `core.automation` ile teslim edilir, `DomainEvent` kuralı bir çalışma açar, takip aktivitesi bir kez oluşur; yeniden teslimde ikinci çalışma olmaz.
 
 ### Test sonuçları (Dilim 2b-2)
 
@@ -494,25 +506,6 @@ Uçların dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 1'
 
 **Bilerek yapılmadı:** bildirim saklama temizliği, modüllerin kutuya bağlanması (yalnızca onay yazıyor), kişisel bildirim tercihi (Ç5b), iş günü takvimi.
 
-### Dilim 4c: Kural aksiyonu "Onaya gönder", kayda bağlı onay (8 Kasım 2026)
-
-Kural motoru ile genel onay (4a/4b) birbirine bağlandı: bir kural, tetiklendiği kayıt için onay talebi açar.
-
-- **Karar 1, talep sahibi kaydın sorumlusudur** (kuralın kimliği değil). Kayıt türü beyanına `AutomationEntityDefinition.OwnerField` eklendi (CRM: müşteri adayı ve fırsat için `ownerId`; beyan edilmiş bir **lookup** alanı olmalı, açılışta doğrulanır). Dört göz sorumlu için geçerlidir: sorumlu kendi talebine karar veremez ve sürecin her adımında sorumludan başka etkin onaycı aranır, yoksa talep açılmaz. Sorumlu boşsa ya da türde `OwnerField` yoksa adım açıkça başarısız olur (sahipsiz talep üretilmez).
-- **Karar 2, süreç adla seçilir, yayında doğrulanır.** Aksiyon parametresi sürecin adıdır (firma içinde tekil); yayın sırasında `ApprovalProcessCheck` (`IAutomationStepCheck`) o adla **etkin** bir süreç olup olmadığına bakar (yoksa 422). Süreç yayından sonra kapanır ya da silinirse kural çalışırken adım açık bir iletiyle başarısız olur; sessizce atlanmaz. Süreç kimliği (GUID) seçilmedi: kullanıcı dostu değil ve süreç yeniden açılınca kural kırılırdı.
-- **Aksiyon** (`core.approval.request`, "Onaya gönder"): Core'un tek aksiyonu; sektörden bağımsızdır, kayıt türünü kuralın kendisinden alır. Parametreler: süreç adı (sabit), başlık (kayıt değişkeni kabul eder, Dilim 4d), açıklama, tutar, para birimi. Tutar bir sayı ya da **para alanından bağlanır** (para alanı sayı parametresine bağlanabilir; para birimi ayrı yazılır). Gereken izin `core.approvals.request` (yayınlayan sahip olmalı, yetki yükseltme yok). `core.automation.approve` bu iş için kullanılmadı; karar yine sürecin onaycısındadır.
-- **Kayda bağlantı ve tekilleştirme:** `core.ApprovalRequests`'e `EntityKey`, `RecordId`, `SourceKey` eklendi (migration `ApprovalRecordLink`, yalnızca null'lanabilir kolonlar ve indeksler, geriye uyumlu; yeni tablo yok, RLS değişmedi). `UNIQUE(TenantId, SourceKey)` (dolu olanlar) kural adımının yeniden teslimini ikinci talepten korur; ayrıca aynı kayıt ve süreç için **bekleyen** talep varsa yenisi açılmaz (karar verildikten sonra yeni talep açılabilir). Talep detayı `EntityKey`/`RecordId` taşır (API'de geriye uyumlu, varsayılan `null`).
-- **Sunucu içi servis:** `IApprovalService.OpenForRecordAsync` yalnızca aksiyondan çağrılır (uç nokta yok), çünkü talep sahibi çağıran değil kayıt sorumlusudur; denetim, e-posta ve bildirim kutusu elle açılışla aynı işlemde.
-- **Dry-run** hiçbir şey yazmaz ("Onay talebi açılacak (süreç: X)"). Özet kişisel veri taşımaz (başlık ve kişi adı yazılmaz).
-- **Bilerek yapılmadı:** onay sonucunun hedef modüle komutu (örn. fırsatta indirimi uygula; Ç6a.3), kalıcı akış, talep detayında bağlı kaydın bağlantısı (API alanı var, arayüz göstermiyor), sorumlunun etkin üye olup olmadığının denetimi (pasif sorumlu için talep açılır, sorumlu göremez; sonraki iş).
-
-### Test sonuçları (Dilim 4c)
-
-| Komut | Sonuç |
-| --- | --- |
-| `dotnet test tests/Modulix.Core.Tests --filter ApprovalAutomationTests` | Yeni 5: Core aksiyonu ve izni beyanı, `OwnerField` doğrulaması, talebin kayıt bağlantısı ve geçersiz bağlantı, para alanının sayı parametresine bağlanması (diğer tip uyuşmazlıkları reddedilir), aksiyona özgü denetim yalnızca kendi aksiyonunda çalışır |
-| `dotnet test tests/Modulix.IntegrationTests --filter ApprovalAutomationTests` (SQL Server) | Yeni 4: mutlu yol (bağlı talep, sorumlu talep sahibi, başlık ve tutar kayıttan, tekrar turda ikinci talep yok, onaycı bekleyenlerde görür), hata (bilinmeyen süreç 422, süreç sonradan kapanınca ve dört göz sağlanamayınca adım başarısız), tenant izolasyonu (aynı adlı süreçler, her firma kendi kaydından kendi talebini açar), yetki (`core.approvals.request` olmayan aksiyonu yayınlayamaz) |
-
 ### Dilim 4d: Metin değişkenleri, ortak şablon doğrulayıcı (7 Kasım 2026)
 
 Dilim 4'ün "şablon motoru" kalemi, onay merkezinden (4a) bağımsız ilk parça olarak uygulandı: kural aksiyonunun metin parametresine kayıt değişkeni.
@@ -532,3 +525,54 @@ Dilim 4'ün "şablon motoru" kalemi, onay merkezinden (4a) bağımsız ilk parç
 | --- | --- |
 | `dotnet test tests/Modulix.Core.Tests --filter "AutomationTextTemplateTests"` | Yeni testler: değişken ayrıştırma, hatalı biçimler, alan uygunluğu ve izin, tip bazlı biçimleme, boş/görülemeyen değer ve notta sızıntı yok, enjeksiyon yok, HTML kodlama, çözümleyici (doldurma, bağlanamayan parametre, kısaltma, boş konu), yayın doğrulaması (kabul, ret, yetkisiz alan, bağlanamayan parametre) |
 | `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | Yeni 4: mutlu yol (konu `Takip: Sessiz aday` olarak açılır), hata (bilinmeyen, kapanmayan, kayıt seçimi, başka kayıt türünün alanı), tenant izolasyonu (her firma kendi kaydından doldurur), yetki (tutar izni olmayan tutar değişkeni yayınlayamaz) |
+
+### Dilim 5d: Kayıt seçici, kayıt üzerinde deneme, elle çalıştırma (7 Kasım 2026)
+
+Dilim 5b'de ertelenen "elle çalıştırma" ve 5c'de eksik kalan "kayıt üzerinde deneme" için ortak bir kayıt seçici kuruldu.
+
+- **`RecordPicker` (Web bileşeni):** bir kayıt türünden tek kayıt seçer. Arama, sayfalama, izin ve veri kapsamı **sunucudadır**: genel kayıt API'si (`GET /api/records/{tür}?search=&page=&pageSize=`) ve kayıt boru hattı kullanılır; kullanıcının göremediği kayıt listede çıkmaz, yeni uç nokta yoktur. ADR-0016 lookup'ından farkı: bir alanın referansı değil kaydın kendisi seçilir; lookup tanımı (kaynak alan, firma ayarı, yönetim ekranı) gerekmez, böylece "Alan ve lookup ayarları" ekranı kirlenmez. Görünüm ve klavye (ok tuşları, Enter, Esc, `aria-activedescendant`) mevcut `lookup-*` sınıflarıyla; yeni CSS yok. Eski aramanın yanıtı yeni aramayı ezmez (sıra numarası), yazarken 300 ms bekler.
+- **Etiket alanı:** kayıt türü beyanına `AutomationEntityDefinition.LabelField` eklendi (CRM: müşteri adayı `subject`, fırsat `title`). Beyan edilmiş bir **metin** alanı olmalı (açılışta doğrulanır); katalog (`AutomationEntityDto.LabelField`, geriye uyumlu, varsayılan `null`) alanı, kullanıcı onu okuyabiliyorsa verir (alan yetkisi atlanmaz). Etiket yoksa ya da bu kayıtta boşsa seçici kısa kimliği (`Kayıt 3f9a1c2e`) gösterir.
+- **Kayıt üzerinde deneme:** kural düzenleyicinin "Doğrulama" bölümünde isteğe bağlı kayıt seçilir; `POST /api/automation/preview` kayıtla çağrılır. Gösterilenler: koşulların sağlanıp sağlanmadığı, koşul ağacının neden açıklaması, kural çalışsaydı yapacakları (parametreler çözülmüş: `Takip: Anka Lojistik`). Hiçbir şey çalıştırılmaz.
+- **Elle çalıştırma:** kural ayrıntısında, **açık** ve tetikleyicisi **elle** olan kuralda ("Elle çalıştır", `core.automation.run`) kayıt seçilir, onay şeridinden sonra `POST /rules/{id}/run` çağrılır ve çalışma ayrıntısına gidilir. Kural elle değilse, kapalıysa ya da kayıt okunamıyorsa sunucu reddeder (düğmenin gizlenmesi yetki değildir); aynı kayıt için bugün zaten çalıştırıldıysa 409 iletisi gösterilir.
+- **Bilinen sınırlar:** seçici yalnızca etiket alanı ve kısa kimlikle tanıtır (ikincil bilgi, ör. durum, yok); kayıt türüne özel arama alanı kayıt deposunun `search` davranışına bağlıdır; tek kayıt seçilir (çoklu seçim, toplu çalıştırma yok); ekran tarayıcıda gözle kontrol edilmedi.
+
+### Test sonuçları (Dilim 5d)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter AutomationLabelFieldTests` | Yeni 4: metin alanı etiket olur, etiketsiz tür, geçersiz etiket (bilinmeyen/metin olmayan/başka türün alanı) açılışta reddedilir, okunamayan etiket alanı katalogda verilmez |
+| `dotnet test tests/Modulix.Modules.Crm.Tests --filter CrmAutomationTemplateTests` | Yeni: her kural yazılabilen CRM türü beyan edilmiş, izin gerektirmeyen bir metin alanını etiket olarak adlandırır |
+| `dotnet test tests/Modulix.Web.Tests` | Yeni 4 (`RecordPickerLabelsTests`): etiket alanı metni, eksik/boş/metin olmayan alanda kısa kimlik, etiketsiz tür, eski katalog yanıtı |
+| `dotnet test tests/Modulix.IntegrationTests --filter CrmAutomationTests` (SQL Server) | Yeni 3: mutlu yol (katalog etiket alanı, aramayla bulma, daraltma), tenant izolasyonu (başka firmanın kaydı çıkmaz), yetki (müşteri adayı okuma izni olmayan türü ve kayıtları göremez, liste 403) |
+
+Elle çalıştırmanın kendi dört kural testi (mutlu yol, hata, tenant izolasyonu, yetki) Dilim 2'de entegrasyon testleriyle kapsanmıştır; bu dilim yeni sunucu davranışı eklemez (yalnızca katalogda etiket alanı).
+
+### Dilim 4c: Kayda bağlı onay (7 Kasım 2026)
+
+- **Modül beyanı:** `IModule.ApprovalTargets` (`ApprovalTargetDefinition`: kayıt türü, görünen ad alanı, tutar ve para birimi alanı, arayüz yolu). İlk tüketici CRM fırsatıdır (`crm.opportunity`). Core sektör ya da modül adı bilmez; katalogdan okur.
+- **Süreç bağlama:** onay süreci isteğe bağlı olarak bir kayıt türüne bağlanır (`TargetEntityKey`; değişiklik sürüm artırır). Bağlı süreçte talep bir kayıt için açılır; kayıt, talep sahibinin kendi yetkisiyle (izin, veri kapsamı, hassas alan) kayıt boru hattından okunur. Göremediği kayıt gönderilemez. Tutarı göremeyen kişi tutar isteyen sürece gönderemez.
+- **Tutar kayıttan gelir:** kullanıcının girdiği tutar yok sayılır. Kaydın görünen adı talebe anlık görüntü olarak yazılır. Aynı kayıt için tek bekleyen talep olur.
+- **Geçersizleşme (Ç6a.2 kabulü):** `core.approvals` aboneliği (`RecordUpdated`) korunan alanlar (tutar, para birimi) değişince kayda bağlı bekleyen talebi `Invalidated` yapar; adımlar iptal olur, talep sahibine bildirim gider, denetimde `core.approvals` kaynağıyla görünür. Hassas alanın değeri aboneye gizli gelse de adı `HiddenFields` içinde olduğu için değişiklik yakalanır. Yeni tutarla yeniden gönderilebilir.
+- **Modül kapısı (Ç6a.3):** `IApprovalStatusReader.LatestAsync` (Core.Contracts) kaydın son talebini verir; modül kendi komutunda kullanabilir. Bu dilimde hiçbir modül komutu onaya bağlanmadı.
+- **Arayüz:** süreç formunda "Kayıt türü", fırsat ekranında `RecordApprovalPanel` (son talep durumu, "Onaya gönder"), Onay merkezinde kayıt bağlantısı.
+
+**Bilerek yapılmadı:** kural aksiyonu "onaya gönder" (süreç seçimi için tenant'a özgü lookup gerekir), onay sonucunun modül komutunu açması ya da kilitlemesi, kalıcı çok adımlı iş akışı.
+
+### Dilim 4c-2: Kural aksiyonu "Onaya gönder" (8 Kasım 2026)
+
+Kural motoru ile kayda bağlı onay (4a/4b/4c) birbirine bağlandı: bir kural, tetiklendiği kayıt için onay talebi açar. Veri modeli Dilim 4c'ninkidir (`TargetEntityKey`/`TargetRecordId`/`TargetLabel`, tutar kayıttan, süreç kayıt türüne bağlı); bu dilim yalnızca kural adımının tekilleştirme anahtarını ekler.
+
+- **Karar 1, talep sahibi kaydın sorumlusudur** (kuralın kimliği değil). Kayıt türü beyanına `AutomationEntityDefinition.OwnerField` eklendi (CRM: müşteri adayı ve fırsat için `ownerId`; beyan edilmiş bir **lookup** alanı olmalı, açılışta doğrulanır). Dört göz sorumlu için geçerlidir: sorumlu kendi talebine karar veremez ve sürecin her adımında sorumludan başka etkin onaycı aranır, yoksa talep açılmaz. Sorumlu boşsa ya da türde `OwnerField` yoksa adım açıkça başarısız olur (sahipsiz talep üretilmez). Kayıt, kuralın kimliğiyle (yayınlayanın yetkisi) okunur.
+- **Karar 2, süreç adla seçilir, yayında doğrulanır.** Aksiyon parametresi sürecin adıdır (firma içinde tekil); yayın sırasında `ApprovalProcessCheck` (`IAutomationStepCheck`, aksiyona özgü yayın denetimi; kuralın kayıt türünü de alır) o adla **etkin** ve **kuralın kayıt türüne bağlı** bir süreç olup olmadığına bakar (yoksa 422). Süreç yayından sonra kapanır, silinir ya da başka türe bağlanırsa kural çalışırken adım açık bir iletiyle başarısız olur; sessizce atlanmaz. Süreç kimliği (GUID) seçilmedi: kullanıcı dostu değil ve süreç yeniden açılınca kural kırılırdı. Editörde süreç, kuralın kayıt türüne bağlı etkin süreçlerden seçilir.
+- **Aksiyon** (`core.approval.request`, "Onaya gönder"): Core'un tek aksiyonu; sektörden bağımsızdır, kayıt türünü kuralın kendisinden alır. Parametreler: süreç adı (sabit), başlık (isteğe bağlı; boşsa kaydın adı; kayıt değişkeni kabul eder, Dilim 4d), açıklama. **Tutar ve para birimi parametre değildir:** kayda bağlı onay (Dilim 4c) onları süreç beyanındaki alanlardan okur; kayıtta değişirlerse bekleyen talep geçersizleşir. Gereken izin `core.approvals.request` (yayınlayan sahip olmalı, yetki yükseltme yok). `core.automation.approve` bu iş için kullanılmadı; karar yine sürecin onaycısındadır.
+- **Tekilleştirme:** `core.ApprovalRequests`'e `SourceKey` eklendi (migration `ApprovalRequestSourceKey`: yalnızca null'lanabilir bir kolon ve süzgeçli `UNIQUE(TenantId, SourceKey)` indeksi, geriye uyumlu; yeni tablo yok, RLS değişmedi). Kural adımının yeniden teslimi (`IdempotencyKey`) ikinci talep açmaz; ayrıca aynı kayıt için **bekleyen** talep varsa (hangi süreçten olursa olsun, Dilim 4c kuralı) kural adımı "atlandı" biter, elle açılış ise 422 verir. Karar verildikten sonra yeni talep açılabilir.
+- **Sunucu içi servis:** `IApprovalService.OpenForRecordAsync` yalnızca aksiyondan çağrılır (uç nokta yok), çünkü talep sahibi çağıran değil kayıt sorumlusudur; denetim, e-posta ve bildirim kutusu elle açılışla aynı işlemde (`OpenAsync` ortak).
+- **Dry-run** hiçbir şey yazmaz ("Onay talebi açılacak (süreç: X)"). Özet kişisel veri taşımaz (başlık ve kişi adı yazılmaz).
+- **Bilerek yapılmadı:** onay sonucunun hedef modüle komutu (örn. fırsatta indirimi uygula; Ç6a.3), kalıcı akış, sorumlunun etkin üye olup olmadığının denetimi (pasif sorumlu için talep açılır, sorumlu göremez; sonraki iş).
+
+### Test sonuçları (Dilim 4c-2)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter ApprovalAutomationTests` | 4: Core aksiyonu ve izni beyanı (tutar parametresi yok), `OwnerField` doğrulaması, kural adımı anahtarı (`SourceKey`) ve geçersiz anahtar, aksiyona özgü denetim yalnızca kendi aksiyonunda çalışır |
+| `dotnet test tests/Modulix.IntegrationTests --filter ApprovalAutomationTests` (SQL Server; CI koşar) | 4: mutlu yol (kayda bağlı talep, sorumlu talep sahibi, başlık değişkenden, tutar kayıttan, tekrar turda ikinci talep yok, onaycı bekleyenlerde görür), hata (bilinmeyen süreç 422, türe bağlı olmayan süreç 422, süreç sonradan kapanınca ve dört göz sağlanamayınca adım başarısız), tenant izolasyonu (aynı adlı süreçler, her firma kendi kaydından kendi talebini açar), yetki (`core.approvals.request` olmayan aksiyonu yayınlayamaz) |

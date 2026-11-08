@@ -219,14 +219,23 @@ public class AutomationScanTests(AutomationFixture fixture) : IClassFixture<Auto
     }
 
     [Fact]
-    public async Task Publishing_scan_triggers_is_allowed_and_domain_event_triggers_still_are_not_but_only_with_the_publish_permission()
+    public async Task Publishing_scan_and_declared_domain_event_triggers_is_allowed_but_only_with_the_publish_permission()
     {
         var setup = await SetUpAsync();
+
+        // Beyanlı iş olayı tetikleyicisi yayınlanır (ADR-0039); beyansız anahtar reddedilir.
         var create = await setup.Client.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
             AutomationTestModule.ModuleKey, Item, "Domain olayı kuralı", null, 100, false, null, null,
             JsonSerializer.SerializeToElement(new AutomationDefinition(new DomainEventTrigger("autotest.item.escalated"), null, [Note()]), AutomationJson.Options)));
         var created = (await create.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!;
-        var refused = await setup.Client.PostAsJsonAsync($"/api/automation/rules/{created.Rule.Id}/publish", new PublishAutomationRuleRequest(true, null));
+        var published = await setup.Client.PostAsJsonAsync($"/api/automation/rules/{created.Rule.Id}/publish", new PublishAutomationRuleRequest(true, null));
+        Assert.True(published.IsSuccessStatusCode, await published.Content.ReadAsStringAsync());
+
+        var unknown = await setup.Client.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
+            AutomationTestModule.ModuleKey, Item, "Beyansız olay kuralı", null, 100, false, null, null,
+            JsonSerializer.SerializeToElement(new AutomationDefinition(new DomainEventTrigger("autotest.item.vanished"), null, [Note()]), AutomationJson.Options)));
+        var unknownRule = (await unknown.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!;
+        var refused = await setup.Client.PostAsJsonAsync($"/api/automation/rules/{unknownRule.Rule.Id}/publish", new PublishAutomationRuleRequest(true, null));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
 
         var scanRule = await PublishRuleAsync(setup, Scheduled());

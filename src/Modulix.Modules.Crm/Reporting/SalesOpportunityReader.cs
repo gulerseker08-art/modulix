@@ -23,7 +23,8 @@ public interface ISalesReportingPolicyProvider
 /// <summary>Rapor için okunan fırsat satırı (kayıt boru hattından; izin, kapsam ve hassas alan kuralları uygulanmıştır).</summary>
 internal sealed record OpportunityRow(
     Guid Id, string Number, string Title, Guid? OwnerId, string Status, string Stage, decimal? Amount, string Currency, int? Probability,
-    bool ProbabilityManual, DateOnly? ExpectedCloseDate, DateOnly? ActualCloseDate, decimal? WonAmount, string? WonCurrency, DateTimeOffset? LastInteractionAt = null)
+    bool ProbabilityManual, DateOnly? ExpectedCloseDate, DateOnly? ActualCloseDate, decimal? WonAmount, string? WonCurrency, DateTimeOffset? LastInteractionAt = null,
+    DateTimeOffset? StageEnteredAt = null)
 {
     public OpportunityFact ToFact() => new(Id, Status, Amount, Currency, Probability, ExpectedCloseDate, ActualCloseDate, WonAmount, WonCurrency);
 }
@@ -102,6 +103,7 @@ internal sealed class SalesOpportunityReader(IRecordPipeline pipeline)
             Text("stage") ?? string.Empty, Money("amount"), Text("currency") ?? Opportunity.DefaultCurrency, Int("probability"),
             v["probabilityManual"] is JsonValue manual && manual.TryGetValue<bool>(out var flag) && flag,
             Date("expectedCloseDate"), Date("actualCloseDate"), Money("wonAmount"), Text("wonCurrency"),
-            DateTimeOffset.TryParse(Text("lastInteractionAt"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var interaction) ? interaction : null);
+            DateTimeOffset.TryParse(Text("lastInteractionAt"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var interaction) ? interaction : null,
+            DateTimeOffset.TryParse(Text("stageEnteredAt"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var entered) ? entered : null);
     }
 }

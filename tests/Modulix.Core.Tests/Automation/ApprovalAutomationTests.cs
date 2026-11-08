@@ -7,7 +7,7 @@ using static Modulix.Core.Tests.Automation.AutomationKit;
 
 namespace Modulix.Core.Tests.Automation;
 
-/// <summary>Kural aksiyonu "Onaya gönder" ve kayda bağlı onay (ADR-0027, Dilim 4c): beyan, sorumlu alanı, bağlantı, tutar bağlama, aksiyona özgü denetim.</summary>
+/// <summary>Kural aksiyonu "Onaya gönder" (ADR-0027, Dilim 4c-2): beyan, sorumlu alanı, kural adımı anahtarı, aksiyona özgü denetim.</summary>
 public class ApprovalAutomationTests
 {
     private static AutomationCapabilities Owned(string? ownerField, params AutomationFieldDefinition[] fields) => new()
@@ -29,11 +29,13 @@ public class ApprovalAutomationTests
         Assert.Equal([CoreModule.Permissions.RequestApprovals], definition.RequiredPermissions);
         Assert.Equal(AutomationSideEffect.Write, definition.SideEffect);
         Assert.True(definition.SupportsDryRun);
-        Assert.Equal(["process", "title", "description", "amount", "currency"], definition.Parameters.Select(p => p.Name));
+        // Tutar ve para birimi parametre değildir: kayda bağlı onay (Dilim 4c) onları kayıttan okur.
+        Assert.Equal(["process", "title", "description"], definition.Parameters.Select(p => p.Name));
 
-        // Süreç adı sabit yazılır; başlık kayıt değişkeni alır; Core kendi başına kural yazılabilen kayıt türü beyan etmez.
+        // Süreç adı sabit yazılır; başlık isteğe bağlıdır (boşsa kaydın adı) ve kayıt değişkeni alır; Core kayıt türü beyan etmez.
         Assert.False(definition.Parameters.Single(p => p.Name == "process").AllowFieldBinding);
         Assert.True(definition.Parameters.Single(p => p.Name == "title").AllowFieldBinding);
+        Assert.False(definition.Parameters.Single(p => p.Name == "title").Required);
         Assert.DoesNotContain(catalog.AutomationEntities, e => e.ModuleKey == CoreModule.ModuleKey);
     }
 
@@ -50,38 +52,20 @@ public class ApprovalAutomationTests
     }
 
     [Fact]
-    public void A_request_links_to_a_record_with_a_source_key_and_refuses_an_invalid_link()
+    public void A_rule_opened_request_carries_its_source_key_and_refuses_an_invalid_one()
     {
         var definition = ApprovalDefinition.Create(
             "Süreç", null, null, [new ApprovalStepDefinition("Yönetici", 1, Guid.NewGuid(), null, null, null)], Guid.NewGuid(), DateTimeOffset.UtcNow);
-        var (request, _) = ApprovalRequest.Open(definition, "Başlık", null, null, null, Guid.NewGuid(), DateTimeOffset.UtcNow);
-        var record = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
 
-        request.LinkToRecord("crm.opportunity", record, "anahtar-1");
+        var (manual, _) = ApprovalRequest.Open(definition, "Başlık", null, null, null, Guid.NewGuid(), now);
+        var (byRule, _) = ApprovalRequest.Open(definition, "Başlık", null, null, null, Guid.NewGuid(), now, target: null, sourceKey: "anahtar-1");
 
-        Assert.Equal(("crm.opportunity", record, "anahtar-1"), (request.EntityKey, request.RecordId, request.SourceKey));
-        Assert.Throws<ArgumentException>(() => request.LinkToRecord("", record, null));
-        Assert.Throws<ArgumentException>(() => request.LinkToRecord("crm.opportunity", Guid.Empty, null));
-        Assert.Throws<ArgumentException>(() => request.LinkToRecord("crm.opportunity", record, new string('a', ApprovalRequest.SourceKeyMaxLength + 1)));
-        Assert.Throws<ArgumentException>(() => request.LinkToRecord(new string('a', ApprovalRequest.EntityKeyMaxLength + 1), record, null));
-    }
-
-    [Fact]
-    public void A_money_field_may_feed_a_number_parameter_but_other_type_mismatches_stay_refused()
-    {
-        var access = new FakeAccess(["sales.deals.read", WritePermission, SecretPermission], ["sales", "billing"]);
-        IReadOnlyList<AutomationIssue> Validate(JsonObject parameters) =>
-            Validator(Catalog(), access).ValidateAsync(
-                "sales", Entity, new AutomationDefinition(new ManualTrigger(), null, [new AutomationActionStep("s1", FollowUp.Key, parameters)]),
-                CancellationToken.None).GetAwaiter().GetResult();
-
-        // Tutar (para) alanı sayı parametresine bağlanır; para birimi ayrı parametreyle verilir.
-        Assert.Empty(Validate(new JsonObject { ["subject"] = "a", ["dueInDays"] = new JsonObject { ["$field"] = Amount.Key } }));
-
-        // Metin alanı sayı parametresine bağlanamaz.
-        Assert.Contains(
-            Validate(new JsonObject { ["subject"] = "a", ["dueInDays"] = new JsonObject { ["$field"] = Title.Key } }),
-            i => i.Message.Contains("uyuşmuyor"));
+        Assert.Null(manual.SourceKey);
+        Assert.Equal("anahtar-1", byRule.SourceKey);
+        Assert.Throws<ArgumentException>(() => ApprovalRequest.Open(definition, "Başlık", null, null, null, Guid.NewGuid(), now, target: null, sourceKey: ""));
+        Assert.Throws<ArgumentException>(() => ApprovalRequest.Open(
+            definition, "Başlık", null, null, null, Guid.NewGuid(), now, target: null, sourceKey: new string('a', ApprovalRequest.SourceKeyMaxLength + 1)));
     }
 
     [Fact]
@@ -105,7 +89,7 @@ public class ApprovalAutomationTests
     {
         public string ActionKey => actionKey;
 
-        public Task<IReadOnlyList<AutomationIssue>> CheckAsync(AutomationActionStep step, string path, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<AutomationIssue>> CheckAsync(string entityKey, AutomationActionStep step, string path, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<AutomationIssue>>([new AutomationIssue(path, message)]);
     }
 }

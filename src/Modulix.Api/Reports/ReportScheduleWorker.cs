@@ -122,7 +122,7 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
         return outcome;
     }
 
-    private sealed record Claim(Guid RunId, Guid OwnerUserId, Guid ReportId);
+    private sealed record Claim(Guid RunId, Guid OwnerUserId, Guid ReportId, ReportFileFormat Format);
 
     /// <summary>Çalışmayı bu örnek için kaydeder; başka örnek aynı planlı anı almışsa (ya da zamanlama değişmişse) null.</summary>
     private async Task<Claim?> ClaimAsync(Guid tenantId, Guid scheduleId, CancellationToken cancellationToken)
@@ -155,7 +155,7 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
             var cutoff = now - AbandonedAfter;
             var reclaimed = await db.ReportScheduleRuns.Where(r => r.Id == existing.Id && r.Status == "Started" && r.StartedAt < cutoff)
                 .ExecuteUpdateAsync(set => set.SetProperty(r => r.StartedAt, now), cancellationToken);
-            return reclaimed == 1 ? new Claim(existing.Id, schedule.OwnerUserId, schedule.ReportId) : null;
+            return reclaimed == 1 ? new Claim(existing.Id, schedule.OwnerUserId, schedule.ReportId, schedule.Format) : null;
         }
 
         var run = new ReportScheduleRun(scheduleId, schedule.NextRunAt, now);
@@ -170,7 +170,7 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
             return null;
         }
 
-        return new Claim(run.Id, schedule.OwnerUserId, schedule.ReportId);
+        return new Claim(run.Id, schedule.OwnerUserId, schedule.ReportId, schedule.Format);
     }
 
     /// <summary>Dosyayı sahibin bağlamında üretir ve e-postayı kuyruğa yazar. Yetki ya da üyelik bozuksa durdurma nedeni döner; hiçbir şey üretilmez.</summary>
@@ -213,7 +213,7 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
                 return (Outcome.Stopped, null, "Zamanlama sahibi firmanın etkin üyesi değil; teslim durduruldu.");
             }
 
-            if (await services.GetRequiredService<IReportExports>().CreateScheduledAsync(claim.ReportId, cancellationToken) is not { } export)
+            if (await services.GetRequiredService<IReportExports>().CreateScheduledAsync(claim.ReportId, cancellationToken, claim.Format) is not { } export)
             {
                 return (Outcome.Stopped, null, "Rapor silinmiş ya da zamanlama sahibi artık göremiyor; teslim durduruldu.");
             }

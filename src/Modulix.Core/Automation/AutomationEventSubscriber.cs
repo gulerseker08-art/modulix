@@ -1,5 +1,6 @@
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Modules;
 
 namespace Modulix.Core.Automation;
 
@@ -26,7 +27,8 @@ public interface IAutomationRunStore
 }
 
 /// <summary>
-/// Kayıt olaylarını (<c>RecordCreated</c>, <c>RecordUpdated</c>) kural çalışmasına çevirir (<c>core.automation</c>, ADR-0027 Dilim 2).
+/// Kayıt olaylarını (<c>RecordCreated</c>, <c>RecordUpdated</c>) ve otomasyona beyan edilmiş iş olaylarını (ADR-0039) kural çalışmasına
+/// çevirir (<c>core.automation</c>, ADR-0027 Dilim 2 ve 2b-3).
 /// <list type="bullet">
 ///   <item>Yalnızca ucuz iş yapar: kayda bakmaz, koşul değerlendirmez, aksiyon çalıştırmaz. Tetikleyicisi olayın farkıyla
 ///   eşleşen her kural için bir <see cref="AutomationRunStatus.Pending"/> çalışma yazar; koşul ve aksiyonlar işleyicide, kuralın
@@ -37,7 +39,7 @@ public interface IAutomationRunStore
 ///   değeri olay farkından çıkarılmış gelir (o alanlara bağlı tetikleyiciler eşleşmez).</item>
 /// </list>
 /// </summary>
-public sealed class AutomationEventSubscriber(IAutomationRunStore store, TimeProvider time) : IEventSubscriber
+public sealed class AutomationEventSubscriber(IAutomationRunStore store, ModuleCatalog catalog, TimeProvider time) : IEventSubscriber
 {
     public async Task HandleAsync(EventEnvelope envelope, CancellationToken cancellationToken)
     {
@@ -61,7 +63,7 @@ public sealed class AutomationEventSubscriber(IAutomationRunStore store, TimePro
                 continue;
             }
 
-            if (!AutomationTriggerMatcher.Matches(version.Definition.Trigger, envelope.EntityKey, envelope.EventType, envelope.Payload))
+            if (!AutomationTriggerMatcher.Matches(version.Definition.Trigger, envelope.EntityKey, envelope.EventType, envelope.Payload, catalog.FindAutomationEvent))
             {
                 continue;
             }

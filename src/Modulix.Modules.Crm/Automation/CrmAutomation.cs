@@ -71,8 +71,8 @@ public static class CrmAutomation
     {
         Entities =
         [
-            new(CrmModule.Entities.Lead, "Müşteri adayı", CrmModule.Permissions.LeadsRead) { RecordSource = typeof(CrmAutomationRecordSource), OwnerField = "ownerId" },
-            new(CrmModule.Entities.Opportunity, "Fırsat", CrmModule.Permissions.OpportunitiesRead) { RecordSource = typeof(CrmAutomationRecordSource), OwnerField = "ownerId" },
+            new(CrmModule.Entities.Lead, "Müşteri adayı", CrmModule.Permissions.LeadsRead) { RecordSource = typeof(CrmAutomationRecordSource), LabelField = "subject", OwnerField = "ownerId" },
+            new(CrmModule.Entities.Opportunity, "Fırsat", CrmModule.Permissions.OpportunitiesRead) { RecordSource = typeof(CrmAutomationRecordSource), LabelField = "title", OwnerField = "ownerId" },
         ],
         Events =
         [
@@ -80,6 +80,10 @@ public static class CrmAutomation
             new("crm.lead.updated", CrmModule.Entities.Lead, DomainEventTypes.RecordUpdated, "Müşteri adayı güncellendi"),
             new("crm.opportunity.created", CrmModule.Entities.Opportunity, DomainEventTypes.RecordCreated, "Fırsat oluşturuldu"),
             new("crm.opportunity.updated", CrmModule.Entities.Opportunity, DomainEventTypes.RecordUpdated, "Fırsat güncellendi"),
+            // İş olayları (ADR-0039): anahtar = tür; yayıncıları fırsat iş akışı ve müşteri adayı dönüşümüdür.
+            new(CrmModule.Events.OpportunityWon, CrmModule.Entities.Opportunity, CrmModule.Events.OpportunityWon, "Fırsat kazanıldı"),
+            new(CrmModule.Events.OpportunityLost, CrmModule.Entities.Opportunity, CrmModule.Events.OpportunityLost, "Fırsat kaybedildi"),
+            new(CrmModule.Events.LeadConverted, CrmModule.Entities.Lead, CrmModule.Events.LeadConverted, "Müşteri adayı dönüştürüldü"),
         ],
         Fields =
         [

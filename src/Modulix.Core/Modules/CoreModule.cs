@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Approvals;
 using Modulix.Core.Automation;
 using Modulix.Core.Events;
 using Modulix.Core.Settings;
@@ -20,7 +21,7 @@ public sealed class CoreModule : IModule
 
         public const string ManageRoles = "core.roles.manage";
 
-        /// <summary>Firma ayarlarını yazar; okumak için izin gerekmez.</summary>
+        /// <summary>Kuruluş ve modül ayarlarını yazar; okumak için izin gerekmez.</summary>
         public const string ManageSettings = "core.settings.manage";
 
         public const string ReadAudit = "core.audit.read";
@@ -100,7 +101,7 @@ public sealed class CoreModule : IModule
     [
         new(Permissions.ManageUsers, "Kullanıcıları ve kullanıcıların rollerini yönetir", "Kullanıcılar"),
         new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir", "Roller"),
-        new(Permissions.ManageSettings, "Firma ayarlarını değiştirir", "Firma ayarları"),
+        new(Permissions.ManageSettings, "Kuruluş ve modül ayarlarını değiştirir", "Kuruluş ayarları"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
         new(Permissions.ManageCompanies, "İşletici şirketleri ve kullanıcıların şirket görevlerini yönetir", "Şirketler"),
@@ -140,6 +141,9 @@ public sealed class CoreModule : IModule
         /// modüllerin <see cref="IModule.Automation"/> ile bildirdiği türlerdir (katalog doldurur); hiçbiri yoksa abonelik de yoktur.
         /// </summary>
         public const string Automation = "core.automation";
+
+        /// <summary>Kayda bağlı onayın bütünlüğü (ADR-0027 Dilim 4c): korunan alan değişince bekleyen talep geçersizleşir.</summary>
+        public const string Approvals = "core.approvals";
     }
 
     /// <summary>Denetim kayıt türleri (Y5). Yönetim kayıtlarının değerleri her denetim okuruna açıktır.</summary>
@@ -255,7 +259,7 @@ public sealed class CoreModule : IModule
     /// <summary>İletişim tercihi denetim değerlerini (maskeli adres, kanıt) yalnızca bu izni olan denetim okuru görür.</summary>
     private const string ReadCommunicationKey = Permissions.ReadCommunication;
 
-    private const string ProfileGroup = "Firma profili";
+    private const string ProfileGroup = "Kuruluş profili";
     private const string RegionalGroup = "Bölgesel ayarlar";
     private const string SecurityGroup = "Güvenlik";
     private const string AutomationGroup = "Otomasyon";
@@ -449,16 +453,17 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.ApprovalDefinition, "Onay süreci", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["currency"] = "Para birimi", ["isActive"] = "Açık", ["revision"] = "Sürüm", ["steps"] = "Adımlar",
+            ["target"] = "Kayıt türü",
         }, "name"),
         new(AuditedEntityKeys.ApprovalRequest, "Onay talebi", null, new Dictionary<string, string>
         {
             ["title"] = "Başlık", ["process"] = "Süreç", ["amount"] = "Tutar", ["currency"] = "Para birimi", ["status"] = "Durum",
-            ["step"] = "Adım", ["decision"] = "Karar", ["comment"] = "Not", ["approver"] = "Onaycı", ["onBehalfOf"] = "Adına karar verilen", ["escalated"] = "Süre aşımı",
+            ["step"] = "Adım", ["decision"] = "Karar", ["comment"] = "Not", ["approver"] = "Onaycı", ["record"] = "Kayıt", ["reason"] = "Neden", ["onBehalfOf"] = "Adına karar verilen", ["escalated"] = "Süre aşımı",
         }, "title")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
-                ["status"] = new Dictionary<string, string> { ["Pending"] = "Bekliyor", ["Approved"] = "Onaylandı", ["Rejected"] = "Reddedildi", ["Withdrawn"] = "Geri çekildi" },
+                ["status"] = new Dictionary<string, string> { ["Pending"] = "Bekliyor", ["Approved"] = "Onaylandı", ["Rejected"] = "Reddedildi", ["Withdrawn"] = "Geri çekildi", ["Invalidated"] = "Geçersizleşti" },
                 ["decision"] = new Dictionary<string, string> { ["Approved"] = "Onay", ["Rejected"] = "Ret" },
             },
         },
@@ -605,19 +610,22 @@ public sealed class CoreModule : IModule
     [
         EventSubscription.For<AssignmentEmailSubscriber>(
             Subscriptions.AssignmentEmail, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
+        EventSubscription.For<ApprovalRecordSubscriber>(
+            Subscriptions.Approvals, [DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
         EventSubscription.For<AutomationEventSubscriber>(
             Subscriptions.Automation, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
     ];
 
-    /// <summary>Core'un kural yeteneği (Dilim 4c): sektörden bağımsız tek aksiyon, "Onaya gönder". Kayıt türü beyan etmez.</summary>
+    /// <summary>Core'un kural yeteneği (Dilim 4c-2): sektörden bağımsız tek aksiyon, "Onaya gönder". Kayıt türü beyan etmez.</summary>
     Modulix.Core.Contracts.Automation.AutomationCapabilities IModule.Automation => Modulix.Core.Approvals.ApprovalAutomation.Capabilities;
 
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<AssignmentEmailSubscriber>();
         services.AddScoped<AutomationEventSubscriber>();
+        services.AddScoped<ApprovalRecordSubscriber>();
 
-        // "Onaya gönder" aksiyonu ve yayındaki süreç adı denetimi (Dilim 4c).
+        // "Onaya gönder" aksiyonu ve yayındaki süreç adı denetimi (Dilim 4c-2).
         services.AddScoped<Modulix.Core.Approvals.RequestApprovalAction>();
         services.AddScoped<IAutomationStepCheck, Modulix.Core.Approvals.ApprovalProcessCheck>();
     }

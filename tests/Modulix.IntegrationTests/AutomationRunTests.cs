@@ -675,20 +675,40 @@ public class AutomationRunTests(AutomationFixture fixture) : IClassFixture<Autom
     }
 
     [Fact]
-    public async Task A_rule_with_a_domain_event_trigger_cannot_be_published_yet()
+    public async Task A_rule_with_a_domain_event_trigger_is_published_and_runs_only_on_its_declared_business_event()
     {
+        // ADR-0039: modülün beyan ettiği iş olayı (autotest.item.escalated) tetikleyici olarak yayınlanabilir.
         var setup = await SetUpAsync();
-        var scheduled = new AutomationDefinition(new DomainEventTrigger("autotest.item.escalated"), null, [Note()]);
+        var rule = await PublishRuleAsync(setup, new AutomationDefinition(new DomainEventTrigger("autotest.item.escalated"), null, [Note(text: "Yükseltildi")]));
+        var record = AutomationRecords.Add(setup.Tenant.Id, Item, status: "open", title: "Anka");
+
+        // Kayıt güncelleme olayı bu kuralı tetiklemez; iş olayı tek çalışma açar ve aksiyon bir kez çalışır.
+        await DeliverEnvelopeAsync(setup.Tenant.Id, Envelope(setup.Tenant.Id, record, DomainEventTypes.RecordUpdated, new JsonObject { ["status"] = new JsonObject { ["old"] = "open", ["new"] = "hold" } }));
+        Assert.Equal(0, await CountRunsAsync(setup.Tenant.Id));
+
+        var escalated = Envelope(setup.Tenant.Id, record, "autotest.item.escalated", new JsonObject { ["status"] = "hold", ["title"] = "Anka" });
+        await DeliverEnvelopeAsync(setup.Tenant.Id, escalated);
+        await DeliverEnvelopeAsync(setup.Tenant.Id, escalated);
+        Assert.Equal(1, await CountRunsAsync(setup.Tenant.Id));
+        await RunRoundAsync(setup.Tenant.Id);
+
+        var call = Assert.Single(AutomationProbe.CallsOf(setup.Tenant.Id));
+        Assert.Equal("Yükseltildi", call.Request.Parameters["text"]!.GetValue<string>());
+        Assert.Equal(rule.Published!.Id, call.Context.RuleVersionId);
+
+        // Kayıt olayı anahtarı iş olayı tetikleyicisi değildir; yayın reddedilir.
+        var recordKey = new AutomationDefinition(new DomainEventTrigger("autotest.item.updated"), null, [Note()]);
         var create = await setup.Client.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
-            AutomationTestModule.ModuleKey, Item, "İş olayı kuralı", null, 100, false, null, null, Json(scheduled)));
+            AutomationTestModule.ModuleKey, Item, "Kayıt olayı anahtarı", null, 100, false, null, null, Json(recordKey)));
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
         var created = (await create.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!;
-
-        // Taslak olarak saklanabilir; yayın sessizce hiç tetiklenmeyen kural bırakmamak için reddedilir.
         var publish = await setup.Client.PostAsJsonAsync($"/api/automation/rules/{created.Rule.Id}/publish", new PublishAutomationRuleRequest(false, null));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, publish.StatusCode);
-        Assert.Contains("henüz çalışmıyor", await publish.Content.ReadAsStringAsync());
+        Assert.Contains("eventKey", await publish.Content.ReadAsStringAsync());
     }
+
+    private EventEnvelope Envelope(Guid tenantId, Guid recordId, string eventType, JsonObject payload) =>
+        new(Guid.NewGuid(), tenantId, eventType, 1, Item, recordId, null, Guid.NewGuid(), ExecutionSource.Api, null, null, 0, payload, fixture.Time.GetUtcNow());
 
     [Fact]
     public async Task The_rule_subscription_is_registered_for_the_declared_entities_only()
