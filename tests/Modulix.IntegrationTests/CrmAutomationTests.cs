@@ -253,6 +253,156 @@ public class CrmAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Cr
         Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
     }
 
+    // --- Dilim 4d: metin değişkenleri ({{alan}}) ---
+
+    private static string LeadSubjectVariable => "{{" + CrmModule.Entities.Lead + ".subject}}";
+
+    private static AutomationDefinition InactiveWithSubject(string subject) =>
+        new(new InactivityTrigger(CrmAutomation.LeadActivities, 7), null, [FollowUp(subject)]);
+
+    [Fact]
+    public async Task A_follow_up_subject_carries_record_variables_and_the_run_fills_them_in()
+    {
+        var setup = await SetUpAsync();
+        await CreateLeadAsync(setup, "Sessiz aday");
+        await PublishRuleAsync(setup, CrmModule.Entities.Lead, InactiveWithSubject($"Takip: {LeadSubjectVariable}"));
+
+        await RunRoundAsync(setup.Tenant.Id);
+
+        var run = Assert.Single(await RunsAsync(setup.Tenant.Id));
+        Assert.Equal(AutomationRunStatus.Succeeded, run.Status);
+        Assert.Equal("Takip: Sessiz aday", Assert.Single(await ActivitiesAsync(setup.Tenant.Id)).Subject);
+    }
+
+    [Fact]
+    public async Task Unknown_malformed_and_unfit_variables_are_refused_at_publish()
+    {
+        var setup = await SetUpAsync();
+
+        foreach (var subject in new[] { "{{crm.lead.nope}}", "Kapanmayan {{crm.lead.subject", "{{crm.lead.ownerId}}" })
+        {
+            var response = await TryPublishAsync(setup, CrmModule.Entities.Lead, InactiveWithSubject(subject));
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        }
+
+        // Başka kayıt türünün alanı da bilinmeyen sayılır (değişken kayıt türüne bağlıdır).
+        var otherEntity = await TryPublishAsync(setup, CrmModule.Entities.Lead, InactiveWithSubject("{{crm.opportunity.title}}"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, otherEntity.StatusCode);
+
+        var valid = await TryPublishAsync(setup, CrmModule.Entities.Lead, InactiveWithSubject($"Takip: {LeadSubjectVariable}"));
+        Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
+    }
+
+    [Fact]
+    public async Task Variables_are_filled_from_each_tenants_own_records_only()
+    {
+        var first = await SetUpAsync();
+        var second = await SetUpAsync();
+        await CreateLeadAsync(first, "Birinci aday");
+        await CreateLeadAsync(second, "İkinci aday");
+        await PublishRuleAsync(first, CrmModule.Entities.Lead, InactiveWithSubject($"Takip: {LeadSubjectVariable}"));
+        await PublishRuleAsync(second, CrmModule.Entities.Lead, InactiveWithSubject($"Takip: {LeadSubjectVariable}"));
+
+        await RunRoundAsync(first.Tenant.Id);
+        await RunRoundAsync(second.Tenant.Id);
+
+        Assert.Equal("Takip: Birinci aday", Assert.Single(await ActivitiesAsync(first.Tenant.Id)).Subject);
+        Assert.Equal("Takip: İkinci aday", Assert.Single(await ActivitiesAsync(second.Tenant.Id)).Subject);
+    }
+
+    [Fact]
+    public async Task A_variable_for_a_field_the_publisher_may_not_read_is_refused()
+    {
+        var setup = await SetUpAsync();
+        var member = await fixture.Factory.CreateUserAsync(setup.Tenant);
+        await fixture.Factory.CreateRoleAsync(setup.Tenant.Id,
+        [
+            Modulix.Core.Modules.CoreModule.Permissions.ReadAutomation, Modulix.Core.Modules.CoreModule.Permissions.ManageAutomation,
+            Modulix.Core.Modules.CoreModule.Permissions.PublishAutomation, CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.ActivitiesWrite,
+        ], RecordScope.All, member);
+        var client = await LoginAsync(member);
+        var amountText = new AutomationDefinition(
+            new ScheduledTrigger("00:00"), null, [FollowUp("Tutar {{" + CrmModule.Entities.Opportunity + ".amount}}")]);
+        var titleText = new AutomationDefinition(
+            new ScheduledTrigger("00:00"), null, [FollowUp("Fırsat {{" + CrmModule.Entities.Opportunity + ".title}}")]);
+
+        // Tutar izni olmayan, tutarı metne de ekleyemez (koşuldaki kuralla aynı); yetkisi olan alan serbesttir.
+        var denied = await TryPublishAsync(client, CrmModule.Entities.Opportunity, amountText);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, denied.StatusCode);
+        Assert.Contains("izniniz yok", await denied.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, (await TryPublishAsync(client, CrmModule.Entities.Opportunity, titleText)).StatusCode);
+
+        // Tutar iznine sahip yönetici aynı metni yayınlayabilir.
+        Assert.Equal(HttpStatusCode.OK, (await TryPublishAsync(setup.Client, CrmModule.Entities.Opportunity, amountText)).StatusCode);
+    }
+
+    // --- Dilim 5d: kayıt seçici (katalog etiket alanı + genel kayıt araması) ---
+
+    private async Task<RecordPageResponse> SearchRecordsAsync(HttpClient client, string entityKey, string? search)
+    {
+        var url = $"/api/records/{entityKey}?page=1&pageSize=10" + (search is null ? string.Empty : $"&search={Uri.EscapeDataString(search)}");
+        var response = await client.GetAsync(url);
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        return (await response.Content.ReadFromJsonAsync<RecordPageResponse>())!;
+    }
+
+    [Fact]
+    public async Task The_catalog_names_the_label_field_and_the_picker_finds_a_record_by_it()
+    {
+        var setup = await SetUpAsync();
+        var lead = await CreateLeadAsync(setup, "Anka Lojistik teklifi");
+        await CreateLeadAsync(setup, "Başka bir talep");
+
+        var catalog = (await setup.Client.GetFromJsonAsync<AutomationCatalogDto>("/api/automation/catalog"))!;
+        var leadEntity = Assert.Single(catalog.Entities, e => e.EntityKey == CrmModule.Entities.Lead);
+        Assert.Equal("subject", leadEntity.LabelField);
+        Assert.Equal("title", Assert.Single(catalog.Entities, e => e.EntityKey == CrmModule.Entities.Opportunity).LabelField);
+
+        // Seçici genel kayıt aramasını kullanır; etiket alanı değerde gelir, arama sonucu daraltır.
+        var found = Assert.Single((await SearchRecordsAsync(setup.Client, CrmModule.Entities.Lead, "Anka")).Items);
+        Assert.Equal(lead, found.Id);
+        Assert.Equal("Anka Lojistik teklifi", found.Values[leadEntity.LabelField!]!.GetValue<string>());
+        Assert.Equal(2, (await SearchRecordsAsync(setup.Client, CrmModule.Entities.Lead, null)).TotalCount);
+        Assert.Empty((await SearchRecordsAsync(setup.Client, CrmModule.Entities.Lead, "yokböyleşey")).Items);
+    }
+
+    [Fact]
+    public async Task The_picker_never_lists_another_tenants_records()
+    {
+        var first = await SetUpAsync();
+        var second = await SetUpAsync();
+        await CreateLeadAsync(first, "Birinci firmanın adayı");
+        await CreateLeadAsync(second, "İkinci firmanın adayı");
+
+        var seenByFirst = await SearchRecordsAsync(first.Client, CrmModule.Entities.Lead, "firmanın");
+        var seenBySecond = await SearchRecordsAsync(second.Client, CrmModule.Entities.Lead, "firmanın");
+
+        Assert.Equal("Birinci firmanın adayı", Assert.Single(seenByFirst.Items).Values["subject"]!.GetValue<string>());
+        Assert.Equal("İkinci firmanın adayı", Assert.Single(seenBySecond.Items).Values["subject"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Someone_who_may_not_read_leads_gets_neither_the_entity_nor_its_records_in_the_picker()
+    {
+        var setup = await SetUpAsync();
+        await CreateLeadAsync(setup, "Gizli aday");
+        var member = await fixture.Factory.CreateUserAsync(setup.Tenant);
+        await fixture.Factory.CreateRoleAsync(setup.Tenant.Id,
+        [
+            Modulix.Core.Modules.CoreModule.Permissions.ReadAutomation, Modulix.Core.Modules.CoreModule.Permissions.RunAutomation,
+            CrmModule.Permissions.OpportunitiesRead,
+        ], RecordScope.All, member);
+        var client = await LoginAsync(member);
+
+        var catalog = (await client.GetFromJsonAsync<AutomationCatalogDto>("/api/automation/catalog"))!;
+        Assert.DoesNotContain(catalog.Entities, e => e.EntityKey == CrmModule.Entities.Lead);
+        Assert.Contains(catalog.Entities, e => e.EntityKey == CrmModule.Entities.Opportunity);
+
+        // Kayıt listesi izinsiz kimlikte reddedilir; seçici hata iletisini gösterir, kayıt sızmaz.
+        var records = await client.GetAsync($"/api/records/{CrmModule.Entities.Lead}?page=1&pageSize=10&search=Gizli");
+        Assert.Equal(HttpStatusCode.Forbidden, records.StatusCode);
+    }
+
     // --- yardımcılar ---
 
     private const string CrmFollowUpActivities_AutomationSource = "automation";

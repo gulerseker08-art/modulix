@@ -3,10 +3,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>@(company?.Name ?? "Firma") · Modulix</PageTitle>
+<PageTitle>@(company?.Name ?? Texts.Get("crm.company.fallbackTitle")) · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.CompaniesRead">
-    <a class="back-link" href="crm/firmalar">← Firmalar</a>
+    <a class="back-link" href="crm/firmalar">← @Texts.Get("crm.companies.title")</a>
 
     @if (message is not null)
     {
@@ -17,7 +17,7 @@
     {
         @if (message is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <p class="text-muted">@Texts.Get("common.loading")</p>
         }
     }
     else if (editingCompany)
@@ -47,18 +47,18 @@
             <div class="header-actions">
                 @if (Session.Can(CrmAccess.CompaniesMerge))
                 {
-                    <a class="btn btn-outline-secondary" href="@($"crm/firmalar/{Id}/birlestir")">Mükerrer firmayı birleştir</a>
+                    <a class="btn btn-outline-secondary" href="@($"crm/firmalar/{Id}/birlestir")">@Texts.Get("crm.company.merge")</a>
                 }
                 @if (Session.Can(CrmAccess.CompaniesWrite))
                 {
-                    <button type="button" class="btn btn-primary" @onclick="() => editingCompany = true">Düzenle</button>
+                    <button type="button" class="btn btn-primary" @onclick="() => editingCompany = true">@Texts.Get("common.edit")</button>
                 }
             </div>
         </div>
 
         <div class="record-layout">
             @* Özet kartı: kimlik, sorumlu, satış özeti ve hızlı iletişim. *@
-            <aside class="record-summary" aria-label="Firma özeti">
+            <aside class="record-summary" aria-label="@Texts.Get("crm.company.summary.aria")">
                 <div class="summary-card">
                     <div class="summary-identity">
                         <span class="summary-avatar" aria-hidden="true">@Initials(company.Name)</span>
@@ -67,49 +67,49 @@
                     </div>
 
                     <dl class="summary-facts">
-                        <div><dt>Sorumlu</dt><dd>@Lookups.MemberName(company.OwnerId)</dd></div>
+                        <div><dt>@Texts.Get("common.field.owner")</dt><dd>@Lookups.MemberName(company.OwnerId)</dd></div>
                         @if (company.Industry is { } industry)
                         {
-                            <div><dt>Sektör</dt><dd>@industry</dd></div>
+                            <div><dt>@Texts.Get("crm.companies.col.industry")</dt><dd>@industry</dd></div>
                         }
                         @if (company.TaxNumber is { } taxNumber)
                         {
-                            <div><dt>Vergi no</dt><dd>@taxNumber</dd></div>
+                            <div><dt>@Texts.Get("crm.companies.col.taxNumber")</dt><dd>@taxNumber</dd></div>
                         }
                         @if (company.City is { } city)
                         {
-                            <div><dt>Şehir</dt><dd>@city</dd></div>
+                            <div><dt>@Texts.Get("common.field.city")</dt><dd>@city</dd></div>
                         }
                     </dl>
 
-                    <h2 class="summary-heading">Satış özeti</h2>
+                    <h2 class="summary-heading">@Texts.Get("crm.company.salesSummary")</h2>
                     <dl class="summary-facts summary-numbers">
                         <div>
-                            <dt>Açık fırsatlar</dt>
+                            <dt>@Texts.Get("crm.company.openOpps")</dt>
                             <dd>
                                 <strong>@Count(summary?.OpenOpportunities)</strong>
                                 @if (summary?.OpenTotals is { Count: > 0 } openTotals) { <small>@Totals(openTotals)</small> }
                             </dd>
                         </div>
                         <div>
-                            <dt>Kazanılan</dt>
+                            <dt>@Texts.Get("crm.company.won")</dt>
                             <dd>
                                 <strong>@Count(summary?.WonOpportunities)</strong>
                                 @if (summary?.WonTotals is { Count: > 0 } wonTotals) { <small>@Totals(wonTotals)</small> }
                             </dd>
                         </div>
                         <div>
-                            <dt>Açık aktiviteler</dt>
+                            <dt>@Texts.Get("crm.company.openActs")</dt>
                             <dd>
                                 <strong>@Count(summary?.OpenActivities)</strong>
-                                @if (summary?.OverdueActivities is > 0 and var overdue) { <small class="overdue-note">@overdue geciken</small> }
+                                @if (summary?.OverdueActivities is > 0 and var overdue) { <small class="overdue-note">@Texts.Get("crm.company.overdue", overdue)</small> }
                             </dd>
                         </div>
                     </dl>
 
                     @if (company.Phone is not null || company.Email is not null || company.Website is not null)
                     {
-                        <h2 class="summary-heading">İletişim</h2>
+                        <h2 class="summary-heading">@Texts.Get("crm.company.contact")</h2>
                         <ul class="summary-contact">
                             @if (company.Phone is { } phone)
                             {
@@ -129,25 +129,25 @@
             </aside>
 
             <div class="record-main">
-                <TabBar Tabs="CompanyTabs" State="tabs" Label="Firma bölümleri" Changed="_ => { }" />
+                <TabBar Tabs="CompanyTabs" State="tabs" Label="@Texts.Get("crm.company.tabs.aria")" Changed="_ => { }" />
 
                 @if (tabs.Rendered(TabGeneral))
                 {
                     <div role="tabpanel" id="tabpanel-@TabGeneral" aria-labelledby="tab-@TabGeneral" class="record-tabpanel" hidden="@tabs.Hidden(TabGeneral)">
                         @* Boş alanlar gösterilmez; telefonda kart kısa kalır. Kimlik ve iletişim özet kartındadır. *@
-                        <FormSection Title="Genel bilgiler" Icon="info">
+                        <FormSection Title="@Texts.Get("crm.company.general")" Icon="info">
                         <dl class="detail-grid">
                             @if (company.Source is { } source)
                             {
-                                <div><dt>Kaynak</dt><dd>@Lookups.Label(CrmLists.CompanySource, source)</dd></div>
+                                <div><dt>@Texts.Get("crm.company.source")</dt><dd>@Lookups.Label(CrmLists.CompanySource, source)</dd></div>
                             }
                             @if (company.Address is { } address)
                             {
-                                <div class="span-all"><dt>Adres</dt><dd>@address</dd></div>
+                                <div class="span-all"><dt>@Texts.Get("crm.company.address")</dt><dd>@address</dd></div>
                             }
                             @if (company.Notes is { } notes)
                             {
-                                <div class="span-all"><dt>Notlar</dt><dd class="notes">@notes</dd></div>
+                                <div class="span-all"><dt>@Texts.Get("common.field.notes")</dt><dd class="notes">@notes</dd></div>
                             }
                             @* Özel alanlar (Y9a): boş olanlar gösterilmez. *@
                             @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Company))
@@ -169,9 +169,9 @@
                         }
 
                         @* Adresler ve iletişim (ADR-0012): ana kayıtlar yukarıdaki telefon/e-posta/adres alanlarının kaynağıdır. *@
-                        <FormSection Title="Adres ve iletişim" Icon="map-pin">
-                            <AddressesSection CompanyId="Id" Title="Adresler" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />
-                            <ContactPointsSection CompanyId="Id" Title="Telefon ve e-posta" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />
+                        <FormSection Title="@Texts.Get("crm.company.addressContact")" Icon="map-pin">
+                            <AddressesSection CompanyId="Id" Title="@Texts.Get("crm.company.addresses")" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />
+                            <ContactPointsSection CompanyId="Id" Title="@Texts.Get("crm.company.phoneEmail")" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />
                         </FormSection>
 
                         <LocationsSection CompanyId="Id" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Lookups="Lookups" />
@@ -185,12 +185,12 @@
                         {
                             <section class="detail-section">
                                 <div class="section-header">
-                                    <h2>Kişiler ve ilişki rolleri</h2>
+                                    <h2>@Texts.Get("crm.company.people.title")</h2>
                                     @if (Session.Can(CrmAccess.ContactsWrite) && !editingLink)
                                     {
-                                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OpenLink(null)">Kişi ilişkilendir</button>
-                                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => creatingPerson = true">Yeni kişi oluştur</button>
-                                        <a class="btn btn-outline-secondary btn-sm" href="crm/kisiler">Kişilere git</a>
+                                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OpenLink(null)">@Texts.Get("crm.company.people.link")</button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => creatingPerson = true">@Texts.Get("crm.company.people.create")</button>
+                                        <a class="btn btn-outline-secondary btn-sm" href="crm/kisiler">@Texts.Get("crm.company.people.goto")</a>
                                     }
                                 </div>
                                 @if (creatingPerson)
@@ -210,20 +210,20 @@
                                                 <div class="item-main">
                                                     <strong><a href="crm/kisiler/@link.ContactId">@link.ContactName</a></strong>
                                                     <span>
-                                                        @if (link.IsPrimary) { <span class="badge status-customer">Ana irtibat</span><text> </text> }
-                                                        @if (link.IsDecisionMaker) { <span class="badge tag">Karar verici</span><text> </text> }
+                                                        @if (link.IsPrimary) { <span class="badge status-customer">@Texts.Get("crm.company.people.primary")</span><text> </text> }
+                                                        @if (link.IsDecisionMaker) { <span class="badge tag">@Texts.Get("crm.company.people.decisionMaker")</span><text> </text> }
                                                         @link.JobTitle
                                                         @if (link.Department is { } department) { <text> · @department</text> }
-                                                        @foreach (var role in link.Roles) { <span class="badge tag">@CrmRelationshipRoles.Labels.GetValueOrDefault(role, role)</span><text> </text> }
-                                                        @if (!link.IsActive) { <text> · Sona erdi: @link.EndDate</text> }
+                                                        @foreach (var role in link.Roles) { <span class="badge tag">@RelationshipRoleNames.Of(role)</span><text> </text> }
+                                                        @if (!link.IsActive) { <text> · @Texts.Get("crm.company.people.ended", link.EndDate)</text> }
                                                     </span>
                                                 </div>
                                                 @if (Session.Can(CrmAccess.ContactsWrite))
                                                 {
-                                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenLink(link)">Düzenle</button>
+                                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenLink(link)">@Texts.Get("common.edit")</button>
                                                     @if (link.IsActive)
                                                     {
-                                                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => EndLinkAsync(link)">Sonlandır</button>
+                                                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => EndLinkAsync(link)">@Texts.Get("crm.company.people.end")</button>
                                                     }
                                                 }
                                             </li>
@@ -232,7 +232,7 @@
                                 }
                                 else if (links is not null)
                                 {
-                                    <p class="text-muted">Henüz kişi ilişkisi yok.</p>
+                                    <p class="text-muted">@Texts.Get("crm.company.people.none")</p>
                                 }
                                 <Pager Page="contactPage" PageSize="ListSize" TotalCount="contactTotal" PageChanged="ContactPageChanged" />
                             </section>
@@ -249,10 +249,10 @@
                         {
                             <section class="detail-section">
                                 <div class="section-header">
-                                    <h2>Fırsatlar</h2>
+                                    <h2>@Texts.Get("crm.opportunities.title")</h2>
                                     @if (Session.Can(CrmAccess.OpportunitiesWrite) && !editingOpportunity)
                                     {
-                                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OpenOpportunity(null)">Fırsat ekle</button>
+                                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OpenOpportunity(null)">@Texts.Get("crm.company.opps.add")</button>
                                     }
                                 </div>
                                 @if (opportunities is { Count: > 0 })
@@ -272,12 +272,12 @@
                                                     </span>
                                                     @if (opportunity.Status == OpportunityStatus.Lost && opportunity.LossReason is { } lossReason)
                                                     {
-                                                        <span>Neden: @Lookups.Label(CrmLists.OpportunityLossReason, lossReason)@(opportunity.LostReason is { } reason ? $" · {reason}" : null)</span>
+                                                        <span>@Texts.Get("crm.company.opps.reason", Lookups.Label(CrmLists.OpportunityLossReason, lossReason))@(opportunity.LostReason is { } reason ? $" · {reason}" : null)</span>
                                                     }
                                                 </div>
                                                 @if (Session.Can(CrmAccess.OpportunitiesWrite))
                                                 {
-                                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenOpportunity(opportunity)">Düzenle</button>
+                                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenOpportunity(opportunity)">@Texts.Get("common.edit")</button>
                                                 }
                                             </li>
                                         }
@@ -285,16 +285,16 @@
                                 }
                                 else if (opportunities is not null)
                                 {
-                                    <p class="text-muted">Henüz fırsat yok.</p>
+                                    <p class="text-muted">@Texts.Get("crm.company.opps.none")</p>
                                 }
                                 <Pager Page="opportunityPage" PageSize="ListSize" TotalCount="opportunityTotal" PageChanged="OpportunityPageChanged" />
                             </section>
                         }
 
                             <RelatedLeads CompanyId="Id" />
-                            <RelatedContracts Title="Sözleşmeler" PartyId="company.PartyId" />
-                            <RelatedOrders Title="Siparişler" PartyId="company.PartyId" />
-                            <RelatedTickets Title="Destek talepleri" PartyId="company.PartyId" />
+                            <RelatedContracts Title="@Texts.Get("crm.company.contracts")" PartyId="company.PartyId" />
+                            <RelatedOrders Title="@Texts.Get("crm.company.orders")" PartyId="company.PartyId" />
+                            <RelatedTickets Title="@Texts.Get("crm.company.tickets")" PartyId="company.PartyId" />
                             <RelatedCampaigns TargetId="company.PartyId" />
                     </div>
                 }
@@ -306,10 +306,10 @@
                         {
                             <section class="detail-section">
                                 <div class="section-header">
-                                    <h2>Aktiviteler</h2>
+                                    <h2>@Texts.Get("crm.activities.title")</h2>
                                     @if (Session.Can(CrmAccess.ActivitiesWrite) && !editingActivity)
                                     {
-                                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OpenActivity(null)">Aktivite ekle</button>
+                                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OpenActivity(null)">@Texts.Get("crm.company.acts.add")</button>
                                     }
                                 </div>
                                 @if (activities is { Count: > 0 })
@@ -320,7 +320,7 @@
                                             <li class="@ActivityClass(activity)">
                                                 @if (Session.Can(CrmAccess.ActivitiesWrite) && !activity.Masked && ActivityStatus.IsOpen(activity.Status))
                                                 {
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm check" title="Tamamla" aria-label="Tamamla"
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm check" title="@Texts.Get("crm.company.acts.complete")" aria-label="@Texts.Get("crm.company.acts.complete")"
                                                             disabled="@busy" @onclick="() => CompleteAsync(activity)">✓</button>
                                                 }
                                                 <div class="item-main">
@@ -334,7 +334,7 @@
                                                 </div>
                                                 @if (Session.Can(CrmAccess.ActivitiesWrite))
                                                 {
-                                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenActivity(activity)">Düzenle</button>
+                                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenActivity(activity)">@Texts.Get("common.edit")</button>
                                                 }
                                             </li>
                                         }
@@ -342,7 +342,7 @@
                                 }
                                 else if (activities is not null)
                                 {
-                                    <p class="text-muted">Henüz aktivite yok.</p>
+                                    <p class="text-muted">@Texts.Get("crm.company.acts.none")</p>
                                 }
                                 <Pager Page="activityPage" PageSize="ListSize" TotalCount="activityTotal" PageChanged="ActivityPageChanged" />
                             </section>
@@ -359,12 +359,12 @@
             </div>
         </div>
 
-        <Drawer Open="editingActivity" Label="@(selectedActivity is null ? "Yeni aktivite" : "Aktiviteyi düzenle")" OnClose="() => editingActivity = false">
+        <Drawer Open="editingActivity" Label="@Texts.Get(selectedActivity is null ? "crm.activities.new" : "crm.activities.edit")" OnClose="() => editingActivity = false">
             <ActivityEditor Activity="selectedActivity" FixedCompanyId="Id" Lookups="Lookups"
                             Saved="ActivitySaved" Deleted="ActivitySaved" Cancelled="() => editingActivity = false" />
         </Drawer>
 
-        <Drawer Open="editingOpportunity" Label="@(selectedOpportunity is null ? "Yeni fırsat" : "Fırsatı düzenle")" OnClose="() => editingOpportunity = false">
+        <Drawer Open="editingOpportunity" Label="@Texts.Get(selectedOpportunity is null ? "crm.opportunities.new" : "crm.opportunities.edit")" OnClose="() => editingOpportunity = false">
             <OpportunityEditor Opportunity="selectedOpportunity" FixedCompanyId="Id" Lookups="Lookups"
                                Saved="OpportunitySaved" Deleted="OpportunitySaved" Cancelled="() => editingOpportunity = false" />
         </Drawer>
@@ -445,18 +445,18 @@
     {
         get
         {
-            List<TabItem> list = [new(TabGeneral, "Genel bilgiler"), new(TabRelations, "Kişiler ve ilişkiler", Session.Can(CrmAccess.ContactsRead) ? (int?)contactTotal : null)];
+            List<TabItem> list = [new(TabGeneral, Texts.Get("crm.company.general")), new(TabRelations, Texts.Get("crm.company.tab.relations"), Session.Can(CrmAccess.ContactsRead) ? (int?)contactTotal : null)];
             if (Session.Can(CrmAccess.OpportunitiesRead) || Session.Can(CrmAccess.LeadsRead))
             {
-                list.Add(new(TabSales, "Fırsatlar ve leadler", Session.Can(CrmAccess.OpportunitiesRead) ? (int?)opportunityTotal : null));
+                list.Add(new(TabSales, Texts.Get("crm.company.tab.sales"), Session.Can(CrmAccess.OpportunitiesRead) ? (int?)opportunityTotal : null));
             }
 
             if (Session.Can(CrmAccess.ActivitiesRead))
             {
-                list.Add(new(TabActivities, "Aktiviteler", activityTotal));
+                list.Add(new(TabActivities, Texts.Get("crm.activities.title"), activityTotal));
             }
 
-            list.Add(new(TabHistory, "Geçmiş"));
+            list.Add(new(TabHistory, Texts.Get("common.history.tab")));
             return list;
         }
     }

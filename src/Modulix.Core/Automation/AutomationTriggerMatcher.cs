@@ -135,6 +135,14 @@ public static class AutomationRuleIdentity
                 {
                     AddRead(modules.FindAutomationField(fieldKey)?.ReadPermission);
                 }
+                else if (value is JsonValue json && json.TryGetValue<string>(out var text))
+                {
+                    // Metin değişkeni ({{alan}}) kayıttan okur: kuralın kimliği o alanın izinlerine de sahip olmalı (Dilim 4d).
+                    foreach (var variable in AutomationTextTemplate.Variables(text))
+                    {
+                        AddRead(modules.FindAutomationField(variable)?.ReadPermission);
+                    }
+                }
             }
         }
 

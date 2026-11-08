@@ -51,6 +51,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             .UseSetting("OrderJobs:WorkerEnabled", "false")
             .UseSetting("SupportJobs:WorkerEnabled", "false")
             .UseSetting("Automation:WorkerEnabled", "false")
+            .UseSetting("Approvals:WorkerEnabled", "false")
             .UseSetting("MarketingSend:WorkerEnabled", "false")
             .UseSetting("ReportJobs:WorkerEnabled", "false")
             .UseSetting("CommunicationCleanup:WorkerEnabled", "false")

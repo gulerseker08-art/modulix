@@ -110,10 +110,18 @@ public sealed record AutomationEntityDto(
     string DisplayName,
     IReadOnlyList<AutomationFieldDto> Fields,
     IReadOnlyList<AutomationEventDto> Events,
-    IReadOnlyList<AutomationRelationDto> Relations);
+    IReadOnlyList<AutomationRelationDto> Relations,
+    string? LabelField = null);
 
 public sealed record AutomationParameterDto(
-    string Name, string Label, string Type, bool Required, string? Description, IReadOnlyList<AutomationOptionDto> Options, string? LookupKey);
+    string Name,
+    string Label,
+    string Type,
+    bool Required,
+    string? Description,
+    IReadOnlyList<AutomationOptionDto> Options,
+    string? LookupKey,
+    bool AllowFieldBinding = true);
 
 public sealed record AutomationActionDto(
     string Key,

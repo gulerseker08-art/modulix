@@ -7,7 +7,7 @@
         <h3>
             <button type="button" class="section-toggle" aria-expanded="@(open ? "true" : "false")"@onclick="() => open = !open">
                 <span class="section-icon"><AppIcon Name="phone" Size="18" /></span>
-                <span class="section-title">@Title</span>
+                <span class="section-title">@(Title ?? Texts.Get("crm.company.contact"))</span>
                 @if (items is not null)
                 {
                     <span class="count-pill">@items.Count</span>
@@ -17,7 +17,7 @@
         </h3>
         @if (CanWrite && form is null)
         {
-            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="OpenNew">Ekle</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="OpenNew">@Texts.Get("common.add")</button>
         }
     </div>
 
@@ -32,19 +32,19 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <FormTabs Title="İletişim bilgisi" Label="İletişim bilgisi formu bölümleri">
+            <FormTabs Title="@Texts.Get("crm.contactPoint.info")" Label="@Texts.Get("crm.contactPoint.tabs")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label">Kanal</label>
+                    <label class="form-label">@Texts.Get("crm.contactPoint.channel")</label>
                     <select class="form-select" @bind="form.Channel" disabled="@(form.Id is not null)">
-                        <option value="@CrmContactPointTypes.Phone">Telefon</option>
-                        <option value="@CrmContactPointTypes.Email">E-posta</option>
+                        <option value="@CrmContactPointTypes.Phone">@Texts.Get("common.field.phone")</option>
+                        <option value="@CrmContactPointTypes.Email">@Texts.Get("common.field.email")</option>
                     </select>
                 </div>
                 <div>
-                    <label class="form-label">Tür</label>
+                    <label class="form-label">@Texts.Get("crm.company.editor.kind")</label>
                     <select class="form-select" @bind="form.Type">
-                        @foreach (var (key, label) in CrmContactPointTypes.Labels)
+                        @foreach (var (key, label) in SharedLabels.ContactPoints())
                         {
                             <option value="@key">@label</option>
                         }
@@ -52,33 +52,33 @@
                     <FieldError Field="type" Errors="errors" />
                 </div>
                 <div class="span-all">
-                    <label class="form-label">Değer *</label>
+                    <label class="form-label">@Texts.Get("crm.contactPoint.value")</label>
                     <input class="form-control" maxlength="@CrmContactPointLimits.ValueMaxLength" @bind="form.Value" />
                     <FieldError Field="value" Errors="errors" />
                 </div>
                 <div class="span-all">
-                    <label class="form-label">Not (ör. dahili numara)</label>
+                    <label class="form-label">@Texts.Get("crm.contactPoint.note")</label>
                     <input class="form-control" maxlength="@CrmContactPointLimits.NoteMaxLength" @bind="form.Note" />
                     <FieldError Field="note" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-check-inline"><input type="checkbox" @bind="form.IsPrimary" /> Ana @(form.Channel == CrmContactPointTypes.Phone ? "telefon" : "e-posta")</label>
+                    <label class="form-check-inline"><input type="checkbox" @bind="form.IsPrimary" /> @Texts.Get(form.Channel == CrmContactPointTypes.Phone ? "crm.contactPoint.primaryPhone" : "crm.contactPoint.primaryEmail")</label>
                     <FieldError Field="isPrimary" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-check-inline"><input type="checkbox" @bind="form.IsShared" /> Paylaşılan (santral / ortak kutu)</label>
+                    <label class="form-check-inline"><input type="checkbox" @bind="form.IsShared" /> @Texts.Get("crm.contactPoint.sharedLong")</label>
                 </div>
                 @if (form.Id is not null)
                 {
                     <div>
-                        <label class="form-check-inline"><input type="checkbox" @bind="form.IsActive" /> Aktif</label>
+                        <label class="form-check-inline"><input type="checkbox" @bind="form.IsActive" /> @Texts.Get("common.active")</label>
                     </div>
                 }
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
             </div>
         </form>
     }
@@ -95,17 +95,17 @@
                             else { <a href="tel:@item.Value">@item.Value</a> }
                         </strong>
                         <span>
-                            @CrmContactPointTypes.Labels.GetValueOrDefault(item.Type, item.Type)
-                            @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">Ana</span> }
-                            @if (item.IsShared) { <text> · </text><span class="badge tag">Paylaşılan</span> }
-                            @if (!item.IsActive) { <text> · Pasif</text> }
+                            @SharedLabels.ContactPoint(item.Type)
+                            @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">@Texts.Get("common.primaryBadge")</span> }
+                            @if (item.IsShared) { <text> · </text><span class="badge tag">@Texts.Get("crm.contactPoint.shared")</span> }
+                            @if (!item.IsActive) { <text> · @Texts.Get("common.inactive")</text> }
                             @if (item.Note is { Length: > 0 } note) { <text> · @note</text> }
                         </span>
                     </div>
                     @if (CanWrite)
                     {
-                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">Düzenle</button>
-                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">Sil</button>
+                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">@Texts.Get("common.edit")</button>
+                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">@Texts.Get("common.delete")</button>
                     }
                 </li>
             }
@@ -113,7 +113,7 @@
     }
     else if (items is not null)
     {
-        <p class="text-muted">Kayıt yok.</p>
+        <p class="text-muted">@Texts.Get("common.noRecords")</p>
     }
     </div>
     }
@@ -128,7 +128,7 @@
     private bool busy;
     private (Guid?, Guid?, Guid?, Guid?)? loadedFor;
 
-    [Parameter, EditorRequired] public string Title { get; set; } = "İletişim";
+    [Parameter] public string? Title { get; set; }
 
     [Parameter] public bool CanWrite { get; set; }
 

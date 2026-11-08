@@ -8,7 +8,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Company is null ? "Yeni firma" : "Firma kartı")</h2>
+            <h2>@Texts.Get(Company is null ? "crm.companies.new" : "crm.company.editor.card")</h2>
             @if (Company is not null)
             {
                 <p>@Company.Name</p>
@@ -16,13 +16,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,31 +38,31 @@
 
     @if (Company is not null)
     {
-        <p class="shared-note text-muted">Ad, vergi bilgileri, telefon, e-posta, web sitesi, şehir ve adres bu firmayı kullanan diğer modüllerde (ör. Lojistik) de görünür; burada yaptığınız değişiklik onlara da yansır. Telefon, e-posta, şehir ve adres alanları ana iletişim noktasını/adresi günceller; birden fazla kayıt için firma detayındaki "Adres ve iletişim" bölümünü kullanın.</p>
+        <p class="shared-note text-muted">@Texts.Get("crm.company.editor.sharedNote")</p>
     }
 
     <div class="record-layout">
         @* Şirket özeti: formdaki değerlerle canlı önizleme. *@
-        <aside class="record-summary" aria-label="Şirket özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("crm.company.editor.summary")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true">@Initials</span>
-                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Name) ? "Firma adı" : form.Name)</strong>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Name) ? Texts.Get("crm.company.editor.nameFallback") : form.Name)</strong>
                     <span class="summary-sub">@Lookups.Label(CrmLists.CompanyStatus, form.Status)</span>
                 </div>
-                <h3 class="summary-heading">Şirket özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("crm.company.editor.summary")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Tür</dt><dd>@(form.Kind == "Individual" ? "Gerçek kişi" : "Tüzel kişi")</dd></div>
-                    <div><dt>Sektör</dt><dd>@(string.IsNullOrWhiteSpace(form.Industry) ? "—" : form.Industry)</dd></div>
-                    <div><dt>Şehir</dt><dd>@(string.IsNullOrWhiteSpace(form.City) ? "—" : form.City)</dd></div>
-                    <div><dt>@(form.Kind == "Individual" ? "T.C. kimlik no" : "Vergi no")</dt><dd>@(string.IsNullOrWhiteSpace(form.TaxNumber) ? "—" : form.TaxNumber)</dd></div>
-                    <div><dt>Sorumlu</dt><dd>@(form.OwnerId is { } owner ? Lookups.MemberName(owner) : (Company is null ? "Ben" : "—"))</dd></div>
+                    <div><dt>@Texts.Get("crm.company.editor.kind")</dt><dd>@Texts.Get(form.Kind == "Individual" ? "crm.company.editor.individual" : "crm.company.editor.organization")</dd></div>
+                    <div><dt>@Texts.Get("crm.companies.col.industry")</dt><dd>@(string.IsNullOrWhiteSpace(form.Industry) ? "—" : form.Industry)</dd></div>
+                    <div><dt>@Texts.Get("common.field.city")</dt><dd>@(string.IsNullOrWhiteSpace(form.City) ? "—" : form.City)</dd></div>
+                    <div><dt>@Texts.Get(form.Kind == "Individual" ? "crm.company.editor.nationalId" : "crm.companies.col.taxNumber")</dt><dd>@(string.IsNullOrWhiteSpace(form.TaxNumber) ? "—" : form.TaxNumber)</dd></div>
+                    <div><dt>@Texts.Get("common.field.owner")</dt><dd>@(form.OwnerId is { } owner ? Lookups.MemberName(owner) : (Company is null ? Texts.Get("common.me") : "—"))</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Firma formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("crm.company.editor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -72,11 +72,7 @@
                             <FieldError Field="name" Errors="errors" />
                             break;
                         case "kind":
-                            <label class="@f.LabelClass()" for="kind">@f.Label</label>
-                            <select id="kind" class="form-select" @bind="form.Kind">
-                                <option value="Organization">Tüzel kişi (şirket)</option>
-                                <option value="Individual">Gerçek kişi (şahıs firması)</option>
-                            </select>
+                            <SegmentedChoice Id="kind" Label="@f.Label" LabelClass="@f.LabelClass()" Options="KindOptions" @bind-Value="form.Kind" />
                             <FieldError Field="kind" Errors="errors" />
                             break;
                         case "status":
@@ -91,7 +87,7 @@
                             break;
                         case "ownerId":
                             <label class="@f.LabelClass()" for="ownerId">@f.Label</label>
-                            <LookupPicker Id="ownerId" LookupKey="crm.company.owner" @bind-Value="form.OwnerId" Required="f.Required" Placeholder="@(Company is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
+                            <LookupPicker Id="ownerId" LookupKey="crm.company.owner" @bind-Value="form.OwnerId" Required="f.Required" Placeholder="@(Company is null ? Texts.Get("common.me") : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
                             <FieldError Field="ownerId" Errors="errors" />
                             break;
                         case "industry":
@@ -116,23 +112,20 @@
                             <FieldError Field="taxOffice" Errors="errors" />
                             break;
                         case "taxNumber":
-                            <label class="@f.LabelClass()" for="taxNumber">@(form.Kind == "Individual" ? "T.C. kimlik no" : "Vergi no")</label>
+                            <label class="@f.LabelClass()" for="taxNumber">@Texts.Get(form.Kind == "Individual" ? "crm.company.editor.nationalId" : "crm.companies.col.taxNumber")</label>
                             <input id="taxNumber" class="form-control" maxlength="@CrmLimits.TaxNumberMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.TaxNumber" />
                             <FieldError Field="taxNumber" Errors="errors" />
                             break;
                         case "tags":
                             <label class="@f.LabelClass()" for="tags">@f.Label</label>
-                            <div class="input-icon">
-                                <AppIcon Name="tag" Size="16" />
-                                <input id="tags" class="form-control" maxlength="@CrmLimits.TagsMaxLength" placeholder="Virgülle ayırın: öncelikli, ihracat" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Tags" />
-                            </div>
+                            <TagInput Id="tags" MaxLength="@CrmLimits.TagsMaxLength" Placeholder="@Texts.Get("common.tagPlaceholder")" Required="@f.Required" @bind-Value="form.Tags" />
                             <FieldError Field="tags" Errors="errors" />
                             break;
                         case "address":
                             <label class="@f.LabelClass()" for="address">@f.Label</label>
                             <div class="input-icon">
                                 <AppIcon Name="map-pin" Size="16" />
-                                <input id="address" class="form-control" maxlength="@CrmLimits.AddressMaxLength" placeholder="Adres bilgisi girin…" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Address" />
+                                <input id="address" class="form-control" maxlength="@CrmLimits.AddressMaxLength" placeholder="@Texts.Get("crm.company.editor.addressPlaceholder")" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Address" />
                             </div>
                             <FieldError Field="address" Errors="errors" />
                             break;
@@ -148,7 +141,7 @@
                             <label class="@f.LabelClass()" for="email">@f.Label</label>
                             <div class="input-icon">
                                 <AppIcon Name="mail" Size="16" />
-                                <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" placeholder="E-posta adresi" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Email" />
+                                <input id="email" class="form-control" type="email" maxlength="@CrmLimits.EmailMaxLength" placeholder="@Texts.Get("crm.company.editor.emailPlaceholder")" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Email" />
                             </div>
                             <FieldError Field="email" Errors="errors" />
                             break;
@@ -156,7 +149,7 @@
                             <label class="@f.LabelClass()" for="website">@f.Label</label>
                             <div class="input-icon">
                                 <AppIcon Name="globe" Size="16" />
-                                <input id="website" class="form-control" maxlength="@CrmLimits.TextMaxLength" placeholder="www.ornek.com" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Website" />
+                                <input id="website" class="form-control" maxlength="@CrmLimits.TextMaxLength" placeholder="@Texts.Get("crm.company.editor.websitePlaceholder")" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Website" />
                             </div>
                             <FieldError Field="website" Errors="errors" />
                             break;
@@ -178,17 +171,17 @@
                 <DuplicateSuggestions Resource="companies" Query="DuplicateQuery" ExcludeId="Company?.Id" Use="UseExisting" />
                 @if (usePartyId is not null)
                 {
-                    <p class="alert alert-info mt-2">Mevcut ortak firma kaydı kullanılacak: yeni taraf açılmaz, kaydettiğinizde bu firma için CRM kaydı oluşur. Boş bıraktığınız ortak alanlar kayıttaki değeri silmez.
-                        <button type="button" class="btn btn-link btn-sm" @onclick="() => usePartyId = null">Vazgeç</button></p>
+                    <p class="alert alert-info mt-2">@Texts.Get("crm.company.editor.usePartyNote")
+                        <button type="button" class="btn btn-link btn-sm" @onclick="() => usePartyId = null">@Texts.Get("common.dismiss")</button></p>
                 }
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
                 @if (Company is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </div>
@@ -196,6 +189,8 @@
 </form>
 
 @code {
+    private static IReadOnlyList<SegmentOption<string>> KindOptions => [new("Organization", Texts.Get("crm.company.editor.organization")), new("Individual", Texts.Get("crm.company.editor.individual"))];
+
     private bool dirty;
     private FormLayoutDto? layout;
     private string? layoutError;
@@ -204,7 +199,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(CrmEntityKeys.Company);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     private const string Url = "/api/crm/companies";

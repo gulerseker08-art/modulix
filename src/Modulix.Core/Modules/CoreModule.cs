@@ -20,7 +20,7 @@ public sealed class CoreModule : IModule
 
         public const string ManageRoles = "core.roles.manage";
 
-        /// <summary>Firma ayarlarını yazar; okumak için izin gerekmez.</summary>
+        /// <summary>Kuruluş ve modül ayarlarını yazar; okumak için izin gerekmez.</summary>
         public const string ManageSettings = "core.settings.manage";
 
         public const string ReadAudit = "core.audit.read";
@@ -100,7 +100,7 @@ public sealed class CoreModule : IModule
     [
         new(Permissions.ManageUsers, "Kullanıcıları ve kullanıcıların rollerini yönetir", "Kullanıcılar"),
         new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir", "Roller"),
-        new(Permissions.ManageSettings, "Firma ayarlarını değiştirir", "Firma ayarları"),
+        new(Permissions.ManageSettings, "Kuruluş ve modül ayarlarını değiştirir", "Kuruluş ayarları"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
         new(Permissions.ManageCompanies, "İşletici şirketleri ve kullanıcıların şirket görevlerini yönetir", "Şirketler"),
@@ -185,6 +185,9 @@ public sealed class CoreModule : IModule
         /// <summary>Onay talebi (ADR-0027 Dilim 4a); kaydın kimliği talebin kimliğidir. Karar, not ve atama değişikliği yazılır.</summary>
         public const string ApprovalRequest = "core.approval-request";
 
+        /// <summary>Onay vekâleti (ADR-0027 Dilim 4b); kaydın kimliği vekâletin kimliğidir.</summary>
+        public const string ApprovalDelegation = "core.approval-delegation";
+
         /// <summary>Kayıtlı rapor (ADR-0026, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string Report = "core.report";
 
@@ -252,7 +255,7 @@ public sealed class CoreModule : IModule
     /// <summary>İletişim tercihi denetim değerlerini (maskeli adres, kanıt) yalnızca bu izni olan denetim okuru görür.</summary>
     private const string ReadCommunicationKey = Permissions.ReadCommunication;
 
-    private const string ProfileGroup = "Firma profili";
+    private const string ProfileGroup = "Kuruluş profili";
     private const string RegionalGroup = "Bölgesel ayarlar";
     private const string SecurityGroup = "Güvenlik";
     private const string AutomationGroup = "Otomasyon";
@@ -450,7 +453,7 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.ApprovalRequest, "Onay talebi", null, new Dictionary<string, string>
         {
             ["title"] = "Başlık", ["process"] = "Süreç", ["amount"] = "Tutar", ["currency"] = "Para birimi", ["status"] = "Durum",
-            ["step"] = "Adım", ["decision"] = "Karar", ["comment"] = "Not", ["approver"] = "Onaycı",
+            ["step"] = "Adım", ["decision"] = "Karar", ["comment"] = "Not", ["approver"] = "Onaycı", ["onBehalfOf"] = "Adına karar verilen", ["escalated"] = "Süre aşımı",
         }, "title")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
@@ -459,6 +462,10 @@ public sealed class CoreModule : IModule
                 ["decision"] = new Dictionary<string, string> { ["Approved"] = "Onay", ["Rejected"] = "Ret" },
             },
         },
+        new(AuditedEntityKeys.ApprovalDelegation, "Onay vekâleti", null, new Dictionary<string, string>
+        {
+            ["principal"] = "Vekâlet veren", ["delegate"] = "Vekil", ["startsAt"] = "Başlangıç", ["endsAt"] = "Bitiş", ["reason"] = "Gerekçe", ["revokedAt"] = "Geri alındı",
+        }, "delegate"),
         new(AuditedEntityKeys.Report, "Rapor", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["dataset"] = "Veri kümesi", ["visibility"] = "Paylaşım", ["sharedWith"] = "Paylaşılan kullanıcılar",

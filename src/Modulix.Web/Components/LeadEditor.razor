@@ -8,7 +8,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Lead is null ? "Yeni müşteri adayı" : "Müşteri adayı kartı")</h2>
+            <h2>@Texts.Get(Lead is null ? "crm.leads.new" : "crm.lead.editor.card")</h2>
             @if (Lead is not null)
             {
                 <p>@Lead.LeadNumber · @Lead.Subject</p>
@@ -16,13 +16,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                @(matches is { Count: > 0 } ? "Yine de kaydet" : "Kaydet")
+                @Texts.Get(matches is { Count: > 0 } ? "crm.lead.editor.saveAnyway" : "common.save")
             </button>
         </div>
     </div>
@@ -36,7 +36,7 @@
         <div class="alert alert-danger" role="alert">@layoutError</div>
     }
 
-    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Müşteri adayı formu bölümleri">
+    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("crm.lead.editor.tabs")">
         <Field Context="f">
             @switch (f.Key)
             {
@@ -50,7 +50,7 @@
                     <select id="lead-priority" class="form-select" @bind="form.Priority">
                         @foreach (var priority in LeadPriority.All)
                         {
-                            <option value="@priority">@LeadPriority.Label(priority)</option>
+                            <option value="@priority">@CrmText.LeadPriorityName(priority)</option>
                         }
                     </select>
                     <FieldError Field="priority" Errors="errors" />
@@ -145,7 +145,7 @@
                     break;
                 case "ownerId":
                     <label class="@f.LabelClass()" for="lead-owner">@f.Label</label>
-                    <LookupPicker Id="lead-owner" LookupKey="crm.lead.owner" @bind-Value="form.OwnerId" Placeholder="Ben" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
+                    <LookupPicker Id="lead-owner" LookupKey="crm.lead.owner" @bind-Value="form.OwnerId" Placeholder="@Texts.Get("common.me")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
                     <FieldError Field="ownerId" Errors="errors" />
                     break;
                 case "companyId":
@@ -161,7 +161,7 @@
                 case "estimatedBudget":
                     <label class="@f.LabelClass()" for="lead-budget">@f.Label</label>
                     <input id="lead-budget" class="form-control" type="number" step="0.01" min="0" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EstimatedBudget" />
-                    <small class="text-muted">Bilinmiyorsa boş bırakın.</small>
+                    <small class="text-muted">@Texts.Get("crm.lead.editor.budgetHint")</small>
                     <FieldError Field="estimatedBudget" Errors="errors" />
                     break;
                 case "currency":
@@ -191,13 +191,13 @@
     @if (matches is { Count: > 0 })
     {
         <div class="alert alert-warning" role="alert">
-            <strong>Olası eşleşmeler</strong> — aynı kişi farklı bir ihtiyaçla yeniden başvurmuş olabilir; yine de kaydedebilirsiniz.
+            <strong>@Texts.Get("crm.lead.editor.matches")</strong> — @Texts.Get("crm.lead.editor.matchesHelp")
             <ul class="item-list">
                 @foreach (var match in matches)
                 {
                     <li>
                         <a href="@MatchLink(match)">@match.Title</a>
-                        <span class="text-muted">@MatchKind(match.Kind)@(match.Status is { } status ? $" · {LeadStatus.Label(status)}" : null) · @string.Join(", ", match.Reasons)</span>
+                        <span class="text-muted">@MatchKind(match.Kind)@(match.Status is { } status ? $" · {CrmText.LeadStatusName(status)}" : null) · @string.Join(", ", match.Reasons)</span>
                     </li>
                 }
             </ul>
@@ -205,11 +205,11 @@
     }
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@(matches is { Count: > 0 } ? "Yine de kaydet" : "Kaydet")</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get(matches is { Count: > 0 } ? "crm.lead.editor.saveAnyway" : "common.save")</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
         @if (Lead is not null && Session.Can(CrmAccess.LeadsDelete) && Lead.Status != LeadStatus.Converted)
         {
-            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
         }
     </div>
 </form>
@@ -223,7 +223,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(CrmEntityKeys.Lead);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     // Sorumlu yalnızca yeni Lead açarken ve atama izniyle seçilir; sonrası Lead detayındaki atama eylemidir.
@@ -287,7 +287,7 @@
         _ => $"crm/kisiler/{match.Id}",
     };
 
-    private static string MatchKind(string kind) => kind switch { "Lead" => "Lead", "Company" => "Firma", _ => "Kişi" };
+    private static string MatchKind(string kind) => kind switch { "Lead" => Texts.Get("crm.leads.single"), "Company" => Texts.Get("crm.company.fallbackTitle"), _ => Texts.Get("crm.contact.fallbackTitle") };
 
     private async Task SaveAsync()
     {

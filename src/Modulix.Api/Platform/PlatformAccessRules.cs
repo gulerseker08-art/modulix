@@ -78,6 +78,10 @@ public static class PlatformAccessRules
         ["PUT /api/platform/tenants/{tenantId}/plan"] = Fin,
         ["PUT /api/platform/tenants/{tenantId}/limits/{limitKey}"] = Fin,
         ["POST /api/platform/tenants/{tenantId}/limits/{limitKey}/revoke"] = Fin,
+        // Ödeme kayıtları (Dilim 7c): Finans yönetir.
+        ["POST /api/platform/tenants/{tenantId}/billing"] = Fin,
+        ["POST /api/platform/billing/{id}/paid"] = Fin,
+        ["POST /api/platform/billing/{id}/cancel"] = Fin,
         ["POST /api/platform/team"] = PlatformRole.Owner,
         ["PUT /api/platform/team/{userId}"] = PlatformRole.Owner,
     };

@@ -141,6 +141,48 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("ApprovalDefinitions", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Approvals.ApprovalDelegation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DelegateUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("EndsAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("PrincipalUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "DelegateUserId", "RevokedAt");
+
+                    b.HasIndex("TenantId", "PrincipalUserId", "RevokedAt");
+
+                    b.ToTable("ApprovalDelegations", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Approvals.ApprovalRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -236,10 +278,22 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<int?>("DueHours")
                         .HasColumnType("int");
 
+                    b.Property<DateTimeOffset?>("EscalatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("EscalationRoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("EscalationUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("OnBehalfOf")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("RequestId")
                         .HasColumnType("uniqueidentifier");
@@ -1844,6 +1898,52 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("ModuleEntitlements", "platform");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DedupeKey")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Link")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "UserId", "DedupeKey")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "UserId", "ReadAt", "CreatedAt");
+
+                    b.ToTable("Notifications", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Organization.Branch", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2049,6 +2149,71 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "MembershipId");
 
                     b.ToTable("MembershipCompanies", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.BillingRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ClosedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "DueDate");
+
+                    b.HasIndex("TenantId", "CreatedAt");
+
+                    b.ToTable("BillingRecords", "platform");
                 });
 
             modelBuilder.Entity("Modulix.Core.Platform.LimitOverride", b =>
@@ -2268,6 +2433,40 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "GrantedAt");
 
                     b.ToTable("SupportAccessGrants", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Platform.SupportAccessRead", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("GrantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GrantId", "At");
+
+                    b.ToTable("SupportAccessReads", "platform");
                 });
 
             modelBuilder.Entity("Modulix.Core.Platform.Tenant", b =>
@@ -4550,50 +4749,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("UX_ContractRenewals_ContractPeriod");
 
                     b.ToTable("ContractRenewals", "contracts");
-                });
-
-            modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSavedView", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("CustomFields")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Filters")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasAlternateKey("TenantId", "Id");
-
-                    b.HasIndex("TenantId", "OwnerUserId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("ContractSavedViews", "contracts");
                 });
 
             modelBuilder.Entity("Modulix.Modules.Contracts.Domain.ContractSignatory", b =>

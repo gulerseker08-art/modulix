@@ -71,7 +71,7 @@ public sealed class ContractsModule : IModule
         public const string ContractsExport = "contracts.contracts.export";
     }
 
-    /// <summary>Firma ayarları (Y6).</summary>
+    /// <summary>Modül ayarları (Y6) (/modul-ayarlari/…).</summary>
     public static class SettingKeys
     {
         public const string AllowSelfApproval = "contracts.approval.allow-self";
@@ -94,7 +94,6 @@ public sealed class ContractsModule : IModule
         public const string ContractTemplate = "contracts.contract-template";
         public const string ContractApprovalRule = "contracts.contract-approval-rule";
         public const string ContractApprovalDelegation = "contracts.contract-approval-delegation";
-        public const string ContractSavedView = "contracts.contract-saved-view";
         public const string ContractCommitment = "contracts.contract-commitment";
     }
 
@@ -456,7 +455,6 @@ public sealed class ContractsModule : IModule
         services.AddScoped<IRecordStore, ContractApprovalRuleRecordStore>();
         services.AddScoped<IRecordStore, ContractApprovalDelegationRecordStore>();
         services.AddScoped<IRecordStore, ContractCommitmentRecordStore>();
-        services.AddScoped<IRecordStore, ContractSavedViewStore>();
         services.AddScoped<IContractCommitments, ContractCommitments>();
         services.AddScoped<IContractRenewals, ContractRenewals>();
         services.AddScoped<IContractDashboard, ContractDashboard>();

@@ -80,11 +80,7 @@
                             <small class="text-muted">Boş bırakılırsa süresiz.</small>
                             break;
                         case "isActive":
-                            <label class="@f.LabelClass()" for="attorney-active">@f.Label</label>
-                            <select id="attorney-active" class="form-select" @bind="form.IsActive">
-                                <option value="True">Etkin</option>
-                                <option value="False">İptal edildi</option>
-                            </select>
+                            <SegmentedChoice Id="attorney-active" Label="@f.Label" LabelClass="@f.LabelClass()" Options="ActiveOptions" @bind-Value="form.IsActive" />
                             <FieldError Field="isActive" Errors="errors" />
                             <small class="text-muted">İptal edilen vekâlet silinmez; tarihi geçerli olsa da geçerli sayılmaz.</small>
                             break;
@@ -116,6 +112,8 @@
 </form>
 
 @code {
+    private static readonly IReadOnlyList<SegmentOption<bool>> ActiveOptions = [new(true, "Etkin"), new(false, "İptal edildi")];
+
     private bool dirty;
     private const string EntityKey = WarehouseAccess.PowerOfAttorneyEntityKey;
     private static readonly string Url = "/api/records/" + EntityKey;

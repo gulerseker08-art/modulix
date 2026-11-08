@@ -3,10 +3,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Kişiler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.contacts.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ContactsRead">
-    <PageHeader Title="Kişiler" Icon="user" Subtitle="@(page is null ? "Firmalardaki ilgili kişileri ve iletişim bilgilerini yönetin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("crm.contacts.title")" Icon="user" Subtitle="@(page is null ? Texts.Get("crm.contacts.subtitle") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -19,16 +19,16 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Kişi görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("crm.contacts.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Kişi ara" placeholder="Ad, soyad, e-posta veya telefon ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("crm.contacts.search.aria")" placeholder="@Texts.Get("crm.contacts.search.placeholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(CrmAccess.ContactsWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni kişi</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("crm.contacts.new")</button>
         }
     </div>
 
@@ -37,11 +37,11 @@
 
     @if (page is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Kayıt yok.</p>
+        <p class="text-muted">@Texts.Get("common.noRecords")</p>
     }
     else
     {
@@ -52,7 +52,7 @@
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -64,11 +64,11 @@
                             @Cell(column, contact)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{contact.FirstName} {contact.LastName} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="crm/kisiler/@contact.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", $"{contact.FirstName} {contact.LastName}")">
+                                <a class="view-menu-item" role="menuitem" href="crm/kisiler/@contact.Id"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></a>
                                 @if (Session.Can(CrmAccess.ContactsWrite))
                                 {
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(contact)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(contact)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 }
                             </RowMenu>
                         </td>
@@ -88,14 +88,14 @@
     private const string RolePrefix = "role:";
 
     // Firma sütunu sunucuda sıralanamaz (firma adı ilişki üzerindedir); sorumlu adı üyelik tablosundadır.
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("name", "Ad soyad", "type", "name", "-name", Locked: true),
-        new("company", "Firma", "building"),
-        new("title", "Unvan", "briefcase", "title", "-title"),
-        new("phone", "Telefon", "phone", "phone", "-phone"),
-        new("email", "E-posta", "mail", "email", "-email"),
-        new("owner", "Sorumlu", "user", DefaultVisible: false),
+        new("name", Texts.Get("crm.contacts.col.fullName"), "type", "name", "-name", Locked: true),
+        new("company", Texts.Get("crm.contacts.col.company"), "building"),
+        new("title", Texts.Get("crm.contacts.col.title"), "briefcase", "title", "-title"),
+        new("phone", Texts.Get("common.field.phone"), "phone", "phone", "-phone"),
+        new("email", Texts.Get("common.field.email"), "mail", "email", "-email"),
+        new("owner", Texts.Get("common.field.owner"), "user", DefaultVisible: false),
     ];
 
     private readonly GridViewState grid = new("crm.contacts", "name");
@@ -128,10 +128,10 @@
     // Görünümler yalnızca süzgeçtir (Benim kişilerim, Tümü, Firmasız, ilişki rolü, kişisel); kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(MineView, "Benim kişilerim", Icon: "star"),
-        new(AllViews, "Tüm kişiler", Icon: "user"),
-        new(WithoutCompanyView, "Firmasız", Icon: "building"),
-        .. CrmRelationshipRoles.Labels.Select(r => new ViewOption(RolePrefix + r.Key, r.Value, Icon: "tag")),
+        new(MineView, Texts.Get("crm.contacts.view.mine"), Icon: "star"),
+        new(AllViews, Texts.Get("crm.contacts.view.all"), Icon: "user"),
+        new(WithoutCompanyView, Texts.Get("crm.contacts.view.withoutCompany"), Icon: "building"),
+        .. RelationshipRoleNames.All().Select(r => new ViewOption(RolePrefix + r.Key, r.Value, Icon: "tag")),
         .. views.Options,
     ];
 

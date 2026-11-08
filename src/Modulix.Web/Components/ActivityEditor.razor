@@ -62,8 +62,8 @@
                     <FieldError Field="dueAt" Errors="errors" />
                     break;
                 case "isAllDay":
-                    <div class="form-check-row">
-                        <input id="allday" class="form-check-input" type="checkbox" @bind="form.IsAllDay" />
+                    <div class="form-check-row form-switch">
+                        <input id="allday" class="form-check-input" type="checkbox" role="switch" @bind="form.IsAllDay" />
                         <label class="form-check-label" for="allday">@f.Label</label>
                     </div>
                     break;
@@ -146,14 +146,14 @@
                     <FieldError Field="onlineMeetingUrl" Errors="errors" />
                     break;
                 case "isPrivate":
-                    <div class="form-check-row">
-                        <input id="private" class="form-check-input" type="checkbox" @bind="form.IsPrivate" />
+                    <div class="form-check-row form-switch">
+                        <input id="private" class="form-check-input" type="checkbox" role="switch" @bind="form.IsPrivate" />
                         <label class="form-check-label" for="private">Özel (diğerleri yalnızca meşgul görür)</label>
                     </div>
                     break;
                 case "logAsDone":
-                    <div class="form-check-row">
-                        <input id="completed" class="form-check-input" type="checkbox" @bind="form.LogAsDone" />
+                    <div class="form-check-row form-switch">
+                        <input id="completed" class="form-check-input" type="checkbox" role="switch" @bind="form.LogAsDone" />
                         <label class="form-check-label" for="completed">Geçmişte gerçekleşti (tamamlanmış etkileşim olarak kaydet)</label>
                     </div>
                     @if (form.LogAsDone)
@@ -169,8 +169,8 @@
                                 <div class="span-6">
                                     <label class="form-label" for="outcome">Sonuç</label>
                                     <select id="outcome" class="form-select" @bind="form.Outcome">
-                                        <option value="@ActivityOutcome.Reached">@ActivityOutcome.Label(ActivityOutcome.Reached)</option>
-                                        <option value="@ActivityOutcome.NoAnswer">@ActivityOutcome.Label(ActivityOutcome.NoAnswer)</option>
+                                        <option value="@ActivityOutcome.Reached">@CrmText.ActivityOutcomeName(ActivityOutcome.Reached)</option>
+                                        <option value="@ActivityOutcome.NoAnswer">@CrmText.ActivityOutcomeName(ActivityOutcome.NoAnswer)</option>
                                     </select>
                                     <small class="text-muted">İlk temas yalnızca gerçekleşen temastan (ulaşılan arama, yapılan toplantı) sayılır.</small>
                                     <FieldError Field="outcome" Errors="errors" />

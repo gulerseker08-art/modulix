@@ -244,4 +244,85 @@ public partial class PlatformAdministrationTests
         var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
         Assert.Single(await db.SupportAccessGrants.AsNoTracking().Where(g => g.TenantId == tenant.Id).ToListAsync());
     }
+
+    [Fact]
+    public async Task Support_access_does_not_see_sensitive_fields()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var owner = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [CompaniesRead, CompaniesWrite, OpportunitiesRead, OpportunitiesWrite, OpportunityAmountsRead], owner);
+        using var ownerClient = await LoginAsync(owner);
+        var company = (await (await ownerClient.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Gizli Ltd."))).Content.ReadFromJsonAsync<CompanyDto>())!;
+        var opportunity = (await (await ownerClient.PostAsJsonAsync("/api/crm/opportunities",
+            new SaveOpportunityRequest("Büyük iş", company.Id, Amount: 250_000m, Currency: "EUR", Probability: 60))).Content.ReadFromJsonAsync<OpportunityDto>())!;
+        Assert.Equal(250_000m, (await ownerClient.GetFromJsonAsync<OpportunityDto>($"/api/crm/opportunities/{opportunity.Id}"))!.Amount);
+
+        var (support, _) = await LoginSupportAsync();
+        using var supportClient = support;
+        Assert.Equal(HttpStatusCode.Created, (await supportClient.PostAsJsonAsync(
+            $"/api/platform/tenants/{tenant.Id}/support-access", new GrantSupportAccessRequest("Tutar sorunu", 30))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await supportClient.PostAsJsonAsync("/api/auth/active-tenant", new SelectTenantRequest(tenant.Id))).StatusCode);
+
+        // Kayıt görünür, hassas alanlar (tutar, olasılık) hiçbir okuma yolunda gelmez; para birimi ve başlık gelir.
+        var read = (await supportClient.GetFromJsonAsync<OpportunityDto>($"/api/crm/opportunities/{opportunity.Id}"))!;
+        Assert.Equal("Büyük iş", read.Title);
+        Assert.Null(read.Amount);
+        Assert.Null(read.Probability);
+        Assert.DoesNotContain("250000", await supportClient.GetStringAsync($"/api/records/crm.opportunity/{opportunity.Id}"));
+        Assert.Null(Assert.Single((await supportClient.GetFromJsonAsync<CrmPage<OpportunityDto>>($"/api/crm/opportunities?companyId={company.Id}"))!.Items).Amount);
+        Assert.DoesNotContain("250000", await supportClient.GetStringAsync($"/api/records/crm.opportunity/{opportunity.Id}/history"));
+
+        // Rol da hassas alan iznini taşımaz.
+        using var roleScope = factory.OpenScope(tenant.Id);
+        var role = (await roleScope.ServiceProvider.GetRequiredService<Modulix.Core.Authorization.IRoleService>().ListAsync(CancellationToken.None))
+            .Single(r => r.Name == "Destek erişimi (salt okunur)");
+        Assert.DoesNotContain(OpportunityAmountsRead, role.Permissions);
+        Assert.Contains(OpportunitiesRead, role.Permissions);
+    }
+
+    [Fact]
+    public async Task Every_support_request_is_logged_before_it_runs_and_is_visible_only_to_the_right_parties()
+    {
+        var (tenant, tenantUser) = await TenantWithDataAsync();
+        var (otherTenant, otherClient) = await TenantWithDataAsync();
+        using var tenantClient = tenantUser;
+        using var other = otherClient;
+        var admin = await factory.CreateUserAsync(tenant);
+        await MakeAdministratorAsync(tenant.Id, admin);
+        var otherAdmin = await factory.CreateUserAsync(otherTenant);
+        await MakeAdministratorAsync(otherTenant.Id, otherAdmin);
+        var (support, _) = await LoginSupportAsync();
+        using var supportClient = support;
+        var grant = (await (await supportClient.PostAsJsonAsync(
+            $"/api/platform/tenants/{tenant.Id}/support-access", new GrantSupportAccessRequest("Kayıt inceleme", 30))).Content.ReadFromJsonAsync<SupportAccessDto>())!;
+        Assert.Equal(HttpStatusCode.OK, (await supportClient.PostAsJsonAsync("/api/auth/active-tenant", new SelectTenantRequest(tenant.Id))).StatusCode);
+
+        // Okuma ve reddedilen yazma denemesi kaydedilir; sorgu değeri (arama metni) kaydedilmez.
+        Assert.Equal(HttpStatusCode.OK, (await supportClient.GetAsync("/api/crm/companies?search=GizliKisiAdi")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await supportClient.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Yazılamaz Ltd."))).StatusCode);
+        // Firma kullanıcısının kendi istekleri destek günlüğüne girmez.
+        Assert.Equal(HttpStatusCode.OK, (await tenantClient.GetAsync("/api/crm/companies")).StatusCode);
+
+        using var adminClient = await LoginAsync(admin);
+        var reads = (await adminClient.GetFromJsonAsync<List<SupportAccessReadDto>>($"/api/tenant/support-access/{grant.Id}/reads"))!;
+        Assert.Contains(reads, r => r is { Method: "GET", Path: "/api/crm/companies" });
+        Assert.Contains(reads, r => r is { Method: "POST", Path: "/api/crm/companies" });
+        Assert.DoesNotContain(reads, r => r.Path.Contains("GizliKisiAdi", StringComparison.Ordinal));
+        Assert.All(reads, r => Assert.StartsWith("/api/", r.Path));
+        var countBefore = reads.Count;
+        Assert.Equal(HttpStatusCode.OK, (await tenantClient.GetAsync("/api/crm/companies")).StatusCode);
+        Assert.Equal(countBefore, (await adminClient.GetFromJsonAsync<List<SupportAccessReadDto>>($"/api/tenant/support-access/{grant.Id}/reads"))!.Count);
+
+        // Platform tarafı da görür; başka firmanın yöneticisi ve yetkisiz firma kullanıcısı göremez.
+        Assert.NotEmpty((await supportClient.GetFromJsonAsync<List<SupportAccessReadDto>>($"/api/platform/support-access/{grant.Id}/reads"))!);
+        using var otherAdminClient = await LoginAsync(otherAdmin);
+        Assert.Equal(HttpStatusCode.NotFound, (await otherAdminClient.GetAsync($"/api/tenant/support-access/{grant.Id}/reads")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await tenantClient.GetAsync($"/api/tenant/support-access/{grant.Id}/reads")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await tenantClient.GetAsync($"/api/platform/support-access/{grant.Id}/reads")).StatusCode);
+
+        // Erişim kapanınca günlük silinmez, geçmişte kalır.
+        Assert.Equal(HttpStatusCode.NoContent, (await adminClient.PostAsync($"/api/tenant/support-access/{grant.Id}/revoke", null)).StatusCode);
+        Assert.NotEmpty((await adminClient.GetFromJsonAsync<List<SupportAccessReadDto>>($"/api/tenant/support-access/{grant.Id}/reads"))!);
+    }
 }

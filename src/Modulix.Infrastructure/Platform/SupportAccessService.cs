@@ -140,16 +140,42 @@ internal sealed class SupportAccessService(
         return [.. rows.Select(r => ToInfo(r.Grant, r.TenantName, r.UserName, now))];
     }
 
+    public async Task RecordReadAsync(Guid membershipId, string method, string path, CancellationToken cancellationToken)
+    {
+        // İstek, üyeliğin en yeni erişim kaydına bağlanır; kayıt yoksa (olmaması gerekir: bağlam geçerli kayıtla kurulur) istek durur.
+        var grant = await db.SupportAccessGrants.AsNoTracking().Where(g => g.MembershipId == membershipId)
+            .OrderByDescending(g => g.GrantedAt).Select(g => new { g.Id, g.TenantId, g.UserId }).FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException("Destek üyeliği için erişim kaydı yok; istek günlüğe yazılamadı.");
+        db.SupportAccessReads.Add(new SupportAccessRead(grant.Id, grant.TenantId, grant.UserId, time.GetUtcNow(), method, path));
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SupportAccessReadInfo>> ListReadsAsync(Guid grantId, Guid? tenantId, int take, CancellationToken cancellationToken)
+    {
+        if (!await db.SupportAccessGrants.AsNoTracking().AnyAsync(g => g.Id == grantId && (tenantId == null || g.TenantId == tenantId), cancellationToken))
+        {
+            throw new UserAdministrationException(UserAdministrationError.NotFound, "Destek erişimi bulunamadı.");
+        }
+
+        return await db.SupportAccessReads.AsNoTracking().Where(r => r.GrantId == grantId)
+            .OrderByDescending(r => r.At).ThenByDescending(r => r.Id)
+            .Take(Math.Clamp(take, 1, 500))
+            .Select(r => new SupportAccessReadInfo(r.At, r.Method, r.Path))
+            .ToListAsync(cancellationToken);
+    }
+
     // Salt okunur rol: yalnızca açık modüllerin okuma izinleri. Dışa aktarma, kullanıcı, denetim, ayar ve yazma izinleri yoktur;
-    // çekirdek (kullanıcı yönetimi, roller, denetim kaydı) kasıtlı olarak dışarıdadır.
+    // çekirdek (kullanıcı yönetimi, roller, denetim kaydı) kasıtlı olarak dışarıdadır. Hassas alan izinleri (ör. fırsat tutarı,
+    // maaş) da ".read" ile biter ama destek rolüne verilmez: o alanlar destek erişiminde gizli kalır (Y8b).
     private async Task<Guid> EnsureRoleAsync(IServiceProvider services, Guid tenantId, CancellationToken cancellationToken)
     {
         var enabled = await services.GetRequiredService<IModuleEntitlements>().GetEnabledAsync(tenantId, cancellationToken);
-        var permissions = catalog.Modules
-            .Where(m => !ModuleCatalog.IsAlwaysEnabled(m.Key) && enabled.Contains(m.Key))
+        var modules = catalog.Modules.Where(m => !ModuleCatalog.IsAlwaysEnabled(m.Key) && enabled.Contains(m.Key)).ToList();
+        var sensitive = modules.SelectMany(m => m.SensitiveFields).Select(s => s.Permission).ToHashSet(StringComparer.Ordinal);
+        var permissions = modules
             .SelectMany(m => m.Permissions)
             .Select(p => p.Key)
-            .Where(key => key.EndsWith(".read", StringComparison.Ordinal))
+            .Where(key => key.EndsWith(".read", StringComparison.Ordinal) && !sensitive.Contains(key))
             .Order(StringComparer.Ordinal)
             .ToList();
 
