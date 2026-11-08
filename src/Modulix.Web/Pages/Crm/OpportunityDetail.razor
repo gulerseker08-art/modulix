@@ -61,7 +61,7 @@
                     </p>
                     <div class="header-meta">
                         <span>@opportunity.OpportunityNumber</span>
-                        <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@OpportunityStatus.Label(opportunity.Status)</span>
+                        <span class="badge stage-@opportunity.Status.ToLowerInvariant()">@CrmText.OpportunityStatusName(opportunity.Status)</span>
                         <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, opportunity.Stage)">@Lookups.Label(CrmLists.OpportunityStage, opportunity.Stage)</span>
                         <span>Öncelik: @CrmText.LeadPriorityName(opportunity.Priority)</span>
                         @if (opportunity.Status == OpportunityStatus.Open && opportunity.ExpectedCloseDate is { } due && due < Today)
@@ -93,7 +93,7 @@
 
         @if (opportunity.StatusReason is { } statusReason && opportunity.Status is OpportunityStatus.OnHold or OpportunityStatus.Cancelled)
         {
-            <div class="alert alert-warning" role="status">@OpportunityStatus.Label(opportunity.Status): @statusReason</div>
+            <div class="alert alert-warning" role="status">@CrmText.OpportunityStatusName(opportunity.Status): @statusReason</div>
         }
 
         @* Satış hunisi: aşamaya tıklamak işlem panelini açar; aşama kuralları ve doğrulamalar o işlemle sunucuda çalışır. *@
@@ -154,7 +154,7 @@
                         <div><dt>Tahmini tutar</dt><dd>@(opportunity.Amount is { } amount ? CrmLabels.Amount(amount, opportunity.Currency) : "Bilinmiyor")</dd></div>
                         <div><dt>Olasılık</dt><dd>@(opportunity.Probability is { } p ? $"%{p}" : "Bilinmiyor")@(opportunity.ProbabilityManual ? " (elle girildi)" : " (aşama varsayılanı)")</dd></div>
                         <div><dt>Ağırlıklı tutar</dt><dd>@(Weighted is { } w ? CrmLabels.Amount(w, opportunity.Currency) : "—")</dd></div>
-                        <div><dt>Müşteri bütçesi</dt><dd>@(opportunity.CustomerBudget is { } budget ? CrmLabels.Amount(budget, opportunity.Currency) : "Bilinmiyor") · @OpportunityBudgetStatus.Label(opportunity.BudgetStatus)</dd></div>
+                        <div><dt>Müşteri bütçesi</dt><dd>@(opportunity.CustomerBudget is { } budget ? CrmLabels.Amount(budget, opportunity.Currency) : "Bilinmiyor") · @CrmText.OpportunityBudgetStatusName(opportunity.BudgetStatus)</dd></div>
                     }
                     <div><dt>Tahmini kapanış</dt><dd>@(opportunity.ExpectedCloseDate is { } close ? CrmLabels.Date(close) : "—")@(opportunity.CloseDateChangeCount > 0 ? $" · {opportunity.CloseDateChangeCount} kez değişti" : null)</dd></div>
                     <div><dt>Hedef karar tarihi</dt><dd>@(opportunity.TargetDecisionDate is { } decision ? CrmLabels.Date(decision) : "—")</dd></div>
@@ -454,7 +454,7 @@
                             @foreach (var role in OpportunityContactRoles.All)
                             {
                                 <label class="form-check form-check-inline">
-                                    <input type="checkbox" class="form-check-input" checked="@newRoles.Contains(role)" @onchange="e => ToggleRole(role, (bool)e.Value!)" /> @OpportunityContactRoles.Label(role)
+                                    <input type="checkbox" class="form-check-input" checked="@newRoles.Contains(role)" @onchange="e => ToggleRole(role, (bool)e.Value!)" /> @CrmText.OpportunityContactRoleName(role)
                                 </label>
                             }
                         </fieldset>
@@ -479,7 +479,7 @@
                             <li>
                                 <div class="item-main">
                                     <a href="crm/kisiler/@link.ContactId">@link.ContactName</a>@(link.IsPrimary ? " · ana irtibat" : null)
-                                    <span class="text-muted">@(link.Roles.Count == 0 ? "Rol belirtilmedi" : string.Join(", ", link.Roles.Select(OpportunityContactRoles.Label)))@(link.Note is { } cn ? $" · {cn}" : null)</span>
+                                    <span class="text-muted">@(link.Roles.Count == 0 ? "Rol belirtilmedi" : string.Join(", ", link.Roles.Select(CrmText.OpportunityContactRoleName)))@(link.Note is { } cn ? $" · {cn}" : null)</span>
                                 </div>
                                 @if (Session.Can(CrmAccess.OpportunitiesWrite))
                                 {
@@ -1111,8 +1111,8 @@
     private string HistoryChange(OpportunityHistoryDto h) => h.Kind switch
     {
         "CloseDate" => $"{(h.FromCloseDate is { } f ? CrmLabels.Date(f) : "—")} → {(h.ToCloseDate is { } t ? CrmLabels.Date(t) : "—")}",
-        "Created" => $"{Lookups.Label(CrmLists.OpportunityStage, h.ToStage)} ({OpportunityStatus.Label(h.ToStatus ?? OpportunityStatus.Open)})",
-        "Status" => $"{OpportunityStatus.Label(h.FromStatus ?? string.Empty)} → {OpportunityStatus.Label(h.ToStatus ?? string.Empty)} · {Lookups.Label(CrmLists.OpportunityStage, h.ToStage)}",
+        "Created" => $"{Lookups.Label(CrmLists.OpportunityStage, h.ToStage)} ({CrmText.OpportunityStatusName(h.ToStatus ?? OpportunityStatus.Open)})",
+        "Status" => $"{CrmText.OpportunityStatusName(h.FromStatus ?? string.Empty)} → {CrmText.OpportunityStatusName(h.ToStatus ?? string.Empty)} · {Lookups.Label(CrmLists.OpportunityStage, h.ToStage)}",
         _ => $"{Lookups.Label(CrmLists.OpportunityStage, h.FromStage)} → {Lookups.Label(CrmLists.OpportunityStage, h.ToStage)}",
     };
 }
