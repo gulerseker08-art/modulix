@@ -6118,10 +6118,15 @@ button.hero-stat {
         display: block;
         overflow: hidden;
         color: var(--mx-text-primary);
+        text-decoration: none;
         font-size: var(--mx-fs-label);
         font-weight: 700;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    .dash-list-main a:hover {
+        text-decoration: underline;
     }
 
     .dash-list-main small {
@@ -6129,12 +6134,115 @@ button.hero-stat {
         font-size: var(--mx-fs-helper);
     }
 
+/* Benim günüm (CRM panosu ikinci sekmesi): solda öneriler ve bugünün akışı, sağda kişisel hedef, bu ay kapanabilecekler ve haftalık özet. */
+.dash-kpi-icon.tone-danger { background: var(--mx-tone-danger-bg); color: var(--mx-tone-danger-fg); }
+
+.dash-day {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: var(--mx-space-4);
+    align-items: start;
+}
+
+.dash-day-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mx-space-4);
+    min-width: 0;
+}
+
+    .dash-day-col > .dash-card,
+    .dash-day-col > .dash-hero,
+    .dash-day-col > .today-panel {
+        margin: 0;
+    }
+
+.dash-card-head h2.dash-card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+}
+
+.dash-steps li {
+    padding: var(--mx-space-3) 0;
+}
+
+    .dash-steps .dash-list-main a {
+        white-space: normal;
+    }
+
+    .dash-steps .btn {
+        flex: none;
+    }
+
+.dash-closing-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--mx-space-3);
+}
+
+    .dash-closing-head a {
+        min-width: 0;
+    }
+
+.dash-closing-track {
+    height: 0.5rem;
+    margin: var(--mx-space-2) 0 var(--mx-space-1);
+    border-radius: var(--mx-radius-badge);
+    background: var(--mx-tone-neutral-bg);
+    overflow: hidden;
+}
+
+    .dash-closing-track i {
+        display: block;
+        height: 100%;
+        border-radius: var(--mx-radius-badge);
+        background: var(--chart-c0);
+    }
+
+.dash-week {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mx-space-3);
+    margin: 0;
+}
+
+    .dash-week dd {
+        margin: 0;
+        font-size: 1.375rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .dash-week dt {
+        color: var(--mx-text-secondary);
+        font-size: var(--mx-fs-helper);
+        font-weight: 500;
+    }
+
+.dash-hero.dash-hero-compact {
+    padding: var(--mx-space-4) var(--mx-space-5);
+}
+
+    .dash-hero-compact .dash-hero-value {
+        font-size: 2.125rem;
+    }
+
+.dash-hero-legend.dash-hero-split {
+    justify-content: space-between;
+}
+
 @media (max-width: 991.98px) {
     .dash-kpis {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .dash-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .dash-day {
         grid-template-columns: minmax(0, 1fr);
     }
 
@@ -6182,6 +6290,22 @@ button.hero-stat {
 
     .dash-kpi .sparkline {
         display: none;
+    }
+
+    .dash-steps li {
+        flex-wrap: wrap;
+    }
+
+        .dash-steps li .btn {
+            margin-left: calc(2rem + var(--mx-space-3));
+        }
+
+        .dash-steps li .dash-list-main {
+            flex-basis: calc(100% - 2rem - var(--mx-space-3));
+        }
+
+    .dash-week dd {
+        font-size: 1.125rem;
     }
 }
 

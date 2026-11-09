@@ -1113,6 +1113,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<SalesOpportunityReader>();
         services.AddScoped<SalesPlanningData>();
         services.AddScoped<ISalesOverview, SalesOverview>();
+        services.AddScoped<IMyDay, MyDay>();
         services.AddScoped<ISalesAnalytics, SalesAnalytics>();
         services.AddScoped<IForecastWorkflow, ForecastWorkflow>();
         services.AddScoped<IRecordStore, OpportunityContactRecordStore>();

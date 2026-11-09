@@ -184,3 +184,37 @@ public sealed record ForecastComparisonDto(
     Guid CurrentId, Guid PreviousId, int CurrentVersionNo, int PreviousVersionNo, bool AmountsVisible,
     IReadOnlyList<ForecastCompareEntryDto> Added, IReadOnlyList<ForecastCompareEntryDto> Removed, IReadOnlyList<ForecastCompareEntryDto> AmountChanged,
     IReadOnlyList<ForecastCompareEntryDto> CategoryChanged);
+
+/// <summary>"Benim günüm" öneri türleri (sunucudaki <c>MyDaySuggestionKind</c> ile aynı değerler).</summary>
+public static class MyDayKinds
+{
+    public const string NewLead = "NewLead";
+    public const string OverdueOpportunity = "OverdueOpportunity";
+    public const string QuoteFollowUp = "QuoteFollowUp";
+    public const string StaleOpportunity = "StaleOpportunity";
+}
+
+/// <summary>"Benim günüm" önerisi (<c>/api/crm/my-day</c>); Kind: NewLead, OverdueOpportunity, QuoteFollowUp, StaleOpportunity. Metni istemci türe göre kurar.</summary>
+public sealed record MyDaySuggestionDto(
+    string Kind, Guid RecordId, string Number, string Title, string? Subtitle, string? Stage, decimal? Amount, string Currency,
+    int? DaysOverdue, int? DaysSinceContact, int? DaysWaiting, DateTimeOffset? Since);
+
+public sealed record MyDayClosingDto(Guid Id, string Number, string Title, decimal? Amount, string Currency, int? Probability, DateOnly ExpectedCloseDate, bool Overdue);
+
+/// <summary>"Benim günüm" özeti: oturumdaki kullanıcının kendi kayıtları; izni olmayan bölüm boş döner (<c>…Available</c> false).</summary>
+public sealed record MyDayDto(
+    DateOnly Today,
+    DateOnly WeekStart,
+    bool AmountsVisible,
+    bool OpportunitiesAvailable,
+    bool LeadsAvailable,
+    bool QuotesAvailable,
+    int OpenOpportunityCount,
+    int OverdueOpportunityCount,
+    int NewLeadCount,
+    int QuotesPresentedThisWeek,
+    int WonThisWeek,
+    int QuoteReminderDays,
+    int StaleDays,
+    IReadOnlyList<MyDaySuggestionDto> Suggestions,
+    IReadOnlyList<MyDayClosingDto> ClosingThisMonth);
