@@ -4,13 +4,13 @@
 @inject CrmLookups Lookups
 @inject NavigationManager Navigation
 
-<PageTitle>Teklifler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.quotes.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuotesRead">
     <div class="page-header">
-        <h1>Teklifler</h1>
+        <h1>@Texts.Get("crm.quotes.title")</h1>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="crm/teklif-raporu">Rapor</a>
+            <a class="btn btn-outline-secondary" href="crm/teklif-raporu">@Texts.Get("crm.quotes.report")</a>
         </div>
     </div>
 
@@ -20,21 +20,21 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; kapsamı sunucu uygular (kimse yetkisi dışındaki teklifi listeleyemez). *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Teklif görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("crm.quotes.viewsLabel")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="quote-search">Teklif ara</label>
-            <input id="quote-search" class="form-control" type="search" placeholder="Başlık veya teklif no ara" @bind="search" />
+            <label class="visually-hidden" for="quote-search">@Texts.Get("crm.quotes.searchLabel")</label>
+            <input id="quote-search" class="form-control" type="search" placeholder="@Texts.Get("crm.quotes.searchPlaceholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(CrmAccess.QuotesWrite))
         {
-            <a class="btn btn-primary" href="crm/teklifler/yeni"><AppIcon Name="plus" Size="16" /> Yeni teklif</a>
+            <a class="btn btn-primary" href="crm/teklifler/yeni"><AppIcon Name="plus" Size="16" /> @Texts.Get("crm.quotes.new")</a>
         }
     </div>
-    <div class="filters" role="group" aria-label="Süzgeçler">
-        <button type="button" class="chip @(latestOnly ? "active" : null)" aria-pressed="@(latestOnly ? "true" : "false")" @onclick="ToggleLatestAsync">Yalnızca son revizyonlar</button>
+    <div class="filters" role="group" aria-label="@Texts.Get("crm.quotes.filtersLabel")">
+        <button type="button" class="chip @(latestOnly ? "active" : null)" aria-pressed="@(latestOnly ? "true" : "false")" @onclick="ToggleLatestAsync">@Texts.Get("crm.quotes.latestOnly")</button>
     </div>
 
     <PersonalViewBar Active="Active" Dirty="grid.Differs(Active) || FiltersDiffer" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
@@ -42,23 +42,23 @@
 
     @if (page is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Bu görünümde teklif yok.</p>
+        <p class="text-muted">@Texts.Get("crm.quotes.empty")</p>
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Teklif listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("crm.quotes.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" Class="@(column.Key == "total" ? "text-end" : null)" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -70,8 +70,8 @@
                             @Cell(column, quote)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{quote.Title} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="crm/teklifler/@quote.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", quote.Title)">
+                                <a class="view-menu-item" role="menuitem" href="crm/teklifler/@quote.Id"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></a>
                             </RowMenu>
                         </td>
                     </tr>
@@ -90,32 +90,32 @@
     private const string StatusPrefix = "status:";
 
     // Varsayılan sıra son oluşturulan teklif ("-createdAt"). Müşteri ve Sorumlu sütunları sunucuda sıralanamaz (adları firma/üyelik tablosundadır).
-    private static readonly GridColumnDef[] Columns =
+    private static GridColumnDef[] Columns =>
     [
-        new("title", "Teklif", "type", "title", "-title", Locked: true),
-        new("company", "Müşteri", "building"),
-        new("status", "Durum", "tag", "status", "-status"),
-        new("approval", "Onay", "check-circle", "approvalStatus", "-approvalStatus"),
-        new("total", "Toplam", "coins", "grossTotal", "-grossTotal"),
-        new("validUntil", "Geçerlilik", "calendar", "validUntil", "-validUntil"),
-        new("owner", "Sorumlu", "user"),
-        new("number", "Teklif no", "hash", "number", "-number", DefaultVisible: false),
-        new("issueDate", "Düzenleme tarihi", "calendar", "issueDate", "-issueDate", DefaultVisible: false),
+        new("title", Texts.Get("crm.quotes.col.title"), "type", "title", "-title", Locked: true),
+        new("company", Texts.Get("crm.quotes.col.company"), "building"),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
+        new("approval", Texts.Get("crm.quotes.col.approval"), "check-circle", "approvalStatus", "-approvalStatus"),
+        new("total", Texts.Get("crm.quotes.col.total"), "coins", "grossTotal", "-grossTotal"),
+        new("validUntil", Texts.Get("crm.quotes.col.validUntil"), "calendar", "validUntil", "-validUntil"),
+        new("owner", Texts.Get("common.field.owner"), "user"),
+        new("number", Texts.Get("crm.quotes.col.number"), "hash", "number", "-number", DefaultVisible: false),
+        new("issueDate", Texts.Get("crm.quotes.col.issueDate"), "calendar", "issueDate", "-issueDate", DefaultVisible: false),
     ];
 
     // Görünüm sekmeleri yalnızca süzgeçtir.
-    private static readonly IReadOnlyList<ViewOption> SystemViews =
+    private static IReadOnlyList<ViewOption> SystemViews =>
     [
-        new(AllView, "Tüm teklifler", Icon: "file-text"),
-        new(MineView, "Tekliflerim", Icon: "star"),
-        new(PendingView, "Onay bekleyenler", Icon: "hourglass"),
-        new(ExpiringView, "Süresi yaklaşanlar (7 gün)", Icon: "clock"),
-        new(StatusPrefix + "Draft", "Taslaklar", Icon: "tag"),
-        new(StatusPrefix + "Presented", "Gönderilenler", Icon: "tag"),
-        new(StatusPrefix + "Accepted", "Kabul edilenler", Icon: "tag"),
-        new(StatusPrefix + "Rejected", "Reddedilenler", Icon: "tag"),
-        new(StatusPrefix + "Expired", "Süresi dolanlar", Icon: "tag"),
-        new(StatusPrefix + "Cancelled", "İptal edilenler", Icon: "tag"),
+        new(AllView, Texts.Get("crm.quotes.view.all"), Icon: "file-text"),
+        new(MineView, Texts.Get("crm.quotes.view.mine"), Icon: "star"),
+        new(PendingView, Texts.Get("crm.quotes.view.pending"), Icon: "hourglass"),
+        new(ExpiringView, Texts.Get("crm.quotes.view.expiring"), Icon: "clock"),
+        new(StatusPrefix + "Draft", Texts.Get("crm.quotes.view.draft"), Icon: "tag"),
+        new(StatusPrefix + "Presented", Texts.Get("crm.quotes.view.presented"), Icon: "tag"),
+        new(StatusPrefix + "Accepted", Texts.Get("crm.quotes.view.accepted"), Icon: "tag"),
+        new(StatusPrefix + "Rejected", Texts.Get("crm.quotes.view.rejected"), Icon: "tag"),
+        new(StatusPrefix + "Expired", Texts.Get("crm.quotes.view.expired"), Icon: "tag"),
+        new(StatusPrefix + "Cancelled", Texts.Get("crm.quotes.view.cancelled"), Icon: "tag"),
     ];
 
     private readonly GridViewState grid = new("crm.quotes", "-createdAt");
@@ -285,9 +285,9 @@
         _ => @<text></text>,
     };
 
-    private static readonly RenderFragment ExpiringBadge = @<span class="badge stage-onhold">Süresi yaklaşıyor</span>;
+    private static RenderFragment ExpiringBadge => @<span class="badge stage-onhold">@Texts.Get("crm.quotes.expiringSoon")</span>;
 
-    private static readonly RenderFragment OverdueBadge = @<span class="badge stage-cancelled">Süresi geçti</span>;
+    private static RenderFragment OverdueBadge => @<span class="badge stage-cancelled">@Texts.Get("crm.quotes.overdue")</span>;
 
     private static bool IsExpiringSoon(QuoteDto q) =>
         q.Status == "Presented" && q.ValidUntil is { } until && until > DateTimeOffset.UtcNow && until <= DateTimeOffset.UtcNow.AddDays(7);
