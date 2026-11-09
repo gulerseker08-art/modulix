@@ -32,6 +32,7 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
     public const int StepNameMaxLength = 100;
     public const int MaxSteps = 10;
     public const int MaxDueHours = 8760;
+    public const int GatedCommandsMaxLength = 500;
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -56,6 +57,15 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
 
     public bool IsActive { get; private set; }
 
+    /// <summary>
+    /// Bu süreç onaylanmadan yapılamayan modül işlemleri (Ç6a.3); anahtarlar virgülle ayrılır, yalnızca kayda bağlı süreçte dolu olabilir.
+    /// Anahtarların kayıt türünün beyanında olduğunu servis denetler.
+    /// </summary>
+    public string? GatedCommands { get; private set; }
+
+    public IReadOnlyList<string> Commands =>
+        GatedCommands is null ? [] : GatedCommands.Split(',', StringSplitOptions.RemoveEmptyEntries);
+
     public string StepsJson { get; private set; } = "[]";
 
     /// <summary>İçerik sürümü: adım ya da para birimi değişince bir artar ve talebe yazılır.</summary>
@@ -77,7 +87,7 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
 
     public static ApprovalDefinition Create(
         string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now,
-        string? targetEntityKey = null)
+        string? targetEntityKey = null, IReadOnlyList<string>? gatedCommands = null)
     {
         ApprovalDefinition definition = new()
         {
@@ -88,16 +98,16 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
             CreatedBy = userId,
             Version = 1,
         };
-        definition.Assign(name, description, currency, steps, userId, now, targetEntityKey);
+        definition.Assign(name, description, currency, steps, userId, now, targetEntityKey, gatedCommands);
         return definition;
     }
 
     public void Update(
         string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now,
-        string? targetEntityKey = null)
+        string? targetEntityKey = null, IReadOnlyList<string>? gatedCommands = null)
     {
         (string StepsJson, string? Currency, string? Target) before = (StepsJson, Currency, TargetEntityKey);
-        Assign(name, description, currency, steps, userId, now, targetEntityKey);
+        Assign(name, description, currency, steps, userId, now, targetEntityKey, gatedCommands);
         if (before != (StepsJson, Currency, TargetEntityKey))
         {
             Revision++;
@@ -116,9 +126,22 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
 
     private void Assign(
         string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now,
-        string? targetEntityKey)
+        string? targetEntityKey, IReadOnlyList<string>? gatedCommands)
     {
         TargetEntityKey = string.IsNullOrWhiteSpace(targetEntityKey) ? null : targetEntityKey.Trim();
+        List<string> commands = [.. (gatedCommands ?? [])
+            .Select(c => (c ?? string.Empty).Trim()).Where(c => c.Length > 0).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
+        if (commands.Count > 0 && TargetEntityKey is null)
+        {
+            throw new ArgumentException("Onaysız yapılamayacak işlem seçmek için süreci bir kayıt türüne bağlayın.");
+        }
+
+        if (commands.Any(c => c.Contains(',', StringComparison.Ordinal)) || string.Join(',', commands).Length > GatedCommandsMaxLength)
+        {
+            throw new ArgumentException("Geçersiz işlem seçimi.");
+        }
+
+        GatedCommands = commands.Count == 0 ? null : string.Join(',', commands);
         string trimmedName = (name ?? string.Empty).Trim();
         if (trimmedName.Length is 0 or > NameMaxLength)
         {

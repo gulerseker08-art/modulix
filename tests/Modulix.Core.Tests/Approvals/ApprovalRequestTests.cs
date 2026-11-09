@@ -102,4 +102,34 @@ public class ApprovalRequestTests
         definition.Update("Yeni ad", null, null, [Step("Yönetici", 1), Step("Genel müdür", 2)], Requester, Now);
         Assert.Equal(2, definition.Revision);
     }
+
+    [Fact]
+    public void Gated_commands_are_trimmed_deduplicated_and_need_a_record_bound_process()
+    {
+        var definition = ApprovalDefinition.Create("Fırsat onayı", null, "TRY", [Step("Yönetici", 1)], Requester, Now, "crm.opportunity", [" win ", "win", ""]);
+        Assert.Equal(["win"], definition.Commands);
+
+        definition.Update("Fırsat onayı", null, "TRY", [Step("Yönetici", 1)], Requester, Now, "crm.opportunity", []);
+        Assert.Empty(definition.Commands);
+        Assert.Null(definition.GatedCommands);
+
+        Assert.Throws<ArgumentException>(() =>
+            ApprovalDefinition.Create("Serbest", null, null, [Step("Yönetici", 1)], Requester, Now, null, ["win"]));
+        Assert.Throws<ArgumentException>(() =>
+            ApprovalDefinition.Create("Virgüllü", null, null, [Step("Yönetici", 1)], Requester, Now, "crm.opportunity", ["a,b"]));
+    }
+
+    [Fact]
+    public void An_approved_request_can_be_invalidated_when_its_amount_changes()
+    {
+        var definition = Definition("TRY", Step("Yönetici", 1));
+        var (request, steps) = ApprovalRequest.Open(definition, "Başlık", null, 100m, "TRY", Requester, Now);
+        request.Approve(steps[0], steps, Approver, null, Now);
+        Assert.Equal(ApprovalRequestStatus.Approved, request.Status);
+
+        request.Invalidate(steps, Now.AddHours(1));
+
+        Assert.Equal(ApprovalRequestStatus.Invalidated, request.Status);
+        Assert.Equal(ApprovalStepStatus.Approved, steps[0].Status);
+    }
 }

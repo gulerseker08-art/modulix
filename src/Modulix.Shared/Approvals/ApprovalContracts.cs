@@ -5,17 +5,20 @@ public sealed record ApprovalStepDefinitionDto(
 
 public sealed record ApprovalDefinitionDto(
     Guid Id, string Name, string? Description, string? Currency, bool IsActive, int Revision, long Version, IReadOnlyList<ApprovalStepDefinitionDto> Steps,
-    string? TargetEntityKey = null);
+    string? TargetEntityKey = null, IReadOnlyList<string>? GatedCommands = null);
 
 public sealed record SaveApprovalDefinitionRequest(
     string Name, string? Description, string? Currency, IReadOnlyList<ApprovalStepDefinitionDto> Steps, long? ExpectedVersion = null,
-    string? TargetEntityKey = null);
+    string? TargetEntityKey = null, IReadOnlyList<string>? GatedCommands = null);
 
-public sealed record ApprovalTargetDto(string EntityKey, string DisplayName);
+/// <summary>Onaya açık kayıt türü ve onaya bağlanabilen işlemleri (Ç6a.3).</summary>
+public sealed record ApprovalTargetDto(string EntityKey, string DisplayName, IReadOnlyList<ApprovalCommandDto>? Commands = null);
+
+public sealed record ApprovalCommandDto(string Key, string DisplayName);
 
 public sealed record RecordApprovalStatusDto(Guid RequestId, string Process, string Status, DateTimeOffset SubmittedAt, DateTimeOffset? CompletedAt, string? CurrentStep);
 
-public sealed record RecordApprovalViewDto(IReadOnlyList<ApproverOptionDto> Processes, RecordApprovalStatusDto? Latest);
+public sealed record RecordApprovalViewDto(IReadOnlyList<ApproverOptionDto> Processes, RecordApprovalStatusDto? Latest, IReadOnlyList<string>? RequiredFor = null);
 
 public sealed record SetApprovalDefinitionActiveRequest(bool IsActive);
 

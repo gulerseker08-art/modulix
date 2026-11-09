@@ -196,7 +196,9 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 4a | Genel onay: süreç tanımı, talep, Onay merkezi (Ç6a asgari) | Uygulandı (aşağıda "Dilim 4a") |
 | 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Uygulandı (aşağıda "Dilim 4b") |
 | 4c | Kayda bağlı onay (modül beyanı, geçersizleşme, kayıt paneli) | Uygulandı (aşağıda "Dilim 4c") |
-| 4c-2 | Kural aksiyonu "onaya gönder", onay sonucunun modül komutuna bağlanması, kalıcı akış | **Kural aksiyonu uygulandı** (aşağıda "Dilim 4c-2"); onay sonucunun modül komutuna bağlanması (Ç6a.3) ve kalıcı akış sonra |
+| 4c-2 | Kural aksiyonu "onaya gönder" | Uygulandı (aşağıda "Dilim 4c-2") |
+| 4c-3 | Onay kapısı: onay sonucunun modül işlemine bağlanması (Ç6a.3) | Uygulandı (aşağıda "Dilim 4c-3") |
+| 4c-4 | Kalıcı çok adımlı iş akışı | Sonra |
 | 4d | Takvim ortaklaştırma, puanlama, şablon motoru | **Metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); takvim ortaklaştırma ve puanlama sonra |
 | 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c"); 5d kayıt seçici, kayıt üzerinde deneme ve elle çalıştırma uygulandı ("Dilim 5d") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
@@ -576,3 +578,15 @@ Kural motoru ile kayda bağlı onay (4a/4b/4c) birbirine bağlandı: bir kural, 
 | --- | --- |
 | `dotnet test tests/Modulix.Core.Tests --filter ApprovalAutomationTests` | 4: Core aksiyonu ve izni beyanı (tutar parametresi yok), `OwnerField` doğrulaması, kural adımı anahtarı (`SourceKey`) ve geçersiz anahtar, aksiyona özgü denetim yalnızca kendi aksiyonunda çalışır |
 | `dotnet test tests/Modulix.IntegrationTests --filter ApprovalAutomationTests` (SQL Server; CI koşar) | 4: mutlu yol (kayda bağlı talep, sorumlu talep sahibi, başlık değişkenden, tutar kayıttan, tekrar turda ikinci talep yok, onaycı bekleyenlerde görür), hata (bilinmeyen süreç 422, türe bağlı olmayan süreç 422, süreç sonradan kapanınca ve dört göz sağlanamayınca adım başarısız), tenant izolasyonu (aynı adlı süreçler, her firma kendi kaydından kendi talebini açar), yetki (`core.approvals.request` olmayan aksiyonu yayınlayamaz) |
+
+### Dilim 4c-3: Onay kapısı (9 Kasım 2026)
+
+Ç6a.3'ün uygulanması: onay sonucu modül işlemini açar ya da kilitler. Kural aksiyonu "onaya gönder" (4c-2) talebi açar; kapı sonucunu modül işlemine bağlar.
+
+- **Modül beyanı:** `ApprovalTargetDefinition.Commands` (`ApprovalCommandDefinition`: kalıcı anahtar + arayüz adı). CRM fırsatı `win` ("Kazanıldı olarak kapatma") beyan eder. Core işlem adı ya da sektör bilmez.
+- **Firma seçimi (dinamik):** kayda bağlı süreçte `GatedCommands` (virgülle ayrılmış anahtarlar; yalnızca kayda bağlı süreçte, yalnızca türün beyan ettiği işlemler; denetimde "Onaysız yapılamaz"). Seçilmeyen işlem serbesttir; kodda süreç ya da firma adına bağlı dal yoktur.
+- **Kapı:** `IApprovalGate.BlockReasonAsync(kayıt, işlem)` (Core.Contracts). İşleme bağlı etkin süreç yoksa `null`; varsa kaydın o süreçlerdeki son talebi `Approved` olmalıdır. Değilse kullanıcıya gösterilecek neden döner (onay yok, bekliyor, reddedildi, geçersizleşti). Modül işlemden önce sorar; CRM `OpportunityWorkflow.WinAsync` 422 ile reddeder. Teklif kabulündeki otomatik kazanma da aynı yoldan geçtiği için kapıya takılır ve nedeni teklif tarihçesine yazar.
+- **Onay tutara bağlıdır:** geçersizleşme bekleyen taleplerle birlikte **onaylanmış** talepleri de kapsar. Onaydan sonra tutar ya da para birimi değişirse onay `Invalidated` olur ve kapı yeniden kapanır. 4c'deki "verilmiş onay değişen tutara taşınmaz" kuralının kapı tarafındaki karşılığıdır.
+- **Arayüz:** süreç formunda kayıt türü seçilince "Onaysız yapılamaz" seçenekleri. Kayıt onay kartında onay verilmemişken "Onay olmadan yapılamaz: …" satırı (`RecordApprovalView.RequiredFor`).
+
+**Bilerek yapılmadı:** başka modül işlemleri (sipariş onayı, sözleşme imzası; modüller beyan ettikçe gelir), işlem başına farklı süreç önceliği (birden çok süreç bağlıysa herhangi birinin son onayı yeter), kapının arayüzde düğmeyi önceden kapatması (bugün düğme açık, sunucu reddeder ve nedeni gösterir).
