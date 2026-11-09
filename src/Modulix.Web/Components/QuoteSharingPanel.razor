@@ -6,22 +6,22 @@
 
 @* Sunulmuş teklifin müşteri belgesi (PDF), paylaşım bağlantıları ve müşterinin kararı (ADR-0019). Her şey sunucudan gelir; maliyet/iç not yoktur. *@
 <section aria-labelledby="share-title" class="quote-sharing">
-    <h2 id="share-title">Müşteri belgesi ve paylaşım</h2>
+    <h2 id="share-title">@Texts.Get("crm.quoteShare.title")</h2>
     <Notice Text="@notice" Failed="@noticeFailed" />
 
     @if (!loaded)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else
     {
-        <h3 class="h6">Belge (PDF)</h3>
+        <h3 class="h6">@Texts.Get("crm.quoteShare.documents")</h3>
         @if (documents.Count == 0)
         {
-            <p class="text-muted">Bu teklif için henüz müşteri belgesi üretilmemiş.</p>
+            <p class="text-muted">@Texts.Get("crm.quoteShare.noDocument")</p>
             @if (CanShare && Quote.Status == "Presented")
             {
-                <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="GenerateAsync">Belgeyi üret</button>
+                <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="GenerateAsync">@Texts.Get("crm.quoteShare.generate")</button>
             }
         }
         else
@@ -31,53 +31,53 @@
                 {
                     <li>
                         <a href="api/crm/quotes/@Quote.Id/documents/@document.Id/file" download="@document.FileName">@document.FileName</a>
-                        <span class="text-muted">@(document.SizeBytes / 1024) KB · @CrmLabels.Time(document.CreatedAt) · şablon v@(document.TemplateVersion)</span>
+                        <span class="text-muted">@Texts.Get("crm.quoteShare.docMeta", document.SizeBytes / 1024, CrmLabels.Time(document.CreatedAt), document.TemplateVersion)</span>
                         <div class="small text-muted">SHA-256: <code title="@document.Sha256">@document.Sha256[..16]…@document.Sha256[^8..]</code></div>
                     </li>
                 }
             </ul>
-            <p class="small text-muted">Belge sunum anında sabitlenir; sonradan firma kartı ya da katalog değişse de müşterinin gördüğü belge aynı kalır.</p>
+            <p class="small text-muted">@Texts.Get("crm.quoteShare.docNote")</p>
         }
 
         @if (CanShare)
         {
-            <h3 class="h6">Paylaşım bağlantıları</h3>
+            <h3 class="h6">@Texts.Get("crm.quoteShare.links")</h3>
             @if (created is not null)
             {
                 <div class="alert alert-success" role="status">
-                    <strong>Bağlantı oluşturuldu.</strong> Bu bağlantı <strong>bir daha gösterilmez</strong>; şimdi kopyalayın.
+                    <strong>@Texts.Get("crm.quoteShare.createdTitle")</strong> @Texts.Strong("crm.quoteShare.createdNote", Texts.Get("crm.quoteShare.neverAgain"))
                     <div class="share-url">
-                        <label class="visually-hidden" for="share-url">Müşteri bağlantısı</label>
+                        <label class="visually-hidden" for="share-url">@Texts.Get("crm.quoteShare.urlLabel")</label>
                         <input id="share-url" class="form-control" readonly value="@FullUrl(created)" />
-                        <button type="button" class="btn btn-outline-primary" @onclick="() => CopyAsync(created)">Kopyala</button>
-                        <button type="button" class="btn btn-link" @onclick="() => created = null">Kapat</button>
+                        <button type="button" class="btn btn-outline-primary" @onclick="() => CopyAsync(created)">@Texts.Get("crm.quoteShare.copy")</button>
+                        <button type="button" class="btn btn-link" @onclick="() => created = null">@Texts.Get("common.close")</button>
                     </div>
-                    <div class="small text-muted">Belirteç adres çubuğunda # işaretinden sonra durur; sunucu günlüklerine ve yönlendiren başlığına girmez.</div>
+                    <div class="small text-muted">@Texts.Get("crm.quoteShare.tokenNote")</div>
                 </div>
             }
 
             @if (links.Count == 0)
             {
-                <p class="text-muted">Henüz bağlantı oluşturulmadı.</p>
+                <p class="text-muted">@Texts.Get("crm.quoteShare.noLinks")</p>
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Paylaşım bağlantıları</caption>
+                    <caption class="visually-hidden">@Texts.Get("crm.quoteShare.links")</caption>
                     <thead>
-                        <tr><th scope="col">Alıcı</th><th scope="col">Durum</th><th scope="col">Bitiş</th><th scope="col">İlk görüntüleme</th><th scope="col">E-posta</th><th scope="col">Bağlantı</th><th scope="col">İşlem</th></tr>
+                        <tr><th scope="col">@Texts.Get("crm.quoteShare.col.recipient")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("crm.quoteShare.col.expires")</th><th scope="col">@Texts.Get("crm.quoteShare.col.firstViewed")</th><th scope="col">@Texts.Get("crm.quoteShare.col.email")</th><th scope="col">@Texts.Get("crm.quoteShare.col.link")</th><th scope="col">@Texts.Get("crm.quoteShare.col.action")</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var link in links)
                         {
                             <tr>
-                                <td data-label="Alıcı" class="primary">@(link.RecipientName ?? "—")@if (link.RecipientEmail is not null) { <small class="text-muted"> @link.RecipientEmail</small> }</td>
-                                <td data-label="Durum"><span class="badge stage-@(link.State == "Active" ? "qualified" : "cancelled")">@LinkState(link.State)</span>
+                                <td data-label="@Texts.Get("crm.quoteShare.col.recipient")" class="primary">@(link.RecipientName ?? "—")@if (link.RecipientEmail is not null) { <small class="text-muted"> @link.RecipientEmail</small> }</td>
+                                <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@(link.State == "Active" ? "qualified" : "cancelled")">@LinkState(link.State)</span>
                                     @if (link.RevokeReason is not null) { <div class="small text-muted">@link.RevokeReason</div> }</td>
-                                <td data-label="Bitiş">@CrmLabels.Time(link.ExpiresAt)</td>
-                                <td data-label="İlk görüntüleme">@(link.FirstViewedAt is { } viewed ? CrmLabels.Time(viewed) : "Henüz açılmadı")</td>
-                                <td data-label="E-posta">
-                                    @if (link.DeliveryStatus == "NotSent") { <span class="text-muted">Gönderilmedi</span> }
+                                <td data-label="@Texts.Get("crm.quoteShare.col.expires")">@CrmLabels.Time(link.ExpiresAt)</td>
+                                <td data-label="@Texts.Get("crm.quoteShare.col.firstViewed")">@(link.FirstViewedAt is { } viewed ? CrmLabels.Time(viewed) : Texts.Get("crm.quoteShare.notOpened"))</td>
+                                <td data-label="@Texts.Get("crm.quoteShare.col.email")">
+                                    @if (link.DeliveryStatus == "NotSent") { <span class="text-muted">@QuoteLabels.Label(QuoteLabels.Deliveries, "NotSent")</span> }
                                     else
                                     {
                                         <span class="badge stage-@(link.DeliveryStatus == "Failed" ? "lost" : link.DeliveryStatus == "Succeeded" ? "won" : "onhold")">@QuoteLabels.Label(QuoteLabels.Deliveries, link.DeliveryStatus)</span>
@@ -85,22 +85,22 @@
                                         @if (link.DeliveryError is not null) { <div class="small text-muted">@link.DeliveryError</div> }
                                     }
                                 </td>
-                                <td data-label="Bağlantı"><code>…@link.TokenHint</code></td>
+                                <td data-label="@Texts.Get("crm.quoteShare.col.link")"><code>…@link.TokenHint</code></td>
                                 <td class="actions">
                                     @if (link.State == "Active")
                                     {
                                         @if (revoking == link.Id)
                                         {
                                             <form @onsubmit="() => RevokeAsync(link)" @onsubmit:preventDefault>
-                                                <label class="visually-hidden" for="revoke-@link.Id">İptal gerekçesi</label>
-                                                <input id="revoke-@link.Id" class="form-control form-control-sm" maxlength="500" placeholder="İptal gerekçesi (zorunlu)" @bind="revokeReason" />
-                                                <button type="submit" class="btn btn-outline-danger btn-sm" disabled="@busy">İptal et</button>
-                                                <button type="button" class="btn btn-link btn-sm" @onclick="() => revoking = null">Vazgeç</button>
+                                                <label class="visually-hidden" for="revoke-@link.Id">@Texts.Get("crm.quoteShare.revokeReasonLabel")</label>
+                                                <input id="revoke-@link.Id" class="form-control form-control-sm" maxlength="500" placeholder="@Texts.Get("crm.quoteShare.revokeReasonPlaceholder")" @bind="revokeReason" />
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" disabled="@busy">@Texts.Get("crm.quoteShare.revoke")</button>
+                                                <button type="button" class="btn btn-link btn-sm" @onclick="() => revoking = null">@Texts.Get("common.dismiss")</button>
                                             </form>
                                         }
                                         else
                                         {
-                                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => StartRevoke(link)">Bağlantıyı iptal et</button>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => StartRevoke(link)">@Texts.Get("crm.quoteShare.revokeLink")</button>
                                         }
                                     }
                                 </td>
@@ -113,40 +113,40 @@
             @if (Quote.Status == "Presented")
             {
                 <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
-                    <h4 class="h6">Yeni bağlantı</h4>
+                    <h4 class="h6">@Texts.Get("crm.quoteShare.newLink")</h4>
                     <div class="form-grid">
                         <div>
-                            <label class="form-label" for="share-name">Alıcı adı</label>
+                            <label class="form-label" for="share-name">@Texts.Get("crm.quoteShare.recipientName")</label>
                             <input id="share-name" class="form-control" maxlength="200" @bind="recipientName" />
                             <FieldError Errors="@errors" Field="recipientName" />
                         </div>
                         <div>
-                            <label class="form-label" for="share-email">Alıcı e-postası</label>
+                            <label class="form-label" for="share-email">@Texts.Get("crm.quoteShare.recipientEmail")</label>
                             <input id="share-email" class="form-control" type="email" maxlength="254" @bind="recipientEmail" />
                             <FieldError Errors="@errors" Field="recipientEmail" />
                         </div>
                         <div class="form-check">
                             <input id="share-send" class="form-check-input" type="checkbox" @bind="sendEmail" />
-                            <label class="form-check-label" for="share-send">Müşteriye e-postayla gönder (alıcı e-postası gerekir)</label>
+                            <label class="form-check-label" for="share-send">@Texts.Get("crm.quoteShare.sendEmail")</label>
                         </div>
                         <div>
-                            <label class="form-label" for="share-days">Geçerlilik (gün)</label>
-                            <input id="share-days" class="form-control" type="number" min="1" max="180" placeholder="Otomatik" @bind="validDays" />
+                            <label class="form-label" for="share-days">@Texts.Get("crm.quoteShare.validDays")</label>
+                            <input id="share-days" class="form-control" type="number" min="1" max="180" placeholder="@Texts.Get("crm.quoteShare.auto")" @bind="validDays" />
                             <FieldError Errors="@errors" Field="validDays" />
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@busy">Bağlantı oluştur</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.quoteShare.create")</button>
                     </div>
-                    <p class="small text-muted">Bağlantı yalnızca bu sürümün sabit belgesini gösterir. E-posta kuyruğa yazılır ve arka planda gönderilir; "Sağlayıcı kabul etti" yalnızca posta sunucusunun kabul ettiği anlamına gelir, alıcıya ulaştığını garanti etmez. İsterseniz bağlantıyı kendiniz de iletebilirsiniz.</p>
+                    <p class="small text-muted">@Texts.Get("crm.quoteShare.createNote")</p>
                 </form>
             }
         }
 
-        <h3 class="h6">Müşteri kararı</h3>
+        <h3 class="h6">@Texts.Get("crm.quoteShare.decision")</h3>
         @if (decisions.Count == 0)
         {
-            <p class="text-muted">Müşteri henüz karar vermedi.</p>
+            <p class="text-muted">@Texts.Get("crm.quoteShare.noDecision")</p>
         }
         else
         {
@@ -154,12 +154,12 @@
                 @foreach (var decision in decisions)
                 {
                     <li>
-                        <strong>@(decision.Decision == "Accepted" ? "Kabul etti" : "Reddetti")</strong>
+                        <strong>@Texts.Get(decision.Decision == "Accepted" ? "crm.quoteShare.decisionAccepted" : "crm.quoteShare.decisionRejected")</strong>
                         — @decision.SignerName@(decision.SignerTitle is null ? string.Empty : $", {decision.SignerTitle}")
                         <span class="text-muted">· @CrmLabels.Time(decision.At)@(decision.SignerEmail is null ? string.Empty : $" · {decision.SignerEmail}")</span>
-                        @if (decision.Reason is not null) { <div class="small">Gerekçe: @decision.Reason</div> }
-                        @if (decision.TermsStatement is not null) { <div class="small text-muted">Onaylanan metin: “@decision.TermsStatement”</div> }
-                        <div class="small text-muted">Belge özeti <code>@decision.DocumentSha256[..12]…</code>@(decision.ClientAddressMasked is null ? string.Empty : $" · istemci {decision.ClientAddressMasked}")</div>
+                        @if (decision.Reason is not null) { <div class="small">@Texts.Get("crm.quoteShare.reason", decision.Reason)</div> }
+                        @if (decision.TermsStatement is not null) { <div class="small text-muted">@Texts.Get("crm.quoteShare.terms", decision.TermsStatement)</div> }
+                        <div class="small text-muted">@Texts.Get("crm.quoteShare.digest") <code>@decision.DocumentSha256[..12]…</code>@(decision.ClientAddressMasked is null ? string.Empty : " · " + Texts.Get("crm.quoteShare.client", decision.ClientAddressMasked))</div>
                     </li>
                 }
             </ul>
@@ -224,7 +224,7 @@
         busy = true;
         var result = await Api.PostAsync<QuoteDocumentDto>($"/api/crm/quotes/{Quote.Id}/documents", new { });
         busy = false;
-        Notify(result.IsSuccess ? "Müşteri belgesi üretildi." : result.Error, !result.IsSuccess);
+        Notify(result.IsSuccess ? Texts.Get("crm.quoteShare.generated") : result.Error, !result.IsSuccess);
         await LoadAsync();
         await OnChanged.InvokeAsync();
     }
@@ -247,8 +247,8 @@
             Notify(queued switch
             {
                 null => null,
-                "Failed" => "Bağlantı oluşturuldu ancak e-posta kuyruğa yazılamadı; bağlantıyı elle iletebilirsiniz.",
-                _ => "Bağlantı oluşturuldu; e-posta gönderim kuyruğuna alındı.",
+                "Failed" => Texts.Get("crm.quoteShare.emailFailed"),
+                _ => Texts.Get("crm.quoteShare.emailQueued"),
             }, queued == "Failed");
             await LoadAsync();
             await OnChanged.InvokeAsync();
@@ -270,14 +270,14 @@
         if (busy) { return; }
         if (string.IsNullOrWhiteSpace(revokeReason))
         {
-            Notify("İptal gerekçesi zorunludur.", failed: true);
+            Notify(Texts.Get("crm.quoteShare.revokeReasonRequired"), failed: true);
             return;
         }
 
         busy = true;
         var result = await Api.PostAsync<QuoteShareLinkDto>($"/api/crm/quotes/{Quote.Id}/share-links/{link.Id}/revoke", new RevokeQuoteShareLinkRequest(revokeReason.Trim()));
         busy = false;
-        Notify(result.IsSuccess ? "Bağlantı iptal edildi; müşteri artık bu bağlantıyla teklifi göremez." : result.Error, !result.IsSuccess);
+        Notify(result.IsSuccess ? Texts.Get("crm.quoteShare.revoked") : result.Error, !result.IsSuccess);
         revoking = null;
         await LoadAsync();
         await OnChanged.InvokeAsync();
@@ -290,19 +290,19 @@
         try
         {
             await Js.InvokeVoidAsync("navigator.clipboard.writeText", FullUrl(link));
-            Notify("Bağlantı panoya kopyalandı.");
+            Notify(Texts.Get("crm.quoteShare.copied"));
         }
         catch (JSException)
         {
-            Notify("Pano erişimi engellendi; bağlantıyı alanı seçip elle kopyalayın.", failed: true);
+            Notify(Texts.Get("crm.quoteShare.copyBlocked"), failed: true);
         }
     }
 
     private static string LinkState(string state) => state switch
     {
-        "Active" => "Etkin",
-        "Expired" => "Süresi doldu",
-        "Revoked" => "İptal edildi",
+        "Active" => Texts.Get("crm.quoteShare.state.active"),
+        "Expired" => Texts.Get("crm.quoteShare.state.expired"),
+        "Revoked" => Texts.Get("crm.quoteShare.state.revoked"),
         _ => state,
     };
 
