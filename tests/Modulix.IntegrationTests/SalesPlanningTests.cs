@@ -12,7 +12,7 @@ using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0026 dilim 1: satış genel görünümü (metrikler, kur, hedef), hedefler (sürüm, çakışma) ve sürümlü tahmin (kategori, düzeltme, kilit, yeniden açma,
+/// ADR-0035 dilim 1: satış genel görünümü (metrikler, kur, hedef), hedefler (sürüm, çakışma) ve sürümlü tahmin (kategori, düzeltme, kilit, yeniden açma,
 /// karşılaştırma). Her özellik için mutlu yol, doğrulama, tenant izolasyonu ve yetki testleri.
 /// </summary>
 public class SalesPlanningTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>

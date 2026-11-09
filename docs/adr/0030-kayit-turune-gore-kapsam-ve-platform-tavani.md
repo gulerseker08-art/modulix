@@ -2,7 +2,7 @@
 
 Durum: **uygulandı** (3 Kasım 2026'da taslak, açık kararlar 4 Kasım 2026'da cevaplandı, bölüm 7; dilim 1, 2a, 2b ve 3 main'de, dilim 4 belge toparlamasıdır). Kalan işler bölüm 8'de, doğrulanmayanlar bölüm 9'dadır; "Doğrulandı" yazılanlar kodda okunmuş ya da testle/elle denenmiştir.
 
-Numara notu: `docs/adr` altında iki belge 0026, `0027` otomasyon, `0028` platform lisans ve tenant yönetimi, `0029` sektör profili genişletme numarasını taşır; bu belge bir sonraki boş numarayı (0030) kullanır. Taslak önce 0028, sonra 0029 olarak açılmış; numaralar başka belgelere verildiği için yeniden numaralandı. Aynı dönemde açılan içe aktarma günlüğü ADR'si de başta 0030 almıştı; o 0033'e taşındı ([ADR-0033](0033-import-takibi-ve-islem-gunlugu.md)), bu belge 0030 olarak kalır.
+Numara notu: `docs/adr` altında iki belge 0026 numarasını taşıyordu (raporlama belgesi sonradan 9 Kasım 2026'da 0035'e taşındı), `0027` otomasyon, `0028` platform lisans ve tenant yönetimi, `0029` sektör profili genişletme numarasını taşır; bu belge bir sonraki boş numarayı (0030) kullanır. Taslak önce 0028, sonra 0029 olarak açılmış; numaralar başka belgelere verildiği için yeniden numaralandı. Aynı dönemde açılan içe aktarma günlüğü ADR'si de başta 0030 almıştı; o 0033'e taşındı ([ADR-0033](0033-import-takibi-ve-islem-gunlugu.md)), bu belge 0030 olarak kalır.
 
 ## 1. Bağlam ve amaç
 

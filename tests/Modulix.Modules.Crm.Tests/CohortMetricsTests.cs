@@ -4,7 +4,7 @@ using Modulix.Modules.Crm.Reporting;
 
 namespace Modulix.Modules.Crm.Tests;
 
-/// <summary>Teklif ve lead kohortları, aşama akışı ve ekip performansı (ADR-0026 dilim 2; veritabanı gerektirmez). Kabul senaryoları 3, 4, 10.</summary>
+/// <summary>Teklif ve lead kohortları, aşama akışı ve ekip performansı (ADR-0035 dilim 2; veritabanı gerektirmez). Kabul senaryoları 3, 4, 10.</summary>
 public class CohortMetricsTests
 {
     private static readonly TimeZoneInfo Istanbul = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul");
@@ -271,7 +271,7 @@ public class CohortMetricsTests
     }
 }
 
-/// <summary>Veri kalitesi denetimi (ADR-0026 dilim 2; kabul senaryosu 10).</summary>
+/// <summary>Veri kalitesi denetimi (ADR-0035 dilim 2; kabul senaryosu 10).</summary>
 public class DataQualityTests
 {
     private static readonly DateOnly Today = new(2026, 11, 2);

@@ -46,7 +46,7 @@ public interface ISalesAnalytics
 }
 
 /// <summary>
-/// Satış analizleri (ADR-0026, dilim 2): teklif ve lead kohortları, tarihsel aşama dönüşümü, kullanıcı bazında performans ve veri kalitesi. Veri kayıt boru hattından okunur
+/// Satış analizleri (ADR-0035, dilim 2): teklif ve lead kohortları, tarihsel aşama dönüşümü, kullanıcı bazında performans ve veri kalitesi. Veri kayıt boru hattından okunur
 /// (izin, veri kapsamı, tutar/olasılık hassas alanı); tarihçe tabanlı aşama akışı yalnızca fırsatın <b>bugünkü</b> sorumlusu çağıranın kapsamındaki fırsatları sayar.
 /// Hesap saf işlevlerdedir (<see cref="QuoteCohort"/>, <see cref="LeadCohort"/>, <see cref="StageFlow"/>, <see cref="TeamPerformance"/>, <see cref="DataQuality"/>).
 /// </summary>

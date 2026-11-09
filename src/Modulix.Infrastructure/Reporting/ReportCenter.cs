@@ -12,7 +12,7 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Infrastructure.Reporting;
 
 /// <summary>
-/// Kayıtlı raporlar (ADR-0026, dilim 3). Raporlar ve paylaşımları tenant verisidir (query filter + RLS); görünürlük her okumada yeniden
+/// Kayıtlı raporlar (ADR-0035, dilim 3). Raporlar ve paylaşımları tenant verisidir (query filter + RLS); görünürlük her okumada yeniden
 /// hesaplanır, bu yüzden paylaşım kaldırılınca ya da rapor özel yapılınca erişim hemen biter. Rapor tanımı veri erişimi vermez; çalıştırma
 /// çağıranın yetkisiyle <see cref="IReportRunner"/> üzerinden yapılır. Her yazma <c>core.report</c> kaydı olarak denetime yazılır.
 /// </summary>

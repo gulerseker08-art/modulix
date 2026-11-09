@@ -91,7 +91,7 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
         builder.HasIndex(o => new { o.TenantId, o.Stage });
         builder.HasIndex(o => new { o.TenantId, o.OwnerId });
         // Liste ve rapor okumaları "durum süzgeci + en yeni önce" sıralıdır (ORDER BY CreatedAt DESC, Id): bu dizin sıralamayı ve sayfalamayı
-        // anahtar aramasından önce yapar (ölçüm: 5000 açık fırsatta 25 sayfalık okuma ≈2,6 sn → ≈1,1 sn, ADR-0026 bölüm 8).
+        // anahtar aramasından önce yapar (ölçüm: 5000 açık fırsatta 25 sayfalık okuma ≈2,6 sn → ≈1,1 sn, ADR-0035 bölüm 8).
         builder.HasIndex(o => new { o.TenantId, o.Status, o.CreatedAt, o.Id })
             .IsDescending(false, false, true, false)
             .HasDatabaseName("IX_Opportunities_TenantId_Status_CreatedAt");
@@ -515,7 +515,7 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.HasIndex(l => new { l.TenantId, l.LeadNumber }).IsUnique();
         builder.HasIndex(l => new { l.TenantId, l.Status, l.OwnerId });
         // Liste ve rapor okumaları "en yeni önce" sıralıdır (ORDER BY FirstReceivedAt DESC, Id): sıralamanın indeksle verilmesi için Id açıkça ve aynı
-        // yönde yer alır (aksi halde SQL Server her sayfada tüm satırları sıralıyordu; ölçüm: 5000 lead okuması 3,5 sn, ADR-0026 bölüm 8).
+        // yönde yer alır (aksi halde SQL Server her sayfada tüm satırları sıralıyordu; ölçüm: 5000 lead okuması 3,5 sn, ADR-0035 bölüm 8).
         // Eski (TenantId, FirstReceivedAt) dizininin yerini alır; dönem aralığı süzgeçleri aynı önek dizinden yararlanır.
         builder.HasIndex(l => new { l.TenantId, l.FirstReceivedAt, l.Id }).IsDescending(false, true, false);
         builder.HasIndex(l => new { l.TenantId, l.Status, l.FirstReceivedAt, l.Id }).IsDescending(false, false, true, false);

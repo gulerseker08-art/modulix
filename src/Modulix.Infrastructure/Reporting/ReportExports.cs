@@ -12,7 +12,7 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Infrastructure.Reporting;
 
 /// <summary>
-/// Dışa aktarma (ADR-0026, dilim 4). Dosya, ekrandaki sonuçla aynı hesaptan (<see cref="IReportRunner"/>) çağıranın yetkisiyle üretilir; bu yüzden
+/// Dışa aktarma (ADR-0035, dilim 4). Dosya, ekrandaki sonuçla aynı hesaptan (<see cref="IReportRunner"/>) çağıranın yetkisiyle üretilir; bu yüzden
 /// hassas alan, veri kapsamı ve tenant sınırı çalıştırıcıda uygulanır, burada tekrar hesap yoktur. Dosya yalnızca sahibine verilir. İndirmede
 /// <b>yetki yeniden denetlenir</b>: rapor merkezi ve dışa aktarma izni, modül, veri kümesi okuma yetkisi ve hazırlandığı andaki erişim parmak izi
 /// (<see cref="ReportAccessStamp"/>); biri tutmuyorsa dosya verilmez. Üretim ve indirme denetim kaydına yazılır (kim, kaç satır).

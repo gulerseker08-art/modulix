@@ -68,7 +68,7 @@ public sealed class CoreModule : IModule
         /// <summary>Onay süreçlerini tanımlar, bütün talepleri görür ve sahipsiz adımın onaycısını değiştirir.</summary>
         public const string ManageApprovals = "core.approvals.manage";
 
-        /// <summary>Rapor merkezini açar, hazır ve paylaşılan raporları çalıştırır (ADR-0026, dilim 3). Veri erişimi vermez: her rapor çalıştıranın kayıt yetkisiyle çalışır.</summary>
+        /// <summary>Rapor merkezini açar, hazır ve paylaşılan raporları çalıştırır (ADR-0035, dilim 3). Veri erişimi vermez: her rapor çalıştıranın kayıt yetkisiyle çalışır.</summary>
         public const string ReadReports = "core.reports.read";
 
         /// <summary>Kendi raporlarını oluşturur, düzenler ve siler; rapor oluşturucuyu kullanır.</summary>
@@ -77,7 +77,7 @@ public sealed class CoreModule : IModule
         /// <summary>Kendi raporunu firmayla ya da seçilen kullanıcılarla paylaşır. Paylaşım veri erişimi kazandırmaz.</summary>
         public const string ShareReports = "core.reports.share";
 
-        /// <summary>Rapor sonucunu CSV olarak dışa aktarır (ADR-0026, dilim 4). Dosya yalnızca sahibine, indirme anında yetki yeniden denetlenerek verilir.</summary>
+        /// <summary>Rapor sonucunu CSV olarak dışa aktarır (ADR-0035, dilim 4). Dosya yalnızca sahibine, indirme anında yetki yeniden denetlenerek verilir.</summary>
         public const string ExportReports = "core.reports.export";
 
         /// <summary>Kendi raporlarını zamanlar; zamanlanmış rapor çalışırken sahibinin yetkisi yeniden denetlenir, yetki kaybında teslim durur.</summary>
@@ -192,10 +192,10 @@ public sealed class CoreModule : IModule
         /// <summary>Onay vekâleti (ADR-0027 Dilim 4b); kaydın kimliği vekâletin kimliğidir.</summary>
         public const string ApprovalDelegation = "core.approval-delegation";
 
-        /// <summary>Kayıtlı rapor (ADR-0026, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
+        /// <summary>Kayıtlı rapor (ADR-0035, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string Report = "core.report";
 
-        /// <summary>Zamanlanmış rapor (ADR-0026, dilim 4); kaydın kimliği zamanlamanın kimliğidir.</summary>
+        /// <summary>Zamanlanmış rapor (ADR-0035, dilim 4); kaydın kimliği zamanlamanın kimliğidir.</summary>
         public const string ReportSchedule = "core.report-schedule";
 
         /// <summary>Tenant'ın faaliyet seçimi (ADR-0029); kaydın kimliği tenant'ın kimliğidir, seçimin tamamı bir kayıt olarak yazılır.</summary>

@@ -10,7 +10,7 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Infrastructure.Reporting;
 
 /// <summary>
-/// Kullanıcının zamanlanmış raporları (ADR-0026, dilim 4). Zamanlama yalnızca sahibine görünür ve yalnızca sahibinin görebildiği rapora kurulur.
+/// Kullanıcının zamanlanmış raporları (ADR-0035, dilim 4). Zamanlama yalnızca sahibine görünür ve yalnızca sahibinin görebildiği rapora kurulur.
 /// Takvim kuralları saftır (<see cref="ReportScheduleRules"/>); saat firmanın saat dilimindedir. Oluşturma, değiştirme, açma/kapama ve silme
 /// <c>core.report-schedule</c> kaydı olarak denetime yazılır. Çalıştırma <see cref="ReportSchedule"/> sınıfının açıkladığı kurallarla arka planda yapılır.
 /// </summary>

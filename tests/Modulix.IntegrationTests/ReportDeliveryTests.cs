@@ -19,7 +19,7 @@ using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0026 dilim 4: dışa aktarma (CSV) ve zamanlanmış rapor. Mutlu yol, hata/doğrulama, tenant izolasyonu ve yetki; indirme anında yetki denetimi, formül
+/// ADR-0035 dilim 4: dışa aktarma (CSV) ve zamanlanmış rapor. Mutlu yol, hata/doğrulama, tenant izolasyonu ve yetki; indirme anında yetki denetimi, formül
 /// enjeksiyonu, süre sonu, zamanlayıcının sahibin yetkisiyle çalışması, yetki kaybında teslimin durması, tekrar/yarışan çalışmada ikinci dosya/e-posta oluşmaması.
 /// </summary>
 public class ReportDeliveryTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>

@@ -3,7 +3,7 @@ using Modulix.Modules.Crm.Reporting;
 
 namespace Modulix.Modules.Crm.Tests;
 
-/// <summary>Satış metrikleri, dönem/mali takvim, kur ve hedef kuralları (ADR-0026; veritabanı gerektirmez). Kabul senaryoları 1, 2, 3, 8 ve 10.</summary>
+/// <summary>Satış metrikleri, dönem/mali takvim, kur ve hedef kuralları (ADR-0035; veritabanı gerektirmez). Kabul senaryoları 1, 2, 3, 8 ve 10.</summary>
 public class SalesMetricsTests
 {
     private static readonly DateOnly Today = new(2026, 11, 2);

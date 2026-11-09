@@ -5,7 +5,7 @@ using Modulix.Shared.Reporting;
 namespace Modulix.Web.Services;
 
 /// <summary>
-/// Rapor merkezinin (ADR-0026 dilim 3) etiket ve biçim yardımcıları. Sabit değerler sunucu sözleşmesindeki camelCase metinlerdir
+/// Rapor merkezinin (ADR-0035 dilim 3) etiket ve biçim yardımcıları. Sabit değerler sunucu sözleşmesindeki camelCase metinlerdir
 /// (<c>ReportContracts.cs</c> baş yorumu); burada yalnızca Türkçe adları ve gösterim biçimleri vardır, hesap sunucudadır.
 /// (Destek raporlarının yardımcıları <see cref="ReportLabels"/>'tadır.)
 /// </summary>

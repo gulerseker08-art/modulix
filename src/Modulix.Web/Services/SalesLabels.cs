@@ -3,7 +3,7 @@ using Modulix.Shared.Crm;
 namespace Modulix.Web.Services;
 
 /// <summary>
-/// Satış görünümü, hedef ve tahmin ekranlarının izin anahtarları (sunucudaki <c>CrmModule.Permissions</c> ile aynı; ADR-0026).
+/// Satış görünümü, hedef ve tahmin ekranlarının izin anahtarları (sunucudaki <c>CrmModule.Permissions</c> ile aynı; ADR-0035).
 /// Menü ve düğmeler buna göre gösterilir; asıl denetim sunucudadır.
 /// </summary>
 public static class SalesAccess

@@ -89,7 +89,7 @@ public interface IForecastWorkflow
 }
 
 /// <summary>
-/// Sürümlü satış tahmini (ADR-0026). Tahmin, dönem × kapsam × para birimi için kapsamdaki <b>açık fırsatların anlık görüntüsü</b> ve yönetici düzeltmeleridir; Taslak → Sunuldu → Kilitlendi
+/// Sürümlü satış tahmini (ADR-0035). Tahmin, dönem × kapsam × para birimi için kapsamdaki <b>açık fırsatların anlık görüntüsü</b> ve yönetici düzeltmeleridir; Taslak → Sunuldu → Kilitlendi
 /// akışıyla yönetilir. Bütün yazmalar kayıt boru hattından (izin, audit, olay) ve <see cref="ForecastWorkflowGate"/> ile aynı işlemde geçer. Tahmin kategorileri birbirini dışlar;
 /// ağırlıklı tahmin kategorilerden ayrı bir yöntemdir. Düzeltme kaynak fırsatı değiştirmez. Kilitli sürüm değişmez; yeniden açma gerekçelidir ve yeni sürüm üretir.
 /// Tenant kapsamlı tahmin ve kilit, yalnızca tüm kayıtlara erişen (veri kapsamı Tümü) kullanıcıyla hazırlanır; böylece anlık görüntü eksik kayıtla oluşmaz.

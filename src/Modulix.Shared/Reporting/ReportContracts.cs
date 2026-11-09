@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Modulix.Shared.Reporting;
 
-// Ortak rapor merkezi (/api/reports, ADR-0026 dilim 3). Rapor tanımı bir veri kümesinin bildirilmiş sütunlarından kurulur (serbest SQL ya da
+// Ortak rapor merkezi (/api/reports, ADR-0035 dilim 3). Rapor tanımı bir veri kümesinin bildirilmiş sütunlarından kurulur (serbest SQL ya da
 // birleştirme yoktur) ve her çalıştırma çağıranın yetkisiyle yapılır. Sabit değerler küçük harfle başlar (camelCase):
 //   işleç: equals, notEquals, greater, greaterOrEqual, less, lessOrEqual, contains, in, isEmpty, notEmpty
 //   toplama: count, sum, average, min, max          tarih ayrıntısı: day, month, year

@@ -1,6 +1,6 @@
 namespace Modulix.Shared.Crm;
 
-// Satış raporlama, hedef ve sürümlü tahmin sözleşmeleri (ADR-0026). Alan adları API'deki modül sonuçlarıyla birebir aynıdır (uç nokta JSON üzerinden eşler).
+// Satış raporlama, hedef ve sürümlü tahmin sözleşmeleri (ADR-0035). Alan adları API'deki modül sonuçlarıyla birebir aynıdır (uç nokta JSON üzerinden eşler).
 
 /// <summary>Dönem türü adları (sorgu parametresi <c>kind</c> ve yanıttaki <c>periodKind</c>).</summary>
 public static class SalesPeriodKinds

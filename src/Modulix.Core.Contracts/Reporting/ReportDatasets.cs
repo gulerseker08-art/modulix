@@ -1,6 +1,6 @@
 namespace Modulix.Core.Contracts.Reporting;
 
-// Ortak rapor merkezinin sözleşmeleri (ADR-0026 K1, dilim 3). Modül, raporlanabilir bir kayıt türünü veri kümesi olarak bildirir;
+// Ortak rapor merkezinin sözleşmeleri (ADR-0035 K1, dilim 3). Modül, raporlanabilir bir kayıt türünü veri kümesi olarak bildirir;
 // Core yalnızca bu beyanı ve kayıt boru hattını kullanır, modülün tablolarını ya da iş mantığını bilmez. Serbest SQL, kullanıcı kodu ve
 // veri kümeleri arası birleştirme yoktur: bir rapor tek bir veri kümesinin bildirilmiş sütunlarından kurulur.
 

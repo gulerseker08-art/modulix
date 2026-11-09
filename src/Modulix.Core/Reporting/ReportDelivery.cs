@@ -17,7 +17,7 @@ public enum ReportFileFormat
 }
 
 /// <summary>
-/// Hazırlanmış dışa aktarma (ADR-0026, dilim 4): rapor sonucunun CSV dosyası. Dosya yalnızca sahibi tarafından, indirme anında yetki yeniden
+/// Hazırlanmış dışa aktarma (ADR-0035, dilim 4): rapor sonucunun CSV dosyası. Dosya yalnızca sahibi tarafından, indirme anında yetki yeniden
 /// denetlenerek indirilir; <see cref="AccessStamp"/> oluşturulduğu andaki erişim parmak izidir (izinler, veri kapsamı, kayıt sahipleri): kişinin
 /// yetkisi sonradan değiştiyse eski dosya indirilemez, yeniden hazırlanması gerekir. Dosya <see cref="ExpiresAt"/>'te geçersiz olur ve silinir.
 /// Tenant verisidir; Row-Level Security ile korunur.
@@ -106,7 +106,7 @@ public sealed class ReportExport : ITenantEntity, ICompanyShared
 }
 
 /// <summary>
-/// Zamanlanmış rapor (ADR-0026, dilim 4): kayıtlı raporu belirli aralıkla <b>sahibinin yetkisiyle</b> çalıştırıp CSV hazırlar ve sahibine indirme
+/// Zamanlanmış rapor (ADR-0035, dilim 4): kayıtlı raporu belirli aralıkla <b>sahibinin yetkisiyle</b> çalıştırıp CSV hazırlar ve sahibine indirme
 /// bağlantısı e-postalar (veri e-postaya konmaz). Çalışma anında sahibin üyeliği, modül, rapor görünürlüğü ve izinler yeniden denetlenir;
 /// biri bozulduysa zamanlama <see cref="StoppedReason"/> ile durdurulur ve hiçbir şey teslim edilmez. Tenant verisidir.
 /// </summary>
@@ -372,7 +372,7 @@ public enum ReportDownloadStatus
 public sealed record ReportDownload(ReportDownloadStatus Status, string? Message, string? FileName = null, string? ContentType = null, byte[]? Content = null);
 
 /// <summary>
-/// Dışa aktarma (ADR-0026, dilim 4). Dosya, ekrandaki sonuçla aynı hesaptan (<see cref="IReportRunner"/>) çağıranın yetkisiyle üretilir; hassas
+/// Dışa aktarma (ADR-0035, dilim 4). Dosya, ekrandaki sonuçla aynı hesaptan (<see cref="IReportRunner"/>) çağıranın yetkisiyle üretilir; hassas
 /// alan, veri kapsamı ve tenant sınırı çalıştırıcıda uygulanır. Yetki (<c>core.reports.export</c>) uç noktada denetlenir; indirme anında ayrıca
 /// <see cref="DownloadAsync"/> içinde yeniden denetlenir.
 /// </summary>
@@ -438,7 +438,7 @@ public sealed record ReportScheduleInput(
     ScheduleFrequency Frequency, int Hour, DayOfWeek? DayOfWeek, int? DayOfMonth, ReportFileFormat Format = ReportFileFormat.Csv, IReadOnlyList<Guid>? RecipientIds = null);
 
 /// <summary>
-/// Kullanıcının zamanlanmış raporları (ADR-0026, dilim 4); yalnızca kendi zamanlamalarını görür ve yönetir. İzin (<c>core.reports.schedule</c>) uç
+/// Kullanıcının zamanlanmış raporları (ADR-0035, dilim 4); yalnızca kendi zamanlamalarını görür ve yönetir. İzin (<c>core.reports.schedule</c>) uç
 /// noktada denetlenir; zamanlama çalışırken yetkiler yeniden denetlenir (bkz. <see cref="ReportSchedule"/>).
 /// </summary>
 public interface IReportSchedules

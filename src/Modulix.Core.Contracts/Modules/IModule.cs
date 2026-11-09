@@ -120,7 +120,7 @@ public interface IModule
     IReadOnlyList<Approvals.ApprovalTargetDefinition> ApprovalTargets => [];
 
     /// <summary>
-    /// Modülün ortak rapor merkezine katkısı (ADR-0026, dilim 3): raporlanabilir veri kümeleri ve modülün kendi rapor ekranlarına bağlantılar.
+    /// Modülün ortak rapor merkezine katkısı (ADR-0035, dilim 3): raporlanabilir veri kümeleri ve modülün kendi rapor ekranlarına bağlantılar.
     /// Veri kümesi kayıt boru hattından okunur; izin, kapsam ve hassas alan kuralları kayıt türünündür. Anahtarlar modül anahtarıyla başlar;
     /// beyan açılışta doğrulanır.
     /// </summary>

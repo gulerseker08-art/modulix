@@ -2,7 +2,7 @@ using Modulix.Modules.Crm.Reporting;
 
 namespace Modulix.Modules.Crm.Domain;
 
-// Satış hedefi ve sürümlü satış tahmini (ADR-0026, dilim 1).
+// Satış hedefi ve sürümlü satış tahmini (ADR-0035, dilim 1).
 
 /// <summary>
 /// Satış hedefi: dönem, metrik, kapsam ve para birimiyle tanımlı hedef. Tutar hedefi (para birimli) ile adet hedefi karıştırılmaz. Aynı kapsam, metrik ve

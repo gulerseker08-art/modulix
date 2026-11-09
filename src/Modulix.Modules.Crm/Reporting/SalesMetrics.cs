@@ -44,7 +44,7 @@ public sealed record ConvertedAmount(decimal? Value, string? Issue, RateLookup? 
     public const string MissingRate = "MissingRate";
 }
 
-/// <summary>Bir dönemin satış metrikleri (ADR-0026 metrik sözlüğü). Tüm tutarlar raporlama para birimindedir, vergi hariç net tutardır.</summary>
+/// <summary>Bir dönemin satış metrikleri (ADR-0035 metrik sözlüğü). Tüm tutarlar raporlama para birimindedir, vergi hariç net tutardır.</summary>
 public sealed record SalesPeriodMetrics(
     ReportPeriod Period,
     string Currency,

@@ -22,13 +22,13 @@ public sealed class PerfFactAttribute : FactAttribute
     {
         if (Environment.GetEnvironmentVariable("MODULIX_PERF") != "1")
         {
-            Skip = "Performans ölçümü: MODULIX_PERF=1 ile çalıştırın (ADR-0026 bölüm 7).";
+            Skip = "Performans ölçümü: MODULIX_PERF=1 ile çalıştırın (ADR-0035 bölüm 7).";
         }
     }
 }
 
 /// <summary>
-/// ADR-0026 bölüm 7: satış genel görünümü, tahmin oluşturma, rapor çalıştırma ve dışa aktarma için temsilî büyük veri setinde süre ölçümü. Test hedef
+/// ADR-0035 bölüm 7: satış genel görünümü, tahmin oluşturma, rapor çalıştırma ve dışa aktarma için temsilî büyük veri setinde süre ölçümü. Test hedef
 /// <b>doğrulamaz</b> (ortama bağlıdır); ölçer, <c>MODULIX_PERF_OUT</c> verilmişse sonucu Markdown tablosu olarak dosyaya yazar. Hedefler, yük profili ve
 /// bulgular ADR'de tutulur. Veri, SQL ile toplu eklenir (API ile 10 bin kayıt eklemek ölçülen şey değildir); okuma yolu gerçektir (HTTP, kayıt boru hattı).
 /// </summary>
