@@ -65,7 +65,10 @@ internal sealed class AutomationRunService(
             (await SummariesAsync([run], cancellationToken)).Single(),
             run.NextAttemptAt,
             [.. steps.Select(s => new AutomationRunStepInfo(
-                s.StepNo, s.StepId, s.Action, s.Status, s.Attempts, s.Summary, s.EffectEntityKey, s.EffectRecordId, s.CompletedAt))]);
+                s.StepNo, s.StepId, s.Action, s.Status, s.Attempts, s.Summary, s.EffectEntityKey, s.EffectRecordId, s.CompletedAt)
+                {
+                    WaitingUntil = s.Status == AutomationStepStatus.Pending ? s.WaitingUntil : null,
+                })]);
     }
 
     public async Task<AutomationRunDetail?> RunManuallyAsync(Guid ruleId, Guid recordId, CancellationToken cancellationToken)
@@ -152,7 +155,8 @@ internal sealed class AutomationRunService(
         await db.AutomationRunSteps
             .Where(s => s.RunId == runId && (s.Status == AutomationStepStatus.Failed || s.Status == AutomationStepStatus.Cancelled))
             .ExecuteUpdateAsync(
-                set => set.SetProperty(s => s.Status, AutomationStepStatus.Pending).SetProperty(s => s.Attempts, 0).SetProperty(s => s.CompletedAt, (DateTimeOffset?)null),
+                set => set.SetProperty(s => s.Status, AutomationStepStatus.Pending).SetProperty(s => s.Attempts, 0).SetProperty(s => s.CompletedAt, (DateTimeOffset?)null)
+                    .SetProperty(s => s.StartedAt, (DateTimeOffset?)null).SetProperty(s => s.WaitingUntil, (DateTimeOffset?)null),
                 cancellationToken);
         var updated = await db.AutomationRuns
             .Where(r => r.Id == runId && r.Status == AutomationRunStatus.Failed)

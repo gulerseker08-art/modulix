@@ -161,7 +161,8 @@ public sealed record AutomationRunStepDto(
     string? Summary,
     string? EffectEntityKey,
     Guid? EffectRecordId,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt,
+    DateTimeOffset? WaitingUntil = null);
 
 public sealed record AutomationRunDetailDto(AutomationRunDto Run, DateTimeOffset NextAttemptAt, IReadOnlyList<AutomationRunStepDto> Steps);
 

@@ -210,7 +210,17 @@ public sealed record AutomationActionRequest(
     JsonObject Parameters,
     RecordRef? Target,
     string IdempotencyKey,
-    bool DryRun = false);
+    bool DryRun = false)
+{
+    /// <summary>
+    /// Kalıcı akışta (ADR-0027 Dilim 4c-4) adımın ilk denendiği an; bekleme adımları süreyi buradan sayar. Adım yeniden çağrıldığında
+    /// (bekleme, yeniden deneme) değişmez. Kural dışı çağrıda boş.
+    /// </summary>
+    public DateTimeOffset? StepStartedAt { get; init; }
+
+    /// <summary>Akışın (kural çalışmasının) başladığı an; önceki bir akıştan kalan sonuçları ayırmak için. Kural dışı çağrıda boş.</summary>
+    public DateTimeOffset? FlowStartedAt { get; init; }
+}
 
 public enum AutomationActionStatus
 {
@@ -223,6 +233,12 @@ public enum AutomationActionStatus
 
     /// <summary>Dry-run: yapılacak iş planlandı, yazılmadı.</summary>
     Planned = 4,
+
+    /// <summary>
+    /// Adım bir süreyi ya da bir sonucu bekliyor (kalıcı akış, Dilim 4c-4). Motor çalışmayı <see cref="AutomationActionResult.ResumeAt"/>
+    /// anına kadar bırakır ve adımı o an yeniden çağırır; bekleme deneme hakkından sayılmaz.
+    /// </summary>
+    Waiting = 5,
 }
 
 /// <summary>Aksiyon sonucu. <see cref="Summary"/> kullanıcıya gösterilir; kişisel veri taşımaz.</summary>
@@ -232,6 +248,15 @@ public sealed record AutomationActionResult(AutomationActionStatus Status, strin
 
     /// <summary>Başarısızlıkta tekrar denemek sonucu değiştirebilir mi?</summary>
     public bool Retryable { get; init; }
+
+    /// <summary><see cref="AutomationActionStatus.Waiting"/> sonucunda adımın yeniden çağrılacağı an (zorunlu).</summary>
+    public DateTimeOffset? ResumeAt { get; init; }
+
+    /// <summary>
+    /// Akış bu adımda bilerek biter (hata değil; ör. onay reddedildi): kalan adımlar "atlandı" olur, çalışma başarılı biter ve
+    /// <see cref="Summary"/> çalışmanın notu olur.
+    /// </summary>
+    public bool StopFlow { get; init; }
 }
 
 /// <summary>

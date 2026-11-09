@@ -616,8 +616,14 @@ public sealed class CoreModule : IModule
             Subscriptions.Automation, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
     ];
 
-    /// <summary>Core'un kural yeteneği (Dilim 4c-2): sektörden bağımsız tek aksiyon, "Onaya gönder". Kayıt türü beyan etmez.</summary>
-    Modulix.Core.Contracts.Automation.AutomationCapabilities IModule.Automation => Modulix.Core.Approvals.ApprovalAutomation.Capabilities;
+    /// <summary>
+    /// Core'un kural yeteneği: sektörden bağımsız aksiyonlar, "Onaya gönder" (Dilim 4c-2) ile kalıcı akışın "Bekle" ve "Onay sonucunu bekle"
+    /// adımları (Dilim 4c-4). Kayıt türü beyan etmez.
+    /// </summary>
+    Modulix.Core.Contracts.Automation.AutomationCapabilities IModule.Automation { get; } = new()
+    {
+        Actions = [.. Modulix.Core.Approvals.ApprovalAutomation.Capabilities.Actions, .. FlowAutomation.Actions],
+    };
 
     public void ConfigureServices(IServiceCollection services)
     {
@@ -628,6 +634,12 @@ public sealed class CoreModule : IModule
         // "Onaya gönder" aksiyonu ve yayındaki süreç adı denetimi (Dilim 4c-2).
         services.AddScoped<Modulix.Core.Approvals.RequestApprovalAction>();
         services.AddScoped<IAutomationStepCheck, Modulix.Core.Approvals.ApprovalProcessCheck>();
+
+        // Kalıcı akışın bekleme adımları ve yayın denetimleri (Dilim 4c-4).
+        services.AddScoped<FlowWaitAction>();
+        services.AddScoped<FlowAwaitApprovalAction>();
+        services.AddScoped<IAutomationStepCheck, FlowWaitCheck>();
+        services.AddScoped<IAutomationStepCheck, FlowAwaitApprovalCheck>();
     }
 
     /// <summary>Kişinin çalıştığı firma: kişisi olan taraf silinemez.</summary>

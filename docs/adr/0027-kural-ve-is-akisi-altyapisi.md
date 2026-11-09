@@ -196,7 +196,9 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 4a | Genel onay: süreç tanımı, talep, Onay merkezi (Ç6a asgari) | Uygulandı (aşağıda "Dilim 4a") |
 | 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Uygulandı (aşağıda "Dilim 4b") |
 | 4c | Kayda bağlı onay (modül beyanı, geçersizleşme, kayıt paneli) | Uygulandı (aşağıda "Dilim 4c") |
-| 4c-2 | Kural aksiyonu "onaya gönder", onay sonucunun modül komutuna bağlanması, kalıcı akış | **Kural aksiyonu uygulandı** (aşağıda "Dilim 4c-2"); onay sonucunun modül komutuna bağlanması (Ç6a.3) ve kalıcı akış sonra |
+| 4c-2 | Kural aksiyonu "onaya gönder" | Uygulandı (aşağıda "Dilim 4c-2") |
+| 4c-3 | Onay kapısı: onay sonucunun modül işlemine bağlanması (Ç6a.3) | PR #278 |
+| 4c-4 | Kalıcı çok adımlı iş akışı ("Bekle", "Onay sonucunu bekle") | Uygulandı (aşağıda "Dilim 4c-4") |
 | 4d | Takvim ortaklaştırma, puanlama, şablon motoru | **Metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); takvim ortaklaştırma ve puanlama sonra |
 | 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c"); 5d kayıt seçici, kayıt üzerinde deneme ve elle çalıştırma uygulandı ("Dilim 5d") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
@@ -576,3 +578,23 @@ Kural motoru ile kayda bağlı onay (4a/4b/4c) birbirine bağlandı: bir kural, 
 | --- | --- |
 | `dotnet test tests/Modulix.Core.Tests --filter ApprovalAutomationTests` | 4: Core aksiyonu ve izni beyanı (tutar parametresi yok), `OwnerField` doğrulaması, kural adımı anahtarı (`SourceKey`) ve geçersiz anahtar, aksiyona özgü denetim yalnızca kendi aksiyonunda çalışır |
 | `dotnet test tests/Modulix.IntegrationTests --filter ApprovalAutomationTests` (SQL Server; CI koşar) | 4: mutlu yol (kayda bağlı talep, sorumlu talep sahibi, başlık değişkenden, tutar kayıttan, tekrar turda ikinci talep yok, onaycı bekleyenlerde görür), hata (bilinmeyen süreç 422, türe bağlı olmayan süreç 422, süreç sonradan kapanınca ve dört göz sağlanamayınca adım başarısız), tenant izolasyonu (aynı adlı süreçler, her firma kendi kaydından kendi talebini açar), yetki (`core.approvals.request` olmayan aksiyonu yayınlayamaz) |
+
+### Dilim 4c-4: Kalıcı çok adımlı iş akışı (9 Kasım 2026)
+
+Karar: **ayrı bir akış motoru ve `WorkflowDefinitions/Instances/Waits` tabloları kurulmaz.** Kural sürümünün aksiyon adımları zaten sıralı, kalıcı (`AutomationRunSteps`), idempotent ve kiralı çalışır (Dilim 2a); bir adımın "beklemesi" bu modele küçük bir ekle girer. Ayrı motor ikinci bir yürütme, tekilleştirme, yeniden deneme ve izleme yolu demekti; kullanıcıya fazladan bir şey vermeden riski artırırdı. Dallanma (koşullu adım), paralel kol ve döngü bu dilimde yoktur; ihtiyaç doğarsa adım tanımına koşul eklemek ayrı bir dilimdir.
+
+- **Sözleşme (Core.Contracts):** `AutomationActionStatus.Waiting` ve `AutomationActionResult.ResumeAt` (adım bir süreyi ya da sonucu bekliyor), `AutomationActionResult.StopFlow` (akış bilerek bitti; hata değil). `AutomationActionRequest.StepStartedAt` (adımın ilk denendiği an; bekleme süresi buradan sayılır) ve `FlowStartedAt` (çalışmanın başladığı an). Var olan aksiyonlar değişmedi.
+- **Motor:** `Waiting` dönen adım `Pending` kalır, `WaitingUntil` yazılır, deneme sayısı geri alınır (bekleme deneme hakkından sayılmaz); çalışma `Running` kalır, kirasını bırakır ve `NextAttemptAt = ResumeAt` olur. Uyanınca aynı adım aynı idempotency anahtarıyla yeniden çağrılır; kural kapalıysa ya da acil durdurma açıksa önce iptal olur (adım sınırı denetimi). `StopFlow` dönen adımdan sonra kalan adımlar `Skipped` ("Akış önceki adımda durdu"), çalışma `Succeeded` biter, not adımın özetidir. Yeniden denemede adımın `StartedAt`/`WaitingUntil` alanları sıfırlanır.
+- **Aksiyonlar (Core, sektörden bağımsız):** `core.flow.wait` ("Bekle": gün 0-365 + saat 0-23, toplam > 0; takvim günü; izin istemez) ve `core.flow.await-approval` ("Onay sonucunu bekle": kaydın son talebi; `Pending` ise 5 dk yoklama aralığıyla bekler, `Approved` ise sürer, `Rejected`/`Withdrawn`/`Invalidated` ya da `timeoutDays` (1-180, varsayılan 30) dolunca akışı durdurur; akıştan önce sonuçlanmış talep sayılmaz, talep yoksa adım başarısız; `core.approvals.request` izni). İkisi de `Read` yan etkilidir ve dry-run destekler. Yayında `IAutomationStepCheck` ile denetlenir: süre aralığı, onay beklemesinin yalnızca onaya açık kayıt türünde olması.
+- **Yoklama, olay değil:** onay kararı çalışmayı olayla uyandırmaz; bekleyen akış 5 dakikada bir tek sorguyla talebe bakar. Gerekçe: onay servisi kural motorunu tanımamalı (bağımlılık yönü), gecikme 5 dakikayla sınırlı ve tur başına çalışma sınırı yükü sınırlar. Ölçümle gerekirse karar olayına abonelik eklenir.
+- **Veri:** `core.AutomationRunSteps`'e `StartedAt` ve `WaitingUntil` (migration `AutomationFlowWaits`; yalnızca null'lanabilir iki kolon, geriye uyumlu, yeni tablo yok, RLS değişmedi). Bekleyen çalışma bitmemiş sayılır, saklama temizliği silmez; tarama kuyruğu sınırı (`ScanBacklogLimit`) yalnızca `Pending` çalışmaları saydığı için uzun bekleyen akışlar taramayı tıkamaz.
+- **Arayüz:** kural düzenleyicinin "Ne yapar" bölümü iki yeni adımı aynı parametre şemasıyla sunar (yeni bileşen yok); çalışma ayrıntısında bekleyen adımın yanında "… tarihine kadar", üst bilgide "Akış sürecek" zamanı görünür.
+
+**Bilerek yapılmadı:** iş günü beklemesi (takvim ortaklaştırması 4d'de bekliyor), tarih alanına göre bekleme ("teslim tarihine kadar bekle"), dallanma ve paralel kol, onay kararıyla anında uyanma, akışa özel liste ekranı (bekleyen akışlar çalışma geçmişinde "Çalışıyor" görünümündedir), CRM şablonu (süreç adı firmaya özgü olduğundan şablon yayında doğrulanamaz).
+
+### Test sonuçları (Dilim 4c-4)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter FlowAutomationTests` | 12: beyan (Core, izin, yan etki), süre toplama ve aralık hataları, onay süresi varsayılanı ve sınırı, okunur süre; katalog testleri Core'un üç aksiyonuna güncellendi. Core paketi 900/900 |
+| `dotnet test tests/Modulix.IntegrationTests --filter AutomationFlowTests` (SQL Server; CI koşar) | 5: mutlu yol (bekleme çalışmayı park eder, süre dolunca kaldığı adımdan sürer; onay gelince takip açılır), hata (ret akışı durdurur ve kalan adım atlanır; sıfır süre ve onaya açık olmayan türde onay beklemesi 422; bekleyen akışın kuralı kapanınca iptal), tenant izolasyonu (bir firmanın onayı yalnızca kendi akışını ilerletir, çalışma diğer firmadan 404), yetki (`core.approvals.request` olmadan onay beklemesi yayınlanamaz; "Bekle" izin istemez) |

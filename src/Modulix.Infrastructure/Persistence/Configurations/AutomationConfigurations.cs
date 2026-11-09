@@ -120,6 +120,10 @@ internal sealed class AutomationRunStepConfiguration : IEntityTypeConfiguration<
         builder.Property(s => s.Summary).HasMaxLength(AutomationRunStep.SummaryMaxLength);
         builder.Property(s => s.EffectEntityKey).HasMaxLength(100);
 
+        // Kalıcı akış (Dilim 4c-4): bekleme adımının başlangıcı ve uyanma anı; ikisi de null'lanabilir, mevcut satırlar etkilenmez.
+        builder.Property(s => s.StartedAt);
+        builder.Property(s => s.WaitingUntil);
+
         builder.HasIndex(s => new { s.TenantId, s.RunId, s.StepNo }).IsUnique();
 
         builder.HasOne<AutomationRun>()

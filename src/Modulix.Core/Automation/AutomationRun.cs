@@ -21,7 +21,7 @@ public enum AutomationRunStatus
     /// <summary>Tetikleyici eşleşti; koşul henüz değerlendirilmedi.</summary>
     Pending = 1,
 
-    /// <summary>Koşul sağlandı; adımlar sırayla çalışıyor ya da yeniden deneme bekliyor.</summary>
+    /// <summary>Koşul sağlandı; adımlar sırayla çalışıyor, yeniden deneme ya da bir bekleme adımı (kalıcı akış) bekliyor.</summary>
     Running = 2,
 
     Succeeded = 3,
@@ -180,6 +180,12 @@ public sealed class AutomationRunStep : ITenantEntity, ICompanyShared
     public string? EffectEntityKey { get; private set; }
 
     public Guid? EffectRecordId { get; private set; }
+
+    /// <summary>Adımın ilk denendiği an (kalıcı akış, Dilim 4c-4): bekleme adımları süreyi buradan sayar; yeniden denemede sıfırlanır.</summary>
+    public DateTimeOffset? StartedAt { get; private set; }
+
+    /// <summary>Adım bekliyorsa yeniden çağrılacağı an; adım bitince boşalır.</summary>
+    public DateTimeOffset? WaitingUntil { get; private set; }
 
     public static AutomationRunStep Create(Guid tenantId, Guid runId, int stepNo, string stepId, string action, string idempotencyKey) =>
         new()
