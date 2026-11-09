@@ -17,6 +17,11 @@
             </p>
         }
 
+        @if (view.RequiredFor is { Count: > 0 } required && view.Latest?.Status != "Approved")
+        {
+            <p class="text-muted"><AppIcon Name="shield" Size="14" /> Onay olmadan yapılamaz: @string.Join(", ", required)</p>
+        }
+
         <Notice Text="@error" Failed="true" />
 
         @if (CanSend)

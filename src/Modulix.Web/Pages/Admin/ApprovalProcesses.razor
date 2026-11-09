@@ -85,8 +85,23 @@
                             <option value="">Kayda bağlı değil (serbest talep)</option>
                             @foreach (var item in targets) { <option value="@item.EntityKey">@item.DisplayName</option> }
                         </select>
-                        <small class="text-muted">Seçilirse talep o kayıttan açılır; tutar kayıttan okunur ve kayıtta değişirse bekleyen talep geçersizleşir.</small>
+                        <small class="text-muted">Seçilirse talep o kayıttan açılır; tutar kayıttan okunur ve kayıtta değişirse bekleyen talep de verilmiş onay da geçersizleşir.</small>
                     </div>
+                    @if (TargetCommands() is { Count: > 0 } commands)
+                    {
+                        <fieldset class="mb-3">
+                            <legend class="form-label">Onaysız yapılamaz</legend>
+                            @foreach (var command in commands)
+                            {
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" checked="@gated.Contains(command.Key)"
+                                           @onchange="e => Toggle(command.Key, e.Value is true)" />
+                                    <span class="form-check-label">@command.DisplayName</span>
+                                </label>
+                            }
+                            <small class="text-muted">İşaretlenen işlem, kayıt bu süreçte onaylanmadan yapılamaz.</small>
+                        </fieldset>
+                    }
                     <div class="mb-3">
                         <label class="form-label" for="process-currency">Para birimi</label>
                         <input id="process-currency" class="form-control" maxlength="3" placeholder="TRY" @bind="currency" />
@@ -200,6 +215,7 @@
     private List<ApprovalDefinitionDto>? definitions;
     private List<ApprovalTargetDto> targets = [];
     private string? target;
+    private HashSet<string> gated = [];
     private ApproverOptionsDto? options;
     private List<StepRow> steps = [];
     private Guid? editId;
@@ -339,6 +355,7 @@
         description = definition?.Description;
         currency = definition?.Currency;
         target = definition?.TargetEntityKey;
+        gated = [.. definition?.GatedCommands ?? []];
         steps = definition is null
             ? [new StepRow()]
             : [.. definition.Steps.Select(s => new StepRow
@@ -355,6 +372,22 @@
 
     private void AddStep() => steps.Add(new StepRow { Order = steps.Max(s => s.Order) + 1 });
 
+    // Seçili kayıt türünün onaya bağlanabilen işlemleri; tür değişince başka türün işlemi gönderilmez.
+    private IReadOnlyList<ApprovalCommandDto> TargetCommands() =>
+        targets.FirstOrDefault(t => t.EntityKey == target)?.Commands ?? [];
+
+    private void Toggle(string command, bool on)
+    {
+        if (on)
+        {
+            gated.Add(command);
+        }
+        else
+        {
+            gated.Remove(command);
+        }
+    }
+
     private async Task SaveAsync()
     {
         busy = true;
@@ -362,7 +395,8 @@
             name, description, currency,
             [.. steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.Id("user"), s.Id("role"), s.MinAmount, s.DueHours, s.EscalationId("user"), s.EscalationId("role")))],
             editVersion,
-            string.IsNullOrEmpty(target) ? null : target);
+            string.IsNullOrEmpty(target) ? null : target,
+            [.. gated.Where(g => TargetCommands().Any(c => c.Key == g))]);
         var saved = editId is { } id
             ? await Api.PutAsync<ApprovalDefinitionDto>($"/api/approvals/definitions/{id}", request)
             : await Api.PostAsync<ApprovalDefinitionDto>("/api/approvals/definitions", request);

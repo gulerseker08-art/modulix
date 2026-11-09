@@ -18,9 +18,11 @@ namespace Modulix.Modules.Crm.Quotes;
 /// <param name="ExpiryReminderDays">Geçerliliği bitmeden bu kadar gün önce sorumlu için hatırlatma aktivitesi açılır; 0 = kapalı.</param>
 /// <param name="SyncOpportunityAmount">Esas teklif sunulunca açık fırsatın tutarı teklifin net toplamıyla eşitlensin mi? Varsayılan hayır.</param>
 /// <param name="ApprovalReminderHours">Onay bu kadar saat beklerse adlı onaylayanlara bir kez hatırlatma e-postası; 0 = kapalı.</param>
+/// <param name="ReplyReminderDays">CRM panosu "Benim günüm": sunulan teklif bu kadar gün yanıtsız kalınca hatırlatma önerilir; 0 = kapalı.</param>
 public sealed record QuotePolicySettings(
     decimal? ApprovalDiscountPercent = null, decimal? ApprovalGrossAbove = null, int DefaultValidityDays = 30, bool AllowSelfApproval = false,
-    bool OnAcceptWinOpportunity = false, int FollowUpDays = 0, int ExpiryReminderDays = 0, bool SyncOpportunityAmount = false, int ApprovalReminderHours = 0);
+    bool OnAcceptWinOpportunity = false, int FollowUpDays = 0, int ExpiryReminderDays = 0, bool SyncOpportunityAmount = false, int ApprovalReminderHours = 0,
+    int ReplyReminderDays = Reporting.MyDayRules.DefaultQuoteReminderDays);
 
 public interface IQuotePolicyProvider
 {

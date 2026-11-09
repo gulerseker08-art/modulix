@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Approvals;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Events;
@@ -82,6 +83,7 @@ internal sealed class OpportunityWorkflow(
     OpportunityHistoryReader historyReader,
     ISalesReportingPolicyProvider reportingPolicy,
     IBusinessEventPublisher events,
+    IApprovalGate approvalGate,
     TimeProvider time) : IOpportunityWorkflow
 {
     private const string Key = CrmModule.Entities.Opportunity;
@@ -141,6 +143,12 @@ internal sealed class OpportunityWorkflow(
         if (OpportunityRules.CanClose(Status(opp)) is { } blocked)
         {
             return Invalid(blocked, "status");
+        }
+
+        // Firma kazanmayı bir onay sürecine bağladıysa onaylanmamış fırsat kazanıldı yapılamaz (ADR-0027 Ç6a.3).
+        if (await approvalGate.BlockReasonAsync(new RecordRef(Key, opp.Id), CrmModule.ApprovalCommands.Win, cancellationToken) is { } awaiting)
+        {
+            return Invalid(awaiting, "approval");
         }
 
         var today = await TodayAsync(cancellationToken);

@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
+using Modulix.Modules.Crm.Opportunities;
 using Modulix.Modules.Crm.Quotes;
 
 namespace Modulix.Modules.Crm.Reporting;
@@ -10,13 +11,14 @@ namespace Modulix.Modules.Crm.Reporting;
 /// <summary>Kural tabanlı öneri türleri (yapay zekâ değil; kurallar <see cref="MyDayRules"/>'tadır).</summary>
 public static class MyDaySuggestionKind
 {
+    public const string AcceptedQuote = "AcceptedQuote";
     public const string NewLead = "NewLead";
     public const string OverdueOpportunity = "OverdueOpportunity";
     public const string QuoteFollowUp = "QuoteFollowUp";
     public const string StaleOpportunity = "StaleOpportunity";
 
     /// <summary>Öncelik sırası: her türün en önemlisi bu sırayla dizilir, sonra ikinciler (<see cref="MyDayRules.Suggest"/>).</summary>
-    public static IReadOnlyList<string> Priority { get; } = [NewLead, OverdueOpportunity, QuoteFollowUp, StaleOpportunity];
+    public static IReadOnlyList<string> Priority { get; } = [AcceptedQuote, NewLead, OverdueOpportunity, QuoteFollowUp, StaleOpportunity];
 }
 
 public sealed record MyDayOpportunity(
@@ -27,9 +29,13 @@ public sealed record MyDayLead(Guid Id, string Number, string Name, string? Comp
 
 public sealed record MyDayQuote(Guid Id, string Number, string Title, string? Customer, decimal? NetTotal, string Currency, DateTimeOffset PresentedAt);
 
+/// <summary>Müşterinin kabul ettiği teklif ve bağlı olduğu fırsat (<see cref="DecidedAt"/> kabul anı).</summary>
+public sealed record MyDayAcceptedQuote(Guid Id, string Number, Guid OpportunityId, decimal? NetTotal, string Currency, DateTimeOffset DecidedAt);
+
 /// <summary>
 /// Sıradaki adım önerisi. Metni istemci türe göre kurar; sunucu yalnızca kaydı ve gerekçe sayılarını verir: <see cref="DaysOverdue"/> kapanış tarihinden bu yana,
-/// <see cref="DaysSinceContact"/> son temastan bu yana, <see cref="DaysWaiting"/> teklifin sunulmasından bu yana geçen gün; <see cref="Since"/> adayın geliş anı.
+/// <see cref="DaysSinceContact"/> son temastan bu yana, <see cref="DaysWaiting"/> teklifin sunulmasından (kabul edilen teklifte kabulden) bu yana geçen gün;
+/// <see cref="Since"/> adayın geliş ya da teklifin kabul anı. Kabul edilen teklif önerisinin kaydı fırsattır; <see cref="Subtitle"/> teklif numarası, tutar teklifin net toplamıdır.
 /// </summary>
 public sealed record MyDaySuggestion(
     string Kind, Guid RecordId, string Number, string Title, string? Subtitle, string? Stage, decimal? Amount, string Currency,
@@ -64,23 +70,40 @@ public static class MyDayRules
     public const int SuggestionLimit = 5;
     public const int ClosingLimit = 5;
 
-    /// <summary>Sunulan teklif bu kadar gün yanıtsız kalınca hatırlatma önerilir.</summary>
-    public const int QuoteReminderDays = 3;
-
-    /// <summary>Açık fırsatla bu kadar gün temas yoksa (temas yoksa aşamaya girişten) yeniden temas önerilir.</summary>
-    public const int StaleDays = 14;
+    /// <summary>Firma ayarı okunamazsa: sunulan teklif bu kadar gün yanıtsız kalınca hatırlatma önerilir (<c>crm.quote.reply-reminder-days</c>; 0 kapalı).</summary>
+    public const int DefaultQuoteReminderDays = 3;
 
     /// <summary>
-    /// Öneriler: yeni aday (en uzun bekleyen önce), kapanış tarihi geçmiş fırsat (en büyük tutar önce), yanıtsız teklif (en eski önce), temassız fırsat
-    /// (en büyük tutar önce). Bir türün listeyi doldurmaması için türler sırayla birer birer alınır; en fazla <see cref="SuggestionLimit"/>.
-    /// Gün farkları firmanın saat dilimindeki takvim günüdür.
+    /// Öneriler: kabul edilen teklifi olan açık fırsat (en eski kabul önce), yeni aday (en uzun bekleyen önce), kapanış tarihi geçmiş fırsat (en büyük tutar önce),
+    /// yanıtsız teklif (en eski önce), temassız fırsat (en büyük tutar önce). Bir türün listeyi doldurmaması için türler sırayla birer birer alınır; en fazla
+    /// <see cref="SuggestionLimit"/>. Kabul edilen teklifi olan fırsat başka türde ayrıca önerilmez. Eşikler firma ayarıdır: <paramref name="quoteReminderDays"/>
+    /// teklif hatırlatma (0 kapalı), <paramref name="staleDays"/> fırsat hareketsizlik eşiği (temas yoksa aşamaya girişten sayılır). Gün farkları firmanın
+    /// saat dilimindeki takvim günüdür.
     /// </summary>
     public static IReadOnlyList<MyDaySuggestion> Suggest(
-        IEnumerable<MyDayOpportunity> opportunities, IEnumerable<MyDayLead> leads, IEnumerable<MyDayQuote> quotes, DateTimeOffset now, TimeZoneInfo zone)
+        IEnumerable<MyDayOpportunity> opportunities, IEnumerable<MyDayLead> leads, IEnumerable<MyDayQuote> quotes, DateTimeOffset now, TimeZoneInfo zone,
+        IEnumerable<MyDayAcceptedQuote>? acceptedQuotes = null, int quoteReminderDays = DefaultQuoteReminderDays, int staleDays = OpportunityPolicy.DefaultStaleDays)
     {
         var today = ReportPeriods.Today(now, zone);
         int DaysSince(DateTimeOffset at) => Math.Max(0, today.DayNumber - ReportPeriods.Today(at, zone).DayNumber);
-        var open = opportunities.ToList();
+        var all = opportunities.ToList();
+        var byId = all.GroupBy(o => o.Id).ToDictionary(g => g.Key, g => g.First());
+
+        // Kabul edilen teklifin fırsatı hâlâ açıksa kazanıldı olarak kapatılmalıdır; aynı fırsatın birden çok kabul edilen teklifinden en yenisi gösterilir.
+        var accepted = (acceptedQuotes ?? [])
+            .Where(q => byId.ContainsKey(q.OpportunityId))
+            .GroupBy(q => q.OpportunityId)
+            .Select(g => g.OrderByDescending(q => q.DecidedAt).First())
+            .OrderBy(q => q.DecidedAt).ThenBy(q => q.Number, StringComparer.Ordinal)
+            .Select(q =>
+            {
+                MyDayOpportunity o = byId[q.OpportunityId];
+                return new MyDaySuggestion(MyDaySuggestionKind.AcceptedQuote, o.Id, o.Number, o.Title, q.Number, o.Stage, q.NetTotal, q.Currency,
+                    null, null, DaysSince(q.DecidedAt), q.DecidedAt);
+            })
+            .ToList();
+        HashSet<Guid> handled = [.. accepted.Select(a => a.RecordId)];
+        var open = all.Where(o => !handled.Contains(o.Id)).ToList();
 
         var newLeads = leads.OrderBy(l => l.ReceivedAt).ThenBy(l => l.Number, StringComparer.Ordinal)
             .Select(l => new MyDaySuggestion(MyDaySuggestionKind.NewLead, l.Id, l.Number, l.Name, l.CompanyName, null, null, Opportunity.DefaultCurrency,
@@ -91,19 +114,19 @@ public static class MyDayRules
             .Select(o => new MyDaySuggestion(MyDaySuggestionKind.OverdueOpportunity, o.Id, o.Number, o.Title, null, o.Stage, o.Amount, o.Currency,
                 today.DayNumber - o.ExpectedCloseDate!.Value.DayNumber, o.LastInteractionAt is { } last ? DaysSince(last) : null, null, null));
 
-        var waitingQuotes = quotes.Where(q => DaysSince(q.PresentedAt) >= QuoteReminderDays)
+        var waitingQuotes = quotes.Where(q => quoteReminderDays > 0 && DaysSince(q.PresentedAt) >= quoteReminderDays)
             .OrderBy(q => q.PresentedAt).ThenBy(q => q.Number, StringComparer.Ordinal)
             .Select(q => new MyDaySuggestion(MyDaySuggestionKind.QuoteFollowUp, q.Id, q.Number, q.Title, q.Customer, null, q.NetTotal, q.Currency,
                 null, null, DaysSince(q.PresentedAt), q.PresentedAt));
 
         var stale = open.Where(o => o.ExpectedCloseDate is not { } close || close >= today)
             .Select(o => (Opportunity: o, Days: (o.LastInteractionAt ?? o.StageEnteredAt) is { } since ? DaysSince(since) : (int?)null))
-            .Where(x => x.Days >= StaleDays)
+            .Where(x => staleDays > 0 && x.Days >= staleDays)
             .OrderByDescending(x => x.Opportunity.Amount ?? -1m).ThenByDescending(x => x.Days).ThenBy(x => x.Opportunity.Number, StringComparer.Ordinal)
             .Select(x => new MyDaySuggestion(MyDaySuggestionKind.StaleOpportunity, x.Opportunity.Id, x.Opportunity.Number, x.Opportunity.Title, null,
                 x.Opportunity.Stage, x.Opportunity.Amount, x.Opportunity.Currency, null, x.Days, null, null));
 
-        var queues = new[] { newLeads, overdue, waitingQuotes, stale }.Select(q => new Queue<MyDaySuggestion>(q)).ToList();
+        var queues = new[] { accepted, newLeads, overdue, waitingQuotes, stale }.Select(q => new Queue<MyDaySuggestion>(q)).ToList();
         var result = new List<MyDaySuggestion>();
         while (result.Count < SuggestionLimit && queues.Any(q => q.Count > 0))
         {
@@ -146,13 +169,20 @@ public interface IMyDay
 /// "Benim günüm" (CRM panosu). Yalnızca oturumdaki kullanıcının sahibi olduğu kayıtlar okunur (<c>ownerId=me</c>) ve hepsi kayıt boru hattından geçer:
 /// izin, veri kapsamı ve hassas alan kuralları liste ekranlarıyla aynıdır. Tutar izni yoksa tutar ve olasılık dönmez.
 /// </summary>
-internal sealed class MyDay(SalesOpportunityReader reader, ICurrentAccess access, TimeProvider time, ISalesReportingPolicyProvider? policyProvider = null) : IMyDay
+internal sealed class MyDay(
+    SalesOpportunityReader reader, ICurrentAccess access, TimeProvider time, ISalesReportingPolicyProvider? policyProvider = null,
+    IOpportunityPolicyProvider? opportunityPolicy = null, IQuotePolicyProvider? quotePolicy = null) : IMyDay
 {
     private const string Me = "me";
+
+    /// <summary>Kabul edilen teklif önerisi için geriye bakılan gün (eski kabuller panoyu doldurmaz).</summary>
+    private const int AcceptedLookbackDays = 90;
 
     public async Task<RecordResult<MyDayResult>> BuildAsync(CancellationToken cancellationToken)
     {
         var policy = policyProvider is null ? SalesReportingPolicy.Default : await policyProvider.GetAsync(cancellationToken);
+        var staleDays = opportunityPolicy is null ? OpportunityPolicy.DefaultStaleDays : (await opportunityPolicy.GetAsync(cancellationToken)).StaleDays;
+        var quoteReminderDays = quotePolicy is null ? MyDayRules.DefaultQuoteReminderDays : (await quotePolicy.GetAsync(cancellationToken)).ReplyReminderDays;
         var now = time.GetUtcNow();
         var today = ReportPeriods.Today(now, policy.TimeZone);
         var weekStart = MyDayRules.WeekStart(today);
@@ -195,6 +225,7 @@ internal sealed class MyDay(SalesOpportunityReader reader, ICurrentAccess access
         }
 
         List<MyDayQuote> quotes = [];
+        List<MyDayAcceptedQuote> accepted = [];
         var presentedThisWeek = 0;
         if (canQuotes)
         {
@@ -202,19 +233,29 @@ internal sealed class MyDay(SalesOpportunityReader reader, ICurrentAccess access
                 new Dictionary<string, string> { ["ownerId"] = Me, ["status"] = QuoteStatus.Presented, ["latestOnly"] = "true" }, cancellationToken);
             var week = await reader.ReadRawAsync(CrmModule.Entities.Quote,
                 new Dictionary<string, string> { ["ownerId"] = Me, ["presentedFrom"] = SalesOpportunityReader.Iso(weekStart.AddDays(-1)) }, cancellationToken);
-            if ((waiting.Error ?? week.Error) is { } error)
+            // Kabul edilmiş ama fırsatı hâlâ açık teklifler: yalnızca açık fırsatı olan kullanıcıda ve son kararlardan okunur.
+            var acceptedPage = open.Count > 0
+                ? await reader.ReadRawAsync(CrmModule.Entities.Quote,
+                    new Dictionary<string, string>
+                    {
+                        ["ownerId"] = Me, ["status"] = QuoteStatus.Accepted, ["decidedFrom"] = SalesOpportunityReader.Iso(today.AddDays(-AcceptedLookbackDays)),
+                    },
+                    cancellationToken)
+                : null;
+            if ((waiting.Error ?? week.Error ?? acceptedPage?.Error) is { } error)
             {
                 return Fail(error);
             }
 
             quotes = [.. waiting.Rows.Select(ToQuote).Where(q => q is not null).Select(q => q!)];
+            accepted = [.. (acceptedPage?.Rows ?? []).Select(r => ToAcceptedQuote(r, amountsVisible)).Where(q => q is not null).Select(q => q!)];
             presentedThisWeek = week.Rows.Count(r => Time(r.Values, "presentedAt") is { } at && at >= weekStartUtc);
         }
 
         return RecordResult<MyDayResult>.Ok(new MyDayResult(
             today, weekStart, amountsVisible, canOpportunities, canLeads, canQuotes,
-            open.Count, open.Count(o => o.ExpectedCloseDate < today), leads.Count, presentedThisWeek, wonThisWeek, MyDayRules.QuoteReminderDays, MyDayRules.StaleDays,
-            MyDayRules.Suggest(open, leads, quotes, now, policy.TimeZone), MyDayRules.ClosingThisMonth(open, today)));
+            open.Count, open.Count(o => o.ExpectedCloseDate < today), leads.Count, presentedThisWeek, wonThisWeek, quoteReminderDays, staleDays,
+            MyDayRules.Suggest(open, leads, quotes, now, policy.TimeZone, accepted, quoteReminderDays, staleDays), MyDayRules.ClosingThisMonth(open, today)));
     }
 
     private static RecordResult<MyDayResult> Fail(RecordError error) => RecordResult<MyDayResult>.Fail(error.Code, error.Message, error.FieldErrors);
@@ -235,6 +276,18 @@ internal sealed class MyDay(SalesOpportunityReader reader, ICurrentAccess access
         var person = string.Join(' ', new[] { Text(v, "firstName"), Text(v, "lastName") }.Where(s => !string.IsNullOrWhiteSpace(s)));
         var name = person.Length > 0 ? person : Text(v, "subject") ?? Text(v, "companyName") ?? string.Empty;
         return new MyDayLead(record.Id, Text(v, "leadNumber") ?? string.Empty, name, Text(v, "companyName"), Text(v, "source"), received);
+    }
+
+    private static MyDayAcceptedQuote? ToAcceptedQuote(RecordData record, bool amountsVisible)
+    {
+        var v = record.Values;
+        if (Time(v, "decidedAt") is not { } decided || !Guid.TryParse(Text(v, "opportunityId"), out var opportunityId))
+        {
+            return null;
+        }
+
+        decimal? total = amountsVisible && v["netTotal"] is JsonValue value && value.TryGetValue<decimal>(out var amount) ? amount : null;
+        return new MyDayAcceptedQuote(record.Id, Text(v, "quoteNumber") ?? string.Empty, opportunityId, total, Text(v, "currency") ?? Opportunity.DefaultCurrency, decided);
     }
 
     private static MyDayQuote? ToQuote(RecordData record)

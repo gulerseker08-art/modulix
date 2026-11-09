@@ -40,14 +40,16 @@ public static class ApprovalEndpoints
             .RequirePermission(CoreModule.Permissions.ManageApprovals);
 
         group.MapGet("/targets", (ModuleCatalog modules) =>
-            Results.Ok(modules.ApprovalTargets.Select(t => new ApprovalTargetDto(t.Target.EntityKey, t.Target.DisplayName))))
+            Results.Ok(modules.ApprovalTargets.Select(t => new ApprovalTargetDto(
+                t.Target.EntityKey, t.Target.DisplayName, [.. t.Target.Commands.Select(c => new ApprovalCommandDto(c.Key, c.DisplayName))]))))
             .RequirePermission(CoreModule.Permissions.ManageApprovals);
 
         group.MapGet("/records/{entityKey}/{recordId:guid}", async (string entityKey, Guid recordId, IApprovalService service, CancellationToken ct) =>
             await service.RecordViewAsync(new RecordRef(entityKey, recordId), ct) is { } view
                 ? Results.Ok(new RecordApprovalViewDto(
                     [.. view.Processes.Select(p => new ApproverOptionDto(p.Id, p.Name))],
-                    view.Latest is { } l ? new RecordApprovalStatusDto(l.RequestId, l.Process, l.Status, l.SubmittedAt, l.CompletedAt, l.CurrentStep) : null))
+                    view.Latest is { } l ? new RecordApprovalStatusDto(l.RequestId, l.Process, l.Status, l.SubmittedAt, l.CompletedAt, l.CurrentStep) : null,
+                    view.RequiredFor))
                 : NotFound())
             .RequireAnyPermission(AnyApprovalPermission);
 
@@ -171,11 +173,11 @@ public static class ApprovalEndpoints
         Results.ValidationProblem(new Dictionary<string, string[]> { [key] = [message] }, statusCode: StatusCodes.Status400BadRequest);
 
     private static ApprovalDefinitionInput ToInput(SaveApprovalDefinitionRequest request) => new(
-        request.Name, request.Description, request.Currency, TargetEntityKey: request.TargetEntityKey, Steps:
+        request.Name, request.Description, request.Currency, TargetEntityKey: request.TargetEntityKey, GatedCommands: request.GatedCommands, Steps:
         [.. (request.Steps ?? []).Select(s => new ApprovalStepDefinition(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours, s.EscalateToUserId, s.EscalateToRoleId))]);
 
     private static ApprovalDefinitionDto ToDto(ApprovalDefinition definition) => new(
-        definition.Id, definition.Name, definition.Description, definition.Currency, definition.IsActive, definition.Revision, definition.Version, TargetEntityKey: definition.TargetEntityKey, Steps:
+        definition.Id, definition.Name, definition.Description, definition.Currency, definition.IsActive, definition.Revision, definition.Version, TargetEntityKey: definition.TargetEntityKey, GatedCommands: definition.Commands, Steps:
         [.. definition.Steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours, s.EscalateToUserId, s.EscalateToRoleId))]);
 
     private static ApprovalRequestDto ToDto(ApprovalRequestDetail detail) => new(

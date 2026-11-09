@@ -353,6 +353,12 @@ public sealed class CrmModule : IModule
         },
     ];
 
+    /// <summary>Onaya bağlanabilen işlemlerin kalıcı anahtarları (ADR-0027 Ç6a.3); firma süreç tanımında bunlara bağlar.</summary>
+    public static class ApprovalCommands
+    {
+        public const string Win = "win";
+    }
+
     /// <summary>
     /// CRM'in yayınladığı iş olayları (ADR-0039). Tür adı sürüm taşımaz; sürüm beyandadır. Açık iş komutları yayınlar:
     /// kazan/kaybet (<c>IOpportunityWorkflow</c>), müşteri adayı dönüşümü (<c>ILeadConversion</c>).
@@ -382,10 +388,16 @@ public sealed class CrmModule : IModule
         new(Events.LeadConverted, 1, Entities.Lead, "Müşteri adayı dönüştürüldü", Events.LeadConvertedFields),
     ];
 
-    // Fırsat onaya gönderilebilir (ADR-0027 Dilim 4c): tutar ve para birimi kayıttan okunur, değişirse bekleyen talep geçersizleşir.
+    // Fırsat onaya gönderilebilir (ADR-0027 Dilim 4c): tutar ve para birimi kayıttan okunur, değişirse bekleyen talep ve verilmiş onay geçersizleşir.
+    // Firma kazanıldı olarak kapatmayı bir onay sürecine bağlayabilir (Ç6a.3); iş akışı kapatmadan önce onay kapısına sorar.
     IReadOnlyList<Core.Contracts.Approvals.ApprovalTargetDefinition> IModule.ApprovalTargets { get; } =
     [
-        new(Entities.Opportunity, "Fırsat", "title", "crm/firsatlar/{id}") { AmountField = "amount", CurrencyField = "currency" },
+        new(Entities.Opportunity, "Fırsat", "title", "crm/firsatlar/{id}")
+        {
+            AmountField = "amount",
+            CurrencyField = "currency",
+            Commands = [new(ApprovalCommands.Win, "Kazanıldı olarak kapatma")],
+        },
     ];
 
     /// <summary>
@@ -636,6 +648,13 @@ public sealed class CrmModule : IModule
         new(SettingKeys.QuoteApprovalReminderHours, "Teklif iç onay hatırlatması (saat)", "CRM Teklif", SettingType.Text, "0")
         {
             Description = "Onay bekleyen teklif bu kadar saat karar almadan beklerse, o adımın adlı onaylayanlarına (ve vekillerine) bir kez e-posta hatırlatması gönderilir. Adlı onaylayanı olmayan adımda gönderilmez. 0 kapalıdır.",
+            Pattern = @"^[0-9]{1,3}$",
+            PatternMessage = "0-999 arası tam sayı girin.",
+            MaxLength = 3,
+        },
+        new(SettingKeys.QuoteReplyReminderDays, "Yanıtsız teklif önerisi (gün)", "CRM Teklif", SettingType.Text, "3")
+        {
+            Description = "CRM panosundaki Benim günüm sekmesi, müşteriye sunulup bu kadar gündür yanıt alınmayan teklifi hatırlatmayı önerir. 0 kapalıdır. Fırsatın hareketsizlik önerisi Fırsat hareketsizlik eşiğini kullanır.",
             Pattern = @"^[0-9]{1,3}$",
             PatternMessage = "0-999 arası tam sayı girin.",
             MaxLength = 3,
@@ -1058,6 +1077,7 @@ public sealed class CrmModule : IModule
         public const string QuoteExpiryReminderDays = "crm.quote.expiry-reminder-days";
         public const string QuoteSyncOpportunityAmount = "crm.quote.sync-opportunity-amount";
         public const string QuoteApprovalReminderHours = "crm.quote.approval-reminder-hours";
+        public const string QuoteReplyReminderDays = "crm.quote.reply-reminder-days";
         public const string FiscalYearStartMonth = "crm.reporting.fiscal-year-start-month";
         public const string ForecastCommitMinProbability = "crm.forecast.commit-min-probability";
         public const string ForecastBestCaseMinProbability = "crm.forecast.best-case-min-probability";

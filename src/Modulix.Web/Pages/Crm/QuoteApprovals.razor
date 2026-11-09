@@ -3,40 +3,40 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Teklif onayları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.crm.quote-approvals") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuotesApprove">
     <div class="page-header">
-        <h1>Teklif onayları</h1>
+        <h1>@Texts.Get("nav.app.crm.quote-approvals")</h1>
     </div>
-    <p class="text-muted">İç onay bekleyen teklifler. Onay belirli bir sürüme bağlıdır; teklifin ticari içeriği değişirse onay isteği geçersizleşir ve bu listeden düşer. Kendi gönderdiğiniz teklifi, ayar izin vermedikçe onaylayamazsınız.</p>
+    <p class="text-muted">@Texts.Get("crm.quoteApprovals.intro")</p>
 
     <Notice Text="@notice" Failed="@noticeFailed" />
 
     @if (items is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (items.Count == 0)
     {
-        <p class="text-muted">Onay bekleyen teklif yok.</p>
+        <p class="text-muted">@Texts.Get("crm.quoteApprovals.empty")</p>
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Onay bekleyen teklifler</caption>
+            <caption class="visually-hidden">@Texts.Get("crm.quoteApprovals.caption")</caption>
             <thead>
-                <tr><th scope="col">Teklif</th><th scope="col">Müşteri</th><th scope="col" class="text-end">Toplam</th><th scope="col">İndirim</th><th scope="col">Bekleme</th><th scope="col">İşlem</th></tr>
+                <tr><th scope="col">@Texts.Get("crm.quotes.col.title")</th><th scope="col">@Texts.Get("crm.quotes.col.company")</th><th scope="col" class="text-end">@Texts.Get("crm.quotes.col.total")</th><th scope="col">@Texts.Get("crm.quoteApprovals.col.discount")</th><th scope="col">@Texts.Get("crm.approval.waiting")</th><th scope="col">@Texts.Get("crm.quoteApprovals.col.action")</th></tr>
             </thead>
             <tbody>
                 @foreach (var quote in items)
                 {
                     <tr>
-                        <td data-label="Teklif" class="primary"><a href="crm/teklifler/@quote.Id">@quote.Title</a> <small class="text-muted">@quote.QuoteNumber · V@(quote.RevisionNo)</small></td>
-                        <td data-label="Müşteri">@Lookups.CompanyName(quote.CompanyId)</td>
-                        <td data-label="Toplam" class="text-end">@QuoteLabels.Money(quote.GrossTotal, quote.Currency)</td>
-                        <td data-label="İndirim">@(quote.ListTotal > 0 ? $"%{(quote.DiscountTotal * 100m / quote.ListTotal):0.##}" : "—")</td>
-                        <td data-label="Bekleme">@Waiting(quote)</td>
+                        <td data-label="@Texts.Get("crm.quotes.col.title")" class="primary"><a href="crm/teklifler/@quote.Id">@quote.Title</a> <small class="text-muted">@quote.QuoteNumber · V@(quote.RevisionNo)</small></td>
+                        <td data-label="@Texts.Get("crm.quotes.col.company")">@Lookups.CompanyName(quote.CompanyId)</td>
+                        <td data-label="@Texts.Get("crm.quotes.col.total")" class="text-end">@QuoteLabels.Money(quote.GrossTotal, quote.Currency)</td>
+                        <td data-label="@Texts.Get("crm.quoteApprovals.col.discount")">@(quote.ListTotal > 0 ? $"%{(quote.DiscountTotal * 100m / quote.ListTotal):0.##}" : "—")</td>
+                        <td data-label="@Texts.Get("crm.approval.waiting")">@Waiting(quote)</td>
                         <td class="actions">
                             @if (active?.Id == quote.Id)
                             {
@@ -44,28 +44,28 @@
                                     @if (requirement is not null)
                                     {
                                         <div class="small approval-reasons">
-                                            <strong>Onay gerekçesi:</strong>
+                                            <strong>@Texts.Get("crm.quoteApprovals.reasons")</strong>
                                             @if (requirement.Steps.Count > 1)
                                             {
-                                                <div>Adımlar: @foreach (var step in requirement.Steps) { <span class="badge stage-@(step.Completed ? "won" : step.Step == requirement.CurrentStep ? "qualified" : "open")">@step.Step. adım @(step.Completed ? "tamam" : step.Step == requirement.CurrentStep ? "bekliyor" : "sırada") · @(step.Approvers.Count == 0 ? "onay izni olan herkes" : string.Join(", ", step.Approvers.Select(a => Lookups.MemberName(a))))</span> }</div>
+                                                <div>@Texts.Get("crm.quoteApprovals.steps") @foreach (var step in requirement.Steps) { <span class="badge stage-@(step.Completed ? "won" : step.Step == requirement.CurrentStep ? "qualified" : "open")">@Texts.Get(step.Completed ? "crm.quoteApprovals.stepDone" : step.Step == requirement.CurrentStep ? "crm.quoteApprovals.stepCurrent" : "crm.quoteApprovals.stepQueued", step.Step) · @(step.Approvers.Count == 0 ? Texts.Get("crm.quoteApprovals.anyApprover") : string.Join(", ", step.Approvers.Select(a => Lookups.MemberName(a))))</span> }</div>
                                             }
-                                            @if (requirement.ActingAsDelegate) { <div class="text-muted">Bu onayı vekâleten vereceksiniz.</div> }
+                                            @if (requirement.ActingAsDelegate) { <div class="text-muted">@Texts.Get("crm.quoteApprovals.asDelegate")</div> }
                                             @foreach (var match in requirement.Matches) { <div>@match.Name — @match.Reason</div> }
                                             @if (requirement.ThresholdReason is not null) { <div>@requirement.ThresholdReason</div> }
                                             @if (requirement.Note is not null) { <div class="text-danger">@requirement.Note</div> }
                                         </div>
                                     }
-                                    <label class="visually-hidden" for="reason-@quote.Id">Gerekçe</label>
-                                    <input id="reason-@quote.Id" class="form-control form-control-sm" placeholder="Gerekçe (red / değişiklik için zorunlu)" maxlength="500" @bind="reason" />
-                                    <button type="button" class="btn btn-primary btn-sm" disabled="@(busy || cannotDecide)" @onclick='() => DecideAsync(quote, "approve")'>Onayla</button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(busy || cannotDecide)" @onclick='() => DecideAsync(quote, "reject-approval")'>Reddet</button>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(busy || cannotDecide)" @onclick='() => DecideAsync(quote, "request-changes")'>Değişiklik iste</button>
-                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => active = null">Vazgeç</button>
+                                    <label class="visually-hidden" for="reason-@quote.Id">@Texts.Get("crm.quoteApprovals.reasonLabel")</label>
+                                    <input id="reason-@quote.Id" class="form-control form-control-sm" placeholder="@Texts.Get("crm.quoteApprovals.reasonPlaceholder")" maxlength="500" @bind="reason" />
+                                    <button type="button" class="btn btn-primary btn-sm" disabled="@(busy || cannotDecide)" @onclick='() => DecideAsync(quote, "approve")'>@Texts.Get("crm.quoteApprovals.approve")</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(busy || cannotDecide)" @onclick='() => DecideAsync(quote, "reject-approval")'>@Texts.Get("crm.quoteApprovals.reject")</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(busy || cannotDecide)" @onclick='() => DecideAsync(quote, "request-changes")'>@Texts.Get("crm.quoteApprovals.requestChanges")</button>
+                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => active = null">@Texts.Get("common.dismiss")</button>
                                 </form>
                             }
                             else
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(quote)">İncele ve karar ver</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(quote)">@Texts.Get("crm.approval.review")</button>
                             }
                         </td>
                     </tr>
@@ -115,14 +115,14 @@
         if (busy) { return; }
         if (action != "approve" && string.IsNullOrWhiteSpace(reason))
         {
-            Notify("Red ve değişiklik isteği için gerekçe zorunludur.", true);
+            Notify(Texts.Get("crm.quoteApprovals.reasonRequired"), true);
             return;
         }
 
         busy = true;
         var result = await Api.PostAsync<QuoteDto>($"/api/crm/quotes/{quote.Id}/{action}", new QuoteTransitionRequest(quote.Version, Blank(reason)));
         busy = false;
-        Notify(result.IsSuccess ? $"{QuoteLabels.Action(action)}: tamamlandı." : result.Error, !result.IsSuccess);
+        Notify(result.IsSuccess ? Texts.Get("crm.quoteApprovals.done", QuoteLabels.Action(action)) : result.Error, !result.IsSuccess);
         active = null;
         await LoadAsync();
     }
@@ -130,7 +130,7 @@
     private static string Waiting(QuoteDto quote)
     {
         var span = DateTimeOffset.UtcNow - (quote.CalculatedAt ?? DateTimeOffset.UtcNow);
-        return span.TotalHours < 1 ? "1 saatten az" : span.TotalDays < 1 ? $"{(int)span.TotalHours} saat" : $"{(int)span.TotalDays} gün";
+        return QuoteLabels.Waiting(span);
     }
 
     private void Notify(string? text, bool failed)
