@@ -9,12 +9,12 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Activity is null ? "Yeni aktivite" : "Aktiviteyi düzenle")</h2>
+            <h2>@Texts.Get(Activity is null ? "crm.activities.new" : "crm.activities.edit")</h2>
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
         </div>
     </div>
 
@@ -27,7 +27,7 @@
         <div class="alert alert-danger" role="alert">@layoutError</div>
     }
 
-    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Aktivite formu bölümleri">
+    <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("crm.act.form.sections")">
         <Field Context="f">
             @switch (f.Key)
             {
@@ -70,13 +70,13 @@
                 case "startAt":
                     @if (form.IsAllDay)
                     {
-                        <label class="@f.LabelClass()" for="startDate">Başlangıç günü</label>
+                        <label class="@f.LabelClass()" for="startDate">@Texts.Get("crm.act.startDay")</label>
                         <input id="startDate" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.StartDate" />
                         <FieldError Field="startDate" Errors="errors" />
                     }
                     else
                     {
-                        <label class="@f.LabelClass()" for="startAt">Başlangıç (zaman bloğu)</label>
+                        <label class="@f.LabelClass()" for="startAt">@Texts.Get("crm.act.startBlock")</label>
                         <input id="startAt" class="form-control" type="datetime-local" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.StartAt" />
                         <FieldError Field="startAt" Errors="errors" />
                     }
@@ -85,13 +85,13 @@
                 case "endAt":
                     @if (form.IsAllDay)
                     {
-                        <label class="@f.LabelClass()" for="endDate">Bitiş günü</label>
+                        <label class="@f.LabelClass()" for="endDate">@Texts.Get("crm.act.endDay")</label>
                         <input id="endDate" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EndDate" />
                         <FieldError Field="endDate" Errors="errors" />
                     }
                     else
                     {
-                        <label class="@f.LabelClass()" for="endAt">Bitiş</label>
+                        <label class="@f.LabelClass()" for="endAt">@Texts.Get("crm.act.endAt")</label>
                         <input id="endAt" class="form-control" type="datetime-local" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EndAt" />
                         <FieldError Field="endAt" Errors="errors" />
                     }
@@ -105,12 +105,12 @@
                     <label class="@f.LabelClass()" for="ownerId">@f.Label</label>
                     @if (Activity is null)
                     {
-                        <LookupPicker Id="ownerId" LookupKey="crm.activity.owner" @bind-Value="form.OwnerId" Placeholder="Ben" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
+                        <LookupPicker Id="ownerId" LookupKey="crm.activity.owner" @bind-Value="form.OwnerId" Placeholder="@Texts.Get("common.me")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
                     }
                     else
                     {
                         <input id="ownerId" class="form-control" value="@Lookups.MemberName(Activity.OwnerId)" disabled />
-                        <small class="text-muted">Sorumlu "Yeniden ata" eylemiyle değişir.</small>
+                        <small class="text-muted">@Texts.Get("crm.act.ownerHint")</small>
                     }
                     <FieldError Field="ownerId" Errors="errors" />
                     break;
@@ -148,31 +148,31 @@
                 case "isPrivate":
                     <div class="form-check-row form-switch">
                         <input id="private" class="form-check-input" type="checkbox" role="switch" @bind="form.IsPrivate" />
-                        <label class="form-check-label" for="private">Özel (diğerleri yalnızca meşgul görür)</label>
+                        <label class="form-check-label" for="private">@Texts.Get("crm.act.private")</label>
                     </div>
                     break;
                 case "logAsDone":
                     <div class="form-check-row form-switch">
                         <input id="completed" class="form-check-input" type="checkbox" role="switch" @bind="form.LogAsDone" />
-                        <label class="form-check-label" for="completed">Geçmişte gerçekleşti (tamamlanmış etkileşim olarak kaydet)</label>
+                        <label class="form-check-label" for="completed">@Texts.Get("crm.act.logAsDone")</label>
                     </div>
                     @if (form.LogAsDone)
                     {
                         <div class="form-grid mt-2">
                             <div class="span-6">
-                                <label class="form-label" for="doneAt">Gerçekleşme zamanı</label>
+                                <label class="form-label" for="doneAt">@Texts.Get("crm.act.doneAt")</label>
                                 <input id="doneAt" class="form-control" type="datetime-local" @bind="form.DoneAt" />
                                 <FieldError Field="completedAt" Errors="errors" />
                             </div>
                             @if (form.Type is ActivityType.Call or ActivityType.Meeting or ActivityType.Visit)
                             {
                                 <div class="span-6">
-                                    <label class="form-label" for="outcome">Sonuç</label>
+                                    <label class="form-label" for="outcome">@Texts.Get("crm.act.outcome")</label>
                                     <select id="outcome" class="form-select" @bind="form.Outcome">
                                         <option value="@ActivityOutcome.Reached">@CrmText.ActivityOutcomeName(ActivityOutcome.Reached)</option>
                                         <option value="@ActivityOutcome.NoAnswer">@CrmText.ActivityOutcomeName(ActivityOutcome.NoAnswer)</option>
                                     </select>
-                                    <small class="text-muted">İlk temas yalnızca gerçekleşen temastan (ulaşılan arama, yapılan toplantı) sayılır.</small>
+                                    <small class="text-muted">@Texts.Get("crm.act.firstContactHint")</small>
                                     <FieldError Field="outcome" Errors="errors" />
                                 </div>
                             }
@@ -193,11 +193,11 @@
     </LayoutForm>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
         @if (Activity is not null)
         {
-            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
         }
     </div>
 </form>
@@ -211,7 +211,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(CrmEntityKeys.Activity);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     // Firma sabitse (firma detayı) seçilmez; geçmişe kayıt yalnızca yeni aktivitede ve yazma izniyle.

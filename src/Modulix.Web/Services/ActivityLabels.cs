@@ -8,32 +8,42 @@ public static class ActivityLabels
     public static string Family(CrmLookups lookups, string type) =>
         lookups.CategoryOf(CrmLists.ActivityType, type) is { } category ? category : ActivityFamily.Task;
 
-    public static string Status(string family, string status) => (family, status) switch
+    public static string Status(string family, string status) =>
+        StatusKey(family, status) is { } key ? Texts.Get(key) : status;
+
+    /// <summary>Durum metninin sözlük anahtarı (<c>crm.act.status.*</c>); tanımsız durum için <c>null</c> (durum anahtarı olduğu gibi gösterilir).</summary>
+    public static string? StatusKey(string family, string status) => (family, status) switch
     {
-        (_, ActivityStatus.Cancelled) => "İptal edildi",
-        (_, ActivityStatus.Blocked) => "Bloke",
-        (_, ActivityStatus.InProgress) => "Devam ediyor",
-        (ActivityFamily.Call, ActivityStatus.Open) => "Planlandı",
-        (ActivityFamily.Call, ActivityStatus.Completed) => "Gerçekleştirildi",
-        (ActivityFamily.Call, ActivityStatus.NoAnswer) => "Ulaşılamadı",
-        (ActivityFamily.Meeting or ActivityFamily.Visit, ActivityStatus.Open) => "Planlandı",
-        (ActivityFamily.Meeting or ActivityFamily.Visit, ActivityStatus.Completed) => "Gerçekleşti",
-        (ActivityFamily.Meeting or ActivityFamily.Visit, ActivityStatus.NoShow) => "Katılım olmadı",
-        (_, ActivityStatus.Draft) => "Taslak",
-        (_, ActivityStatus.Queued) => "Kuyruğa alındı",
-        (_, ActivityStatus.Sent) => "Gönderildi",
-        (_, ActivityStatus.Failed) => "Başarısız",
-        (_, ActivityStatus.Open) => "Açık",
-        (_, ActivityStatus.Completed) => "Tamamlandı",
-        _ => status,
+        (_, ActivityStatus.Cancelled) => "crm.act.status.cancelled",
+        (_, ActivityStatus.Blocked) => "crm.act.status.blocked",
+        (_, ActivityStatus.InProgress) => "crm.act.status.inProgress",
+        (ActivityFamily.Call, ActivityStatus.Open) => "crm.act.status.planned",
+        (ActivityFamily.Call, ActivityStatus.Completed) => "crm.act.status.done",
+        (ActivityFamily.Call, ActivityStatus.NoAnswer) => "crm.act.status.unreached",
+        (ActivityFamily.Meeting or ActivityFamily.Visit, ActivityStatus.Open) => "crm.act.status.planned",
+        (ActivityFamily.Meeting or ActivityFamily.Visit, ActivityStatus.Completed) => "crm.act.status.held",
+        (ActivityFamily.Meeting or ActivityFamily.Visit, ActivityStatus.NoShow) => "crm.act.status.noShow",
+        (_, ActivityStatus.Draft) => "crm.act.status.draft",
+        (_, ActivityStatus.Queued) => "crm.act.status.queued",
+        (_, ActivityStatus.Sent) => "crm.act.status.sent",
+        (_, ActivityStatus.Failed) => "crm.act.status.failed",
+        (_, ActivityStatus.Open) => "crm.act.status.open",
+        (_, ActivityStatus.Completed) => "crm.act.status.completed",
+        _ => null,
     };
 
-    public static string Priority(string priority) => priority switch
+    /// <summary>Gecikmiş açık kaydın durumunun yanına eklenen son ek (örn. " · gecikti").</summary>
+    public static string OverdueSuffix => " · " + Texts.Get("crm.act.overdue");
+
+    public static string Priority(string priority) => Texts.Get(PriorityKey(priority));
+
+    /// <summary>Önceliğin sözlük anahtarı (<c>crm.act.priority.*</c>); bilinmeyen değer Normal sayılır.</summary>
+    public static string PriorityKey(string priority) => priority switch
     {
-        ActivityPriority.Low => "Düşük",
-        ActivityPriority.High => "Yüksek",
-        ActivityPriority.Urgent => "Acil",
-        _ => "Normal",
+        ActivityPriority.Low => "crm.act.priority.low",
+        ActivityPriority.High => "crm.act.priority.high",
+        ActivityPriority.Urgent => "crm.act.priority.urgent",
+        _ => "crm.act.priority.normal",
     };
 
     public static bool IsOverdue(ActivityDto activity) => activity.IsOverdue(DateTimeOffset.UtcNow);
@@ -89,12 +99,12 @@ public static class ActivityLabels
     {
         if (a.Masked && a.StartAt is null && a.StartDate is null)
         {
-            return "Meşgul";
+            return Texts.Get("crm.act.busy");
         }
 
         if (a.IsAllDay)
         {
-            return "Tüm gün";
+            return Texts.Get("crm.act.allDay");
         }
 
         if (a.StartAt is { } start)
@@ -103,7 +113,7 @@ public static class ActivityLabels
             return a.EndAt is { } end ? $"{from}–{Regional.ToTenant(end).ToString(Regional.TimePattern)}" : from;
         }
 
-        return a.DueAt is { } due ? $"son {Regional.ToTenant(due).ToString(Regional.TimePattern)}" : string.Empty;
+        return a.DueAt is { } due ? Texts.Get("crm.act.dueTime", Regional.ToTenant(due).ToString(Regional.TimePattern)) : string.Empty;
     }
 
     /// <summary>Sunucuya gönderilen takvim penceresi: firma saat dilimindeki gün sınırları ve tarihleri.</summary>

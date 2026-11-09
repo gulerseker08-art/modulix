@@ -3,18 +3,18 @@
 <section class="today-panel" aria-labelledby="today-panel-title">
     <header class="today-panel-head">
         <div>
-            <h2 id="today-panel-title">Bugünün aktiviteleri</h2>
+            <h2 id="today-panel-title">@Texts.Get("crm.act.today.title")</h2>
             <p class="today-panel-date">@DateText</p>
         </div>
         @if (Items is not null)
         {
-            <span class="count-pill" aria-label="@Items.Count aktivite">@Items.Count</span>
+            <span class="count-pill" aria-label="@Texts.Get("crm.act.countLabel", Items.Count)">@Items.Count</span>
         }
     </header>
 
     @if (Items is null)
     {
-        <p class="today-panel-state" role="status">Yükleniyor…</p>
+        <p class="today-panel-state" role="status">@Texts.Get("common.loading")</p>
     }
     else if (Error is not null)
     {
@@ -22,7 +22,7 @@
     }
     else if (Items.Count == 0)
     {
-        <p class="today-panel-state">Bugün için planlı aktivite yok.</p>
+        <p class="today-panel-state">@Texts.Get("crm.act.today.empty")</p>
     }
     else
     {
@@ -34,7 +34,7 @@
                     <span class="today-icon" aria-hidden="true"><AppIcon Name="@ActivityLabels.Icon(activity.Masked ? null : family)" Size="18" /></span>
                     <button type="button" class="today-body" @onclick="() => OnSelect.InvokeAsync(activity)">
                         <span class="today-time">@ActivityLabels.TimeText(activity)</span>
-                        <strong class="today-subject">@(activity.Masked ? "Meşgul" : activity.Subject)</strong>
+                        <strong class="today-subject">@(activity.Masked ? Texts.Get("crm.act.busy") : activity.Subject)</strong>
                         @if (!activity.Masked)
                         {
                             @if (activity.ContactId is not null)
@@ -51,7 +51,7 @@
                     {
                         <span class="today-tags">
                             <span class="badge fam-badge fam-@family">@Lookups.Label(CrmLists.ActivityType, activity.Type)</span>
-                            <span class="today-status">@ActivityLabels.Status(family, activity.Status)@(ActivityLabels.IsOverdue(activity) ? " · gecikti" : null)</span>
+                            <span class="today-status">@ActivityLabels.Status(family, activity.Status)@(ActivityLabels.IsOverdue(activity) ? ActivityLabels.OverdueSuffix : null)</span>
                         </span>
                     }
                 </li>
@@ -73,5 +73,5 @@
     private string FamilyOf(ActivityDto activity) => ActivityLabels.Family(Lookups, activity.Type);
 
     private static string DateText =>
-        Regional.Now.DateTime.ToString("d MMMM yyyy, dddd", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"));
+        Regional.Now.DateTime.ToString("d MMMM yyyy, dddd", UiLanguage.Culture);
 }
