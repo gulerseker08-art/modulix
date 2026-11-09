@@ -40,6 +40,7 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
     public const int TitleMaxLength = 200;
     public const int DescriptionMaxLength = 2000;
     public const int CommentMaxLength = 1000;
+    public const int SourceKeyMaxLength = 200;
 
     private ApprovalRequest()
     {
@@ -73,6 +74,12 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
     /// <summary>Kaydın açılış anındaki görünen adı (anlık görüntü).</summary>
     public string? TargetLabel { get; private set; }
 
+    /// <summary>
+    /// Talebi açan kural adımının tekilleştirme anahtarı (Dilim 4c-2). Aynı anahtarla ikinci talep açılmaz: kural motorunun en az bir kez
+    /// teslimi ikinci talep üretmez. Elle açılan talepte boş.
+    /// </summary>
+    public string? SourceKey { get; private set; }
+
     public ApprovalRequestStatus Status { get; private set; }
 
     public DateTimeOffset SubmittedAt { get; private set; }
@@ -88,8 +95,13 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
     /// </summary>
     public static (ApprovalRequest Request, List<ApprovalRequestStep> Steps) Open(
         ApprovalDefinition definition, string title, string? description, decimal? amount, string? currency, Guid requesterId, DateTimeOffset now,
-        ApprovalRecordTarget? target = null)
+        ApprovalRecordTarget? target = null, string? sourceKey = null)
     {
+        if (sourceKey is not null && (sourceKey.Length is 0 || sourceKey.Length > SourceKeyMaxLength))
+        {
+            throw new ArgumentException("Kural adımı anahtarı geçersiz.");
+        }
+
         if ((definition.TargetEntityKey is null) != (target is null) || (target is not null && target.EntityKey != definition.TargetEntityKey))
         {
             throw new ArgumentException(definition.TargetEntityKey is null ? "Bu süreç bir kayda bağlanmaz." : "Bu süreç için kayıt seçin.");
@@ -137,6 +149,7 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
             TargetEntityKey = target?.EntityKey,
             TargetRecordId = target?.RecordId,
             TargetLabel = target is null ? null : target.Label.Length > TitleMaxLength ? target.Label[..TitleMaxLength] : target.Label,
+            SourceKey = sourceKey,
             Status = ApprovalRequestStatus.Pending,
             SubmittedAt = now,
             Version = 1,

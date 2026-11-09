@@ -10,7 +10,7 @@
         <div class="form-check">
             <input id="@inputId" class="form-check-input" type="checkbox" checked="@Selected.Contains(item.Code)"
                    disabled="@(ActivitiesOnly && item.Active && item.Kind != "Activity")" @onchange="e => Toggle(item.Code, (bool)e.Value!)" />
-            <label class="form-check-label" for="@inputId">@(item.Depth > 0 ? string.Concat(Enumerable.Repeat("– ", item.Depth)) : null)@item.Name@(item.Active ? null : " (pasif)")</label>
+            <label class="form-check-label" for="@inputId">@(item.Depth > 0 ? string.Concat(Enumerable.Repeat("– ", item.Depth)) : null)@item.Name@(item.Active ? null : $" ({Texts.Get("common.inactiveLower")})")</label>
         </div>
     }
 </div>

@@ -225,6 +225,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("RequesterId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("SourceKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -259,6 +263,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "DefinitionId");
+
+                    b.HasIndex("TenantId", "SourceKey")
+                        .IsUnique()
+                        .HasFilter("[SourceKey] IS NOT NULL");
 
                     b.HasIndex("TenantId", "RequesterId", "Status");
 

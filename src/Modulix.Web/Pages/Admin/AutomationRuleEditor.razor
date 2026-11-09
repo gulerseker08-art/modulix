@@ -1,6 +1,7 @@
 @page "/yonetim/otomasyon/yeni"
 @page "/yonetim/otomasyon/{RuleId:guid}/duzenle"
 @using System.Text.Json
+@using Modulix.Shared.Approvals
 @inject ApiClient Api
 @inject SessionState Session
 @inject NavigationManager Navigation
@@ -426,6 +427,22 @@
                                                         <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => step.Parameters.Remove(p.Name)">Sabit değere çevir</button>
                                                     </div>
                                                 }
+                                                else if (step.Action == ApprovalRequestAction && p.Name == "process" && processes is { Count: > 0 })
+                                                {
+                                                    @* Onaya gönder (Dilim 4c-2): süreç, kuralın kayıt türüne bağlı etkin süreçlerden seçilir; yayında ad yine sunucuda doğrulanır. *@
+                                                    <select class="form-select" aria-label="@p.Label" value="@step.ValueText(p.Name)" @onchange="e => step.SetValue(p.Name, p.Type, e.Value?.ToString())">
+                                                        <option value="">Seçin…</option>
+                                                        @if (!string.IsNullOrEmpty(step.ValueText(p.Name)) && processes.All(d => d.Name != step.ValueText(p.Name) || d.TargetEntityKey != entityKey))
+                                                        {
+                                                            <option value="@step.ValueText(p.Name)">@step.ValueText(p.Name) (etkin değil ya da bu kayıt türüne bağlı değil)</option>
+                                                        }
+
+                                                        @foreach (var definitionOption in processes.Where(d => d.TargetEntityKey == entityKey))
+                                                        {
+                                                            <option value="@definitionOption.Name">@definitionOption.Name</option>
+                                                        }
+                                                    </select>
+                                                }
                                                 else if (p.Options.Count > 0)
                                                 {
                                                     <select class="form-select" aria-label="@p.Label" value="@step.ValueText(p.Name)" @onchange="e => step.SetValue(p.Name, p.Type, e.Value?.ToString())">
@@ -648,6 +665,9 @@
             }
         }
 
+        // "Onaya gönder" aksiyonunun süreç seçicisi için etkin süreçler; kuralın kayıt türüne bağlı olanlar listelenir (en iyi çaba: izin yoksa ya da alınamazsa metin girişi kalır).
+        processes = (await Api.GetAsync<List<ApprovalDefinitionDto>>("/api/approvals/definitions?activeOnly=true")).Value;
+
         catalog = catalogResult.Value;
     }
 
@@ -807,6 +827,10 @@
         definition.Actions.RemoveAt(index);
         definition.Actions.Insert(target, step);
     }
+
+    private const string ApprovalRequestAction = "core.approval.request";
+
+    private List<ApprovalDefinitionDto>? processes;
 
     private int insertions;
 

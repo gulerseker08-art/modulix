@@ -79,6 +79,7 @@ internal sealed class ApprovalRequestConfiguration : IEntityTypeConfiguration<Ap
         builder.Property(r => r.Version).IsConcurrencyToken();
         builder.Property(r => r.TargetEntityKey).HasMaxLength(100);
         builder.Property(r => r.TargetLabel).HasMaxLength(ApprovalRequest.TitleMaxLength);
+        builder.Property(r => r.SourceKey).HasMaxLength(ApprovalRequest.SourceKeyMaxLength);
 
         builder.HasAlternateKey(r => new { r.TenantId, r.Id });
         builder.HasOne<ApprovalDefinition>().WithMany()
@@ -91,6 +92,9 @@ internal sealed class ApprovalRequestConfiguration : IEntityTypeConfiguration<Ap
 
         // Kayıt ekranı ve geçersizleştirme kaydın taleplerini arar.
         builder.HasIndex(r => new { r.TenantId, r.TargetEntityKey, r.TargetRecordId, r.Status });
+
+        // Kural kaynaklı talep (Dilim 4c-2): açan kural adımının tekilleştirme anahtarı; aynı anahtarla ikinci talep açılmaz.
+        builder.HasIndex(r => new { r.TenantId, r.SourceKey }).IsUnique().HasFilter("[SourceKey] IS NOT NULL");
     }
 }
 

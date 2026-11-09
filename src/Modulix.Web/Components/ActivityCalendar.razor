@@ -4,7 +4,7 @@
    Her aktivite bir düğmedir (klavyeyle odaklanır, Enter açar); gün hücresine Enter hızlı oluşturur; bir aktiviteyi başka güne
    sürüklemek yeniden planlamadır (sunucu yetki ve çakışmayı denetler). Son tarih işaretleri (⏰) zaman bloğundan ayrı gösterilir. *@
 
-<div class="cal" role="grid" aria-label="Aktivite takvimi">
+<div class="cal" role="grid" aria-label="@Texts.Get("crm.act.cal.label")">
     @if (Mode == CalendarMode.Agenda)
     {
         @foreach (var (day, items) in Grouped())
@@ -21,7 +21,7 @@
         }
         @if (!Items.Any())
         {
-            <p class="text-muted">Bu aralıkta aktivite yok.</p>
+            <p class="text-muted">@Texts.Get("crm.act.cal.empty")</p>
         }
     }
     else if (Mode is CalendarMode.Week or CalendarMode.Day)
@@ -36,16 +36,16 @@
                     <div class="cal-time-dayhead @(day == Today ? "today" : null)" role="columnheader">
                         <span class="cal-time-weekday">@WeekdayNames[((int)day.DayOfWeek + 6) % 7]</span>
                         <button type="button" class="cal-day-link" @onclick="() => OnCreate.InvokeAsync(day)"
-                                title="Bu güne aktivite ekle" aria-label="@Heading(day) için yeni aktivite">@day.Day</button>
+                                title="@Texts.Get("crm.act.cal.addToDay")" aria-label="@Texts.Get("crm.act.cal.newFor", Heading(day))">@day.Day</button>
                     </div>
                 }
             </div>
             <div class="cal-time-row cal-time-allday" role="row">
-                <div class="cal-time-gutter">Tüm gün</div>
+                <div class="cal-time-gutter">@Texts.Get("crm.act.allDay")</div>
                 @foreach (var day in days)
                 {
                     var untimed = UntimedOn(day);
-                    <div class="cal-time-allday-cell" role="gridcell" tabindex="0" aria-label="@Heading(day), tüm gün ve son tarihli @untimed.Count aktivite"
+                    <div class="cal-time-allday-cell" role="gridcell" tabindex="0" aria-label="@Texts.Get("crm.act.cal.allDayCell", Heading(day), untimed.Count)"
                          @onkeydown="e => CellKey(e, day)" @ondragover:preventDefault @ondrop="() => DropAsync(day)">
                         @foreach (var activity in untimed)
                         {
@@ -99,11 +99,11 @@
             {
                 var items = ItemsOn(day);
                 <div class="cal-cell @(day == Today ? "today" : null) @(Mode == CalendarMode.Month && day.Month != Anchor.Month ? "outside" : null)"
-                     role="gridcell" tabindex="0" aria-label="@Heading(day), @items.Count aktivite"
+                     role="gridcell" tabindex="0" aria-label="@Texts.Get("crm.act.cal.dayCell", Heading(day), items.Count)"
                      @onkeydown="e => CellKey(e, day)" @ondragover:preventDefault @ondrop="() => DropAsync(day)">
                     <div class="cal-date">
                         <button type="button" class="cal-day-link" @onclick="() => OnCreate.InvokeAsync(day)"
-                                title="Bu güne aktivite ekle" aria-label="@Heading(day) için yeni aktivite">@day.Day</button>
+                                title="@Texts.Get("crm.act.cal.addToDay")" aria-label="@Texts.Get("crm.act.cal.newFor", Heading(day))">@day.Day</button>
                     </div>
                     @foreach (var activity in items.Take(Mode == CalendarMode.Month ? 4 : 50))
                     {
@@ -114,7 +114,7 @@
                     }
                     @if (Mode == CalendarMode.Month && items.Count > 4)
                     {
-                        <button type="button" class="btn btn-link btn-sm" @onclick="() => OnDayChosen.InvokeAsync(day)">+@(items.Count - 4) daha</button>
+                        <button type="button" class="btn btn-link btn-sm" @onclick="() => OnDayChosen.InvokeAsync(day)">@Texts.Get("crm.act.cal.more", items.Count - 4)</button>
                     }
                 </div>
             }
@@ -123,7 +123,11 @@
 </div>
 
 @code {
-    private static readonly string[] WeekdayNames = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+    private static string[] WeekdayNames =>
+    [
+        Texts.Get("crm.act.weekday.mon"), Texts.Get("crm.act.weekday.tue"), Texts.Get("crm.act.weekday.wed"), Texts.Get("crm.act.weekday.thu"),
+        Texts.Get("crm.act.weekday.fri"), Texts.Get("crm.act.weekday.sat"), Texts.Get("crm.act.weekday.sun"),
+    ];
 
     private ActivityDto? dragging;
 
@@ -160,7 +164,7 @@
         builder.OpenElement(0, "button");
         builder.AddAttribute(1, "type", "button");
         builder.AddAttribute(2, "class", "cal-entry");
-        builder.AddAttribute(3, "title", activity.Masked ? "Meşgul" : $"{activity.Subject} · {ActivityLabels.TimeText(activity)}");
+        builder.AddAttribute(3, "title", activity.Masked ? Texts.Get("crm.act.busy") : $"{activity.Subject} · {ActivityLabels.TimeText(activity)}");
         builder.AddAttribute(4, "onclick", EventCallback.Factory.Create(this, () => OnSelect.InvokeAsync(activity)));
         builder.AddContent(5, $"{(deadlineOnly ? "⏰ " : null)}{ActivityLabels.TimeText(activity)} {activity.Subject}");
         builder.CloseElement();
@@ -172,7 +176,7 @@
         builder.OpenElement(0, "button");
         builder.AddAttribute(1, "type", "button");
         builder.AddAttribute(2, "class", "cal-entry");
-        builder.AddAttribute(3, "title", activity.Masked ? "Meşgul" : $"{activity.Subject} · {ActivityLabels.TimeText(activity)}");
+        builder.AddAttribute(3, "title", activity.Masked ? Texts.Get("crm.act.busy") : $"{activity.Subject} · {ActivityLabels.TimeText(activity)}");
         builder.AddAttribute(4, "onclick", EventCallback.Factory.Create(this, () => OnSelect.InvokeAsync(activity)));
         builder.OpenElement(5, "span");
         builder.AddAttribute(6, "class", "cal-entry-time");
@@ -180,7 +184,7 @@
         builder.CloseElement();
         builder.OpenElement(8, "span");
         builder.AddAttribute(9, "class", "cal-entry-subject");
-        builder.AddContent(10, activity.Masked ? "Meşgul" : activity.Subject);
+        builder.AddContent(10, activity.Masked ? Texts.Get("crm.act.busy") : activity.Subject);
         builder.CloseElement();
         builder.CloseElement();
     };
@@ -354,7 +358,7 @@
 
     private static string Heading(DateOnly day)
     {
-        var tr = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
-        return $"{day.ToString("d MMMM yyyy", tr)} {day.ToString("dddd", tr)}";
+        var culture = UiLanguage.Culture;
+        return $"{day.ToString("d MMMM yyyy", culture)} {day.ToString("dddd", culture)}";
     }
 }
