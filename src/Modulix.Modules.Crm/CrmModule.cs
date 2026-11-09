@@ -652,6 +652,13 @@ public sealed class CrmModule : IModule
             PatternMessage = "0-999 arası tam sayı girin.",
             MaxLength = 3,
         },
+        new(SettingKeys.QuoteReplyReminderDays, "Yanıtsız teklif önerisi (gün)", "CRM Teklif", SettingType.Text, "3")
+        {
+            Description = "CRM panosundaki Benim günüm sekmesi, müşteriye sunulup bu kadar gündür yanıt alınmayan teklifi hatırlatmayı önerir. 0 kapalıdır. Fırsatın hareketsizlik önerisi Fırsat hareketsizlik eşiğini kullanır.",
+            Pattern = @"^[0-9]{1,3}$",
+            PatternMessage = "0-999 arası tam sayı girin.",
+            MaxLength = 3,
+        },
         // Satış raporlama ve tahmin (ADR-0026). Değişiklik yalnızca sonraki hesapları etkiler; kilitli tahmin ve kaydedilmiş kurlar yeniden yorumlanmaz.
         new(SettingKeys.FiscalYearStartMonth, "Mali yıl başlangıç ayı", "CRM Raporlama", SettingType.Text, "1")
         {
@@ -1070,6 +1077,7 @@ public sealed class CrmModule : IModule
         public const string QuoteExpiryReminderDays = "crm.quote.expiry-reminder-days";
         public const string QuoteSyncOpportunityAmount = "crm.quote.sync-opportunity-amount";
         public const string QuoteApprovalReminderHours = "crm.quote.approval-reminder-hours";
+        public const string QuoteReplyReminderDays = "crm.quote.reply-reminder-days";
         public const string FiscalYearStartMonth = "crm.reporting.fiscal-year-start-month";
         public const string ForecastCommitMinProbability = "crm.forecast.commit-min-probability";
         public const string ForecastBestCaseMinProbability = "crm.forecast.best-case-min-probability";
