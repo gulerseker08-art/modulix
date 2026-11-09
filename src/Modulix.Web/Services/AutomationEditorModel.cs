@@ -343,19 +343,32 @@ public sealed class EditorAction
     /// <summary>Parametre adı → değer (sabit değer ya da <c>{"$field": …}</c> bağlaması). Bilinmeyen parametreler de korunur.</summary>
     public JsonObject Parameters { get; set; } = [];
 
+    /// <summary>Adım koşulu (dallanma, Dilim 4c-5): boşsa adım her zaman çalışır; doluysa yalnızca koşul sağlanınca.</summary>
+    public EditorCondition When { get; set; } = new();
+
     public static EditorAction Parse(JsonObject node) => new()
     {
         Id = node["id"]?.GetValue<string>() ?? string.Empty,
         Action = node["action"]?.GetValue<string>() ?? string.Empty,
         Parameters = node["parameters"] is JsonObject p ? (JsonObject)p.DeepClone() : [],
+        When = EditorCondition.Parse(node["when"]),
     };
 
-    public JsonObject Build() => new()
+    public JsonObject Build()
     {
-        ["id"] = Id,
-        ["action"] = Action,
-        ["parameters"] = Parameters.DeepClone(),
-    };
+        var node = new JsonObject
+        {
+            ["id"] = Id,
+            ["action"] = Action,
+            ["parameters"] = Parameters.DeepClone(),
+        };
+        if (When.Build() is { } when)
+        {
+            node["when"] = when;
+        }
+
+        return node;
+    }
 
     /// <summary>Parametre alan bağlamasıyla mı verilmiş (<c>{"$field": "anahtar"}</c>)? Bağlanan alanın anahtarını döndürür.</summary>
     public string? BoundField(string name) =>

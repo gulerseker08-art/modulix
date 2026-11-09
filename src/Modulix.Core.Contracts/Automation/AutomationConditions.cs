@@ -218,7 +218,15 @@ public sealed record DomainEventTrigger(string EventKey) : AutomationTrigger;
 public sealed record ManualTrigger : AutomationTrigger;
 
 /// <summary>Kuralın bir aksiyon adımı. <see cref="Id"/> sürüm içinde tekildir; tekilleştirme anahtarının parçasıdır.</summary>
-public sealed record AutomationActionStep(string Id, string Action, JsonObject Parameters);
+public sealed record AutomationActionStep(string Id, string Action, JsonObject Parameters)
+{
+    /// <summary>
+    /// Adım koşulu (akışta dallanma, ADR-0027 Dilim 4c-5): doluysa adım yalnızca bu koşul sağlanırsa çalışır, sağlanmazsa atlanır ve
+    /// akış sıradaki adımla sürer. Adıma sıra geldiğinde kaydın <b>güncel</b> değerleriyle değerlendirilir (önceki adımların ve beklemenin
+    /// ardından); bu yüzden eski değer ve değişiklik operatörleri kullanılamaz. Boşsa adım her zaman çalışır.
+    /// </summary>
+    public ConditionNode? When { get; init; }
+}
 
 /// <summary>Bir kural sürümünün içeriği: ne zaman, hangi koşulda, ne yapılır.</summary>
 public sealed record AutomationDefinition(AutomationTrigger Trigger, ConditionNode? Condition, IReadOnlyList<AutomationActionStep> Actions);

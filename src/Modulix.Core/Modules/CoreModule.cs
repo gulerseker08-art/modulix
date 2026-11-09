@@ -638,6 +638,7 @@ public sealed class CoreModule : IModule
         // Kalıcı akışın bekleme adımları ve yayın denetimleri (Dilim 4c-4).
         services.AddScoped<FlowWaitAction>();
         services.AddScoped<FlowAwaitApprovalAction>();
+        services.AddScoped<FlowStopAction>();
         services.AddScoped<IAutomationStepCheck, FlowWaitCheck>();
         services.AddScoped<IAutomationStepCheck, FlowAwaitApprovalCheck>();
     }

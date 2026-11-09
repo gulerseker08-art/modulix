@@ -242,4 +242,30 @@ public class AutomationEditorModelTests
         Assert.All(EditorTrigger.Types, t => Assert.NotEqual(t, AutomationLabels.TriggerType(t)));
         Assert.Contains(EditorTrigger.DomainEvent, EditorTrigger.Types); // iş olayı tetikleyicisi ADR-0039 ile yayınlanabilir
     }
+
+    /// <summary>Core.Tests'teki <c>AutomationEditorJsonShapeTests.Branch</c> ile aynı metin: adım koşulu (dallanma, Dilim 4c-5).</summary>
+    private const string Branch =
+        """{"trigger":{"type":"manual"},"actions":[{"id":"adim1","action":"core.flow.stop","parameters":{"reason":"Küçük"},"when":{"type":"group","logic":"and","items":[{"type":"leaf","field":"crm.opportunity.amount","operator":"lt","values":["50000"],"currency":"TRY"}]}},{"id":"adim2","action":"crm.follow-up.create","parameters":{"subject":"Ara","dueInDays":2}}]}""";
+
+    [Fact]
+    public void A_step_condition_is_written_only_when_the_step_has_one_and_round_trips()
+    {
+        var definition = new EditorDefinition();
+        var stop = new EditorAction { Id = "adim1", Action = "core.flow.stop" };
+        stop.SetValue("reason", "Text", "Küçük");
+        stop.When.Leaves.Add(new EditorLeaf { Field = "crm.opportunity.amount", Operator = "lt", Values = ["50000"], Currency = "TRY" });
+        var followUp = new EditorAction { Id = "adim2", Action = "crm.follow-up.create" };
+        followUp.SetValue("subject", "Text", "Ara");
+        followUp.SetValue("dueInDays", "Number", "2");
+        definition.Actions.AddRange([stop, followUp]);
+
+        var built = definition.Build();
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(Branch), built), built.ToJsonString());
+        Assert.Null(built["actions"]![1]!["when"]); // koşulsuz adım eskisi gibi yazılır
+
+        var parsed = EditorDefinition.Parse(Json(Branch));
+        Assert.Single(parsed.Actions[0].When.Leaves);
+        Assert.Empty(parsed.Actions[1].When.Leaves);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(Branch), parsed.Build()));
+    }
 }

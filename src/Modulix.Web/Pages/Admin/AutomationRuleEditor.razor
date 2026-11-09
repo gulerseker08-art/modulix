@@ -253,122 +253,12 @@
                     }
                     else
                     {
-                        @if (definition.Condition.Leaves.Count > 1)
-                        {
-                            <div class="form-grid">
-                                <div class="span-6">
-                                    <label class="form-label" for="conditionLogic">Koşulların birleşimi</label>
-                                    <select id="conditionLogic" class="form-select" @bind="definition.Condition.Logic">
-                                        <option value="@EditorCondition.And">@AutomationLabels.Logic(EditorCondition.And)</option>
-                                        <option value="@EditorCondition.Or">@AutomationLabels.Logic(EditorCondition.Or)</option>
-                                    </select>
-                                </div>
-                            </div>
-                        }
-
-                        @for (var i = 0; i < definition.Condition.Leaves.Count; i++)
-                        {
-                            var leaf = definition.Condition.Leaves[i];
-                            var leafField = FieldOf(leaf.Field);
-                            var count = EditorLeaf.ValueCount(leaf.Operator);
-                            var number = i + 1;
-                            <div class="form-grid" role="group" aria-label="@($"Koşul {number}")">
-                                <div class="span-4">
-                                    <label class="form-label" for="@($"leafField{number}")">Alan</label>
-                                    <select id="@($"leafField{number}")" class="form-select" value="@leaf.Field" @onchange="e => ChooseLeafField(leaf, e.Value?.ToString())">
-                                        <option value="">Seçin…</option>
-                                        @foreach (var field in entity.Fields)
-                                        {
-                                            <option value="@field.Key">@field.Label</option>
-                                        }
-                                    </select>
-                                </div>
-                                <div class="span-4">
-                                    <label class="form-label" for="@($"leafOp{number}")">Koşul</label>
-                                    <select id="@($"leafOp{number}")" class="form-select" value="@leaf.Operator" @onchange="e => ChooseOperator(leaf, e.Value?.ToString())" disabled="@(leafField is null)">
-                                        @if (leafField is not null)
-                                        {
-                                            @foreach (var op in OperatorsFor(leafField))
-                                            {
-                                                <option value="@EditorLeaf.OperatorKey(op)">@AutomationLabels.Operator(op)</option>
-                                            }
-                                        }
-                                    </select>
-                                </div>
-                                <div class="span-4">
-                                    @if (leafField is not null && count.Max > 0)
-                                    {
-                                        <span class="form-label">Değer</span>
-                                        @if (count.Max == 2)
-                                        {
-                                            <div class="d-flex gap-2">
-                                                <input class="form-control" type="@InputType(leafField)" aria-label="İlk değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())" />
-                                                <input class="form-control" type="@InputType(leafField)" aria-label="İkinci değer" value="@ValueAt(leaf, 1)" @onchange="e => SetValueAt(leaf, 1, e.Value?.ToString())" />
-                                            </div>
-                                        }
-                                        else if (count.Max > 2 && leafField.Options.Count > 0)
-                                        {
-                                            <div class="chip-group">
-                                                @foreach (var o in leafField.Options)
-                                                {
-                                                    var optionKey = o.Key;
-                                                    <label class="form-check">
-                                                        <input class="form-check-input" type="checkbox" checked="@leaf.Values.Contains(optionKey)"
-                                                               @onchange="e => ToggleValue(leaf, optionKey, (bool)(e.Value ?? false))" />
-                                                        @o.Label
-                                                    </label>
-                                                }
-                                            </div>
-                                        }
-                                        else if (count.Max > 2)
-                                        {
-                                            <input class="form-control" aria-label="Değerler" placeholder="Virgülle ayırın" value="@string.Join(", ", leaf.Values)"
-                                                   @onchange="e => SetList(leaf, e.Value?.ToString())" />
-                                        }
-                                        else if (leafField.Options.Count > 0)
-                                        {
-                                            <select class="form-select" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())">
-                                                <option value="">Seçin…</option>
-                                                @foreach (var o in leafField.Options)
-                                                {
-                                                    <option value="@o.Key">@o.Label</option>
-                                                }
-                                            </select>
-                                        }
-                                        else if (leafField.Type == "Boolean")
-                                        {
-                                            <select class="form-select" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())">
-                                                <option value="">Seçin…</option>
-                                                <option value="true">Evet</option>
-                                                <option value="false">Hayır</option>
-                                            </select>
-                                        }
-                                        else
-                                        {
-                                            <input class="form-control" type="@InputType(leafField)" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())" />
-                                        }
-
-                                        @if (leafField.Type == "Money")
-                                        {
-                                            <input class="form-control mt-2" maxlength="3" aria-label="Para birimi" placeholder="Para birimi (ör. TRY)" value="@leaf.Currency" @onchange="e => leaf.Currency = Empty(e.Value?.ToString()?.ToUpperInvariant())" />
-                                        }
-                                    }
-                                    @if (definition.Trigger.HasChanges)
-                                    {
-                                        <select class="form-select mt-2" aria-label="Hangi değere bakılsın" @bind="leaf.Source">
-                                            <option value="new">Yeni değere bak</option>
-                                            <option value="old">Eski değere bak</option>
-                                        </select>
-                                    }
-                                    <button type="button" class="btn btn-sm btn-outline-danger mt-2" @onclick="() => RemoveLeaf(leaf)">Koşulu kaldır</button>
-                                </div>
-                            </div>
-                        }
+                        @LeafRows(definition.Condition, string.Empty, definition.Trigger.HasChanges)
                     }
                 </ChildContent>
             </FormSection>
 
-            <FormSection Title="Ne yapar" Icon="check" Description="Adımlar sırayla çalışır; başarısız bir adım kalanları durdurur. &quot;Bekle&quot; ve &quot;Onay sonucunu bekle&quot; adımlarıyla çok adımlı, kalıcı bir akış kurabilirsiniz.">
+            <FormSection Title="Ne yapar" Icon="check" Description="Adımlar sırayla çalışır; başarısız bir adım kalanları durdurur. &quot;Bekle&quot; ve &quot;Onay sonucunu bekle&quot; adımlarıyla çok adımlı, kalıcı bir akış kurabilirsiniz; adım koşulu ve &quot;Akışı bitir&quot; ile akış dallanır.">
                 <Actions>
                     <button type="button" class="btn btn-tonal" @onclick="AddAction">Aksiyon ekle</button>
                 </Actions>
@@ -485,6 +375,37 @@
                                                 }
                                             </div>
                                         }
+                                    }
+                                </div>
+
+                                @* Adım koşulu (dallanma, Dilim 4c-5): adım yalnızca koşul sağlanırsa çalışır, sağlanmazsa atlanır ve akış sürer. *@
+                                <div class="cond-group mt-3" role="group" aria-label="@($"Adım {number} koşulu")">
+                                    <div class="cond-head">
+                                        <strong>Yalnızca şu koşulda çalışsın</strong>
+                                        @if (!step.When.IsLocked)
+                                        {
+                                            <button type="button" class="btn btn-tonal ms-auto" @onclick="() => step.When.Leaves.Add(new EditorLeaf())">Adım koşulu ekle</button>
+                                        }
+                                        <small class="text-muted cond-hint">
+                                            Koşul, adıma sıra geldiğinde kaydın güncel değerleriyle sorulur (önceki adımlar ve beklemelerden sonra). Sağlanmazsa
+                                            adım atlanır, akış sıradaki adımla sürer. Dallanma için iki adıma karşıt koşul verin; bir dalı bitirmek için
+                                            "Akışı bitir" adımını kullanın.
+                                        </small>
+                                    </div>
+                                    @if (step.When.IsLocked)
+                                    {
+                                        <div class="alert alert-warning" role="status">
+                                            Bu adımın koşulu iç içe gruplar ya da ilişki sorgusu içeriyor; burada düzenlenemez ve olduğu gibi korunur.
+                                            <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => step.When = new EditorCondition()">Koşulu kaldırıp yeniden kur</button>
+                                        </div>
+                                    }
+                                    else if (step.When.Leaves.Count == 0)
+                                    {
+                                        <p class="text-muted mb-0" role="status">Koşul yok: adım her zaman çalışır.</p>
+                                    }
+                                    else
+                                    {
+                                        @LeafRows(step.When, $"step{number}-", false)
                                     }
                                 </div>
                             </div>
@@ -703,7 +624,7 @@
                 leaf.Source = "new";
                 if (EditorLeaf.IsChange(leaf.Operator))
                 {
-                    leaf.Operator = FirstOperator(FieldOf(leaf.Field));
+                    leaf.Operator = FirstOperator(FieldOf(leaf.Field), false);
                     leaf.Values = [];
                 }
             }
@@ -741,25 +662,143 @@
 
     // Koşullar
 
-    private IEnumerable<string> OperatorsFor(AutomationFieldDto field) =>
-        field.Operators.Where(o => definition.Trigger.HasChanges || !EditorLeaf.IsChange(EditorLeaf.OperatorKey(o)));
+    // Değişiklik operatörleri yalnızca kural koşulunda ve güncelleme tetikleyicilerinde; adım koşulu güncel kayda bakar (Dilim 4c-5).
+    private static IEnumerable<string> OperatorsFor(AutomationFieldDto field, bool allowChanges) =>
+        field.Operators.Where(o => allowChanges || !EditorLeaf.IsChange(EditorLeaf.OperatorKey(o)));
 
-    private string FirstOperator(AutomationFieldDto? field) =>
-        field is null ? "eq" : EditorLeaf.OperatorKey(OperatorsFor(field).FirstOrDefault() ?? "Eq");
+    private static string FirstOperator(AutomationFieldDto? field, bool allowChanges) =>
+        field is null ? "eq" : EditorLeaf.OperatorKey(OperatorsFor(field, allowChanges).FirstOrDefault() ?? "Eq");
 
     private void AddLeaf() => definition.Condition.Leaves.Add(new EditorLeaf());
 
-    private void RemoveLeaf(EditorLeaf leaf) => definition.Condition.Leaves.Remove(leaf);
-
     private void ClearLockedCondition() => definition.Condition = new EditorCondition();
 
-    private void ChooseLeafField(EditorLeaf leaf, string? key)
+    private void ChooseLeafField(EditorLeaf leaf, string? key, bool allowChanges)
     {
         leaf.Field = key ?? string.Empty;
-        leaf.Operator = FirstOperator(FieldOf(leaf.Field));
+        leaf.Operator = FirstOperator(FieldOf(leaf.Field), allowChanges);
         leaf.Values = [];
         leaf.Currency = null;
     }
+
+    /// <summary>
+    /// Koşul satırları (alan, koşul, değer); kural koşulunda ve adım koşulunda (dallanma) ortak. <paramref name="prefix"/> girdi
+    /// kimliklerini adımlar arasında tekil tutar; <paramref name="allowChanges"/> eski değer ve değişiklik operatörlerini açar.
+    /// </summary>
+    private RenderFragment LeafRows(EditorCondition condition, string prefix, bool allowChanges) => __builder =>
+    {
+        @if (condition.Leaves.Count > 1)
+        {
+            <div class="form-grid">
+                <div class="span-6">
+                    <label class="form-label" for="@($"{prefix}conditionLogic")">Koşulların birleşimi</label>
+                    <select id="@($"{prefix}conditionLogic")" class="form-select" @bind="condition.Logic">
+                        <option value="@EditorCondition.And">@AutomationLabels.Logic(EditorCondition.And)</option>
+                        <option value="@EditorCondition.Or">@AutomationLabels.Logic(EditorCondition.Or)</option>
+                    </select>
+                </div>
+            </div>
+        }
+
+        @for (var i = 0; i < condition.Leaves.Count; i++)
+        {
+            var leaf = condition.Leaves[i];
+            var leafField = FieldOf(leaf.Field);
+            var count = EditorLeaf.ValueCount(leaf.Operator);
+            var number = i + 1;
+            <div class="form-grid" role="group" aria-label="@($"Koşul {number}")">
+                <div class="span-4">
+                    <label class="form-label" for="@($"{prefix}leafField{number}")">Alan</label>
+                    <select id="@($"{prefix}leafField{number}")" class="form-select" value="@leaf.Field" @onchange="e => ChooseLeafField(leaf, e.Value?.ToString(), allowChanges)">
+                        <option value="">Seçin…</option>
+                        @foreach (var field in entity?.Fields ?? [])
+                        {
+                            <option value="@field.Key">@field.Label</option>
+                        }
+                    </select>
+                </div>
+                <div class="span-4">
+                    <label class="form-label" for="@($"{prefix}leafOp{number}")">Koşul</label>
+                    <select id="@($"{prefix}leafOp{number}")" class="form-select" value="@leaf.Operator" @onchange="e => ChooseOperator(leaf, e.Value?.ToString())" disabled="@(leafField is null)">
+                        @if (leafField is not null)
+                        {
+                            @foreach (var op in OperatorsFor(leafField, allowChanges))
+                            {
+                                <option value="@EditorLeaf.OperatorKey(op)">@AutomationLabels.Operator(op)</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="span-4">
+                    @if (leafField is not null && count.Max > 0)
+                    {
+                        <span class="form-label">Değer</span>
+                        @if (count.Max == 2)
+                        {
+                            <div class="d-flex gap-2">
+                                <input class="form-control" type="@InputType(leafField)" aria-label="İlk değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())" />
+                                <input class="form-control" type="@InputType(leafField)" aria-label="İkinci değer" value="@ValueAt(leaf, 1)" @onchange="e => SetValueAt(leaf, 1, e.Value?.ToString())" />
+                            </div>
+                        }
+                        else if (count.Max > 2 && leafField.Options.Count > 0)
+                        {
+                            <div class="chip-group">
+                                @foreach (var o in leafField.Options)
+                                {
+                                    var optionKey = o.Key;
+                                    <label class="form-check">
+                                        <input class="form-check-input" type="checkbox" checked="@leaf.Values.Contains(optionKey)"
+                                               @onchange="e => ToggleValue(leaf, optionKey, (bool)(e.Value ?? false))" />
+                                        @o.Label
+                                    </label>
+                                }
+                            </div>
+                        }
+                        else if (count.Max > 2)
+                        {
+                            <input class="form-control" aria-label="Değerler" placeholder="Virgülle ayırın" value="@string.Join(", ", leaf.Values)"
+                                   @onchange="e => SetList(leaf, e.Value?.ToString())" />
+                        }
+                        else if (leafField.Options.Count > 0)
+                        {
+                            <select class="form-select" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())">
+                                <option value="">Seçin…</option>
+                                @foreach (var o in leafField.Options)
+                                {
+                                    <option value="@o.Key">@o.Label</option>
+                                }
+                            </select>
+                        }
+                        else if (leafField.Type == "Boolean")
+                        {
+                            <select class="form-select" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())">
+                                <option value="">Seçin…</option>
+                                <option value="true">Evet</option>
+                                <option value="false">Hayır</option>
+                            </select>
+                        }
+                        else
+                        {
+                            <input class="form-control" type="@InputType(leafField)" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())" />
+                        }
+
+                        @if (leafField.Type == "Money")
+                        {
+                            <input class="form-control mt-2" maxlength="3" aria-label="Para birimi" placeholder="Para birimi (ör. TRY)" value="@leaf.Currency" @onchange="e => leaf.Currency = Empty(e.Value?.ToString()?.ToUpperInvariant())" />
+                        }
+                    }
+                    @if (allowChanges)
+                    {
+                        <select class="form-select mt-2" aria-label="Hangi değere bakılsın" @bind="leaf.Source">
+                            <option value="new">Yeni değere bak</option>
+                            <option value="old">Eski değere bak</option>
+                        </select>
+                    }
+                    <button type="button" class="btn btn-sm btn-outline-danger mt-2" @onclick="() => condition.Leaves.Remove(leaf)">Koşulu kaldır</button>
+                </div>
+            </div>
+        }
+    };
 
     private void ChooseOperator(EditorLeaf leaf, string? op)
     {
