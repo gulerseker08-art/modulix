@@ -1,3 +1,4 @@
+using Modulix.Core.Approvals;
 using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Modules;
@@ -21,7 +22,10 @@ public class AutomationCapabilityCatalogTests
         Assert.Equal("sales", catalog.FindAutomationAction(FollowUp.Key)!.Value.ModuleKey);
         Assert.Equal(9, catalog.AutomationFieldsOf(Entity).Count());
         Assert.Equal(3, catalog.AutomationEventsOf(Entity).Count());
-        Assert.Equal(2, catalog.AutomationActions.Count());
+        Assert.Equal(2, catalog.AutomationActions.Count(a => a.ModuleKey == "sales"));
+
+        // Core'un tek aksiyonu "Onaya gönder"dir (Dilim 4c-2); kayıt türü, alan ya da olay beyan etmez.
+        Assert.Equal(ApprovalAutomation.RequestAction, Assert.Single(catalog.AutomationActions, a => a.ModuleKey == "core").Action.Definition.Key);
     }
 
     [Fact]
@@ -30,7 +34,9 @@ public class AutomationCapabilityCatalogTests
         var catalog = Catalog(AutomationCapabilities.None);
 
         Assert.Empty(catalog.AutomationEntities);
-        Assert.Empty(catalog.AutomationActions);
+
+        // Yetenek beyan etmeyen modül hiçbir aksiyon eklemez; kalan yalnızca Core'un "Onaya gönder"idir.
+        Assert.Equal(ApprovalAutomation.RequestAction, Assert.Single(catalog.AutomationActions).Action.Definition.Key);
     }
 
     [Fact]

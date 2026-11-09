@@ -196,7 +196,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 4a | Genel onay: süreç tanımı, talep, Onay merkezi (Ç6a asgari) | Uygulandı (aşağıda "Dilim 4a") |
 | 4b | Uygulama içi bildirim kutusu (Ç5a), onay süre aşımı eskalasyonu, genel vekâlet | Uygulandı (aşağıda "Dilim 4b") |
 | 4c | Kayda bağlı onay (modül beyanı, geçersizleşme, kayıt paneli) | Uygulandı (aşağıda "Dilim 4c") |
-| 4c-2 | Kural aksiyonu "onaya gönder", onay sonucunun modül komutuna bağlanması, kalıcı akış | Sonra |
+| 4c-2 | Kural aksiyonu "onaya gönder", onay sonucunun modül komutuna bağlanması, kalıcı akış | **Kural aksiyonu uygulandı** (aşağıda "Dilim 4c-2"); onay sonucunun modül komutuna bağlanması (Ç6a.3) ve kalıcı akış sonra |
 | 4d | Takvim ortaklaştırma, puanlama, şablon motoru | **Metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); takvim ortaklaştırma ve puanlama sonra |
 | 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c"); 5d kayıt seçici, kayıt üzerinde deneme ve elle çalıştırma uygulandı ("Dilim 5d") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
@@ -557,3 +557,22 @@ Elle çalıştırmanın kendi dört kural testi (mutlu yol, hata, tenant izolasy
 - **Arayüz:** süreç formunda "Kayıt türü", fırsat ekranında `RecordApprovalPanel` (son talep durumu, "Onaya gönder"), Onay merkezinde kayıt bağlantısı.
 
 **Bilerek yapılmadı:** kural aksiyonu "onaya gönder" (süreç seçimi için tenant'a özgü lookup gerekir), onay sonucunun modül komutunu açması ya da kilitlemesi, kalıcı çok adımlı iş akışı.
+
+### Dilim 4c-2: Kural aksiyonu "Onaya gönder" (8 Kasım 2026)
+
+Kural motoru ile kayda bağlı onay (4a/4b/4c) birbirine bağlandı: bir kural, tetiklendiği kayıt için onay talebi açar. Veri modeli Dilim 4c'ninkidir (`TargetEntityKey`/`TargetRecordId`/`TargetLabel`, tutar kayıttan, süreç kayıt türüne bağlı); bu dilim yalnızca kural adımının tekilleştirme anahtarını ekler.
+
+- **Karar 1, talep sahibi kaydın sorumlusudur** (kuralın kimliği değil). Kayıt türü beyanına `AutomationEntityDefinition.OwnerField` eklendi (CRM: müşteri adayı ve fırsat için `ownerId`; beyan edilmiş bir **lookup** alanı olmalı, açılışta doğrulanır). Dört göz sorumlu için geçerlidir: sorumlu kendi talebine karar veremez ve sürecin her adımında sorumludan başka etkin onaycı aranır, yoksa talep açılmaz. Sorumlu boşsa ya da türde `OwnerField` yoksa adım açıkça başarısız olur (sahipsiz talep üretilmez). Kayıt, kuralın kimliğiyle (yayınlayanın yetkisi) okunur.
+- **Karar 2, süreç adla seçilir, yayında doğrulanır.** Aksiyon parametresi sürecin adıdır (firma içinde tekil); yayın sırasında `ApprovalProcessCheck` (`IAutomationStepCheck`, aksiyona özgü yayın denetimi; kuralın kayıt türünü de alır) o adla **etkin** ve **kuralın kayıt türüne bağlı** bir süreç olup olmadığına bakar (yoksa 422). Süreç yayından sonra kapanır, silinir ya da başka türe bağlanırsa kural çalışırken adım açık bir iletiyle başarısız olur; sessizce atlanmaz. Süreç kimliği (GUID) seçilmedi: kullanıcı dostu değil ve süreç yeniden açılınca kural kırılırdı. Editörde süreç, kuralın kayıt türüne bağlı etkin süreçlerden seçilir.
+- **Aksiyon** (`core.approval.request`, "Onaya gönder"): Core'un tek aksiyonu; sektörden bağımsızdır, kayıt türünü kuralın kendisinden alır. Parametreler: süreç adı (sabit), başlık (isteğe bağlı; boşsa kaydın adı; kayıt değişkeni kabul eder, Dilim 4d), açıklama. **Tutar ve para birimi parametre değildir:** kayda bağlı onay (Dilim 4c) onları süreç beyanındaki alanlardan okur; kayıtta değişirlerse bekleyen talep geçersizleşir. Gereken izin `core.approvals.request` (yayınlayan sahip olmalı, yetki yükseltme yok). Kural kimliği yalnızca tanımın gerektirdiği izinlerle çalıştığından (`AutomationRuleIdentity`), "Onaya gönder" adımı için onay hedefinin korunan alanlarının (tutar, para birimi) okuma izni de kimliğe eklenir; yayın denetimi yayınlayanın bu alanı görebildiğini arar (göremiyorsa 422), aksi hâlde kayıt boru hattı hassas tutarı gizler ve talep açılamaz. `core.automation.approve` bu iş için kullanılmadı; karar yine sürecin onaycısındadır.
+- **Tekilleştirme:** `core.ApprovalRequests`'e `SourceKey` eklendi (migration `ApprovalRequestSourceKey`: yalnızca null'lanabilir bir kolon ve süzgeçli `UNIQUE(TenantId, SourceKey)` indeksi, geriye uyumlu; yeni tablo yok, RLS değişmedi). Kural adımının yeniden teslimi (`IdempotencyKey`) ikinci talep açmaz; ayrıca aynı kayıt için **bekleyen** talep varsa (hangi süreçten olursa olsun, Dilim 4c kuralı) kural adımı "atlandı" biter, elle açılış ise 422 verir. Karar verildikten sonra yeni talep açılabilir.
+- **Sunucu içi servis:** `IApprovalService.OpenForRecordAsync` yalnızca aksiyondan çağrılır (uç nokta yok), çünkü talep sahibi çağıran değil kayıt sorumlusudur; denetim, e-posta ve bildirim kutusu elle açılışla aynı işlemde (`OpenAsync` ortak).
+- **Dry-run** hiçbir şey yazmaz ("Onay talebi açılacak (süreç: X)"). Özet kişisel veri taşımaz (başlık ve kişi adı yazılmaz).
+- **Bilerek yapılmadı:** onay sonucunun hedef modüle komutu (örn. fırsatta indirimi uygula; Ç6a.3), kalıcı akış, sorumlunun etkin üye olup olmadığının denetimi (pasif sorumlu için talep açılır, sorumlu göremez; sonraki iş).
+
+### Test sonuçları (Dilim 4c-2)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter ApprovalAutomationTests` | 4: Core aksiyonu ve izni beyanı (tutar parametresi yok), `OwnerField` doğrulaması, kural adımı anahtarı (`SourceKey`) ve geçersiz anahtar, aksiyona özgü denetim yalnızca kendi aksiyonunda çalışır |
+| `dotnet test tests/Modulix.IntegrationTests --filter ApprovalAutomationTests` (SQL Server; CI koşar) | 4: mutlu yol (kayda bağlı talep, sorumlu talep sahibi, başlık değişkenden, tutar kayıttan, tekrar turda ikinci talep yok, onaycı bekleyenlerde görür), hata (bilinmeyen süreç 422, türe bağlı olmayan süreç 422, süreç sonradan kapanınca ve dört göz sağlanamayınca adım başarısız), tenant izolasyonu (aynı adlı süreçler, her firma kendi kaydından kendi talebini açar), yetki (`core.approvals.request` olmayan aksiyonu yayınlayamaz) |

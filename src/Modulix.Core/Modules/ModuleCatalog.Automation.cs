@@ -131,6 +131,14 @@ public sealed partial class ModuleCatalog
                 }
             }
 
+            foreach (var owned in capabilities.Entities.Where(e => e.OwnerField is not null))
+            {
+                if (!capabilities.Fields.Any(f => f.EntityKey == owned.EntityKey && f.Name == owned.OwnerField && f.Type == AutomationFieldType.Lookup))
+                {
+                    throw Fail($"kayıt türü '{owned.EntityKey}' sorumlu alanı '{owned.OwnerField}' kayıt türünün beyan edilmiş bir lookup alanı olmalı");
+                }
+            }
+
             foreach (var relation in capabilities.Relations)
             {
                 if (!AutomationKeyPattern().IsMatch(relation.Key)

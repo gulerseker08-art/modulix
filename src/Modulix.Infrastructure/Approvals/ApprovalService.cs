@@ -233,10 +233,47 @@ internal sealed class ApprovalService(
     public async Task<ApprovalRequestDetail> OpenRequestAsync(ApprovalRequestInput input, CancellationToken cancellationToken)
     {
         TenantContext tenant = RequireTenant();
-        ApprovalDefinition definition = await db.ApprovalDefinitions.AsNoTracking()
-            .SingleOrDefaultAsync(d => d.Id == input.DefinitionId && d.IsActive, cancellationToken)
+        ApprovalDefinition definition = await ActiveDefinitionAsync(input.DefinitionId, cancellationToken);
+        return await OpenAsync(tenant, definition, input, tenant.UserId, sourceKey: null, cancellationToken);
+    }
+
+    public async Task<ApprovalOpenResult> OpenForRecordAsync(ApprovalRecordRequest record, CancellationToken cancellationToken)
+    {
+        TenantContext tenant = RequireTenant();
+
+        // İdempotency 1: aynı kural adımının yeniden teslimi ikinci talep açmaz.
+        ApprovalRequest? existing = await db.ApprovalRequests.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.SourceKey == record.SourceKey, cancellationToken);
+        if (existing is null)
+        {
+            ApprovalDefinition definition = await ActiveDefinitionAsync(record.Input.DefinitionId, cancellationToken);
+            if (definition.TargetEntityKey is not { } entityKey || record.Input.RecordId is not { } recordId)
+            {
+                throw new ApprovalException("Bu süreç bir kayda bağlanmaz; kural aksiyonu yalnızca kayda bağlı süreçle çalışır.");
+            }
+
+            // İdempotency 2: aynı kayıt için hâlâ bekleyen talep varsa yenisi açılmaz (elle açılış bu durumda hata verir, kural adımı atlanır).
+            existing = await db.ApprovalRequests.AsNoTracking().FirstOrDefaultAsync(
+                r => r.TargetEntityKey == entityKey && r.TargetRecordId == recordId && r.Status == ApprovalRequestStatus.Pending, cancellationToken);
+            if (existing is null)
+            {
+                ApprovalRequestDetail opened = await OpenAsync(tenant, definition, record.Input, record.RequesterId, record.SourceKey, cancellationToken);
+                return new ApprovalOpenResult(opened, AlreadyExisted: false);
+            }
+        }
+
+        Me me = await MeAsync(tenant, cancellationToken);
+        return new ApprovalOpenResult((await DetailsAsync(tenant, me, [existing], cancellationToken))[0], AlreadyExisted: true);
+    }
+
+    private async Task<ApprovalDefinition> ActiveDefinitionAsync(Guid definitionId, CancellationToken cancellationToken) =>
+        await db.ApprovalDefinitions.AsNoTracking().SingleOrDefaultAsync(d => d.Id == definitionId && d.IsActive, cancellationToken)
             ?? throw new ApprovalException("Onay süreci bulunamadı ya da kapalı.");
 
+    // Ortak açılış: talep sahibi çağıran (elle) ya da kaydın sorumlusu (kural kaynaklı); dört göz hangisi için geçerliyse ona uygulanır.
+    private async Task<ApprovalRequestDetail> OpenAsync(
+        TenantContext tenant, ApprovalDefinition definition, ApprovalRequestInput input, Guid requesterId, string? sourceKey, CancellationToken cancellationToken)
+    {
         DateTimeOffset now = time.GetUtcNow();
         ApprovalRecordTarget? target = null;
         decimal? amount = input.Amount;
@@ -258,12 +295,12 @@ internal sealed class ApprovalService(
         }
 
         (ApprovalRequest request, List<ApprovalRequestStep> steps) = Guarded(() =>
-            ApprovalRequest.Open(definition, title, input.Description, amount, currency, tenant.UserId, now, target));
+            ApprovalRequest.Open(definition, title, input.Description, amount, currency, requesterId, now, target, sourceKey));
 
         // Süreç açılışta sahipsiz kalmasın: her adımda talep sahibinden başka etkin bir onaycı olmalı (dört göz).
         foreach (ApprovalRequestStep step in steps)
         {
-            if ((await ApproversAsync(tenant, step, withDelegates: false, cancellationToken)).All(id => id == tenant.UserId))
+            if ((await ApproversAsync(tenant, step, withDelegates: false, cancellationToken)).All(id => id == requesterId))
             {
                 throw new ApprovalException($"\"{step.Name}\" adımında talep sahibinden başka etkin onaycı yok; yöneticinize başvurun.");
             }

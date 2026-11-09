@@ -21,7 +21,8 @@ public static class ActionParameterBinding
 /// (şema, izin, modül/lisans). Yayın ve önizleme bunu kullanır. Yayınlayan, sahip olmadığı izni gerektiren aksiyonu ya da göremediği
 /// alanı kullanamaz (yetki yükseltme yok).
 /// </summary>
-public sealed partial class AutomationDefinitionValidator(ModuleCatalog modules, IAutomationCatalog catalog, ICurrentAccess access)
+public sealed partial class AutomationDefinitionValidator(
+    ModuleCatalog modules, IAutomationCatalog catalog, ICurrentAccess access, IEnumerable<IAutomationStepCheck>? stepChecks = null)
 {
     public const int MaxActions = 20;
 
@@ -50,7 +51,7 @@ public sealed partial class AutomationDefinitionValidator(ModuleCatalog modules,
 
         ValidateTrigger(definition.Trigger, entityKey, fields, issues);
         issues.AddRange(ConditionValidator.Validate(definition.Condition, fields, OptionsFor(definition.Trigger)));
-        await ValidateActionsAsync(definition.Actions, fields, issues, cancellationToken);
+        await ValidateActionsAsync(entityKey, definition.Actions, fields, issues, cancellationToken);
         return issues;
     }
 
@@ -192,7 +193,7 @@ public sealed partial class AutomationDefinitionValidator(ModuleCatalog modules,
     }
 
     private async Task ValidateActionsAsync(
-        IReadOnlyList<AutomationActionStep> actions, AutomationFieldSet fields, List<AutomationIssue> issues, CancellationToken cancellationToken)
+        string entityKey, IReadOnlyList<AutomationActionStep> actions, AutomationFieldSet fields, List<AutomationIssue> issues, CancellationToken cancellationToken)
     {
         if (actions.Count == 0)
         {
@@ -229,6 +230,12 @@ public sealed partial class AutomationDefinitionValidator(ModuleCatalog modules,
             }
 
             ValidateParameters(view.Definition, step.Parameters ?? new JsonObject(), fields, path, issues);
+
+            // Aksiyona özgü denetim: parametrenin tenant verisine karşı geçerliliği (ör. onay süreci adı) - Dilim 4c-2.
+            foreach (var check in stepChecks?.Where(c => c.ActionKey == step.Action) ?? [])
+            {
+                issues.AddRange(await check.CheckAsync(entityKey, step, path, cancellationToken));
+            }
         }
     }
 

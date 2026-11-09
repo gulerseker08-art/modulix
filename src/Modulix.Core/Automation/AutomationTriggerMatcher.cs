@@ -129,6 +129,16 @@ public static class AutomationRuleIdentity
                 permissions.UnionWith(found.Action.Definition.RequiredPermissions);
             }
 
+            // "Onaya gönder" (Dilim 4c-2) tutarı ve para birimini parametreden değil kayıttan okur (kayda bağlı onay): kimlik, onay
+            // hedefinin korunan alanlarının iznine de sahip olmalı. Yayın denetimi (ApprovalProcessCheck) yayınlayanda da arar.
+            if (step.Action == Approvals.ApprovalAutomation.RequestAction)
+            {
+                foreach (var field in Approvals.ApprovalAutomation.GuardedFields(entityKey, modules))
+                {
+                    AddRead(field.ReadPermission);
+                }
+            }
+
             foreach (var value in (step.Parameters ?? new JsonObject()).Select(p => p.Value))
             {
                 if (ActionParameterBinding.FieldOf(value) is { } fieldKey)
