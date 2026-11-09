@@ -314,6 +314,7 @@ public sealed class ReportPerformanceMeasurementTests(ModulixApiFactory factory,
             INSERT INTO {table} ({string.Join(", ", names)})
             SELECT {string.Join(", ", values)} FROM n
             """;
+        db.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));   // 50 bin+ satırlık tohumlama yoğun makinede varsayılan 30 sn'yi aşar
         var inserted = await db.Database.ExecuteSqlRawAsync(sql, parameters);
         Assert.Equal(total, inserted);
     }

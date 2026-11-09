@@ -2849,6 +2849,33 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("ReportSchedules", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Reporting.ReportScheduleRecipient", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ScheduleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ScheduleId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ReportScheduleRecipients", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Reporting.ReportScheduleRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -13427,6 +13454,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Core.Reporting.ReportDefinition", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "ReportId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Reporting.ReportScheduleRecipient", b =>
+                {
+                    b.HasOne("Modulix.Core.Reporting.ReportSchedule", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ScheduleId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

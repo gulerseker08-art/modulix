@@ -568,6 +568,231 @@ public class ReportDeliveryTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Single(await ListExportsAsync(s.Admin));
     }
 
+    // ---- Satış genel görünümü kartı dışa aktarma
+
+    private const string CardExport = "/api/crm/sales/overview/cards/OpenPipeline/exports";
+
+    [Fact]
+    public async Task Overview_card_export_has_the_card_rows_and_total_as_csv_and_xlsx_and_is_audited()
+    {
+        var s = await SetUpAsync();
+        await OpenAsync(s.Admin, s.CompanyId, "Alfa", 100m);
+        await OpenAsync(s.Admin, s.CompanyId, "=Formül", 250.5m);
+        var detail = await ReadAsync<SalesCardDetailDto>(await s.Admin.GetAsync("/api/crm/sales/overview/cards/OpenPipeline?kind=Month"));
+
+        var export = await ReadAsync<ReportExportDto>(await s.Admin.PostAsync($"{CardExport}?kind=Month", null), HttpStatusCode.Created);
+        Assert.EndsWith(".csv", export.FileName);
+        Assert.Equal(Opportunities, export.DatasetKey);
+        Assert.Equal(detail.RowCount, export.RowCount);
+
+        var csv = Encoding.UTF8.GetString(await (await s.Admin.GetAsync($"{Reports}/exports/{export.Id}/download")).Content.ReadAsByteArrayAsync());
+        Assert.Contains("Fırsat no", csv);
+        Assert.Contains("Tutar (TRY)", csv);
+        Assert.Contains("Alfa", csv);
+        Assert.Contains("'=Formül", csv);               // formül enjeksiyonuna karşı kaçışlı
+        Assert.Contains("250.5", csv);
+        Assert.Equal(detail.RowCount + 1, csv.Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Length);   // başlık + kart satırları
+        Assert.Equal(350.5m, detail.Total.Amount);      // dosyadaki tutarlar kart toplamıyla aynı kümeden
+
+        var xlsx = await ReadAsync<ReportExportDto>(await s.Admin.PostAsync($"{CardExport}?kind=Month&format=xlsx", null), HttpStatusCode.Created);
+        Assert.EndsWith(".xlsx", xlsx.FileName);
+        var bytes = await (await s.Admin.GetAsync($"{Reports}/exports/{xlsx.Id}/download")).Content.ReadAsByteArrayAsync();
+        using var zip = new System.IO.Compression.ZipArchive(new MemoryStream(bytes), System.IO.Compression.ZipArchiveMode.Read);
+        using var reader = new StreamReader(zip.GetEntry("xl/worksheets/sheet1.xml")!.Open());
+        var sheet = await reader.ReadToEndAsync();
+        Assert.Contains("Alfa", sheet);
+        Assert.DoesNotContain("<f>", sheet);
+
+        using var auditScope = factory.OpenScope(s.TenantId);
+        var audit = await auditScope.ServiceProvider.GetRequiredService<Modulix.Core.Audit.IAuditLog>().QueryAsync(
+            new Modulix.Core.Audit.AuditQuery(EntityKey: CoreModule.AuditedEntityKeys.Report, Action: AuditAction.Exported), CancellationToken.None);
+        Assert.True(audit.TotalCount >= 4);   // iki dosya + iki indirme
+    }
+
+    [Fact]
+    public async Task Overview_card_export_rejects_unknown_card_period_and_format()
+    {
+        var s = await SetUpAsync();
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await s.Admin.PostAsync("/api/crm/sales/overview/cards/Nope/exports", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await s.Admin.PostAsync($"{CardExport}?kind=Decade", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await s.Admin.PostAsync($"{CardExport}?kind=Month&format=pdf", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Overview_card_export_is_not_visible_to_another_tenant_and_carries_none_of_its_data()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        await OpenAsync(a.Admin, a.CompanyId, "A firmasının gizli fırsatı", 999m);
+        await OpenAsync(b.Admin, b.CompanyId, "B firmasının fırsatı", 5m);
+
+        var export = await ReadAsync<ReportExportDto>(await b.Admin.PostAsync($"{CardExport}?kind=Month", null), HttpStatusCode.Created);
+        var csv = Encoding.UTF8.GetString(await (await b.Admin.GetAsync($"{Reports}/exports/{export.Id}/download")).Content.ReadAsByteArrayAsync());
+
+        Assert.Contains("B firmasının fırsatı", csv);
+        Assert.DoesNotContain("A firmasının gizli fırsatı", csv);
+        Assert.Equal(HttpStatusCode.NotFound, (await a.Admin.GetAsync($"{Reports}/exports/{export.Id}/download")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Overview_card_export_needs_both_permissions_hides_amounts_without_the_amount_permission_and_follows_data_scope()
+    {
+        var s = await SetUpAsync();
+        await OpenAsync(s.Admin, s.CompanyId, "Yönetici fırsatı", 7_654.32m);
+        var cardAndExport = new[] { CompaniesRead, OpportunitiesRead, SalesReportsRead, CoreModule.Permissions.ReadReports, CoreModule.Permissions.ExportReports };
+
+        // Satış raporu izni yok → 403; dışa aktarma izni yok → 403.
+        var noReport = await UserAsync(s, [CompaniesRead, OpportunitiesRead, CoreModule.Permissions.ReadReports, CoreModule.Permissions.ExportReports], Scope.All);
+        Assert.Equal(HttpStatusCode.Forbidden, (await noReport.PostAsync($"{CardExport}?kind=Month", null)).StatusCode);
+        var noExport = await UserAsync(s, [CompaniesRead, OpportunitiesRead, SalesReportsRead, CoreModule.Permissions.ReadReports], Scope.All);
+        Assert.Equal(HttpStatusCode.Forbidden, (await noExport.PostAsync($"{CardExport}?kind=Month", null)).StatusCode);
+
+        // Tutar izni yok → dosyada tutar sütunu ve değeri yoktur, fırsat satırı vardır.
+        var noAmounts = await UserAsync(s, cardAndExport, Scope.All);
+        var hidden = await ReadAsync<ReportExportDto>(await noAmounts.PostAsync($"{CardExport}?kind=Month", null), HttpStatusCode.Created);
+        var hiddenCsv = Encoding.UTF8.GetString(await (await noAmounts.GetAsync($"{Reports}/exports/{hidden.Id}/download")).Content.ReadAsByteArrayAsync());
+        Assert.Contains("Yönetici fırsatı", hiddenCsv);
+        Assert.DoesNotContain("Tutar (", hiddenCsv);
+        Assert.DoesNotContain("7654.32", hiddenCsv);
+
+        // Veri kapsamı Kendi → başkasının fırsatı dosyaya girmez.
+        var rep = await UserAsync(s, [.. cardAndExport, OpportunityAmountsRead], Scope.Own);
+        var own = await ReadAsync<ReportExportDto>(await rep.PostAsync($"{CardExport}?kind=Month", null), HttpStatusCode.Created);
+        Assert.Equal(0, own.RowCount);
+        var ownCsv = Encoding.UTF8.GetString(await (await rep.GetAsync($"{Reports}/exports/{own.Id}/download")).Content.ReadAsByteArrayAsync());
+        Assert.DoesNotContain("Yönetici fırsatı", ownCsv);
+    }
+
+    // ---- Zamanlama: dağıtım listesi
+
+    private static readonly string[] RecipientRights = [CompaniesRead, OpportunitiesRead, OpportunityAmountsRead, CoreModule.Permissions.ReadReports, CoreModule.Permissions.ExportReports];
+
+    private async Task<(HttpClient Client, ModulixUser User)> MemberAsync(Setup s, IReadOnlyCollection<string> permissions, Scope scope)
+    {
+        var user = await factory.CreateUserAsync(s.Tenant);
+        await factory.CreateRoleAsync(s.TenantId, permissions, scope, user);
+        return (await LoginAsync(user), user);
+    }
+
+    [Fact]
+    public async Task Each_recipient_gets_their_own_file_under_their_own_authority_and_unauthorised_recipients_are_skipped_with_a_reason()
+    {
+        var s = await SetUpAsync();
+        await OpenAsync(s.Admin, s.CompanyId, "Gizli müşteri", 424_242m);
+        var full = await MemberAsync(s, RecipientRights, Scope.All);
+        var own = await MemberAsync(s, RecipientRights, Scope.Own);
+        var noExport = await MemberAsync(s, [CompaniesRead, OpportunitiesRead, OpportunityAmountsRead, CoreModule.Permissions.ReadReports], Scope.All);
+        var notShared = await MemberAsync(s, RecipientRights, Scope.All);
+
+        var report = await SaveAsync(s.Admin, "Dağıtımlı rapor", new ReportSpecDto { Dataset = Opportunities, Columns = ["title", "amount"] });
+        await ReadAsync<ReportDetailDto>(await s.Admin.PutAsJsonAsync(
+            $"{Reports}/{report.Summary.Id}/sharing", new ShareReportRequest("users", [full.User.Id, own.User.Id, noExport.User.Id])));
+        var schedule = await ReadAsync<ReportScheduleDto>(await s.Admin.PostAsJsonAsync(
+            $"{Reports}/{report.Summary.Id}/schedules",
+            new SaveReportScheduleRequest("daily", 9, RecipientIds: [full.User.Id, own.User.Id, noExport.User.Id, notShared.User.Id])), HttpStatusCode.Created);
+        Assert.Equal(4, schedule.Recipients!.Count);
+
+        await MakeDueAsync(s.TenantId, schedule.Id);
+        var (run, _) = await factory.Services.GetRequiredService<ReportScheduleRunner>().RunTenantAsync(s.TenantId, CancellationToken.None);
+        Assert.Equal((1, 1), (run!.Due, run.Delivered));
+
+        // Yetkili alıcı kendi dosyasını alır; veri kapsamı Kendi olan alıcının dosyasında yöneticinin fırsatı yoktur (veri başkasının kapsamıyla gitmez).
+        var fullExport = Assert.Single(await ListExportsAsync(full.Client));
+        Assert.Equal("schedule", fullExport.Source);
+        Assert.Contains("424242", Encoding.UTF8.GetString(await (await full.Client.GetAsync($"{Reports}/exports/{fullExport.Id}/download")).Content.ReadAsByteArrayAsync()));
+        var ownExport = Assert.Single(await ListExportsAsync(own.Client));
+        Assert.DoesNotContain("424242", Encoding.UTF8.GetString(await (await own.Client.GetAsync($"{Reports}/exports/{ownExport.Id}/download")).Content.ReadAsByteArrayAsync()));
+        Assert.Single(await ListExportsAsync(s.Admin));   // sahibin dosyası ayrıca hazırlanır
+
+        // Dışa aktarma izni olmayan ve raporu göremeyen alıcıya dosya da e-posta da yok.
+        Assert.Equal(0, await ExportsOwnedByAsync(s.TenantId, noExport.User.Id));
+        Assert.Equal(0, await ExportsOwnedByAsync(s.TenantId, notShared.User.Id));
+        Assert.Empty(await EmailsToAsync(noExport.User.Email!));
+        Assert.Empty(await EmailsToAsync(notShared.User.Email!));
+        var mail = Assert.Single(await EmailsToAsync(full.User.Email!));
+        Assert.DoesNotContain("424242", mail.HtmlBody);
+        Assert.Contains("tarafından zamanlanan rapor", System.Net.WebUtility.HtmlDecode(mail.HtmlBody));
+
+        var after = (await ReadAsync<List<ReportScheduleDto>>(await s.Admin.GetAsync($"{Reports}/schedules"))).Single();
+        Assert.Equal("Delivered", after.LastStatus);
+        Assert.Contains("2 teslim", after.LastMessage);
+        Assert.Contains("2 atlandı", after.LastMessage);
+        Assert.Contains("yetki yok: 1", after.LastMessage);
+        Assert.Contains("raporu göremiyor: 1", after.LastMessage);
+    }
+
+    [Fact]
+    public async Task Recipients_must_be_active_members_of_this_tenant_are_capped_and_the_list_follows_updates()
+    {
+        var s = await SetUpAsync();
+        var other = await SetUpAsync();
+        var one = await MemberAsync(s, RecipientRights, Scope.All);
+        var two = await MemberAsync(s, RecipientRights, Scope.All);
+        var report = await SaveAsync(s.Admin, "Alıcı doğrulama", CountSpec());
+        var url = $"{Reports}/{report.Summary.Id}/schedules";
+
+        // Başka firmanın kullanıcısı ya da bilinmeyen kimlik alıcı olamaz.
+        var foreign = await factory.CreateUserAsync(other.Tenant);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await s.Admin.PostAsJsonAsync(url, new SaveReportScheduleRequest("daily", 9, RecipientIds: [foreign.Id]))).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await s.Admin.PostAsJsonAsync(url, new SaveReportScheduleRequest("daily", 9, RecipientIds: [Guid.NewGuid()]))).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await s.Admin.PostAsJsonAsync(
+            url, new SaveReportScheduleRequest("daily", 9, RecipientIds: [.. Enumerable.Range(0, 21).Select(_ => Guid.NewGuid())]))).StatusCode);
+
+        // Tekrarlar birleşir; sahibin kendisi listeye yazılmaz (zaten alır).
+        var owner = await OwnerIdAsync(s);
+        var created = await ReadAsync<ReportScheduleDto>(await s.Admin.PostAsJsonAsync(
+            url, new SaveReportScheduleRequest("daily", 9, RecipientIds: [one.User.Id, one.User.Id, owner])), HttpStatusCode.Created);
+        Assert.Equal([one.User.Id], created.Recipients!.Select(r => r.UserId));
+
+        // Alıcı vermeyen güncelleme listeyi korur; yeni liste değiştirir; boş liste temizler.
+        var kept = await ReadAsync<ReportScheduleDto>(await s.Admin.PutAsJsonAsync(
+            $"{Reports}/schedules/{created.Id}", new SaveReportScheduleRequest("daily", 10, ExpectedVersion: created.Version)));
+        Assert.Equal([one.User.Id], kept.Recipients!.Select(r => r.UserId));
+        var changed = await ReadAsync<ReportScheduleDto>(await s.Admin.PutAsJsonAsync(
+            $"{Reports}/schedules/{created.Id}", new SaveReportScheduleRequest("daily", 10, ExpectedVersion: kept.Version, RecipientIds: [two.User.Id])));
+        Assert.Equal([two.User.Id], changed.Recipients!.Select(r => r.UserId));
+        var cleared = await ReadAsync<ReportScheduleDto>(await s.Admin.PutAsJsonAsync(
+            $"{Reports}/schedules/{created.Id}", new SaveReportScheduleRequest("daily", 10, ExpectedVersion: changed.Version, RecipientIds: [])));
+        Assert.Empty(cleared.Recipients!);
+    }
+
+    [Fact]
+    public async Task Another_user_cannot_see_or_change_the_recipients_of_a_schedule_and_deleting_it_removes_them()
+    {
+        var s = await SetUpAsync();
+        var member = await MemberAsync(s, RecipientRights, Scope.All);
+        var stranger = await MemberAsync(s, [.. RecipientRights, CoreModule.Permissions.ScheduleReports], Scope.All);
+        var report = await SaveAsync(s.Admin, "Alıcı yetkisi", CountSpec());
+        var schedule = await ReadAsync<ReportScheduleDto>(await s.Admin.PostAsJsonAsync(
+            $"{Reports}/{report.Summary.Id}/schedules", new SaveReportScheduleRequest("daily", 9, RecipientIds: [member.User.Id])), HttpStatusCode.Created);
+
+        Assert.Empty(await ReadAsync<List<ReportScheduleDto>>(await stranger.Client.GetAsync($"{Reports}/schedules")));
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.Client.PutAsJsonAsync(
+            $"{Reports}/schedules/{schedule.Id}", new SaveReportScheduleRequest("daily", 9, ExpectedVersion: schedule.Version, RecipientIds: []))).StatusCode);
+
+        // Zamanlama izni olmayan kullanıcı alıcı listesi kuramaz.
+        var noSchedule = await MemberAsync(s, RecipientRights, Scope.All);
+        Assert.Equal(HttpStatusCode.Forbidden, (await noSchedule.Client.PostAsJsonAsync(
+            $"{Reports}/{report.Summary.Id}/schedules", new SaveReportScheduleRequest("daily", 9, RecipientIds: [member.User.Id]))).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await s.Admin.DeleteAsync($"{Reports}/schedules/{schedule.Id}")).StatusCode);
+        using var scope = factory.OpenScope(s.TenantId);
+        Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().ReportScheduleRecipients.CountAsync());
+    }
+
+    private async Task<int> ExportsOwnedByAsync(Guid tenantId, Guid userId)
+    {
+        using var scope = factory.OpenScope(tenantId);
+        return await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().ReportExports.CountAsync(e => e.OwnerUserId == userId);
+    }
+
+    private async Task<Guid> OwnerIdAsync(Setup s)
+    {
+        using var scope = factory.OpenScope(s.TenantId);
+        var email = s.AdminEmail;
+        return await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Users.AsNoTracking().Where(u => u.Email == email).Select(u => u.Id).SingleAsync();
+    }
+
     // ---- Yardımcılar
 
     private record Setup(HttpClient Admin, Tenant Tenant, Guid CompanyId, string AdminEmail)

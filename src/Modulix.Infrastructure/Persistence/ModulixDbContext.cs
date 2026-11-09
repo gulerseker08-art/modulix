@@ -152,6 +152,8 @@ public class ModulixDbContext(
 
     public DbSet<ReportScheduleRun> ReportScheduleRuns => Set<ReportScheduleRun>();
 
+    public DbSet<ReportScheduleRecipient> ReportScheduleRecipients => Set<ReportScheduleRecipient>();
+
     public DbSet<BusinessUnitRole> BusinessUnitRoles => Set<BusinessUnitRole>();
 
     public DbSet<RoleScopeOverride> RoleScopeOverrides => Set<RoleScopeOverride>();

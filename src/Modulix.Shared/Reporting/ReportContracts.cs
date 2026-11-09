@@ -183,8 +183,15 @@ public sealed record ReportExportDto(
 public sealed record ExportReportRequest(ReportSpecDto? Spec, string? Name);
 
 /// <summary>Sıklık: daily, weekly, monthly. Haftanın günü: sunday..saturday (haftalıkta zorunlu). Ayın günü 1-28 (aylıkta zorunlu). Saat firmanın saat diliminde yerel saattir.</summary>
-/// <summary>Biçim: csv (varsayılan) ya da xlsx.</summary>
-public sealed record SaveReportScheduleRequest(string Frequency, int Hour, string? DayOfWeek = null, int? DayOfMonth = null, long? ExpectedVersion = null, string? Format = null);
+/// <summary>
+/// Biçim: csv (varsayılan) ya da xlsx. <see cref="RecipientIds"/>: sahibi dışındaki alıcılar (dağıtım listesi, en çok 20, etkin üyeler); null güncellemede listeyi korur,
+/// boş liste temizler. Her alıcı raporu <b>kendi yetkisiyle</b> üretilmiş kendi dosyası olarak alır; göremeyen ya da yetkisi olmayan alıcı atlanır.
+/// </summary>
+public sealed record SaveReportScheduleRequest(
+    string Frequency, int Hour, string? DayOfWeek = null, int? DayOfMonth = null, long? ExpectedVersion = null, string? Format = null, IReadOnlyList<Guid>? RecipientIds = null);
+
+/// <summary>Dağıtım listesindeki alıcı; etkin üye değilse <see cref="DisplayName"/> boştur.</summary>
+public sealed record ReportScheduleRecipientDto(Guid UserId, string? DisplayName);
 
 public sealed record SetReportScheduleEnabledRequest(bool Enabled);
 
@@ -204,4 +211,5 @@ public sealed record ReportScheduleDto(
     string? LastMessage,
     string? StoppedReason,
     long Version,
-    string Format = "csv");
+    string Format = "csv",
+    IReadOnlyList<ReportScheduleRecipientDto>? Recipients = null);

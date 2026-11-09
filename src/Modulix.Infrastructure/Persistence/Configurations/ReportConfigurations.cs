@@ -161,3 +161,26 @@ internal sealed class ReportScheduleRunConfiguration : IEntityTypeConfiguration<
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal sealed class ReportScheduleRecipientConfiguration : IEntityTypeConfiguration<ReportScheduleRecipient>
+{
+    public void Configure(EntityTypeBuilder<ReportScheduleRecipient> builder)
+    {
+        builder.ToTable("ReportScheduleRecipients", DatabaseSchemas.Core);
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).ValueGeneratedNever();
+        builder.Property(r => r.TenantId).IsRequired();
+        builder.Property(r => r.CreatedAt).IsRequired();
+
+        builder.HasAlternateKey(r => new { r.TenantId, r.Id });
+        // Bir alıcı bir zamanlamada bir kez bulunur (benzersizlik tenant ile birlikte).
+        builder.HasIndex(r => new { r.TenantId, r.ScheduleId, r.UserId }).IsUnique();
+
+        // Zamanlama silinince alıcıları da silinir.
+        builder.HasOne<ReportSchedule>()
+            .WithMany()
+            .HasForeignKey(r => new { r.TenantId, r.ScheduleId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

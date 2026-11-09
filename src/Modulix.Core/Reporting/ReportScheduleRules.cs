@@ -18,6 +18,9 @@ public static class ReportScheduleRules
     /// <summary>Bir kullanıcının sahip olabileceği en fazla zamanlama.</summary>
     public const int MaxPerUser = 10;
 
+    /// <summary>Bir zamanlamanın sahibi dışındaki en fazla alıcı sayısı (dağıtım listesi).</summary>
+    public const int MaxRecipients = 20;
+
     public static string? Validate(ScheduleFrequency frequency, int hour, DayOfWeek? dayOfWeek, int? dayOfMonth)
     {
         if (!Enum.IsDefined(frequency))

@@ -1,0 +1,92 @@
+@* Satış genel görünümü kart ayrıntısını dışa aktarır (ADR-0026). Yalnızca core.reports.export izni olana görünür. Dosya sunucuda ekrandaki kartla aynı
+   hesaptan, çağıranın yetkisiyle üretilir (tutar izni yoksa tutar sütunları dosyada olmaz); rapor merkezinin dışa aktarma dosyasıdır (24 saat, sahibine özel). *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject IJSRuntime Js
+
+@if (Session.Can(ReportAccess.Read) && Session.Can(ReportAccess.Export))
+{
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => RunExportAsync("csv")'>
+            @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
+            CSV olarak dışa aktar
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => RunExportAsync("xlsx")'>Excel olarak dışa aktar</button>
+
+        <div aria-live="polite">
+            @if (error is not null)
+            {
+                <span class="text-danger" role="alert">@error</span>
+            }
+            else if (export is not null)
+            {
+                <span role="status"><strong>Dosya hazır:</strong> @export.FileName (@export.RowCount.ToString("N0", Regional.Numbers) satır).</span>
+                <button type="button" class="btn btn-primary btn-sm ms-2" disabled="@busy" @onclick="DownloadAsync">İndir</button>
+                <a class="ms-2" href="raporlar/disa-aktarimlar">Dışa aktarımlarım</a>
+            }
+
+            @if (downloadError is not null)
+            {
+                <span class="text-danger" role="alert">@downloadError</span>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private ReportExportDto? export;
+    private string? error;
+    private string? downloadError;
+    private bool busy;
+
+    /// <summary>Kart anahtarı (<c>SalesCards</c>).</summary>
+    [Parameter, EditorRequired] public string Card { get; set; } = string.Empty;
+
+    /// <summary>Ekranın uyguladığı sorgu (dönem, kullanıcı, para birimi); kart ayrıntısıyla aynıdır.</summary>
+    [Parameter, EditorRequired] public string Query { get; set; } = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        // Kart ya da süzgeç değişince eski dosya bilgisi yanıltmasın.
+        if (!string.Equals(lastKey, Card + "?" + Query, StringComparison.Ordinal))
+        {
+            lastKey = Card + "?" + Query;
+            export = null;
+            error = null;
+            downloadError = null;
+        }
+    }
+
+    private string? lastKey;
+
+    private async Task RunExportAsync(string format)
+    {
+        busy = true;
+        error = null;
+        downloadError = null;
+        export = null;
+        var result = await Api.PostAsync<ReportExportDto>($"/api/crm/sales/overview/cards/{Card}/exports?{Query}&format={format}", new { });
+        busy = false;
+        if (result.IsSuccess)
+        {
+            export = result.Value;
+            return;
+        }
+
+        error = result.Status == System.Net.HttpStatusCode.Forbidden
+            ? $"Dışa aktarma yetkiniz yok ya da modül salt okunur. {result.Error}"
+            : result.Error;
+    }
+
+    private async Task DownloadAsync()
+    {
+        if (export is null)
+        {
+            return;
+        }
+
+        busy = true;
+        downloadError = await ReportExportDownloads.DownloadAsync(Api, Js, export);
+        busy = false;
+    }
+}

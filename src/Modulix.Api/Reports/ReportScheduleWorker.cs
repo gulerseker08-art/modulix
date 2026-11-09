@@ -122,7 +122,7 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
         return outcome;
     }
 
-    private sealed record Claim(Guid RunId, Guid OwnerUserId, Guid ReportId, ReportFileFormat Format);
+    private sealed record Claim(Guid RunId, Guid ScheduleId, Guid OwnerUserId, Guid ReportId, ReportFileFormat Format);
 
     /// <summary>Çalışmayı bu örnek için kaydeder; başka örnek aynı planlı anı almışsa (ya da zamanlama değişmişse) null.</summary>
     private async Task<Claim?> ClaimAsync(Guid tenantId, Guid scheduleId, CancellationToken cancellationToken)
@@ -155,7 +155,7 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
             var cutoff = now - AbandonedAfter;
             var reclaimed = await db.ReportScheduleRuns.Where(r => r.Id == existing.Id && r.Status == "Started" && r.StartedAt < cutoff)
                 .ExecuteUpdateAsync(set => set.SetProperty(r => r.StartedAt, now), cancellationToken);
-            return reclaimed == 1 ? new Claim(existing.Id, schedule.OwnerUserId, schedule.ReportId, schedule.Format) : null;
+            return reclaimed == 1 ? new Claim(existing.Id, scheduleId, schedule.OwnerUserId, schedule.ReportId, schedule.Format) : null;
         }
 
         var run = new ReportScheduleRun(scheduleId, schedule.NextRunAt, now);
@@ -170,7 +170,7 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
             return null;
         }
 
-        return new Claim(run.Id, schedule.OwnerUserId, schedule.ReportId, schedule.Format);
+        return new Claim(run.Id, scheduleId, schedule.OwnerUserId, schedule.ReportId, schedule.Format);
     }
 
     /// <summary>Dosyayı sahibin bağlamında üretir ve e-postayı kuyruğa yazar. Yetki ya da üyelik bozuksa durdurma nedeni döner; hiçbir şey üretilmez.</summary>
@@ -221,7 +221,8 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
             var link = services.GetRequiredService<INotificationRecipients>().Link("raporlar/disa-aktarimlar");
             services.GetRequiredService<IEmailQueue>().Enqueue(Message(recipient, export, link));
             await services.GetRequiredService<ModulixDbContext>().SaveChangesAsync(cancellationToken);
-            return (Outcome.Delivered, export.Id, $"{export.RowCount} satırlık dosya hazırlandı.");
+            var recipientNote = await DeliverToRecipientsAsync(tenantId, claim, recipient.DisplayName, cancellationToken);
+            return (Outcome.Delivered, export.Id, $"{export.RowCount} satırlık dosya hazırlandı.{recipientNote}");
         }
         catch (ReportForbiddenException exception)
         {
@@ -230,6 +231,111 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
         catch (ReportException exception)
         {
             return (Outcome.Failed, null, exception.Message);
+        }
+    }
+
+    /// <summary>Dağıtım listesindeki her alıcıya, <b>alıcının kendi yetkisiyle</b> üretilmiş kendi dosyasını ve e-postasını verir. Özet cümle döner (teslim/atlanan).</summary>
+    private async Task<string> DeliverToRecipientsAsync(Guid tenantId, Claim claim, string ownerName, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        List<Guid> ids;
+        await using (var lookup = scope.ServiceProvider.GetRequiredService<ITenantScopeFactory>().Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty)))
+        {
+            ids = await lookup.ServiceProvider.GetRequiredService<ModulixDbContext>().ReportScheduleRecipients.AsNoTracking()
+                .Where(r => r.ScheduleId == claim.ScheduleId).OrderBy(r => r.CreatedAt).Select(r => r.UserId).ToListAsync(cancellationToken);
+        }
+
+        if (ids.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var delivered = 0;
+        var skipped = new List<string>();
+        foreach (var userId in ids)
+        {
+            try
+            {
+                if (await DeliverToRecipientAsync(tenantId, claim, userId, ownerName, cancellationToken) is { } reason)
+                {
+                    skipped.Add(reason);
+                }
+                else
+                {
+                    delivered++;
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Tenant {TenantId} zamanlama {ScheduleId} alıcı {UserId} için işlenemedi.", tenantId, claim.ScheduleId, userId);
+                skipped.Add("hata");
+            }
+        }
+
+        var summary = $" Alıcılar: {delivered} teslim";
+        if (skipped.Count > 0)
+        {
+            summary += $", {skipped.Count} atlandı ({string.Join(", ", skipped.GroupBy(r => r).Select(g => $"{g.Key}: {g.Count()}"))})";
+        }
+
+        return summary + ".";
+    }
+
+    /// <summary>Tek alıcı için teslim. Atlanırsa nedeni (kısa metin) döner, teslim edildiyse null. Alıcının yetkisi ya da kapsamı yoksa dosya hiç üretilmez.</summary>
+    private async Task<string?> DeliverToRecipientAsync(Guid tenantId, Claim claim, Guid userId, string ownerName, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var tenantScopes = scope.ServiceProvider.GetRequiredService<ITenantScopeFactory>();
+        Guid membershipId;
+        await using (var lookup = tenantScopes.Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty)))
+        {
+            var membership = await lookup.ServiceProvider.GetRequiredService<ModulixDbContext>().Memberships.AsNoTracking()
+                .Where(m => m.TenantId == tenantId && m.UserId == userId).Select(m => new { m.Id, m.Status }).SingleOrDefaultAsync(cancellationToken);
+            if (membership is not { Status: MembershipStatus.Active })
+            {
+                return "üyelik etkin değil";
+            }
+
+            membershipId = membership.Id;
+        }
+
+        await using var recipientScope = tenantScopes.Create(new TenantContext(tenantId, userId, membershipId));
+        var services = recipientScope.ServiceProvider;
+        var access = services.GetRequiredService<ICurrentAccess>();
+        if (!await access.HasPermissionAsync(CoreModule.Permissions.ReadReports, cancellationToken)
+            || !await access.HasPermissionAsync(CoreModule.Permissions.ExportReports, cancellationToken))
+        {
+            return "yetki yok";
+        }
+
+        var recipients = services.GetRequiredService<INotificationRecipients>();
+        if (await recipients.FindAsync(userId, cancellationToken) is not { } recipient)
+        {
+            return "üyelik etkin değil";
+        }
+
+        try
+        {
+            if (await services.GetRequiredService<IReportExports>().CreateScheduledAsync(claim.ReportId, cancellationToken, claim.Format) is not { } export)
+            {
+                return "raporu göremiyor";
+            }
+
+            services.GetRequiredService<IEmailQueue>().Enqueue(Message(recipient, export, recipients.Link("raporlar/disa-aktarimlar"), ownerName));
+            await services.GetRequiredService<ModulixDbContext>().SaveChangesAsync(cancellationToken);
+            return null;
+        }
+        catch (ReportForbiddenException)
+        {
+            return "yetki yok";
+        }
+        catch (ReportException)
+        {
+            return "rapor çalışmadı";
         }
     }
 
@@ -272,11 +378,13 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static EmailMessage Message(NotificationRecipient recipient, ReportExportInfo export, string? link)
+    private static EmailMessage Message(NotificationRecipient recipient, ReportExportInfo export, string? link, string? scheduledBy = null)
     {
         var html = string.Concat(
             $"<p>Merhaba {WebUtility.HtmlEncode(recipient.DisplayName)},</p>",
-            $"<p>Zamanlanmış raporunuz hazır: <strong>{WebUtility.HtmlEncode(export.ReportName)}</strong> ({export.RowCount} satır).</p>",
+            scheduledBy is null
+                ? $"<p>Zamanlanmış raporunuz hazır: <strong>{WebUtility.HtmlEncode(export.ReportName)}</strong> ({export.RowCount} satır).</p>"
+                : $"<p>{WebUtility.HtmlEncode(scheduledBy)} tarafından zamanlanan rapor sizin yetkinizle hazırlandı: <strong>{WebUtility.HtmlEncode(export.ReportName)}</strong> ({export.RowCount} satır).</p>",
             link is null
                 ? "<p>Dosyayı Modülix'te Raporlar &gt; Dışa aktarımlar bölümünden indirebilirsiniz.</p>"
                 : $"<p><a href=\"{WebUtility.HtmlEncode(link)}\">Dosyayı indir</a></p>",

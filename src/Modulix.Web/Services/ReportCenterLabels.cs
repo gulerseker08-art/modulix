@@ -196,6 +196,9 @@ public static class ReportCenterLabels
 
     public const int MaxSchedules = 10;
 
+    /// <summary>Sunucudaki <c>ReportScheduleRules.MaxRecipients</c> ile aynı (sahibi dışındaki en fazla alıcı).</summary>
+    public const int MaxRecipients = 20;
+
     public static string ExportSource(string key) => key switch { "schedule" => "Zamanlanmış", "manual" => "Elle", _ => key };
 
     public static string Hour(int hour) => $"{hour:00}:00";
