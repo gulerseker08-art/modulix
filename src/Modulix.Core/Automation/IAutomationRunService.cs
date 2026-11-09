@@ -28,7 +28,11 @@ public sealed record AutomationRunStepInfo(
     string? Summary,
     string? EffectEntityKey,
     Guid? EffectRecordId,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt)
+{
+    /// <summary>Adım bir bekleme adımında uyuyorsa yeniden çağrılacağı an (kalıcı akış, Dilim 4c-4); bekleyen adımda dolu.</summary>
+    public DateTimeOffset? WaitingUntil { get; init; }
+}
 
 public sealed record AutomationRunDetail(
     AutomationRunSummary Run, DateTimeOffset NextAttemptAt, IReadOnlyList<AutomationRunStepInfo> Steps);

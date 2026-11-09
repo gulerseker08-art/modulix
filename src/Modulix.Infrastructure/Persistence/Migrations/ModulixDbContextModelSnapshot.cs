@@ -701,6 +701,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("RunId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -720,6 +723,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("WaitingUntil")
+                        .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
 

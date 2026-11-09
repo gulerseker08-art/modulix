@@ -74,7 +74,7 @@
                 <dd>@(run.CompletedAt is { } done ? CrmLabels.Time(done) : "—")</dd>
                 @if (run.Status == AutomationLabels.RunRunning)
                 {
-                    <dt>Sonraki deneme</dt>
+                    <dt>@(detail.Steps.Any(s => s.WaitingUntil is not null) ? "Akış sürecek" : "Sonraki deneme")</dt>
                     <dd>@CrmLabels.Time(detail.NextAttemptAt)</dd>
                 }
                 @if (!string.IsNullOrWhiteSpace(run.Note))
@@ -86,7 +86,7 @@
         </FormSection>
 
         <FormSection Title="Adımlar" Icon="check"
-                     Description="Adımlar sırayla çalışır; başarısız adım kalanları durdurur.">
+                     Description="Adımlar sırayla çalışır; başarısız adım kalanları durdurur. Bekleme adımında akış kaydedilir ve zamanı gelince kaldığı yerden sürer.">
             @if (detail.Steps.Count == 0)
             {
                 <p class="text-muted" role="status">
@@ -107,7 +107,8 @@
                                 <td data-label="Sıra">@step.StepNo</td>
                                 <td data-label="Adım" class="primary">@step.StepId</td>
                                 <td data-label="İşlem">@ActionName(step.Action)</td>
-                                <td data-label="Durum"><span class="badge stage-@AutomationLabels.StepStatusBadge(step.Status)">@AutomationLabels.StepStatus(step.Status)</span></td>
+                                <td data-label="Durum"><span class="badge stage-@AutomationLabels.StepStatusBadge(step.Status)">@(step.Status == "Pending" && step.WaitingUntil is null && detail.Steps.Any(s => s.WaitingUntil is not null) ? "Sırada" : AutomationLabels.StepStatus(step.Status))</span>
+                                    @if (step.WaitingUntil is { } until) { <small class="text-muted"> · @CrmLabels.Time(until) tarihine kadar</small> }</td>
                                 <td data-label="Deneme">@step.Attempts</td>
                                 <td data-label="Sonuç">@(string.IsNullOrWhiteSpace(step.Summary) ? "—" : step.Summary)</td>
                             </tr>

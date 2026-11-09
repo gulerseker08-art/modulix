@@ -61,8 +61,8 @@ public sealed class AutomationOptions
 }
 
 /// <summary>Bir tenant için bir turun özeti.</summary>
-/// <remarks><c>Scanned</c>: tarama tetikleyicilerinden bu turda kuyruğa alınan çalışma sayısı.</remarks>
-public sealed record AutomationRound(int Evaluated, int NotMatched, int StepsRun, int Retrying, int Failed, int Cancelled, int Scanned = 0);
+/// <remarks><c>Scanned</c>: tarama tetikleyicilerinden bu turda kuyruğa alınan çalışma sayısı. <c>Waiting</c>: bir bekleme adımında uykuya geçen çalışma sayısı (kalıcı akış).</remarks>
+public sealed record AutomationRound(int Evaluated, int NotMatched, int StepsRun, int Retrying, int Failed, int Cancelled, int Scanned = 0, int Waiting = 0);
 
 /// <summary>
 /// Kural çalışmalarını işler (ADR-0027, Dilim 2). Bir tur bir tenant içindir ve tenant başına oturum kilidiyle (<c>sp_getapplock</c>) tek örnekte
@@ -79,6 +79,9 @@ public sealed record AutomationRound(int Evaluated, int NotMatched, int StepsRun
 ///   <see cref="AutomationRunStatus.NotMatched"/>; sağlanırsa adımlar yazılır.</item>
 ///   <item><b>Adımlar:</b> sırayla, her biri kendi idempotency anahtarıyla. Geçici hata artan aralıkla yeniden denenir
 ///   (<see cref="AutomationRetryPolicy"/>); kalıcı hata ya da deneme hakkı bitince çalışma <see cref="AutomationRunStatus.Failed"/> olur, kalan adımlar iptal edilir.</item>
+///   <item><b>Kalıcı akış (Dilim 4c-4):</b> <see cref="AutomationActionStatus.Waiting"/> dönen adım bekler; çalışma kirasını bırakır ve
+///   <see cref="AutomationActionResult.ResumeAt"/> anında aynı adımdan sürer. <see cref="AutomationActionResult.StopFlow"/> akışı bilerek bitirir:
+///   kalan adımlar atlanır, çalışma başarılı biter.</item>
 /// </list>
 /// Loglara tenant, çalışma ve kural kimlikleri yazılır; kayıt değeri ve parametre yazılmaz.
 /// </summary>
@@ -441,14 +444,32 @@ public sealed class AutomationRunner(
             }
 
             var attempts = step.Attempts + 1;
+            var startedAt = step.StartedAt ?? time.GetUtcNow();
             await db.AutomationRunSteps.Where(s => s.Id == step.Id)
-                .ExecuteUpdateAsync(set => set.SetProperty(s => s.Attempts, attempts), cancellationToken);
+                .ExecuteUpdateAsync(set => set.SetProperty(s => s.Attempts, attempts).SetProperty(s => s.StartedAt, startedAt), cancellationToken);
 
-            var result = await RunStepAsync(db, services, run, version, definition, step, cancellationToken);
+            var result = await RunStepAsync(db, services, run, version, definition, step, startedAt, cancellationToken);
             tally.StepsRun++;
             var now = time.GetUtcNow();
             switch (result.Status)
             {
+                case AutomationActionStatus.Waiting when result.ResumeAt is { } resumeAt:
+                    // Kalıcı akış (Dilim 4c-4): çalışma kirasını bırakır ve bekleme anına kadar uyur; bekleme deneme hakkından sayılmaz.
+                    var waitAt = resumeAt > now ? resumeAt : now;
+                    await db.AutomationRunSteps.Where(s => s.Id == step.Id)
+                        .ExecuteUpdateAsync(
+                            set => set
+                                .SetProperty(s => s.Attempts, step.Attempts)
+                                .SetProperty(s => s.WaitingUntil, waitAt)
+                                .SetProperty(s => s.Summary, Truncate(result.Summary, AutomationRunStep.SummaryMaxLength)),
+                            cancellationToken);
+                    await db.AutomationRuns.Where(r => r.Id == run.Id && r.LeaseToken == token)
+                        .ExecuteUpdateAsync(
+                            set => set.SetProperty(r => r.NextAttemptAt, waitAt).SetProperty(r => r.LeaseToken, (Guid?)null).SetProperty(r => r.LeaseUntil, (DateTimeOffset?)null),
+                            cancellationToken);
+                    tally.Waiting++;
+                    return;
+
                 case AutomationActionStatus.Succeeded or AutomationActionStatus.Skipped:
                     var effectKey = result.Effect?.EntityKey;
                     Guid? effectId = result.Effect?.Id;
@@ -460,9 +481,24 @@ public sealed class AutomationRunner(
                                 .SetProperty(s => s.Status, stepStatus)
                                 .SetProperty(s => s.CompletedAt, now)
                                 .SetProperty(s => s.Summary, summary)
+                                .SetProperty(s => s.WaitingUntil, (DateTimeOffset?)null)
                                 .SetProperty(s => s.EffectEntityKey, effectKey)
                                 .SetProperty(s => s.EffectRecordId, effectId),
                             cancellationToken);
+                    if (result.StopFlow)
+                    {
+                        // Akış bilerek bitti (ör. onay reddedildi): kalan adımlar hata değil, "atlandı".
+                        await db.AutomationRunSteps.Where(s => s.RunId == run.Id && s.Status == AutomationStepStatus.Pending)
+                            .ExecuteUpdateAsync(
+                                set => set
+                                    .SetProperty(s => s.Status, AutomationStepStatus.Skipped)
+                                    .SetProperty(s => s.CompletedAt, now)
+                                    .SetProperty(s => s.Summary, "Akış önceki adımda durduğu için çalışmadı."),
+                                cancellationToken);
+                        await FinishAsync(db, run, token, AutomationRunStatus.Succeeded, summary, tally, cancellationToken);
+                        return;
+                    }
+
                     continue;
 
                 default:
@@ -525,6 +561,7 @@ public sealed class AutomationRunner(
         AutomationRuleVersion version,
         AutomationDefinition definition,
         AutomationRunStep step,
+        DateTimeOffset startedAt,
         CancellationToken cancellationToken)
     {
         try
@@ -551,7 +588,11 @@ public sealed class AutomationRunner(
             }
 
             var handler = (IAutomationAction)services.GetRequiredService(registration.Action.Handler);
-            var request = new AutomationActionRequest(step.Action, resolved.Values, new RecordRef(run.EntityKey, run.RecordId), step.IdempotencyKey);
+            var request = new AutomationActionRequest(step.Action, resolved.Values, new RecordRef(run.EntityKey, run.RecordId), step.IdempotencyKey)
+            {
+                StepStartedAt = startedAt,
+                FlowStartedAt = run.CreatedAt,
+            };
             var context = new AutomationCallContext(AutomationCallerKind.Automation, Guid.Empty, run.CorrelationId, run.EventId, run.Depth)
             {
                 RuleVersionId = version.Id,
@@ -563,7 +604,7 @@ public sealed class AutomationRunner(
 
             // Aksiyonun kuyruğa yazdığı e-posta gibi bekleyen yazımlar aksiyon kapsamında kaydedilir.
             await services.GetRequiredService<ModulixDbContext>().SaveChangesAsync(timeout.Token);
-            return result.Status is AutomationActionStatus.Planned
+            return result.Status is AutomationActionStatus.Planned || (result.Status is AutomationActionStatus.Waiting && result.ResumeAt is null)
                 ? new AutomationActionResult(AutomationActionStatus.Failed, "Aksiyon beklenmeyen bir sonuç döndü.")
                 : result;
         }
@@ -678,6 +719,8 @@ public sealed class AutomationRunner(
 
         public int Scanned { get; set; }
 
-        public AutomationRound ToRound() => new(Evaluated, NotMatched, StepsRun, Retrying, Failed, Cancelled, Scanned);
+        public int Waiting { get; set; }
+
+        public AutomationRound ToRound() => new(Evaluated, NotMatched, StepsRun, Retrying, Failed, Cancelled, Scanned, Waiting);
     }
 }

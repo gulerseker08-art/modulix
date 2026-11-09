@@ -208,7 +208,7 @@ public static class AutomationEndpoints
         ToDto(detail.Run),
         detail.NextAttemptAt,
         [.. detail.Steps.Select(s => new AutomationRunStepDto(
-            s.StepNo, s.StepId, s.Action, s.Status.ToString(), s.Attempts, s.Summary, s.EffectEntityKey, s.EffectRecordId, s.CompletedAt))]);
+            s.StepNo, s.StepId, s.Action, s.Status.ToString(), s.Attempts, s.Summary, s.EffectEntityKey, s.EffectRecordId, s.CompletedAt, s.WaitingUntil))]);
 
     private static AutomationRuleSummaryDto ToDto(AutomationRuleSummary rule) => new(
         rule.Id, rule.Name, rule.ModuleKey, rule.EntityKey, rule.Status.ToString(), rule.PublishedVersionNo, rule.HasDraft,
