@@ -188,13 +188,14 @@ public sealed record ForecastComparisonDto(
 /// <summary>"Benim günüm" öneri türleri (sunucudaki <c>MyDaySuggestionKind</c> ile aynı değerler).</summary>
 public static class MyDayKinds
 {
+    public const string AcceptedQuote = "AcceptedQuote";
     public const string NewLead = "NewLead";
     public const string OverdueOpportunity = "OverdueOpportunity";
     public const string QuoteFollowUp = "QuoteFollowUp";
     public const string StaleOpportunity = "StaleOpportunity";
 }
 
-/// <summary>"Benim günüm" önerisi (<c>/api/crm/my-day</c>); Kind: NewLead, OverdueOpportunity, QuoteFollowUp, StaleOpportunity. Metni istemci türe göre kurar.</summary>
+/// <summary>"Benim günüm" önerisi (<c>/api/crm/my-day</c>); Kind: AcceptedQuote, NewLead, OverdueOpportunity, QuoteFollowUp, StaleOpportunity. Metni istemci türe göre kurar.</summary>
 public sealed record MyDaySuggestionDto(
     string Kind, Guid RecordId, string Number, string Title, string? Subtitle, string? Stage, decimal? Amount, string Currency,
     int? DaysOverdue, int? DaysSinceContact, int? DaysWaiting, DateTimeOffset? Since);

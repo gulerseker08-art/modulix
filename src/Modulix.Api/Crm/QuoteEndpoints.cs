@@ -257,6 +257,7 @@ internal sealed class QuotePolicyProvider(IServiceProvider services) : IQuotePol
             Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteFollowUpDays, cancellationToken)),
             Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteExpiryReminderDays, cancellationToken)),
             string.Equals(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteSyncOpportunityAmount, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
-            Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteApprovalReminderHours, cancellationToken)));
+            Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteApprovalReminderHours, cancellationToken)),
+            Days(await settings.GetValueAsync(CrmModule.SettingKeys.QuoteReplyReminderDays, cancellationToken)));
     }
 }

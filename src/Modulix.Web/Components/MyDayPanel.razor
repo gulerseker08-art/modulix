@@ -182,7 +182,10 @@
 
     private string RulesHint => day is null
         ? "Öneriler kurallarla üretilir."
-        : $"Öneriler kurallarla üretilir (yapay zekâ değil): ilk teması bekleyen müşteri adayları, kapanış tarihi geçen fırsatlar, {day.QuoteReminderDays} gündür yanıtsız teklifler ve {day.StaleDays} gündür temas olmayan fırsatlar.";
+        : "Öneriler kurallarla üretilir (yapay zekâ değil): teklifi kabul edilen açık fırsatlar, ilk teması bekleyen müşteri adayları, kapanış tarihi geçen fırsatlar"
+            + (day.QuoteReminderDays > 0 ? $", {day.QuoteReminderDays} gündür yanıtsız teklifler" : string.Empty)
+            + (day.StaleDays > 0 ? $" ve {day.StaleDays} gündür temas olmayan fırsatlar." : ".")
+            + " Süreler firma ayarlarından değiştirilir.";
 
     private static DateOnly TodayDate => DateOnly.FromDateTime(Regional.Now.DateTime);
 
@@ -257,6 +260,7 @@
 
     private static string StepTitle(MyDaySuggestionDto step) => step.Kind switch
     {
+        MyDayKinds.AcceptedQuote => $"Teklif kabul edildi, fırsatı kazanıldı olarak kapatın: {step.Title}",
         MyDayKinds.NewLead => $"Yeni müşteri adayına ilk temas: {step.Title}",
         MyDayKinds.OverdueOpportunity => $"Kapanış tarihi geçti, müşteriyi arayın: {step.Title}",
         MyDayKinds.QuoteFollowUp => $"Teklifi hatırlatın: {(string.IsNullOrWhiteSpace(step.Title) ? step.Number : step.Title)}",
@@ -273,10 +277,14 @@
             return Join(parts);
         }
 
-        parts.Add(step.Kind == MyDayKinds.QuoteFollowUp ? step.Subtitle : null);
+        parts.Add(step.Kind is MyDayKinds.QuoteFollowUp or MyDayKinds.AcceptedQuote ? step.Subtitle : null);
         parts.Add(step.Amount is { } amount ? SalesLabels.Compact(amount, step.Currency) : null);
         parts.Add(step.Stage is { Length: > 0 } stage ? Lookups.Label(CrmLists.OpportunityStage, stage) : null);
-        parts.Add(step.DaysWaiting is { } waiting ? $"{waiting} gün önce sunuldu, yanıt yok" : null);
+        parts.Add(step.DaysWaiting is { } waiting
+            ? step.Kind == MyDayKinds.AcceptedQuote
+                ? (waiting == 0 ? "teklif bugün kabul edildi" : $"teklif {waiting} gün önce kabul edildi")
+                : $"{waiting} gün önce sunuldu, yanıt yok"
+            : null);
         parts.Add(step.DaysSinceContact is { } quiet ? $"{quiet} gündür temas yok" : null);
         parts.Add(step.DaysOverdue is { } late ? (late == 0 ? "kapanış tarihi bugün" : $"kapanış tarihi {late} gün önce geçti") : null);
         return Join(parts);
@@ -284,6 +292,7 @@
 
     private static (string Icon, string Tone, string Cta, string Href) StepAction(MyDaySuggestionDto step) => step.Kind switch
     {
+        MyDayKinds.AcceptedQuote => ("check-circle", "success", "Fırsatı aç", $"crm/firsatlar/{step.RecordId}"),
         MyDayKinds.NewLead => ("inbox", "teal", "Adayı aç", $"crm/leadler/{step.RecordId}"),
         MyDayKinds.OverdueOpportunity => ("phone", "danger", "Fırsatı aç", $"crm/firsatlar/{step.RecordId}"),
         MyDayKinds.QuoteFollowUp => ("file-text", "warning", "Teklifi aç", $"crm/teklifler/{step.RecordId}"),

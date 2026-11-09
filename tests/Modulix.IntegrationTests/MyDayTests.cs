@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Settings;
 using Modulix.Shared.Crm;
 using static Modulix.Modules.Crm.CrmModule.Permissions;
 using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
@@ -50,7 +52,26 @@ public class MyDayTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
         var month = Assert.Single(day.ClosingThisMonth, c => c.Id == closing);
         Assert.Equal((70, false), (month.Probability, month.Overdue));
         Assert.DoesNotContain(day.ClosingThisMonth, c => c.Id == foreign);
-        Assert.Equal((3, 14), (day.QuoteReminderDays, day.StaleDays));
+        // Eşikler firma ayarıdır; varsayılanlar: teklif hatırlatma 3 gün, fırsat hareketsizlik eşiği 30 gün.
+        Assert.Equal((3, 30), (day.QuoteReminderDays, day.StaleDays));
+    }
+
+    [Fact]
+    public async Task An_accepted_quote_on_an_open_opportunity_is_suggested_first_and_thresholds_follow_tenant_settings()
+    {
+        var s = await SetUpAsync();
+        var seller = await UserAsync(s, [.. SellerPermissions, QuotesWrite, QuotesManualPrice, QuotesPresent, QuotesRecordDecision, CoreModule.Permissions.ManageSettings], Scope.All);
+        var opportunity = await OpenAsync(seller.Client, s.CompanyId, "Depo kurulumu", 40_000m, 50, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(20));
+        var quote = await AcceptedQuoteAsync(seller.Client, s.CompanyId, opportunity);
+
+        await SetSettingAsync(seller.Client, Modulix.Modules.Crm.CrmModule.SettingKeys.QuoteReplyReminderDays, "0");
+        await SetSettingAsync(seller.Client, Modulix.Modules.Crm.CrmModule.SettingKeys.OpportunityStaleDays, "7");
+        var day = await MyDayAsync(seller.Client);
+
+        var step = Assert.Single(day.Suggestions);
+        Assert.Equal((MyDayKinds.AcceptedQuote, opportunity, quote.QuoteNumber), (step.Kind, step.RecordId, step.Subtitle));
+        Assert.Equal(0, step.DaysWaiting);
+        Assert.Equal((0, 7), (day.QuoteReminderDays, day.StaleDays));
     }
 
     [Fact]
@@ -157,6 +178,29 @@ public class MyDayTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
             new SaveOpportunityRequest(title, companyId, Amount: amount, ExpectedCloseDate: DateOnly.FromDateTime(DateTime.UtcNow)));
         var result = await ReadAsync<OpportunityActionResultDto>(await client.PostAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}/win", new WinOpportunityRequestDto(opportunity.Version)));
         return result.Opportunity.ActualCloseDate!.Value;
+    }
+
+    /// <summary>Fırsata bağlı teklif açar, kalem ekler, müşteriye sunar ve kabulünü kaydeder.</summary>
+    private static async Task<QuoteDto> AcceptedQuoteAsync(HttpClient client, Guid companyId, Guid opportunityId)
+    {
+        var quote = await PostAsync<QuoteDto>(client, "/api/crm/quotes",
+            new SaveQuoteRequest("Kurulum teklifi", companyId, OpportunityId: opportunityId, ValidUntil: DateTimeOffset.UtcNow.AddDays(30)));
+        await PostAsync<QuoteLineDto>(client, "/api/crm/quote-lines", new SaveQuoteLineRequest(quote.Id, "Kurulum", "Free", null, 1m, 30_000m, null, "None", 0m, 20m, null, "Standard"));
+        await QuoteTransitionAsync(client, quote.Id, "present");
+        return await QuoteTransitionAsync(client, quote.Id, "record-accepted");
+    }
+
+    private static async Task<QuoteDto> QuoteTransitionAsync(HttpClient client, Guid id, string action)
+    {
+        var current = (await client.GetFromJsonAsync<QuoteDto>($"/api/crm/quotes/{id}"))!;
+        return await ReadAsync<QuoteDto>(await client.PostAsJsonAsync($"/api/crm/quotes/{id}/{action}", new QuoteTransitionRequest(current.Version)));
+    }
+
+    private static async Task SetSettingAsync(HttpClient client, string key, string value)
+    {
+        var current = (await client.GetFromJsonAsync<SettingsResponse>("/api/settings"))!.Settings.First(x => x.Key == key);
+        var response = await client.PutAsJsonAsync("/api/settings", new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { [key] = new(value, current.Version) }));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
     }
 
     private static async Task<MyDayDto> MyDayAsync(HttpClient client) => await ReadAsync<MyDayDto>(await client.GetAsync("/api/crm/my-day"));
