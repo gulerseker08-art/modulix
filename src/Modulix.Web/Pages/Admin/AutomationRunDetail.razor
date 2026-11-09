@@ -107,7 +107,7 @@
                                 <td data-label="Sıra">@step.StepNo</td>
                                 <td data-label="Adım" class="primary">@step.StepId</td>
                                 <td data-label="İşlem">@ActionName(step.Action)</td>
-                                <td data-label="Durum"><span class="badge stage-@AutomationLabels.StepStatusBadge(step.Status)">@AutomationLabels.StepStatus(step.Status)</span>
+                                <td data-label="Durum"><span class="badge stage-@AutomationLabels.StepStatusBadge(step.Status)">@(step.Status == "Pending" && step.WaitingUntil is null && detail.Steps.Any(s => s.WaitingUntil is not null) ? "Sırada" : AutomationLabels.StepStatus(step.Status))</span>
                                     @if (step.WaitingUntil is { } until) { <small class="text-muted"> · @CrmLabels.Time(until) tarihine kadar</small> }</td>
                                 <td data-label="Deneme">@step.Attempts</td>
                                 <td data-label="Sonuç">@(string.IsNullOrWhiteSpace(step.Summary) ? "—" : step.Summary)</td>
