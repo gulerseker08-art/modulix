@@ -95,12 +95,24 @@ public class MyDayTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFac
     }
 
     [Fact]
-    public async Task Without_the_sales_report_permission_my_day_is_forbidden()
+    public async Task A_rep_without_the_sales_report_permission_sees_own_day_but_without_any_read_permission_it_is_forbidden()
     {
         var s = await SetUpAsync();
-        var seller = await UserAsync(s, [.. SellerPermissions.Except([SalesReportsRead])], Scope.All);
+        var rep = await UserAsync(s, [.. SellerPermissions.Except([SalesReportsRead])], Scope.Own);
+        var today = await WinAsync(s.Admin, s.CompanyId, "Çapa", 1_000m);
+        var mine = await OpenAsync(s.Admin, s.CompanyId, "Temsilcinin", 20_000m, 50, today.AddDays(-3), owner: rep.UserId);
+        await OpenAsync(s.Admin, s.CompanyId, "Yöneticinin", 90_000m, 50, today.AddDays(-3));
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await seller.Client.GetAsync("/api/crm/my-day")).StatusCode);
+        // Satış raporu izni olmadan da kendi günü açılır; yalnızca kendi kaydı gelir.
+        var day = await MyDayAsync(rep.Client);
+        Assert.Equal(mine, Assert.Single(day.Suggestions).RecordId);
+        Assert.Equal(1, day.OpenOpportunityCount);
+        // Satış raporu (Hedef merkezi) ucu hâlâ kapalıdır.
+        Assert.Equal(HttpStatusCode.Forbidden, (await rep.Client.GetAsync("/api/crm/sales/overview")).StatusCode);
+
+        // Fırsat, aday, teklif, aktivite ve rapor okuma izinlerinden hiçbiri olmayan kullanıcı Benim günüm'ü açamaz.
+        var outsider = await UserAsync(s, [CompaniesRead], Scope.All);
+        Assert.Equal(HttpStatusCode.Forbidden, (await outsider.Client.GetAsync("/api/crm/my-day")).StatusCode);
     }
 
     [Fact]

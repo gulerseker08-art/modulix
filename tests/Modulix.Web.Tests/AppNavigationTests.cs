@@ -85,11 +85,15 @@ public class AppNavigationTests
     }
 
     [Fact]
-    public void Crm_dashboard_is_hidden_without_sales_reports_permission()
+    public void Crm_dashboard_is_shown_to_a_rep_without_sales_reports_permission_for_my_day()
     {
+        // Satış raporu izni olmayan temsilci panoyu yalnızca "Benim günüm" sekmesiyle görür (Hedef merkezi gizlidir).
         MenuContext menu = Nav(AllModules, SalesUser).Context("crm/firmalar")!;
+        Assert.Contains("Pano", EntryNames(menu, AppCatalog.CrmWorkspaceGroup));
 
-        Assert.DoesNotContain("Pano", EntryNames(menu, AppCatalog.CrmWorkspaceGroup));
+        // Fırsat, aday, teklif, aktivite ve rapor okuma izinlerinden hiçbiri yoksa pano yoktur.
+        MenuContext none = Nav(AllModules, [CrmAccess.CompaniesRead]).Context("crm/firmalar")!;
+        Assert.DoesNotContain("Pano", EntryNames(none, AppCatalog.CrmWorkspaceGroup));
     }
 
     [Fact]
@@ -226,7 +230,7 @@ public class AppNavigationTests
     {
         var nav = Nav(AllModules, SalesUser);
 
-        Assert.Equal("crm/aktiviteler", nav.EntryRoute(nav.Find(AppCatalog.Crm)!));
+        Assert.Equal("crm/pano", nav.EntryRoute(nav.Find(AppCatalog.Crm)!));
     }
 
     [Fact]
@@ -246,7 +250,7 @@ public class AppNavigationTests
         var menu = nav.Context("crm/teklifler")!;
         var workspace = EntryNames(menu, AppCatalog.CrmWorkspaceGroup).ToList();
 
-        Assert.Equal(["Aktiviteler", "Onay bekleyen işlerim"], workspace);
+        Assert.Equal(["Pano", "Aktiviteler", "Onay bekleyen işlerim"], workspace);
 
         // Karar ekranlarına doğrudan bağlantı ya da bildirim e-postası gelirse üst satır işaretlenir; sayfalar ayrı satır olmaz.
         foreach (var path in new[] { "crm/teklif-onaylari", "sozlesmeler/onaylar", "crm/onay-bekleyenler" })
