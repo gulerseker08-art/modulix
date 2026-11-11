@@ -18,4 +18,7 @@ internal delegate IQueryable<TEntity>? RecordFilter<TEntity>(IQueryable<TEntity>
 internal static class FilterValue
 {
     public static Guid? Id(string value) => Guid.TryParse(value, out var id) && id != Guid.Empty ? id : null;
+
+    public static DateOnly? Day(string value) =>
+        DateOnly.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day) ? day : null;
 }

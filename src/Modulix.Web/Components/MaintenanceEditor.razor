@@ -1,0 +1,284 @@
+@* Bakım kaydı ekleme/düzenleme formu; Bakım kayıtları ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Kayıt genel
+   kayıt uçlarından (/api/records/fleet.maintenance) yapılır. Tarih ve kilometre tutarlılığı, para birimi kuralı sunucudadır; ileti alanın
+   altında gösterilir. Kaydedilen bakım aracın "sonraki bakım" alanlarını günceller (ADR-0038 dilim 1b). *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Record is null ? "Yeni bakım kaydı" : "Bakım kaydı")</h2>
+            @if (Record is not null)
+            {
+                <p>@Lookups.Label(FleetAccess.MaintenanceKindList, form.KindKey) · @(form.PerformedOn is { } d ? FleetLabels.Date(d) : "")</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Bakım özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="wrench" Size="24" /></span>
+                    <strong class="summary-name">@(string.IsNullOrEmpty(form.KindKey) ? "Bakım türü" : Lookups.Label(FleetAccess.MaintenanceKindList, form.KindKey))</strong>
+                    <span class="summary-sub">@(form.PerformedOn is { } day ? FleetLabels.Date(day) : "Bakım tarihi")</span>
+                </div>
+                <h3 class="summary-heading">Bakım özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Kilometre</dt><dd>@FleetLabels.Km(form.OdometerKm)</dd></div>
+                    <div><dt>Tutar</dt><dd>@FleetLabels.Money(form.Cost, form.Currency)</dd></div>
+                    <div><dt>Sonraki bakım</dt><dd>@(form.NextDueDate is { } next ? FleetLabels.Date(next) : "—")</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Bakım formu bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "vehicleId":
+                            <label class="@f.LabelClass()" for="maintenance-vehicle">@f.Label</label>
+                            <LookupPicker Id="maintenance-vehicle" LookupKey="@FleetAccess.MaintenanceVehicleLookup" @bind-Value="form.VehicleId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Plaka ile araç seçin…" Invalid="@(errors?.ContainsKey("vehicleId") == true)" />
+                            <FieldError Field="vehicleId" Errors="errors" />
+                            @if (form.Id is not null)
+                            {
+                                <small class="text-muted">Bakımın aracı oluşturulduktan sonra değiştirilemez.</small>
+                            }
+                            break;
+                        case "kindKey":
+                            <label class="@f.LabelClass()" for="maintenance-kind">@f.Label</label>
+                            <select id="maintenance-kind" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.KindKey">
+                                @foreach (var kind in Lookups.Choices(FleetAccess.MaintenanceKindList, form.KindKey))
+                                {
+                                    <option value="@kind.Key">@kind.Label</option>
+                                }
+                            </select>
+                            <FieldError Field="kindKey" Errors="errors" />
+                            break;
+                        case "performedOn":
+                            <label class="@f.LabelClass()" for="maintenance-date">@f.Label</label>
+                            <input id="maintenance-date" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PerformedOn" />
+                            <FieldError Field="performedOn" Errors="errors" />
+                            break;
+                        case "odometerKm":
+                            <label class="@f.LabelClass()" for="maintenance-km">@f.Label</label>
+                            <input id="maintenance-km" class="form-control" type="number" min="0" step="1" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.OdometerKm" />
+                            <FieldError Field="odometerKm" Errors="errors" />
+                            break;
+                        case "supplierPartyId":
+                            <label class="@f.LabelClass()" for="maintenance-supplier">@f.Label</label>
+                            <LookupPicker Id="maintenance-supplier" LookupKey="@FleetAccess.MaintenanceSupplierLookup" @bind-Value="form.SupplierPartyId" Required="f.Required" Placeholder="Servis firması seçin…" Invalid="@(errors?.ContainsKey("supplierPartyId") == true)" />
+                            <FieldError Field="supplierPartyId" Errors="errors" />
+                            <small class="text-muted">Kendi atölyenizde yapıldıysa boş bırakın.</small>
+                            break;
+                        case "cost":
+                            <label class="@f.LabelClass()" for="maintenance-cost">@f.Label</label>
+                            <input id="maintenance-cost" class="form-control" type="number" min="0" step="0.01" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Cost" />
+                            <FieldError Field="cost" Errors="errors" />
+                            break;
+                        case "currency":
+                            <label class="@f.LabelClass()" for="maintenance-currency">@f.Label</label>
+                            <input id="maintenance-currency" class="form-control" maxlength="3" placeholder="TRY" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Currency" />
+                            <FieldError Field="currency" Errors="errors" />
+                            break;
+                        case "nextDueDate":
+                            <label class="@f.LabelClass()" for="maintenance-next-date">@f.Label</label>
+                            <input id="maintenance-next-date" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NextDueDate" />
+                            <FieldError Field="nextDueDate" Errors="errors" />
+                            <small class="text-muted">Aracın "sonraki bakım" tarihi olur; hatırlatma kuralları bu tarihe bakar.</small>
+                            break;
+                        case "nextDueKm":
+                            <label class="@f.LabelClass()" for="maintenance-next-km">@f.Label</label>
+                            <input id="maintenance-next-km" class="form-control" type="number" min="0" step="1" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NextDueKm" />
+                            <FieldError Field="nextDueKm" Errors="errors" />
+                            break;
+                        case "description":
+                            <label class="@f.LabelClass()" for="maintenance-description">@f.Label</label>
+                            <textarea id="maintenance-description" class="form-control" rows="4" maxlength="1000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                            <FieldError Field="description" Errors="errors" />
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private bool dirty;
+    private const string EntityKey = FleetAccess.MaintenanceEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private MaintenanceForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek bakım kaydı; null ise yeni kayıt.</summary>
+    [Parameter] public RecordResponse? Record { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir kayıt verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Record))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Record;
+        form = Record is { } r
+            ? new MaintenanceForm
+            {
+                Id = r.Id, Version = r.Version, VehicleId = WarehouseLabels.Id(r, "vehicleId"), KindKey = WarehouseLabels.Text(r, "kindKey"),
+                PerformedOn = FleetLabels.Day(WarehouseLabels.Text(r, "performedOn")), OdometerKm = r.Values["odometerKm"]?.GetValue<int>(),
+                SupplierPartyId = WarehouseLabels.Id(r, "supplierPartyId"), Cost = r.Values["cost"]?.GetValue<decimal>(),
+                Currency = WarehouseLabels.Text(r, "currency"), NextDueDate = FleetLabels.Day(WarehouseLabels.Text(r, "nextDueDate")),
+                NextDueKm = r.Values["nextDueKm"]?.GetValue<int>(), Description = WarehouseLabels.Text(r, "description"),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new MaintenanceForm
+            {
+                KindKey = Lookups.DefaultOf(FleetAccess.MaintenanceKindList) ?? string.Empty,
+                PerformedOn = DateOnly.FromDateTime(DateTime.Now),
+                Currency = "TRY",
+            };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["kindKey"] = form.KindKey,
+            ["performedOn"] = form.PerformedOn?.ToString("yyyy-MM-dd"),
+            ["odometerKm"] = form.OdometerKm,
+            ["supplierPartyId"] = form.SupplierPartyId?.ToString(),
+            ["cost"] = form.Cost,
+            ["currency"] = string.IsNullOrWhiteSpace(form.Currency) ? null : form.Currency.Trim(),
+            ["nextDueDate"] = form.NextDueDate?.ToString("yyyy-MM-dd"),
+            ["nextDueKm"] = form.NextDueKm,
+            ["description"] = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            // Araç yalnızca oluştururken verilir; sonra değiştirilemez.
+            values["vehicleId"] = form.VehicleId?.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class MaintenanceForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? VehicleId { get; set; }
+
+        public string KindKey { get; set; } = string.Empty;
+
+        public DateOnly? PerformedOn { get; set; }
+
+        public int? OdometerKm { get; set; }
+
+        public Guid? SupplierPartyId { get; set; }
+
+        public decimal? Cost { get; set; }
+
+        public string? Currency { get; set; }
+
+        public DateOnly? NextDueDate { get; set; }
+
+        public int? NextDueKm { get; set; }
+
+        public string? Description { get; set; }
+    }
+}

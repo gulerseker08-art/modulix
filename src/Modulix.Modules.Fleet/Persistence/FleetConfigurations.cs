@@ -46,5 +46,23 @@ internal sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.HasIndex(v => new { v.TenantId, v.Plate }).IsUnique().HasDatabaseName("UX_Vehicles_Plate");
         builder.HasIndex(v => new { v.TenantId, v.Vin }).IsUnique().HasFilter("[Vin] IS NOT NULL").HasDatabaseName("UX_Vehicles_Vin");
         builder.HasIndex(v => new { v.TenantId, v.CarrierPartyId }).HasDatabaseName("IX_Vehicles_Carrier");
+        builder.HasIndex(v => new { v.TenantId, v.NextMaintenanceDate }).HasDatabaseName("IX_Vehicles_NextMaintenance");
+    }
+}
+
+internal sealed class MaintenanceRecordConfiguration : IEntityTypeConfiguration<MaintenanceRecord>
+{
+    public void Configure(EntityTypeBuilder<MaintenanceRecord> builder)
+    {
+        FleetTables.ConfigureCommon(builder, "MaintenanceRecords");
+        builder.Property(m => m.KindKey).HasMaxLength(100).IsRequired();
+        builder.Property(m => m.Cost).HasPrecision(18, 2);
+        builder.Property(m => m.Currency).HasMaxLength(3).IsFixedLength().IsUnicode(false);
+        builder.Property(m => m.Description).HasMaxLength(MaintenanceRecord.DescriptionMaxLength);
+
+        // Araç bağı (TenantId, Id) üzerinden: başka tenant'ın aracına veritabanı düzeyinde de bağlanılamaz; araç silinmediği için kısıt korur.
+        builder.HasOne<Vehicle>().WithMany().HasForeignKey(m => new { m.TenantId, m.VehicleId })
+            .HasPrincipalKey(v => new { v.TenantId, v.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(m => new { m.TenantId, m.VehicleId, m.PerformedOn }).HasDatabaseName("IX_MaintenanceRecords_Vehicle");
     }
 }

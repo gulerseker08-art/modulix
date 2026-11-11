@@ -8736,6 +8736,74 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Fleet.Domain.MaintenanceRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("Cost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("KindKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateOnly?>("NextDueDate")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("NextDueKm")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("OdometerKm")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("PerformedOn")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("SupplierPartyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "VehicleId", "PerformedOn")
+                        .HasDatabaseName("IX_MaintenanceRecords_Vehicle");
+
+                    b.ToTable("MaintenanceRecords", "fleet");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Fleet.Domain.Vehicle", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8759,6 +8827,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<DateOnly?>("LastMaintenanceOn")
+                        .HasColumnType("date");
+
                     b.Property<decimal?>("LoadingMeters")
                         .HasPrecision(6, 2)
                         .HasColumnType("decimal(6,2)");
@@ -8770,9 +8841,18 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<int?>("ModelYear")
                         .HasColumnType("int");
 
+                    b.Property<DateOnly?>("NextMaintenanceDate")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("NextMaintenanceKm")
+                        .HasColumnType("int");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int?>("OdometerKm")
+                        .HasColumnType("int");
 
                     b.Property<string>("Ownership")
                         .IsRequired()
@@ -8819,10 +8899,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("TenantId", "Id");
-
                     b.HasIndex("TenantId", "CarrierPartyId")
                         .HasDatabaseName("IX_Vehicles_Carrier");
+
+                    b.HasIndex("TenantId", "NextMaintenanceDate")
+                        .HasDatabaseName("IX_Vehicles_NextMaintenance");
 
                     b.HasIndex("TenantId", "Plate")
                         .IsUnique()
@@ -14376,6 +14457,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Modules.Crm.Domain.SalesTarget", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "TargetId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Fleet.Domain.MaintenanceRecord", b =>
+                {
+                    b.HasOne("Modulix.Modules.Fleet.Domain.Vehicle", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "VehicleId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

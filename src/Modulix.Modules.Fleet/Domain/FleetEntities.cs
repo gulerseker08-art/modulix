@@ -104,4 +104,61 @@ public sealed class Vehicle : FleetEntity
     public string Status { get; internal set; } = Statuses.Active;
 
     public string? Notes { get; internal set; }
+
+    // Bakım kayıtlarından türetilen alanlar (dilim 1b): yalnızca bakım kayıt deposu yazar; araç formundan değiştirilemez.
+
+    /// <summary>En son bakımın tarihi.</summary>
+    public DateOnly? LastMaintenanceOn { get; internal set; }
+
+    /// <summary>Bakım kayıtlarındaki en yüksek kilometre (araçtaki bilinen son sayaç değeri).</summary>
+    public int? OdometerKm { get; internal set; }
+
+    /// <summary>En son bakımda planlanan sonraki bakım tarihi; "bakıma N gün kala" kuralları bu alana bakar.</summary>
+    public DateOnly? NextMaintenanceDate { get; internal set; }
+
+    /// <summary>En son bakımda planlanan sonraki bakım kilometresi.</summary>
+    public int? NextMaintenanceKm { get; internal set; }
+
+    internal void ApplyMaintenance(DateOnly? last, int? odometer, DateOnly? nextDate, int? nextKm)
+    {
+        LastMaintenanceOn = last;
+        OdometerKm = odometer;
+        NextMaintenanceDate = nextDate;
+        NextMaintenanceKm = nextKm;
+        Touch();
+    }
+}
+
+/// <summary>
+/// Bakım kaydı (ADR-0038 K1, dilim 1b): aracın yapılmış bir bakımı ya da onarımı. Türü firmanın listesindedir (kategori: planlı / plansız).
+/// Kayıt sonraki bakımın tarihini ve kilometresini taşır; aracın "sonraki bakım" alanları en son bakım kaydından türetilir
+/// (<see cref="Vehicle.ApplyMaintenance"/>). Tutar para birimiyle saklanır; ödeme ve fatura finans işidir (ADR-0037).
+/// </summary>
+public sealed class MaintenanceRecord : FleetEntity
+{
+    public const int DescriptionMaxLength = 1000;
+    public const int MaxKm = 5_000_000;
+
+    public Guid VehicleId { get; internal set; }
+
+    /// <summary>Bakım türü (Y9b seçim listesi <c>fleet.maintenance-kind</c>).</summary>
+    public string KindKey { get; internal set; } = string.Empty;
+
+    public DateOnly PerformedOn { get; internal set; }
+
+    public int? OdometerKm { get; internal set; }
+
+    /// <summary>Bakımı yapan servis ya da tedarikçi firma (<c>core.Party</c>); boş olabilir (kendi atölyesi).</summary>
+    public Guid? SupplierPartyId { get; internal set; }
+
+    public decimal? Cost { get; internal set; }
+
+    /// <summary>ISO 4217 para birimi (ör. TRY); tutar varsa zorunludur.</summary>
+    public string? Currency { get; internal set; }
+
+    public DateOnly? NextDueDate { get; internal set; }
+
+    public int? NextDueKm { get; internal set; }
+
+    public string? Description { get; internal set; }
 }

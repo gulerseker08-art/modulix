@@ -111,6 +111,7 @@
     private const string MaintenanceView = "maintenance";
     private const string PassiveView = "passive";
     private const string SubcontractedView = "subcontracted";
+    private const string MaintenanceDueView = "maintenance-due";
 
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (VehicleRecordStore.SortKeys).
     private static readonly GridColumnDef[] BaseColumns =
@@ -122,6 +123,7 @@
         new("brand", "Marka / model", "type", "brand", "-brand"),
         new("modelYear", "Model yılı", "calendar", "modelYear", "-modelYear", DefaultVisible: false),
         new("payloadKg", "Kapasite", "package", "payloadKg", "-payloadKg"),
+        new("nextMaintenanceDate", "Sonraki bakım", "wrench", "nextMaintenanceDate", "-nextMaintenanceDate"),
         new("status", "Durum", "tag", "status", "-status"),
     ];
 
@@ -137,6 +139,7 @@
     private string view = AllViews;
     private string? status;
     private string? viewOwnership;
+    private string? maintenanceDueBy;
     private string kindKey = "";
     private string ownership = "";
 
@@ -162,6 +165,7 @@
     [
         new(AllViews, "Tüm araçlar", Icon: "truck"),
         new(ActiveView, "Etkin araçlar", Icon: "check-circle"),
+        new(MaintenanceDueView, "Bakımı yaklaşan", Icon: "alert-circle"),
         new(MaintenanceView, "Bakımda", Icon: "wrench"),
         new(PassiveView, "Pasif araçlar", Icon: "clock"),
         new(SubcontractedView, "Taşeron araçlar", Icon: "briefcase"),
@@ -179,6 +183,7 @@
             var filters = GridFilters.Parse(saved.Filters);
             status = filters.GetValueOrDefault("status");
             viewOwnership = null;
+            maintenanceDueBy = filters.GetValueOrDefault("maintenanceDueBy");
             ownership = filters.GetValueOrDefault("ownership") ?? "";
             kindKey = filters.GetValueOrDefault("kindKey") ?? "";
         }
@@ -187,6 +192,8 @@
             grid.Reset();
             status = key switch { ActiveView => "active", MaintenanceView => "maintenance", PassiveView => "passive", _ => null };
             viewOwnership = key == SubcontractedView ? FleetAccess.Subcontracted : null;
+            // Bakımı yaklaşan: sonraki bakım tarihi 30 gün içinde ya da geçmiş araçlar (görsel eşik; uyarı kuralları otomasyondadır).
+            maintenanceDueBy = key == MaintenanceDueView ? DateOnly.FromDateTime(DateTime.Now).AddDays(30).ToString("yyyy-MM-dd") : null;
             kindKey = ownership = "";
         }
 
@@ -207,7 +214,8 @@
     private string? CurrentFilters => GridFilters.Build(
         status is { } s ? ("status", s) : null,
         EffectiveOwnership is { } o ? ("ownership", o) : null,
-        kindKey.Length > 0 ? ("kindKey", kindKey) : null);
+        kindKey.Length > 0 ? ("kindKey", kindKey) : null,
+        maintenanceDueBy is { } due ? ("maintenanceDueBy", due) : null);
 
     private void StartNaming() => views.StartNaming(true);
 
@@ -245,7 +253,7 @@
             url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
         }
 
-        foreach (var (name, value) in new[] { ("status", status), ("ownership", EffectiveOwnership), ("kindKey", kindKey.Length > 0 ? kindKey : null) })
+        foreach (var (name, value) in new[] { ("status", status), ("ownership", EffectiveOwnership), ("kindKey", kindKey.Length > 0 ? kindKey : null), ("maintenanceDueBy", maintenanceDueBy) })
         {
             if (value is not null)
             {
@@ -274,11 +282,18 @@
         "brand" => @<text>@BrandModel(vehicle)</text>,
         "modelYear" => @<text>@(vehicle.Values["modelYear"]?.ToString() ?? "—")</text>,
         "payloadKg" => @<text>@FleetLabels.Capacity(vehicle.Values["payloadKg"]?.GetValue<decimal>(), "kg")</text>,
+        "nextMaintenanceDate" => NextMaintenance(vehicle),
         "status" => @<span class="badge @FleetLabels.StatusBadge(WarehouseLabels.Text(vehicle, "status"))">@FleetLabels.Status(WarehouseLabels.Text(vehicle, "status"))</span>,
         _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(FleetAccess.VehicleEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
             @<text>@CustomFieldText.Format(field, vehicle.Values["custom"] as JsonObject)</text>,
         _ => @<text></text>,
     };
+
+    private static RenderFragment NextMaintenance(RecordResponse vehicle)
+    {
+        var (badge, text) = FleetLabels.Due(FleetLabels.Day(WarehouseLabels.Text(vehicle, "nextMaintenanceDate")), DateOnly.FromDateTime(DateTime.Now));
+        return @<span class="badge @badge">@text</span>;
+    }
 
     private static string BrandModel(RecordResponse vehicle)
     {

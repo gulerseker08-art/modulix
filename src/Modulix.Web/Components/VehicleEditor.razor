@@ -49,6 +49,8 @@
                     <div><dt>Mülkiyet</dt><dd>@FleetLabels.Ownership(form.Ownership)</dd></div>
                     <div><dt>Durum</dt><dd>@FleetLabels.Status(form.Status)</dd></div>
                     <div><dt>Kapasite</dt><dd>@FleetLabels.Capacity(form.PayloadKg, "kg")</dd></div>
+                    <div><dt>Kilometre</dt><dd>@FleetLabels.Km(Vehicle?.Values["odometerKm"]?.GetValue<int>())</dd></div>
+                    <div><dt>Sonraki bakım</dt><dd>@(FleetLabels.Day(Vehicle is null ? null : WarehouseLabels.Text(Vehicle, "nextMaintenanceDate")) is { } next ? FleetLabels.Date(next) : "—")</dd></div>
                 </dl>
             </div>
         </aside>

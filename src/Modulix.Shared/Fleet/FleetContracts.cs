@@ -11,11 +11,22 @@ public static class FleetAccess
     public const string VehiclesRead = "fleet.vehicles.read";
     public const string VehiclesWrite = "fleet.vehicles.write";
 
+    public const string MaintenanceRead = "fleet.maintenance.read";
+    public const string MaintenanceWrite = "fleet.maintenance.write";
+
     public const string VehicleEntityKey = "fleet.vehicle";
+    public const string MaintenanceEntityKey = "fleet.maintenance";
 
     public const string VehicleKindList = "fleet.vehicle-kind";
+    public const string MaintenanceKindList = "fleet.maintenance-kind";
 
     public const string VehicleCarrierLookup = "fleet.vehicle.carrier";
+    public const string MaintenanceVehicleLookup = "fleet.maintenance.vehicle";
+    public const string MaintenanceSupplierLookup = "fleet.maintenance.supplier";
+
+    /// <summary>Bakım türü kategorileri: planlı ve plansız.</summary>
+    public const string MaintenancePlanned = "planned";
+    public const string MaintenanceUnplanned = "unplanned";
 
     /// <summary>Araç türü kategorileri: motorlu ve çekilen (dorse, römork).</summary>
     public const string KindPowered = "powered";
