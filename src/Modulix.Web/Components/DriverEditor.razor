@@ -1,0 +1,326 @@
+@* Sürücü kartı ekleme/düzenleme formu; Sürücüler ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Sürücü bir
+   kişidir (ADR-0038 K2): yeni sürücüde kayıtlı kişi seçilir ya da ad, soyad ve telefonla yeni kişi açılır (ortak kişi kaydı, sürücü
+   yazma izniyle). Taşıyıcı rolü, tek kart kuralı ve Filo'daki aracın uygunluğu sunucuda denetlenir; ileti alanın altında gösterilir. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Driver is null ? "Yeni sürücü" : "Sürücü kartı")</h2>
+            @if (Driver is not null)
+            {
+                <p>@personName · @LogisticsLabels.DriverType(form.DriverType)</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Sürücü özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="user" Size="24" /></span>
+                    <strong class="summary-name">@(SummaryName ?? "Sürücü")</strong>
+                    <span class="summary-sub">@LogisticsLabels.DriverType(form.DriverType)</span>
+                </div>
+                <h3 class="summary-heading">Sürücü özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Telefon</dt><dd>@(string.IsNullOrWhiteSpace(SummaryPhone) ? "—" : SummaryPhone)</dd></div>
+                    <div><dt>Durum</dt><dd>@LogisticsLabels.Status(form.Status)</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Sürücü formu bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "personId":
+                            @if (form.Id is not null)
+                            {
+                                <span class="@f.LabelClass()">@f.Label</span>
+                                <p class="mb-0"><strong>@personName</strong></p>
+                                <small class="text-muted">Ad ve iletişim bilgisi kişi kaydındadır; sürücünün kişisi değiştirilemez.</small>
+                            }
+                            else
+                            {
+                                <SegmentedChoice Id="driver-person-mode" Label="@f.Label" LabelClass="@f.LabelClass()" Options="PersonModes" @bind-Value="newPerson" />
+                                @if (newPerson)
+                                {
+                                    <div class="form-grid mt-2">
+                                        <div class="span-6">
+                                            <label class="form-label required" for="driver-first">Ad</label>
+                                            <input id="driver-first" class="form-control" maxlength="100" aria-required="true" @bind="form.FirstName" />
+                                            <FieldError Field="firstName" Errors="personErrors" />
+                                        </div>
+                                        <div class="span-6">
+                                            <label class="form-label required" for="driver-last">Soyad</label>
+                                            <input id="driver-last" class="form-control" maxlength="100" aria-required="true" @bind="form.LastName" />
+                                            <FieldError Field="lastName" Errors="personErrors" />
+                                        </div>
+                                        <div class="span-6">
+                                            <label class="form-label" for="driver-phone">Telefon</label>
+                                            <input id="driver-phone" class="form-control" type="tel" maxlength="50" @bind="form.Phone" />
+                                            <FieldError Field="phone" Errors="personErrors" />
+                                        </div>
+                                        <div class="span-6">
+                                            <label class="form-label" for="driver-email">E-posta</label>
+                                            <input id="driver-email" class="form-control" type="email" maxlength="200" @bind="form.Email" />
+                                            <FieldError Field="email" Errors="personErrors" />
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <LookupPicker Id="driver-person" LookupKey="@LogisticsAccess.DriverPersonLookup" @bind-Value="form.PersonId" Required="true" Placeholder="Kayıtlı kişiyi seçin…" Invalid="@(errors?.ContainsKey("personId") == true)" />
+                                }
+                                <FieldError Field="personId" Errors="errors" />
+                            }
+                            break;
+                        case "status":
+                            <label class="@f.LabelClass()" for="driver-status">@f.Label</label>
+                            <select id="driver-status" class="form-select" @bind="form.Status">
+                                @foreach (var (key, label) in LogisticsAccess.Statuses)
+                                {
+                                    <option value="@key">@label</option>
+                                }
+                            </select>
+                            <FieldError Field="status" Errors="errors" />
+                            <small class="text-muted">Sürücü silinmez; çalışmayan sürücüyü "Pasif" yapın.</small>
+                            break;
+                        case "driverType":
+                            <label class="@f.LabelClass()" for="driver-type">@f.Label</label>
+                            <select id="driver-type" class="form-select" @bind="form.DriverType" @bind:after="TypeChanged">
+                                @foreach (var (key, label) in LogisticsAccess.DriverTypes)
+                                {
+                                    <option value="@key">@label</option>
+                                }
+                            </select>
+                            <FieldError Field="driverType" Errors="errors" />
+                            break;
+                        case "carrierPartyId":
+                            <label class="@f.LabelClass()" for="driver-carrier">@f.Label@(IsSubcontracted ? " *" : "")</label>
+                            <LookupPicker Id="driver-carrier" LookupKey="@LogisticsAccess.DriverCarrierLookup" @bind-Value="form.CarrierPartyId" Required="IsSubcontracted" Disabled="@(!IsSubcontracted)" Placeholder="@(IsSubcontracted ? "Taşıyıcı firma seçin…" : "Yalnızca taşeron sürücüde")" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
+                            <FieldError Field="carrierPartyId" Errors="errors" />
+                            <small class="text-muted">Yalnızca "Taşıyıcı" rolündeki firmalar listelenir.</small>
+                            break;
+                        case "defaultVehicleId":
+                            <label class="@f.LabelClass()" for="driver-vehicle">@f.Label</label>
+                            <LookupPicker Id="driver-vehicle" LookupKey="@LogisticsAccess.DriverVehicleLookup" @bind-Value="form.DefaultVehicleId" Placeholder="Plaka ile araç seçin…" Invalid="@(errors?.ContainsKey("defaultVehicleId") == true)" />
+                            <FieldError Field="defaultVehicleId" Errors="errors" />
+                            <small class="text-muted">Filo modülündeki çekici, kamyon ya da panelvan; dorse ve römork atanmaz.</small>
+                            break;
+                        case "notes":
+                            <label class="@f.LabelClass()" for="driver-notes">@f.Label</label>
+                            <textarea id="driver-notes" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
+                            <FieldError Field="notes" Errors="errors" />
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private bool dirty;
+    private const string EntityKey = LogisticsAccess.DriverEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+    private static readonly IReadOnlyList<SegmentOption<bool>> PersonModes = [new(false, "Kayıtlı kişi"), new(true, "Yeni kişi")];
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private DriverForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private IReadOnlyDictionary<string, string[]>? personErrors;
+    private string? message;
+    private bool busy;
+    private bool newPerson = true;
+    private string personName = "—";
+    private string? personPhone;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek sürücü; null ise yeni sürücü.</summary>
+    [Parameter] public RecordResponse? Driver { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    private bool IsSubcontracted => form.DriverType == LogisticsAccess.Subcontracted;
+
+    private string? SummaryName => form.Id is not null
+        ? personName
+        : newPerson ? $"{form.FirstName} {form.LastName}".Trim() is { Length: > 0 } typed ? typed : null : null;
+
+    private string? SummaryPhone => form.Id is not null ? personPhone : newPerson ? form.Phone : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir sürücü verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        if (initialized && ReferenceEquals(source, Driver))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Driver;
+        form = Driver is { } r
+            ? new DriverForm
+            {
+                Id = r.Id, Version = r.Version, PersonId = WarehouseLabels.Id(r, "personId"), DriverType = WarehouseLabels.Text(r, "driverType"),
+                CarrierPartyId = WarehouseLabels.Id(r, "carrierPartyId"), DefaultVehicleId = WarehouseLabels.Id(r, "defaultVehicleId"),
+                Status = WarehouseLabels.Text(r, "status"), Notes = WarehouseLabels.Text(r, "notes"),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new DriverForm();
+        errors = personErrors = null;
+        message = null;
+        personName = "—";
+        personPhone = null;
+
+        // Sürücünün adı ve telefonu kişi kaydından okunur (kişiyi görme izni yoksa ad gösterilmez).
+        if (form.PersonId is { } personId && (await Api.GetAsync<RecordResponse>($"/api/records/core.person/{personId}")).Value is { } person)
+        {
+            personName = $"{WarehouseLabels.Text(person, "firstName")} {WarehouseLabels.Text(person, "lastName")}".Trim();
+            personPhone = WarehouseLabels.Text(person, "phone");
+        }
+    }
+
+    // Taşıyıcı yalnızca taşeron sürücüde seçilir; tip değişince eski seçim taşınmaz.
+    private void TypeChanged()
+    {
+        if (!IsSubcontracted)
+        {
+            form.CarrierPartyId = null;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = personErrors = null;
+
+        // Yeni kişi: önce ortak kişi kaydı açılır; sürücü kaydı başarısız olursa tekrar denemede aynı kişi kullanılır (çift kişi açılmaz).
+        if (form.Id is null && newPerson && form.CreatedPersonId is null)
+        {
+            var person = await Api.PostAsync<RecordResponse>("/api/records/core.person", new RecordWriteRequest(new JsonObject
+            {
+                ["firstName"] = form.FirstName.Trim(),
+                ["lastName"] = form.LastName.Trim(),
+                ["phone"] = string.IsNullOrWhiteSpace(form.Phone) ? null : form.Phone.Trim(),
+                ["email"] = string.IsNullOrWhiteSpace(form.Email) ? null : form.Email.Trim(),
+            }));
+            if (!person.IsSuccess)
+            {
+                busy = false;
+                personErrors = person.FieldErrors;
+                message = person.FieldErrors is { Count: > 0 } ? "Kişi bilgilerini kontrol edin." : person.Error;
+                return;
+            }
+
+            form.CreatedPersonId = person.Value!.Id;
+        }
+
+        var values = new JsonObject
+        {
+            ["driverType"] = form.DriverType,
+            ["carrierPartyId"] = IsSubcontracted ? form.CarrierPartyId?.ToString() : null,
+            ["defaultVehicleId"] = form.DefaultVehicleId?.ToString(),
+            ["status"] = form.Status,
+            ["notes"] = string.IsNullOrWhiteSpace(form.Notes) ? null : form.Notes.Trim(),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            values["personId"] = (newPerson ? form.CreatedPersonId : form.PersonId)?.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class DriverForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? PersonId { get; set; }
+
+        /// <summary>Bu formda açılan yeni kişi (sürücü kaydı başarısız olursa tekrar denemede kullanılır).</summary>
+        public Guid? CreatedPersonId { get; set; }
+
+        public string FirstName { get; set; } = string.Empty;
+
+        public string LastName { get; set; } = string.Empty;
+
+        public string? Phone { get; set; }
+
+        public string? Email { get; set; }
+
+        public string DriverType { get; set; } = "employee";
+
+        public Guid? CarrierPartyId { get; set; }
+
+        public Guid? DefaultVehicleId { get; set; }
+
+        public string Status { get; set; } = "active";
+
+        public string? Notes { get; set; }
+    }
+}

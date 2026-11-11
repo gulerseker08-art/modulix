@@ -7,6 +7,7 @@ using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
 using Modulix.Shared.Support;
 using Modulix.Shared.Fleet;
+using Modulix.Shared.Logistics;
 using Modulix.Shared.Warehouse;
 using Modulix.Web.Services;
 
@@ -306,6 +307,20 @@ public class AppNavigationTests
     }
 
     [Fact]
+    public void Logistics_app_shows_the_drivers_screen_only_with_the_module_and_the_permission()
+    {
+        var nav = Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.DriversRead]);
+
+        var root = Assert.Single(nav.Roots());
+        Assert.Equal((AppCatalog.Logistics, "Lojistik"), (root.Id, root.Name));
+        Assert.Equal(["Sürücüler"], nav.MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+        Assert.Equal(AppCatalog.Logistics, nav.Context("lojistik/suruculer")!.Root.Id);
+
+        Assert.Empty(Nav([], [LogisticsAccess.DriversRead]).Roots());
+        Assert.Empty(Nav([LogisticsAccess.ModuleKey], []).Roots());
+    }
+
+    [Fact]
     public void Fleet_app_shows_the_vehicles_screen_only_with_the_module_and_the_permission()
     {
         var nav = Nav([FleetAccess.ModuleKey], [FleetAccess.VehiclesRead]);
@@ -356,8 +371,8 @@ public class AppNavigationTests
     [Fact]
     public void Planned_apps_are_listed_as_inert_cards_and_never_as_real_apps()
     {
-        // Antrepo artık gerçek uygulamadır ("Depo ve Antrepo", AppCatalog.All); pasif kart olarak kalmaz.
-        Assert.Equal(["Lojistik", "İnsan Kaynakları"], AppCatalog.Planned.Select(p => p.Name));
+        // Antrepo ve Lojistik artık gerçek uygulamadır (AppCatalog.All); pasif kart olarak kalmaz.
+        Assert.Equal(["İnsan Kaynakları"], AppCatalog.Planned.Select(p => p.Name));
 
         // Pasif kart: route'u, menüsü ve yetkisi yoktur; gerçek bir uygulama kataloğa girince çakışmamalı.
         var realNames = AppCatalog.All.Where(a => a.ParentId is null).Select(a => a.Name).ToHashSet();
