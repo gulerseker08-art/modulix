@@ -833,7 +833,8 @@ dotnet run --project src/Modulix.Api
 | `Modulix.Core` | Tenant, yetki, entitlement, kayıt boru hattı, audit, outbox, metadata | Core.Contracts |
 | `Modulix.Infrastructure` | EF Core, SQL Server, RLS, dosya, e-posta | Core, Core.Contracts |
 | `Modulix.Modules.Crm` | Firma, kişi, fırsat, aktivite | Core.Contracts |
-| `Modulix.Modules.Logistics` | Sevkiyat, taşıyıcı, maliyet | Core.Contracts |
+| `Modulix.Modules.Logistics` | Sevkiyat, taşıyıcı, maliyet (iskelet; araç Filo modülündedir) | Core.Contracts |
+| `Modulix.Modules.Fleet` | Filo ([ADR-0038](docs/adr/0038-filo-modulu-ve-lojistik-dilim-plani.md) dilim 1a): araç kimliği (`fleet.vehicle`: plaka boşluksuz büyük harf ve tenant içinde benzersiz, araç türü seçim listesi `fleet.vehicle-kind` kategorisi motorlu/çekilen yani dorse ve römork da araçtır, mülkiyet özmal/kiralık/taşeron, taşeron araçta "Taşıyıcı" rollü firma zorunlu, marka/model/yıl, isteğe bağlı 17 karakterlik şasi no benzersiz, kapasite kg/m³/LDM/palet, durum etkin/bakımda/pasif; **silinmez**, pasife alınır, silme 409), genel kayıt uçlarından; liste `sort`: `plate, kindKey, ownership, brand, modelYear, payloadKg, status, createdAt`, süzgeçler `status, ownership, kindKey, carrierPartyId`; izinler `fleet.vehicles.read/write`; ekran `/filo/araclar`; diğer modüller aracı `IVehicleDirectory` (Core.Contracts) ile okur, Filo kapalıysa dizin boş döner; otomasyon varlığı `fleet.vehicle` (eski `logistics.vehicle` beyanı buraya taşındı); bakım kaydı dilim 1b | Core.Contracts |
 | `Modulix.Modules.Contracts` | Sözleşme yönetimi (şablon, sürüm, onay, imza, taahhüt, yenileme) | Core.Contracts |
 | `Modulix.Modules.Orders` | Sipariş ve satış devri (tekliften sipariş; devir, operasyon ve teslimat sonraki dilimlerde) | Core.Contracts |
 | `Modulix.Modules.Support` | Destek ve şikâyet yönetimi (talep, kuyruk, kategori, durum makinesi, mesaj/iç not; SLA ve diğerleri sonraki dilimlerde) | Core.Contracts |

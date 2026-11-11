@@ -1,0 +1,303 @@
+@page "/filo/araclar"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Araçlar · Modulix</PageTitle>
+
+<AuthGate Module="@FleetAccess.ModuleKey" Permission="@FleetAccess.VehiclesRead">
+    <PageHeader Title="Araçlar" Icon="truck" Subtitle="@(page is null ? "Çekici, kamyon, panelvan, dorse ve römorkları yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <VehicleEditor Vehicle="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Araç görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Araç ara" placeholder="Plaka, marka, model veya şasi ara" @bind="search" />
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(FleetAccess.VehiclesWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni araç</button>
+        }
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="Araç türü" @bind="kindKey" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm türler</option>
+                @foreach (var kind in Lookups.ValuesOf(FleetAccess.VehicleKindList))
+                {
+                    <option value="@kind.Key">@kind.Label</option>
+                }
+            </select>
+            <select class="form-select" aria-label="Mülkiyet" @bind="ownership" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm mülkiyetler</option>
+                @foreach (var (key, label) in FleetAccess.Ownerships)
+                {
+                    <option value="@key">@label</option>
+                }
+            </select>
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan araç yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) araç listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Araç listesi</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var vehicle in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, vehicle)
+                        }
+                        <td class="row-menu-cell">
+                            @if (Session.Can(FleetAccess.VehiclesWrite))
+                            {
+                                <RowMenu Label="@($"{WarehouseLabels.Text(vehicle, "plate")} eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(vehicle)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + FleetAccess.VehicleEntityKey;
+
+    private const string AllViews = "all";
+    private const string ActiveView = "active";
+    private const string MaintenanceView = "maintenance";
+    private const string PassiveView = "passive";
+    private const string SubcontractedView = "subcontracted";
+
+    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (VehicleRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("plate", "Plaka", "hash", "plate", "-plate", Locked: true),
+        new("kindKey", "Tür", "truck", "kindKey", "-kindKey"),
+        new("ownership", "Mülkiyet", "building", "ownership", "-ownership"),
+        new("carrier", "Taşıyıcı", "briefcase"),
+        new("brand", "Marka / model", "type", "brand", "-brand"),
+        new("modelYear", "Model yılı", "calendar", "modelYear", "-modelYear", DefaultVisible: false),
+        new("payloadKg", "Kapasite", "package", "payloadKg", "-payloadKg"),
+        new("status", "Durum", "tag", "status", "-status"),
+    ];
+
+    private readonly GridViewState grid = new("fleet.vehicles", "plate");
+    private readonly Dictionary<Guid, string> carrierNames = [];
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private bool filtersOpen;
+    private string? message;
+    private string? search;
+    private string view = AllViews;
+    private string? status;
+    private string? viewOwnership;
+    private string kindKey = "";
+    private string ownership = "";
+
+    private int ActiveFilters => (kindKey.Length > 0 ? 1 : 0) + (ownership.Length > 0 ? 1 : 0);
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "fleet.vehicles");
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(FleetAccess.VehiclesRead))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(FleetAccess.VehicleEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Etkin, Bakımda, Pasif, Taşeron, kişisel); yetkiyi ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm araçlar", Icon: "truck"),
+        new(ActiveView, "Etkin araçlar", Icon: "check-circle"),
+        new(MaintenanceView, "Bakımda", Icon: "wrench"),
+        new(PassiveView, "Pasif araçlar", Icon: "clock"),
+        new(SubcontractedView, "Taşeron araçlar", Icon: "briefcase"),
+        .. views.Options,
+    ];
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm: sütunlar, sıralama ve süzgeç birlikte gelir.
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            status = filters.GetValueOrDefault("status");
+            viewOwnership = null;
+            ownership = filters.GetValueOrDefault("ownership") ?? "";
+            kindKey = filters.GetValueOrDefault("kindKey") ?? "";
+        }
+        else
+        {
+            grid.Reset();
+            status = key switch { ActiveView => "active", MaintenanceView => "maintenance", PassiveView => "passive", _ => null };
+            viewOwnership = key == SubcontractedView ? FleetAccess.Subcontracted : null;
+            kindKey = ownership = "";
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    // Sütun seçimi/sırası değişince veri yeniden çekilmez; olay işleyicisi sayfada olduğu için tablo yeniden çizilir.
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? EffectiveOwnership => viewOwnership ?? (ownership.Length > 0 ? ownership : null);
+
+    private string? CurrentFilters => GridFilters.Build(
+        status is { } s ? ("status", s) : null,
+        EffectiveOwnership is { } o ? ("ownership", o) : null,
+        kindKey.Length > 0 ? ("kindKey", kindKey) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        foreach (var (name, value) in new[] { ("status", status), ("ownership", EffectiveOwnership), ("kindKey", kindKey.Length > 0 ? kindKey : null) })
+        {
+            if (value is not null)
+            {
+                url += $"&{name}={Uri.EscapeDataString(value)}";
+            }
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            var ids = page.Items.Select(v => WarehouseLabels.Id(v, "carrierPartyId")).OfType<Guid>();
+            await WarehouseLabels.ResolveNamesAsync(Api, FleetAccess.VehicleCarrierLookup, ids, carrierNames);
+        }
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse vehicle) => @<td data-label="@column.Label" class="@(column.Key == "plate" ? "primary" : null)">@CellContent(column.Key, vehicle)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse vehicle) => key switch
+    {
+        "plate" => @<text>@WarehouseLabels.Text(vehicle, "plate")</text>,
+        "kindKey" => @<span class="badge @FleetLabels.KindBadge(Lookups.CategoryOf(FleetAccess.VehicleKindList, WarehouseLabels.Text(vehicle, "kindKey")))">@Lookups.Label(FleetAccess.VehicleKindList, WarehouseLabels.Text(vehicle, "kindKey"))</span>,
+        "ownership" => @<text>@FleetLabels.Ownership(WarehouseLabels.Text(vehicle, "ownership"))</text>,
+        "carrier" => @<text>@(WarehouseLabels.Id(vehicle, "carrierPartyId") is { } carrier ? WarehouseLabels.NameOf(carrierNames, carrier) : "—")</text>,
+        "brand" => @<text>@BrandModel(vehicle)</text>,
+        "modelYear" => @<text>@(vehicle.Values["modelYear"]?.ToString() ?? "—")</text>,
+        "payloadKg" => @<text>@FleetLabels.Capacity(vehicle.Values["payloadKg"]?.GetValue<decimal>(), "kg")</text>,
+        "status" => @<span class="badge @FleetLabels.StatusBadge(WarehouseLabels.Text(vehicle, "status"))">@FleetLabels.Status(WarehouseLabels.Text(vehicle, "status"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(FleetAccess.VehicleEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, vehicle.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private static string BrandModel(RecordResponse vehicle)
+    {
+        var text = $"{WarehouseLabels.Text(vehicle, "brand")} {WarehouseLabels.Text(vehicle, "model")}".Trim();
+        return text.Length == 0 ? "—" : text;
+    }
+
+    private void Open(RecordResponse? vehicle)
+    {
+        selected = vehicle;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

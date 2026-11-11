@@ -1,6 +1,7 @@
 using Modulix.Shared.Access;
 using Modulix.Shared.Contracts;
 using Modulix.Shared.Crm;
+using Modulix.Shared.Fleet;
 using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
 using Modulix.Shared.Reporting;
@@ -95,6 +96,8 @@ public static class AppCatalog
     public const string Support = "support";
     public const string Marketing = "marketing";
     public const string Warehouse = "warehouse";
+
+    public const string Fleet = "fleet";
     public const string Reports = "reports";
     public const string Approvals = "approvals";
     public const string Admin = "admin";
@@ -231,6 +234,8 @@ public static class AppCatalog
         new("warehouse.stock-items", Warehouse, "Stok kartları", "package", "depo/stok-kartlari", 60, WarehouseAccess.ModuleKey, WarehouseAccess.StockItemsRead, Tone: AppTone.Teal),
         new("warehouse.customs-declarations", Warehouse, "Beyannameler", "clipboard-list", "depo/beyannameler", 70, WarehouseAccess.ModuleKey, WarehouseAccess.DeclarationsRead),
         new("warehouse.regime-bindings", Warehouse, "Rejim profilleri", "shield", "depo/rejim-profilleri", 80, WarehouseAccess.ModuleKey, WarehouseAccess.RegimesRead, Tone: AppTone.Teal),
+        new(Fleet, null, "Filo", "truck", null, 45, ModuleKey: FleetAccess.ModuleKey, Group: OperationsGroup),
+        new("fleet.vehicles", Fleet, "Araçlar", "truck", "filo/araclar", 10, FleetAccess.ModuleKey, FleetAccess.VehiclesRead),
 
         // Rapor merkezi çekirdeğe aittir (modül anahtarı yok; yönetim girdileri gibi yalnızca izne bağlıdır). Tek ekranlı olduğu için alt uygulaması yoktur,
         // kendi route'u vardır; /raporlar altındaki oluşturucu ve çalıştırma ekranları da bu uygulamanın bağlamında kalır.
