@@ -38,6 +38,9 @@ public sealed class ApiClient(HttpClient http)
         return http.PostAsync(url, content);
     });
 
+    /// <summary>Çok parçalı form gönderir (ör. kayda dosya eki, ADR-0040). Gövde çağıranındır; bu çağrı onu kapatmaz.</summary>
+    public Task<ApiResult<T>> PostMultipartAsync<T>(string url, MultipartFormDataContent content) => SendAsync<T>(() => http.PostAsync(url, content));
+
     public Task<ApiResult<bool>> DeleteAsync(string url) => SendAsync<bool>(() => http.DeleteAsync(url));
 
     private static async Task<ApiResult<T>> SendAsync<T>(Func<Task<HttpResponseMessage>> send)

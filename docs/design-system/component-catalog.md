@@ -88,6 +88,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Takvim | Var | `ActivityCalendar.razor`: ay ızgarası, hafta/gün saat çizelgesi (`cal-time-*`, çakışanlar yan yana, şimdiki zaman çizgisi), ajanda; renk `FamilyOf` → `fam-*` |
 | Günün ajandası | Var | `TodayActivities.razor` |
 | Grafikler | Var | `BarChart.razor`, `DonutChart.razor` (`--chart-c*`) |
+| Dosya ekleri | Var | `AttachmentPanel.razor` (ADR-0040): `EntityKey`, `RecordId`, `CanWrite`, `CountChanged`; mevcut sınıflarla çizilir (`detail-section`, `item-list`, `badge`, `btn-outline-danger`), yeni CSS yoktur. Kaydın bir sekmesine konur (örnek: Firma ayrıntısı "Dosyalar"); silme satır içi onaylıdır; tarama durumu rozeti (`NotScanned` → "Taranmadı") |
 
 ## Pano bandı ve adım izi
 

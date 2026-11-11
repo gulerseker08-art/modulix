@@ -1,0 +1,201 @@
+@* Kayda bağlı dosyalar (ADR-0040, Ç4 dilim 1b): herhangi bir kayıt ekranına konabilir (kayıt türü + kimlik). Yetki bağlı kaydın yetkisidir ve sunucuda
+   uygulanır; CanWrite yalnızca düğmeleri gizler/gösterir (gizlemek yetki değildir). Tür, imza ve boyut denetimi sunucudadır; bu bileşen iletir ve gösterir.
+   İçerik taraması henüz yoktur ve bu açıkça yazılır. *@
+@inject ApiClient Api
+
+<section class="detail-section" aria-labelledby="@titleId">
+    <div class="section-header">
+        <h2 id="@titleId">@Texts.Get("files.title")</h2>
+    </div>
+    <Notice Text="@message" Failed="@failed" />
+    @if (items is null)
+    {
+        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+    }
+    else if (items.Count == 0)
+    {
+        <p class="text-muted">@Texts.Get("files.none")</p>
+    }
+    else
+    {
+        <ul class="item-list" aria-label="@Texts.Get("files.list.aria")">
+            @foreach (var f in items)
+            {
+                <li>
+                    <div class="item-main">
+                        <strong><a href="api/files/@f.Id/content" download="@f.FileName" title="@Texts.Get("files.download")">@f.FileName</a></strong>
+                        <span>
+                            @Size(f.SizeBytes) · @CrmLabels.Time(f.CreatedAt)
+                            <span class="badge @ScanBadge(f.ScanStatus)">@Texts.Get($"files.scan.{f.ScanStatus}")</span>
+                        </span>
+                    </div>
+                    @if (CanWrite)
+                    {
+                        @if (confirming == f.Id)
+                        {
+                            <span class="text-muted">@Texts.Get("files.delete.confirm")</span>
+                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(f)">@Texts.Get("files.delete.yes")</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirming = null">@Texts.Get("files.delete.no")</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => confirming = f.Id">@Texts.Get("files.delete")</button>
+                        }
+                    }
+                </li>
+            }
+        </ul>
+    }
+
+    @if (CanWrite)
+    {
+        <form class="record-form" novalidate @onsubmit="UploadAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <legend class="h6">@Texts.Get("files.add")</legend>
+                <p class="small text-muted">@Texts.Get("files.hint") @Texts.Get("files.scanNote")</p>
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label" for="@inputId">@Texts.Get("files.choose")</label>
+                        <InputFile @key="inputKey" id="@inputId" class="form-control" OnChange="OnFileChosen" />
+                        <FieldError Field="file" Errors="errors" />
+                    </div>
+                </div>
+            </fieldset>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-sm" disabled="@(busy || file is null)">@Texts.Get("files.upload")</button>
+            </div>
+        </form>
+    }
+</section>
+
+@code {
+    /// <summary>Tarayıcının dosyayı okuyabileceği üst sınır. Gerçek boyut sınırı sunucudadır (yapılandırılabilir) ve yanıtla bildirilir.</summary>
+    private const long ReadLimit = 50 * 1024 * 1024;
+
+    private static int instances;
+
+    private readonly string titleId = $"files-title-{Interlocked.Increment(ref instances)}";
+    private readonly string inputId = $"files-input-{instances}";
+
+    /// <summary>Bağlı kaydın türü (ör. <c>crm.company</c>).</summary>
+    [Parameter, EditorRequired] public string EntityKey { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public Guid RecordId { get; set; }
+
+    /// <summary>Kullanıcı bu kayda dosya ekleyip silebilir mi (kaydın yazma izni). Yalnızca arayüzü belirler; sunucu her istekte denetler.</summary>
+    [Parameter] public bool CanWrite { get; set; }
+
+    /// <summary>Liste yüklendiğinde ya da değiştiğinde dosya sayısı (üst ekranın sekme sayacı için).</summary>
+    [Parameter] public EventCallback<int> CountChanged { get; set; }
+
+    private List<StoredFileDto>? items;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private IBrowserFile? file;
+    private Guid? confirming;
+    private int inputKey;
+    private string? loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Kayıt değişince yeniden yüklenir; aynı kayıtta üst ekranın yeniden çizimi isteği tekrarlamaz.
+        var key = $"{EntityKey}/{RecordId}";
+        if (loadedFor == key) { return; }
+        loadedFor = key;
+        items = null;
+        message = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<StoredFileDto>>($"/api/files?entityKey={Uri.EscapeDataString(EntityKey)}&recordId={RecordId}");
+        if (!result.IsSuccess)
+        {
+            items = [];
+            failed = true;
+            message = result.Error;
+        }
+        else
+        {
+            items = result.Value ?? [];
+        }
+
+        await CountChanged.InvokeAsync(items.Count);
+    }
+
+    private void OnFileChosen(InputFileChangeEventArgs e)
+    {
+        file = e.File;
+        errors = null;
+        message = null;
+    }
+
+    private async Task UploadAsync()
+    {
+        if (busy || file is null) { return; }
+        busy = true;
+        message = null;
+        errors = null;
+        try
+        {
+            using var stream = file.OpenReadStream(ReadLimit);
+            using var content = new MultipartFormDataContent
+            {
+                { new StringContent(EntityKey), "entityKey" },
+                { new StringContent(RecordId.ToString()), "recordId" },
+                { new StreamContent(stream), "file", file.Name },
+            };
+            var result = await Api.PostMultipartAsync<StoredFileDto>("/api/files", content);
+            failed = !result.IsSuccess;
+            errors = result.FieldErrors;
+            message = result.IsSuccess ? Texts.Get("files.uploaded") : result.Error ?? Texts.Get("files.uploadFailed");
+            if (result.IsSuccess)
+            {
+                file = null;
+                inputKey++;
+                await LoadAsync();
+            }
+        }
+        catch (IOException)
+        {
+            // Tarayıcı okuma üst sınırı aşıldı (sunucu sınırından çok büyük).
+            failed = true;
+            message = Texts.Get("files.tooBig");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(StoredFileDto f)
+    {
+        if (busy) { return; }
+        busy = true;
+        message = null;
+        try
+        {
+            var result = await Api.DeleteAsync($"/api/files/{f.Id}?version={f.Version}");
+            failed = !result.IsSuccess;
+            message = result.IsSuccess ? Texts.Get("files.deleted") : result.Error;
+            confirming = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static string ScanBadge(string status) => status switch
+    {
+        "Clean" => "status-customer",
+        "Infected" => "stage-lost",
+        _ => "tag",
+    };
+
+    private static string Size(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:0.#} MB" : bytes >= 1024 ? $"{bytes / 1024.0:0.#} KB" : $"{bytes} B";
+}

@@ -350,6 +350,14 @@
                     </div>
                 }
 
+                @if (tabs.Rendered(TabFiles))
+                {
+                    <div role="tabpanel" id="tabpanel-@TabFiles" aria-labelledby="tab-@TabFiles" class="record-tabpanel" hidden="@tabs.Hidden(TabFiles)">
+                        @* Dosyalar (ADR-0040): yetki firmanın yetkisidir; yazma düğmeleri firmayı yazabilene görünür, sunucu her istekte denetler. *@
+                        <AttachmentPanel EntityKey="@CrmEntityKeys.Company" RecordId="Id" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" CountChanged="FilesCounted" />
+                    </div>
+                }
+
                 @if (tabs.Rendered(TabHistory))
                 {
                     <div role="tabpanel" id="tabpanel-@TabHistory" aria-labelledby="tab-@TabHistory" class="record-tabpanel" hidden="@tabs.Hidden(TabHistory)">
@@ -379,6 +387,7 @@
     private const string TabRelations = "iliskiler";
     private const string TabSales = "satis";
     private const string TabActivities = "aktiviteler";
+    private const string TabFiles = "dosyalar";
     private const string TabHistory = "gecmis";
 
     private readonly TabState tabs = new(TabGeneral);
@@ -396,6 +405,7 @@
     private ActivityDto? selectedActivity;
     private OpportunityDto? selectedOpportunity;
     private bool editingCompany;
+    private int? fileCount;
     private bool editingActivity;
     private bool editingOpportunity;
     private bool busy;
@@ -456,6 +466,7 @@
                 list.Add(new(TabActivities, Texts.Get("crm.activities.title"), activityTotal));
             }
 
+            list.Add(new(TabFiles, Texts.Get("files.title"), fileCount));
             list.Add(new(TabHistory, Texts.Get("common.history.tab")));
             return list;
         }
@@ -566,6 +577,9 @@
         company = saved;
         editingCompany = false;
     }
+
+    /// <summary>Dosyalar sekmesi açılıp liste yüklenince (ve her değişiklikte) sekme sayacı güncellenir; açılmadan önce sayaç yoktur.</summary>
+    private void FilesCounted(int count) => fileCount = count;
 
     private void CompanyDeleted() => Navigation.NavigateTo("crm/firmalar");
 

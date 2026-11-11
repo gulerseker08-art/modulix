@@ -91,7 +91,7 @@ IBlobStorage
 
 | Dilim | İçerik |
 | --- | --- |
-| 1b | `AttachmentPanel` Blazor bileşeni; ilk ekran (Firma ayrıntısı), sonra fırsat, aktivite |
+| 1b | **Yapıldı (11 Kasım 2026):** `AttachmentPanel` Blazor bileşeni ve ilk ekran (Firma ayrıntısı "Dosyalar" sekmesi). Sonraki ekranlar (fırsat, kişi, aktivite) bileşeni kayıt sekmesine koymaktan ibarettir |
 | 2 | Karantina ve zararlı içerik taraması (`Pending` → `Clean`/`Infected`), sıkıştırılmış dosya limitleri, `Classification` ile yeni sınıflar |
 | 3 | Yaşam döngüsü: sürüm, saklama, legal hold, silinen kaydın ekleri, yetim blob temizliği, kota rezervasyonu (Ç12) |
 | 4 | İmzalı kısa ömürlü bağlantı; portal erişimi |
