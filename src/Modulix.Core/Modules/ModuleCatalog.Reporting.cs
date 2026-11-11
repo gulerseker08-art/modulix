@@ -3,7 +3,7 @@ using Modulix.Core.Reporting;
 
 namespace Modulix.Core.Modules;
 
-/// <summary>Rapor veri kümeleri ve bağlantıları (ADR-0026, dilim 3): modül başına sabit; açılışta doğrulanır, geçersizse uygulama açılmaz.</summary>
+/// <summary>Rapor veri kümeleri ve bağlantıları (ADR-0035, dilim 3): modül başına sabit; açılışta doğrulanır, geçersizse uygulama açılmaz.</summary>
 public sealed partial class ModuleCatalog
 {
     private readonly Dictionary<string, (string ModuleKey, DatasetDefinition Dataset)> datasets = new(StringComparer.Ordinal);

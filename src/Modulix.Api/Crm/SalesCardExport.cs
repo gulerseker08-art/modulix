@@ -7,7 +7,7 @@ using Modulix.Shared.Crm;
 namespace Modulix.Api.Crm;
 
 /// <summary>
-/// Satış genel görünümü kartının ayrıntı satırlarını rapor merkezinin dışa aktarma biçimine (<see cref="ReportResult"/>) çevirir (ADR-0026).
+/// Satış genel görünümü kartının ayrıntı satırlarını rapor merkezinin dışa aktarma biçimine (<see cref="ReportResult"/>) çevirir (ADR-0035).
 /// Satırlar ekrandaki kart ayrıntısıyla <b>aynı</b> hesaptan gelir (<c>ISalesOverview.DetailAsync</c>): kart toplamı = dosyadaki tutar sütunu toplamı.
 /// Tutar izni yoksa tutar sütunları hiç yazılmaz (ekrandaki gibi). Burada yeniden hesap, izin ya da kapsam kararı yoktur.
 /// </summary>

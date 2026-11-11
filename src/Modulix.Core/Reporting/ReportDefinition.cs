@@ -15,7 +15,7 @@ public enum ReportVisibility
 }
 
 /// <summary>
-/// Kayıtlı rapor (ADR-0026, dilim 3): veri kümesi, sınırlı oluşturucunun ürettiği tanım (<see cref="SpecJson"/>) ve paylaşım ayarı. Tanım
+/// Kayıtlı rapor (ADR-0035, dilim 3): veri kümesi, sınırlı oluşturucunun ürettiği tanım (<see cref="SpecJson"/>) ve paylaşım ayarı. Tanım
 /// <b>veri erişimi vermez</b>: paylaşılan raporu açan kişi raporu kendi yetkisiyle çalıştırır, göremediği kayıt ve alan sonuca girmez.
 /// Tenant verisidir; Row-Level Security ile korunur. Sütunlar kalıcı alan adlarıyla saklanır, bu yüzden görünen ad değişince rapor bozulmaz.
 /// </summary>

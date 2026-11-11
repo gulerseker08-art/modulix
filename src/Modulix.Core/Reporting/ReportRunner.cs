@@ -18,7 +18,7 @@ public interface IReportRunner
 }
 
 /// <summary>
-/// Rapor çalıştırıcı (ADR-0026, dilim 3). Kayıtlar yalnızca <see cref="IRecordPipeline"/> üzerinden okunur: izin, veri kapsamı, şirket kapsamı
+/// Rapor çalıştırıcı (ADR-0035, dilim 3). Kayıtlar yalnızca <see cref="IRecordPipeline"/> üzerinden okunur: izin, veri kapsamı, şirket kapsamı
 /// ve hassas alan kuralları aggregate'ten önce uygulanır; çağıranın göremediği sütun hiç hesaba girmez. Rapor tanımı (ve paylaşımı) yetki
 /// kazandırmaz. Okuma en fazla <see cref="ReportLimits.MaxRowsRead"/> kayıtla sınırlıdır; aşılırsa sonuç eksik olabilir ve öyle işaretlenir.
 /// </summary>

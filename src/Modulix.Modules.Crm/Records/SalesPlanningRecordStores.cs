@@ -39,7 +39,7 @@ internal sealed class ForecastWorkflowGate
 }
 
 /// <summary>
-/// Satış hedefi (ADR-0026). Metrik, kapsam, para birimi ve dönem oluştururken verilir, sonra değişmez; yalnızca hedef değeri (gerekçeyle, sürümlü) ve not
+/// Satış hedefi (ADR-0035). Metrik, kapsam, para birimi ve dönem oluştururken verilir, sonra değişmez; yalnızca hedef değeri (gerekçeyle, sürümlü) ve not
 /// değişir. Aynı kapsam, metrik ve para biriminde dönemler çakışamaz. Tutar hedefi para birimi ister, adet hedefi tam sayıdır ve para birimi taşımaz.
 /// </summary>
 internal sealed class SalesTargetRecordStore(CrmStoreContext context) : CrmRecordStore<SalesTarget>(context)
@@ -211,7 +211,7 @@ internal sealed class SalesTargetRecordStore(CrmStoreContext context) : CrmRecor
 }
 
 /// <summary>
-/// Satış tahmini başlığı (ADR-0026). Dönem, kapsam, durum, sürüm ve damgalar yalnızca <see cref="ForecastWorkflowGate"/> açıkken yazılır; genel uçlardan yalnızca
+/// Satış tahmini başlığı (ADR-0035). Dönem, kapsam, durum, sürüm ve damgalar yalnızca <see cref="ForecastWorkflowGate"/> açıkken yazılır; genel uçlardan yalnızca
 /// not (Taslak durumunda) değişir. Satırlar ve düzeltmeler kapı etkisiyle aynı işlemde yazılır. Kilitli sürüm değişmez ve silinmez.
 /// </summary>
 internal sealed class ForecastSubmissionRecordStore(CrmStoreContext context, ForecastWorkflowGate gate) : CrmRecordStore<ForecastSubmission>(context), IRecordStore

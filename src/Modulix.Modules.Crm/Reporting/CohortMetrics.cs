@@ -3,7 +3,7 @@ using Modulix.Modules.Crm.Quotes;
 
 namespace Modulix.Modules.Crm.Reporting;
 
-// Kohort, dönüşüm ve performans hesapları (ADR-0026, dilim 2). Saf işlevler: veritabanı ve izin bilmez; girdi, kayıt boru hattından kullanıcının
+// Kohort, dönüşüm ve performans hesapları (ADR-0035, dilim 2). Saf işlevler: veritabanı ve izin bilmez; girdi, kayıt boru hattından kullanıcının
 // kapsamıyla okunmuş kayıtlardır, bu yüzden hesap kapsamı aşamaz.
 
 // ---- Teklif kohortu

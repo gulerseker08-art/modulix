@@ -106,7 +106,7 @@ public sealed class CrmModule : IModule
         public const string QuotesExport = "crm.quotes.export";
         public const string QuoteCostsRead = "crm.quote-costs.read";
 
-        // Satış raporlama ve tahmin (ADR-0026). Rapor görüntüleme, hedef yönetimi ve tahminin her adımı ayrı izindir; hiçbiri veri erişimi kazandırmaz:
+        // Satış raporlama ve tahmin (ADR-0035). Rapor görüntüleme, hedef yönetimi ve tahminin her adımı ayrı izindir; hiçbiri veri erişimi kazandırmaz:
         // raporlar kayıt boru hattından okunur, kullanıcının fırsat izni, veri kapsamı ve tutar iznini aşan hiçbir kayıt toplama girmez.
         public const string SalesReportsRead = "crm.sales-reports.read";
         public const string SalesTargetsRead = "crm.sales-targets.read";
@@ -323,7 +323,7 @@ public sealed class CrmModule : IModule
             // Y8: temsilci yalnızca sorumlusu olduğu kayıtları görür; ekip lideri için kapsam rolde genişletilir.
             Scope = RecordScope.Own,
         },
-        // Satış tahmini ve hedefleri (ADR-0026): tüm kayıtları görür; tahminin her adımı ayrı izindir, mevcut rollere eklenmez.
+        // Satış tahmini ve hedefleri (ADR-0035): tüm kayıtları görür; tahminin her adımı ayrı izindir, mevcut rollere eklenmez.
         new(
             "crm.sales-manager",
             "Satış yöneticisi",
@@ -433,7 +433,7 @@ public sealed class CrmModule : IModule
     /// <summary>Lookup alanları (ADR-0016); tanımlar <see cref="CrmLookupDefinitions"/>'tadır.</summary>
     IReadOnlyList<LookupDefinition> IModule.Lookups => CrmLookupDefinitions.All;
 
-    /// <summary>Ortak rapor merkezine katkı (ADR-0026, dilim 3): fırsat ve lead veri kümeleri, satış rapor ekranlarına bağlantılar.</summary>
+    /// <summary>Ortak rapor merkezine katkı (ADR-0035, dilim 3): fırsat ve lead veri kümeleri, satış rapor ekranlarına bağlantılar.</summary>
     ModuleReporting IModule.Reports => CrmReportDatasets.Reporting;
 
     /// <summary>Form düzenleri (ADR-0021); varsayılan yerleşimler <see cref="CrmForms"/>'tadır, firma üzerine kendi düzenini kurar.</summary>
@@ -659,7 +659,7 @@ public sealed class CrmModule : IModule
             PatternMessage = "0-999 arası tam sayı girin.",
             MaxLength = 3,
         },
-        // Satış raporlama ve tahmin (ADR-0026). Değişiklik yalnızca sonraki hesapları etkiler; kilitli tahmin ve kaydedilmiş kurlar yeniden yorumlanmaz.
+        // Satış raporlama ve tahmin (ADR-0035). Değişiklik yalnızca sonraki hesapları etkiler; kilitli tahmin ve kaydedilmiş kurlar yeniden yorumlanmaz.
         new(SettingKeys.FiscalYearStartMonth, "Mali yıl başlangıç ayı", "CRM Raporlama", SettingType.Text, "1")
         {
             Description = "Çeyrek ve yıl dönemleri bu aya göre kurulur (1 = Ocak). Ay dönemi her zaman takvim ayıdır. Tanımlı hedefler ve kilitli tahminler tarihleriyle saklandığından geçmiş değişmez.",

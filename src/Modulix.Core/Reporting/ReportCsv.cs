@@ -6,7 +6,7 @@ using Modulix.Core.Contracts.Reporting;
 namespace Modulix.Core.Reporting;
 
 /// <summary>
-/// Rapor sonucunu CSV'ye çevirir (ADR-0026, dilim 4). Dışa aktarma ekrandaki sonuçla <b>aynı</b> <see cref="ReportResult"/>'tan üretilir; ayrı bir
+/// Rapor sonucunu CSV'ye çevirir (ADR-0035, dilim 4). Dışa aktarma ekrandaki sonuçla <b>aynı</b> <see cref="ReportResult"/>'tan üretilir; ayrı bir
 /// hesap yoktur. CSV/Excel formül enjeksiyonuna karşı metin hücreleri ve başlıklar kaçışlanır: "=", "+", "-", "@", sekme ya da satır başı ile
 /// başlayan metin başına kesme işareti konur (sayısal hücreler metin değildir ve olduğu gibi yazılır). UTF-8 BOM'lu, CRLF satır sonlu, noktalı
 /// virgüllü değil virgüllü CSV; sayılar değişmez kültürle (nokta ondalık).

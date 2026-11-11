@@ -46,7 +46,7 @@ Kısıtlar (değişmez): modüller yalnızca `Modulix.Core.Contracts`'a başvuru
 
 **K10 — Kiralama sözleşmesi belgesi: modül kendi şablonunu taşır, genel Sözleşme modülüne bağlanma sonra.** Rezervasyondan üretilen kiralama sözleşmesi/teslim formu PDF'i rentcar içindedir. Genel Sözleşme modülüyle (ADR-0022) birleşme ya da bağlama ayrı karardır (açık soru 4); bu ADR'de bağımlılık yoktur.
 
-**K11 — Mevcut platform yetenekleri aynen kullanılır.** `IModule` üzerinden: izinler, rol şablonları, `AuditedEntities`, `Settings` (rezervasyon numaralama, tampon süre, gecikme toleransı), `SensitiveFields`, `CustomizableEntities` (araç, rezervasyon), `ChoiceLists` (araç durumu, hasar türü, ek hizmet), `Lookups` (araç sınıfı, şube), `Forms` (ADR-0021; çok sekmeli varsayılan düzen birim testle denetlenir), `Automation` (bakım/belge tarihi, gecikmiş iade, ADR-0027) ve `Reports` (doluluk, araç başına gelir; ADR-0026). Arayüz, `docs/design-system/` kurallarına uyar (sekmeli formlar, `record-table`, `ViewSelector`).
+**K11 — Mevcut platform yetenekleri aynen kullanılır.** `IModule` üzerinden: izinler, rol şablonları, `AuditedEntities`, `Settings` (rezervasyon numaralama, tampon süre, gecikme toleransı), `SensitiveFields`, `CustomizableEntities` (araç, rezervasyon), `ChoiceLists` (araç durumu, hasar türü, ek hizmet), `Lookups` (araç sınıfı, şube), `Forms` (ADR-0021; çok sekmeli varsayılan düzen birim testle denetlenir), `Automation` (bakım/belge tarihi, gecikmiş iade, ADR-0027) ve `Reports` (doluluk, araç başına gelir; ADR-0035). Arayüz, `docs/design-system/` kurallarına uyar (sekmeli formlar, `record-table`, `ViewSelector`).
 
 **K12 — Sektör profili.** `rentcar` profili modül kombinasyonunu ve varsayılan form/rol/liste değerlerini seçer; veri silosu açmaz ve lisans/izin yükseltmez (yol haritası Y9.3 kabul ölçütü). Faaliyet ağacına bağlanma (araç kiralama faaliyeti, hazır-modül göstergesi) ADR-0029 kabul edilince yapılır; o zamana dek profil kodda tanımlanır. Modül kodunda `if sektor == ...` yoktur.
 
@@ -79,7 +79,7 @@ Tablolar `rentcar` şemasında, hepsi `TenantId` taşır ve RLS politikasına ek
 | C | Tarife + rezervasyon + çakışma güvencesi (K4) + önizleme | B; K4 eşzamanlılık testi |
 | D | Teslim/iade, hasar, depozito kaydı, kiralama belgesi PDF'i | C |
 | E | CRM entegrasyonu: kabul edilmiş teklif → rezervasyon; müşteri kartında özet | C; ADR-0019 sözleşmesi |
-| F | Raporlar, otomasyon (belge/bakım/gecikmiş iade), panel göstergeleri | B–D; ADR-0026/0027 |
+| F | Raporlar, otomasyon (belge/bakım/gecikmiş iade), panel göstergeleri | B–D; ADR-0035/0027 |
 | G | Sektör profili ve rentcar kurulum paketi | ADR-0029 kabulü |
 | H | Gerçek tahsilat, e-belge, ceza/geçiş sorgusu, saha ekranı | Ayrı epic ve ADR'ler |
 

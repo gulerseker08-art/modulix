@@ -16,7 +16,7 @@ using Modulix.Shared.Crm;
 namespace Modulix.Api.Crm;
 
 /// <summary>
-/// Satış raporlama ve tahmin uç noktaları (ADR-0026): /api/crm/sales/overview, /api/crm/sales-targets, /api/crm/sales/forecasts. Hepsi kayıt boru hattından geçer:
+/// Satış raporlama ve tahmin uç noktaları (ADR-0035): /api/crm/sales/overview, /api/crm/sales-targets, /api/crm/sales/forecasts. Hepsi kayıt boru hattından geçer:
 /// izin, veri kapsamı ve hassas alan kuralları fırsat listesiyle aynıdır; tenant istemciden değil oturumdan gelir. Tahmin eylemleri ayrı izinlerdir.
 /// </summary>
 internal static class SalesPlanningEndpoints

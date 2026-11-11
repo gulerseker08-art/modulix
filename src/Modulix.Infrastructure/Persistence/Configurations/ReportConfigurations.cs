@@ -8,7 +8,7 @@ internal sealed class ReportDefinitionConfiguration : IEntityTypeConfiguration<R
 {
     public void Configure(EntityTypeBuilder<ReportDefinition> builder)
     {
-        // Tenant verisi (ADR-0026, dilim 3): core şemasında; Row-Level Security ile korunur (migration: TenantIsolationSql).
+        // Tenant verisi (ADR-0035, dilim 3): core şemasında; Row-Level Security ile korunur (migration: TenantIsolationSql).
         builder.ToTable("Reports", DatabaseSchemas.Core);
         builder.HasKey(r => r.Id);
         builder.Property(r => r.Id).ValueGeneratedNever();
@@ -80,7 +80,7 @@ internal sealed class ReportExportConfiguration : IEntityTypeConfiguration<Repor
 {
     public void Configure(EntityTypeBuilder<ReportExport> builder)
     {
-        // Hazırlanmış dışa aktarma dosyası (ADR-0026, dilim 4): tenant verisi, RLS'li; içerik en çok MaxBytes, süresi dolunca silinir.
+        // Hazırlanmış dışa aktarma dosyası (ADR-0035, dilim 4): tenant verisi, RLS'li; içerik en çok MaxBytes, süresi dolunca silinir.
         builder.ToTable("ReportExports", DatabaseSchemas.Core);
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).ValueGeneratedNever();

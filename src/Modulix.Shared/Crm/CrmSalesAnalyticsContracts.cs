@@ -1,6 +1,6 @@
 namespace Modulix.Shared.Crm;
 
-// Satış analizi sözleşmeleri (ADR-0026, dilim 2). Alan adları API'deki modül sonuçlarıyla birebir aynıdır (uç nokta JSON üzerinden eşler).
+// Satış analizi sözleşmeleri (ADR-0035, dilim 2). Alan adları API'deki modül sonuçlarıyla birebir aynıdır (uç nokta JSON üzerinden eşler).
 
 /// <summary>Analiz zarfı: dönem, kapsam ve kısmi veri uyarılarıyla birlikte sonuç.</summary>
 public sealed record AnalyticsDto<T>(

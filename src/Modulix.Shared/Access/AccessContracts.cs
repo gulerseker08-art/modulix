@@ -227,7 +227,7 @@ public static class CoreAccess
     public const string DecideApprovals = "core.approvals.decide";
     public const string ManageApprovals = "core.approvals.manage";
 
-    // Rapor merkezi (ADR-0026): yönetim değil, kullanıcı özelliğidir; bu izinler "Yönetim" bölümünü açmaz (AdministrationPermissions dışında).
+    // Rapor merkezi (ADR-0035): yönetim değil, kullanıcı özelliğidir; bu izinler "Yönetim" bölümünü açmaz (AdministrationPermissions dışında).
     public const string ReadReports = "core.reports.read";
     public const string ManageReports = "core.reports.manage";
     public const string ShareReports = "core.reports.share";

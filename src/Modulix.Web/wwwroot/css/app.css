@@ -5400,7 +5400,7 @@ button.pipeline-label {
     font-size: var(--mx-fs-helper);
 }
 
-/* ---- Rapor merkezi (ADR-0026 dilim 3) ---- */
+/* ---- Rapor merkezi (ADR-0035 dilim 3) ---- */
 .report-table-wrap {
     margin-bottom: .5rem;
 }

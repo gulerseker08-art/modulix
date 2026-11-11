@@ -7,7 +7,7 @@ using Modulix.Modules.Crm.Reporting;
 namespace Modulix.Modules.Crm.Records;
 
 /// <summary>
-/// Tahmin sürümünün fırsat satırı, <b>salt okunur</b> (ADR-0026, rapor veri kümesi için). Satırlar yalnızca tahmin iş akışıyla yazılır; bu depo hiçbir
+/// Tahmin sürümünün fırsat satırı, <b>salt okunur</b> (ADR-0035, rapor veri kümesi için). Satırlar yalnızca tahmin iş akışıyla yazılır; bu depo hiçbir
 /// kullanıcıya yazma izni vermez (yönetici dahil). Görünürlük okuma anında <b>fırsatın bugünkü sorumlusuna</b> göre belirlenir (K7): kapsamı sınırlı
 /// çağıran, yalnızca bugünkü sorumlusu kapsamında olan fırsatların satırlarını görür; satırdaki <c>ownerId</c> ise anlık görüntü anındaki sorumludur.
 /// Tutar ve olasılık alanları fırsat tutarı iznine bağlı hassas alandır.
@@ -81,7 +81,7 @@ internal sealed class ForecastItemRecordStore(CrmStoreContext context) : CrmReco
 }
 
 /// <summary>
-/// Satış hedefinin değer revizyonu (eski/yeni değer, gerekçe, yapan, zaman), <b>salt okunur</b> ve değişmez (ADR-0026). Revizyon yalnızca hedef değeri
+/// Satış hedefinin değer revizyonu (eski/yeni değer, gerekçe, yapan, zaman), <b>salt okunur</b> ve değişmez (ADR-0035). Revizyon yalnızca hedef değeri
 /// değiştiğinde hedef deposu tarafından yazılır; bu depo yazma izni vermez. Okuma izni hedefi okuma iznidir.
 /// </summary>
 internal sealed class SalesTargetRevisionRecordStore(CrmStoreContext context) : CrmRecordStore<SalesTargetRevision>(context), IRecordStore
@@ -120,7 +120,7 @@ internal sealed class SalesTargetRevisionRecordStore(CrmStoreContext context) : 
 }
 
 /// <summary>
-/// Tahmin düzeltme geçmişi (eski/yeni değer, gerekçe, yapan, zaman), <b>salt okunur</b> ve değişmez (ADR-0026). Satırlar yalnızca tahmin düzeltme akışıyla
+/// Tahmin düzeltme geçmişi (eski/yeni değer, gerekçe, yapan, zaman), <b>salt okunur</b> ve değişmez (ADR-0035). Satırlar yalnızca tahmin düzeltme akışıyla
 /// yazılır. Görünürlük fırsatın bugünkü sorumlusuna göre belirlenir (<see cref="ForecastItemRecordStore"/> ile aynı kural). Eski/yeni değer tutar ya da
 /// olasılık taşıyabildiği için fırsat tutarı iznine bağlı hassas alandır.
 /// </summary>

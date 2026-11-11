@@ -72,7 +72,7 @@ public interface ISalesOverview
 }
 
 /// <summary>
-/// Satış genel görünümü (ADR-0026). Veriyi kayıt boru hattından okur: izin, veri kapsamı ve hassas alan kuralları fırsat listesiyle aynıdır; kapsam dışı fırsat hiçbir toplamda
+/// Satış genel görünümü (ADR-0035). Veriyi kayıt boru hattından okur: izin, veri kapsamı ve hassas alan kuralları fırsat listesiyle aynıdır; kapsam dışı fırsat hiçbir toplamda
 /// yer almaz. Metrikler <see cref="SalesMetrics"/>'ten gelir (kart, detay ve tahmin aynı hesabı kullanır). Hesap bugünkü kayıt değerlerindendir; geçmiş dönem tahmini için
 /// kilitli tahmin sürümleri vardır.
 /// </summary>

@@ -8,7 +8,7 @@ using Modulix.Core.Contracts.Reporting;
 namespace Modulix.Core.Reporting;
 
 /// <summary>
-/// Rapor sonucunu Excel (.xlsx) dosyasına çevirir (ADR-0026). <see cref="ReportCsv"/> ile <b>aynı</b> <see cref="ReportResult"/>'tan, aynı sütun ve
+/// Rapor sonucunu Excel (.xlsx) dosyasına çevirir (ADR-0035). <see cref="ReportCsv"/> ile <b>aynı</b> <see cref="ReportResult"/>'tan, aynı sütun ve
 /// satır düzeniyle üretilir (para birimi sütunu, toplam satırları). Dış paket kullanılmaz: dosya elle yazılmış en küçük OOXML paketidir (tek çalışma
 /// sayfası, başlık satırı kalın, sütun genişliği sabit). Metin hücreleri <b>satır içi metin</b> (<c>t="inlineStr"</c>) olarak yazılır; Excel bunları
 /// formül olarak yorumlamaz, bu yüzden CSV'deki kesme işareti kaçışı gerekmez (yazılsa metinde görünürdü). Sayılar sayı hücresidir.

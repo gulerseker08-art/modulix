@@ -28,7 +28,7 @@ public sealed class ReportJobsOptions
 public sealed record ReportJobsRun(int Due, int Delivered, int Stopped, int Failed, int Skipped, int Purged);
 
 /// <summary>
-/// Bir tenant'ın zamanlanmış raporlarını çalıştırır (ADR-0026, dilim 4). Her zamanlama <b>sahibinin yetkisiyle</b> çalışır: sahibin tenant bağlamı kurulur
+/// Bir tenant'ın zamanlanmış raporlarını çalıştırır (ADR-0035, dilim 4). Her zamanlama <b>sahibinin yetkisiyle</b> çalışır: sahibin tenant bağlamı kurulur
 /// ve rapor merkezi, dışa aktarma ve zamanlama izinleri, modül, rapor görünürlüğü ve alıcının etkin üyeliği o anda yeniden denetlenir. Biri bozulduysa
 /// zamanlama nedeniyle <b>durdurulur</b> ve hiçbir dosya ya da e-posta üretilmez. Hata bir zamanlamayı, bir tenant'ı ya da turu durdurmaz.
 /// <list type="bullet">

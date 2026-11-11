@@ -16,7 +16,7 @@ using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0026 dilim 3: ortak rapor merkezi ve sınırlı oluşturucu. Mutlu yol, hata/doğrulama, tenant izolasyonu ve yetki; paylaşım ve sonradan yetki iptali,
+/// ADR-0035 dilim 3: ortak rapor merkezi ve sınırlı oluşturucu. Mutlu yol, hata/doğrulama, tenant izolasyonu ve yetki; paylaşım ve sonradan yetki iptali,
 /// hassas alan, veri kapsamı, dinamik alan (yeniden adlandırma/kaldırma) ve kart/özet = ayrıntı tutarlılığı.
 /// </summary>
 public class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>

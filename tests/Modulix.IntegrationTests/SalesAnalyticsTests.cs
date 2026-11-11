@@ -12,7 +12,7 @@ using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0026 dilim 2: teklif kohortu, lead dönüşümü, aşama akışı, ekip performansı ve veri kalitesi. Mutlu yol, hata/doğrulama, tenant izolasyonu ve yetki.
+/// ADR-0035 dilim 2: teklif kohortu, lead dönüşümü, aşama akışı, ekip performansı ve veri kalitesi. Mutlu yol, hata/doğrulama, tenant izolasyonu ve yetki.
 /// </summary>
 public class SalesAnalyticsTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {

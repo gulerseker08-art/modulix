@@ -1,4 +1,4 @@
-# ADR-0026 — Raporlama ve satış tahmini (EPIC 14)
+# ADR-0035 — Raporlama ve satış tahmini (EPIC 14)
 
 Durum: kabul edildi (2 Kasım 2026). Uygulama dilimlerle ilerler; her dilimin durumu bölüm 8'dedir. Yalnızca testle doğrulananlar "yapıldı" yazılır.
 
@@ -141,7 +141,7 @@ Ekranlar: Satış görünümü (`/crm/satis-gorunumu`), Satış hedefleri (`/crm
 - **CRM katkısı:** `crm.opportunities` (aşama, durum, öncelik, tür, kaynak, kayıp nedeni, sorumlu, firma, tutar, kazanılan tutar, olasılık, tarihler) ve `crm.leads` veri kümeleri; 8 hazır rapor; 6 satış rapor ekranı bağlantısı. Tutar/olasılık sütunları `crm.opportunity-amounts.read` olmadan görünmez.
 - **Testler:** 58 birim (`ReportSpecValidatorTests`, `ReportAggregatorTests`, `DatasetCatalogTests`) ve 23 entegrasyon (`ReportCenterTests`: katalog, kart=detay ve para birimi ayrımı, tablo/sayfalama/etiket, veri yok–sıfır ayrımı, eksik değer, lead veri kümesi, geçersiz tanım, hassas alan sızıntısı, veri kapsamı, kaydet/sürüm/ad tekilliği, paylaşım ve anında iptal, sonradan yetki iptali, dinamik alan yeniden adlandırma/arşiv/geri alma, modül kapalı, izin, tenant izolasyonu, denetim).
 - **Dilim 3'te yapılmadı / sınırlar:** ayrı "kayıtlı süzgeç" varlığı yok (süzgeçli rapor kayıtlı süzgeçtir); pano/widget yok; kişi, aktivite, sipariş veri kümeleri yok (fırsat, lead, teklif ve firma var; son ikisi dilim 4 sonrası iyileştirmede eklendi); ekip/departman/kanal kırılımı yok (dilim 2 ile aynı neden); tarih ayrıntısı gün/ay/yıl (çeyrek mali takvime bağlı olduğundan yalnızca satış ekranlarında); lookup sütununda süzgeç değeri kimlik (seçici yok); tutar kur çevrimi yok; iş ortağı katkı dağıtımı yok; ekranlar tarayıcıda **görsel doğrulanmadı** (yalnızca sunucu tarafı bileşen çizimiyle sahte yanıt üzerinde denendi; tıklama/klavye/odak etkileşimi denenmedi).
-- **Numaralandırma notu:** `docs/adr/` altında iki belge `0026` numaralıdır (departman hiyerarşisi ve bu belge); kod yorumları bu belgeye `ADR-0026` ile başvurur. Birinin yeniden numaralandırılması ayrı bir düzenlemedir.
+- **Numaralandırma notu:** Bu belge başta `0026` numarasını departman hiyerarşisi ADR'siyle paylaşıyordu; 9 Kasım 2026'da `0035` olarak yeniden numaralandı. Kod yorumları, README ve yol haritası bu belgeye artık `ADR-0035` ile başvurur; `ADR-0026` yalnızca departman hiyerarşisidir.
 
 
 **Dilim 4 — yapıldı (ayrı PR):** dışa aktarma, zamanlama, önbellek kararı ve performans ölçümü.

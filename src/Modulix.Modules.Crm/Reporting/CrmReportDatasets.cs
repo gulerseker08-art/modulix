@@ -3,7 +3,7 @@ using Modulix.Core.Contracts.Reporting;
 namespace Modulix.Modules.Crm.Reporting;
 
 /// <summary>
-/// CRM'in ortak rapor merkezine katkısı (ADR-0026, dilim 3): fırsat ve lead veri kümeleri ile satış raporu ekranlarına bağlantılar. Veri kümeleri kayıt
+/// CRM'in ortak rapor merkezine katkısı (ADR-0035, dilim 3): fırsat ve lead veri kümeleri ile satış raporu ekranlarına bağlantılar. Veri kümeleri kayıt
 /// boru hattından okunur (izin, veri kapsamı, hassas alan kuralları fırsat/lead kayıt türünündür); tutar ve olasılık sütunları
 /// <c>crm.opportunity-amounts.read</c> izni olmayan için hiç görünmez. Tutar sütunları para birimine göre ayrı toplanır. Satış genel görünümü,
 /// hedef ve tahmin gibi kurallı metrikler (kur, dönem, kohort) bu veri kümelerinden değil, kendi ekranlarından okunur.

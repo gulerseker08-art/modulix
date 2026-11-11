@@ -90,7 +90,7 @@ public sealed class ReportConflictException(string message) : Exception(message)
 public sealed class ReportForbiddenException(string message) : Exception(message);
 
 /// <summary>
-/// Aktif tenant'ın kayıtlı raporları (ADR-0026, dilim 3). Görünürlük: sahibi, firmaya açık raporlar ve kendisiyle paylaşılanlar; paylaşım
+/// Aktif tenant'ın kayıtlı raporları (ADR-0035, dilim 3). Görünürlük: sahibi, firmaya açık raporlar ve kendisiyle paylaşılanlar; paylaşım
 /// kaldırılınca ya da rapor özel yapılınca hemen görünmez olur. Yazma işlemleri yalnızca sahibine açıktır ve denetim kaydına yazılır.
 /// Çalıştırma her zaman çağıranın yetkisiyle yapılır (<see cref="IReportRunner"/>). Yetki (<c>core.reports.*</c>) uç noktada denetlenir.
 /// </summary>

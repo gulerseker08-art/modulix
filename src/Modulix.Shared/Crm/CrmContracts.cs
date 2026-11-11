@@ -63,7 +63,7 @@ public static class CrmAccess
     public const string QuotesExport = "crm.quotes.export";
     public const string QuoteCostsRead = "crm.quote-costs.read";
 
-    // Satış raporlama ve tahmin (ADR-0026)
+    // Satış raporlama ve tahmin (ADR-0035)
     public const string SalesReportsRead = "crm.sales-reports.read";
     public const string SalesTargetsRead = "crm.sales-targets.read";
     public const string SalesTargetsManage = "crm.sales-targets.manage";

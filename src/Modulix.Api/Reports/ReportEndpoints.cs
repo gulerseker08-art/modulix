@@ -8,7 +8,7 @@ using Modulix.Shared.Reporting;
 namespace Modulix.Api.Reports;
 
 /// <summary>
-/// Ortak rapor merkezi (ADR-0026, dilim 3). Rapor merkezini açmak ve çalıştırmak <c>core.reports.read</c>, kendi raporlarını yönetmek
+/// Ortak rapor merkezi (ADR-0035, dilim 3). Rapor merkezini açmak ve çalıştırmak <c>core.reports.read</c>, kendi raporlarını yönetmek
 /// <c>core.reports.manage</c>, paylaşmak <c>core.reports.share</c> ister. İzinler <b>veri erişimi vermez</b>: her çalıştırma çağıranın kayıt
 /// izni, veri kapsamı ve hassas alan kurallarıyla yapılır; paylaşılan rapor yalnızca tanımı görünür kılar. Tenant oturumdan belirlenir,
 /// başka tenant'ın raporu "bulunamadı" döner. Çalıştırma sonucu domain durumunu <c>status</c> alanında taşır (HTTP 200).
