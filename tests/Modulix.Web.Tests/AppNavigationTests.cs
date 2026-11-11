@@ -322,6 +322,10 @@ public class AppNavigationTests
         // Modül kapalıysa ya da araç izni yoksa uygulama görünmez (menüyü gizlemek yetki değildir; sunucu yine denetler).
         Assert.Empty(Nav([], [FleetAccess.VehiclesRead]).Roots());
         Assert.Empty(Nav([FleetAccess.ModuleKey], []).Roots());
+
+        // Bakım kayıtları kendi iznine bağlıdır: araç izni yetmez.
+        Assert.Equal(["Araçlar"], nav.MenuEntries(AppCatalog.Fleet).Select(e => e.Name));
+        Assert.Equal(["Araçlar", "Bakım kayıtları"], Nav([FleetAccess.ModuleKey], [FleetAccess.VehiclesRead, FleetAccess.MaintenanceRead]).MenuEntries(AppCatalog.Fleet).Select(e => e.Name));
     }
 
     [Fact]

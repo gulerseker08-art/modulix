@@ -22,16 +22,20 @@ public sealed class FleetModule : IModule
     {
         public const string VehiclesRead = "fleet.vehicles.read";
         public const string VehiclesWrite = "fleet.vehicles.write";
+        public const string MaintenanceRead = "fleet.maintenance.read";
+        public const string MaintenanceWrite = "fleet.maintenance.write";
     }
 
     public static class Entities
     {
         public const string Vehicle = "fleet.vehicle";
+        public const string Maintenance = "fleet.maintenance";
     }
 
     public static class Lists
     {
         public const string VehicleKind = "fleet.vehicle-kind";
+        public const string MaintenanceKind = "fleet.maintenance-kind";
     }
 
     /// <summary>Araç türü kategorileri: kod türün adına değil kategorisine bakar (ör. dorse kapasite taşır ama sürücü atanmaz).</summary>
@@ -39,6 +43,19 @@ public sealed class FleetModule : IModule
     {
         public const string Powered = "powered";
         public const string Towed = "towed";
+    }
+
+    /// <summary>Bakım türü kategorileri: planlı (periyodik, lastik) ve plansız (arıza onarımı); raporlar kategoriye bakar.</summary>
+    public static class MaintenanceKindCategories
+    {
+        public const string Planned = "planned";
+        public const string Unplanned = "unplanned";
+    }
+
+    /// <summary>Kural alanı adları (tarama kaynağının da tanıdığı).</summary>
+    public static class AutomationFields
+    {
+        public const string NextMaintenanceDate = "nextMaintenanceDate";
     }
 
     /// <summary>Platform ilişki rolleri (ADR-0029 K9): taşeron aracın sahibi bu roldeki firmadır.</summary>
@@ -55,6 +72,8 @@ public sealed class FleetModule : IModule
     [
         new(Permissions.VehiclesRead, "Araçları görüntüler", "Araçlar"),
         new(Permissions.VehiclesWrite, "Araç ekler ve düzenler", "Araçlar"),
+        new(Permissions.MaintenanceRead, "Bakım kayıtlarını görüntüler", "Bakım kayıtları"),
+        new(Permissions.MaintenanceWrite, "Bakım kaydı ekler, düzenler ve siler", "Bakım kayıtları"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5).</summary>
@@ -70,11 +89,21 @@ public sealed class FleetModule : IModule
         {
             References = new Dictionary<string, string> { ["carrierPartyId"] = SharedEntities.Party },
         },
+        new(Entities.Maintenance, "Bakım kaydı", Permissions.MaintenanceRead, new Dictionary<string, string>
+        {
+            ["vehicleId"] = "Araç", ["kindKey"] = "Bakım türü", ["performedOn"] = "Bakım tarihi", ["odometerKm"] = "Kilometre",
+            ["supplierPartyId"] = "Servis firması", ["cost"] = "Tutar", ["currency"] = "Para birimi", ["nextDueDate"] = "Sonraki bakım tarihi",
+            ["nextDueKm"] = "Sonraki bakım kilometresi", ["description"] = "Açıklama",
+        }, "performedOn")
+        {
+            References = new Dictionary<string, string> { ["vehicleId"] = Entities.Vehicle, ["supplierPartyId"] = SharedEntities.Party },
+        },
     ];
 
     IReadOnlyList<CustomizableEntity> IModule.CustomizableEntities { get; } =
     [
         new(Entities.Vehicle, "Araç"),
+        new(Entities.Maintenance, "Bakım kaydı"),
     ];
 
     /// <summary>
@@ -101,6 +130,25 @@ public sealed class FleetModule : IModule
         {
             Default = "Truck",
         },
+
+        // Bakım türü (Y9b): hazır değerler örnektir; tenant kendi türlerini ekler, yeni türde kategori seçilir (planlı / plansız).
+        new(
+            Lists.MaintenanceKind,
+            "Bakım türü",
+            Entities.Maintenance,
+            "kindKey",
+            Required: true,
+            [new(MaintenanceKindCategories.Planned, "Planlı bakım"), new(MaintenanceKindCategories.Unplanned, "Plansız onarım")],
+            [
+                new("Periodic", "Periyodik bakım", MaintenanceKindCategories.Planned),
+                new("Tires", "Lastik değişimi", MaintenanceKindCategories.Planned),
+                new("Inspection", "Muayene hazırlığı", MaintenanceKindCategories.Planned),
+                new("Repair", "Arıza onarımı", MaintenanceKindCategories.Unplanned),
+                new("Accident", "Hasar onarımı", MaintenanceKindCategories.Unplanned),
+            ])
+        {
+            Default = "Periodic",
+        },
     ];
 
     IReadOnlyList<LookupDefinition> IModule.Lookups => FleetLookupDefinitions.All;
@@ -109,12 +157,14 @@ public sealed class FleetModule : IModule
     IReadOnlyList<SharedRecordAccess> IModule.SharedRecordAccess { get; } =
     [
         new(SharedEntities.Party, Permissions.VehiclesRead),
+        new(SharedEntities.Party, Permissions.MaintenanceRead),
     ];
 
     /// <summary>Firmanın nerede kullanıldığı (silme ve birleştirme koruması).</summary>
     IReadOnlyList<SharedRecordReference> IModule.SharedRecordReferences { get; } =
     [
         new(SharedEntities.Party, Entities.Vehicle, "carrierPartyId", "araç (taşıyıcı)"),
+        new(SharedEntities.Party, Entities.Maintenance, "supplierPartyId", "bakım kaydı (servis)"),
     ];
 
     /// <summary>Araç formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>
@@ -128,7 +178,7 @@ public sealed class FleetModule : IModule
     {
         Entities =
         [
-            new(Entities.Vehicle, "Araç", Permissions.VehiclesRead),
+            new(Entities.Vehicle, "Araç", Permissions.VehiclesRead) { RecordSource = typeof(FleetAutomationRecordSource), LabelField = "plate" },
         ],
         Events =
         [
@@ -137,6 +187,7 @@ public sealed class FleetModule : IModule
         ],
         Fields =
         [
+            new(Entities.Vehicle, "plate", "Plaka", AutomationFieldType.Text),
             new(Entities.Vehicle, "status", "Durum", AutomationFieldType.Choice)
             {
                 Options = [new("active", "Etkin"), new("maintenance", "Bakımda"), new("passive", "Pasif")],
@@ -146,6 +197,11 @@ public sealed class FleetModule : IModule
                 Options = [new("owned", "Özmal"), new("leased", "Kiralık"), new("subcontracted", "Taşeron")],
             },
             new(Entities.Vehicle, "modelYear", "Model yılı", AutomationFieldType.Number),
+            new(Entities.Vehicle, AutomationFields.NextMaintenanceDate, "Sonraki bakım tarihi", AutomationFieldType.Date)
+            {
+                Hint = "Bakımı yaklaşan araçlar için (tarihe kala tetikleyicisi); en son bakım kaydından gelir.",
+            },
+            new(Entities.Vehicle, "odometerKm", "Kilometre", AutomationFieldType.Number),
         ],
     };
 
@@ -154,14 +210,16 @@ public sealed class FleetModule : IModule
         new(
             "fleet.manager",
             "Filo sorumlusu",
-            "Araçları ve dorseleri görüntüler, ekler ve düzenler.",
-            [Permissions.VehiclesRead, Permissions.VehiclesWrite]),
+            "Araçları, dorseleri ve bakım kayıtlarını görüntüler, ekler ve düzenler.",
+            [Permissions.VehiclesRead, Permissions.VehiclesWrite, Permissions.MaintenanceRead, Permissions.MaintenanceWrite]),
     ];
 
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<FleetStoreContext>();
         services.AddScoped<IRecordStore, VehicleRecordStore>();
+        services.AddScoped<IRecordStore, MaintenanceRecordStore>();
+        services.AddScoped<FleetAutomationRecordSource>();
         services.AddScoped<IVehicleDirectory, VehicleDirectory>();
     }
 }

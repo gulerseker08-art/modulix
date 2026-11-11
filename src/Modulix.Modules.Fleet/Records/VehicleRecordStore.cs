@@ -36,6 +36,12 @@ internal sealed partial class VehicleRecordStore(FleetStoreContext context) : Fl
         Field.Integer<Vehicle>("palletCapacity", v => v.PalletCapacity, (v, x) => v.PalletCapacity = x, 0, 100),
         Field.Choice<Vehicle>("status", Vehicle.Statuses.All, v => v.Status, (v, x) => v.Status = x),
         Field.Text<Vehicle>("notes", Vehicle.NotesMaxLength, v => v.Notes, (v, x) => v.Notes = x),
+
+        // Bakım kayıtlarından türetilir (dilim 1b); genel uçtan gelen değer yok sayılır.
+        Field.Computed<Vehicle>("lastMaintenanceOn", v => Day(v.LastMaintenanceOn)),
+        Field.Computed<Vehicle>("odometerKm", v => v.OdometerKm is { } km ? JsonValue.Create(km) : null),
+        Field.Computed<Vehicle>("nextMaintenanceDate", v => Day(v.NextMaintenanceDate)),
+        Field.Computed<Vehicle>("nextMaintenanceKm", v => v.NextMaintenanceKm is { } km ? JsonValue.Create(km) : null),
     ];
 
     protected override IReadOnlyDictionary<string, RecordFilter<Vehicle>> Filters { get; } = new Dictionary<string, RecordFilter<Vehicle>>
@@ -44,13 +50,16 @@ internal sealed partial class VehicleRecordStore(FleetStoreContext context) : Fl
         ["ownership"] = (q, v) => Vehicle.Ownerships.All.Contains(v) ? q.Where(x => x.Ownership == v) : null,
         ["kindKey"] = (q, v) => v.Length is > 0 and <= 100 ? q.Where(x => x.KindKey == v) : null,
         ["carrierPartyId"] = (q, v) => FilterValue.Id(v) is { } id ? q.Where(x => x.CarrierPartyId == id) : null,
+
+        // Bakımı yaklaşan ya da geciken araçlar: sonraki bakım tarihi bu güne kadar olanlar (dilim 1b).
+        ["maintenanceDueBy"] = (q, v) => FilterValue.Day(v) is { } day ? q.Where(x => x.NextMaintenanceDate != null && x.NextMaintenanceDate <= day) : null,
     };
 
     protected override IOrderedQueryable<Vehicle> Order(IQueryable<Vehicle> source) => source.OrderBy(v => v.Plate);
 
     // Liste başlıklarına göre sıralama (sort=plate, sort=-plate ...); eşit kayıtlar plakaya göre sıralanır.
     protected override IReadOnlyCollection<string>? SortKeys { get; } =
-        WithDescending("plate", "kindKey", "ownership", "brand", "modelYear", "payloadKg", "status", "createdAt");
+        WithDescending("plate", "kindKey", "ownership", "brand", "modelYear", "payloadKg", "status", "nextMaintenanceDate", "createdAt");
 
     protected override IOrderedQueryable<Vehicle> Order(IQueryable<Vehicle> source, string? sort)
     {
@@ -64,6 +73,7 @@ internal sealed partial class VehicleRecordStore(FleetStoreContext context) : Fl
             "modelYear" => ByNullsLast(source, v => v.ModelYear, desc).ThenBy(v => v.Plate),
             "payloadKg" => ByNullsLast(source, v => v.PayloadKg, desc).ThenBy(v => v.Plate),
             "status" => By(source, v => v.Status, desc).ThenBy(v => v.Plate),
+            "nextMaintenanceDate" => ByNullsLast(source, v => v.NextMaintenanceDate, desc).ThenBy(v => v.Plate),
             "createdAt" => By(source, v => v.CreatedAt, desc).ThenBy(v => v.Plate),
             _ => Order(source),
         };
@@ -135,6 +145,8 @@ internal sealed partial class VehicleRecordStore(FleetStoreContext context) : Fl
 
     protected override Task BeforeDeleteAsync(Vehicle entity, CancellationToken cancellationToken) =>
         throw new RecordConflictException("Araçlar silinmez; kullanım dışı aracın durumunu \"Pasif\" yapın.");
+
+    private static JsonNode? Day(DateOnly? day) => day is { } d ? JsonValue.Create(d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null;
 
     /// <summary>Plaka ve şasi numarası boşluksuz, büyük harfle saklanır ve aranır ("34 abc 123" = "34ABC123").</summary>
     internal static string Normalize(string value) =>

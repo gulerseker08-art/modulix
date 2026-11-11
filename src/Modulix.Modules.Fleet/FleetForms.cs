@@ -39,5 +39,27 @@ public static class FleetForms
             new("palletCapacity", "Palet kapasitesi", "yuk", 3),
             new("notes", "Notlar", "notlar", 12),
         ]),
+
+        new(FleetModule.Entities.Maintenance, "Bakım kaydı",
+        [new(General, "Genel bilgiler"), new("plan", "Sonraki bakım ve notlar")],
+        [
+            new("bakim", "Bakım", "wrench"),
+            new("maliyet", "Servis ve maliyet", "wallet"),
+            new("sonraki", "Sonraki bakım", "calendar", Tab: "plan"),
+            new("aciklama", "Açıklama", "message-square", Tab: "plan"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "plan"),
+        ],
+        [
+            new("vehicleId", "Araç", "bakim", 6, Required: true, Fixed: true),
+            new("kindKey", "Bakım türü", "bakim", 6, Required: true, Fixed: true),
+            new("performedOn", "Bakım tarihi", "bakim", 6, Required: true, Fixed: true),
+            new("odometerKm", "Kilometre", "bakim", 6),
+            new("supplierPartyId", "Servis firması", "maliyet", 12),
+            new("cost", "Tutar", "maliyet", 8),
+            new("currency", "Para birimi", "maliyet", 4),
+            new("nextDueDate", "Sonraki bakım tarihi", "sonraki", 6),
+            new("nextDueKm", "Sonraki bakım kilometresi", "sonraki", 6),
+            new("description", "Açıklama", "aciklama", 12),
+        ]),
     ];
 }

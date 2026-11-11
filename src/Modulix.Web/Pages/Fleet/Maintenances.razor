@@ -1,0 +1,290 @@
+@page "/filo/bakimlar"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Bakım kayıtları · Modulix</PageTitle>
+
+<AuthGate Module="@FleetAccess.ModuleKey" Permission="@FleetAccess.MaintenanceRead">
+    <PageHeader Title="Bakım kayıtları" Icon="wrench" Subtitle="@(page is null ? "Araçların bakım ve onarımlarını izleyin; sonraki bakım araç kartına yansır." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <MaintenanceEditor Record="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Bakım görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Bakım ara" placeholder="Plaka veya açıklama ara" @bind="search" />
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(FleetAccess.MaintenanceWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni bakım</button>
+        }
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="Bakım türü" @bind="kindKey" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm türler</option>
+                @foreach (var kind in Lookups.ValuesOf(FleetAccess.MaintenanceKindList))
+                {
+                    <option value="@kind.Key">@kind.Label</option>
+                }
+            </select>
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan bakım kaydı yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) bakım kaydı listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Bakım kayıtları</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var record in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, record)
+                        }
+                        <td class="row-menu-cell">
+                            @if (Session.Can(FleetAccess.MaintenanceWrite))
+                            {
+                                <RowMenu Label="@($"{PlateOf(record)} bakımı eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(record)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + FleetAccess.MaintenanceEntityKey;
+
+    private const string AllViews = "all";
+    private const string Last30View = "last30";
+    private const string ThisYearView = "year";
+
+    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (MaintenanceRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("performedOn", "Tarih", "calendar", "performedOn", "-performedOn", Locked: true),
+        new("vehicle", "Araç", "truck"),
+        new("kindKey", "Tür", "wrench", "kindKey", "-kindKey"),
+        new("odometerKm", "Kilometre", "hash", "odometerKm", "-odometerKm"),
+        new("supplier", "Servis", "building"),
+        new("cost", "Tutar", "wallet", "cost", "-cost"),
+        new("nextDueDate", "Sonraki bakım", "clock", "nextDueDate", "-nextDueDate"),
+    ];
+
+    private readonly GridViewState grid = new("fleet.maintenance", "-performedOn");
+    private readonly Dictionary<Guid, string> vehicleNames = [];
+    private readonly Dictionary<Guid, string> supplierNames = [];
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private bool filtersOpen;
+    private string? message;
+    private string? search;
+    private string view = AllViews;
+    private string? performedFrom;
+    private string kindKey = "";
+
+    private int ActiveFilters => kindKey.Length > 0 ? 1 : 0;
+
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "fleet.maintenance");
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(FleetAccess.MaintenanceRead))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(FleetAccess.MaintenanceEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm bakımlar", Icon: "wrench"),
+        new(Last30View, "Son 30 gün", Icon: "clock"),
+        new(ThisYearView, "Bu yıl", Icon: "calendar"),
+        .. views.Options,
+    ];
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            performedFrom = filters.GetValueOrDefault("performedFrom");
+            kindKey = filters.GetValueOrDefault("kindKey") ?? "";
+        }
+        else
+        {
+            grid.Reset();
+            performedFrom = key switch
+            {
+                Last30View => Today.AddDays(-30).ToString("yyyy-MM-dd"),
+                ThisYearView => new DateOnly(Today.Year, 1, 1).ToString("yyyy-MM-dd"),
+                _ => null,
+            };
+            kindKey = "";
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(
+        performedFrom is { } p ? ("performedFrom", p) : null, kindKey.Length > 0 ? ("kindKey", kindKey) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (performedFrom is { } from)
+        {
+            url += $"&performedFrom={from}";
+        }
+
+        if (kindKey.Length > 0)
+        {
+            url += $"&kindKey={Uri.EscapeDataString(kindKey)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            await WarehouseLabels.ResolveNamesAsync(Api, FleetAccess.MaintenanceVehicleLookup, page.Items.Select(m => WarehouseLabels.Id(m, "vehicleId")).OfType<Guid>(), vehicleNames);
+            await WarehouseLabels.ResolveNamesAsync(Api, FleetAccess.MaintenanceSupplierLookup, page.Items.Select(m => WarehouseLabels.Id(m, "supplierPartyId")).OfType<Guid>(), supplierNames);
+        }
+    }
+
+    private string PlateOf(RecordResponse record) => WarehouseLabels.NameOf(vehicleNames, WarehouseLabels.Id(record, "vehicleId"));
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse record) => @<td data-label="@column.Label" class="@(column.Key == "performedOn" ? "primary" : null)">@CellContent(column.Key, record)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse record) => key switch
+    {
+        "performedOn" => @<text>@(FleetLabels.Day(WarehouseLabels.Text(record, "performedOn")) is { } d ? FleetLabels.Date(d) : "—")</text>,
+        "vehicle" => @<text>@PlateOf(record)</text>,
+        "kindKey" => @<span class="badge @FleetLabels.MaintenanceBadge(Lookups.CategoryOf(FleetAccess.MaintenanceKindList, WarehouseLabels.Text(record, "kindKey")))">@Lookups.Label(FleetAccess.MaintenanceKindList, WarehouseLabels.Text(record, "kindKey"))</span>,
+        "odometerKm" => @<text>@FleetLabels.Km(record.Values["odometerKm"]?.GetValue<int>())</text>,
+        "supplier" => @<text>@(WarehouseLabels.Id(record, "supplierPartyId") is { } supplier ? WarehouseLabels.NameOf(supplierNames, supplier) : "—")</text>,
+        "cost" => @<text>@FleetLabels.Money(record.Values["cost"]?.GetValue<decimal>(), WarehouseLabels.Text(record, "currency"))</text>,
+        "nextDueDate" => NextDue(record),
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(FleetAccess.MaintenanceEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, record.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private RenderFragment NextDue(RecordResponse record)
+    {
+        var (badge, text) = FleetLabels.Due(FleetLabels.Day(WarehouseLabels.Text(record, "nextDueDate")), Today);
+        return @<span class="badge @badge">@text</span>;
+    }
+
+    private void Open(RecordResponse? record)
+    {
+        selected = record;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

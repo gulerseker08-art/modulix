@@ -184,6 +184,7 @@
   "nav.app.warehouse.regime-bindings": "Regime profiles",
   "nav.app.fleet": "Fleet",
   "nav.app.fleet.vehicles": "Vehicles",
+  "nav.app.fleet.maintenance": "Maintenance records",
   "nav.app.reports": "Reports",
   "nav.app.admin": "Administration",
   "nav.app.admin.home": "Overview",

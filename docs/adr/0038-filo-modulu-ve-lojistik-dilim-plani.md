@@ -155,3 +155,20 @@ Dilim 1 iki parçaya bölündü: **1a** Filo modülü, araç ve dorse kaydı, `I
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69 / 120: referans kuralı, modül kaydı, otomasyon tarafsızlığı; menü testi (Filo yalnızca modül ve izinle görünür) |
 
 Yerel veritabanında `TableInventoryTests` başka bir oturumdan kalan `platform.LicensePolicies` tablosu yüzünden düşer (bu dalın migration'larında yok); CI temiz veritabanında koşar.
+
+## 11. Dilim 1b: Bakım kaydı ve sonraki bakım (11 Kasım 2026)
+
+- **Bakım kaydı (`fleet.MaintenanceRecords`, `ICompanyShared`):** araç (yalnızca oluştururken; `(TenantId, VehicleId)` yabancı anahtarıyla), bakım türü (Y9b listesi `fleet.maintenance-kind`, kategori `planned`/`unplanned`; hazır değerler periyodik bakım, lastik, muayene hazırlığı, arıza onarımı, hasar onarımı), bakım tarihi (ileri gün olamaz; plan "sonraki bakım" alanına yazılır), kilometre, servis firması (`core.Party`, rol süzgeci yok; servis/tedarikçi rolleri katalogda netleşince eklenir, K4), tutar + para birimi (tutar varsa zorunlu, ödeme finans işidir), sonraki bakım tarihi ve kilometresi (bakımdan sonra / büyük), açıklama, özel alanlar. Düzeltme için silinebilir (K12 araç, sefer ve masrafı kapsar; bakım kaydı kapsamaz).
+- **Türetilmiş araç alanları:** `LastMaintenanceOn`, `OdometerKm` (bakımlardaki en yüksek km), `NextMaintenanceDate`, `NextMaintenanceKm` en son bakımdan (tarih, sonra kayıt anı) hesaplanır; bakım kaydı oluşturma, düzeltme ve silmede aynı işlemde yeniden yazılır (depodaki defter → bakiye kalıbı). Araç kaydında salt okunur hesaplanmış alanlardır; genel uçtan gelen değer yok sayılır. Bu türetilmiş yazım araç sürümünü artırır, denetim kaydına araç değişikliği olarak yazılmaz (kaynak bakım kaydı denetlenir).
+- **Otomasyon:** `fleet.vehicle` varlığına tarama kaynağı (`FleetAutomationRecordSource`: zamanlanmış = pasif olmayan araçlar, tarihe göre = `nextMaintenanceDate`) ve `plate`, `nextMaintenanceDate`, `odometerKm` alanları eklendi; "bakıma 7 gün kala" kuralı koda değil firmanın kuralına yazılır (eşik gün sayısı tenant kararı).
+- **Arayüz:** "Bakım kayıtları" ekranı (`/filo/bakimlar`, grid şablonu: Tüm bakımlar, Son 30 gün, Bu yıl, kişisel görünüm; tür süzgeci; sonraki bakım rozeti gecikti/yaklaşıyor/ileride), sekmeli bakım kartı; araç listesinde "Sonraki bakım" sütunu ve "Bakımı yaklaşan" görünümü (30 gün içinde ya da gecikmiş; görsel eşik), araç kartı özetinde kilometre ve sonraki bakım. Yeni CSS sınıfı ya da token yok. Migration `FleetMaintenance` (araç kolonları null'lanabilir, yeni tablo + RLS).
+
+**Bilerek yapılmadı:** kilometreye göre hatırlatma (sayaç okuması/telematik yok; km yalnızca bakımda girilir), bakım planı şablonları (araç türüne göre periyot), bakım belgesi/fatura dosyası (Ç4), bakım maliyetinin kârlılığa girmesi (dilim 9), servis firması rol süzgeci.
+
+### Test sonuçları (Dilim 1b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Fleet.Tests` | 7: tür listeleri ve kategorileri, iki sekmeli varsayılan form, lookup hedefleri ve yalnızca taşıyıcıda rol süzgeci, sonraki bakım tarihi kural alanı + tarama kaynağı, Shared sabitleri |
+| `dotnet test tests/Modulix.IntegrationTests --filter "FleetMaintenanceTests\|FleetVehicleTests"` (SQL Server; CI koşar) | 10: mutlu yol (türetilmiş araç alanları, türetilmiş alan formdan yazılamaz, silmede önceki bakıma dönüş, "bakımı yaklaşan" süzgeci, arama, denetim kaydı; **bakıma 7 gün kala kuralı taramayla yalnızca eşleşen aracı bulur**), doğrulama (zorunlu alan, tarih/km tutarlılığı, para birimi, ileri tarih, araç değiştirilemez), tenant izolasyonu (başka tenant'ın aracına bakım yazılamaz, kayıt görünmez ve silinemez), yetki (okuyan yazamaz, araç izni bakım ekranını açmaz) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69 / 120: menüde bakım ekranı yalnızca bakım okuma izniyle |

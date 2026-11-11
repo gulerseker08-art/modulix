@@ -44,41 +44,64 @@ public class FleetModuleTests
     }
 
     [Fact]
-    public void Vehicle_kinds_are_categorised_as_powered_or_towed_and_the_default_exists()
+    public void Vehicle_and_maintenance_kinds_are_categorised_and_their_defaults_exist()
     {
-        var list = Assert.Single(Module.ChoiceLists);
+        var kinds = Assert.Single(Module.ChoiceLists, l => l.Key == FleetModule.Lists.VehicleKind);
+        Assert.Equal([FleetModule.VehicleKindCategories.Powered, FleetModule.VehicleKindCategories.Towed], kinds.Categories.Select(c => c.Key));
+        Assert.Contains(kinds.Values, v => v.Category == FleetModule.VehicleKindCategories.Towed); // dorse ayrı tablo değil, araç türüdür
 
-        Assert.Equal(FleetModule.Lists.VehicleKind, list.Key);
-        Assert.Equal([FleetModule.VehicleKindCategories.Powered, FleetModule.VehicleKindCategories.Towed], list.Categories.Select(c => c.Key));
-        Assert.All(list.Values, v => Assert.Contains(v.Category, list.Categories.Select(c => c.Key)));
-        Assert.Contains(list.Values, v => v.Key == list.Default);
-        Assert.Contains(list.Values, v => v.Category == FleetModule.VehicleKindCategories.Towed); // dorse ayrı tablo değil, araç türüdür
+        var maintenance = Assert.Single(Module.ChoiceLists, l => l.Key == FleetModule.Lists.MaintenanceKind);
+        Assert.Equal(
+            [FleetModule.MaintenanceKindCategories.Planned, FleetModule.MaintenanceKindCategories.Unplanned], maintenance.Categories.Select(c => c.Key));
+
+        Assert.All(Module.ChoiceLists, list =>
+        {
+            Assert.All(list.Values, v => Assert.Contains(v.Category, list.Categories.Select(c => c.Key)));
+            Assert.Contains(list.Values, v => v.Key == list.Default);
+        });
     }
 
     [Fact]
-    public void The_default_vehicle_form_has_several_tabs_and_keeps_identity_on_the_first_tab()
+    public void Default_forms_have_several_tabs_and_keep_identity_on_the_first_tab()
     {
-        var form = Assert.Single(FleetForms.All);
-
-        Assert.True(form.Tabs.Count >= 2);
-        Assert.Equal("genel", form.Tabs[0].Key);
-        Assert.All(form.Tabs, tab => Assert.Contains(form.Sections, s => s.Tab == tab.Key));
-        Assert.Contains(form.Sections, s => s.Key == FormDefinition.ExtrasSection);
-        var firstTab = form.Sections.Where(s => s.Tab == form.Tabs[0].Key).Select(s => s.Key).ToHashSet();
-        Assert.All(form.Fields.Where(f => f is { Required: true, Fixed: true }), f => Assert.Contains(f.Section, firstTab));
-        Assert.All(form.Fields, f => Assert.Contains(f.Span, FormSpans.Allowed));
-        Assert.Contains(form.EntityKey, Module.CustomizableEntities.Select(c => c.EntityKey));
+        Assert.Equal([FleetModule.Entities.Vehicle, FleetModule.Entities.Maintenance], FleetForms.All.Select(f => f.EntityKey));
+        foreach (var form in FleetForms.All)
+        {
+            Assert.True(form.Tabs.Count >= 2, form.EntityKey);
+            Assert.Equal("genel", form.Tabs[0].Key);
+            Assert.All(form.Tabs, tab => Assert.Contains(form.Sections, s => s.Tab == tab.Key));
+            Assert.Contains(form.Sections, s => s.Key == FormDefinition.ExtrasSection);
+            var firstTab = form.Sections.Where(s => s.Tab == form.Tabs[0].Key).Select(s => s.Key).ToHashSet();
+            Assert.All(form.Fields.Where(f => f is { Required: true, Fixed: true }), f => Assert.Contains(f.Section, firstTab));
+            Assert.All(form.Fields, f => Assert.Contains(f.Span, FormSpans.Allowed));
+            Assert.Contains(form.EntityKey, Module.CustomizableEntities.Select(c => c.EntityKey));
+        }
     }
 
     [Fact]
-    public void Carrier_lookup_is_limited_to_parties_with_the_carrier_role()
+    public void Lookups_point_at_vehicles_or_parties_and_only_the_carrier_is_role_filtered()
     {
-        var lookup = Assert.Single(Module.Lookups);
+        Assert.All(Module.Lookups, lookup =>
+        {
+            Assert.StartsWith(FleetModule.ModuleKey + ".", lookup.Key, StringComparison.Ordinal);
+            Assert.Contains(lookup.TargetEntityKey, new[] { SharedEntities.Party, FleetModule.Entities.Vehicle });
+        });
 
-        Assert.Equal(SharedEntities.Party, lookup.TargetEntityKey);
-        Assert.Equal("relationshipRole", lookup.FixedFilterName);
-        Assert.Equal(FleetModule.RelationshipRoles.Carrier, lookup.FixedFilterValue);
-        Assert.Contains(Module.SharedRecordReferences, r => r.Field == "carrierPartyId");
+        var carrier = Assert.Single(Module.Lookups, l => l.FixedFilterName is not null);
+        Assert.Equal(FleetLookupDefinitions.VehicleCarrier, carrier.Key);
+        Assert.Equal("relationshipRole", carrier.FixedFilterName);
+        Assert.Equal(FleetModule.RelationshipRoles.Carrier, carrier.FixedFilterValue);
+        Assert.Equal(["carrierPartyId", "supplierPartyId"], Module.SharedRecordReferences.Select(r => r.Field));
+    }
+
+    [Fact]
+    public void Next_maintenance_date_is_a_date_rule_field_with_a_scan_source()
+    {
+        var catalog = ModuleCatalog.Create(new FleetModule());
+
+        Assert.Equal(AutomationFieldType.Date, catalog.FindAutomationField("fleet.vehicle.nextMaintenanceDate")!.Type);
+        Assert.NotNull(catalog.FindAutomationEntity(FleetModule.Entities.Vehicle)!.Value.Entity.RecordSource);
+        Assert.Null(catalog.FindAutomationEntity(FleetModule.Entities.Maintenance)); // bakım kaydına kural yazılmaz; araç alanı yeter
     }
 
     [Fact]
@@ -87,10 +110,17 @@ public class FleetModuleTests
         Assert.Equal(FleetModule.ModuleKey, FleetAccess.ModuleKey);
         Assert.Equal(FleetModule.Permissions.VehiclesRead, FleetAccess.VehiclesRead);
         Assert.Equal(FleetModule.Permissions.VehiclesWrite, FleetAccess.VehiclesWrite);
+        Assert.Equal(FleetModule.Permissions.MaintenanceRead, FleetAccess.MaintenanceRead);
+        Assert.Equal(FleetModule.Permissions.MaintenanceWrite, FleetAccess.MaintenanceWrite);
         Assert.Equal(FleetModule.Entities.Vehicle, FleetAccess.VehicleEntityKey);
+        Assert.Equal(FleetModule.Entities.Maintenance, FleetAccess.MaintenanceEntityKey);
         Assert.Equal(FleetModule.Lists.VehicleKind, FleetAccess.VehicleKindList);
+        Assert.Equal(FleetModule.Lists.MaintenanceKind, FleetAccess.MaintenanceKindList);
         Assert.Equal(FleetLookupDefinitions.VehicleCarrier, FleetAccess.VehicleCarrierLookup);
+        Assert.Equal(FleetLookupDefinitions.MaintenanceVehicle, FleetAccess.MaintenanceVehicleLookup);
+        Assert.Equal(FleetLookupDefinitions.MaintenanceSupplier, FleetAccess.MaintenanceSupplierLookup);
         Assert.Equal(FleetModule.VehicleKindCategories.Towed, FleetAccess.KindTowed);
+        Assert.Equal(FleetModule.MaintenanceKindCategories.Unplanned, FleetAccess.MaintenanceUnplanned);
         Assert.Equal(Vehicle.Ownerships.All, FleetAccess.Ownerships.Select(o => o.Key));
         Assert.Equal(Vehicle.Statuses.All, FleetAccess.Statuses.Select(s => s.Key));
         Assert.Equal(Vehicle.Ownerships.Subcontracted, FleetAccess.Subcontracted);
