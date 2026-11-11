@@ -169,6 +169,9 @@ public sealed class CoreModule : IModule
         /// <summary>İçe aktarma tasarımı (ADR-0033); kaydın kimliği firmanın tasarım satırının kimliğidir.</summary>
         public const string ImportDesign = "core.import-design";
 
+        /// <summary>Kayda bağlı dosya (ADR-0040); kaydın kimliği dosyanın kimliğidir.</summary>
+        public const string File = "core.file";
+
         public const string Membership = "core.membership";
 
         /// <summary>İşletici şirket (ADR-0008): ad ve varsayılan olup olmadığı; kaydın kimliği şirketin kimliğidir.</summary>
@@ -320,6 +323,11 @@ public sealed class CoreModule : IModule
 
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
     [
+        new(AuditedEntityKeys.File, "Dosya", null, new Dictionary<string, string>
+        {
+            ["fileName"] = "Dosya adı", ["contentType"] = "Tür", ["sizeBytes"] = "Boyut (bayt)", ["sha256"] = "SHA-256 özeti",
+            ["entityKey"] = "Bağlı kayıt türü", ["recordId"] = "Bağlı kayıt",
+        }, "fileName"),
         new(AuditedEntityKeys.ImportDesign, "İçe aktarma tasarımı", null, new Dictionary<string, string>
         {
             ["entityKey"] = "Kayıt türü", ["enabled"] = "Açık", ["runAutomation"] = "Kurallar ve atama e-postaları çalışır",
@@ -638,6 +646,7 @@ public sealed class CoreModule : IModule
         // Kalıcı akışın bekleme adımları ve yayın denetimleri (Dilim 4c-4).
         services.AddScoped<FlowWaitAction>();
         services.AddScoped<FlowAwaitApprovalAction>();
+        services.AddScoped<FlowStopAction>();
         services.AddScoped<IAutomationStepCheck, FlowWaitCheck>();
         services.AddScoped<IAutomationStepCheck, FlowAwaitApprovalCheck>();
     }

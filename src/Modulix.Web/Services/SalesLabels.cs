@@ -13,6 +13,10 @@ public static class SalesAccess
     public const string TargetsManage = CrmAccess.SalesTargetsManage;
     public const string ForecastsRead = CrmAccess.ForecastsRead;
     public const string ForecastsWrite = CrmAccess.ForecastsWrite;
+
+    /// <summary>CRM panosunun "Benim günüm" sekmesi: bunlardan biri yeterlidir (sunucudaki <c>MyDayRules.AccessPermissions</c> ile aynı). Hedef merkezi <see cref="ReportsRead"/> ister.</summary>
+    public static readonly IReadOnlyList<string> MyDayAny =
+        [CrmAccess.SalesReportsRead, CrmAccess.OpportunitiesRead, CrmAccess.LeadsRead, CrmAccess.QuotesRead, CrmAccess.ActivitiesRead];
 }
 
 /// <summary>Satış raporlama ve tahmin ekranlarının Türkçe etiketleri ve gösterim yardımcıları. Hesap sunucudadır; burada yalnızca biçim vardır.</summary>

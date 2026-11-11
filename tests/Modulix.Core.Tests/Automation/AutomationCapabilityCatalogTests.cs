@@ -9,7 +9,7 @@ namespace Modulix.Core.Tests.Automation;
 
 public class AutomationCapabilityCatalogTests
 {
-    private static readonly string[] CoreActions = [ApprovalAutomation.RequestAction, FlowAutomation.WaitAction, FlowAutomation.AwaitApprovalAction];
+    private static readonly string[] CoreActions = [ApprovalAutomation.RequestAction, FlowAutomation.WaitAction, FlowAutomation.AwaitApprovalAction, FlowAutomation.StopAction];
 
     private static Action Build(AutomationCapabilities capabilities) => () => Catalog(capabilities);
 

@@ -212,7 +212,8 @@
         var week = Uri.EscapeDataString(ActivityLabels.Range(weekFrom, weekTo));
 
         var dayTask = Api.GetAsync<MyDayDto>("/api/crm/my-day");
-        var targetTask = Session.User is { } user
+        // Kişisel hedef satış raporu iznine bağlıdır; izni olmayan temsilcide kart gösterilmez.
+        var targetTask = Session.User is { } user && Session.Can(SalesAccess.ReportsRead)
             ? Api.GetAsync<SalesOverviewDto>($"/api/crm/sales/overview?kind={SalesPeriodKinds.Quarter}&ownerId={user.UserId}")
             : null;
         if (Session.Can(CrmAccess.ActivitiesRead))

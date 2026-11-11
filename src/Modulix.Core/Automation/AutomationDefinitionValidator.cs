@@ -216,6 +216,12 @@ public sealed partial class AutomationDefinitionValidator(
                 issues.Add(new(path, "Adım kimliği küçük harf, rakam ve tire içermeli (en çok 40 karakter) ve kuralda tekil olmalı."));
             }
 
+            // Adım koşulu (Dilim 4c-5) adıma sıra gelince güncel kayıtla değerlendirilir: olayın farkı yoktur, eski değer/değişiklik kullanılamaz.
+            if (step.When is not null)
+            {
+                issues.AddRange(ConditionValidator.Validate(step.When, fields, ConditionOptions.StepCondition, $"{path}.when"));
+            }
+
             var view = await catalog.FindActionAsync(step.Action, cancellationToken);
             if (view is null)
             {

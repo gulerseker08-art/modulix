@@ -124,6 +124,8 @@ public static class AutomationRuleIdentity
         Walk(definition.Condition);
         foreach (var step in definition.Actions)
         {
+            // Adım koşulunun (Dilim 4c-5) okuduğu alanlar da kuralın kimliğine girer.
+            Walk(step.When);
             if (modules.FindAutomationAction(step.Action) is { } found)
             {
                 permissions.UnionWith(found.Action.Definition.RequiredPermissions);

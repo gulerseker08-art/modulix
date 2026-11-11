@@ -11,6 +11,11 @@ public readonly record struct ConditionOptions(bool AllowOld, bool AllowChange)
     public static ConditionOptions Current { get; } = new(false, false);
 
     public static ConditionOptions WithChanges { get; } = new(true, true);
+
+    /// <summary>Adım koşulu (dallanma, Dilim 4c-5): güncel kayda bakar; eski değer ve değişiklik yok, iletiler adıma göre yazılır.</summary>
+    public static ConditionOptions StepCondition { get; } = new(false, false) { Step = true };
+
+    public bool Step { get; init; }
 }
 
 /// <summary>Koşul ağacının yapısal ve tip doğrulaması (saf; veritabanı bilmez). Sorunların hepsini toplar.</summary>
@@ -25,7 +30,9 @@ public static class ConditionValidator
     private static readonly AutomationOperator[] CountOperators =
         [AutomationOperator.Eq, AutomationOperator.Ne, AutomationOperator.Gt, AutomationOperator.Gte, AutomationOperator.Lt, AutomationOperator.Lte];
 
-    public static IReadOnlyList<AutomationIssue> Validate(ConditionNode? node, AutomationFieldSet fields, ConditionOptions options)
+    /// <param name="path">Sorunların yolu: kural koşulu için <c>condition</c>, adım koşulu için <c>actions[i].when</c>.</param>
+    public static IReadOnlyList<AutomationIssue> Validate(
+        ConditionNode? node, AutomationFieldSet fields, ConditionOptions options, string path = "condition")
     {
         var issues = new List<AutomationIssue>();
         if (node is null)
@@ -34,10 +41,10 @@ public static class ConditionValidator
         }
 
         var leaves = 0;
-        Walk(node, fields, options, "condition", depth: 1, allowRelation: true, issues, ref leaves);
+        Walk(node, fields, options, path, depth: 1, allowRelation: true, issues, ref leaves);
         if (leaves > MaxLeaves)
         {
-            issues.Add(new("condition", $"Koşul en çok {MaxLeaves} satır içerebilir."));
+            issues.Add(new(path, $"Koşul en çok {MaxLeaves} satır içerebilir."));
         }
 
         return issues;
@@ -148,13 +155,17 @@ public static class ConditionValidator
 
         if (AutomationOperators.IsChange(leaf.Operator) && !options.AllowChange)
         {
-            issues.Add(new(path, "Değişiklik koşulları yalnızca kayıt güncelleme tetikleyicilerinde (alan değişince, durum geçişi) kullanılabilir."));
+            issues.Add(new(path, options.Step
+                ? "Adım koşulu kaydın güncel değerine bakar; değişiklik koşulları yalnızca kuralın koşulunda kullanılabilir."
+                : "Değişiklik koşulları yalnızca kayıt güncelleme tetikleyicilerinde (alan değişince, durum geçişi) kullanılabilir."));
             return;
         }
 
         if (leaf.Source == AutomationValueSource.Old && !options.AllowOld)
         {
-            issues.Add(new(path, "Eski değer yalnızca kayıt güncelleme tetikleyicilerinde (alan değişince, durum geçişi) kullanılabilir."));
+            issues.Add(new(path, options.Step
+                ? "Adım koşulu kaydın güncel değerine bakar; eski değer yalnızca kuralın koşulunda kullanılabilir."
+                : "Eski değer yalnızca kayıt güncelleme tetikleyicilerinde (alan değişince, durum geçişi) kullanılabilir."));
         }
 
         var (min, max) = AutomationOperators.ValueCount(leaf.Operator);

@@ -67,6 +67,16 @@ public sealed record MyDayResult(
 /// <summary>Öneri ve "bu ay kapanabilecekler" kuralları; saf fonksiyonlar (birim testli).</summary>
 public static class MyDayRules
 {
+    /// <summary>
+    /// "Benim günüm" için bunlardan biri yeterlidir (satış raporu izni gerekmez): kullanıcı yalnızca kendi kayıtlarını görür, bölümler ayrıca kendi
+    /// okuma iznine bağlıdır. Arayüzdeki karşılığı <c>SalesAccess.MyDayAny</c>.
+    /// </summary>
+    public static IReadOnlyList<string> AccessPermissions { get; } =
+    [
+        CrmModule.Permissions.SalesReportsRead, CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.LeadsRead,
+        CrmModule.Permissions.QuotesRead, CrmModule.Permissions.ActivitiesRead,
+    ];
+
     public const int SuggestionLimit = 5;
     public const int ClosingLimit = 5;
 
