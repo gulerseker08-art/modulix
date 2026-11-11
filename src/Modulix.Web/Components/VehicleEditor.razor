@@ -1,0 +1,308 @@
+@* Araç ekleme/düzenleme formu; Araçlar ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Kayıt genel kayıt
+   uçlarından (/api/records/fleet.vehicle) yapılır. Plaka biçimi, plaka/şasi benzersizliği ve taşeron araçta "Taşıyıcı" rollü firma
+   kuralı sunucudadır; ileti alanın altında gösterilir. Araç silinmez, durumu "Pasif" yapılır (ADR-0038 K12). *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Vehicle is null ? "Yeni araç" : "Araç kartı")</h2>
+            @if (Vehicle is not null)
+            {
+                <p>@form.Plate · @Lookups.Label(FleetAccess.VehicleKindList, form.KindKey)</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Araç özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="truck" Size="24" /></span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Plate) ? "Plaka" : form.Plate.ToUpperInvariant())</strong>
+                    <span class="summary-sub">@(string.IsNullOrEmpty(form.KindKey) ? "Araç türü" : Lookups.Label(FleetAccess.VehicleKindList, form.KindKey))</span>
+                </div>
+                <h3 class="summary-heading">Araç özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Mülkiyet</dt><dd>@FleetLabels.Ownership(form.Ownership)</dd></div>
+                    <div><dt>Durum</dt><dd>@FleetLabels.Status(form.Status)</dd></div>
+                    <div><dt>Kapasite</dt><dd>@FleetLabels.Capacity(form.PayloadKg, "kg")</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Araç formu bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "plate":
+                            <label class="@f.LabelClass()" for="vehicle-plate">@f.Label</label>
+                            <input id="vehicle-plate" class="form-control" maxlength="20" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Plate" />
+                            <FieldError Field="plate" Errors="errors" />
+                            <small class="text-muted">Boşluksuz büyük harfle saklanır (ör. 34ABC123); firmada benzersiz.</small>
+                            break;
+                        case "kindKey":
+                            <label class="@f.LabelClass()" for="vehicle-kind">@f.Label</label>
+                            <select id="vehicle-kind" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.KindKey">
+                                @foreach (var kind in Lookups.Choices(FleetAccess.VehicleKindList, form.KindKey))
+                                {
+                                    <option value="@kind.Key">@kind.Label</option>
+                                }
+                            </select>
+                            <FieldError Field="kindKey" Errors="errors" />
+                            <small class="text-muted">Dorse ve römork "çekilen araç" türüdür; türleri firma ayarlarından yönetebilirsiniz.</small>
+                            break;
+                        case "status":
+                            <label class="@f.LabelClass()" for="vehicle-status">@f.Label</label>
+                            <select id="vehicle-status" class="form-select" @bind="form.Status">
+                                @foreach (var (key, label) in FleetAccess.Statuses)
+                                {
+                                    <option value="@key">@label</option>
+                                }
+                            </select>
+                            <FieldError Field="status" Errors="errors" />
+                            <small class="text-muted">Araç silinmez; kullanım dışı aracı "Pasif" yapın.</small>
+                            break;
+                        case "ownership":
+                            <label class="@f.LabelClass()" for="vehicle-ownership">@f.Label</label>
+                            <select id="vehicle-ownership" class="form-select" @bind="form.Ownership" @bind:after="OwnershipChanged">
+                                @foreach (var (key, label) in FleetAccess.Ownerships)
+                                {
+                                    <option value="@key">@label</option>
+                                }
+                            </select>
+                            <FieldError Field="ownership" Errors="errors" />
+                            break;
+                        case "carrierPartyId":
+                            <label class="@f.LabelClass()" for="vehicle-carrier">@f.Label@(IsSubcontracted ? " *" : "")</label>
+                            <LookupPicker Id="vehicle-carrier" LookupKey="@FleetAccess.VehicleCarrierLookup" @bind-Value="form.CarrierPartyId" Required="IsSubcontracted" Disabled="@(!IsSubcontracted)" Placeholder="@(IsSubcontracted ? "Taşıyıcı firma seçin…" : "Yalnızca taşeron araçta")" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
+                            <FieldError Field="carrierPartyId" Errors="errors" />
+                            <small class="text-muted">Yalnızca "Taşıyıcı" rolündeki firmalar listelenir; rol firma kaydından verilir.</small>
+                            break;
+                        case "brand":
+                            <label class="@f.LabelClass()" for="vehicle-brand">@f.Label</label>
+                            <input id="vehicle-brand" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Brand" />
+                            <FieldError Field="brand" Errors="errors" />
+                            break;
+                        case "model":
+                            <label class="@f.LabelClass()" for="vehicle-model">@f.Label</label>
+                            <input id="vehicle-model" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Model" />
+                            <FieldError Field="model" Errors="errors" />
+                            break;
+                        case "modelYear":
+                            <label class="@f.LabelClass()" for="vehicle-year">@f.Label</label>
+                            <input id="vehicle-year" class="form-control" type="number" min="1950" max="2100" step="1" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ModelYear" />
+                            <FieldError Field="modelYear" Errors="errors" />
+                            break;
+                        case "vin":
+                            <label class="@f.LabelClass()" for="vehicle-vin">@f.Label</label>
+                            <input id="vehicle-vin" class="form-control" maxlength="17" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Vin" />
+                            <FieldError Field="vin" Errors="errors" />
+                            <small class="text-muted">17 karakter; verilirse firmada benzersiz.</small>
+                            break;
+                        case "payloadKg":
+                            <label class="@f.LabelClass()" for="vehicle-payload">@f.Label</label>
+                            <input id="vehicle-payload" class="form-control" type="number" min="0" step="0.01" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PayloadKg" />
+                            <FieldError Field="payloadKg" Errors="errors" />
+                            break;
+                        case "volumeM3":
+                            <label class="@f.LabelClass()" for="vehicle-volume">@f.Label</label>
+                            <input id="vehicle-volume" class="form-control" type="number" min="0" step="0.01" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.VolumeM3" />
+                            <FieldError Field="volumeM3" Errors="errors" />
+                            break;
+                        case "loadingMeters":
+                            <label class="@f.LabelClass()" for="vehicle-ldm">@f.Label</label>
+                            <input id="vehicle-ldm" class="form-control" type="number" min="0" max="30" step="0.01" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.LoadingMeters" />
+                            <FieldError Field="loadingMeters" Errors="errors" />
+                            break;
+                        case "palletCapacity":
+                            <label class="@f.LabelClass()" for="vehicle-pallets">@f.Label</label>
+                            <input id="vehicle-pallets" class="form-control" type="number" min="0" max="100" step="1" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PalletCapacity" />
+                            <FieldError Field="palletCapacity" Errors="errors" />
+                            break;
+                        case "notes":
+                            <label class="@f.LabelClass()" for="vehicle-notes">@f.Label</label>
+                            <textarea id="vehicle-notes" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
+                            <FieldError Field="notes" Errors="errors" />
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private bool dirty;
+    private const string EntityKey = FleetAccess.VehicleEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private VehicleForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek araç; null ise yeni araç.</summary>
+    [Parameter] public RecordResponse? Vehicle { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    private bool IsSubcontracted => form.Ownership == FleetAccess.Subcontracted;
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir araç verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Vehicle))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Vehicle;
+        form = Vehicle is { } r
+            ? new VehicleForm
+            {
+                Id = r.Id, Version = r.Version, Plate = WarehouseLabels.Text(r, "plate"), KindKey = WarehouseLabels.Text(r, "kindKey"),
+                Ownership = WarehouseLabels.Text(r, "ownership"), CarrierPartyId = WarehouseLabels.Id(r, "carrierPartyId"),
+                Brand = WarehouseLabels.Text(r, "brand"), Model = WarehouseLabels.Text(r, "model"), ModelYear = r.Values["modelYear"]?.GetValue<int>(),
+                Vin = WarehouseLabels.Text(r, "vin"), PayloadKg = r.Values["payloadKg"]?.GetValue<decimal>(), VolumeM3 = r.Values["volumeM3"]?.GetValue<decimal>(),
+                LoadingMeters = r.Values["loadingMeters"]?.GetValue<decimal>(), PalletCapacity = r.Values["palletCapacity"]?.GetValue<int>(),
+                Status = WarehouseLabels.Text(r, "status"), Notes = WarehouseLabels.Text(r, "notes"),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new VehicleForm { KindKey = Lookups.DefaultOf(FleetAccess.VehicleKindList) ?? string.Empty };
+        errors = null;
+        message = null;
+    }
+
+    // Taşıyıcı yalnızca taşeron araçta seçilir; mülkiyet değişince eski seçim taşınmaz.
+    private void OwnershipChanged()
+    {
+        if (!IsSubcontracted)
+        {
+            form.CarrierPartyId = null;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["plate"] = form.Plate,
+            ["kindKey"] = form.KindKey,
+            ["ownership"] = form.Ownership,
+            ["carrierPartyId"] = IsSubcontracted ? form.CarrierPartyId?.ToString() : null,
+            ["brand"] = Empty(form.Brand),
+            ["model"] = Empty(form.Model),
+            ["modelYear"] = form.ModelYear,
+            ["vin"] = Empty(form.Vin),
+            ["payloadKg"] = form.PayloadKg,
+            ["volumeM3"] = form.VolumeM3,
+            ["loadingMeters"] = form.LoadingMeters,
+            ["palletCapacity"] = form.PalletCapacity,
+            ["status"] = form.Status,
+            ["notes"] = Empty(form.Notes),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private static string? Empty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class VehicleForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Plate { get; set; } = string.Empty;
+
+        public string KindKey { get; set; } = string.Empty;
+
+        public string Ownership { get; set; } = "owned";
+
+        public Guid? CarrierPartyId { get; set; }
+
+        public string? Brand { get; set; }
+
+        public string? Model { get; set; }
+
+        public int? ModelYear { get; set; }
+
+        public string? Vin { get; set; }
+
+        public decimal? PayloadKg { get; set; }
+
+        public decimal? VolumeM3 { get; set; }
+
+        public decimal? LoadingMeters { get; set; }
+
+        public int? PalletCapacity { get; set; }
+
+        public string Status { get; set; } = "active";
+
+        public string? Notes { get; set; }
+    }
+}

@@ -9,7 +9,7 @@ namespace Modulix.ArchitectureTests;
 /// </summary>
 public partial class AutomationNeutralityRulesTests
 {
-    private static readonly string[] ModuleKeys = ["crm", "logistics", "contracts", "orders", "support", "marketing", "warehouse"];
+    private static readonly string[] ModuleKeys = ["crm", "logistics", "contracts", "orders", "support", "marketing", "warehouse", "fleet"];
 
     private static IEnumerable<FileInfo> AutomationSources(string project)
     {

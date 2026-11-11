@@ -19,21 +19,19 @@ public class LogisticsAutomationCapabilityTests
 
         Assert.Equal(["core", "logistics"], catalog.Modules.Select(m => m.Key));
         Assert.Equal(
-            [LogisticsModule.AutomationEntityKeys.Shipment, LogisticsModule.AutomationEntityKeys.Vehicle],
+            [LogisticsModule.AutomationEntityKeys.Shipment],
             catalog.AutomationEntities.Select(e => e.Entity.EntityKey).Order());
         Assert.All(catalog.AutomationEntities, e => Assert.Equal("logistics", e.ModuleKey));
     }
 
     [Fact]
-    public void Missing_document_maintenance_date_and_capacity_threshold_can_be_expressed_with_typed_fields()
+    public void Missing_document_and_capacity_threshold_can_be_expressed_with_typed_fields()
     {
         var catalog = Catalog();
 
         Assert.Equal(AutomationFieldType.Choice, catalog.FindAutomationField("logistics.shipment.documentStatus")!.Type);
-        Assert.Equal(AutomationFieldType.Date, catalog.FindAutomationField("logistics.vehicle.nextMaintenanceDate")!.Type);
         Assert.Equal(AutomationFieldType.Number, catalog.FindAutomationField("logistics.shipment.capacityUsagePercent")!.Type);
         Assert.Contains(AutomationOperator.Gte, AutomationOperators.For(AutomationFieldType.Number));
-        Assert.Contains(AutomationOperator.WithinNextDays, AutomationOperators.For(AutomationFieldType.Date));
     }
 
     [Fact]
@@ -55,6 +53,6 @@ public class LogisticsAutomationCapabilityTests
         var catalog = Catalog();
 
         Assert.Equal(LogisticsModule.Permissions.ShipmentsRead, catalog.FindAutomationEntity("logistics.shipment")!.Value.Entity.ReadPermission);
-        Assert.True(catalog.ContainsPermission(catalog.FindAutomationEntity("logistics.vehicle")!.Value.Entity.ReadPermission!));
+        Assert.Null(catalog.FindAutomationEntity("logistics.vehicle")); // araç Filo modülüne taşındı (ADR-0038 K1)
     }
 }

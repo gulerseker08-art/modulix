@@ -37,27 +37,24 @@ public sealed class LogisticsModule : IModule
     public static class AutomationEntityKeys
     {
         public const string Shipment = "logistics.shipment";
-        public const string Vehicle = "logistics.vehicle";
     }
 
     /// <summary>
-    /// Kural altyapısı yetenekleri (ADR-0027): belge eksikliği, bakım tarihi ve kapasite eşiği kuralları CRM olmadan, aynı sözleşmeyle
-    /// yazılabilir. Lojistik henüz iskelet modüldür (sevkiyat ve araç kayıt depoları yok); bu beyan yeteneğin Core'a modül koduna
+    /// Kural altyapısı yetenekleri (ADR-0027): belge eksikliği ve kapasite eşiği kuralları CRM olmadan, aynı sözleşmeyle
+    /// yazılabilir. Lojistik henüz iskelet modüldür (sevkiyat kayıt deposu yok); bu beyan yeteneğin Core'a modül koduna
     /// dokunmadan eklenebildiğini gösterir ve kayıt depoları gelince kural çalıştırmak ek Core değişikliği gerektirmez. Aksiyon
-    /// beyan edilmez: lojistik aksiyonları kayıt servisleriyle birlikte gelir.
+    /// beyan edilmez: lojistik aksiyonları kayıt servisleriyle birlikte gelir. Araç beyanı Filo modülüne taşındı (`fleet.vehicle`, ADR-0038 K1).
     /// </summary>
     AutomationCapabilities IModule.Automation { get; } = new()
     {
         Entities =
         [
             new(AutomationEntityKeys.Shipment, "Sevkiyat", Permissions.ShipmentsRead),
-            new(AutomationEntityKeys.Vehicle, "Araç", Permissions.CarriersRead),
         ],
         Events =
         [
             new("logistics.shipment.created", AutomationEntityKeys.Shipment, DomainEventTypes.RecordCreated, "Sevkiyat oluşturuldu"),
             new("logistics.shipment.updated", AutomationEntityKeys.Shipment, DomainEventTypes.RecordUpdated, "Sevkiyat güncellendi"),
-            new("logistics.vehicle.updated", AutomationEntityKeys.Vehicle, DomainEventTypes.RecordUpdated, "Araç güncellendi"),
         ],
         Fields =
         [
@@ -69,10 +66,6 @@ public sealed class LogisticsModule : IModule
             new(AutomationEntityKeys.Shipment, "capacityUsagePercent", "Kapasite kullanımı (%)", AutomationFieldType.Number)
             {
                 Hint = "Kapasite eşiği kuralları için.",
-            },
-            new(AutomationEntityKeys.Vehicle, "nextMaintenanceDate", "Sonraki bakım tarihi", AutomationFieldType.Date)
-            {
-                Hint = "Bakım tarihi yaklaşan araçlar için (tarihe kala tetikleyicisi).",
             },
         ],
     };

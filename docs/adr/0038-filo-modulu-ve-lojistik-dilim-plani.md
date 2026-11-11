@@ -1,6 +1,6 @@
 # ADR-0038 — Filo modülü ve lojistik (M2) dilim planı
 
-Durum: **taslak** (7 Kasım 2026, tartışma için; kabul edilmedi). Bu belge tek başına hiçbir şeyi uygulamaz; kod yazılmadı, test çalıştırılmadı. Mevzuata değen maddeler (bölüm 8) uzman doğrulaması ister; doğrulanmamış kural zorunlu üretim kuralı yapılmaz (ADR-0032 ilkesi).
+Durum: **Kabul edildi, 11 Kasım 2026** (taslak 7 Kasım 2026). Kabul, ürün sahibinin "lojistiğe geç" talimatıyla ve bölüm 9'daki varsayılan cevaplarla verildi; dilim 1a (Filo: araç ve dorse) bu kabulle birlikte teslim edilir. Mevzuata değen maddeler (bölüm 8) hâlâ uzman doğrulaması ister; doğrulanmamış kural zorunlu üretim kuralı yapılmaz (ADR-0032 ilkesi).
 
 İlgili: yol haritası M2, M2.1–M2.8, M3.2, M4.5, Ç0.4, Ç4, Ç6a, Ç8, Ç11b, Ç16, Ç18a, Ç21.4; ADR-0006 (ortak firma/kişi), ADR-0007 (olay altyapısı), ADR-0008 (şirket kapsamı), ADR-0021 (form düzeni), ADR-0023 (sipariş ve operasyon işi), ADR-0027 (kural altyapısı), ADR-0029 (sektör/faaliyet modeli, ilişki rolleri), ADR-0031 (araç kiralama), ADR-0032 (depo/antrepo), ADR-0033 (içe aktarma), ADR-0037 taslağı (finans sınırı ve faturalanabilir kalem).
 
@@ -120,3 +120,38 @@ Sonraya bırakılanlar (ayrı epic): sürücü saha ekranı ve çevrimdışı (�
 - Kapasite ölçü seti (tonaj, hacim, LDM, aks yükü) ve denetim sınırları.
 - Pilotun işleyişi, kullandığı muhasebe programı ve sürücü belge takibi.
 - Tablo, arayüz ve izin adları taslaktır; kodla denenmedi, hiçbir test çalıştırılmadı.
+
+## 9. Kabul ve açık soruların varsayılan cevapları (11 Kasım 2026, Dilim 0)
+
+Pilot verisi gelene kadar aşağıdaki cevaplarla ilerlenir; her biri pilotla değiştirilebilir ve değişiklik bu bölüme yazılır.
+
+1. **Özmal/taşeron ve parsiyel oranı:** bilinmiyor. Model ikisini de baştan taşır (mülkiyet alanı, taşıyıcı Party; durak zinciri). Dilim 7–9 sırası pilotla netleşir.
+2. **Çoklu sürücü ve aktarma:** ilk sürümde çoklu sürücü (sefer başına birden çok sürücü) var, aktarma yok; aktarma yeni sefer + bağlı sevkiyatla elle yapılır.
+3. **Süreli belge zorunluluğu:** varsayılan **uyarı**; tenant ayarıyla engele çevrilir (koda sabit yazılmaz).
+4. **Web kanalından talep:** ilk sürümde yok; talep elle ve API'den açılır.
+5. **Filo lisansı:** Filo ayrı modül anahtarıdır (`fleet`, ADR-0028 lisans kuralları aynen geçerli). Ticari paketleme (lojistik ya da rentcar ile birlikte verilmesi) lisans tanımıdır, kodda bağımlılık yoktur; lojistik ve rentcar Filo kapalıyken araç seçimini sunmaz ama çalışır (yumuşak bağımlılık, Ç20.2).
+
+Dilim 0'ın Core ön koşul kararları: Ç0.4 iş olayları ADR-0039 ile uygulandı; Ç6a asgari onay ADR-0027 dilim 4a ile uygulandı; Ç4 (dosya) ve Ç8.1 (belge serisi) kendi ADR'leriyle gelir ve yalnızca dilim 2, 5, 6, 8'i bekletir. Dilim 1 bunlara bağlı değildir.
+
+Dilim 1 iki parçaya bölündü: **1a** Filo modülü, araç ve dorse kaydı, `IVehicleDirectory`; **1b** bakım kaydı ve planı. Lojistiğin `logistics.vehicle` otomasyon beyanı 1a ile `fleet.vehicle`'a taşınır (bu anahtara bağlı kural yoktur).
+
+## 10. Dilim 1a: Filo modülü ve araç kaydı (11 Kasım 2026)
+
+- **Modül:** `Modulix.Modules.Fleet` (anahtar ve şema `fleet`, yalnızca `Core.Contracts`'a başvurur; mimari referans tablosuna eklendi). İzinler `fleet.vehicles.read/write`, rol şablonu "Filo sorumlusu".
+- **Araç (`fleet.Vehicles`, `ICompanyShared`):** plaka (boşluk ve tire atılır, büyük harf; `UNIQUE(TenantId, Plate)`), araç türü (Y9b listesi `fleet.vehicle-kind`, kategori `powered`/`towed`; hazır değerler çekici, kamyon, kamyonet, panelvan, dorse, römork), mülkiyet (`owned`, `leased`, `subcontracted`; sabit, çünkü kod buna göre davranır), taşıyıcı firma (yalnızca taşeron araçta ve zorunlu; firmanın `tasiyici` ilişki rolü olmalı, rol taşıyıcı ya da mülkiyet değişince denetlenir), marka, model, model yılı, şasi no (17 karakter, I/O/Q yok; verilirse `UNIQUE(TenantId, Vin)` süzgeçli), kapasite (kg, m³, LDM, palet), durum (`active`, `maintenance`, `passive`), notlar, özel alanlar. Silme 409 döner (K12). Migration `FleetVehicles`: tablo + `TenantIsolationSql.AddTable` + şema yetkisi; `init.sql` güncellendi.
+- **`IVehicleDirectory` (Core.Contracts.Fleet):** `IsAvailableAsync` (Filo bu tenant'ta açık mı) ve `GetAsync(ids)` → `VehicleSummary` (tür kategorisi, mülkiyet, taşıyıcı, durum, kapasite). Tenant filtresi + RLS altında; Filo kapalıysa boş döner (yumuşak bağımlılık).
+- **Lojistik:** `logistics.vehicle` otomasyon beyanı ve "sonraki bakım tarihi" alanı kaldırıldı; Filo `fleet.vehicle` varlığını (oluşturuldu/güncellendi olayları; durum, mülkiyet, model yılı alanları) beyan eder. Bakım tarihi alanı bakım kaydıyla (1b) gelir.
+- **Arayüz:** "Filo" uygulaması (Operasyon grubu), `/filo/araclar` grid şablonuyla (görünüm sekmeleri: tümü, etkin, bakımda, pasif, taşeron; süzgeç: tür, mülkiyet; sıralanabilir ikonlu başlıklar; sütun seçici; kişisel görünüm; ⋯ menüsü) ve sekmeli araç kartı (ADR-0021 düzeni: Genel bilgiler, Kapasite, Notlar ve ek bilgiler). Yeni CSS sınıfı ya da token yok. Demo firmasında (acme) Filo açılır.
+
+**Bilerek yapılmadı:** bakım kaydı ve planı (1b), araç belgeleri (dilim 2, Core süreli belge), araç–dorse eşleştirmesi (sefer atamasında, dilim 5), içe aktarma tanımı (ADR-0033; ayrı küçük iş), rentcar bağlantısı (rentcar modülü yok).
+
+### Test sonuçları (Dilim 1a)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Fleet.Tests` | 6: katalog yalnızca Core + Filo ile kurulur ve araç kural varlığı Filo'dadır, izin/rol şablonu modüle ait, tür kategorileri ve varsayılan, sekmeli varsayılan form, taşıyıcı lookup'ı rol süzgeçli, Shared sabitleri sunucuyla aynı |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 4: lojistik beyanından araç kaldırıldı |
+| `dotnet test tests/Modulix.IntegrationTests --filter "FleetVehicleTests\|ModulesAndRolesTests"` (SQL Server; CI koşar) | 14: mutlu yol (plaka/şasi biçimi, dorse ve taşeron araç, süzgeç, arama, sıralama, güncelleme, denetim kaydı, `IVehicleDirectory`), doğrulama (zorunlu alan, plaka/şasi benzersizliği ve biçimi, bilinmeyen tür ve mülkiyet, taşıyıcı zorunluluğu ve rolü, silme 409, eski sürüm 409), tenant izolasyonu (aynı plaka iki tenant'ta serbest, araç ve taşıyıcı başka tenant'tan görünmez, dizin yalnızca kendi tenant'ını okur), yetki (izinsiz 403, okuyan yazamaz, modül kapalıyken 403 ve dizin boş); modül listesi `fleet` ile güncellendi |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69 / 120: referans kuralı, modül kaydı, otomasyon tarafsızlığı; menü testi (Filo yalnızca modül ve izinle görünür) |
+
+Yerel veritabanında `TableInventoryTests` başka bir oturumdan kalan `platform.LicensePolicies` tablosu yüzünden düşer (bu dalın migration'larında yok); CI temiz veritabanında koşar.

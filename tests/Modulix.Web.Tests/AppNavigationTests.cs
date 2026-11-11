@@ -6,6 +6,7 @@ using Modulix.Shared.Crm;
 using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
 using Modulix.Shared.Support;
+using Modulix.Shared.Fleet;
 using Modulix.Shared.Warehouse;
 using Modulix.Web.Services;
 
@@ -302,6 +303,21 @@ public class AppNavigationTests
         // Modül kapalıysa ya da hiçbir depo izni yoksa uygulama görünmez (menüyü gizlemek yetki değildir; sunucu yine denetler).
         Assert.Empty(Nav([], [WarehouseAccess.FacilitiesRead]).Roots());
         Assert.Empty(Nav([WarehouseAccess.ModuleKey], []).Roots());
+    }
+
+    [Fact]
+    public void Fleet_app_shows_the_vehicles_screen_only_with_the_module_and_the_permission()
+    {
+        var nav = Nav([FleetAccess.ModuleKey], [FleetAccess.VehiclesRead]);
+
+        var root = Assert.Single(nav.Roots());
+        Assert.Equal((AppCatalog.Fleet, "Filo"), (root.Id, root.Name));
+        Assert.Equal("filo/araclar", nav.Find("fleet.vehicles")!.Route);
+        Assert.Equal(AppCatalog.Fleet, nav.Context("filo/araclar")!.Root.Id);
+
+        // Modül kapalıysa ya da araç izni yoksa uygulama görünmez (menüyü gizlemek yetki değildir; sunucu yine denetler).
+        Assert.Empty(Nav([], [FleetAccess.VehiclesRead]).Roots());
+        Assert.Empty(Nav([FleetAccess.ModuleKey], []).Roots());
     }
 
     [Fact]
