@@ -4578,6 +4578,16 @@ button.pipeline-label {
         outline-offset: -2px;
     }
 
+/* overflow-x: auto, dikeyi de kaydırılabilir yapar; etkin sekmenin alt çizgisi (bottom: -1px) taşıp
+   dikey kaydırma çubuğu çıkarıyordu. Dikeyi kapat, çizgiyi kutunun içinde tut. */
+.record-tabs {
+    overflow-y: hidden;
+}
+
+.view-tabs .record-tab.active::after {
+    bottom: 0;
+}
+
 .record-tab-count {
     padding: 0.05rem 0.45rem;
     border-radius: 999px;
