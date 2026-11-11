@@ -8917,6 +8917,83 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Vehicles", "fleet");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Logistics.Domain.CarrierTerms", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AgreementNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("CarrierPartyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int?>("PaymentTermDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PerformanceNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RateNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly>("ValidFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("ValidTo")
+                        .HasColumnType("date");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "CarrierPartyId", "AgreementNo")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CarrierTerms_AgreementNo")
+                        .HasFilter("[AgreementNo] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "CarrierPartyId", "ValidFrom")
+                        .HasDatabaseName("IX_CarrierTerms_Carrier");
+
+                    b.ToTable("CarrierTerms", "logistics");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Logistics.Domain.Driver", b =>
                 {
                     b.Property<Guid>("Id")

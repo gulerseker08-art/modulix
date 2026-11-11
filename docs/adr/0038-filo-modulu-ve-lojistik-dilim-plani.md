@@ -191,3 +191,22 @@ Sıra kararı: dilim 2 (Core süreli belge) dosya ekleri ADR'sini (Ç4, PR #285,
 | `dotnet test tests/Modulix.Modules.Logistics.Tests` | 8: sekmeli form, kişi uzantısı ve Filo aracına yalnızca anahtarla bağ (Filo derleme başvurusu yok), rol şablonu ve katalog, Shared sabitleri |
 | `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsDriverTests\|FleetVehicleTests\|ModulesAndRolesTests"` (SQL Server; CI koşar) | 18: mutlu yol (kişi + kart, taşeron, Filo aracı, ada ve telefona göre arama, sıralama, süzgeçler, denetim kaydı, kişi kullanımdayken silinemez), doğrulama (tek kart, taşıyıcı zorunluluğu ve rolü, dorse, pasif ve bilinmeyen araç, Filo kapalıyken araç seçilemez ama kart güncellenir, silme 409), tenant izolasyonu (başka tenant'ın kişisi ve aracı kullanılamaz, kart görünmez), yetki (okuyan yazamaz ve kişi açamaz, sürücü yazma izni kişi açmaya yeter, modül kapalıyken 403) |
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69 / 121: Lojistik menüsü yalnızca modül ve izinle; pasif kartlarda yalnızca İK kaldı |
+
+## 13. Dilim 3b: Taşıyıcı anlaşması (11 Kasım 2026)
+
+K4 uygulandı: taşıyıcı firma kimliği `core.Party`'dir ("Taşıyıcı" ilişki rolü); lojistik yalnızca ilişkinin **koşulunu** tutar. Modülün mevcut `logistics.carriers.read/write` izinleri bu kaydı korur (izin açıklamaları "taşıyıcı anlaşması" olarak güncellendi).
+
+- **Anlaşma (`logistics.CarrierTerms`, `ICompanyShared`):** taşıyıcı (yalnızca oluştururken; rol oluşturmada denetlenir), anlaşma adı, numara (büyük harf; `UNIQUE(TenantId, CarrierPartyId, AgreementNo)` süzgeçli), başlangıç, bitiş (boş = süresiz), para birimi (ISO 4217), ödeme vadesi (0-365 gün), ücret anlaşması ve performans notu (serbest metin), etkin bayrağı, özel alanlar. Migration `LogisticsCarrierTerms` (RLS).
+- **Çakışma kuralı:** aynı taşıyıcının **etkin** anlaşmalarının `[başlangıç, bitiş]` aralıkları kesişemez; bir günde tek geçerli anlaşma olur. Pasif anlaşma (taslak teklif, eski koşul) denetime girmez. İleti çakışan anlaşmanın adını verir.
+- **Süzgeçler:** `validOn` o gün geçerli etkin anlaşmaları, `expiredBefore` o günden önce biteni verir; liste taşıyıcı adına göre, aynı taşıyıcıda en yeni dönem üstte sıralanır. Düzeltme için silinebilir (K12 anlaşmayı kapsamaz; hakediş gelince kullanılan anlaşmanın silinmesi o dilimde engellenir).
+- **Arayüz:** "Taşıyıcı anlaşmaları" ekranı (`/lojistik/tasiyici-anlasmalari`: Tüm anlaşmalar, Bugün geçerli, Süresi dolan, Pasif; durum rozeti geçerli / bitiyor (30 gün, görsel eşik) / süresi doldu / başlamadı / pasif) ve sekmeli anlaşma kartı (Genel bilgiler; Ücret ve performans). Yeni CSS sınıfı ya da token yok.
+
+**Bilerek yapılmadı:** tarife ve ücret hesabı (Ç18a.2), hakediş (dilim 7), anlaşma belgesi dosyası (Ç4, PR #285), anlaşma bitişine kala uyarı kuralı (Lojistik'in otomasyon kayıt kaynağı yok; sevkiyat diliminde eklenir), taşıyıcı performans puanı.
+
+### Test sonuçları (Dilim 3b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 11 (3 yeni): sekmeli anlaşma formu, taşıyıcı izinleri ve firma bağı, Shared sabitleri; taşıyıcı seçen her lookup rol süzgeçli |
+| `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsCarrierTermsTests\|LogisticsDriverTests"` (SQL Server; CI koşar) | 8: mutlu yol (birbirini izleyen dönemler, bugün geçerli / süresi dolan süzgeçleri, taşıyıcıya göre sıralama ve arama, denetim kaydı, silme), doğrulama (zorunlu alanlar, taşıyıcı rolü, tarih sırası, para birimi, numara benzersizliği, süresiz anlaşmayla çakışma; pasif anlaşma çakışmaz), tenant izolasyonu (başka tenant'ın taşıyıcısı ve anlaşması görünmez), yetki (okuyan yazamaz ve silemez, sürücü izni anlaşmaları açmaz) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69 / 121: anlaşma ekranı yalnızca taşıyıcı okuma izniyle |

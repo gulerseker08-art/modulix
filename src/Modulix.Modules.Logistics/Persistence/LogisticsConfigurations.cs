@@ -41,3 +41,21 @@ internal sealed class DriverConfiguration : IEntityTypeConfiguration<Driver>
         builder.HasIndex(d => new { d.TenantId, d.DefaultVehicleId }).HasDatabaseName("IX_Drivers_Vehicle");
     }
 }
+
+internal sealed class CarrierTermsConfiguration : IEntityTypeConfiguration<CarrierTerms>
+{
+    public void Configure(EntityTypeBuilder<CarrierTerms> builder)
+    {
+        LogisticsTables.ConfigureCommon(builder, "CarrierTerms");
+        builder.Property(t => t.Title).HasMaxLength(CarrierTerms.TitleMaxLength).IsRequired();
+        builder.Property(t => t.AgreementNo).HasMaxLength(CarrierTerms.AgreementNoMaxLength);
+        builder.Property(t => t.Currency).HasMaxLength(3).IsFixedLength().IsUnicode(false).IsRequired();
+        builder.Property(t => t.RateNote).HasMaxLength(CarrierTerms.TextMaxLength);
+        builder.Property(t => t.PerformanceNote).HasMaxLength(CarrierTerms.TextMaxLength);
+        builder.Property(t => t.IsActive).HasDefaultValue(true);
+
+        builder.HasIndex(t => new { t.TenantId, t.CarrierPartyId, t.ValidFrom }).HasDatabaseName("IX_CarrierTerms_Carrier");
+        builder.HasIndex(t => new { t.TenantId, t.CarrierPartyId, t.AgreementNo }).IsUnique()
+            .HasFilter("[AgreementNo] IS NOT NULL").HasDatabaseName("UX_CarrierTerms_AgreementNo");
+    }
+}

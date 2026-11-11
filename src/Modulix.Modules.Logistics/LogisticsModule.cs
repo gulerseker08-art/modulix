@@ -36,8 +36,8 @@ public sealed class LogisticsModule : IModule
     [
         new(Permissions.ShipmentsRead, "Sevkiyatları görüntüler", "Sevkiyatlar"),
         new(Permissions.ShipmentsWrite, "Sevkiyat ekler ve düzenler", "Sevkiyatlar"),
-        new(Permissions.CarriersRead, "Taşıyıcıları görüntüler", "Taşıyıcılar"),
-        new(Permissions.CarriersWrite, "Taşıyıcı ekler ve düzenler", "Taşıyıcılar"),
+        new(Permissions.CarriersRead, "Taşıyıcı anlaşmalarını görüntüler", "Taşıyıcılar"),
+        new(Permissions.CarriersWrite, "Taşıyıcı anlaşması ekler, düzenler ve siler", "Taşıyıcılar"),
         new(Permissions.CostsRead, "Maliyetleri görüntüler", "Maliyetler"),
         new(Permissions.CostsWrite, "Maliyet ekler ve düzenler", "Maliyetler"),
         new(Permissions.DriversRead, "Sürücü kartlarını görüntüler", "Sürücüler"),
@@ -98,6 +98,7 @@ public sealed class LogisticsModule : IModule
     public static class Entities
     {
         public const string Driver = "logistics.driver";
+        public const string CarrierTerms = "logistics.carrier-terms";
     }
 
     /// <summary>Platform ilişki rolleri (ADR-0029 K9): taşeron sürücünün çalıştığı firma bu roldedir.</summary>
@@ -120,11 +121,21 @@ public sealed class LogisticsModule : IModule
         {
             References = new Dictionary<string, string> { ["personId"] = SharedEntities.Person, ["carrierPartyId"] = SharedEntities.Party },
         },
+        new(Entities.CarrierTerms, "Taşıyıcı anlaşması", Permissions.CarriersRead, new Dictionary<string, string>
+        {
+            ["carrierPartyId"] = "Taşıyıcı firma", ["title"] = "Anlaşma adı", ["agreementNo"] = "Anlaşma no", ["validFrom"] = "Başlangıç",
+            ["validTo"] = "Bitiş", ["currency"] = "Para birimi", ["paymentTermDays"] = "Ödeme vadesi (gün)", ["rateNote"] = "Ücret anlaşması",
+            ["performanceNote"] = "Performans notu", ["isActive"] = "Etkin",
+        }, "title")
+        {
+            References = new Dictionary<string, string> { ["carrierPartyId"] = SharedEntities.Party },
+        },
     ];
 
     IReadOnlyList<CustomizableEntity> IModule.CustomizableEntities { get; } =
     [
         new(Entities.Driver, "Sürücü"),
+        new(Entities.CarrierTerms, "Taşıyıcı anlaşması"),
     ];
 
     IReadOnlyList<LookupDefinition> IModule.Lookups => LogisticsLookupDefinitions.All;
@@ -137,6 +148,7 @@ public sealed class LogisticsModule : IModule
     [
         new(SharedEntities.Person, Permissions.DriversRead, Permissions.DriversWrite),
         new(SharedEntities.Party, Permissions.DriversRead),
+        new(SharedEntities.Party, Permissions.CarriersRead),
     ];
 
     /// <summary>Kişinin ve firmanın nerede kullanıldığı (silme ve birleştirme koruması).</summary>
@@ -144,6 +156,7 @@ public sealed class LogisticsModule : IModule
     [
         new(SharedEntities.Person, Entities.Driver, "personId", "sürücü kartı"),
         new(SharedEntities.Party, Entities.Driver, "carrierPartyId", "sürücü (taşıyıcı)"),
+        new(SharedEntities.Party, Entities.CarrierTerms, "carrierPartyId", "taşıyıcı anlaşması"),
     ];
 
     /// <summary>Sürücü formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>
@@ -153,5 +166,6 @@ public sealed class LogisticsModule : IModule
     {
         services.AddScoped<LogisticsStoreContext>();
         services.AddScoped<IRecordStore, DriverRecordStore>();
+        services.AddScoped<IRecordStore, CarrierTermsRecordStore>();
     }
 }

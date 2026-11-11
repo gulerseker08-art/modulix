@@ -11,12 +11,16 @@ public static class LogisticsAccess
 
     public const string DriversRead = "logistics.drivers.read";
     public const string DriversWrite = "logistics.drivers.write";
+    public const string CarriersRead = "logistics.carriers.read";
+    public const string CarriersWrite = "logistics.carriers.write";
 
     public const string DriverEntityKey = "logistics.driver";
+    public const string CarrierTermsEntityKey = "logistics.carrier-terms";
 
     public const string DriverPersonLookup = "logistics.driver.person";
     public const string DriverCarrierLookup = "logistics.driver.carrier";
     public const string DriverVehicleLookup = "logistics.driver.vehicle";
+    public const string TermsCarrierLookup = "logistics.carrier-terms.carrier";
 
     public const string Subcontracted = "subcontracted";
 

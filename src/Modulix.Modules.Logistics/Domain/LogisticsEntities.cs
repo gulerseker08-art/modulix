@@ -80,3 +80,45 @@ public sealed class Driver : LogisticsEntity
 
     public string? Notes { get; internal set; }
 }
+
+/// <summary>
+/// Taşıyıcı anlaşması (ADR-0038 K4, dilim 3b): taşeron taşıyıcıyla yapılan çalışma koşulu. Taşıyıcının kimliği <c>core.Party</c>'dir
+/// ("Taşıyıcı" ilişki rolü); bu kayıt yalnızca ilişkinin koşulunu (geçerlilik, para birimi, ödeme vadesi, ücret açıklaması, performans
+/// notu) tutar. Aynı taşıyıcının etkin anlaşmalarının geçerlilik aralıkları çakışamaz: bir günde tek geçerli anlaşma olur. Tarife ve
+/// hakediş hesabı sonraki dilimlerdedir (Ç18a.2, dilim 7); ücret bugün açıklama olarak girilir.
+/// </summary>
+public sealed class CarrierTerms : LogisticsEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int AgreementNoMaxLength = 50;
+    public const int TextMaxLength = 2000;
+    public const int MaxPaymentTermDays = 365;
+
+    public Guid CarrierPartyId { get; internal set; }
+
+    /// <summary>Anlaşmanın adı (ör. "2026 yurt içi parsiyel").</summary>
+    public string Title { get; internal set; } = string.Empty;
+
+    /// <summary>Sözleşme / anlaşma numarası; verilirse taşıyıcı içinde benzersiz.</summary>
+    public string? AgreementNo { get; internal set; }
+
+    public DateOnly ValidFrom { get; internal set; }
+
+    /// <summary>Boşsa süresiz.</summary>
+    public DateOnly? ValidTo { get; internal set; }
+
+    /// <summary>ISO 4217 para birimi (ör. TRY, EUR).</summary>
+    public string Currency { get; internal set; } = "TRY";
+
+    /// <summary>Hakediş ödeme vadesi (gün).</summary>
+    public int? PaymentTermDays { get; internal set; }
+
+    /// <summary>Ücret anlaşmasının açıklaması (tarife altyapısı gelene kadar serbest metin).</summary>
+    public string? RateNote { get; internal set; }
+
+    /// <summary>Performans ve kalite notu (gecikme, hasar, iletişim).</summary>
+    public string? PerformanceNote { get; internal set; }
+
+    /// <summary>Pasif anlaşma çakışma denetimine girmez ve "geçerli" sayılmaz.</summary>
+    public bool IsActive { get; internal set; } = true;
+}

@@ -318,6 +318,10 @@ public class AppNavigationTests
 
         Assert.Empty(Nav([], [LogisticsAccess.DriversRead]).Roots());
         Assert.Empty(Nav([LogisticsAccess.ModuleKey], []).Roots());
+
+        // Taşıyıcı anlaşmaları kendi iznine bağlıdır: sürücü izni yetmez.
+        Assert.Equal(["Sürücüler", "Taşıyıcı anlaşmaları"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.DriversRead, LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+        Assert.Equal(["Taşıyıcı anlaşmaları"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
     }
 
     [Fact]

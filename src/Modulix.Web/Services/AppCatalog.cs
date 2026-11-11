@@ -238,6 +238,7 @@ public static class AppCatalog
         new("warehouse.regime-bindings", Warehouse, "Rejim profilleri", "shield", "depo/rejim-profilleri", 80, WarehouseAccess.ModuleKey, WarehouseAccess.RegimesRead, Tone: AppTone.Teal),
         new(Logistics, null, "Lojistik", "truck", null, 42, ModuleKey: LogisticsAccess.ModuleKey, Group: OperationsGroup),
         new("logistics.drivers", Logistics, "Sürücüler", "user", "lojistik/suruculer", 10, LogisticsAccess.ModuleKey, LogisticsAccess.DriversRead),
+        new("logistics.carrier-terms", Logistics, "Taşıyıcı anlaşmaları", "file-text", "lojistik/tasiyici-anlasmalari", 20, LogisticsAccess.ModuleKey, LogisticsAccess.CarriersRead, Tone: AppTone.Teal),
         new(Fleet, null, "Filo", "truck", null, 45, ModuleKey: FleetAccess.ModuleKey, Group: OperationsGroup),
         new("fleet.vehicles", Fleet, "Araçlar", "truck", "filo/araclar", 10, FleetAccess.ModuleKey, FleetAccess.VehiclesRead),
         new("fleet.maintenance", Fleet, "Bakım kayıtları", "wrench", "filo/bakimlar", 20, FleetAccess.ModuleKey, FleetAccess.MaintenanceRead, Tone: AppTone.Teal),

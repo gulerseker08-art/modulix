@@ -12,6 +12,7 @@ public static class LogisticsLookupDefinitions
     public const string DriverPerson = "logistics.driver.person";
     public const string DriverCarrier = "logistics.driver.carrier";
     public const string DriverVehicle = "logistics.driver.vehicle";
+    public const string TermsCarrier = "logistics.carrier-terms.carrier";
 
     /// <summary>Filo'nun araç kayıt türü (sözleşme metni; Filo projesine başvurulmaz).</summary>
     public const string VehicleEntityKey = "fleet.vehicle";
@@ -32,6 +33,14 @@ public static class LogisticsLookupDefinitions
             SearchDescription = "Ad, soyad ve e-posta",
         },
         new(DriverCarrier, LogisticsModule.Entities.Driver, "carrierPartyId", "Taşıyıcı firma", LookupTargetKind.Record, SharedEntities.Party)
+        {
+            LabelFields = PartyLabel,
+            SecondaryFields = PartySecondary,
+            SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir (yalnızca \"Taşıyıcı\" rolündeki firmalar)",
+            FixedFilterName = "relationshipRole",
+            FixedFilterValue = LogisticsModule.RelationshipRoles.Carrier,
+        },
+        new(TermsCarrier, LogisticsModule.Entities.CarrierTerms, "carrierPartyId", "Taşıyıcı firma", LookupTargetKind.Record, SharedEntities.Party)
         {
             LabelFields = PartyLabel,
             SecondaryFields = PartySecondary,
