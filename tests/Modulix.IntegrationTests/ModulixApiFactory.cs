@@ -27,6 +27,9 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
     public const string Password = "Test.Password1";
     public const string SignatureWebhookSecret = "test-only-signature-webhook-secret";
 
+    /// <summary>Dosya içerik deposunun bu fabrikaya özel kökü (ADR-0040).</summary>
+    public string BlobRoot { get; } = Path.Combine(Path.GetTempPath(), "modulix-blobs-" + Guid.NewGuid().ToString("N"));
+
     // Bu fabrikanın oluşturduğu tenant'lar; Dispose yalnızca bunların platform kayıtlarını temizler.
     private readonly System.Collections.Concurrent.ConcurrentBag<Guid> createdTenants = [];
 
@@ -55,6 +58,9 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             .UseSetting("MarketingSend:WorkerEnabled", "false")
             .UseSetting("ReportJobs:WorkerEnabled", "false")
             .UseSetting("CommunicationCleanup:WorkerEnabled", "false")
+
+            // Dosya içerikleri testlerde bu fabrikaya özel geçici dizine yazılır (ADR-0040); testler dizini doğrudan inceleyebilir.
+            .UseSetting("Storage:LocalRoot", BlobRoot)
 
             // Oturumsuz kimlik uçlarının IP başına hız sınırı testlerde pratikte kapalıdır; sınırı sınayan test düşürür (HardeningTests).
             .UseSetting("Auth:RateLimitPerMinute", "100000")
