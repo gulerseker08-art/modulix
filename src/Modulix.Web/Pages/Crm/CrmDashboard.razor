@@ -9,7 +9,8 @@
 <PageTitle>CRM panosu · Modulix</PageTitle>
 
 @* İki sekme (ViewTabs): Hedef merkezi ve Benim günüm (MyDayPanel). Hedef merkezi: veri Satış görünümüyle aynı uçtan gelir, yeni hesap yoktur. Kapsam ve tutar izni sunucuda uygulanır; tutar izni yoksa adetler gösterilir. *@
-<AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ReportsRead">
+@* Satış raporu izni olmayan temsilci yalnızca Benim günüm'ü görür (sekme çubuğu çizilmez). *@
+<AuthGate Module="@CrmAccess.ModuleKey" AnyPermission="SalesAccess.MyDayAny">
     <div class="page-header">
         <div>
             <h1>CRM panosu</h1>
@@ -50,7 +51,10 @@
         </div>
     </div>
 
-    <ViewTabs Items="Views" Value="@view" ValueChanged="ChooseViewAsync" Label="Pano görünümleri" />
+    @if (CanReports)
+    {
+        <ViewTabs Items="Views" Value="@view" ValueChanged="ChooseViewAsync" Label="Pano görünümleri" />
+    }
 
     @if (view == DayView)
     {
@@ -285,16 +289,19 @@
     protected override async Task OnInitializedAsync()
     {
         await Session.EnsureLoadedAsync();
-        view = ViewParameter == DayView ? DayView : GoalView;
-        if (Session.Can(SalesAccess.ReportsRead))
+        // Satış raporu izni yoksa Hedef merkezi yoktur; pano doğrudan Benim günüm açılır.
+        view = ViewParameter == DayView || !CanReports ? DayView : GoalView;
+        await Lookups.LoadAsync();
+        if (CanReports)
         {
-            await Lookups.LoadAsync();
             if (view == GoalView)
             {
                 await LoadAsync();
             }
         }
     }
+
+    private bool CanReports => Session.Can(SalesAccess.ReportsRead);
 
     private async Task ChooseViewAsync(string key)
     {

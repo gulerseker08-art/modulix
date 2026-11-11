@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Modulix.Core.Files;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Persistence;
 
@@ -41,7 +42,7 @@ public interface ITenantDataTransfer
     Task<TenantDeleteResult> DeleteAsync(Guid tenantId, CancellationToken cancellationToken);
 }
 
-internal sealed class TenantDataTransfer(ModulixDbContext db, ModulixDatabaseOptions database, ILogger<TenantDataTransfer> logger) : ITenantDataTransfer
+internal sealed class TenantDataTransfer(ModulixDbContext db, ModulixDatabaseOptions database, IBlobStorage blobs, ILogger<TenantDataTransfer> logger) : ITenantDataTransfer
 {
     private const string TenantColumn = "TenantId";
 
@@ -62,6 +63,9 @@ internal sealed class TenantDataTransfer(ModulixDbContext db, ModulixDatabaseOpt
             counts.Add(new TenantTableCount(schema, table, await ExportTableAsync(connection, tenantId, schema, table, directory, cancellationToken)));
         }
 
+        // Dosya içerikleri (ADR-0040): üst veri tablo olarak yukarıda yazıldı; içerik adaptörden "files/<depolama anahtarı>" olarak kopyalanır.
+        var fileCount = await blobs.ExportTenantAsync(tenantId, Path.Combine(directory, "files"), cancellationToken);
+
         await WriteJsonAsync(Path.Combine(directory, "tenant.json"), writer =>
         {
             writer.WriteStartObject();
@@ -80,6 +84,7 @@ internal sealed class TenantDataTransfer(ModulixDbContext db, ModulixDatabaseOpt
             writer.WriteString("tenantId", tenant.Id);
             writer.WriteString("slug", tenant.Slug);
             writer.WriteString("exportedAt", DateTimeOffset.UtcNow);
+            writer.WriteNumber("files", fileCount);
             writer.WriteStartArray("tables");
             foreach (var count in counts)
             {
@@ -168,6 +173,21 @@ internal sealed class TenantDataTransfer(ModulixDbContext db, ModulixDatabaseOpt
         }
 
         await transaction.CommitAsync(cancellationToken);
+
+        // Dosya içerikleri üst veri kesinleştikten sonra silinir (ADR-0040 K6). Silinemezse komut başarısız olur ve operatör tekrar çalıştırır; tenant kaydı
+        // artık yoktur, bu yüzden yeniden çalıştırma yalnızca içerik dizinini temizler.
+        int deletedFiles;
+        try
+        {
+            deletedFiles = await blobs.DeleteTenantAsync(tenantId, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            logger.LogError(exception, "Tenant {Slug} ({TenantId}) veritabanından silindi ama dosya içerikleri silinemedi; komutu tekrar çalıştırın.", tenant.Slug, tenant.Id);
+            throw;
+        }
+
+        logger.LogWarning("Tenant {Slug} ({TenantId}) dosya içeriği silindi: {Files} dosya.", tenant.Slug, tenant.Id, deletedFiles);
         logger.LogWarning("Tenant {Slug} ({TenantId}) silindi: {Tables} tablodan {Rows} satır.",
             tenant.Slug, tenant.Id, counts.Count, counts.Sum(c => c.Rows));
         await AuditAsync(PlatformAuditActions.TenantDeleted, tenant, counts, null, cancellationToken);

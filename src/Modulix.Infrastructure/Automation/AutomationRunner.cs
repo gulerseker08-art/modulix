@@ -82,6 +82,8 @@ public sealed record AutomationRound(int Evaluated, int NotMatched, int StepsRun
 ///   <item><b>Kalıcı akış (Dilim 4c-4):</b> <see cref="AutomationActionStatus.Waiting"/> dönen adım bekler; çalışma kirasını bırakır ve
 ///   <see cref="AutomationActionResult.ResumeAt"/> anında aynı adımdan sürer. <see cref="AutomationActionResult.StopFlow"/> akışı bilerek bitirir:
 ///   kalan adımlar atlanır, çalışma başarılı biter.</item>
+///   <item><b>Dallanma (Dilim 4c-5):</b> koşullu adım (<see cref="AutomationActionStep.When"/>) ilk denemesinde kaydın güncel değerleriyle
+///   sorulur; sağlanmazsa atlanır ve akış sürer. "Akışı bitir" adımı akışı bilerek bitirir.</item>
 /// </list>
 /// Loglara tenant, çalışma ve kural kimlikleri yazılır; kayıt değeri ve parametre yazılmaz.
 /// </summary>
@@ -444,11 +446,12 @@ public sealed class AutomationRunner(
             }
 
             var attempts = step.Attempts + 1;
+            var firstAttempt = step.StartedAt is null;
             var startedAt = step.StartedAt ?? time.GetUtcNow();
             await db.AutomationRunSteps.Where(s => s.Id == step.Id)
                 .ExecuteUpdateAsync(set => set.SetProperty(s => s.Attempts, attempts).SetProperty(s => s.StartedAt, startedAt), cancellationToken);
 
-            var result = await RunStepAsync(db, services, run, version, definition, step, startedAt, cancellationToken);
+            var result = await RunStepAsync(db, services, run, version, definition, step, startedAt, firstAttempt, cancellationToken);
             tally.StepsRun++;
             var now = time.GetUtcNow();
             switch (result.Status)
@@ -562,6 +565,7 @@ public sealed class AutomationRunner(
         AutomationDefinition definition,
         AutomationRunStep step,
         DateTimeOffset startedAt,
+        bool firstAttempt,
         CancellationToken cancellationToken)
     {
         try
@@ -578,6 +582,19 @@ public sealed class AutomationRunner(
                 return failure.Status == AutomationRunStatus.Cancelled
                     ? new AutomationActionResult(AutomationActionStatus.Skipped, failure.Note)
                     : new AutomationActionResult(AutomationActionStatus.Failed, failure.Note);
+            }
+
+            // Adım koşulu (dallanma, Dilim 4c-5): adıma sıra geldiğinde bir kez, kaydın güncel değerleriyle. Bekleyen ya da yeniden denenen
+            // adım koşulu yeniden sormaz (başlamış adım yarıda dal değiştirmez).
+            if (firstAttempt && stepDefinition.When is { } when)
+            {
+                var day = await services.GetRequiredService<ITenantClock>().GetAsync(cancellationToken);
+                var check = await ConditionEvaluator.EvaluateAsync(when, loaded.Fields!, loaded.Facts!, day, cancellationToken);
+                if (!check.Passed)
+                {
+                    return new AutomationActionResult(
+                        AutomationActionStatus.Skipped, $"Adım koşulu sağlanmadı, adım atlandı ({ConditionText.Describe(when, loaded.Fields!)}).");
+                }
             }
 
             var resolved = AutomationParameterResolver.Resolve(stepDefinition, loaded.Fields!, loaded.Facts!, registration.Action.Definition);

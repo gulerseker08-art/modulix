@@ -175,6 +175,9 @@ public class ModulixDbContext(
     /// <summary>Kullanıcının kişisel liste görünümleri (ADR-0034).</summary>
     public DbSet<Modulix.Core.Views.GridView> GridViews => Set<Modulix.Core.Views.GridView>();
 
+    /// <summary>Kayıtlara bağlı dosyaların üst verisi (ADR-0040); içerik depolama adaptöründedir.</summary>
+    public DbSet<Modulix.Core.Files.StoredFile> StoredFiles => Set<Modulix.Core.Files.StoredFile>();
+
     public DbSet<ActivityNode> ActivityNodes => Set<ActivityNode>();
 
     public DbSet<Capability> Capabilities => Set<Capability>();

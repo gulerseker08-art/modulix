@@ -31,8 +31,8 @@ internal static class SalesPlanningEndpoints
         var sales = crm.MapGroup("/sales");
         sales.MapGet("/overview", OverviewAsync).RequirePermission(CrmModule.Permissions.SalesReportsRead);
         sales.MapGet("/overview/cards/{card}", CardAsync).RequirePermission(CrmModule.Permissions.SalesReportsRead);
-        // Benim günüm: yalnızca kullanıcının kendi kayıtları; bölümler ayrıca kendi okuma iznine bağlıdır.
-        crm.MapGet("/my-day", MyDayAsync).RequirePermission(CrmModule.Permissions.SalesReportsRead);
+        // Benim günüm: yalnızca kullanıcının kendi kayıtları. Satış raporu izni istemez; okuma izinlerinden biri yeterlidir, bölümler kendi iznine bağlıdır.
+        crm.MapGet("/my-day", MyDayAsync).RequireAnyPermission([.. MyDayRules.AccessPermissions]);
 
         // Kart ayrıntısını dosyaya çevirir (rapor merkezinin dışa aktarma dosyası: sahibine özel, 24 saat, denetimli). İki izin de gerekir:
         // kartı görmek (satış raporları) ve dışa aktarmak (rapor merkezi); indirme rapor merkezinin /api/reports/exports/{id}/download ucundandır.
