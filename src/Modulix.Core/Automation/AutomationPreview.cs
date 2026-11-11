@@ -92,7 +92,7 @@ public sealed class AutomationPreviewService(
         var day = await clock.GetAsync(cancellationToken);
         var explanation = await ConditionEvaluator.EvaluateAsync(request.Definition.Condition, fields, facts, day, cancellationToken);
         var planned = explanation.Passed
-            ? await PlanAsync(request.Definition.Actions, fields, facts, cancellationToken)
+            ? await PlanAsync(request.Definition.Actions, fields, facts, day, cancellationToken)
             : [];
         return RecordResult<AutomationPreview>.Ok(
             new AutomationPreview([], triggerText, conditionText, true, explanation.Passed, explanation, planned, warnings));
@@ -110,7 +110,7 @@ public sealed class AutomationPreviewService(
 
     // Parametreler çözülür; aksiyon işleyicisi çağrılmaz (Dilim 3'te SupportsDryRun işleyicileri için ayrıca eklenir).
     private async Task<IReadOnlyList<PlannedAction>> PlanAsync(
-        IReadOnlyList<AutomationActionStep> steps, AutomationFieldSet fields, IAutomationFacts facts, CancellationToken cancellationToken)
+        IReadOnlyList<AutomationActionStep> steps, AutomationFieldSet fields, IAutomationFacts facts, TenantDay day, CancellationToken cancellationToken)
     {
         var planned = new List<PlannedAction>();
         foreach (var step in steps)
@@ -131,6 +131,15 @@ public sealed class AutomationPreviewService(
                 AutomationSideEffect.Draft => "taslak oluşturur",
                 _ => "kayıt değiştirir ya da dış etki üretir",
             };
+            // Adım koşulu (Dilim 4c-5): örnek kaydın bugünkü değerleriyle; gerçek çalışmada adıma sıra gelince yeniden sorulur.
+            if (step.When is { } when)
+            {
+                var check = await ConditionEvaluator.EvaluateAsync(when, fields, facts, day, cancellationToken);
+                notes.Add(check.Passed
+                    ? $"Adım koşulu bu kayıtta sağlanıyor ({ConditionText.Describe(when, fields)})."
+                    : $"Adım koşulu bu kayıtta sağlanmıyor, adım atlanırdı ({ConditionText.Describe(when, fields)}).");
+            }
+
             notes.Add($"Planlandı, çalıştırılmadı ({effect}).");
             planned.Add(new PlannedAction(
                 step.Id, step.Action, view.Definition.DisplayName, view.Definition.SideEffect, parameters, view.Available,
@@ -147,7 +156,7 @@ public static class AutomationSummary
     public static string Describe(AutomationDefinition definition, AutomationFieldSet fields, ModuleCatalog modules)
     {
         var actions = definition.Actions.Select(a =>
-            modules.FindAutomationAction(a.Action)?.Action.Definition.DisplayName ?? a.Action);
+            (modules.FindAutomationAction(a.Action)?.Action.Definition.DisplayName ?? a.Action) + (a.When is null ? "" : " (koşullu)"));
         return $"{ConditionText.Trigger(definition.Trigger, fields)} | {ConditionText.Describe(definition.Condition, fields)} | {string.Join(", ", actions)}";
     }
 }

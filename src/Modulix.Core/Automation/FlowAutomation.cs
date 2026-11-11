@@ -14,6 +14,8 @@ namespace Modulix.Core.Automation;
 ///   <item><b>Bekle</b> (<see cref="WaitAction"/>): adımın ilk denendiği andan itibaren gün + saat; takvim günüdür (iş günü sonraki iş).</item>
 ///   <item><b>Onay sonucunu bekle</b> (<see cref="AwaitApprovalAction"/>): kaydın onay talebi sonuçlanana kadar bekler. Onaylanırsa akış
 ///   sürer; reddedilir, geri çekilir ya da geçersizleşirse akış bilerek durur (kalan adımlar atlanır); süre aşımında da durur.</item>
+///   <item><b>Akışı bitir</b> (<see cref="StopAction"/>, Dilim 4c-5): akışı bilerek bitirir. Adım koşuluyla (<see cref="AutomationActionStep.When"/>)
+///   birlikte dallanma kurar: koşulu sağlamayan adım atlanır, akış sürer.</item>
 /// </list>
 /// Kural kapanır ya da acil durdurma açılırsa bekleyen akış bir sonraki uyanışta iptal olur (motorun adım sınırı denetimi).
 /// </summary>
@@ -21,6 +23,7 @@ public static class FlowAutomation
 {
     public const string WaitAction = "core.flow.wait";
     public const string AwaitApprovalAction = "core.flow.await-approval";
+    public const string StopAction = "core.flow.stop";
 
     public const int MaxWaitDays = 365;
     public const int DefaultApprovalTimeoutDays = 30;
@@ -64,6 +67,23 @@ public static class FlowAutomation
                 },
             ],
             [CoreModule.Permissions.RequestApprovals],
+            [],
+            AutomationSideEffect.Read,
+            SupportsDryRun: true)),
+        AutomationActionRegistration.For<FlowStopAction>(new AutomationActionDefinition(
+            StopAction,
+            "Akışı bitir",
+            "Akışı bu adımda bilerek bitirir; kalan adımlar atlanır ve çalışma başarılı sayılır. Adım koşuluyla birlikte kullanılır "
+            + "(ör. \"tutar 100.000'den küçükse akışı bitir\").",
+            [
+                new AutomationParameter("reason", "Neden", AutomationFieldType.Text, Required: false)
+                {
+                    AllowFieldBinding = false,
+                    MaxLength = 200,
+                    Description = "Çalışma geçmişinde görünür (ör. \"Küçük tutar, onay gerekmiyor\").",
+                },
+            ],
+            [],
             [],
             AutomationSideEffect.Read,
             SupportsDryRun: true)),
@@ -224,6 +244,21 @@ internal sealed class FlowAwaitApprovalAction(IApprovalStatusReader approvals, T
     }
 
     private static AutomationActionResult Failed(string summary) => new(AutomationActionStatus.Failed, summary);
+}
+
+/// <summary>"Akışı bitir" (Dilim 4c-5): akışı bilerek bitirir; kalan adımlar atlanır, çalışma başarılı biter.</summary>
+internal sealed class FlowStopAction : IAutomationAction
+{
+    public Task<AutomationActionResult> ExecuteAsync(AutomationActionRequest request, AutomationCallContext context, CancellationToken cancellationToken)
+    {
+        var reason = request.Parameters["reason"] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text)
+            ? text.Trim()
+            : null;
+        var summary = reason is null ? "Akış bu adımda bitirildi." : $"Akış bu adımda bitirildi: {reason}";
+        return Task.FromResult(request.DryRun
+            ? new AutomationActionResult(AutomationActionStatus.Planned, reason is null ? "Akış burada bitecek." : $"Akış burada bitecek: {reason}")
+            : new AutomationActionResult(AutomationActionStatus.Succeeded, summary) { StopFlow = true });
+    }
 }
 
 /// <summary>Yayında "Bekle" süresini denetler (çalışmada da aynı kural uygulanır).</summary>

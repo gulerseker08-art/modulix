@@ -37,6 +37,23 @@ public class AutomationEditorJsonShapeTests
         Assert.Equal(2, step.Parameters["dueInDays"]!.GetValue<int>());
     }
 
+    /// <summary>Web.Tests'teki <c>AutomationEditorModelTests.Branch</c> ile aynı metin: adım koşulu (dallanma, Dilim 4c-5).</summary>
+    public const string Branch = """
+        {"trigger":{"type":"manual"},"actions":[{"id":"adim1","action":"core.flow.stop","parameters":{"reason":"Küçük"},"when":{"type":"group","logic":"and","items":[{"type":"leaf","field":"crm.opportunity.amount","operator":"lt","values":["50000"],"currency":"TRY"}]}},{"id":"adim2","action":"crm.follow-up.create","parameters":{"subject":"Ara","dueInDays":2}}]}
+        """;
+
+    [Fact]
+    public void A_step_condition_written_by_the_editor_deserializes_onto_the_step()
+    {
+        var definition = AutomationJson.Deserialize(Branch);
+
+        var group = Assert.IsType<ConditionGroup>(definition.Actions[0].When);
+        var leaf = Assert.IsType<ConditionLeaf>(Assert.Single(group.Items));
+        Assert.Equal(AutomationOperator.Lt, leaf.Operator);
+        Assert.Equal("TRY", leaf.Currency);
+        Assert.Null(definition.Actions[1].When);
+    }
+
     [Theory]
     [InlineData("""{"type":"recordCreated"}""", typeof(RecordCreatedTrigger))]
     [InlineData("""{"type":"manual"}""", typeof(ManualTrigger))]

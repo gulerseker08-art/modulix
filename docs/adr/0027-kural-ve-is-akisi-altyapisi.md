@@ -199,6 +199,7 @@ Her yönetim işlemi `core.automation-rule` kaydı olarak denetime yazılır (`E
 | 4c-2 | Kural aksiyonu "onaya gönder" | Uygulandı (aşağıda "Dilim 4c-2") |
 | 4c-3 | Onay kapısı: onay sonucunun modül işlemine bağlanması (Ç6a.3) | Uygulandı (aşağıda "Dilim 4c-3") |
 | 4c-4 | Kalıcı çok adımlı iş akışı ("Bekle", "Onay sonucunu bekle") | Uygulandı (aşağıda "Dilim 4c-4") |
+| 4c-5 | Akışta dallanma (adım koşulu, "Akışı bitir") | Uygulandı (aşağıda "Dilim 4c-5") |
 | 4d | Takvim ortaklaştırma, puanlama, şablon motoru | **Metin değişkenleri uygulandı** (aşağıda "Dilim 4d"); takvim ortaklaştırma ve puanlama sonra |
 | 5 | Blazor ekranları (5a liste, şablon, ayrıntı; 5b çalışma geçmişi; 5c düzenleyici) | 5a, 5b ve 5c (ilk sürüm) uygulandı (aşağıda "Dilim 5a", "5b", "5c"); 5d kayıt seçici, kayıt üzerinde deneme ve elle çalıştırma uygulandı ("Dilim 5d") |
 | 6 | Performans ölçümü, işletim belgesi, yol haritası | Sonra |
@@ -593,7 +594,7 @@ Kural motoru ile kayda bağlı onay (4a/4b/4c) birbirine bağlandı: bir kural, 
 
 ### Dilim 4c-4: Kalıcı çok adımlı iş akışı (9 Kasım 2026)
 
-Karar: **ayrı bir akış motoru ve `WorkflowDefinitions/Instances/Waits` tabloları kurulmaz.** Kural sürümünün aksiyon adımları zaten sıralı, kalıcı (`AutomationRunSteps`), idempotent ve kiralı çalışır (Dilim 2a); bir adımın "beklemesi" bu modele küçük bir ekle girer. Ayrı motor ikinci bir yürütme, tekilleştirme, yeniden deneme ve izleme yolu demekti; kullanıcıya fazladan bir şey vermeden riski artırırdı. Dallanma (koşullu adım), paralel kol ve döngü bu dilimde yoktur; ihtiyaç doğarsa adım tanımına koşul eklemek ayrı bir dilimdir.
+Karar: **ayrı bir akış motoru ve `WorkflowDefinitions/Instances/Waits` tabloları kurulmaz.** Kural sürümünün aksiyon adımları zaten sıralı, kalıcı (`AutomationRunSteps`), idempotent ve kiralı çalışır (Dilim 2a); bir adımın "beklemesi" bu modele küçük bir ekle girer. Ayrı motor ikinci bir yürütme, tekilleştirme, yeniden deneme ve izleme yolu demekti; kullanıcıya fazladan bir şey vermeden riski artırırdı. Dallanma (koşullu adım), paralel kol ve döngü bu dilimde yoktur; dallanma Dilim 4c-5 ile adım koşulu olarak eklendi.
 
 - **Sözleşme (Core.Contracts):** `AutomationActionStatus.Waiting` ve `AutomationActionResult.ResumeAt` (adım bir süreyi ya da sonucu bekliyor), `AutomationActionResult.StopFlow` (akış bilerek bitti; hata değil). `AutomationActionRequest.StepStartedAt` (adımın ilk denendiği an; bekleme süresi buradan sayılır) ve `FlowStartedAt` (çalışmanın başladığı an). Var olan aksiyonlar değişmedi.
 - **Motor:** `Waiting` dönen adım `Pending` kalır, `WaitingUntil` yazılır, deneme sayısı geri alınır (bekleme deneme hakkından sayılmaz); çalışma `Running` kalır, kirasını bırakır ve `NextAttemptAt = ResumeAt` olur. Uyanınca aynı adım aynı idempotency anahtarıyla yeniden çağrılır; kural kapalıysa ya da acil durdurma açıksa önce iptal olur (adım sınırı denetimi). `StopFlow` dönen adımdan sonra kalan adımlar `Skipped` ("Akış önceki adımda durdu"), çalışma `Succeeded` biter, not adımın özetidir. Yeniden denemede adımın `StartedAt`/`WaitingUntil` alanları sıfırlanır.
@@ -610,3 +611,24 @@ Karar: **ayrı bir akış motoru ve `WorkflowDefinitions/Instances/Waits` tablol
 | --- | --- |
 | `dotnet test tests/Modulix.Core.Tests --filter FlowAutomationTests` | 12: beyan (Core, izin, yan etki), süre toplama ve aralık hataları, onay süresi varsayılanı ve sınırı, okunur süre; katalog testleri Core'un üç aksiyonuna güncellendi. Core paketi 900/900 |
 | `dotnet test tests/Modulix.IntegrationTests --filter AutomationFlowTests` (SQL Server; CI koşar) | 5: mutlu yol (bekleme çalışmayı park eder, süre dolunca kaldığı adımdan sürer; onay gelince takip açılır), hata (ret akışı durdurur ve kalan adım atlanır; sıfır süre ve onaya açık olmayan türde onay beklemesi 422; bekleyen akışın kuralı kapanınca iptal), tenant izolasyonu (bir firmanın onayı yalnızca kendi akışını ilerletir, çalışma diğer firmadan 404), yetki (`core.approvals.request` olmadan onay beklemesi yayınlanamaz; "Bekle" izin istemez) |
+
+### Dilim 4c-5: Akışta dallanma (9 Kasım 2026)
+
+Karar: dallanma **adım koşuluyla** kurulur; ağaç biçiminde "eğer/değilse" blokları, paralel kol ve döngü yoktur. Kuralın adımları düz, sıralı ve kalıcı kalır (Dilim 2a, 4c-4); her adıma isteğe bağlı bir koşul eklenir. "Eğer tutar ≥ 50.000 ise A, değilse B" iki adıma karşıt koşul vererek, "küçükse burada bitir" ise koşullu **Akışı bitir** adımıyla yazılır. Gerekçe: iç içe blok modeli yürütmede adım numaralarını, tekilleştirme anahtarlarını, düzenleyiciyi ve çalışma ayrıntısını baştan değiştirirdi; adım koşulu bunların hiçbirine dokunmadan dalların hemen hepsini anlatır ve her adımın neden çalışıp çalışmadığı geçmişte tek satırda görünür.
+
+- **Sözleşme (Core.Contracts):** `AutomationActionStep.When` (isteğe bağlı `ConditionNode`; JSON'da `when`). Boşsa yazılmaz: var olan kural sürümlerinin JSON'u ve özeti (`DefinitionHash`) değişmez, migration yok.
+- **Değerlendirme anı:** adım koşulu adıma **sıra geldiğinde, ilk denemesinde** kaydın güncel değerleriyle (kayıt boru hattından, kuralın kimliğiyle) sorulur; önceki adımların değişiklikleri ve beklemeler dahil. Sağlanmazsa adım `Skipped` olur ("Adım koşulu sağlanmadı, adım atlandı (koşulun metni)") ve akış sıradaki adımla sürer. Başlamış adım (bekleyen ya da yeniden denenen) koşulu yeniden sormaz: dal yarıda değişmez. Elle "Yeniden dene" adımı baştan başlattığı için koşul yeniden sorulur.
+- **Doğrulama:** kural koşuluyla aynı doğrulayıcı (`ConditionValidator`, yol `actions[i].when`); olayın farkı adım anında anlamlı olmadığından eski değer ve değişiklik operatörleri adım koşulunda yasaktır (`ConditionOptions.StepCondition`, iletisi adıma göre). Yayınlayan göremediği alanla adım koşulu yazamaz; adım koşulunun okuduğu alanların okuma izni kuralın kimliğine eklenir (`AutomationRuleIdentity`).
+- **Akışı bitir** (`core.flow.stop`): akışı bilerek bitirir (`StopFlow`); kalan adımlar atlanır, çalışma başarılı biter, isteğe bağlı "Neden" (en çok 200 karakter) çalışmanın notu olur. İzin istemez, `Read` yan etkili, dry-run destekler.
+- **Önizleme ve özet:** "Doğrula" örnek kayıtta her adım koşulunun bugün sağlanıp sağlanmadığını adımın notunda yazar; kural özeti (denetim kaydı) koşullu adımı "(koşullu)" diye işaretler.
+- **Arayüz:** düzenleyicide her adım kartında "Yalnızca şu koşulda çalışsın" bölümü; kural koşuluyla aynı koşul satırları (ortak parça), değişiklik operatörleri ve eski değer seçimi sunulmaz. Yeni CSS sınıfı ya da token yok (`cond-group`, `cond-head`, `cond-hint`). Çalışma ayrıntısında atlanan adım ve nedeni var olan özet sütununda görünür.
+
+**Bilerek yapılmadı:** iç içe dal blokları ve dalların birleşmesi için ayrı sözdizimi (karşıt koşullarla yazılır), paralel kol, döngü, adım koşulunda ilişki/iç içe grup düzenleme (sunucu kabul eder; düzenleyici bu koşulu kilitli gösterip korur), bir adımın sonucuna (ör. önceki adım atlandı mı) bakan koşul.
+
+### Test sonuçları (Dilim 4c-5)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Core.Tests --filter FlowBranchTests` | 7: karşıt koşullu dal geçerli, adım koşulu sorunları `actions[i].when` yolunda, güncelleme tetikleyicisinde de değişiklik/eski değer reddi, görülemeyen alan reddi, kimliğe alan izni eklenmesi, koşulsuz adımın JSON'u değişmez ve koşul gidip gelir, "Akışı bitir" beyanı ve dry-run; düzenleyici JSON biçimi (`AutomationEditorJsonShapeTests`) ve Core aksiyon kataloğu güncellendi. Core paketi 910/910 |
+| `dotnet test tests/Modulix.Web.Tests --filter AutomationEditorModel` | 13 (1 yeni): adım koşulu yalnızca doluysa yazılır, okunur ve aynen geri yazılır |
+| `dotnet test tests/Modulix.IntegrationTests --filter AutomationBranchTests` (SQL Server; CI koşar) | 4: mutlu yol (bekleme sırasında tutar değişince dal adım anındaki değere göre seçilir; koşulu sağlamayan adım atlanır), hata (koşullu "Akışı bitir" yalnızca eşleşen dalı bitirir; değişiklik koşulu ve bilinmeyen alan 422), tenant izolasyonu (çalışma diğer firmadan 404, kural diğer firmadan çalıştırılamaz), yetki (tutarı göremeyen yayınlayan tutara bakan adım koşulu yazamaz, görebildiği alanla yazabilir). Otomasyon + onay entegrasyon testleri 144/144 |
