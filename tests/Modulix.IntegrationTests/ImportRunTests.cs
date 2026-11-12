@@ -155,7 +155,7 @@ public class ImportRunTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         Assert.Equal(("Succeeded", 1), (unknown.Run.Status, unknown.Run.CreatedCount));
         Assert.Equal(("file-invalid", "Warning"), (unknown.Issues.Items[0].Code, unknown.Issues.Items[0].Severity));
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client, "/api/imports", Lead, "a.xlsx", "Konu\r\n")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client, "/api/imports", Lead, "a.xls", "Konu\r\n")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await PostAsync(client, "/api/imports", "crm.bilinmiyor", "a.csv", "Konu\r\n")).StatusCode);
         Assert.Equal(ImportLimits.MaxFileBytes, ImportFileLimits.MaxFileBytes);
     }
@@ -320,6 +320,94 @@ public class ImportRunTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         using var client = await LoginAsync(admin);
         var response = await client.PostAsJsonAsync("/api/customization/fields", new SaveCustomFieldRequest(Lead, label, CustomFieldType.Text));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+    }
+
+    // ADR-0033 Dilim 4a: .xlsx çalışma kitabı CSV ile aynı yoldan (boru hattı, günlük, yetki) geçer.
+    [Fact]
+    public async Task Xlsx_workbook_runs_through_the_same_pipeline_with_typed_cells()
+    {
+        var (client, tenant, user) = await ImporterAsync();
+        using var _c = client;
+
+        // Sayı ve tarih hücreleri gerçek tiptedir (Excel'in sakladığı gibi); boş satır numarayı ilerletir.
+        var workbook = Workbook(
+            new Dictionary<string, object?> { ["Konu"] = "Filo", ["Soyad"] = "Yılmaz", ["Tahmini bütçe"] = 1250.5, ["Hedef satın alma tarihi"] = new DateTime(2026, 12, 31), ["E-posta"] = "a@acme.test" },
+            new Dictionary<string, object?> { ["Konu"] = null, ["Soyad"] = null, ["Tahmini bütçe"] = null, ["Hedef satın alma tarihi"] = null, ["E-posta"] = null },
+            new Dictionary<string, object?> { ["Konu"] = "Depo", ["Soyad"] = "Kaya", ["Tahmini bütçe"] = 100d, ["Hedef satın alma tarihi"] = null, ["E-posta"] = "gecersiz" });
+
+        var result = await RunBytesAsync(client, "/api/imports", "liste.xlsx", workbook);
+
+        Assert.Equal(("Apply", "PartiallySucceeded", 2, 1, 1), (result.Run.Mode, result.Run.Status, result.Run.TotalRows, result.Run.CreatedCount, result.Run.FailedCount));
+        var issue = Assert.Single(result.Issues.Items);
+        Assert.Equal((4, "email", "format-invalid"), (issue.RowNo, issue.ColumnKey, issue.Code));
+
+        using var scope = factory.OpenScope(tenant.Id);
+        var lead = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Lead>().AsNoTracking().SingleAsync();
+        Assert.Equal(("Filo", 1250.50m, user.Id), (lead.Subject, lead.EstimatedBudget, lead.OwnerId));
+        Assert.Equal(new DateOnly(2026, 12, 31), lead.TargetPurchaseDate);
+    }
+
+    [Fact]
+    public async Task Broken_or_unsupported_workbooks_fail_the_run_without_writing_records()
+    {
+        var (client, tenant, _) = await ImporterAsync();
+        using var _c = client;
+
+        // Uzantısı .xlsx olan düz metin ve zip imzalı ama çalışma kitabı olmayan içerik: dosya sorunu olarak günlüğe yazılır.
+        foreach (var bytes in new[] { Encoding.UTF8.GetBytes("Konu;Soyad\r\nA;B\r\n"), new byte[] { (byte)'P', (byte)'K', 3, 4, 0, 0, 0, 0 } })
+        {
+            var result = await RunBytesAsync(client, "/api/imports", "bozuk.xlsx", bytes);
+            Assert.Equal(("Failed", 0), (result.Run.Status, result.Run.CreatedCount));
+            Assert.Contains(result.Issues.Items, i => i is { Code: "file-invalid", Severity: "Error" });
+        }
+
+        using var scope = factory.OpenScope(tenant.Id);
+        Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Lead>().CountAsync());
+
+        // Yetki ve oturum CSV ile aynı uçta denetlenir.
+        using var anonymous = factory.CreateBrowserClient();
+        var response = await anonymous.PostAsync($"/api/imports?entityKey={Lead}&fileName=a.xlsx", new ByteArrayContent(Workbook(new Dictionary<string, object?> { ["Konu"] = "X" })));
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Xlsx_upload_is_isolated_between_tenants()
+    {
+        var (clientA, tenantA, _) = await ImporterAsync();
+        var (clientB, tenantB, _) = await ImporterAsync();
+        using var _a = clientA;
+        using var _b = clientB;
+
+        await RunBytesAsync(clientA, "/api/imports", "a.xlsx", Workbook(new Dictionary<string, object?> { ["Konu"] = "Yalnızca A", ["Soyad"] = "Kaya" }));
+
+        using var scopeA = factory.OpenScope(tenantA.Id);
+        Assert.Equal(1, await scopeA.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Lead>().CountAsync());
+        using var scopeB = factory.OpenScope(tenantB.Id);
+        Assert.Equal(0, await scopeB.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Lead>().CountAsync());
+        var logB = await clientB.GetFromJsonAsync<ImportRunPageDto>("/api/imports");
+        Assert.Empty(logB!.Items);
+    }
+
+    private static byte[] Workbook(params Dictionary<string, object?>[] rows)
+    {
+        using var stream = new MemoryStream();
+        MiniExcelLibs.MiniExcel.SaveAs(stream, rows);
+        return stream.ToArray();
+    }
+
+    private static async Task<ImportRunDetailDto> RunBytesAsync(HttpClient client, string url, string fileName, byte[] bytes)
+    {
+        var response = await client.PostAsync($"{url}?entityKey={Lead}&fileName={fileName}", new ByteArrayContent(bytes));
+        Assert.True(response.StatusCode == HttpStatusCode.Accepted, await response.Content.ReadAsStringAsync());
+        var detail = (await response.Content.ReadFromJsonAsync<ImportRunDetailDto>())!;
+        for (var attempt = 0; detail.Run.Status is "Pending" or "Running"; attempt++)
+        {
+            Assert.True(attempt < 1200, "İçe aktarma bitmedi.");
+            await Task.Delay(100);
+            detail = (await client.GetFromJsonAsync<ImportRunDetailDto>($"/api/imports/{detail.Run.Id}?pageSize=200"))!;
+        }
+
+        return detail;
     }
 
     private async Task<Tenant> TenantAsync()
