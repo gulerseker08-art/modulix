@@ -107,7 +107,7 @@
     /* Köşe yarıçapları */
     --mx-radius-input: 9px;
     --mx-radius-button: 10px;
-    --mx-radius-card: 12px;
+    --mx-radius-card: 16px;
     --mx-radius-drawer: 16px;
     --mx-radius-modal: 16px;
     --mx-radius-badge: 999px;
@@ -134,6 +134,18 @@
     --mx-hero-tile: rgba(255, 255, 255, 0.12);
     --mx-hero-tile-hover: rgba(255, 255, 255, 0.2);
     --mx-nav-active-bg: linear-gradient(90deg, #E1F4FA, #E5EEFD);
+    /* Birincil eylem (CTA, 12.11.2026 görsel kararı): koyu turkuazdan maviye dolu degrade; beyaz metinle iki uçta da en az 4.5:1 (AA) */
+    --mx-gradient-cta: linear-gradient(135deg, #0A8093 0%, #0B6AA6 100%);
+    --mx-gradient-cta-hover: linear-gradient(135deg, #086F80 0%, #095B91 100%);
+    --mx-shadow-cta: 0 6px 16px rgba(10, 128, 147, 0.28);
+    --mx-shadow-cta-hover: 0 8px 20px rgba(10, 128, 147, 0.36);
+    /* Etkin sekmenin alt çizgisi: turkuazdan maviye */
+    --mx-gradient-tab-line: linear-gradient(90deg, #00C2C7, #087DB8);
+    /* İçerik paneli: sayfa zemininde yüzen yuvarlak açık yüzey */
+    --mx-panel-bg: linear-gradient(180deg, #FCFDFF 0%, #F2F8FD 100%);
+    --mx-panel-border: #E3ECF6;
+    --mx-radius-panel: 24px;
+    --mx-shadow-panel: 0 1px 2px rgba(16, 29, 53, 0.03), 0 16px 48px rgba(16, 29, 53, 0.07);
     /* Pano göstergesi: zemin, ayırıcı ve dolgular (dash-hero) */
     --mx-hero-track: rgba(255, 255, 255, 0.14);
     --mx-hero-line: rgba(255, 255, 255, 0.18);
@@ -253,6 +265,15 @@
     --mx-gradient-brand-hover: linear-gradient(135deg, #6CC6F2 0%, #8DBBFC 100%);
     --mx-gradient-hero: linear-gradient(115deg, #0A1E3C 0%, #0F3560 55%, #125580 100%);
     --mx-nav-active-bg: var(--mx-surface-muted);
+    /* Koyu temada CTA açık turkuaz→mavi degrade + koyu metin (--mx-text-on-brand) */
+    --mx-gradient-cta: linear-gradient(135deg, #2DD4D8 0%, #4DB4F2 100%);
+    --mx-gradient-cta-hover: linear-gradient(135deg, #5EEAEE 0%, #7CC8F7 100%);
+    --mx-shadow-cta: 0 6px 16px rgba(45, 212, 216, 0.18);
+    --mx-shadow-cta-hover: 0 8px 20px rgba(45, 212, 216, 0.28);
+    --mx-gradient-tab-line: linear-gradient(90deg, #2DD4D8, #3BAEE6);
+    --mx-panel-bg: linear-gradient(180deg, #0F1A2F 0%, #0D172B 100%);
+    --mx-panel-border: #1B2C48;
+    --mx-shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 48px rgba(0, 0, 0, 0.35);
     --mx-hero-line: rgba(255, 255, 255, 0.16);
 
     --bs-body-bg: var(--mx-background);
@@ -344,55 +365,44 @@ a, .btn-link {
     width: var(--mx-control-height);
 }
 
-/* Birincil: çizgili lacivert (koyu temada açık çizgi). Tek eleman, ek işaretleme gerekmez:
-   iki yan kenar yarım daire, üst ve alt kenar degrade çizgi parçalarıyla çizilir. Beklemede üstte uzun parça solda,
-   altta sağda; hover'da parçalar yer değiştirir ve zemin açık tona dolar. Yazı rengi çizgiyle aynıdır. */
+/* Birincil (12.11.2026 görsel kararı): dolu turkuaz→mavi degrade, hafif ışıma, yuvarlatılmış dikdörtgen. Yazı --mx-text-on-brand
+   (açıkta beyaz, koyuda koyu lacivert); degradenin iki ucu da metinle AA. Hover'da bir ton koyulaşır ve 1 px yükselir. */
 .btn-primary {
-    --mx-line: var(--mx-fill-primary);
-    --mx-line-long: calc(100% - 48px);
-    --mx-line-short: 8px;
-    --bs-btn-color: var(--mx-fill-primary);
+    --bs-btn-color: var(--mx-text-on-brand);
     --bs-btn-bg: transparent;
-    --bs-btn-border-color: var(--mx-fill-primary);
-    --bs-btn-hover-color: var(--mx-fill-primary);
-    --bs-btn-hover-bg: var(--mx-surface-control);
-    --bs-btn-hover-border-color: var(--mx-fill-primary);
-    --bs-btn-active-color: var(--mx-fill-primary);
-    --bs-btn-active-bg: var(--mx-surface-control);
-    --bs-btn-active-border-color: var(--mx-fill-primary);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-text-on-brand);
+    --bs-btn-hover-bg: transparent;
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-text-on-brand);
+    --bs-btn-active-bg: transparent;
+    --bs-btn-active-border-color: transparent;
     --bs-btn-disabled-color: var(--mx-text-secondary);
     --bs-btn-disabled-bg: var(--mx-surface-muted);
     --bs-btn-disabled-border-color: transparent;
     --bs-btn-disabled-opacity: 1;
     font-weight: 700;
-    border-width: 0 2px;
-    border-radius: 999px;
-    background-image: linear-gradient(var(--mx-line), var(--mx-line)), linear-gradient(var(--mx-line), var(--mx-line)), linear-gradient(var(--mx-line), var(--mx-line)), linear-gradient(var(--mx-line), var(--mx-line));
-    background-repeat: no-repeat;
-    background-origin: border-box;
-    background-position: left 16px top 0, right 16px top 0, right 16px bottom 0, left 16px bottom 0;
-    background-size: var(--mx-line-long) 2px, var(--mx-line-short) 2px, var(--mx-line-long) 2px, var(--mx-line-short) 2px;
-    transition: background-size 0.45s ease, background-color 0.3s ease, color 0.15s ease, transform 0.15s ease;
+    border-width: 0;
+    background-image: var(--mx-gradient-cta);
+    box-shadow: var(--mx-shadow-cta);
 }
 
     .btn-primary:hover:not(:disabled):not(.disabled) {
-        background-size: var(--mx-line-short) 2px, var(--mx-line-long) 2px, var(--mx-line-short) 2px, var(--mx-line-long) 2px;
+        background-image: var(--mx-gradient-cta-hover);
+        box-shadow: var(--mx-shadow-cta-hover);
+        transform: translateY(-1px);
     }
 
     .btn-primary:active:not(:disabled):not(.disabled) {
         transform: translateY(1px);
+        box-shadow: var(--mx-shadow-control);
     }
 
     .btn-primary:disabled,
     .btn-primary.disabled {
         background-image: none;
+        box-shadow: none;
     }
-
-@media (prefers-reduced-motion: reduce) {
-    .btn-primary {
-        transition: none;
-    }
-}
 
 /* Yıkıcı onay düğmesi: düz kırmızı dolgu; koyu temada açık kırmızı + koyu metin. Hover'da bir ton açılır ve 1 px yükselir. */
 .btn-danger {
@@ -620,7 +630,7 @@ a, .btn-link {
 }
 
 .btn-primary:focus-visible {
-    border-color: var(--mx-fill-primary);
+    border-color: transparent;
 }
 
 .btn-danger:focus-visible {
@@ -959,14 +969,15 @@ code {
         min-width: 0;
     }
 
+    /* Sayfa ikonu (12.11.2026 görsel kararı): daha büyük, yumuşak marka→turkuaz zeminli yuvarlak kutu. */
     .page-header .page-icon {
         display: inline-grid;
         place-items: center;
         flex: none;
-        width: 3rem;
-        height: 3rem;
+        width: 3.5rem;
+        height: 3.5rem;
         border-radius: var(--mx-radius-card);
-        background: var(--mx-tone-brand-bg);
+        background: linear-gradient(135deg, var(--mx-tone-brand-bg), var(--mx-tone-teal-bg));
         color: var(--mx-brand-primary);
     }
 
@@ -1520,6 +1531,22 @@ tr.done td.primary {
 .list-toolbar-spacer {
     flex: 1 1 auto;
 }
+
+/* Araç çubuğu düğmeleri (Filtrele, Sütunlar; 12.11.2026 görsel kararı): beyaz yüzey, ince çerçeve, sonunda açılır ok. */
+.list-toolbar .btn-ghost {
+    --bs-btn-bg: var(--mx-surface);
+    --bs-btn-border-color: var(--mx-border);
+    --bs-btn-hover-bg: var(--mx-surface-hover);
+    --bs-btn-hover-border-color: var(--mx-border-strong);
+    --bs-btn-active-bg: var(--mx-surface-hover);
+    --bs-btn-active-border-color: var(--mx-border-strong);
+    box-shadow: var(--mx-shadow-control);
+}
+
+    .list-toolbar .btn-ghost .toolbar-chevron {
+        margin-left: var(--mx-space-1);
+        color: var(--mx-text-secondary);
+    }
 
 .view-selector,
 .row-menu {
@@ -4652,6 +4679,31 @@ button.pipeline-label {
     bottom: 0;
 }
 
+/* Liste görünümleri (ViewTabs, 12.11.2026 görsel kararı): etkin sekme açık marka zeminli, üstü yuvarlak, altında turkuaz→mavi çizgi. */
+.view-tabs {
+    gap: var(--mx-space-2);
+}
+
+    .view-tabs .record-tab {
+        padding: 0 var(--mx-space-5);
+        border-radius: var(--mx-radius-button) var(--mx-radius-button) 0 0;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+        .view-tabs .record-tab:hover:not(.active) {
+            background: var(--mx-surface-hover);
+        }
+
+        .view-tabs .record-tab.active {
+            background: var(--mx-tone-brand-bg);
+        }
+
+        .view-tabs .record-tab.active::after {
+            left: 0;
+            right: 0;
+            background: var(--mx-gradient-tab-line);
+        }
+
 .record-tab-count {
     padding: 0.05rem 0.45rem;
     border-radius: 999px;
@@ -4760,7 +4812,8 @@ button.pipeline-label {
     padding: 0 var(--mx-space-3) 0 2.625rem;
     border: 1px solid var(--mx-border);
     border-radius: 999px;
-    background: var(--mx-background);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow-control);
     color: var(--mx-text-primary);
     font-size: var(--mx-fs-body);
 }
@@ -6399,7 +6452,7 @@ button.hero-stat {
     min-width: 1.125rem;
     padding: 0 4px;
     border-radius: 999px;
-    background: var(--mx-gradient-brand);
+    background: var(--mx-gradient-cta);
     color: var(--mx-text-on-brand);
     font-size: 0.6875rem;
     font-weight: 700;
