@@ -8988,6 +8988,69 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Vehicles", "fleet");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Logistics.Domain.Driver", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CarrierPartyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("DefaultVehicleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DriverType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "CarrierPartyId")
+                        .HasDatabaseName("IX_Drivers_Carrier");
+
+                    b.HasIndex("TenantId", "DefaultVehicleId")
+                        .HasDatabaseName("IX_Drivers_Vehicle");
+
+                    b.HasIndex("TenantId", "PersonId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Drivers_Person");
+
+                    b.ToTable("Drivers", "logistics");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Marketing.Domain.AudienceSnapshot", b =>
                 {
                     b.Property<Guid>("Id")

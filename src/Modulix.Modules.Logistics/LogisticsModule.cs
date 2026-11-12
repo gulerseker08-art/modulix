@@ -1,10 +1,17 @@
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Modules.Logistics.Records;
 
 namespace Modulix.Modules.Logistics;
 
-/// <summary>Lojistik: sevkiyat, taşıyıcı, maliyet.</summary>
+/// <summary>
+/// Lojistik (ADR-0038): sürücü kartı (dilim 3), sonra taşıma talebi, sevkiyat, sefer, teslim ve masraf. Araç kimliği Filo modülündedir
+/// (<c>IVehicleDirectory</c>); sürücü <c>core.Person</c> kaydının uzantısıdır.
+/// </summary>
 public sealed class LogisticsModule : IModule
 {
     public const string ModuleKey = "logistics";
@@ -17,6 +24,8 @@ public sealed class LogisticsModule : IModule
         public const string CarriersWrite = "logistics.carriers.write";
         public const string CostsRead = "logistics.costs.read";
         public const string CostsWrite = "logistics.costs.write";
+        public const string DriversRead = "logistics.drivers.read";
+        public const string DriversWrite = "logistics.drivers.write";
     }
 
     public string Key => ModuleKey;
@@ -31,6 +40,8 @@ public sealed class LogisticsModule : IModule
         new(Permissions.CarriersWrite, "Taşıyıcı ekler ve düzenler", "Taşıyıcılar"),
         new(Permissions.CostsRead, "Maliyetleri görüntüler", "Maliyetler"),
         new(Permissions.CostsWrite, "Maliyet ekler ve düzenler", "Maliyetler"),
+        new(Permissions.DriversRead, "Sürücü kartlarını görüntüler", "Sürücüler"),
+        new(Permissions.DriversWrite, "Sürücü kartı ekler ve düzenler; sürücü için kişi kaydı açar", "Sürücüler"),
     ];
 
     /// <summary>Kural altyapısında kullanılan kayıt türleri (ADR-0027).</summary>
@@ -75,11 +86,72 @@ public sealed class LogisticsModule : IModule
         new(
             "logistics.operations",
             "Operasyon",
-            "Sevkiyatları ve taşıyıcıları görüntüler ve düzenler; maliyetleri görüntüler.",
+            "Sevkiyatları, taşıyıcıları ve sürücü kartlarını görüntüler ve düzenler; maliyetleri görüntüler.",
             [
                 Permissions.ShipmentsRead, Permissions.ShipmentsWrite,
                 Permissions.CarriersRead, Permissions.CarriersWrite,
                 Permissions.CostsRead,
+                Permissions.DriversRead, Permissions.DriversWrite,
             ]),
     ];
+
+    public static class Entities
+    {
+        public const string Driver = "logistics.driver";
+    }
+
+    /// <summary>Platform ilişki rolleri (ADR-0029 K9): taşeron sürücünün çalıştığı firma bu roldedir.</summary>
+    public static class RelationshipRoles
+    {
+        public const string Carrier = "tasiyici";
+    }
+
+    /// <summary>Filo araç türü kategorisi (Filo modülünün <c>VehicleKindCategories.Towed</c> değeri; sözleşme metnidir, proje başvurusu değil).</summary>
+    public const string VehicleKindTowed = "towed";
+
+    /// <summary>Denetim kaydında görünen kayıt türleri (Y5).</summary>
+    IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
+    [
+        new(Entities.Driver, "Sürücü", Permissions.DriversRead, new Dictionary<string, string>
+        {
+            ["personId"] = "Kişi", ["driverType"] = "Sürücü tipi", ["carrierPartyId"] = "Taşıyıcı firma",
+            ["defaultVehicleId"] = "Varsayılan araç", ["status"] = "Durum", ["notes"] = "Notlar",
+        }, "personId")
+        {
+            References = new Dictionary<string, string> { ["personId"] = SharedEntities.Person, ["carrierPartyId"] = SharedEntities.Party },
+        },
+    ];
+
+    IReadOnlyList<CustomizableEntity> IModule.CustomizableEntities { get; } =
+    [
+        new(Entities.Driver, "Sürücü"),
+    ];
+
+    IReadOnlyList<LookupDefinition> IModule.Lookups => LogisticsLookupDefinitions.All;
+
+    /// <summary>
+    /// Ortak kayıtlar (ADR-0006): sürücü bir kişidir; sürücü yazma izni olan, sürücü için kişi kaydı da açabilir (ad, telefon). Taşeron
+    /// sürücünün taşıyıcısı firmadır, okunur. Lojistik firma oluşturmaz.
+    /// </summary>
+    IReadOnlyList<SharedRecordAccess> IModule.SharedRecordAccess { get; } =
+    [
+        new(SharedEntities.Person, Permissions.DriversRead, Permissions.DriversWrite),
+        new(SharedEntities.Party, Permissions.DriversRead),
+    ];
+
+    /// <summary>Kişinin ve firmanın nerede kullanıldığı (silme ve birleştirme koruması).</summary>
+    IReadOnlyList<SharedRecordReference> IModule.SharedRecordReferences { get; } =
+    [
+        new(SharedEntities.Person, Entities.Driver, "personId", "sürücü kartı"),
+        new(SharedEntities.Party, Entities.Driver, "carrierPartyId", "sürücü (taşıyıcı)"),
+    ];
+
+    /// <summary>Sürücü formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>
+    IReadOnlyList<FormDefinition> IModule.Forms => LogisticsForms.All;
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddScoped<LogisticsStoreContext>();
+        services.AddScoped<IRecordStore, DriverRecordStore>();
+    }
 }

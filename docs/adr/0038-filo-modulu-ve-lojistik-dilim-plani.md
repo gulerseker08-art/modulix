@@ -172,3 +172,22 @@ Yerel veritabanında `TableInventoryTests` başka bir oturumdan kalan `platform.
 | `dotnet test tests/Modulix.Modules.Fleet.Tests` | 7: tür listeleri ve kategorileri, iki sekmeli varsayılan form, lookup hedefleri ve yalnızca taşıyıcıda rol süzgeci, sonraki bakım tarihi kural alanı + tarama kaynağı, Shared sabitleri |
 | `dotnet test tests/Modulix.IntegrationTests --filter "FleetMaintenanceTests\|FleetVehicleTests"` (SQL Server; CI koşar) | 10: mutlu yol (türetilmiş araç alanları, türetilmiş alan formdan yazılamaz, silmede önceki bakıma dönüş, "bakımı yaklaşan" süzgeci, arama, denetim kaydı; **bakıma 7 gün kala kuralı taramayla yalnızca eşleşen aracı bulur**), doğrulama (zorunlu alan, tarih/km tutarlılığı, para birimi, ileri tarih, araç değiştirilemez), tenant izolasyonu (başka tenant'ın aracına bakım yazılamaz, kayıt görünmez ve silinemez), yetki (okuyan yazamaz, araç izni bakım ekranını açmaz) |
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69 / 120: menüde bakım ekranı yalnızca bakım okuma izniyle |
+
+## 12. Dilim 3a: Sürücü kartı (11 Kasım 2026)
+
+Sıra kararı: dilim 2 (Core süreli belge) dosya ekleri ADR'sini (Ç4, PR #285, başka oturum) beklediği için sürücü kartı belgelerden önce, yetkinliksiz başlatıldı; ehliyet, SRC ve psikoteknik dilim 2 ile karta eklenir. Taşıyıcı koşulu (`CarrierTerms`) dilim 3b'ye bırakıldı.
+
+- **Sürücü (`logistics.Drivers`, `ICompanyShared`):** `PersonId` (ortak kişi; `UNIQUE(TenantId, PersonId)`, yalnızca oluştururken), tip (`employee` kadrolu / `subcontracted` taşeron; sabit, çünkü kod buna göre davranır), taşıyıcı firma (yalnızca taşeronda ve zorunlu; `tasiyici` rolü oluşturmada ya da tip/taşıyıcı değişince denetlenir), varsayılan araç, durum (`active`, `onLeave`, `passive`), notlar, özel alanlar. Silme 409 (K12). Migration `LogisticsDrivers` (RLS + şema yetkisi; `logistics` şeması init.sql'de vardı).
+- **Kişi:** sürücünün adı, telefonu ve e-postası kişi kaydındadır, sürücü kartına kopyalanmaz. Lojistik kişiye `SharedRecordAccess(core.person, drivers.read, drivers.write)` bildirir: sürücü yazma izni olan, CRM izni olmadan da sürücü için kişi açabilir; kişi sürücü kartında kullanıldıkça silinemez (`SharedRecordReference`).
+- **Araç bağı (modüller arası):** varsayılan araç Filo'nun kaydıdır; lojistik Filo projesine başvurmaz ve araç tablosuna yabancı anahtar kurmaz. Kayıt sırasında `IVehicleDirectory` ile denetlenir: araç bu tenant'ta olmalı, kategorisi `towed` (dorse/römork) ve durumu pasif olmamalı; Filo kapalıysa araç seçilemez ama kart çalışır (yumuşak bağımlılık). Araç seçimi `fleet.vehicle` hedefli lookup'la yapılır.
+- **Arayüz:** "Lojistik" uygulaması artık gerçektir (panelde pasif "Lojistik" kartı kaldırıldı). Operasyon grubunda "Sürücüler" ekranı (`/lojistik/suruculer`: Tüm sürücüler, Etkin, İzinde, Taşeron, Pasif; soyada göre sıralama; ad, telefon ve e-posta araması) ve sekmeli sürücü kartı ("Kayıtlı kişi / Yeni kişi" seçimi; yeni kişi açılıp sürücü kaydı başarısız olursa tekrar denemede aynı kişi kullanılır). Yeni CSS sınıfı ya da token yok.
+
+**Bilerek yapılmadı:** yetkinlik belgeleri (dilim 2), taşıyıcı koşulu (3b), İK çalışan bağı (M4.1), sürücü portalı (Ç16), çalışma süreleri.
+
+### Test sonuçları (Dilim 3a)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 8: sekmeli form, kişi uzantısı ve Filo aracına yalnızca anahtarla bağ (Filo derleme başvurusu yok), rol şablonu ve katalog, Shared sabitleri |
+| `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsDriverTests\|FleetVehicleTests\|ModulesAndRolesTests"` (SQL Server; CI koşar) | 18: mutlu yol (kişi + kart, taşeron, Filo aracı, ada ve telefona göre arama, sıralama, süzgeçler, denetim kaydı, kişi kullanımdayken silinemez), doğrulama (tek kart, taşıyıcı zorunluluğu ve rolü, dorse, pasif ve bilinmeyen araç, Filo kapalıyken araç seçilemez ama kart güncellenir, silme 409), tenant izolasyonu (başka tenant'ın kişisi ve aracı kullanılamaz, kart görünmez), yetki (okuyan yazamaz ve kişi açamaz, sürücü yazma izni kişi açmaya yeter, modül kapalıyken 403) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69 / 121: Lojistik menüsü yalnızca modül ve izinle; pasif kartlarda yalnızca İK kaldı |

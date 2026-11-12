@@ -1,0 +1,262 @@
+@page "/lojistik/suruculer"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Sürücüler · Modulix</PageTitle>
+
+<AuthGate Module="@LogisticsAccess.ModuleKey" Permission="@LogisticsAccess.DriversRead">
+    <PageHeader Title="Sürücüler" Icon="user" Subtitle="@(page is null ? "Kadrolu ve taşeron sürücüleri, çalıştıkları taşıyıcıyı ve araçlarını yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <DriverEditor Driver="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Sürücü görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Sürücü ara" placeholder="Ad, soyad, telefon veya e-posta ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(LogisticsAccess.DriversWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni sürücü</button>
+        }
+    </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan sürücü yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) sürücü listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Sürücü listesi</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var driver in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, driver)
+                        }
+                        <td class="row-menu-cell">
+                            @if (Session.Can(LogisticsAccess.DriversWrite))
+                            {
+                                <RowMenu Label="@($"{NameOf(driver)} eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(driver)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + LogisticsAccess.DriverEntityKey;
+
+    private const string AllViews = "all";
+    private const string ActiveView = "active";
+    private const string OnLeaveView = "onLeave";
+    private const string PassiveView = "passive";
+    private const string SubcontractedView = "subcontracted";
+
+    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (DriverRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("name", "Ad soyad", "user", "name", "-name", Locked: true),
+        new("driverType", "Tip", "briefcase", "driverType", "-driverType"),
+        new("carrier", "Taşıyıcı", "building"),
+        new("vehicle", "Varsayılan araç", "truck"),
+        new("status", "Durum", "tag", "status", "-status"),
+    ];
+
+    private readonly GridViewState grid = new("logistics.drivers", "name");
+    private readonly Dictionary<Guid, string> personNames = [];
+    private readonly Dictionary<Guid, string> carrierNames = [];
+    private readonly Dictionary<Guid, string> vehiclePlates = [];
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private string? search;
+    private string view = AllViews;
+    private string? status;
+    private string? driverType;
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "logistics.drivers");
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(LogisticsAccess.DriversRead))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(LogisticsAccess.DriverEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm sürücüler", Icon: "users"),
+        new(ActiveView, "Etkin", Icon: "check-circle"),
+        new(OnLeaveView, "İzinde", Icon: "calendar"),
+        new(SubcontractedView, "Taşeron", Icon: "briefcase"),
+        new(PassiveView, "Pasif", Icon: "clock"),
+        .. views.Options,
+    ];
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            status = filters.GetValueOrDefault("status");
+            driverType = filters.GetValueOrDefault("driverType");
+        }
+        else
+        {
+            grid.Reset();
+            status = key switch { ActiveView => "active", OnLeaveView => "onLeave", PassiveView => "passive", _ => null };
+            driverType = key == SubcontractedView ? LogisticsAccess.Subcontracted : null;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(status is { } s ? ("status", s) : null, driverType is { } t ? ("driverType", t) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (status is { } s)
+        {
+            url += $"&status={s}";
+        }
+
+        if (driverType is { } t)
+        {
+            url += $"&driverType={t}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            // Adlar kişi kaydından, taşıyıcı firmadan ve Filo'daki araçtan seçim kutusunun çözümleme ucuyla gelir (izin yoksa "—").
+            await WarehouseLabels.ResolveNamesAsync(Api, LogisticsAccess.DriverPersonLookup, page.Items.Select(d => WarehouseLabels.Id(d, "personId")).OfType<Guid>(), personNames);
+            await WarehouseLabels.ResolveNamesAsync(Api, LogisticsAccess.DriverCarrierLookup, page.Items.Select(d => WarehouseLabels.Id(d, "carrierPartyId")).OfType<Guid>(), carrierNames);
+            await WarehouseLabels.ResolveNamesAsync(Api, LogisticsAccess.DriverVehicleLookup, page.Items.Select(d => WarehouseLabels.Id(d, "defaultVehicleId")).OfType<Guid>(), vehiclePlates);
+        }
+    }
+
+    private string NameOf(RecordResponse driver) => WarehouseLabels.NameOf(personNames, WarehouseLabels.Id(driver, "personId"));
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse driver) => @<td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, driver)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse driver) => key switch
+    {
+        "name" => @<text>@NameOf(driver)</text>,
+        "driverType" => @<span class="badge @LogisticsLabels.TypeBadge(WarehouseLabels.Text(driver, "driverType"))">@LogisticsLabels.DriverType(WarehouseLabels.Text(driver, "driverType"))</span>,
+        "carrier" => @<text>@(WarehouseLabels.Id(driver, "carrierPartyId") is { } carrier ? WarehouseLabels.NameOf(carrierNames, carrier) : "—")</text>,
+        "vehicle" => @<text>@(WarehouseLabels.Id(driver, "defaultVehicleId") is { } vehicle ? WarehouseLabels.NameOf(vehiclePlates, vehicle) : "—")</text>,
+        "status" => @<span class="badge @LogisticsLabels.StatusBadge(WarehouseLabels.Text(driver, "status"))">@LogisticsLabels.Status(WarehouseLabels.Text(driver, "status"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(LogisticsAccess.DriverEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, driver.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private void Open(RecordResponse? driver)
+    {
+        selected = driver;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}
