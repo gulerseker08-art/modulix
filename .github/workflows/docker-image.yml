@@ -1,0 +1,86 @@
+# Modulix API imaji: main'deki CI basariyla bitince imaji derler ve GitHub Container Registry'ye (ghcr.io) iter.
+# CI kirmizi ise imaj yayinlanmaz; test ortami bozuk bir main'i almaz.
+# Test ortami guncel imaji su komutlarla ceker:
+#   docker pull ghcr.io/gulerseker08-art/modulix-api:main
+#   (compose ile: image satirini bu etikete cevirip `docker compose pull api && docker compose up -d api`)
+# Etiketler: main (hep en son main), sha-<kisa commit> (geri donus icin degismez).
+# Gizli bilgi imaja girmez; yapilandirma calisma aninda ortam degiskenleriyle verilir (tek imaj ilkesi).
+
+name: Docker imaji
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Ust uste birlestirmede eski derleme iptal edilir; en son main her zaman kazanir.
+concurrency:
+  group: docker-image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write  # GITHUB_TOKEN ile ghcr.io'ya yazmak icin
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/modulix-api
+
+jobs:
+  publish:
+    # Yalnizca main'e push ile gelen ve basarili biten CI calismasi. 'event == push' sart: depo herkese acik
+    # oldugundan, dali 'main' adli bir fork pull request'i de branches suzgecine uyar; onun imaji yayinlanmamali.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-24.04  # sabit: runner imaji degisince derleme sessizce bozulmasin
+    timeout-minutes: 30
+
+    steps:
+      # workflow_run varsayilan dalin ucunu gosterir; imaj tam olarak CI'in test ettigi commit'ten derlenir.
+      - name: Kodu al
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Commit bilgisi
+        id: commit
+        run: |
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          echo "full=$sha" >> "$GITHUB_OUTPUT"
+          echo "short=${sha:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Buildx kurulumu
+        uses: docker/setup-buildx-action@v3
+
+      - name: ghcr.io oturumu
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Depo sahibi adi buyuk harf iceriyorsa imaj adi kucuk harfe cevrilir (registry zorunlulugu).
+      - name: Imaj etiketleri
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=main
+            type=raw,value=sha-${{ steps.commit.outputs.short }}
+          labels: |
+            org.opencontainers.image.title=Modulix API
+            org.opencontainers.image.revision=${{ steps.commit.outputs.full }}
+
+      - name: Derle ve it
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Modulix.Api/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
