@@ -271,6 +271,7 @@
         min-height: 0;
         overflow-y: auto;
         overflow-x: hidden;
+        scrollbar-width: thin; /* ince çubuk: aktif modül kartının çerçevesini kesmez */
     }
 
     /* Daraltılmış menü: metinler gizlenir, ikonlar ortalanır; adlar title ile ipucu olarak görünür. */
