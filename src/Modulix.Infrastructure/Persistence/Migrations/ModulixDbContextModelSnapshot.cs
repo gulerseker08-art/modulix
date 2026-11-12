@@ -9294,6 +9294,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<decimal?>("FreightAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("FreightCurrency")
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
+
                     b.Property<bool>("Hazardous")
                         .HasColumnType("bit");
 
@@ -9543,6 +9553,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.Property<DateOnly>("PlannedStart")
                         .HasColumnType("date");
+
+                    b.Property<decimal?>("SettlementAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("SettlementCurrency")
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
 
                     b.Property<string>("Status")
                         .IsRequired()

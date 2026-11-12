@@ -75,7 +75,7 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 | 4 | Taşıma talebi ve sevkiyat | 3 |
 | 5 | Sefer, durak zinciri, atama, uygunluk denetimi (belge, kapasite), durum makinesi, sefer numarası | 4, Ç8.1 |
 | 6 | Teslim kanıtı + `ShipmentDelivered.v1` | 5, Ç0.4 |
-| 7 | Navlun ve hakediş → faturalanabilir kalem | 6, ADR-0037 dilim 1 |
+| 7 | Navlun ve hakediş (7a, yapıldı: hassas alanlar) → faturalanabilir kalem (7b) | 6, ADR-0037 dilim 1 |
 | 8 | Masraf + onay + yakıt alanları | 5, Ç6a asgari |
 | 9 | Kârlılık görünümü, eşik kuralları, pano | 7, 8 |
 | 10 | Belgeler: taşıma irsaliyesi çıktısı (Ç8.2), e-İrsaliye adaptörü (Ç11b.3), U-ETDS bildirimi | Ç8, Ç11, bölüm 8 doğrulaması |
@@ -450,3 +450,28 @@ K8 uygulandı. Yoldaki sevkiyat teslim edilir, kısmen teslim edilir ya da tesli
 | `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsDeliveryTests"` | 5/5. **Mutlu yol:** teslim kanıtı, sunucu zamanı, durum, tek iş olayı ve outbox yükü, kanıta fotoğraf, denetim kaydı; kısmi teslim; başarısız teslim ayrı olay ve faturalanabilir olay yok. **Doğrulama:** yoldaki olmayan sevkiyat 409, teslim alan / not / neden zorunlu, başarısızda teslim alan olamaz, bilinmeyen sonuç, hatalı denemeler hiçbir şey yazmaz, eski sürüm 409, genel eylem ucu teslime geçmez, kanıt genel uçtan açılmaz, ikinci teslim 409, kanıt değişmez ve silinmez. **Tenant izolasyonu:** başka tenant'ın sevkiyatı teslim edilemez (404), kanıtı görünmez, listelenmez, dosyası eklenemez. **Yetki:** okuyan teslim kaydedemez ve dosya ekleyemez ama kanıtı ve dosyalarını okur, izinsiz kişi 403, modül kapalıyken 403 |
 | `... --filter "FieldRulePackageTests\|LogisticsTripTests\|LogisticsShipmentTests\|LogisticsDeliveryTests"` (temiz veritabanı) | 18/18 |
 | `... --filter "TableInventoryTests\|TenantIsolationTests\|TenantDataTransferTests\|AutomationRuleTests\|BusinessEventTests\|ModulesAndRolesTests\|SharedRecordTests\|LookupTests\|StarterPackageTests\|CredentialTests\|LogisticsDriverTests\|FleetVehicleTests"` (temiz veritabanı) | 77/77 |
+
+
+## 19. Dilim 7a: Navlun ve taşeron hakedişi (12 Kasım 2026)
+
+Dilim 7 ikiye bölündü: bu dilim yalnızca tutar alanlarını ve yetkisini getirir; "teslim → faturalanabilir kalem" köprüsü (dilim 7b) ADR-0037 kabul edilip `core.BillableItems` yazılınca gelir (ADR-0037 henüz taslaktır ve main'de yoktur). Ölçüm sözlüğü (K11): navlun operasyon değeridir, gelir ya da fatura değildir.
+
+- **Navlun** (sevkiyat): `freightAmount` (decimal 18,2) + `freightCurrency` (ISO 4217, `char(3)`). Müşteriye uygulanan taşıma bedeli, elle girilir (tarife hesabı Ç18a.2 sonraya bırakıldı). **Talepte tutulmaz:** onayda sevkiyata kopyalanırsa, navlun izni olmayan onaylayanın isteğinde alan hiç gelmeyeceği için sessizce kaybolurdu; navlun sevkiyat açıldıktan sonra girilir.
+- **Hakediş** (sefer): `settlementAmount` + `settlementCurrency`. Taşeron seferde taşıyıcıya ödenecek anlaşmalı tutar; yalnızca `carrierPartyId` seçiliyken girilir (taşıyıcısız seferde 422). Tarife ve anlaşma (`CarrierTerms`) ile otomatik hesap yoktur.
+- **Kural** (`MoneyRules`, iki yerde ortak): tutar varsa para birimi zorunlu, para birimi varsa tutar zorunlu; tutar 0 ile 9.999.999.999.999.999,99 arasında, en çok iki ondalık; para birimi üç harfli kod, büyük harfe çevrilir. Tutar silinince para birimi de silinir.
+- **Hassas alan** (`IModule.SensitiveFields`, izin `logistics.freight.read`): dört alan da (para birimleri dahil: yetkisiz kişi mevcut tutarın para birimini değiştirmesin). İzin yoksa alan yanıtta gelmez, yazılamaz, denetim kaydında gizlenir; yazma ayrıca sevkiyat/sefer yazma iznini gerektirir (navlun izni tek başına yazma hakkı vermez). Rol şablonu: yalnızca "Operasyon müdürü" taşır; "Operasyon" taşımaz.
+- **Düzenleme penceresi:** navlun, sevkiyatın yük bilgisiyle aynı kilide bağlıdır (Planlama bekliyor, Planlandı); hakediş sefer planlanırken düzenlenir. Yükleme başladıktan sonra düzeltme ayrı, denetimli bir komut olarak sonraya kaldı.
+- **İş olayı yükü değişmedi:** `ShipmentDelivered` navlun taşımaz; hassas alan olay yükünü gerekmeden yetkisiz abonelere açardı. Faturalanabilir kalem köprüsü (7b) sevkiyatı yetkili bağlamda okuyacak.
+- **Migration:** `LogisticsFreightAndSettlement` yalnızca boş bırakılabilir dört sütun ekler (geriye uyumlu, mevcut tabloda RLS politikası zaten var).
+- **Arayüz:** sevkiyat formunda "Navlun" bölümü (Yük sekmesi), sefer formunda "Hakediş" bölümü; alanlar yalnızca `logistics.freight.read` izni olan kullanıcıya çizilir ve kaydet isteğine yalnızca onun için girer. Sefer formunda taşıyıcı seçilmeden hakediş alanları pasiftir. Yeni CSS sınıfı ya da token yok. **Açık ve koyu tema ekran görüntüsü alınmadı.**
+
+**Bilerek yapılmadı:** faturalanabilir kalem köprüsü (7b), tarife ve anlaşmadan otomatik navlun/hakediş hesabı, yükleme sonrası navlun düzeltme komutu, navlun/hakediş için liste sütunu ve süzgeç, olay yüküne tutar, kâr/marj görünümü (dilim 9), talepte fiyat teklifi.
+
+### Test sonuçları (Dilim 7a)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 21 (3 yeni): hassas alan beyanı ve izin, formlarda alan yerleşimi (talep formunda yok), yalnızca müdür rol şablonu navlun izni taşır |
+| `dotnet test tests/Modulix.ArchitectureTests` | 69/69 |
+| `... --filter "LogisticsFreightTests"` (temiz veritabanı) | 4/4. **Mutlu yol:** navlun girilir, para birimi büyük harfe çevrilir, silinir; talep onayı navlunsuz sevkiyat açar; taşeron seferde hakediş. **Doğrulama:** tutarsız para birimi, tutarsız tutar, geçersiz kod, eksi ve üç ondalıklı tutar, taşıyıcısız hakediş, para birimsiz hakediş, yüklemesi başlayan sevkiyatın navlunu kilitli; hatalı denemeler hiçbir şey yazmaz. **Tenant izolasyonu:** başka tenant'ın sevkiyat ve seferi 404, listede yok, değiştirilemez. **Yetki:** navlun izni olmayan alanları görmez, yazamaz, diğer alanları düzenlemeye devam eder ve navlun korunur, denetim kaydında tutarı görmez, izinsiz kişi 403 |
+| `... --filter "LogisticsDelivery\|LogisticsTrip\|LogisticsShipment\|LogisticsDriver\|LogisticsCarrierTerms\|FieldRulePackage\|AutomationRule\|ModulesAndRoles\|TableInventory\|TenantDataTransfer\|BusinessEvent\|SharedRecord\|TenantIsolation"` (temiz veritabanı) | 85/85 |

@@ -26,7 +26,7 @@ Her yeni ya da değişen ekran için açık ve koyu temada, **1440px**, **1024px
 ## Koyu tema
 - [ ] Inputlar, select okları, tablo başlıkları ve rozetler koyu zemine uyumlu.
 - [ ] Metin/zemin kontrastı ≥ 4.5:1 (büyük metin ≥ 3:1).
-- [ ] Glow ve parlama yok.
+- [ ] Glow ve parlama yok (tek istisna: birincil düğmenin `--mx-shadow-cta` ışıması).
 
 ## Fonksiyonel regresyon
 - [ ] Form açılıyor, kayıt yükleniyor, kaydetme ve doğrulama çalışıyor.
