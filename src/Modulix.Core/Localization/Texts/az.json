@@ -187,6 +187,8 @@
   "nav.app.fleet.maintenance": "Texniki xidmət qeydləri",
   "nav.app.fleet.credentials": "Nəqliyyat vasitəsi sənədləri",
   "nav.app.logistics": "Logistika",
+  "nav.app.logistics.requests": "Daşıma sorğuları",
+  "nav.app.logistics.shipments": "Göndərişlər",
   "nav.app.logistics.drivers": "Sürücülər",
   "nav.app.logistics.carrier-terms": "Daşıyıcı müqavilələri",
   "nav.app.logistics.credentials": "Sürücü sənədləri",

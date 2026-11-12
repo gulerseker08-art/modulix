@@ -52,5 +52,40 @@ public static class LogisticsForms
             new("rateNote", "Ücret anlaşması", "ucret", 12),
             new("performanceNote", "Performans notu", "performans", 12),
         ]),
+
+        Cargo(LogisticsModule.Entities.TransportRequest, "Taşıma talebi", [new("externalRef", "Dış referans", "taraflar", 6)]),
+        Cargo(LogisticsModule.Entities.Shipment, "Sevkiyat", []),
     ];
+
+    /// <summary>Talep ve sevkiyatın ortak düzeni: taraflar ve güzergâh, yük, notlar (üç sekme).</summary>
+    private static FormDefinition Cargo(string entity, string name, IReadOnlyList<FormFieldDefinition> extra) =>
+        new(entity, name,
+        [new(General, "Taraflar ve güzergâh"), new("yuk", "Yük"), new("notlar", "Notlar ve ek bilgiler")],
+        [
+            new("taraflar", "Taraflar", "building"),
+            new("guzergah", "Güzergâh ve tarih", "map-pin"),
+            new("yuk", "Yük", "package", Tab: "yuk"),
+            new("notlar", "Notlar", "message-square", Tab: "notlar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
+        ],
+        [
+            new("customerPartyId", "Müşteri", "taraflar", 6, Required: true, Fixed: true),
+            new("transportModeKey", "Taşıma türü", "taraflar", 6, Required: true, Fixed: true),
+            new("senderPartyId", "Gönderen", "taraflar", 6),
+            new("receiverPartyId", "Alıcı", "taraflar", 6),
+            .. extra,
+            new("pickupCity", "Yükleme şehri", "guzergah", 6, Required: true, Fixed: true),
+            new("deliveryCity", "Teslim şehri", "guzergah", 6, Required: true, Fixed: true),
+            new("pickupAddress", "Yükleme adresi", "guzergah", 6),
+            new("deliveryAddress", "Teslim adresi", "guzergah", 6),
+            new("pickupDate", "Yükleme günü", "guzergah", 6, Required: true, Fixed: true),
+            new("deliveryBy", "En geç teslim", "guzergah", 6),
+            new("cargoDescription", "Yük tanımı", "yuk", 12, Required: true, Fixed: true),
+            new("weightKg", "Ağırlık (kg)", "yuk", 3),
+            new("volumeM3", "Hacim (m³)", "yuk", 3),
+            new("palletCount", "Palet", "yuk", 3),
+            new("loadingMeters", "Yükleme metresi (LDM)", "yuk", 3),
+            new("hazardous", "Tehlikeli madde (ADR)", "yuk", 6),
+            new("notes", "Notlar", "notlar", 12),
+        ]);
 }

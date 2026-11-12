@@ -278,3 +278,62 @@ K3'ün uyarı kısmı uygulandı: eşik koda değil firmanın kuralına yazılı
 | `dotnet test tests/Modulix.Modules.Fleet.Tests` | 14: belge kural türü, tarih alanı, tarama kaynağı, "Bildirim gönder" ve alıcı lookup'ı katalogda; sahip okuma izni modülün olmalı |
 | `dotnet test tests/Modulix.Core.Tests` | Core aksiyon listesi ve abonelik kayıt türleri süreli belgeyle güncellendi |
 | `dotnet test tests/Modulix.IntegrationTests --filter "CredentialExpiryTests\|CredentialTests"` (SQL Server; CI koşar) | mutlu yol ("bitişine 30 gün kala" kuralı yalnızca o güne düşen geçerli belgeyi bulur, iptal edilen ve 31 gün kalan taranmaz, bildirim kayıt değişkeniyle bir kez yazılır; listede plaka ve ad soyad), doğrulama (metin alanına tarih tetikleyicisi, boş ileti, alıcısız adım yayınlanmaz), tenant izolasyonu (tarama başka tenant'ın belgesini bulmaz, onun üyesine bildirim gitmez), yetki (aracı göremeyen alıcıya araç belgesinin bildirimi gitmez; sürücü izni araç belgelerini göstermez) |
+
+## 16. Dilim 4: Taşıma talebi ve sevkiyat (12 Kasım 2026)
+
+K6 ve K7'nin ilk yarısı uygulandı: talep → onay → sevkiyat → planlama → yükleme → yol. Teslim (K8) dilim 6'da, sefer ve durak (K5) dilim 5'tedir.
+
+- **Ortak yük ve güzergâh** (`CargoEntity`):
+  - Taraflar: müşteri (zorunlu), gönderen, alıcı (`core.Party`).
+  - Taşıma türü: `logistics.transport-mode` listesi (Y9b). Kategoriler `full` (komple) ve `partial` (parsiyel); hazır değerler FTL, Ekspres, LTL, Grupaj.
+  - Güzergâh: yükleme ve teslim şehri (zorunlu) ve adresi.
+  - Tarih: yükleme günü (zorunlu) ve en geç teslim; teslim günü yükleme gününden önce olamaz.
+  - Yük: tanım (zorunlu), kg, m³, palet, LDM, tehlikeli madde (ADR) bayrağı.
+  - Notlar, durum ve gerekçe; özel alanlar.
+  - Adres bugün metindir; durak adresi lookup'ı sefer diliminde gelir.
+- **Taşıma talebi** (`logistics.TransportRequests`):
+  - Kaynak `manual` / `api`.
+  - Dış referans kaynak içinde tekildir: `UNIQUE(TenantId, Source, ExternalRef)` süzgeçli. Böylece API'nin yeniden denediği istek çift talep açmaz.
+  - Yalnızca "Yeni" talep düzenlenir.
+- **Sevkiyat** (`logistics.Shipments`):
+  - Genel uçtan açılmaz; yalnızca talep onayıyla doğar.
+  - Her talepten en çok bir sevkiyat: `UNIQUE(TenantId, RequestId)`. Talebe aynı modül içinde bileşik yabancı anahtarla bağlıdır.
+  - Yükleme başlayana kadar (Planlama bekliyor, Planlandı) yük ve tarih düzeltilebilir.
+  - Migration `LogisticsRequestsShipments` (RLS).
+- **Durum yalnızca komutla** (K7):
+  - Geçiş tablosu `LogisticsTransitions`; iş akışı `LogisticsWorkflow`.
+  - Uçlar: `GET/POST /api/logistics/{requests|shipments}/{id}/actions`.
+  - Durum ve gerekçe alanları genel güncellemede yok sayılır. Komut, depoya "iş akışı kapısı"nı açarak kayıt boru hattından yazar (izin, sürüm denetimi 409, denetim kaydı, outbox). Bu, Siparişlerin `OrderWorkflowGate` kalıbıdır.
+- **Talep eylemleri** (onay mekanizması):
+  - **Onayla**: ayrı izin `logistics.requests.approve`. Aynı işlemde (`RunAtomicAsync`) sevkiyatı talebin yük ve güzergâhıyla açar, talebi "Onaylandı" yapar ve sevkiyata bağlar (`shipmentId`).
+  - **Reddet**: aynı izin, gerekçe zorunlu.
+  - **İptal**: yazma izni, gerekçe zorunlu, yalnızca yeni talep.
+  - Onaylayan, sevkiyat yazma izni olmadan da onaylayabilir; sevkiyat onayın parçasıdır.
+- **Sevkiyat eylemleri:**
+  - Planlandı → Yükleme başladı → Yola çıktı.
+  - İptal: teslimden önce ve yola çıkmadan, gerekçeli.
+  - Teslim durumlarına bu komutlarla geçilmez (birim testle denetlenir).
+  - "Planlandı" bugün elle verilir; sefer ataması gelince otomatik olur.
+- **Rol şablonları:**
+  - "Operasyon": talep açar, sevkiyat yürütür, onaylamaz.
+  - Yeni "Operasyon müdürü": onaylar ve reddeder.
+- **Kural yeteneği:** iki kural türü `logistics.transport-request` ve `logistics.shipment`.
+  - Tarama kaynağı yalnızca açık kayıtları tarar.
+  - Tarihe bağlı tetikleyici `pickupDate` / `deliveryBy`, ör. "yükleme gününe 1 gün kala planlanmamış sevkiyatı bildir". Durum geçişleri güncelleme olayıdır.
+  - Eski iskelet beyanındaki `documentStatus` ve `capacityUsagePercent` alanları kayıtta olmadığı için kaldırıldı; uygunluk sefer atamasındadır.
+- **Arayüz:** Lojistik › Taşıma talepleri (`/lojistik/talepler`) ve Sevkiyatlar (`/lojistik/sevkiyatlar`).
+  - Grid şablonu. Görünümler: Onay bekleyen / Onaylanan / Reddedilen / Tümü; Açık / Planlama bekleyen / Yolda / Kapanan / Tümü.
+  - Sekmeli kart: Taraflar ve güzergâh, Yük, Notlar. Kartın üstünde eylem çubuğu var; gerekçe isteyen eylem önce gerekçe sorar, yapılamayan eylem nedeniyle pasif görünür.
+  - Kapanan kayıt salt okunur.
+  - Yeni CSS sınıfı ya da token yok.
+
+**Karar (sapma):** talep ve sevkiyat bölüm 3'teki öneriye göre `ICompanyScoped` olacaktı. Kod tabanında henüz şirket kapsamlı tablo yok ve boru hattının şirket süzgeci uçtan uca denenmedi. Bu yüzden bu dilimde `ICompanyShared` kaldı. İşletici şirket alanı ilk şirket kapsamlı tabloyla birlikte ayrı bir dilimde eklenir (boş sütun + geri doldurma).
+
+**Bilerek yapılmadı:** navlun ve para birimi (dilim 7, alan yetkisiyle), sefer ve durak bağı (dilim 5), teslim ve kanıt (dilim 6), web formu ve sipariş köprüsü (K6, dilim 11), talep numarası serisi (Ç8.1), kendi talebini onaylama yasağı ayarı (Siparişlerdeki gibi; ilk ihtiyaçta ayar olarak).
+
+### Test sonuçları (Dilim 4)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 14: geçiş tablosu durum listesiyle tutarlı, teslim durumlarına komutla geçilmez, iptal gerekçeli ve yoldan önce, onay ayrı izin ve yalnızca müdür şablonunda; sekmeli formlar; kategorili taşıma türü; Shared sabitleri; kural alanları ve tarama kaynağı |
+| `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsShipmentTests\|SharedRecordTests\|LookupTests"` (SQL Server; CI koşar) | mutlu yol (talep → onay → sevkiyat aynı işlemde ve bağlı → planlandı → yükleniyor → yolda, durum süzgeci, denetim kaydı), doğrulama (zorunlu alanlar, tarih sırası, referans tekilliği, genel güncelleme durumu yazamaz, gerekçesiz ret, bilinmeyen eylem, eski sürüm, sevkiyat doğrudan açılmaz, silme yok, kapanan talep düzenlenmez, sırasız geçiş, yoldaki sevkiyat iptal edilmez ve düzenlenmez), tenant izolasyonu (başka tenant'ın müşterisi kullanılamaz, talebi görünmez, eylemleri 404, aynı referans başka tenant'ta serbest), yetki (operasyon onaylayamaz ve eylem listesinde onay görmez, okuyan yazamaz ve eylem yapamaz, izinsiz 403, yalnızca onay izniyle onaylanır, modül kapalıyken 403) |

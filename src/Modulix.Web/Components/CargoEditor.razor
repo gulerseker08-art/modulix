@@ -1,0 +1,360 @@
+@* Taşıma talebi ve sevkiyat formu (ADR-0038 dilim 4); Taşıma talepleri ve Sevkiyatlar ekranları kullanır. Düzen firmanın form düzenine (ADR-0021) göre
+   çizilir. Kayıt genel kayıt uçlarından yapılır (/api/records/logistics.transport-request, /api/records/logistics.shipment). Durum bu formdan
+   değişmez: üstteki eylem çubuğu (LogisticsActionsBar) iş akışı komutlarını çalıştırır. Kapanmış kayıt salt okunur gösterilir; sunucu da reddeder.
+   Sevkiyat bu formdan açılmaz, talep onaylanınca doğar. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@Heading</h2>
+            @if (Record is not null)
+            {
+                <p>@form.PickupCity → @form.DeliveryCity · <span class="badge @LogisticsLabels.CargoStatusBadge(Status)">@StatusLabel</span></p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    @if (Record is not null)
+    {
+        <LogisticsActionsBar Kind="@Kind" Record="Record" Changed="ActionDoneAsync" />
+    }
+
+    @if (ReadOnly && Record is not null)
+    {
+        <div class="alert alert-info" role="status">@LockedText</div>
+    }
+
+    <fieldset disabled="@ReadOnly">
+        <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@($"{Noun} formu bölümleri")">
+            <Field Context="f">
+                @switch (f.Key)
+                {
+                    case "customerPartyId":
+                        <label class="@f.LabelClass()" for="cargo-customer">@f.Label</label>
+                        <LookupPicker Id="cargo-customer" LookupKey="@Lookup("customer")" @bind-Value="form.CustomerPartyId" Required="f.Required" Placeholder="Müşteri firma seçin…" Invalid="@(errors?.ContainsKey("customerPartyId") == true)" />
+                        <FieldError Field="customerPartyId" Errors="errors" />
+                        break;
+                    case "senderPartyId":
+                        <label class="@f.LabelClass()" for="cargo-sender">@f.Label</label>
+                        <LookupPicker Id="cargo-sender" LookupKey="@Lookup("sender")" @bind-Value="form.SenderPartyId" Required="f.Required" Placeholder="Boşsa müşteri" Invalid="@(errors?.ContainsKey("senderPartyId") == true)" />
+                        <FieldError Field="senderPartyId" Errors="errors" />
+                        break;
+                    case "receiverPartyId":
+                        <label class="@f.LabelClass()" for="cargo-receiver">@f.Label</label>
+                        <LookupPicker Id="cargo-receiver" LookupKey="@Lookup("receiver")" @bind-Value="form.ReceiverPartyId" Required="f.Required" Placeholder="Alıcı firma seçin…" Invalid="@(errors?.ContainsKey("receiverPartyId") == true)" />
+                        <FieldError Field="receiverPartyId" Errors="errors" />
+                        break;
+                    case "transportModeKey":
+                        <label class="@f.LabelClass()" for="cargo-mode">@f.Label</label>
+                        <select id="cargo-mode" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.TransportModeKey">
+                            @foreach (var mode in Lookups.Choices(LogisticsAccess.TransportModeList, form.TransportModeKey))
+                            {
+                                <option value="@mode.Key">@mode.Label</option>
+                            }
+                        </select>
+                        <FieldError Field="transportModeKey" Errors="errors" />
+                        <small class="text-muted">Komple: araç tek müşteriye; parsiyel: araç paylaşılır. Türleri firma ayarlarından yönetebilirsiniz.</small>
+                        break;
+                    case "externalRef":
+                        <label class="@f.LabelClass()" for="cargo-ref">@f.Label</label>
+                        <input id="cargo-ref" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" disabled="@(form.Id is not null)" @bind="form.ExternalRef" />
+                        <FieldError Field="externalRef" Errors="errors" />
+                        <small class="text-muted">Müşterinin sipariş ya da yük numarası; aynı referansla ikinci talep açılmaz.</small>
+                        break;
+                    case "pickupCity":
+                        <label class="@f.LabelClass()" for="cargo-from">@f.Label</label>
+                        <input id="cargo-from" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PickupCity" />
+                        <FieldError Field="pickupCity" Errors="errors" />
+                        break;
+                    case "deliveryCity":
+                        <label class="@f.LabelClass()" for="cargo-to">@f.Label</label>
+                        <input id="cargo-to" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.DeliveryCity" />
+                        <FieldError Field="deliveryCity" Errors="errors" />
+                        break;
+                    case "pickupAddress":
+                        <label class="@f.LabelClass()" for="cargo-from-address">@f.Label</label>
+                        <textarea id="cargo-from-address" class="form-control" rows="2" maxlength="500" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PickupAddress"></textarea>
+                        <FieldError Field="pickupAddress" Errors="errors" />
+                        break;
+                    case "deliveryAddress":
+                        <label class="@f.LabelClass()" for="cargo-to-address">@f.Label</label>
+                        <textarea id="cargo-to-address" class="form-control" rows="2" maxlength="500" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.DeliveryAddress"></textarea>
+                        <FieldError Field="deliveryAddress" Errors="errors" />
+                        break;
+                    case "pickupDate":
+                        <label class="@f.LabelClass()" for="cargo-pickup">@f.Label</label>
+                        <input id="cargo-pickup" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PickupDate" />
+                        <FieldError Field="pickupDate" Errors="errors" />
+                        break;
+                    case "deliveryBy":
+                        <label class="@f.LabelClass()" for="cargo-deliver">@f.Label</label>
+                        <input id="cargo-deliver" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.DeliveryBy" />
+                        <FieldError Field="deliveryBy" Errors="errors" />
+                        break;
+                    case "cargoDescription":
+                        <label class="@f.LabelClass()" for="cargo-desc">@f.Label</label>
+                        <textarea id="cargo-desc" class="form-control" rows="2" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" placeholder="ör. 24 palet ambalajlı gıda, istiflenebilir" @bind="form.CargoDescription"></textarea>
+                        <FieldError Field="cargoDescription" Errors="errors" />
+                        break;
+                    case "weightKg":
+                        <label class="@f.LabelClass()" for="cargo-kg">@f.Label</label>
+                        <input id="cargo-kg" class="form-control" type="number" min="0" step="0.01" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.WeightKg" />
+                        <FieldError Field="weightKg" Errors="errors" />
+                        break;
+                    case "volumeM3":
+                        <label class="@f.LabelClass()" for="cargo-m3">@f.Label</label>
+                        <input id="cargo-m3" class="form-control" type="number" min="0" step="0.01" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.VolumeM3" />
+                        <FieldError Field="volumeM3" Errors="errors" />
+                        break;
+                    case "palletCount":
+                        <label class="@f.LabelClass()" for="cargo-pallets">@f.Label</label>
+                        <input id="cargo-pallets" class="form-control" type="number" min="0" step="1" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PalletCount" />
+                        <FieldError Field="palletCount" Errors="errors" />
+                        break;
+                    case "loadingMeters":
+                        <label class="@f.LabelClass()" for="cargo-ldm">@f.Label</label>
+                        <input id="cargo-ldm" class="form-control" type="number" min="0" max="100" step="0.01" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.LoadingMeters" />
+                        <FieldError Field="loadingMeters" Errors="errors" />
+                        break;
+                    case "hazardous":
+                        <SegmentedChoice Id="cargo-hazardous" Label="@f.Label" LabelClass="@f.LabelClass()" Options="HazardousOptions" @bind-Value="form.Hazardous" />
+                        <FieldError Field="hazardous" Errors="errors" />
+                        break;
+                    case "notes":
+                        <label class="@f.LabelClass()" for="cargo-notes">@f.Label</label>
+                        <textarea id="cargo-notes" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
+                        <FieldError Field="notes" Errors="errors" />
+                        break;
+                }
+            </Field>
+        </LayoutForm>
+    </fieldset>
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)">Kaydet</button>
+    </div>
+</form>
+
+@code {
+    private static readonly IReadOnlyList<SegmentOption<bool>> HazardousOptions = [new(false, "Hayır"), new(true, "Evet")];
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private CargoForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary><c>requests</c> (taşıma talebi) ya da <c>shipments</c> (sevkiyat).</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = LogisticsLabels.Requests;
+
+    /// <summary>Düzenlenecek kayıt; null ise yeni talep (sevkiyat yeni açılmaz).</summary>
+    [Parameter] public RecordResponse? Record { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private bool IsRequest => Kind == LogisticsLabels.Requests;
+
+    private string EntityKey => IsRequest ? LogisticsAccess.TransportRequestEntityKey : LogisticsAccess.ShipmentEntityKey;
+
+    private string Url => "/api/records/" + EntityKey;
+
+    private string Noun => IsRequest ? "Taşıma talebi" : "Sevkiyat";
+
+    private string Heading => Record is null ? "Yeni taşıma talebi" : Noun;
+
+    private string Status => Record is null ? string.Empty : WarehouseLabels.Text(Record, "status");
+
+    private string StatusLabel => LogisticsLabels.CargoStatus(Kind, Status);
+
+    /// <summary>Talep yalnızca "Yeni"yken, sevkiyat yükleme başlayana kadar düzenlenir.</summary>
+    private bool ReadOnly => Record is not null && !(IsRequest ? Status == "new" : Status is "pending" or "planned");
+
+    private string LockedText => IsRequest
+        ? "Bu talep kapandı (onaylandı, reddedildi ya da iptal edildi); bilgileri değiştirilemez."
+        : "Yüklemesi başlamış ya da kapanmış sevkiyatın yük bilgisi değiştirilemez.";
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    private string Lookup(string role) => (IsRequest, role) switch
+    {
+        (true, "customer") => LogisticsAccess.RequestCustomerLookup,
+        (true, "sender") => LogisticsAccess.RequestSenderLookup,
+        (true, _) => LogisticsAccess.RequestReceiverLookup,
+        (false, "customer") => LogisticsAccess.ShipmentCustomerLookup,
+        (false, "sender") => LogisticsAccess.ShipmentSenderLookup,
+        _ => LogisticsAccess.ShipmentReceiverLookup,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir kayıt verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Record))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Record;
+        form = Record is { } r
+            ? new CargoForm
+            {
+                Id = r.Id, Version = r.Version, CustomerPartyId = WarehouseLabels.Id(r, "customerPartyId"), SenderPartyId = WarehouseLabels.Id(r, "senderPartyId"),
+                ReceiverPartyId = WarehouseLabels.Id(r, "receiverPartyId"), TransportModeKey = WarehouseLabels.Text(r, "transportModeKey"),
+                ExternalRef = r.Values["externalRef"]?.GetValue<string>(), PickupCity = WarehouseLabels.Text(r, "pickupCity"),
+                PickupAddress = r.Values["pickupAddress"]?.GetValue<string>(), DeliveryCity = WarehouseLabels.Text(r, "deliveryCity"),
+                DeliveryAddress = r.Values["deliveryAddress"]?.GetValue<string>(), PickupDate = FleetLabels.Day(WarehouseLabels.Text(r, "pickupDate")),
+                DeliveryBy = FleetLabels.Day(WarehouseLabels.Text(r, "deliveryBy")), CargoDescription = WarehouseLabels.Text(r, "cargoDescription"),
+                WeightKg = r.Values["weightKg"]?.GetValue<decimal>(), VolumeM3 = r.Values["volumeM3"]?.GetValue<decimal>(),
+                PalletCount = r.Values["palletCount"]?.GetValue<int>(), LoadingMeters = r.Values["loadingMeters"]?.GetValue<decimal>(),
+                Hazardous = WarehouseLabels.Flag(r, "hazardous"), Notes = r.Values["notes"]?.GetValue<string>(),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new CargoForm
+            {
+                PickupDate = DateOnly.FromDateTime(DateTime.Now).AddDays(1),
+                TransportModeKey = Lookups.DefaultOf(LogisticsAccess.TransportModeList) ?? string.Empty,
+            };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (ReadOnly)
+        {
+            return;
+        }
+
+        busy = true;
+        var values = new JsonObject
+        {
+            ["customerPartyId"] = form.CustomerPartyId?.ToString(),
+            ["senderPartyId"] = form.SenderPartyId?.ToString(),
+            ["receiverPartyId"] = form.ReceiverPartyId?.ToString(),
+            ["transportModeKey"] = form.TransportModeKey,
+            ["pickupCity"] = form.PickupCity.Trim(),
+            ["pickupAddress"] = Blank(form.PickupAddress),
+            ["deliveryCity"] = form.DeliveryCity.Trim(),
+            ["deliveryAddress"] = Blank(form.DeliveryAddress),
+            ["pickupDate"] = form.PickupDate?.ToString("yyyy-MM-dd"),
+            ["deliveryBy"] = form.DeliveryBy?.ToString("yyyy-MM-dd"),
+            ["cargoDescription"] = form.CargoDescription.Trim(),
+            ["weightKg"] = form.WeightKg,
+            ["volumeM3"] = form.VolumeM3,
+            ["palletCount"] = form.PalletCount,
+            ["loadingMeters"] = form.LoadingMeters,
+            ["hazardous"] = form.Hazardous,
+            ["notes"] = Blank(form.Notes),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (IsRequest && form.Id is null)
+        {
+            // Referans yalnızca oluştururken verilir.
+            values["externalRef"] = Blank(form.ExternalRef);
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    /// <summary>Eylem çalışınca kaydın yeni hali sayfaya iletilir (durum, sürüm).</summary>
+    private Task ActionDoneAsync(RecordResponse updated) => Saved.InvokeAsync(updated);
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class CargoForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? CustomerPartyId { get; set; }
+
+        public Guid? SenderPartyId { get; set; }
+
+        public Guid? ReceiverPartyId { get; set; }
+
+        public string TransportModeKey { get; set; } = string.Empty;
+
+        public string? ExternalRef { get; set; }
+
+        public string PickupCity { get; set; } = string.Empty;
+
+        public string? PickupAddress { get; set; }
+
+        public string DeliveryCity { get; set; } = string.Empty;
+
+        public string? DeliveryAddress { get; set; }
+
+        public DateOnly? PickupDate { get; set; }
+
+        public DateOnly? DeliveryBy { get; set; }
+
+        public string CargoDescription { get; set; } = string.Empty;
+
+        public decimal? WeightKg { get; set; }
+
+        public decimal? VolumeM3 { get; set; }
+
+        public int? PalletCount { get; set; }
+
+        public decimal? LoadingMeters { get; set; }
+
+        public bool Hazardous { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}

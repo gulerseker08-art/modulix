@@ -6,6 +6,27 @@ namespace Modulix.Web.Services;
 /// <summary>Lojistik ekranlarının etiket ve rozet kuralları. Rozet tonları yalnızca mevcut tasarım sınıflarından seçilir.</summary>
 public static class LogisticsLabels
 {
+
+    /// <summary>İş akışı uçlarındaki tür adları (<c>/api/logistics/{tür}/...</c>).</summary>
+    public const string Requests = "requests";
+    public const string Shipments = "shipments";
+
+    public static string CargoStatus(string kind, string? key) =>
+        (kind == Requests ? LogisticsAccess.RequestStatuses : LogisticsAccess.ShipmentStatuses).FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    /// <summary>Yeni ve planlama bekleyen marka tonu, ilerleyen dikkat tonu, tamamlanan başarı tonu, ret/iptal/başarısız kayıp ya da nötr ton.</summary>
+    public static string CargoStatusBadge(string? key) => key switch
+    {
+        "new" or "pending" => "stage-qualified",
+        "planned" or "loading" or "inTransit" => "stage-negotiation",
+        "approved" or "delivered" => "status-customer",
+        "partial" => "stage-proposal",
+        "rejected" or "failed" => "stage-lost",
+        _ => "status-inactive",
+    };
+
+    /// <summary>Güzergâh: "İstanbul → Ankara".</summary>
+    public static string Route(RecordResponse record) => $"{WarehouseLabels.Text(record, "pickupCity")} → {WarehouseLabels.Text(record, "deliveryCity")}";
     public static string DriverType(string? key) => LogisticsAccess.DriverTypes.FirstOrDefault(t => t.Key == key).Label ?? key ?? string.Empty;
 
     public static string Status(string? key) => LogisticsAccess.Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;

@@ -21,12 +21,12 @@ namespace Modulix.IntegrationTests;
 /// </summary>
 public class FieldRulePackageTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
-    private const string Status = "logistics.shipment.documentStatus";
-    private const string Capacity = "logistics.shipment.capacityUsagePercent";
+    private const string Status = "logistics.shipment.status";
+    private const string Capacity = "logistics.shipment.weightKg";
 
     private static string NewPrefix() => $"t{Guid.NewGuid():N}"[..9];
 
-    private static FieldRuleDto Rule(string key, string field, string effect, string? message = null, string? value = null, bool locked = false, string whenStatus = "missing")
+    private static FieldRuleDto Rule(string key, string field, string effect, string? message = null, string? value = null, bool locked = false, string whenStatus = "pending")
     {
         var condition = JsonSerializer.SerializeToElement<ConditionNode>(new ConditionLeaf(Status, AutomationOperator.Eq, [whenStatus]), AutomationJson.Options);
         return new FieldRuleDto(key, field, effect, condition, message, value, locked);
@@ -74,7 +74,7 @@ public class FieldRulePackageTests(ModulixApiFactory factory) : IClassFixture<Mo
         Assert.Equal("Kapasite aşıldı.", rolledBack.Published.Rules.Single().Message);
 
         // Sektör paketi, sektörün altındaki bir faaliyeti seçen firmaya ulaşır.
-        await SaveDraftAsync(platform, sectorPackage.Id, [Rule($"{prefix}.block", Status, "Block", "Eksik belgeyle sevk edilemez.", whenStatus: "missing")]);
+        await SaveDraftAsync(platform, sectorPackage.Id, [Rule($"{prefix}.block", Status, "Block", "Planlanmadan sevk edilemez.", whenStatus: "pending")]);
         await PublishAsync(platform, sectorPackage.Id);
 
         var (_, adminA) = await CreateTenantAdminAsync(withLogistics: true);

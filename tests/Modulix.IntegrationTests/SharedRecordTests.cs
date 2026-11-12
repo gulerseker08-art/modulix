@@ -161,8 +161,8 @@ public class SharedRecordTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Equal(HttpStatusCode.Forbidden, write.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await reader.GetAsync(People)).StatusCode);
 
-        // Lojistik ortak kayıt bildirmedi: izinleri ortak kayda erişim vermez.
-        var logistics = await ClientAsync([LogisticsModule.Permissions.ShipmentsRead], LogisticsModule.ModuleKey);
+        // Bildirilmemiş izin ortak kayda erişim vermez: Lojistik maliyet izni için firma erişimi bildirmedi (sevkiyat ve talep izinleri bildirir).
+        var logistics = await ClientAsync([LogisticsModule.Permissions.CostsRead], LogisticsModule.ModuleKey);
         using var _l = logistics;
         Assert.Equal(HttpStatusCode.Forbidden, (await logistics.GetAsync(Parties)).StatusCode);
     }

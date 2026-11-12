@@ -1,0 +1,286 @@
+@* Taşıma talepleri ve sevkiyatlar listesi (ADR-0038 dilim 4; sayfaları TransportRequests ve Shipments). Grid şablonu: görünüm sekmeleri (sunucuda
+   durum süzgeci), arama, sıralanan başlıklar, sütun seçici, satır menüsü, sayfalama. Yeni talep bu listeden açılır; sevkiyat yalnızca talep
+   onaylanınca doğar. Durum değişiklikleri kartın üstündeki eylem çubuğundadır. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>@Title · Modulix</PageTitle>
+
+<AuthGate Module="@LogisticsAccess.ModuleKey" Permission="@ReadPermission">
+    <PageHeader Title="@Title" Icon="@(IsRequest ? "inbox" : "truck")" Subtitle="@(page is null ? Subtitle : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <CargoEditor Kind="@Kind" Record="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@($"{Title} görünümleri")" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="@($"{Title} ara")" placeholder="Müşteri, şehir veya yük tanımı ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (IsRequest && Session.Can(LogisticsAccess.RequestsWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni talep</button>
+        }
+    </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">@(IsRequest ? "Bu görünüme uyan taşıma talebi yok." : "Bu görünüme uyan sevkiyat yok; sevkiyat talep onaylanınca açılır.")</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) kayıt listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">@Title</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var record in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, record)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{LogisticsLabels.Route(record)} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(record)"><AppIcon Name="pencil" Size="16" /> <span>Aç</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private readonly Dictionary<Guid, string> customerNames = [];
+    private GridViewState grid = default!;
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private string? search;
+    private string view = string.Empty;
+    private string? status;
+    private string? loadedFor;
+
+    /// <summary><c>requests</c> (taşıma talepleri) ya da <c>shipments</c> (sevkiyatlar).</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = LogisticsLabels.Requests;
+
+    private bool IsRequest => Kind == LogisticsLabels.Requests;
+
+    private string EntityKey => IsRequest ? LogisticsAccess.TransportRequestEntityKey : LogisticsAccess.ShipmentEntityKey;
+
+    private string Url => "/api/records/" + EntityKey;
+
+    private string ReadPermission => IsRequest ? LogisticsAccess.RequestsRead : LogisticsAccess.ShipmentsRead;
+
+    private string Title => IsRequest ? "Taşıma talepleri" : "Sevkiyatlar";
+
+    private string Subtitle => IsRequest
+        ? "Müşterilerin taşıma isteklerini kaydedin; onaylanan talep sevkiyata dönüşür."
+        : "Onaylanan taleplerden doğan yükleri planlamadan yola çıkışa kadar izleyin.";
+
+    private string CustomerLookup => IsRequest ? LogisticsAccess.RequestCustomerLookup : LogisticsAccess.ShipmentCustomerLookup;
+
+    /// <summary>Görünüm → durum süzgeci (virgülle birden çok durum).</summary>
+    private IReadOnlyList<(string Key, string Label, string Icon, string? Status)> Views => IsRequest
+        ?
+        [
+            ("new", "Onay bekleyen", "hourglass", "new"),
+            ("approved", "Onaylanan", "check-circle", "approved"),
+            ("rejected", "Reddedilen", "x", "rejected,cancelled"),
+            ("all", "Tüm talepler", "inbox", null),
+        ]
+        :
+        [
+            ("open", "Açık sevkiyatlar", "truck", "pending,planned,loading,inTransit"),
+            ("pending", "Planlama bekleyen", "hourglass", "pending"),
+            ("road", "Yolda", "map-pin", "loading,inTransit"),
+            ("closed", "Kapanan", "check-circle", "delivered,partial,failed,cancelled"),
+            ("all", "Tüm sevkiyatlar", "list", null),
+        ];
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions => [.. Views.Select(v => new ViewOption(v.Key, v.Label, Icon: v.Icon)), .. views.Options];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Kind)
+        {
+            return;
+        }
+
+        loadedFor = Kind;
+        page = null;
+        editing = false;
+        search = null;
+
+        // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (CargoRecordStore.SortKeys).
+        grid = new GridViewState(EntityKey, "pickupDate");
+        views = new PersonalGridViews(Api, EntityKey);
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(ReadPermission))
+        {
+            await Lookups.LoadAsync();
+            grid.Define(
+            [
+                new("customer", "Müşteri", "building", "customer", "-customer", Locked: true),
+                new("route", "Güzergâh", "map-pin", "pickupCity", "-pickupCity"),
+                new("mode", "Taşıma türü", "tag", DefaultVisible: false),
+                new("pickupDate", "Yükleme", "calendar", "pickupDate", "-pickupDate"),
+                new("deliveryBy", "En geç teslim", "calendar", "deliveryBy", "-deliveryBy"),
+                new("cargo", "Yük", "package"),
+                new("weight", "Ağırlık", "hash", DefaultVisible: false),
+                new("status", "Durum", "tag", "status", "-status"),
+                .. Lookups.FieldsOf(EntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList)),
+            ]);
+            await views.LoadAsync();
+            await ChooseViewAsync(Views[0].Key);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            status = GridFilters.Parse(saved.Filters).GetValueOrDefault("status");
+        }
+        else
+        {
+            grid.Reset();
+            status = Views.FirstOrDefault(v => v.Key == key).Status;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(status is { } s ? ("status", s) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(Views[0].Key);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (status is not null)
+        {
+            url += $"&status={Uri.EscapeDataString(status)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            await WarehouseLabels.ResolveNamesAsync(Api, CustomerLookup, page.Items.Select(r => WarehouseLabels.Id(r, "customerPartyId")).OfType<Guid>(), customerNames);
+        }
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse record) =>
+        @<td data-label="@column.Label" class="@(column.Key == "customer" ? "primary" : null)">@CellContent(column.Key, record)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse record) => key switch
+    {
+        "customer" => @<text>@WarehouseLabels.NameOf(customerNames, WarehouseLabels.Id(record, "customerPartyId"))</text>,
+        "route" => @<text>@LogisticsLabels.Route(record)</text>,
+        "mode" => @<text>@Lookups.Label(LogisticsAccess.TransportModeList, WarehouseLabels.Text(record, "transportModeKey"))</text>,
+        "pickupDate" => @<text>@(FleetLabels.Day(WarehouseLabels.Text(record, "pickupDate")) is { } day ? FleetLabels.Date(day) : "—")</text>,
+        "deliveryBy" => @<text>@(FleetLabels.Day(WarehouseLabels.Text(record, "deliveryBy")) is { } day ? FleetLabels.Date(day) : "—")</text>,
+        "cargo" => @<text>@WarehouseLabels.Text(record, "cargoDescription")@(WarehouseLabels.Flag(record, "hazardous") ? " · ADR" : "")</text>,
+        "weight" => @<text>@FleetLabels.Capacity(record.Values["weightKg"]?.GetValue<decimal>(), "kg")</text>,
+        "status" => @<span class="badge @LogisticsLabels.CargoStatusBadge(WarehouseLabels.Text(record, "status"))">@LogisticsLabels.CargoStatus(Kind, WarehouseLabels.Text(record, "status"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(EntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, record.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private void Open(RecordResponse? record)
+    {
+        selected = record;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    /// <summary>Kayıt ya da eylem sonrası liste yenilenir; düzenlenen kayıt güncel haliyle açık kalır.</summary>
+    private async Task SavedAsync(RecordResponse saved)
+    {
+        await LoadAsync(page?.Page ?? 1);
+        selected = saved;
+        editing = true;
+    }
+}

@@ -53,7 +53,7 @@ public class LogisticsDriverModuleTests
         var catalog = ModuleCatalog.Create(new LogisticsModule());
 
         Assert.Equal(["core", "logistics"], catalog.Modules.Select(m => m.Key));
-        var operations = Assert.Single(Module.RoleTemplates);
+        var operations = Module.RoleTemplates.Single(t => t.Key == "logistics.operations");
         Assert.Contains(LogisticsModule.Permissions.DriversRead, operations.Permissions);
         Assert.Contains(LogisticsModule.Permissions.DriversWrite, operations.Permissions);
     }

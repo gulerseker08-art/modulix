@@ -103,13 +103,16 @@ internal static class Field
             (e, v) => set(e, (int?)v));
 
     /// <summary>Sabit anahtar listesinden tek değer (teknik doğrulama seçimi; tenant listesi değildir). Boş gönderilirse verilmemiş sayılır.</summary>
-    public static RecordField<T> Choice<T>(string name, IReadOnlyCollection<string> allowed, Func<T, string> get, Action<T, string> set) =>
+    public static RecordField<T> Choice<T>(string name, IReadOnlyCollection<string> allowed, Func<T, string> get, Action<T, string> set, bool createOnly = false) =>
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() == JsonValueKind.String && node.GetValue<string>().Trim() is var key && allowed.Contains(key)
                     ? ParsedValue.Of(key)
                     : ParsedValue.Fail($"Şunlardan biri olmalıdır: {string.Join(", ", allowed)}."),
             e => get(e),
-            (e, v) => { if (v is string key) { set(e, key); } });
+            (e, v) => { if (v is string key) { set(e, key); } })
+        {
+            CreateOnly = createOnly,
+        };
 
     /// <summary>Firmanın seçim listesinden bir değer (Y9b). Listede olup olmadığını depo aktif tenant'ın listesine bakarak denetler.</summary>
     public static RecordField<T> ListChoice<T>(string name, string listKey, Func<T, string?> get, Action<T, string?> set, bool required = true) =>

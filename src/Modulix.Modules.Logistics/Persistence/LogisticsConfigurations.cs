@@ -59,3 +59,54 @@ internal sealed class CarrierTermsConfiguration : IEntityTypeConfiguration<Carri
             .HasFilter("[AgreementNo] IS NOT NULL").HasDatabaseName("UX_CarrierTerms_AgreementNo");
     }
 }
+
+internal static class CargoTables
+{
+    public static void Configure<TEntity>(EntityTypeBuilder<TEntity> builder, string table)
+        where TEntity : CargoEntity
+    {
+        LogisticsTables.ConfigureCommon(builder, table);
+        builder.Property(e => e.TransportModeKey).HasMaxLength(50).IsRequired();
+        builder.Property(e => e.PickupCity).HasMaxLength(CargoEntity.CityMaxLength).IsRequired();
+        builder.Property(e => e.PickupAddress).HasMaxLength(CargoEntity.AddressMaxLength);
+        builder.Property(e => e.DeliveryCity).HasMaxLength(CargoEntity.CityMaxLength).IsRequired();
+        builder.Property(e => e.DeliveryAddress).HasMaxLength(CargoEntity.AddressMaxLength);
+        builder.Property(e => e.CargoDescription).HasMaxLength(CargoEntity.TextMaxLength).IsRequired();
+        builder.Property(e => e.WeightKg).HasPrecision(12, 2);
+        builder.Property(e => e.VolumeM3).HasPrecision(10, 2);
+        builder.Property(e => e.LoadingMeters).HasPrecision(6, 2);
+        builder.Property(e => e.Notes).HasMaxLength(CargoEntity.TextMaxLength);
+        builder.Property(e => e.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(e => e.StatusReason).HasMaxLength(CargoEntity.ReasonMaxLength);
+
+        builder.HasIndex(e => new { e.TenantId, e.Status, e.PickupDate }).HasDatabaseName($"IX_{table}_Status");
+        builder.HasIndex(e => new { e.TenantId, e.CustomerPartyId }).HasDatabaseName($"IX_{table}_Customer");
+    }
+}
+
+internal sealed class TransportRequestConfiguration : IEntityTypeConfiguration<TransportRequest>
+{
+    public void Configure(EntityTypeBuilder<TransportRequest> builder)
+    {
+        CargoTables.Configure(builder, "TransportRequests");
+        builder.Property(r => r.Source).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(r => r.ExternalRef).HasMaxLength(TransportRequest.ExternalRefMaxLength);
+
+        // Aynı kaynaktan aynı referansla iki talep açılmaz (API yeniden denemesi çift kayıt üretmez, ADR-0038 tablo).
+        builder.HasIndex(r => new { r.TenantId, r.Source, r.ExternalRef }).IsUnique()
+            .HasFilter("[ExternalRef] IS NOT NULL").HasDatabaseName("UX_TransportRequests_ExternalRef");
+    }
+}
+
+internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
+{
+    public void Configure(EntityTypeBuilder<Shipment> builder)
+    {
+        CargoTables.Configure(builder, "Shipments");
+
+        // Her talepten en çok bir sevkiyat; talebe veritabanı yabancı anahtarı (aynı modül) bileşik anahtarla kurulur.
+        builder.HasIndex(s => new { s.TenantId, s.RequestId }).IsUnique().HasDatabaseName("UX_Shipments_Request");
+        builder.HasOne<TransportRequest>().WithMany().HasForeignKey(s => new { s.TenantId, s.RequestId })
+            .HasPrincipalKey(r => new { r.TenantId, r.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}

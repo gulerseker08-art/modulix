@@ -122,3 +122,124 @@ public sealed class CarrierTerms : LogisticsEntity
     /// <summary>Pasif anlaşma çakışma denetimine girmez ve "geçerli" sayılmaz.</summary>
     public bool IsActive { get; internal set; } = true;
 }
+
+/// <summary>
+/// Taşıma talebi ve sevkiyatın ortak yük ve güzergâh alanları (ADR-0038 K5, K6): gönderen ve alıcı firma, yükleme ve boşaltma yeri, tarih penceresi,
+/// yük tanımı ve ölçüleri, taşıma türü (Y9b; kod yalnızca kategoriye bakar: komple / parsiyel). Adres bugün metindir; durak adresi lookup'ı (ADR-0016)
+/// sefer diliminde gelir.
+/// </summary>
+public abstract class CargoEntity : LogisticsEntity
+{
+    public const int CityMaxLength = 100;
+    public const int AddressMaxLength = 500;
+    public const int TextMaxLength = 2000;
+    public const int ReasonMaxLength = 500;
+
+    /// <summary>Taşımayı isteyen ve navlunu ödeyen müşteri firma.</summary>
+    public Guid CustomerPartyId { get; internal set; }
+
+    public Guid? SenderPartyId { get; internal set; }
+
+    public Guid? ReceiverPartyId { get; internal set; }
+
+    public string TransportModeKey { get; internal set; } = string.Empty;
+
+    public string PickupCity { get; internal set; } = string.Empty;
+
+    public string? PickupAddress { get; internal set; }
+
+    public string DeliveryCity { get; internal set; } = string.Empty;
+
+    public string? DeliveryAddress { get; internal set; }
+
+    /// <summary>En erken yükleme günü.</summary>
+    public DateOnly PickupDate { get; internal set; }
+
+    /// <summary>En geç teslim günü; boşsa belirtilmedi.</summary>
+    public DateOnly? DeliveryBy { get; internal set; }
+
+    public string CargoDescription { get; internal set; } = string.Empty;
+
+    public decimal? WeightKg { get; internal set; }
+
+    public decimal? VolumeM3 { get; internal set; }
+
+    public int? PalletCount { get; internal set; }
+
+    public decimal? LoadingMeters { get; internal set; }
+
+    /// <summary>Tehlikeli madde (ADR) yükü; araç ve sürücü uygunluğu sefer atamasında denetlenir (dilim 5).</summary>
+    public bool Hazardous { get; internal set; }
+
+    public string? Notes { get; internal set; }
+
+    /// <summary>Durum yalnızca iş akışı komutuyla değişir (K7); genel kayıt güncellemesi yazamaz.</summary>
+    public string Status { get; internal set; } = string.Empty;
+
+    /// <summary>Son geçişin gerekçesi (ret, iptal).</summary>
+    public string? StatusReason { get; internal set; }
+}
+
+/// <summary>
+/// Taşıma talebi (ADR-0038 K6): müşterinin taşıma isteği; elle ya da API'den açılır (web ve sipariş köprüsü sonraki dilimlerde). Onay iş akışından
+/// geçer: Yeni → Onaylandı (aynı işlemde sevkiyat açılır) / Reddedildi (gerekçeli); yeni talep iptal edilebilir. Silinmez (K12).
+/// </summary>
+public sealed class TransportRequest : CargoEntity
+{
+    public const int ExternalRefMaxLength = 100;
+
+    public static class Statuses
+    {
+        public const string New = "new";
+        public const string Approved = "approved";
+        public const string Rejected = "rejected";
+        public const string Cancelled = "cancelled";
+
+        public static IReadOnlyList<string> All { get; } = [New, Approved, Rejected, Cancelled];
+    }
+
+    public static class Sources
+    {
+        public const string Manual = "manual";
+        public const string Api = "api";
+
+        public static IReadOnlyList<string> All { get; } = [Manual, Api];
+    }
+
+    public TransportRequest() => Status = Statuses.New;
+
+    public string Source { get; internal set; } = Sources.Manual;
+
+    /// <summary>Müşterinin ya da kaynak sistemin referansı; verilirse kaynak içinde tekildir (aynı talep iki kez açılmaz).</summary>
+    public string? ExternalRef { get; internal set; }
+
+    /// <summary>Onaylanınca açılan sevkiyat.</summary>
+    public Guid? ShipmentId { get; internal set; }
+}
+
+/// <summary>
+/// Sevkiyat (ADR-0038 K5, K7): onaylanan talepten doğan müşteri yükü. Durumlar iş akışı komutuyla ilerler: Planlama bekliyor → Planlandı →
+/// Yükleniyor → Yolda; teslim (Teslim edildi / Kısmi / Başarısız) yalnızca teslim komutuyla gelir (dilim 6). İptal teslimden önce ve gerekçeyle.
+/// Sefer ve durak bağı dilim 5'tedir. Silinmez (K12).
+/// </summary>
+public sealed class Shipment : CargoEntity
+{
+    public static class Statuses
+    {
+        public const string Pending = "pending";
+        public const string Planned = "planned";
+        public const string Loading = "loading";
+        public const string InTransit = "inTransit";
+        public const string Delivered = "delivered";
+        public const string Partial = "partial";
+        public const string Failed = "failed";
+        public const string Cancelled = "cancelled";
+
+        public static IReadOnlyList<string> All { get; } = [Pending, Planned, Loading, InTransit, Delivered, Partial, Failed, Cancelled];
+    }
+
+    public Shipment() => Status = Statuses.Pending;
+
+    /// <summary>Kaynak taşıma talebi; her talepten en çok bir sevkiyat.</summary>
+    public Guid RequestId { get; internal set; }
+}
