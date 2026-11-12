@@ -480,3 +480,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Yerel dosya deposu (ADR-0040 Storage:LocalRoot varsayılanı): tenant dosyaları repoya girmez.
+src/Modulix.Api/App_Data/blobs/
