@@ -292,6 +292,21 @@ public interface IRecordStore
 /// <summary>Eşzamanlı değişiklik veya benzersizlik ihlali.</summary>
 public sealed class RecordConflictException(string message, Exception? innerException = null) : Exception(message, innerException);
 
+/// <summary>
+/// Kayıt türünde izin olduğu hâlde bu kayıt üzerinde işlem yetkisi yok (ör. süreli belgenin sahip kaydında güncelleme izni yok); boru hattı
+/// "yetkisiz" (403) döner. Kaydın varlığı zaten görünürken kullanılır; görünmeyen kayıt için depo "bulunamadı" döner.
+/// </summary>
+public sealed class RecordAccessDeniedException(string message) : Exception(message);
+
+/// <summary>
+/// Kayıt türü iznine ek olarak kayıt düzeyinde yazma kuralı olan depolar (ör. süreli belge: sahip kaydın güncelleme izni ve modül lisansı) bunu uygular.
+/// Kayda bağlı yan yazmalar (dosya ekleme ve silme, ADR-0040) tür izninden sonra bunu da sorar; dönen ileti doluysa işlem yetkisizdir.
+/// </summary>
+public interface IRecordWriteGuard
+{
+    Task<string?> WriteDeniedAsync(Guid id, CancellationToken cancellationToken);
+}
+
 /// <summary>Yalnızca veriye bakarak anlaşılabilen doğrulama hatası (ör. seçilen firma bu tenant'ta yok).</summary>
 public sealed class RecordValidationException(IReadOnlyList<RecordFieldError> errors)
     : Exception("Doğrulama hatası.")

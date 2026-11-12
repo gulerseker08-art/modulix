@@ -210,3 +210,32 @@ K4 uygulandı: taşıyıcı firma kimliği `core.Party`'dir ("Taşıyıcı" ili�
 | `dotnet test tests/Modulix.Modules.Logistics.Tests` | 11 (3 yeni): sekmeli anlaşma formu, taşıyıcı izinleri ve firma bağı, Shared sabitleri; taşıyıcı seçen her lookup rol süzgeçli |
 | `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsCarrierTermsTests\|LogisticsDriverTests"` (SQL Server; CI koşar) | 8: mutlu yol (birbirini izleyen dönemler, bugün geçerli / süresi dolan süzgeçleri, taşıyıcıya göre sıralama ve arama, denetim kaydı, silme), doğrulama (zorunlu alanlar, taşıyıcı rolü, tarih sırası, para birimi, numara benzersizliği, süresiz anlaşmayla çakışma; pasif anlaşma çakışmaz), tenant izolasyonu (başka tenant'ın taşıyıcısı ve anlaşması görünmez), yetki (okuyan yazamaz ve silemez, sürücü izni anlaşmaları açmaz) |
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69 / 121: anlaşma ekranı yalnızca taşıyıcı okuma izniyle |
+
+## 14. Dilim 2a: Core süreli belge (12 Kasım 2026)
+
+K3 uygulandı. Dosya ekleri (ADR-0040, PR #285) main'e girdiği için belge dosyası da bu dilimde bağlandı. Yaklaşan bitiş uyarısı (`DateRelative` kuralı) dilim 2b'ye ayrıldı: Core kayıt türünün otomasyon kayıt kaynağı ayrı bir incelenebilir adımdır.
+
+- **Kayıt (`core.Credentials`, `ICompanyShared`):** sahip kayıt türü ve kimliği (yalnızca oluştururken), belge türü, belge no (`UNIQUE(TenantId, OwnerEntityKey, OwnerId, TypeKey, DocumentNo)` süzgeçli), veren kurum, başlangıç ve bitiş (boş = süresiz), durum (`active` / `revoked`), notlar. "Süresi doldu" saklanmaz, tarihten hesaplanır. Migration `CoreCredentials` (RLS). Sahip kayda veritabanı yabancı anahtarı yoktur; bağ kayıt deposunda denetlenir.
+- **Sahip türünü modül bildirir:** `IModule.CredentialOwners` (ör. Filo `fleet.vehicle` → `vehicle`, Lojistik `logistics.driver` → `driver`). Katalog anahtarın modüle ait olduğunu ve kategorinin tanımlı olduğunu denetler. Core'da sektör koşulu yoktur.
+- **Belge türü** `core.credential-type` (Y9b) listesidir. Kategorileri: `vehicle`, `driver`, `party`, `facility`. Hazır değerler örnektir (muayene, trafik sigortası, kasko, egzoz, takograf kalibrasyonu; ehliyet, SRC, psikoteknik, ADR, takograf kartı; yetki belgesi, vekâletname; faaliyet izni). Türün kategorisi sahip türün kategorisiyle aynı olmalıdır.
+- **Erişim sahip kaydın erişimidir** (ADR-0040 K2 ile aynı ilke; ayrı `core.credentials.*` izni açılmadı, bölüm 5'teki taslaktan sapma):
+  - Sahip türü okuyabilen o türün belgelerini görür. Okuyamadığı türün belgeleri sorgudan elenir ve tekil okumada 404 döner.
+  - Ekleme, değiştirme ve silme için sahip kayıtta güncelleme izni ve sahip modülün yazılabilir lisansı gerekir. Yoksa 403 döner; bunun için yeni `RecordAccessDeniedException` eklendi.
+  - Sahip modülü kapanınca belgeler de görünmez.
+  - Dosya ekleme ve silme aynı kurala uyar: yeni `IRecordWriteGuard` sözleşmesini dosya deposu da sorar. Böylece araç yazan biri sürücü belgesine dosya ekleyemez.
+  - Sahip türü veri kapsamlı (sorumlu ya da şirket alanı) olamaz. Depo bu durumda satır düzeyi sahip kapsamı uygulamaz, ilk kullanımda hata verir; bugünkü sahipler (araç, sürücü) kapsamsızdır.
+- **Silme:** yanlış girilen belge silinebilir. Dosyası olan belge silinmez (409): önce dosya silinir ya da belge "İptal edildi" yapılır, böylece dosya erişilemez kalmaz.
+- **Süzgeçler:** sahip (tür, kimlik), tür, durum, `validOn` (o gün geçerli), `expiresBy` (o güne kadar bitecek ya da bitmiş geçerli belgeler), `expiredBefore`. Varsayılan sıra bitişi en yakın olandan başlar; süresiz belgeler sondadır.
+- **Arayüz:**
+  - Araç ve sürücü kartının altında "Araç belgeleri" / "Sürücü belgeleri" paneli var. Durum rozetleri: geçerli, "N gün kaldı" (30 gün, yalnızca görsel eşik), süresi doldu, başlamadı, iptal. Özet satırı yaklaşan ve süresi dolan belgeleri sayar.
+  - Sekmeli belge formu (Belge; Notlar) ve ortak `AttachmentPanel` (ADR-0040 dilim 1b'nin ilk bileşeni: liste, yükleme, indirme, silme).
+  - Yeni CSS sınıfı ya da token yok.
+
+**Bilerek yapılmadı:** yaklaşan bitiş uyarı kuralı (dilim 2b), belge zorunluluğu (sefer atamasında uyarı/engel, dilim 5, bölüm 9 madde 3), firma ve tesis sahipleri (Party belgesi ve antrepo izni; kategori hazır, sahip bildirimi sonra), tüm belgelerin tek listesi (sahip adını göstermek için sahip etiketi sözleşmesi gerekir; 2b ile), vekâletin taşınması (K3: zorunlu değil).
+
+### Test sonuçları (Dilim 2a)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Fleet.Tests` | sahip bildirimi ve katalog doğrulaması, belge türü listesi ve formu, Shared sabitleri |
+| `dotnet test tests/Modulix.IntegrationTests --filter "CredentialTests\|FileTests"` (SQL Server; CI koşar) | mutlu yol (araç ve sürücü belgeleri, bitişe göre sıra, geçerli / bitecek / bitmiş süzgeçleri, arama, iptal, denetim kaydı, dosya eki, dosyalı belge silinmez), doğrulama (zorunlu alanlar, sahip olmayan tür, bilinmeyen kayıt, kategori, liste dışı tür, tarih sırası, numara tekilliği, sahip değişmez, eski sürüm), tenant izolasyonu (başka tenant'ın aracına belge eklenemez, belgesi görünmez, değiştirilemez, silinemez, dosya eklenemez), yetki (araç okuyan görür ama yazamaz ve dosya ekleyemez; sürücü yazan araç belgesini görmez; araç yazan sürücü belgesini değiştiremez ve dosya ekleyemez; modül kapanınca belgeler gizlenir; izinsiz 403) |

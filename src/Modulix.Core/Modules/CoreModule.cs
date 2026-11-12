@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Credentials;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.SharedRecords;
@@ -321,8 +322,76 @@ public sealed class CoreModule : IModule
         },
     ];
 
+    /// <summary>
+    /// Süreli belge türü (ADR-0038 K3, Y9b): hazır değerler örnektir; tenant kendi türlerini ekler, yeni türde kategori seçilir. Kategori
+    /// belgenin hangi kayda eklenebileceğini belirler (araç, sürücü, firma, tesis; sahip türünü modül bildirir).
+    /// </summary>
+    IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
+    [
+        new(
+            CredentialEntities.TypeList,
+            "Süreli belge türü",
+            CredentialEntities.Credential,
+            "typeKey",
+            Required: true,
+            [
+                new(CredentialCategories.Vehicle, "Araç belgesi"),
+                new(CredentialCategories.Driver, "Sürücü belgesi"),
+                new(CredentialCategories.Party, "Firma belgesi"),
+                new(CredentialCategories.Facility, "Tesis belgesi"),
+            ],
+            [
+                new("Inspection", "Araç muayenesi", CredentialCategories.Vehicle),
+                new("TrafficInsurance", "Trafik sigortası", CredentialCategories.Vehicle),
+                new("Casco", "Kasko", CredentialCategories.Vehicle),
+                new("ExhaustEmission", "Egzoz emisyon ölçümü", CredentialCategories.Vehicle),
+                new("TachographCalibration", "Takograf kalibrasyonu", CredentialCategories.Vehicle),
+                new("DrivingLicense", "Sürücü belgesi (ehliyet)", CredentialCategories.Driver),
+                new("Src", "SRC belgesi", CredentialCategories.Driver),
+                new("Psychotechnical", "Psikoteknik belgesi", CredentialCategories.Driver),
+                new("AdrCertificate", "ADR sertifikası", CredentialCategories.Driver),
+                new("TachographCard", "Takograf sürücü kartı", CredentialCategories.Driver),
+                new("AuthorizationCertificate", "Yetki belgesi", CredentialCategories.Party),
+                new("PowerOfAttorney", "Vekâletname", CredentialCategories.Party),
+                new("OperatingPermit", "Faaliyet izni", CredentialCategories.Facility),
+            ]),
+    ];
+
+    /// <summary>Süreli belge formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>
+    IReadOnlyList<FormDefinition> IModule.Forms { get; } =
+    [
+        new(CredentialEntities.Credential, "Süreli belge",
+        [new(FormDefinition.DefaultTab, "Belge"), new("notlar", "Notlar")],
+        [
+            new("belge", "Belge", "file-text"),
+            new("gecerlilik", "Geçerlilik", "calendar"),
+            new("notlar", "Notlar", "message-square", Tab: "notlar"),
+            new(FormDefinition.ExtrasSection, "Ek bilgiler", "square-pen", Tab: "notlar"),
+        ],
+        [
+            new("typeKey", "Belge türü", "belge", 6, Required: true, Fixed: true),
+            new("documentNo", "Belge no", "belge", 6),
+            new("issuedBy", "Veren kurum", "belge", 8),
+            new("status", "Durum", "belge", 4, Fixed: true),
+            new("validFrom", "Başlangıç", "gecerlilik", 6),
+            new("validTo", "Bitiş", "gecerlilik", 6),
+            new("notes", "Notlar", "notlar", 12),
+        ]),
+    ];
+
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
     [
+        new(CredentialEntities.Credential, "Süreli belge", null, new Dictionary<string, string>
+        {
+            ["ownerEntityKey"] = "Sahip kayıt türü", ["ownerId"] = "Sahip kayıt", ["typeKey"] = "Belge türü", ["documentNo"] = "Belge no",
+            ["issuedBy"] = "Veren kurum", ["validFrom"] = "Başlangıç", ["validTo"] = "Bitiş", ["status"] = "Durum", ["notes"] = "Notlar",
+        }, "typeKey")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string> { [CredentialStatuses.Active] = "Geçerli", [CredentialStatuses.Revoked] = "İptal edildi" },
+            },
+        },
         new(AuditedEntityKeys.File, "Dosya", null, new Dictionary<string, string>
         {
             ["fileName"] = "Dosya adı", ["contentType"] = "Tür", ["sizeBytes"] = "Boyut (bayt)", ["sha256"] = "SHA-256 özeti",

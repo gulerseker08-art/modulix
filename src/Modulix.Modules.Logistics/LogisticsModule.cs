@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Automation;
+using Modulix.Core.Contracts.Credentials;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
@@ -157,6 +158,12 @@ public sealed class LogisticsModule : IModule
         new(SharedEntities.Person, Entities.Driver, "personId", "sürücü kartı"),
         new(SharedEntities.Party, Entities.Driver, "carrierPartyId", "sürücü (taşıyıcı)"),
         new(SharedEntities.Party, Entities.CarrierTerms, "carrierPartyId", "taşıyıcı anlaşması"),
+    ];
+
+    /// <summary>Sürücü yetkinlikleri (ehliyet, SRC, psikoteknik...) Core süreli belgesidir (ADR-0038 K2, K3); sürücü kartının "Belgeler" bölümünde yönetilir.</summary>
+    IReadOnlyList<CredentialOwner> IModule.CredentialOwners { get; } =
+    [
+        new(Entities.Driver, CredentialCategories.Driver, "Sürücü"),
     ];
 
     /// <summary>Sürücü formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>

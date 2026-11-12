@@ -1295,6 +1295,82 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("People", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Credentials.Credential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DocumentNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("IssuedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("OwnerEntityKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)")
+                        .HasDefaultValue("active");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TypeKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly?>("ValidFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("ValidTo")
+                        .HasColumnType("date");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ValidTo")
+                        .HasDatabaseName("IX_Credentials_ValidTo");
+
+                    b.HasIndex("TenantId", "OwnerEntityKey", "OwnerId")
+                        .HasDatabaseName("IX_Credentials_Owner");
+
+                    b.HasIndex("TenantId", "OwnerEntityKey", "OwnerId", "TypeKey", "DocumentNo")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Credentials_DocumentNo")
+                        .HasFilter("[DocumentNo] IS NOT NULL");
+
+                    b.ToTable("Credentials", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Customization.CustomField", b =>
                 {
                     b.Property<Guid>("Id")

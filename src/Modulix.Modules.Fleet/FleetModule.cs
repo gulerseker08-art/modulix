@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Automation;
+using Modulix.Core.Contracts.Credentials;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Fleet;
 using Modulix.Core.Contracts.Modules;
@@ -165,6 +166,12 @@ public sealed class FleetModule : IModule
     [
         new(SharedEntities.Party, Entities.Vehicle, "carrierPartyId", "araç (taşıyıcı)"),
         new(SharedEntities.Party, Entities.Maintenance, "supplierPartyId", "bakım kaydı (servis)"),
+    ];
+
+    /// <summary>Araç belgeleri (muayene, sigorta, kasko...) Core süreli belgesidir (ADR-0038 K3); araç kartının "Belgeler" bölümünde yönetilir.</summary>
+    IReadOnlyList<CredentialOwner> IModule.CredentialOwners { get; } =
+    [
+        new(Entities.Vehicle, CredentialCategories.Vehicle, "Araç"),
     ];
 
     /// <summary>Araç formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>

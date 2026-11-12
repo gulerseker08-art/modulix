@@ -226,6 +226,12 @@ internal sealed class FileStore(
             return new RecordError(RecordErrorCode.PermissionDenied, "Bu kayda dosya eklemek ya da silmek için güncelleme izni gerekir.");
         }
 
+        // Kayıt düzeyinde yazma kuralı olan türler (ör. süreli belge: sahip kaydın güncelleme izni) ayrıca sorulur.
+        if (stores.Find(record.EntityKey) is IRecordWriteGuard guard && await guard.WriteDeniedAsync(record.Id, cancellationToken) is { } denied)
+        {
+            return new RecordError(RecordErrorCode.PermissionDenied, denied);
+        }
+
         var moduleKey = record.EntityKey[..record.EntityKey.IndexOf('.', StringComparison.Ordinal)];
         if (!await license.IsWritableAsync(tenant.TenantId, moduleKey, cancellationToken))
         {

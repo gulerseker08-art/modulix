@@ -1,0 +1,158 @@
+@* Kayda bağlı dosyalar (ADR-0040 dilim 1b): liste, yükleme, indirme ve silme. Erişim sunucuda bağlı kaydın erişimidir: kaydı okuyabilen
+   listeler ve indirir, güncelleyebilen yükler ve siler; panel yazma düğmelerini yalnızca CanWrite ile gösterir, kararı sunucu verir.
+   İndirme her zaman "attachment" olarak sunulur (tarayıcıda çalıştırılmaz). Tür, boyut ve çift yükleme kuralları sunucudadır. *@
+@inject ApiClient Api
+
+<section class="settings-group" aria-label="@Title">
+    <h3>@Title</h3>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (files is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (files.Count == 0)
+    {
+        <p class="text-muted" role="status">@EmptyText</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">@Title</caption>
+            <thead>
+                <tr><th scope="col">Dosya</th><th scope="col">Boyut</th><th scope="col">Eklenme</th><th scope="col"></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var file in files)
+                {
+                    <tr>
+                        <td data-label="Dosya" class="primary">
+                            <a href="@($"/api/files/{file.Id}/content")" download="@file.FileName"><AppIcon Name="file-text" Size="16" /> @file.FileName</a>
+                        </td>
+                        <td data-label="Boyut">@CredentialLabels.Size(file.SizeBytes)</td>
+                        <td data-label="Eklenme">@file.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        <td class="actions">
+                            @if (CanWrite)
+                            {
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(file)">Sil</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (CanWrite)
+    {
+        @* Kayıt formunun içinde de görünsün diye form-actions değil araç çubuğu: formun alt çubuğu üst çubuk varken gizlenir. *@
+        <div class="list-toolbar">
+            <label class="btn btn-tonal" for="@inputId">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <AppIcon Name="plus" Size="16" />
+                }
+                Dosya ekle
+            </label>
+            <InputFile id="@inputId" class="visually-hidden" accept="@Accept" OnChange="UploadAsync" disabled="@busy" />
+            <small class="text-muted">PDF, görüntü ya da Office belgesi; en fazla 10 MB.</small>
+        </div>
+    }
+</section>
+
+@code {
+    private const long MaxBytes = 10 * 1024 * 1024;
+    private const string Accept = ".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.txt";
+
+    private readonly string inputId = "file-" + Guid.NewGuid().ToString("N")[..8];
+    private List<StoredFileDto>? files;
+    private string? message;
+    private bool busy;
+    private (string, Guid) loadedFor;
+
+    [Parameter, EditorRequired] public string EntityKey { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public Guid RecordId { get; set; }
+
+    [Parameter] public bool CanWrite { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Dosyalar";
+
+    [Parameter] public string EmptyText { get; set; } = "Henüz dosya eklenmedi.";
+
+    /// <summary>Dosya sayısı değişince (yükleme, silme) çağrılır.</summary>
+    [Parameter] public EventCallback<int> CountChanged { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (EntityKey, RecordId))
+        {
+            return;
+        }
+
+        loadedFor = (EntityKey, RecordId);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<StoredFileDto>>($"/api/files?entityKey={Uri.EscapeDataString(EntityKey)}&recordId={RecordId}");
+        files = result.Value ?? [];
+        message = result.Error;
+        await CountChanged.InvokeAsync(files.Count);
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file.Size > MaxBytes)
+        {
+            message = "Dosya en fazla 10 MB olabilir.";
+            return;
+        }
+
+        busy = true;
+        message = null;
+        using var buffer = new MemoryStream();
+        await using (var stream = file.OpenReadStream(MaxBytes))
+        {
+            await stream.CopyToAsync(buffer);
+        }
+
+        using var content = new MultipartFormDataContent
+        {
+            { new StringContent(EntityKey), "entityKey" },
+            { new StringContent(RecordId.ToString()), "recordId" },
+            { new ByteArrayContent(buffer.ToArray()), "file", file.Name },
+        };
+        var result = await Api.PostFormAsync<StoredFileDto>("/api/files", content);
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            message = result.FieldErrors?.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error;
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(StoredFileDto file)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/files/{file.Id}?version={file.Version}");
+        busy = false;
+        message = result.Error;
+        if (result.IsSuccess)
+        {
+            await LoadAsync();
+        }
+    }
+}

@@ -80,6 +80,12 @@ public interface IModule
     IReadOnlyList<SharedRecordReference> SharedRecordReferences => [];
 
     /// <summary>
+    /// Süreli belge taşıyabilen kayıt türleri (ADR-0038 K3, ör. Filo: araç → "vehicle" kategorisi). Belgeye erişim sahip kaydın
+    /// erişimidir; kategori, kayda eklenebilecek belge türlerini (<c>core.credential-type</c> listesi) belirler.
+    /// </summary>
+    IReadOnlyList<Credentials.CredentialOwner> CredentialOwners => [];
+
+    /// <summary>
     /// Olay abonelikleri (ADR-0007): modül başka modüllerin değişikliğine bunlarla tepki verir. Anahtar modül anahtarıyla
     /// başlar; izinler modülün kendi izinleridir; abone sınıfı <see cref="ConfigureServices"/>'te scoped kaydedilir.
     /// </summary>

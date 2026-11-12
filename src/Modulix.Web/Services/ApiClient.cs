@@ -38,6 +38,9 @@ public sealed class ApiClient(HttpClient http)
         return http.PostAsync(url, content);
     });
 
+    /// <summary>Çok parçalı form gövdesiyle POST (ör. kayda dosya yükleme, <c>/api/files</c>).</summary>
+    public Task<ApiResult<T>> PostFormAsync<T>(string url, MultipartFormDataContent content) => SendAsync<T>(() => http.PostAsync(url, content));
+
     public Task<ApiResult<bool>> DeleteAsync(string url) => SendAsync<bool>(() => http.DeleteAsync(url));
 
     private static async Task<ApiResult<T>> SendAsync<T>(Func<Task<HttpResponseMessage>> send)
