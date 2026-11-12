@@ -1,5 +1,10 @@
 # Modulix CI: her push ve pull request'te derler, gercek SQL Server uzerinde testleri calistirir.
 # Yerel kurulumla ayni dosyalari kullanir (compose.yaml, docker/sqlserver/init.sql).
+#
+# Yapi (sure kisaltma, 11.11.2026): entegrasyon testleri tek job'da ~52 dk suruyordu (toplam ~57 dk). Simdi uc katman paralel kosar:
+#   unit-tests         derleme + birim testleri, veritabani yok (~5 dk)
+#   integration-tests  entegrasyon testleri INTEGRATION_SHARDS parcaya bolunur; her parca kendi SQL Server'inda kosar
+#   build-and-test     ikisini toplayan kapi; dal kurali (ruleset) bu adi zorunlu kontrol olarak ister, adi degistirme
 
 name: CI
 
@@ -20,13 +25,16 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
 jobs:
-  build-and-test:
+  # Birim testleri veritabanina dokunmaz (tests/ altinda entegrasyon disinda SqlConnection/WebApplicationFactory yok);
+  # tum cozumu derler, bu yuzden derleme hatasi ve NuGet guvenlik denetimi burada yakalanir.
+  unit-tests:
     runs-on: ubuntu-24.04  # sabit: runner imaji degisince CI sessizce bozulmasin
-    timeout-minutes: 60  # entegrasyon testleri hizli runner'da ~27 dk, yavas runner'da 40+ dk suruyor; 45 dk siniri 6.11.2026'de iki PR'i iptal etti
-    env:
-      DOTNET_NOLOGO: "1"
-      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    timeout-minutes: 30
 
     steps:
       - name: Kodu al
@@ -47,36 +55,12 @@ jobs:
           dotnet --list-sdks
           dotnet --version
 
-      # Her calismada yeni, yalnizca bu calismaya ozel sifreler. Kayitlarda gizlenir.
-      - name: Gecici veritabani sifreleri
-        run: |
-          sa="Mx!$(openssl rand -hex 12)"
-          app="Mx!$(openssl rand -hex 12)"
-          migrator="Mx!$(openssl rand -hex 12)"
-          for secret in "$sa" "$app" "$migrator"; do echo "::add-mask::$secret"; done
-          printf 'MSSQL_PORT=14333\nMSSQL_SA_PASSWORD=%s\nMODULIX_APP_PASSWORD=%s\nMODULIX_MIGRATOR_PASSWORD=%s\n' \
-            "$sa" "$app" "$migrator" > .env
-          {
-            echo "ConnectionStrings__Modulix=Server=localhost,14333;Database=Modulix;User Id=modulix_app;Password=$app;TrustServerCertificate=True"
-            echo "ConnectionStrings__ModulixMigrations=Server=localhost,14333;Database=Modulix;User Id=modulix_migrator;Password=$migrator;TrustServerCertificate=True"
-          } >> "$GITHUB_ENV"
-
-      # Mailpit: yerel test posta kutusu; e-posta entegrasyon testi gercek SMTP gonderimini burada dogrular.
-      - name: SQL Server'i ve Mailpit'i baslat
-        run: docker compose up -d --wait sqlserver mailpit
-
-      - name: Veritabani, semalar ve kullanicilar
-        run: docker compose run --rm db-init
-
       - name: Paketleri geri yukle
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet restore 2>&1 | tee "$RUNNER_TEMP/steplogs/restore.log"
 
       # Directory.Build.props: CI'da yuksek/kritik guvenlik acigi olan paket derlemeyi durdurur.
       - name: Derle
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet build --configuration Release --no-restore 2>&1 | tee "$RUNNER_TEMP/steplogs/build.log"
-
-      - name: Migration'lari uygula
-        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet run --project src/Modulix.Api --configuration Release --no-build -- migrate 2>&1 | tee "$RUNNER_TEMP/steplogs/migrate.log"
 
       - name: Mimari testler
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.ArchitectureTests/Modulix.ArchitectureTests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/architecture-tests.log"
@@ -111,13 +95,6 @@ jobs:
       - name: Filo birim testleri
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Modules.Fleet.Tests/Modulix.Modules.Fleet.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/fleet-tests.log"
 
-      - name: Entegrasyon testleri
-        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/integration-tests.log"
-
-      - name: Hata durumunda SQL Server kayitlari
-        if: failure()
-        run: mkdir -p "$RUNNER_TEMP/steplogs"; docker compose logs sqlserver --tail 100 2>&1 | tee "$RUNNER_TEMP/steplogs/sqlserver.log"
-
       - name: Test ozeti
         if: always()
         run: |
@@ -137,3 +114,125 @@ jobs:
             body="${body//'%'/'%25'}"; body="${body//$'\r'/'%0D'}"; body="${body//$'\n'/'%0A'}"
             echo "::error title=$(basename "$f")::${body:0:60000}"
           done
+
+  # Entegrasyon testleri test SINIFI duzeyinde parcalara bolunur (scripts/ci-test-shard.sh; sinif basina test sayisina gore dengeli).
+  # Her parca kendi SQL Server + Mailpit'ini kurar, bu yuzden parcalar birbirinin verisini etkilemez. Parca sayisini artirmak icin
+  # matrix.shard listesine numara eklemek yeter (parca sayisi strategy.job-total'dan okunur).
+  integration-tests:
+    name: integration-tests (${{ matrix.shard }}/${{ strategy.job-total }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45  # tek job'da 52 dk suren testler 4 parcada ~13 dk bekleniyor; fazlasi takilmis demektir
+    strategy:
+      fail-fast: false  # bir parca kirmizi olsa da digerleri biter; tum hatalar tek seferde gorunur
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      INTEGRATION_SHARDS: ${{ strategy.job-total }}
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v5
+
+      - name: .NET SDK kurulumu
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.100'
+
+      # Her calismada yeni, yalnizca bu calismaya ozel sifreler. Kayitlarda gizlenir.
+      - name: Gecici veritabani sifreleri
+        run: |
+          sa="Mx!$(openssl rand -hex 12)"
+          app="Mx!$(openssl rand -hex 12)"
+          migrator="Mx!$(openssl rand -hex 12)"
+          for secret in "$sa" "$app" "$migrator"; do echo "::add-mask::$secret"; done
+          printf 'MSSQL_PORT=14333\nMSSQL_SA_PASSWORD=%s\nMODULIX_APP_PASSWORD=%s\nMODULIX_MIGRATOR_PASSWORD=%s\n' \
+            "$sa" "$app" "$migrator" > .env
+          {
+            echo "ConnectionStrings__Modulix=Server=localhost,14333;Database=Modulix;User Id=modulix_app;Password=$app;TrustServerCertificate=True"
+            echo "ConnectionStrings__ModulixMigrations=Server=localhost,14333;Database=Modulix;User Id=modulix_migrator;Password=$migrator;TrustServerCertificate=True"
+          } >> "$GITHUB_ENV"
+
+      # Mailpit: yerel test posta kutusu; e-posta entegrasyon testi gercek SMTP gonderimini burada dogrular.
+      - name: SQL Server'i ve Mailpit'i baslat
+        run: docker compose up -d --wait sqlserver mailpit
+
+      - name: Veritabani, semalar ve kullanicilar
+        run: docker compose run --rm db-init
+
+      - name: Paketleri geri yukle
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet restore tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj 2>&1 | tee "$RUNNER_TEMP/steplogs/restore.log"
+
+      # Yalnizca entegrasyon projesi (ve bagimliliklari) derlenir; tum cozumun derlemesi unit-tests job'inda yapilir.
+      - name: Derle
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet build tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj --configuration Release --no-restore 2>&1 | tee "$RUNNER_TEMP/steplogs/build.log"
+
+      - name: Migration'lari uygula
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet run --project src/Modulix.Api --configuration Release --no-build -- migrate 2>&1 | tee "$RUNNER_TEMP/steplogs/migrate.log"
+
+      # Parca filtresi: derlenmis testlerin sinif listesinden bu parcanin payi hesaplanir.
+      - name: Parca filtresini hesapla
+        run: |
+          set -o pipefail
+          dotnet test tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj --configuration Release --no-build --list-tests > "$RUNNER_TEMP/integration-list.txt"
+          filter=$(bash scripts/ci-test-shard.sh "${{ matrix.shard }}" "$INTEGRATION_SHARDS" < "$RUNNER_TEMP/integration-list.txt")
+          echo "INTEGRATION_FILTER=$filter" >> "$GITHUB_ENV"
+          echo "Parca ${{ matrix.shard }}/$INTEGRATION_SHARDS filtresi:"
+          echo "$filter" | tr '|' '\n'
+
+      - name: Entegrasyon testleri
+        run: |
+          set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"
+          dotnet test tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj --configuration Release --no-build \
+            --filter "$INTEGRATION_FILTER" \
+            --results-directory "$RUNNER_TEMP/trx" --logger "trx;LogFileName=integration.trx" \
+            2>&1 | tee "$RUNNER_TEMP/steplogs/integration-tests.log"
+
+      - name: Hata durumunda SQL Server kayitlari
+        if: failure()
+        run: mkdir -p "$RUNNER_TEMP/steplogs"; docker compose logs sqlserver --tail 100 2>&1 | tee "$RUNNER_TEMP/steplogs/sqlserver.log"
+
+      - name: Test ozeti
+        if: always()
+        run: |
+          for f in "$RUNNER_TEMP"/steplogs/*-tests.log; do
+            [ -f "$f" ] || continue
+            line=$(grep -E "(Passed|Failed)!|total:|toplam:" "$f" | tail -n 1)
+            echo "::notice title=integration-${{ matrix.shard }}::${line:-ozet bulunamadi}"
+          done
+
+      # En yavas siniflar: parca dengesini veriyle ayarlamak icin (job ozetinde gorunur).
+      - name: En yavas siniflar
+        if: always()
+        run: |
+          {
+            echo "### Parca ${{ matrix.shard }}/$INTEGRATION_SHARDS: en yavas test siniflari"
+            bash scripts/ci-slow-classes.sh "$RUNNER_TEMP/trx/integration.trx"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Hata ayrintisi GitHub annotation olarak yazilir (kayit dosyasina erisemeyen araclar icin).
+      - name: Hata ozeti
+        if: failure()
+        run: |
+          for f in "$RUNNER_TEMP"/steplogs/*.log; do
+            [ -f "$f" ] || continue
+            body=$( { grep -E "error|Error|ERROR|fail|Fail|Exception|Assert" "$f" | tail -n 40; echo '--- son satirlar ---'; tail -n 40 "$f"; } )
+            body="${body//'%'/'%25'}"; body="${body//$'\r'/'%0D'}"; body="${body//$'\n'/'%0A'}"
+            echo "::error title=$(basename "$f")::${body:0:60000}"
+          done
+
+  # Zorunlu kontrol (ruleset "main: build ve test zorunlu" bu adi bekler). Matris parcalari tek tek adlandirildigi icin
+  # tek bir kapi gerekir; iptal/atlanan her sonuc de basarisizdir.
+  build-and-test:
+    needs: [unit-tests, integration-tests]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Sonuclari denetle
+        env:
+          UNIT: ${{ needs.unit-tests.result }}
+          INTEGRATION: ${{ needs.integration-tests.result }}
+        run: |
+          echo "unit-tests: $UNIT"
+          echo "integration-tests: $INTEGRATION"
+          [ "$UNIT" = "success" ] && [ "$INTEGRATION" = "success" ]

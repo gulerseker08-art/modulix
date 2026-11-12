@@ -157,6 +157,82 @@ public class ImportFileRulesTests
         Assert.Equal("﻿Konu;Not;Hata\r\n'=HYPERLINK(1);\"a;b\";Konu geçersiz.\r\n", text);
     }
 
+    // ADR-0033 Dilim 4a: .xlsx hücreleri tiptedir; metin sütunlarının okuduğu Türkçe biçime inerler.
+    [Theory]
+    [InlineData(1250.5, "1250,5")]
+    [InlineData(100d, "100")]
+    [InlineData(0.1 + 0.2, "0,3")]
+    [InlineData(-3.25, "-3,25")]
+    public void Workbook_numbers_become_turkish_decimal_text(double number, string expected) =>
+        Assert.Equal(expected, ImportFiles.Text(number));
+
+    [Fact]
+    public void Workbook_dates_booleans_and_empty_cells_become_text()
+    {
+        Assert.Equal("31.12.2026", ImportFiles.Text(new DateTime(2026, 12, 31)));
+        Assert.Equal("31.12.2026 14:30", ImportFiles.Text(new DateTime(2026, 12, 31, 14, 30, 0)));
+        Assert.Equal("31.12.2026", ImportFiles.Text(new DateOnly(2026, 12, 31)));
+        Assert.Equal("Evet", ImportFiles.Text(true));
+        Assert.Equal("Hayır", ImportFiles.Text(false));
+        Assert.Null(ImportFiles.Text(null));
+        Assert.Equal("5321112233", ImportFiles.Text(5321112233L));
+    }
+
+    [Fact]
+    public void Workbook_rows_use_the_same_blank_line_numbering_as_csv_and_converted_cells_parse_like_typed_text()
+    {
+        IReadOnlyList<object?>[] raw =
+        [
+            ["Konu", "Tahmini bütçe", "Hedef tarih"],
+            [null, null, null],
+            ["Filo", 1250.5, new DateTime(2026, 12, 31)],
+        ];
+
+        var file = ImportFiles.Build(';', raw);
+
+        Assert.Equal(["Konu", "Tahmini bütçe", "Hedef tarih"], file.Headers);
+        var row = Assert.Single(file.Rows);
+        Assert.Equal(3, row.RowNo);
+        var (values, problems) = ImportRows.Build(
+            [new ImportColumn(0, Subject), new ImportColumn(1, Budget), new ImportColumn(2, Target)], row);
+        Assert.Empty(problems);
+        Assert.Equal(1250.5m, values["estimatedBudget"]!.GetValue<decimal>());
+        Assert.Equal("2026-12-31", values["targetPurchaseDate"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void Row_reading_stops_once_the_row_limit_is_exceeded_so_large_workbooks_do_not_fill_memory()
+    {
+        var read = 0;
+        IEnumerable<IReadOnlyList<object?>> Many()
+        {
+            yield return new object?[] { "Konu" };
+            for (var i = 0; i < ImportLimits.MaxRows * 10; i++)
+            {
+                read++;
+                yield return new object?[] { "x" };
+            }
+        }
+
+        var file = ImportFiles.Build(';', Many());
+
+        Assert.Equal(ImportLimits.MaxRows + 1, file.Rows.Count);
+        Assert.True(read <= ImportLimits.MaxRows + 1);
+    }
+
+    [Theory]
+    [InlineData("liste.xlsx", true, true)]
+    [InlineData("LISTE.XLSX", true, true)]
+    [InlineData("liste.csv", true, false)]
+    [InlineData("liste.txt", true, false)]
+    [InlineData("liste.xls", false, false)]
+    [InlineData("liste", false, false)]
+    public void Format_is_chosen_from_the_extension(string name, bool supported, bool workbook)
+    {
+        Assert.Equal(supported, ImportFiles.IsSupported(name));
+        Assert.Equal(workbook, ImportFiles.IsWorkbook(name));
+    }
+
     [Fact]
     public void Template_is_a_header_row_of_labels() =>
         Assert.Equal("﻿Konu;Tahmini bütçe\r\n", Encoding.UTF8.GetString(ImportErrorReport.Template([Subject, Budget])));
