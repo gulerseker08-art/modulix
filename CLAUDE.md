@@ -23,7 +23,7 @@ dotnet run --project src/Modulix.Api -- tenant-delete <slug> --confirm <slug>  #
 
 - Yerel veritabanı: `docker compose up -d --wait sqlserver mailpit && docker compose run --rm db-init` (şifreler `.env`'de; Windows'ta `scripts/db-up.ps1`). Port 14333.
 - Migration (tek zincir): `dotnet ef migrations add <Ad> --project src/Modulix.Infrastructure --startup-project src/Modulix.Api` (`Persistence/Migrations`). `dotnet ef database update` kullanma. Tek veritabanı bütün tenant'ları etkilediği için migration'lar geriye uyumlu ve kesintisiz olmalı. Yeni tenant tablosu RLS politikasına da eklenir (`TenantIsolationSql.AddTable`).
-- CI (`.github/workflows/ci.yml`) Release modunda derler, migration uygular, mimari + Core + CRM + entegrasyon testlerini çalıştırır. CI'da yüksek/kritik açıklı NuGet paketi derlemeyi durdurur.
+- CI (`.github/workflows/ci.yml`) Release modunda derler, migration uygular, mimari + birim + entegrasyon testlerini çalıştırır. Entegrasyon testleri test sınıfı düzeyinde 4 paralel parçaya bölünür (`scripts/ci-test-shard.sh`, her parça kendi SQL Server'ında); `build-and-test` job'u zorunlu kontrol olan toplayıcı kapıdır, adını değiştirme. CI'da yüksek/kritik açıklı NuGet paketi derlemeyi durdurur.
 - Değişiklikten sonra en az `dotnet build` ve mimari testleri çalıştır; veritabanı yoksa entegrasyon testlerini çalıştıramadığını açıkça söyle.
 
 ## Mimari kurallar (testlerle denetlenir)
