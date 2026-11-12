@@ -29,6 +29,7 @@ public static class LogisticsAccess
     public const string RequestsApprove = "logistics.requests.approve";
     public const string ShipmentsRead = "logistics.shipments.read";
     public const string ShipmentsWrite = "logistics.shipments.write";
+    public const string FreightRead = "logistics.freight.read";
 
     public const string TransportRequestEntityKey = "logistics.transport-request";
     public const string ShipmentEntityKey = "logistics.shipment";

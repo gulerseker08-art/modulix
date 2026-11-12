@@ -103,6 +103,8 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
     public void Configure(EntityTypeBuilder<Shipment> builder)
     {
         CargoTables.Configure(builder, "Shipments");
+        builder.Property(s => s.FreightAmount).HasPrecision(18, 2);
+        builder.Property(s => s.FreightCurrency).HasMaxLength(LogisticsEntity.CurrencyLength).IsFixedLength().IsUnicode(false);
 
         // Her talepten en çok bir sevkiyat; talebe veritabanı yabancı anahtarı (aynı modül) bileşik anahtarla kurulur.
         builder.HasIndex(s => new { s.TenantId, s.RequestId }).IsUnique().HasDatabaseName("UX_Shipments_Request");
@@ -125,6 +127,8 @@ internal sealed class TripConfiguration : IEntityTypeConfiguration<Trip>
         builder.Property(t => t.Notes).HasMaxLength(Trip.TextMaxLength);
         builder.Property(t => t.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
         builder.Property(t => t.StatusReason).HasMaxLength(Trip.ReasonMaxLength);
+        builder.Property(t => t.SettlementAmount).HasPrecision(18, 2);
+        builder.Property(t => t.SettlementCurrency).HasMaxLength(LogisticsEntity.CurrencyLength).IsFixedLength().IsUnicode(false);
 
         builder.HasIndex(t => new { t.TenantId, t.Number }).IsUnique().HasDatabaseName("UX_Trips_Number");
         builder.HasIndex(t => new { t.TenantId, t.Status, t.PlannedStart }).HasDatabaseName("IX_Trips_Status");

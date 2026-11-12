@@ -49,7 +49,7 @@
     }
 
     <fieldset disabled="@ReadOnly">
-        <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@($"{Noun} formu bölümleri")">
+        <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@($"{Noun} formu bölümleri")">
             <Field Context="f">
                 @switch (f.Key)
                 {
@@ -143,6 +143,17 @@
                     case "hazardous":
                         <SegmentedChoice Id="cargo-hazardous" Label="@f.Label" LabelClass="@f.LabelClass()" Options="HazardousOptions" @bind-Value="form.Hazardous" />
                         <FieldError Field="hazardous" Errors="errors" />
+                        break;
+                    case "freightAmount":
+                        <label class="@f.LabelClass()" for="cargo-freight">@f.Label</label>
+                        <input id="cargo-freight" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.FreightAmount" />
+                        <FieldError Field="freightAmount" Errors="errors" />
+                        break;
+                    case "freightCurrency":
+                        <label class="@f.LabelClass()" for="cargo-freight-currency">@f.Label</label>
+                        <input id="cargo-freight-currency" class="form-control" maxlength="3" list="cargo-currencies" autocomplete="off" @bind="form.FreightCurrency" />
+                        <datalist id="cargo-currencies"><option value="TRY"></option><option value="EUR"></option><option value="USD"></option><option value="GBP"></option></datalist>
+                        <FieldError Field="freightCurrency" Errors="errors" />
                         break;
                     case "notes":
                         <label class="@f.LabelClass()" for="cargo-notes">@f.Label</label>
@@ -251,12 +262,14 @@
                 WeightKg = r.Values["weightKg"]?.GetValue<decimal>(), VolumeM3 = r.Values["volumeM3"]?.GetValue<decimal>(),
                 PalletCount = r.Values["palletCount"]?.GetValue<int>(), LoadingMeters = r.Values["loadingMeters"]?.GetValue<decimal>(),
                 Hazardous = WarehouseLabels.Flag(r, "hazardous"), Notes = r.Values["notes"]?.GetValue<string>(),
+                FreightAmount = r.Values["freightAmount"]?.GetValue<decimal>(), FreightCurrency = r.Values["freightCurrency"]?.GetValue<string>() ?? "TRY",
                 Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
             }
             : new CargoForm
             {
                 PickupDate = DateOnly.FromDateTime(DateTime.Now).AddDays(1),
                 TransportModeKey = Lookups.DefaultOf(LogisticsAccess.TransportModeList) ?? string.Empty,
+                FreightCurrency = "TRY",
             };
         errors = null;
         message = null;
@@ -291,6 +304,13 @@
             ["notes"] = Blank(form.Notes),
             ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
         };
+        if (CanSeeFreight && !IsRequest)
+        {
+            // Navlun hassas alandır (logistics.freight.read): izni olmayan kullanıcının isteğinde hiç yer almaz.
+            values["freightAmount"] = form.FreightAmount;
+            values["freightCurrency"] = form.FreightAmount is null ? null : Blank(form.FreightCurrency);
+        }
+
         if (IsRequest && form.Id is null)
         {
             // Referans yalnızca oluştururken verilir.
@@ -315,6 +335,15 @@
     }
 
     /// <summary>Eylem çalışınca kaydın yeni hali sayfaya iletilir (durum, sürüm).</summary>
+    private bool CanSeeFreight => Session.Can(LogisticsAccess.FreightRead);
+
+    // Navlun alanları yalnızca sevkiyat formunda ve yetkili kullanıcıya çizilir (Y8b hassas alan).
+    private bool Shows(FormFieldDto field) => field.Key switch
+    {
+        "freightAmount" or "freightCurrency" => !IsRequest && CanSeeFreight,
+        _ => true,
+    };
+
     private Task ActionDoneAsync(RecordResponse updated) => Saved.InvokeAsync(updated);
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -360,6 +389,10 @@
         public decimal? LoadingMeters { get; set; }
 
         public bool Hazardous { get; set; }
+
+        public decimal? FreightAmount { get; set; }
+
+        public string FreightCurrency { get; set; } = "TRY";
 
         public string? Notes { get; set; }
     }

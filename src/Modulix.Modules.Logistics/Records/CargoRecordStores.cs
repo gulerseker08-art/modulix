@@ -199,6 +199,8 @@ internal sealed class ShipmentRecordStore(LogisticsStoreContext context) : Cargo
         .. CargoFields(),
         Field.Reference<Shipment, TransportRequest>("requestId", "Taşıma talebi bulunamadı.", s => s.RequestId, (s, v) => s.RequestId = v!.Value, required: true, createOnly: true),
         Field.Computed<Shipment>("tripId", s => s.TripId?.ToString()),
+        MoneyRules.Amount<Shipment>("freightAmount", s => s.FreightAmount, (s, v) => s.FreightAmount = v),
+        MoneyRules.Currency<Shipment>("freightCurrency", s => s.FreightCurrency, (s, v) => s.FreightCurrency = v),
     ];
 
     protected override IReadOnlyDictionary<string, RecordFilter<Shipment>> Filters { get; } = new Dictionary<string, RecordFilter<Shipment>>(
@@ -218,6 +220,13 @@ internal sealed class ShipmentRecordStore(LogisticsStoreContext context) : Cargo
         else if (Context.Gate.IsOpen && Context.Gate.Status == Shipment.Statuses.Pending)
         {
             entity.TripId = null;
+        }
+
+        var errors = new List<RecordFieldError>();
+        MoneyRules.Validate(entity.FreightAmount, entity.FreightCurrency, "freightAmount", "freightCurrency", errors);
+        if (errors.Count > 0)
+        {
+            throw new RecordValidationException(errors);
         }
 
         if (isNew && (entity.RequestId == Guid.Empty
