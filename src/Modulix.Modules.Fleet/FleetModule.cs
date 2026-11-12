@@ -171,7 +171,7 @@ public sealed class FleetModule : IModule
     /// <summary>Araç belgeleri (muayene, sigorta, kasko...) Core süreli belgesidir (ADR-0038 K3); araç kartının "Belgeler" bölümünde yönetilir.</summary>
     IReadOnlyList<CredentialOwner> IModule.CredentialOwners { get; } =
     [
-        new(Entities.Vehicle, CredentialCategories.Vehicle, "Araç"),
+        new(Entities.Vehicle, CredentialCategories.Vehicle, "Araç", Permissions.VehiclesRead),
     ];
 
     /// <summary>Araç formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>

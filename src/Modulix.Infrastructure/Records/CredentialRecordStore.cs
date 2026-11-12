@@ -135,7 +135,28 @@ internal sealed class CredentialRecordStore(
         var items = await Order(source, sort).ThenBy(c => c.Id)
             .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
             .ToListAsync(cancellationToken);
-        return new RecordPage([.. items.Select(ToData)], query.Page, query.PageSize, total);
+        var data = items.Select(ToData).ToList();
+        await AddOwnerLabelsAsync(data, cancellationToken);
+        return new RecordPage(data, query.Page, query.PageSize, total);
+    }
+
+    /// <summary>
+    /// Listede sahip kaydın kısa adı (<c>ownerLabel</c>, salt okunur): sahip deposu <see cref="IRecordLabelProvider"/> uygularsa (araç → plaka,
+    /// sürücü → ad soyad). Yalnızca listede verilir; tekil okuma ve denetim kaydı değişmez. Satırlar zaten okunabilir sahip türleriyle süzülmüştür.
+    /// </summary>
+    private async Task AddOwnerLabelsAsync(List<RecordData> data, CancellationToken cancellationToken)
+    {
+        foreach (var group in data.GroupBy(d => d.Values["ownerEntityKey"]!.GetValue<string>()))
+        {
+            var ids = group.Select(d => Guid.Parse(d.Values["ownerId"]!.GetValue<string>())).Distinct().ToList();
+            var labels = OwnerStore(group.Key) is IRecordLabelProvider provider
+                ? await provider.LabelsAsync(ids, cancellationToken)
+                : new Dictionary<Guid, string>();
+            foreach (var item in group)
+            {
+                item.Values["ownerLabel"] = labels.GetValueOrDefault(Guid.Parse(item.Values["ownerId"]!.GetValue<string>()));
+            }
+        }
     }
 
     public async Task<RecordData> CreateAsync(JsonObject values, CancellationToken cancellationToken)

@@ -239,9 +239,11 @@ public static class AppCatalog
         new(Logistics, null, "Lojistik", "truck", null, 42, ModuleKey: LogisticsAccess.ModuleKey, Group: OperationsGroup),
         new("logistics.drivers", Logistics, "Sürücüler", "user", "lojistik/suruculer", 10, LogisticsAccess.ModuleKey, LogisticsAccess.DriversRead),
         new("logistics.carrier-terms", Logistics, "Taşıyıcı anlaşmaları", "file-text", "lojistik/tasiyici-anlasmalari", 20, LogisticsAccess.ModuleKey, LogisticsAccess.CarriersRead, Tone: AppTone.Teal),
+        new("logistics.credentials", Logistics, "Sürücü belgeleri", "calendar", "lojistik/surucu-belgeleri", 30, LogisticsAccess.ModuleKey, LogisticsAccess.DriversRead, Tone: AppTone.Indigo),
         new(Fleet, null, "Filo", "truck", null, 45, ModuleKey: FleetAccess.ModuleKey, Group: OperationsGroup),
         new("fleet.vehicles", Fleet, "Araçlar", "truck", "filo/araclar", 10, FleetAccess.ModuleKey, FleetAccess.VehiclesRead),
         new("fleet.maintenance", Fleet, "Bakım kayıtları", "wrench", "filo/bakimlar", 20, FleetAccess.ModuleKey, FleetAccess.MaintenanceRead, Tone: AppTone.Teal),
+        new("fleet.credentials", Fleet, "Araç belgeleri", "calendar", "filo/belgeler", 30, FleetAccess.ModuleKey, FleetAccess.VehiclesRead, Tone: AppTone.Indigo),
 
         // Rapor merkezi çekirdeğe aittir (modül anahtarı yok; yönetim girdileri gibi yalnızca izne bağlıdır). Tek ekranlı olduğu için alt uygulaması yoktur,
         // kendi route'u vardır; /raporlar altındaki oluşturucu ve çalıştırma ekranları da bu uygulamanın bağlamında kalır.

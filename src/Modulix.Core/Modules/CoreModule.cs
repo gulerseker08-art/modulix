@@ -357,6 +357,16 @@ public sealed class CoreModule : IModule
             ]),
     ];
 
+    /// <summary>Core lookup'ları: kural aksiyonlarında üye seçimi ("Bildirim gönder" alıcısı).</summary>
+    IReadOnlyList<LookupDefinition> IModule.Lookups { get; } =
+    [
+        new(NotifyAutomation.RecipientLookup, "core.notification", "userId", "Alıcı", LookupTargetKind.Member)
+        {
+            SearchDescription = "Üyenin görünen adı",
+            PageSize = 20,
+        },
+    ];
+
     /// <summary>Süreli belge formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>
     IReadOnlyList<FormDefinition> IModule.Forms { get; } =
     [
@@ -695,11 +705,14 @@ public sealed class CoreModule : IModule
 
     /// <summary>
     /// Core'un kural yeteneği: sektörden bağımsız aksiyonlar, "Onaya gönder" (Dilim 4c-2) ile kalıcı akışın "Bekle" ve "Onay sonucunu bekle"
-    /// adımları (Dilim 4c-4). Kayıt türü beyan etmez.
+    /// adımları (Dilim 4c-4), "Bildirim gönder" ve süreli belge kayıt türü (ADR-0038 dilim 2b: bitişe kala tetikleyicisi).
     /// </summary>
     Modulix.Core.Contracts.Automation.AutomationCapabilities IModule.Automation { get; } = new()
     {
-        Actions = [.. Modulix.Core.Approvals.ApprovalAutomation.Capabilities.Actions, .. FlowAutomation.Actions],
+        Entities = Modulix.Core.Credentials.CredentialAutomation.Capabilities.Entities,
+        Events = Modulix.Core.Credentials.CredentialAutomation.Capabilities.Events,
+        Fields = Modulix.Core.Credentials.CredentialAutomation.Capabilities.Fields,
+        Actions = [.. Modulix.Core.Approvals.ApprovalAutomation.Capabilities.Actions, .. FlowAutomation.Actions, .. NotifyAutomation.Actions],
     };
 
     public void ConfigureServices(IServiceCollection services)
@@ -718,6 +731,10 @@ public sealed class CoreModule : IModule
         services.AddScoped<FlowStopAction>();
         services.AddScoped<IAutomationStepCheck, FlowWaitCheck>();
         services.AddScoped<IAutomationStepCheck, FlowAwaitApprovalCheck>();
+
+        // Süreli belgenin tarama kaynağı ve "Bildirim gönder" aksiyonu (ADR-0038 dilim 2b).
+        services.AddScoped<Modulix.Core.Credentials.CredentialAutomationRecordSource>();
+        services.AddScoped<NotifyAction>();
     }
 
     /// <summary>Kişinin çalıştığı firma: kişisi olan taraf silinemez.</summary>

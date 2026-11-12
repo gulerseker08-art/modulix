@@ -317,14 +317,15 @@ public class AppNavigationTests
 
         var root = Assert.Single(nav.Roots());
         Assert.Equal((AppCatalog.Logistics, "Lojistik"), (root.Id, root.Name));
-        Assert.Equal(["Sürücüler"], nav.MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+        Assert.Equal(["Sürücüler", "Sürücü belgeleri"], nav.MenuEntries(AppCatalog.Logistics).Select(e => e.Name)); // belge takibi sürücü okuma iznine bağlı
         Assert.Equal(AppCatalog.Logistics, nav.Context("lojistik/suruculer")!.Root.Id);
+        Assert.Equal(AppCatalog.Logistics, nav.Context("lojistik/surucu-belgeleri")!.Root.Id);
 
         Assert.Empty(Nav([], [LogisticsAccess.DriversRead]).Roots());
         Assert.Empty(Nav([LogisticsAccess.ModuleKey], []).Roots());
 
         // Taşıyıcı anlaşmaları kendi iznine bağlıdır: sürücü izni yetmez.
-        Assert.Equal(["Sürücüler", "Taşıyıcı anlaşmaları"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.DriversRead, LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+        Assert.Equal(["Sürücüler", "Taşıyıcı anlaşmaları", "Sürücü belgeleri"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.DriversRead, LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
         Assert.Equal(["Taşıyıcı anlaşmaları"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
     }
 
@@ -337,14 +338,15 @@ public class AppNavigationTests
         Assert.Equal((AppCatalog.Fleet, "Filo"), (root.Id, root.Name));
         Assert.Equal("filo/araclar", nav.Find("fleet.vehicles")!.Route);
         Assert.Equal(AppCatalog.Fleet, nav.Context("filo/araclar")!.Root.Id);
+        Assert.Equal(AppCatalog.Fleet, nav.Context("filo/belgeler")!.Root.Id);
 
         // Modül kapalıysa ya da araç izni yoksa uygulama görünmez (menüyü gizlemek yetki değildir; sunucu yine denetler).
         Assert.Empty(Nav([], [FleetAccess.VehiclesRead]).Roots());
         Assert.Empty(Nav([FleetAccess.ModuleKey], []).Roots());
 
         // Bakım kayıtları kendi iznine bağlıdır: araç izni yetmez.
-        Assert.Equal(["Araçlar"], nav.MenuEntries(AppCatalog.Fleet).Select(e => e.Name));
-        Assert.Equal(["Araçlar", "Bakım kayıtları"], Nav([FleetAccess.ModuleKey], [FleetAccess.VehiclesRead, FleetAccess.MaintenanceRead]).MenuEntries(AppCatalog.Fleet).Select(e => e.Name));
+        Assert.Equal(["Araçlar", "Araç belgeleri"], nav.MenuEntries(AppCatalog.Fleet).Select(e => e.Name)); // belge takibi araç okuma iznine bağlı
+        Assert.Equal(["Araçlar", "Bakım kayıtları", "Araç belgeleri"], Nav([FleetAccess.ModuleKey], [FleetAccess.VehiclesRead, FleetAccess.MaintenanceRead]).MenuEntries(AppCatalog.Fleet).Select(e => e.Name));
     }
 
     [Fact]

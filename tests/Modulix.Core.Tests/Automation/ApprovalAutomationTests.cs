@@ -32,11 +32,11 @@ public class ApprovalAutomationTests
         // Tutar ve para birimi parametre değildir: kayda bağlı onay (Dilim 4c) onları kayıttan okur.
         Assert.Equal(["process", "title", "description"], definition.Parameters.Select(p => p.Name));
 
-        // Süreç adı sabit yazılır; başlık isteğe bağlıdır (boşsa kaydın adı) ve kayıt değişkeni alır; Core kayıt türü beyan etmez.
+        // Süreç adı sabit yazılır; başlık isteğe bağlıdır (boşsa kaydın adı) ve kayıt değişkeni alır; Core'un kayıt türü yalnızca süreli belgedir.
         Assert.False(definition.Parameters.Single(p => p.Name == "process").AllowFieldBinding);
         Assert.True(definition.Parameters.Single(p => p.Name == "title").AllowFieldBinding);
         Assert.False(definition.Parameters.Single(p => p.Name == "title").Required);
-        Assert.DoesNotContain(catalog.AutomationEntities, e => e.ModuleKey == CoreModule.ModuleKey);
+        Assert.Equal(["core.credential"], catalog.AutomationEntities.Where(e => e.ModuleKey == CoreModule.ModuleKey).Select(e => e.Entity.EntityKey));
     }
 
     [Fact]

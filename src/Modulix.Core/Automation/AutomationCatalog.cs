@@ -116,6 +116,32 @@ public sealed class AutomationCatalogService(
             return null;
         }
 
+        // Erişimi sahip kayda bağlı tür (süreli belge): kural bütün sahip türlerinin belgelerini kapsar. Modülü açık en az bir sahip türü olmalı ve
+        // kullanıcı modülü açık her sahip türünü okuyabilmeli; kural bu okuma izinleriyle çalışır (AutomationRuleIdentity).
+        if (modules.AutomationOwnerReads(entity.EntityKey) is { } owners)
+        {
+            var enabled = 0;
+            foreach (var (ownerModule, permission) in owners)
+            {
+                if (!await access.IsModuleEnabledAsync(ownerModule, cancellationToken))
+                {
+                    continue;
+                }
+
+                if (!permissions.Contains(permission))
+                {
+                    return null;
+                }
+
+                enabled++;
+            }
+
+            if (enabled == 0)
+            {
+                return null;
+            }
+        }
+
         var fields = modules.AutomationFieldsOf(entity.EntityKey).ToList();
         if (modules.FindCustomizable(entity.EntityKey) is not null)
         {

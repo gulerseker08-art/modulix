@@ -163,7 +163,7 @@ public sealed class LogisticsModule : IModule
     /// <summary>Sürücü yetkinlikleri (ehliyet, SRC, psikoteknik...) Core süreli belgesidir (ADR-0038 K2, K3); sürücü kartının "Belgeler" bölümünde yönetilir.</summary>
     IReadOnlyList<CredentialOwner> IModule.CredentialOwners { get; } =
     [
-        new(Entities.Driver, CredentialCategories.Driver, "Sürücü"),
+        new(Entities.Driver, CredentialCategories.Driver, "Sürücü", Permissions.DriversRead),
     ];
 
     /// <summary>Sürücü formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>

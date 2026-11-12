@@ -299,6 +299,15 @@ public sealed class RecordConflictException(string message, Exception? innerExce
 public sealed class RecordAccessDeniedException(string message) : Exception(message);
 
 /// <summary>
+/// Kayıtları başka bir listede tanıtmak için kısa ad (ör. araç → plaka, sürücü → kişinin adı). Süreli belge listesi sahip kaydı bununla gösterir
+/// (ADR-0038 dilim 2b). Çağıran kayıt türünü okuma iznini önceden denetler; bulunmayan kimlik sonuçta yer almaz.
+/// </summary>
+public interface IRecordLabelProvider
+{
+    Task<IReadOnlyDictionary<Guid, string>> LabelsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+}
+
+/// <summary>
 /// Kayıt türü iznine ek olarak kayıt düzeyinde yazma kuralı olan depolar (ör. süreli belge: sahip kaydın güncelleme izni ve modül lisansı) bunu uygular.
 /// Kayda bağlı yan yazmalar (dosya ekleme ve silme, ADR-0040) tür izninden sonra bunu da sorar; dönen ileti doluysa işlem yetkisizdir.
 /// </summary>

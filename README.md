@@ -366,7 +366,9 @@ Firma yöneticisi her kayıt formunun düzenini kendine göre kurar: alanları t
   - **Süzgeçler:** `ownerEntityKey, ownerId, typeKey, status, validOn, expiresBy, expiredBefore` (tarihler `yyyy-AA-gg`).
   - **Sıralama** (`sort`): `validTo` (varsayılan; süresizler sonda), `typeKey, documentNo, createdAt`.
   - **Arayüz:** araç ve sürücü kartının altında belge paneli.
-  - **Yapılmadı:** bitişe kala uyarı kuralı (dilim 2b).
+  - **Bitişe kala uyarı (dilim 2b):** kural türü `core.credential`; tarihe bağlı tetikleyici `validTo`/`validFrom` (ör. bitişine 30 gün kala), yalnızca geçerli belgeler taranır. Kuralı yazmak için tenant'ta modülü açık her sahip türünü okuyabilmek gerekir; kural bu izinlerle çalışır.
+  - **Bildirim gönder** (`core.notify`, Core aksiyonu, her kayıt türünde): alıcı (üye; `core.notification.recipient` lookup'ı) ve ileti (`{{alan}}`). Alıcı kaydı kendi yetkisiyle göremiyorsa gönderilmez; aynı adım aynı kayıt ve alıcı için bir kez yazar.
+  - **Belge takibi:** listede salt okunur `ownerLabel` (araç plakası, sürücü adı soyadı; `IRecordLabelProvider`). Ekranlar `/filo/belgeler` ve `/lojistik/surucu-belgeleri` (Bitişi yaklaşan, Süresi dolan, Bugün geçerli, Tüm belgeler, İptal edilen).
 - `GET /api/grid-views?screen=crm.companies` (üyenin o ekrandaki görünümleri, ada göre), `POST /api/grid-views`, `PUT /api/grid-views/{id}` (gövdede `version`; sürümsüz 428, eski sürüm 409), `DELETE /api/grid-views/{id}?version=`. Gövde: `screenKey`, `name`, `columns` (sıralı sütun anahtarları), `sort` (ör. `-name`), `filters` (sorgu dizgisi, ör. `status=Active`).
 - Yalnızca sahibi görür ve değiştirir (aynı tenant'taki başka üye de "bulunamadı" alır); ek izin istemez, oturum ve aktif tenant yeter. Görünüm yetki vermez: liste uç noktası izni, veri kapsamını ve alan yetkisini her istekte uygular.
 - Ad üyenin aynı ekranında tekildir (422), ekran başına en fazla 20 görünüm; geçersiz sütun/sıralama/süzgeç 422 alan hatalarıyla döner. Denetim kaydı yazılmaz (kişisel tercih).

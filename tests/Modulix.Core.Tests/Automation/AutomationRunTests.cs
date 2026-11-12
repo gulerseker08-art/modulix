@@ -389,7 +389,7 @@ public class AutomationSubscriptionCatalogTests
 
         Assert.NotNull(subscription);
         Assert.Equal("core", subscription.Value.ModuleKey);
-        Assert.Equal([Activity, Entity], subscription.Value.Subscription.EntityKeys);
+        Assert.Equal(["core.credential", Activity, Entity], subscription.Value.Subscription.EntityKeys);
         Assert.False(subscription.Value.Subscription.Ordered);
         Assert.Empty(subscription.Value.Subscription.Permissions);
         Assert.True(subscription.Value.Subscription.Matches(DomainEventTypes.RecordUpdated, Entity));
@@ -397,11 +397,12 @@ public class AutomationSubscriptionCatalogTests
     }
 
     [Fact]
-    public void Without_any_rule_capability_there_is_no_subscription_and_no_delivery_overhead()
+    public void Without_module_rule_capabilities_the_subscription_listens_only_to_core_credentials()
     {
         var catalog = Catalog(AutomationCapabilities.None);
 
-        Assert.Null(catalog.FindSubscription(CoreModule.Subscriptions.Automation));
+        // Core'un tek kural türü süreli belgedir (ADR-0038 dilim 2b); modül türü yoksa başka kayıt olayı abonelik yüküne girmez.
+        Assert.Equal(["core.credential"], catalog.FindSubscription(CoreModule.Subscriptions.Automation)!.Value.Subscription.EntityKeys);
         Assert.Empty(catalog.SubscriptionsFor(DomainEventTypes.RecordUpdated, Entity).Where(s => s.Subscription.Key == CoreModule.Subscriptions.Automation));
     }
 }

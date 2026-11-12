@@ -20,8 +20,8 @@ public class LogisticsAutomationCapabilityTests
         Assert.Equal(["core", "logistics"], catalog.Modules.Select(m => m.Key));
         Assert.Equal(
             [LogisticsModule.AutomationEntityKeys.Shipment],
-            catalog.AutomationEntities.Select(e => e.Entity.EntityKey).Order());
-        Assert.All(catalog.AutomationEntities, e => Assert.Equal("logistics", e.ModuleKey));
+            catalog.AutomationEntities.Where(e => e.ModuleKey != "core").Select(e => e.Entity.EntityKey).Order());
+        Assert.All(catalog.AutomationEntities.Where(e => e.ModuleKey != "core"), e => Assert.Equal("logistics", e.ModuleKey));
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public class LogisticsAutomationCapabilityTests
     {
         var catalog = Catalog();
 
-        var events = catalog.AutomationEntities.SelectMany(e => catalog.AutomationEventsOf(e.Entity.EntityKey)).ToList();
+        var events = catalog.AutomationEntities.Where(e => e.ModuleKey == "logistics").SelectMany(e => catalog.AutomationEventsOf(e.Entity.EntityKey)).ToList();
 
         Assert.NotEmpty(events);
         Assert.All(events, e => Assert.StartsWith("logistics.", e.Key));

@@ -89,6 +89,12 @@ public static class AutomationRuleIdentity
             permissions.Add(entityRead);
         }
 
+        // Erişimi sahip kayda bağlı tür (süreli belge): sahip türlerinin okuma izinleri; yayınlayanın hepsine sahip olduğu katalogda denetlenmiştir.
+        foreach (var (_, ownerRead) in modules.AutomationOwnerReads(entityKey) ?? [])
+        {
+            permissions.Add(ownerRead);
+        }
+
         void AddRead(string? read)
         {
             if (read is not null)

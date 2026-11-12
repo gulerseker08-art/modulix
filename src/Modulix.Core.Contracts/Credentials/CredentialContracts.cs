@@ -37,5 +37,6 @@ public static class CredentialStatuses
 /// <summary>
 /// Süreli belge taşıyabilen kayıt türü. <see cref="EntityKey"/> bildiren modülün kayıt türüdür ve kayıt deposu olmalıdır;
 /// <see cref="Category"/> <see cref="CredentialCategories"/> değerlerinden biridir. <see cref="DisplayName"/>: sahip türün adı (ör. "Araç").
+/// <see cref="ReadPermission"/>: sahip türü okuma izni (modülün izni); kural düzenleyicide "Süreli belge" kayıt türü bu izinlerden biri olana görünür.
 /// </summary>
-public sealed record CredentialOwner(string EntityKey, string Category, string DisplayName);
+public sealed record CredentialOwner(string EntityKey, string Category, string DisplayName, string ReadPermission);

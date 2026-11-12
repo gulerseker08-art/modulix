@@ -239,3 +239,42 @@ K3 uygulandı. Dosya ekleri (ADR-0040, PR #285) main'e girdiği için belge dosy
 | --- | --- |
 | `dotnet test tests/Modulix.Modules.Fleet.Tests` | sahip bildirimi ve katalog doğrulaması, belge türü listesi ve formu, Shared sabitleri |
 | `dotnet test tests/Modulix.IntegrationTests --filter "CredentialTests\|FileTests"` (SQL Server; CI koşar) | mutlu yol (araç ve sürücü belgeleri, bitişe göre sıra, geçerli / bitecek / bitmiş süzgeçleri, arama, iptal, denetim kaydı, dosya eki, dosyalı belge silinmez), doğrulama (zorunlu alanlar, sahip olmayan tür, bilinmeyen kayıt, kategori, liste dışı tür, tarih sırası, numara tekilliği, sahip değişmez, eski sürüm), tenant izolasyonu (başka tenant'ın aracına belge eklenemez, belgesi görünmez, değiştirilemez, silinemez, dosya eklenemez), yetki (araç okuyan görür ama yazamaz ve dosya ekleyemez; sürücü yazan araç belgesini görmez; araç yazan sürücü belgesini değiştiremez ve dosya ekleyemez; modül kapanınca belgeler gizlenir; izinsiz 403) |
+
+## 15. Dilim 2b: Bitişe kala uyarı ve belge takibi (12 Kasım 2026)
+
+K3'ün uyarı kısmı uygulandı: eşik koda değil firmanın kuralına yazılır.
+
+- **Kural türü `core.credential`** (ADR-0027):
+  - Tarama kaynağı `CredentialAutomationRecordSource`, yalnızca geçerli (iptal edilmemiş) belgeleri tarar.
+  - Tarihe bağlı tetikleyici `validTo` / `validFrom` alanlarında çalışır, ör. "bitişine 30 gün kala".
+  - Kayıt olayları: eklendi, güncellendi.
+  - Alanlar: belge no (etiket), tür anahtarı, sahip türü, veren kurum, tarihler, durum.
+- **Erişim kuralı:** belge kuralı bütün sahip türlerinin belgelerini kapsar.
+  - Kural düzenleyicide "Süreli belge" türünü yalnızca tenant'ta modülü açık **her** sahip türünü okuyabilen görür; bunun için en az bir sahip modülü açık olmalıdır.
+  - Kural bu okuma izinleriyle çalışır (`ModuleCatalog.AutomationOwnerReads`, `AutomationRuleIdentity`). Yayınlayanın sahip olmadığı bir okuma izni kurala geçmez.
+  - Sahip modülü olmayan tenant'ta tür görünmez.
+- **Core aksiyonu "Bildirim gönder"** (`core.notify`): sektörden bağımsızdır, her kayıt türünün kuralında kullanılır.
+  - Parametreler: alıcı (Core üye lookup'ı `core.notification.recipient`; kaydın sorumlu alanına da bağlanabilir) ve ileti (en çok 200 karakter, `{{alan}}` değişkenli).
+  - Alıcı kaydı **kendi yetkisiyle** göremiyorsa bildirim gönderilmez, adım atlanır. Böylece başlıktaki kayıt değişkenleri görmediği bilgiyi sızdırmaz.
+  - Aynı adım aynı kayıt için aynı alıcıya bir kez yazar. Tekilleştirme anahtarı adımın idempotency anahtarının SHA-256 özetidir.
+  - Kural motorunun çağrı kimliğinde kullanıcı yoktur (`UserId` boş); bu yüzden alıcı zorunludur.
+- **Sahip etiketi sözleşmesi:** `IRecordLabelProvider`. Araç kaydı plakayı, sürücü kaydı kişinin adını soyadını verir. Belge listesi her satıra salt okunur `ownerLabel` ekler; bu alan yalnızca listede bulunur, tekil okuma ve denetim kaydında yoktur.
+- **Arayüz:** "Belge takibi" ekranı iki menüde: Filo › Araç belgeleri (`/filo/belgeler`) ve Lojistik › Sürücü belgeleri (`/lojistik/surucu-belgeleri`).
+  - Aynı bileşen, sahip türü rotadan gelir.
+  - Görünümler: Bitişi yaklaşan (varsayılan: bugün geçerli ve 30 gün içinde bitecek), Süresi dolan, Bugün geçerli, Tüm belgeler, İptal edilen.
+  - Grid şablonu (`ViewTabs`, sıralanan başlıklar, sütun seçici, ⋯ menüsü, sayfalama). Belge kartın panelinden eklenir, buradan düzenlenir.
+  - Yeni CSS sınıfı ya da token yok.
+
+**Bilerek yapılmadı:**
+- Hazır kural şablonu ("bitişine 30 gün kala bildir"): alıcı tenant'a özgüdür, şablon alıcısız yayınlanamaz.
+- E-posta ile bildirim: aksiyon yalnızca uygulama içi; e-posta tercihi ayrı iştir.
+- Bildirim bağlantısı: belgenin kendi sayfası yok; sahip kartına bağlantı, sahip türüne göre rota sözleşmesi ister.
+- Sahip modülü sonradan açılırsa kural o türün okuma iznini de kazanır; yayın anındaki küme saklanmaz. Kabul edilen risk: bildirim yine alıcının kendi yetkisiyle süzülür.
+
+### Test sonuçları (Dilim 2b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Fleet.Tests` | 14: belge kural türü, tarih alanı, tarama kaynağı, "Bildirim gönder" ve alıcı lookup'ı katalogda; sahip okuma izni modülün olmalı |
+| `dotnet test tests/Modulix.Core.Tests` | Core aksiyon listesi ve abonelik kayıt türleri süreli belgeyle güncellendi |
+| `dotnet test tests/Modulix.IntegrationTests --filter "CredentialExpiryTests\|CredentialTests"` (SQL Server; CI koşar) | mutlu yol ("bitişine 30 gün kala" kuralı yalnızca o güne düşen geçerli belgeyi bulur, iptal edilen ve 31 gün kalan taranmaz, bildirim kayıt değişkeniyle bir kez yazılır; listede plaka ve ad soyad), doğrulama (metin alanına tarih tetikleyicisi, boş ileti, alıcısız adım yayınlanmaz), tenant izolasyonu (tarama başka tenant'ın belgesini bulmaz, onun üyesine bildirim gitmez), yetki (aracı göremeyen alıcıya araç belgesinin bildirimi gitmez; sürücü izni araç belgelerini göstermez) |

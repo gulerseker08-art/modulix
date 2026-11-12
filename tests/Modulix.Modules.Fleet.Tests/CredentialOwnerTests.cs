@@ -11,6 +11,8 @@ namespace Modulix.Modules.Fleet.Tests;
 /// </summary>
 public class CredentialOwnerTests
 {
+    private const string Read = "fleet.vehicles.read";
+
     [Fact]
     public void Fleet_registers_the_vehicle_as_a_credential_owner_with_vehicle_types_available()
     {
@@ -28,13 +30,28 @@ public class CredentialOwnerTests
         Assert.NotNull(catalog.FindForm(CredentialEntities.Credential));
     }
 
+    [Fact]
+    public void Credentials_expose_an_expiry_trigger_and_core_offers_a_notify_action()
+    {
+        var catalog = ModuleCatalog.Create(new FleetModule());
+
+        var entity = catalog.FindAutomationEntity(CredentialEntities.Credential)!.Value;
+        Assert.Equal(CoreModule.ModuleKey, entity.ModuleKey);
+        Assert.NotNull(entity.Entity.RecordSource);
+        Assert.Equal(Modulix.Core.Contracts.Automation.AutomationFieldType.Date, catalog.FindAutomationField("core.credential.validTo")!.Type);
+        Assert.Contains(catalog.AutomationActions, a => a.Action.Definition.Key == Modulix.Core.Automation.NotifyAutomation.NotifyAction);
+        Assert.NotNull(catalog.FindLookup(Modulix.Core.Automation.NotifyAutomation.RecipientLookup));
+    }
+
     [Theory]
     [InlineData("fleet.vehicle", "spaceship")]
     [InlineData("crm.company", CredentialCategories.Party)]
     [InlineData("fleet.vehicle", CredentialCategories.Vehicle, true)]
-    public void Invalid_or_duplicate_owner_declarations_stop_the_catalog(string entityKey, string category, bool duplicate = false)
+    [InlineData("fleet.vehicle", CredentialCategories.Vehicle, false, "crm.companies.read")]
+    public void Invalid_or_duplicate_owner_declarations_stop_the_catalog(string entityKey, string category, bool duplicate = false, string permission = Read)
     {
-        CredentialOwner[] owners = duplicate ? [new(entityKey, category, "Araç"), new(entityKey, category, "Araç")] : [new(entityKey, category, "Araç")];
+        CredentialOwner owner = new(entityKey, category, "Araç", permission);
+        CredentialOwner[] owners = duplicate ? [owner, owner] : [owner];
 
         var error = Assert.Throws<InvalidOperationException>(() => ModuleCatalog.Create(new OwnerModule(owners)));
         Assert.Contains("süreli belge sahibi", error.Message, StringComparison.Ordinal);
@@ -56,7 +73,7 @@ public class CredentialOwnerTests
 
         public string DisplayName => "Sahte filo";
 
-        public IReadOnlyList<PermissionDefinition> Permissions => [];
+        public IReadOnlyList<PermissionDefinition> Permissions => [new(Read, "Araçları görüntüler", "Araçlar")];
 
         public IReadOnlyList<CredentialOwner> CredentialOwners => owners;
     }

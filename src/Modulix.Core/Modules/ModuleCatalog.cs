@@ -149,10 +149,11 @@ public sealed partial class ModuleCatalog
                 if (!owner.EntityKey.StartsWith(module.Key + ".", StringComparison.Ordinal)
                     || !CredentialCategories.All.Contains(owner.Category)
                     || string.IsNullOrWhiteSpace(owner.DisplayName)
+                    || !module.Permissions.Any(p => p.Key == owner.ReadPermission)
                     || !credentialOwners.TryAdd(owner.EntityKey, (module.Key, owner)))
                 {
                     throw new InvalidOperationException(
-                        $"Geçersiz süreli belge sahibi: '{owner.EntityKey}' ({module.Key}). Kayıt türü modülün olmalı, kategori tanımlı olmalı, tür bir kez bildirilmeli.");
+                        $"Geçersiz süreli belge sahibi: '{owner.EntityKey}' ({module.Key}). Kayıt türü ve okuma izni modülün olmalı, kategori tanımlı olmalı, tür bir kez bildirilmeli.");
                 }
             }
 
@@ -334,6 +335,14 @@ public sealed partial class ModuleCatalog
     /// <summary>Süreli belge taşıyabilen kayıt türleri, modül ve tanım sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, CredentialOwner Owner)> CredentialOwners =>
         Modules.SelectMany(m => m.CredentialOwners.Select(o => (m.Key, o)));
+
+    /// <summary>
+    /// Erişimi sahip kaydın erişimi olan Core türü (süreli belge) için sahip türlerinin (modül, okuma izni) listesi; diğer türlerde null (türün kendi
+    /// okuma izni geçerlidir). Bu türün kuralı bütün sahip türlerinin belgelerini kapsar: kural yazan, tenant'ta modülü açık <b>her</b> sahip türünü
+    /// okuyabilmelidir ve kural bu okuma izinleriyle çalışır (yetki yükseltmesi yok). Sahibi bildirilmemişse liste boştur: tür kimseye görünmez.
+    /// </summary>
+    public IReadOnlyList<(string ModuleKey, string Permission)>? AutomationOwnerReads(string entityKey) =>
+        entityKey == CredentialEntities.Credential ? [.. CredentialOwners.Select(o => (o.ModuleKey, o.Owner.ReadPermission))] : null;
 
     /// <summary>Olay aboneliği ve modülü (ADR-0007); tanımlı değilse null.</summary>
     public (string ModuleKey, EventSubscription Subscription)? FindSubscription(string key) =>
