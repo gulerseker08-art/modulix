@@ -345,3 +345,44 @@ public sealed class TripStop : LogisticsEntity
 
     public string? Notes { get; internal set; }
 }
+
+/// <summary>
+/// Teslim kanıtı (ADR-0038 K8, dilim 6): bir sevkiyatın teslim komutuyla yazılan <b>değişmez</b> kaydı. Sonuç (teslim, kısmi, başarısız), teslim alan,
+/// sunucu zamanı, hasar ve eksik işareti, başarısız teslimin nedeni ve notu taşır. Fotoğraf ve imza dosyaları kayda Core dosya deposuyla
+/// eklenir (<c>IFileStore</c>). Kayıt güncellenmez ve silinmez; düzeltme yeni kanıtla yapılır. Genel uçtan oluşturulamaz.
+/// </summary>
+public sealed class DeliveryProof : LogisticsEntity
+{
+    public const int ReceivedByMaxLength = 200;
+    public const int TextMaxLength = 2000;
+
+    public static class Outcomes
+    {
+        public const string Delivered = "delivered";
+        public const string Partial = "partial";
+        public const string Failed = "failed";
+
+        public static IReadOnlyList<string> All { get; } = [Delivered, Partial, Failed];
+    }
+
+    public Guid ShipmentId { get; internal set; }
+
+    public string Outcome { get; internal set; } = Outcomes.Delivered;
+
+    /// <summary>Teslim alanın adı (teslim ve kısmi teslimde zorunlu).</summary>
+    public string? ReceivedBy { get; internal set; }
+
+    /// <summary>Teslimin kaydedildiği an; sunucu zamanıdır, istemciden gelmez.</summary>
+    public DateTimeOffset ReceivedAt { get; internal set; }
+
+    /// <summary>Teslimde hasar görüldü.</summary>
+    public bool Damaged { get; internal set; }
+
+    /// <summary>Teslimde eksik çıktı.</summary>
+    public bool Shortage { get; internal set; }
+
+    /// <summary>Başarısız teslimin nedeni (başarısızda zorunlu).</summary>
+    public string? FailureReason { get; internal set; }
+
+    public string? Notes { get; internal set; }
+}

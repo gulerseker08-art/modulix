@@ -9141,6 +9141,67 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("CarrierTerms", "logistics");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Logistics.Domain.DeliveryProof", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("Damaged")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReceivedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("ShipmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Shortage")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ShipmentId", "ReceivedAt")
+                        .HasDatabaseName("IX_DeliveryProofs_Shipment");
+
+                    b.ToTable("DeliveryProofs", "logistics");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Logistics.Domain.Driver", b =>
                 {
                     b.Property<Guid>("Id")
@@ -15148,6 +15209,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Modules.Fleet.Domain.Vehicle", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "VehicleId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Logistics.Domain.DeliveryProof", b =>
+                {
+                    b.HasOne("Modulix.Modules.Logistics.Domain.Shipment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ShipmentId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

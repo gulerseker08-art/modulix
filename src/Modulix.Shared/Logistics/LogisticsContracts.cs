@@ -1,3 +1,5 @@
+using Modulix.Shared.Records;
+
 namespace Modulix.Shared.Logistics;
 
 /// <summary>
@@ -67,6 +69,15 @@ public static class LogisticsAccess
 
     public const string TripEntityKey = "logistics.trip";
     public const string TripStopEntityKey = "logistics.trip-stop";
+    public const string DeliveryProofEntityKey = "logistics.delivery-proof";
+
+    /// <summary>Teslim sonuçları (sabit; sunucudaki <c>DeliveryProof.Outcomes</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> DeliveryOutcomes { get; } =
+    [
+        ("delivered", "Teslim edildi"),
+        ("partial", "Kısmi teslim"),
+        ("failed", "Teslim edilemedi"),
+    ];
 
     public const string TripVehicleLookup = "logistics.trip.vehicle";
     public const string TripTrailerLookup = "logistics.trip.trailer";
@@ -128,3 +139,12 @@ public sealed record TripLoadDto(
 
 /// <summary>Planlama bekleyen sevkiyatı sefere ekleme isteği.</summary>
 public sealed record AssignShipmentRequest(Guid ShipmentId);
+
+/// <summary>
+/// Teslim komutu isteği (ADR-0038 K8, dilim 6). <c>Outcome</c>: <c>delivered</c>, <c>partial</c> ya da <c>failed</c>. Teslim ve kısmi teslimde teslim alan,
+/// kısmi teslimde açıklama (<c>Notes</c>), başarısız teslimde neden zorunludur. Zaman sunucuda verilir; fotoğraf ve imza kanıt kaydına dosya olarak eklenir.
+/// </summary>
+public sealed record RecordDeliveryRequest(long Version, string Outcome, string? ReceivedBy, bool Damaged, bool Shortage, string? FailureReason, string? Notes);
+
+/// <summary>Teslim komutunun sonucu: güncel sevkiyat ve yazılan (değişmez) teslim kanıtı.</summary>
+public sealed record DeliveryResponse(RecordResponse Shipment, RecordResponse Proof);

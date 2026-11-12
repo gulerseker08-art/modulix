@@ -156,3 +156,20 @@ internal sealed class TripStopConfiguration : IEntityTypeConfiguration<TripStop>
             .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class DeliveryProofConfiguration : IEntityTypeConfiguration<DeliveryProof>
+{
+    public void Configure(EntityTypeBuilder<DeliveryProof> builder)
+    {
+        LogisticsTables.ConfigureCommon(builder, "DeliveryProofs");
+        builder.Property(p => p.Outcome).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(p => p.ReceivedBy).HasMaxLength(DeliveryProof.ReceivedByMaxLength);
+        builder.Property(p => p.FailureReason).HasMaxLength(DeliveryProof.TextMaxLength);
+        builder.Property(p => p.Notes).HasMaxLength(DeliveryProof.TextMaxLength);
+
+        // Bir sevkiyatın birden çok kanıtı olabilir (düzeltme yeni kanıtla yapılır); sevkiyata aynı modül içinde bileşik yabancı anahtar.
+        builder.HasIndex(p => new { p.TenantId, p.ShipmentId, p.ReceivedAt }).HasDatabaseName("IX_DeliveryProofs_Shipment");
+        builder.HasOne<Shipment>().WithMany().HasForeignKey(p => new { p.TenantId, p.ShipmentId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}

@@ -54,6 +54,8 @@ public static class LogisticsLabels
     public static string Route(RecordResponse record) => $"{WarehouseLabels.Text(record, "pickupCity")} → {WarehouseLabels.Text(record, "deliveryCity")}";
     public static string DriverType(string? key) => LogisticsAccess.DriverTypes.FirstOrDefault(t => t.Key == key).Label ?? key ?? string.Empty;
 
+    public static string DeliveryOutcome(string? key) => LogisticsAccess.DeliveryOutcomes.FirstOrDefault(o => o.Key == key).Label ?? key ?? string.Empty;
+
     public static string Status(string? key) => LogisticsAccess.Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Etkin başarı tonu, izinde dikkat tonu, pasif nötr ton.</summary>

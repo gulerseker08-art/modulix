@@ -60,6 +60,23 @@ public static class LogisticsEndpoints
                 : RecordEndpoints.ToProblem(result.Error!);
         });
 
+        // Teslim (dilim 6): yoldaki sevkiyat teslim edilir, kısmen teslim edilir ya da teslim edilemez. Değişmez teslim kanıtı, durum ve iş olayı tek işlemde
+        // yazılır. Yazan POST salt okunur lisans evresinde 403'tür; sunucu zamanı verir, istemci zamanı yok sayılır.
+        group.MapPost("/shipments/{id:guid}/delivery", async (Guid id, RecordDeliveryRequest request, IShipmentDelivery delivery, CancellationToken ct) =>
+        {
+            var result = await delivery.RecordAsync(
+                id, request.Version, new DeliveryCommand(request.Outcome ?? string.Empty, request.ReceivedBy, request.Damaged, request.Shortage, request.FailureReason, request.Notes), ct);
+            if (!result.IsSuccess)
+            {
+                return RecordEndpoints.ToProblem(result.Error!);
+            }
+
+            var (shipment, proof) = (result.Value!.Shipment, result.Value.Proof);
+            return Results.Ok(new DeliveryResponse(
+                new RecordResponse(shipment.EntityKey, shipment.Id, shipment.Version, shipment.Values),
+                new RecordResponse(proof.EntityKey, proof.Id, proof.Version, proof.Values)));
+        });
+
         // Sefer planlama (dilim 5): uygunluk denetimi, sevkiyat ekleme ve çıkarma. Yazma izni ve sefer durumu serviste denetlenir.
         group.MapGet("/trips/{id:guid}/check", async (Guid id, ITripPlanner planner, CancellationToken ct) =>
         {

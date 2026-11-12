@@ -233,6 +233,7 @@ public sealed class LogisticsModule : IModule
         public const string Shipment = "logistics.shipment";
         public const string Trip = "logistics.trip";
         public const string TripStop = "logistics.trip-stop";
+        public const string DeliveryProof = "logistics.delivery-proof";
     }
 
     /// <summary>
@@ -267,6 +268,34 @@ public sealed class LogisticsModule : IModule
 
     /// <summary>Filo araç türü kategorisi (Filo modülünün <c>VehicleKindCategories.Towed</c> değeri; sözleşme metnidir, proje başvurusu değil).</summary>
     public const string VehicleKindTowed = "towed";
+
+    /// <summary>İş olayı türleri ve payload alanları (ADR-0039, ADR-0038 K8); yayıncı aynı listeleri kullanır.</summary>
+    public static class Events
+    {
+        public const string ShipmentDelivered = "logistics.shipment.delivered";
+        public const string ShipmentDeliveryFailed = "logistics.shipment.delivery-failed";
+
+        /// <summary>Sevkiyat kaydının alanları (komutun döndürdüğü kayıttan alınır).</summary>
+        public static IReadOnlyList<string> ShipmentFields { get; } =
+            ["customerPartyId", "senderPartyId", "receiverPartyId", "tripId", "transportModeKey", "deliveryCity", "weightKg", "volumeM3", "palletCount", "status"];
+
+        /// <summary>Teslim ve kısmi teslim: sevkiyat alanları + teslim kanıtından türetilen alanlar (kayıtta karşılığı yok, hassas sayılmaz).</summary>
+        public static IReadOnlyList<string> ShipmentDeliveredFields { get; } =
+            [.. ShipmentFields, "proofId", "outcome", "receivedAt", "receivedBy", "damaged", "shortage"];
+
+        public static IReadOnlyList<string> ShipmentDeliveryFailedFields { get; } =
+            [.. ShipmentFields, "proofId", "outcome", "receivedAt", "failureReason"];
+    }
+
+    /// <summary>
+    /// İş olayı beyanları (ADR-0039): teslim ve kısmi teslim ADR-0037 "teslim → faturalanabilir kalem" köprüsünün ve kuralların tetikleyicisidir;
+    /// başarısız teslim ayrı olaydır (faturalanabilir kalem üretmez).
+    /// </summary>
+    IReadOnlyList<BusinessEventDefinition> IModule.BusinessEvents { get; } =
+    [
+        new(Events.ShipmentDelivered, 1, Entities.Shipment, "Sevkiyat teslim edildi", Events.ShipmentDeliveredFields),
+        new(Events.ShipmentDeliveryFailed, 1, Entities.Shipment, "Sevkiyat teslim edilemedi", Events.ShipmentDeliveryFailedFields),
+    ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5).</summary>
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
@@ -310,7 +339,22 @@ public sealed class LogisticsModule : IModule
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["stopType"] = StopTypeLabels },
         },
+        new(Entities.DeliveryProof, "Teslim kanıtı", Permissions.ShipmentsRead, new Dictionary<string, string>
+        {
+            ["shipmentId"] = "Sevkiyat", ["outcome"] = "Sonuç", ["receivedBy"] = "Teslim alan", ["receivedAt"] = "Teslim zamanı",
+            ["damaged"] = "Hasarlı", ["shortage"] = "Eksik", ["failureReason"] = "Başarısız teslim nedeni", ["notes"] = "Notlar",
+        }, "receivedBy")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["outcome"] = DeliveryOutcomeLabels },
+        },
     ];
+
+    public static IReadOnlyDictionary<string, string> DeliveryOutcomeLabels { get; } = new Dictionary<string, string>
+    {
+        [Domain.DeliveryProof.Outcomes.Delivered] = "Teslim edildi",
+        [Domain.DeliveryProof.Outcomes.Partial] = "Kısmi teslim",
+        [Domain.DeliveryProof.Outcomes.Failed] = "Teslim edilemedi",
+    };
 
     private static AuditedEntity CargoAudit(
         string entity, string name, string permission, IReadOnlyDictionary<string, string> statuses, IReadOnlyDictionary<string, string> extra) =>
@@ -389,6 +433,8 @@ public sealed class LogisticsModule : IModule
         services.AddScoped<IRecordStore, ShipmentRecordStore>();
         services.AddScoped<IRecordStore, TripRecordStore>();
         services.AddScoped<IRecordStore, TripStopRecordStore>();
+        services.AddScoped<IRecordStore, DeliveryProofRecordStore>();
+        services.AddScoped<Lifecycle.IShipmentDelivery, Lifecycle.ShipmentDelivery>();
         services.AddScoped<Lifecycle.ITripPlanner, Lifecycle.TripPlanner>();
         services.AddScoped<Lifecycle.ILogisticsWorkflow, Lifecycle.LogisticsWorkflow>();
         services.AddScoped<LogisticsAutomationRecordSource>();

@@ -281,7 +281,7 @@ K3'ün uyarı kısmı uygulandı: eşik koda değil firmanın kuralına yazılı
 
 ## 16. Dilim 4: Taşıma talebi ve sevkiyat (12 Kasım 2026)
 
-K6 ve K7'nin ilk yarısı uygulandı: talep → onay → sevkiyat → planlama → yükleme → yol. Teslim (K8) dilim 6'da, sefer ve durak (K5) dilim 5'tedir.
+K6 ve K7'nin ilk yarısı uygulandı: talep → onay → sevkiyat → planlama → yükleme → yol. Teslim (K8) dilim 6'da (bölüm 18), sefer ve durak (K5) dilim 5'te (bölüm 17) uygulandı.
 
 - **Ortak yük ve güzergâh** (`CargoEntity`):
   - Taraflar: müşteri (zorunlu), gönderen, alıcı (`core.Party`).
@@ -409,3 +409,44 @@ K5 ve K7'nin ikinci yarısı uygulandı. Sevkiyatın "Planlandı" durumu artık 
 | `dotnet test tests/Modulix.Modules.Logistics.Tests` | 15: geçiş tablosu bütün durum listeleriyle tutarlı, sevkiyatı elle planlayan eylem yok, sefer geçişleri ve iptal kuralı, belge ayarı varsayılanı uyarı, rol şablonlarında sefer izni, sekmeli sefer formu, Shared sabitleri (sefer durumları, durak türleri, lookup'lar), kural türleri |
 | `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsTripTests\|LogisticsShipmentTests\|FieldRulePackageTests"` (temiz SQL Server veritabanında; CI koşar) | 13/13. **Mutlu yol:** numara, iki sevkiyat → dört durak ve "Planlandı", ara durak araya girer, denetim temiz, onay → çıkış → varışlar → tamamlama, sürücü süzgeci, denetim kaydı. **Doğrulama:** dorse/çekici türü, aynı sürücü, tarih sırası; sevkiyatsız ve kapasite aşan sefer onaylanmaz; çıkarma durakları kaldırır; süresi dolan belge uyarıyla onaylanır, ayarla engellenir; hazır sefer, durak, varış ve silme reddedilir; geri alma; gerekçesiz iptal 422; iptal sevkiyatı planlamaya döndürür; sefer silinmez; planlanmış sevkiyat ikinci kez eklenmez; varışsız tamamlama ve yoldaki iptal 409; bakımdaki araç engel. **Tenant izolasyonu:** başka tenant'ın seferi, durakları, denetimi ve eylemleri görünmez (404); aracı ve sürücüsü kullanılamaz; sevkiyatı sefere eklenemez; seferine durak açılamaz. **Yetki:** okuyan denetimi görür ama yazamaz, eylem yapamaz, sevkiyat ve durak ekleyemez; sefer izni olmayan sevkiyatçı seferi göremez ve ekleyemez; izinsiz 403; modül kapalıyken 403 |
 | `... --filter "TableInventoryTests\|TenantIsolationTests\|TenantDataTransferTests\|ScopeLimitTests\|AutomationRuleTests\|SharedRecordTests\|LookupTests\|CredentialTests\|CredentialExpiryTests\|LogisticsDriverTests\|LogisticsCarrierTermsTests\|FleetVehicleTests\|StarterPackageTests"` | 78/78 |
+
+
+## 18. Dilim 6: Teslim kanıtı ve `ShipmentDelivered` iş olayı (12 Kasım 2026)
+
+K8 uygulandı. Yoldaki sevkiyat teslim edilir, kısmen teslim edilir ya da teslim edilemez; üç sonuç yalnızca teslim komutuyla verilir (genel eylem ucu teslim durumlarına geçmez, birim testle denetlenir).
+
+- **Teslim kanıtı** (`logistics.DeliveryProofs`, kayıt türü `logistics.delivery-proof`):
+  - Alanlar: sevkiyat (bileşik yabancı anahtar), sonuç (`delivered`, `partial`, `failed`), teslim alan, teslim zamanı (**sunucu zamanı**, istemciden gelmez), hasar ve eksik işareti, başarısız teslim nedeni, not.
+  - **Değişmez:** güncellenmez ve silinmez (409); genel uçtan oluşturulamaz (409). Bir sevkiyatın birden çok kanıtı olabilir (düzeltme yeni kanıtla; düzeltme komutu sonraki dilim), bu yüzden `ShipmentId` benzersiz değildir.
+  - Kurallar depodadır, komut atlanamaz: yalnızca yoldaki sevkiyata yazılır; teslim ve kısmi teslimde teslim alan, kısmi teslimde açıklama (not), başarısız teslimde neden zorunludur; başarısız teslimde teslim alan, hasar ya da eksik işaretlenmez.
+  - Migration `LogisticsDeliveryProofs` (RLS).
+  - Okuma izni `logistics.shipments.read`, yazma izni `logistics.shipments.write` (yeni izin yok; rol şablonları değişmedi).
+- **Teslim komutu** (`IShipmentDelivery`, `POST /api/logistics/shipments/{id}/delivery`, gövde `{ version, outcome, receivedBy, damaged, shortage, failureReason, notes }`):
+  - Tek işlemde (`RunAtomicAsync`) kanıtı yazar, sevkiyatın durumunu değiştirir ve iş olayını yayınlar: birlikte yazılır ya da hiçbiri.
+  - Sevkiyat yoldaysa ve sürüm güncelse çalışır; değilse 409, bilinmeyen sonuç ya da eksik zorunlu alan 422, izin yoksa 403, başka tenant'ın sevkiyatı 404.
+  - Sevkiyatın "son geçiş notu" kısmi teslimde açıklama, başarısız teslimde nedendir.
+  - Teslim edilen, kısmi ya da başarısız sevkiyatın yük bilgisi artık değişmez (dilim 4 kuralı).
+- **İş olayları** (ADR-0039, beyanlı):
+  - `logistics.shipment.delivered` v1: teslim ve kısmi teslim. ADR-0037 "teslim → faturalanabilir kalem" köprüsünün ve `DomainEvent` tetikleyicisinin dayanağıdır. Yük: sevkiyat alanları (müşteri, gönderen, alıcı, sefer, taşıma türü, teslim şehri, kg, m³, palet, durum) + `proofId, outcome, receivedAt, receivedBy, damaged, shortage`.
+  - `logistics.shipment.delivery-failed` v1: başarısız teslim; faturalanabilir kalem üretmez. Yük: sevkiyat alanları + `proofId, outcome, receivedAt, failureReason`.
+  - Olayın sıra numarası sevkiyatın komuttan sonraki sürümüdür; payload yalnızca beyan edilmiş alanları taşır.
+- **Dosyalar:** fotoğraf ve imza kanıta Core dosya deposuyla eklenir (`POST /api/files`, `entityKey=logistics.delivery-proof`). Erişim ADR-0040 uyarınca kaydın erişimidir: kanıtı okuyan listeler ve indirir, sevkiyat yazma izni olan ekler.
+- **Arayüz:** sevkiyat kartında (yoldaki ya da kapanmış sevkiyat) "Teslim" paneli. Yoldaki sevkiyatta "Teslimi kaydet" formu (sonuç, teslim alan, hasar / eksik, neden, not); altında her kanıt için özet ve "Fotoğraf ve imza" dosya paneli. Yeni CSS sınıfı ya da token yok. **Açık ve koyu tema ekran görüntüsü bu dilimde alınmadı.**
+- **Test yalıtımı:** `FieldRulePackageTests`'in yayımladığı ürün paketinin koşulu "Teslim edilemedi" durumuydu; bu durum artık teslim komutuyla gerçekten üretildiği için paket aynı veritabanındaki teslim testlerini bozuyordu. Koşul, hiçbir testin üretmediği bir yük tanımına (`__alan-kurali-testi__`) çevrildi.
+
+**Bilerek yapılmadı:**
+- Teslim düzeltme komutu (yeni kanıt açma): kanıt modeli hazır; ilk ihtiyaçta komut eklenir.
+- Hasar işaretli tesliminde Destek şikâyet taslağı önerisi (isteğe bağlı köprü, K8).
+- Sefer başlayınca sevkiyatların otomatik "Yolda" olması ve sevkiyat teslim edilince seferin bütün sevkiyatları kapanınca otomatik tamamlanması. Eylemler ayrı kalır.
+- Teslim → faturalanabilir kalem (ADR-0037 dilim 5) ve navlun (dilim 7).
+- İmza çizimi / mobil sürücü uygulaması (dosya olarak eklenir).
+- Teslim alanın alıcı firmanın kişilerinden seçilmesi (bugün serbest metin).
+
+### Test sonuçları (Dilim 6)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 18: teslim sonuçları Shared sabitleriyle aynı ve etiketli, iş olayı beyanları (modül anahtarı, sürüm 1, sevkiyat kaydı, alan ayrımı), teslim durumlarına geçiş tablosundan ulaşılamaz ve kanıt denetim kaydında |
+| `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsDeliveryTests"` | 5/5. **Mutlu yol:** teslim kanıtı, sunucu zamanı, durum, tek iş olayı ve outbox yükü, kanıta fotoğraf, denetim kaydı; kısmi teslim; başarısız teslim ayrı olay ve faturalanabilir olay yok. **Doğrulama:** yoldaki olmayan sevkiyat 409, teslim alan / not / neden zorunlu, başarısızda teslim alan olamaz, bilinmeyen sonuç, hatalı denemeler hiçbir şey yazmaz, eski sürüm 409, genel eylem ucu teslime geçmez, kanıt genel uçtan açılmaz, ikinci teslim 409, kanıt değişmez ve silinmez. **Tenant izolasyonu:** başka tenant'ın sevkiyatı teslim edilemez (404), kanıtı görünmez, listelenmez, dosyası eklenemez. **Yetki:** okuyan teslim kaydedemez ve dosya ekleyemez ama kanıtı ve dosyalarını okur, izinsiz kişi 403, modül kapalıyken 403 |
+| `... --filter "FieldRulePackageTests\|LogisticsTripTests\|LogisticsShipmentTests\|LogisticsDeliveryTests"` (temiz veritabanı) | 18/18 |
+| `... --filter "TableInventoryTests\|TenantIsolationTests\|TenantDataTransferTests\|AutomationRuleTests\|BusinessEventTests\|ModulesAndRolesTests\|SharedRecordTests\|LookupTests\|StarterPackageTests\|CredentialTests\|LogisticsDriverTests\|FleetVehicleTests"` (temiz veritabanı) | 77/77 |

@@ -22,15 +22,17 @@ namespace Modulix.IntegrationTests;
 public class FieldRulePackageTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
     private const string Status = "logistics.shipment.status";
+    private const string Description = "logistics.shipment.cargoDescription";
+    private const string Sentinel = "__alan-kurali-testi__";
     private const string Capacity = "logistics.shipment.weightKg";
 
     private static string NewPrefix() => $"t{Guid.NewGuid():N}"[..9];
 
-    // Koşul, henüz hiçbir komutun ulaşmadığı "Teslim edilemedi" durumudur (teslim dilim 6'da): yayınlanan ürün paketi bu veritabanındaki bütün
-    // lojistik firmalarına ulaşır; "Planlama bekliyor" gibi gerçek bir durum seçilirse aynı veritabanını paylaşan sevkiyat ve sefer testleri bozulur.
-    private static FieldRuleDto Rule(string key, string field, string effect, string? message = null, string? value = null, bool locked = false, string whenStatus = "failed")
+    // Koşul, hiçbir testin ya da komutun üretmediği bir yük tanımıdır: yayınlanan ürün paketi bu veritabanındaki bütün lojistik firmalarına ulaşır;
+    // gerçek bir durum (planlama bekliyor, teslim edilemedi…) seçilirse aynı veritabanını paylaşan sevkiyat, sefer ve teslim testleri bozulur.
+    private static FieldRuleDto Rule(string key, string field, string effect, string? message = null, string? value = null, bool locked = false, string whenDescription = Sentinel)
     {
-        var condition = JsonSerializer.SerializeToElement<ConditionNode>(new ConditionLeaf(Status, AutomationOperator.Eq, [whenStatus]), AutomationJson.Options);
+        var condition = JsonSerializer.SerializeToElement<ConditionNode>(new ConditionLeaf(Description, AutomationOperator.Eq, [whenDescription]), AutomationJson.Options);
         return new FieldRuleDto(key, field, effect, condition, message, value, locked);
     }
 
@@ -76,7 +78,7 @@ public class FieldRulePackageTests(ModulixApiFactory factory) : IClassFixture<Mo
         Assert.Equal("Kapasite aşıldı.", rolledBack.Published.Rules.Single().Message);
 
         // Sektör paketi, sektörün altındaki bir faaliyeti seçen firmaya ulaşır.
-        await SaveDraftAsync(platform, sectorPackage.Id, [Rule($"{prefix}.block", Status, "Block", "Teslim edilemeyen sevkiyat değiştirilemez.", whenStatus: "failed")]);
+        await SaveDraftAsync(platform, sectorPackage.Id, [Rule($"{prefix}.block", Status, "Block", "Teslim edilemeyen sevkiyat değiştirilemez.")]);
         await PublishAsync(platform, sectorPackage.Id);
 
         var (_, adminA) = await CreateTenantAdminAsync(withLogistics: true);
