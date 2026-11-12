@@ -13,7 +13,7 @@
     <div class="page-header">
         <div>
             <h1>Yeni içe aktarma</h1>
-            <p class="text-muted mb-0">Excel'de hazırladığınız listeyi CSV olarak kaydedip yükleyin. Önce kuru çalışmayla deneyin; kuru çalışma kayıt oluşturmaz.</p>
+            <p class="text-muted mb-0">Excel çalışma kitabını (.xlsx) ya da CSV dosyasını yükleyin; Excel'de yalnızca ilk sayfa okunur. Önce kuru çalışmayla deneyin; kuru çalışma kayıt oluşturmaz.</p>
         </div>
     </div>
 
@@ -52,8 +52,8 @@
             </div>
             <div class="mb-3">
                 <label class="form-label" for="import-file">Dosya *</label>
-                <InputFile @key="inputKey" id="import-file" class="form-control" accept=".csv,.txt" OnChange="OnFileChosenAsync" disabled="@busy" />
-                <div class="form-text">Yalnızca CSV; en çok @(ImportFileLimits.MaxFileBytes / (1024 * 1024)) MB ve 2.000 satır.</div>
+                <InputFile @key="inputKey" id="import-file" class="form-control" accept=".xlsx,.csv,.txt" OnChange="OnFileChosenAsync" disabled="@busy" />
+                <div class="form-text">.xlsx (ilk sayfa) veya CSV; en çok @(ImportFileLimits.MaxFileBytes / (1024 * 1024)) MB ve 2.000 satır.</div>
             </div>
             <div class="d-flex gap-2 justify-content-end">
                 <button type="button" class="btn btn-outline-secondary" disabled="@(busy || bytes is null)" @onclick="() => RunAsync(dryRun: true)">Kuru çalışma</button>
@@ -153,7 +153,7 @@
         message = null;
         result = null;
         var query = $"entityKey={Uri.EscapeDataString(entityKey)}&fileName={Uri.EscapeDataString(fileName)}";
-        var response = await Api.PostBytesAsync<ImportRunDetailDto>($"/api/imports{(dryRun ? "/preview" : string.Empty)}?{query}", bytes, "text/csv");
+        var response = await Api.PostBytesAsync<ImportRunDetailDto>($"/api/imports{(dryRun ? "/preview" : string.Empty)}?{query}", bytes, fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv");
         message = response.IsSuccess ? null : response.Error;
         if (response.Value is { } started)
         {

@@ -118,9 +118,9 @@ public static class ImportEndpoints
         }
 
         var name = Path.GetFileName(fileName ?? string.Empty);
-        if (Path.GetExtension(name).ToLowerInvariant() is not (".csv" or ".txt"))
+        if (!ImportFiles.IsSupported(name))
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Şimdilik yalnızca .csv dosyası yüklenebilir; Excel'de 'CSV' olarak kaydedin.");
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Yalnızca .xlsx (Excel çalışma kitabı) ve .csv dosyası yüklenebilir; eski .xls dosyasını Excel'de .xlsx olarak kaydedin.");
         }
 
         var (content, problem) = await LimitedBody.ReadAsync(http, ImportLimits.MaxFileBytes, ct);
