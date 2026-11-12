@@ -804,13 +804,15 @@ Modüller birbirinin değişikliğine ve bildirimlere olaylarla tepki verir ([AD
 
 `main` dalına her push'ta ve her pull request'te GitHub Actions (`.github/workflows/ci.yml`):
 
-1. SQL Server'ı yereldekiyle aynı `compose.yaml` ve `init.sql` ile açar; şifreler her çalışmada yeniden üretilir.
-2. Release modunda derler. Yüksek veya kritik güvenlik açığı olan bir paket varsa derleme durur.
-3. Migration'ları uygular; mimari, birim ve entegrasyon testlerini çalıştırır.
+Üç katman paralel çalışır:
 
-CI tüm dallarda çalışır. Yeni migration'ı GitHub üzerinde üretmek için **Actions → EF migration olustur → Run workflow**.
+1. **`unit-tests`**: bütün çözümü Release modunda derler (yüksek/kritik güvenlik açıklı paket derlemeyi durdurur), mimari ve birim testlerini çalıştırır. Veritabanı gerekmez.
+2. **`integration-tests`**: entegrasyon testleri (tek job'da ~52 dk sürüyordu) test sınıfı düzeyinde **4 parçaya** bölünür (`scripts/ci-test-shard.sh`; sınıf başına test sayısına göre dengeli). Her parça kendi SQL Server + Mailpit'ini yereldekiyle aynı `compose.yaml` ve `init.sql` ile açar (şifreler her çalışmada yeniden üretilir), migration'ları uygular ve yalnızca kendi sınıflarını koşar. Her parçanın iş özetinde en yavaş test sınıfları listelenir (`scripts/ci-slow-classes.sh`); dengeyi bu veriyle ayarla. Parça sayısı `matrix.shard` listesinden gelir.
+3. **`build-and-test`**: ikisini toplayan kapı. Dal kuralı (ruleset) bu adı zorunlu kontrol olarak ister; adı değiştirme.
 
-Sonuç GitHub'da reponun **Actions** sekmesinde ve README'deki rozette görünür. Bir çalışma yaklaşık 5–8 dakika sürer; özel repolarda bu süre aylık ücretsiz dakika kotasından düşer.
+CI `main` push'unda ve `main` tabanlı pull request'te çalışır. Yeni migration'ı GitHub üzerinde üretmek için **Actions → EF migration olustur → Run workflow**.
+
+Sonuç GitHub'da reponun **Actions** sekmesinde ve README'deki rozette görünür. Bir çalışma yaklaşık 15–20 dakika sürer (parçalamadan önce ~57 dk). Yeni entegrasyon test sınıfı eklemek ayrı bir ayar gerektirmez; sınıf otomatik olarak bir parçaya düşer.
 
 ## Günlük komutlar
 
