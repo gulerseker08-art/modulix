@@ -206,6 +206,16 @@ internal static class Field
             e => get(e) is { } value ? value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
             (e, v) => set(e, (DateOnly?)v));
 
+    /// <summary>Tarih ve saat (ISO 8601, saat dilimiyle; ör. 2026-11-12T08:30:00+03:00). Boş gönderilirse temizlenir.</summary>
+    public static RecordField<T> Moment<T>(string name, Func<T, DateTimeOffset?> get, Action<T, DateTimeOffset?> set) =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() == JsonValueKind.String
+                && DateTimeOffset.TryParse(node.GetValue<string>(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at)
+                    ? ParsedValue.Of(at)
+                    : ParsedValue.Fail("Tarih ve saat ISO 8601 biçiminde olmalıdır (ör. 2026-11-12T08:30:00+03:00)."),
+            e => get(e) is { } value ? value.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture) : null,
+            (e, v) => set(e, (DateTimeOffset?)v));
+
     private static ParsedValue ParseId(JsonNode node) =>
         node.GetValueKind() == JsonValueKind.String && Guid.TryParse(node.GetValue<string>(), out var id) && id != Guid.Empty
             ? ParsedValue.Of(id)

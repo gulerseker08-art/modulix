@@ -8,16 +8,23 @@ using Modulix.Shared.Records;
 namespace Modulix.Api.Logistics;
 
 /// <summary>
-/// Lojistik iş akışı uçları (ADR-0038 K7, dilim 4): taşıma talebi ve sevkiyatın durum eylemleri. Kayıtlar genel kayıt uçlarındadır
+/// Lojistik iş akışı uçları (ADR-0038 K7, dilim 4–5): taşıma talebi, sevkiyat ve seferin durum eylemleri; seferin uygunluk denetimi ve
+/// sevkiyat ekleme/çıkarma. Kayıtlar genel kayıt uçlarındadır
 /// (<c>/api/records/logistics.transport-request</c>, <c>/api/records/logistics.shipment</c>); durum yalnızca buradaki komutlarla değişir.
 /// Eylemin izni serviste denetlenir (talep onayı ayrı izindir); tenant oturumdan gelir. Salt okunur lisans evresinde POST 403'tür.
 /// </summary>
 public static class LogisticsEndpoints
 {
+    private static IResult ToResponse(Modulix.Core.Contracts.Records.RecordResult<Modulix.Core.Contracts.Records.RecordData> result) =>
+        result.IsSuccess
+            ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
+            : RecordEndpoints.ToProblem(result.Error!);
+
     private static readonly Dictionary<string, string> EntityOf = new(StringComparer.Ordinal)
     {
         ["requests"] = LogisticsModule.Entities.TransportRequest,
         ["shipments"] = LogisticsModule.Entities.Shipment,
+        ["trips"] = LogisticsModule.Entities.Trip,
     };
 
     public static IEndpointRouteBuilder MapLogisticsEndpoints(this IEndpointRouteBuilder app)
@@ -53,6 +60,40 @@ public static class LogisticsEndpoints
                 : RecordEndpoints.ToProblem(result.Error!);
         });
 
+        // Sefer planlama (dilim 5): uygunluk denetimi, sevkiyat ekleme ve çıkarma. Yazma izni ve sefer durumu serviste denetlenir.
+        group.MapGet("/trips/{id:guid}/check", async (Guid id, ITripPlanner planner, CancellationToken ct) =>
+        {
+            var result = await planner.CheckAsync(id, ct);
+            if (!result.IsSuccess)
+            {
+                return RecordEndpoints.ToProblem(result.Error!);
+            }
+
+            var (issues, load) = (result.Value!.Issues, result.Value.Load);
+            return Results.Ok(new TripCheckDto(
+                result.Value.CanConfirm,
+                [.. issues.Select(i => new TripCheckIssueDto(i.Code, i.Message, i.Blocking))],
+                new TripLoadDto(load.ShipmentCount, load.StopCount, load.WeightKg, load.PayloadKg, load.Pallets, load.PalletCapacity, load.LoadingMeters,
+                    load.LoadingMetersCapacity, load.VolumeM3, load.VolumeCapacity)));
+        });
+
+        group.MapPost("/trips/{id:guid}/shipments", async (Guid id, AssignShipmentRequest request, ITripPlanner planner, CancellationToken ct) =>
+            ToResponse(await planner.AssignAsync(id, request.ShipmentId, ct)));
+
+        group.MapDelete("/trips/{id:guid}/shipments/{shipmentId:guid}", async (Guid id, Guid shipmentId, ITripPlanner planner, CancellationToken ct) =>
+            ToResponse(await planner.UnassignAsync(id, shipmentId, ct)));
+
         return app;
+    }
+}
+
+/// <summary>Lojistik politikası: tenant ayarlarından okunur (modül Core'un ayar servisini görmez; host bu köprüyü sağlar).</summary>
+internal sealed class LogisticsPolicyProvider(IServiceProvider services) : ILogisticsPolicyProvider
+{
+    public async Task<string> CredentialCheckAsync(CancellationToken cancellationToken)
+    {
+        var value = await services.GetRequiredService<Modulix.Core.Settings.ITenantSettings>()
+            .GetValueAsync(LogisticsModule.SettingKeys.CredentialCheck, cancellationToken);
+        return value == LogisticsModule.CredentialCheckModes.Block ? LogisticsModule.CredentialCheckModes.Block : LogisticsModule.CredentialCheckModes.Warn;
     }
 }

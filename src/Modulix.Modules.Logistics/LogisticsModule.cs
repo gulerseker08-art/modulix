@@ -30,6 +30,8 @@ public sealed class LogisticsModule : IModule
         public const string RequestsRead = "logistics.requests.read";
         public const string RequestsWrite = "logistics.requests.write";
         public const string RequestsApprove = "logistics.requests.approve";
+        public const string TripsRead = "logistics.trips.read";
+        public const string TripsWrite = "logistics.trips.write";
     }
 
     /// <summary>Seçim listeleri (Y9b).</summary>
@@ -62,6 +64,8 @@ public sealed class LogisticsModule : IModule
         new(Permissions.RequestsRead, "Taşıma taleplerini görüntüler", "Taşıma talepleri"),
         new(Permissions.RequestsWrite, "Taşıma talebi açar, düzenler ve iptal eder", "Taşıma talepleri"),
         new(Permissions.RequestsApprove, "Taşıma talebini onaylar (sevkiyat açılır) ya da reddeder", "Taşıma talepleri"),
+        new(Permissions.TripsRead, "Seferleri ve duraklarını görüntüler", "Seferler"),
+        new(Permissions.TripsWrite, "Sefer planlar, araç ve sürücü atar, sevkiyat ekler, seferi yürütür ve iptal eder", "Seferler"),
     ];
 
     /// <summary>Kural altyapısında kullanılan kayıt türleri (ADR-0027).</summary>
@@ -69,6 +73,7 @@ public sealed class LogisticsModule : IModule
     {
         public const string Shipment = Entities.Shipment;
         public const string TransportRequest = Entities.TransportRequest;
+        public const string Trip = Entities.Trip;
     }
 
     /// <summary>
@@ -88,6 +93,10 @@ public sealed class LogisticsModule : IModule
             {
                 RecordSource = typeof(LogisticsAutomationRecordSource), LabelField = "cargoDescription",
             },
+            new(AutomationEntityKeys.Trip, "Sefer", Permissions.TripsRead)
+            {
+                RecordSource = typeof(LogisticsAutomationRecordSource), LabelField = "number",
+            },
         ],
         Events =
         [
@@ -95,10 +104,64 @@ public sealed class LogisticsModule : IModule
             new("logistics.transport-request.updated", AutomationEntityKeys.TransportRequest, DomainEventTypes.RecordUpdated, "Taşıma talebi güncellendi"),
             new("logistics.shipment.created", AutomationEntityKeys.Shipment, DomainEventTypes.RecordCreated, "Sevkiyat oluşturuldu"),
             new("logistics.shipment.updated", AutomationEntityKeys.Shipment, DomainEventTypes.RecordUpdated, "Sevkiyat güncellendi"),
+            new("logistics.trip.created", AutomationEntityKeys.Trip, DomainEventTypes.RecordCreated, "Sefer açıldı"),
+            new("logistics.trip.updated", AutomationEntityKeys.Trip, DomainEventTypes.RecordUpdated, "Sefer güncellendi"),
         ],
         Fields = [.. CargoAutomationFields(AutomationEntityKeys.TransportRequest, Domain.TransportRequest.Statuses.All, RequestStatusLabels),
-            .. CargoAutomationFields(AutomationEntityKeys.Shipment, Domain.Shipment.Statuses.All, ShipmentStatusLabels)],
+            .. CargoAutomationFields(AutomationEntityKeys.Shipment, Domain.Shipment.Statuses.All, ShipmentStatusLabels),
+            new(AutomationEntityKeys.Trip, "status", "Durum", AutomationFieldType.Choice)
+            {
+                Options = [.. Domain.Trip.Statuses.All.Select(s => new AutomationOption(s, TripStatusLabels[s]))],
+            },
+            new(AutomationEntityKeys.Trip, "number", "Sefer no", AutomationFieldType.Text),
+            new(AutomationEntityKeys.Trip, "plannedStart", "Planlanan başlangıç", AutomationFieldType.Date)
+            {
+                Hint = "\"Sefere 1 gün kala hâlâ hazır olmayan sefer\" gibi uyarılar için tarihe bağlı tetikleyicide kullanın.",
+            },
+            new(AutomationEntityKeys.Trip, "plannedEnd", "Planlanan bitiş", AutomationFieldType.Date),
+            new(AutomationEntityKeys.Trip, "vehicleId", "Araç (kimlik)", AutomationFieldType.Text),
+            new(AutomationEntityKeys.Trip, "driverId", "Sürücü (kimlik)", AutomationFieldType.Text)],
     };
+
+    public static IReadOnlyDictionary<string, string> TripStatusLabels { get; } = new Dictionary<string, string>
+    {
+        [Domain.Trip.Statuses.Planning] = "Planlanıyor",
+        [Domain.Trip.Statuses.Ready] = "Hazır",
+        [Domain.Trip.Statuses.InProgress] = "Yolda",
+        [Domain.Trip.Statuses.Completed] = "Tamamlandı",
+        [Domain.Trip.Statuses.Cancelled] = "İptal edildi",
+    };
+
+    public static IReadOnlyDictionary<string, string> StopTypeLabels { get; } = new Dictionary<string, string>
+    {
+        [Domain.TripStop.Types.Loading] = "Yükleme",
+        [Domain.TripStop.Types.Unloading] = "Boşaltma",
+        [Domain.TripStop.Types.Border] = "Sınır / gümrük",
+        [Domain.TripStop.Types.Rest] = "Mola",
+        [Domain.TripStop.Types.EmptyReturn] = "Boş dönüş",
+    };
+
+    /// <summary>Firma ayarları (Y6): sefer uygunluğunda süreli belge kuralı (ADR-0038 bölüm 9 madde 3: varsayılan uyarı, ayarla engel).</summary>
+    public static class SettingKeys
+    {
+        public const string CredentialCheck = "logistics.trips.credential-check";
+    }
+
+    /// <summary>Belge kuralı değerleri: uyar (onay uyarıyla verilir) ya da engelle (onay verilmez).</summary>
+    public static class CredentialCheckModes
+    {
+        public const string Warn = "warn";
+        public const string Block = "block";
+    }
+
+    IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
+    [
+        new(SettingKeys.CredentialCheck, "Sefer: süresi dolan belge", "Lojistik", SettingType.Choice, CredentialCheckModes.Warn)
+        {
+            Description = "Seferi hazır yaparken araç, dorse ya da sürücü belgesinin (muayene, sigorta, ehliyet, SRC…) süresi doluyorsa ne olsun? Uyar: onay uyarıyla verilir ve uyarı seferde saklanır. Engelle: belge yenilenmeden sefer hazır olmaz.",
+            Options = [new SettingOption(CredentialCheckModes.Warn, "Uyar"), new SettingOption(CredentialCheckModes.Block, "Engelle")],
+        },
+    ];
 
     /// <summary>Durum anahtarı → görünen ad (kural editörü, denetim kaydı, arayüz).</summary>
     public static IReadOnlyDictionary<string, string> RequestStatusLabels { get; } = new Dictionary<string, string>
@@ -139,10 +202,11 @@ public sealed class LogisticsModule : IModule
         new(
             "logistics.operations",
             "Operasyon",
-            "Taşıma taleplerini açar, sevkiyatları, taşıyıcıları ve sürücü kartlarını görüntüler ve düzenler; maliyetleri görüntüler. Talep onaylamaz.",
+            "Taşıma taleplerini açar; sevkiyatları, seferleri, taşıyıcıları ve sürücü kartlarını görüntüler ve düzenler; maliyetleri görüntüler. Talep onaylamaz.",
             [
                 Permissions.RequestsRead, Permissions.RequestsWrite,
                 Permissions.ShipmentsRead, Permissions.ShipmentsWrite,
+                Permissions.TripsRead, Permissions.TripsWrite,
                 Permissions.CarriersRead, Permissions.CarriersWrite,
                 Permissions.CostsRead,
                 Permissions.DriversRead, Permissions.DriversWrite,
@@ -154,6 +218,7 @@ public sealed class LogisticsModule : IModule
             [
                 Permissions.RequestsRead, Permissions.RequestsWrite, Permissions.RequestsApprove,
                 Permissions.ShipmentsRead, Permissions.ShipmentsWrite,
+                Permissions.TripsRead, Permissions.TripsWrite,
                 Permissions.CarriersRead, Permissions.CarriersWrite,
                 Permissions.CostsRead, Permissions.CostsWrite,
                 Permissions.DriversRead, Permissions.DriversWrite,
@@ -166,6 +231,8 @@ public sealed class LogisticsModule : IModule
         public const string CarrierTerms = "logistics.carrier-terms";
         public const string TransportRequest = "logistics.transport-request";
         public const string Shipment = "logistics.shipment";
+        public const string Trip = "logistics.trip";
+        public const string TripStop = "logistics.trip-stop";
     }
 
     /// <summary>
@@ -224,7 +291,25 @@ public sealed class LogisticsModule : IModule
         CargoAudit(Entities.TransportRequest, "Taşıma talebi", Permissions.RequestsRead, RequestStatusLabels,
             new Dictionary<string, string> { ["source"] = "Kaynak", ["externalRef"] = "Dış referans", ["shipmentId"] = "Sevkiyat" }),
         CargoAudit(Entities.Shipment, "Sevkiyat", Permissions.ShipmentsRead, ShipmentStatusLabels,
-            new Dictionary<string, string> { ["requestId"] = "Taşıma talebi" }),
+            new Dictionary<string, string> { ["requestId"] = "Taşıma talebi", ["tripId"] = "Sefer" }),
+        new(Entities.Trip, "Sefer", Permissions.TripsRead, new Dictionary<string, string>
+        {
+            ["number"] = "Sefer no", ["plannedStart"] = "Planlanan başlangıç", ["plannedEnd"] = "Planlanan bitiş", ["vehicleId"] = "Araç",
+            ["trailerId"] = "Dorse", ["driverId"] = "Sürücü", ["coDriverId"] = "İkinci sürücü", ["carrierPartyId"] = "Taşıyıcı firma",
+            ["notes"] = "Notlar", ["status"] = "Durum", ["statusReason"] = "Not / gerekçe",
+        }, "number")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["status"] = TripStatusLabels },
+            References = new Dictionary<string, string> { ["carrierPartyId"] = SharedEntities.Party },
+        },
+        new(Entities.TripStop, "Sefer durağı", Permissions.TripsRead, new Dictionary<string, string>
+        {
+            ["tripId"] = "Sefer", ["sequence"] = "Sıra", ["stopType"] = "Tür", ["city"] = "Şehir", ["address"] = "Adres",
+            ["plannedAt"] = "Planlanan varış", ["arrivedAt"] = "Gerçekleşen varış", ["notes"] = "Notlar", ["shipmentId"] = "Sevkiyat",
+        }, "city")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["stopType"] = StopTypeLabels },
+        },
     ];
 
     private static AuditedEntity CargoAudit(
@@ -251,6 +336,7 @@ public sealed class LogisticsModule : IModule
         new(Entities.CarrierTerms, "Taşıyıcı anlaşması"),
         new(Entities.TransportRequest, "Taşıma talebi"),
         new(Entities.Shipment, "Sevkiyat"),
+        new(Entities.Trip, "Sefer"),
     ];
 
     IReadOnlyList<LookupDefinition> IModule.Lookups => LogisticsLookupDefinitions.All;
@@ -266,6 +352,7 @@ public sealed class LogisticsModule : IModule
         new(SharedEntities.Party, Permissions.CarriersRead),
         new(SharedEntities.Party, Permissions.RequestsRead),
         new(SharedEntities.Party, Permissions.ShipmentsRead),
+        new(SharedEntities.Party, Permissions.TripsRead),
     ];
 
     /// <summary>Kişinin ve firmanın nerede kullanıldığı (silme ve birleştirme koruması).</summary>
@@ -280,6 +367,7 @@ public sealed class LogisticsModule : IModule
         new(SharedEntities.Party, Entities.Shipment, "customerPartyId", "sevkiyat (müşteri)"),
         new(SharedEntities.Party, Entities.Shipment, "senderPartyId", "sevkiyat (gönderen)"),
         new(SharedEntities.Party, Entities.Shipment, "receiverPartyId", "sevkiyat (alıcı)"),
+        new(SharedEntities.Party, Entities.Trip, "carrierPartyId", "sefer (taşıyıcı)"),
     ];
 
     /// <summary>Sürücü yetkinlikleri (ehliyet, SRC, psikoteknik...) Core süreli belgesidir (ADR-0038 K2, K3); sürücü kartının "Belgeler" bölümünde yönetilir.</summary>
@@ -299,6 +387,9 @@ public sealed class LogisticsModule : IModule
         services.AddScoped<IRecordStore, CarrierTermsRecordStore>();
         services.AddScoped<IRecordStore, TransportRequestRecordStore>();
         services.AddScoped<IRecordStore, ShipmentRecordStore>();
+        services.AddScoped<IRecordStore, TripRecordStore>();
+        services.AddScoped<IRecordStore, TripStopRecordStore>();
+        services.AddScoped<Lifecycle.ITripPlanner, Lifecycle.TripPlanner>();
         services.AddScoped<Lifecycle.ILogisticsWorkflow, Lifecycle.LogisticsWorkflow>();
         services.AddScoped<LogisticsAutomationRecordSource>();
     }

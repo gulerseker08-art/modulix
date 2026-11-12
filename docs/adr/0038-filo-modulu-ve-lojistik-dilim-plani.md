@@ -337,3 +337,75 @@ K6 ve K7'nin ilk yarısı uygulandı: talep → onay → sevkiyat → planlama �
 | --- | --- |
 | `dotnet test tests/Modulix.Modules.Logistics.Tests` | 14: geçiş tablosu durum listesiyle tutarlı, teslim durumlarına komutla geçilmez, iptal gerekçeli ve yoldan önce, onay ayrı izin ve yalnızca müdür şablonunda; sekmeli formlar; kategorili taşıma türü; Shared sabitleri; kural alanları ve tarama kaynağı |
 | `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsShipmentTests\|SharedRecordTests\|LookupTests"` (SQL Server; CI koşar) | mutlu yol (talep → onay → sevkiyat aynı işlemde ve bağlı → planlandı → yükleniyor → yolda, durum süzgeci, denetim kaydı), doğrulama (zorunlu alanlar, tarih sırası, referans tekilliği, genel güncelleme durumu yazamaz, gerekçesiz ret, bilinmeyen eylem, eski sürüm, sevkiyat doğrudan açılmaz, silme yok, kapanan talep düzenlenmez, sırasız geçiş, yoldaki sevkiyat iptal edilmez ve düzenlenmez), tenant izolasyonu (başka tenant'ın müşterisi kullanılamaz, talebi görünmez, eylemleri 404, aynı referans başka tenant'ta serbest), yetki (operasyon onaylayamaz ve eylem listesinde onay görmez, okuyan yazamaz ve eylem yapamaz, izinsiz 403, yalnızca onay izniyle onaylanır, modül kapalıyken 403) |
+
+## 17. Dilim 5: Sefer, durak zinciri, atama ve uygunluk (12 Kasım 2026)
+
+K5 ve K7'nin ikinci yarısı uygulandı. Sevkiyatın "Planlandı" durumu artık sefer atamasıdır; dilim 4'teki elle "Planlandı" eylemi kaldırıldı.
+
+- **Sefer** (`logistics.Trips`):
+  - Numara sunucuda verilir: `SF-yıl-sıra`, `UNIQUE(TenantId, Number)`. Ç8.1 belge serisi henüz yok; aynı anda açılan iki sefer aynı numarayı alırsa benzersizlik dizini ikincisini reddeder. Seri gelince numara oraya taşınır.
+  - Alanlar: planlanan başlangıç ve bitiş; Filo'dan araç ve dorse (`IVehicleDirectory`: araç motorlu, dorse çekilen araç olmalı; pasif araç seçilemez; Filo kapalıyken araç seçilemez); sürücü ve ikinci sürücü (bölüm 9 madde 2; aynı kişi iki kez seçilemez, pasif sürücü seçilemez); taşeron seferde "Taşıyıcı" rollü firma (K4); notlar.
+  - Sürücüye aynı modül içinde bileşik yabancı anahtar vardır. Filo aracına veritabanı bağı kurulmaz.
+  - Yalnızca "Planlanıyor"ken düzenlenir. Silinmez (K12).
+- **Durak** (`logistics.TripStops`):
+  - Sıra sefer içinde tekildir: `UNIQUE(TenantId, TripId, Sequence)`. Verilmezse son sıranın 10 fazlası olur, böylece araya durak eklenebilir (ör. 25).
+  - Türler: yükleme, boşaltma, sınır/gümrük, mola, boş dönüş.
+  - Alanlar: şehir, adres, planlanan varış ve gerçekleşen varış.
+  - Plan yalnızca sefer planlanırken değişir; varış yalnızca yoldaki seferde girilir ve ileri bir zaman olamaz; kapanan seferin durağı değişmez.
+  - Sevkiyat durağı elle silinmez ve türü değişmez.
+  - Migration `LogisticsTrips` (iki tablo RLS'te; `Shipments.TripId` sütunu ve yabancı anahtarı).
+- **Atama** (`ITripPlanner`):
+  - Uçlar: `POST /api/logistics/trips/{id}/shipments` ve `DELETE /api/logistics/trips/{id}/shipments/{shipmentId}`.
+  - Ekleme: planlama bekleyen sevkiyat için tek işlemde (`RunAtomicAsync`) sevkiyatın güzergâhından yükleme ve boşaltma durağı açılır ve durağa bağlanır; sevkiyat "Planlandı" olur ve sefere bağlanır.
+  - Çıkarma: yalnızca henüz yüklenmemiş sevkiyat çıkarılır; durakları kalkar ve sevkiyat "Planlama bekliyor"a döner.
+  - İkisi de yalnızca planlanan seferde yapılır. Her yazma kayıt boru hattından geçer (sefer yazma izni, denetim kaydı, outbox, sürüm).
+- **Uygunluk denetimi** (`GET /api/logistics/trips/{id}/check`):
+  - Engeller:
+    - Sevkiyat yok.
+    - Yükleme ya da boşaltma durağı yok, ya da bir sevkiyatın boşaltma durağı yüklemesinden önce.
+    - Kendi seferinde araç ya da sürücü eksik.
+    - Araç bakımda ya da pasif; sürücü izinde ya da pasif.
+    - Kapasite aşımı: yük toplamı, araç ve dorsenin girilmiş kapasitelerinin toplamını aşıyor (kg, palet, LDM, m³). Kapasitesi girilmemiş ölçü denetlenmez.
+  - Süreli belge (K3, bölüm 9 madde 3): araç, dorse ve sürücülerin her belge türünde en uzun geçerli belgesi sefer bitmeden doluyorsa bulgudur.
+    - Firma ayarı `logistics.trips.credential-check` belirler: uyar (varsayılan) ya da engelle.
+    - Hangi belge türünün zorunlu olduğu henüz ayarlanamaz; sonraki dilimde.
+    - Modüller belgeleri Core'un yeni okuma sözleşmesiyle okur: `ICredentialDirectory` (Core.Contracts; kayıt izni sormaz, çağıran modül kendi iznini denetler).
+  - Uyarılar: aynı araç, dorse ya da sürücü tarihleri çakışan başka açık seferde; seferde ADR yükü var.
+- **Durum yalnızca komutla** (K7; sefer de genel eylem ucunu kullanır: `/api/logistics/trips/{id}/actions`):
+  - Akış: Planlanıyor → Hazır → Yolda → Tamamlandı.
+  - **Planı onayla:** denetimden geçer; engel varsa 409 ve bulgular iletide. Uyarılar seferin notuna yazılır ("Uyarılarla onaylandı: …").
+  - **Planlamaya geri al:** hazır seferi yeniden düzenlemeye açar.
+  - **Sefere çıkar:** denetim yinelenir (onaydan sonra araç bakıma girmiş olabilir).
+  - **Seferi tamamla:** bütün duraklara varış girilmiş olmalı.
+  - **İptal:** gerekçeli ve yoldan önce. Aynı işlemde seferdeki planlanmış sevkiyatlar "Planlama bekliyor"a döner ve seferden ayrılır. Yüklemesi başlamış sevkiyatı olan sefer iptal edilemez. Duraklar geçmiş olarak kalır.
+  - Bütün sefer eylemleri `logistics.trips.write` iznindedir. Operasyon ve Operasyon müdürü rol şablonlarına sefer izinleri eklendi.
+- **Kural yeteneği:** `logistics.trip` kural türü (durum, numara, planlanan başlangıç ve bitiş; tarama yalnızca açık seferler). Örnek: "sefere 1 gün kala hâlâ hazır olmayan sefer".
+- **Arayüz:** Lojistik › Seferler (`/lojistik/seferler`).
+  - Grid şablonu. Görünümler: Açık / Planlanan / Hazır / Yolda / Kapanan / Tümü.
+  - Sütunlar: numara, tarih, araç (+ dorse), sürücü, taşıyıcı, durum.
+  - Sekmeli kart: Plan ve atama, Notlar. Kartın üstünde eylem çubuğu ve son geçiş notu var.
+  - Kartın altında iki panel:
+    - **Uygunluk denetimi:** yük/kapasite kartları (aşan ölçü tehlike tonunda), engeller ve uyarılar.
+    - **Duraklar ve sevkiyatlar:** sevkiyat ekleme, ara durak ekleme, seferden çıkarma, yoldaki seferde "Vardı".
+  - Sürücü seçimi bugün açılır listedir (ilk 200 kart; ad kişi kaydından). Araç, dorse ve taşıyıcı lookup'larla seçilir: `logistics.trip.vehicle`, `.trailer`, `.carrier` (rolle süzülür).
+  - Yeni CSS sınıfı ya da token yok.
+
+**Test yalıtımı:** `FieldRulePackageTests`'in yayımladığı ürün paketi aynı veritabanındaki bütün lojistik firmalarına ulaşır. Paketin "durum = Planlama bekliyor" koşulu, sevkiyatı planlamaya döndüren çıkarma ve iptal testlerini bozuyordu. Koşul, henüz hiçbir komutun ulaşmadığı "Teslim edilemedi" durumuna çevrildi.
+
+**Bilerek yapılmadı:**
+- Zorunlu belge türleri ayarı. Bugün bütün türler bakılır; "SRC şart" gibi tür bazlı zorunluluk sonra gelecek.
+- Belge serisinden sefer numarası (Ç8.1).
+- Sefer başlayınca sevkiyatların otomatik "Yolda" olması. Sevkiyat eylemleri ayrı kalır; teslimle birlikte dilim 6'da ele alınacak.
+- Durak sırasını sürükle-bırak ile değiştirme. Bugün sıra numarasıyla yapılıyor.
+- Durak adresi lookup'ı.
+- Araç takvimi ve kapasite planlama panosu.
+- Sürücü seçiminde arama (büyük filolar).
+- İşletici şirket alanı (bölüm 16'daki sapma sürüyor).
+
+### Test sonuçları (Dilim 5)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 15: geçiş tablosu bütün durum listeleriyle tutarlı, sevkiyatı elle planlayan eylem yok, sefer geçişleri ve iptal kuralı, belge ayarı varsayılanı uyarı, rol şablonlarında sefer izni, sekmeli sefer formu, Shared sabitleri (sefer durumları, durak türleri, lookup'lar), kural türleri |
+| `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsTripTests\|LogisticsShipmentTests\|FieldRulePackageTests"` (temiz SQL Server veritabanında; CI koşar) | 13/13. **Mutlu yol:** numara, iki sevkiyat → dört durak ve "Planlandı", ara durak araya girer, denetim temiz, onay → çıkış → varışlar → tamamlama, sürücü süzgeci, denetim kaydı. **Doğrulama:** dorse/çekici türü, aynı sürücü, tarih sırası; sevkiyatsız ve kapasite aşan sefer onaylanmaz; çıkarma durakları kaldırır; süresi dolan belge uyarıyla onaylanır, ayarla engellenir; hazır sefer, durak, varış ve silme reddedilir; geri alma; gerekçesiz iptal 422; iptal sevkiyatı planlamaya döndürür; sefer silinmez; planlanmış sevkiyat ikinci kez eklenmez; varışsız tamamlama ve yoldaki iptal 409; bakımdaki araç engel. **Tenant izolasyonu:** başka tenant'ın seferi, durakları, denetimi ve eylemleri görünmez (404); aracı ve sürücüsü kullanılamaz; sevkiyatı sefere eklenemez; seferine durak açılamaz. **Yetki:** okuyan denetimi görür ama yazamaz, eylem yapamaz, sevkiyat ve durak ekleyemez; sefer izni olmayan sevkiyatçı seferi göremez ve ekleyemez; izinsiz 403; modül kapalıyken 403 |
+| `... --filter "TableInventoryTests\|TenantIsolationTests\|TenantDataTransferTests\|ScopeLimitTests\|AutomationRuleTests\|SharedRecordTests\|LookupTests\|CredentialTests\|CredentialExpiryTests\|LogisticsDriverTests\|LogisticsCarrierTermsTests\|FleetVehicleTests\|StarterPackageTests"` | 78/78 |

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Credentials;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
@@ -300,6 +301,7 @@ public static class RecordsSetup
         services.AddScoped<IRecordStore, PersonRecordStore>();
         services.AddScoped<IRecordStore, PartyRelationshipRecordStore>();
         services.AddScoped<IRecordStore, CredentialRecordStore>();
+        services.AddScoped<ICredentialDirectory, CredentialDirectory>();
         return services;
     }
 }

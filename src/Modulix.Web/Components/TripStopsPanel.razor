@@ -1,0 +1,279 @@
+@* Seferin durak zinciri ve sevkiyatları (ADR-0038 K5, dilim 5). Planlanan seferde planlama bekleyen sevkiyat eklenir (yükleme ve boşaltma durağı
+   sevkiyatın güzergâhından açılır, sevkiyat "Planlandı" olur) ya da çıkarılır; ara durak (sınır, mola, boş dönüş) elle eklenir, sıra numarası
+   onar onar artar (araya eklemek için ör. 15). Yoldaki seferde duraklara varış saati girilir ("Vardı"); bütün duraklara varış girilince sefer
+   tamamlanabilir. Kurallar sunucudadır; sayfa içi küçük eylem formu olduğu için sekmesizdir. *@
+@inject ApiClient Api
+
+<section class="settings-group" aria-label="Duraklar ve sevkiyatlar">
+    <h2>Duraklar ve sevkiyatlar</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (Planning && CanWrite)
+    {
+        <div class="list-toolbar" aria-label="Sevkiyat ekle">
+            <label class="visually-hidden" for="trip-add-shipment">Planlama bekleyen sevkiyat</label>
+            <select id="trip-add-shipment" class="form-select" @bind="pickShipment">
+                <option value="">@(pending.Count == 0 ? "Planlama bekleyen sevkiyat yok" : "Planlama bekleyen sevkiyat seçin…")</option>
+                @foreach (var shipment in pending)
+                {
+                    <option value="@shipment.Id">@ShipmentLabel(shipment)</option>
+                }
+            </select>
+            <button type="button" class="btn btn-tonal" disabled="@(busy || pickShipment is null)" aria-busy="@(busy ? "true" : null)" @onclick="AssignAsync">
+                <AppIcon Name="plus" Size="16" /> Sevkiyatı ekle
+            </button>
+        </div>
+
+        <form class="list-toolbar" aria-label="Ara durak ekle" @onsubmit="AddStopAsync" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="stop-type">Durak türü</label>
+            <select id="stop-type" class="form-select" @bind="newStop.Type">
+                @foreach (var (key, label) in LogisticsAccess.StopTypes)
+                {
+                    <option value="@key">@label</option>
+                }
+            </select>
+            <label class="visually-hidden" for="stop-city">Şehir</label>
+            <input id="stop-city" class="form-control" maxlength="100" placeholder="Şehir" required @bind="newStop.City" />
+            <label class="visually-hidden" for="stop-at">Planlanan varış</label>
+            <input id="stop-at" class="form-control" type="datetime-local" title="Planlanan varış" @bind="newStop.PlannedAt" />
+            <label class="visually-hidden" for="stop-seq">Sıra</label>
+            <input id="stop-seq" class="form-control" type="number" min="1" max="9999" placeholder="Sıra (boşsa sona)" @bind="newStop.Sequence" />
+            <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(newStop.City))">
+                <AppIcon Name="map-pin" Size="16" /> Durak ekle
+            </button>
+        </form>
+        <FieldError Field="sequence" Errors="errors" />
+        <FieldError Field="city" Errors="errors" />
+    }
+
+    @if (stops is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (stops.Count == 0)
+    {
+        <p class="text-muted" role="status">Henüz durak yok. Sevkiyat ekleyin; yükleme ve boşaltma durakları sevkiyatın güzergâhından açılır.</p>
+    }
+    else
+    {
+        <p class="text-muted" role="status" aria-live="polite">@Summary</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Sefer durakları</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><AppIcon Name="hash" Size="14" /> Sıra</th>
+                    <th scope="col"><AppIcon Name="tag" Size="14" /> Tür</th>
+                    <th scope="col"><AppIcon Name="map-pin" Size="14" /> Yer</th>
+                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Planlanan</th>
+                    <th scope="col"><AppIcon Name="clock" Size="14" /> Varış</th>
+                    <th scope="col"><AppIcon Name="package" Size="14" /> Sevkiyat</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var stop in stops)
+                {
+                    var shipmentId = WarehouseLabels.Id(stop, "shipmentId");
+                    var shipment = shipmentId is { } sid ? shipments.FirstOrDefault(s => s.Id == sid) : null;
+                    var arrived = Moment(WarehouseLabels.Text(stop, "arrivedAt"));
+                    <tr>
+                        <td data-label="Sıra">@(stop.Values["sequence"]?.GetValue<int>())</td>
+                        <td data-label="Tür" class="primary"><AppIcon Name="@LogisticsLabels.StopIcon(WarehouseLabels.Text(stop, "stopType"))" Size="16" /> @LogisticsLabels.StopType(WarehouseLabels.Text(stop, "stopType"))</td>
+                        <td data-label="Yer">@WarehouseLabels.Text(stop, "city")@(WarehouseLabels.Text(stop, "address") is { Length: > 0 } a ? $" — {a}" : "")</td>
+                        <td data-label="Planlanan">@(Moment(WarehouseLabels.Text(stop, "plannedAt")) ?? "—")</td>
+                        <td data-label="Varış">
+                            @if (arrived is not null)
+                            {
+                                <span class="badge status-customer">@arrived</span>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </td>
+                        <td data-label="Sevkiyat">
+                            @if (shipment is not null)
+                            {
+                                <span>@LogisticsLabels.Route(shipment)</span>
+                                <span class="badge @LogisticsLabels.CargoStatusBadge(WarehouseLabels.Text(shipment, "status"))">@LogisticsLabels.CargoStatus(LogisticsLabels.Shipments, WarehouseLabels.Text(shipment, "status"))</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Ara durak</span>
+                            }
+                        </td>
+                        <td class="row-menu-cell actions">
+                            @if (CanWrite && Planning && shipmentId is { } assigned)
+                            {
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => UnassignAsync(assigned)">Seferden çıkar</button>
+                            }
+                            else if (CanWrite && Planning)
+                            {
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveStopAsync(stop)">Kaldır</button>
+                            }
+                            else if (CanWrite && InProgress && arrived is null)
+                            {
+                                <button type="button" class="btn btn-tonal btn-sm" disabled="@busy" @onclick="() => ArriveAsync(stop)"><AppIcon Name="check" Size="16" /> Vardı</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+@code {
+    private List<RecordResponse>? stops;
+    private List<RecordResponse> shipments = [];
+    private List<RecordResponse> pending = [];
+    private Guid? pickShipment;
+    private NewStop newStop = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private (Guid, long) loadedFor;
+
+    [Parameter, EditorRequired] public RecordResponse Trip { get; set; } = default!;
+
+    [Parameter] public bool CanWrite { get; set; }
+
+    /// <summary>Durak ya da sevkiyat değişti (uygunluk denetimi yenilenir).</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private string Status => WarehouseLabels.Text(Trip, "status");
+
+    private bool Planning => Status == "planning";
+
+    private bool InProgress => Status == "inProgress";
+
+    private string Summary
+    {
+        get
+        {
+            var arrived = stops!.Count(s => s.Values["arrivedAt"] is not null);
+            return InProgress || Status == "completed"
+                ? $"{stops!.Count} durak, {arrived} durağa varıldı · {shipments.Count} sevkiyat"
+                : $"{stops!.Count} durak · {shipments.Count} sevkiyat";
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (Trip.Id, Trip.Version))
+        {
+            return;
+        }
+
+        loadedFor = (Trip.Id, Trip.Version);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var stopPage = await Api.GetAsync<RecordPageResponse>($"/api/records/{LogisticsAccess.TripStopEntityKey}?tripId={Trip.Id}&pageSize=200");
+        stops = stopPage.Value?.Items.ToList() ?? [];
+        message = stopPage.Error;
+
+        var onTrip = await Api.GetAsync<RecordPageResponse>($"/api/records/{LogisticsAccess.ShipmentEntityKey}?tripId={Trip.Id}&pageSize=200");
+        shipments = onTrip.Value?.Items.ToList() ?? [];
+
+        if (Planning && CanWrite)
+        {
+            var open = await Api.GetAsync<RecordPageResponse>($"/api/records/{LogisticsAccess.ShipmentEntityKey}?status=pending&tripId=none&pageSize=100");
+            pending = open.Value?.Items.ToList() ?? [];
+        }
+    }
+
+    private async Task AssignAsync()
+    {
+        if (pickShipment is not { } shipmentId)
+        {
+            return;
+        }
+
+        await RunAsync(() => Api.PostAsync<RecordResponse>($"/api/logistics/trips/{Trip.Id}/shipments", new AssignShipmentRequest(shipmentId)));
+        pickShipment = null;
+    }
+
+    private Task UnassignAsync(Guid shipmentId) =>
+        RunAsync(() => Api.DeleteAsync($"/api/logistics/trips/{Trip.Id}/shipments/{shipmentId}"));
+
+    private async Task AddStopAsync()
+    {
+        var values = new System.Text.Json.Nodes.JsonObject
+        {
+            ["tripId"] = Trip.Id.ToString(),
+            ["stopType"] = newStop.Type,
+            ["city"] = newStop.City.Trim(),
+            ["plannedAt"] = newStop.PlannedAt is { } at ? Iso(at) : null,
+        };
+        if (newStop.Sequence is { } sequence)
+        {
+            values["sequence"] = sequence;
+        }
+
+        if (await RunAsync(() => Api.PostAsync<RecordResponse>($"/api/records/{LogisticsAccess.TripStopEntityKey}", new RecordWriteRequest(values, null))))
+        {
+            newStop = new NewStop();
+        }
+    }
+
+    private Task RemoveStopAsync(RecordResponse stop) =>
+        RunAsync(() => Api.DeleteAsync($"/api/records/{LogisticsAccess.TripStopEntityKey}/{stop.Id}?version={stop.Version}"));
+
+    /// <summary>Durağa şimdi varıldı (sunucu ileri zamanı reddeder).</summary>
+    private Task ArriveAsync(RecordResponse stop) =>
+        RunAsync(() => Api.PutAsync<RecordResponse>($"/api/records/{LogisticsAccess.TripStopEntityKey}/{stop.Id}",
+            new RecordWriteRequest(new System.Text.Json.Nodes.JsonObject { ["arrivedAt"] = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz") }, stop.Version)));
+
+    private async Task<bool> RunAsync<T>(Func<Task<ApiResult<T>>> call)
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await call();
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            message = result.FieldErrors?.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error;
+            return false;
+        }
+
+        await LoadAsync();
+        await Changed.InvokeAsync();
+        return true;
+    }
+
+    private static string ShipmentLabel(RecordResponse shipment)
+    {
+        var day = FleetLabels.Day(WarehouseLabels.Text(shipment, "pickupDate")) is { } d ? FleetLabels.Date(d) : "—";
+        var kg = shipment.Values["weightKg"]?.GetValue<decimal>() is { } w ? $" · {FleetLabels.Capacity(w, "kg")}" : "";
+        return $"{LogisticsLabels.Route(shipment)} · {day} · {WarehouseLabels.Text(shipment, "cargoDescription")}{kg}";
+    }
+
+    /// <summary>Yerel saatle "12.11.2026 08:30".</summary>
+    private static string? Moment(string? value) =>
+        DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var at)
+            ? at.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)
+            : null;
+
+    private static string Iso(DateTime local) =>
+        new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)).ToString("yyyy-MM-ddTHH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture);
+
+    private sealed class NewStop
+    {
+        public string Type { get; set; } = "border";
+
+        public string City { get; set; } = string.Empty;
+
+        public DateTime? PlannedAt { get; set; }
+
+        public int? Sequence { get; set; }
+    }
+}

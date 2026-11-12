@@ -1,0 +1,264 @@
+@* Sefer formu (ADR-0038 dilim 5); Seferler ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir; kayıt genel kayıt uçlarından
+   yapılır (/api/records/logistics.trip). Durum bu formdan değişmez: üstteki eylem çubuğu (LogisticsActionsBar) planı onaylar, sefere çıkarır,
+   tamamlar ya da iptal eder. Kayıtlı seferde formun altında uygunluk denetimi (TripCheckPanel) ve durak/sevkiyat paneli (TripStopsPanel) vardır.
+   Yalnızca planlanan sefer düzenlenir; sunucu da reddeder. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+@inject SessionState Session
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Record is null ? "Yeni sefer" : $"Sefer {WarehouseLabels.Text(Record, "number")}")</h2>
+            @if (Record is not null)
+            {
+                <p><span class="badge @LogisticsLabels.TripStatusBadge(Status)">@LogisticsLabels.TripStatus(Status)</span></p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Kapat</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)" aria-busy="@(busy ? "true" : null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    @if (Record is not null)
+    {
+        <LogisticsActionsBar Kind="@LogisticsLabels.Trips" Record="Record" Changed="ActionDoneAsync" />
+        @if (WarehouseLabels.Text(Record, "statusReason") is { Length: > 0 } note)
+        {
+            <div class="alert @(Status == "cancelled" ? "alert-info" : "alert-warning")" role="status">@note</div>
+        }
+    }
+
+    @if (ReadOnly && Record is not null)
+    {
+        <div class="alert alert-info" role="status">@LockedText</div>
+    }
+
+    <fieldset disabled="@ReadOnly">
+        <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Sefer formu bölümleri">
+            <Field Context="f">
+                @switch (f.Key)
+                {
+                    case "plannedStart":
+                        <label class="@f.LabelClass()" for="trip-start">@f.Label</label>
+                        <input id="trip-start" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PlannedStart" />
+                        <FieldError Field="plannedStart" Errors="errors" />
+                        break;
+                    case "plannedEnd":
+                        <label class="@f.LabelClass()" for="trip-end">@f.Label</label>
+                        <input id="trip-end" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PlannedEnd" />
+                        <FieldError Field="plannedEnd" Errors="errors" />
+                        <small class="text-muted">Boşsa tek günlük sefer sayılır; belge ve çakışma denetimi bu tarihe göre yapılır.</small>
+                        break;
+                    case "vehicleId":
+                        <label class="@f.LabelClass()" for="trip-vehicle">@f.Label</label>
+                        <LookupPicker Id="trip-vehicle" LookupKey="@LogisticsAccess.TripVehicleLookup" @bind-Value="form.VehicleId" Required="f.Required" Placeholder="Plaka ile arayın…" Invalid="@(errors?.ContainsKey("vehicleId") == true)" />
+                        <FieldError Field="vehicleId" Errors="errors" />
+                        break;
+                    case "trailerId":
+                        <label class="@f.LabelClass()" for="trip-trailer">@f.Label</label>
+                        <LookupPicker Id="trip-trailer" LookupKey="@LogisticsAccess.TripTrailerLookup" @bind-Value="form.TrailerId" Required="f.Required" Placeholder="Dorse ya da römork…" Invalid="@(errors?.ContainsKey("trailerId") == true)" />
+                        <FieldError Field="trailerId" Errors="errors" />
+                        break;
+                    case "driverId":
+                        <label class="@f.LabelClass()" for="trip-driver">@f.Label</label>
+                        @DriverSelect("trip-driver", form.DriverId, v => form.DriverId = v, f.Required)
+                        <FieldError Field="driverId" Errors="errors" />
+                        break;
+                    case "coDriverId":
+                        <label class="@f.LabelClass()" for="trip-codriver">@f.Label</label>
+                        @DriverSelect("trip-codriver", form.CoDriverId, v => form.CoDriverId = v, f.Required)
+                        <FieldError Field="coDriverId" Errors="errors" />
+                        <small class="text-muted">Uzun yolda çift sürücü; aktarma için yeni sefer açın.</small>
+                        break;
+                    case "carrierPartyId":
+                        <label class="@f.LabelClass()" for="trip-carrier">@f.Label</label>
+                        <LookupPicker Id="trip-carrier" LookupKey="@LogisticsAccess.TripCarrierLookup" @bind-Value="form.CarrierPartyId" Required="f.Required" Placeholder="Taşeron seferde taşıyıcı firma…" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
+                        <FieldError Field="carrierPartyId" Errors="errors" />
+                        <small class="text-muted">Taşeron seferde araç ve sürücü isteğe bağlıdır; firma "Taşıyıcı" ilişki rolünde olmalıdır.</small>
+                        break;
+                    case "notes":
+                        <label class="@f.LabelClass()" for="trip-notes">@f.Label</label>
+                        <textarea id="trip-notes" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
+                        <FieldError Field="notes" Errors="errors" />
+                        break;
+                }
+            </Field>
+        </LayoutForm>
+    </fieldset>
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">Kapat</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)">Kaydet</button>
+    </div>
+</form>
+
+@if (Record is not null)
+{
+    <TripCheckPanel TripId="Record.Id" Refresh="refresh" />
+    <TripStopsPanel Trip="Record" CanWrite="@Session.Can(LogisticsAccess.TripsWrite)" Changed="StopsChanged" />
+}
+
+@code {
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private TripForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+    private int refresh;
+
+    /// <summary>Düzenlenecek sefer; null ise yeni sefer.</summary>
+    [Parameter] public RecordResponse? Record { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    /// <summary>Seçilebilecek sürücüler (adlarıyla); pasif sürücü yalnızca zaten seçiliyse görünür.</summary>
+    [Parameter] public IReadOnlyList<DriverOption> Drivers { get; set; } = [];
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private string Status => Record is null ? string.Empty : WarehouseLabels.Text(Record, "status");
+
+    /// <summary>Yalnızca planlanan sefer düzenlenir.</summary>
+    private bool ReadOnly => Record is not null && Status != "planning";
+
+    private string LockedText => Status == "ready"
+        ? "Planı onaylanan sefer değiştirilemez; değişiklik için \"Planlamaya geri al\" eylemini kullanın."
+        : "Yoldaki ya da kapanan seferin planı değiştirilemez; yoldaki seferde duraklara varış saatini aşağıdan girin.";
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(LogisticsAccess.TripEntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(LogisticsAccess.TripEntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir kayıt verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Record))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Record;
+        form = Record is { } r
+            ? new TripForm
+            {
+                Id = r.Id, Version = r.Version, PlannedStart = FleetLabels.Day(WarehouseLabels.Text(r, "plannedStart")),
+                PlannedEnd = FleetLabels.Day(WarehouseLabels.Text(r, "plannedEnd")), VehicleId = WarehouseLabels.Id(r, "vehicleId"),
+                TrailerId = WarehouseLabels.Id(r, "trailerId"), DriverId = WarehouseLabels.Id(r, "driverId"), CoDriverId = WarehouseLabels.Id(r, "coDriverId"),
+                CarrierPartyId = WarehouseLabels.Id(r, "carrierPartyId"), Notes = r.Values["notes"]?.GetValue<string>(),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new TripForm { PlannedStart = DateOnly.FromDateTime(DateTime.Now).AddDays(1) };
+        errors = null;
+        message = null;
+        refresh++;
+    }
+
+    private RenderFragment DriverSelect(string id, Guid? value, Action<Guid?> set, bool required) =>
+        @<select id="@id" class="form-select" required="@required" aria-required="@(required ? "true" : null)"
+                 value="@(value?.ToString() ?? string.Empty)" @onchange="e => { set(Guid.TryParse(e.Value?.ToString(), out var g) ? g : null); dirty = true; }">
+            <option value="">Seçilmedi</option>
+            @foreach (var driver in Drivers.Where(d => d.Status != "passive" || d.Id == value))
+            {
+                <option value="@driver.Id">@driver.Name@(driver.Status == "onLeave" ? " (izinde)" : driver.Status == "passive" ? " (pasif)" : "")</option>
+            }
+        </select>;
+
+    private async Task SaveAsync()
+    {
+        if (ReadOnly)
+        {
+            return;
+        }
+
+        busy = true;
+        var values = new JsonObject
+        {
+            ["plannedStart"] = form.PlannedStart?.ToString("yyyy-MM-dd"),
+            ["plannedEnd"] = form.PlannedEnd?.ToString("yyyy-MM-dd"),
+            ["vehicleId"] = form.VehicleId?.ToString(),
+            ["trailerId"] = form.TrailerId?.ToString(),
+            ["driverId"] = form.DriverId?.ToString(),
+            ["coDriverId"] = form.CoDriverId?.ToString(),
+            ["carrierPartyId"] = form.CarrierPartyId?.ToString(),
+            ["notes"] = string.IsNullOrWhiteSpace(form.Notes) ? null : form.Notes.Trim(),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"/api/records/{LogisticsAccess.TripEntityKey}/{id}", request)
+            : await Api.PostAsync<RecordResponse>($"/api/records/{LogisticsAccess.TripEntityKey}", request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    /// <summary>Eylem çalışınca seferin yeni hali sayfaya iletilir (durum, sürüm).</summary>
+    private Task ActionDoneAsync(RecordResponse updated) => Saved.InvokeAsync(updated);
+
+    /// <summary>Durak ya da sevkiyat değişince uygunluk denetimi yenilenir.</summary>
+    private void StopsChanged() => refresh++;
+
+    private sealed class TripForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public DateOnly? PlannedStart { get; set; }
+
+        public DateOnly? PlannedEnd { get; set; }
+
+        public Guid? VehicleId { get; set; }
+
+        public Guid? TrailerId { get; set; }
+
+        public Guid? DriverId { get; set; }
+
+        public Guid? CoDriverId { get; set; }
+
+        public Guid? CarrierPartyId { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}

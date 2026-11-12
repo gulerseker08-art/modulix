@@ -55,6 +55,28 @@ public static class LogisticsForms
 
         Cargo(LogisticsModule.Entities.TransportRequest, "Taşıma talebi", [new("externalRef", "Dış referans", "taraflar", 6)]),
         Cargo(LogisticsModule.Entities.Shipment, "Sevkiyat", []),
+
+        // Sefer: plan ve atama (araç, dorse, sürücüler ya da taşeron), notlar. Duraklar ve sevkiyatlar formun altındaki durak panelindedir.
+        new(LogisticsModule.Entities.Trip, "Sefer",
+        [new(General, "Plan ve atama"), new("notlar", "Notlar ve ek bilgiler")],
+        [
+            new("plan", "Plan", "calendar"),
+            new("arac", "Araç", "truck"),
+            new("surucu", "Sürücüler", "user"),
+            new("tasiyici", "Taşeron", "building"),
+            new("notlar", "Notlar", "message-square", Tab: "notlar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
+        ],
+        [
+            new("plannedStart", "Planlanan başlangıç", "plan", 6, Required: true, Fixed: true),
+            new("plannedEnd", "Planlanan bitiş", "plan", 6),
+            new("vehicleId", "Araç (çekici / kamyon)", "arac", 6, Fixed: true),
+            new("trailerId", "Dorse", "arac", 6),
+            new("driverId", "Sürücü", "surucu", 6, Fixed: true),
+            new("coDriverId", "İkinci sürücü", "surucu", 6),
+            new("carrierPartyId", "Taşıyıcı firma", "tasiyici", 12),
+            new("notes", "Notlar", "notlar", 12),
+        ]),
     ];
 
     /// <summary>Talep ve sevkiyatın ortak düzeni: taraflar ve güzergâh, yük, notlar (üç sekme).</summary>

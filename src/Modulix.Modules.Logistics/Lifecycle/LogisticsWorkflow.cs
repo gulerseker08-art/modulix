@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Logistics.Domain;
@@ -10,9 +11,11 @@ namespace Modulix.Modules.Logistics.Lifecycle;
 public sealed record LogisticsActionState(string Action, string Label, bool Allowed, string? Message, bool RequiresReason, bool Destructive);
 
 /// <summary>
-/// Taşıma talebi ve sevkiyat iş akışı (ADR-0038 K7, dilim 4). Durum yalnızca bu komutlarla değişir; her geçiş kayıt boru hattından geçer (izin,
-/// sürüm denetimi 409, audit, outbox olayı). Talep onayı aynı işlemde sevkiyatı açar ve talebe bağlar. Teslim eylemleri teslim kanıtıyla gelir
-/// (dilim 6); sefer ataması "Planlandı"yı otomatik verir (dilim 5), o zamana kadar planlama elle işaretlenir.
+/// Taşıma talebi, sevkiyat ve sefer iş akışı (ADR-0038 K7, dilim 4–5). Durum yalnızca bu komutlarla değişir; her geçiş kayıt boru hattından geçer
+/// (izin, sürüm denetimi 409, audit, outbox olayı). Talep onayı aynı işlemde sevkiyatı açar ve talebe bağlar. Sevkiyatın "Planlandı" durumu sefer
+/// atamasıdır (<see cref="ITripPlanner"/>). Seferin planı uygunluk denetimi geçince onaylanır (uyarılar seferde saklanır), sefere çıkışta denetim
+/// yinelenir; sefer bütün duraklara varış girilince tamamlanır; iptal seferdeki yüklenmemiş sevkiyatları planlamaya döndürür. Teslim eylemleri
+/// teslim kanıtıyla gelir (dilim 6).
 /// </summary>
 public interface ILogisticsWorkflow
 {
@@ -29,7 +32,10 @@ public static class LogisticsActions
     public const string Approve = "approve";
     public const string Reject = "reject";
     public const string Cancel = "cancel";
-    public const string Plan = "plan";
+    public const string Confirm = "confirm";
+    public const string Reopen = "reopen";
+    public const string Start = "start";
+    public const string Complete = "complete";
     public const string StartLoading = "startLoading";
     public const string Depart = "depart";
 }
@@ -50,8 +56,6 @@ public static class LogisticsTransitions
         new(LogisticsModule.Entities.TransportRequest, LogisticsActions.Cancel, "İptal et", LogisticsModule.Permissions.RequestsWrite,
             [TransportRequest.Statuses.New], TransportRequest.Statuses.Cancelled, true, "Yalnızca yeni talep iptal edilebilir; onaylanan talebin sevkiyatını iptal edin.", Destructive: true),
 
-        new(LogisticsModule.Entities.Shipment, LogisticsActions.Plan, "Planlandı", LogisticsModule.Permissions.ShipmentsWrite,
-            [Shipment.Statuses.Pending], Shipment.Statuses.Planned, false, "Yalnızca planlama bekleyen sevkiyat planlanabilir."),
         new(LogisticsModule.Entities.Shipment, LogisticsActions.StartLoading, "Yükleme başladı", LogisticsModule.Permissions.ShipmentsWrite,
             [Shipment.Statuses.Planned], Shipment.Statuses.Loading, false, "Yükleme yalnızca planlanmış sevkiyatta başlar."),
         new(LogisticsModule.Entities.Shipment, LogisticsActions.Depart, "Yola çıktı", LogisticsModule.Permissions.ShipmentsWrite,
@@ -59,13 +63,25 @@ public static class LogisticsTransitions
         new(LogisticsModule.Entities.Shipment, LogisticsActions.Cancel, "İptal et", LogisticsModule.Permissions.ShipmentsWrite,
             [Shipment.Statuses.Pending, Shipment.Statuses.Planned, Shipment.Statuses.Loading], Shipment.Statuses.Cancelled, true,
             "Yola çıkmış ya da kapanmış sevkiyat iptal edilemez.", Destructive: true),
+
+        new(LogisticsModule.Entities.Trip, LogisticsActions.Confirm, "Planı onayla", LogisticsModule.Permissions.TripsWrite,
+            [Trip.Statuses.Planning], Trip.Statuses.Ready, false, "Yalnızca planlanan sefer onaylanır."),
+        new(LogisticsModule.Entities.Trip, LogisticsActions.Reopen, "Planlamaya geri al", LogisticsModule.Permissions.TripsWrite,
+            [Trip.Statuses.Ready], Trip.Statuses.Planning, false, "Yalnızca hazır sefer planlamaya geri alınır."),
+        new(LogisticsModule.Entities.Trip, LogisticsActions.Start, "Sefere çıkar", LogisticsModule.Permissions.TripsWrite,
+            [Trip.Statuses.Ready], Trip.Statuses.InProgress, false, "Sefere yalnızca planı onaylanmış (hazır) sefer çıkar."),
+        new(LogisticsModule.Entities.Trip, LogisticsActions.Complete, "Seferi tamamla", LogisticsModule.Permissions.TripsWrite,
+            [Trip.Statuses.InProgress], Trip.Statuses.Completed, false, "Yalnızca yoldaki sefer tamamlanır."),
+        new(LogisticsModule.Entities.Trip, LogisticsActions.Cancel, "İptal et", LogisticsModule.Permissions.TripsWrite,
+            [Trip.Statuses.Planning, Trip.Statuses.Ready], Trip.Statuses.Cancelled, true, "Yola çıkmış ya da kapanmış sefer iptal edilemez.", Destructive: true),
     ];
 
     public static Transition? Find(string entityKey, string action) =>
         All.FirstOrDefault(t => t.EntityKey == entityKey && t.Action == action);
 }
 
-internal sealed class LogisticsWorkflow(IRecordPipeline pipeline, LogisticsWorkflowGate gate, ICurrentAccess access) : ILogisticsWorkflow
+internal sealed class LogisticsWorkflow(
+    IRecordPipeline pipeline, LogisticsWorkflowGate gate, ICurrentAccess access, ITripPlanner planner, LogisticsStoreContext context) : ILogisticsWorkflow
 {
     /// <summary>Talepten sevkiyata kopyalanan alanlar (yük, güzergâh, taraflar).</summary>
     private static readonly string[] CargoKeys =
@@ -84,14 +100,14 @@ internal sealed class LogisticsWorkflow(IRecordPipeline pipeline, LogisticsWorkf
 
         var granted = await access.GetPermissionsAsync(cancellationToken);
         var status = StatusOf(record.Value!);
-        IReadOnlyList<LogisticsActionState> actions =
-        [
-            .. LogisticsTransitions.All
-                .Where(t => t.EntityKey == entityKey && granted.Contains(t.Permission))
-                .Select(t => new LogisticsActionState(
-                    t.Action, t.Label, t.From.Contains(status), t.From.Contains(status) ? null : t.DeniedMessage, t.RequiresReason, t.Destructive)),
-        ];
-        return RecordResult<IReadOnlyList<LogisticsActionState>>.Ok(actions);
+        var actions = new List<LogisticsActionState>();
+        foreach (var t in LogisticsTransitions.All.Where(t => t.EntityKey == entityKey && granted.Contains(t.Permission)))
+        {
+            var denied = !t.From.Contains(status) ? t.DeniedMessage : await PreconditionAsync(entityKey, id, t.Action, cancellationToken);
+            actions.Add(new LogisticsActionState(t.Action, t.Label, denied is null, denied, t.RequiresReason, t.Destructive));
+        }
+
+        return RecordResult<IReadOnlyList<LogisticsActionState>>.Ok([.. actions]);
     }
 
     public async Task<RecordResult<RecordData>> RunAsync(string entityKey, Guid id, string action, long version, string? reason, CancellationToken cancellationToken)
@@ -128,6 +144,16 @@ internal sealed class LogisticsWorkflow(IRecordPipeline pipeline, LogisticsWorkf
         {
             return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe çok uzun.",
                 [new RecordFieldError("reason", $"En fazla {CargoEntity.ReasonMaxLength} karakter olabilir.")]);
+        }
+
+        if (await PreconditionAsync(entityKey, id, transition.Action, cancellationToken) is { } blocked)
+        {
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, blocked);
+        }
+
+        if (entityKey == LogisticsModule.Entities.Trip)
+        {
+            return await RunTripAsync(id, transition, version, trimmed, cancellationToken);
         }
 
         return transition.Action == LogisticsActions.Approve && entityKey == LogisticsModule.Entities.TransportRequest
@@ -169,6 +195,90 @@ internal sealed class LogisticsWorkflow(IRecordPipeline pipeline, LogisticsWorkf
         {
             return await pipeline.UpdateAsync(new RecordCommand(entityKey, id, new JsonObject { ["status"] = transition.To }, version), cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Durum dışı ön koşul (409 iletisi): sefer bütün duraklara varış girilmeden tamamlanmaz; yüklemesi başlamış sevkiyatı olan sefer iptal edilmez.
+    /// Plan onayı ve sefere çıkışın uygunluk denetimi eylemde yapılır (<see cref="RunTripAsync"/>).
+    /// </summary>
+    private async Task<string?> PreconditionAsync(string entityKey, Guid id, string action, CancellationToken cancellationToken)
+    {
+        if (entityKey != LogisticsModule.Entities.Trip)
+        {
+            return null;
+        }
+
+        return action switch
+        {
+            LogisticsActions.Complete when await context.Data.Set<TripStop>().AnyAsync(s => s.TripId == id && s.ArrivedAt == null, cancellationToken) =>
+                "Bütün duraklara varış saati girilmeden sefer tamamlanamaz.",
+            LogisticsActions.Cancel when await context.Data.Set<Shipment>().AnyAsync(
+                    s => s.TripId == id && (s.Status == Shipment.Statuses.Loading || s.Status == Shipment.Statuses.InTransit), cancellationToken) =>
+                "Yüklemesi başlamış sevkiyatı olan sefer iptal edilemez.",
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Sefer eylemleri. Plan onayı ve sefere çıkış uygunluk denetiminden geçer: engel varsa 409 (bulgular iletide); onayda uyarılar seferin notuna
+    /// yazılır. İptal tek işlemde seferdeki planlanmış sevkiyatları "Planlama bekliyor"a döndürür ve seferden ayırır (duraklar geçmiş olarak kalır).
+    /// </summary>
+    private async Task<RecordResult<RecordData>> RunTripAsync(
+        Guid id, LogisticsTransitions.Transition transition, long version, string? reason, CancellationToken cancellationToken)
+    {
+        if (transition.Action is LogisticsActions.Confirm or LogisticsActions.Start)
+        {
+            var check = await planner.CheckAsync(id, cancellationToken);
+            if (!check.IsSuccess)
+            {
+                return RecordResult<RecordData>.Fail(check.Error!.Code, check.Error.Message, check.Error.FieldErrors);
+            }
+
+            if (!check.Value!.CanConfirm)
+            {
+                return RecordResult<RecordData>.Fail(
+                    RecordErrorCode.Conflict, "Sefer hazır değil: " + string.Join(" ", check.Value.Issues.Where(i => i.Blocking).Select(i => i.Message)));
+            }
+
+            if (transition.Action == LogisticsActions.Confirm && check.Value.Issues.Count > 0)
+            {
+                var warnings = "Uyarılarla onaylandı: " + string.Join(" ", check.Value.Issues.Select(i => i.Message));
+                reason = warnings.Length > Trip.ReasonMaxLength ? warnings[..(Trip.ReasonMaxLength - 1)] + "…" : warnings;
+            }
+        }
+
+        if (transition.Action != LogisticsActions.Cancel)
+        {
+            return await TransitionAsync(LogisticsModule.Entities.Trip, id, transition, version, reason, linkedId: null, cancellationToken);
+        }
+
+        return await pipeline.RunAtomicAsync(async ct =>
+        {
+            var planned = await context.Data.Set<Shipment>().AsNoTracking()
+                .Where(s => s.TripId == id && s.Status == Shipment.Statuses.Planned).Select(s => s.Id).ToListAsync(ct);
+            foreach (var shipmentId in planned)
+            {
+                var shipment = await pipeline.GetAsync(new RecordRef(LogisticsModule.Entities.Shipment, shipmentId), ct);
+                if (!shipment.IsSuccess)
+                {
+                    return shipment;
+                }
+
+                RecordResult<RecordData> released;
+                using (gate.Open(LogisticsModule.Permissions.TripsWrite, Shipment.Statuses.Pending, reason: null))
+                {
+                    released = await pipeline.UpdateAsync(new RecordCommand(
+                        LogisticsModule.Entities.Shipment, shipmentId, new JsonObject { ["status"] = Shipment.Statuses.Pending }, shipment.Value!.Version), ct);
+                }
+
+                if (!released.IsSuccess)
+                {
+                    return released;
+                }
+            }
+
+            return await TransitionAsync(LogisticsModule.Entities.Trip, id, transition, version, reason, linkedId: null, ct);
+        }, cancellationToken);
     }
 
     private static string StatusOf(RecordData record) => record.Values["status"]?.GetValue<string>() ?? string.Empty;

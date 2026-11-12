@@ -40,3 +40,18 @@ public static class CredentialStatuses
 /// <see cref="ReadPermission"/>: sahip türü okuma izni (modülün izni); kural düzenleyicide "Süreli belge" kayıt türü bu izinlerden biri olana görünür.
 /// </summary>
 public sealed record CredentialOwner(string EntityKey, string Category, string DisplayName, string ReadPermission);
+
+/// <summary>
+/// Süreli belgelerin modüller arası okuma sözleşmesi (ADR-0038 K3: "sahip modül belgenin zorunluluğunu kendi kuralıyla söyler; Core saklar ve
+/// sorgular"). Ör. Lojistik sefer uygunluğunda aracın ve sürücünün belgelerine bakar. Tenant filtresi ve RLS uygulanır; kayıt izni sormaz (çağıran
+/// modül kendi kaydının iznini denetler). İptal edilen belgeler de döner; durumu <see cref="CredentialSummary.Status"/>'tadır.
+/// </summary>
+public interface ICredentialDirectory
+{
+    /// <summary>Verilen sahip kayıtların belgeleri (sahip türü + kimlikler). En çok 500 kimlik.</summary>
+    Task<IReadOnlyList<CredentialSummary>> ForOwnersAsync(string ownerEntityKey, IReadOnlyCollection<Guid> ownerIds, CancellationToken cancellationToken);
+}
+
+/// <summary>Belgenin modüller arası özeti; <see cref="TypeLabel"/> belge türü listesindeki görünen addır (liste dışıysa anahtar).</summary>
+public sealed record CredentialSummary(
+    Guid Id, string OwnerEntityKey, Guid OwnerId, string TypeKey, string TypeLabel, string? DocumentNo, DateOnly? ValidFrom, DateOnly? ValidTo, string Status);

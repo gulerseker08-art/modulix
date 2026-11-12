@@ -38,9 +38,9 @@ public class LogisticsDriverModuleTests
 
         var vehicle = Assert.Single(Module.Lookups, l => l.Key == LogisticsLookupDefinitions.DriverVehicle);
         Assert.Equal("fleet.vehicle", vehicle.TargetEntityKey);
-        // Taşıyıcı seçen her lookup "Taşıyıcı" rolüyle süzülür (sürücü ve taşıyıcı anlaşması).
+        // Taşıyıcı seçen her lookup "Taşıyıcı" rolüyle süzülür (sürücü, taşıyıcı anlaşması, taşeron sefer).
         var carriers = Module.Lookups.Where(l => l.FixedFilterName is not null).ToList();
-        Assert.Equal([LogisticsLookupDefinitions.DriverCarrier, LogisticsLookupDefinitions.TermsCarrier], carriers.Select(l => l.Key));
+        Assert.Equal([LogisticsLookupDefinitions.DriverCarrier, LogisticsLookupDefinitions.TermsCarrier, LogisticsLookupDefinitions.TripCarrier], carriers.Select(l => l.Key));
         Assert.All(carriers, l => Assert.Equal(LogisticsModule.RelationshipRoles.Carrier, l.FixedFilterValue));
 
         // Modül yalnızca Core.Contracts'a başvurur: Filo'ya derleme zamanı bağı yoktur.

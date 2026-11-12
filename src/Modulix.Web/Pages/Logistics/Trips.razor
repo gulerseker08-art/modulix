@@ -1,0 +1,278 @@
+@page "/lojistik/seferler"
+@* Lojistik › Seferler (ADR-0038 dilim 5). Grid şablonu: görünüm sekmeleri (sunucuda durum süzgeci), arama (sefer no ya da durak şehri), sıralanan
+   başlıklar, sütun seçici, satır menüsü, sayfalama. Seferin formu, durakları, sevkiyatları ve uygunluk denetimi TripEditor'dadır. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Seferler · Modulix</PageTitle>
+
+<AuthGate Module="@LogisticsAccess.ModuleKey" Permission="@LogisticsAccess.TripsRead">
+    <PageHeader Title="Seferler" Icon="map-pin" Subtitle="@(page is null ? "Araç ve sürücü atayın, sevkiyatları duraklara bağlayın, seferi yola çıkarın." : $"{page.TotalCount} sefer")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <TripEditor Record="selected" Lookups="Lookups" Drivers="drivers" Saved="SavedAsync" Cancelled="Close" />
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Sefer görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Seferlerde ara" placeholder="Sefer no ya da durak şehri ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(LogisticsAccess.TripsWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni sefer</button>
+        }
+    </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan sefer yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) sefer listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Seferler</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var record in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, record)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(record, "number")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(record)"><AppIcon Name="pencil" Size="16" /> <span>Aç</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/records/" + LogisticsAccess.TripEntityKey;
+
+    /// <summary>Görünüm → durum süzgeci (virgülle birden çok durum).</summary>
+    private static readonly IReadOnlyList<(string Key, string Label, string Icon, string? Status)> Views =
+    [
+        ("open", "Açık seferler", "map-pin", "planning,ready,inProgress"),
+        ("planning", "Planlanan", "hourglass", "planning"),
+        ("ready", "Hazır", "check", "ready"),
+        ("road", "Yolda", "truck", "inProgress"),
+        ("closed", "Kapanan", "check-circle", "completed,cancelled"),
+        ("all", "Tüm seferler", "list", null),
+    ];
+
+    private readonly Dictionary<Guid, string> plates = [];
+    private readonly Dictionary<Guid, string> carriers = [];
+    private IReadOnlyList<DriverOption> drivers = [];
+    private GridViewState grid = new(LogisticsAccess.TripEntityKey, "-plannedStart");
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private string? search;
+    private string view = Views[0].Key;
+    private string? status;
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions => [.. Views.Select(v => new ViewOption(v.Key, v.Label, Icon: v.Icon)), .. views.Options];
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, LogisticsAccess.TripEntityKey);
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(LogisticsAccess.TripsRead))
+        {
+            return;
+        }
+
+        await Lookups.LoadAsync();
+        grid.Define(
+        [
+            new("number", "Sefer no", "hash", "number", "-number", Locked: true),
+            new("plannedStart", "Başlangıç", "calendar", "plannedStart", "-plannedStart"),
+            new("vehicle", "Araç", "truck"),
+            new("driver", "Sürücü", "user"),
+            new("carrier", "Taşıyıcı", "building", DefaultVisible: false),
+            new("status", "Durum", "tag", "status", "-status"),
+            .. Lookups.FieldsOf(LogisticsAccess.TripEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList)),
+        ]);
+        drivers = Session.Can(LogisticsAccess.DriversRead) ? await LogisticsDrivers.LoadAsync(Api) : [];
+        await views.LoadAsync();
+        await ChooseViewAsync(Views[0].Key);
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            status = GridFilters.Parse(saved.Filters).GetValueOrDefault("status");
+        }
+        else
+        {
+            grid.Reset();
+            status = Views.FirstOrDefault(v => v.Key == key).Status;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(status is { } s ? ("status", s) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(Views[0].Key);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (status is not null)
+        {
+            url += $"&status={Uri.EscapeDataString(status)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            await WarehouseLabels.ResolveNamesAsync(Api, LogisticsAccess.TripVehicleLookup,
+                page.Items.SelectMany(t => new[] { WarehouseLabels.Id(t, "vehicleId"), WarehouseLabels.Id(t, "trailerId") }).OfType<Guid>(), plates);
+            await WarehouseLabels.ResolveNamesAsync(Api, LogisticsAccess.TripCarrierLookup,
+                page.Items.Select(t => WarehouseLabels.Id(t, "carrierPartyId")).OfType<Guid>(), carriers);
+        }
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse record) =>
+        @<td data-label="@column.Label" class="@(column.Key == "number" ? "primary" : null)">@CellContent(column.Key, record)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse record) => key switch
+    {
+        "number" => @<text>@WarehouseLabels.Text(record, "number")</text>,
+        "plannedStart" => @<text>@Dates(record)</text>,
+        "vehicle" => @<text>@Vehicle(record)</text>,
+        "driver" => @<text>@Driver(record)</text>,
+        "carrier" => @<text>@WarehouseLabels.NameOf(carriers, WarehouseLabels.Id(record, "carrierPartyId"))</text>,
+        "status" => @<span class="badge @LogisticsLabels.TripStatusBadge(WarehouseLabels.Text(record, "status"))">@LogisticsLabels.TripStatus(WarehouseLabels.Text(record, "status"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(LogisticsAccess.TripEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, record.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    /// <summary>"12.11.2026" ya da çok günlükse "12.11.2026 – 14.11.2026".</summary>
+    private static string Dates(RecordResponse record)
+    {
+        var start = FleetLabels.Day(WarehouseLabels.Text(record, "plannedStart"));
+        var end = FleetLabels.Day(WarehouseLabels.Text(record, "plannedEnd"));
+        return (start, end) switch
+        {
+            ({ } s, { } e) when e != s => $"{FleetLabels.Date(s)} – {FleetLabels.Date(e)}",
+            ({ } s, _) => FleetLabels.Date(s),
+            _ => "—",
+        };
+    }
+
+    /// <summary>"34 ABC 123 + 34 DRS 45" (çekici + dorse).</summary>
+    private string Vehicle(RecordResponse record)
+    {
+        string[] parts = [.. new[] { WarehouseLabels.Id(record, "vehicleId"), WarehouseLabels.Id(record, "trailerId") }.OfType<Guid>().Select(id => WarehouseLabels.NameOf(plates, id))];
+        return parts.Length == 0 ? "—" : string.Join(" + ", parts);
+    }
+
+    private string Driver(RecordResponse record)
+    {
+        string[] parts = [.. new[] { WarehouseLabels.Id(record, "driverId"), WarehouseLabels.Id(record, "coDriverId") }.OfType<Guid>().Select(id => LogisticsDrivers.NameOf(drivers, id))];
+        return parts.Length == 0 ? "—" : string.Join(", ", parts);
+    }
+
+    private void Open(RecordResponse? record)
+    {
+        selected = record;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    /// <summary>Kayıt ya da eylem sonrası liste yenilenir; düzenlenen sefer güncel haliyle açık kalır.</summary>
+    private async Task SavedAsync(RecordResponse saved)
+    {
+        await LoadAsync(page?.Page ?? 1);
+        selected = saved;
+        editing = true;
+    }
+}
