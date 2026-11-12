@@ -22,20 +22,37 @@ public sealed record ImportFileRow(int RowNo, IReadOnlyList<string?> Cells);
 
 public sealed record ImportFileContent(char Delimiter, IReadOnlyList<string> Headers, IReadOnlyList<ImportFileRow> Rows);
 
-/// <summary>CSV dosyasını başlık ve satırlara indirir. Boş satırlar atlanır; hücreler kırpılır, hata raporunun kaçışı geri alınır.</summary>
-public static class ImportCsvFile
+/// <summary>Dosya okunamadı (bozuk ya da desteklenmeyen biçim, sınır aşımı). İleti kullanıcıya gösterilir.</summary>
+public sealed class ImportFileException(string message) : Exception(message);
+
+/// <summary>Çalışma kitabı (.xlsx) okuyucu sözleşmesi (ADR-0033, Dilim 4a). Gerçeklemesi altyapıdadır; Core paket bağımlılığı taşımaz.</summary>
+public interface IImportWorkbookReader
 {
-    public static ImportFileContent Read(byte[] content)
+    /// <summary>İlk sayfayı hücre satırlarına indirir. Okunamayan dosyada <see cref="ImportFileException"/> fırlatır.</summary>
+    ImportFileContent Read(byte[] content);
+}
+
+/// <summary>Dosya biçimini uzantıdan seçer; satır kurma ve hücre temizliği CSV ve XLSX için ortaktır.</summary>
+public static class ImportFiles
+{
+    public static bool IsSupported(string fileName) => Format(fileName) is not null;
+
+    public static bool IsWorkbook(string fileName) => Format(fileName) == ".xlsx";
+
+    private static string? Format(string fileName) =>
+        Path.GetExtension(fileName ?? string.Empty).ToLowerInvariant() is ".csv" or ".txt" or ".xlsx" ? Path.GetExtension(fileName!).ToLowerInvariant() : null;
+
+    /// <summary>Boş satırları atlar (numara yine ilerler), ilk dolu satırı başlık sayar; hücreleri kırpar, hata raporunun kaçışını geri alır.</summary>
+    public static ImportFileContent Build(char delimiter, IEnumerable<IReadOnlyList<object?>> raw)
     {
-        ArgumentNullException.ThrowIfNull(content);
-        var delimiter = GtipCsv.DetectDelimiter(GtipCsv.Decode(content));
+        ArgumentNullException.ThrowIfNull(raw);
         List<string>? headers = null;
         var rows = new List<ImportFileRow>();
         var rowNo = 0;
-        foreach (var raw in GtipCsv.Parse(content))
+        foreach (var line in raw)
         {
             rowNo++;
-            var cells = raw.Select(Clean).ToList();
+            var cells = line.Select(Clean).ToList();
             if (cells.All(c => c is null))
             {
                 continue;
@@ -48,14 +65,49 @@ public static class ImportCsvFile
             else
             {
                 rows.Add(new ImportFileRow(rowNo, cells));
+                if (rows.Count > ImportLimits.MaxRows)
+                {
+                    // Sınırı aşan dosya zaten reddedilecek; kalanını okumanın anlamı yok (büyük .xlsx belleği doldurmasın).
+                    break;
+                }
             }
         }
 
         return new ImportFileContent(delimiter, headers ?? [], rows);
     }
 
+    /// <summary>Hücre değerini içe aktarma metnine çevirir: sayı ve tarih, metin sütunlarının okuduğu Türkçe biçime (1234,5 ve gg.aa.yyyy) iner.</summary>
+    public static string? Text(object? cell) => cell switch
+    {
+        null => null,
+        string text => text,
+        bool flag => flag ? "Evet" : "Hayır",
+        DateTime date => date.TimeOfDay == TimeSpan.Zero
+            ? date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)
+            : date.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture),
+        DateOnly date => date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+        double number => Number(double.IsFinite(number) ? (decimal)Math.Round(number, 10) : 0m),
+        float number => Number(float.IsFinite(number) ? (decimal)Math.Round(number, 6) : 0m),
+        decimal number => Number(number),
+        IFormattable other => other.ToString(null, CultureInfo.InvariantCulture),
+        _ => cell.ToString(),
+    };
+
+    private static string Number(decimal number) => number.ToString("0.##########", CultureInfo.InvariantCulture).Replace('.', ',');
+
     private static string? Clean(object? cell) =>
-        cell is string text && text.Trim() is { Length: > 0 } value ? ReportCsv.Unescape(value) : null;
+        Text(cell)?.Trim() is { Length: > 0 } value ? ReportCsv.Unescape(value) : null;
+}
+
+/// <summary>CSV dosyasını başlık ve satırlara indirir. Boş satırlar atlanır; hücreler kırpılır, hata raporunun kaçışı geri alınır.</summary>
+public static class ImportCsvFile
+{
+    public static ImportFileContent Read(byte[] content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        var delimiter = GtipCsv.DetectDelimiter(GtipCsv.Decode(content));
+        return ImportFiles.Build(delimiter, GtipCsv.Parse(content));
+    }
 }
 
 /// <summary>Dosya sütununun bağlandığı alan.</summary>
