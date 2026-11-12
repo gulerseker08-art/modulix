@@ -33,6 +33,8 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
         Field.Reference<Trip, Driver>("driverId", "Sürücü bulunamadı.", t => t.DriverId, (t, v) => t.DriverId = v),
         Field.Reference<Trip, Driver>("coDriverId", "İkinci sürücü bulunamadı.", t => t.CoDriverId, (t, v) => t.CoDriverId = v),
         Field.PartyRef<Trip>("carrierPartyId", "Taşıyıcı firma bulunamadı.", t => t.CarrierPartyId, (t, v) => t.CarrierPartyId = v),
+        MoneyRules.Amount<Trip>("settlementAmount", t => t.SettlementAmount, (t, v) => t.SettlementAmount = v),
+        MoneyRules.Currency<Trip>("settlementCurrency", t => t.SettlementCurrency, (t, v) => t.SettlementCurrency = v),
         Field.Text<Trip>("notes", Trip.TextMaxLength, t => t.Notes, (t, v) => t.Notes = v),
         Field.Computed<Trip>("status", t => t.Status),
         Field.Computed<Trip>("statusReason", t => t.StatusReason),
@@ -126,6 +128,12 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
         if (entity.CarrierPartyId is { } carrier && Changed("carrierPartyId") && !await CarrierRoles.HasAsync(Context, carrier, cancellationToken))
         {
             errors.Add(new RecordFieldError("carrierPartyId", "Seçilen firma \"Taşıyıcı\" ilişki rolüne sahip değil; önce firma kaydından rolü ekleyin."));
+        }
+
+        MoneyRules.Validate(entity.SettlementAmount, entity.SettlementCurrency, "settlementAmount", "settlementCurrency", errors);
+        if (entity.SettlementAmount is not null && entity.CarrierPartyId is null)
+        {
+            errors.Add(new RecordFieldError("settlementAmount", "Hakediş yalnızca taşıyıcı firma seçili (taşeron) seferde girilir."));
         }
 
         if (errors.Count > 0)
